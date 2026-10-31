@@ -598,7 +598,8 @@ export async function readBookData(
     parts.has(name) ? readSlice() : Promise.resolve(empty);
   const none: never[] = [];
   const [
-    [miners, statements, extractions, observed, scheduled, feederRows],
+    [miners, statements, extractions, scheduled, feederRows],
+    observed,
     [payments, dismissals, declarations, adjustments, writeOffs],
     answers,
     paidStatementIds,
@@ -611,12 +612,13 @@ export async function readBookData(
           list<Miner>('miners'),
           list<Statement>('statements'),
           list<SyncExtraction>('extractions'),
-          book.observed(),
           part('meta', async () => (await meta('scheduledSync')).data(), 'meta:schedule'),
           feedersOf(book, characterId, corporationId),
         ] as const),
-      [none, none, none, none, undefined, none] as const
+      [none, none, none, undefined, none] as const
     ),
+    // The ledger rows are a part of their own: a tab that needs none never reads them (#5717).
+    slice('observed', () => book.observed(), [] as ObservedRow[]),
     slice(
       'ledger',
       () =>
@@ -968,7 +970,8 @@ export async function readMoonBookData(
       feeders,
       groupingAnswers: none,
       scheduledSync: scheduledSyncFrom(scheduled),
-      parts: new Set<BookPart>(['core', 'ledger']),
+      // The shown pull's window stands in for the ledger rows.
+      parts: new Set<BookPart>(['core', 'observed', 'ledger']),
     },
   };
 }
@@ -1005,7 +1008,7 @@ export function mergeBookData(held: BookData, extra: BookData): BookData {
       dismissals: pick('ledger', held.state.dismissals, extra.state.dismissals),
       writeOffs: pick('ledger', held.state.writeOffs, extra.state.writeOffs),
     },
-    observed: pick('core', held.observed, extra.observed),
+    observed: pick('observed', held.observed, extra.observed),
     feeders: pick('core', held.feeders, extra.feeders),
     scheduledSync: pick('core', held.scheduledSync, extra.scheduledSync),
     declarations: pick('ledger', held.declarations, extra.declarations),

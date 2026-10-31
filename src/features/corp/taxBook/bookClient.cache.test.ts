@@ -39,6 +39,7 @@ vi.mock('@/auth/session', () => ({ getValidAccessToken: vi.fn() }));
 import { db } from '@/db';
 import { READ_MODELS_SCHEMA } from '../../../../functions/src/corpTaxBookVersionKeys';
 import { clearBookCache } from './bookCache';
+import { bookPartsFor } from './bookParts';
 import { mergeBookData, readBookData, readBookState, readRebills } from './bookClient';
 
 const CORP = 98000001;
@@ -163,9 +164,17 @@ describe('readBookData over the version marker', () => {
     const data = await readBookData(7, CORP, new Set(['core']));
 
     const read = new Set(store.reads);
-    for (const c of ['miners', 'statements', 'extractions', 'observed', 'feeders'])
+    for (const c of ['miners', 'statements', 'extractions', 'feeders'])
       expect(read).toContain(`${BOOK}/${c}`);
-    for (const c of ['payments', 'dismissals', 'declarations', 'adjustments', 'writeOffs'])
+    // The ledger rows are a part of their own (#5717).
+    for (const c of [
+      'observed',
+      'payments',
+      'dismissals',
+      'declarations',
+      'adjustments',
+      'writeOffs',
+    ])
       expect(read).not.toContain(`${BOOK}/${c}`);
     expect(read).not.toContain(`${BOOK}/meta/groupingAnswers`);
     expect(read).toContain(`${BOOK}/meta/paid`);
@@ -175,8 +184,42 @@ describe('readBookData over the version marker', () => {
     expect(data?.state.payments).toEqual([]);
   });
 
+  it('the Moon owners plan reads each owner summary and no ledger row (#5717)', async () => {
+    store.docs.set(`${BOOK}/feederViews/5`, { schemaVersion: 1 });
+    const data = await readBookData(7, CORP, bookPartsFor('moon-owners', null));
+
+    expect(store.reads.filter((r) => r.startsWith(`${BOOK}/observed`))).toEqual([]);
+    expect(store.reads).toContain(`${BOOK}/feederViews/5`);
+    expect(data?.observed).toEqual([]);
+    expect(data?.feederSummaries?.get(5)).toEqual({ schemaVersion: 1 });
+  });
+
+  it('a later tab that needs the rows reads only them, and the merge keeps the rest', async () => {
+    const owners = await readBookData(7, CORP, bookPartsFor('moon-owners', null));
+    store.reads.length = 0;
+
+    const rows = await readBookData(7, CORP, new Set(['observed']));
+    const merged = mergeBookData(owners!, rows!);
+
+    expect(store.reads).toContain(`${BOOK}/observed`);
+    expect(store.reads).not.toContain(`${BOOK}/miners`);
+    expect(merged.observed).toHaveLength(1);
+    expect(merged.state.miners).toEqual(owners?.state.miners);
+    expect(merged.feederSummaries).toEqual(owners?.feederSummaries);
+  });
+
+  it('a warm Overview opens as it did before the split: the head doc and meta/paid only', async () => {
+    const wanted = bookPartsFor('overview', null);
+    await readBookData(7, CORP, wanted);
+    store.reads.length = 0;
+
+    await readBookData(7, CORP, wanted);
+
+    expect(store.reads).toEqual([BOOK, `${BOOK}/meta/paid`]);
+  });
+
   it('a later tab reads only the slice it adds, and the merge keeps the core', async () => {
-    const core = await readBookData(7, CORP, new Set(['core']));
+    const core = await readBookData(7, CORP, new Set(['core', 'observed']));
     store.reads.length = 0;
     store.docs.set(`${BOOK}/payments/p1`, { id: 'p1' });
     store.docs.set(BOOK, stamped({ payments: 'payments-2' }));
@@ -187,7 +230,7 @@ describe('readBookData over the version marker', () => {
     expect(store.reads).not.toContain(`${BOOK}/miners`);
     expect(store.reads).not.toContain(`${BOOK}/observed`);
     expect(store.reads).toContain(`${BOOK}/payments`);
-    expect(merged.parts).toEqual(new Set(['core', 'ledger']));
+    expect(merged.parts).toEqual(new Set(['core', 'observed', 'ledger']));
     expect(merged.state.miners).toEqual(core?.state.miners);
     expect(merged.observed).toEqual(core?.observed);
     expect(merged.state.payments).toHaveLength(1);

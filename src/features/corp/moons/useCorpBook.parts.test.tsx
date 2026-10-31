@@ -78,7 +78,7 @@ beforeEach(() => {
 });
 
 describe('useCorpBook read plan', () => {
-  it('opens on the core only, and reads just the ledger when Statements opens', async () => {
+  it('opens on the core and rows, and reads just the ledger when Statements opens', async () => {
     const { result, rerender } = renderHook(
       ({ tab }) => useCorpBook(SYNC, bookPartsFor(tab, null)),
       {
@@ -87,7 +87,7 @@ describe('useCorpBook read plan', () => {
     );
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
     expect(readBookData).toHaveBeenCalledTimes(1);
-    expect(readBookData.mock.calls[0]?.[2]).toEqual(new Set(['core']));
+    expect(readBookData.mock.calls[0]?.[2]).toEqual(new Set(['core', 'observed']));
 
     rerender({ tab: 'statements' });
     await waitFor(() => expect(readBookData).toHaveBeenCalledTimes(2));
@@ -98,6 +98,57 @@ describe('useCorpBook read plan', () => {
     rerender({ tab: 'extractions' });
     rerender({ tab: 'statements' });
     expect(readBookData).toHaveBeenCalledTimes(2);
+  });
+
+  it('the Moon owners tab opens without rows, and falls back to them only when it must (#5717)', async () => {
+    const owners = (extractions: unknown[], summaries?: Map<number, unknown>) =>
+      readBookData.mockImplementation(async (_c, _b, parts: BookPartSet) => ({
+        ...book(parts),
+        ...(parts.has('core')
+          ? {
+              state: { ...book(parts).state, extractions } as never,
+              feeders: [
+                {
+                  corporationId: 5,
+                  status: 'active',
+                  mode: 'normal',
+                  joinedAt: 0,
+                  coveragePeriods: [],
+                  payouts: [],
+                },
+              ] as never,
+            }
+          : {}),
+        ...(summaries ? { feederSummaries: summaries as never } : {}),
+      }));
+    // An Extraction settles has-own-refineries; the moon owner has no summary: rows needed.
+    owners(
+      [
+        {
+          structureId: 1,
+          moonId: 2,
+          chunkArrivalTime: '2026-10-20T00:00:00.000Z',
+          naturalDecayTime: '2026-10-22T00:00:00.000Z',
+        },
+      ],
+      new Map()
+    );
+    const first = renderHook(() => useCorpBook(SYNC, bookPartsFor('moon-owners', null)));
+    await waitFor(() => expect(first.result.current.state.status).toBe('ready'));
+    expect(readBookData.mock.calls.map((c) => [...(c[2] as BookPartSet)].sort())).toEqual([
+      ['core', 'owners'],
+      ['observed'],
+    ]);
+    first.unmount();
+
+    // The same book with no way to tell (no Extraction, one moon owner) also reads the rows.
+    readBookData.mockClear();
+    owners([], new Map());
+    const second = renderHook(() => useCorpBook(SYNC, bookPartsFor('moon-owners', null)));
+    await waitFor(() => expect(second.result.current.state.status).toBe('ready'));
+    expect(readBookData.mock.calls.map((c) => [...(c[2] as BookPartSet)].sort())).toContainEqual([
+      'observed',
+    ]);
   });
 
   it('shows the loading state, not a half-joined book, while a tab reads its slices', async () => {

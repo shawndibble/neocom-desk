@@ -177,3 +177,37 @@ describe('BookHealthStrip, plain status', () => {
     await waitFor(() => expect(screen.queryByText(/Hidden from members/)).toBeNull());
   });
 });
+
+describe('BookHealthStrip, unrated days (#5717)', () => {
+  const renderWith = (parts: ReadonlySet<string> | undefined) =>
+    render(
+      <MemoryRouter>
+        <BookProvider
+          value={
+            {
+              characterId: 7,
+              corporationId: 98000001,
+              view: { unrated: [{}, {}], billableThrough: null, input: { graceHours: 6 } },
+              names: { refinery: () => 'x' },
+              data: { scheduledSync: null, feeders: [], parts },
+              settings: {},
+              verdict: { canEdit: true },
+              reload: vi.fn(),
+            } as unknown as Omit<BookContextValue, 'edit' | 'canEdit'>
+          }
+        >
+          <BookHealthStrip sync={sync} />
+        </BookProvider>
+      </MemoryRouter>
+    );
+
+  it('counts them on a tab that holds the ledger rows', () => {
+    renderWith(new Set(['core', 'observed']));
+    expect(screen.getByText(/2 days/i)).toBeInTheDocument();
+  });
+
+  it('says nothing about them on a tab that reads no rows, rather than counting none', () => {
+    renderWith(new Set(['core', 'owners']));
+    expect(screen.queryByText(/2 days/i)).not.toBeInTheDocument();
+  });
+});
