@@ -11,19 +11,24 @@ export const COLLAPSED_ROWS = 3;
 
 const WORD_BOUNDARY = /[^\p{L}\p{N}]/u;
 
-/** 0 exact, 1 prefix, 2 a word's prefix, 3 substring, 4 matched on something other than the label. */
+/**
+ * 0 exact, 1 the label or one of its words starts with the query, 2 substring,
+ * 3 matched on something other than the label. A word start ranks with a
+ * prefix: "Industry › Opportunities" is as strong a hit for "opp" as any name
+ * that begins with it, and the provider order then breaks the tie.
+ */
 export function matchTier(label: string, query: string): number {
   const q = query.trim().toLowerCase();
   const l = label.toLowerCase();
   if (l === q) return 0;
   if (l.startsWith(q)) return 1;
   let from = l.indexOf(q);
-  if (from < 0) return 4;
+  if (from < 0) return 3;
   while (from >= 0) {
-    if (from === 0 || WORD_BOUNDARY.test(l[from - 1])) return 2;
+    if (WORD_BOUNDARY.test(l[from - 1])) return 1;
     from = l.indexOf(q, from + 1);
   }
-  return 3;
+  return 2;
 }
 
 function bestTier(group: PaletteGroup, query: string): number {

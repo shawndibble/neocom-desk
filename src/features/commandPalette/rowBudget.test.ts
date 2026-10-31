@@ -24,27 +24,33 @@ function group(
 const ids = (groups: readonly PaletteGroup[]) => groups.map((g) => g.provider.id);
 
 describe('matchTier', () => {
-  it('ranks exact, prefix, word-prefix, substring, then anything else', () => {
+  it('ranks exact, prefix or word start, substring, then anything else', () => {
     expect(matchTier('Caldari', 'caldari')).toBe(0);
     expect(matchTier('Caldari Navy Hornet', 'caldari')).toBe(1);
-    expect(matchTier('0EK-NJ 5 - Caldari Navy Anchorage', 'caldari')).toBe(2);
-    expect(matchTier('Nocaldarix', 'caldari')).toBe(3);
-    expect(matchTier('Settings', 'caldari')).toBe(4);
+    expect(matchTier('0EK-NJ 5 - Caldari Navy Anchorage', 'caldari')).toBe(1);
+    expect(matchTier('Nocaldarix', 'caldari')).toBe(2);
+    expect(matchTier('Settings', 'caldari')).toBe(3);
   });
 });
 
 describe('rankGroups', () => {
-  it('puts prefix hits above substring-only hits, ties by provider order', () => {
+  it('puts word-start hits above substring-only hits, ties by provider order', () => {
     const places = group('places', 4, ['0EK-NJ 5 - Caldari Navy Anchorage']);
     const assets = group('assets', 3, ['Caldari Navy Hornet']);
     const lp = group('lp', 5, ['Caldari Navy']);
     const pages = group('pages', 0, ['Mocaldarix']);
     expect(ids(rankGroups([pages, assets, places, lp], 'caldari'))).toEqual([
       'assets',
-      'lp',
       'places',
+      'lp',
       'pages',
     ]);
+  });
+
+  it('ranks a page whose breadcrumb word starts with the query level with a name prefix', () => {
+    const pages = group('pages', 0, ['Industry › Opportunities']);
+    const market = group('market', 8, ['Opportunity Chip']);
+    expect(ids(rankGroups([market, pages], 'opp'))).toEqual(['pages', 'market']);
   });
 
   it('uses the best result in a group', () => {
