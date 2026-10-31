@@ -27,7 +27,7 @@ function summary(): ProductionRunSummary {
     },
     saleLinks: [],
     losses: [],
-    quantityLost: 0,
+    quantityLost: 3,
     orderWatches: [],
     profit: {
       totalCost: 1000,
@@ -58,6 +58,7 @@ describe('productionRunsCsvColumns', () => {
       'industry.realizedRevenue',
       'industry.realizedProfit',
       'industry.productionRunColumnSold',
+      'industry.csvQuantityLost',
       'industry.productionRunColumnStatus',
     ]);
   });
@@ -70,6 +71,7 @@ describe('productionRunsCsvColumns', () => {
       800,
       -215,
       4,
+      3,
       'industry.productionRunStatusOpen',
     ]);
   });
@@ -84,6 +86,7 @@ describe('productionLogRunsCsvColumns', () => {
       'industry.quantity',
       'industry.totalCost',
       'industry.productionRunColumnSold',
+      'industry.csvQuantityLost',
       'industry.realizedProfit',
       'industry.productionRunColumnStatus',
     ]);

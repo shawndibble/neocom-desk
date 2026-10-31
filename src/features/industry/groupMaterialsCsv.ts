@@ -24,5 +24,11 @@ export function groupMaterialsCsvColumns(
     { header: t('industry.volume'), value: (row) => rowVolume(row, volumeFor) },
     { header: t('industry.ownedQuantity'), value: (row) => ownedFor(row.typeID) ?? null },
     { header: t('industry.stillToBuyColumn'), value: (row) => row.buyToShow },
+    {
+      // The table flags a still-to-buy line with no price; its cost is then not in any total.
+      header: t('industry.csvUnpriced'),
+      value: (row) =>
+        row.unpriced && row.buyToShow > 0 ? t('industry.csvYes') : t('industry.csvNo'),
+    },
   ];
 }

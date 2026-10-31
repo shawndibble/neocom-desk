@@ -31,6 +31,9 @@ function realizedProfit<Row extends ProductionRunSummary>(t: CsvTranslate): CsvC
 function quantitySold<Row extends ProductionRunSummary>(t: CsvTranslate): CsvColumn<Row> {
   return { header: t('industry.productionRunColumnSold'), value: (r) => r.quantitySold };
 }
+function quantityLost<Row extends ProductionRunSummary>(t: CsvTranslate): CsvColumn<Row> {
+  return { header: t('industry.csvQuantityLost'), value: (r) => r.quantityLost };
+}
 function status<Row extends ProductionRunSummary>(t: CsvTranslate): CsvColumn<Row> {
   return { header: t('industry.productionRunColumnStatus'), value: (r) => t(STATUS_KEY[r.status]) };
 }
@@ -44,6 +47,7 @@ export function productionRunsCsvColumns(t: CsvTranslate): CsvColumn<ProductionR
     { header: t('industry.realizedRevenue'), value: (r) => r.profit.grossRevenue },
     realizedProfit(t),
     quantitySold(t),
+    quantityLost(t),
     status(t),
   ];
 }
@@ -58,6 +62,7 @@ export function productionLogRunsCsvColumns(
     quantity(t),
     totalCost(t),
     quantitySold(t),
+    quantityLost(t),
     realizedProfit(t),
     status(t),
   ];

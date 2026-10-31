@@ -1,11 +1,7 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { BuildResult } from '@/engine/industry/types';
 import type { HubOrderCounts } from '@/market/fuzzwork';
-import {
-  COMPARE_COLUMN_IDS,
-  COMPARE_DEFAULT_COLUMNS,
-  type CompareColumnId,
-} from './compareColumns';
+import { COMPARE_COLUMN_IDS, type CompareColumnId } from './compareColumns';
 import type { ComparedBuildRow } from './useComparedBuildResults';
 
 /** A figure off the row's result — blank while loading, on a failed row, or where it's unpriceable. */
@@ -16,8 +12,8 @@ function figure(
 }
 
 export interface CompareCsvOptions {
-  /** The columns the table shows; the plan name is always first. Defaults to the table's own default set. */
-  visible?: readonly CompareColumnId[];
+  /** Why a plan has no figures (a failed compute, or an unpriceable material or product); null when it resolved. */
+  unresolvedReason?: (row: ComparedBuildRow) => string | null | undefined;
   /** A row's average orders traded per day in the hub's region. */
   ordersPerDay?: (row: ComparedBuildRow) => number | null | undefined;
   /** A row's open order counts at the chosen hub; null/undefined while loading, failed or unknown. */
@@ -27,15 +23,16 @@ export interface CompareCsvOptions {
 /**
  * Export columns for Compare mode's table, in its order. Time is raw seconds
  * and margin a raw percent (the table's `20%` is `20`), so both sort and sum;
- * every cell the table shows as "…" or "—" is blank. Only the columns the
- * table shows are exported, so the file matches the screen.
+ * every cell the table shows as "…" or "—" is blank. Every column is
+ * exported whatever the column picker hides — the picker is a view choice,
+ * the file holds the whole comparison.
  */
 export function buildPlanCompareCsvColumns(
   t: CsvTranslate,
   {
-    visible = COMPARE_DEFAULT_COLUMNS,
     hubCounts = () => null,
     ordersPerDay = () => null,
+    unresolvedReason = () => null,
   }: CompareCsvOptions = {}
 ): CsvColumn<ComparedBuildRow>[] {
   const hub =
@@ -71,6 +68,10 @@ export function buildPlanCompareCsvColumns(
   };
   return [
     { header: t('industry.comparePlanColumn'), value: (row) => row.planName },
-    ...COMPARE_COLUMN_IDS.filter((id) => visible.includes(id)).map((id) => byId[id]),
+    ...COMPARE_COLUMN_IDS.map((id) => byId[id]),
+    {
+      header: t('industry.csvUnresolvedReason'),
+      value: (row) => (row.loading ? null : (unresolvedReason(row) ?? null)),
+    },
   ];
 }
