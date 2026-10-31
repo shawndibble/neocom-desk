@@ -15202,7 +15202,7 @@
           "alone": "On their own",
           "aloneNote": "no one else from their corporation or alliance here",
           "unplaced": "Corporation not known",
-          "unnamed": "…",
+          "unnamed": "#{{id}}",
           "fold": "Hide {{name}}",
           "unfold": "Show {{name}}",
           "dangerous_one": "{{count}} dangerous",

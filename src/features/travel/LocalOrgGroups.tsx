@@ -105,7 +105,7 @@ function OrgSectionView({
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  const name = section.name ?? t('travel.pilot.list.org.unnamed');
+  const name = section.name ?? t('travel.pilot.list.org.unnamed', { id: section.id });
   const shown = !isPhone || open;
   // An alliance heading shows only an alliance contact: one corporation's contact is not the alliance's.
   const standing =
@@ -121,7 +121,8 @@ function OrgSectionView({
         {section.kind === 'corporation' && section.alliance !== null && (
           <span className="text-xs font-normal">
             <AllianceLink id={section.alliance.id} className="text-text-dim">
-              {section.alliance.name ?? t('travel.pilot.list.org.unnamed')}
+              {section.alliance.name ??
+                t('travel.pilot.list.org.unnamed', { id: section.alliance.id })}
             </AllianceLink>
           </span>
         )}
@@ -169,7 +170,7 @@ function CorporationView({
   renderRows: RenderPilotRows;
 }) {
   const { t } = useTranslation();
-  const name = corporation.name ?? t('travel.pilot.list.org.unnamed');
+  const name = corporation.name ?? t('travel.pilot.list.org.unnamed', { id: corporation.id });
   const standing = standingVia(corporation.rows, 'corporation');
   return (
     <div className="space-y-1.5">
