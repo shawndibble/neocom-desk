@@ -9,9 +9,8 @@
  * (`verifyOfficer`, access token only, ADR 0023). A reload after every edit
  * is the caller's: Firestore here is the `lite` build, with no listeners.
  *
- * `options.minerId` names the Miner whose page is open. With `CORP_BOOK_MINER_SCOPED_READ` on, the
- * book is then that Miner's read-model slice (#5258, `readMinerBookData`) instead of the whole
- * ledger; off, it is ignored and nothing changes.
+ * `options.minerId` names the Miner whose page is open. The book is then that Miner's read-model
+ * slice (#5258, `readMinerBookData`) instead of the whole ledger.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
@@ -56,7 +55,6 @@ import {
 } from '../taxBook/bookClient';
 import { ALL_BOOK_PART_SET, missingBookParts, type BookPartSet } from '../taxBook/bookParts';
 import { forgetObservedCopy } from '../taxBook/observedStore';
-import { CORP_BOOK_MINER_SCOPED_READ } from '../taxBook/readModelSwitch';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 import { refineryPlaceholder } from './moonsFormat';
 import { MINUTE_MS } from '@/lib/age';
@@ -159,7 +157,7 @@ export function useCorpBook(
   wanted: BookPartSet = ALL_BOOK_PART_SET,
   options: { minerId?: string } = {}
 ): CorpBook {
-  const scopedMiner = CORP_BOOK_MINER_SCOPED_READ ? options.minerId : undefined;
+  const scopedMiner = options.minerId;
   const characterId = useActiveCharacter((s) => s.activeCharacterId);
   const corporationId = useActiveCorporationId();
   const [fetched, setFetched] = useState<Fetched>({ status: 'loading' });

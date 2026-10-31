@@ -1,18 +1,8 @@
-// The Miner page's read path follows CORP_BOOK_MINER_SCOPED_READ (issue #5258): off, the whole-book
-// read it always made; on, one Miner's read-model slice.
+// The Miner page reads one Miner's read-model slice (issue #5258); every other page the whole book.
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BookData } from '../taxBook/bookClient';
 
-const flag = vi.hoisted(() => ({ on: false }));
-vi.mock('../taxBook/readModelSwitch', () => ({
-  get CORP_BOOK_READ_MODELS() {
-    return flag.on;
-  },
-  get CORP_BOOK_MINER_SCOPED_READ() {
-    return flag.on;
-  },
-}));
 const readBookData = vi.hoisted(() => vi.fn());
 const readMinerBookData = vi.hoisted(() => vi.fn());
 vi.mock('../taxBook/bookClient', async (orig) => ({
@@ -104,7 +94,6 @@ function book(): BookData {
 }
 
 beforeEach(() => {
-  flag.on = false;
   readBookData.mockReset().mockImplementation(async () => book());
   readMinerBookData
     .mockReset()
@@ -113,17 +102,7 @@ beforeEach(() => {
 });
 
 describe('Miner page read path', () => {
-  it('switch off: reads the whole book, never the read models', async () => {
-    const { result } = renderHook(() => useCorpBook(SYNC, undefined, { minerId: 'solo:5' }));
-    await waitFor(() => expect(result.current.state.status).toBe('ready'));
-    expect(readBookData).toHaveBeenCalledTimes(1);
-    expect(readMinerBookData).not.toHaveBeenCalled();
-    // Every day it was mined is priced, as before.
-    expect(loadDatedUnitPricesByHub.mock.calls[0]?.[0]).toEqual(expect.arrayContaining([11, 22]));
-  });
-
-  it('switch on: reads the Miner slice only, and prices only its open window', async () => {
-    flag.on = true;
+  it('reads the Miner slice only, and prices only its open window', async () => {
     const { result } = renderHook(() => useCorpBook(SYNC, undefined, { minerId: 'solo:5' }));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
     expect(readMinerBookData).toHaveBeenCalledWith(7, 98000001, 'solo:5');
@@ -131,16 +110,15 @@ describe('Miner page read path', () => {
     expect(loadDatedUnitPricesByHub.mock.calls[0]?.[0]).toEqual([22]);
   });
 
-  it('switch on, no Miner open: the whole book as before', async () => {
-    flag.on = true;
+  it('no Miner open: the whole book, every day priced', async () => {
     const { result } = renderHook(() => useCorpBook(SYNC));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
     expect(readBookData).toHaveBeenCalledTimes(1);
     expect(readMinerBookData).not.toHaveBeenCalled();
+    expect(loadDatedUnitPricesByHub.mock.calls[0]?.[0]).toEqual(expect.arrayContaining([11, 22]));
   });
 
-  it('switch on: leaving the Miner reads the whole book again, and shows loading meanwhile', async () => {
-    flag.on = true;
+  it('leaving the Miner reads the whole book again, and shows loading meanwhile', async () => {
     const { result, rerender } = renderHook(
       ({ minerId }: { minerId?: string }) => useCorpBook(SYNC, undefined, { minerId }),
       { initialProps: { minerId: 'solo:5' } as { minerId?: string } }

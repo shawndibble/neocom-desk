@@ -258,17 +258,15 @@ export interface ReadModelDocs {
 }
 
 /**
- * The projection a tab renders. With `enabled` off (the switch, `readModelSwitch.ts`) it is
- * always the whole-book view's, and the docs are never looked at. With it on, the docs feed
- * it, unless they are missing or from another schema: then the old path still answers.
+ * The projection a tab renders: the docs', unless they are missing or from another schema
+ * (the server has not built or deployed them yet). Then the whole-book view still answers.
  */
 export function tabsProjection(
-  enabled: boolean,
   view: BookView,
   docs: ReadModelDocs | undefined,
   schema: number
 ): TabsProjection {
-  if (enabled && docs && readModelsUsable(docs.minerList, docs.overview, schema))
+  if (docs && readModelsUsable(docs.minerList, docs.overview, schema))
     return fromReadModels({ minerList: docs.minerList, overview: docs.overview! }, view.input);
   return fromBookView(view);
 }

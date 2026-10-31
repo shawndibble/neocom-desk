@@ -57,7 +57,6 @@ import {
   type HeaderTotals,
 } from '@/engine/corpTaxBook/minerScope';
 import { forgetObservedCopy } from './observedStore';
-import { CORP_BOOK_READ_MODELS } from './readModelSwitch';
 import type { ReadModelDocs } from '@/engine/corpTaxBook/readModels';
 import { callRouted } from '@/sync/routedCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
@@ -501,7 +500,7 @@ export interface BookData {
   scheduledSync?: ScheduledSyncStatus | null;
   /** Which slices this read covered (bookParts.ts); the rest are empty. Absent: the whole book. */
   parts?: BookPartSet;
-  /** The Overview and Miners tab docs (ADR 0032); read only behind `CORP_BOOK_READ_MODELS`. */
+  /** The Overview and Miners tab docs (ADR 0032); absent until the server has built them. */
   readModels?: ReadModelDocs;
   /**
    * The Miner a one-Miner read (`readMinerBookData`) covered; absent for the whole book. Then
@@ -552,8 +551,7 @@ function feedersOf(
 export async function readBookData(
   characterId: number,
   corporationId: number,
-  parts: BookPartSet = ALL_BOOK_PART_SET,
-  withReadModels: boolean = CORP_BOOK_READ_MODELS
+  parts: BookPartSet = ALL_BOOK_PART_SET
 ): Promise<BookData | null> {
   const book = await openBook(characterId, corporationId);
   if (!book) return null;
@@ -602,21 +600,19 @@ export async function readBookData(
       undefined
     ),
     book.paidStatementIds(),
-    // Two docs, one stamp (ADR 0032). Off: not a single read. Best effort, even on a refusal
-    // (rules not deployed): the screens fall back to the whole-book view, and the book's own
-    // reads above already surface a lost role.
-    withReadModels
-      ? part('readModels', async () => {
-          const docs = async (id: string) =>
-            (
-              await getDoc(
-                doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'readModels', id)
-              )
-            ).data();
-          const [minerList, overview] = await Promise.all([docs('minerList'), docs('overview')]);
-          return { minerList, overview } as ReadModelDocs;
-        }).catch(() => undefined)
-      : Promise.resolve(undefined),
+    // Two docs, one stamp (ADR 0032). Best effort, even on a refusal (rules not deployed): the
+    // screens fall back to the whole-book view, and the book's own reads above already surface
+    // a lost role.
+    part('readModels', async () => {
+      const docs = async (id: string) =>
+        (
+          await getDoc(
+            doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'readModels', id)
+          )
+        ).data();
+      const [minerList, overview] = await Promise.all([docs('minerList'), docs('overview')]);
+      return { minerList, overview } as ReadModelDocs;
+    }).catch(() => undefined),
   ]);
   return {
     settings,
