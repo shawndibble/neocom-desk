@@ -134,6 +134,32 @@ test.describe('Fitting Compare control toolbar', () => {
       expect(select!.x - (label!.x + label!.width)).toBeLessThan(12);
     }
   });
+
+  for (const width of [1440, 1024]) {
+    test(`at ${width} loading three fits keeps the toolbar one row, toggle in Stats`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await signInAndGoto(page, './ships/fittings/compare');
+      await answerAnyType(page);
+      const controls = page.getByTestId('compare-controls');
+      const empty = (await controls.boundingBox())!.height;
+      for (const [i, eft] of [FIT_A, FIT_B, FIT_C].entries()) {
+        await addFitting(page, i === 0 ? eft : `${eft}\n125mm Gatling AutoCannon I`);
+      }
+      await expect(page.locator('table')).toHaveCount(2, { timeout: 20_000 });
+      expect(empty).toBeLessThan(70);
+      expect((await controls.boundingBox())!.height).toBeLessThanOrEqual(empty + 1);
+      const target = (await page.getByRole('combobox', { name: 'Target profile' }).boundingBox())!;
+      const manage = (await page.getByRole('button', { name: /manage targets/i }).boundingBox())!;
+      expect(
+        Math.abs(manage.y + manage.height / 2 - (target.y + target.height / 2))
+      ).toBeLessThanOrEqual(4);
+      const toggle = page.getByText('Show differences only');
+      await expect(toggle).toBeVisible();
+      await expect(controls.getByText('Show differences only')).toHaveCount(0);
+    });
+  }
 });
 
 test.describe('Fitting Compare column alignment', () => {
