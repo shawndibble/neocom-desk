@@ -181,7 +181,6 @@ export function useLpLandingStoreColumns({
         header: t('loyaltyStore.landing.colNearest'),
         align: 'right',
         width: '16ch',
-        // Nearest first on the first click (DESIGN.md: a distance sorts ascending).
         sortValue: (row) => row.nearest?.jumps,
         sortFirst: 'asc',
         render: (row) => {

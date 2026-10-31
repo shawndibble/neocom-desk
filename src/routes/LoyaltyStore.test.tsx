@@ -938,7 +938,7 @@ describe('LoyaltyStore switching stores through the search', () => {
     render(
       <MemoryRouter
         initialEntries={[
-          { pathname: '/loyalty/1000168', state: { from: 'lp-search', q: 'tritanium' } },
+          { pathname: '/loyalty/1000168', state: { from: 'lp-search', search: '?q=tritanium' } },
         ]}
       >
         <Routes>
@@ -967,7 +967,7 @@ describe('LoyaltyStore switching stores through the search', () => {
         initialEntries={[
           {
             pathname: '/loyalty/1000168',
-            state: { from: 'lp-search', q: 'cap', search: '?view=offers&q=cap&noFw=1' },
+            state: { from: 'lp-search', search: '?view=offers&q=cap&noFw=1' },
           },
         ]}
       >

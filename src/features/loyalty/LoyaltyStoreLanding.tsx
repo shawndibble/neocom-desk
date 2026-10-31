@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useDeferredValue, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -46,6 +46,7 @@ import {
 import {
   DEFAULT_LP_LANDING_FILTERS,
   MIN_SELLS_PER_DAY_OPTIONS,
+  lpLandingBestOffers,
   lpLandingHoldings,
   lpLandingOffers,
   lpLandingStores,
@@ -126,7 +127,7 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
   const location = useLocation();
   const tabsId = useTabsId();
   const [params, setParams] = useUrlParams(VIEW_PARAMS);
-  const [filters, setFilters] = useUrlFilter<LpLandingFilters>(
+  const [filters, setFilters, deferredFilters] = useUrlFilter<LpLandingFilters>(
     'lp-landing',
     FILTER.schema,
     FILTER.fieldToParam,
@@ -147,20 +148,26 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
   const query = params.q;
   const filterValue: LpLandingFilterValue = { ...filters, hubId, priceBasis };
   function onFilterChange(next: LpLandingFilterValue) {
-    // Hub and basis are the app-wide settings, written where they are edited and nowhere else.
     if (next.hubId !== hubId) void setHubId(next.hubId);
     if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
     // Only the filter's own fields reach the URL.
     setFilters(next);
   }
 
+  // Deferred: a keystroke or chip click never waits on a pass over every offer.
+  const deferredQuery = useDeferredValue(query);
+  const bestOffers = useMemo(
+    () => (view === 'stores' ? lpLandingBestOffers(data.offers, deferredFilters) : null),
+    [view, data.offers, deferredFilters]
+  );
   const shownStores = useMemo(
-    () => lpLandingStores(data.stores, data.offers, filters, query),
-    [data.stores, data.offers, filters, query]
+    () =>
+      bestOffers ? lpLandingStores(data.stores, bestOffers, deferredFilters, deferredQuery) : [],
+    [bestOffers, data.stores, deferredFilters, deferredQuery]
   );
   const shownOffers = useMemo(
-    () => (view === 'offers' ? lpLandingOffers(data.offers, filters, query) : []),
-    [view, data.offers, filters, query]
+    () => (view === 'offers' ? lpLandingOffers(data.offers, deferredFilters, deferredQuery) : []),
+    [view, data.offers, deferredFilters, deferredQuery]
   );
   const holdings = useMemo(
     () => lpLandingHoldings(data.stores, ownLpValue),
@@ -190,7 +197,7 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
   const offerSort = useUrlSort('offerSort', OFFERS_SORT, OFFER_SORT_IDS);
 
   // The whole landing URL rides along, so Close after a reload rebuilds this view, not just the query.
-  const crumb: LpSearchCrumbState = { from: 'lp-search', q: query, search: location.search };
+  const crumb: LpSearchCrumbState = { from: 'lp-search', search: location.search };
   const openStore = (store: LpLandingStore) =>
     navigate(lpStorePath(store.corporationId), { state: crumb });
   const openOffer = (offer: LpLandingOffer) =>

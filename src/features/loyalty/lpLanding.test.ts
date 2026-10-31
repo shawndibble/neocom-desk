@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LP_LANDING_FILTERS,
   lpLandingActiveFilterCount,
+  lpLandingBestOffers,
   lpLandingHoldings,
   lpLandingOffers,
   lpLandingStores,
@@ -107,7 +108,7 @@ describe('lpLandingStores', () => {
   ];
   const stores = [near, far, unplaced];
   const bestOf = (filters: LpLandingFilters) =>
-    lpLandingStores(stores, offers, filters, '').map((s) => [
+    lpLandingStores(stores, lpLandingBestOffers(offers, filters), filters, '').map((s) => [
       s.corporationId,
       s.best?.row.offer.offer_id ?? null,
     ]);
@@ -134,12 +135,16 @@ describe('lpLandingStores', () => {
   });
 
   it('never filters a store out for having no passing offer', () => {
-    expect(lpLandingStores(stores, offers, { ...ANY, categories: [4] }, '')).toHaveLength(3);
+    expect(
+      lpLandingStores(stores, lpLandingBestOffers(offers, ANY), { ...ANY, categories: [4] }, '')
+    ).toHaveLength(3);
   });
 
   it('applies the store filters', () => {
     const listed = (filters: LpLandingFilters, query = '') =>
-      lpLandingStores(stores, offers, filters, query).map((s) => s.corporationId);
+      lpLandingStores(stores, lpLandingBestOffers(offers, filters), filters, query).map(
+        (s) => s.corporationId
+      );
     expect(listed({ ...ANY, range: '5' })).toEqual([1]);
     expect(listed({ ...ANY, faction: 'none' })).toEqual([2]);
     expect(listed({ ...ANY, faction: 500001 })).toEqual([1, 3]);

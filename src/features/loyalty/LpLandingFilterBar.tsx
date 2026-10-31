@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui';
 import { JumpRangeSelect } from '@/features/route/JumpRangeControls';
+import { toggleFilterMember } from '@/lib/multiSelectFilter';
 import type { TradeHub } from '@/market/hubs';
 import type { PriceBasis } from './priceBasis';
 import { PriceBasisSelect } from './PriceBasisSelect';
@@ -26,28 +27,18 @@ import {
 } from './lpLanding';
 import type { LpLandingOption } from './useLpStoreLanding';
 
-/** Every category is ticked while the filter is off (an empty list). */
-function selectedCategories(
-  chosen: readonly number[],
-  options: readonly LpLandingOption[]
-): ReadonlySet<number> {
-  return new Set(chosen.length === 0 ? options.map((option) => option.id) : chosen);
-}
-
-/**
- * Ticking the last one back clears the filter (an empty list). The last ticked
- * category stays ticked: no category at all would only empty the table.
- */
+/** The URL's empty category list is the shared multi-select's `all`. */
 function toggleCategory(
   chosen: readonly number[],
   options: readonly LpLandingOption[],
   id: number
 ): readonly number[] {
-  const next = new Set(selectedCategories(chosen, options));
-  if (next.has(id)) next.delete(id);
-  else next.add(id);
-  if (next.size === options.length) return [];
-  return next.size === 0 ? chosen : [...next];
+  const next = toggleFilterMember(
+    chosen.length === 0 ? 'all' : new Set(chosen),
+    id,
+    options.map((option) => option.id)
+  );
+  return next === 'all' ? [] : [...next];
 }
 
 export type LpLandingView = 'stores' | 'offers';
@@ -198,7 +189,11 @@ export function LpLandingFilterBar({
                   value: category.id,
                   label: category.name,
                 }))}
-                selected={selectedCategories(draft.categories, categories)}
+                selected={
+                  new Set(
+                    draft.categories.length === 0 ? categories.map((c) => c.id) : draft.categories
+                  )
+                }
                 onToggle={(id) =>
                   setDraft({
                     ...draft,

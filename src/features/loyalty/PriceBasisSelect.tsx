@@ -6,11 +6,8 @@ import type { PriceBasis } from '@/features/loyalty/priceBasis';
  * The LP Store's revenue-basis select, shared by the store modal's and the
  * landing's filter rows.
  *
- * Radix rather than `NativeSelect`, the one thing a real `<select>` can't do:
- * the trigger shows just "Sell"/"Buy" while the open list spells out what each
- * basis means. A native option's text is the same in both places, so the
- * closed box had to carry "(list order)" — twelve characters of explanation
- * sitting permanently in a filter row.
+ * Radix, not `NativeSelect`: the trigger shows "Sell"/"Buy", the open list
+ * spells out each basis; a native option has one text for both.
  */
 export function PriceBasisSelect({
   value,

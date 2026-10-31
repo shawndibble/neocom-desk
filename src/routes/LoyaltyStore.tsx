@@ -280,14 +280,9 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       navigate(-1);
       return;
     }
-    // Back to the landing view this store was opened from: its whole query
-    // string, or (from an older entry) just its search.
-    let back = '';
-    if (arrivedState?.from === 'lp-search') {
-      if (arrivedState.search?.startsWith('?')) back = arrivedState.search;
-      else if (arrivedState.q) back = `?q=${encodeURIComponent(arrivedState.q)}`;
-    }
-    navigate(`/wallet/lp-store${back}`, { replace: true });
+    // Back to the landing view this store was opened from.
+    const search = arrivedState?.from === 'lp-search' ? arrivedState.search : undefined;
+    navigate(`/wallet/lp-store${search?.startsWith('?') ? search : ''}`, { replace: true });
   }
 
   const list = (

@@ -176,7 +176,7 @@ describe('LoyaltyStoreLanding', () => {
     await user.click(screen.getByText('Navy Cap Booster 800'));
     expect(probe.pathname).toBe('/wallet/lp-store/2');
     expect(probe.search).toBe('?offer=21');
-    expect(probe.state).toEqual({ from: 'lp-search', q: '', search: '?view=offers' });
+    expect(probe.state).toEqual({ from: 'lp-search', search: '?view=offers' });
   });
 
   it('shows no holdings and disables the LP chips when the Character holds no LP', async () => {

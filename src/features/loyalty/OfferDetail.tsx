@@ -42,7 +42,7 @@ import { useRedemptionPricing } from './useRedemptionPricing';
  * the Market link. A blueprint row is labelled with the product that button
  * opens; the BP badge beside it still marks the row as a blueprint.
  */
-export function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
+function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
   const { typeId, itemName } = resolveLoyaltyRowItem(row);
   return <span className={entityLinkClassName()}>{typeId === null ? row.itemName : itemName}</span>;
 }

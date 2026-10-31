@@ -6,10 +6,9 @@
  * market LP Value, the Character's balances, factions, item categories and
  * the jumps from the Current System.
  *
- * Every offer is priced: about 3,700 types in one market fetch (cached), and
- * one pass over ~31,000 offers (tens of milliseconds). The pass waits for the
- * catalog, the prices, the names and the daily volume, so the sales floor
- * never flashes a list that then shrinks.
+ * Every offer is priced in one market fetch and one pass. The pass waits for
+ * the catalog, prices, names and daily volume, so the sales floor never
+ * flashes a list that then shrinks.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRetryableLoad } from '@/lib/useRetryableLoad';
@@ -24,18 +23,18 @@ import {
   type BlueprintCatalog,
 } from '@/features/industry/blueprintCatalog';
 import { useMarketSnapshot } from '@/features/industry/useMarketSnapshot';
-import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { loadCorrectedSkills, skillLevelsOf } from '@/features/skills/correctedSkills';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
 import { loadFactions } from '@/features/standings/factions';
 import { rootOf } from '@/features/market/marketTree';
 import { loadLpCorporations, loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
 import type { LpCorporationEntry } from '@/sde/marketTypes';
-import { loadSolarSystemsById } from '@/sde/solarSystems';
+import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import type { CharacterLoyaltyPoints, LoyaltyStoreOffer, UniverseFaction } from '@/esi/endpoints';
 import type { SkillLevels } from '@/engine/industry/types';
-import { usePriceBasis } from './priceBasis';
-import { loadLpStoreVolume, type LpStoreVolume } from './lpStoreVolume';
+import { revenuePricing, usePriceBasis } from './priceBasis';
+import { useLpStoreVolume } from './lpStoreVolume';
 import { loadMarketLpValues } from './marketLpValue';
 import {
   loadLpStoreSnapshot,
@@ -46,7 +45,7 @@ import {
 import { collectNameableTypeIds, computeLoyaltyOfferRows, offerPriceTypeIds } from './offerRows';
 import type { LpLandingOffer, LpLandingStoreFacts } from './lpLanding';
 
-export type LpLandingStatus = 'loading' | 'ready' | 'unavailable';
+type LpLandingStatus = 'loading' | 'ready' | 'unavailable';
 
 export interface LpLandingOption {
   id: number;
@@ -82,11 +81,14 @@ interface Categories {
 }
 
 /**
- * `active` false while a store's modal covers the landing: the snapshot and
- * names still load, but nothing is priced, so a store opened by a link does
- * not price every other store behind it.
+ * `active` false while a store's modal covers the landing: nothing is priced
+ * until the landing has been on screen once, so a store opened by a link does
+ * not price every other store behind it. Once priced, a modal opened over the
+ * landing keeps it priced.
  */
 export function useLpStoreLanding(active = true): LpStoreLandingState {
+  const [warmed, setWarmed] = useState(active);
+  if (active && !warmed) setWarmed(true);
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
   const hubId = useMarketHub((s) => s.value);
   const hubHydrated = useMarketHub((s) => s.hydrated);
@@ -102,7 +104,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
   const [factionList, setFactionList] = useState<UniverseFaction[] | null>(null);
   const [categories, setCategories] = useState<Categories | null>(null);
   const [itemNames, setItemNames] = useState<ReadonlyMap<number, string> | null>(null);
-  const [systemNames, setSystemNames] = useState<ReadonlyMap<number, string>>(new Map());
+  const systemIndex = useSolarSystemIndex();
   const {
     attempt: catalogAttempt,
     fail: failCatalog,
@@ -147,20 +149,14 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     void loadFactions().then((list) => {
       if (!cancelled) setFactionList(list);
     });
-    void loadSolarSystemsById()
-      .then((byId) => {
-        if (cancelled || !byId) return;
-        setSystemNames(new Map([...byId].map(([id, entry]) => [id, entry.name])));
-      })
-      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // The market catalogue is large; it is read only once the landing is on screen.
+  // The market type list is large; read once the landing has been on screen.
   useEffect(() => {
-    if (!active) return;
+    if (!warmed) return;
     let cancelled = false;
     // Categories only add a filter: a failed read leaves every offer uncategorised.
     void Promise.all([loadMarketTypes(), loadMarketGroups()])
@@ -177,7 +173,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     return () => {
       cancelled = true;
     };
-  }, [active]);
+  }, [warmed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -227,9 +223,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     void loadCorrectedSkills(activeCharacterId, Date.now(), { skipQueueWithoutScope: true })
       .then((corrected) => {
         if (cancelled) return;
-        const map: SkillLevels = {};
-        for (const [skillId, trained] of corrected.trained) map[skillId] = trained.level;
-        setSkillsFor({ characterId: activeCharacterId, skills: map });
+        setSkillsFor({ characterId: activeCharacterId, skills: skillLevelsOf(corrected) });
       })
       .catch(() => {});
     return () => {
@@ -237,24 +231,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     };
   }, [activeCharacterId]);
 
-  // The hub setting's region, once it hydrates: the default hub's volume would be the wrong number.
-  const volumeRegionId = hubHydrated ? hub.regionId : null;
-  const [loadedVolume, setLoadedVolume] = useState<{
-    regionId: number;
-    volume: LpStoreVolume | null;
-  } | null>(null);
-  useEffect(() => {
-    if (volumeRegionId === null) return;
-    let cancelled = false;
-    void loadLpStoreVolume(volumeRegionId).then((volume) => {
-      if (!cancelled) setLoadedVolume({ regionId: volumeRegionId, volume });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [volumeRegionId]);
-  const volumeSettled = loadedVolume !== null && loadedVolume.regionId === volumeRegionId;
-  const volume = volumeSettled ? loadedVolume.volume : null;
+  const { volume, settled: volumeSettled } = useLpStoreVolume(hubHydrated ? hub.regionId : null);
 
   const offersByCorp = useMemo(() => {
     const map = new Map<number, LoyaltyStoreOffer[]>();
@@ -266,9 +243,9 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
   const allOffers = useMemo(() => [...offersByCorp.values()].flat(), [offersByCorp]);
 
   useEffect(() => {
-    if (!active || allOffers.length === 0) return;
+    if (!warmed || allOffers.length === 0) return;
     let cancelled = false;
-    // Unnamed offers still price; they fall back to the catalogue's names or `#typeId`.
+    // Unnamed offers still price; they fall back to the catalog's names or `#typeId`.
     void loadTypeNames(collectNameableTypeIds(allOffers))
       .then((names) => {
         if (!cancelled) setItemNames(names);
@@ -279,11 +256,11 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     return () => {
       cancelled = true;
     };
-  }, [active, allOffers]);
+  }, [warmed, allOffers]);
 
   const typeIds = useMemo(
-    () => (active && catalog ? offerPriceTypeIds(allOffers, catalog) : []),
-    [active, allOffers, catalog]
+    () => (warmed && catalog ? offerPriceTypeIds(allOffers, catalog) : []),
+    [warmed, allOffers, catalog]
   );
   const { snapshot, loading: snapshotLoading } = useMarketSnapshot(hub, hubHydrated ? typeIds : []);
 
@@ -293,7 +270,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     values: Map<number, number | null>;
   } | null>(null);
   useEffect(() => {
-    if (!active || !hubHydrated || offersByCorp.size === 0) return;
+    if (!warmed || !hubHydrated || offersByCorp.size === 0) return;
     let cancelled = false;
     void loadMarketLpValues(offersByCorp.keys(), hub, { held: offersByCorp })
       .then((values) => {
@@ -308,7 +285,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     };
     // `hub` is derived from `hubId`; the id is the stable dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, hubHydrated, hubId, offersByCorp]);
+  }, [warmed, hubHydrated, hubId, offersByCorp]);
   const valuesForHub = lpValues?.hubId === hub.id ? lpValues.values : null;
 
   const corporationById = useMemo(
@@ -355,8 +332,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
       offers: allOffers,
       catalog,
       hubPrices: snapshot.hubPrices,
-      revenueHubPrices: priceBasis === 'buy' ? snapshot.hubBuyPrices : snapshot.hubPrices,
-      liquidationBasis: priceBasis === 'buy' ? 'instant' : 'order',
+      ...revenuePricing(snapshot, priceBasis),
       adjustedPrices: snapshot.adjustedPrices,
       systemCostIndex: snapshot.systemCostIndex,
       skills,
@@ -404,8 +380,8 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
   }, [categories, offers]);
 
   const systemName = useCallback(
-    (systemId: number) => systemNames.get(systemId) ?? null,
-    [systemNames]
+    (systemId: number) => systemIndex?.get(systemId)?.name ?? null,
+    [systemIndex]
   );
   const factionNames = useMemo(
     () => new Map((factionList ?? []).map((f) => [f.faction_id, f.name] as const)),

@@ -33,7 +33,7 @@ export interface LpLandingFilters {
   categories: readonly number[];
 }
 
-/** Opens on a 1-a-day sales floor (scope decision 1A); nothing else narrows. */
+/** Opens on a 1-a-day sales floor (scope decision 20261030-200155-…-hides-offers-that-sell-under); nothing else narrows. */
 export const DEFAULT_LP_LANDING_FILTERS: LpLandingFilters = {
   faction: 'all',
   range: 'any',
@@ -86,7 +86,7 @@ function storePasses(store: LpLandingStoreFacts, filters: LpLandingFilters): boo
 
 function offerPasses(offer: LpLandingOffer, filters: LpLandingFilters): boolean {
   const { row } = offer;
-  // Unknown volume is not zero volume (scope decision 1A).
+  // Unknown volume is not zero volume.
   if (row.sellsPerDay !== null && row.sellsPerDay < filters.minSellsPerDay) return false;
   if (filters.noTurnIns && row.offer.required_items.length > 0) return false;
   if (filters.affordableOnly && (offer.store.yourLp ?? 0) < row.offer.lp_cost) return false;
@@ -116,13 +116,11 @@ export function lpLandingOffers(
   });
 }
 
-/** The Stores view: stores passing the store filters and the query, each with its best passing offer. */
-export function lpLandingStores(
-  stores: readonly LpLandingStoreFacts[],
+/** Each store's best ISK/LP among its offers that pass the offer filters; independent of the query. */
+export function lpLandingBestOffers(
   offers: readonly LpLandingOffer[],
-  filters: LpLandingFilters,
-  query: string
-): LpLandingStore[] {
+  filters: LpLandingFilters
+): ReadonlyMap<number, LpLandingOffer> {
   const best = new Map<number, LpLandingOffer>();
   for (const offer of offers) {
     const value = offer.row.profit.iskPerLp;
@@ -131,6 +129,16 @@ export function lpLandingStores(
     if (!current || value > current.row.profit.iskPerLp!)
       best.set(offer.store.corporationId, offer);
   }
+  return best;
+}
+
+/** The Stores view: stores passing the store filters and the query, each with its best passing offer. */
+export function lpLandingStores(
+  stores: readonly LpLandingStoreFacts[],
+  best: ReadonlyMap<number, LpLandingOffer>,
+  filters: LpLandingFilters,
+  query: string
+): LpLandingStore[] {
   const passing = stores.filter((store) => storePasses(store, filters));
   return matching(passing, query, { primary: (s) => s.name, limit: passing.length }).map(
     (store) => ({ ...store, best: best.get(store.corporationId) ?? null })
@@ -172,17 +180,19 @@ export function lpLandingHoldings(
   stores: readonly LpLandingStoreFacts[],
   ownLpValue: number
 ): LpLandingHoldings | null {
-  const held = stores.filter((store) => store.yourLp !== null && store.yourLp > 0);
+  const held = stores.flatMap((store) =>
+    store.yourLp === null ? [] : [{ store, lp: store.yourLp }]
+  );
   if (held.length === 0) return null;
   let lp = 0;
   let worth = 0;
   let unpriced = 0;
   let best: LpLandingStoreFacts | null = null;
-  for (const store of held) {
-    lp += store.yourLp!;
+  for (const { store, lp: balance } of held) {
+    lp += balance;
     const { rate } = lpRate(ownLpValue, store.lpValue);
     if (rate === null) unpriced++;
-    else worth += store.yourLp! * rate;
+    else worth += balance * rate;
     if (store.lpValue !== null && (best === null || store.lpValue > best.lpValue!)) best = store;
   }
   return { stores: held.length, lp, worth, unpriced, best };
