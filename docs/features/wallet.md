@@ -11,6 +11,7 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 | `transactions` alias tab                 | `pageTabs.ts:90-94`, `Wallet.tsx:522`     | not a tab; redirects to `/market/history`                                                                              |
 | Cross-character balance (`?char=`)       | `Wallet.tsx:570`                          | per-Character table + total, picker, CSV/XLSX/clipboard export                                                         |
 | Net worth chart                          | `features/netWorth/NetWorthPanel.tsx`     | lazy Recharts stack (one Character) or lines (several), layer legend, drill                                            |
+| Cash flow                                | `features/netWorth/CashFlowPanel.tsx`     | earned, spent, net, per day, daily bars for 7/30/90 days; day opens the Journal                                        |
 | ISK waiting and Goal                     | `features/netWorth/WalletWaitingGoal.tsx` | sell orders, buy escrow, contracts from the newest Net Worth Snapshot; one device-local wallet Goal with pace and date |
 | LP Store picker                          | `features/loyalty/LpStorePicker.tsx`      | select-box over every NPC corp with an LP Store; no longer mounted since Balance dropped its LP panel                  |
 | Journal filters                          | `WalletJournalTable.tsx`                  | ref type, date range, free text; filtered count + net total; ref-type breakdown (in/out/net, row click filters)        |
@@ -118,6 +119,11 @@ Replaces the old journal balance-history chart. Maths in `src/engine/netWorth/` 
 - **Device-local toggles:** hidden layers and hidden Characters persist per device (`netWorthHiddenLayers`, `netWorthHiddenCharacters`, stored as what is hidden so a new Character shows by default).
 - **Export:** surface `wallet-balances`; columns Character, one per layer, Net worth of the shown layers; blank (not 0) for an excluded Character.
 - Sync status is the shell-wide `SyncStatusDot` / `SyncErrorNote`; the panel adds no control.
+
+### Cash flow panel (`features/netWorth/CashFlowPanel.tsx`)
+
+- Above ISK waiting on Balance: earned, spent, net and average per day over 7, 30 or 90 UTC days (`cashFlow`, `engine/netWorth/waiting` sibling `cashFlow.ts`), the earned change against the period before (only when the journal history reaches that far back), and the Journal's own daily bars (`IskFlowChartBars`). A day on the bars opens the Journal on that day.
+- Reads the picked, drilled or active Characters' cached journals (`loadAllCharactersJournals`); transfers between the pilot's own Characters are left out. A period the history only partly covers says so. By-source breakdown stays on the Journal tab.
 
 ### ISK waiting and Goal panels (`features/netWorth/WalletWaitingGoal.tsx`)
 

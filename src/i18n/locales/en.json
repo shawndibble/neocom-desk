@@ -7091,6 +7091,17 @@
     "journalBountyKills_other": "{{count}} NPCs killed",
     "journalFilteredSummaryStatus_one": "{{count}} entry · net {{net}}",
     "journalFilteredSummaryStatus_other": "{{count}} entries · net {{net}}",
+    "cashFlow": {
+      "title": "Cash flow",
+      "period": "Period",
+      "earned": "Earned",
+      "spent": "Spent",
+      "net": "Net",
+      "perDay": "Average per day",
+      "versusBefore": "Earned is {{change}} on the {{days}} days before ({{amount}} ISK).",
+      "partial": "Journal history starts {{day}}, so this counts less than the full period.",
+      "lagNote": "The journal can lag the live balance by up to an hour, so today can read low."
+    },
     "waiting": {
       "title": "ISK waiting",
       "sellOrders": "Sell orders",
