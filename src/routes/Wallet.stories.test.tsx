@@ -23,7 +23,8 @@ describe('Wallet › Balance page story', () => {
     expect(await screen.findByText('EverMarks', {}, { timeout: 6_000 })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: /primary|main/i })).toBeInTheDocument();
     expect(screen.getAllByText('Kestrel Vane').length).toBeGreaterThan(0);
-    expect(screen.getByText('Caldari Navy')).toBeInTheDocument();
+    // The per-corporation loyalty list is the LP Store tab's, not Balance's.
+    expect(screen.queryByText('Caldari Navy')).not.toBeInTheDocument();
     // The net worth view fans out to the whole roster; wait for the requests
     // to stop before asking whether any had no fixture.
     await whenFetchQuiet();

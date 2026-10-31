@@ -13,8 +13,10 @@ export const FITTING_EDIT_PATH = tabPath(SHIPS_TABS, 'fittings/edit');
 export const FITTING_COMPARE_PATH = `${FITTINGS_PATH}/compare`;
 export const SHIP_TREE_PATH = tabPath(SHIPS_TABS, 'tree');
 
+export type FittingEditLocation = { pathname: string; search: string };
+
 /** The editor's location for a Fitting Share Code. */
-export function fittingEditLocation(code: string): { pathname: string; search: string } {
+export function fittingEditLocation(code: string): FittingEditLocation {
   return { pathname: FITTING_EDIT_PATH, search: `?${new URLSearchParams({ f: code })}` };
 }
 

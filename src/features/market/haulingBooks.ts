@@ -69,9 +69,15 @@ async function fetchBooks(stationId: number): Promise<HaulingBooks | null> {
     const response = await fetch(`${R2_SNAPSHOT_ORIGIN}/hauling-books/${stationId}.json`, {
       signal: AbortSignal.timeout(READ_TIMEOUT_MS),
     });
-    if (!response.ok) return null;
-    return parseHaulingBooks(await response.json());
-  } catch {
+    if (!response.ok) {
+      console.warn('[hauling-diag] books fetch not ok', stationId, response.status);
+      return null;
+    }
+    const parsed = parseHaulingBooks(await response.json());
+    if (!parsed) console.warn('[hauling-diag] books parse failed', stationId);
+    return parsed;
+  } catch (error) {
+    console.warn('[hauling-diag] books fetch threw', stationId, error);
     return null;
   }
 }
@@ -85,8 +91,15 @@ export async function loadHaulingBooks(stationId: number): Promise<HaulingBooks 
       { staleAfterMs: STALE_AFTER_MS, allowStaleServe: true }
     );
     const books = cached?.data ?? null;
-    return books && Date.now() - books.asOf <= MAX_BOOKS_AGE_MS ? books : null;
-  } catch {
+    const usable = books !== null && Date.now() - books.asOf <= MAX_BOOKS_AGE_MS;
+    console.warn('[hauling-diag] books loaded', stationId, {
+      cached: cached !== null,
+      fromCache: cached?.fromCache,
+      usable,
+    });
+    return usable ? books : null;
+  } catch (error) {
+    console.warn('[hauling-diag] loadHaulingBooks threw', stationId, error);
     return null;
   }
 }

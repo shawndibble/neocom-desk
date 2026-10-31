@@ -26,7 +26,8 @@ export interface FittingChoices {
   /** False until the saved list and, when granted, the In-game list have loaded. */
   ready: boolean;
   /** The picked Fitting, or null when it is gone or won't decode. */
-  resolve: (id: string) => Promise<{ name: string; fitting: Fitting } | null>;
+  /** `code`: a saved Fitting's own share code, for a link that opens exactly it. */
+  resolve: (id: string) => Promise<{ name: string; fitting: Fitting; code?: string } | null>;
 }
 
 const inGameId = (fittingId: number) => `game-${fittingId}`;
@@ -64,7 +65,11 @@ export function useFittingChoices(characterId: number | null): FittingChoices {
     if (!record) return null;
     const decoded = await decodeFittingShare(record.code);
     if (!decoded.ok) return null;
-    return { name: record.name, fitting: shareToFitting(decoded.value, record.name) };
+    return {
+      name: record.name,
+      fitting: shareToFitting(decoded.value, record.name),
+      code: record.code,
+    };
   }, []);
 
   const inGameSettled = granted === false || result !== null || error;

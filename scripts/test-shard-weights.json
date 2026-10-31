@@ -886,7 +886,6 @@
   "src/features/character/logoutAll.test.ts": 1,
   "src/features/character/lookupPrefetch.test.ts": 1,
   "src/features/character/loyalty.test.ts": 1,
-  "src/features/character/loyaltyPointsCsv.test.ts": 1,
   "src/features/character/mail.test.ts": 1,
   "src/features/character/mailAll.test.ts": 1,
   "src/features/character/MailBodyView.test.tsx": 1,

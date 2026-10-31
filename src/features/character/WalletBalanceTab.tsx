@@ -7,10 +7,8 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { GrantBanner } from '@/app/GrantNote';
 import { NetWorthPanel, type NetWorthCharacter } from '@/features/netWorth/NetWorthPanel';
-import {
-  WalletLoyaltyPanel,
-  type LoyaltyReauthCharacter,
-} from '@/features/character/WalletLoyaltyPanel';
+import { CashFlowPanel } from '@/features/netWorth/CashFlowPanel';
+import { WalletWaitingGoal } from '@/features/netWorth/WalletWaitingGoal';
 import type { useWalletBalances } from '@/features/character/useWalletBalances';
 import type { useWalletDrill } from '@/features/character/useWalletDrill';
 import type { useWalletLoyalty } from '@/features/character/useWalletLoyalty';
@@ -32,7 +30,6 @@ interface WalletBalanceTabProps {
   balanceNeedsReauth: boolean;
   /** The picked Characters' loyalty points, summed per corporation. */
   loyaltyResult: CachedResult<CharacterLoyaltyPoints[]> | null;
-  loyaltyReauthCharacters: readonly LoyaltyReauthCharacter[];
   loyaltyLoading: boolean;
   journalNeedsReauth: boolean;
   journalTruncated: boolean;
@@ -42,7 +39,7 @@ interface WalletBalanceTabProps {
 
 /**
  * Wallet's Balance tab: the net worth panel — the active Character's, every
- * picked Character's, or the one drilled into — over the loyalty points table.
+ * picked Character's, or the one drilled into — over the ISK waiting and Goal panels.
  */
 export function WalletBalanceTab({
   activeCharacterId,
@@ -56,7 +53,6 @@ export function WalletBalanceTab({
   balanceResult,
   balanceNeedsReauth,
   loyaltyResult,
-  loyaltyReauthCharacters,
   loyaltyLoading,
   journalNeedsReauth,
   journalTruncated,
@@ -97,7 +93,20 @@ export function WalletBalanceTab({
     return map;
   }, [balances.snapshot, activeCharacterId, balanceResult, balanceNeedsReauth]);
 
-  // Summed over the same picked Characters as the loyalty points table.
+  const scopeCharacters = useMemo(
+    () =>
+      drilledCharacter
+        ? [drilledCharacter]
+        : showingBeyondActive
+          ? pickedCharacters
+          : activeCharacter
+            ? [activeCharacter]
+            : [],
+    [drilledCharacter, showingBeyondActive, pickedCharacters, activeCharacter]
+  );
+  const scopeIds = useMemo(() => scopeCharacters.map((c) => c.characterId), [scopeCharacters]);
+
+  // Summed over the same picked Characters as the net worth panel.
   const everMarksStat = (
     <div>
       <p className={cx(eyebrowClassName, 'flex items-center gap-1')}>
@@ -210,15 +219,8 @@ export function WalletBalanceTab({
         />
       )}
 
-      <WalletLoyaltyPanel
-        loyaltyResult={loyaltyResult}
-        reauthCharacters={loyaltyReauthCharacters}
-        loading={loyaltyLoading}
-        otherLoyalty={loyalty.otherLoyalty}
-        columns={loyalty.columns}
-        sortProps={loyalty.sortProps}
-        tableExport={loyalty.tableExport}
-      />
+      <CashFlowPanel key={scopeIds.join(',')} characters={scopeCharacters} />
+      <WalletWaitingGoal characterIds={scopeIds} />
     </div>
   );
 }
