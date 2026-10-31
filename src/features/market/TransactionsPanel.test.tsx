@@ -311,7 +311,7 @@ describe('TransactionsPanel — desktop filter and totals', () => {
     // Header plus the one buy the filter leaves — the Damage Control II sale is gone.
     expect(lines).toEqual([
       expect.stringContaining('"Date"'),
-      '2026-09-10 12:00:00,"Tritanium","Buy",10,5,-50',
+      expect.stringMatching(/^2026-09-10 12:00:00,.*"Tritanium","Buy",10,5,-50,,,,,"[^"]+"$/),
     ]);
     spy.mockRestore();
   });
