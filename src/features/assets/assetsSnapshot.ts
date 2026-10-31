@@ -5,8 +5,8 @@ import {
   type OtherCharacterAssets,
 } from '@/features/assets/assets';
 import type { CachedResult } from '@/esi/cache';
-import { loadStationName, loadStationSystemId } from '@/features/character/stations';
-import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
+import { loadStationName } from '@/features/character/stations';
+import { loadStructureName } from '@/features/character/structures';
 import { loadSystemName } from '@/features/character/systemSecurity';
 import { loadTypeNames, loadTypeVolumes } from '@/features/character/typeNames';
 import { type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -26,11 +26,6 @@ export interface Snapshot {
   assetsNeedsReauth: boolean;
   typeNames: Map<number, string>;
   locationNames: Map<number, string>;
-  /**
-   * The solar system name of each station and structure the assets sit in, by location id: the
-   * export's System column. A place whose system could not be read (a structure off the ACL) is absent.
-   */
-  systemNameByLocationId: Map<number, string>;
   /** Global average market price per type, used for the tree's estimated-value badges. */
   priceByTypeId: Map<number, number>;
   /** Each blueprint copy's own value by item id (`engine/blueprintCopyValue.ts`) — a copy never takes its type's average price. */
@@ -55,47 +50,6 @@ function loadOwnCopyValues(
   );
 }
 
-/** A failed read is a gap in the column, never a failed snapshot. */
-function settled<T>(read: () => Promise<T | null>): Promise<T | null> {
-  return Promise.resolve()
-    .then(read)
-    .catch(() => null);
-}
-
-/**
- * The system name of each station (a baked-snapshot lookup, no request) and
- * structure (the same cached read that named it), for the export's System column.
- */
-async function loadLocationSystemNames(
-  characterId: number,
-  stationIds: readonly number[],
-  structureIds: readonly number[]
-): Promise<Map<number, string>> {
-  const systemIdByLocation = new Map<number, number>();
-  await Promise.all([
-    ...stationIds.map(async (id) => {
-      const systemId = await settled(() => loadStationSystemId(id));
-      if (systemId !== null) systemIdByLocation.set(id, systemId);
-    }),
-    ...structureIds.map(async (id) => {
-      const systemId = await settled(() => loadStructureSystemId(characterId, id));
-      if (systemId !== null) systemIdByLocation.set(id, systemId);
-    }),
-  ]);
-  const names = new Map<number, string>();
-  const systemNames = new Map<number, string | null>();
-  await Promise.all(
-    [...new Set(systemIdByLocation.values())].map(async (systemId) => {
-      systemNames.set(systemId, await settled(() => loadSystemName(systemId)));
-    })
-  );
-  for (const [locationId, systemId] of systemIdByLocation) {
-    const name = systemNames.get(systemId);
-    if (name) names.set(locationId, name);
-  }
-  return names;
-}
-
 export async function loadAssetsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal<Snapshot>
@@ -114,7 +68,6 @@ export async function loadAssetsSnapshot(
     assetsNeedsReauth,
     typeNames: new Map(),
     locationNames: new Map(),
-    systemNameByLocationId: new Map(),
     priceByTypeId: new Map(),
     pricesReady: false,
     copyValueByItemId: new Map(),
@@ -210,21 +163,10 @@ export async function loadAssetsSnapshot(
   });
 
   show({ locationNames });
-  // Behind the rows like prices: only for places whose name resolved, so the read is served from the
-  // cache that name filled and a place that 404s or 5xxs is never asked a second time.
-  const systemNamesPromise = signal.cancelled
-    ? Promise.resolve(new Map<number, string>())
-    : loadLocationSystemNames(
-        characterId,
-        stationIds.filter((id) => locationNames.has(id)),
-        [...structureIds, ...orphanParentIds].filter((id) => locationNames.has(id))
-      );
-  void systemNamesPromise.then((systemNameByLocationId) => show({ systemNameByLocationId }));
-  const [copyValueByItemId, priceByTypeId, assetNames, systemNameByLocationId] = await Promise.all([
+  const [copyValueByItemId, priceByTypeId, assetNames] = await Promise.all([
     copyValuesPromise,
     pricesPromise,
     assetNamesPromise,
-    systemNamesPromise,
   ]);
 
   return {
@@ -233,7 +175,6 @@ export async function loadAssetsSnapshot(
     assetsNeedsReauth,
     typeNames,
     locationNames,
-    systemNameByLocationId,
     priceByTypeId,
     pricesReady: true,
     copyValueByItemId,
@@ -247,8 +188,6 @@ export interface CrossCharacterData {
   entries: OtherCharacterAssets[];
   typeNames: Map<number, string>;
   locationNames: Map<number, string>;
-  /** System name by station or structure id, as the active Character's snapshot carries it. */
-  systemNameByLocationId: Map<number, string>;
   /** Owning Character per asset item_id — item ids are globally unique, so this is safe to merge flat across Characters. */
   characterIdByItemId: Map<number, number>;
   characterNameById: Map<number, string>;
@@ -265,11 +204,9 @@ export interface CrossCharacterData {
  * so a structure must resolve under the Character whose asset actually sits
  * in it, not the active Character running the search.
  */
-async function loadCrossCharacterNames(entries: readonly OtherCharacterAssets[]): Promise<{
-  typeNames: Map<number, string>;
-  locationNames: Map<number, string>;
-  systemNameByLocationId: Map<number, string>;
-}> {
+async function loadCrossCharacterNames(
+  entries: readonly OtherCharacterAssets[]
+): Promise<{ typeNames: Map<number, string>; locationNames: Map<number, string> }> {
   const allAssets = entries.flatMap((entry) => entry.assets);
   const typeNames = await loadTypeNames(allAssets.map((a) => a.type_id));
 
@@ -325,22 +262,7 @@ async function loadCrossCharacterNames(entries: readonly OtherCharacterAssets[])
     );
   });
 
-  // Behind the names, and only for places that resolved (see `loadAssetsSnapshot`).
-  const systemNameByLocationId = new Map<number, string>();
-  const resolvedStationIds = stationIds.filter((id) => locationNames.has(id));
-  await mapWithConcurrencyLimit(entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
-    const placeIds = entry.assets
-      .filter((a) => a.location_type === 'other' || a.location_type === 'item')
-      .map((a) => a.location_id);
-    const resolved = await loadLocationSystemNames(
-      entry.characterId,
-      resolvedStationIds,
-      [...new Set(placeIds)].filter((id) => locationNames.has(id))
-    );
-    for (const [id, name] of resolved) systemNameByLocationId.set(id, name);
-  });
-
-  return { typeNames, locationNames, systemNameByLocationId };
+  return { typeNames, locationNames };
 }
 
 /** Fetches + resolves everything the cross-character Character filter needs, once per resolved id set. */
@@ -349,7 +271,7 @@ export async function loadCrossCharacterData(
 ): Promise<CrossCharacterData> {
   const { entries, skipped } = await loadOtherCharactersAssetsDetailed(otherCharacterIds);
   const copyValueByItemId = new Map<number, number>();
-  const [{ typeNames, locationNames, systemNameByLocationId }] = await Promise.all([
+  const [{ typeNames, locationNames }] = await Promise.all([
     loadCrossCharacterNames(entries),
     mapWithConcurrencyLimit(entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
       for (const [itemId, value] of await loadOwnCopyValues(entry.characterId, entry.assets))
@@ -368,7 +290,6 @@ export async function loadCrossCharacterData(
     entries,
     typeNames,
     locationNames,
-    systemNameByLocationId,
     characterIdByItemId,
     characterNameById,
     copyValueByItemId,

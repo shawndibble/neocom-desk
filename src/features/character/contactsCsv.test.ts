@@ -129,7 +129,7 @@ describe('contactsCsvColumns', () => {
       'contacts.ownAlliance': 'common.exportFlagNo',
       'characters.csvAchievementTitle': 'Veteran',
       'characters.csvAchievementScore': 900,
-      'contacts.labels': 'Friends, Traders',
+      'contacts.labels': 'Friends; Traders',
     });
   });
 

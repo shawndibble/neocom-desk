@@ -32,6 +32,8 @@ import {
 import { useAssetCategoryIndex } from '@/features/assets/useAssetCategoryIndex';
 import { useAssetKindPreference } from '@/features/assets/assetKindPreference';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { rootPlaceRefs, useExportSystemNames } from '@/features/assets/assetSystemNames';
+import type { PlaceRef } from '@/features/places/types';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
 import type { TableExport } from '@/components/ui/useTableExport';
 import { usePlaceNicknameMap } from '@/features/assets/placeNicknames';
@@ -79,6 +81,7 @@ const EMPTY_ITEM_OWNERS: ReadonlyMap<number, number> = new Map();
 const EMPTY_CHARACTER_NAMES: ReadonlyMap<number, string> = new Map();
 export const LOCATION_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterLocation'];
 const NO_BUILD_PLANS: readonly BuildPlanRecord[] = [];
+const NO_PLACE_REFS: readonly PlaceRef[] = [];
 
 export function useAssetsData() {
   const { t } = useTranslation();
@@ -318,9 +321,6 @@ export function useAssetsData() {
     (itemId) => activeCrossCharacterData?.characterIdByItemId.get(itemId) ?? activeCharacterId,
     `${activeCharacterId}:${activeCrossCharacterData ? 'all' : 'one'}`
   );
-  // The React Compiler is not enabled in this build; it only objects to these
-  // two memos' dependency shape, which the hand-written deps get right.
-
   const priceByTypeId = useMemo(
     () =>
       abyssal.isAbyssalType
@@ -375,18 +375,26 @@ export function useAssetsData() {
     () => new Map(mergedAssets.map((asset) => [asset.item_id, asset])),
     [mergedAssets]
   );
-  const ownSystemNames = data?.systemNameByLocationId ?? NO_NAMES;
-  const mergedSystemNames = useMemo(() => {
-    if (!activeCrossCharacterData) return ownSystemNames;
-    return new Map([...activeCrossCharacterData.systemNameByLocationId, ...ownSystemNames]);
-  }, [ownSystemNames, activeCrossCharacterData]);
+  // The export's System column is read once an export menu opens (any entry point).
+  const [exportArmed, setExportArmed] = useState(false);
+  const systemRefs = useMemo(
+    () =>
+      exportArmed
+        ? rootPlaceRefs(
+            mergedAssets,
+            mergedLocationNames,
+            (itemId) => characterBadges.idByItemId.get(itemId) ?? activeCharacterId
+          )
+        : NO_PLACE_REFS,
+    [exportArmed, mergedAssets, mergedLocationNames, characterBadges.idByItemId, activeCharacterId]
+  );
+  const systemNames = useExportSystemNames(exportArmed, systemRefs);
 
   // The export follows the page: what the search, Category, Blueprints and min value leave on
   // screen, including other Characters' assets while a search runs (a Character column says whose).
   //
-  // The grouped/sorted rows are built only when the export actually runs
-  // (`assetsExport.getRows` below) — matching every asset and locale-sorting
-  // on each data/search change was waste for a menu that is rarely opened.
+  // Built only when an export runs (`assetsExport.getRows` below): matching and
+  // locale-sorting every asset is costly and the menu is rarely opened.
   function buildCsvGroups() {
     const searched = matchAssets(mergedAssets, mergedTypeNames, debouncedSearch, assetNames);
     const matches =
@@ -407,7 +415,6 @@ export function useAssetsData() {
     }
     return [...byLocation.entries()]
       .map(([locationId, locationEntries]) => ({
-        locationId,
         label: locationLabel(
           locationId,
           locationEntries[0].asset.location_type,
@@ -428,30 +435,29 @@ export function useAssetsData() {
   const assetsExport: TableExport<AssetCsvRow> = {
     surface: 'assets',
     columns: assetsCsvColumnList,
-    truncated: assetsTruncated,
-    getRows: () =>
-      assetCsvRows(
-        buildCsvGroups().map((group) => ({ label: group.label, entries: group.entries })),
-        {
-          assetsByItemId,
-          typeNames: mergedTypeNames,
-          gameNames: assetNames,
-          locationNames: mergedLocationNames,
-          systemNameByLocationId: mergedSystemNames,
-          priceByTypeId,
-          itemValueByItemId,
-          volumeByTypeId,
-          blueprintTypeIds,
-          placeNicknames,
-          characterNameOf: (itemId) => {
-            const ownerId = characterBadges.idByItemId.get(itemId) ?? activeCharacterId;
-            return (
-              crossCharacterCandidates.find((c) => c.characterId === ownerId)?.characterName ?? ''
-            );
-          },
-          t,
-        }
-      ),
+    truncated: assetsTruncated || systemNames.pending,
+    onExportIntent: () => setExportArmed(true),
+    getRows: () => {
+      const characterNames = new Map(
+        crossCharacterCandidates.map((c) => [c.characterId, c.characterName])
+      );
+      return assetCsvRows(buildCsvGroups(), {
+        assetsByItemId,
+        typeNames: mergedTypeNames,
+        gameNames: assetNames,
+        locationNames: mergedLocationNames,
+        systemNameByLocationId: systemNames.names,
+        priceByTypeId,
+        itemValueByItemId,
+        volumeByTypeId,
+        blueprintTypeIds,
+        placeNicknames,
+        characterNameOf: (itemId) =>
+          characterNames.get(characterBadges.idByItemId.get(itemId) ?? activeCharacterId ?? -1) ??
+          '',
+        t,
+      });
+    },
   };
 
   const assetItemActions = useMemo<AssetItemActions>(

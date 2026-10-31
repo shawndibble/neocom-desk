@@ -7,6 +7,7 @@ import type { AchievementLookup } from './useCharacterAchievements';
 import type { ContactAffiliationRow } from './contactAffiliation';
 import type { AcrossCharactersRow } from './contactsAcrossCharacters';
 import { exportFlag } from '@/lib/exportFlag';
+import { joined } from '@/lib/exportSheets';
 
 function entityName(names: ReadonlyMap<number, string>, id: number): string {
   return names.get(id) ?? `#${id}`;
@@ -23,17 +24,8 @@ function ownable(
 }
 
 /**
- * CSV columns for the Character tab (issue #2164): name, type, corporation and
- * alliance, whether either is the pilot's own, title and score, standing,
- * labels, blocked, watched. A fixed set independent of the table's column
- * picker, splitting its combined `flags` cell into its own blocked/watched
- * columns. `labels` are the contact's in-game label names joined (the table's
- * optional Labels column, which only exists for a pilot who has labels). The
- * table's two-line Affiliation cell is two columns here, corporation and
- * alliance, each with an own-corporation / own-alliance flag. `standing` passes
- * through as the raw number, not the `StandingIcon` tag the table renders. The
- * title and score read the public records the Title / Score column loads, so
- * they are blank until that has been read.
+ * CSV columns for the Character tab: a fixed set, whatever the column picker shows, splitting the
+ * table's Affiliation and flags cells. Title and score are blank until the public records are read.
  */
 export function contactsCsvColumns(
   t: CsvTranslate,
@@ -77,7 +69,7 @@ export function contactsCsvColumns(
     { header: t('contacts.standing'), value: (contact) => contact.standing },
     {
       header: t('contacts.labels'),
-      value: (contact) => contactLabelNames(contact, contactLabels).join(', '),
+      value: (contact) => joined(contactLabelNames(contact, contactLabels)),
     },
     {
       header: t('contacts.blocked'),
@@ -90,16 +82,7 @@ export function contactsCsvColumns(
   ];
 }
 
-/**
- * CSV columns for the Across tab (issue #2164): name, type, how many characters
- * hold the contact, out of how many, who holds it and who does not, each
- * holder's own standing, and whether the characters disagree. `held` and
- * `total` are raw numbers. `standings` is a deliberate exception: one
- * `"Name: value"` pair per holding character, joined, so a row where two alts
- * disagree (`"Main: 10; Hauler: -10"`) says which one holds which. A deduped
- * list of values would lose exactly that. There is no fixed per-character
- * column set to spread them into either: the character list differs per pilot.
- */
+/** CSV columns for the Across tab. Standings are `"Name: value"` pairs, so a row where alts disagree says which holds which. */
 export function contactsAcrossCsvColumns(
   t: CsvTranslate,
   names: ReadonlyMap<number, string>
@@ -115,15 +98,15 @@ export function contactsAcrossCsvColumns(
     { header: t('contacts.csvAcrossTotal'), value: (row) => row.held.length + row.missing.length },
     {
       header: t('contacts.csvAcrossHolders'),
-      value: (row) => row.held.map((h) => h.name).join('; '),
+      value: (row) => joined(row.held.map((h) => h.name)),
     },
     {
       header: t('contacts.csvAcrossMissing'),
-      value: (row) => row.missing.map((m) => m.name).join('; '),
+      value: (row) => joined(row.missing.map((m) => m.name)),
     },
     {
       header: t('contacts.acrossStandings'),
-      value: (row) => row.held.map((h) => `${h.name}: ${h.contact.standing}`).join('; '),
+      value: (row) => joined(row.held.map((h) => `${h.name}: ${h.contact.standing}`)),
     },
     { header: t('contacts.csvAcrossDisagrees'), value: (row) => exportFlag(t, row.disagrees) },
   ];

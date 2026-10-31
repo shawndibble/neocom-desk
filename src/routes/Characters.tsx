@@ -177,8 +177,7 @@ export function Characters() {
   // Always read (a small roster, cached): the table's Docked at and Ship columns and the export,
   // which carries them in either view.
   const whereabouts = useCharacterWhereabouts(
-    useMemo(() => (characters ?? []).map((character) => character.characterId), [characters]),
-    true
+    useMemo(() => (characters ?? []).map((character) => character.characterId), [characters])
   );
 
   const {

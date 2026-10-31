@@ -62,8 +62,9 @@ describe('assetHolderChain', () => {
     });
     const a = inItem(6, 7);
     const b = inItem(7, 6);
-    expect(
-      assetHolderChain(a, new Map([a, b].map((x) => [x.item_id, x]))).chain.map((x) => x.item_id)
-    ).toEqual([7]);
+    const looped = assetHolderChain(a, new Map([a, b].map((x) => [x.item_id, x])));
+    expect(looped.chain.map((x) => x.item_id)).toEqual([7]);
+    expect(looped.cyclic).toBe(true);
+    expect(assetHolderChain(orphan, new Map([[5, orphan]])).cyclic).toBe(false);
   });
 });

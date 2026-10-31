@@ -1,38 +1,47 @@
 import { describe, it, expect } from 'vitest';
-import { shipsCsvColumns, type ShipCsvRow } from './shipsCsv';
+import type { ShipRow } from '@/engine/myShips';
+import { shipsCsvColumns, type ShipsCsvLookups } from './shipsCsv';
 
 const t = (k: string) => k;
 
-function row(overrides: Partial<ShipCsvRow> = {}): ShipCsvRow {
+const ship: ShipRow = {
+  itemId: 11,
+  typeId: 28606,
+  characterId: 1,
+  locationId: 60003760,
+  locationType: 'station',
+  inCargo: true,
+  trail: [5],
+  holderFlags: ['Cargo'],
+  packaged: false,
+  quantity: 1,
+};
+
+function lookups(over: Partial<ShipsCsvLookups> = {}): ShipsCsvLookups {
   return {
-    ship: 'Orca',
-    gameName: 'Big Blue',
-    shipClass: 'Industrial Command Ship',
-    packaged: false,
-    quantity: 1,
-    character: 'Rixx Javix',
-    location: 'Jita IV - Moon 4',
-    heldInside: 'Cargo Container',
-    security: 0.9,
-    jumps: 0,
-    itemId: 11,
-    typeId: 28606,
-    locationId: 60003760,
-    ...overrides,
+    shipName: () => 'Orca',
+    gameName: () => 'Big Blue',
+    shipClass: () => 'Industrial Command Ship',
+    characterName: () => 'Rixx Javix',
+    location: () => 'Jita IV - Moon 4',
+    heldInside: () => 'Cargo Container',
+    security: () => 0.9,
+    jumps: () => 0,
+    ...over,
   };
 }
 
-const valuesOf = (r: ShipCsvRow) =>
-  Object.fromEntries(shipsCsvColumns(t).map((c) => [c.header, c.value(r)]));
+const valuesOf = (row: ShipRow, over: Partial<ShipsCsvLookups> = {}) =>
+  Object.fromEntries(shipsCsvColumns(t, lookups(over)).map((c) => [c.header, c.value(row)]));
 
 describe('shipsCsvColumns', () => {
   it('orders every column the tab shows, then the ids', () => {
-    expect(shipsCsvColumns(t).map((c) => c.header)).toEqual([
+    expect(shipsCsvColumns(t, lookups()).map((c) => c.header)).toEqual([
       'assets.myShips.columns.ship',
-      'assets.myShips.csvGameName',
+      'assets.csvGameName',
       'assets.myShips.csvClass',
       'assets.myShips.packaged',
-      'assets.myShips.csvQuantity',
+      'assets.csvQuantity',
       'assets.myShips.columns.character',
       'assets.myShips.columns.location',
       'assets.myShips.csvHeldInside',
@@ -45,13 +54,16 @@ describe('shipsCsvColumns', () => {
   });
 
   it('exports numbers raw, keeping 0 jumps and leaving unread values blank', () => {
-    expect(valuesOf(row())).toMatchObject({
+    expect(valuesOf(ship)).toMatchObject({
       'assets.myShips.columns.security': 0.9,
       'assets.myShips.columns.jumps': 0,
-      'assets.myShips.csvQuantity': 1,
+      'assets.csvQuantity': 1,
       'assets.myShips.packaged': 'common.exportFlagNo',
+      'assets.csvItemId': 11,
     });
-    expect(valuesOf(row({ security: null, jumps: null, packaged: true }))).toMatchObject({
+    expect(
+      valuesOf({ ...ship, packaged: true }, { security: () => null, jumps: () => null })
+    ).toMatchObject({
       'assets.myShips.columns.security': null,
       'assets.myShips.columns.jumps': null,
       'assets.myShips.packaged': 'common.exportFlagYes',

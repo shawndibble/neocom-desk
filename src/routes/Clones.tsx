@@ -32,7 +32,7 @@ import { useClonesView } from '@/features/character/useClonesView';
 import { cloneJumpCooldown } from '@/engine/clone/cloneJump';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { cloneCsvRows, clonesCsvColumns, type CloneCsvRow } from '@/features/character/clonesCsv';
+import { cloneCsvRows, clonesCsvColumns } from '@/features/character/clonesCsv';
 import { CloneVerdictCard } from '@/features/character/CloneVerdictCard';
 import { WORN_CLONE_ID } from '@/features/character/cloneTraining';
 import { CLONES_SORTS, type ClonesSort } from '@/features/character/clonesSort';
@@ -151,11 +151,6 @@ export function Clones() {
     jumpsByLocation,
     prices,
   });
-  // The worn clone heads the list, then the jump clones in the sort the reader chose.
-  const csvRows = useMemo(
-    () => (clonesBlocked ? [] : cloneCsvRows(hasWorn ? wornIds : null, sortedClones)),
-    [clonesBlocked, hasWorn, wornIds, sortedClones]
-  );
   const csvColumns = useMemo(
     () =>
       clonesCsvColumns(t, {
@@ -165,41 +160,29 @@ export function Clones() {
         nicknames,
         prices,
         wornPlaceName: characterSystemName,
-        securityOf: (row: CloneCsvRow) => {
-          const systemId =
-            row.clone === null ? characterSystemId : (systemIds.get(row.clone.location_id) ?? null);
-          return systemId === null ? undefined : securities.get(systemId);
-        },
-        jumpsOf: (row) =>
-          row.clone === null ? undefined : jumpsByLocation?.get(row.clone.location_id),
-        trainingOf: (row) =>
-          showTraining
-            ? rowOf(row.clone === null ? WORN_CLONE_ID : row.clone.jump_clone_id)
-            : undefined,
-        bestCloneId,
       }),
-    [
-      t,
-      locationNames,
-      implantNames,
-      implantDetails,
-      nicknames,
-      prices,
-      characterSystemName,
-      characterSystemId,
-      systemIds,
-      securities,
-      jumpsByLocation,
-      showTraining,
-      rowOf,
-      bestCloneId,
-    ]
+    [t, locationNames, implantNames, implantDetails, nicknames, prices, characterSystemName]
   );
   const clonesExport = useTableExport({
     surface: 'clones',
     // No table is mounted, so `rows` carries the reader's sort.
     source: 'rows',
-    rows: csvRows,
+    rows: () =>
+      clonesBlocked
+        ? []
+        : cloneCsvRows(hasWorn ? wornIds : null, sortedClones, (clone) => ({
+            security:
+              clone === null
+                ? characterSystemId === null
+                  ? undefined
+                  : securities.get(characterSystemId)
+                : securityOf(clone.location_id),
+            jumps: clone === null ? undefined : jumpsByLocation?.get(clone.location_id),
+            training: showTraining
+              ? rowOf(clone === null ? WORN_CLONE_ID : clone.jump_clone_id)
+              : undefined,
+            best: bestCloneId === (clone === null ? WORN_CLONE_ID : clone.jump_clone_id),
+          })),
     columns: csvColumns,
   });
 

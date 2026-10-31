@@ -1,6 +1,7 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { EmploymentHistoryRow } from './employmentHistory';
 import { exportFlag } from '@/lib/exportFlag';
+import { isoTime } from '@/lib/exportSheets';
 
 const SECONDS_PER_DAY = 86_400;
 
@@ -27,7 +28,7 @@ export function employmentHistoryCsvColumns(
       value: (row) =>
         row.ongoing
           ? undefined
-          : new Date(new Date(row.startDate).getTime() + row.tenureSeconds * 1000).toISOString(),
+          : isoTime(new Date(row.startDate).getTime() + row.tenureSeconds * 1000),
     },
     {
       header: t('employmentHistory.csvDurationDays'),

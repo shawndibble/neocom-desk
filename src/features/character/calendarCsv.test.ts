@@ -66,7 +66,7 @@ describe('calendarCsvColumns', () => {
       'calendar.csvKind': 'calendar.kind.industryJob',
       'calendar.csvDetail': 'calendar.detail.industryJob.Jita IV',
       'calendar.csvResponse': undefined,
-      'calendar.csvImportant': undefined,
+      'calendar.csvImportant': null,
       'calendar.csvId': 42,
     });
   });

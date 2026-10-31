@@ -27,6 +27,12 @@ export interface CharacterCsvRow {
 
 const JOB_SLOT_CATEGORIES: readonly JobSlotCategory[] = ['manufacturing', 'science', 'reaction'];
 
+/** The Docked at cell's reading of a Character's place: undefined until it is read. */
+function placeLabelOf(row: CharacterCsvRow) {
+  const place = row.whereabouts?.place;
+  return place ? placeLabel(place) : undefined;
+}
+
 function isoOrUndefined(ms: number | null | undefined): string | undefined {
   return ms == null ? undefined : new Date(ms).toISOString();
 }
@@ -83,10 +89,8 @@ export function charactersCsvColumns(
     {
       header: t('characters.csvDockedAt'),
       value: (row) => {
-        const place = row.whereabouts?.place;
-        if (!place) return undefined;
-        const label = placeLabel(place);
-        return label.kind === 'docked' ? label.name : undefined;
+        const label = placeLabelOf(row);
+        return label?.kind === 'docked' ? label.name : undefined;
       },
     },
     { header: t('characters.csvSystem'), value: (row) => row.whereabouts?.place?.systemName },
@@ -95,9 +99,8 @@ export function charactersCsvColumns(
       // structure reads "structure", an item in space "in space".
       header: t('characters.csvPlaceKind'),
       value: (row) => {
-        const place = row.whereabouts?.place;
-        if (!place) return undefined;
-        const label = placeLabel(place);
+        const label = placeLabelOf(row);
+        if (!label) return undefined;
         return label.kind === 'docked'
           ? t('characters.csvPlaceDocked')
           : t(label.kind === 'inSpace' ? 'characters.inSpace' : 'characters.structure');

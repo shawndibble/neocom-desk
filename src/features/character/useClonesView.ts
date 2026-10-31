@@ -123,24 +123,28 @@ export function useClonesView({
     (id: string | number) => verdictResult?.rows.find((r) => r.cloneId === id),
     [verdictResult]
   );
-  const sortedClones = sortClones(
-    clones.map((clone) => {
-      const implantValue = prices ? sumImplantValue(clone.implants, prices) : null;
-      return {
-        clone,
-        id: clone.jump_clone_id,
-        locationId: clone.location_id,
-        deltaSeconds: showTraining ? (rowOf(clone.jump_clone_id)?.deltaSeconds ?? null) : null,
-        value:
-          implantValue &&
-          (implantValue.unpriced < clone.implants.length || clone.implants.length === 0)
-            ? implantValue.total
-            : null,
-      };
-    }),
-    sort,
-    jumpsByLocation
-  ).map((x) => x.clone);
+  const sortedClones = useMemo(
+    () =>
+      sortClones(
+        clones.map((clone) => {
+          const implantValue = prices ? sumImplantValue(clone.implants, prices) : null;
+          return {
+            clone,
+            id: clone.jump_clone_id,
+            locationId: clone.location_id,
+            deltaSeconds: showTraining ? (rowOf(clone.jump_clone_id)?.deltaSeconds ?? null) : null,
+            value:
+              implantValue &&
+              (implantValue.unpriced < clone.implants.length || clone.implants.length === 0)
+                ? implantValue.total
+                : null,
+          };
+        }),
+        sort,
+        jumpsByLocation
+      ).map((x) => x.clone),
+    [clones, prices, showTraining, rowOf, sort, jumpsByLocation]
+  );
   const bestCloneId = showTraining ? (verdictResult?.bestCloneId ?? null) : null;
 
   return {

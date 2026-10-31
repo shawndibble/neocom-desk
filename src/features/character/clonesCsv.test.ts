@@ -1,10 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { cloneCsvRows, clonesCsvColumns, type CloneCsvRow } from './clonesCsv';
+import { cloneCsvRows, clonesCsvColumns, type CloneCsvFacts, type CloneCsvRow } from './clonesCsv';
 import type { JumpClone } from '@/esi/endpoints';
-import type { CloneRow } from '@/engine/clone/cloneVerdict';
-import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { ImplantDetail } from './clones';
-import { WORN_CLONE_ID } from './cloneTraining';
 
 const t = (k: string, options?: Record<string, unknown>) =>
   options ? `${k}:${JSON.stringify(options)}` : k;
@@ -25,10 +22,6 @@ interface Options {
   details?: Map<number, ImplantDetail>;
   nicknames?: Record<number, string>;
   prices?: Map<number, number | null>;
-  security?: number;
-  jumps?: JumpsAwayResult;
-  training?: CloneRow;
-  best?: string | number | null;
 }
 
 function columnsFor(o: Options = {}) {
@@ -39,10 +32,6 @@ function columnsFor(o: Options = {}) {
     nicknames: o.nicknames ?? {},
     prices: o.prices,
     wornPlaceName: 'Jita',
-    securityOf: () => o.security,
-    jumpsOf: () => o.jumps,
-    trainingOf: () => o.training,
-    bestCloneId: o.best ?? null,
   });
 }
 
@@ -50,7 +39,12 @@ function valuesOf(row: CloneCsvRow, o: Options = {}) {
   return Object.fromEntries(columnsFor(o).map((col) => [col.header, col.value(row)]));
 }
 
-const jumpRow = (c: JumpClone): CloneCsvRow => ({ clone: c, implants: c.implants });
+const jumpRow = (c: JumpClone, facts: Partial<CloneCsvFacts> = {}): CloneCsvRow => ({
+  clone: c,
+  implants: c.implants,
+  best: false,
+  ...facts,
+});
 
 describe('clonesCsvColumns', () => {
   it('orders the columns like the card reads', () => {
@@ -136,7 +130,7 @@ describe('clonesCsvColumns', () => {
 
   it('explains an unknown jump count, and lists each implant with its bonus and price', () => {
     expect(
-      valuesOf(jumpRow(clone()), { jumps: { kind: 'unknown', reason: 'noRoute' } })
+      valuesOf(jumpRow(clone(), { jumps: { kind: 'unknown', reason: 'noRoute' } }))
     ).toMatchObject({
       'clones.csvJumpsAway': undefined,
       'clones.csvJumpsNote': 'assets.jumpsAway.unknownReason.noRoute',
@@ -155,12 +149,14 @@ describe('clonesCsvColumns', () => {
   });
 
   it('carries security, jumps away, queue time, delta and the best flag', () => {
-    const values = valuesOf(jumpRow(clone({ jump_clone_id: 7 })), {
-      security: 0.9,
-      jumps: { kind: 'known', jumps: 4 },
-      training: { cloneId: 7, totalSeconds: 3600, deltaSeconds: -600 },
-      best: 7,
-    });
+    const values = valuesOf(
+      jumpRow(clone({ jump_clone_id: 7 }), {
+        security: 0.9,
+        jumps: { kind: 'known', jumps: 4 },
+        training: { cloneId: 7, totalSeconds: 3600, deltaSeconds: -600 },
+        best: true,
+      })
+    );
     expect(values).toMatchObject({
       'clones.csvSecurity': 0.9,
       'clones.csvJumpsAway': 4,
@@ -169,19 +165,19 @@ describe('clonesCsvColumns', () => {
       'clones.csvBestForTraining': 'clones.verdict.badge',
     });
     expect(
-      valuesOf(jumpRow(clone({ jump_clone_id: 8 })), { best: 7 })['clones.csvBestForTraining']
+      valuesOf(jumpRow(clone({ jump_clone_id: 8 })))['clones.csvBestForTraining']
     ).toBeUndefined();
   });
 
   it('exports the worn clone as a flagged row in the current system', () => {
-    const rows = cloneCsvRows([9941], [clone()]);
+    const rows = cloneCsvRows([9941], [clone()], (c) => ({ best: c === null }));
     expect(rows.map((r) => r.clone?.jump_clone_id ?? null)).toEqual([null, 1]);
-    const values = valuesOf(rows[0], { best: WORN_CLONE_ID });
+    const values = valuesOf(rows[0]);
     expect(values).toMatchObject({
       'clones.csvWorn': 'clones.wearingNow',
       'clones.location': 'Jita',
       'clones.csvBestForTraining': 'clones.verdict.badge',
     });
-    expect(cloneCsvRows(null, [clone()])).toHaveLength(1);
+    expect(cloneCsvRows(null, [clone()], () => ({ best: false }))).toHaveLength(1);
   });
 });

@@ -372,7 +372,6 @@ export function StockManagerTable({
       column.id === 'select' || column.id === 'item' || isVisible(column.id as StockColumnId)
   );
 
-  // Every column, whatever the picker shows; the rows are the table's own, in its sort.
   const stockColumns = useMemo(
     () => stockCsvColumns(t, { nameOf, groupOf, characterName }),
     [t, nameOf, groupOf, characterName]

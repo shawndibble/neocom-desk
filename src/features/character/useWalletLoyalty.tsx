@@ -73,8 +73,7 @@ export function useWalletLoyalty(
   );
   const tableExport = useTableExport({
     surface: 'loyalty-points',
-    // Every entry, EverMarks included, in the table's sort: the table itself
-    // lists only the corporations' LP, the EverMarks figure sits in the balance box.
+    // The whole list, not the table's slice, in the table's sort.
     rows: loyaltyResult?.data ?? NO_LOYALTY,
     source: 'sorted-rows',
     columns: csvColumns,

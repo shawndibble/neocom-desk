@@ -6,6 +6,7 @@ import {
 } from '@/engine/character/board';
 import { KIND_LABEL } from './calendarKindLabels';
 import { exportFlag } from '@/lib/exportFlag';
+import { isoTime } from '@/lib/exportSheets';
 
 const RESPONSE_KEY: Record<CalendarResponse, string> = {
   accepted: 'calendar.responseAccepted',
@@ -15,16 +16,13 @@ const RESPONSE_KEY: Record<CalendarResponse, string> = {
 };
 
 /**
- * CSV columns for the Coming Up rail: every kind the screen lists (calendar
- * events, skill training, jobs, PI, dens, moon chunks, skyhooks, contract and
- * order expiries, the skill plan), told apart by Kind. The date is the instant
- * the clock runs out, as an ISO string, not the rail's countdown. Response and
- * Important belong to calendar events alone and stay blank for the rest.
+ * CSV columns for the Coming Up rail: every kind it lists, told apart by Kind. The date is the instant the
+ * clock runs out, as an ISO string. Response and Important belong to calendar events and stay blank otherwise.
  */
 export function calendarCsvColumns(t: CsvTranslate): CsvColumn<CharacterBoardItem>[] {
   return [
     { header: t('calendar.csvKind'), value: (item) => t(KIND_LABEL[item.kind]) },
-    { header: t('calendar.csvDate'), value: (item) => new Date(item.deadlineMs).toISOString() },
+    { header: t('calendar.csvDate'), value: (item) => isoTime(item.deadlineMs) },
     { header: t('calendar.csvTitle'), value: (item) => item.subject },
     {
       header: t('calendar.csvDetail'),

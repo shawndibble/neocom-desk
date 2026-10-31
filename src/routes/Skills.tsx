@@ -277,7 +277,7 @@ export function Skills() {
   // export to its matches, exactly as it narrows the list (collapsing a group
   // is not a filter, so collapsed groups still export). Nothing while the
   // skills scope needs re-auth — the old export button was disabled then too.
-  const csvRows = useMemo(() => {
+  const csvRows = () => {
     if (skillsBlocked) return [];
     if (!searching) return skillCsvRows(boardCsvGroups(groups, plannedLevels));
     return skillCsvRows(
@@ -291,10 +291,11 @@ export function Skills() {
         plannedLevels
       )
     );
-  }, [groups, skillsBlocked, searching, filterResult, plannedLevels]);
+  };
   const csvColumns = useMemo(() => skillCsvColumns(t), [t]);
   const skillsExport = useTableExport({
     surface: 'skills',
+    // Built when an export runs: it maps the whole catalog.
     rows: csvRows,
     columns: csvColumns,
     source: 'rows',

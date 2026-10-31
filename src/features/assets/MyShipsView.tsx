@@ -46,7 +46,7 @@ import { JumpsAwayText, SecurityValue } from './assetBrowserRows';
 import { PlaceName } from './PlaceName';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { shipsCsvColumns, type ShipCsvRow } from './shipsCsv';
+import { shipsCsvColumns } from './shipsCsv';
 import type { JumpBasis } from '@/features/route/jumpBasis';
 
 /** SDE category 6. */
@@ -509,38 +509,33 @@ export function MyShipsView({
     });
     return items.map((item) => item.row);
   }, [staticKeys, places, query, sort]);
-  // The export is the list as shown (the search narrows it, the sort orders it), with every column
-  // whatever the layout hides: the Character column, the class and Packaged tags, the holder trail.
-  const shipCsvRows = useMemo<ShipCsvRow[]>(() => {
+  const shipsCsvColumnList = useMemo(() => {
     if (state.status !== 'ready') return [];
     const { data } = state;
-    return sorted.map((row) => {
-      const place = places.get(placeKey(row));
-      const known = typeof place?.systemId === 'number';
-      const jumps = place?.jumps;
-      return {
-        ship: data.typeNames.get(row.typeId) ?? t('assets.myShips.unknownType', { id: row.typeId }),
-        gameName: (!row.packaged && data.gameNames[row.itemId]) || '',
-        shipClass: shipClasses.get(data.groupIdByType.get(row.typeId) ?? -1) ?? '',
-        packaged: row.packaged,
-        quantity: row.quantity,
-        character: data.characterNames.get(row.characterId) ?? '',
-        location: place?.name ?? '',
-        heldInside: holderTrailText(row, data.holderNames, t),
-        security: known ? (place.security ?? null) : null,
-        jumps: jumps?.kind === 'known' ? jumps.jumps : null,
-        itemId: row.itemId,
-        typeId: row.typeId,
-        locationId: row.locationId,
-      };
+    const placeOf = (row: ShipRow) => places.get(placeKey(row));
+    return shipsCsvColumns(t, {
+      shipName: (row) =>
+        data.typeNames.get(row.typeId) ?? t('assets.myShips.unknownType', { id: row.typeId }),
+      gameName: (row) => (!row.packaged && data.gameNames[row.itemId]) || '',
+      shipClass: (row) => shipClasses.get(data.groupIdByType.get(row.typeId) ?? -1) ?? '',
+      characterName: (row) => data.characterNames.get(row.characterId) ?? '',
+      location: (row) => placeOf(row)?.name ?? '',
+      heldInside: (row) => holderTrailText(row, data.holderNames, t),
+      security: (row) => {
+        const place = placeOf(row);
+        return typeof place?.systemId === 'number' ? (place.security ?? null) : null;
+      },
+      jumps: (row) => {
+        const jumps = placeOf(row)?.jumps;
+        return jumps?.kind === 'known' ? jumps.jumps : null;
+      },
     });
-  }, [state, sorted, places, shipClasses, t]);
-  const shipsCsvColumnList = useMemo(() => shipsCsvColumns(t), [t]);
+  }, [state, places, shipClasses, t]);
   const shipsExport = useTableExport({
     surface: 'my-ships',
-    // Not a DataTable: `rows` already carries the sort.
+    // Not a DataTable: `sorted` already carries the search and the sort.
     source: 'rows',
-    rows: shipCsvRows,
+    rows: sorted,
     columns: shipsCsvColumnList,
   });
   // One Character's ships need no Character column.
@@ -572,7 +567,7 @@ export function MyShipsView({
             aria-label={t('assets.myShips.searchLabel')}
             className="w-full sm:ml-auto sm:w-64"
           />
-          {state.status === 'ready' && shipCsvRows.length > 0 && (
+          {state.status === 'ready' && sorted.length > 0 && (
             <TableActionsMenu name={t('assets.myShips.title')} tableExport={shipsExport} />
           )}
         </div>

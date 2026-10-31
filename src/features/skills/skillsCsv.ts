@@ -12,7 +12,7 @@ export interface SkillGroup {
     sp: number | null;
     /** Markup-stripped skill description, for the row's tooltip. Null/absent when the skill has none. */
     description?: string | null;
-    /** Training time multiplier; also feeds SkillBar's progress-toward-next-level segment (#405). */
+    /** Training time multiplier; feeds SkillBar's progress-toward-next-level segment. */
     rank: number;
     /** In the character's ESI skills at all; false is a skill book still to inject. */
     injected: boolean;
