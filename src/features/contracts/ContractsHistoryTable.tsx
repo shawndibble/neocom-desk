@@ -75,7 +75,6 @@ export function ContractsHistoryTable({
             available={CONTRACTS_HISTORY_COLUMN_IDS}
             visible={columnVisibility.visible}
             columnsById={optionalColumns}
-            showLabel
             onToggle={columnVisibility.toggle}
             buttonLabel={t('common.columnsButton')}
             menuTitle={t('common.columnsMenuTitle')}

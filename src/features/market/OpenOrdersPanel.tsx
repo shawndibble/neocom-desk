@@ -694,7 +694,6 @@ export function OpenOrdersPanel({
                         menuTitle={t('market.orders.fixList.columnsMenuTitle')}
                         onReset={resetColumns}
                         resetLabel={t('common.resetColumns')}
-                        showLabel
                       />
                     )
                   }

@@ -374,12 +374,7 @@ export function Contracts() {
         actions={
           tab === 'history' ? (
             <>
-              <TableActionsMenu
-                name={t('contracts.title')}
-                tableExport={historyExport}
-                size="md"
-                showLabel
-              />
+              <TableActionsMenu name={t('contracts.title')} tableExport={historyExport} size="md" />
               <IconButton
                 icon={<Icon.Refresh />}
                 label={t('contracts.refresh')}

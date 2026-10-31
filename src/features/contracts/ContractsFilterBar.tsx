@@ -31,7 +31,6 @@ export function ContractsFilterBar({
       value={filter}
       onChange={onChange}
       activeCount={activeContractsFilterCount(filter)}
-      triggerLabel
       actions={actions}
       className="border-b border-line px-3 py-2"
       search={
