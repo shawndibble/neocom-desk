@@ -29,7 +29,7 @@ test('Ctrl+K opens the palette, searches and navigates', async ({ page }) => {
   });
   await expect(input).toBeFocused();
 
-  await input.fill('opp');
+  await input.fill('opportunities');
   await expect(
     page
       .getByRole('group', { name: 'Pages' })
