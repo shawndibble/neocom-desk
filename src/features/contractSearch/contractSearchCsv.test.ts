@@ -41,6 +41,7 @@ describe('contractSearchCsvColumns', () => {
       'contractSearch.qtyColumn',
       'contractSearch.priceColumn',
       'contractSearch.plexColumn',
+      'contractSearch.iskPerUnitColumn',
       'contractSearch.systemColumn',
       'contractSearch.itemsJumpsColumn',
       'contractSearch.regionColumn',
@@ -56,7 +57,7 @@ describe('contractSearchCsvColumns', () => {
   it('writes numbers raw, names as text and the expiry as a UTC date', () => {
     const csv = toCsv([offer()], contractSearchCsvColumns(t, lookups));
     expect(csv.split('\r\n')[1]).toBe(
-      '"Damage Control II",3,1500000,,"Jita",4,"The Forge",2026-09-30 12:00:00,,0.95,,,'
+      '"Damage Control II",3,1500000,,,"Jita",4,"The Forge",2026-09-30 12:00:00,,0.95,,,'
     );
   });
 
@@ -71,7 +72,7 @@ describe('contractSearchCsvColumns', () => {
       contractSearchCsvColumns(t, lookups)
     );
     expect(csv.split('\r\n')[1]).toBe(
-      '"Damage Control II",3,,,,,"The Forge",2026-09-30 12:00:00,,,,,'
+      '"Damage Control II",3,,,,,,"The Forge",2026-09-30 12:00:00,,,,,'
     );
   });
 
@@ -82,6 +83,15 @@ describe('contractSearchCsvColumns', () => {
     expect(plex.value(row)).toBe(10);
     const [, , unknownPrice] = contractSearchCsvColumns(t, { ...lookups, plexPrice: null });
     expect(unknownPrice.value(row)).toBeNull();
+  });
+
+  it('exports ISK per unit for a single-type contract, blank for a bundle', () => {
+    const cols = contractSearchCsvColumns(t, lookups);
+    const unit = cols.findIndex((c) => c.header === 'contractSearch.iskPerUnitColumn');
+    const cell = (row: PublicContractOfferRow) => cols[unit].value(row);
+    expect(cell(offer({ lineCount: 1 }))).toBe(500_000);
+    expect(cell(offer({ lineCount: 2 }))).toBeNull();
+    expect(cell(offer())).toBeNull();
   });
 
   it('names an auction as buyout or starting bid, blank for a plain sale', () => {

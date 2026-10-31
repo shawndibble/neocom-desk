@@ -15050,6 +15050,7 @@
     "itemColumn": "Item",
     "qtyColumn": "Qty",
     "priceColumn": "Price",
+    "iskPerUnitColumn": "ISK/unit",
     "flag": {
       "overpricedLabel": "Priced far above market",
       "overpricedHint": "Asks {{times}} times the {{hub}} sell price.",
@@ -15108,6 +15109,7 @@
     "mobile": {
       "qtyAffix": "Qty ",
       "jumpsAffix": "Jumps ",
+      "perUnitAffix": "/unit",
       "expiresAffix": "Exp ",
       "offerCount_one": "{{count}} offer",
       "offerCount_other": "{{count}} offers"

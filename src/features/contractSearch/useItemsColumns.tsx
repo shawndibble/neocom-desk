@@ -12,7 +12,11 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import type { ContractFlag } from '@/engine/contracts/contractFlags';
-import { isUnpricedOffer, offerAskingPrice } from '@/engine/contracts/contractSearch';
+import {
+  isUnpricedOffer,
+  offerAskingPrice,
+  offerUnitPrice,
+} from '@/engine/contracts/contractSearch';
 import {
   CONTRACT_SEARCH_ITEMS_COLUMN_IDS,
   type ContractSearchItemsColumnId,
@@ -117,6 +121,21 @@ export function useItemsColumns({
         // The dense phone card has no header row, and a bare "12" beside a
         // system name says nothing about what it counts.
         stackAffix: { before: t('contractSearch.mobile.qtyAffix') },
+      },
+      iskPerUnit: {
+        id: 'iskPerUnit',
+        header: t('contractSearch.iskPerUnitColumn'),
+        width: '14ch',
+        align: 'right',
+        className: 'tabular-nums whitespace-nowrap',
+        sortFirst: 'asc',
+        // `undefined` (bundle, unpriced) sorts last either way, as Price does.
+        sortValue: (row) => offerUnitPrice(row, plexPrice),
+        render: (row) => {
+          const unit = offerUnitPrice(row, plexPrice);
+          return unit === undefined ? '–' : <IskAmount value={unit} />;
+        },
+        stackAffix: { after: t('contractSearch.mobile.perUnitAffix') },
       },
       price: {
         id: 'price',

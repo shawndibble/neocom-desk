@@ -1,6 +1,10 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import { isUnpricedOffer, offerAskingPrice } from '@/engine/contracts/contractSearch';
+import {
+  isUnpricedOffer,
+  offerAskingPrice,
+  offerUnitPrice,
+} from '@/engine/contracts/contractSearch';
 import { memoByRow } from '@/lib/memoByRow';
 import { auctionKindLabel, flagLabel, flagMultiple, flagReferencePrice } from './contractFlagText';
 import type { ContractFlag } from '@/engine/contracts/contractFlags';
@@ -45,6 +49,10 @@ export function contractSearchCsvColumns(
         isUnpricedOffer(row, lookups.plexPrice) ? null : offerAskingPrice(row, lookups.plexPrice),
     },
     { header: t('contractSearch.plexColumn'), value: (row) => row.requestedPlex ?? null },
+    {
+      header: t('contractSearch.iskPerUnitColumn'),
+      value: (row) => offerUnitPrice(row, lookups.plexPrice) ?? null,
+    },
     { header: t('contractSearch.systemColumn'), value: (row) => lookups.systemName(row) },
     { header: t('contractSearch.itemsJumpsColumn'), value: (row) => lookups.jumps(row) },
     { header: t('contractSearch.regionColumn'), value: (row) => lookups.regionName(row.regionId) },

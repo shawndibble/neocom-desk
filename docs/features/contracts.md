@@ -240,13 +240,12 @@ Dense cards and mobile sort on both search tabs; filters in a funnel sheet; pane
 - History modal item lists exist only for item_exchange/auction; courier/loan show no contents.
 - Jump counts on Courier use local graph under Travel rules, not live ESI; "—" for unplaced ends or unreachable.
 - No saved searches or price alerts on contract searches; no notifications for new matching offers.
-- Items tab has no ISK/unit column; price is per contract line stack, not per unit (a multi-type contract's price is unknowable).
+- Items tab's ISK/unit column (beside Qty, on by default for users who have not customised their columns) shows the asking price per unit only for single-type contracts (`lineCount` of 1); it is "–" for bundles, rows not yet stamped with a line count and unpriced offers, and sorts those last. It uses the Price column's own asking price (buyout else starting bid, PLEX at market), and is in the CSV export.
 - Help/FAQ do not describe Contracts at all (only the stored-data list).
 - BPC Sourcing (Industry tab) reads the same snapshot with BPC-only filters, and `/bpc-contracts` appears in ARCHITECTURE as a route; documented in Industry, not here.
 
 ## Improvement ideas
 
-- Per-unit price column and sort on Items for stacks.
 - Saved search / alert when a matching offer appears under a price (reuses Quickbar price alerts).
 - Corporation contracts under `/corp`.
 - Make the whole History row open the modal (keep button for a11y).
