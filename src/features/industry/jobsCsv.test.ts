@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toCsv } from '@/lib/csv';
 import type { IndustryJob } from '@/esi/endpoints';
-import { jobsCsvColumns } from './jobsCsv';
+import { jobHistoryCsvColumns, jobsCsvColumns } from './jobsCsv';
 
 const t = (k: string) => k;
 const nameFor = (typeID: number) => `Item ${typeID}`;
@@ -33,6 +33,9 @@ describe('jobsCsvColumns', () => {
       'industry.csvJobEnd',
       'industry.csvJobCostIsk',
       'industry.csvJobStatus',
+      'industry.csvJobProduct',
+      'industry.csvCharacter',
+      'industry.csvJobOwner',
     ]);
   });
 
@@ -113,5 +116,51 @@ describe('jobsCsvColumns', () => {
     const columns = jobsCsvColumns(t, nameFor);
     const costColumn = columns.find((c) => c.header === 'industry.csvJobCostIsk')!;
     expect(costColumn.value(job({ cost: 12345.5 }))).toBe(12345.5);
+  });
+});
+
+describe('jobsCsvColumns character and owner', () => {
+  it('exports the product, installer and owner of a corp job', () => {
+    const columns = jobsCsvColumns(t, nameFor);
+    const row = {
+      ...job({ product_type_id: 77 }),
+      characterName: 'Pilot',
+      owner: 'corporation' as const,
+    };
+    expect(columns.slice(8).map((c) => c.value(row))).toEqual([
+      'Item 77',
+      'Pilot',
+      'industry.csvJobOwnerCorporation',
+    ]);
+  });
+
+  it('leaves them blank on a bare job', () => {
+    const columns = jobsCsvColumns(t, nameFor);
+    expect(columns.slice(8).map((c) => c.value(job()))).toEqual([null, null, null]);
+  });
+});
+
+describe('jobHistoryCsvColumns', () => {
+  const states = new Map([[1, { kind: 'logged' as const, buildPlanId: 'p1', runId: 'r1' }]]);
+  const columns = jobHistoryCsvColumns(t, nameFor, states, new Set([2]));
+  const logged = (id: number) => ({
+    ...job({ job_id: id, product_type_id: 5 }),
+    owner: 'personal' as const,
+  });
+
+  it('labels the end date as the delivery and appends the log state', () => {
+    const headers = columns.map((c) => c.header);
+    expect(headers).not.toContain('industry.csvJobEnd');
+    expect(headers).toContain('industry.historyColDelivered');
+    expect(headers.slice(-2)).toEqual(['industry.csvJobLogState', 'industry.csvJobLoggedPlanId']);
+  });
+
+  it('reports logged, dismissed and not-logged deliveries', () => {
+    const state = (id: number) => columns.at(-2)!.value(logged(id));
+    expect(state(1)).toBe('industry.historyLogged');
+    expect(state(2)).toBe('industry.historyDismissed');
+    expect(state(3)).toBe('industry.csvJobNotLogged');
+    expect(columns.at(-1)!.value(logged(1))).toBe('p1');
+    expect(columns.at(-1)!.value(logged(3))).toBeNull();
   });
 });

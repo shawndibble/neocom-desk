@@ -16,12 +16,15 @@ function opportunity(runs: number, profit: number | null): OpportunityRow {
     },
     result: {
       profit,
+      totalCost: 100,
+      revenue: 150,
       marginPct: profit === null ? null : 10,
       seconds: 7200,
       iskPerHour: profit,
       materials: [{ ownedQuantity: 5, remainingQuantity: 5, unitPrice: 10, lineCost: 50 }],
     },
     orderDepth: 'thin',
+    forgoneSale: 0,
   } as unknown as OpportunityRow;
 }
 
@@ -42,6 +45,13 @@ describe('opportunitiesCsvColumns', () => {
       'industry.csvTimeSeconds',
       'industry.iskPerHour',
       'industry.opportunitiesOrderDepthLabel',
+      'industry.csvProfit',
+      'industry.csvTotalCost',
+      'industry.csvRevenue',
+      'industry.csvForgoneSale',
+      'industry.csvSkillGated',
+      'industry.csvMissingSkills',
+      'industry.csvClosestCharacter',
     ]);
   });
 
@@ -59,6 +69,42 @@ describe('opportunitiesCsvColumns', () => {
       7200,
       1000,
       'industry.opportunitiesOrderDepth.thin',
+      1000,
+      100,
+      150,
+      0,
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it('exports the loss-tooltip figures and the skill gate verdict', () => {
+    const gated = opportunitiesCsvColumns(t, {
+      verdictFor: () => ({
+        gated: true,
+        shortfall: [{ typeID: 3380, haveLevel: 2, needLevel: 4 }],
+        bestCharacterId: 7,
+      }),
+      nameForSkill: () => 'Industry',
+      nameForCharacter: () => 'Pilot Two',
+    });
+    const row = opportunity(5, -500) as unknown as {
+      result: Record<string, unknown>;
+      forgoneSale: number;
+    };
+    row.result.totalCost = 900;
+    row.result.revenue = 400;
+    row.forgoneSale = 120;
+    row.result.profit = -500;
+    expect(gated.slice(12).map((c) => c.value(row as unknown as OpportunityRow))).toEqual([
+      -500,
+      900,
+      400,
+      120,
+      'industry.csvYes',
+      'Industry IV (industry.csvHaveLevel)',
+      'Pilot Two',
     ]);
   });
 
@@ -99,6 +145,10 @@ describe('marketWideOpportunitiesCsvColumns', () => {
       'industry.iskPerDay',
       'industry.buildCost',
       'industry.opportunitiesOrderDepthLabel',
+      'industry.csvPriceCapped',
+      'industry.csvSkillGated',
+      'industry.csvMissingSkills',
+      'industry.csvClosestCharacter',
     ]);
   });
 
@@ -113,6 +163,10 @@ describe('marketWideOpportunitiesCsvColumns', () => {
       48_000,
       1_500_000,
       'industry.opportunitiesOrderDepth.deep',
+      'industry.csvNo',
+      null,
+      null,
+      null,
     ]);
   });
 });

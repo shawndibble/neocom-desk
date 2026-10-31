@@ -168,11 +168,23 @@ export function MarketWideOpportunitiesPanel({
   const { skillGateByProductTypeID, commonGate, gatedCount, dailySales, visibleRows } =
     useMarketWideRanking({ rows, hasRun, hub, catalog, characterIds, filter });
 
-  const csvColumns = useMemo(() => marketWideOpportunitiesCsvColumns(t), [t]);
+  const csvColumns = useMemo(
+    () =>
+      marketWideOpportunitiesCsvColumns(t, {
+        verdictFor: (productTypeID) =>
+          productTypeID === null ? undefined : skillGateByProductTypeID.get(productTypeID),
+        nameForSkill: (typeID) => (catalog ? nameForType(catalog, typeID) : `#${typeID}`),
+        nameForCharacter: (id) => characterNames.get(id) ?? `#${id}`,
+      }),
+    [t, skillGateByProductTypeID, catalog, characterNames]
+  );
+  // `visibleRows`, not the table's `shownRows`: the table mounts the first
+  // page behind "Show more", the file holds every row the filter keeps.
   const marketWideExport = useTableExport({
     surface: 'market-wide-opportunities',
     rows: visibleRows,
     columns: csvColumns,
+    source: 'sorted-rows',
   });
 
   const startPlanFor = (row: MarketWideResultRow) => {

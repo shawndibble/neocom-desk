@@ -376,7 +376,16 @@ export function OpportunitiesPanel({
 
   const showCharacterColumn = new Set(rows.map((r) => r.candidate.characterId)).size > 1;
 
-  const csvColumns = useMemo(() => opportunitiesCsvColumns(t), [t]);
+  const csvColumns = useMemo(
+    () =>
+      opportunitiesCsvColumns(t, {
+        verdictFor: (productTypeID) =>
+          productTypeID === null ? undefined : skillGateByProductTypeID.get(productTypeID),
+        nameForSkill: (typeID) => nameForType(catalog, typeID),
+        nameForCharacter: (id) => characterNames.get(id) ?? `#${id}`,
+      }),
+    [t, skillGateByProductTypeID, catalog, characterNames]
+  );
   const opportunitiesExport = useTableExport({
     surface: 'industry-opportunities',
     rows,

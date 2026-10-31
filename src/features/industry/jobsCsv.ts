@@ -1,5 +1,12 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import { activityI18nKey, type ActiveJob } from './jobs';
+import { isLoggableHistoryJob, type HistoryJobState } from './jobHistory';
+
+/** An `ActiveJob` plus the Character and owner the panel tags each row with (`JobRow`). */
+export type JobCsvRow = ActiveJob & {
+  characterName?: string;
+  owner?: 'personal' | 'corporation';
+};
 
 /**
  * CSV columns for the active-jobs list: activity, blueprint, blueprint type
@@ -16,7 +23,7 @@ import { activityI18nKey, type ActiveJob } from './jobs';
 export function jobsCsvColumns(
   t: CsvTranslate,
   nameFor: (blueprintTypeId: number) => string
-): CsvColumn<ActiveJob>[] {
+): CsvColumn<JobCsvRow>[] {
   return [
     {
       header: t('industry.csvJobActivity'),
@@ -49,6 +56,61 @@ export function jobsCsvColumns(
     {
       header: t('industry.csvJobStatus'),
       value: (job) => job.status,
+    },
+    {
+      header: t('industry.csvJobProduct'),
+      value: (job) => (job.product_type_id != null ? nameFor(job.product_type_id) : null),
+    },
+    {
+      // The installer for a corp job.
+      header: t('industry.csvCharacter'),
+      value: (job) => job.characterName || null,
+    },
+    {
+      header: t('industry.csvJobOwner'),
+      value: (job) =>
+        job.owner === 'corporation'
+          ? t('industry.csvJobOwnerCorporation')
+          : job.owner === 'personal'
+            ? t('industry.csvJobOwnerPersonal')
+            : null,
+    },
+  ];
+}
+
+/**
+ * Job History's export: the same facts as the Active list (its End date is the
+ * delivery) plus whether the Production Log holds the delivery. Blank where a
+ * job is not one the log can hold (not a manufacturing delivery).
+ */
+export function jobHistoryCsvColumns(
+  t: CsvTranslate,
+  nameFor: (blueprintTypeId: number) => string,
+  states: ReadonlyMap<number, HistoryJobState>,
+  dismissedJobIds: ReadonlySet<number>
+): CsvColumn<JobCsvRow>[] {
+  const delivered = t('industry.csvJobEnd');
+  const base = jobsCsvColumns(t, nameFor).map((column) =>
+    column.header === delivered ? { ...column, header: t('industry.historyColDelivered') } : column
+  );
+  return [
+    ...base,
+    {
+      header: t('industry.csvJobLogState'),
+      value: (job) => {
+        if (!isLoggableHistoryJob(job)) return null;
+        if (states.get(job.job_id)?.kind === 'logged') return t('industry.historyLogged');
+        return dismissedJobIds.has(job.job_id)
+          ? t('industry.historyDismissed')
+          : t('industry.csvJobNotLogged');
+      },
+    },
+    {
+      header: t('industry.csvJobLoggedPlanId'),
+      value: (job) => {
+        const state = states.get(job.job_id);
+        return state?.kind === 'logged' ? state.buildPlanId : null;
+      },
     },
   ];
 }

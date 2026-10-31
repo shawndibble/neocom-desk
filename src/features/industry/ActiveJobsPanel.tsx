@@ -64,7 +64,7 @@ import { setJobDismissed } from './jobHistoryStore';
 import { formatDuration } from '@/lib/duration';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { jobsCsvColumns } from './jobsCsv';
+import { jobHistoryCsvColumns, jobsCsvColumns } from './jobsCsv';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { jobSlotSkillsFromCharacterSkills } from '@/features/character/jobSlotSkills';
@@ -615,6 +615,16 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     rows: filteredJobs,
     columns: jobsCsv,
   });
+  // Every delivery the picker names, in the table's sort.
+  const historyCsv = useMemo(
+    () => jobHistoryCsvColumns(t, nameForBlueprint, historyStates, dismissedJobIds),
+    [t, nameForBlueprint, historyStates, dismissedJobIds]
+  );
+  const historyExport = useTableExport({
+    surface: 'industry-job-history',
+    rows: historyRows,
+    columns: historyCsv,
+  });
 
   /**
    * Open manufacturing/science/reaction slots for the panel's current
@@ -751,6 +761,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       {jobs.length > 0 && !historyView && (
         <TableActionsMenu name={t('industry.jobsTitle')} tableExport={jobsExport} />
       )}
+      {historyRows.length > 0 && historyView && (
+        <TableActionsMenu name={t('industry.historyTableLabel')} tableExport={historyExport} />
+      )}
       <IconButton
         size="sm"
         icon={<Icon.Refresh />}
@@ -824,6 +837,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
             <div className="overflow-x-auto">
               <DataTable
                 columns={historyColumnDefs}
+                {...historyExport.tableProps}
                 rows={historyRows}
                 rowKey={(job) => job.job_id}
                 label={t('industry.historyTableLabel')}

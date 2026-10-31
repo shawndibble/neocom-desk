@@ -27,6 +27,15 @@ describe('materialsCsvColumns', () => {
       'industry.csvUnitPriceIsk',
       'industry.csvLineTotalIsk',
       'industry.csvMakeOrBuy',
+      'industry.errands.haveColumn',
+      'industry.errands.buyColumn',
+      'industry.volume',
+      'industry.csvErrand',
+      'industry.csvSubBuildRuns',
+      'industry.csvPriceSource',
+      'industry.csvBlueprintMe',
+      'industry.csvBlueprintTe',
+      'industry.csvBlueprintSource',
     ]);
   });
 
@@ -124,5 +133,64 @@ describe('materialsCsvColumns', () => {
     const row = line(34, 1000, 1000, {}, sourcing);
     expect(columns[2].value(row)).toBeNull();
     expect(columns[3].value(row)).toBe(0);
+  });
+});
+
+describe('materialsCsvColumns shopping-list facts', () => {
+  const sourcing: MaterialSourcingMap = { 34: { ownedQuantity: 400 } };
+  const columns = materialsCsvColumns(t, nameFor, sourcing, true, undefined, () => 0.01);
+  const extra = (row: Parameters<(typeof columns)[number]['value']>[0]) =>
+    columns.slice(5).map((c) => c.value(row));
+
+  it('exports owned, to buy, volume, section and price source for a bought row', () => {
+    expect(extra(line(34, 1000, 1000, { 34: 5 }, sourcing))).toEqual([
+      400,
+      600,
+      10,
+      'industry.errands.toBuy',
+      null,
+      'industry.csvPriceSources.hub',
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it('marks a fully owned row Have/owned and an unpriced one unpriced', () => {
+    const owned: MaterialSourcingMap = { 34: { ownedQuantity: 1000 } };
+    expect(extra(line(34, 1000, 1000, {}, owned)).slice(3, 6)).toEqual([
+      'industry.errands.have',
+      null,
+      'industry.csvPriceSources.owned',
+    ]);
+    expect(extra(line(99, 10, 10, {}))[5]).toBe('industry.csvPriceSources.unpriced');
+  });
+
+  it('exports a built row with its summed runs and no buy, volume or price source', () => {
+    const built = {
+      ...line(35, 10, 10, {}),
+      subBuilds: [{ runs: 2 }, { runs: 3 }],
+    } as unknown as Parameters<(typeof columns)[number]['value']>[0];
+    expect(extra(built)).toEqual([
+      0,
+      null,
+      null,
+      'industry.errands.building',
+      5,
+      null,
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it('exports the acquisition tier of a blueprint row and its community source', () => {
+    const bp = {
+      ...line(1000, 1, 1, { 1000: 9 }),
+      acquisitionTier: { me: 10, te: 20, community: { memberName: 'Ally', stale: false } },
+    };
+    const values = extra(bp);
+    expect(values[3]).toBe('industry.errands.blueprint');
+    expect(values.slice(6)).toEqual([10, 20, 'Ally']);
   });
 });
