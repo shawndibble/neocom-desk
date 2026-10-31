@@ -12,7 +12,7 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 | Cross-character balance (`?char=`)       | `Wallet.tsx:570`                          | per-Character table + total, picker, CSV/XLSX/clipboard export                                                         |
 | Net worth chart                          | `features/netWorth/NetWorthPanel.tsx`     | lazy Recharts stack (one Character) or lines (several), layer legend, drill                                            |
 | ISK flow                                 | `features/netWorth/CashFlowPanel.tsx`     | earned, spent, net, per day, daily bars for 7/30/90 days; day opens the Journal                                        |
-| ISK waiting and Goal                     | `features/netWorth/WalletWaitingGoal.tsx` | sell orders, buy escrow, contracts from the newest Net Worth Snapshot; one device-local wallet Goal with pace and date |
+| ISK waiting and Goals                    | `features/netWorth/WalletWaitingGoal.tsx` | sell orders, buy escrow, contracts from the newest Net Worth Snapshot; one device-local wallet Goal with pace and date |
 | LP Store picker                          | `features/loyalty/LpStorePicker.tsx`      | select-box over every NPC corp with an LP Store; no longer mounted since Balance dropped its LP panel                  |
 | Journal filters                          | `WalletJournalTable.tsx`                  | ref type, date range, free text; filtered count + net total; ref-type breakdown (in/out/net, row click filters)        |
 | Journal column picker                    | `walletJournalColumns.ts`                 | date/description/amount/balance toggle; device-local                                                                   |

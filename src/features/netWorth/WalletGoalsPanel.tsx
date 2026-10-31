@@ -1,22 +1,29 @@
 import { useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   Button,
   IskAmount,
   IskInput,
   Modal,
-  NativeSelect,
   Panel,
   ProgressBar,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   TextInput,
 } from '@/components/ui';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
 import { GOAL_MAX_TARGET, goalProgress } from '@/engine/netWorth/waiting';
 import { useFittingChoices } from '@/features/fittings/useFittingChoices';
+import { useMarketHub } from '@/features/market/hub';
 import { parseIskAmount } from '@/lib/isk';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useGoalPrices } from './useGoalPrices';
+import { goalPriceKey, useGoalPrices, type GoalPrice } from './useGoalPrices';
 import { useWalletGoals, type WalletGoal } from './walletGoalSetting';
 
 interface WalletGoalsPanelProps {
@@ -29,15 +36,17 @@ interface Draft {
   id: string | null;
   name: string;
   amount: string;
+  /** `NO_FITTING` for none: the select cannot hold an empty value. */
   fittingId: string;
 }
 
-const NEW_DRAFT: Draft = { id: null, name: '', amount: '', fittingId: '' };
+const NO_FITTING = 'none';
+const NEW_DRAFT: Draft = { id: null, name: '', amount: '', fittingId: NO_FITTING };
 
 /**
  * The wallet Goals: each a name and a target, either typed or the price of a
- * Fitting at the default Trade Hub, with progress against the summed wallet
- * ISK and the pace and date from the last 30 days of snapshots.
+ * Fitting at the pilot's Trade Hub, with progress against the summed wallet
+ * ISK and the 30 day average and ETA from the last 30 days of snapshots.
  */
 export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
   const { t, i18n } = useTranslation();
@@ -46,8 +55,10 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
   useHydratedStore(useWalletGoals);
   const characterId = useActiveCharacter((s) => s.activeCharacterId);
   const choices = useFittingChoices(characterId);
-  const prices = useGoalPrices(goals, choices.resolve, choices.ready);
+  const hub = getTradeHub(useMarketHub((s) => s.value)) ?? DEFAULT_TRADE_HUB;
+  const prices = useGoalPrices(goals, hub, choices.resolve, choices.ready);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [removing, setRemoving] = useState<WalletGoal | null>(null);
 
   const formatDay = (day: string) =>
     new Intl.DateTimeFormat(i18n.language, {
@@ -60,13 +71,13 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
   const amount = draft ? parseIskAmount(draft.amount) : null;
   const typed = draft !== null && draft.amount.trim() !== '';
   const amountOk = amount !== null && amount > 0 && amount <= GOAL_MAX_TARGET;
-  const canSave = draft !== null && (typed ? amountOk : draft.fittingId !== '');
+  const canSave = draft !== null && (typed ? amountOk : draft.fittingId !== NO_FITTING);
 
   const save = () => {
     if (!draft || !canSave) return;
     const picked = choices.all.find((choice) => choice.id === draft.fittingId);
     const goal: WalletGoal = {
-      id: draft.id ?? `goal-${Date.now().toString(36)}`,
+      id: draft.id ?? crypto.randomUUID(),
       name: draft.name.trim(),
       target: typed ? amount : null,
       fittingId: typed ? null : draft.fittingId,
@@ -83,7 +94,7 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
       id: goal.id,
       name: goal.name,
       amount: goal.target === null ? '' : String(goal.target),
-      fittingId: goal.fittingId ?? '',
+      fittingId: goal.fittingId ?? NO_FITTING,
     });
 
   return (
@@ -105,7 +116,8 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
               goal={goal}
               rows={rows}
               today={today}
-              price={prices.get(goal.id)}
+              hubName={hub.name}
+              price={prices.get(goalPriceKey(goal))}
               formatDay={formatDay}
               onEdit={() => edit(goal)}
             />
@@ -120,11 +132,8 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
           <>
             {draft?.id != null && (
               <Button
-                variant="ghost"
-                onClick={() => {
-                  setGoals(goals.filter((g) => g.id !== draft.id));
-                  setDraft(null);
-                }}
+                variant="danger"
+                onClick={() => setRemoving(goals.find((g) => g.id === draft.id) ?? null)}
               >
                 {t('wallet.goal.remove')}
               </Button>
@@ -158,28 +167,47 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
                 className="mt-1 w-full"
               />
             </label>
-            <label className="block text-sm">
-              {t('wallet.goal.fittingLabel')}
-              <NativeSelect
+            <div className="text-sm">
+              <span id="goal-fitting-label">{t('wallet.goal.fittingLabel')}</span>
+              <Select
                 value={draft.fittingId}
                 disabled={typed || choices.all.length === 0}
-                onChange={(e) => setDraft({ ...draft, fittingId: e.target.value })}
-                className="mt-1 w-full"
+                onValueChange={(fittingId) => setDraft({ ...draft, fittingId })}
               >
-                <option value="">{t('wallet.goal.fittingNone')}</option>
-                {choices.all.map((choice) => (
-                  <option key={choice.id} value={choice.id}>
-                    {choice.name}
-                  </option>
-                ))}
-              </NativeSelect>
-            </label>
-            <p className="-mt-1 text-xs text-text-dim">
-              {typed ? t('wallet.goal.fittingNeedsBlank') : t('wallet.goal.fittingHint')}
+                <SelectTrigger aria-labelledby="goal-fitting-label" className="mt-1 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_FITTING}>{t('wallet.goal.fittingNone')}</SelectItem>
+                  {choices.all.map((choice) => (
+                    <SelectItem key={choice.id} value={choice.id}>
+                      {choice.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-text-dim">
+              {typed
+                ? t('wallet.goal.fittingNeedsBlank')
+                : t('wallet.goal.fittingHint', { hub: hub.name })}
             </p>
           </div>
         )}
       </Modal>
+      <ConfirmDialog
+        open={removing !== null}
+        title={t('wallet.goal.remove')}
+        body={t('wallet.goal.removeBody', { name: removing?.name || removing?.fittingName || '' })}
+        actionLabel={t('wallet.goal.remove')}
+        cancelLabel={t('common.cancel')}
+        onClose={() => setRemoving(null)}
+        onConfirm={async () => {
+          if (!removing) return;
+          setGoals(goals.filter((g) => g.id !== removing.id));
+          setDraft(null);
+        }}
+      />
     </Panel>
   );
 }
@@ -188,14 +216,13 @@ interface GoalRowProps {
   goal: WalletGoal;
   rows: readonly NetWorthSnapshotRow[];
   today: string;
-  price: ReturnType<typeof useGoalPrices> extends ReadonlyMap<string, infer P>
-    ? P | undefined
-    : never;
+  hubName: string;
+  price: GoalPrice | undefined;
   formatDay: (day: string) => string;
   onEdit: () => void;
 }
 
-function GoalRow({ goal, rows, today, price, formatDay, onEdit }: GoalRowProps) {
+function GoalRow({ goal, rows, today, hubName, price, formatDay, onEdit }: GoalRowProps) {
   const { t } = useTranslation();
   const target = goal.target ?? (price?.status === 'ready' ? price.sell : null);
   const progress = useMemo(
@@ -208,7 +235,12 @@ function GoalRow({ goal, rows, today, price, formatDay, onEdit }: GoalRowProps) 
     <li className="space-y-1">
       <div className="flex items-baseline justify-between gap-3">
         <p className="min-w-0 truncate font-medium">{title}</p>
-        <Button size="sm" variant="ghost" onClick={onEdit}>
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label={t('wallet.goal.editNamed', { name: title })}
+          onClick={onEdit}
+        >
           {t('wallet.goal.edit')}
         </Button>
       </div>
@@ -220,7 +252,7 @@ function GoalRow({ goal, rows, today, price, formatDay, onEdit }: GoalRowProps) 
             {goal.fittingId !== null && (
               <span className="text-text-dim">
                 {' '}
-                {t('wallet.goal.pricedFrom', { name: goal.fittingName ?? title })}
+                {t('wallet.goal.pricedFrom', { name: goal.fittingName ?? title, hub: hubName })}
               </span>
             )}
           </p>
@@ -235,8 +267,10 @@ function GoalRow({ goal, rows, today, price, formatDay, onEdit }: GoalRowProps) 
             ) : progress.perDay !== null && progress.projectedDay ? (
               <>
                 <span className="tabular-nums">
-                  {t('wallet.goal.avg')} <IskAmount value={progress.perDay} decimals={0} />{' '}
-                  {t('wallet.goal.iskUnit')}
+                  <Trans
+                    i18nKey="wallet.goal.avg"
+                    components={{ amount: <IskAmount value={progress.perDay} decimals={0} /> }}
+                  />
                 </span>
                 <span>{t('wallet.goal.eta', { date: formatDay(progress.projectedDay) })}</span>
               </>
@@ -247,7 +281,11 @@ function GoalRow({ goal, rows, today, price, formatDay, onEdit }: GoalRowProps) 
         </>
       ) : (
         <p className="text-sm text-text-dim">
-          {price?.status === 'failed' ? t('wallet.goal.priceFailed') : t('wallet.goal.pricing')}
+          {price?.status === 'failed'
+            ? t('wallet.goal.priceFailed')
+            : price?.status === 'partial'
+              ? t('wallet.goal.pricePartial')
+              : t('wallet.goal.pricing')}
         </p>
       )}
     </li>

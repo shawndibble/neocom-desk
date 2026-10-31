@@ -18,7 +18,10 @@ vi.mock('@/features/character/wallet', () => ({
   loadWalletJournal: vi.fn(async () => null),
 }));
 vi.mock('./useSellOrderHealth', () => ({ useSellOrderHealth: vi.fn(() => null) }));
-vi.mock('@/features/fittings/fittingPrice', () => ({ loadFittingPrice: vi.fn() }));
+vi.mock('@/features/fittings/fittingPrice', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/fittings/fittingPrice')>()),
+  loadFittingPrice: vi.fn(),
+}));
 vi.mock('@/features/fittings/useFittingChoices', () => {
   const resolve = vi.fn(async (id: string) => ({ name: id, fitting: {} }));
   const choices = {
@@ -50,7 +53,10 @@ const snap = (day: string, wallet: number): NetWorthSnapshotRow => ({
 
 beforeEach(async () => {
   vi.mocked(useSellOrderHealth).mockReturnValue(null);
-  vi.mocked(loadFittingPrice).mockResolvedValue({ totals: { sell: 5_000_000_000 } } as never);
+  vi.mocked(loadFittingPrice).mockResolvedValue({
+    rows: [{ sellTotal: 5_000_000_000 }],
+    totals: { sell: 5_000_000_000 },
+  } as never);
   await db.delete();
   await db.open();
   useWalletGoals.setState({ value: [], hydrated: true });
@@ -82,7 +88,10 @@ async function addGoal(
   await user.click(await screen.findByRole('button', { name: 'Add goal' }));
   if (name) await user.type(screen.getByLabelText('Name (optional)'), name);
   if (amount) await user.type(screen.getByLabelText('Target'), amount);
-  if (fitting) await user.selectOptions(screen.getByLabelText('Or aim at a fitting'), fitting);
+  if (fitting) {
+    await user.click(screen.getByRole('combobox', { name: 'Or aim at a fitting' }));
+    await user.click(await screen.findByRole('option', { name: fitting }));
+  }
   await user.click(screen.getByRole('button', { name: 'Save' }));
 }
 
@@ -145,10 +154,21 @@ describe('WalletWaitingGoal', () => {
   it('prices a goal from a fitting when the target is left blank', async () => {
     const user = userEvent.setup();
     renderPanels();
-    await addGoal(user, { fitting: 'fit-1' });
+    await addGoal(user, { fitting: 'Raven PvE' });
     expect(await screen.findByText('Raven PvE')).toBeInTheDocument();
     expect(await screen.findByText('5B')).toBeInTheDocument();
-    expect(screen.getByText(/price of Raven PvE at Jita/)).toBeInTheDocument();
+    expect(screen.getByText(/price of Raven PvE at/)).toBeInTheDocument();
+  });
+
+  it('refuses to price a goal from a fitting with items nobody sells', async () => {
+    vi.mocked(loadFittingPrice).mockResolvedValue({
+      rows: [{ sellTotal: 10 }, { sellTotal: null }],
+      totals: { sell: 10 },
+    } as never);
+    const user = userEvent.setup();
+    renderPanels();
+    await addGoal(user, { fitting: 'Raven PvE' });
+    expect(await screen.findByText(/have no sell order/)).toBeInTheDocument();
   });
 
   it('turns the fitting pick off while a target is typed, and needs one or the other to save', async () => {
@@ -157,7 +177,7 @@ describe('WalletWaitingGoal', () => {
     await user.click(await screen.findByRole('button', { name: 'Add goal' }));
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     await user.type(screen.getByLabelText('Target'), '5');
-    expect(screen.getByLabelText('Or aim at a fitting')).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Or aim at a fitting' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
   });
 
@@ -167,8 +187,10 @@ describe('WalletWaitingGoal', () => {
       value: [{ id: 'a', name: 'Ship', target: 5_000_000_000, fittingId: null, fittingName: null }],
     });
     renderPanels();
-    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    await user.click(await screen.findByRole('button', { name: /^Edit Ship/ }));
     await user.click(screen.getByRole('button', { name: 'Remove goal' }));
+    const confirm = await screen.findAllByRole('button', { name: 'Remove goal' });
+    await user.click(confirm[confirm.length - 1]!);
     expect(await screen.findByText(/Add an ISK target/)).toBeInTheDocument();
   });
 
