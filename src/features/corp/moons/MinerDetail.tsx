@@ -217,6 +217,7 @@ export function MinerDetail({ id }: { id: string }) {
   // The three day tables share one grid (select, day, moon, character, ore, rate, tax), so a
   // reader's eye keeps its column from one section to the next: Earlier days keeps the select
   // gutter (empty) and says each day's status under its ore instead of in a column of its own.
+  const dayMoon = (d: DayRow) => moonName(d.moonId ?? moonOf.get(d.structureId));
   const dayColumns = (
     withSelect: boolean,
     withStatus: boolean,
@@ -263,12 +264,11 @@ export function MinerDetail({ id }: { id: string }) {
       render: (d) => (
         <PlaceCell
           refinery={names.refinery(d.structureId)}
-          moon={moonName(d.moonId ?? moonOf.get(d.structureId))}
+          moon={dayMoon(d)}
           to={d.extractionId === undefined ? undefined : extractionPath(d.extractionId)}
         />
       ),
-      sortValue: (d) =>
-        moonName(d.moonId ?? moonOf.get(d.structureId)) ?? names.refinery(d.structureId),
+      sortValue: (d) => dayMoon(d) ?? names.refinery(d.structureId),
     },
     // One character mined every day: a column repeating the page's own name is width for nothing.
     ...(row.characterIds.length > 1
@@ -496,8 +496,6 @@ export function MinerDetail({ id }: { id: string }) {
         ) : (
           paymentCredited(r.payment)
         ),
-      // A correction is billed on a Statement, not credited by money: it sinks.
-      sortValue: (r) => (r.kind === 'payment' ? r.payment.credited : undefined),
     },
     ...(canEdit
       ? [

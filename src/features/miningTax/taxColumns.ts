@@ -23,4 +23,5 @@ export type TaxColumnId = (typeof TAX_COLUMN_IDS)[number];
 export const useVisibleTaxColumns = createColumnVisibilitySetting({
   key: 'miningTaxLedgerVisibleColumns',
   ids: TAX_COLUMN_IDS,
+  allowEmpty: true,
 });

@@ -79,10 +79,10 @@ describe('Miner page', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
-  it('sorts the Payments ledger by When, From, Amount and Credited to', () => {
+  it('sorts the Payments ledger by When, From and Amount', () => {
     renderBook(<MinerDetail id={VARRO_ID} />);
     const payments = screen.getByRole('table', { name: 'Payments' });
-    for (const name of [/^When/, /^From/, /^Amount/, /^Credited to/])
+    for (const name of [/^When/, /^From/, /^Amount/])
       expect(within(payments).getByRole('button', { name })).toBeInTheDocument();
   });
 

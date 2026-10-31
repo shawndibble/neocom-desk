@@ -74,10 +74,17 @@ export function useTaxTables({
     statusWidthClass,
   });
 
-  // Validated against every column on offer, so a sort on an unticked one survives.
-  const sortableIds = allColumns.map((c) => c.id);
-  const taxSort = useUrlSort('tax.sort', TAX_DEFAULT_SORT, sortableIds);
-  const historySort = useUrlSort('tax.historySort', TAX_DEFAULT_SORT, sortableIds);
+  // Validated against the columns shown: unticking the sorted one falls back to the default sort.
+  const taxSort = useUrlSort(
+    'tax.sort',
+    TAX_DEFAULT_SORT,
+    openColumns.map((c) => c.id)
+  );
+  const historySort = useUrlSort(
+    'tax.historySort',
+    TAX_DEFAULT_SORT,
+    historyColumns.map((c) => c.id)
+  );
 
   // The table's own cell helpers, so the export reads each row exactly as it
   // is shown.

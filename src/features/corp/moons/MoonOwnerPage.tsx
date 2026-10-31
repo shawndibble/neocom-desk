@@ -177,6 +177,7 @@ export function MoonOwnerPage({
   const { row } = detail;
   const payouts = detail.payouts;
 
+  const methodLabel = (p: MoonOwnerPayout) => t(k(`payouts.method.${p.method}`));
   const payoutColumns: DataTableColumn<MoonOwnerPayout>[] = [
     {
       id: 'date',
@@ -197,8 +198,8 @@ export function MoonOwnerPage({
     {
       id: 'how',
       header: t(k('payouts.how')),
-      render: (p) => t(k(`payouts.method.${p.method}`)),
-      sortValue: (p) => t(k(`payouts.method.${p.method}`)),
+      render: (p) => methodLabel(p),
+      sortValue: (p) => methodLabel(p),
     },
     {
       id: 'status',

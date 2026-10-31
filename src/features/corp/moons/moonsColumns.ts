@@ -22,6 +22,8 @@ export type StatementsColumnId = (typeof STATEMENTS_COLUMN_IDS)[number];
 export const useVisibleStatementsColumns = createColumnVisibilitySetting({
   key: 'corpMoonsStatementsVisibleColumns',
   ids: STATEMENTS_COLUMN_IDS,
+  // Period alone is a fair table: honour a pick of nothing instead of restoring everything on reload.
+  allowEmpty: true,
 });
 
 export const MINERS_COLUMN_IDS = [
@@ -41,4 +43,5 @@ export const MINERS_PHONE_OFF: readonly MinersColumnId[] = ['credit'];
 export const useVisibleMinersColumns = createColumnVisibilitySetting({
   key: 'corpMoonsMinersVisibleColumns',
   ids: MINERS_COLUMN_IDS,
+  allowEmpty: true,
 });

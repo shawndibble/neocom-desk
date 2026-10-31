@@ -8,8 +8,10 @@ import {
   SearchInput,
   StatChip,
   StatChips,
+  sortRows,
   useOpenAfterMenu,
   type DataTableColumn,
+  type DataTableSort,
 } from '@/components/ui';
 import {
   minerDetail,
@@ -46,6 +48,8 @@ const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 
 
 /** Standings in the order the Standing column sorts them. */
 const STANDING_RANK: readonly MinerStanding[] = ['member', 'guest', 'left'];
+
+const DEFAULT_SORT: DataTableSort = { columnId: 'overdue', direction: 'desc' };
 
 const OPEN_MINER_KEY = 'corpTaxBook.minersTab.openMiner.';
 
@@ -203,6 +207,12 @@ export function MinersTab() {
   const columns = allColumns.filter(
     (c) => c.id === 'miner' || columnVisibility.isVisible(c.id as MinersColumnId)
   );
+  // The table can only sort by a column it shows: while the sorted one is unticked, sort the rows here.
+  const [sort, setSort] = useState<DataTableSort>(DEFAULT_SORT);
+  const hiddenSortColumn = columns.some((c) => c.id === sort.columnId)
+    ? undefined
+    : allColumns.find((c) => c.id === sort.columnId);
+  const sortedRows = hiddenSortColumn ? sortRows(rows, hiddenSortColumn, sort.direction) : rows;
 
   return (
     <div className="space-y-4">
@@ -261,7 +271,7 @@ export function MinersTab() {
           <DataTable
             label={t('corpTaxBook.moons.tabs.miners')}
             columns={columns}
-            rows={rows}
+            rows={sortedRows}
             rowKey={(m) => m.id}
             expandableRow={{
               renderDetail: (m) => <MinerExpandedRow miner={m} />,
@@ -274,7 +284,8 @@ export function MinersTab() {
             rowClassName={() => 'group'}
             rowContextMenu={rowContextMenu}
             rowMoreActions={canEdit}
-            defaultSort={{ columnId: 'overdue', direction: 'desc' }}
+            sort={hiddenSortColumn ? null : sort}
+            onSortChange={setSort}
             mobileSort
             stackSummary={t('corpTaxBook.moons.miners.summary', {
               shown: rows.length,
