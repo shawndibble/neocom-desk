@@ -148,6 +148,7 @@ test.describe('Fitting Compare control toolbar', () => {
         await addFitting(page, i === 0 ? eft : `${eft}\n125mm Gatling AutoCannon I`);
       }
       await expect(page.locator('table')).toHaveCount(2, { timeout: 20_000 });
+      expect(empty).toBeLessThan(70);
       expect((await controls.boundingBox())!.height).toBeLessThanOrEqual(empty + 1);
       const target = (await page.getByRole('combobox', { name: 'Target profile' }).boundingBox())!;
       const manage = (await page.getByRole('button', { name: /manage targets/i }).boundingBox())!;
