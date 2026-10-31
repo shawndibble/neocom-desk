@@ -2,6 +2,8 @@ import { loadCharacterSkillsWithStatus } from '@/features/skills/data';
 import {
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,
+  useSpFarmCharacters,
+  isSpFarmCharacter,
 } from '@/features/character/spExtractionSettings';
 import type {
   SpExtractionEntrySnapshot,
@@ -25,6 +27,11 @@ async function currentSpExtractionEnabled(): Promise<boolean> {
   return useSpExtractionMonitoringEnabled.getState().value;
 }
 
+async function isMarkedSpFarm(characterId: number): Promise<boolean> {
+  await useSpFarmCharacters.getState().hydrate();
+  return isSpFarmCharacter(useSpFarmCharacters.getState().value, characterId);
+}
+
 async function currentSpExtractionThresholdSp(): Promise<number> {
   await useSpExtractionThresholdSp.getState().hydrate();
   return useSpExtractionThresholdSp.getState().value;
@@ -44,6 +51,9 @@ export const spExtractionDomain = defineDomain<
     // pilot has turned monitoring on, matching `corpContextFor`'s "err
     // toward not calling the endpoint" precedent above.
     if (!(await currentSpExtractionEnabled())) return null;
+    // Only a marked SP Farm character is ever ready. Unmarked: no ESI call, and
+    // an empty entry list resets the baseline so a later re-mark can fire.
+    if (!(await isMarkedSpFarm(characterId))) return [];
     const result = await loadCharacterSkillsWithStatus(characterId);
     if (result.needsReauth || result.cached === null) return null;
     const thresholdSp = await currentSpExtractionThresholdSp();

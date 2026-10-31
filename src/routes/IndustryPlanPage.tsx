@@ -117,7 +117,7 @@ export function IndustryPlanPage() {
 
   return (
     <ItemActionsProvider page={itemActions}>
-      <div className="mx-auto max-w-7xl space-y-4">
+      <div className="mx-auto max-w-page space-y-4">
         {/* Same chrome the index shows above its own tab strip — a plan is
             still conceptually inside Build Plans, so moving here should read
             as "the content under the tabs changed," not a jump to a different

@@ -167,7 +167,7 @@ export function Clones() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <CharacterHeader
         characterId={activeCharacterId}
         totalSp={sp.totalSp}
@@ -218,7 +218,9 @@ export function Clones() {
         title={t('clones.title')}
         actions={
           <span className="flex items-center gap-2">
-            {clonesResult && <DataAgeBadge date={clonesResult.fetchedAt} />}
+            {clonesResult && (
+              <DataAgeBadge date={clonesResult.fetchedAt} expiresAt={clonesResult.expiresAt} />
+            )}
             <IconButton
               size="sm"
               icon={<Icon.Refresh />}

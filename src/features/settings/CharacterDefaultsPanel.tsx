@@ -4,6 +4,7 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import {
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,
+  useSpFarmCharacters,
 } from '@/features/character/spExtractionSettings';
 import { SP_EXTRACTION_CHUNK_SP } from '@/engine/skills/spExtraction';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
@@ -31,8 +32,13 @@ export function CharacterDefaultsPanel() {
   const defaultCharacterFilterHydrated = useHydratedStore(useDefaultCharacterFilter);
   const spExtractionEnabledHydrated = useHydratedStore(useSpExtractionMonitoringEnabled);
   const spExtractionThresholdHydrated = useHydratedStore(useSpExtractionThresholdSp);
+  const spFarm = useSpFarmCharacters((state) => state.value);
+  const spFarmHydrated = useHydratedStore(useSpFarmCharacters);
   const ready =
-    defaultCharacterFilterHydrated && spExtractionEnabledHydrated && spExtractionThresholdHydrated;
+    defaultCharacterFilterHydrated &&
+    spExtractionEnabledHydrated &&
+    spExtractionThresholdHydrated &&
+    spFarmHydrated;
 
   // Only for the picker's "This character" preview and quick-select — the
   // stored default itself keeps meaning "whichever Character I'm on" even on
@@ -65,7 +71,11 @@ export function CharacterDefaultsPanel() {
           <CheckboxField
             id="settings-sp-extraction-enabled"
             label={t('settings.spExtractionEnabledLabel')}
-            hint={t('settings.spExtractionEnabledHint')}
+            hint={
+              spExtractionEnabled && spFarm.length === 0
+                ? `${t('settings.spExtractionEnabledHint')} ${t('characters.spFarmHint')}`
+                : t('settings.spExtractionEnabledHint')
+            }
             checked={spExtractionEnabled}
             onChange={() => void setSpExtractionEnabled(!spExtractionEnabled)}
           />

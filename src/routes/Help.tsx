@@ -18,7 +18,7 @@ export function Help() {
   const tabsId = useTabsId();
 
   return (
-    // Prose, so narrower than the app-wide `max-w-6xl` data width: the cards
+    // Prose, so narrower than the app-wide `max-w-page` data width: the cards
     // sit at a readable line length and the text fills them edge to edge.
     <div className="mx-auto max-w-3xl space-y-4">
       <PageHeader title={t('nav.help')} />

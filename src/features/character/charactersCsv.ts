@@ -17,6 +17,7 @@ export interface CharacterCsvRow {
   totalSp: number | undefined;
   alertCount: number;
   starred: boolean;
+  spFarm: boolean;
 }
 
 const JOB_SLOT_CATEGORIES: readonly JobSlotCategory[] = ['manufacturing', 'science', 'reaction'];
@@ -101,9 +102,15 @@ export function charactersCsvColumns(
     ...(spExtractionEnabled
       ? [
           {
+            header: t('characters.column.spFarm'),
+            value: (row) => (row.spFarm ? t('characters.spFarmYes') : undefined),
+          } satisfies CsvColumn<CharacterCsvRow>,
+          {
             header: t('characters.column.spReady'),
             value: (row) =>
-              row.totalSp !== undefined && isSpExtractionReady(row.totalSp, spExtractionThresholdSp)
+              row.spFarm &&
+              row.totalSp !== undefined &&
+              isSpExtractionReady(row.totalSp, spExtractionThresholdSp)
                 ? t('characters.spReadyYes')
                 : undefined,
           } satisfies CsvColumn<CharacterCsvRow>,

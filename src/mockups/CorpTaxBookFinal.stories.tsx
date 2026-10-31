@@ -132,7 +132,7 @@ import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 const PHONE = PHONE_GLOBALS;
 
 function Page({ children }: { children: ReactNode }) {
-  return <div className="mx-auto max-w-6xl space-y-4 px-4 py-4">{children}</div>;
+  return <div className="mx-auto max-w-page space-y-4 px-4 py-4">{children}</div>;
 }
 
 // ---------------------------------------------------------------- Extractions

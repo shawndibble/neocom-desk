@@ -1392,6 +1392,27 @@ describe('DataTable opt-in phone features', () => {
       expect(offerIds()).toEqual(['2']);
     });
 
+    it('orders groups by groupCompare without touching the rows inside them', async () => {
+      const user = userEvent.setup();
+      renderOffers({
+        groupBy: {
+          ...groupBy,
+          allWidths: true,
+          minSize: 1,
+          defaultExpanded: () => true,
+          // Smallest group first: the reverse of the sorted order.
+          groupCompare: (a, b) => a.length - b.length,
+        },
+      });
+      const headers = () =>
+        [...document.querySelectorAll('.dt-group-header')].map((h) => h.textContent);
+      expect(headers()).toEqual(['Dodixie→Rens ×1', 'Jita→Amarr ×2']);
+      // Members keep their sorted order inside the reordered group.
+      expect(offerIds()).toEqual(['4', '2', '1', '3']);
+      await user.click(screen.getByRole('button', { name: 'Dodixie→Rens ×1' }));
+      expect(offerIds()).toEqual(['2', '1', '3']);
+    });
+
     it('never groups off a phone', () => {
       renderOffers();
       expect(document.querySelector('.dt-group-header')).toBeNull();

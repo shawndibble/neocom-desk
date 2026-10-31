@@ -50,7 +50,7 @@ export function Assets() {
     <ItemActionsProvider page={itemActions}>
       <div
         className={cx(
-          'mx-auto flex w-full max-w-6xl flex-col gap-3',
+          'mx-auto flex w-full max-w-page flex-col gap-3',
           // Fills the remaining viewport height (issue #148) rather than
           // growing with content: bounds the height against `<main>`'s own
           // chrome (Layout.tsx's `p-4`, plus the mobile bottom nav's

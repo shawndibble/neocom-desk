@@ -20,6 +20,11 @@
  */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { SP_EXTRACTION_CHUNK_SP } from '@/engine/skills/spExtraction';
+import {
+  isCharacterStarred,
+  parseStarredCharacters,
+  withToggledStar,
+} from '@/features/character/starredCharacters';
 
 export const SP_EXTRACTION_ENABLED_KEY = 'sync.spExtractionMonitoringEnabled';
 export const SP_EXTRACTION_THRESHOLD_KEY = 'sync.spExtractionThresholdSp';
@@ -40,3 +45,26 @@ export const useSpExtractionThresholdSp = createSyncedSetting<number>({
   // reach isSpExtractionReady as a threshold of 0 or NaN.
   parse: (raw) => (typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null),
 });
+
+export const SP_FARM_CHARACTERS_KEY = 'sync.spFarmCharacters';
+
+/** Nobody marked — named so callers and tests never hand-roll a second empty array. */
+export const NO_SP_FARM_CHARACTERS: readonly number[] = [];
+
+/**
+ * The Characters marked "SP Farm" (issue #5658): SP extraction readiness, its
+ * column and its alert apply only to these. One synced key holding Character
+ * ids — a judgement about the pilot's own roster, like the threshold. An
+ * emptied list is stored as `[]`, never unset, so the tombstone-expiry edge
+ * does not bite. A stored value that is not an array of ids is rejected whole.
+ */
+export const useSpFarmCharacters = createSyncedSetting<readonly number[]>({
+  key: SP_FARM_CHARACTERS_KEY,
+  defaultValue: NO_SP_FARM_CHARACTERS,
+  parse: parseStarredCharacters,
+});
+
+export const isSpFarmCharacter = isCharacterStarred;
+
+/** Marks `characterId` when it isn't marked, unmarks it when it is. Never mutates `marked`. */
+export const withToggledSpFarm = withToggledStar;

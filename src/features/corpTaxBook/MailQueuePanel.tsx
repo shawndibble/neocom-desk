@@ -162,8 +162,8 @@ export function MailQueueTable({
                 <Icon.Pending size={Icon.ICON_SIZE.sm} aria-hidden="true" />
               )}
               {status === 'failed' && <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
+              {status === 'sent' && <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
               {t(`corpTaxBook.mailQueue.status.${status}`)}
-              {status === 'sent' && <span aria-hidden="true"> ✓</span>}
               {status === 'sent' && row.sentAt !== undefined && (
                 <span className="font-normal text-text-dim">
                   {t('corpTaxBook.mailQueue.sentAt', {

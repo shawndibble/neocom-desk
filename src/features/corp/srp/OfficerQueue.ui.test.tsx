@@ -498,3 +498,15 @@ describe('OfficerQueue doctrine check', () => {
     expect(screen.queryByText('Doctrine')).toBeNull();
   });
 });
+
+describe('OfficerQueue Pending layout (md+)', () => {
+  it('keeps Approve and Reject on one line and reserves the bulk bar height', () => {
+    setup([claim(1)]);
+    const approve = screen.getAllByRole('button', { name: 'Approve' })[0]!;
+    const pair = approve.parentElement!.closest('span.flex')!;
+    expect(pair.className).toContain('flex-nowrap');
+    expect(pair.className).not.toContain('flex-wrap');
+    const selectAll = screen.getByRole('button', { name: /Select all/ });
+    expect(selectAll.parentElement!.className).toContain('min-h-12');
+  });
+});

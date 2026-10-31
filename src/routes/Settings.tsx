@@ -115,7 +115,7 @@ export function Settings() {
 
   if (isIndex) {
     return (
-      <div className="mx-auto max-w-6xl space-y-4">
+      <div className="mx-auto max-w-page space-y-4">
         <PageHeader title={t('settings.title')} />
         <PhoneSettingsIndex groups={groups} />
       </div>
@@ -123,7 +123,7 @@ export function Settings() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <PageHeader title={t('settings.title')} actions={<SettingsBackLink />} />
       <div className="space-y-4 md:grid md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6 md:space-y-0">
         <SettingsNav groups={groups} value={section} />

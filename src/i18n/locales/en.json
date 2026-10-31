@@ -4719,6 +4719,7 @@
       "lastSynced": "Last synced",
       "training": "Training",
       "pi": "PI",
+      "spFarm": "SP Farm",
       "spReady": "SP ready",
       "alerts": "Alerts",
       "starred": "Starred",
@@ -4734,6 +4735,12 @@
     "structure": "structure",
     "needsPermission": "{{name}} has not granted {{permission}}. Grant it from Permissions.",
     "spReadyYes": "Ready",
+    "spFarmYes": "SP Farm",
+    "markSpFarm": "Mark {{name}} as SP Farm",
+    "unmarkSpFarm": "Unmark {{name}} as SP Farm",
+    "markSpFarmMenuLabel": "Mark as SP Farm",
+    "unmarkSpFarmMenuLabel": "Unmark SP Farm",
+    "spFarmHint": "Mark characters as SP Farm to see when they are ready to extract. Only marked characters can be ready.",
     "extractionTotal": "Ready extractions net {{isk}} ISK across characters, {{each}} each ({{hub}}: sell injector − buy extractor, before fees)",
     "extractionUnpriced": "Extraction net unavailable: no sell orders at {{hub}}",
     "achievement": {
@@ -6778,6 +6785,10 @@
       "hours": "{{count}}h ago",
       "days": "{{count}}d ago"
     },
+    "dataAge": {
+      "esiUpdatesIn": "ESI updates this in {{count}} min ({{time}})",
+      "esiMayHaveNewer": "ESI may have newer data; refresh"
+    },
     "loadFailedTitle": "Could not load",
     "loadFailedHint": "Something went wrong fetching this. Try Refresh.",
     "couldntLoad": "Couldn't load",
@@ -6821,7 +6832,7 @@
       "emptyHint": "A snapshot is recorded each day the app is open. Wallet history comes from your journal.",
       "firstDays": "Layers start on {{date}}. The chart fills in as days are recorded.",
       "gapNote": "Hatched days: the app was not open, so only the wallet is known. Nothing is estimated.",
-      "footnote": "Assets are priced at your chosen hub on the day they were recorded and are not re-valued later. An abyssal module counts at the last MutaMarket estimate this device held that day, so the line steps up on the day one is first estimated. In contracts counts your open contracts' items at the same prices, plus a courier reward you have paid in. It leaves out the contract price and collateral, and any contract it cannot price.",
+      "footnote": "Assets are priced at your chosen hub on the day they were recorded and are not re-valued later. An abyssal module counts at the last MutaMarket estimate this device held that day, so the line steps up on the day one is first estimated. In contracts counts your open contracts' items at the same prices, plus a courier reward you have paid in and collateral you posted on a courier you are hauling, until its delivery deadline. It leaves out the contract price and any contract it cannot price.",
       "walletCrumb": "Wallet",
       "layers": {
         "isk": "ISK",
@@ -6923,6 +6934,17 @@
       "gapRange": "{{from}} – {{to}}",
       "gap": "Not recorded: {{ranges, list}}. EVE only returns 30 days, so a stretch the app was not opened for can't be recovered."
     },
+    "viewByStation": "By station",
+    "stationsFilterLabel": "Stations",
+    "stationsAll": "All stations",
+    "stationsSearchPlaceholder": "Search stations…",
+    "stationsNoResults": "No stations match.",
+    "stationsByLabel": "Stations by",
+    "stationsByNet": "Net",
+    "stationsByName": "Name",
+    "stationsByTrades": "Trades",
+    "stationTrades_one": "{{count}} trade",
+    "stationTrades_other": "{{count}} trades",
     "sideFilterLabel": "Side",
     "sideFilterAll": "All sides",
     "transactionsSearchPlaceholder": "Search item…",
@@ -9204,6 +9226,8 @@
     }
   },
   "piPlan": {
+    "vs90dSpike": "{{pct}} vs 90d",
+    "vs90dDrop": "{{pct}} vs 90d · below its 90-day price",
     "thinSales": "Plan sells {{plan}}/day · {{region}} trades {{trades}}/day ({{pct}}%) · counted at {{counted}}/day",
     "account": {
       "title": "Best use of all your planets",
@@ -11488,6 +11512,12 @@
     "materialColBuyCost": "Buy cost",
     "unpriceable": "Can't be priced at this hub — a material or the product has no listed sell price.",
     "unpriceableRequiredItem": "Can't be priced at this hub — a required item has no listed sell price.",
+    "howMany": "How many",
+    "iskPerLpAtN": "{{atN}} at {{n}} · {{at1}} at 1",
+    "walkedAverage": "avg",
+    "walkedLoading": "Reading order books…",
+    "unfilledUnits": "{{count}} not on the book",
+    "unsoldUnits": "{{count}} units the buy orders cannot take",
     "viewInMarket": "View in Market",
     "planInIndustry": "Plan in Industry",
     "assumesBaseStandingsHint": "Broker fees on sell-order profits are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."
@@ -13076,12 +13106,18 @@
       "sell": "Sell · {{count}}",
       "buy": "Buy · {{count}}"
     },
+    "headingFigure": {
+      "units": "Units listed",
+      "value": "ISK value listed"
+    },
     "sideSummary": {
-      "none": "{{count}} orders",
-      "sell_one": "{{count}} order · lowest {{price}}",
-      "sell_other": "{{count}} orders · lowest {{price}}",
-      "buy_one": "{{count}} order · highest {{price}}",
-      "buy_other": "{{count}} orders · highest {{price}}",
+      "orders_one": "{{count}} order",
+      "orders_other": "{{count}} orders",
+      "units_one": "{{formatted}} unit",
+      "units_other": "{{formatted}} units",
+      "value": "≈ {{amount}} ISK",
+      "lowest": "lowest {{price}}",
+      "highest": "highest {{price}}",
       "baitHidden_one": "{{count}} bait sell hidden",
       "baitHidden_other": "{{count}} bait sells hidden"
     },
@@ -13528,7 +13564,7 @@
             "defaults": "Defaults: trade hub (the default, and the trade hub of each character), industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
             "industry": "Industry: build groups and BPC Sourcing's hide auctions / hide PLEX.",
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, item contract flag multiple, and the structure broker fees you typed.",
-            "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
+            "skills": "Skills: Alpha/Omega per character, the target skill plan, SP Extraction monitoring and its threshold, and which characters you marked as SP Farm. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, how the Assign form edits ore values, and the moon surveys you connected to a payee with Assign Taxes. Assets: the refining rate you type for your own structure, and its reprocessing tax, and the nicknames you gave your stations and structures (shown on the Assets page only). Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
             "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your Corp Board layout, the stock targets you set on corporation assets, hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
@@ -14040,7 +14076,7 @@
     "defaultCharacterFilterLabel": "Default characters shown",
     "defaultCharacterFilterHint": "Starting choice for the This character / All characters filter. Each page then remembers its last pick.",
     "spExtractionEnabledLabel": "SP extraction monitoring",
-    "spExtractionEnabledHint": "Flags a character and alerts you when they hold enough spare SP for a Skill Extractor.",
+    "spExtractionEnabledHint": "Flags a character marked as SP Farm and alerts you when they hold enough spare SP for a Skill Extractor.",
     "spExtractionThresholdLabel": "SP extraction threshold",
     "spExtractionThresholdHint": "Spare SP above the 5,000,000 floor that counts as \"ready.\" One Skill Extractor pulls 500,000 SP.",
     "darkThresholdLabel": "Members go dark after",

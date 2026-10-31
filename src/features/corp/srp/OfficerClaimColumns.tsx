@@ -64,7 +64,7 @@ const lostColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
 const fleetColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
   id: 'fleet',
   header: ctx.t('srp.officer.columns.fleetOrFc'),
-  className: 'max-w-48',
+  className: 'max-w-48 wrap-anywhere',
   render: (row) =>
     row.fleetOrFc ? (
       <span className="text-text-dim">{row.fleetOrFc}</span>
@@ -95,7 +95,7 @@ export function pendingColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpCla
       id: 'amount',
       header: ctx.t('srp.officer.columns.amount'),
       align: 'right',
-      className: 'min-w-44',
+      className: 'min-w-36 wrap-anywhere',
       render: (row) => <PendingAmount claim={row} ctx={ctx} />,
     },
     {
@@ -104,7 +104,7 @@ export function pendingColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpCla
       align: 'right',
       className: 'whitespace-nowrap',
       render: (row) => (
-        <span className="flex flex-wrap justify-end gap-2">
+        <span className="flex flex-nowrap justify-end gap-2">
           <ApproveReject claim={row} ctx={ctx} className="whitespace-nowrap" />
         </span>
       ),

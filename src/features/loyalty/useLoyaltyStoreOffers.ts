@@ -30,6 +30,7 @@ import {
   useDetectedOwnedStock,
   useOwnedStockSnapshot,
 } from '@/features/industry/useDetectedOwnedStock';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import type { MaterialSourcingMap, SkillLevels } from '@/engine/industry/types';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
 import {
@@ -47,6 +48,9 @@ export interface LoyaltyStoreResult {
   offersError: boolean;
   reloadOffers: () => void;
   rows: LoyaltyOfferRow[];
+  /** The character's skills and hub standing the rows were priced with; Offer Detail's "How many" walk reuses them. */
+  skills: SkillLevels;
+  standing: ResolvedStandings | undefined;
   /** For resolving a blueprint's material names in the detail panel. */
   catalog: BlueprintCatalog | null;
   /** The blueprint catalog couldn't load: blueprint offers list as plain items, with no build-versus-buy figures. */
@@ -295,6 +299,8 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     catalog,
     playerLp,
     hub,
+    skills,
+    standing,
     hubHydrated,
     catalogUnavailable: catalog === EMPTY_BLUEPRINT_CATALOG,
     // A store with no offers has no prices to wait for, so `snapshot` stays

@@ -387,7 +387,7 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
   });
   const rowClassName = (row: PersonalRow) => cx(settled(row) && 'text-text-dim');
   return (
-    <div className="mx-auto max-w-6xl space-y-4 px-4 py-4">
+    <div className="mx-auto max-w-page space-y-4 px-4 py-4">
       <PageHeader
         title="Mining"
         meta={<DataAgeBadge date={LOADED_AT} />}

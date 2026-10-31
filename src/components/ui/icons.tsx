@@ -58,6 +58,7 @@ import { Check } from '@phosphor-icons/react/dist/csr/Check';
 import { CloudCheck } from '@phosphor-icons/react/dist/csr/CloudCheck';
 import { CloudWarning } from '@phosphor-icons/react/dist/csr/CloudWarning';
 import { CheckCircle } from '@phosphor-icons/react/dist/csr/CheckCircle';
+import { CheckSquare } from '@phosphor-icons/react/dist/csr/CheckSquare';
 import { Clipboard } from '@phosphor-icons/react/dist/csr/Clipboard';
 import { ClockCounterClockwise } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
 import { CloudSlash } from '@phosphor-icons/react/dist/csr/CloudSlash';
@@ -65,6 +66,7 @@ import { Code } from '@phosphor-icons/react/dist/csr/Code';
 import { Columns as ColumnsGlyph } from '@phosphor-icons/react/dist/csr/Columns';
 import { Copy } from '@phosphor-icons/react/dist/csr/Copy';
 import { Backpack } from '@phosphor-icons/react/dist/csr/Backpack';
+import { Bridge } from '@phosphor-icons/react/dist/csr/Bridge';
 import { CaretUp } from '@phosphor-icons/react/dist/csr/CaretUp';
 import { Crosshair } from '@phosphor-icons/react/dist/csr/Crosshair';
 import { SketchLogo } from '@phosphor-icons/react/dist/csr/SketchLogo';
@@ -113,12 +115,15 @@ import { Receipt } from '@phosphor-icons/react/dist/csr/Receipt';
 import { Rocket } from '@phosphor-icons/react/dist/csr/Rocket';
 import { RocketLaunch } from '@phosphor-icons/react/dist/csr/RocketLaunch';
 import { Scales } from '@phosphor-icons/react/dist/csr/Scales';
+import { Spiral } from '@phosphor-icons/react/dist/csr/Spiral';
 import { ShareNetwork } from '@phosphor-icons/react/dist/csr/ShareNetwork';
 import { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck';
 import { ShoppingCart } from '@phosphor-icons/react/dist/csr/ShoppingCart';
 import { Sliders } from '@phosphor-icons/react/dist/csr/Sliders';
+import { Square } from '@phosphor-icons/react/dist/csr/Square';
 import { SquaresFour } from '@phosphor-icons/react/dist/csr/SquaresFour';
 import { Stack } from '@phosphor-icons/react/dist/csr/Stack';
+import { Plant } from '@phosphor-icons/react/dist/csr/Plant';
 import { Star } from '@phosphor-icons/react/dist/csr/Star';
 import { Table as TableGlyph } from '@phosphor-icons/react/dist/csr/Table';
 import { TextB } from '@phosphor-icons/react/dist/csr/TextB';
@@ -215,6 +220,8 @@ export const Search = withWeight(MagnifyingGlass);
 export const Select = withWeight(Check);
 /** Pin — filled when pinned, outline when not (pass `weight="fill"`). */
 export const Pin = withWeight(Star);
+/** SP Farm mark — filled when the character is marked, outline when not (pass `weight="fill"`). */
+export const SpFarm = withWeight(Plant);
 /** Search across every character on the account. */
 /** Signs another character in to the roster. */
 export const AddCharacter = withWeight(UserPlus);
@@ -245,6 +252,10 @@ export const Compare = withWeight(Scales);
 export const SwapEnds = withWeight(ArrowRight);
 /** Route preference (shortest vs safest). */
 export const Route = withWeight(ArrowsLeftRight);
+/** A route hop over an Ansiblex jump bridge: a span between two systems. Not `Route`'s arrows, which mean "pick one of two". */
+export const BridgeHop = withWeight(Bridge);
+/** A route hop through a wormhole (Thera / Turnur): a spiral, the hole itself. Distinct from `BridgeHop`'s span at 1rem. */
+export const WormholeHop = withWeight(Spiral);
 /** Bulk-writes a chosen hub/facility/security/build-system onto every plan in a Build Group (issue #632) — the same crosshair `PriceAlert` uses, for retargeting a group. */
 export const RetargetGroup = withWeight(Target);
 /** Something is incomplete or unresolved — pairs with `warning` text, never used alone. */
@@ -298,6 +309,10 @@ export const CopyToClipboard = withWeight(Copy);
 export const Share = withWeight(ShareNetwork);
 /** Confirms an action that leaves nothing on screen to look at, e.g. a copy that went to the clipboard. */
 export const Done = withWeight(Check);
+/** A ticked task-list box in static text (survey notes). Not a control: no checkbox semantics. */
+export const TaskDone = withWeight(CheckSquare);
+/** An unticked task-list box in static text (survey notes). Not a control: no checkbox semantics. */
+export const TaskOpen = withWeight(Square);
 /** Overflow menu. */
 export const More = withWeight(DotsThreeVertical);
 /** Send the plan queue to the clipboard or a CSV download (#224 icon-only toolbar). */

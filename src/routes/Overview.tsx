@@ -106,7 +106,7 @@ function Board({ characterId, layout }: BoardProps) {
   const summary = useOverviewSummary(layout.widgets);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <CharacterHeader
         characterId={characterId}
         overview
@@ -223,7 +223,7 @@ export function Overview() {
   }
   if (layout === null) {
     return (
-      <div className="mx-auto max-w-6xl space-y-4">
+      <div className="mx-auto max-w-page space-y-4">
         <CharacterHeader characterId={activeCharacterId} overview />
         <OverviewSubNav />
         <DangerBanner />

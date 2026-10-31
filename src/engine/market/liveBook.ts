@@ -15,6 +15,7 @@ import {
   buyOrderReaches,
   walkSellIntoBuys,
   type ReachableBuyOrder,
+  type SellingStation,
 } from '@/engine/market/buyReach';
 
 /** The fields of a region order this module reads. */
@@ -28,6 +29,31 @@ export interface LiveOrder {
   range?: string;
   min_volume?: number;
   volume_remain?: number;
+}
+
+/**
+ * The buy orders in `orders` that fill a sale at `station`, in the walk's shape.
+ * A price that is not positive is skipped, never free.
+ */
+export function reachableBuyOrders(
+  orders: readonly LiveOrder[],
+  station: SellingStation,
+  jumps: ReadonlyMap<number, number> | undefined
+): ReachableBuyOrder[] {
+  const reaching: ReachableBuyOrder[] = [];
+  for (const order of orders) {
+    if (!order.is_buy_order || !Number.isFinite(order.price) || order.price <= 0) continue;
+    const candidate: ReachableBuyOrder = {
+      price: order.price,
+      volumeRemain: order.volume_remain ?? 0,
+      minVolume: order.min_volume,
+      range: order.range,
+      locationId: order.location_id,
+      systemId: order.system_id ?? 0,
+    };
+    if (buyOrderReaches(candidate, station, jumps)) reaching.push(candidate);
+  }
+  return reaching;
 }
 
 /** What the buy walk needs: the hub's system, its gate jumps to every system, and the units to sell. */

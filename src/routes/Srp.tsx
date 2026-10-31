@@ -15,12 +15,10 @@ export function Srp() {
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
   if (hydrated && activeCharacterId === null) return <Navigate to="/characters" replace />;
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       {activeCharacterId !== null && <CharacterHeader characterId={activeCharacterId} />}
       <OverviewSubNav />
-      <div className="mx-auto max-w-5xl">
-        <MemberSrpView />
-      </div>
+      <MemberSrpView />
     </div>
   );
 }

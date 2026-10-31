@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
 import { PageHeader, Tabs, useTabPanelProps, useTabsId } from '@/components/ui';
-import { cx } from '@/lib/cx';
 import { usePageTab } from '@/lib/usePageTab';
 import { SRP_TABS } from './srpTabs';
 import { SRP_VIEWS } from './srpViews';
@@ -30,7 +29,7 @@ export function SrpPage({
   if (!view) return null;
   const View = view.component;
   return (
-    <div className={cx('mx-auto grid gap-4 px-4 py-4', view.wide ? 'max-w-6xl' : 'max-w-5xl')}>
+    <div className="mx-auto grid max-w-page gap-4 px-4 py-4">
       <PageHeader title={t('srp.title')} />
       {tabbed && (
         <Tabs

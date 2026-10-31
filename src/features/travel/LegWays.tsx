@@ -22,6 +22,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret, textActionClassName } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import {
   focusRingInsetClassName,
   inlineLinkClassName,
@@ -142,7 +143,7 @@ function WayBox({
             key={`bridge-${from}-${bridgeTo}`}
             className="flex flex-wrap items-center gap-x-1.5 text-sm text-text-dim"
           >
-            <span aria-hidden="true">⇉</span>
+            <Icon.BridgeHop size={Icon.ICON_SIZE.sm} aria-hidden="true" />
             <span>{t('travel.ways.bridge', { from: nameOf(from), to: nameOf(bridgeTo) })}</span>
             {gate.name !== '' && (
               <>
@@ -157,7 +158,7 @@ function WayBox({
             key={`${from}-${holeTo}`}
             className="flex flex-wrap items-center gap-x-1.5 text-sm text-text-dim"
           >
-            <span aria-hidden="true">⤳</span>
+            <Icon.WormholeHop size={Icon.ICON_SIZE.sm} aria-hidden="true" />
             <span>{t('travel.ways.hole', { from: nameOf(from), to: nameOf(holeTo) })}</span>
             {hole.maxShipSize && (
               <>

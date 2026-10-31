@@ -245,7 +245,13 @@ describe('conditional revalidation (ETag / 304)', () => {
     expect(sent).toEqual(['"e1"']);
     expect(put).not.toHaveBeenCalled();
     expect(result).toEqual({
-      cached: { data: 'v1', fetchedAt: new Date(later), fromCache: false, truncated: false },
+      cached: {
+        data: 'v1',
+        fetchedAt: new Date(later),
+        expiresAt: new Date(Date.parse(expires.toUTCString())),
+        fromCache: false,
+        truncated: false,
+      },
       needsReauth: false,
     });
     const meta = await db.esiCacheMeta.get([CHAR_ID, KEY]);

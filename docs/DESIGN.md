@@ -404,6 +404,12 @@ shape has to be carried into them by hand.
   choice, and the mismatch is more visible than the few extra millimeters of
   target size. Prefer this only where the controls sit in the same visual
   row and the sibling's own size wasn't itself an oversight.
+- **Page width: `mx-auto max-w-page` (96rem, `--container-page`).** Every
+  app page's root uses it, on every tab, so switching tabs or pages never
+  changes the width. Never a `max-w-5xl`/`6xl`/`7xl` or a per-tab width on a
+  page root. The exceptions are prose (Help `max-w-3xl`, Communities
+  `max-w-4xl`), public pages (landing, shared links) and the open Fitting
+  editor (`max-w-[120rem]`, its Ring and stats side by side).
 - Radius: **minimal**. `rounded-xs` (2px) for panels, buttons, chips, inputs.
   `rounded-full` only for avatars, dots, spinners. Never `rounded-md`+ on rectangles.
   The one exception: the landing page's phone-capture frames (`QuestionGrid`) keep
@@ -614,6 +620,9 @@ exactly the markup above.
   members indented on the `panel` fill. Groups keep the table's sort: each
   sits where its best-ranked member did (`groupSortedRows`). Phone only —
   desktop has the width to compare those rows side by side.
+  `groupCompare` orders the groups apart from that sort (Market History's
+  By station view ranks stations by net while rows stay newest first): only
+  groups move, rows inside keep the sort. `allWidths` groups at every width.
 
 Skills › Certificates is a third: below `sm` its sort `Select` is replaced by an
 icon-only `IconButton` + radio `DropdownMenu` (`Icon.Sort`), so the group select,
@@ -1033,6 +1042,8 @@ focus back on the menu button. Opened from the item's `onSelect`, the dialog
 would hand focus back to a menu item that no longer exists, and focus falls to
 the top of the page (WCAG 2.4.3). An item that hands focus to an inline field
 instead (a rename) passes `keepFocus`.
+
+**A mark on a row (Characters: Starred, SP Farm).** A yes/no mark the pilot sets on a Character is a column of `IconButton`s with `pressed`: the glyph is filled when marked and outline when not (state on the glyph, not on colour), the header sorts marked first or last, and the Columns menu shows or hides the column. The accessible name says the action ("Mark Alice as SP Farm"). The row's ⋮ menu carries the same action as a text item ("Mark as SP Farm" / "Unmark SP Farm") for keyboard and phone users. A mark that only matters while a feature is on (SP Farm, with SP extraction monitoring) hides its column and menu item while that feature is off.
 
 **Customizing a page (the Overview).** A mode, not a page: Customize snapshots what is there, and Done keeps while Cancel restores it exactly. While it runs the edit bar shows what you are doing ("Customizing", "N of 30 widgets") with Add widget, Start from a role, Reset (an inline "Reset the layout? Reset / Keep" question, not a dialog: the change is undoable) and Cancel / Done; each widget gets a dashed edge, a size control, earlier / later / remove buttons and, on a pointer-sized screen, a drag handle. Every change that can be undone (add, remove, resize, duplicate, reset, a role replacing the layout) raises one `Toast` with Undo, which expires after 8 s (see Transient messages). Adding scrolls to the new widget and outlines it for 1.6 s; reduced motion keeps the outline and drops the smooth scroll. A phone customizes in a reorder, remove and add list with 36px targets and says sizes, views and ranges are set on a larger screen.
 
