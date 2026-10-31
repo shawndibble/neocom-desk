@@ -101,10 +101,38 @@ describe('createPlacesProvider', () => {
     expect(results).toEqual([]);
   });
 
-  it('puts an exact system name above its stations, otherwise stations lead', async () => {
+  it('lists systems before the stations that share their name', async () => {
     const withPlace = provider({ searchPlaces: () => Promise.resolve([JITA_4_4]) });
-    expect((await withPlace.search('jita', signal))[0].id).toBe('system:30000142');
+    const ids = (await withPlace.search('jita', signal)).map((r) => r.id);
+    expect(ids).toEqual(['system:30000142', 'station:60003760']);
+  });
+
+  it('finds a station by its own name once the query is specific', async () => {
+    const withPlace = provider({ searchPlaces: () => Promise.resolve([JITA_4_4]) });
     expect((await withPlace.search('jita iv', signal))[0].id).toBe('station:60003760');
+  });
+
+  it('leaves stations out of a short query and never asks for them', async () => {
+    const searchPlaces = vi.fn(() => Promise.resolve([JITA_4_4]));
+    const results = await provider({ searchPlaces }).search('jit', signal);
+    expect(results.map((r) => r.id)).toEqual(['system:30000142']);
+    expect(searchPlaces).not.toHaveBeenCalled();
+  });
+
+  it('leaves out stations that only contain the query mid-name', async () => {
+    const results = await provider({ searchPlaces: () => Promise.resolve([JITA_4_4]) }).search(
+      'caldari',
+      signal
+    );
+    expect(results).toEqual([]);
+  });
+
+  it('keeps a nicknamed place whatever the query length', async () => {
+    const [row] = await provider({
+      nicknames: () => ({ 60003760: 'Hub' }),
+      resolvePlace: () => Promise.resolve({ name: JITA_4_4.name, systemId: 30000142 }),
+    }).search('hu', signal);
+    expect(row.label).toBe('Hub');
   });
 
   it('needs two characters and sits between Assets and LP Stores', () => {
