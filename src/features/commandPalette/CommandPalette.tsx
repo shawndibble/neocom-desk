@@ -57,12 +57,31 @@ import { loadLpCorporations } from '@/sde/loadMarketSde';
 import { loadShipTree } from '@/sde/loadSde';
 import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
 import { createShipsProvider } from './shipsProvider';
+import { createPlacesProvider } from './placesProvider';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
+import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
+import { permissionsForEndpoints } from '@/esi/registry';
+import { useOnline } from '@/stores/network';
+import { setWaypointsInGame } from '@/features/travel/sendWaypoints';
+import { routeToHref } from '@/features/route/routeSafetyLink';
+import { loadSolarSystems } from '@/sde/loadMarketSde';
+import { searchKnownPlaces } from '@/features/places/placeSearch';
+import { resolvePlace } from '@/features/places';
+import { usePlaceNicknames } from '@/features/assets/placeNicknames';
+import { fixed1 } from '@/lib/fixedFormat';
 import { readCachedLoyaltyBalances } from '@/features/character/loyalty';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
 import { createLpStoresProvider, NO_BALANCES } from './lpStoresProvider';
-import { GROUP_LIMIT, type PaletteProvider, type PaletteResult } from './types';
+import {
+  GROUP_LIMIT,
+  type PaletteAltOutcome,
+  type PaletteProvider,
+  type PaletteResult,
+} from './types';
 import { usePaletteSearch } from './usePaletteSearch';
 
+const WAYPOINT_ENDPOINTS = ['postAutopilotWaypoint'] as const;
+const WAYPOINT_GROUPS = permissionsForEndpoints(WAYPOINT_ENDPOINTS);
 const NO_CONTACTS: readonly PaletteContact[] = [];
 const NO_ASSETS: readonly PaletteAsset[] = [];
 
@@ -140,6 +159,69 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
     [navigate, shipWindowOpen]
   );
 
+  const online = useOnline();
+  const lacksWaypointScope = useCharacterLacksEndpoints(activeCharacterId, WAYPOINT_ENDPOINTS);
+  const setWaypoint = useMemo(
+    () =>
+      async (locationId: number, placeName: string): Promise<PaletteAltOutcome> => {
+        if (activeCharacterId === null)
+          return { tone: 'alert', text: t('travel.waypoints.needCharacter') };
+        if (lacksWaypointScope)
+          return { tone: 'alert', text: <GrantMissingLink groups={WAYPOINT_GROUPS} /> };
+        if (!online) return { tone: 'alert', text: t('common.needsConnection') };
+        const result = await setWaypointsInGame(activeCharacterId, [locationId]);
+        if (result.ok)
+          return { tone: 'status', text: t('market.orderDetail.destinationSet', { placeName }) };
+        if (result.offline)
+          return {
+            tone: 'alert',
+            text: result.unconfirmed
+              ? t('travel.waypoints.unconfirmed')
+              : t('travel.waypoints.offline'),
+          };
+        return {
+          tone: 'alert',
+          text: result.needsPermission ? (
+            <GrantMissingLink groups={WAYPOINT_GROUPS} />
+          ) : (
+            t('travel.waypoints.failed', {
+              message: result.message ?? t('travel.waypoints.unknownError'),
+            })
+          ),
+        };
+      },
+    [activeCharacterId, lacksWaypointScope, online, t]
+  );
+  const places = useMemo(
+    () =>
+      createPlacesProvider({
+        loadSystems: loadSolarSystems,
+        searchPlaces: (query, limit) => searchKnownPlaces(activeCharacterId, query, limit),
+        nicknames: () => usePlaceNicknames.getState().value,
+        resolvePlace: async (locationId) => {
+          const place = await resolvePlace(
+            { locationId, characterId: activeCharacterId },
+            undefined,
+            { settle: true }
+          );
+          return place.name !== null && place.systemId !== null
+            ? { name: place.name, systemId: place.systemId }
+            : null;
+        },
+        openRoute: (systemId, stationId) =>
+          void navigate(routeToHref(systemId, null, null, stationId)),
+        setWaypoint,
+        waypointLabel: t('commandPalette.setWaypoint'),
+        describeSystem: (system) =>
+          t('commandPalette.systemSublabel', { security: fixed1(system.security) }),
+        describeStation: ({ name, systemName }, nickname) =>
+          [nickname === undefined ? null : name, systemName]
+            .filter((part): part is string => part !== null)
+            .join(' · '),
+      }),
+    [activeCharacterId, navigate, setWaypoint, t]
+  );
+
   const providers = useMemo(
     () => [
       createPagesProvider({ destinations, navigate: (path) => void navigate(path) }),
@@ -185,6 +267,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
         quantityHint: (quantity) =>
           t('commandPalette.assetQuantity', { quantity: formatCount(quantity) }),
       }),
+      places,
       lpStores,
       ships,
       createMarketItemsProvider({ catalogue: marketItemCatalogue, onSelect: onShowItem }),
@@ -199,6 +282,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
       contacts,
       assets,
       assetsScope,
+      places,
       lpStores,
       ships,
       onShowItem,
@@ -251,11 +335,13 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
     group.results.map((result) => ({ key: `${group.provider.id}:${result.id}`, result }))
   );
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
+  const [altOutcome, setAltOutcome] = useState<PaletteAltOutcome>(null);
   // A new query starts back at the top: Enter then takes the best match.
   const [prevQuery, setPrevQuery] = useState(query);
   if (prevQuery !== query) {
     setPrevQuery(query);
     setHighlightedKey(null);
+    setAltOutcome(null);
   }
   const foundIndex = options.findIndex((option) => option.key === highlightedKey);
   const highlightedIndex = foundIndex >= 0 ? foundIndex : options.length > 0 ? 0 : null;
@@ -288,6 +374,14 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
     if (activeDescendant === undefined) return;
     document.getElementById(activeDescendant)?.scrollIntoView?.({ block: 'nearest' });
   }, [activeDescendant]);
+
+  /** Shift+Enter or the row's button: the second action, palette kept open to show its outcome. */
+  function activateAlt(result: PaletteResult) {
+    const action = result.altAction;
+    if (!action) return;
+    setAltOutcome(null);
+    void Promise.resolve(action.run()).then(setAltOutcome);
+  }
 
   function activate(result: PaletteResult) {
     // Closed first: the dialog's teardown hands focus back to where it came
@@ -339,6 +433,10 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
       case 'Enter':
         if (highlightedIndex === null) return;
         event.preventDefault();
+        if (event.shiftKey && options[highlightedIndex].result.altAction) {
+          activateAlt(options[highlightedIndex].result);
+          break;
+        }
         activate(options[highlightedIndex].result);
         break;
       case 'Escape':
@@ -457,6 +555,25 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                                 </span>
                               )}
                             </span>
+                            {highlighted && result.altAction && (
+                              <button
+                                type="button"
+                                tabIndex={-1}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  activateAlt(result);
+                                }}
+                                className={cx(
+                                  'min-h-9 shrink-0 rounded-xs border border-line px-2 text-xs text-text',
+                                  interactiveClassName,
+                                  focusRingClassName
+                                )}
+                              >
+                                {result.altAction.label}
+                                <kbd className="ml-1.5 hidden text-text-dim md:inline">⇧↵</kbd>
+                              </button>
+                            )}
                             {result.hint && (
                               <span className="shrink-0 text-xs text-text-dim">{result.hint}</span>
                             )}
@@ -512,6 +629,17 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
               </Link>
             ))}
           </section>
+        )}
+        {altOutcome && (
+          <p
+            role={altOutcome.tone === 'alert' ? 'alert' : 'status'}
+            className={cx(
+              'px-2 text-sm',
+              altOutcome.tone === 'alert' ? 'text-danger' : 'text-text-dim'
+            )}
+          >
+            {altOutcome.text}
+          </p>
         )}
         <span role="status" aria-live="polite" className="sr-only">
           {statusText}

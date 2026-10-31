@@ -6,17 +6,17 @@ Code: `src/features/commandPalette/` (`CommandPaletteHost.tsx`, `CommandPalette.
 
 ## Summary
 
-| Feature                   | What                                                                                 | Where                                                               |
-| ------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| Open: chord               | Ctrl+K (Windows/Linux) / Cmd+K (Apple), also from inside text fields; again to close | `CommandPaletteHost.tsx`, `shortcuts.ts` `isCommandPaletteShortcut` |
-| Open: desktop button      | "Go to..." button top of the rail, shows the chord                                   | `RailNav.tsx:47`                                                    |
-| Open: phone               | Search field at top of the More sheet (closes sheet first)                           | `MobileMoreSheet.tsx:106,153`                                       |
-| Groups (fixed order)      | Pages, Commands, Characters, Assets, Market items, LP Stores, Contacts               | `CommandPalette.tsx` `useShippedProviders`                          |
-| Keyboard                  | ArrowUp/Down, Home, End, Enter, Escape; focus stays in input                         | `CommandPalette.tsx` `handleKeyDown`                                |
-| Pointer                   | Click a row to activate; mouse-down does not steal focus                             | same                                                                |
-| Locked pages              | Marked with amber dot + sr-only text, still navigate                                 | `result.locked`                                                     |
-| Loading / error per group | "Searching..." row; "Couldn't load these results" in that group only                 | `usePaletteSearch.ts`                                               |
-| Result count (a11y)       | polite live region                                                                   | `CommandPalette.tsx`                                                |
+| Feature                   | What                                                                                  | Where                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Open: chord               | Ctrl+K (Windows/Linux) / Cmd+K (Apple), also from inside text fields; again to close  | `CommandPaletteHost.tsx`, `shortcuts.ts` `isCommandPaletteShortcut` |
+| Open: desktop button      | "Go to..." button top of the rail, shows the chord                                    | `RailNav.tsx:47`                                                    |
+| Open: phone               | Search field at top of the More sheet (closes sheet first)                            | `MobileMoreSheet.tsx:106,153`                                       |
+| Groups (fixed order)      | Pages, Commands, Characters, Assets, Places, LP Stores, Contacts, Ships, Market items | `CommandPalette.tsx` `useShippedProviders`                          |
+| Keyboard                  | ArrowUp/Down, Home, End, Enter, Escape; focus stays in input                          | `CommandPalette.tsx` `handleKeyDown`                                |
+| Pointer                   | Click a row to activate; mouse-down does not steal focus                              | same                                                                |
+| Locked pages              | Marked with amber dot + sr-only text, still navigate                                  | `result.locked`                                                     |
+| Loading / error per group | "Searching..." row; "Couldn't load these results" in that group only                  | `usePaletteSearch.ts`                                               |
+| Result count (a11y)       | polite live region                                                                    | `CommandPalette.tsx`                                                |
 
 ## Purpose and user goal
 
@@ -50,6 +50,7 @@ Code: `src/features/commandPalette/` (`CommandPaletteHost.tsx`, `CommandPalette.
 ## Search model
 
 - `usePaletteSearch(providers, query)`: trims the query, sorts providers by `order`, skips those whose `minQueryLength` exceeds the trimmed length, asks each provider during render (memoised on providers + query). Sync answer renders immediately; Promise answer shows that group as `loading` until it settles; rejection shows an error row in that group only; stale answers for an old query are dropped and their `AbortSignal` aborted. Empty groups are hidden. No debounce (all providers are in-memory).
+- **Places** (#5742, `placesProvider.ts`): solar systems (SDE), NPC stations, structures Dexie already knows (`searchKnownPlaces`) and Place Nicknames; local reads only. Enter opens Route Safety there (`routeToHref`); a result's `altAction` (Shift+Enter, or the small button on the highlighted row for touch) sets the in-game waypoint and keeps the palette open to show the outcome. No jumps-away sublabel: it would need the Character's location per keystroke.
 - Highlight is one index across groups, tracked by `groupId:resultId`, so an async group landing above does not move it; new query resets to the top, so Enter takes the best match. Home/End/arrows wrap via `moveHighlight`.
 - Ranking (`rankedSearch.ts`): case-insensitive; exact name > prefix > substring > secondary-field-only match; alphabetical within rank; empty query returns nothing. Per group cap `GROUP_LIMIT = 6` rows.
 - ARIA: hand-built combobox (input `role=combobox`, `aria-activedescendant`), one `role=group` per provider labelled by heading, results `role=option`. "Nothing matches." when query non-empty and no group has rows.

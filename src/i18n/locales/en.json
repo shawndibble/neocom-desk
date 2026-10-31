@@ -14422,6 +14422,8 @@
     }
   },
   "commandPalette": {
+    "setWaypoint": "Set waypoint",
+    "systemSublabel": "System · {{security}}",
     "emptyTitle": "Search a page, item, asset, pilot or command",
     "emptyHint": "Or paste a fit, item list, Local list or D-Scan",
     "title": "Command palette",
@@ -14448,6 +14450,7 @@
       "contacts": "Contacts",
       "lpStores": "LP Stores",
       "ships": "Ships",
+      "places": "Places",
       "marketItems": "Market items"
     },
     "commands": {
