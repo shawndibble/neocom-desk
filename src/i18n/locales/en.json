@@ -14432,6 +14432,11 @@
       "columnLocation": "Location",
       "columnJoined": "Joined",
       "columnRoles": "Roles",
+      "csvCeo": "CEO",
+      "csvYou": "You",
+      "csvDark": "Dark",
+      "csvYes": "yes",
+      "csvNo": "no",
       "you": "You",
       "never": "Never",
       "total": "Members",
@@ -14551,7 +14556,20 @@
       },
       "csv": {
         "kind": "Blueprint",
-        "place": "Location"
+        "place": "Location",
+        "stockStatus": "Stock status",
+        "stock": {
+          "short": "Short",
+          "none-owned": "None owned",
+          "met": "Met"
+        },
+        "stacks": "Stacks",
+        "groupItems": "Location total items",
+        "groupValue": "Location total value",
+        "divisionsInUse": "Divisions in use",
+        "emptyOffice": "Empty office",
+        "yes": "yes",
+        "no": "no"
       },
       "itemTableLabel": "Corporation assets by item",
       "locationTableLabel": "Corporation assets by location",
