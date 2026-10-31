@@ -6793,8 +6793,6 @@
     "exportFlagYes": "yes",
     "exportFlagNo": "no",
     "unknownType": "Type {{id}}",
-    "exportFlagYes": "yes",
-    "exportFlagNo": "no",
     "needsConnection": "Needs a connection",
     "opensInNewTab": "(opens in a new tab)",
     "pricesUnavailableOffline": "Prices unavailable offline",
