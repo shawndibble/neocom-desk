@@ -10,6 +10,7 @@ import { loyaltyPointsCsvColumns } from '@/features/character/loyaltyPointsCsv';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterLoyaltyPoints } from '@/esi/endpoints';
 
+const NO_LOYALTY: readonly CharacterLoyaltyPoints[] = [];
 const LOYALTY_SORT = { columnId: 'points', direction: 'desc' } as const;
 
 /**
@@ -72,7 +73,10 @@ export function useWalletLoyalty(
   );
   const tableExport = useTableExport({
     surface: 'loyalty-points',
-    rows: otherLoyalty,
+    // Every entry, EverMarks included, in the table's sort: the table itself
+    // lists only the corporations' LP, the EverMarks figure sits in the balance box.
+    rows: loyaltyResult?.data ?? NO_LOYALTY,
+    source: 'sorted-rows',
     columns: csvColumns,
   });
 
