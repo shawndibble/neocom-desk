@@ -74,7 +74,7 @@ describe('WalletWaitingGoal', () => {
     const panel = (await screen.findByRole('heading', { name: 'ISK waiting' })).closest(
       'section'
     ) as HTMLElement;
-    expect(within(panel).getByText('Healthy')).toBeInTheDocument();
+    expect(within(panel).getByText('Fine')).toBeInTheDocument();
     expect(within(panel).getByText('1,000 ISK')).toBeInTheDocument();
     expect(within(panel).getByText('Needs you')).toBeInTheDocument();
     expect(within(panel).getByText('Not checked')).toBeInTheDocument();

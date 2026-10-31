@@ -7098,11 +7098,11 @@
       "contracts": "Contracts outstanding",
       "change": "Wallet, last 30 days:",
       "openJournal": "Open Journal",
-      "healthTitle": "Sell orders now",
+      "healthTitle": "Sell orders now, live prices",
       "orderCount_one": "{{count}} order",
       "orderCount_other": "{{count}} orders",
       "health": {
-        "healthy": "Healthy",
+        "healthy": "Fine",
         "needsYou": "Needs you",
         "watch": "Watch",
         "notChecked": "Not checked"

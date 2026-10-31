@@ -96,7 +96,9 @@ export function WalletWaitingGoal({ characterIds }: WalletWaitingGoalProps) {
           </ul>
           {health && health.total.orders > 0 && (
             <div className="mt-3 border-t border-line pt-3 text-sm">
-              <Eyebrow>{t('wallet.waiting.healthTitle')}</Eyebrow>
+              <Eyebrow>
+                {t('wallet.waiting.healthTitle')}: {formatIsk(health.total.isk)} ISK
+              </Eyebrow>
               <ul className="mt-1 space-y-1">
                 {(['healthy', 'needsYou', 'watch', 'notChecked'] as const)
                   .filter((key) => health[key].orders > 0)
