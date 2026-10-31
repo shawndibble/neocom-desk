@@ -313,24 +313,27 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
   const groups = useMemo(() => rankGroups(found, query), [found, query]);
   // Sections the pilot has arrowed into show every row; the rest show a few.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
-  const rowCounts = visibleRowCounts(groups, expanded);
+  const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
 
   // Keyed by group and result id, not position, so an async group landing
   // above the highlight does not move it onto a different row.
   const allOptions = groups.flatMap((group) =>
-    group.results.map((result) => ({
+    group.results.map((result, row) => ({
       groupId: group.provider.id,
+      row,
       key: `${group.provider.id}:${result.id}`,
       result,
     }))
   );
-  // What is on screen. Hidden rows take no index: arrowing onto one expands its section first.
-  const options = groups.flatMap((group) =>
-    group.results
-      .slice(0, rowCounts.get(group.provider.id) ?? 0)
-      .map((result) => ({ key: `${group.provider.id}:${result.id}`, result }))
+  // The highlighted row's section stays open, so a section landing late cannot
+  // collapse the row the pilot is on.
+  const highlightedGroupId = allOptions.find((option) => option.key === highlightedKey)?.groupId;
+  const rowCounts = visibleRowCounts(
+    groups,
+    highlightedGroupId === undefined ? expanded : new Set(expanded).add(highlightedGroupId)
   );
-  const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
+  // What is on screen. Hidden rows take no index: arrowing onto one expands its section first.
+  const options = allOptions.filter((option) => option.row < (rowCounts.get(option.groupId) ?? 0));
   const [altOutcome, setAltOutcome] = useState<PaletteAltOutcome>(null);
   /** A second Shift+Enter while one is sending must not send twice. */
   const altInFlight = useRef(false);
@@ -517,7 +520,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
             role="listbox"
             aria-label={t('commandPalette.resultsLabel')}
             // The input stays put above; only the results scroll.
-            className="flex max-h-[min(30rem,60vh)] scroll-py-2 flex-col gap-2 overflow-y-auto overscroll-contain"
+            className="flex max-h-[min(30rem,calc(70vh-9rem))] scroll-py-2 flex-col gap-2 overflow-y-auto overscroll-contain"
           >
             {groups.map((group) => {
               const headingId = `${baseId}-group-${group.provider.id}`;

@@ -32,8 +32,8 @@ function bestTier(group: PaletteGroup, query: string): number {
 
 /**
  * Ready sections, strongest match first (ties by provider order). A loading
- * or failed section keeps the slot it had, so one landing late never shoves
- * the rows under the pilot's eyes.
+ * or failed section keeps the slot it had, so one pending never reshuffles
+ * the others; a ready section landing late can still rank above the rest.
  */
 export function rankGroups(groups: readonly PaletteGroup[], query: string): PaletteGroup[] {
   const ready = groups

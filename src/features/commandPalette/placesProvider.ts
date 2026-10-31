@@ -50,6 +50,8 @@ interface PlaceRow {
 
 /** Stations and structures need a query this long, so a short word lists systems only. */
 const STATION_MIN_QUERY_LENGTH = 4;
+/** Candidates read before the prefix filter, so a real prefix hit is not cut by the row cap. */
+const STATION_FETCH_LIMIT = GROUP_LIMIT * 8;
 
 export function createPlacesProvider(options: PlacesProviderOptions): PaletteProvider {
   return {
@@ -62,7 +64,7 @@ export function createPlacesProvider(options: PlacesProviderOptions): PalettePro
       const wantStations = query.trim().length >= STATION_MIN_QUERY_LENGTH;
       const [systems, searched, nicknamed] = await Promise.all([
         options.loadSystems(),
-        wantStations ? options.searchPlaces(query, GROUP_LIMIT) : Promise.resolve([]),
+        wantStations ? options.searchPlaces(query, STATION_FETCH_LIMIT) : Promise.resolve([]),
         resolveNicknamed(query, nicknames, options),
       ]);
       // An NPC station's name starts with its system's, so a broad word would
