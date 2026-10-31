@@ -3,7 +3,8 @@
  * offers turn a loyalty point into at a Trade Hub, after fees — the same
  * ISK/LP the LP Store page ranks its offers by. Read off the store's best
  * offers rather than its single best, and only from offers the hub could
- * absorb a few redemptions of and that trade every day, so one thin, lucky order can't set the rate.
+ * absorb a few redemptions of and that trade every day, so one thin, lucky
+ * order can't set the rate.
  */
 
 import { upperMedian } from '../math';
@@ -16,7 +17,7 @@ export interface LpValueCandidate {
   sellVolume: number;
   /** Units one redemption hands out. */
   quantity: number;
-  /** Units of it traded a day lately; null when that is not known. */
+  /** Units of it traded a day lately; null when unchecked (no trade data), and the offer is kept. */
   soldPerDay: number | null;
 }
 

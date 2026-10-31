@@ -11,6 +11,7 @@
  */
 import { marketLpValue } from '@/engine/loyalty/marketLpValue';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
+import { HAULING_THRESHOLDS } from '@/engine/market/haulingMarket';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { loadMarketSnapshots, type MarketSnapshot } from '@/features/industry/marketData';
 import type { TradeHub } from '@/market/hubs';
@@ -19,9 +20,6 @@ import { computeLoyaltyOfferRows, offerPriceTypeIds } from './offerRows';
 import { loadLoyaltyStoreOffers } from './store';
 
 const REMEMBER_MS = 15 * 60 * 1000;
-
-/** Days a demand object's `volume` covers. */
-const DEMAND_WINDOW_DAYS = 30;
 
 const remembered = new Map<string, { at: number; value: Promise<number | null> }>();
 
@@ -53,7 +51,9 @@ function valueOf(
         sellVolume: snapshot.hubSellVolumes[sold] ?? 0,
         quantity: product ? product.quantity : row.offer.quantity,
         // A type absent from a loaded demand object never traded in the window.
-        soldPerDay: demand ? (demand.types.get(sold)?.volume ?? 0) / DEMAND_WINDOW_DAYS : null,
+        soldPerDay: demand
+          ? (demand.types.get(sold)?.volume ?? 0) / HAULING_THRESHOLDS.historyDays
+          : null,
       };
     })
   );
@@ -123,7 +123,9 @@ export async function loadMarketLpValues(
       const forget = () => {
         if (remembered.get(keyOf(id))?.value === value) remembered.delete(keyOf(id));
       };
-      batch.then(({ checked }) => !checked && forget(), forget);
+      batch.then((priced) => {
+        if (!priced.checked) forget();
+      }, forget);
     }
   }
   const values = await Promise.all(
