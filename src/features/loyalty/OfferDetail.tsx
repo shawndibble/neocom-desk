@@ -267,7 +267,7 @@ export function OfferDetail({
             {profit.revenue === null ? '—' : formatIsk(profit.revenue)}
           </dd>
         </div>
-        {row.revenueCheck?.capped && !walked?.output.moved && (
+        {row.revenueCheck?.capped && (
           <div className="text-right text-[0.6875rem] text-warning">
             {t(
               priceBasis === 'buy'
@@ -276,6 +276,7 @@ export function OfferDetail({
               {
                 price: formatIsk(row.revenueCheck.price),
                 listed: formatIsk(row.revenueCheck.listed),
+                multiple: fixed1(row.revenueCheck.listed / row.revenueCheck.price),
               }
             )}
           </div>

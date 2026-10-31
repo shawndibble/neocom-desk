@@ -290,7 +290,8 @@ function computeBlueprintRow(
     sellsPerDay: sellsPerDayOf(inputs.sellsPerDayByType, entry.productTypeID),
     requiredItems,
     requiredItemsCost: itemsCost,
-    revenueCheck,
+    // No sale is counted while the build is unpriced, so nothing was checked either.
+    revenueCheck: revenue === null ? null : revenueCheck,
   };
 }
 

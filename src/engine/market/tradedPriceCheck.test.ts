@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   LISTED_ABOVE_TRADES_FACTOR,
+  capListedPrice,
   checkListedPrice,
   tradedPriceCeiling,
 } from '@/engine/market/tradedPriceCheck';
@@ -16,9 +17,18 @@ const RISING_PRICE = {
 };
 
 describe('tradedPriceCeiling', () => {
-  it('is the higher of the recent median sale and the latest day’s top trade', () => {
+  it('is the higher of the recent median sale and the latest day’s lowest trade', () => {
     expect(tradedPriceCeiling(LONE_BILLION_ORDER)).toBe(17_300_000);
-    expect(tradedPriceCeiling(RISING_PRICE)).toBe(134_200_000);
+    expect(tradedPriceCeiling(RISING_PRICE)).toBe(126_900_000);
+  });
+
+  it('bounds a latest day that only traded far above the median (a self-trade)', () => {
+    const selfTrade = {
+      recentSalePrice: 17_300_000,
+      latestDay: { date: '2026-10-29', highest: 1_000_000_000, lowest: 1_000_000_000 },
+    };
+    expect(tradedPriceCeiling(selfTrade)).toBe(17_300_000 * 3);
+    expect(checkListedPrice(1_000_000_000, selfTrade).capped).toBe(true);
   });
 
   it('is null with nothing traded to go on', () => {
@@ -32,6 +42,7 @@ describe('checkListedPrice', () => {
     expect(checkListedPrice(1_000_000_000, LONE_BILLION_ORDER)).toEqual({
       price: 17_300_000,
       listed: 1_000_000_000,
+      ceiling: 17_300_000,
       capped: true,
     });
   });
@@ -40,6 +51,7 @@ describe('checkListedPrice', () => {
     expect(checkListedPrice(129_900_000, RISING_PRICE)).toEqual({
       price: 129_900_000,
       listed: 129_900_000,
+      ceiling: 126_900_000,
       capped: false,
     });
   });
@@ -54,7 +66,14 @@ describe('checkListedPrice', () => {
     expect(checkListedPrice(5_000, undefined)).toEqual({
       price: 5_000,
       listed: 5_000,
+      ceiling: null,
       capped: false,
     });
+  });
+
+  it('caps against a ceiling already worked out', () => {
+    expect(capListedPrice(100, 50).price).toBe(50);
+    expect(capListedPrice(60, 50).price).toBe(60);
+    expect(capListedPrice(100, null).price).toBe(100);
   });
 });

@@ -638,7 +638,12 @@ describe('computeLoyaltyOfferRows', () => {
         offers: [probes],
         hubPrices: { [PROBE_ID]: 1_800 },
       });
-      expect(checked.revenueCheck).toEqual({ price: 1_800, listed: 50_000, capped: true });
+      expect(checked.revenueCheck).toEqual({
+        price: 1_800,
+        listed: 50_000,
+        ceiling: 1_800,
+        capped: true,
+      });
       expect(checked.profit.iskPerLp).toBeCloseTo(plain.profit.iskPerLp!);
     });
 
@@ -651,6 +656,17 @@ describe('computeLoyaltyOfferRows', () => {
       });
       expect(row.revenueCheck?.capped).toBe(true);
       expect(row.revenueCheck?.price).toBe(50_000_000);
+    });
+
+    it('has no check for a blueprint whose build cannot be priced', () => {
+      const [row] = computeLoyaltyOfferRows({
+        ...base,
+        offers: [astero],
+        hubPrices: { [ASTERO_ID]: 500_000_000 },
+        tradedPrices: new Map([[ASTERO_ID, traded(50_000_000)]]),
+      });
+      expect(row.profit.revenue).toBeNull();
+      expect(row.revenueCheck).toBeNull();
     });
 
     it('leaves turn-ins at their listed price', () => {
@@ -671,7 +687,12 @@ describe('computeLoyaltyOfferRows', () => {
         offers: [probes],
         hubPrices: { [PROBE_ID]: 50_000 },
       });
-      expect(row.revenueCheck).toEqual({ price: 50_000, listed: 50_000, capped: false });
+      expect(row.revenueCheck).toEqual({
+        price: 50_000,
+        listed: 50_000,
+        ceiling: null,
+        capped: false,
+      });
     });
   });
 });

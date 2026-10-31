@@ -688,7 +688,15 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
 
   it('says when a sale counts at recent trades, not the listing far above them', async () => {
     mockRows([
-      { ...ITEM_ROW, revenueCheck: { price: 17_300_000, listed: 1_000_000_000, capped: true } },
+      {
+        ...ITEM_ROW,
+        revenueCheck: {
+          price: 17_300_000,
+          listed: 1_000_000_000,
+          ceiling: 17_300_000,
+          capped: true,
+        },
+      },
     ]);
     const user = userEvent.setup();
     renderStore();
@@ -696,7 +704,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     await user.click(screen.getByText('Scourge Fury Heavy Missile').closest('tr')!);
 
     expect(screen.getByText(/Counted at recent trades/)).toHaveTextContent(
-      'Counted at recent trades, 17,300,000 ISK each: the cheapest listing asks 1,000,000,000 ISK'
+      'Counted at recent trades, 17,300,000 ISK each: the cheapest listing asks 1,000,000,000 ISK, 57.8× that.'
     );
   });
 
