@@ -252,7 +252,14 @@ async function loadSnapshotBooks(
     ...new Set(candidates.flatMap((c) => [c.lane.from.stationId, c.lane.to.stationId])),
   ];
   const loaded = await Promise.all(stations.map((id) => loadHaulingBooks(id)));
-  if (loaded.some((books) => books === null)) return null;
+  if (loaded.some((books) => books === null)) {
+    console.warn(
+      '[hauling-diag] snapshot books unavailable',
+      stations,
+      loaded.map((b) => b !== null)
+    );
+    return null;
+  }
   return new Map(stations.map((id, i) => [id, loaded[i]!]));
 }
 
