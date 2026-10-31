@@ -227,6 +227,12 @@ describe('the Full scan', () => {
         wormholeSpace
       />
     );
+    const answer = await screen.findByTestId('dscan-answer');
+    expect(
+      await within(answer).findByText(
+        'Smallest hole each ship needs: Small 1 · Medium 3 · 1 not sized.'
+      )
+    ).toBeTruthy();
     await openFullScan(user);
     const worth = await screen.findByRole('region', { name: /Worth on the scan/ });
     await within(worth).findByText('Smallest hole each ship needs');
@@ -257,6 +263,7 @@ describe('the Full scan', () => {
     expect(worth.textContent).not.toContain('Smallest hole');
     expect(worth.textContent).not.toContain('Hulls weigh');
     expect(document.body.textContent).not.toContain('Medium hole');
+    expect(screen.getByTestId('dscan-answer').textContent).not.toContain('Smallest hole');
   });
 
   it('says so when there is no earlier scan, and a Shared D-Scan shows no diff', async () => {

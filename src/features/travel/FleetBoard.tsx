@@ -30,6 +30,7 @@ import { DscanMeta } from './DscanMeta';
 import { useLastScan } from './lastScan';
 import { OwnShipPicker } from './OwnShipPicker';
 import { useManualShip } from './ownShip';
+import { holeSizeCounts, useHoleSizes } from './useHoleSizes';
 import { HOUR_MS } from '@/lib/age';
 
 /**
@@ -125,6 +126,7 @@ export function FleetBoard({
 
   const hulls = useMemo(() => (loaded === undefined ? [] : shipHulls(loaded.board)), [loaded]);
   const previous = useLastScan(hulls, trackHistory && loaded !== undefined);
+  const holes = useHoleSizes(hulls, wormholeSpace);
 
   const manual = useManualShip();
   const current = useCharacterShipTypeId();
@@ -187,7 +189,7 @@ export function FleetBoard({
         names={names}
         trackHistory={trackHistory}
         previous={previous}
-        wormholeSpace={wormholeSpace}
+        holes={holes}
       />
       {board.leftOut > 0 && (
         <p className="text-xs text-text-dim">
@@ -206,6 +208,7 @@ export function FleetBoard({
             read={answer}
             names={names}
             age={trackHistory ? scanAge(Math.max(0, now - loaded.at)) : null}
+            holes={holes === null ? null : holeSizeCounts(t, holes)}
             shipControl={
               <OwnShipPicker
                 typeId={manual.typeId}

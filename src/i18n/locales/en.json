@@ -15353,6 +15353,7 @@
         "shareCopy": "Copy",
         "shareTooLarge": "Too large to share as a link (over {{max}} characters).",
         "danger": {
+          "holes": "Smallest hole each ship needs: {{counts}}.",
           "level": {
             "clear": "Clear on scan",
             "watch": "Watch",

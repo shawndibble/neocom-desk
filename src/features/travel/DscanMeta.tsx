@@ -2,16 +2,15 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { IskAmount } from '@/components/ui';
-import { buildHoleSizes } from '@/engine/pilotList/dscanHoleSize';
+import type { HoleSizeRead } from '@/engine/pilotList/dscanHoleSize';
 import { buildWorth, diffHulls, type HullCount } from '@/engine/pilotList/dscanWorth';
 import { useMarketHub } from '@/features/market/hub';
 import { cx } from '@/lib/cx';
 import { formatNumber } from '@/lib/numberLocale';
-import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
-import { loadShipMass } from '@/sde/loadSde';
 import { hullsKey } from './lastScan';
+import { holeSizeCounts } from './useHoleSizes';
 
 const SHOWN_LINES = 4;
 
@@ -29,19 +28,19 @@ export function DscanMeta({
   names,
   trackHistory,
   previous,
-  wormholeSpace,
+  holes,
 }: {
   hulls: readonly HullCount[];
   names: ReadonlyMap<number, string>;
   trackHistory: boolean;
   /** The earlier scan from `useLastScan`; only read when `trackHistory` is set. */
   previous: HullCount[] | null | undefined;
-  /** The Current System is wormhole space: the Worth card adds the hole sizes. */
-  wormholeSpace: boolean;
+  /** Set only in wormhole space: the Worth card adds the hole sizes. */
+  holes: HoleSizeRead | null;
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      <WorthCard hulls={hulls} names={names} wormholeSpace={wormholeSpace} />
+      <WorthCard hulls={hulls} names={names} holes={holes} />
       {trackHistory && <SinceLastScanCard hulls={hulls} previous={previous} names={names} />}
     </div>
   );
@@ -50,11 +49,11 @@ export function DscanMeta({
 function WorthCard({
   hulls,
   names,
-  wormholeSpace,
+  holes,
 }: {
   hulls: readonly HullCount[];
   names: ReadonlyMap<number, string>;
-  wormholeSpace: boolean;
+  holes: HoleSizeRead | null;
 }) {
   const { t } = useTranslation();
   const hubId = useMarketHub((s) => s.value);
@@ -128,39 +127,22 @@ function WorthCard({
           : null}{' '}
         {t('travel.pilot.dscan.worth.note', { hub: hub.systemName })}
       </p>
-      {wormholeSpace && <HoleSizes hulls={hulls} />}
+      {holes !== null && <HoleSizes read={holes} />}
     </section>
   );
 }
 
 /**
- * The smallest wormhole each ship needs and the hulls' base mass (issue #5669):
- * a hull too heavy for a hole can never pass it, and the mass is a floor.
- * Neither says the fleet can pass a hole.
+ * The smallest wormhole each ship needs and the hulls' base mass: a hull too
+ * heavy for a hole can never pass it, and the mass is a floor. Neither says
+ * the fleet can pass a hole.
  */
-function HoleSizes({ hulls }: { hulls: readonly HullCount[] }) {
+function HoleSizes({ read }: { read: HoleSizeRead }) {
   const { t } = useTranslation();
-  // Without the table there is simply no block.
-  const table = useKeyedLoad('shipMass', loadShipMass).data;
-  if (table === undefined) return null;
-  const read = buildHoleSizes(
-    hulls,
-    (typeId) => table[String(typeId)]?.[1],
-    (typeId) => table[String(typeId)]?.[2]
-  );
-  if (read === null) return null;
-  const counts = [
-    ...read.sizes.map(({ size, count }) =>
-      t('travel.pilot.dscan.worth.holes.size', { size: t(`travel.thera.size.${size}`), count })
-    ),
-    ...(read.unsized > 0
-      ? [t('travel.pilot.dscan.worth.holes.unsized', { count: read.unsized })]
-      : []),
-  ];
   return (
     <div className="space-y-0.5 border-t border-line pt-2 text-sm">
       <h4 className={captionClassName}>{t('travel.pilot.dscan.worth.holes.title')}</h4>
-      <p className="tabular-nums">{counts.join(' · ')}</p>
+      <p className="tabular-nums">{holeSizeCounts(t, read)}</p>
       {read.massKg > 0 && (
         <p className="text-text-dim">
           {t('travel.pilot.dscan.worth.holes.mass', {
