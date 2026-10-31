@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { ALL_BOOK_PARTS, bookPartsFor, mergeBookParts, missingBookParts } from './bookParts';
 
 describe('bookPartsFor', () => {
-  it('reads only the core for Extractions and Moon owners', () => {
-    for (const route of ['extractions', 'moon-owners'] as const) {
-      expect([...bookPartsFor(route, null)]).toEqual(['core']);
-    }
+  it('reads only the core for Extractions', () => {
+    expect([...bookPartsFor('extractions', null)]).toEqual(['core']);
+  });
+
+  it('adds the moon owner summaries for the Moon owners tab only (#5717)', () => {
+    expect(new Set(bookPartsFor('moon-owners', null))).toEqual(new Set(['core', 'owners']));
+    // Its detail page prices one owner from the ledger rows and reads no summary.
+    expect([...bookPartsFor('moon-owners', 'moonOwner')]).toEqual(['core']);
+    expect(ALL_BOOK_PARTS).not.toContain('owners');
   });
 
   it('adds the ledger for Miners and Statements, and the answers for Miners', () => {

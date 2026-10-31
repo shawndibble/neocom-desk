@@ -346,3 +346,50 @@ describe('readBookData and the Overview/Miners read models (#5259)', () => {
     expect(await db.corpBookParts.count()).toBeGreaterThan(0);
   });
 });
+
+describe('readBookData and the moon owner summaries (#5717)', () => {
+  const VIEW = `${BOOK}/feederViews/5`;
+  beforeEach(() => {
+    store.docs.set(`${BOOK}/feeders/6`, { corporationId: 6, status: 'active' });
+    store.docs.set(VIEW, { schemaVersion: 1, minedValueIsk: 10 });
+  });
+  const feederViewReads = () => store.reads.filter((p) => p.includes('/feederViews'));
+
+  it('reads one summary doc per moon owner with the owners part, and nothing under it', async () => {
+    const data = await readBookData(7, CORP, new Set(['core', 'owners']));
+    expect(feederViewReads()).toEqual([VIEW, `${BOOK}/feederViews/6`]);
+    expect([...data!.feederSummaries!.keys()]).toEqual([5]);
+    expect(data!.feederSummaries!.get(5)).toMatchObject({ minedValueIsk: 10 });
+  });
+
+  it('reads none without it: the other tabs and the whole-book export', async () => {
+    expect((await readBookData(7, CORP, new Set(['core'])))!.feederSummaries).toBeUndefined();
+    expect((await readBookData(7, CORP))!.feederSummaries).toBeUndefined();
+    expect(feederViewReads()).toEqual([]);
+  });
+
+  it('leaves out a summary the rules refuse, so that moon owner is priced from its rows', async () => {
+    store.denied.add(VIEW);
+    const data = await readBookData(7, CORP, new Set(['core', 'owners']));
+    expect(data!.feederSummaries!.size).toBe(0);
+  });
+
+  it('reads the owners part alone from the held record list, then merges it', async () => {
+    const held = await readBookData(7, CORP, new Set(['core']));
+    store.reads.length = 0;
+    const extra = await readBookData(7, CORP, new Set(['owners']));
+    // The record list came from this tab's copy: no feeders collection read, only the summaries.
+    expect(store.reads.filter((p) => p.includes('/feeders'))).toEqual([]);
+    expect(feederViewReads()).toEqual([VIEW, `${BOOK}/feederViews/6`]);
+    const merged = mergeBookData(held!, extra!);
+    expect(merged.parts).toEqual(new Set(['core', 'owners']));
+    expect(merged.feederSummaries?.get(5)).toBeDefined();
+    expect(merged.observed).toEqual(held!.observed);
+  });
+
+  it('reads no ledger row for the moon owner summaries', async () => {
+    store.reads.length = 0;
+    await readBookData(7, CORP, new Set(['owners']));
+    expect(store.reads.filter((p) => p.startsWith(`${BOOK}/observed`))).toEqual([]);
+  });
+});
