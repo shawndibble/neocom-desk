@@ -466,6 +466,7 @@ export function ContractDetailModal({
                       title={t('contracts.detailItemsIncluded')}
                       columns={itemColumns}
                       items={included}
+                      allItems={items.list}
                       typeNames={items.typeNames}
                     />
                   )}
@@ -475,6 +476,7 @@ export function ContractDetailModal({
                       title={t('contracts.detailItemsRequested')}
                       columns={itemColumns}
                       items={requested}
+                      allItems={items.list}
                       typeNames={items.typeNames}
                     />
                   )}
@@ -556,23 +558,28 @@ function ItemSection({
   title,
   columns,
   items,
+  allItems,
   typeNames,
 }: {
   contractId: number;
   title: string;
   columns: DataTableColumn<ContractItem>[];
   items: ContractItem[];
+  /** Every item of the contract: each section's export holds them all, with a Side column. */
+  allItems: ContractItem[];
   typeNames: ReadonlyMap<number, string>;
 }) {
   const { t } = useTranslation();
   const csvColumns = useMemo(() => contractItemsCsvColumns(t, typeNames), [t, typeNames]);
-  // Contract id and section in the filename: exporting Included then
-  // Requested, or two contracts in a row, never overwrites the same file.
+  // Both sections export the whole contract (Included and Requested, told
+  // apart by the Side column), so `source: 'rows'`, not this section's table.
+  // The contract id in the filename: two contracts in a row never overwrite one file.
   const tableExport = useTableExport({
     surface: 'contract-items',
-    rows: items,
+    rows: allItems,
     columns: csvColumns,
-    qualifier: `${contractId} ${title}`,
+    qualifier: String(contractId),
+    source: 'rows',
   });
   if (items.length === 0) return null;
   return (

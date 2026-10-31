@@ -61,7 +61,7 @@ import {
   corpContractsView,
   currentContractsView,
 } from '@/features/contracts/contractsHistoryView';
-import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
+import { useCharacterCountOrLoading, useCharacterNames } from '@/features/character/useCharacters';
 import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 
@@ -290,9 +290,20 @@ export function Contracts() {
     () => filterContracts(contracts, rowsFilter, issuerNames, selfOf),
     [contracts, rowsFilter, issuerNames, selfOf]
   );
+  const characterNames = useCharacterNames();
   const historyCsvColumns = useMemo(
-    () => contractsCsvColumns(t, (id) => issuerNames.get(id) ?? `#${id}`, selfOf),
-    [t, issuerNames, selfOf]
+    () =>
+      contractsCsvColumns(
+        t,
+        (id) => issuerNames.get(id) ?? `#${id}`,
+        selfOf,
+        (contract) => {
+          if (view.characterNameOf) return view.characterNameOf(contract);
+          const owner = view.ownerOf(contract);
+          return owner === null ? null : (characterNames.get(owner) ?? null);
+        }
+      ),
+    [t, issuerNames, selfOf, view, characterNames]
   );
   const historyExport = useTableExport({
     surface: 'contracts',

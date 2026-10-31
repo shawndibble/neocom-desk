@@ -24,16 +24,59 @@ function contract(overrides: Partial<Contract> = {}): Contract {
 }
 
 describe('contractsCsvColumns', () => {
-  it('orders columns type, status, issuer, receiver, price, expires', () => {
-    const columns = contractsCsvColumns(t, nameFor);
+  it('exports every column the table can show plus the courier route and deadline', () => {
+    const columns = contractsCsvColumns(t, nameFor, undefined, () => 'Alpha');
     expect(columns.map((c) => c.header)).toEqual([
       'contracts.type',
+      'contracts.csvTitle',
+      'contracts.character',
       'contracts.status',
       'contracts.issuer',
       'contracts.receiver',
       'contracts.price',
+      'contracts.csvCollateral',
+      'contracts.issued',
       'contracts.expires',
+      'contracts.csvCourierStart',
+      'contracts.csvCourierEnd',
+      'contracts.csvCourierDeadline',
     ]);
+  });
+
+  it('leaves the character column out when nothing names the owner', () => {
+    expect(contractsCsvColumns(t, nameFor).map((c) => c.header)).not.toContain(
+      'contracts.character'
+    );
+  });
+
+  it('exports the type and status as the table labels them, not the ESI slug', () => {
+    const columns = contractsCsvColumns(t, nameFor);
+    const at = (header: string, c: Contract) => columns.find((x) => x.header === header)!.value(c);
+    expect(at('contracts.type', contract({ type: 'courier' }))).toBe('contracts.typeCourier');
+    expect(at('contracts.status', contract({ status: 'finished_issuer' }))).toBe(
+      'contracts.statusFinishedIssuer'
+    );
+    expect(at('contracts.issued', contract())).toBe('2026-08-20T12:00:00Z');
+  });
+
+  it('exports a courier route ids and delivery deadline, blank for other contracts', () => {
+    const columns = contractsCsvColumns(t, nameFor);
+    const at = (header: string, c: Contract) => columns.find((x) => x.header === header)!.value(c);
+    const courier = contract({
+      type: 'courier',
+      status: 'in_progress',
+      start_location_id: 60003760,
+      end_location_id: 60008494,
+      collateral: 1_000_000,
+      days_to_complete: 3,
+      date_accepted: '2026-08-21T00:00:00Z',
+    });
+    expect(at('contracts.csvCourierStart', courier)).toBe(60003760);
+    expect(at('contracts.csvCourierEnd', courier)).toBe(60008494);
+    expect(at('contracts.csvCourierDeadline', courier)).toBe('2026-08-24T00:00:00.000Z');
+    expect(at('contracts.csvCollateral', courier)).toBe(1_000_000);
+    expect(at('contracts.csvCourierDeadline', contract())).toBeNull();
+    expect(at('contracts.csvCourierStart', contract({ start_location_id: 5 }))).toBeNull();
   });
 
   it('names the receiver, blank when none or the pilot', () => {
@@ -45,11 +88,11 @@ describe('contractsCsvColumns', () => {
     expect(col.value(contract({ acceptor_id: 100 }))).toBeNull();
   });
 
-  it('prefers title over type when a title is set', () => {
+  it('exports the title in its own column, blank when none is set', () => {
     const columns = contractsCsvColumns(t, nameFor);
-    const typeColumn = columns.find((c) => c.header === 'contracts.type')!;
-    expect(typeColumn.value(contract({ title: 'Fuel run', type: 'courier' }))).toBe('Fuel run');
-    expect(typeColumn.value(contract({ title: undefined, type: 'courier' }))).toBe('courier');
+    const titleColumn = columns.find((c) => c.header === 'contracts.csvTitle')!;
+    expect(titleColumn.value(contract({ title: 'Fuel run', type: 'courier' }))).toBe('Fuel run');
+    expect(titleColumn.value(contract({ title: undefined, type: 'courier' }))).toBeNull();
   });
 
   it('resolves the issuer name via nameFor', () => {
@@ -80,7 +123,7 @@ describe('contractsCsvColumns', () => {
     const row = contract({ price: undefined, reward: undefined });
     const csv = toCsv([row], columns);
     const fields = csv.split('\r\n')[1].split(',');
-    expect(fields[3]).toBe('');
+    expect(fields[6]).toBe('');
   });
 
   it('passes expires through unchanged as a raw ISO string', () => {

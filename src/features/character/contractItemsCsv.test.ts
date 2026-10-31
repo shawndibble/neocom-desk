@@ -18,8 +18,9 @@ function item(overrides: Partial<ContractItem> = {}): ContractItem {
 }
 
 describe('contractItemsCsvColumns', () => {
-  it("uses the detail table's headers: item, then quantity", () => {
+  it("uses the detail table's headers, led by which table the item sits in", () => {
     expect(contractItemsCsvColumns(t, typeNames).map((c) => c.header)).toEqual([
+      'contracts.detailItemSide',
       'contracts.detailItemName',
       'contracts.detailQuantity',
     ]);
@@ -31,7 +32,12 @@ describe('contractItemsCsvColumns', () => {
       contractItemsCsvColumns(t, typeNames)
     );
     const [, known, unknown] = csv.split('\r\n');
-    expect(known).toBe('"Damage Control II",744');
-    expect(unknown).toBe('"#99999",1000');
+    expect(known).toBe('"contracts.detailItemsIncluded","Damage Control II",744');
+    expect(unknown).toBe('"contracts.detailItemsIncluded","#99999",1000');
+  });
+
+  it('marks an item the acceptor must supply as Requested', () => {
+    const csv = toCsv([item({ is_included: false })], contractItemsCsvColumns(t, typeNames));
+    expect(csv.split('\r\n')[1]).toBe('"contracts.detailItemsRequested","Damage Control II",744');
   });
 });
