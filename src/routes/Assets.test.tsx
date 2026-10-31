@@ -666,8 +666,12 @@ describe('Assets', () => {
     expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
     // The ship row's menu offers where it sits (Set waypoint) and its name; "Open in Fittings" lives in the opened ship's header.
     await user.click(screen.getByRole('button', { name: 'More actions for Drake' }));
-    expect(await screen.findByRole('menuitem', { name: /set waypoint/i })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    // The menu re-renders once its station lookup lands, so each assertion
+    // re-queries instead of holding an item the re-render may have replaced.
+    await waitFor(() => {
+      expect(screen.getByRole('menuitem', { name: /set waypoint/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    });
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('button', { name: 'Open in Fittings' })).not.toBeInTheDocument();
 
@@ -683,16 +687,13 @@ describe('Assets', () => {
 
     // Back walks up exactly one level per press: Cargo Hold -> Drake -> the
     // station's own contents -> the root list.
-    // Each step waits for the level it leaves to be gone before asserting the
-    // new one: the old level's own heading can satisfy a `findBy` and then be
-    // swapped out from under the assertion.
     await goBack(user); // now at Drake: its row is Cargo Hold
-    await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
     expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
 
     await goBack(user); // now at the station: its row is Drake
-    await waitFor(() => expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument());
     expect(await screen.findByRole('heading', { name: 'Drake' })).toBeInTheDocument();
+    expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
 
     await goBack(user); // now at the root list
     expect(
