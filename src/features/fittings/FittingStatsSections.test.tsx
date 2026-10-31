@@ -1486,9 +1486,12 @@ describe('FittingStatsSections — column and side panels', () => {
       />
     );
     const pilot = within(await screen.findByRole('dialog', { name: 'Pilot' }));
-    expect(pilot.getByRole('button', { name: 'What to train' })).toHaveAttribute(
-      'aria-expanded',
-      'true'
+    // The section unfolds once the saved layout has hydrated, after the panel opens.
+    await waitFor(() =>
+      expect(pilot.getByRole('button', { name: 'What to train' })).toHaveAttribute(
+        'aria-expanded',
+        'true'
+      )
     );
     expect(pilot.getByText('Train list')).toBeInTheDocument();
     expect(onShown).toHaveBeenCalled();
