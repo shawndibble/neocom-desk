@@ -9,6 +9,8 @@ import {
 } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
 import * as Icon from '@/components/ui/icons';
+import { ExportTableSub } from '@/components/ui/TableExport';
+import { MenuKindContext } from '@/components/ui/rowActionsContext';
 import { PlanConfirmation } from './PlanConfirmation';
 import type { usePlanExport } from './usePlanExport';
 import type { usePlanImport } from './usePlanImport';
@@ -22,12 +24,10 @@ export function PlanImportExportActions({
   container,
   imports,
   exporter,
-  scheduledCount,
 }: {
   container: HTMLElement;
   imports: ReturnType<typeof usePlanImport>;
   exporter: ReturnType<typeof usePlanExport>;
-  scheduledCount: number;
 }) {
   const { t } = useTranslation();
   const {
@@ -42,8 +42,14 @@ export function PlanImportExportActions({
     undoQueueImportReplace,
     importError,
   } = imports;
-  const { copyConfirm, exportMenuOpen, setExportMenuOpen, handleExport, handleExportCsv } =
-    exporter;
+  const {
+    copyConfirm,
+    exportMenuOpen,
+    setExportMenuOpen,
+    handleExport,
+    handleTableDone,
+    tableExport,
+  } = exporter;
   return createPortal(
     <>
       <DropdownMenu open={importMenuOpen} onOpenChange={setImportMenuOpen}>
@@ -102,9 +108,9 @@ export function PlanImportExportActions({
           >
             {t('plans.exportClipboard')}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleExportCsv} disabled={scheduledCount === 0}>
-            {t('plans.exportCsvQueue')}
-          </DropdownMenuItem>
+          <MenuKindContext.Provider value="dropdown">
+            <ExportTableSub tableExport={tableExport} onDone={handleTableDone} />
+          </MenuKindContext.Provider>
         </DropdownMenuContent>
       </DropdownMenu>
       {/* Beside the buttons that produced them, not down in the entries

@@ -42,6 +42,8 @@ interface ContactsCharacterColumnsInput {
   contactLabels: ReadonlyMap<number, string>;
   affiliations: ReadonlyMap<number, CharacterAffiliation>;
   ownAffiliation: OwnAffiliation;
+  /** The export menu was opened: read every contact's Title / Score for the file, whatever the column shows. */
+  exportArmed?: boolean;
 }
 
 /**
@@ -55,6 +57,7 @@ export function useContactsCharacterColumns({
   contactLabels,
   affiliations,
   ownAffiliation,
+  exportArmed = false,
 }: ContactsCharacterColumnsInput) {
   const { t } = useTranslation();
   const characterColumnVisibility = useColumnVisibility(
@@ -81,8 +84,11 @@ export function useContactsCharacterColumns({
   const achievementIds = useMemo(() => achievementContactIds(contacts), [contacts]);
   const achievements = useCharacterAchievements(
     achievementIds,
-    characterColumnVisibility.isVisible('achievement')
+    characterColumnVisibility.isVisible('achievement') || exportArmed
   );
+  // Still reading: an export made now has blank titles and scores, so it is marked partial.
+  const achievementsPending =
+    exportArmed && achievementIds.some((id) => achievements.partsOf(id) === undefined);
 
   // The identity column (never hidden) plus the optional columns the picker
   // controls, in table order — `CONTACTS_CHARACTER_COLUMN_IDS`' own order.
@@ -249,6 +255,8 @@ export function useContactsCharacterColumns({
 
   return {
     affiliationRows,
+    achievements,
+    achievementsPending,
     optionalCharacterColumns,
     availableCharacterColumnIds,
     columns,

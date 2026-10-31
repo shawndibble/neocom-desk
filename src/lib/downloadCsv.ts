@@ -23,9 +23,12 @@ export type CsvSurface =
   | 'wallet-transactions'
   | 'corp-wallet-transactions'
   | 'assets'
+  | 'my-ships'
   | 'corp-assets'
   | 'contracts'
   | 'contacts'
+  | 'npc-standings'
+  | 'stock-targets'
   // The Across tab's rows are a different shape (one row per contact across
   // every character, not one row per contact on this one) and must never
   // collide with the Character tab's own file — same reasoning as

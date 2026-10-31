@@ -9,7 +9,7 @@
  * active Character holds a blueprint, so an industry pilot sees what to build
  * and can hand the lot to a Build Group.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { SecurityStatus } from '@/components/SecurityStatus';
@@ -145,6 +145,20 @@ export function StockMarketPage({
   const loading = loaded?.key !== loadKey && failedKey !== loadKey;
   const failed = failedKey === loadKey && loaded?.key !== loadKey;
   const summary = useMemo(() => (data ? summarizeStock(data.rows) : null), [data]);
+  // Stable between renders: the Manager table's export columns are built from them.
+  const groupOf = useCallback((typeId: number) => data?.groups.get(typeId), [data]);
+  const nameOf = useCallback(
+    (typeId: number) => data?.names.get(typeId) ?? t('common.unknownType', { id: typeId }),
+    [data, t]
+  );
+  // With one Character the holder is always them: naming them says nothing.
+  const characterName = useMemo(
+    () =>
+      data && data.characterNames.size > 1
+        ? (id: number) => data.characterNames.get(id) ?? `#${id}`
+        : undefined,
+    [data]
+  );
   // Retry unmounts into a spinner: focus waits on the results wrapper instead of the page body.
   const [resultsRef, , holdRetryFocus] = useRetryFocus(
     loading ? 'busy' : failed ? 'failed' : 'ok',
@@ -253,7 +267,6 @@ export function StockMarketPage({
   );
 
   const rows = data?.rows ?? [];
-  const groupOf = (typeId: number) => data?.groups.get(typeId);
   const groupNames = [
     ...new Set(rows.map((row) => groupOf(row.typeId)).filter((g): g is string => !!g)),
   ].sort((a, b) => a.localeCompare(b));
@@ -280,15 +293,7 @@ export function StockMarketPage({
       ]}
     />
   );
-  const nameOf = (typeId: number) =>
-    data?.names.get(typeId) ?? t('common.unknownType', { id: typeId });
   const place = data?.place ?? null;
-  // With one Character the holder is always them: naming them says nothing.
-  const characterName =
-    data && data.characterNames.size > 1
-      ? (id: number) => data.characterNames.get(id) ?? `#${id}`
-      : undefined;
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {showBack && (

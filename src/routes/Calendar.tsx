@@ -58,7 +58,7 @@ import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { CalendarSettingsForm } from '@/features/settings/CalendarSettingsForm';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { calendarCsvColumns, calendarExportEvents } from '@/features/character/calendarCsv';
+import { calendarCsvColumns } from '@/features/character/calendarCsv';
 import type { CalendarRsvpResponse } from '@/esi/endpoints';
 
 /**
@@ -327,17 +327,13 @@ export function Calendar() {
     setAnchor(density === 'month' ? addMonths(current, delta) : addWeeks(current, delta));
   }
 
-  // The events aren't a DataTable (the map and the rail are views over
-  // them), so the export reads `events` in ESI's order, narrowed to what the
-  // rail shows: kind filter and selected day.
-  const exportEvents = useMemo(
-    () => calendarExportEvents(events, hiddenKinds, selectedDayMs, zone),
-    [events, hiddenKinds, selectedDayMs, zone]
-  );
+  // The rail isn't a DataTable (the map and the rail are views over the board),
+  // so the export reads `railItems`: every kind the rail lists, honouring the
+  // hidden-kind toggles and the selected day, in the rail's deadline order.
   const csvColumns = useMemo(() => calendarCsvColumns(t), [t]);
   const eventsExport = useTableExport({
     surface: 'calendar',
-    rows: exportEvents,
+    rows: railItems,
     columns: csvColumns,
     source: 'rows',
   });

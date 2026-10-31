@@ -1,31 +1,38 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { CharacterContact } from '@/esi/endpoints';
 import { contactTypeLabelKey } from './contactsFilter';
+import { contactLabelNames } from './contacts';
+import { achievementCsvColumns } from './achievementCsv';
+import type { AchievementLookup } from './useCharacterAchievements';
 import type { ContactAffiliationRow } from './contactAffiliation';
 import type { AcrossCharactersRow } from './contactsAcrossCharacters';
+import { exportFlag } from '@/lib/exportFlag';
+import { joined } from '@/lib/exportSheets';
 
 function entityName(names: ReadonlyMap<number, string>, id: number): string {
   return names.get(id) ?? `#${id}`;
 }
 
-function yesNo(t: CsvTranslate, value: boolean): string {
-  return value ? t('contacts.csvYes') : t('contacts.csvNo');
+/** Own-corporation and own-alliance are only known for a character whose affiliation has loaded. */
+function ownable(
+  contact: CharacterContact,
+  affiliationRows: ReadonlyMap<number, ContactAffiliationRow>
+): ContactAffiliationRow | undefined {
+  if (contact.contact_type !== 'character') return undefined;
+  const row = affiliationRows.get(contact.contact_id);
+  return row && row.corporationId !== null ? row : undefined;
 }
 
 /**
- * CSV columns for the Character tab (issue #2164): name, type, affiliation,
- * standing, blocked, watched. A fixed set independent of the table's column
- * picker, splitting its combined `flags` cell into its own blocked/watched
- * columns and dropping `labels` (in-game labels, not core to the export).
- * `standing` passes through as the raw number, not the `StandingIcon` tag the
- * table renders. Affiliation prints the corp name only, never the alliance
- * too: the table shows both on separate lines, but a CSV row is flat, and the
- * corp is the more specific of the two.
+ * CSV columns for the Character tab: a fixed set, whatever the column picker shows, splitting the
+ * table's Affiliation and flags cells. Title and score are blank until the public records are read.
  */
 export function contactsCsvColumns(
   t: CsvTranslate,
   names: ReadonlyMap<number, string>,
-  affiliationRows: ReadonlyMap<number, ContactAffiliationRow>
+  affiliationRows: ReadonlyMap<number, ContactAffiliationRow>,
+  contactLabels: ReadonlyMap<number, string>,
+  achievements: AchievementLookup
 ): CsvColumn<CharacterContact>[] {
   return [
     { header: t('contacts.name'), value: (contact) => entityName(names, contact.contact_id) },
@@ -37,28 +44,45 @@ export function contactsCsvColumns(
         return row && row.corporationId !== null ? entityName(names, row.corporationId) : null;
       },
     },
+    {
+      header: t('contacts.csvAlliance'),
+      value: (contact) => {
+        const row = affiliationRows.get(contact.contact_id);
+        return row && row.allianceId !== null ? entityName(names, row.allianceId) : null;
+      },
+    },
+    {
+      header: t('contacts.ownCorporation'),
+      value: (contact) => {
+        const row = ownable(contact, affiliationRows);
+        return exportFlag(t, row?.inOwnCorporation);
+      },
+    },
+    {
+      header: t('contacts.ownAlliance'),
+      value: (contact) => {
+        const row = ownable(contact, affiliationRows);
+        return exportFlag(t, row?.inOwnAlliance);
+      },
+    },
+    ...achievementCsvColumns<CharacterContact>(t, (contact) => contact.contact_id, achievements),
     { header: t('contacts.standing'), value: (contact) => contact.standing },
     {
+      header: t('contacts.labels'),
+      value: (contact) => joined(contactLabelNames(contact, contactLabels)),
+    },
+    {
       header: t('contacts.blocked'),
-      value: (contact) => yesNo(t, contact.is_blocked === true),
+      value: (contact) => exportFlag(t, contact.is_blocked === true),
     },
     {
       header: t('contacts.watched'),
-      value: (contact) => yesNo(t, contact.is_watched === true),
+      value: (contact) => exportFlag(t, contact.is_watched === true),
     },
   ];
 }
 
-/**
- * CSV columns for the Across tab (issue #2164): name, type, how many
- * characters hold the contact, and every distinct standing set on it.
- * `held` is a raw number, matching every other numeric export column; `standings`
- * is a deliberate exception (a joined string, e.g. `"10, -10"`) — a row here
- * can carry more than one standing, and reducing that to a single raw number
- * would drop exactly the disagreement this tab exists to show. There is no
- * fixed per-character column set to spread them into either: the character
- * list differs per pilot.
- */
+/** CSV columns for the Across tab. Standings are `"Name: value"` pairs, so a row where alts disagree says which holds which. */
 export function contactsAcrossCsvColumns(
   t: CsvTranslate,
   names: ReadonlyMap<number, string>
@@ -71,6 +95,19 @@ export function contactsAcrossCsvColumns(
         t(contactTypeLabelKey({ contact_id: row.contactId, contact_type: row.contactType })),
     },
     { header: t('contacts.acrossCharacters'), value: (row) => row.held.length },
-    { header: t('contacts.acrossStandings'), value: (row) => row.standings.join(', ') },
+    { header: t('contacts.csvAcrossTotal'), value: (row) => row.held.length + row.missing.length },
+    {
+      header: t('contacts.csvAcrossHolders'),
+      value: (row) => joined(row.held.map((h) => h.name)),
+    },
+    {
+      header: t('contacts.csvAcrossMissing'),
+      value: (row) => joined(row.missing.map((m) => m.name)),
+    },
+    {
+      header: t('contacts.acrossStandings'),
+      value: (row) => joined(row.held.map((h) => `${h.name}: ${h.contact.standing}`)),
+    },
+    { header: t('contacts.csvAcrossDisagrees'), value: (row) => exportFlag(t, row.disagrees) },
   ];
 }

@@ -55,6 +55,7 @@ import type {
   CorporationWalletDivision,
   CorporationWalletTransaction,
   WalletJournalEntry,
+  WalletTransactionCommon,
 } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
 import type { JournalRow } from '@/engine/journalNetting';
@@ -331,6 +332,9 @@ interface CorpJournalPanelProps {
   journalColumns: DataTableColumn<JournalRow>[];
   playerOptions: readonly PlayerOption[];
   playerNameFor: (entry: JournalRow) => string;
+  /** The market fill behind a journal line, and the names of its items: the export's item columns. */
+  linkFor: (entry: JournalRow) => WalletTransactionCommon | undefined;
+  nameFor: (typeId: number) => string;
   filter: WalletJournalFilter;
   rowsFilter: WalletJournalFilter;
   onFilterChange: (filter: WalletJournalFilter) => void;
@@ -350,6 +354,8 @@ function CorpJournalPanel({
   journalColumns,
   playerOptions,
   playerNameFor,
+  linkFor,
+  nameFor,
   filter,
   rowsFilter,
   onFilterChange,
@@ -364,8 +370,8 @@ function CorpJournalPanel({
   const { filteredJournal, breakdownJournal, chartJournal, refTypeOptions } =
     useJournalFilterResult(journal, rowsFilter);
   const journalCsvColumns = useMemo(
-    () => walletJournalCsvColumns(t, undefined, playerNameFor),
-    [t, playerNameFor]
+    () => walletJournalCsvColumns(t, { playerName: playerNameFor, fills: { linkFor, nameFor } }),
+    [t, playerNameFor, linkFor, nameFor]
   );
   // Named after the division, so exporting two divisions never overwrites the
   // same file (issue #413).
@@ -668,6 +674,8 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
             journalColumns={journalColumns}
             playerOptions={playerOptions}
             playerNameFor={playerNameFor}
+            linkFor={linkFor}
+            nameFor={nameForType}
             filter={journalFilter}
             rowsFilter={journalRowsFilter}
             onFilterChange={setJournalFilter}

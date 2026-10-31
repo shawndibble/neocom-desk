@@ -3,7 +3,7 @@
  * in place (§6c's faint pencil); a row opens Show Info; the row's ⋮ is the
  * item menu every other item row has, plus "Remove from list".
  */
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -27,6 +27,9 @@ import { useRowSelection } from '@/lib/useRowSelection';
 import { StockFillBar, StockStatusPill } from './StockStatus';
 import { formatNumber } from '@/lib/numberLocale';
 import { StockHolders } from './StockHolders';
+import { stockCsvColumns } from './stockCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { STOCK_COLUMN_IDS, useVisibleStockColumns, type StockColumnId } from './stockColumns';
 
 function TargetCell({
@@ -369,6 +372,16 @@ export function StockManagerTable({
       column.id === 'select' || column.id === 'item' || isVisible(column.id as StockColumnId)
   );
 
+  const stockColumns = useMemo(
+    () => stockCsvColumns(t, { nameOf, groupOf, characterName }),
+    [t, nameOf, groupOf, characterName]
+  );
+  const stockExport = useTableExport({
+    surface: 'stock-targets',
+    rows,
+    columns: stockColumns,
+  });
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-2 px-3 py-2">
@@ -383,7 +396,7 @@ export function StockManagerTable({
             {t('stockTargets.table.removeSelected', { count: selection.selected.size })}
           </Button>
         )}
-        <span className="ml-auto">
+        <span className="ml-auto flex items-center gap-2">
           <ColumnPickerMenu
             available={STOCK_COLUMN_IDS}
             visible={visible}
@@ -394,6 +407,7 @@ export function StockManagerTable({
             menuTitle={t('common.columnsMenuTitle')}
             resetLabel={t('common.resetColumns')}
           />
+          <TableActionsMenu name={t('stockTargets.table.label')} tableExport={stockExport} />
         </span>
       </div>
       <DataTable
@@ -401,6 +415,7 @@ export function StockManagerTable({
         rows={rows}
         mobileSort
         rowKey={(row) => row.typeId}
+        {...stockExport.tableProps}
         label={t('stockTargets.table.label')}
         stackLayout="dense"
         // The ⋮ pins to the card's edge on a phone, so line one stays text-tall (§4a).

@@ -32,7 +32,7 @@ import { useClonesView } from '@/features/character/useClonesView';
 import { cloneJumpCooldown } from '@/engine/clone/cloneJump';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { clonesCsvColumns } from '@/features/character/clonesCsv';
+import { cloneCsvRows, clonesCsvColumns } from '@/features/character/clonesCsv';
 import { CloneVerdictCard } from '@/features/character/CloneVerdictCard';
 import { WORN_CLONE_ID } from '@/features/character/cloneTraining';
 import { CLONES_SORTS, type ClonesSort } from '@/features/character/clonesSort';
@@ -152,13 +152,37 @@ export function Clones() {
     prices,
   });
   const csvColumns = useMemo(
-    () => clonesCsvColumns(t, { locationNames, implantNames, nicknames }),
-    [t, locationNames, implantNames, nicknames]
+    () =>
+      clonesCsvColumns(t, {
+        locationNames,
+        implantNames,
+        implantDetails,
+        nicknames,
+        prices,
+        wornPlaceName: characterSystemName,
+      }),
+    [t, locationNames, implantNames, implantDetails, nicknames, prices, characterSystemName]
   );
   const clonesExport = useTableExport({
     surface: 'clones',
-    // Nothing behind the full re-login banner, same as the list.
-    rows: clonesBlocked ? NO_CLONES : clones,
+    // No table is mounted, so `rows` carries the reader's sort.
+    source: 'rows',
+    rows: () =>
+      clonesBlocked
+        ? []
+        : cloneCsvRows(hasWorn ? wornIds : null, sortedClones, (clone) => ({
+            security:
+              clone === null
+                ? characterSystemId === null
+                  ? undefined
+                  : securities.get(characterSystemId)
+                : securityOf(clone.location_id),
+            jumps: clone === null ? undefined : jumpsByLocation?.get(clone.location_id),
+            training: showTraining
+              ? rowOf(clone === null ? WORN_CLONE_ID : clone.jump_clone_id)
+              : undefined,
+            best: bestCloneId === (clone === null ? WORN_CLONE_ID : clone.jump_clone_id),
+          })),
     columns: csvColumns,
   });
 

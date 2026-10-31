@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { JumpClone } from '@/esi/endpoints';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
@@ -119,25 +119,32 @@ export function useClonesView({
     };
   })();
   const showTraining = verdictCard !== null && verdictCard.kind !== 'note';
-  const rowOf = (id: string | number) => verdictResult?.rows.find((r) => r.cloneId === id);
-  const sortedClones = sortClones(
-    clones.map((clone) => {
-      const implantValue = prices ? sumImplantValue(clone.implants, prices) : null;
-      return {
-        clone,
-        id: clone.jump_clone_id,
-        locationId: clone.location_id,
-        deltaSeconds: showTraining ? (rowOf(clone.jump_clone_id)?.deltaSeconds ?? null) : null,
-        value:
-          implantValue &&
-          (implantValue.unpriced < clone.implants.length || clone.implants.length === 0)
-            ? implantValue.total
-            : null,
-      };
-    }),
-    sort,
-    jumpsByLocation
-  ).map((x) => x.clone);
+  const rowOf = useCallback(
+    (id: string | number) => verdictResult?.rows.find((r) => r.cloneId === id),
+    [verdictResult]
+  );
+  const sortedClones = useMemo(
+    () =>
+      sortClones(
+        clones.map((clone) => {
+          const implantValue = prices ? sumImplantValue(clone.implants, prices) : null;
+          return {
+            clone,
+            id: clone.jump_clone_id,
+            locationId: clone.location_id,
+            deltaSeconds: showTraining ? (rowOf(clone.jump_clone_id)?.deltaSeconds ?? null) : null,
+            value:
+              implantValue &&
+              (implantValue.unpriced < clone.implants.length || clone.implants.length === 0)
+                ? implantValue.total
+                : null,
+          };
+        }),
+        sort,
+        jumpsByLocation
+      ).map((x) => x.clone),
+    [clones, prices, showTraining, rowOf, sort, jumpsByLocation]
+  );
   const bestCloneId = showTraining ? (verdictResult?.bestCloneId ?? null) : null;
 
   return {

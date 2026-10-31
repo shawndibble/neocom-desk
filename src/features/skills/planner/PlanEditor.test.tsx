@@ -427,18 +427,18 @@ describe('PlanEditor tools pane', () => {
     expect(screen.getByText('Skill A')).toBeInTheDocument();
   });
 
-  it('collapses Export into one control that reveals "to clipboard" / "to CSV" only after being opened', async () => {
+  it('collapses Export into one control that reveals "to clipboard" / the "Export table" submenu only after being opened', async () => {
     const user = userEvent.setup();
     renderEditor();
     await openTools(user);
 
     expect(screen.queryByRole('menuitem', { name: 'Export to clipboard' })).toBeNull();
-    expect(screen.queryByRole('menuitem', { name: 'Export CSV' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Export table' })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Export' }));
 
     expect(screen.getByRole('menuitem', { name: 'Export to clipboard' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Export CSV' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Export table' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('menuitem', { name: 'Export to clipboard' }));
     await waitFor(() => expect(clipboardWriteText).toHaveBeenCalledTimes(1));

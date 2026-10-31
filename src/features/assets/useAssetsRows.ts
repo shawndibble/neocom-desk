@@ -49,6 +49,7 @@ import {
   locationLabel,
   matchAssets,
   type ValuedAssetMatch,
+  assetHolderChain,
   compareValuedAssetMatches,
   sortStations,
   placeKindForStation,
@@ -243,27 +244,18 @@ export function useAssetsRows(assetsData: AssetsData) {
 
   /** Ancestor labels for a search hit, outermost first — where this item actually lives. */
   function trailFor(asset: CharacterAsset): string[] {
-    const labels: string[] = [];
-    let current = asset;
-    const seen = new Set<number>([asset.item_id]);
-    while (current.location_type === 'item') {
-      const parent = assetsByItemId.get(current.location_id);
-      if (!parent || seen.has(parent.item_id)) break;
-      seen.add(parent.item_id);
-      labels.unshift(mergedTypeNames.get(parent.type_id) ?? `Type #${parent.type_id}`);
-      current = parent;
-    }
-    labels.unshift(
+    const { chain, rootLocationId, rootLocationType } = assetHolderChain(asset, assetsByItemId);
+    return [
       locationLabel(
-        current.location_id,
-        current.location_type,
+        rootLocationId,
+        rootLocationType,
         mergedLocationNames,
         assetsByItemId,
         mergedTypeNames,
         t
-      )
-    );
-    return labels;
+      ),
+      ...chain.map((parent) => mergedTypeNames.get(parent.type_id) ?? `Type #${parent.type_id}`),
+    ];
   }
 
   /** Where a search hit sits in the drill-down tree; null when the tree does not hold it. */
@@ -273,25 +265,11 @@ export function useAssetsRows(assetsData: AssetsData) {
 
   /** The station a search hit belongs to, for the link back into the drill-down. */
   function rootStationIdFor(asset: CharacterAsset): number | null {
-    let current = asset;
-    const seen = new Set<number>([asset.item_id]);
-    while (current.location_type === 'item') {
-      const parent = assetsByItemId.get(current.location_id);
-      if (!parent) break;
-      if (seen.has(parent.item_id)) {
-        // A cycle in the asset chain — `current.location_id` points at a node
-        // `buildAssetTree`'s cycle guard already absorbed, so no orphan
-        // station carries this id. Report unresolved rather than link to a
-        // station that doesn't exist.
-        return null;
-      }
-      seen.add(parent.item_id);
-      current = parent;
-    }
-    // We reached a real location, or the chain broke on a missing parent —
-    // in which case `buildAssetTree` made that same location_id an orphan
-    // group, so it addresses the right row either way.
-    return current.location_id;
+    const { rootLocationId, cyclic } = assetHolderChain(asset, assetsByItemId);
+    // A cycle points at a node `buildAssetTree`'s cycle guard already absorbed, so no orphan
+    // station carries this id. Otherwise the root is a real location, or the chain broke on a
+    // missing parent, which `buildAssetTree` made an orphan group of that same id.
+    return cyclic ? null : rootLocationId;
   }
 
   // Also requires a non-empty `debouncedSearch` when flat mode is driven by

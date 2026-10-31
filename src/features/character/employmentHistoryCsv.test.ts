@@ -25,11 +25,16 @@ function valuesOf(r: EmploymentHistoryRow, names: ReadonlyMap<number, string> = 
 }
 
 describe('employmentHistoryCsvColumns', () => {
-  it('orders columns corporation, joined, duration in days', () => {
+  it('orders columns corporation, joined, ended, duration in days, then the flags', () => {
     expect(employmentHistoryCsvColumns(t, new Map()).map((c) => c.header)).toEqual([
       'employmentHistory.corporation',
       'employmentHistory.started',
+      'employmentHistory.csvEnded',
       'employmentHistory.csvDurationDays',
+      'employmentHistory.current',
+      'employmentHistory.npc',
+      'employmentHistory.returned',
+      'employmentHistory.shortStay',
     ]);
   });
 
@@ -46,5 +51,25 @@ describe('employmentHistoryCsvColumns', () => {
 
   it('emits the tenure as a number of whole days, not a formatted duration', () => {
     expect(valuesOf(row())['employmentHistory.csvDurationDays']).toBe(10);
+  });
+
+  it('ends a past stint where its tenure runs out and leaves the current one open', () => {
+    expect(valuesOf(row({ tenureSeconds: 86_400 }))['employmentHistory.csvEnded']).toBe(
+      '2024-03-02T12:00:00.000Z'
+    );
+    expect(valuesOf(row({ ongoing: true }))['employmentHistory.csvEnded']).toBeUndefined();
+  });
+
+  it('flags current, NPC, returned and short stays as yes/no', () => {
+    expect(valuesOf(row({ ongoing: true, npc: true }))).toMatchObject({
+      'employmentHistory.current': 'common.exportFlagYes',
+      'employmentHistory.npc': 'common.exportFlagYes',
+      'employmentHistory.returned': 'common.exportFlagNo',
+      'employmentHistory.shortStay': 'common.exportFlagNo',
+    });
+    expect(valuesOf(row({ returned: true, shortStay: true }))).toMatchObject({
+      'employmentHistory.returned': 'common.exportFlagYes',
+      'employmentHistory.shortStay': 'common.exportFlagYes',
+    });
   });
 });
