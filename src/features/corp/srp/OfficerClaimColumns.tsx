@@ -61,10 +61,12 @@ const lostColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
   ),
 });
 
+/** Steps aside below `xl` so Approve and Reject fit at 1024; the claim detail still shows it. */
 const fleetColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
   id: 'fleet',
   header: ctx.t('srp.officer.columns.fleetOrFc'),
-  className: 'max-w-48 wrap-anywhere',
+  className: 'hidden max-w-48 wrap-anywhere xl:table-cell',
+  headerCellClassName: 'hidden xl:table-cell',
   render: (row) =>
     row.fleetOrFc ? (
       <span className="text-text-dim">{row.fleetOrFc}</span>
