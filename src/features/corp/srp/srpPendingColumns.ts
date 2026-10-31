@@ -1,7 +1,7 @@
 /**
  * The officer Pending table's optional columns and device-local visible-columns
- * preference. Pilot, Amount and the actions are not in the catalog: they are
- * what a claim is decided on.
+ * preference. The tick box, Pilot, Amount and the actions are not in the
+ * catalog: they are what a claim is decided on.
  *
  * Lost and Fleet or FC start off (issue #5701), so the table fits at 1024 with
  * Approve and Reject in view; the claim detail shows both. An officer who

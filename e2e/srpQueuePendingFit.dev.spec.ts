@@ -96,6 +96,7 @@ for (const width of [1024, 1280]) {
     const row = table.locator('tbody tr', { hasText: 'Varro Kestane' }).first();
     // Measured once the hull and system names have loaded, at their real widths.
     await expect(row).toContainText('Gila');
+    await expect(row).toContainText('Tama');
 
     const fit = await scrollerFit(table);
     expect(fit, 'no sideways scroller around the table').not.toBeNull();

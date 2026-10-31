@@ -5,7 +5,6 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { SrpClaim, SrpClaimOutcome } from '../srpClaimTypes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { stubViewport } from '@/test/viewport';
 
 vi.mock('./useSrpClaimNames', () => ({
   useSrpClaimNames: () => ({
@@ -24,7 +23,7 @@ const mailResult = vi.hoisted(() => vi.fn());
 vi.mock('./useSrpResultMail', () => ({ useSrpResultMail: () => mailResult }));
 
 import { OfficerQueue } from './OfficerQueue';
-import { PENDING_DEFAULT_COLUMNS, useVisiblePendingColumns } from './pendingColumns';
+import { PENDING_DEFAULT_COLUMNS, useVisiblePendingColumns } from './srpPendingColumns';
 import { setSrpMemberBackendOverride, type SrpMemberBackend } from './srpMemberBackend';
 import type { SrpClaimValues } from '../srpTypes';
 import type { SrpHistoryState, SrpQueueData } from './useSrpQueue';
@@ -514,11 +513,9 @@ describe('OfficerQueue Pending layout (md+)', () => {
 });
 
 describe('OfficerQueue pending columns', () => {
-  afterEach(() => void useVisiblePendingColumns.getState().setValue(PENDING_DEFAULT_COLUMNS));
+  afterEach(() => useVisiblePendingColumns.getState().setValue(PENDING_DEFAULT_COLUMNS));
 
   it('starts with Lost and Fleet or FC off, and the Columns menu turns Lost on', async () => {
-    // A desktop viewport: the table, not the phone's cards.
-    stubViewport((query) => !query.includes('max-width'));
     setup(pendingSet());
     const table = screen.getByRole('table');
     expect(within(table).getByRole('columnheader', { name: 'Hull' })).toBeInTheDocument();
@@ -526,6 +523,10 @@ describe('OfficerQueue pending columns', () => {
     expect(within(table).queryByRole('columnheader', { name: 'Fleet or FC' })).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    // Every catalog id names a real column: the menu reads each one's header.
+    for (const name of ['Hull', 'Lost', 'Fleet or FC']) {
+      expect(await screen.findByRole('menuitemcheckbox', { name })).toBeInTheDocument();
+    }
     await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Lost' }));
     await userEvent.keyboard('{Escape}');
     expect(

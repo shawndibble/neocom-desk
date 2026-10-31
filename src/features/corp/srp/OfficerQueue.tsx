@@ -53,7 +53,7 @@ import {
   PENDING_DEFAULT_COLUMNS,
   useVisiblePendingColumns,
   type PendingColumnId,
-} from './pendingColumns';
+} from './srpPendingColumns';
 import { groupByPilot, withMailSummary, type SrpMailClaim } from './srpResultMail';
 import { failureText } from './srpClaimText';
 import {
@@ -258,11 +258,17 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
   // The phone card has no such columns; only the desktop Pending table picks them.
   const picking = tab === 'pending' && !phone;
   const pendingAll = pendingColumns(ctx);
+  const pickable = Object.fromEntries(
+    pendingAll.filter((c) => isPendingColumnId(c.id)).map((c) => [c.id, c])
+  ) as Record<PendingColumnId, DataTableColumn<SrpClaim>>;
+  const pendingTable = pendingAll.filter(
+    (c) => !isPendingColumnId(c.id) || pendingShown.isVisible(c.id)
+  );
   const columns: DataTableColumn<SrpClaim>[] =
     tab === 'pending'
       ? phone
         ? phonePendingColumns(ctx)
-        : pendingAll.filter((c) => !isPendingColumnId(c.id) || pendingShown.isVisible(c.id))
+        : pendingTable
       : tab === 'owed'
         ? (phone ? phoneOwedColumns : owedColumns)(ctx)
         : (phone ? phoneHistoryColumns : historyColumns)(ctx);
@@ -356,11 +362,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
             <ColumnPickerMenu
               available={PENDING_COLUMN_IDS}
               visible={pendingShown.visible}
-              columnsById={
-                Object.fromEntries(
-                  pendingAll.filter((c) => isPendingColumnId(c.id)).map((c) => [c.id, c])
-                ) as Record<PendingColumnId, DataTableColumn<SrpClaim>>
-              }
+              columnsById={pickable}
               onToggle={pendingShown.toggle}
               onReset={pendingShown.reset}
               buttonLabel={t('common.columnsButton')}
