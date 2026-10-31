@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { encodeFittingShare } from '@/engine/fittings/fittingShare';
-import { fittingToShareInput } from '@/engine/fittings/shareMapper';
-import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
+import { fittingEditLocationFor } from '@/features/fittings/fittingEditLink';
+import { fittingEditLocation, type FittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { loadFittingPrice, unpricedSellRows } from '@/features/fittings/fittingPrice';
 import type { FittingChoices } from '@/features/fittings/useFittingChoices';
 import type { TradeHub } from '@/market/hubs';
@@ -15,16 +14,11 @@ export type GoalPrice =
 export const goalPriceKey = (goal: Pick<WalletGoal, 'id' | 'fittingId'>) =>
   JSON.stringify([goal.id, goal.fittingId]);
 
-export interface GoalFittingLocation {
-  pathname: string;
-  search: string;
-}
-
 export interface GoalPrices {
   /** Keyed by `goalPriceKey`; absent while loading. */
   prices: ReadonlyMap<string, GoalPrice>;
   /** Where each Fitting-priced Goal's Fitting opens, keyed by `goalPriceKey`; absent until it resolves or when it is too large to share. */
-  links: ReadonlyMap<string, GoalFittingLocation>;
+  links: ReadonlyMap<string, FittingEditLocation>;
 }
 
 const NONE: GoalPrices = { prices: new Map(), links: new Map() };
@@ -60,11 +54,12 @@ export function useGoalPrices(
         try {
           const picked = await resolve(fittingId);
           if (!picked) return failed;
-          const [price, encoded] = await Promise.all([
-            loadFittingPrice(picked.fitting, hub),
-            encodeFittingShare(fittingToShareInput(picked.fitting)),
-          ]);
-          const link = encoded.ok ? fittingEditLocation(encoded.payload) : null;
+          // A saved Fitting opens by its own code; an In-game one is encoded. A failed
+          // encode costs the link, never the price.
+          const link = picked.code
+            ? fittingEditLocation(picked.code)
+            : await fittingEditLocationFor(picked.fitting);
+          const price = await loadFittingPrice(picked.fitting, hub);
           if (unpricedSellRows(price.rows).length > 0) {
             return { key, price: { status: 'partial' } as GoalPrice, link };
           }

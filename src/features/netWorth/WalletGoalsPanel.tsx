@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   Button,
+  entityLinkClassName,
   Field,
   Fields,
   IskAmount,
@@ -21,19 +22,14 @@ import {
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
 import { GOAL_MAX_TARGET, goalProgress } from '@/engine/netWorth/waiting';
+import type { FittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { useFittingChoices } from '@/features/fittings/useFittingChoices';
 import { useMarketHub } from '@/features/market/hub';
 import { parseIskAmount } from '@/lib/isk';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import {
-  goalPriceKey,
-  useGoalPrices,
-  type GoalFittingLocation,
-  type GoalPrice,
-} from './useGoalPrices';
+import { goalPriceKey, useGoalPrices, type GoalPrice } from './useGoalPrices';
 import { useWalletGoals, type WalletGoal } from './walletGoalSetting';
 
 interface WalletGoalsPanelProps {
@@ -87,12 +83,14 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
   const save = () => {
     if (!draft || !canSave) return;
     const picked = choices.all.find((choice) => choice.id === draft.fittingId);
+    // A Fitting that is gone from the lists keeps the name it was picked under.
+    const kept = goals.find((g) => g.id === draft.id && g.fittingId === draft.fittingId);
     const goal: WalletGoal = {
       id: draft.id ?? crypto.randomUUID(),
       name: draft.name.trim(),
       target: byFitting ? null : amount,
       fittingId: byFitting ? draft.fittingId : null,
-      fittingName: byFitting ? (picked?.name ?? null) : null,
+      fittingName: byFitting ? (picked?.name ?? kept?.fittingName ?? null) : null,
     };
     setGoals(
       draft.id === null ? [...goals, goal] : goals.map((g) => (g.id === goal.id ? goal : g))
@@ -194,7 +192,7 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
                 }
               >
                 <Select
-                  value={draft.fittingId === '' ? undefined : draft.fittingId}
+                  value={draft.fittingId}
                   disabled={choices.all.length === 0}
                   onValueChange={(fittingId) => setDraft({ ...draft, fittingId })}
                 >
@@ -248,7 +246,7 @@ interface GoalRowProps {
   hubName: string;
   price: GoalPrice | undefined;
   /** Where the goal's Fitting opens, once known. */
-  fittingLink: GoalFittingLocation | undefined;
+  fittingLink: FittingEditLocation | undefined;
   formatDay: (day: string) => string;
   onEdit: () => void;
 }
