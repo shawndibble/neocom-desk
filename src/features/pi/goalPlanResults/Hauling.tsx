@@ -19,17 +19,7 @@ import { commodityName, formatUnits } from '../goalPlannerFormat';
 import { piProductHref } from '../piPlanLink';
 import { ColonyLink } from './ColonyLink';
 import { endName, type PlanNames } from './format';
-
-interface LegRow {
-  key: string;
-  from: FlowEnd;
-  to: FlowEnd;
-  typeId: number;
-  name: string;
-  m3PerTrip: number;
-  /** Undefined without distances yet; null when there is no route. */
-  jumps: number | null | undefined;
-}
+import { haulingCsvColumns, type LegRow } from './planExportColumns';
 
 function EndLink({ end, names }: { end: FlowEnd; names: PlanNames }) {
   return end === 'hub' ? <>{names.hub.systemName}</> : <ColonyLink planetId={end} names={names} />;
@@ -164,16 +154,11 @@ export function Hauling({
     ],
     [t, names]
   );
+  const haulCsv = useMemo(() => haulingCsvColumns(t, names), [t, names]);
   const tableExport = useTableExport({
     surface: 'pi-plan-hauling',
     rows,
-    columns: [
-      { header: t('piPlan.legFromCsv'), value: (row) => endName(row.from, names) },
-      { header: t('piPlan.legToCsv'), value: (row) => endName(row.to, names) },
-      { header: t('piPlan.legItem'), value: (row) => row.name },
-      { header: t('piPlan.legM3'), value: (row) => Math.round(row.m3PerTrip * 10) / 10 },
-      { header: t('piPlan.legJumps'), value: (row) => row.jumps ?? '' },
-    ],
+    columns: haulCsv,
   });
   const perColony = [...hauling.perColony]
     .map(([planetId, m3]) => ({ planetId, ...m3 }))

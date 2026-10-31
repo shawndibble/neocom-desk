@@ -9941,6 +9941,15 @@
     "legJumps": "Jumps",
     "legJumpsPending": "Counting jumps…",
     "legSameSystem": "same system",
+    "csvBlockedBy": "Blocked by",
+    "csvPlanetTypesNeeded": "Planet types needed",
+    "csvRouteStatus": "Route",
+    "csvRoute": {
+      "pending": "Counting",
+      "none": "No route",
+      "sameSystem": "Same system",
+      "routed": "Routed"
+    },
     "legFromCsv": "From",
     "legToCsv": "To",
     "haulEffortPlan": "Effort",
