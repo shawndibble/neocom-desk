@@ -1,5 +1,5 @@
 import { formatCount } from '@/lib/formatCount';
-import { marketLinkParams } from '@/engine/market/urlState';
+import { marketItemUrl } from '@/engine/market/urlState';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   useEffect,
@@ -252,10 +252,7 @@ function useShippedProviders(): {
       createMarketItemsProvider({
         catalogue: marketItemCatalogue,
         // The Market Browser, carrying the hub or region it is already on.
-        onSelect: ({ typeId }) =>
-          void navigate(
-            `/market/browser?${new URLSearchParams(marketLinkParams(typeId, location.search)).toString()}`
-          ),
+        onSelect: ({ typeId }) => void navigate(marketItemUrl(typeId, location.search)),
       }),
     ],
     [
