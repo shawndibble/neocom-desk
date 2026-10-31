@@ -26,6 +26,12 @@ vi.mock('@/sde/loadSde', () => ({
     '420': 6,
     '28': 6,
   }),
+  // Orca left out on purpose: a hull with no baked mass.
+  loadShipMass: async () => ({
+    '1': ['Cenotaph', 419, 13_000_000],
+    '3': ['Rapier', 833, 11_000_000],
+    '4': ['Catalyst', 420, 1_500_000],
+  }),
 }));
 
 vi.mock('@/market/prices', () => ({
@@ -210,6 +216,54 @@ describe('the Full scan', () => {
       const stored = await db.settings.get('dscan.lastScan');
       expect(stored?.value).toContainEqual({ typeId: 22548, count: 3 });
     });
+  });
+
+  it("in wormhole space, names the hole each ship needs and the hulls' mass floor", async () => {
+    const user = userEvent.setup();
+    // The drone (Infiltrator II) adds to neither the sizes nor the mass.
+    render(
+      <FleetBoard
+        rows={[row(1, 10), row(3, 12), row(3, 14), row(4, 5), row(28606, 20), row(2175, 8)]}
+        wormholeSpace
+      />
+    );
+    const answer = await screen.findByTestId('dscan-answer');
+    expect(
+      await within(answer).findByText(
+        'Smallest hole each ship needs: Small 1 · Medium 3 · 1 not sized.'
+      )
+    ).toBeTruthy();
+    await openFullScan(user);
+    const worth = await screen.findByRole('region', { name: /Worth on the scan/ });
+    await within(worth).findByText('Smallest hole each ship needs');
+    expect(worth.textContent).toContain('Small 1 · Medium 3 · 1 not sized');
+    expect(worth.textContent).toMatch(
+      /Hulls weigh at least 36.500 t \(no fittings, prop mods or cargo\)\./
+    );
+    expect(worth.textContent).toContain('1 ship left out of the total.');
+    const recon = screen.getByRole('region', { name: 'Support' });
+    expect(recon.textContent).toContain('Medium hole');
+  });
+
+  it('drops the mass line when no ship on scan has a baked mass', async () => {
+    const user = userEvent.setup();
+    render(<FleetBoard rows={[row(28606, 20)]} wormholeSpace />);
+    await openFullScan(user);
+    const worth = await screen.findByRole('region', { name: /Worth on the scan/ });
+    await within(worth).findByText('1 not sized');
+    expect(worth.textContent).not.toContain('Hulls weigh');
+  });
+
+  it('outside wormhole space, shows no hole sizes or mass', async () => {
+    const user = userEvent.setup();
+    render(<FleetBoard rows={[row(1, 10), row(3, 12)]} />);
+    await openFullScan(user);
+    const worth = await screen.findByRole('region', { name: /Worth on the scan/ });
+    await within(worth).findAllByText('100M');
+    expect(worth.textContent).not.toContain('Smallest hole');
+    expect(worth.textContent).not.toContain('Hulls weigh');
+    expect(document.body.textContent).not.toContain('Medium hole');
+    expect(screen.getByTestId('dscan-answer').textContent).not.toContain('Smallest hole');
   });
 
   it('says so when there is no earlier scan, and a Shared D-Scan shows no diff', async () => {

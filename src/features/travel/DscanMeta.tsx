@@ -2,12 +2,15 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { IskAmount } from '@/components/ui';
+import type { HoleSizeRead } from '@/engine/pilotList/dscanHoleSize';
 import { buildWorth, diffHulls, type HullCount } from '@/engine/pilotList/dscanWorth';
 import { useMarketHub } from '@/features/market/hub';
 import { cx } from '@/lib/cx';
+import { formatNumber } from '@/lib/numberLocale';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 import { hullsKey } from './lastScan';
+import { holeSizeCounts } from './useHoleSizes';
 
 const SHOWN_LINES = 4;
 
@@ -25,16 +28,19 @@ export function DscanMeta({
   names,
   trackHistory,
   previous,
+  holes,
 }: {
   hulls: readonly HullCount[];
   names: ReadonlyMap<number, string>;
   trackHistory: boolean;
   /** The earlier scan from `useLastScan`; only read when `trackHistory` is set. */
   previous: HullCount[] | null | undefined;
+  /** Set only in wormhole space: the Worth card adds the hole sizes. */
+  holes: HoleSizeRead | null;
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      <WorthCard hulls={hulls} names={names} />
+      <WorthCard hulls={hulls} names={names} holes={holes} />
       {trackHistory && <SinceLastScanCard hulls={hulls} previous={previous} names={names} />}
     </div>
   );
@@ -43,9 +49,11 @@ export function DscanMeta({
 function WorthCard({
   hulls,
   names,
+  holes,
 }: {
   hulls: readonly HullCount[];
   names: ReadonlyMap<number, string>;
+  holes: HoleSizeRead | null;
 }) {
   const { t } = useTranslation();
   const hubId = useMarketHub((s) => s.value);
@@ -119,7 +127,32 @@ function WorthCard({
           : null}{' '}
         {t('travel.pilot.dscan.worth.note', { hub: hub.systemName })}
       </p>
+      {holes !== null && <HoleSizes read={holes} />}
     </section>
+  );
+}
+
+/**
+ * The smallest wormhole each ship needs and the hulls' base mass: a hull too
+ * heavy for a hole can never pass it, and the mass is a floor. Neither says
+ * the fleet can pass a hole.
+ */
+function HoleSizes({ read }: { read: HoleSizeRead }) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-0.5 border-t border-line pt-2 text-sm">
+      <h4 className={captionClassName}>{t('travel.pilot.dscan.worth.holes.title')}</h4>
+      <p className="tabular-nums">{holeSizeCounts(t, read)}</p>
+      {read.massKg > 0 && (
+        <p className="text-text-dim">
+          {t('travel.pilot.dscan.worth.holes.mass', {
+            mass: formatNumber(Math.floor(read.massKg / 1000)),
+          })}
+          {read.shipsWithoutMass > 0 &&
+            ` ${t('travel.pilot.dscan.worth.holes.massLeftOut', { count: read.shipsWithoutMass })}`}
+        </p>
+      )}
+    </div>
   );
 }
 

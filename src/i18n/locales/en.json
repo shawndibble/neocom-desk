@@ -15333,7 +15333,16 @@
           "noPrice": "price unavailable",
           "unpriced_one": "1 ship has no price and is left out.",
           "unpriced_other": "{{count}} ships have no price and are left out.",
-          "note": "Fittings and cargo cannot be seen. Lowest sell price at {{hub}}."
+          "note": "Fittings and cargo cannot be seen. Lowest sell price at {{hub}}.",
+          "holes": {
+            "title": "Smallest hole each ship needs",
+            "size": "{{size}} {{count}}",
+            "unsized_one": "{{count}} not sized",
+            "unsized_other": "{{count}} not sized",
+            "mass": "Hulls weigh at least {{mass}} t (no fittings, prop mods or cargo).",
+            "massLeftOut_one": "{{count}} ship left out of the total.",
+            "massLeftOut_other": "{{count}} ships left out of the total."
+          }
         },
         "since": {
           "title": "Since your last scan on this device",
@@ -15349,6 +15358,7 @@
         "laneNoDistance": "{{role}}: {{count}}, no distances",
         "laneNotes": "D-Scan gives a distance, not a direction.",
         "nameHint": "{{count}} named {{name}}",
+        "holeSize": "{{size}} hole",
         "leftOut_one": "{{count}} other item not counted (capsules, probes, celestials).",
         "leftOut_other": "{{count}} other items not counted (capsules, probes, celestials).",
         "emptyTitle": "No ships, drones or structures in this D-Scan",
@@ -15361,6 +15371,7 @@
         "shareCopy": "Copy",
         "shareTooLarge": "Too large to share as a link (over {{max}} characters).",
         "danger": {
+          "holes": "Smallest hole each ship needs: {{counts}}.",
           "level": {
             "clear": "Clear on scan",
             "watch": "Watch",

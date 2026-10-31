@@ -86,8 +86,14 @@ export function PilotListView({ paste }: { paste: PilotPaste }) {
   return paste.kind === 'local' ? (
     <LocalList key={paste.names.join('|')} paste={paste} />
   ) : (
-    <FleetBoard rows={paste.rows} trackHistory />
+    <LiveFleetBoard rows={paste.rows} />
   );
+}
+
+/** The live paste: it was taken where the pilot is, so their Current System says if it is wormhole space. */
+function LiveFleetBoard({ rows }: { rows: DscanPaste['rows'] }) {
+  const { space } = useHereSpace();
+  return <FleetBoard rows={rows} trackHistory wormholeSpace={space === 'wormhole'} />;
 }
 
 /** How many hulls a row names under "Flew on kills". */

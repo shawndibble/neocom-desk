@@ -26,6 +26,12 @@ vi.mock('@/features/route/useSolarSystems', () => ({
   useSolarSystemList: () => ({ systems: null, failed: false, retry: () => {} }),
   useSystemName: () => 'Uedama',
 }));
+// The board is FleetBoard's own to test; here only what the live paste hands it.
+vi.mock('./FleetBoard', () => ({
+  FleetBoard: ({ wormholeSpace }: { wormholeSpace?: boolean }) => (
+    <p>{wormholeSpace ? 'wormhole board' : 'k-space board'}</p>
+  ),
+}));
 vi.mock('./useHereSpace', () => ({
   useHereSpace: () => ({
     current: { systemId: 30002768, source: 'game', pick: vi.fn(), clearPick: vi.fn() },
@@ -257,6 +263,26 @@ describe('PilotListView (Local list)', () => {
     renderList();
     expect(await screen.findByRole('button', { name: /Change your system/ })).toBeTruthy();
     expect(screen.getByText('Last API system')).toBeTruthy();
+  });
+});
+
+describe('PilotListView (D-Scan)', () => {
+  const dscan = { kind: 'dscan' as const, typeIds: [], rows: [], text: '' };
+
+  it('tells the board when the Current System is wormhole space', () => {
+    mocks.here.space = 'wormhole';
+    render(<PilotListView paste={dscan} />);
+    expect(screen.getByText('wormhole board')).toBeTruthy();
+  });
+
+  it('tells the board k-space, or an unknown system, is not', () => {
+    mocks.here.space = 'lowsec';
+    const first = render(<PilotListView paste={dscan} />);
+    expect(screen.getByText('k-space board')).toBeTruthy();
+    first.unmount();
+    mocks.here.space = null;
+    render(<PilotListView paste={dscan} />);
+    expect(screen.getByText('k-space board')).toBeTruthy();
   });
 });
 
