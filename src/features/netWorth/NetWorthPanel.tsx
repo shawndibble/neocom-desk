@@ -424,7 +424,6 @@ export function NetWorthPanel({
       {mode === 'single' && singleSeries.gapDays.length > 0 && (
         <p className="mt-2 text-xs text-text-dim">{t('wallet.netWorth.gapNote')}</p>
       )}
-      <p className="mt-2 text-[0.6875rem] text-text-dim">{t('wallet.netWorth.footnote')}</p>
     </Panel>
   );
 
