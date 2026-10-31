@@ -25,6 +25,7 @@ import {
   blueprintKindParam,
   blueprintsTicked,
   categoryPickParam,
+  pruneCategoryIndex,
   filterIsOpen,
   pickIsAll,
   type AssetKindFilter,
@@ -347,6 +348,19 @@ export function useAssetsData() {
   }, [typeNames, activeCrossCharacterData]);
   const blueprintTypeIds = useBlueprintTypeIds(mergedTypeNames);
 
+  // The picker lists only categories the shown assets fall under.
+  const pickerIndex = useMemo(
+    () =>
+      categoryIndex
+        ? pruneCategoryIndex(
+            categoryIndex,
+            mergedAssets.map((asset) => asset.type_id),
+            categoryPick
+          )
+        : null,
+    [categoryIndex, mergedAssets, categoryPick]
+  );
+
   const kindFilter = useMemo<AssetKindFilter | null>(() => {
     if (!categoryIndex) return null;
     const filter = {
@@ -508,6 +522,7 @@ export function useAssetsData() {
     flatModeActive,
     minValueThreshold,
     categoryIndex,
+    pickerIndex,
     categoryPick,
     blueprintKind,
     kindFilter,

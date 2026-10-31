@@ -35,7 +35,7 @@ export function AssetsFilterRow({
     setView,
     minValueInput,
     flatModeActive,
-    categoryIndex,
+    pickerIndex,
     categoryPick,
     blueprintKind,
     showBlueprintSelect,
@@ -43,9 +43,9 @@ export function AssetsFilterRow({
   } = assetsData;
   const { searchRef, sortField, setSortField } = assetsRows;
 
-  const category = categoryIndex && (
+  const category = pickerIndex && (
     <AssetCategoryPicker
-      index={categoryIndex}
+      index={pickerIndex}
       pick={categoryPick}
       onChange={(cat) => setView({ cat })}
     />
