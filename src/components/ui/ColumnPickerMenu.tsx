@@ -32,8 +32,6 @@ interface ColumnPickerMenuProps<Id extends string, Row> {
   size?: ComponentProps<typeof IconButton>['size'];
   /** Checkable picks that aren't columns (a heading figure), below a separator after the columns. */
   extraItems?: readonly { id: string; label: string; checked: boolean; onToggle: () => void }[];
-  /** Tier 2: show "Columns" beside the icon from `md` up. */
-  showLabel?: boolean;
 }
 
 /**
@@ -56,7 +54,6 @@ export function ColumnPickerMenu<Id extends string, Row>({
   onReset,
   resetLabel,
   size,
-  showLabel,
   extraItems,
 }: ColumnPickerMenuProps<Id, Row>) {
   const visibleSet = new Set(visible);
@@ -64,12 +61,7 @@ export function ColumnPickerMenu<Id extends string, Row>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton
-          icon={<Icon.ColumnsPicker />}
-          label={buttonLabel}
-          size={size}
-          visibleLabel={showLabel ? buttonLabel : undefined}
-        />
+        <IconButton icon={<Icon.ColumnsPicker />} label={buttonLabel} size={size} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
         <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{menuTitle}</p>

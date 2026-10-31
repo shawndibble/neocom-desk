@@ -368,7 +368,6 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
               buttonLabel={t('common.columnsButton')}
               menuTitle={t('common.columnsMenuTitle')}
               resetLabel={t('common.resetColumns')}
-              showLabel
             />
           ) : undefined
         }

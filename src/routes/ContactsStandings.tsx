@@ -231,7 +231,6 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
               menuTitle={t('common.columnsMenuTitle')}
               onReset={visibility.reset}
               resetLabel={t('common.resetColumns')}
-              showLabel
             />
           }
         />

@@ -88,7 +88,6 @@ export function LpLandingFilterBar({
       onChange={onChange}
       activeCount={lpLandingActiveFilterCount(value)}
       rowAlign="end"
-      triggerLabel
       search={
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <SegmentedControl
