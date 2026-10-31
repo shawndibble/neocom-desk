@@ -27,6 +27,7 @@ describe('fittingVariationsCsvColumns', () => {
   it('uses the table header keys, in table order', () => {
     expect(fittingVariationsCsvColumns(t).map((c) => c.header)).toEqual([
       'fittings.variations.name',
+      'fittings.variations.tier',
       'fittings.variations.changes',
       'fittings.variations.fits',
       'fittings.variations.canFly',
@@ -37,6 +38,7 @@ describe('fittingVariationsCsvColumns', () => {
   it('exports the stat changes as one cell, the verdicts as words and the price raw', () => {
     expect(fittingVariationsCsvColumns(t).map((c) => c.value(variation()))).toEqual([
       'Small Shield Booster II',
+      'Tech II',
       'fittings.variations.stat.cpuUsed(+5); fittings.variations.stat.capacitorUnstable(2m 0s)',
       'fittings.variations.fitsYes',
       'fittings.variations.canFlyNo',
@@ -48,13 +50,13 @@ describe('fittingVariationsCsvColumns', () => {
     const row = variation({
       delta: [{ kind: 'role', change: { key: 'remoteRepair', before: 40, after: 32 } }],
     });
-    expect(fittingVariationsCsvColumns(t)[1].value(row)).toBe(
+    expect(fittingVariationsCsvColumns(t)[2].value(row)).toBe(
       'fittings.whatToTrain.role.remoteRepair(40,32)'
     );
   });
 
   it('names the overage when the swap does not fit', () => {
-    const fits = fittingVariationsCsvColumns(t)[2];
+    const fits = fittingVariationsCsvColumns(t)[3];
     expect(
       fits.value(variation({ fits: false, overage: { resource: 'cpu', amount: 12.34 } }))
     ).toBe('fittings.variations.stillOverBy(12.3,fittings.list.cpu)');
@@ -62,8 +64,10 @@ describe('fittingVariationsCsvColumns', () => {
 
   it('says no change for an empty delta, and leaves still-loading cells blank', () => {
     const columns = fittingVariationsCsvColumns(t);
-    expect(columns[1].value(variation({ delta: [] }))).toBe('fittings.variations.noChanges');
+    expect(columns[2].value(variation({ delta: [] }))).toBe('fittings.variations.noChanges');
     const loading = variation({ delta: null, fits: null, canFly: null, price: null });
-    expect(toCsv([loading], columns).split('\r\n')[1]).toBe('"Small Shield Booster II",,,,');
+    expect(toCsv([loading], columns).split('\r\n')[1]).toBe(
+      '"Small Shield Booster II","Tech II",,,,'
+    );
   });
 });

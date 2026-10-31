@@ -40,7 +40,8 @@ export function swapChangeLabel({ kind, change }: SwapChange, t: Translate): str
 }
 
 /**
- * Export columns for the Variations table. The stat changes are one text
+ * Export columns for the Variations table: the variant, its tier (the meta group the table
+ * prints beside the name), then the changes and verdicts. The stat changes are one text
  * cell (the table's own wording, `; `-joined) — each is a different stat and
  * unit, so they do not split into summable columns. A cell still loading
  * exports blank rather than the table's "Loading…".
@@ -48,6 +49,7 @@ export function swapChangeLabel({ kind, change }: SwapChange, t: Translate): str
 export function fittingVariationsCsvColumns(t: Translate): CsvColumn<VariationRow>[] {
   return [
     { header: t('fittings.variations.name'), value: (row) => row.name },
+    { header: t('fittings.variations.tier'), value: (row) => row.metaGroupName },
     {
       header: t('fittings.variations.changes'),
       value: (row) => {

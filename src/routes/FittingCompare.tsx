@@ -49,6 +49,7 @@ import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
 import { useShipDataNeedsConnection } from '@/features/fittings/useDogmaEngineStatus';
 import {
   fittingCompareCsvColumns,
+  type FittingCompareCsvRow,
   fittingCompareModulesCsvColumns,
 } from '@/features/fittings/fittingCompareCsv';
 import { useModuleDiffNames } from '@/features/fittings/useModuleDiffNames';
@@ -177,17 +178,41 @@ export function FittingCompare() {
     () =>
       slots.map((slot, index) => {
         const position = okSlots.indexOf(index);
+        const fitStats = stats.values[index];
+        const overage = fitStats ? firstResourceOverage(fitStats) : null;
+        const flies = canFly.values[index];
         return {
           name: slot?.fitting?.name ?? '',
           statsIndex: position === -1 ? null : position,
+          // The header's verdicts, in the words it prints under the name.
+          fits: fitStats
+            ? overage
+              ? t('fittings.compare.overBy', {
+                  resource: t(`fittings.list.${overage.resource}`),
+                  amount: fixed0(overage.amount),
+                })
+              : t('fittings.compare.fitsYes')
+            : null,
+          canFly:
+            flies !== null && flies !== undefined
+              ? t(flies ? 'fittings.compare.canFlyYes' : 'fittings.compare.canFlyNo')
+              : canFly.failed[index]
+                ? t('fittings.compare.canFlyUnknown')
+                : null,
         };
       }),
-    [slots, okSlots]
+    [slots, okSlots, stats.values, canFly.values, canFly.failed, t]
   );
   const statsCsvColumns = useMemo(() => fittingCompareCsvColumns(t, csvFittings), [t, csvFittings]);
-  const statsCsvRows = useMemo(
+  const statsCsvRows = useMemo<FittingCompareCsvRow[]>(
     () =>
-      table ? (showDifferencesOnly ? table.rows.filter((row) => row.differs) : table.rows) : [],
+      table
+        ? [
+            { fact: 'fits' },
+            { fact: 'canFly' },
+            ...(showDifferencesOnly ? table.rows.filter((row) => row.differs) : table.rows),
+          ]
+        : [],
     [table, showDifferencesOnly]
   );
   const statsExport = useTableExport({
