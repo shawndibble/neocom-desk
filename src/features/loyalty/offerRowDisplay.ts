@@ -1,5 +1,20 @@
 import { iskToneClass } from '@/features/character/format';
+import { fixed1 } from '@/lib/fixedFormat';
+import { formatCount } from '@/lib/formatCount';
 import type { LoyaltyOfferRow } from './offerRows';
+
+/**
+ * A short uppercase marker beside a name ("BP", "FW"). `shrink-0` +
+ * `whitespace-nowrap`: beside a long name it was squeezed until "BP" broke
+ * across two lines, one letter each.
+ */
+export const tagWordClassName =
+  'shrink-0 px-1 text-[0.6875rem] font-bold tracking-widest whitespace-nowrap text-warning uppercase';
+
+/** Units a day: one decimal under 10, where it still says something. */
+export function formatSellsPerDay(value: number): string {
+  return value < 10 ? fixed1(value) : formatCount(value);
+}
 
 export function iskPerLpTone(value: number | null): string {
   return value === null ? 'text-text-dim' : iskToneClass(value);

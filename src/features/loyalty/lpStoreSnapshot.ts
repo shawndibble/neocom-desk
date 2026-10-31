@@ -4,6 +4,9 @@
  * object in Cloudflare R2 (docs/context/decisions/20261018-201511-moving-the-daily-snapshots-to-r2.md). Public and unauthenticated, so the page works with no
  * Firebase session.
  *
+ * ESI's offers carry no home station, so a corporation is as far as its
+ * nearest station: the snapshot lists every system it has one in.
+ *
  * Cache-through like the contract snapshots (global key, a window matched to
  * the backend's cadence, a lapsed copy served while the next read runs), with
  * `null` for "unavailable" so the page shows its unavailable state.
@@ -11,8 +14,54 @@
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import type { R2Snapshot, R2SnapshotRead } from '@/features/contractSearch/r2Snapshot';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
-import type { LpSnapshotStore } from './itemSearch';
+import type { LoyaltyStoreOffer } from '@/esi/endpoints';
 import { HOUR_MS } from '@/lib/age';
+
+/** `[offerId, typeId, quantity, iskCost, lpCost, requiredItems: [typeId, quantity][]]` */
+export type LpSnapshotOffer = [number, number, number, number, number, [number, number][]];
+
+/** One corporation's row of the LP offers snapshot. */
+export interface LpSnapshotStore {
+  corporationId: number;
+  systemIds: number[];
+  offers: LpSnapshotOffer[];
+}
+
+export interface NearestStation {
+  systemId: number;
+  jumps: number;
+}
+
+/** The station system with the fewest jumps; null when none is reachable or distances are not known yet. */
+export function nearestStation(
+  systemIds: readonly number[],
+  jumps: ReadonlyMap<number, number> | null
+): NearestStation | null {
+  if (jumps === null) return null;
+  let best: NearestStation | null = null;
+  for (const systemId of systemIds) {
+    const count = jumps.get(systemId);
+    if (count !== undefined && (best === null || count < best.jumps)) {
+      best = { systemId, jumps: count };
+    }
+  }
+  return best;
+}
+
+export function toStoreOffer(offer: LpSnapshotOffer): LoyaltyStoreOffer {
+  const [offer_id, type_id, quantity, isk_cost, lp_cost, required] = offer;
+  return {
+    offer_id,
+    type_id,
+    quantity,
+    isk_cost,
+    lp_cost,
+    required_items: required.map(([requiredType, requiredQuantity]) => ({
+      type_id: requiredType,
+      quantity: requiredQuantity,
+    })),
+  };
+}
 
 const SNAPSHOT_URL = `${R2_SNAPSHOT_ORIGIN}/lp-store-offers/snapshot.json`;
 const CACHE_KEY = 'lpStoreOffersR2';

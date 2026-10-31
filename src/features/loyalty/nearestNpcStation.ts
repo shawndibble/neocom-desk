@@ -1,7 +1,7 @@
 /**
  * Which station of an NPC corporation is nearest the pilot (issue #5384).
  * Pure over the NPC station list and the jumps from the Current System, the
- * same `jumps` map `nearestStation` in `itemSearch.ts` takes.
+ * same `jumps` map `nearestStation` in `lpStoreSnapshot.ts` takes.
  */
 import type { NpcStationEntry } from '@/sde/marketTypes';
 
