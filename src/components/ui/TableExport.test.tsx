@@ -96,21 +96,21 @@ describe('TableActionsMenu', () => {
     expect(screen.queryByRole('menuitem', { name: 'Export table' })).not.toBeInTheDocument();
   });
 
-  it('tells onOpenChange when the menu opens', async () => {
-    const onOpenChange = vi.fn();
+  it('calls onExportIntent when any menu showing the export items opens', async () => {
+    const onExportIntent = vi.fn();
     function Armed() {
-      const tableExport = useTableExport({ surface: 'market-sell', rows, columns: csvColumns });
-      return (
-        <TableActionsMenu
-          name="Sell orders"
-          tableExport={tableExport}
-          onOpenChange={onOpenChange}
-        />
-      );
+      const tableExport = useTableExport({
+        surface: 'market-sell',
+        rows,
+        columns: csvColumns,
+        onExportIntent,
+      });
+      return <TableActionsMenu name="Sell orders" tableExport={tableExport} />;
     }
     render(<Armed />);
+    expect(onExportIntent).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: /Sell orders/ }));
-    expect(onOpenChange).toHaveBeenCalledWith(true);
+    expect(onExportIntent).toHaveBeenCalled();
   });
 
   it('becomes a ⋯ menu with Export in a submenu once it has other actions', async () => {

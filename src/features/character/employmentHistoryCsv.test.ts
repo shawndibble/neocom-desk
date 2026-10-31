@@ -62,14 +62,14 @@ describe('employmentHistoryCsvColumns', () => {
 
   it('flags current, NPC, returned and short stays as yes/no', () => {
     expect(valuesOf(row({ ongoing: true, npc: true }))).toMatchObject({
-      'employmentHistory.current': 'employmentHistory.csvYes',
-      'employmentHistory.npc': 'employmentHistory.csvYes',
-      'employmentHistory.returned': 'employmentHistory.csvNo',
-      'employmentHistory.shortStay': 'employmentHistory.csvNo',
+      'employmentHistory.current': 'common.exportFlagYes',
+      'employmentHistory.npc': 'common.exportFlagYes',
+      'employmentHistory.returned': 'common.exportFlagNo',
+      'employmentHistory.shortStay': 'common.exportFlagNo',
     });
     expect(valuesOf(row({ returned: true, shortStay: true }))).toMatchObject({
-      'employmentHistory.returned': 'employmentHistory.csvYes',
-      'employmentHistory.shortStay': 'employmentHistory.csvYes',
+      'employmentHistory.returned': 'common.exportFlagYes',
+      'employmentHistory.shortStay': 'common.exportFlagYes',
     });
   });
 });

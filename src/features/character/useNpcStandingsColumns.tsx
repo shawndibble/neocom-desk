@@ -13,8 +13,8 @@ import {
 } from '@/features/character/contactsColumns';
 import { EmptyCell } from '@/features/character/ContactCells';
 import {
-  npcAccessLevel,
-  npcAgentAccessState,
+  npcAccessSortValue,
+  npcAgentAccessText,
   type NpcStandingRow,
 } from '@/features/character/npcStandingsRows';
 import { AccessPips } from '@/features/standings/table/AccessPips';
@@ -127,22 +127,17 @@ export function useNpcStandingsColumns(skillsKnown: boolean) {
         // show how far up the levels their chain reaches.
         render: (row) => {
           if (row.kind === 'agent') {
-            const access = npcAgentAccessState(row);
-            if (access === null) return <EmptyCell />;
-            if (access.state === 'open')
-              return <span className="text-success">{t('contacts.standings.accessOpen')}</span>;
-            return (
-              <span className="text-text-dim">
-                {access.state === 'blocked'
-                  ? t('contacts.standings.accessBlocked')
-                  : t('contacts.standings.accessNeeds', { standing: fixed2(access.standing) })}
-              </span>
+            const text = npcAgentAccessText(t, row);
+            if (text === null) return <EmptyCell />;
+            return row.agentAccess?.open ? (
+              <span className="text-success">{text}</span>
+            ) : (
+              <span className="text-text-dim">{text}</span>
             );
           }
           return row.accessLevel === null ? <EmptyCell /> : <AccessPips level={row.accessLevel} />;
         },
-        // One scale for every kind: the agent level you can use (0 when you cannot).
-        sortValue: (row) => npcAccessLevel(row) ?? undefined,
+        sortValue: npcAccessSortValue,
         stackAffix: { before: `${t('contacts.standings.columnAccess')} ` },
       },
       fees: {

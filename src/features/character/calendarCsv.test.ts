@@ -44,8 +44,8 @@ describe('calendarCsvColumns', () => {
       'calendar.csvTitle': 'Fleet op',
       'calendar.csvDetail': undefined,
       'calendar.csvResponse': 'calendar.responseDeclined',
-      'calendar.csvImportant': 'calendar.csvYes',
-      'calendar.csvProjected': 'calendar.csvNo',
+      'calendar.csvImportant': 'common.exportFlagYes',
+      'calendar.csvProjected': 'common.exportFlagNo',
       'calendar.csvId': 9001,
     });
   });

@@ -219,7 +219,7 @@ export function PlanEditor({
   });
   const exporter = usePlanExport({
     schedule,
-    entries: plan.entries,
+    mergedRows,
     milestones: plan.milestones ?? NO_MILESTONES,
     pinnedInProgress,
     loadedAtMs,

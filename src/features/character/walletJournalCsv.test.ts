@@ -134,8 +134,8 @@ describe('walletJournalCsvColumns', () => {
     const column = walletJournalCsvColumns(t).find(
       (c) => c.header === 'wallet.journalBetweenMarker'
     )!;
-    expect(column.value({ ...entry(), internal: true })).toBe('wallet.csvYes');
-    expect(column.value(entry())).toBe('wallet.csvNo');
+    expect(column.value({ ...entry(), internal: true })).toBe('common.exportFlagYes');
+    expect(column.value(entry())).toBe('common.exportFlagNo');
   });
 
   it("names a daily goal payout's goal, falling back to the plain label", () => {

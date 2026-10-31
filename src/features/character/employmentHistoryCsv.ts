@@ -1,10 +1,8 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { EmploymentHistoryRow } from './employmentHistory';
+import { exportFlag } from '@/lib/exportFlag';
 
 const SECONDS_PER_DAY = 86_400;
-
-const yesNo = (t: CsvTranslate, flag: boolean) =>
-  t(flag ? 'employmentHistory.csvYes' : 'employmentHistory.csvNo');
 
 /**
  * Export columns for Employment History: corporation, join and leave dates,
@@ -35,9 +33,9 @@ export function employmentHistoryCsvColumns(
       header: t('employmentHistory.csvDurationDays'),
       value: (row) => Math.floor(row.tenureSeconds / SECONDS_PER_DAY),
     },
-    { header: t('employmentHistory.current'), value: (row) => yesNo(t, row.ongoing) },
-    { header: t('employmentHistory.npc'), value: (row) => yesNo(t, row.npc) },
-    { header: t('employmentHistory.returned'), value: (row) => yesNo(t, row.returned) },
-    { header: t('employmentHistory.shortStay'), value: (row) => yesNo(t, row.shortStay) },
+    { header: t('employmentHistory.current'), value: (row) => exportFlag(t, row.ongoing) },
+    { header: t('employmentHistory.npc'), value: (row) => exportFlag(t, row.npc) },
+    { header: t('employmentHistory.returned'), value: (row) => exportFlag(t, row.returned) },
+    { header: t('employmentHistory.shortStay'), value: (row) => exportFlag(t, row.shortStay) },
   ];
 }

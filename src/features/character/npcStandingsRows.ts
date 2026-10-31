@@ -31,6 +31,8 @@ import { nearestStationWhere } from '@/features/loyalty/nearestNpcStation';
 import { buildChain, type ChainTarget } from '@/features/standings/buildChain';
 import { TRADE_HUBS } from '@/market/hubs';
 import type { NpcAgent } from '@/sde/agents';
+import { fixed2 } from '@/lib/fixedFormat';
+import type { Translate } from '@/lib/translate';
 import type { NpcStationEntry } from '@/sde/marketTypes';
 
 export type NpcStandingKind = 'faction' | 'corp' | 'agent';
@@ -276,25 +278,26 @@ export function countNpcStandingRows(
   return counts;
 }
 
-/**
- * The one access scale the Access column sorts and exports on: the agent level
- * an agent row opens (0 when you cannot use them), the chain's highest agent
- * level otherwise. Null when unknown (skills unread, an agent with no known level).
- */
+/** The agent level an agent row opens (0 when you cannot use them), the chain's highest level otherwise; null when unknown. */
 export function npcAccessLevel(row: NpcStandingRow): number | null {
   if (row.kind !== 'agent') return row.accessLevel;
   if (!row.agentAccess) return null;
   return row.agentAccess.open ? (row.belongsTo?.level ?? null) : 0;
 }
 
-/** What an agent row says about using that agent; null for other kinds and when it cannot be told. */
-export type NpcAgentAccessState =
-  { state: 'open' } | { state: 'blocked' } | { state: 'needs'; standing: number };
+/** `npcAccessLevel` as the table sorts it: an open agent with no known level still counts as level 1. */
+export function npcAccessSortValue(row: NpcStandingRow): number | undefined {
+  if (row.kind === 'agent' && row.agentAccess?.open) return row.belongsTo?.level ?? 1;
+  return npcAccessLevel(row) ?? undefined;
+}
 
-export function npcAgentAccessState(row: NpcStandingRow): NpcAgentAccessState | null {
+/** What an agent row says about using that agent; null for other kinds and when it cannot be told. */
+export function npcAgentAccessText(t: Translate, row: NpcStandingRow): string | null {
   const access = row.kind === 'agent' ? row.agentAccess : null;
   if (!access) return null;
-  if (access.open) return { state: 'open' };
-  if (access.blockedBy) return { state: 'blocked' };
-  return access.needs === null ? null : { state: 'needs', standing: access.needs };
+  if (access.open) return t('contacts.standings.accessOpen');
+  if (access.blockedBy) return t('contacts.standings.accessBlocked');
+  return access.needs === null
+    ? null
+    : t('contacts.standings.accessNeeds', { standing: fixed2(access.needs) });
 }

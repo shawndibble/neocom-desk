@@ -151,7 +151,7 @@ describe('skillCsvColumns', () => {
       skillCsvColumns(identityT).map((c) => [c.header, c.value(rows[0])])
     );
     expect(values).toMatchObject({
-      'skills.csvInjected': 'skills.csvNo',
+      'skills.csvInjected': 'common.exportFlagNo',
       'skills.csvRank': 3,
       'skills.csvQueuedLevel': 2,
       'skills.csvPlannedLevel': 4,

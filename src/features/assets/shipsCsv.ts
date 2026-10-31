@@ -1,4 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
+import { exportFlag } from '@/lib/exportFlag';
 
 /** One ship on the Ships tab, with everything its row shows (the place, the Sec and Jumps cells, the class and Packaged tags, the holder trail). */
 export interface ShipCsvRow {
@@ -32,7 +33,7 @@ export function shipsCsvColumns(t: CsvTranslate): CsvColumn<ShipCsvRow>[] {
     { header: t('assets.myShips.csvClass'), value: (row) => row.shipClass },
     {
       header: t('assets.myShips.packaged'),
-      value: (row) => t(row.packaged ? 'assets.myShips.csvYes' : 'assets.myShips.csvNo'),
+      value: (row) => exportFlag(t, row.packaged),
     },
     { header: t('assets.myShips.csvQuantity'), value: (row) => row.quantity },
     { header: t('assets.myShips.columns.character'), value: (row) => row.character },

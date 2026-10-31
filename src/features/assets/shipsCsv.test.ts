@@ -49,12 +49,12 @@ describe('shipsCsvColumns', () => {
       'assets.myShips.columns.security': 0.9,
       'assets.myShips.columns.jumps': 0,
       'assets.myShips.csvQuantity': 1,
-      'assets.myShips.packaged': 'assets.myShips.csvNo',
+      'assets.myShips.packaged': 'common.exportFlagNo',
     });
     expect(valuesOf(row({ security: null, jumps: null, packaged: true }))).toMatchObject({
       'assets.myShips.columns.security': null,
       'assets.myShips.columns.jumps': null,
-      'assets.myShips.packaged': 'assets.myShips.csvYes',
+      'assets.myShips.packaged': 'common.exportFlagYes',
     });
   });
 });

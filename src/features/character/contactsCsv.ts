@@ -6,13 +6,10 @@ import { achievementCsvColumns } from './achievementCsv';
 import type { AchievementLookup } from './useCharacterAchievements';
 import type { ContactAffiliationRow } from './contactAffiliation';
 import type { AcrossCharactersRow } from './contactsAcrossCharacters';
+import { exportFlag } from '@/lib/exportFlag';
 
 function entityName(names: ReadonlyMap<number, string>, id: number): string {
   return names.get(id) ?? `#${id}`;
-}
-
-function yesNo(t: CsvTranslate, value: boolean): string {
-  return value ? t('contacts.csvYes') : t('contacts.csvNo');
 }
 
 /** Own-corporation and own-alliance are only known for a character whose affiliation has loaded. */
@@ -66,14 +63,14 @@ export function contactsCsvColumns(
       header: t('contacts.ownCorporation'),
       value: (contact) => {
         const row = ownable(contact, affiliationRows);
-        return row ? yesNo(t, row.inOwnCorporation) : null;
+        return exportFlag(t, row?.inOwnCorporation);
       },
     },
     {
       header: t('contacts.ownAlliance'),
       value: (contact) => {
         const row = ownable(contact, affiliationRows);
-        return row ? yesNo(t, row.inOwnAlliance) : null;
+        return exportFlag(t, row?.inOwnAlliance);
       },
     },
     ...achievementCsvColumns<CharacterContact>(t, (contact) => contact.contact_id, achievements),
@@ -84,11 +81,11 @@ export function contactsCsvColumns(
     },
     {
       header: t('contacts.blocked'),
-      value: (contact) => yesNo(t, contact.is_blocked === true),
+      value: (contact) => exportFlag(t, contact.is_blocked === true),
     },
     {
       header: t('contacts.watched'),
-      value: (contact) => yesNo(t, contact.is_watched === true),
+      value: (contact) => exportFlag(t, contact.is_watched === true),
     },
   ];
 }
@@ -128,6 +125,6 @@ export function contactsAcrossCsvColumns(
       header: t('contacts.acrossStandings'),
       value: (row) => row.held.map((h) => `${h.name}: ${h.contact.standing}`).join('; '),
     },
-    { header: t('contacts.csvAcrossDisagrees'), value: (row) => yesNo(t, row.disagrees) },
+    { header: t('contacts.csvAcrossDisagrees'), value: (row) => exportFlag(t, row.disagrees) },
   ];
 }

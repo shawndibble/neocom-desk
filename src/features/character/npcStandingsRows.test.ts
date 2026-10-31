@@ -7,6 +7,9 @@ import {
   buildNpcStandingRows,
   countNpcStandingRows,
   feeOwnerIds,
+  npcAccessLevel,
+  npcAccessSortValue,
+  npcAgentAccessText,
   filterNpcStandingRows,
   type NpcStandingRow,
   type NpcStandingsFilter,
@@ -395,5 +398,52 @@ describe('feeOwnerIds', () => {
     expect(ids.has(1000035)).toBe(true);
     expect(ids.has(500002)).toBe(true);
     expect(ids.size).toBe(9);
+  });
+});
+
+describe('npc access helpers', () => {
+  const agent = (over: Partial<NpcStandingRow>): NpcStandingRow =>
+    ({
+      id: 1,
+      name: 'Agent',
+      kind: 'agent',
+      base: 0,
+      effective: 0,
+      belongsTo: { name: 'Corp' },
+      accessLevel: null,
+      agentAccess: { open: true, needs: null, short: 0, blockedBy: null },
+      nearest: null,
+      usedForFees: false,
+      ...over,
+    }) as NpcStandingRow;
+
+  it('sorts an open agent with no known level as 1 but exports it blank', () => {
+    const row = agent({});
+    expect(npcAccessSortValue(row)).toBe(1);
+    expect(npcAccessLevel(row)).toBeNull();
+  });
+
+  it('reads 0 for an agent you cannot use, and nothing when it cannot be told', () => {
+    const closed = agent({ agentAccess: { open: false, needs: 3, short: 1, blockedBy: null } });
+    expect(npcAccessSortValue(closed)).toBe(0);
+    expect(npcAccessLevel(closed)).toBe(0);
+    expect(npcAccessSortValue(agent({ agentAccess: null }))).toBeUndefined();
+  });
+
+  it('words open, blocked and needs, and gives no text for an unknown need', () => {
+    const t = (k: string) => k;
+    expect(npcAgentAccessText(t, agent({}))).toBe('contacts.standings.accessOpen');
+    expect(
+      npcAgentAccessText(
+        t,
+        agent({ agentAccess: { open: false, needs: 3, short: 1, blockedBy: {} as never } })
+      )
+    ).toBe('contacts.standings.accessBlocked');
+    expect(
+      npcAgentAccessText(
+        t,
+        agent({ agentAccess: { open: false, needs: null, short: 1, blockedBy: null } })
+      )
+    ).toBeNull();
   });
 });

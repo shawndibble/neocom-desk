@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
-import type { EngineSkill, PlanEntry, PlanMilestone, TrainedSkill } from '@/engine/types';
+import type { EngineSkill, PlanMilestone, TrainedSkill } from '@/engine/types';
 import type { SkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { ExportFormat } from '@/lib/downloadCsv';
 import { useAutoDismiss } from '@/lib/useAutoDismiss';
 import { queueCsvColumns, queueCsvRows } from '../queueCsv';
-import type { PinnedInProgressEntry } from '../queueRows';
+import type { MergedRow, PinnedInProgressEntry } from '../queueRows';
 
 /**
  * Export to clipboard (EVE format) and the queue table (`useTableExport`, shown
@@ -16,7 +16,7 @@ import type { PinnedInProgressEntry } from '../queueRows';
  */
 export function usePlanExport({
   schedule,
-  entries,
+  mergedRows,
   milestones,
   trainedSkills,
   engineSkills,
@@ -26,7 +26,7 @@ export function usePlanExport({
   userSkillTypeIDs,
 }: {
   schedule: SkillPlanSchedule;
-  entries: readonly PlanEntry[];
+  mergedRows: readonly MergedRow[];
   milestones: readonly PlanMilestone[];
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   engineSkills: ReadonlyMap<number, EngineSkill>;
@@ -40,23 +40,24 @@ export function usePlanExport({
   const { show: showCopyConfirm } = useAutoDismiss<boolean>(setCopyConfirm, false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const { scheduled } = schedule;
-  const rows = useMemo(
-    () =>
+  const columns = useMemo(
+    () => queueCsvColumns(t, nameFor, userSkillTypeIDs, { schedule, engineSkills }),
+    [t, nameFor, userSkillTypeIDs, schedule, engineSkills]
+  );
+  const tableExport = useTableExport({
+    surface: 'skill-queue', // Built when an export runs, not on every plan edit.
+    rows: () =>
       queueCsvRows({
+        mergedRows,
         schedule,
-        entries,
         trainedSkills,
         pinned: pinnedInProgress,
         nowMs: loadedAtMs,
         milestones,
       }),
-    [schedule, entries, trainedSkills, pinnedInProgress, loadedAtMs, milestones]
-  );
-  const columns = useMemo(
-    () => queueCsvColumns(t, nameFor, userSkillTypeIDs, { schedule, engineSkills }),
-    [t, nameFor, userSkillTypeIDs, schedule, engineSkills]
-  );
-  const tableExport = useTableExport({ surface: 'skill-queue', rows, columns, source: 'rows' });
+    columns,
+    source: 'rows',
+  });
 
   async function handleExport() {
     const text = exportPlanToClipboard(

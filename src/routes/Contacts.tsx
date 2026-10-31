@@ -233,6 +233,8 @@ export function Contacts() {
     rows: filteredContacts,
     columns: characterCsvColumns,
     truncated: contactsTruncated || achievementsPending,
+    // Title / Score are read once any export menu opens (header or a row's).
+    onExportIntent: () => setExportArmed(true),
   });
   const acrossCsvColumns = useMemo(
     () => contactsAcrossCsvColumns(t, contactNames),
@@ -306,7 +308,6 @@ export function Contacts() {
               ) : (
                 <TableActionsMenu
                   name={t('contacts.title')}
-                  onOpenChange={(open) => open && setExportArmed(true)}
                   tableExport={characterExport}
                   size="md"
                 />

@@ -31,6 +31,12 @@ export interface TableExportConfig<T> {
    * holding more (or other) rows than the table mounts.
    */
   getRows?: () => readonly T[];
+  /**
+   * Called when any menu showing this table's export items opens (the header
+   * menu, a row's right-click or ⋮ menu): for rows that need data fetched
+   * lazily, so the load starts before a format is picked.
+   */
+  onExportIntent?: () => void;
 }
 
 /** A config plus where its rows come from, read at export time. */
@@ -72,22 +78,27 @@ export function useTableExport<T>({
   rows,
   truncated,
   qualifier,
+  onExportIntent,
   source = 'table',
 }: Omit<TableExportConfig<T>, 'getRows'> & {
-  rows: readonly T[];
+  /** A function builds the rows only when an export runs, for rows costly to derive. */
+  rows: readonly T[] | (() => readonly T[]);
   source?: 'table' | 'rows' | 'sorted-rows';
 }): UseTableExport<T> {
   const exportRef = useRef<DataTableExportHandle<T> | null>(null);
   // Read at export time only, so the latest committed rows are enough.
   const rowsRef = useRef(rows);
+  const intentRef = useRef(onExportIntent);
   useLayoutEffect(() => {
     rowsRef.current = rows;
-  }, [rows]);
+    intentRef.current = onExportIntent;
+  }, [rows, onExportIntent]);
   return useMemo(() => {
     // Every ref read happens at export time, inside these functions.
     function readRows(): readonly T[] {
       const table = exportRef.current;
-      const given = rowsRef.current;
+      const rowSource = rowsRef.current;
+      const given = typeof rowSource === 'function' ? rowSource() : rowSource;
       if (source === 'rows') return given;
       // Every row the caller holds, in the mounted table's current sort.
       if (source === 'sorted-rows') return table ? table.sortRows(given) : given;
@@ -98,6 +109,7 @@ export function useTableExport<T>({
       columns,
       truncated,
       qualifier,
+      onExportIntent: () => intentRef.current?.(),
       // DataTable reads its own sorted rows unless the export holds other rows.
       getRows: source === 'table' ? undefined : readRows,
     };

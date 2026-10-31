@@ -5,6 +5,7 @@ import {
   type CharacterBoardItem,
 } from '@/engine/character/board';
 import { KIND_LABEL } from './calendarKindLabels';
+import { exportFlag } from '@/lib/exportFlag';
 
 const RESPONSE_KEY: Record<CalendarResponse, string> = {
   accepted: 'calendar.responseAccepted',
@@ -39,14 +40,11 @@ export function calendarCsvColumns(t: CsvTranslate): CsvColumn<CharacterBoardIte
     },
     {
       header: t('calendar.csvImportant'),
-      value: (item) =>
-        item.kind === 'calendarEvent'
-          ? t(item.important ? 'calendar.csvYes' : 'calendar.csvNo')
-          : undefined,
+      value: (item) => (item.kind === 'calendarEvent' ? exportFlag(t, item.important) : null),
     },
     {
       header: t('calendar.csvProjected'),
-      value: (item) => t(isProjectedKind(item.kind) ? 'calendar.csvYes' : 'calendar.csvNo'),
+      value: (item) => exportFlag(t, isProjectedKind(item.kind)),
     },
     // The source's own id: an ESI event id for calendar events, a job or contract id otherwise.
     {

@@ -3,6 +3,7 @@ import { journalRefKey, type JournalRow } from '@/engine/journalNetting';
 import type { WalletTransactionCommon } from '@/esi/endpoints';
 import { journalRefLabel } from './journalRefLabel';
 import { dailyGoalMessageIdOf, dailyGoalName } from './dailyGoal';
+import { exportFlag } from '@/lib/exportFlag';
 
 /**
  * CSV columns for the wallet journal: date, ref type, description, amount,
@@ -87,7 +88,7 @@ export function walletJournalCsvColumns(
     { header: t('wallet.secondPartyId'), value: (entry) => entry.second_party_id ?? null },
     {
       header: t('wallet.journalBetweenMarker'),
-      value: (entry) => t(entry.internal ? 'wallet.csvYes' : 'wallet.csvNo'),
+      value: (entry) => exportFlag(t, entry.internal === true),
     },
     {
       header: t('wallet.dailyGoal'),

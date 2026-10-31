@@ -76,10 +76,10 @@ describe('contactsCsvColumns', () => {
     const plain = contact({ contact_id: 1002 });
     const flaggedValues = Object.fromEntries(columns.map((c) => [c.header, c.value(flagged)]));
     const plainValues = Object.fromEntries(columns.map((c) => [c.header, c.value(plain)]));
-    expect(flaggedValues['contacts.blocked']).toBe('contacts.csvYes');
-    expect(flaggedValues['contacts.watched']).toBe('contacts.csvYes');
-    expect(plainValues['contacts.blocked']).toBe('contacts.csvNo');
-    expect(plainValues['contacts.watched']).toBe('contacts.csvNo');
+    expect(flaggedValues['contacts.blocked']).toBe('common.exportFlagYes');
+    expect(flaggedValues['contacts.watched']).toBe('common.exportFlagYes');
+    expect(plainValues['contacts.blocked']).toBe('common.exportFlagNo');
+    expect(plainValues['contacts.watched']).toBe('common.exportFlagNo');
   });
 
   it('prints the resolved corp name for affiliation, and null when there is none', () => {
@@ -125,8 +125,8 @@ describe('contactsCsvColumns', () => {
     );
     expect(values).toMatchObject({
       'contacts.csvAlliance': 'Home Alliance',
-      'contacts.ownCorporation': 'contacts.csvYes',
-      'contacts.ownAlliance': 'contacts.csvNo',
+      'contacts.ownCorporation': 'common.exportFlagYes',
+      'contacts.ownAlliance': 'common.exportFlagNo',
       'characters.csvAchievementTitle': 'Veteran',
       'characters.csvAchievementScore': 900,
       'contacts.labels': 'Friends, Traders',
@@ -142,7 +142,7 @@ describe('contactsCsvColumns', () => {
     const columns = contactsCsvColumns(t, new Map(), rows, NO_LABELS, NO_ACHIEVEMENTS);
     const own = (c: CharacterContact) =>
       columns.find((col) => col.header === 'contacts.ownCorporation')!.value(c);
-    expect(own(contact())).toBe('contacts.csvYes');
+    expect(own(contact())).toBe('common.exportFlagYes');
     expect(own(contact({ contact_id: 1002 }))).toBeNull();
     expect(own(contact({ contact_id: 2001, contact_type: 'corporation' }))).toBeNull();
     expect(own(contact({ contact_id: 5 }))).toBeNull();
@@ -218,7 +218,7 @@ describe('contactsAcrossCsvColumns', () => {
       'contacts.csvAcrossHolders': 'Main; Hauler',
       'contacts.csvAcrossMissing': 'Scout',
       'contacts.acrossStandings': 'Main: 10; Hauler: -10',
-      'contacts.csvAcrossDisagrees': 'contacts.csvYes',
+      'contacts.csvAcrossDisagrees': 'common.exportFlagYes',
     });
   });
 

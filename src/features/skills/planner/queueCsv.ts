@@ -1,36 +1,27 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type {
-  EngineSkill,
-  PlanEntry,
-  PlanMilestone,
-  ScheduledStep,
-  TrainedSkill,
-} from '@/engine/types';
-import type { SkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
+import type { EngineSkill, PlanMilestone, ScheduledStep, TrainedSkill } from '@/engine/types';
+import { milestoneKey } from '@/engine/skills/skillPlanMilestones';
+import { stepKey, type SkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
 import { stepFinish } from '@/lib/duration';
+import { exportFlag } from '@/lib/exportFlag';
+import { isoTime, joined } from '@/lib/exportSheets';
 import { priorityLabelKey } from './entryList/rowChrome';
-import { entrySlices } from './entrySlices';
-import { entryId } from './reorder';
-import type { PinnedInProgressEntry } from './queueRows';
+import type { MergedRow, PinnedInProgressEntry } from './queueRows';
 
 /** Why a plan row is listed: a scheduled step, or what keeps its entry out of the schedule. */
 export type QueueEntryStatus =
   'scheduled' | 'trained' | 'unknown' | 'queued' | 'training' | 'unscheduled' | 'orphanMilestone';
 
 /**
- * One exported plan row: a scheduled training step, or a plan entry the
- * schedule leaves out (already trained, in training or ahead of the plan in the
- * live queue, unknown to this SDE snapshot, or left unscheduled by a plan
- * error), so the file lists every entry the plan holds, in plan position.
- * A Plan Milestone with no row to sit on is a row of its own.
+ * One exported plan row: a scheduled step, or a plan entry with no step of its
+ * own, so the file lists every entry the plan holds, in the plan's order. A
+ * Plan Milestone with no row to sit on is a row of its own.
  */
 export interface QueueCsvRow {
   status: QueueEntryStatus;
   skillTypeID: number;
   level: number;
-  /** Present for `scheduled` only. */
-  step?: ScheduledStep;
-  /** The step's index in the schedule, for the marker, Booster and Alpha lookups. */
+  /** Index into `schedule.scheduled`; present for `scheduled` only. */
   stepIndex?: number;
   /** The level in training in the live queue: its real time left, and the instant that ends. */
   remainingSeconds?: number;
@@ -39,7 +30,7 @@ export interface QueueCsvRow {
   milestone?: string;
 }
 
-/** What the rows are read against: the costed schedule and the plan's own entries. */
+/** What the columns read a row against: the costed schedule and the catalog. */
 export interface QueueCsvContext {
   schedule: Pick<
     SkillPlanSchedule,
@@ -54,19 +45,20 @@ export interface QueueCsvContext {
 }
 
 /**
- * The plan in plan position: each entry's scheduled steps (its prerequisites
- * first), then a status row when the entry has no step of its own.
+ * The editor's merged rows (each entry's prerequisites ahead of it, markers
+ * skipped) as export rows: every scheduled step, plus a status row for an entry
+ * with no step of its own. Built when an export runs.
  */
 export function queueCsvRows({
+  mergedRows,
   schedule,
-  entries,
   trainedSkills,
   pinned,
   nowMs,
   milestones,
 }: {
-  schedule: Pick<SkillPlanSchedule, 'scheduled' | 'isKnownSkill' | 'entryBoundaries' | 'error'>;
-  entries: readonly PlanEntry[];
+  mergedRows: readonly MergedRow[];
+  schedule: Pick<SkillPlanSchedule, 'scheduled' | 'isKnownSkill' | 'error'>;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   /** The entry that is the in-game queue's level in training, with its real seconds left. */
   pinned: PinnedInProgressEntry | null;
@@ -78,27 +70,27 @@ export function queueCsvRows({
     status: 'scheduled',
     skillTypeID: scheduled[stepIndex].skillTypeID,
     level: scheduled[stepIndex].level,
-    step: scheduled[stepIndex],
     stepIndex,
   });
-  const scheduledLevels = new Set(scheduled.map((s) => `${s.skillTypeID}:${s.level}`));
-  // A rejected plan has no schedule, so no boundaries to read.
-  const slices =
-    schedule.error === null
-      ? entrySlices(entries, schedule.entryBoundaries, scheduled, schedule.isKnownSkill)
-      : entries.map(() => ({ start: 0, ownStart: -1, end: 0 }));
+  const scheduledKeys = new Set(scheduled.map(stepKey));
   const rows: QueueCsvRow[] = [];
-  entries.forEach((entry, i) => {
-    for (let stepIndex = slices[i].start; stepIndex < slices[i].end; stepIndex++) {
-      rows.push(stepRow(stepIndex));
+  for (const merged of mergedRows) {
+    if (merged.kind === 'marker') continue;
+    if (merged.kind === 'prereq') {
+      rows.push(stepRow(merged.stepIndex));
+      continue;
     }
-    if (scheduledLevels.has(`${entry.skillTypeID}:${entry.targetLevel}`)) return;
+    for (const stepIndex of merged.stepIndices) rows.push(stepRow(stepIndex));
+    const { entry } = merged;
+    if (scheduledKeys.has(stepKey({ skillTypeID: entry.skillTypeID, level: entry.targetLevel }))) {
+      continue;
+    }
     const base = { skillTypeID: entry.skillTypeID, level: entry.targetLevel };
     if (!schedule.isKnownSkill(entry.skillTypeID)) {
       rows.push({ ...base, status: 'unknown' });
     } else if ((trainedSkills.get(entry.skillTypeID)?.level ?? 0) >= entry.targetLevel) {
       rows.push({ ...base, status: 'trained' });
-    } else if (pinned !== null && pinned.id === entryId(entry)) {
+    } else if (pinned?.id === merged.id) {
       rows.push({
         ...base,
         status: 'training',
@@ -109,24 +101,23 @@ export function queueCsvRows({
       // A plan the normalizer rejected has no schedule at all: say so rather than "queued".
       rows.push({ ...base, status: schedule.error === null ? 'queued' : 'unscheduled' });
     }
-  });
+  }
   const namesAt = new Map<string, string[]>();
   for (const milestone of milestones) {
-    const key = `${milestone.skillTypeID}:${milestone.level}`;
+    const key = milestoneKey(milestone);
     namesAt.set(key, [...(namesAt.get(key) ?? []), milestone.name]);
   }
   const placed = new Set<string>();
   for (const row of rows) {
-    const key = `${row.skillTypeID}:${row.level}`;
+    const key = stepKey(row);
     const names = namesAt.get(key);
     if (names) {
-      row.milestone = names.join('; ');
+      row.milestone = joined(names);
       placed.add(key);
     }
   }
   for (const milestone of milestones) {
-    const key = `${milestone.skillTypeID}:${milestone.level}`;
-    if (placed.has(key)) continue;
+    if (placed.has(milestoneKey(milestone))) continue;
     rows.push({
       status: 'orphanMilestone',
       skillTypeID: milestone.skillTypeID,
@@ -150,9 +141,8 @@ const STATUS_KEY: Record<QueueEntryStatus, string> = {
 /**
  * CSV columns for the computed training queue. Level/seconds/cumulative
  * seconds are raw numbers, not the roman numeral or formatDuration() strings
- * ComputedQueue.tsx renders for display — the CSV needs to support
- * spreadsheet math. Start and done-by are the instants the step begins and
- * ends on the plan's own clock, as ISO strings.
+ * the list renders, so the file supports spreadsheet math. Start and done-by
+ * are the instants a step begins and ends on the plan's own clock.
  */
 export function queueCsvColumns(
   t: CsvTranslate,
@@ -160,36 +150,31 @@ export function queueCsvColumns(
   userSkillTypeIDs: ReadonlySet<number>,
   { schedule, engineSkills }: QueueCsvContext
 ): CsvColumn<QueueCsvRow>[] {
-  const yesNo = (flag: boolean) => t(flag ? 'plans.csvYes' : 'plans.csvNo');
-  const stepOnly =
-    <V>(read: (step: ScheduledStep, stepIndex: number) => V) =>
-    (row: QueueCsvRow) =>
-      row.step === undefined || row.stepIndex === undefined
-        ? undefined
-        : read(row.step, row.stepIndex);
+  const stepOf = (row: QueueCsvRow): ScheduledStep | undefined =>
+    row.stepIndex === undefined ? undefined : schedule.scheduled[row.stepIndex];
+  const finishMs = (seconds: number) => stepFinish(seconds, schedule.startDate).getTime();
   return [
     { header: t('plans.csvSkill'), value: (row) => nameFor(row.skillTypeID) },
     { header: t('plans.csvLevel'), value: (row) => row.level },
     { header: t('plans.csvStatus'), value: (row) => t(STATUS_KEY[row.status]) },
-    { header: t('plans.csvSeconds'), value: (row) => row.step?.seconds ?? row.remainingSeconds },
-    { header: t('plans.csvCumulativeSeconds'), value: stepOnly((step) => step.cumulativeSeconds) },
+    { header: t('plans.csvSeconds'), value: (row) => stepOf(row)?.seconds ?? row.remainingSeconds },
+    { header: t('plans.csvCumulativeSeconds'), value: (row) => stepOf(row)?.cumulativeSeconds },
     {
       header: t('plans.csvStart'),
-      value: stepOnly((step) =>
-        stepFinish(step.cumulativeSeconds - step.seconds, schedule.startDate).toISOString()
-      ),
+      value: (row) => {
+        const step = stepOf(row);
+        return step && isoTime(finishMs(step.cumulativeSeconds - step.seconds));
+      },
     },
     {
       header: t('plans.csvDoneBy'),
-      value: (row) =>
-        row.step
-          ? stepFinish(row.step.cumulativeSeconds, schedule.startDate).toISOString()
-          : row.doneByMs === undefined
-            ? undefined
-            : new Date(row.doneByMs).toISOString(),
+      value: (row) => {
+        const step = stepOf(row);
+        return step ? isoTime(finishMs(step.cumulativeSeconds)) : isoTime(row.doneByMs);
+      },
     },
     { header: t('plans.csvMilestone'), value: (row) => row.milestone },
-    { header: t('plans.csvSp'), value: stepOnly((step) => step.sp) },
+    { header: t('plans.csvSp'), value: (row) => stepOf(row)?.sp },
     {
       header: t('plans.csvPriority'),
       value: (row) => {
@@ -215,21 +200,30 @@ export function queueCsvColumns(
     },
     {
       header: t('plans.csvBoosted'),
-      value: stepOnly((_, i) => yesNo(schedule.boostedSteps.has(i))),
+      value: (row) =>
+        row.stepIndex === undefined
+          ? null
+          : exportFlag(t, schedule.boostedSteps.has(row.stepIndex)),
     },
     {
       header: t('plans.csvAlphaCapped'),
-      value: stepOnly((_, i) => yesNo(schedule.alphaCappedSteps.has(i))),
+      value: (row) =>
+        row.stepIndex === undefined
+          ? null
+          : exportFlag(t, schedule.alphaCappedSteps.has(row.stepIndex)),
     },
     {
       header: t('plans.csvRemapBefore'),
-      value: stepOnly((_, i) => yesNo(schedule.markerStepIndices.includes(i))),
+      value: (row) =>
+        row.stepIndex === undefined
+          ? null
+          : exportFlag(t, schedule.markerStepIndices.includes(row.stepIndex)),
     },
     {
       header: t('plans.csvPrereq'),
-      // A step whose skillTypeID isn't in userSkillTypeIDs was inserted by
-      // the planner as a prerequisite (mirrors ComputedQueue.tsx's isPrereq).
-      value: stepOnly((step) => yesNo(!userSkillTypeIDs.has(step.skillTypeID))),
+      // A step whose skill isn't one the user listed was inserted by the planner as a prerequisite.
+      value: (row) =>
+        row.stepIndex === undefined ? null : exportFlag(t, !userSkillTypeIDs.has(row.skillTypeID)),
     },
   ];
 }

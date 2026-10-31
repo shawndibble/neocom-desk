@@ -1,4 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
+import { exportFlag } from '@/lib/exportFlag';
 
 /** Trained skills of one SDE group, as /skills builds them for display and export. */
 export interface SkillGroup {
@@ -62,7 +63,7 @@ export function skillCsvColumns(t: CsvTranslate): CsvColumn<SkillCsvRow>[] {
     { header: t('skills.csvRank'), value: (row) => row.rank },
     {
       header: t('skills.csvInjected'),
-      value: (row) => t(row.injected ? 'skills.csvYes' : 'skills.csvNo'),
+      value: (row) => exportFlag(t, row.injected),
     },
     { header: t('skills.csvQueuedLevel'), value: (row) => row.queuedLevel },
     { header: t('skills.csvPlannedLevel'), value: (row) => row.plannedLevel },

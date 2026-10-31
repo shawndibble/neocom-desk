@@ -54,6 +54,9 @@ interface ExportItemsProps<T> {
  */
 export function ExportTableItems<T>({ tableExport, onDone }: ExportItemsProps<T>) {
   const { t } = useTranslation();
+  // The items exist only while a menu is open: opening one is the intent to export.
+  const { onExportIntent } = tableExport;
+  useEffect(() => onExportIntent?.(), [onExportIntent]);
   const select = (format: ExportFormat) => {
     // Started inside the select handler, while the document still has focus:
     // the clipboard write is refused once focus has moved on.
@@ -140,7 +143,6 @@ export function TableActionsMenu<T>({
   label: labelOverride,
   triggerText,
   onCloseAutoFocus,
-  onOpenChange,
 }: {
   /** What the table is, for the button's accessible name ("Export Open orders"). */
   name: string;
@@ -153,8 +155,6 @@ export function TableActionsMenu<T>({
   triggerText?: string;
   /** From `useOpenAfterMenu`, for a child item that opens a dialog. */
   onCloseAutoFocus?: (event: Event) => void;
-  /** Hears the menu open and close: a table whose export needs data it loads lazily starts that load on first open. */
-  onOpenChange?: (open: boolean) => void;
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<number | null>(null);
@@ -184,7 +184,7 @@ export function TableActionsMenu<T>({
       <LiveStatus announceKey={copyCount}>
         {copied !== null && t('common.tableExport.copied', { count: copied })}
       </LiveStatus>
-      <DropdownMenu onOpenChange={onOpenChange}>
+      <DropdownMenu>
         <DropdownMenuTrigger asChild>
           {triggerText ? (
             <Button
