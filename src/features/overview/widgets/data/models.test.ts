@@ -319,6 +319,33 @@ describe('training', () => {
     expect(view.table?.rows[0]?.info).toEqual({ typeId: 3300 });
   });
 
+  it('lists up to three queued skills behind the active one, then "+N more" to the queue', () => {
+    const at = (position: number) => ({
+      skill_id: 3300,
+      queue_position: position,
+      finished_level: 5,
+      start_date: new Date(NOW + (position * 10 - 1) * HOUR).toISOString(),
+      finish_date: new Date(NOW + (position * 10 + 9) * HOUR).toISOString(),
+    });
+    const view = (n: number) =>
+      buildView(
+        'training',
+        { skills: skills(Array.from({ length: n + 1 }, (_, i) => at(i))) as never },
+        ctx()
+      );
+    expect(view(0).number.upcoming).toBeUndefined();
+    expect(view(1).number.upcoming?.rows).toHaveLength(1);
+    expect(view(1).number.upcoming?.more).toBeUndefined();
+    expect(view(3).number.upcoming?.more).toBeUndefined();
+    const ten = view(10).number.upcoming;
+    expect(ten?.rows).toHaveLength(3);
+    expect(ten?.rows[0].value).toBe('19h 0m');
+    expect(ten?.more).toEqual({
+      label: 'overview.widgets.training.more{"count":7}',
+      to: '/skills/plans',
+    });
+  });
+
   it('warns about an idle queue only where the not-training alert is on', () => {
     const quiet = buildView('training', { skills: skills([]) as never }, ctx());
     expect(quiet.number.tone).toBe('clear');

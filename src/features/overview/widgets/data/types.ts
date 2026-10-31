@@ -96,6 +96,12 @@ export interface NumberModel {
   secondary?: NumberSecondary;
   /** Plain dim lines under the secondary: the Number view only (the chart and table carry the same in their own notes). */
   notes?: string[];
+  /** The skills queued behind the active one (Training): plain text rows, the Number view only. */
+  upcoming?: {
+    rows: { key: string; title: string; value: string }[];
+    /** Ends the list when more are queued than shown; opens the queue. */
+    more?: { label: string; to: string };
+  };
   /** The severity ladder's tone; `clear` draws plain. */
   tone: DeadlineSeverity;
   /** A follow-on link under the figure, the Number view only (Open orders' "Work through (N)"). */

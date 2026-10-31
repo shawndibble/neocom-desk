@@ -25,3 +25,21 @@ export function selectActiveEntryFromSorted(
   const firstFuture = ordered.find((e) => e.finish_date && Date.parse(e.finish_date) > nowMs);
   return firstFuture ?? null;
 }
+
+/**
+ * The skills queued behind the active one: up to `limit` of them, plus how
+ * many more follow. Takes `sortQueueEntries`-ordered input. Entries already
+ * finished are not "next", and with no active skill nothing is upcoming.
+ */
+export function selectUpcomingEntries(
+  ordered: readonly SkillQueueEntry[],
+  active: SkillQueueEntry | null,
+  nowMs: number,
+  limit = 3
+): { upcoming: SkillQueueEntry[]; more: number } {
+  if (!active) return { upcoming: [], more: 0 };
+  const behind = ordered
+    .slice(ordered.indexOf(active) + 1)
+    .filter((e) => !e.finish_date || Date.parse(e.finish_date) > nowMs);
+  return { upcoming: behind.slice(0, limit), more: Math.max(0, behind.length - limit) };
+}

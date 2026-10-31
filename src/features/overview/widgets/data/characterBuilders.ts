@@ -12,7 +12,11 @@ import { extractableSp, extractorCount } from '@/engine/skills/spExtraction';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { DAY_MS } from '@/lib/age';
-import { sortQueueEntries, selectActiveEntryFromSorted } from '@/features/overview/overviewQueue';
+import {
+  sortQueueEntries,
+  selectActiveEntryFromSorted,
+  selectUpcomingEntries,
+} from '@/features/overview/overviewQueue';
 import {
   comingUpEventSeverity,
   comingUpSeverity,
@@ -86,6 +90,7 @@ export const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
     };
   }
   const finish = finishOf(active);
+  const { upcoming, more } = selectUpcomingEntries(sorted, active, now);
   const segments = queueSegments(sorted, now);
   return {
     ...base,
@@ -111,6 +116,25 @@ export const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
           level: active.finished_level,
         }),
       },
+      upcoming: upcoming.length
+        ? {
+            rows: upcoming.map((entry) => {
+              const at = finishOf(entry);
+              return {
+                key: `${entry.skill_id}:${entry.queue_position}`,
+                title: t('overview.widgets.training.skillLevel', {
+                  name: nameOf(entry.skill_id),
+                  level: entry.finished_level,
+                }),
+                value: at === null ? UNKNOWN : formatCountdown(Math.max(0, at - now) / 1000),
+              };
+            }),
+            more:
+              more > 0
+                ? { label: t('overview.widgets.training.more', { count: more }), to }
+                : undefined,
+          }
+        : undefined,
       tone: 'clear',
     },
     rows,
