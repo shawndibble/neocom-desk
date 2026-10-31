@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
 import '@/i18n';
@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
+import { routeToHref } from '@/features/route/routeSafetyLink';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useCloneNicknames } from '@/features/character/cloneNicknames';
 
@@ -517,6 +518,67 @@ describe('Clones', () => {
     expect(screen.queryByText(/Infomorph Synchronizing/)).not.toBeInTheDocument();
     const section = screen.getByRole('region', { name: 'Jump Cooldown' });
     expect(section.querySelector('p.text-xs')).toBeNull();
+  });
+
+  it("links the respawn station and the worn clone's system, and leaves a Station #id fallback plain", async () => {
+    render(<App />);
+    const station = await screen.findAllByRole('link', {
+      name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+    });
+    expect(station.some((a) => a.getAttribute('href') === '/clones?info=place-60003760')).toBe(
+      true
+    );
+    const system = await screen.findByRole('link', { name: 'Jita' });
+    expect(system.getAttribute('href')).toBe(routeToHref(30000142));
+  });
+
+  it('links the place under a nicknamed jump clone, but not its unresolved structure fallback', async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/clones`, () =>
+        HttpResponse.json({
+          jump_clones: [
+            {
+              jump_clone_id: 1,
+              location_id: 60003760,
+              location_type: 'station',
+              implants: [],
+              name: 'Alpha',
+            },
+            {
+              jump_clone_id: 2,
+              location_id: 1000000000002,
+              location_type: 'structure',
+              implants: [],
+              name: 'Beta',
+            },
+          ],
+        })
+      )
+    );
+    render(<App />);
+    const alpha = (await screen.findByText('Alpha')).closest('li');
+    expect(
+      within(alpha as HTMLElement)
+        .getByRole('link', { name: /Caldari Navy Assembly Plant/ })
+        .getAttribute('href')
+    ).toBe('/clones?info=place-60003760');
+    const beta = screen.getByText('Beta').closest('li') as HTMLElement;
+    expect(within(beta).getByText('Structure #1000000000002')).toBeInTheDocument();
+    expect(within(beta).queryByRole('link', { name: /Structure #/ })).not.toBeInTheDocument();
+  });
+
+  it('leaves an unresolved respawn structure as plain text', async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/clones`, () =>
+        HttpResponse.json({
+          home_location: { location_id: 1000000000002, location_type: 'structure' },
+          jump_clones: [],
+        })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('Structure #1000000000002')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Structure #/ })).not.toBeInTheDocument();
   });
 
   it('lists the clone being worn first, its implants linking to Show info, with count and value', async () => {

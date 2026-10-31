@@ -125,7 +125,7 @@ export function CloneCard({
 }: {
   title: string;
   /** Under a named clone's title; null when the title already is the place. */
-  place: string | null;
+  place: ReactNode;
   security: number | undefined;
   jumps: ReactNode;
   implantIds: readonly number[];
