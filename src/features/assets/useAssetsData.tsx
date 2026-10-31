@@ -25,6 +25,7 @@ import {
   blueprintKindParam,
   blueprintsTicked,
   categoryPickParam,
+  pruneCategoryIndex,
   filterIsOpen,
   pickIsAll,
   type AssetKindFilter,
@@ -152,11 +153,7 @@ export function useAssetsData() {
 
   const categoryPick = useMemo(() => CATEGORY_PARAM.parse(catKey), [catKey]);
   const blueprintKind = view.bp;
-  const showBlueprintSelect = categoryIndex ? blueprintsTicked(categoryIndex, categoryPick) : false;
-  const activeFilterCount =
-    (pickIsAll(categoryPick) ? 0 : 1) +
-    (blueprintKind !== 'any' && showBlueprintSelect ? 1 : 0) +
-    (minValueThreshold > 0 ? 1 : 0);
+
   const resetFilters = () => setView({ cat: 'all', bp: 'any', min: '' });
 
   // Viewing a named Character is a fixed scope: the cross-Character filter
@@ -347,16 +344,35 @@ export function useAssetsData() {
   }, [typeNames, activeCrossCharacterData]);
   const blueprintTypeIds = useBlueprintTypeIds(mergedTypeNames);
 
+  // The picker lists only categories the shown assets fall under.
+  // Null while there is nothing to list, so the picker never shows empty.
+  const pickerIndex = useMemo(() => {
+    if (!categoryIndex) return null;
+    const pruned = pruneCategoryIndex(
+      categoryIndex,
+      mergedAssets.map((asset) => asset.type_id),
+      categoryPick
+    );
+    return pruned.headings.length > 0 ? pruned : null;
+  }, [categoryIndex, mergedAssets, categoryPick]);
+
+  const showBlueprintSelect = pickerIndex ? blueprintsTicked(pickerIndex, categoryPick) : false;
+  const activeFilterCount =
+    (pickIsAll(categoryPick) ? 0 : 1) +
+    (blueprintKind !== 'any' && showBlueprintSelect ? 1 : 0) +
+    (minValueThreshold > 0 ? 1 : 0);
+
   const kindFilter = useMemo<AssetKindFilter | null>(() => {
     if (!categoryIndex) return null;
     const filter = {
       index: categoryIndex,
       pick: categoryPick,
-      blueprints: blueprintKind,
+      // A hidden Blueprints select must not keep filtering.
+      blueprints: showBlueprintSelect ? blueprintKind : 'any',
       blueprintTypeIds,
     };
     return filterIsOpen(filter) ? null : filter;
-  }, [categoryIndex, categoryPick, blueprintKind, blueprintTypeIds]);
+  }, [categoryIndex, categoryPick, blueprintKind, showBlueprintSelect, blueprintTypeIds]);
   const mergedLocationNames = useMemo(() => {
     if (!activeCrossCharacterData) return locationNames;
     const merged = new Map(locationNames);
@@ -508,6 +524,7 @@ export function useAssetsData() {
     flatModeActive,
     minValueThreshold,
     categoryIndex,
+    pickerIndex,
     categoryPick,
     blueprintKind,
     kindFilter,
