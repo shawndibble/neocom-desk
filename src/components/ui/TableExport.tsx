@@ -139,7 +139,6 @@ export function TableActionsMenu<T>({
   size = 'sm',
   label: labelOverride,
   triggerText,
-  showLabel,
   onCloseAutoFocus,
 }: {
   /** What the table is, for the button's accessible name ("Export Open orders"). */
@@ -151,8 +150,6 @@ export function TableActionsMenu<T>({
   label?: string;
   /** Shows the word on the trigger (grid icon, text, caret) instead of a bare ⋯ icon: a page's named Tools menu. */
   triggerText?: string;
-  /** Tier 2: an export-only trigger shows "Export" beside the download icon from `md` up. */
-  showLabel?: boolean;
   /** From `useOpenAfterMenu`, for a child item that opens a dialog. */
   onCloseAutoFocus?: (event: Event) => void;
 }) {
@@ -210,11 +207,6 @@ export function TableActionsMenu<T>({
               }
               label={copied === null ? label : t('common.tableExport.copied', { count: copied })}
               size={size}
-              visibleLabel={
-                showLabel && exportOnly && copied === null
-                  ? t('common.tableExport.exportVerb')
-                  : undefined
-              }
             />
           )}
         </DropdownMenuTrigger>

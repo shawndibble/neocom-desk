@@ -55,7 +55,7 @@ export const PhoneSheet: Story = {
 };
 
 /** @summary The funnel opens a popover anchored to it, for a panel title bar with no room beneath. */
-export const PopoverSurface: Story = { args: { pointerSurface: 'popover', triggerLabel: true } };
+export const PopoverSurface: Story = { args: { pointerSurface: 'popover' } };
 
 /** @summary `trailing` view controls after the funnel, so the funnel sits beside the search box. */
 export const WithTrailing: Story = {
