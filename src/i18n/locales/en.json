@@ -17335,6 +17335,7 @@
         "outsideCorp": "not in the corporation",
         "dialogTitle": "Group characters with {{name}}",
         "dialogIntro": "Pick the Miners whose characters should be billed together.",
+        "listFailed": "Couldn't load the other Miners. Close this and try again.",
         "mailMain": "Mail goes to",
         "confirm_one": "Group {{count}} Miner",
         "confirm_other": "Group {{count}} Miners",

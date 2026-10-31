@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Miner } from './charges';
-import { planAutoGroups, planRegroup } from './grouping';
+import { minerChoices, planAutoGroups, planRegroup } from './grouping';
 
 const miner = (id: string, characterIds: number[], main = characterIds[0]): Miner => ({
   id,
@@ -107,5 +107,48 @@ describe('planAutoGroups', () => {
     ).toEqual([
       { action: 'setMiner', minerId: 'solo:5', characterIds: [5, 6], mainCharacterId: 5 },
     ]);
+  });
+});
+
+describe('minerChoices', () => {
+  const CORP = 98000001;
+  const row = (characterId: number, date: string, recordedCorporationId = CORP) => ({
+    characterId,
+    date,
+    recordedCorporationId,
+  });
+
+  it('lists every stored group, then a solo Miner per ungrouped character mining since the start', () => {
+    const choices = minerChoices({
+      corporationId: CORP,
+      startDate: '2026-08-01',
+      miners: [miner('g1', [1, 2])],
+      entries: [
+        row(2, '2026-08-03'),
+        row(5, '2026-08-04'),
+        row(5, '2026-08-05'),
+        row(3, '2026-08-02'),
+        row(9, '2026-07-30'),
+      ],
+    });
+    expect(choices.map((c) => [c.id, c.mainCharacterId, c.characterIds])).toEqual([
+      ['g1', 1, [1, 2]],
+      ['solo:3', 3, [3]],
+      ['solo:5', 5, [5]],
+    ]);
+  });
+
+  it('marks a Miner whose characters were never in the corporation as a guest', () => {
+    const choices = minerChoices({
+      corporationId: CORP,
+      miners: [],
+      entries: [row(1, '2026-08-03'), row(2, '2026-08-03', 555), row(3, '2026-08-03', 555)],
+      memberIds: new Set([1, 3]),
+    });
+    expect(Object.fromEntries(choices.map((c) => [c.id, c.standing]))).toEqual({
+      'solo:1': 'member',
+      'solo:2': 'guest',
+      'solo:3': 'member',
+    });
   });
 });

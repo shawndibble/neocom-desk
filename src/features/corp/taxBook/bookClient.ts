@@ -503,6 +503,11 @@ export interface BookData {
   parts?: BookPartSet;
   /** The Overview and Miners tab docs (ADR 0032); read only behind `CORP_BOOK_READ_MODELS`. */
   readModels?: ReadModelDocs;
+  /**
+   * The Miner a one-Miner read (`readMinerBookData`) covered; absent for the whole book. Then
+   * `state.miners` holds that Miner only, so a dialog listing other Miners reads them itself.
+   */
+  scopedMiner?: string;
 }
 
 const feederPayouts = (characterId: number, book: number, feeder: number) =>
@@ -796,8 +801,24 @@ export async function readMinerBookData(
       groupingAnswers: groupingAnswersFrom(answers),
       scheduledSync: scheduledSyncFrom(scheduled),
       parts: ALL_BOOK_PART_SET,
+      scopedMiner: minerId,
     },
   };
+}
+
+/**
+ * What the group dialog lists on a one-Miner page (#5704): the stored groups and the ledger
+ * rows, through the same copies the whole-book read uses, so a warm device reads only the
+ * book doc and what changed. Officer-only.
+ */
+export async function readGroupingSources(
+  characterId: number,
+  corporationId: number
+): Promise<{ miners: Miner[]; observed: ObservedRow[] } | null> {
+  const book = await openBook(characterId, corporationId);
+  if (!book) return null;
+  const [miners, observed] = await Promise.all([book.list<Miner>('miners'), book.observed()]);
+  return { miners, observed };
 }
 
 /** `extra`'s slices laid over `held`; everything else, and the settings, is `extra`'s fresher copy. */

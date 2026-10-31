@@ -11,8 +11,16 @@ import { MinerCharacters } from './MinerCharacters';
 import type { BookData, BookSettings, GroupingAnswer, OfficerVerdict } from '../taxBook/bookClient';
 
 const editBook = vi.fn();
+const readGroupingSources = vi.fn();
 vi.mock('../taxBook/bookClient', () => ({
   editBook: (...a: unknown[]) => editBook(...a),
+  readGroupingSources: (...a: unknown[]) => readGroupingSources(...a),
+}));
+vi.mock('../currentMembers', () => ({
+  loadCurrentMemberIds: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('@/features/character/names', () => ({
+  resolveNames: vi.fn(async (ids: number[]) => new Map(ids.map((id) => [id, `Pilot ${id}`]))),
 }));
 
 const CORP = 98000001;
@@ -38,7 +46,8 @@ function renderPanel(
   miners: (Miner & { pendingConfirmation?: number[] })[],
   minerId: string,
   ui: (row: ReturnType<typeof buildBookView>['miners'][number]) => ReactElement,
-  groupingAnswers: GroupingAnswer[] = []
+  groupingAnswers: GroupingAnswer[] = [],
+  scoped?: { entries: ReturnType<typeof entry>[]; data: Partial<BookData> }
 ) {
   const view = buildBookView({
     corporationId: CORP,
@@ -52,7 +61,7 @@ function renderPanel(
     oreForm: 'compressed',
     structureExpiryHours: {},
     rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-08-01' }],
-    entries: [entry(1), entry(2), entry(3, 555)],
+    entries: scoped?.entries ?? [entry(1), entry(2), entry(3, 555)],
     miners,
     statements: [],
     payments: [],
@@ -79,8 +88,13 @@ function renderPanel(
             moon: (id) => `Moon ${id}`,
             ore: () => 'Sylvite',
           },
-          settings: {} as BookSettings,
-          data: { state: { miners }, adjustments: [], groupingAnswers } as unknown as BookData,
+          settings: { startDate: '2026-08-01' } as BookSettings,
+          data: {
+            state: { miners },
+            adjustments: [],
+            groupingAnswers,
+            ...scoped?.data,
+          } as unknown as BookData,
           verdict,
           reload: vi.fn(),
         }}
@@ -164,5 +178,49 @@ describe('MinerCharacters', () => {
       })
     );
     expect(editBook).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists every Miner on a one-Miner page, and absorbs a stored group (#5704)', async () => {
+    const row = (characterId: number, recordedCorporationId = CORP) => ({
+      ...entry(characterId, recordedCorporationId),
+      typeId: 45490,
+      quantity: 1000,
+    });
+    readGroupingSources.mockResolvedValue({
+      miners: [{ id: 'g2', characterIds: [2, 4], mainCharacterId: 2 }],
+      observed: [row(1), row(2), row(4), row(3, 555)],
+    });
+    // The page's own read: this Miner only.
+    renderPanel([], 'solo:1', (r) => <MinerCharacters miner={r} />, [], {
+      entries: [entry(1)],
+      data: { scopedMiner: 'solo:1' },
+    });
+    await openCharacters();
+    await userEvent.click(screen.getByRole('button', { name: 'Group with' }));
+    expect(await screen.findByText('Pilot 3')).toBeInTheDocument();
+    expect(screen.getByText(/not in the corporation/)).toBeInTheDocument();
+    await userEvent.click(screen.getByText(/^Pilot 2/));
+    await userEvent.click(screen.getByRole('button', { name: 'Group 1 Miner' }));
+    await waitFor(() =>
+      expect(editBook).toHaveBeenCalledWith(7, CORP, {
+        action: 'regroupMiner',
+        minerId: 'solo:1',
+        characterIds: [1, 2, 4],
+        mainCharacterId: 1,
+        absorbMinerIds: ['g2'],
+      })
+    );
+    expect(readGroupingSources).toHaveBeenCalledWith(7, CORP);
+  });
+
+  it('says so when the other Miners could not be read', async () => {
+    readGroupingSources.mockRejectedValue(new Error('offline'));
+    renderPanel([], 'solo:1', (r) => <MinerCharacters miner={r} />, [], {
+      entries: [entry(1)],
+      data: { scopedMiner: 'solo:1' },
+    });
+    await openCharacters();
+    await userEvent.click(screen.getByRole('button', { name: 'Group with' }));
+    expect(await screen.findByText(/Couldn't load the other Miners/)).toBeInTheDocument();
   });
 });
