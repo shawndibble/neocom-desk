@@ -330,4 +330,16 @@ describe('readBookData and the Overview/Miners read models (#5259)', () => {
     await readBookData(7, CORP, undefined, true);
     expect(store.reads.filter((p) => p.includes('/readModels'))).toHaveLength(2);
   });
+
+  it('opens the book without them, wiping nothing, when the rules refuse the docs', async () => {
+    await readBookData(7, CORP);
+    clearBookCache();
+    store.denied.add(`${BOOK}/readModels/minerList`);
+    store.denied.add(`${BOOK}/readModels/overview`);
+
+    const data = await readBookData(7, CORP, undefined, true);
+    expect(data?.readModels).toBeUndefined();
+    expect(data?.state.miners).toBeDefined();
+    expect(await db.corpBookParts.count()).toBeGreaterThan(0);
+  });
 });

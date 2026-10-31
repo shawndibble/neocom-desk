@@ -15,6 +15,7 @@ vi.mock('../taxBook/readModelSwitch', () => ({
   get CORP_BOOK_READ_MODELS() {
     return flag.on;
   },
+  CORP_BOOK_MINER_SCOPED_READ: false,
 }));
 vi.mock('../taxBook/bookClient', () => ({ editBook: vi.fn(), readAudit: vi.fn() }));
 vi.mock('@/features/corpTaxBook/mailQueueStore', () => ({

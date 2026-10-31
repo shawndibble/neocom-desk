@@ -129,7 +129,7 @@ Tickets #5254-#5261 cover these.
 
 0. `extractionId` on every row, with backfill (#5254). Stamping only; no verifier yet.
 1. Miner doc (`minerTotals`) in shadow mode, with the property test, the scheduled verifier and its overlap flag (#5255).
-2. Miner page switches to miner doc, open set, Statements, payments, dismissals, behind `CORP_BOOK_READ_MODELS` (#5258; reads all of one Miner's Statements, see docs/context/decisions/).
+2. Miner page switches to miner doc, open set, Statements, payments, dismissals, behind `CORP_BOOK_MINER_SCOPED_READ` (#5258; reads all of one Miner's Statements, see docs/context/decisions/).
 3. Moon doc and the Fully Mined flag (control `ready-for-human`); moon page switches.
 4. Overview doc and miner list doc; overview and Miners tab switch.
 5. Stop loading the full ledger in the officer client; replace the per-day price load with prices for open days and the moon page's window.
