@@ -127,8 +127,9 @@ Replaces the old journal balance-history chart. Maths in `src/engine/netWorth/` 
 
 ### ISK waiting and Goal panels (`features/netWorth/WalletWaitingGoal.tsx`)
 
-- Replaced the Loyalty Points table on Balance: the LP Store tab lists LP, so Balance shows money instead. Both panels read stored Net Worth Snapshots (no ESI read) for the picked, drilled or active Characters, and use only Characters whose newest snapshot is under a week old.
+- Replaced the Loyalty Points table on Balance: the LP Store tab lists LP, so Balance shows money instead. Both panels read stored Net Worth Snapshots for the picked, drilled or active Characters, and use only Characters whose newest snapshot is under a week old. The sell-orders health split below is the exception: it reads the Open Orders snapshot (live orders and station prices, cache key `market:open-orders`, shared with the Orders page and the Overview card).
 - **ISK waiting**: sell-order stock, buy-order escrow, contracts (`iskWaiting`, `engine/netWorth/waiting.ts`), the wallet change over 30 days, and an "Open Journal" link.
+- **Sell orders now, live prices**: sell-order ISK split Fine / Needs you / Watch / Not checked by `sellOrderHealth` (`features/market/orderHealthSplit.ts`), the Orders page's own urgency. Rows come from `openOrderRowsFromSnapshot` (station prices and standings only), so an order can read healthier here than on Orders; structure orders read Not checked. "Fix in Open Orders" links the work-through when any order Needs you.
 - **Goal**: one name and ISK target in a dialog (`walletGoal`, device-local, not synced, capped at 1e15). Progress is summed wallet ISK; pace is wallet gain per day over the last 30 days (needs 7+ days of snapshots); the date follows (`goalProgress`).
 - The loyalty reauth banner left with the table: EverMarks reads "unknown" when the loyalty scope is missing.
 

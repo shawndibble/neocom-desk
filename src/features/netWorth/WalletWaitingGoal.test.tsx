@@ -7,13 +7,17 @@ import '@/i18n';
 import { db } from '@/db';
 import { shiftUtcDate } from '@/engine/localDay';
 import { utcDay, type NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
+import type { SellOrderHealth } from '@/features/market/orderHealthSplit';
 import { WalletWaitingGoal } from './WalletWaitingGoal';
+import { useSellOrderHealth } from './useSellOrderHealth';
 import { REQUIRED_SCOPES } from './recordSnapshots';
 import { useWalletGoal } from './walletGoalSetting';
 
 vi.mock('@/features/character/wallet', () => ({
   loadWalletJournal: vi.fn(async () => null),
 }));
+
+vi.mock('./useSellOrderHealth', () => ({ useSellOrderHealth: vi.fn(() => null) }));
 
 const today = utcDay(Date.now());
 const snap = (day: string, wallet: number): NetWorthSnapshotRow => ({
@@ -30,6 +34,7 @@ const snap = (day: string, wallet: number): NetWorthSnapshotRow => ({
 });
 
 beforeEach(async () => {
+  vi.mocked(useSellOrderHealth).mockReturnValue(null);
   await db.delete();
   await db.open();
   useWalletGoal.setState({ value: null, hydrated: true });
@@ -55,6 +60,31 @@ function renderPanels() {
 }
 
 describe('WalletWaitingGoal', () => {
+  it('splits sell-order ISK by health and links the orders that need the pilot', async () => {
+    const part = (isk: number, orders: number) => ({ isk, orders });
+    const health: SellOrderHealth = {
+      healthy: part(1_000, 3),
+      needsYou: part(400, 1),
+      watch: part(0, 0),
+      notChecked: part(50, 2),
+      total: part(1_450, 6),
+    };
+    vi.mocked(useSellOrderHealth).mockReturnValue(health);
+    renderPanels();
+    const panel = (await screen.findByRole('heading', { name: 'ISK waiting' })).closest(
+      'section'
+    ) as HTMLElement;
+    expect(within(panel).getByText('Fine')).toBeInTheDocument();
+    expect(within(panel).getByText('1,000 ISK')).toBeInTheDocument();
+    expect(within(panel).getByText('Needs you')).toBeInTheDocument();
+    expect(within(panel).getByText('Not checked')).toBeInTheDocument();
+    expect(within(panel).queryByText('Watch')).not.toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: 'Fix in Open Orders' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('/market/orders')
+    );
+  });
+
   it('lists the ISK waiting in orders and contracts, with the wallet change and a Journal link', async () => {
     renderPanels();
     const panel = (await screen.findByRole('heading', { name: 'ISK waiting' })).closest(

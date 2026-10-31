@@ -7,12 +7,12 @@
  * `boardSummary`; this only picks which figure leads and how each row reads.
  */
 import {
-  buildOpenOrderRows,
   needsAttentionCount,
   notCheckedCount,
   openOrderProblemCounts,
 } from '@/features/market/openOrdersModel';
 import { openOrdersHref } from '@/features/market/openOrdersFilter';
+import { openOrderRowsFromSnapshot } from '@/features/market/openOrdersSnapshotRows';
 import { stockBoardSeverity } from '@/features/stockTargets/stockBoard';
 import { formatCountdown } from '@/lib/duration';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
@@ -164,16 +164,7 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
   // the cross-character Orders page; a widget on one Character narrows the
   // built rows, which costs nothing since the other Characters' orders were
   // already fetched for the page's cache.
-  const built = buildOpenOrderRows({
-    snapshot: snapshot.openOrders,
-    typeNames: snapshot.typeNames,
-    stationPrices: snapshot.stationPrices,
-    costBases: snapshot.costBases,
-    walletBasisGaps: snapshot.walletBasisGaps,
-    stationNames: new Map([...snapshot.npcStations].map(([id, s]) => [id, s.name])),
-    skillsByCharacter: snapshot.skillsByCharacter,
-    now: snapshot.now,
-  });
+  const built = openOrderRowsFromSnapshot(snapshot);
   const rows = everyone ? built : built.filter((row) => row.characterId === activeCharacterId);
   // No entry at all for this Character means the grant was never given.
   const entries = snapshot.openOrders.entries;

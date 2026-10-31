@@ -71,8 +71,8 @@ export async function loadSkillsQueuePanel(characterId: number): Promise<SkillsQ
  * competition loaders for three counts.
  */
 export function loadOrdersBoard(characterId: number, signal: RouteSnapshotSignal) {
-  return import('@/features/market/openOrdersPageSnapshot').then((m) =>
-    m.loadOpenOrdersSnapshot(characterId, signal)
+  return import('@/features/market/openOrdersSnapshotRows').then((m) =>
+    m.loadOpenOrdersSnapshotLazy(characterId, signal)
   );
 }
 
