@@ -8,7 +8,7 @@
  * as of build 3569502 (Oct 2026). A goal CCP adds later reads as "Daily goal"
  * until it is added there.
  */
-import type { TFunction } from 'i18next';
+import type { Translate } from '@/lib/translate';
 
 const BARE_ID = /^\d+$/;
 
@@ -20,7 +20,7 @@ export function dailyGoalMessageIdOf(entry: { ref_type: string; reason?: string 
 }
 
 /** A daily goal's name, or null when `wallet.dailyGoalNames` has none for its id. */
-export function dailyGoalName(messageId: number, t: TFunction): string | null {
+export function dailyGoalName(messageId: number, t: Translate): string | null {
   return t(`wallet.dailyGoalNames.${messageId}`, { defaultValue: '' }) || null;
 }
 
@@ -31,7 +31,7 @@ export function dailyGoalName(messageId: number, t: TFunction): string | null {
  */
 export function journalDescriptionText(
   entry: { ref_type: string; description: string; reason?: string },
-  t: TFunction
+  t: Translate
 ): string {
   const goalId = dailyGoalMessageIdOf(entry);
   if (goalId === null) return entry.description;

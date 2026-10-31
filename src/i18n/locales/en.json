@@ -7123,6 +7123,8 @@
     "journalBetween_other": "Between your Characters · {{count}} entries",
     "journalBetweenHelp": "Left out of In and Out: both sides are your Characters. ISK moved through a corporation wallet is not netted and still counts.",
     "journalBetweenMarker": "Between your Characters",
+    "csvYes": "yes",
+    "csvNo": "no",
     "journalLeftOut_one": "{{count}} entry between your Characters left out",
     "journalLeftOut_other": "{{count}} entries between your Characters left out",
     "journalEntryCount_one": "{{count}} entry",
