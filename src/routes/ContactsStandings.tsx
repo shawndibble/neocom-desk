@@ -36,6 +36,9 @@ import {
   type NpcStandingRow,
   type NpcStandingsFilter,
 } from '@/features/character/npcStandingsRows';
+import { npcStandingsCsvColumns } from '@/features/character/npcStandingsCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { useNpcStandingsColumns } from '@/features/character/useNpcStandingsColumns';
 import { openNpcInfo, type NpcInfoKind } from '@/features/standings/openNpcInfo';
 import { DataGate } from '@/components/DataGate';
@@ -187,6 +190,13 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     [state?.rows, rowsFilter]
   );
   const counts = useMemo(() => countNpcStandingRows(state?.rows ?? []), [state?.rows]);
+  // Every column and the rows the filter bar leaves, in the table's sort.
+  const csvColumns = useMemo(() => npcStandingsCsvColumns(t), [t]);
+  const standingsExport = useTableExport({
+    surface: 'npc-standings',
+    rows,
+    columns: csvColumns,
+  });
 
   let content: ReactNode;
   if (lacksScope) {
@@ -247,6 +257,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
               columns={columns}
               rows={rows}
               rowKey={(row) => row.id}
+              {...standingsExport.tableProps}
               {...sortProps}
               mobileSort
               stackLayout="dense"
@@ -263,12 +274,21 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     !lacksScope && state?.characterId === characterId && !state.failed && state.available;
   const meta = ready && state.fetchedAt && <DataAgeBadge date={state.fetchedAt} />;
   const actions = !lacksScope && (
-    <IconButton
-      icon={<Icon.Refresh />}
-      label={t('contacts.refresh')}
-      onClick={refresh}
-      disabled={refreshing || !state || state.characterId !== characterId}
-    />
+    <>
+      {ready && (
+        <TableActionsMenu
+          name={t('contacts.tabStandings')}
+          tableExport={standingsExport}
+          size="md"
+        />
+      )}
+      <IconButton
+        icon={<Icon.Refresh />}
+        label={t('contacts.refresh')}
+        onClick={refresh}
+        disabled={refreshing || !state || state.characterId !== characterId}
+      />
+    </>
   );
   return {
     meta,

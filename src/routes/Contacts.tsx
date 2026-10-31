@@ -131,6 +131,7 @@ export function Contacts() {
   const contacts = useMemo(() => contactsResult?.data ?? [], [contactsResult]);
   const {
     affiliationRows,
+    achievements,
     optionalCharacterColumns,
     availableCharacterColumnIds,
     columns,
@@ -220,8 +221,8 @@ export function Contacts() {
   // One export button in the page header, exporting whichever tab's table is showing —
   // each tab keeps its own surface so the two files never share a name.
   const characterCsvColumns = useMemo(
-    () => contactsCsvColumns(t, contactNames, affiliationRows),
-    [t, contactNames, affiliationRows]
+    () => contactsCsvColumns(t, contactNames, affiliationRows, contactLabels, achievements),
+    [t, contactNames, affiliationRows, contactLabels, achievements]
   );
   const characterExport = useTableExport({
     surface: 'contacts',

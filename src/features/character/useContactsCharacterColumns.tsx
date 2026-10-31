@@ -249,6 +249,7 @@ export function useContactsCharacterColumns({
 
   return {
     affiliationRows,
+    achievements,
     optionalCharacterColumns,
     availableCharacterColumnIds,
     columns,
