@@ -21,6 +21,10 @@ export function marketNeed(market: MarketSummary): MarketNeed {
   return 'stocked';
 }
 
+/** Worst first, for sorting a list of markets by need. */
+export const marketNeedRank = (market: MarketSummary): number =>
+  ({ out: 0, low: 1, stocked: 2 })[marketNeed(market)];
+
 /** Most items out first, then most low, then the dearest to fill. */
 export function rankMarkets<T extends Pick<MarketSummary, 'out' | 'low' | 'costToFill'>>(
   markets: readonly T[]

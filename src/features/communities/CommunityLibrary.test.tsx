@@ -117,6 +117,26 @@ describe('CommunityLibrary', () => {
     expect(rows.find((text) => text?.includes('Efa VII'))).toMatch(/Efa VII—.*10 \/ 20.*7 runs/);
   });
 
+  it('hides an optional shared column from the picker, never the blueprint, and resets', async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+    const table = await screen.findByRole('table', { name: l.sharedLabel });
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    expect(screen.queryByRole('menuitemcheckbox', { name: l.columns.blueprint })).toBeNull();
+    await user.click(screen.getByRole('menuitemcheckbox', { name: l.columns.member }));
+    await user.keyboard('{Escape}');
+    expect(
+      within(table).queryByRole('columnheader', { name: new RegExp(l.columns.member) })
+    ).toBeNull();
+    expect(
+      within(table).getByRole('columnheader', { name: new RegExp(l.columns.blueprint) })
+    ).toBeInTheDocument();
+
+    // Shared device-local store: put it back for the next test.
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Reset to default' }));
+  });
+
   it('opens Show info from the blueprint name', async () => {
     renderLibrary();
     const table = await screen.findByRole('table', { name: l.sharedLabel });
