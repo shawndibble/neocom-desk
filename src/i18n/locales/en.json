@@ -13069,7 +13069,7 @@
     },
     "orders": {
       "slots": {
-        "label": "Orders",
+        "label": "Order slots",
         "value": "{{label}} {{used}} / {{max}}",
         "tooltip": "Open orders against the most you can keep open: {{detail}}.",
         "base": "{{count}} base",

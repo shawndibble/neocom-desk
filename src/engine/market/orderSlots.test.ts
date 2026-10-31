@@ -73,7 +73,7 @@ describe('orderSlotBreakdown', () => {
 });
 
 describe('orderSlotTone', () => {
-  it('is ok below 95% of the ceiling', () => {
+  it('is default below 95% of the ceiling', () => {
     expect(orderSlotTone(144, 305)).toBe('default');
   });
   it('turns warning at 95%', () => {
@@ -84,7 +84,7 @@ describe('orderSlotTone', () => {
     expect(orderSlotTone(305, 305)).toBe('danger');
     expect(orderSlotTone(310, 305)).toBe('danger');
   });
-  it('treats a zero ceiling as no signal rather than dividing by it', () => {
+  it('reads a zero ceiling as full rather than dividing by it', () => {
     expect(orderSlotTone(0, 0)).toBe('danger');
   });
 });
