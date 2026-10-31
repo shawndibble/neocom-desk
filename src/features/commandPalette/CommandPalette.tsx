@@ -53,18 +53,21 @@ import {
   marketItemCatalogue,
   type ShownMarketItem,
 } from './marketItems';
-import { loadLpCorporations } from '@/sde/loadMarketSde';
+import { loadLpCorporations, loadSolarSystems } from '@/sde/loadMarketSde';
 import { loadShipTree } from '@/sde/loadSde';
 import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
 import { createShipsProvider } from './shipsProvider';
 import { createPlacesProvider } from './placesProvider';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { permissionsForEndpoints } from '@/esi/registry';
 import { useOnline } from '@/stores/network';
 import { setWaypointsInGame } from '@/features/travel/sendWaypoints';
+import {
+  WAYPOINT_ENDPOINTS,
+  WAYPOINT_GROUPS,
+  waypointOutcome,
+} from '@/features/travel/waypointOutcome';
 import { routeToHref } from '@/features/route/routeSafetyLink';
-import { loadSolarSystems } from '@/sde/loadMarketSde';
 import { searchKnownPlaces } from '@/features/places/placeSearch';
 import { resolvePlace } from '@/features/places';
 import { usePlaceNicknames } from '@/features/assets/placeNicknames';
@@ -80,8 +83,6 @@ import {
 } from './types';
 import { usePaletteSearch } from './usePaletteSearch';
 
-const WAYPOINT_ENDPOINTS = ['postAutopilotWaypoint'] as const;
-const WAYPOINT_GROUPS = permissionsForEndpoints(WAYPOINT_ENDPOINTS);
 const NO_CONTACTS: readonly PaletteContact[] = [];
 const NO_ASSETS: readonly PaletteAsset[] = [];
 
@@ -169,26 +170,11 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
         if (lacksWaypointScope)
           return { tone: 'alert', text: <GrantMissingLink groups={WAYPOINT_GROUPS} /> };
         if (!online) return { tone: 'alert', text: t('common.needsConnection') };
-        const result = await setWaypointsInGame(activeCharacterId, [locationId]);
-        if (result.ok)
-          return { tone: 'status', text: t('market.orderDetail.destinationSet', { placeName }) };
-        if (result.offline)
-          return {
-            tone: 'alert',
-            text: result.unconfirmed
-              ? t('travel.waypoints.unconfirmed')
-              : t('travel.waypoints.offline'),
-          };
-        return {
-          tone: 'alert',
-          text: result.needsPermission ? (
-            <GrantMissingLink groups={WAYPOINT_GROUPS} />
-          ) : (
-            t('travel.waypoints.failed', {
-              message: result.message ?? t('travel.waypoints.unknownError'),
-            })
-          ),
-        };
+        return waypointOutcome(
+          await setWaypointsInGame(activeCharacterId, [locationId]),
+          placeName,
+          t
+        );
       },
     [activeCharacterId, lacksWaypointScope, online, t]
   );
@@ -336,6 +322,8 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
   );
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
   const [altOutcome, setAltOutcome] = useState<PaletteAltOutcome>(null);
+  /** A second Shift+Enter while one is sending must not send twice. */
+  const altInFlight = useRef(false);
   // A new query starts back at the top: Enter then takes the best match.
   const [prevQuery, setPrevQuery] = useState(query);
   if (prevQuery !== query) {
@@ -379,8 +367,16 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
   function activateAlt(result: PaletteResult) {
     const action = result.altAction;
     if (!action) return;
+    if (altInFlight.current) return;
+    altInFlight.current = true;
     setAltOutcome(null);
-    void Promise.resolve(action.run()).then(setAltOutcome);
+    void Promise.resolve(action.run())
+      .then(setAltOutcome, () =>
+        setAltOutcome({ tone: 'alert', text: t('travel.waypoints.unknownError') })
+      )
+      .finally(() => {
+        altInFlight.current = false;
+      });
   }
 
   function activate(result: PaletteResult) {
@@ -537,6 +533,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                             id={optionDomId(index)}
                             role="option"
                             aria-selected={highlighted}
+                            aria-keyshortcuts={result.altAction ? 'Shift+Enter' : undefined}
                             // Keeps focus in the input, as every combobox here does.
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => activate(result)}
