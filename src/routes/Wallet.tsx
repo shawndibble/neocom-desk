@@ -13,7 +13,6 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { NO_NAMES } from '@/lib/emptyCollections';
 import { useCharacters } from '@/features/character/useCharacters';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
@@ -168,27 +167,7 @@ export function Wallet() {
     : activeLoyaltyNeedsReauth
       ? null
       : (data?.loyaltyResult ?? null);
-  const loyaltyReauthCharacters = useMemo(() => {
-    if (!showingBeyondActive) {
-      return activeLoyaltyNeedsReauth && activeCharacterId !== null
-        ? [{ characterId: activeCharacterId }]
-        : [];
-    }
-    return (pickedLoyalty.snapshot?.reauthCharacterIds ?? []).map((characterId) => ({
-      characterId,
-      name: multiCharacters.find((c) => c.characterId === characterId)?.name,
-    }));
-  }, [
-    showingBeyondActive,
-    activeLoyaltyNeedsReauth,
-    activeCharacterId,
-    pickedLoyalty.snapshot,
-    multiCharacters,
-  ]);
   const loyaltyLoading = showingBeyondActive && pickedLoyalty.snapshot === null;
-  const corporationNames =
-    (showingBeyondActive ? pickedLoyalty.snapshot?.corporationNames : data?.corporationNames) ??
-    NO_NAMES;
 
   const journalView = useWalletJournalView({
     journalOpen: tab === 'journal',
@@ -200,7 +179,7 @@ export function Wallet() {
     journalNeedsReauth,
     journalTruncated,
   });
-  const loyalty = useWalletLoyalty(loyaltyResult, corporationNames);
+  const loyalty = useWalletLoyalty(loyaltyResult);
   // "Where the ISK went" side panel; the page shifts aside while it is open.
   const [iskPanelOpen, setIskPanelOpen] = useState(false);
   const handlePersonalRefresh = () => {
@@ -299,7 +278,6 @@ export function Wallet() {
             balanceResult={balanceResult}
             balanceNeedsReauth={balanceNeedsReauth}
             loyaltyResult={loyaltyResult}
-            loyaltyReauthCharacters={loyaltyReauthCharacters}
             loyaltyLoading={loyaltyLoading}
             journalNeedsReauth={journalNeedsReauth}
             journalTruncated={journalTruncated}

@@ -252,7 +252,24 @@ async function loadSnapshotBooks(
     ...new Set(candidates.flatMap((c) => [c.lane.from.stationId, c.lane.to.stationId])),
   ];
   const loaded = await Promise.all(stations.map((id) => loadHaulingBooks(id)));
-  if (loaded.some((books) => books === null)) return null;
+  // A failed read stores nothing, so one more try is a real second fetch: a cold-start hiccup
+  // should not drop the whole scan to the capped ESI path (and cache that for minutes).
+  const missing = stations.filter((_, i) => loaded[i] === null);
+  if (missing.length > 0) {
+    console.warn('[hauling-diag] retrying snapshot books', missing);
+    const retried = await Promise.all(missing.map((id) => loadHaulingBooks(id)));
+    missing.forEach((id, j) => {
+      loaded[stations.indexOf(id)] = retried[j]!;
+    });
+  }
+  if (loaded.some((books) => books === null)) {
+    console.warn(
+      '[hauling-diag] snapshot books unavailable',
+      stations,
+      loaded.map((b) => b !== null)
+    );
+    return null;
+  }
   return new Map(stations.map((id, i) => [id, loaded[i]!]));
 }
 

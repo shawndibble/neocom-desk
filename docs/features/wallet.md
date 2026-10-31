@@ -4,26 +4,27 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 
 ## Summary
 
-| Feature                                  | Where                                 | Notes                                                                                                           |
-| ---------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Balance tab (`/wallet/balance`, default) | `Wallet.tsx`                          | Worth panel (net worth, EverMarks, chart), LP-per-corp table                                                    |
-| Journal tab (`/wallet/journal`)          | `Wallet.tsx:759-816`                  | filterable/sortable/virtualized ledger, column picker, export                                                   |
-| `transactions` alias tab                 | `pageTabs.ts:90-94`, `Wallet.tsx:522` | not a tab; redirects to `/market/history`                                                                       |
-| Cross-character balance (`?char=`)       | `Wallet.tsx:570`                      | per-Character table + total, picker, CSV/XLSX/clipboard export                                                  |
-| Net worth chart                          | `features/netWorth/NetWorthPanel.tsx` | lazy Recharts stack (one Character) or lines (several), layer legend, drill                                     |
-| Loyalty Points table                     | `Wallet.tsx:707-756`                  | per-corp LP, row → LP Store, export, LP Store picker                                                            |
-| LP Store picker                          | `features/loyalty/LpStorePicker.tsx`  | select-box over every NPC corp with an LP Store                                                                 |
-| Journal filters                          | `WalletJournalTable.tsx`              | ref type, date range, free text; filtered count + net total; ref-type breakdown (in/out/net, row click filters) |
-| Journal column picker                    | `walletJournalColumns.ts`             | date/description/amount/balance toggle; device-local                                                            |
-| Journal row enrichments                  | `JournalDescriptionCell.tsx`          | bounty factions, daily-goal names, contract link, mining-tax link, market item                                  |
-| Wallet-alert deep link                   | `Wallet.tsx:185`                      | `walletBalanceChanged` → `/wallet/journal?highlight=<id>` pulses the row                                        |
-| Exports                                  | `useTableExport` + `TableActionsMenu` | 3 surfaces: `wallet-journal`, `wallet-balances`, `loyalty-points`                                               |
-| Refresh                                  | `Wallet.tsx:530`                      | PageHeader icon button                                                                                          |
-| Corp wallet                              | pointer only                          | `/corp/wallet` (`routes/CorpWallet.tsx`), see Pointers                                                          |
+| Feature                                  | Where                                     | Notes                                                                                                                                                                            |
+| ---------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Balance tab (`/wallet/balance`, default) | `Wallet.tsx`                              | Worth panel (net worth, EverMarks, chart), ISK waiting, Goal                                                                                                                     |
+| Journal tab (`/wallet/journal`)          | `Wallet.tsx:759-816`                      | filterable/sortable/virtualized ledger, column picker, export                                                                                                                    |
+| `transactions` alias tab                 | `pageTabs.ts:90-94`, `Wallet.tsx:522`     | not a tab; redirects to `/market/history`                                                                                                                                        |
+| Cross-character balance (`?char=`)       | `Wallet.tsx:570`                          | per-Character table + total, picker, CSV/XLSX/clipboard export                                                                                                                   |
+| Net worth chart                          | `features/netWorth/NetWorthPanel.tsx`     | lazy Recharts stack (one Character) or lines (several), layer legend, drill                                                                                                      |
+| ISK flow                                 | `features/netWorth/CashFlowPanel.tsx`     | earned, spent, net, per day, daily bars for 7/30/90 days; day opens the Journal                                                                                                  |
+| ISK waiting and Goals                    | `features/netWorth/WalletWaitingGoal.tsx` | sell orders, buy escrow, contracts from the newest Net Worth Snapshot; any number of device-local wallet Goals (typed target or a Fitting's price) with a 30 day average and ETA |
+| LP Store picker                          | `features/loyalty/LpStorePicker.tsx`      | select-box over every NPC corp with an LP Store; no longer mounted since Balance dropped its LP panel                                                                            |
+| Journal filters                          | `WalletJournalTable.tsx`                  | ref type, date range, free text; filtered count + net total; ref-type breakdown (in/out/net, row click filters)                                                                  |
+| Journal column picker                    | `walletJournalColumns.ts`                 | date/description/amount/balance toggle; device-local                                                                                                                             |
+| Journal row enrichments                  | `JournalDescriptionCell.tsx`              | bounty factions, daily-goal names, contract link, mining-tax link, market item                                                                                                   |
+| Wallet-alert deep link                   | `Wallet.tsx:185`                          | `walletBalanceChanged` → `/wallet/journal?highlight=<id>` pulses the row                                                                                                         |
+| Exports                                  | `useTableExport` + `TableActionsMenu`     | 2 surfaces: `wallet-journal`, `wallet-balances`                                                                                                                                  |
+| Refresh                                  | `Wallet.tsx:530`                          | PageHeader icon button                                                                                                                                                           |
+| Corp wallet                              | pointer only                              | `/corp/wallet` (`routes/CorpWallet.tsx`), see Pointers                                                                                                                           |
 
 ## Purpose and user goal
 
-"How much am I worth, and where did my ISK go?" Wallet holds the active Character's money: Balance shows the Worth panel (net worth over time by layer, EverMarks) and LP per corporation; Journal is the ledger. Since `20261010-200446` (#3527) the LP Store is a Wallet tab too, because the store is where LP balances are spent; the LP Store section below still describes it as Market's. Personal fills live on Market › History › Transactions (`20261001-113143`).
+"How much am I worth, and where did my ISK go?" Wallet holds the active Character's money: Balance shows the Worth panel (net worth over time by layer, EverMarks) then ISK waiting and a Goal; Journal is the ledger. Since `20261010-200446` (#3527) the LP Store is a Wallet tab too, because the store is where LP balances are spent; the LP Store section below still describes it as Market's. Personal fills live on Market › History › Transactions (`20261001-113143`).
 
 - **Top jobs (ranked):** 1. "Where did the ISK go / what was this payment?" (Journal: filters, ref-type breakdown, #2995). The Journal is the main reason to open Wallet (owner, 2026-10-11). 2. "Is my net worth going up?" (Balance: a nice overview of wallet progress, secondary; owner, 2026-10-11; #2935, #3004) 3. "What can I buy with my LP?" (LP Store).
 - **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11). Phone parity: Wallet is not a default phone tab (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`); pilots arrive from the `walletBalanceChanged` alert, which pulses one Journal row (`20260905-195857`); phone Journal fixes (#2992, #3501).
@@ -119,14 +120,18 @@ Replaces the old journal balance-history chart. Maths in `src/engine/netWorth/` 
 - **Export:** surface `wallet-balances`; columns Character, one per layer, Net worth of the shown layers; blank (not 0) for an excluded Character.
 - Sync status is the shell-wide `SyncStatusDot` / `SyncErrorNote`; the panel adds no control.
 
-### Loyalty Points panel
+### ISK flow panel (`features/netWorth/CashFlowPanel.tsx`)
 
-- Header actions: `LpStorePicker` (size sm, always shown, even with no LP: entry to any corp's store, issue #2321) and `TableActionsMenu` (surface `loyalty-points`; only when there are non-Paragon rows).
-- Table columns: Corporation (accent link to `/wallet/lp-store/<corpId>`, `Wallet.tsx:391`, sortable by name), Loyalty Points (right, bold, sortable, default sort desc), caret column. Whole row click navigates to the store. No row menu, no More-actions button (per `Wallet.test.tsx:168`; DESIGN §6c).
-- Sort in URL (`loyalty.sort`).
-- States: `loyaltyNeedsReauth` → `GrantBanner` (`getCharacterLoyaltyPoints`); no data / only EverMarks → `CachedEmptyState` "No loyalty points …".
-- CSV columns: Corporation (name or `#id`), Loyalty Points.
-- Always uses the active Character's LP (not affected by `?char=`).
+- Above ISK waiting on Balance: earned, spent, net and average per day over 7, 30 or 90 UTC days (`cashFlow`, `engine/netWorth/waiting` sibling `cashFlow.ts`), the earned change against the period before (only when the journal history reaches that far back), and the Journal's own daily bars (`IskFlowChartBars`). A day on the bars opens the Journal on that day (no separate Journal link). Figures are full ISK with no unit after them; the other Balance panels use shorthand (`IskAmount`).
+- Reads the picked, drilled or active Characters' cached journals (`loadAllCharactersJournals`); transfers between the pilot's own Characters are left out. A period the history only partly covers says so. By-source breakdown stays on the Journal tab.
+
+### ISK waiting and Goals panels (`features/netWorth/WalletWaitingGoal.tsx`)
+
+- Replaced the Loyalty Points table on Balance: the LP Store tab lists LP, so Balance shows money instead. Both panels read stored Net Worth Snapshots for the picked, drilled or active Characters, and use only Characters whose newest snapshot is under a week old. The sell-orders health split below is the exception: it reads the Open Orders snapshot (live orders and station prices, cache key `market:open-orders`, shared with the Orders page and the Overview card).
+- **ISK waiting** (rows are `ValueList`): sell-order stock, buy-order escrow, contracts (`iskWaiting`, `engine/netWorth/waiting.ts`), the wallet change over 30 days, and an "Open Journal" link.
+- **Sell orders now, live prices**: sell-order ISK split Fine / Needs you / Watch / Not checked by `sellOrderHealth` (`features/market/orderHealthSplit.ts`), the Orders page's own urgency. Rows come from `openOrderRowsFromSnapshot` (station prices and standings only), so an order can read healthier here than on Orders; structure orders read Not checked. "Fix in Open Orders" links the work-through when any order Needs you.
+- **Goals** (`WalletGoalsPanel.tsx`, `walletGoalSetting.ts`): any number of Goals, device-local and not synced (key `walletGoal`, which also reads the old single Goal). Each is a name and either a typed target (`IskInput`, capped at 1e15) or, with the target left blank, a Fitting whose sell price at the pilot's Trade Hub (`useMarketHub`) is the target (`useGoalPrices`, so it follows the market; a fit with an item nobody sells has no price). A fitting goal's name links to the editor with that fitting (`useGoalPrices` encodes it). The add/edit dialog is `Fields` with a target choice (`SegmentedControl`: Amount or Fitting price). Progress is summed wallet ISK; each row reads `30 day avg: <shorthand> ISK` and `ETA: <date>` from the last 30 days of snapshots (needs 7+ days).
+- The loyalty reauth banner left with the table: EverMarks reads "unknown" when the loyalty scope is missing.
 
 ### LP Store picker (`features/loyalty/LpStorePicker.tsx`)
 
@@ -186,7 +191,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 - Journal: `responsive="table"`, Balance off by default on phones (Columns menu shows them), filters collapse into a sheet; date range kept on one row inside the sheet (test `Wallet.test.tsx:522`).
 - Character filter trigger is an avatar stack with no words at every width (portrait, or up to 3 faces + "+N" for All, 2 below `md`); the words are in its tooltip and accessible name.
 - "Transactions" link has 44px min hit area below `md`.
-- LP table and balance table: `responsive="table"`.
+- Balance table: `responsive="table"`.
 
 ## Pointers (not documented here)
 
@@ -212,15 +217,16 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 
 ## Persistence and sync
 
-| State                            | Where                                                                                                                           | Synced                                |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| Tab                              | URL path segment `/wallet/<tab>` (ADR `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`)                            | no                                    |
-| Character filter                 | `?char=`; default from synced Settings default-character-filter (`useDefaultCharacterFilter`); URL value is never written back  | default synced, URL not               |
-| Journal filter / sort            | `?journal.q`, `journal.refType`, `journal.start`, `journal.end`, `journal.sort`; balance `balance.sort`; loyalty `loyalty.sort` | no                                    |
-| Journal visible columns          | device-local `walletJournalVisibleColumns`, shared with corp journal                                                            | no (view prefs are not Editable Data) |
-| Highlighted row                  | `?highlight=<journal id>`                                                                                                       | no                                    |
-| Balance, journal, fills, loyalty | Dexie ESI cache per Character (API-Derived Data, never synced through the backend, `GLOSSARY.md` glossary)                      | no                                    |
-| Mining-tax links                 | Dexie `miningTaxAssignments`                                                                                                    | synced elsewhere (Mining Tax)         |
+| State                            | Where                                                                                                                          | Synced                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| Tab                              | URL path segment `/wallet/<tab>` (ADR `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`)                           | no                                    |
+| Character filter                 | `?char=`; default from synced Settings default-character-filter (`useDefaultCharacterFilter`); URL value is never written back | default synced, URL not               |
+| Journal filter / sort            | `?journal.q`, `journal.refType`, `journal.start`, `journal.end`, `journal.sort`; balance `balance.sort`                        | no                                    |
+| Journal visible columns          | device-local `walletJournalVisibleColumns`, shared with corp journal                                                           | no (view prefs are not Editable Data) |
+| Highlighted row                  | `?highlight=<journal id>`                                                                                                      | no                                    |
+| Wallet Goal (name, ISK target)   | `walletGoal` local setting                                                                                                     | no (device-local)                     |
+| Balance, journal, fills, loyalty | Dexie ESI cache per Character (API-Derived Data, never synced through the backend, `GLOSSARY.md` glossary)                     | no                                    |
+| Mining-tax links                 | Dexie `miningTaxAssignments`                                                                                                   | synced elsewhere (Mining Tax)         |
 
 ## Decisions (why)
 
@@ -243,7 +249,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 
 ## Test-covered behaviours (`src/routes/Wallet.test.tsx`)
 
-Default Balance; EverMarks + other LP table; LP row link + caret, no row menu; picker without LP (#2321); EverMarks tooltip; empty/re-login states for loyalty; journal concatenates pages newest-first; item line linked to Show info; notification deep link opens Journal; `/wallet/transactions` redirect (#1749); highlight pulse; ref type humanized; offline fallback; truncation warning present/absent; ref/text filters; net total tone (#1961); filtered summary (#1721); filtered-empty + reset; no-data empty; failed refresh vs initial offline (UX-REVIEW #10); 401 re-login (BUG #3); mobile date range on one row; cross-character: no filter for one Character, filter rides in header across panel swap, no picker-driven fetch by default, All shows total, synced default opens on All, skipped notice only for selected Characters (#607).
+Default Balance; EverMarks, no loyalty table on Balance; EverMarks tooltip; journal concatenates pages newest-first; item line linked to Show info; notification deep link opens Journal; `/wallet/transactions` redirect (#1749); highlight pulse; ref type humanized; offline fallback; truncation warning present/absent; ref/text filters; net total tone (#1961); filtered summary (#1721); filtered-empty + reset; no-data empty; failed refresh vs initial offline (UX-REVIEW #10); 401 re-login (BUG #3); mobile date range on one row; cross-character: no filter for one Character, filter rides in header across panel swap, no picker-driven fetch by default, All shows total, synced default opens on All, skipped notice only for selected Characters (#607).
 
 ## Interview Q&A
 
@@ -257,7 +263,7 @@ Default Balance; EverMarks + other LP table; LP row link + caret, no row menu; p
 8. **Why can the Journal tab show "No journal entries cached" for a revoked scope?** The journal loader returns no needsReauth flag; only Balance shows the grant banner. `Wallet.tsx:782` vs `Wallet.tsx:636`.
 9. **What does the journal column picker control and where is it stored?** Date/Description/Amount/Balance (Type fixed); device-local setting shared with corp journal. `walletJournalColumns.ts`.
 10. **How does the Character filter default?** URL `?char=` else synced Settings default; one-Character accounts never see the control. `Wallet.tsx:202-244`.
-11. **What do the CSV exports contain?** Journal: filtered rows in table order incl. tax/reason/context/party ids, truncated flag; balances: raw numbers with blanks for unreadable; LP: corp name + points. `walletJournalCsv.ts`, `walletBalancesCsv.ts`, `loyaltyPointsCsv.ts`.
+11. **What do the CSV exports contain?** Journal: filtered rows in table order incl. tax/reason/context/party ids, truncated flag; balances: raw numbers with blanks for unreadable. `walletJournalCsv.ts`, `walletBalancesCsv.ts`.
 12. **Why is EverMarks outside the LP table?** Paragon (1000419) is a distinct in-client currency but ESI returns it in the same array; split out for the balance box. `loyalty.ts:36-43`.
 
 ## Improvement ideas

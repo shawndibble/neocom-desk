@@ -15,6 +15,7 @@ import { utcDay } from '@/engine/netWorth/snapshot';
 import type { JournalRow } from '@/engine/journalNetting';
 import { useJournalFlowChartHidden } from '@/features/character/journalFlowChartPref';
 import { journalRefLabel } from '@/features/character/journalRefLabel';
+import { IskFlowLegend } from '@/features/character/IskFlowLegend';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import type { WalletJournalFilter } from '@/features/character/walletJournalFilter';
 import { useNow } from '@/lib/useNow';
@@ -89,19 +90,11 @@ export function IskFlowChart({ rows, filter, onFilterChange }: IskFlowChartProps
               }}
             />
           </Suspense>
-          <p className="flex flex-wrap gap-x-4 text-xs text-text-dim">
-            <span>
-              <span aria-hidden className="mr-1 inline-block size-2 rounded-xs bg-isk-pos" />
-              {t('wallet.journalFlowLegendIn')}
-            </span>
-            <span>
-              <span aria-hidden className="mr-1 inline-block size-2 rounded-xs bg-isk-neg" />
-              {t('wallet.journalFlowLegendOut')}
-            </span>
+          <IskFlowLegend>
             <span>
               {t('wallet.journalFlowClickHint', { context: touch ? 'touch' : undefined })}
             </span>
-          </p>
+          </IskFlowLegend>
         </>
       )}
     </section>

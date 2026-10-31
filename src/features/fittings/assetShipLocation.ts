@@ -5,14 +5,12 @@
  * as its Fitting Share Code. Null when it's too large for one.
  */
 import type { AssetTreeContainerNode, AssetTreeNode } from '@/engine/assetTree';
-import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { assetShipToFitting, type ShipAssetItem } from '@/engine/fittings/assetShipMapper';
-import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import { loadFittingSlots } from '@/sde/loadSde';
 import type { ItemMutation } from '@/engine/fittings/types';
 import { mutationsForItems } from '@/features/abyssal/dynamicItems';
 import { loadMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
-import { fittingEditLocation } from './fittingRoutes';
+import { fittingEditLocationFor } from './fittingEditLink';
 
 /** Every asset inside a ship, whichever bay the tree grouped it under. */
 function shipItems(ship: AssetTreeContainerNode): ShipAssetItem[] {
@@ -77,6 +75,5 @@ export async function shipItemsEditLocation(
     },
     mutations
   );
-  const encoded = await encodeFittingShare(fittingToShareInput(fitting));
-  return encoded.ok ? fittingEditLocation(encoded.payload) : null;
+  return fittingEditLocationFor(fitting);
 }
