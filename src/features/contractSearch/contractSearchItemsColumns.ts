@@ -18,7 +18,7 @@ export const CONTRACT_SEARCH_ITEMS_COLUMN_IDS = [
 
 export type ContractSearchItemsColumnId = (typeof CONTRACT_SEARCH_ITEMS_COLUMN_IDS)[number];
 
-/** Every column shown today, so shipping the picker changes nothing on its own. */
+/** Every column is on by default, ISK/unit included (it sits beside Qty, which is on). */
 export const DEFAULT_VISIBLE_CONTRACT_SEARCH_ITEMS_COLUMNS: readonly ContractSearchItemsColumnId[] =
   CONTRACT_SEARCH_ITEMS_COLUMN_IDS;
 
