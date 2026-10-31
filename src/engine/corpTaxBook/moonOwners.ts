@@ -62,15 +62,44 @@ export type MoonOwnerStatus =
   | 'left'
   | 'removed';
 
+/**
+ * What the Moon owners tab reads of a moon owner's server-built view summary
+ * (`corps/{book}/feederViews/{feeder}`, `FeederViewSummary` fits): one doc per moon owner in
+ * place of every ledger row it recorded (ADR 0032, issue #5717).
+ */
+export interface MoonOwnerSummary {
+  schemaVersion: number;
+  status: MoonOwnerFeeder['status'];
+  builtAt: number;
+  coverageFrom: string | null;
+  coverageTo: string | null;
+  lastReadWellAt: number | null;
+  rateHistory: readonly Pick<OwnerRateEntry, 'kind' | 'pct' | 'effectiveFrom'>[];
+  /** Ore value at 100% over the covered days. */
+  minedValueIsk: number;
+  accruedIsk: number;
+  paidIsk: number;
+  balanceKind: BalanceDisplay['kind'];
+  balanceIsk: number;
+  refineryCount: number;
+  /** Covered, billable days the server could not price; the entry path prices them again. */
+  unpricedDays: number;
+}
+
 export interface MoonOwnersInput {
   /** ISO instant the tab is read at. */
   now: string;
   graceHours: number;
   bookCorporationId: number;
   rates: readonly TaxRate[];
-  /** Observed rows grouped into entries, every refinery the book reads. */
+  /**
+   * Observed rows grouped into entries, every refinery the book reads. A moon owner with a
+   * current summary needs none of them (see `summaryFor`).
+   */
   entries: readonly ObservedMiningEntry[];
   feeders: readonly MoonOwnerFeeder[];
+  /** Each moon owner's view summary, by corporation id; absent where it was not read. */
+  summaries?: ReadonlyMap<number, MoonOwnerSummary>;
   /** The day's unit prices, by raw type id. */
   pricesOn: (date: string) => ReadonlyMap<number, number>;
 }
@@ -152,6 +181,103 @@ function minerRateAt(
   }
   const top = [...counts].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0];
   return top && { pct: top[0] };
+}
+
+/** A rate history as one comparable string: kind, rate and day, in day order. */
+const historyKey = (h: readonly Pick<OwnerRateEntry, 'kind' | 'pct' | 'effectiveFrom'>[]) =>
+  h
+    .map((e) => `${e.kind}|${e.pct}|${e.effectiveFrom}`)
+    .sort()
+    .join(';');
+
+/**
+ * The moon owner's summary when it still says what the record says, else undefined and the
+ * entries are priced instead. The server rebuilds a view on a ledger read, a payout, a payee
+ * change, a leave or removal and a dismissal, but not when an officer sets a rate or mode, and a
+ * day it could not price is priced later: any of those leaves a summary behind the record, so
+ * the figures here must not come from it. Nothing is read to check: the record is already held.
+ */
+export function summaryFor(
+  input: MoonOwnersInput,
+  f: MoonOwnerFeeder
+): MoonOwnerSummary | undefined {
+  const s = input.summaries?.get(f.corporationId);
+  if (!s || s.schemaVersion !== 1 || s.unpricedDays > 0 || s.status !== f.status) return undefined;
+  const today = input.now.slice(0, 10);
+  const settledNow = isSettledOn(deriveModeChanges(f), today);
+  if ((s.balanceKind === 'none') !== settledNow) return undefined;
+  const read = f.lastReadWellAt === undefined ? null : Date.parse(f.lastReadWellAt);
+  if (s.lastReadWellAt !== read) return undefined;
+  if (s.paidIsk !== paidOf(f.payouts)) return undefined;
+  if (historyKey(s.rateHistory) !== historyKey(deriveOwnerRateHistory(f))) return undefined;
+  const periods = [...f.coveragePeriods].sort((a, b) => a.from.localeCompare(b.from));
+  if (s.coverageFrom !== (periods[0]?.from ?? null)) return undefined;
+  if (s.coverageTo !== (periods.at(-1)?.to ?? null)) return undefined;
+  return s;
+}
+
+/**
+ * What miners pay at a moon owner's refineries, with no entry to ask. Exact when no rate depends
+ * on the entry (a Guest, per-refinery or per-moon rate does): then it is the rate every entry
+ * resolves to. Otherwise undefined, and the caller reads the entries if it holds any.
+ */
+function minerRateWithoutEntries(
+  input: MoonOwnersInput,
+  feederId: number,
+  today: string,
+  noRows: boolean
+): { pct: number } | undefined | 'depends' {
+  const base = { date: today, minerId: '', recordKey: '', feederId, moonId: undefined };
+  // The entry path prices a moon owner with no ore yet as Guests.
+  if (noRows) return resolveRate(input.rates, { ...base, isGuest: true });
+  if (input.rates.some((r) => r.scope === 'guest' || r.scope === 'structure' || r.scope === 'moon'))
+    return 'depends';
+  return resolveRate(input.rates, { ...base, isGuest: false });
+}
+
+/** A moon owner's row from its summary: the figures the server already worked out from its rows. */
+function workFromSummary(
+  input: MoonOwnersInput,
+  f: MoonOwnerFeeder,
+  s: MoonOwnerSummary,
+  entries: () => readonly ObservedMiningEntry[]
+): MoonOwnerRow {
+  const today = input.now.slice(0, 10);
+  const settledNow = isSettledOn(deriveModeChanges(f), today);
+  const rate = effectiveOwnerRate(deriveOwnerRateHistory(f), today);
+  const display: BalanceDisplay = { kind: s.balanceKind, isk: s.balanceIsk };
+  const froms = f.coveragePeriods.map((p) => p.from).sort();
+  const open = f.coveragePeriods.some((p) => p.to === undefined);
+  const lastTo = f.coveragePeriods
+    .flatMap((p) => (p.to === undefined ? [] : [p.to]))
+    .sort()
+    .at(-1);
+  const until = f.staleSince !== undefined ? utcDay(f.staleSince) : open ? undefined : lastTo;
+  const rated = minerRateWithoutEntries(input, f.corporationId, today, s.refineryCount === 0);
+  // The entries are held only until the page stops reading them; none held is not "no ore yet".
+  const own = rated === 'depends' ? entries() : [];
+  const minerRate =
+    rated === 'depends'
+      ? own.length > 0
+        ? minerRateAt(input, f.corporationId, own, today)
+        : undefined
+      : rated;
+  return {
+    id: String(f.corporationId),
+    corporationId: f.corporationId,
+    status: statusOf(f, settledNow, rate?.pct),
+    refineryCount: s.refineryCount,
+    mined: s.minedValueIsk,
+    ...(froms[0] !== undefined ? { since: froms[0] } : {}),
+    ...(until !== undefined ? { until } : {}),
+    ...(rate ? { theirRatePct: rate.pct } : {}),
+    ...(minerRate ? { minerRatePct: minerRate.pct } : {}),
+    owed: display.kind === 'owed' ? display.isk : 0,
+    balance: display,
+    ...(f.lastReadWellAt !== undefined ? { lastReadWellAt: f.lastReadWellAt } : {}),
+    ...(f.staleSince !== undefined ? { staleSince: f.staleSince } : {}),
+    mode: settledNow ? 'settled-otherwise' : 'normal',
+  };
 }
 
 interface Worked {
@@ -255,9 +381,16 @@ export function buildMoonOwners(input: MoonOwnersInput): {
   rows: MoonOwnerRow[];
   totals: MoonOwnerTotals;
 } {
-  const bySource = entriesBySource(input.entries);
+  // Grouped only when a moon owner has no current summary (or its miner rate depends on entries).
+  let bySource: ReturnType<typeof entriesBySource> | undefined;
+  const entriesOf = (id: number) => (bySource ??= entriesBySource(input.entries)).get(id) ?? [];
   const rows = input.feeders
-    .map((f) => work(input, f, bySource.get(f.corporationId) ?? []).row)
+    .map((f) => {
+      const summary = summaryFor(input, f);
+      return summary
+        ? workFromSummary(input, f, summary, () => entriesOf(f.corporationId))
+        : work(input, f, entriesOf(f.corporationId)).row;
+    })
     .filter(listed);
   const month = input.now.slice(0, 7);
   const paidThisMonth = input.feeders.reduce(

@@ -9,11 +9,14 @@
  * - `ledger`: payments, dismissals, declarations, adjustments and write-offs.
  *   A Miner's balance, a Statement's state and an Extraction page's per-day billing read them.
  * - `answers`: guests' answers to a hand-made grouping, shown beside a Miner.
+ * - `owners`: each moon owner's server-built view summary (one doc per moon owner), which the
+ *   Moon owners tab shows in place of accrual worked from every ledger row (#5717). Not in
+ *   `ALL_BOOK_PARTS`: a whole-book read (the export) has no use for it.
  *
  * The settings document and `meta/paid` are not slices: every read takes them fresh.
  */
 export const ALL_BOOK_PARTS = ['core', 'ledger', 'answers'] as const;
-export type BookPart = (typeof ALL_BOOK_PARTS)[number];
+export type BookPart = (typeof ALL_BOOK_PARTS)[number] | 'owners';
 
 export type BookPartSet = ReadonlySet<BookPart>;
 
@@ -34,6 +37,8 @@ export function bookPartsFor(tab: string, detail: BookDetailKind | null): BookPa
     case 'miners':
       return new Set<BookPart>(['core', 'ledger', 'answers']);
     // An Extraction's page says whether its days are billed, dismissed or in Today's mining.
+    case 'moon-owners':
+      return new Set<BookPart>(['core', 'owners']);
     case 'extraction':
     case 'statements':
     case 'statementPeriod':

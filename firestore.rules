@@ -523,8 +523,11 @@ service cloud.firestore {
           && get(viewerPath(feederCorp)).data.expiresAt > request.time.toMillis();
       }
 
+      // An officer of the book (`isOfficer()`) also reads each moon owner's summary and its
+      // `refineries` (issue #5717, ADR 0032), so the Moon owners tab needs no ledger row. Additive:
+      // `days`, `payouts` and `viewers` stay the moon owner's, and the summaries cannot be listed.
       match /feederViews/{feederCorp} {
-        allow get: if isMoonOwnerOf(feederCorp);
+        allow get: if isMoonOwnerOf(feederCorp) || isOfficer();
         allow list, write: if false;
       }
 
@@ -537,6 +540,7 @@ service cloud.firestore {
       match /feederViews/{feederCorp}/{viewCollection}/{viewDoc} {
         allow get, list: if viewCollection in ['days', 'refineries', 'payouts']
           && isMoonOwnerOf(feederCorp);
+        allow get, list: if viewCollection == 'refineries' && isOfficer();
         allow write: if false;
       }
 

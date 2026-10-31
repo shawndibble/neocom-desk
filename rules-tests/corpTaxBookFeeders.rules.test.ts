@@ -225,12 +225,67 @@ describe('moon owner view', () => {
     }
   });
 
-  it('denies an unauthenticated client and an officer of the book without a record', async () => {
+  it('denies an unauthenticated client, and an officer of the book without a record the days and payouts', async () => {
     await seed();
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), VIEW)));
-    await assertFails(getDoc(doc(characterAuth(env, OFFICER, 'h').firestore(), VIEW)));
     await assertFails(
-      getDoc(doc(characterAuth(env, OFFICER, 'h').firestore(), `${VIEW}/days/2026-10-12`))
+      getDoc(doc(env.unauthenticatedContext().firestore(), `${VIEW}/refineries/77`))
     );
+    const officer = characterAuth(env, OFFICER, 'h').firestore();
+    await assertFails(getDoc(doc(officer, `${VIEW}/days/2026-10-12`)));
+    await assertFails(getDocs(collection(officer, `${VIEW}/days`)));
+    await assertFails(getDoc(doc(officer, `${VIEW}/payouts/p1`)));
+    await assertFails(getDoc(doc(officer, `${VIEW}/viewers/char:${MOON_OWNER}`)));
+    await assertFails(getDocs(collection(officer, `${VIEW}/viewers`)));
+  });
+
+  // Issue #5717 (ADR 0032): the Moon owners tab reads one summary per moon owner instead of every ledger row.
+  describe('an officer of the book', () => {
+    const officer = () => characterAuth(env, OFFICER, 'h').firestore();
+
+    it('reads each moon owner summary and refineries, with no viewer record', async () => {
+      await seed(null);
+      for (const view of [VIEW, OTHER_VIEW]) {
+        await assertSucceeds(getDoc(doc(officer(), view)));
+        await assertSucceeds(getDoc(doc(officer(), `${view}/refineries/77`)));
+        await assertSucceeds(getDocs(collection(officer(), `${view}/refineries`)));
+      }
+    });
+
+    it('still cannot list the summaries, nor write anything under a view', async () => {
+      await seed();
+      await assertFails(getDocs(collection(officer(), 'corps/98000001/feederViews')));
+      for (const path of [VIEW, `${VIEW}/refineries/77`, `${VIEW}/refineries/new`]) {
+        await assertFails(setDoc(doc(officer(), path), { x: 1 }));
+        await assertFails(deleteDoc(doc(officer(), path)));
+      }
+    });
+
+    it('is refused when the officer record has lapsed, for another hash, or another book', async () => {
+      await seed();
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        await setDoc(doc(db, `corps/98000001/officers/char:${OFFICER}`), {
+          ownerHash: 'h',
+          corporationId: 98000001,
+          canView: true,
+          expiresAt: Date.now() - 1000,
+        });
+      });
+      await assertFails(getDoc(doc(officer(), VIEW)));
+      await assertFails(getDoc(doc(officer(), `${VIEW}/refineries/77`)));
+      await assertFails(getDoc(doc(characterAuth(env, OFFICER, 'other').firestore(), VIEW)));
+      await assertFails(getDoc(doc(characterAuth(env, 2, 'h').firestore(), VIEW)));
+      await assertFails(
+        getDoc(doc(characterAuth(env, 2, 'h').firestore(), `${VIEW}/refineries/77`))
+      );
+    });
+
+    it('leaves moon owner access as it was: a moon owner reads only its own view', async () => {
+      await seed();
+      await assertFails(getDoc(doc(owner(), OTHER_VIEW)));
+      await assertFails(getDoc(doc(owner(), `${OTHER_VIEW}/refineries/77`)));
+      await assertSucceeds(getDoc(doc(owner(), VIEW)));
+    });
   });
 });

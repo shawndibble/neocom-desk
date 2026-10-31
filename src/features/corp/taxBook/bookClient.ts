@@ -50,6 +50,7 @@ import { getSyncFirestore } from '@/sync/firebaseApp';
 import { bookVersionsOf, cachedPart } from './bookCache';
 import { bookPartStore } from './bookPartStore';
 import { ALL_BOOK_PART_SET, mergeBookParts, type BookPart, type BookPartSet } from './bookParts';
+import type { FeederViewSummary } from './feederViewClient';
 import { readObservedRows } from './observedRead';
 import {
   minerScopedRows,
@@ -503,6 +504,11 @@ export interface BookData {
   /** The Overview and Miners tab docs (ADR 0032); absent until the server has built them. */
   readModels?: ReadModelDocs;
   /**
+   * Each moon owner's view summary by corporation id (ADR 0032, #5717); read with the `owners`
+   * part. Absent when that part was not read; a moon owner without one is priced from `observed`.
+   */
+  feederSummaries?: ReadonlyMap<number, FeederViewSummary>;
+  /**
    * The Miner a one-Miner read (`readMinerBookData`) covered; absent for the whole book. Then
    * `state.miners` holds that Miner only, so a dialog listing other Miners reads them itself.
    */
@@ -542,6 +548,32 @@ function feedersOf(
       ),
     'feeders:rows'
   );
+}
+
+/**
+ * The book's moon owners' view summaries, one doc each, nothing under them. An officer of the
+ * book may read them (rules, #5717). One that is missing, or that the rules do not yet let this
+ * officer read, is left out: the caller prices that moon owner from its ledger rows instead.
+ */
+async function readFeederSummaries(
+  characterId: number,
+  corporationId: number,
+  feederCorporationIds: readonly number[]
+): Promise<Map<number, FeederViewSummary>> {
+  const db = getSyncFirestore(characterId);
+  const found = await Promise.all(
+    feederCorporationIds.map(async (id) => {
+      try {
+        const snap = await getDoc(
+          doc(db, 'corps', String(corporationId), 'feederViews', String(id))
+        );
+        return snap.exists() ? ([id, snap.data() as FeederViewSummary] as const) : undefined;
+      } catch {
+        return undefined;
+      }
+    })
+  );
+  return new Map(found.flatMap((f) => (f ? [f] : [])));
 }
 
 /**
@@ -614,6 +646,16 @@ export async function readBookData(
       return { minerList, overview } as ReadModelDocs;
     }).catch(() => undefined),
   ]);
+  // One doc per moon owner, from the cached record list when `core` was read earlier.
+  const feederSummaries = parts.has('owners')
+    ? await readFeederSummaries(
+        characterId,
+        corporationId,
+        (parts.has('core') ? feederRows : await feedersOf(book, characterId, corporationId)).map(
+          (f) => f.corporationId
+        )
+      )
+    : undefined;
   return {
     settings,
     state: {
@@ -634,6 +676,7 @@ export async function readBookData(
     scheduledSync: scheduledSyncFrom(scheduled),
     parts,
     ...(readModels ? { readModels } : {}),
+    ...(feederSummaries ? { feederSummaries } : {}),
   };
 }
 
@@ -843,6 +886,9 @@ export function mergeBookData(held: BookData, extra: BookData): BookData {
     parts,
     ...((extra.readModels ?? held.readModels)
       ? { readModels: extra.readModels ?? held.readModels }
+      : {}),
+    ...(pick('owners', held.feederSummaries, extra.feederSummaries)
+      ? { feederSummaries: pick('owners', held.feederSummaries, extra.feederSummaries) }
       : {}),
   };
 }

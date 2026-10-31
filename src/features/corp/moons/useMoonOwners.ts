@@ -17,10 +17,12 @@ export function useMoonOwnersInput(): MoonOwnersInput {
       rates: settings.rates,
       entries: view.input.entries,
       feeders: data.feeders ?? [],
+      // Read with the Moon owners tab's `owners` part; absent elsewhere, then priced from entries.
+      ...(data.feederSummaries ? { summaries: data.feederSummaries } : {}),
       // The moon owner's page's prices (#4621), so the tab, Pay and that page owe one figure.
       pricesOn: view.input.moonOwnerPricesOn ?? ((date) => view.input.pricesOn(date).prices),
     }),
-    [view, settings, data.feeders, corporationId]
+    [view, settings, data.feeders, data.feederSummaries, corporationId]
   );
 }
 
