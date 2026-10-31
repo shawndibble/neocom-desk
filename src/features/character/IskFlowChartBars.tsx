@@ -44,7 +44,8 @@ interface BarPoint extends JournalDayFlow {
 
 const BARS: { dataKey: string; fill: string; radius: [number, number, number, number] }[] = [
   { dataKey: 'in', fill: 'var(--color-isk-pos)', radius: [4, 4, 0, 0] },
-  { dataKey: 'below', fill: 'var(--color-isk-neg)', radius: [0, 0, 4, 4] },
+  // Recharts mirrors a negative bar's corners (its first two sit at the bar's far end), so `[4, 4, 0, 0]` rounds the tip here too.
+  { dataKey: 'below', fill: 'var(--color-isk-neg)', radius: [4, 4, 0, 0] },
 ];
 
 function FlowTooltip({ active, payload }: TooltipContentProps) {
