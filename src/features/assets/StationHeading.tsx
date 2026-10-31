@@ -1,9 +1,11 @@
 import { useId, type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { IconButton, TextInput, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useInPlaceEdit } from '@/lib/useInPlaceEdit';
 import { PLACE_NICKNAME_MAX, savePlaceNickname } from './placeNicknames';
+import { isRenamePlaceState } from './renamePlaceState';
 
 /**
  * The drilled-in station heading: the Place Nickname (else the real name) as
@@ -30,6 +32,8 @@ export function StationHeading({
 }) {
   const { t } = useTranslation();
   const hintId = useId();
+  // The row menu's Rename lands here with the field already open.
+  const openOnArrival = isRenamePlaceState(useLocation().state);
   const {
     editing,
     start,
@@ -37,6 +41,7 @@ export function StationHeading({
     inputProps,
   } = useInPlaceEdit({
     initial: () => nickname ?? '',
+    open: openOnArrival,
     onCommit: (draft) => savePlaceNickname(locationId, draft),
   });
   if (editing) {

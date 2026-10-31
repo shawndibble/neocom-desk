@@ -1,7 +1,7 @@
 import type { PinState } from '@/features/assets/stationPins';
 
 /** One entry of an Assets place row's menu, in the order it is offered. */
-export type PlaceMenuAction = 'setWaypoint' | 'openInEve' | 'copyName' | 'togglePin';
+export type PlaceMenuAction = 'setWaypoint' | 'openInEve' | 'copyName' | 'rename' | 'togglePin';
 
 /**
  * Which actions a place row's menu offers. A station or structure row is a
@@ -12,15 +12,24 @@ export type PlaceMenuAction = 'setWaypoint' | 'openInEve' | 'copyName' | 'toggle
 export function placeMenuActions({
   kind,
   pinnable,
+  renamable = false,
   resolved,
 }: {
   kind: 'station' | 'container';
   pinnable: boolean;
+  /** The page keeps Place Nicknames (Assets, not corp): offers Rename on a station. */
+  renamable?: boolean;
   resolved: boolean;
 }): PlaceMenuAction[] {
   if (!resolved) return ['copyName'];
   if (kind === 'container') return ['setWaypoint', 'copyName'];
-  return ['setWaypoint', 'openInEve', 'copyName', ...(pinnable ? (['togglePin'] as const) : [])];
+  return [
+    'setWaypoint',
+    'openInEve',
+    'copyName',
+    ...(renamable ? (['rename'] as const) : []),
+    ...(pinnable ? (['togglePin'] as const) : []),
+  ];
 }
 
 /** The menu item's label key: the step the pin toggle takes next. */

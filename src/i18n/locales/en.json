@@ -8382,6 +8382,7 @@
     "csvLocationId": "Location ID",
     "placeNickname": {
       "rename": "Rename {{place}}",
+      "menuRename": "Rename",
       "tooltip": "Give this place a nickname",
       "field": "Place nickname",
       "hint": "Only you see this, and only on the Assets page. Leave it empty to show the real name."

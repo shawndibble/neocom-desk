@@ -16,6 +16,7 @@ export function PlaceRowMenuItems({
   placeName,
   pinState,
   onTogglePin,
+  onRename,
   t,
 }: {
   actions: readonly PlaceMenuAction[];
@@ -23,6 +24,7 @@ export function PlaceRowMenuItems({
   placeName: string;
   pinState?: PinState;
   onTogglePin?: () => void;
+  onRename?: () => void;
   t: Translate;
 }) {
   return (
@@ -42,6 +44,12 @@ export function PlaceRowMenuItems({
               <CopyMenuItem key={action} text={placeName}>
                 {t('market.contextMenu.copyName')}
               </CopyMenuItem>
+            );
+          case 'rename':
+            return onRename === undefined ? null : (
+              <MenuItem key={action} onSelect={onRename}>
+                {t('assets.placeNickname.menuRename')}
+              </MenuItem>
             );
           case 'togglePin':
             return pinState === undefined || onTogglePin === undefined ? null : (
