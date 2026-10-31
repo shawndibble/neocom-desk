@@ -22,7 +22,7 @@ const REMEMBER_MS = 15 * 60 * 1000;
 const remembered = new Map<string, { at: number; value: Promise<number | null> }>();
 
 function valueOf(
-  offers: LoyaltyStoreOffer[],
+  offers: readonly LoyaltyStoreOffer[],
   catalog: BlueprintCatalog,
   snapshot: MarketSnapshot
 ): number | null {
@@ -51,14 +51,22 @@ function valueOf(
   );
 }
 
+/** Offers by corporation the caller already holds (the LP Store landing's snapshot). */
+export type HeldLpOffers = ReadonlyMap<number, readonly LoyaltyStoreOffer[]>;
+
 /** Prices every store in one market fetch, so materials they share are fetched once. */
 async function computeMany(
   corporationIds: number[],
-  hub: TradeHub
+  hub: TradeHub,
+  held: HeldLpOffers | undefined
 ): Promise<Map<number, number | null>> {
   const [catalog, offersByCorp] = await Promise.all([
     loadBlueprintCatalog(),
-    Promise.all(corporationIds.map(async (id) => (await loadLoyaltyStoreOffers(id))?.data ?? [])),
+    Promise.all(
+      corporationIds.map(
+        async (id) => held?.get(id) ?? (await loadLoyaltyStoreOffers(id))?.data ?? []
+      )
+    ),
   ]);
   const priced = corporationIds
     .map((id, i) => ({ id, offers: offersByCorp[i]! }))
@@ -75,11 +83,16 @@ async function computeMany(
   return values;
 }
 
-/** ISK per LP the market pays for each of `corporationIds`' LP at `hub`; null for a store that gives too little to go on. */
+/**
+ * ISK per LP the market pays for each of `corporationIds`' LP at `hub`; null
+ * for a store that gives too little to go on. `held` supplies offers the
+ * caller already has, so pricing every store does not ask ESI for each one.
+ */
 export async function loadMarketLpValues(
   corporationIds: Iterable<number>,
   hub: TradeHub,
-  now: () => number = Date.now
+  now: () => number = Date.now,
+  held?: HeldLpOffers
 ): Promise<Map<number, number | null>> {
   const ids = [...new Set(corporationIds)];
   const keyOf = (id: number) => `${id}|${hub.id}`;
@@ -88,7 +101,7 @@ export async function loadMarketLpValues(
     return !hit || now() - hit.at >= REMEMBER_MS;
   });
   if (stale.length > 0) {
-    const batch = computeMany(stale, hub);
+    const batch = computeMany(stale, hub, held);
     for (const id of stale) {
       const value = batch.then((values) => values.get(id) ?? null);
       remembered.set(keyOf(id), { at: now(), value });

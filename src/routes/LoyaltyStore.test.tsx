@@ -17,17 +17,21 @@ vi.mock('@/features/loyalty/useLoyaltyStoreOffers', () => ({
   useLoyaltyStoreOffers: (corporationId: number) => useLoyaltyStoreOffers(corporationId),
 }));
 
-// The landing's cross-store search has its own tests (`LpStoreSearch.test.tsx`).
-vi.mock('@/features/loyalty/useLpStoreSearch', () => ({
-  useLpStoreSearch: () => ({
+// The landing's views have their own tests (`lpLanding.test.ts`); here it is an empty, ready page.
+vi.mock('@/features/loyalty/useLpStoreLanding', () => ({
+  useLpStoreLanding: () => ({
     status: 'ready',
     syncedAt: null,
-    result: { groups: [], corporations: [], totalItemMatches: 0 },
-    heldStores: [],
-    rowFor: () => null,
-    systemName: () => null,
-    jumpsStatus: 'ready',
+    stores: [],
+    offers: [],
     pricing: false,
+    valuing: false,
+    balancesKnown: true,
+    systemName: () => null,
+    factionName: () => null,
+    jumpsStatus: 'ready',
+    factions: [],
+    categories: [],
   }),
 }));
 
@@ -111,9 +115,14 @@ function renderStore(search = '') {
   );
 }
 
+/** The store's funnel, not the landing's behind the modal. */
+function storeFiltersButton() {
+  return within(screen.getByRole('dialog')).getByRole('button', { name: /^Filters/ });
+}
+
 /** Every filter now sits behind the funnel (FilterBar, issue #1282). */
 function openFilters() {
-  fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
+  fireEvent.click(storeFiltersButton());
 }
 
 function offer(overrides: Partial<LoyaltyStoreOffer>): LoyaltyStoreOffer {
@@ -267,7 +276,7 @@ describe('LoyaltyStore filters', () => {
     const user = userEvent.setup();
     renderStore();
 
-    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await user.click(storeFiltersButton());
     await user.click(screen.getByRole('combobox', { name: /Market hub/i }));
     await user.click(screen.getByRole('option', { name: OTHER_HUB.systemName }));
     expect(useMarketHub.getState().value).toBe(OTHER_HUB.id);
@@ -279,11 +288,11 @@ describe('LoyaltyStore filters', () => {
     renderStore();
 
     // "Affordable only" is on by default, so turning it off is one active filter.
-    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await user.click(storeFiltersButton());
     await user.click(screen.getByRole('button', { name: /Affordable/i }));
     await user.keyboard('{Escape}');
 
-    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await user.click(storeFiltersButton());
     expect(screen.getByRole('button', { name: /Affordable/i })).toHaveAttribute(
       'aria-pressed',
       'false'
@@ -836,11 +845,11 @@ describe('LoyaltyStore switching stores through the search', () => {
     );
   }
 
-  it('lands on a pick-a-corporation state with no store chosen, loading no offers', () => {
+  it('lands on the Stores view with no store chosen, loading no store offers', () => {
     renderAt('/loyalty');
     expect(screen.getByRole('heading', { level: 1, name: 'LP Store' })).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: 'Search LP Stores' })).toBeInTheDocument();
-    expect(screen.getByText('Search every LP Store')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stores', pressed: true })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Change store' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /corporation/i })).not.toBeInTheDocument();
     expect(useLoyaltyStoreOffers).not.toHaveBeenCalled();
@@ -949,6 +958,36 @@ describe('LoyaltyStore switching stores through the search', () => {
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(probe.pathname).toBe('/wallet/lp-store'));
     expect(probe.search).toBe('?q=tritanium');
+  });
+
+  it('closes back to the whole landing view the store was opened from', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/loyalty/1000168',
+            state: { from: 'lp-search', q: 'cap', search: '?view=offers&q=cap&noFw=1' },
+          },
+        ]}
+      >
+        <Routes>
+          <Route
+            path="/loyalty/:corporationId"
+            element={
+              <>
+                <LoyaltyStore />
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route path="*" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(probe.pathname).toBe('/wallet/lp-store'));
+    expect(probe.search).toBe('?view=offers&q=cap&noFw=1');
   });
 
   it('sets the trade hub from the gear, the same setting as the filter row', async () => {
