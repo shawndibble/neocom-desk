@@ -12,6 +12,7 @@ import { cooldownProgress, type ImplantValue } from '@/engine/implantValue';
 import { cloneJumpCooldownHours, type CloneJumpCooldown } from '@/engine/clone/cloneJump';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import { JumpsAwayText } from '@/features/assets/assetBrowserRows';
+import { PlaceLink } from '@/features/entities';
 import { TOUCH_LINK } from '@/features/character/CloneCard';
 import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -31,6 +32,8 @@ interface ClonesSummaryCardsProps {
   wornValue: ImplantValue | null;
   homeLocationId: number | undefined;
   homeLocationName: string | null;
+  /** False while the name is the "Station #id" fallback: nothing to open yet. */
+  homeLocationResolved: boolean;
   homeSecurity: number | undefined;
   homeJumps: JumpsAwayResult | undefined;
   lastStationChangeDate: string | null;
@@ -51,6 +54,7 @@ export function ClonesSummaryCards({
   wornValue,
   homeLocationId,
   homeLocationName,
+  homeLocationResolved,
   homeSecurity,
   homeJumps,
   lastStationChangeDate,
@@ -122,7 +126,13 @@ export function ClonesSummaryCards({
           <section aria-label={t('clones.respawn')} className="space-y-1">
             <h3 className={eyebrowClassName}>{t('clones.respawn')}</h3>
             <p className="flex flex-wrap items-center gap-x-2">
-              <span className="[overflow-wrap:anywhere]">{homeLocationName}</span>
+              {homeLocationResolved && homeLocationId !== undefined ? (
+                <PlaceLink id={homeLocationId} className="[overflow-wrap:anywhere]">
+                  {homeLocationName}
+                </PlaceLink>
+              ) : (
+                <span className="[overflow-wrap:anywhere]">{homeLocationName}</span>
+              )}
               {homeSecurity !== undefined && <SecurityStatus security={homeSecurity} />}
               <JumpsAwayText
                 result={homeJumps}
