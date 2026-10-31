@@ -16,7 +16,8 @@ import { fixed1 } from '@/lib/fixedFormat';
 import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { type ReactElement, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { RENAME_PLACE_STATE } from './renamePlaceState';
 import { NicknamedName } from '@/features/assets/PlaceName';
 import { IskAmount, RowActionsMenu, RowMoreActions, Tooltip } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
@@ -218,8 +219,10 @@ export function LocationRow({
   const actions = placeMenuActions({
     kind: 'station',
     pinnable: showPin,
+    renamable: showPin,
     resolved: !unresolvedParent,
   });
+  const navigate = useNavigate();
   const pinned = pinState !== 'unpinned';
   const row = (
     <div className="relative flex items-center gap-2 border-b border-line pr-2 pl-3 hover:bg-panel-2">
@@ -298,6 +301,7 @@ export function LocationRow({
           placeName={label}
           pinState={pinState}
           onTogglePin={onTogglePin}
+          onRename={() => void navigate(href, { state: RENAME_PLACE_STATE })}
           t={t}
         />
       }

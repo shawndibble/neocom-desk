@@ -11,6 +11,21 @@ describe('placeMenuActions', () => {
     ]);
   });
 
+  it('offers Rename before the pin where the page keeps Place Nicknames', () => {
+    expect(
+      placeMenuActions({ kind: 'station', pinnable: true, renamable: true, resolved: true })
+    ).toEqual(['setWaypoint', 'openInEve', 'copyName', 'rename', 'togglePin']);
+  });
+
+  it('never offers Rename on a container or an unresolved place', () => {
+    expect(
+      placeMenuActions({ kind: 'container', pinnable: false, renamable: true, resolved: true })
+    ).not.toContain('rename');
+    expect(
+      placeMenuActions({ kind: 'station', pinnable: true, renamable: true, resolved: false })
+    ).toEqual(['copyName']);
+  });
+
   it('drops the pin where the page has no pinning (corp)', () => {
     expect(placeMenuActions({ kind: 'station', pinnable: false, resolved: true })).toEqual([
       'setWaypoint',
