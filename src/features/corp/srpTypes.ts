@@ -150,6 +150,14 @@ export interface SrpStatus {
 /** A claim's `state`. `closedAt` (epoch ms) is set when it becomes paid or rejected. */
 export type SrpClaimState = 'pending' | 'approved' | 'paid' | 'rejected';
 
+/** A claim's lifecycle order, for sorting a State column as the claim moves rather than A to Z. */
+export const SRP_STATE_RANK: Record<SrpClaimState, number> = {
+  pending: 0,
+  approved: 1,
+  paid: 2,
+  rejected: 3,
+};
+
 /** `fileSrpClaimCallable`'s input beside the corporation and token. */
 export interface FileSrpClaimInput {
   /** A pasted zKillboard (`/kill/<id>/`) or ESI (`/killmails/<id>/<hash>/`) link. */

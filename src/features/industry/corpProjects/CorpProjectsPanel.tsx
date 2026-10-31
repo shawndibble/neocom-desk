@@ -104,6 +104,13 @@ function CharacterPricing({
 
 const NO_BLUEPRINTS: readonly CharacterBlueprint[] = [];
 
+const SOURCE_RANK: Record<NonNullable<CorpProjectRow['source']>['kind'], number> = {
+  owned: 0,
+  community: 1,
+  copy: 2,
+  assumed: 3,
+};
+
 export function CorpProjectsPanel({
   title,
   leading,
@@ -263,6 +270,10 @@ export function CorpProjectsPanel({
     {
       id: 'blueprint',
       header: t('industry.corpProjects.blueprint'),
+      // Cheapest route first: owned, then a community offer, a bought copy, the amber assumption.
+      // Still pricing or unpriced has no source to rank, so it sinks.
+      sortValue: (row) => (row.source ? SOURCE_RANK[row.source.kind] : undefined),
+      sortFirst: 'asc',
       render: (row) => <BlueprintSourceCell row={row} />,
     },
     {

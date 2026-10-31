@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -52,5 +52,25 @@ describe('LostShipsList', () => {
     const { onOpen } = setup();
     await userEvent.click(screen.getByRole('link', { name: 'Jita' }));
     expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('sorts by ship when its header is clicked', async () => {
+    render(
+      <MemoryRouter>
+        <LostShipsList
+          rows={[row, { ...row, killmailId: 2, hullName: 'Abaddon' }]}
+          onOpen={vi.fn()}
+          onFile={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+    const shipNames = () =>
+      screen
+        .getAllByRole('row')
+        .slice(1)
+        .map((r) => within(r).getAllByRole('button')[0].textContent);
+    expect(shipNames()).toEqual(['Hurricane', 'Abaddon']);
+    await userEvent.click(screen.getByRole('button', { name: /^ship/i }));
+    expect(shipNames()).toEqual(['Abaddon', 'Hurricane']);
   });
 });

@@ -181,6 +181,7 @@ export function GroupMaterialsPanel({
         id: 'owned',
         header: t('industry.ownedQuantity'),
         align: 'right',
+        sortValue: (material) => ownedStockMap.get(material.typeID) ?? 0,
         render: (material) => {
           const owned = ownedStockMap.get(material.typeID);
           const scopedQuantity = detection.scopedQuantityFor(material.typeID);

@@ -332,7 +332,7 @@ describe('MaterialsTable sourcing', () => {
     // that digit, so tabbing down the column and typing works as it did when
     // every cell was a field.
     const target = valueButton('Have: Tritanium');
-    for (let i = 0; i < 10 && document.activeElement !== target; i++) {
+    for (let i = 0; i < 12 && document.activeElement !== target; i++) {
       await user.tab();
     }
     expect(document.activeElement).toBe(target);
@@ -1284,7 +1284,7 @@ describe('MaterialsTable build-here control', () => {
     // Ahead of every row now: the phone-only sort picker `mobileSort` always
     // renders (real CSS hides it at this width; jsdom doesn't) plus one
     // header sort button per sortable column.
-    for (let i = 0; i < 12 && !reached; i++) {
+    for (let i = 0; i < 14 && !reached; i++) {
       await user.tab();
       reached = document.activeElement === control;
     }

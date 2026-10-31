@@ -411,6 +411,8 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           ) : (
             <div className="overflow-x-auto">
               <DataTable
+                // A tab's columns differ, so a sort must not carry over to the same id on another tab.
+                key={tab}
                 label={t(`srp.officer.title.${tab}`)}
                 columns={columns}
                 rows={rows}
@@ -418,6 +420,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
                 onRowClick={(row) => setOpenId(row.killmailId)}
                 selectedRowKey={openId}
                 stackLayout={phone ? 'dense' : 'labelled'}
+                mobileSort
                 // Phone: tick box, title, amount and ⋮ share line one (Hauling's card).
                 className="dt-dense-tight"
                 rowContextMenu={

@@ -31,6 +31,7 @@ export function LostShipsList({ rows, onFile, onOpen, busyKillmailId = null }: L
         id: 'hull',
         header: t('srpMember.lost.ship'),
         primary: true,
+        sortValue: (r) => r.hullName,
         render: (r) => (
           <button
             type="button"
@@ -44,11 +45,13 @@ export function LostShipsList({ rows, onFile, onOpen, busyKillmailId = null }: L
       {
         id: 'system',
         header: t('srpMember.lost.system'),
+        sortValue: (r) => r.systemName,
         render: (r) => <SystemLink systemId={r.solarSystemId}>{r.systemName}</SystemLink>,
       },
       {
         id: 'lost',
         header: t('srpMember.lost.lost'),
+        sortValue: (r) => r.killedAt,
         render: (r) => (
           <span className="tabular-nums">
             {formatDateOnly(new Date(r.killedAt), timeZone)}{' '}
@@ -101,6 +104,7 @@ export function LostShipsList({ rows, onFile, onOpen, busyKillmailId = null }: L
         rows={rows}
         rowKey={(r) => r.killmailId}
         stackLayout="dense"
+        mobileSort
         onRowClick={onOpen}
       />
     </div>
