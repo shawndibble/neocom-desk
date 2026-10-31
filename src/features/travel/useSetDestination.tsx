@@ -35,7 +35,12 @@ interface SetDestination {
   send: () => void;
 }
 
-export function useSetDestination(locationId: number, placeName: string): SetDestination {
+export function useSetDestination(
+  locationId: number,
+  placeName: string,
+  /** `false` adds the place as the next stop instead of replacing the route. */
+  clearOthers = true
+): SetDestination {
   const { t } = useTranslation();
   const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   const lacksScope = useCharacterLacksEndpoints(characterId, WAYPOINT_ENDPOINTS);
@@ -59,7 +64,10 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
     setSending(true);
     setOutcome(null);
     try {
-      setOutcome(waypointOutcome(await setWaypointsInGame(id, [locationId]), placeName, t));
+      const result = clearOthers
+        ? await setWaypointsInGame(id, [locationId])
+        : await setWaypointsInGame(id, [locationId], { clearOthers: false });
+      setOutcome(waypointOutcome(result, placeName, t, !clearOthers));
     } finally {
       inFlight.current = false;
       setSending(false);

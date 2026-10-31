@@ -35,6 +35,15 @@ export function PlaceRowMenuItems({
             return placeId === null ? null : (
               <SetWaypointMenuItem key={action} locationId={placeId} placeName={placeName} />
             );
+          case 'addWaypoint':
+            return placeId === null ? null : (
+              <SetWaypointMenuItem
+                key={action}
+                locationId={placeId}
+                placeName={placeName}
+                mode="add"
+              />
+            );
           case 'openInEve':
             return placeId === null ? null : (
               <OpenInEveMenuItem key={action} kind="information" id={placeId} />

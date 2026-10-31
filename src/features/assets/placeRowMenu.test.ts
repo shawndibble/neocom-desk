@@ -5,6 +5,7 @@ describe('placeMenuActions', () => {
   it('offers Set waypoint first on a station, then the rest', () => {
     expect(placeMenuActions({ kind: 'station', pinnable: true, resolved: true })).toEqual([
       'setWaypoint',
+      'addWaypoint',
       'openInEve',
       'copyName',
       'togglePin',
@@ -14,7 +15,7 @@ describe('placeMenuActions', () => {
   it('offers Rename before the pin where the page keeps Place Nicknames', () => {
     expect(
       placeMenuActions({ kind: 'station', pinnable: true, renamable: true, resolved: true })
-    ).toEqual(['setWaypoint', 'openInEve', 'copyName', 'rename', 'togglePin']);
+    ).toEqual(['setWaypoint', 'addWaypoint', 'openInEve', 'copyName', 'rename', 'togglePin']);
   });
 
   it('never offers Rename on a container or an unresolved place', () => {
@@ -29,6 +30,7 @@ describe('placeMenuActions', () => {
   it('drops the pin where the page has no pinning (corp)', () => {
     expect(placeMenuActions({ kind: 'station', pinnable: false, resolved: true })).toEqual([
       'setWaypoint',
+      'addWaypoint',
       'openInEve',
       'copyName',
     ]);
@@ -37,6 +39,7 @@ describe('placeMenuActions', () => {
   it('offers a container only where it sits and its name', () => {
     expect(placeMenuActions({ kind: 'container', pinnable: false, resolved: true })).toEqual([
       'setWaypoint',
+      'addWaypoint',
       'copyName',
     ]);
   });

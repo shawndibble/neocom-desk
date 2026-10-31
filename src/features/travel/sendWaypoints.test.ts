@@ -24,6 +24,14 @@ describe('setWaypointsInGame', () => {
     ]);
   });
 
+  it('keeps the client route when asked not to clear', async () => {
+    postAutopilotWaypointMock.mockResolvedValue({ data: null });
+    await setWaypointsInGame(7, [30000002], { clearOthers: false });
+    expect(postAutopilotWaypointMock.mock.calls).toEqual([
+      [7, 30000002, { clearOtherWaypoints: false }],
+    ]);
+  });
+
   it('sends nothing for no waypoints', async () => {
     expect(await setWaypointsInGame(7, [])).toEqual({ ok: true, set: 0 });
     expect(postAutopilotWaypointMock).not.toHaveBeenCalled();

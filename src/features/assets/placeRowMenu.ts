@@ -1,7 +1,8 @@
 import type { PinState } from '@/features/assets/stationPins';
 
 /** One entry of an Assets place row's menu, in the order it is offered. */
-export type PlaceMenuAction = 'setWaypoint' | 'openInEve' | 'copyName' | 'rename' | 'togglePin';
+export type PlaceMenuAction =
+  'setWaypoint' | 'addWaypoint' | 'openInEve' | 'copyName' | 'rename' | 'togglePin';
 
 /**
  * Which actions a place row's menu offers. A station or structure row is a
@@ -22,9 +23,10 @@ export function placeMenuActions({
   resolved: boolean;
 }): PlaceMenuAction[] {
   if (!resolved) return ['copyName'];
-  if (kind === 'container') return ['setWaypoint', 'copyName'];
+  if (kind === 'container') return ['setWaypoint', 'addWaypoint', 'copyName'];
   return [
     'setWaypoint',
+    'addWaypoint',
     'openInEve',
     'copyName',
     ...(renamable ? (['rename'] as const) : []),
