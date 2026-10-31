@@ -97,8 +97,6 @@ export function useAppraisalColumns({
       ...withOwned.filter((r) => r.need === 0),
     ];
   }, [rows, owned]);
-  const csvColumns = useMemo(() => appraisalCsvColumns(t), [t]);
-  const tableExport = useTableExport({ surface: 'market-appraisal', rows, columns: csvColumns });
   const hasRefine = rows.some((row) => row.refineTotal !== undefined);
   // Undefined per row when nothing the active Character holds LP with sells
   // this item — same "only earns its place once something has it" rule as
@@ -161,6 +159,18 @@ export function useAppraisalColumns({
     accountingLevel === null || brokerRelationsLevel === null
       ? null
       : { accountingLevel, brokerRelationsLevel, standing };
+  // Every column, whichever the picker shows; fees blank until the skills load.
+  const csvColumns = useMemo(
+    () =>
+      appraisalCsvColumns(t, {
+        fees:
+          accountingLevel === null || brokerRelationsLevel === null
+            ? null
+            : { accountingLevel, brokerRelationsLevel, standing },
+      }),
+    [t, accountingLevel, brokerRelationsLevel, standing]
+  );
+  const tableExport = useTableExport({ surface: 'market-appraisal', rows, columns: csvColumns });
   const taxFor = (row: OwnedRow) =>
     accountingLevel === null ? null : sellSalesTax(row, accountingLevel);
   const brokerFor = (row: OwnedRow) =>
