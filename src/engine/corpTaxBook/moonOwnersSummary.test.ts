@@ -304,13 +304,17 @@ describe('moonOwnersNeedRows (#5717)', () => {
     ...(i.summaries ? { summaries: i.summaries } : {}),
   });
 
-  it.each(Object.entries(FEEDERS))('%s: needs no row when the summary stands in', (_n, feeders) => {
-    const i = withSummaries(input(feeders));
-    // Only an owner the summary cannot stand in for asks for rows, and then the answer is yes.
-    const needs = moonOwnersNeedRows(bare(i));
-    const noRows = buildMoonOwners({ ...i, entries: [] });
-    if (!needs) expect(noRows.rows).toEqual(buildMoonOwners(i).rows);
-  });
+  it.each(Object.entries(FEEDERS))(
+    '%s: asks for rows only when the tab would differ without them',
+    (_n, feeders) => {
+      const i = withSummaries(input(feeders));
+      const same =
+        JSON.stringify(buildMoonOwners({ ...i, entries: [] }).rows) ===
+        JSON.stringify(buildMoonOwners(i).rows);
+      // A tab that renders the same with no rows must not ask for them; one that differs must.
+      if (!same) expect(moonOwnersNeedRows(bare(i))).toBe(true);
+    }
+  );
 
   it('needs none for a plain owner with a current summary', () => {
     expect(moonOwnersNeedRows(bare(withSummaries(input([feeder(A)]))))).toBe(false);

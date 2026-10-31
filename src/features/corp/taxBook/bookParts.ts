@@ -7,7 +7,7 @@
  *   status. Every tab joins these.
  * - `observed`: the ledger rows (a Dexie delta on a device that holds a copy, ADR 0031). Every
  *   tab reads them except Moon owners, whose figures come from the `owners` summaries (#5717);
- *   that tab asks for them only when a summary cannot stand in (`ownersNeedRows`).
+ *   that tab asks for them only when a summary cannot stand in (`needsRowsFallback`).
  * - `ledger`: payments, dismissals, declarations, adjustments and write-offs.
  *   A Miner's balance, a Statement's state and an Extraction page's per-day billing read them.
  * - `answers`: guests' answers to a hand-made grouping, shown beside a Miner.

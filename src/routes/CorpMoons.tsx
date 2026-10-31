@@ -325,6 +325,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
         data: state.data,
         verdict: state.verdict,
         reload: book.reload,
+        requestRows: book.requestRows,
       }}
     >
       <ReadyBook sync={sync} />

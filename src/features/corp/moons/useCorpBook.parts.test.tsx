@@ -1,5 +1,5 @@
 // Which slices of the book `useCorpBook` reads as the page's tab changes (issue #5248).
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BookData } from '../taxBook/bookClient';
 import type { BookPartSet } from '../taxBook/bookParts';
@@ -149,6 +149,22 @@ describe('useCorpBook read plan', () => {
     expect(readBookData.mock.calls.map((c) => [...(c[2] as BookPartSet)].sort())).toContainEqual([
       'observed',
     ]);
+  });
+
+  it('requestRows reads the rows a Moon owners tab opened without, and keeps the page ready', async () => {
+    const { result } = renderHook(() => useCorpBook(SYNC, bookPartsFor('moon-owners', null)));
+    await waitFor(() => expect(result.current.state.status).toBe('ready'));
+    expect(readBookData).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.requestRows());
+    expect(result.current.state.status).toBe('ready');
+    await waitFor(() => expect(readBookData).toHaveBeenCalledTimes(2));
+    expect([...(readBookData.mock.calls[1]?.[2] as BookPartSet)]).toEqual(['observed']);
+    await waitFor(() =>
+      expect(
+        result.current.state.status === 'ready' && result.current.state.data.parts?.has('observed')
+      ).toBe(true)
+    );
   });
 
   it('shows the loading state, not a half-joined book, while a tab reads its slices', async () => {

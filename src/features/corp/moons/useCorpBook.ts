@@ -135,6 +135,8 @@ export interface CorpBook {
   state: CorpBookState;
   /** Re-reads the book; call after an edit. */
   reload: () => void;
+  /** Reads the ledger rows a tab opened without; see `BookContextValue.requestRows`. */
+  requestRows: () => void;
   characterId: number | null;
   corporationId: number | null;
 }
@@ -186,9 +188,16 @@ export function useCorpBook(
   // The Moon owners tab reads no ledger rows unless its summaries cannot stand in (#5717).
   const needsRows =
     fetched.status === 'loaded' && needsRowsFallback(wanted, fetched.data, now, corporationId);
-  const asked = useMemo(
+  // A dialog that prices from rows asks for them (`requestRows`); the page stays ready meanwhile.
+  const [rowsAsked, setRowsAsked] = useState(false);
+  const requestRows = useCallback(() => setRowsAsked(true), []);
+  const required = useMemo(
     () => (needsRows ? new Set<BookPart>([...wanted, 'observed']) : wanted),
     [wanted, needsRows]
+  );
+  const asked = useMemo(
+    () => (rowsAsked ? new Set<BookPart>([...required, 'observed']) : required),
+    [required, rowsAsked]
   );
   const wantedKey = [...asked].sort().join(',');
   // A stable copy: the full read below and the tab-switch read both start from the latest ask.
@@ -501,7 +510,7 @@ export function useCorpBook(
         view &&
         fetched.scope?.minerId === scopedMiner &&
         fetched.forMoon === scopedMoon &&
-        missingBookParts(asked, fetched.data.parts).size === 0
+        missingBookParts(required, fetched.data.parts).size === 0
         ? {
             status: 'ready',
             verdict: fetched.verdict,
@@ -512,7 +521,7 @@ export function useCorpBook(
           }
         : { status: 'loading' }
       : fetched;
-  return { state, reload, characterId, corporationId };
+  return { state, reload, requestRows, characterId, corporationId };
 }
 
 /**
@@ -558,15 +567,13 @@ async function loadBookPrices(data: BookData, from?: string) {
   );
   return {
     // A page left open past midnight asks for a day it never priced: use the last loaded one.
-    pricesOn: ((date) => {
+    pricesOn: (date: string) => {
       const day = priceDay(prices, data.settings.hubId, date);
       return day.prices.size > 0 ? day : priceDay(prices, data.settings.hubId, loadedOn);
-    }) as BookViewInput['pricesOn'],
+    },
     // No fallback day: the moon owner's page prices an unsaved day at 0, so this does too.
-    moonOwnerPricesOn: ((date) =>
-      moonOwnerPricesAtHubOnDate(prices, hubForPayee(data.settings.hubId).id, date)) as NonNullable<
-      BookViewInput['moonOwnerPricesOn']
-    >,
+    moonOwnerPricesOn: (date: string) =>
+      moonOwnerPricesAtHubOnDate(prices, hubForPayee(data.settings.hubId).id, date),
   };
 }
 
