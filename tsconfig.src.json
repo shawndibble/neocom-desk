@@ -19,6 +19,7 @@
     "functions/src/callableManifest.ts",
     "functions/src/corpTaxBookEngine.ts",
     "functions/src/corpTaxBookMinerTotals.ts",
+    "functions/src/corpTaxBookMoonDocs.ts",
     "functions/src/corpTaxBookReadModels.ts",
     "functions/src/corpTaxBookVersionKeys.ts"
   ],

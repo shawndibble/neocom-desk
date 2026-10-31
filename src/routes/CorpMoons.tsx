@@ -232,7 +232,10 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
     [tab, pathname]
   );
   const open = moonsDetail(pathname);
-  const book = useCorpBook(sync, wanted, { minerId: open?.kind === 'miner' ? open.id : undefined });
+  const book = useCorpBook(sync, wanted, {
+    minerId: open?.kind === 'miner' ? open.id : undefined,
+    extractionId: open?.kind === 'extraction' ? open.id : undefined,
+  });
   const { state } = book;
   // The rail and the page title list Moons' tabs only once a book mode is chosen.
   const unchosen = state.status === 'off';
