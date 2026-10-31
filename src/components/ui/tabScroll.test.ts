@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pageScrollDelta, scrollEdges, wheelScrollDelta } from './tabScroll';
+import { pageScrollDelta, revealScrollDelta, scrollEdges, wheelScrollDelta } from './tabScroll';
 
 describe('scrollEdges', () => {
   it('has nothing beyond either edge when the bar fits', () => {
@@ -67,5 +67,21 @@ describe('pageScrollDelta', () => {
   it('moves three quarters of the bar so the last tab stays in view as an anchor', () => {
     expect(pageScrollDelta('after', 400)).toBe(300);
     expect(pageScrollDelta('before', 400)).toBe(-300);
+  });
+});
+
+describe('revealScrollDelta', () => {
+  const bar = { start: 10, end: 400 };
+
+  it('stays put when the item is already inside the bar', () => {
+    expect(revealScrollDelta(bar, { left: 50, right: 200 })).toBe(0);
+  });
+
+  it('moves forward by the part cut off past the end', () => {
+    expect(revealScrollDelta(bar, { left: 300, right: 460 })).toBe(60);
+  });
+
+  it('moves back by the part cut off before the start', () => {
+    expect(revealScrollDelta(bar, { left: -40, right: 100 })).toBe(-50);
   });
 });

@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
 import { useSrpNavVisible } from '@/features/corp/srp/useSrpNavVisible';
@@ -13,6 +13,7 @@ import {
   tabListClassName,
   tabScrollerClassName,
 } from '@/components/ui/tabStyles';
+import { revealInScroller } from '@/components/ui/tabScroll';
 
 function subNavClass({ isActive }: { isActive: boolean }): string {
   return cx(tabItemClassName, 'gap-1.5', isActive ? tabItemActiveClassName : tabItemIdleClassName);
@@ -65,10 +66,34 @@ export function OverviewSubNav({ trailing }: { trailing?: ReactNode }) {
   const locked = useLockedRoutes(TAB_PATHS);
   // Hidden, never locked or dimmed, unless the pilot's corporation has SRP on (`NavSubView.visible`).
   const srpVisible = useSrpNavVisible();
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const { pathname } = useLocation();
+
+  // On a phone the strip outgrows its frame and opens at scroll 0, so landing
+  // on a later view cut its own tab off (or hid SRP entirely). Slide the
+  // current link into view on landing, on every route change, and when the
+  // strip or its tabs resize: the `trailing` data-age badge arrives with the
+  // data and narrows the strip after landing. A no-op when the link already
+  // fits, and a swipe resizes nothing, so it never fights the reader.
+  // `srpVisible` too: the SRP tab mounts after landing.
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const reveal = () => {
+      const current = scroller.querySelector('[aria-current="page"]');
+      if (current) revealInScroller(scroller, current);
+    };
+    reveal();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reveal);
+    observer?.observe(scroller);
+    const list = scroller.firstElementChild;
+    if (list) observer?.observe(list);
+    return () => observer?.disconnect();
+  }, [pathname, srpVisible]);
 
   return (
     <div className="flex items-stretch">
-      <div className={cx(tabScrollerClassName, 'min-w-0 flex-1')}>
+      <div ref={scrollerRef} className={cx(tabScrollerClassName, 'min-w-0 flex-1')}>
         <nav aria-label={t('nav.overview')} className={tabListClassName}>
           <NavLink to="/overview" className={subNavClass}>
             {t('nav.overview')}
