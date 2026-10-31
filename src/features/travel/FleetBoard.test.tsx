@@ -220,9 +220,10 @@ describe('the Full scan', () => {
 
   it("in wormhole space, names the hole each ship needs and the hulls' mass floor", async () => {
     const user = userEvent.setup();
+    // The drone (Infiltrator II) adds to neither the sizes nor the mass.
     render(
       <FleetBoard
-        rows={[row(1, 10), row(3, 12), row(3, 14), row(4, 5), row(28606, 20)]}
+        rows={[row(1, 10), row(3, 12), row(3, 14), row(4, 5), row(28606, 20), row(2175, 8)]}
         wormholeSpace
       />
     );
@@ -236,6 +237,15 @@ describe('the Full scan', () => {
     expect(worth.textContent).toContain('1 ship left out of the total.');
     const recon = screen.getByRole('region', { name: 'Support' });
     expect(recon.textContent).toContain('Medium hole');
+  });
+
+  it('drops the mass line when no ship on scan has a baked mass', async () => {
+    const user = userEvent.setup();
+    render(<FleetBoard rows={[row(28606, 20)]} wormholeSpace />);
+    await openFullScan(user);
+    const worth = await screen.findByRole('region', { name: /Worth on the scan/ });
+    await within(worth).findByText('1 not sized');
+    expect(worth.textContent).not.toContain('Hulls weigh');
   });
 
   it('outside wormhole space, shows no hole sizes or mass', async () => {

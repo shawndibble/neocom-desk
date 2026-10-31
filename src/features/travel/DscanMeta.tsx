@@ -30,7 +30,6 @@ export function DscanMeta({
   trackHistory,
   previous,
   wormholeSpace,
-  groupOf,
 }: {
   hulls: readonly HullCount[];
   names: ReadonlyMap<number, string>;
@@ -39,11 +38,10 @@ export function DscanMeta({
   previous: HullCount[] | null | undefined;
   /** The Current System is wormhole space: the Worth card adds the hole sizes. */
   wormholeSpace: boolean;
-  groupOf: (typeId: number) => number | undefined;
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      <WorthCard hulls={hulls} names={names} groupOf={wormholeSpace ? groupOf : undefined} />
+      <WorthCard hulls={hulls} names={names} wormholeSpace={wormholeSpace} />
       {trackHistory && <SinceLastScanCard hulls={hulls} previous={previous} names={names} />}
     </div>
   );
@@ -52,11 +50,11 @@ export function DscanMeta({
 function WorthCard({
   hulls,
   names,
-  groupOf,
+  wormholeSpace,
 }: {
   hulls: readonly HullCount[];
   names: ReadonlyMap<number, string>;
-  groupOf: ((typeId: number) => number | undefined) | undefined;
+  wormholeSpace: boolean;
 }) {
   const { t } = useTranslation();
   const hubId = useMarketHub((s) => s.value);
@@ -124,13 +122,13 @@ function WorthCard({
           </tbody>
         </table>
       )}
-      {groupOf !== undefined && <HoleSizes hulls={hulls} groupOf={groupOf} />}
       <p className="text-xs text-text-dim">
         {worth !== null && worth.unpriced > 0
           ? t('travel.pilot.dscan.worth.unpriced', { count: worth.unpriced })
           : null}{' '}
         {t('travel.pilot.dscan.worth.note', { hub: hub.systemName })}
       </p>
+      {wormholeSpace && <HoleSizes hulls={hulls} />}
     </section>
   );
 }
@@ -140,18 +138,16 @@ function WorthCard({
  * a hull too heavy for a hole can never pass it, and the mass is a floor.
  * Neither says the fleet can pass a hole.
  */
-function HoleSizes({
-  hulls,
-  groupOf,
-}: {
-  hulls: readonly HullCount[];
-  groupOf: (typeId: number) => number | undefined;
-}) {
+function HoleSizes({ hulls }: { hulls: readonly HullCount[] }) {
   const { t } = useTranslation();
   // Without the table there is simply no block.
   const table = useKeyedLoad('shipMass', loadShipMass).data;
   if (table === undefined) return null;
-  const read = buildHoleSizes(hulls, groupOf, (typeId) => table[String(typeId)]?.[2]);
+  const read = buildHoleSizes(
+    hulls,
+    (typeId) => table[String(typeId)]?.[1],
+    (typeId) => table[String(typeId)]?.[2]
+  );
   if (read === null) return null;
   const counts = [
     ...read.sizes.map(({ size, count }) =>
@@ -163,15 +159,17 @@ function HoleSizes({
   ];
   return (
     <div className="space-y-0.5 border-t border-line pt-2 text-sm">
-      <h4 className="font-semibold text-text">{t('travel.pilot.dscan.worth.holes.title')}</h4>
+      <h4 className={captionClassName}>{t('travel.pilot.dscan.worth.holes.title')}</h4>
       <p className="tabular-nums">{counts.join(' · ')}</p>
-      <p className="text-text-dim">
-        {t('travel.pilot.dscan.worth.holes.mass', {
-          mass: formatNumber(Math.floor(read.massKg / 1000)),
-        })}
-        {read.massLeftOut > 0 &&
-          ` ${t('travel.pilot.dscan.worth.holes.massLeftOut', { count: read.massLeftOut })}`}
-      </p>
+      {read.massKg > 0 && (
+        <p className="text-text-dim">
+          {t('travel.pilot.dscan.worth.holes.mass', {
+            mass: formatNumber(Math.floor(read.massKg / 1000)),
+          })}
+          {read.shipsWithoutMass > 0 &&
+            ` ${t('travel.pilot.dscan.worth.holes.massLeftOut', { count: read.shipsWithoutMass })}`}
+        </p>
+      )}
     </div>
   );
 }

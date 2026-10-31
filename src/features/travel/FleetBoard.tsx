@@ -188,7 +188,6 @@ export function FleetBoard({
         trackHistory={trackHistory}
         previous={previous}
         wormholeSpace={wormholeSpace}
-        groupOf={(typeId) => loaded.infoOf(typeId)?.groupId}
       />
       {board.leftOut > 0 && (
         <p className="text-xs text-text-dim">

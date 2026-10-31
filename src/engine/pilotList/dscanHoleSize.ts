@@ -20,7 +20,7 @@ export interface HoleSizeRead {
   /** Base hull mass of every ship with a baked mass, in kg. */
   massKg: number;
   /** Ships with no baked mass, so left out of `massKg`. */
-  massLeftOut: number;
+  shipsWithoutMass: number;
 }
 
 /** The read for a scan's ship hulls, or null when it holds no ship. */
@@ -33,14 +33,14 @@ export function buildHoleSizes(
   const bySize = new Map<WormholeShipSize, number>();
   let unsized = 0;
   let massKg = 0;
-  let massLeftOut = 0;
+  let shipsWithoutMass = 0;
   for (const { typeId, count } of hulls) {
     const groupId = groupOf(typeId);
     const size = groupId === undefined ? null : wormholeSizeForShipGroup(groupId);
     if (size === null) unsized += count;
     else bySize.set(size, (bySize.get(size) ?? 0) + count);
     const mass = massKgOf(typeId);
-    if (mass === undefined) massLeftOut += count;
+    if (mass === undefined) shipsWithoutMass += count;
     else massKg += mass * count;
   }
   return {
@@ -50,6 +50,6 @@ export function buildHoleSizes(
     }),
     unsized,
     massKg,
-    massLeftOut,
+    shipsWithoutMass,
   };
 }

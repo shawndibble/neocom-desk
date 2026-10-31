@@ -45,8 +45,6 @@ import { useNow } from '@/lib/useNow';
 import type { PilotPaste } from '@/engine/pilotList/parsePilotPaste';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { newArrivals } from '@/engine/pilotList/localDiff';
-import { isWormholeSystem } from '@/engine/route/routeSafety';
-import { useCurrentSystem } from '@/features/route/currentSystem';
 import { FleetBoard } from './FleetBoard';
 import { useLastLocal } from './lastLocal';
 import { NewArrivalTag } from './NewArrivalTag';
@@ -74,14 +72,8 @@ export function PilotListView({ paste }: { paste: PilotPaste }) {
 
 /** The live paste: it was taken where the pilot is, so their Current System says if it is wormhole space. */
 function LiveFleetBoard({ rows }: { rows: DscanPaste['rows'] }) {
-  const { systemId } = useCurrentSystem();
-  return (
-    <FleetBoard
-      rows={rows}
-      trackHistory
-      wormholeSpace={systemId !== null && isWormholeSystem(systemId)}
-    />
-  );
+  const { space } = useHereSpace();
+  return <FleetBoard rows={rows} trackHistory wormholeSpace={space === 'wormhole'} />;
 }
 
 /** How many hulls a row names under "Flew on kills". */

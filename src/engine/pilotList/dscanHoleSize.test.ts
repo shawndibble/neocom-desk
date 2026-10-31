@@ -40,7 +40,7 @@ describe('buildHoleSizes', () => {
       sizes: [{ size: 'medium', count: 3 }],
       unsized: 0,
       massKg: 29_800_000,
-      massLeftOut: 0,
+      shipsWithoutMass: 0,
     });
   });
 
@@ -63,7 +63,7 @@ describe('buildHoleSizes', () => {
 
   it('leaves an Orca unsized but still adds its hull mass', () => {
     const read = buildHoleSizes([{ typeId: ORCA, count: 1 }], groupOf, massKgOf);
-    expect(read).toEqual({ sizes: [], unsized: 1, massKg: 150_000_000, massLeftOut: 0 });
+    expect(read).toEqual({ sizes: [], unsized: 1, massKg: 150_000_000, shipsWithoutMass: 0 });
   });
 
   it('counts a hull with no group or mass as unsized and left out of the total', () => {
@@ -79,7 +79,7 @@ describe('buildHoleSizes', () => {
       sizes: [{ size: 'medium', count: 1 }],
       unsized: 3,
       massKg: 9_600_000,
-      massLeftOut: 3,
+      shipsWithoutMass: 3,
     });
   });
 
