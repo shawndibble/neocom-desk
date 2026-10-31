@@ -224,6 +224,45 @@ describe('RequestsTab board', () => {
   });
 });
 
+describe('RequestsTab columns', () => {
+  it('hides an optional column from the picker, never the request, and resets', async () => {
+    const user = userEvent.setup();
+    renderTab([request({})]);
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Request' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Terms' }));
+    await user.keyboard('{Escape}');
+    expect(screen.queryByText('Budget 300M')).not.toBeInTheDocument();
+    expect(screen.getByText('Aria Voss · Khanid')).toBeInTheDocument();
+
+    // Shared device-local store: put it back for the next test.
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Reset to default' }));
+    expect(screen.getByText('Budget 300M')).toBeInTheDocument();
+  });
+
+  it('sorts by progress, most filled first', async () => {
+    const user = userEvent.setup();
+    renderTab(
+      [request({ id: 'a', ownerName: 'Aaa' }), request({ id: 'b', ownerName: 'Bbb' })],
+      vi.fn(),
+      {
+        b: [
+          {
+            uid: 'char:9',
+            lines: { 0: { quantity: 1000, delivered: 1000, contractIds: [] } },
+            updatedAt: NOW,
+          },
+        ],
+      }
+    );
+    await user.click(screen.getByRole('button', { name: /Progress/ }));
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(rows[0]).toHaveTextContent('Bbb');
+    expect(rows[1]).toHaveTextContent('Aaa');
+  });
+});
+
 describe('Request panel', () => {
   it('gives a Member no requester controls', async () => {
     const user = userEvent.setup();

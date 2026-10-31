@@ -44,7 +44,7 @@ import { loadLibrariesWithFallback } from './communityCache';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 import { useReconnectCount } from '@/stores/network';
 import { sharedBlueprintRows, systemIdsByName } from './sharedBlueprintCopies';
-import { SharedBlueprintTable } from './SharedBlueprintTable';
+import { SharedBlueprintColumnPicker, SharedBlueprintTable } from './SharedBlueprintTable';
 
 const FILTERS: LibraryFilter[] = ['missingCommunity', 'ownedByMe', 'missingFromMe'];
 
@@ -372,6 +372,7 @@ export function CommunityLibrary({
             ))}
           </SelectContent>
         </Select>
+        {view === 'shared' && <SharedBlueprintColumnPicker />}
         {/* Sourcing a copy leaves the Library, so it sits apart at the row's end. */}
         <span className="flex items-center gap-1 sm:ml-auto">
           <Link to={bpcSourcingCommunityHref()} className={buttonClassName({ size: 'md' })}>

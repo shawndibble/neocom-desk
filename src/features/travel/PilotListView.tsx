@@ -251,6 +251,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     {
       id: 'pilot',
       header: t('travel.pilot.list.pilot'),
+      sortValue: (row) => row.name.toLowerCase(),
       render: (row) => {
         const threat = rowThreat(row, now);
         return (
@@ -275,6 +276,9 @@ function LocalList({ paste }: { paste: LocalPaste }) {
       id: 'standing',
       header: t('travel.pilot.list.standing'),
       headerCellClassName: STANDING_COLUMN_WIDTH,
+      // Worst standing first: the one to watch. No contact sinks.
+      sortValue: (row) => row.standing?.value,
+      sortFirst: 'asc',
       render: (row) => <StandingCell row={row} />,
     },
     ...spaces.map((space): DataTableColumn<PilotListRow> => ({
@@ -283,6 +287,9 @@ function LocalList({ paste }: { paste: LocalPaste }) {
       align: 'right',
       className: 'tabular-nums',
       headerCellClassName: COUNT_COLUMN_WIDTH,
+      // A pilot with no kill count (loading, unreachable, skipped) sinks.
+      sortValue: (row) =>
+        row.kills.kind === 'ready' ? row.kills.summary.bySpace[space].count : undefined,
       render: (row) => <SpaceCell row={row} space={space} now={now} />,
     })),
     {

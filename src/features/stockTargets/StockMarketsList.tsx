@@ -9,6 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
   Button,
+  ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -20,14 +21,23 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { marketNeed } from '@/engine/stockTargets/markets';
+import { marketNeed, type MarketNeed } from '@/engine/stockTargets/markets';
 import type { StockList } from '@/engine/stockTargets/stockLists';
+import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import type { TradeHub } from '@/market/hubs';
 import { StockNeedPill } from './StockStatus';
+import {
+  STOCK_MARKET_COLUMN_IDS,
+  useVisibleStockMarketColumns,
+  type StockMarketColumnId,
+} from './stockMarketColumns';
 import { STOCK_PATH } from './StockMarketPage';
 import { loadStockMarkets, type StockMarketRow, type StockMarketsData } from './stockTargetsData';
 import { formatNumber } from '@/lib/numberLocale';
+
+/** Worst first, the page's own order. */
+const NEED_RANK: Record<MarketNeed, number> = { out: 0, low: 1, stocked: 2 };
 
 export function StockMarketsList({
   lists,
@@ -195,6 +205,8 @@ export function StockMarketsList({
       render: (market) => (
         <StockNeedPill need={marketNeed(market)}>{needWord(market)}</StockNeedPill>
       ),
+      sortValue: (market) => NEED_RANK[marketNeed(market)],
+      sortFirst: 'asc',
     },
     {
       id: 'go',
@@ -206,6 +218,19 @@ export function StockMarketsList({
       render: () => <RowCaret />,
     },
   ];
+
+  const { visible, isVisible, toggle, reset } = useColumnVisibility(
+    useVisibleStockMarketColumns,
+    STOCK_MARKET_COLUMN_IDS
+  );
+  const columnsById = Object.fromEntries(columns.map((column) => [column.id, column])) as Record<
+    StockMarketColumnId,
+    DataTableColumn<StockMarketRow>
+  >;
+  const shownColumns = columns.filter(
+    (column) =>
+      column.id === 'market' || column.id === 'go' || isVisible(column.id as StockMarketColumnId)
+  );
 
   const needing = data?.markets.filter((m) => marketNeed(m) !== 'stocked').length ?? 0;
 
@@ -252,9 +277,24 @@ export function StockMarketsList({
         ) : !data ? (
           <Spinner label={t('common.loading')} />
         ) : (
-          <Panel padded={false}>
+          <Panel
+            padded={false}
+            actions={
+              <ColumnPickerMenu
+                size="sm"
+                available={STOCK_MARKET_COLUMN_IDS}
+                visible={visible}
+                columnsById={columnsById}
+                onToggle={toggle}
+                onReset={reset}
+                buttonLabel={t('common.columnsButton')}
+                menuTitle={t('common.columnsMenuTitle')}
+                resetLabel={t('common.resetColumns')}
+              />
+            }
+          >
             <DataTable
-              columns={columns}
+              columns={shownColumns}
               rows={data.markets}
               rowKey={(market) => market.listId}
               label={t('stockTargets.markets.label')}

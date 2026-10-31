@@ -46,6 +46,7 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
       header: t('fittings.appraisal.item'),
       className: 'min-w-32 break-words',
       stickyStart: true,
+      sortValue: (row) => row.name,
       render: (row) => (
         <MarketItemLink typeId={row.typeId} className={entityLinkClassName()}>
           {row.name}
@@ -57,6 +58,7 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
       header: t('fittings.appraisal.quantity'),
       align: 'right',
       className: 'tabular-nums',
+      sortValue: (row) => row.quantity,
       render: (row) => formatCount(row.quantity),
     },
     {
@@ -65,6 +67,7 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
       phoneHidden: true,
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
+      sortValue: (row) => row.sellEach ?? undefined,
       render: (row) => isk(row.sellEach),
     },
     {
@@ -72,6 +75,7 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
       header: t('fittings.appraisal.lineTotal'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
+      sortValue: (row) => row.sellTotal ?? undefined,
       render: (row) => isk(row.sellTotal),
     },
   ];

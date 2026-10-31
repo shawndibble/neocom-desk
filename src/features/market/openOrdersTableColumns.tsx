@@ -11,7 +11,7 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { DEFAULT_PROBLEM_THRESHOLDS } from '@/engine/market/orderProblems';
 import { formatMarketIsk } from '@/lib/isk';
 import { CharacterBadge } from '@/features/assets/assetBrowserRows';
-import type { OpenOrderRow } from './openOrdersModel';
+import { problemRank, type OpenOrderRow } from './openOrdersModel';
 import { OPEN_ORDER_COLUMN_IDS, type OpenOrderColumnId } from './openOrdersColumns';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { rowFixCall } from './orderDoThis';
@@ -82,6 +82,9 @@ export function useOpenOrderTableColumns({
         id: 'problem',
         header: t('market.orders.fixList.colProblem'),
         className: 'whitespace-nowrap',
+        // Worst first, the fix list's own order.
+        sortValue: (row) => problemRank(row.problem),
+        sortFirst: 'asc',
         render: (row) => {
           const { badge } = rowFixCall(row).advice;
           return (
