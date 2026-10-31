@@ -3,8 +3,12 @@ import type { EmploymentHistoryRow } from './employmentHistory';
 
 const SECONDS_PER_DAY = 86_400;
 
+const yesNo = (t: CsvTranslate, flag: boolean) =>
+  t(flag ? 'employmentHistory.csvYes' : 'employmentHistory.csvNo');
+
 /**
- * Export columns for Employment History: corporation, join date, tenure.
+ * Export columns for Employment History: corporation, join and leave dates,
+ * tenure, and the badges the timeline shows (current, NPC, returned, short stay).
  * The join date passes through as ESI's raw timestamp (a real date in the
  * file), and the tenure is whole days — a number that sorts and sums — not
  * the table's "2y 3mo" rendering.
@@ -20,8 +24,20 @@ export function employmentHistoryCsvColumns(
     },
     { header: t('employmentHistory.started'), value: (row) => row.startDate },
     {
+      header: t('employmentHistory.csvEnded'),
+      // The next record's start: the join date plus the stint. Blank for the current stint.
+      value: (row) =>
+        row.ongoing
+          ? undefined
+          : new Date(new Date(row.startDate).getTime() + row.tenureSeconds * 1000).toISOString(),
+    },
+    {
       header: t('employmentHistory.csvDurationDays'),
       value: (row) => Math.floor(row.tenureSeconds / SECONDS_PER_DAY),
     },
+    { header: t('employmentHistory.current'), value: (row) => yesNo(t, row.ongoing) },
+    { header: t('employmentHistory.npc'), value: (row) => yesNo(t, row.npc) },
+    { header: t('employmentHistory.returned'), value: (row) => yesNo(t, row.returned) },
+    { header: t('employmentHistory.shortStay'), value: (row) => yesNo(t, row.shortStay) },
   ];
 }

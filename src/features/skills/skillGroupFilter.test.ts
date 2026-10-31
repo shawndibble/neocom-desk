@@ -6,13 +6,39 @@ const GROUPS: SkillGroup[] = [
   {
     groupName: 'Gunnery',
     skills: [
-      { skillTypeID: 1, name: 'Small Hybrid Turret', level: 5, sp: 256000, rank: 1 },
-      { skillTypeID: 2, name: 'Gunnery', level: 4, sp: 45000, rank: 1 },
+      {
+        skillTypeID: 1,
+        name: 'Small Hybrid Turret',
+        level: 5,
+        sp: 256000,
+        rank: 1,
+        injected: true,
+        queuedLevel: null,
+      },
+      {
+        skillTypeID: 2,
+        name: 'Gunnery',
+        level: 4,
+        sp: 45000,
+        rank: 1,
+        injected: true,
+        queuedLevel: null,
+      },
     ],
   },
   {
     groupName: 'Spaceship Command',
-    skills: [{ skillTypeID: 3, name: 'Frigate', level: 3, sp: 8000, rank: 1 }],
+    skills: [
+      {
+        skillTypeID: 3,
+        name: 'Frigate',
+        level: 3,
+        sp: 8000,
+        rank: 1,
+        injected: true,
+        queuedLevel: null,
+      },
+    ],
   },
 ];
 

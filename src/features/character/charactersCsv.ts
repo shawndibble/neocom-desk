@@ -1,13 +1,16 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import { isSpExtractionReady } from '@/engine/skills/spExtraction';
+import { extractionTotalIsk, isSpExtractionReady } from '@/engine/skills/spExtraction';
 import { maxJobSlots, type JobSlotCategory, type JobSlotSkills } from '@/engine/industry/jobSlots';
 import type { CharacterSortStats } from './groups';
 import type { QueueInfo } from './rosterView';
 import { isPiExpired, type AttentionEntry } from './rosterAttention';
+import { placeLabel, type CharacterWhereabouts } from './characterWhereabouts';
+import { achievementCsvColumns } from './achievementCsv';
+import type { AchievementLookup } from './useCharacterAchievements';
 
 /** The slice of a Characters-table row the export reads (the route's `CharacterRow` satisfies it). */
 export interface CharacterCsvRow {
-  character: { name: string };
+  character: { characterId: number; name: string };
   corporationName: string | undefined;
   groupId: string | null;
   stats: CharacterSortStats | undefined;
@@ -18,6 +21,8 @@ export interface CharacterCsvRow {
   alertCount: number;
   starred: boolean;
   spFarm: boolean;
+  /** Docked place and hull; undefined until read (the read only runs while its columns show). */
+  whereabouts: CharacterWhereabouts | undefined;
 }
 
 const JOB_SLOT_CATEGORIES: readonly JobSlotCategory[] = ['manufacturing', 'science', 'reaction'];
@@ -39,6 +44,8 @@ export function charactersCsvColumns(
     groupNameById,
     spExtractionEnabled,
     spExtractionThresholdSp,
+    extractionNet,
+    achievements,
     lastSynced,
     now = Date.now,
   }: {
@@ -46,6 +53,9 @@ export function charactersCsvColumns(
     /** The SP-ready column only exists while SP-extraction monitoring is on, as in the table. */
     spExtractionEnabled: boolean;
     spExtractionThresholdSp: number;
+    /** Net ISK per extractor at the hub; null when unpriced. */
+    extractionNet: number | null;
+    achievements: AchievementLookup;
     /** The route's one "how stale is this character" rule, shared with its card and table. */
     lastSynced: (row: CharacterCsvRow) => Date | undefined;
     /** The clock PI expiry is read against, at export time. Injected for tests. */
@@ -63,12 +73,35 @@ export function charactersCsvColumns(
       header: t('characters.column.corp'),
       value: (row) => row.corporationName,
     },
+    ...achievementCsvColumns<CharacterCsvRow>(t, (row) => row.character.characterId, achievements),
     {
       header: t('characters.column.group'),
       value: (row) => (row.groupId === null ? undefined : groupNameById.get(row.groupId)),
     },
     { header: t('characters.column.spTotal'), value: (row) => row.stats?.skillPoints },
     { header: t('characters.column.wallet'), value: (row) => row.stats?.wallet },
+    {
+      header: t('characters.csvDockedAt'),
+      value: (row) => {
+        const place = row.whereabouts?.place;
+        if (!place) return undefined;
+        const label = placeLabel(place);
+        return label.kind === 'docked' ? label.name : undefined;
+      },
+    },
+    { header: t('characters.csvSystem'), value: (row) => row.whereabouts?.place?.systemName },
+    {
+      header: t('characters.csvPlaceKind'),
+      value: (row) => {
+        const place = row.whereabouts?.place;
+        if (!place) return undefined;
+        if (place.dockedKind === null) return t('characters.inSpace');
+        return place.dockedKind === 'structure'
+          ? t('characters.structure')
+          : t('characters.csvPlaceStation');
+      },
+    },
+    { header: t('characters.column.ship'), value: (row) => row.whereabouts?.shipName },
     {
       header: t('characters.column.lastSynced'),
       value: (row) => lastSynced(row)?.toISOString(),
@@ -112,6 +145,15 @@ export function charactersCsvColumns(
               row.totalSp !== undefined &&
               isSpExtractionReady(row.totalSp, spExtractionThresholdSp)
                 ? t('characters.spReadyYes')
+                : undefined,
+          } satisfies CsvColumn<CharacterCsvRow>,
+          {
+            header: t('characters.csvSpReadyValue'),
+            value: (row) =>
+              row.spFarm &&
+              row.totalSp !== undefined &&
+              isSpExtractionReady(row.totalSp, spExtractionThresholdSp)
+                ? extractionTotalIsk(row.totalSp, extractionNet)
                 : undefined,
           } satisfies CsvColumn<CharacterCsvRow>,
         ]

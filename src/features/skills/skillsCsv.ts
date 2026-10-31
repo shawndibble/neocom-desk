@@ -11,8 +11,12 @@ export interface SkillGroup {
     sp: number | null;
     /** Markup-stripped skill description, for the row's tooltip. Null/absent when the skill has none. */
     description?: string | null;
-    /** Feeds SkillBar's progress-toward-next-level segment (#405); not part of the CSV export. */
+    /** Training time multiplier; also feeds SkillBar's progress-toward-next-level segment (#405). */
     rank: number;
+    /** In the character's ESI skills at all; false is a skill book still to inject. */
+    injected: boolean;
+    /** The highest level waiting in the queue, only when above `level`. */
+    queuedLevel: number | null;
   }[];
 }
 
@@ -21,9 +25,13 @@ export interface SkillCsvRow {
   name: string;
   level: number;
   sp: number | null;
+  skillTypeId: number;
+  rank: number;
+  injected: boolean;
+  queuedLevel: number | null;
 }
 
-/** One row per skill, preserving the incoming group order and within-group order. */
+/** One row per skill (injected or not), preserving the incoming group order and within-group order. */
 export function skillCsvRows(groups: readonly SkillGroup[]): SkillCsvRow[] {
   return groups.flatMap((group) =>
     group.skills.map((skill) => ({
@@ -31,6 +39,10 @@ export function skillCsvRows(groups: readonly SkillGroup[]): SkillCsvRow[] {
       name: skill.name,
       level: skill.level,
       sp: skill.sp,
+      skillTypeId: skill.skillTypeID,
+      rank: skill.rank,
+      injected: skill.injected,
+      queuedLevel: skill.queuedLevel,
     }))
   );
 }
@@ -41,5 +53,12 @@ export function skillCsvColumns(t: CsvTranslate): CsvColumn<SkillCsvRow>[] {
     { header: t('skills.csvSkill'), value: (row) => row.name },
     { header: t('skills.csvLevel'), value: (row) => row.level },
     { header: t('skills.csvSp'), value: (row) => row.sp },
+    { header: t('skills.csvRank'), value: (row) => row.rank },
+    {
+      header: t('skills.csvInjected'),
+      value: (row) => t(row.injected ? 'skills.csvYes' : 'skills.csvNo'),
+    },
+    { header: t('skills.csvQueuedLevel'), value: (row) => row.queuedLevel },
+    { header: t('skills.csvTypeId'), value: (row) => row.skillTypeId },
   ];
 }

@@ -6,7 +6,7 @@ const NOW = Date.parse('2026-09-29T12:00:00Z');
 
 function row(overrides: Partial<CharacterCsvRow> = {}): CharacterCsvRow {
   return {
-    character: { name: 'Rixx Javix' },
+    character: { characterId: 1, name: 'Rixx Javix' },
     corporationName: 'Brave Newbies',
     groupId: 'g1',
     stats: { name: 'Rixx Javix', skillPoints: 52_000_000, wallet: 1_234_567.89 },
@@ -36,6 +36,10 @@ function row(overrides: Partial<CharacterCsvRow> = {}): CharacterCsvRow {
     alertCount: 3,
     starred: true,
     spFarm: true,
+    whereabouts: {
+      place: { systemName: 'Jita', dockedKind: 'station', dockedName: 'Jita IV - Moon 4' },
+      shipName: 'Rifter',
+    },
     ...overrides,
   } as CharacterCsvRow;
 }
@@ -45,6 +49,11 @@ function build(options: Partial<Parameters<typeof charactersCsvColumns>[1]> = {}
     groupNameById: new Map([['g1', 'Mains']]),
     spExtractionEnabled: true,
     spExtractionThresholdSp: 5_500_000,
+    extractionNet: 100,
+    achievements: {
+      partsOf: () => ({ title: 'Veteran', score: 1200 }),
+      scoreOf: () => 1200,
+    },
     lastSynced: () => new Date('2026-09-29T11:00:00Z'),
     now: () => NOW,
     ...options,
@@ -60,9 +69,15 @@ describe('charactersCsvColumns', () => {
     expect(build().map((c) => c.header)).toEqual([
       'characters.column.name',
       'characters.column.corp',
+      'characters.csvAchievementTitle',
+      'characters.csvAchievementScore',
       'characters.column.group',
       'characters.column.spTotal',
       'characters.column.wallet',
+      'characters.csvDockedAt',
+      'characters.csvSystem',
+      'characters.csvPlaceKind',
+      'characters.column.ship',
       'characters.column.lastSynced',
       'characters.column.training',
       'characters.csvTrainingFinishes',
@@ -73,6 +88,7 @@ describe('charactersCsvColumns', () => {
       'characters.csvPiExpires',
       'characters.column.spFarm',
       'characters.column.spReady',
+      'characters.csvSpReadyValue',
       'characters.column.alerts',
       'characters.column.starred',
     ]);
@@ -156,6 +172,31 @@ describe('charactersCsvColumns', () => {
       })
     );
     expect(values['characters.column.pi']).toBe('pi.attention.idle');
+  });
+
+  it('carries achievement, whereabouts and the extraction value', () => {
+    expect(valuesOf(row())).toMatchObject({
+      'characters.csvAchievementTitle': 'Veteran',
+      'characters.csvAchievementScore': 1200,
+      'characters.csvDockedAt': 'Jita IV - Moon 4',
+      'characters.csvSystem': 'Jita',
+      'characters.csvPlaceKind': 'characters.csvPlaceStation',
+      'characters.column.ship': 'Rifter',
+      // 52M SP fills 94 extractors at 100 net each.
+      'characters.csvSpReadyValue': 9400,
+    });
+    const inSpace = valuesOf(
+      row({
+        whereabouts: {
+          place: { systemName: 'Amarr', dockedKind: null, dockedName: null },
+          shipName: null,
+        },
+      })
+    );
+    expect(inSpace['characters.csvDockedAt']).toBeUndefined();
+    expect(inSpace['characters.csvPlaceKind']).toBe('characters.inSpace');
+    expect(valuesOf(row({ whereabouts: undefined }))['characters.csvSystem']).toBeUndefined();
+    expect(valuesOf(row(), { extractionNet: null })['characters.csvSpReadyValue']).toBeNull();
   });
 
   it('marks SP ready only past the extraction threshold', () => {

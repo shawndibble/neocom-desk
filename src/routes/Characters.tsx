@@ -214,10 +214,10 @@ export function Characters() {
     whereabouts,
   });
 
-  // One batched read for the roster: every card's line, or the table's column while it shows.
+  // One batched read for the roster (public records): the cards' line, the table's column and
+  // the export, which carries title and score whatever the Columns picker shows.
   const achievements = useCharacterAchievements(
-    useMemo(() => (characters ?? []).map((character) => character.characterId), [characters]),
-    viewMode === 'card' || activeColumnIds.includes('achievement')
+    useMemo(() => (characters ?? []).map((character) => character.characterId), [characters])
   );
 
   // Not `useMemo`: `handleToggleStar` below closes over `starred`/`setStarred`
@@ -296,9 +296,11 @@ export function Characters() {
         groupNameById: new Map(groupList.map((group) => [group.id, group.name])),
         spExtractionEnabled,
         spExtractionThresholdSp: spExtractionThreshold,
+        extractionNet: extractionPrices.net,
+        achievements,
         lastSynced: (row) => characterLastSynced(row.stats, row.queue),
       }),
-    [t, groupList, spExtractionEnabled, spExtractionThreshold]
+    [t, groupList, spExtractionEnabled, spExtractionThreshold, extractionPrices.net, achievements]
   );
   const charactersExport = useTableExport({
     surface: 'characters',
@@ -425,11 +427,11 @@ export function Characters() {
                 className="min-w-40 flex-1"
               />
             }
-            // Card view has no columns to pick or table to export, so these
-            // only exist alongside the table they act on.
+            // The column picker only acts on the table; the export holds every
+            // column and the same rows in either view.
             actions={
-              viewMode === 'table' ? (
-                <>
+              <>
+                {viewMode === 'table' && (
                   <ColumnPickerMenu
                     available={availableColumnIds}
                     visible={activeColumnIds}
@@ -438,13 +440,13 @@ export function Characters() {
                     buttonLabel={t('characters.columnsButton')}
                     menuTitle={t('characters.columnsMenuTitle')}
                   />
-                  <TableActionsMenu
-                    name={t('characters.title')}
-                    tableExport={charactersExport}
-                    size="md"
-                  />
-                </>
-              ) : undefined
+                )}
+                <TableActionsMenu
+                  name={t('characters.title')}
+                  tableExport={charactersExport}
+                  size="md"
+                />
+              </>
             }
           >
             {(draft, setDraft) => (

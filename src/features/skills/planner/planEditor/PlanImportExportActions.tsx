@@ -22,12 +22,10 @@ export function PlanImportExportActions({
   container,
   imports,
   exporter,
-  scheduledCount,
 }: {
   container: HTMLElement;
   imports: ReturnType<typeof usePlanImport>;
   exporter: ReturnType<typeof usePlanExport>;
-  scheduledCount: number;
 }) {
   const { t } = useTranslation();
   const {
@@ -42,8 +40,14 @@ export function PlanImportExportActions({
     undoQueueImportReplace,
     importError,
   } = imports;
-  const { copyConfirm, exportMenuOpen, setExportMenuOpen, handleExport, handleExportCsv } =
-    exporter;
+  const {
+    copyConfirm,
+    exportMenuOpen,
+    setExportMenuOpen,
+    handleExport,
+    handleExportQueue,
+    queueRowCount,
+  } = exporter;
   return createPortal(
     <>
       <DropdownMenu open={importMenuOpen} onOpenChange={setImportMenuOpen}>
@@ -102,8 +106,23 @@ export function PlanImportExportActions({
           >
             {t('plans.exportClipboard')}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleExportCsv} disabled={scheduledCount === 0}>
+          <DropdownMenuItem
+            onSelect={() => void handleExportQueue('csv')}
+            disabled={queueRowCount === 0}
+          >
             {t('plans.exportCsvQueue')}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => void handleExportQueue('xlsx')}
+            disabled={queueRowCount === 0}
+          >
+            {t('plans.exportXlsxQueue')}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => void handleExportQueue('clipboard')}
+            disabled={queueRowCount === 0}
+          >
+            {t('plans.exportSheetsQueue')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

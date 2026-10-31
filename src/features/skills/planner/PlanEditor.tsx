@@ -216,7 +216,9 @@ export function PlanEditor({
     onUpdate,
   });
   const exporter = usePlanExport({
-    scheduled,
+    schedule,
+    entries: plan.entries,
+    trainedSkills,
     engineSkills: catalog.engineSkills,
     nameFor,
     userSkillTypeIDs,
@@ -358,7 +360,6 @@ export function PlanEditor({
           container={headerActionsContainer}
           imports={imports}
           exporter={exporter}
-          scheduledCount={scheduled.length}
         />
       )}
 

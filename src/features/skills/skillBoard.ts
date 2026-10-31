@@ -100,21 +100,25 @@ export function buildSkillBoard({
   return groups.sort((a, b) => a.groupName.localeCompare(b.groupName));
 }
 
-/** The board's trained skills in the CSV's `SkillGroup` shape; groups with none are dropped. */
+/**
+ * Every skill the board lists in the CSV's `SkillGroup` shape, trained or not:
+ * the board shows the whole catalog, so the file does too, with `injected`
+ * telling an owned skill from a book still to buy.
+ */
 export function boardCsvGroups(groups: readonly BoardGroup[]): SkillGroup[] {
   return groups
     .map((group) => ({
       groupName: group.groupName,
-      skills: group.skills
-        .filter((skill) => skill.injected)
-        .map((skill) => ({
-          skillTypeID: skill.skillTypeID,
-          name: skill.name,
-          level: skill.level,
-          sp: skill.sp,
-          description: skill.description,
-          rank: skill.rank,
-        })),
+      skills: group.skills.map((skill) => ({
+        skillTypeID: skill.skillTypeID,
+        name: skill.name,
+        level: skill.level,
+        sp: skill.sp,
+        description: skill.description,
+        rank: skill.rank,
+        injected: skill.injected,
+        queuedLevel: skill.queuedLevel,
+      })),
     }))
     .filter((group) => group.skills.length > 0);
 }
