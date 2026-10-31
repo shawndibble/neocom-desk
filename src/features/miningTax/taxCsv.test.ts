@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { toCsv } from '@/lib/csv';
 import type { DisplayRow } from './groupRows';
-import { taxCsvColumns, type TaxCsvContext } from './taxCsv';
+import { expandCombinedRows, taxCsvColumns, type TaxCsvContext } from './taxCsv';
 
 const t = (k: string) => k;
 
 function displayRow(overrides: Partial<DisplayRow> = {}): DisplayRow {
   return {
     key: 'a',
-    row: { characterName: 'Miner One', entry: { date: '2026-09-04', solarSystemId: 1 } },
+    row: {
+      characterName: 'Miner One',
+      entry: { date: '2026-09-04', solarSystemId: 1 },
+      unassignedOreLines: [],
+    },
     assignment: { id: 'a', payeeId: 'p', status: 'outstanding' },
     status: 'outstanding',
     ...overrides,
@@ -16,7 +20,8 @@ function displayRow(overrides: Partial<DisplayRow> = {}): DisplayRow {
 }
 
 const context: TaxCsvContext = {
-  showCharacter: true,
+  oreName: (id) => (id === 1230 ? 'Veldspar' : `#${id}`),
+  securityOf: () => 0.4,
   dateLabel: () => '2026-09-04',
   systemName: () => 'Jita',
   payeeName: () => 'Corp Tax',
@@ -30,25 +35,34 @@ describe('taxCsvColumns', () => {
       'miningTax.characterColumn',
       'miningTax.dateColumn',
       'miningTax.systemColumn',
+      'miningTax.csvSecurity',
       'miningTax.payeeColumn',
       'miningTax.labelColumn',
+      'miningTax.oreColumn',
       'miningTax.estimatedValueColumn',
       'miningTax.taxOwedColumn',
       'miningTax.statusColumn',
+      'miningTax.csvCombinedGroup',
+      'miningTax.csvTaxPct',
+      'miningTax.csvNeedsReview',
+      'miningTax.csvCorpOverlap',
+      'miningTax.csvCorrectedFrom',
     ]);
-  });
-
-  it('drops Character when the table does', () => {
-    expect(
-      taxCsvColumns(t, { ...context, showCharacter: false }).map((c) => c.header)
-    ).not.toContain('miningTax.characterColumn');
   });
 
   it('exports raw ISK numbers and the translated status', () => {
     const values = taxCsvColumns(t, context).map((c) =>
       c.value(
         displayRow({
-          assignment: { id: 'a', payeeId: 'p', status: 'outstanding', label: 'Athanor' },
+          assignment: {
+            id: 'a',
+            payeeId: 'p',
+            status: 'outstanding',
+            label: 'Athanor',
+            groupId: 'g1',
+            taxPct: 10,
+            oreLines: [{ typeId: 1230, quantity: 500 }],
+          },
         } as unknown as Partial<DisplayRow>)
       )
     );
@@ -56,21 +70,52 @@ describe('taxCsvColumns', () => {
       'Miner One',
       '2026-09-04',
       'Jita',
+      0.4,
       'Corp Tax',
       'Athanor',
+      'Veldspar 500',
       1234567.5,
       123456.75,
       'miningTax.status.outstanding',
+      'g1',
+      10,
+      'miningTax.csvNo',
+      null,
+      null,
     ]);
   });
 
   it('blanks tax owed on a row with no Assignment, rather than the table dash', () => {
     const csv = toCsv(
       [displayRow({ assignment: null, status: 'unassigned' })],
-      taxCsvColumns(t, { ...context, showCharacter: false, taxOwed: () => null })
+      taxCsvColumns(t, { ...context, taxOwed: () => null })
     );
     expect(csv.split('\r\n')[1]).toBe(
-      '"2026-09-04","Jita","Corp Tax",,1234567.5,,"miningTax.status.unassigned"'
+      '"Miner One","2026-09-04","Jita",0.4,"Corp Tax",,,1234567.5,,"miningTax.status.unassigned",,,"miningTax.csvNo",,'
     );
+  });
+});
+
+describe('expandCombinedRows', () => {
+  const member = (id: string, date: string, status: string) => ({
+    row: { characterName: 'Miner One', entry: { date, solarSystemId: 1 } },
+    assignment: { id, groupId: 'g1', status, taxOwed: 10, oreLines: [] },
+  });
+
+  it('turns a combined row into one row per member day, keeping ordinary rows', () => {
+    const first = member('a', '2026-09-04', 'outstanding');
+    const second = member('b', '2026-09-05', 'paid');
+    const combined = displayRow({
+      key: 'a',
+      row: first.row,
+      assignment: first.assignment,
+      groupMembers: [second],
+    } as unknown as Partial<DisplayRow>);
+    const plain = displayRow({ key: 'z' });
+    const out = expandCombinedRows([combined, plain]);
+    expect(out.map((r) => r.key)).toEqual(['a', 'b', 'z']);
+    expect(out[0].groupMembers).toBeUndefined();
+    expect(out[1].status).toBe('paid');
+    expect(out[1].row.entry.date).toBe('2026-09-05');
   });
 });

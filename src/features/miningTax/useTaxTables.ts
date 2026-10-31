@@ -5,7 +5,7 @@ import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useUrlSort } from '@/lib/useUrlState';
 import type { DisplayRow } from '@/features/miningTax/groupRows';
 import { statusColumnWidthClass } from '@/features/miningTax/statusColumnWidth';
-import { taxCsvColumns } from '@/features/miningTax/taxCsv';
+import { expandCombinedRows, taxCsvColumns } from '@/features/miningTax/taxCsv';
 import { dateLabel, taxOwedOf } from '@/features/miningTax/taxRowFormat';
 import { statusLabel, useTaxColumns } from '@/features/miningTax/useTaxColumns';
 import { TAX_COLUMN_IDS, useVisibleTaxColumns } from './taxColumns';
@@ -91,7 +91,8 @@ export function useTaxTables({
   const csvColumns = useMemo(
     () =>
       taxCsvColumns(t, {
-        showCharacter: showCharacterColumn,
+        oreName: (typeId) => columnInput.typeNames?.get(typeId) ?? `#${typeId}`,
+        securityOf: (dr) => columnInput.systemSecurity?.get(dr.row.entry.solarSystemId),
         dateLabel,
         systemName,
         payeeName: (dr) => (dr.assignment ? payeeDisplayName(dr) : null),
@@ -102,11 +103,21 @@ export function useTaxTables({
             : null,
         statusLabel: (dr) => (dr.corp ? corpStateLabel(dr.corp) : undefined),
       }),
-    [t, showCharacterColumn, systemName, payeeDisplayName, estimatedValueOf, corpStateLabel]
+    [
+      t,
+      columnInput.typeNames,
+      columnInput.systemSecurity,
+      systemName,
+      payeeDisplayName,
+      estimatedValueOf,
+      corpStateLabel,
+    ]
   );
+  // A combined row exports as one row per day, so no member's figures are lost.
+  const exportRows = useMemo(() => expandCombinedRows(visibleRows), [visibleRows]);
   const taxExport = useTableExport({
     surface: 'mining-tax',
-    rows: visibleRows,
+    rows: exportRows,
     columns: csvColumns,
     // Open and History are two tables; the default reads only the mounted
     // Open one, so the file would drop every settled record.
