@@ -19,17 +19,7 @@ import { commodityName, formatUnits } from '../goalPlannerFormat';
 import { piProductHref } from '../piPlanLink';
 import { ColonyLink } from './ColonyLink';
 import { endName, type PlanNames } from './format';
-
-interface LegRow {
-  key: string;
-  from: FlowEnd;
-  to: FlowEnd;
-  typeId: number;
-  name: string;
-  m3PerTrip: number;
-  /** Undefined without distances yet; null when there is no route. */
-  jumps: number | null | undefined;
-}
+import { haulingCsvColumns, routeState, type LegRow } from './planExportColumns';
 
 function EndLink({ end, names }: { end: FlowEnd; names: PlanNames }) {
   return end === 'hub' ? <>{names.hub.systemName}</> : <ColonyLink planetId={end} names={names} />;
@@ -132,7 +122,8 @@ export function Hauling({
         sortFirst: 'asc',
         sortValue: (row) => row.jumps ?? undefined,
         render: (row) => {
-          if (row.jumps === undefined) {
+          const state = routeState(row.jumps);
+          if (state === 'pending') {
             return (
               <span className="text-text-dim" title={t('piPlan.legJumpsPending')}>
                 <span aria-hidden="true">…</span>
@@ -140,7 +131,7 @@ export function Hauling({
               </span>
             );
           }
-          if (row.jumps === null) {
+          if (state === 'none') {
             return (
               <span className="text-text-dim" title={t('jumpRange.distanceUnavailable')}>
                 <span aria-hidden="true">—</span>
@@ -150,7 +141,7 @@ export function Hauling({
           }
           const to = endSystem(row.to, names);
           const from = endSystem(row.from, names);
-          if (row.jumps === 0)
+          if (state === 'sameSystem')
             return <span className="text-text-dim">{t('piPlan.legSameSystem')}</span>;
           return to === undefined ? (
             String(row.jumps)
@@ -164,16 +155,11 @@ export function Hauling({
     ],
     [t, names]
   );
+  const haulCsv = useMemo(() => haulingCsvColumns(t, names), [t, names]);
   const tableExport = useTableExport({
     surface: 'pi-plan-hauling',
     rows,
-    columns: [
-      { header: t('piPlan.legFromCsv'), value: (row) => endName(row.from, names) },
-      { header: t('piPlan.legToCsv'), value: (row) => endName(row.to, names) },
-      { header: t('piPlan.legItem'), value: (row) => row.name },
-      { header: t('piPlan.legM3'), value: (row) => Math.round(row.m3PerTrip * 10) / 10 },
-      { header: t('piPlan.legJumps'), value: (row) => row.jumps ?? '' },
-    ],
+    columns: haulCsv,
   });
   const perColony = [...hauling.perColony]
     .map(([planetId, m3]) => ({ planetId, ...m3 }))

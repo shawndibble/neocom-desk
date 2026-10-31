@@ -56,6 +56,7 @@ export type CsvSurface =
   | 'build-plan-compare'
   | 'build-plan-runs'
   | 'industry-opportunities'
+  | 'industry-job-history'
   | 'industry-owned-blueprints'
   | 'market-wide-opportunities'
   | 'production-log-items'

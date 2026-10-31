@@ -4,6 +4,8 @@ import type { MoonMiningTaxRow } from './snapshot';
 import {
   allMembers,
   buildSettleUpReason,
+  expandCombinedRows,
+  type DisplayRow,
   flatten,
   SETTLE_UP_REASON_MAX_LENGTH,
   worstStatus,
@@ -147,5 +149,34 @@ describe('buildSettleUpReason', () => {
 
   it('returns just the prefix for no dates', () => {
     expect(buildSettleUpReason('Moon tax', [], [])).toBe('Moon tax');
+  });
+});
+
+describe('expandCombinedRows', () => {
+  const member = (id: string, date: string, status: string) => ({
+    row: { characterName: 'Miner One', entry: { date, solarSystemId: 1 } },
+    assignment: { id, groupId: 'g1', status, taxOwed: 10, oreLines: [] },
+  });
+
+  it('turns a combined row into one row per member day, keeping ordinary rows', () => {
+    const first = member('a', '2026-09-04', 'outstanding');
+    const second = member('b', '2026-09-05', 'paid');
+    const combined = {
+      key: 'a',
+      row: first.row,
+      assignment: first.assignment,
+      groupMembers: [second],
+    } as unknown as DisplayRow;
+    const plain = {
+      key: 'z',
+      row: first.row,
+      assignment: null,
+      status: 'unassigned',
+    } as unknown as DisplayRow;
+    const out = expandCombinedRows([combined, plain]);
+    expect(out.map((r) => r.key)).toEqual(['a', 'b', 'z']);
+    expect(out[0].groupMembers).toBeUndefined();
+    expect(out[1].status).toBe('paid');
+    expect(out[1].row.entry.date).toBe('2026-09-05');
   });
 });

@@ -1,18 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { toCsv } from '@/lib/csv';
-import type { IndustryJob } from '@/esi/endpoints';
-import { jobsCsvColumns } from './jobsCsv';
+import type { JobRow } from './activeJobColumns';
+import { jobHistoryCsvColumns, jobsCsvColumns } from './jobsCsv';
 
 const t = (k: string) => k;
 const nameFor = (typeID: number) => `Item ${typeID}`;
 
-function job(overrides: Partial<IndustryJob> = {}): IndustryJob {
+function job(overrides: Partial<JobRow> = {}): JobRow {
   return {
+    characterId: 1,
+    characterName: '',
+    owner: 'personal',
     job_id: 1,
     activity_id: 1,
     blueprint_type_id: 100,
-    facility_id: 60003760,
-    station_id: 60003760,
     runs: 5,
     start_date: '2026-08-29T12:00:00Z',
     end_date: '2026-08-30T12:00:00Z',
@@ -33,6 +34,10 @@ describe('jobsCsvColumns', () => {
       'industry.csvJobEnd',
       'industry.csvJobCostIsk',
       'industry.csvJobStatus',
+      'industry.csvJobState',
+      'industry.csvJobProduct',
+      'industry.csvCharacter',
+      'industry.csvJobOwner',
     ]);
   });
 
@@ -113,5 +118,67 @@ describe('jobsCsvColumns', () => {
     const columns = jobsCsvColumns(t, nameFor);
     const costColumn = columns.find((c) => c.header === 'industry.csvJobCostIsk')!;
     expect(costColumn.value(job({ cost: 12345.5 }))).toBe(12345.5);
+  });
+});
+
+describe('jobsCsvColumns character and owner', () => {
+  it('exports the product, installer and owner of a corp job', () => {
+    const columns = jobsCsvColumns(t, nameFor);
+    const row = {
+      ...job({ product_type_id: 77 }),
+      characterName: 'Pilot',
+      owner: 'corporation' as const,
+    };
+    expect(columns.slice(9).map((c) => c.value(row))).toEqual([
+      'Item 77',
+      'Pilot',
+      'industry.csvJobOwnerCorporation',
+    ]);
+  });
+
+  it('leaves product and installer blank on a bare job', () => {
+    const columns = jobsCsvColumns(t, nameFor);
+    expect(columns.slice(9).map((c) => c.value(job()))).toEqual([
+      null,
+      null,
+      'industry.csvJobOwnerPersonal',
+    ]);
+  });
+});
+
+describe('jobHistoryCsvColumns', () => {
+  const states = new Map([[1, { kind: 'logged' as const, buildPlanId: 'p1', runId: 'r1' }]]);
+  const columns = jobHistoryCsvColumns(t, nameFor, states, new Set([2]));
+  const logged = (id: number) => ({
+    ...job({ job_id: id, product_type_id: 5 }),
+    owner: 'personal' as const,
+  });
+
+  it('labels the end date as the delivery and appends the log state', () => {
+    const headers = columns.map((c) => c.header);
+    expect(headers).not.toContain('industry.csvJobEnd');
+    expect(headers).toContain('industry.historyColDelivered');
+    expect(headers.slice(-2)).toEqual(['industry.csvJobLogState', 'industry.csvJobLoggedPlanId']);
+  });
+
+  it('reports logged, dismissed and not-logged deliveries', () => {
+    const state = (id: number) => columns.at(-2)!.value(logged(id));
+    expect(state(1)).toBe('industry.historyLogged');
+    expect(state(2)).toBe('industry.historyDismissed');
+    expect(state(3)).toBe('industry.csvJobNotLogged');
+    expect(columns.at(-1)!.value(logged(1))).toBe('p1');
+    expect(columns.at(-1)!.value(logged(3))).toBeNull();
+  });
+});
+
+describe('jobsCsvColumns State', () => {
+  const at = Date.parse('2026-08-30T11:30:00Z');
+  const columns = jobsCsvColumns(t, nameFor, { now: () => at });
+  const state = (end: string) => columns[8].value(job({ end_date: end }));
+
+  it('reads Completing soon, Done or blank off the clock, beside ESI status', () => {
+    expect(state('2026-08-30T12:00:00Z')).toBe('industry.jobsCompletingSoon');
+    expect(state('2026-08-30T11:00:00Z')).toBe('industry.jobsDone');
+    expect(state('2026-08-31T12:00:00Z')).toBeNull();
   });
 });

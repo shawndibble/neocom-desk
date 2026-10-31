@@ -1,28 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import type { MarketWideDayRow } from './marketWideOpportunities';
+import { marketWideDayRow, opportunityRow } from './exportFixtures.testutil';
 import type { OpportunityRow } from './opportunities';
 import { marketWideOpportunitiesCsvColumns, opportunitiesCsvColumns } from './opportunitiesCsv';
 
 const t = (k: string) => k;
 
 function opportunity(runs: number, profit: number | null): OpportunityRow {
-  return {
-    candidate: {
-      id: '1:1',
-      characterId: 1,
-      characterName: 'Pilot One',
-      blueprint: { runs },
-      catalogEntry: { productName: 'Rifter', blueprint: { products: [{ quantity: 1 }] } },
-    },
+  const base = opportunityRow();
+  return opportunityRow({
+    candidate: { ...base.candidate, blueprint: { ...base.candidate.blueprint, runs } },
     result: {
       profit,
+      totalCost: 100,
+      revenue: 150,
       marginPct: profit === null ? null : 10,
       seconds: 7200,
       iskPerHour: profit,
-      materials: [{ ownedQuantity: 5, remainingQuantity: 5, unitPrice: 10, lineCost: 50 }],
+      materials: [
+        {
+          typeID: 34,
+          baseQuantity: 10,
+          quantity: 10,
+          ownedQuantity: 5,
+          remainingQuantity: 5,
+          unitPrice: 10,
+          lineCost: 50,
+          unpriced: false,
+        },
+      ],
     },
-    orderDepth: 'thin',
-  } as unknown as OpportunityRow;
+  });
 }
 
 describe('opportunitiesCsvColumns', () => {
@@ -42,6 +49,13 @@ describe('opportunitiesCsvColumns', () => {
       'industry.csvTimeSeconds',
       'industry.iskPerHour',
       'industry.opportunitiesOrderDepthLabel',
+      'industry.csvProfit',
+      'industry.csvTotalCost',
+      'industry.csvRevenue',
+      'industry.csvForgoneSale',
+      'industry.csvSkillGated',
+      'industry.csvMissingSkills',
+      'industry.csvClosestCharacter',
     ]);
   });
 
@@ -59,7 +73,48 @@ describe('opportunitiesCsvColumns', () => {
       7200,
       1000,
       'industry.opportunitiesOrderDepth.thin',
+      1000,
+      100,
+      150,
+      0,
+      null,
+      null,
+      null,
     ]);
+  });
+
+  it('exports the loss-tooltip figures and the skill gate verdict', () => {
+    const gated = opportunitiesCsvColumns(t, {
+      verdictFor: () => ({
+        gated: true,
+        shortfall: [{ typeID: 3380, haveLevel: 2, needLevel: 4 }],
+        bestCharacterId: 7,
+      }),
+      nameForSkill: () => 'Industry',
+      nameForCharacter: () => 'Pilot Two',
+    });
+    const base = opportunity(5, -500);
+    const row = {
+      ...base,
+      forgoneSale: 120,
+      result: { ...base.result, totalCost: 900, revenue: 400 },
+    };
+    expect(gated.slice(12).map((c) => c.value(row))).toEqual([
+      -500,
+      900,
+      400,
+      120,
+      'common.exportFlagYes',
+      'Industry IV (industry.csvHaveLevel)',
+      'Pilot Two',
+    ]);
+  });
+
+  it('blanks Total cost while a material is unpriced, since it is only a floor', () => {
+    const base = opportunity(5, null);
+    const unpriced = { ...base, result: { ...base.result, unpriceable: true } };
+    expect(columns[13].value(unpriced)).toBeNull();
+    expect(columns[13].value(base)).toBe(100);
   });
 
   it('leaves a BPO runs cell and unpriced figures blank', () => {
@@ -75,18 +130,7 @@ describe('opportunitiesCsvColumns', () => {
 
 describe('marketWideOpportunitiesCsvColumns', () => {
   const columns = marketWideOpportunitiesCsvColumns(t);
-  const row = {
-    productTypeID: 587,
-    productName: 'Rifter',
-    blueprintSource: 'market',
-    marginPct: 62.5,
-    seconds: 3600,
-    iskPerHour: null,
-    iskPerDay: 48_000,
-    vs90d: 35.4,
-    buildCost: 1_500_000,
-    orderDepth: 'deep',
-  } as unknown as MarketWideDayRow;
+  const row = marketWideDayRow();
 
   it('orders columns as the table does', () => {
     expect(columns.map((c) => c.header)).toEqual([
@@ -99,6 +143,10 @@ describe('marketWideOpportunitiesCsvColumns', () => {
       'industry.iskPerDay',
       'industry.buildCost',
       'industry.opportunitiesOrderDepthLabel',
+      'industry.csvPriceCapped',
+      'industry.csvSkillGated',
+      'industry.csvMissingSkills',
+      'industry.csvClosestCharacter',
     ]);
   });
 
@@ -113,6 +161,10 @@ describe('marketWideOpportunitiesCsvColumns', () => {
       48_000,
       1_500_000,
       'industry.opportunitiesOrderDepth.deep',
+      'common.exportFlagNo',
+      null,
+      null,
+      null,
     ]);
   });
 });

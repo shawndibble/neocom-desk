@@ -4,6 +4,7 @@
  * `downloadWorkbook`.
  */
 import type { CsvTranslate } from '@/lib/csv';
+import { exportFlag } from '@/lib/exportFlag';
 import {
   isoTime,
   joined,
@@ -14,6 +15,7 @@ import {
   type SheetColumns,
 } from '@/lib/exportSheets';
 import type { AnyXlsxSheet } from '@/lib/xlsx';
+import { groupTypeIds } from './doctrineDiff';
 import type { SrpAuditEntry, SrpClaim } from '../srpClaimTypes';
 import type { DoctrineFit, HullRule, SrpClaimBasis, SrpSettings } from '../srpTypes';
 
@@ -39,10 +41,12 @@ const sheet = <T>(t: CsvTranslate, name: string, rows: readonly T[], columns: Sh
   sheetFrom(t, PREFIX, name, rows, columns);
 
 /** `2x Name; 1x Name`, in the order each type first appears. */
-function counted(typeIds: readonly number[], names: SrpExportNames): string {
-  const counts = new Map<number, number>();
-  for (const id of typeIds) counts.set(id, (counts.get(id) ?? 0) + 1);
-  return joined([...counts].map(([id, n]) => `${n}x ${names.type(id)}`));
+const counted = (typeIds: readonly number[], names: SrpExportNames): string =>
+  joined(groupTypeIds(typeIds).map(({ typeId, count }) => `${count}x ${names.type(typeId)}`));
+
+/** A Doctrine diff's side as counted types; blank when the claim has none (not checked, or a clean match). */
+function diffText(typeIds: readonly number[] | undefined, names: SrpExportNames): string | null {
+  return typeIds && typeIds.length > 0 ? counted(typeIds, names) : null;
 }
 
 function basisText(basis: SrpClaimBasis | null, t: CsvTranslate): string | null {
@@ -57,8 +61,6 @@ function settingsRows(
   t: CsvTranslate
 ): SettingRow[] {
   if (!s) return [[t('srp.export.setting.enabled'), t('srp.export.never')]];
-  const yes = t('srp.export.yes');
-  const no = t('srp.export.no');
   const label = (key: string, options?: Record<string, unknown>) =>
     t(`srp.export.setting.${key}`, options);
   const fitName = new Map(doctrines.map((d) => [d.id, d.name]));
@@ -82,11 +84,11 @@ function settingsRows(
     return rows;
   };
   return [
-    [label('enabled'), s.enabled ? yes : no],
+    [label('enabled'), exportFlag(t, s.enabled)],
     [label('killmailPct'), s.killmailPct],
     [label('appraisalPct'), s.appraisalPct],
     [label('windowDays'), s.windowDays],
-    [label('requireFleetOrFc'), s.requireFleetOrFc ? yes : no],
+    [label('requireFleetOrFc'), exportFlag(t, s.requireFleetOrFc)],
     [label('ownerId'), s.ownerCharacterId],
     [label('createdById'), s.createdBy],
     [label('createdAt'), isoTime(s.createdAt)],
@@ -111,6 +113,7 @@ export function srpExportSheets(
       [...input.claims].sort((a, b) => a.filedAt - b.filedAt || a.killmailId - b.killmailId),
       [
         ['killmailId', (c) => c.killmailId],
+        ['killmailHash', (c) => c.killmailHash],
         ['state', (c) => t(`srp.export.state.${c.state}`)],
         ['pilot', (c) => c.characterName],
         ['pilotId', (c) => c.characterId],
@@ -132,8 +135,17 @@ export function srpExportSheets(
           (c) => t(`srp.export.doctrine.${c.doctrineCheck?.status ?? 'not-checked'}`),
         ],
         ['doctrineFit', (c) => c.doctrineCheck?.doctrineName],
+        ['missingModules', (c) => diffText(c.doctrineCheck?.diff?.missingModules, names)],
+        ['extraModules', (c) => diffText(c.doctrineCheck?.diff?.extraModules, names)],
+        ['missingRigs', (c) => diffText(c.doctrineCheck?.diff?.missingRigs, names)],
+        ['extraRigs', (c) => diffText(c.doctrineCheck?.diff?.extraRigs, names)],
+        [
+          'amountSource',
+          (c) => (c.amountSource ? t(`srp.export.amountSource.${c.amountSource}`) : null),
+        ],
         ['overrideReason', (c) => c.overrideReason],
         ['overrideBy', (c) => c.overrideByName],
+        ['overrideAt', (c) => isoTime(c.overrideAt)],
         ['decided', (c) => isoTime(c.decidedAt)],
         ['decidedBy', (c) => c.decidedByName],
         ['rejectionReason', (c) => c.rejectionReason ?? c.previousRejectionReason],

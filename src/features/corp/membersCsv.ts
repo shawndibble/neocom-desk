@@ -1,13 +1,15 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
+import { exportFlag } from '@/lib/exportFlag';
 import { label } from '@/engine/corp/members';
 import type { RosterRow } from './CorpRoster';
+import { rolesText } from './roles';
 
 /**
- * CSV columns for the corp members roster export (issue #421): member, last
- * seen, ship, location, joined — the table's own columns, in the table's own
- * order. `lastSeenMs`/`startMs` pass through as epoch ms rather than the
- * table's localized span/date string: the export is data, not a screenshot
- * of the rendering.
+ * CSV columns for the corp members roster export: member, last seen, ship,
+ * location, joined and roles in the table's order, plus the CEO, you and dark
+ * tags the member cell carries. `lastSeenMs`/`startMs` pass through as epoch
+ * ms rather than the table's localized strings: the export is data, not a
+ * screenshot of the rendering.
  *
  * The member column reuses the table's own `label()` — `characterId` is
  * never null, so it always degrades to `#id` rather than `label()`'s DASH
@@ -36,6 +38,23 @@ export function membersCsvColumns(t: CsvTranslate): CsvColumn<RosterRow>[] {
     {
       header: t('corp.members.columnJoined'),
       value: (row) => row.startMs,
+    },
+    {
+      header: t('corp.members.columnRoles'),
+      value: (row) => rolesText(row.roles),
+    },
+    // The member cell's tags, as columns a spreadsheet can filter on.
+    {
+      header: t('corp.members.csvCeo'),
+      value: (row) => exportFlag(t, row.isCeo),
+    },
+    {
+      header: t('corp.members.csvYou'),
+      value: (row) => exportFlag(t, row.isSelf),
+    },
+    {
+      header: t('corp.members.csvDark'),
+      value: (row) => exportFlag(t, row.standing.isDark),
     },
   ];
 }

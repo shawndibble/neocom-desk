@@ -503,13 +503,13 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   const csvColumns = useMemo(
     () =>
       yieldOverviewCsvColumns(t, {
-        showCharacter: showCharacterColumn,
         showRefining: refining,
         systemNames: data?.systemNames ?? new Map(),
+        systemSecurity: data?.systemSecurity ?? new Map(),
         typeNames: data?.typeNames ?? new Map(),
         typeVolumes: data?.typeVolumes ?? new Map(),
       }),
-    [t, showCharacterColumn, refining, data]
+    [t, refining, data]
   );
   const overviewExport = useTableExport({
     surface: 'mining-overview',
