@@ -14,14 +14,11 @@ import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { permissionsForEndpoints, type EsiEndpointId, type ScopeGroup } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
 import { setWaypointsInGame } from './sendWaypoints';
-
-const ENDPOINTS: readonly EsiEndpointId[] = ['postAutopilotWaypoint'];
-
-const MISSING_GROUPS: readonly ScopeGroup[] = permissionsForEndpoints(ENDPOINTS);
+import type { ScopeGroup } from '@/esi/registry';
+import { WAYPOINT_ENDPOINTS, WAYPOINT_GROUPS, waypointOutcome } from './waypointOutcome';
 
 type SetDestinationOutcome = { tone: 'status' | 'alert'; text: ReactNode } | null;
 
@@ -41,7 +38,7 @@ interface SetDestination {
 export function useSetDestination(locationId: number, placeName: string): SetDestination {
   const { t } = useTranslation();
   const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
-  const lacksScope = useCharacterLacksEndpoints(characterId, ENDPOINTS);
+  const lacksScope = useCharacterLacksEndpoints(characterId, WAYPOINT_ENDPOINTS);
   const online = useOnline();
   const [sending, setSending] = useState(false);
   const [outcome, setOutcome] = useState<SetDestinationOutcome>(null);
@@ -52,7 +49,7 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
     characterId === null ? (
       t('travel.waypoints.needCharacter')
     ) : lacksScope ? (
-      <GrantMissingLink groups={MISSING_GROUPS} />
+      <GrantMissingLink groups={WAYPOINT_GROUPS} />
     ) : !online ? (
       t('common.needsConnection')
     ) : null;
@@ -62,28 +59,7 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
     setSending(true);
     setOutcome(null);
     try {
-      const result = await setWaypointsInGame(id, [locationId]);
-      if (result.ok) {
-        setOutcome({ tone: 'status', text: t('market.orderDetail.destinationSet', { placeName }) });
-      } else if (result.offline) {
-        setOutcome({
-          tone: 'alert',
-          text: result.unconfirmed
-            ? t('travel.waypoints.unconfirmed')
-            : t('travel.waypoints.offline'),
-        });
-      } else {
-        setOutcome({
-          tone: 'alert',
-          text: result.needsPermission ? (
-            <GrantMissingLink groups={MISSING_GROUPS} />
-          ) : (
-            t('travel.waypoints.failed', {
-              message: result.message ?? t('travel.waypoints.unknownError'),
-            })
-          ),
-        });
-      }
+      setOutcome(waypointOutcome(await setWaypointsInGame(id, [locationId]), placeName, t));
     } finally {
       inFlight.current = false;
       setSending(false);
@@ -93,7 +69,7 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
   return {
     blockedReason,
     offline: characterId !== null && !lacksScope && !online,
-    missingGroups: lacksScope && characterId !== null ? MISSING_GROUPS : [],
+    missingGroups: lacksScope && characterId !== null ? WAYPOINT_GROUPS : [],
     sending,
     outcome,
     send: () => {

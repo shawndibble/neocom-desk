@@ -73,13 +73,21 @@ const LOCKED = new Set(['/assets']);
 vi.mock('@/app/useGrantedScopes', () => ({
   useGrantedScopes: () => undefined,
   useLockedRoutes: () => LOCKED,
+  useCharacterLacksEndpoints: () => false,
 }));
 vi.mock('@/features/corp/useCorpNavVisible', () => ({ useCorpNavVisible: () => false }));
 vi.mock('@/features/corp/useCorpAccess', () => ({
   useCorpAccess: () => ({ state: 'none', capabilities: NO_CORP_CAPABILITIES }),
 }));
 const loadLpCorporations = vi.hoisted(() => vi.fn());
-vi.mock('@/sde/loadMarketSde', () => ({ loadLpCorporations }));
+const loadSolarSystems = vi.hoisted(() => vi.fn());
+const setWaypointsInGame = vi.hoisted(() => vi.fn());
+vi.mock('@/features/travel/sendWaypoints', () => ({ setWaypointsInGame }));
+vi.mock('@/sde/loadMarketSde', () => ({
+  loadLpCorporations,
+  loadSolarSystems,
+  loadNpcStations: () => Promise.resolve([]),
+}));
 const loadShipTree = vi.hoisted(() => vi.fn());
 vi.mock('@/sde/loadSde', () => ({ loadShipTree }));
 const beginAddCharacterLogin = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
@@ -118,6 +126,10 @@ beforeEach(async () => {
   await useActiveCharacter.getState().setActiveCharacter(1);
   await db.esiCache.clear();
   loadShipTree.mockResolvedValue(SHIP_TREE);
+  loadSolarSystems.mockResolvedValue([
+    { id: 30000142, name: 'Jita', security: 0.9, regionId: 10000002 },
+  ]);
+  setWaypointsInGame.mockResolvedValue({ ok: true, set: 1 });
   loadLpCorporations.mockResolvedValue([
     { id: 1000130, name: 'Sisters of EVE' },
     { id: 1000125, name: 'CONCORD' },
@@ -256,6 +268,29 @@ describe('CommandPalette', () => {
     await user.keyboard('{Enter}');
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(screen.getByTestId('where')).toHaveTextContent('/industry/opportunities');
+  });
+
+  it('finds a solar system: Enter opens its route, Shift+Enter sets the waypoint and stays open', async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(await screen.findByRole('combobox'), 'jita');
+
+    const places = await screen.findByRole('group', { name: 'Places' });
+    expect(within(places).getByRole('option', { name: /Jita/ })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+
+    await user.keyboard('{Shift>}{Enter}{/Shift}');
+    expect(setWaypointsInGame).toHaveBeenCalledWith(1, [30000142]);
+    expect(await screen.findByText('Destination set to Jita')).toBeInTheDocument();
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+
+    await user.keyboard('{Enter}');
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent('/travel/route');
+    expect(screen.getByTestId('search')).toHaveTextContent('stops=30000142');
   });
 
   it('replaces its history entry when a result navigates, so Back returns to the page under it', async () => {

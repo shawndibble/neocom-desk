@@ -408,6 +408,15 @@ export function InteractionGrammar() {
       </Group>
 
       <Group title={k('groups.menusRows')}>
+        <Cue rule={k('rules.altAction')} note={k('notes.altAction')}>
+          <div className="flex min-h-9 w-72 items-center gap-2 rounded-xs bg-panel-2 px-2 py-1.5 text-sm text-text">
+            <span className="min-w-0 flex-1 truncate">{k('samples.altActionRow')}</span>
+            <Button size="sm">
+              {k('samples.altActionButton')}
+              <kbd className="ml-1.5 hidden text-text-dim md:inline">⇧↵</kbd>
+            </Button>
+          </div>
+        </Cue>
         <Cue rule={k('rules.rowMenu')} note={k('notes.rowMenu')}>
           <div className="w-full">
             <DataTable
