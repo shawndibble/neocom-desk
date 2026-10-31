@@ -26,6 +26,7 @@ import {
   PageHeader,
   SlideOver,
   Spinner,
+  TabPanel,
   Tabs,
   Toast,
   useTabsId,
@@ -101,7 +102,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
     return <Navigate to={tabPath(MOONS_TABS, 'moon-owners')} replace />;
   const tabs = tabBarTabs(MOONS_TABS).filter((x) => showExtractions || x.id !== 'extractions');
   return (
-    <div className="mx-auto max-w-6xl space-y-4 px-4 py-4">
+    <div className="mx-auto max-w-page space-y-4 px-4 py-4">
       {detail === null && (
         <>
           <PageHeader
@@ -159,11 +160,13 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             </p>
           )}
           <BookHealthStrip sync={sync} />
-          {tab === 'overview' && <OverviewTab showMoons={showExtractions} />}
-          {tab === 'extractions' && <ExtractionsTab />}
-          {tab === 'miners' && <MinersTab />}
-          {tab === 'statements' && <StatementsTab />}
-          {tab === 'moon-owners' && <MoonOwnersTab onInvite={() => setInviteOpen(true)} />}
+          <TabPanel tabsId={tabsId} tabId={tab}>
+            {tab === 'overview' && <OverviewTab showMoons={showExtractions} />}
+            {tab === 'extractions' && <ExtractionsTab />}
+            {tab === 'miners' && <MinersTab />}
+            {tab === 'statements' && <StatementsTab />}
+            {tab === 'moon-owners' && <MoonOwnersTab onInvite={() => setInviteOpen(true)} />}
+          </TabPanel>
         </>
       )}
       {detail?.kind === 'extraction' && <MoonDetail key={detail.id} id={detail.id} />}
@@ -203,7 +206,7 @@ function MoonsLoading() {
   const { t } = useTranslation();
   const bar = 'block animate-pulse rounded-xs bg-line motion-reduce:animate-none';
   return (
-    <div className="mx-auto max-w-6xl space-y-4 px-4 py-4">
+    <div className="mx-auto max-w-page space-y-4 px-4 py-4">
       <PageHeader title={t('corp.moons.title')} />
       <div
         role="status"
@@ -242,7 +245,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   if (state.status === 'loading') return <MoonsLoading />;
   if (state.status === 'failed') {
     return (
-      <div className="mx-auto max-w-6xl p-4">
+      <div className="mx-auto max-w-page p-4">
         <LoadFailedState
           title={t('corpTaxBook.moons.failed')}
           hint={t('corpTaxBook.moons.failedHint')}
@@ -254,7 +257,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   }
   if (state.status === 'denied' && state.unverified) {
     return (
-      <div className="mx-auto max-w-6xl space-y-4 p-4">
+      <div className="mx-auto max-w-page space-y-4 p-4">
         <PageHeader title={t('corp.moons.title')} />
         <LoadFailedState
           title={t('corpTaxBook.moons.unverified.title')}
@@ -266,7 +269,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   }
   if (state.status === 'denied') {
     return (
-      <div className="mx-auto max-w-6xl space-y-4 p-4">
+      <div className="mx-auto max-w-page space-y-4 p-4">
         <PageHeader title={t('corp.moons.title')} />
         <EmptyState
           title={t('corp.moons.noAccessTitle')}
@@ -277,7 +280,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   }
   if (state.status === 'off' && book.characterId !== null && book.corporationId !== null) {
     return (
-      <div className="mx-auto max-w-6xl space-y-4 p-4">
+      <div className="mx-auto max-w-page space-y-4 p-4">
         <PageHeader title={t('corp.moons.title')} />
         <MoonsSetup
           characterId={book.characterId}
@@ -294,7 +297,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   // Only a corporation with a book syncs it: a moon owner never needs the mining scope here.
   if (needsScope) {
     return (
-      <div className="mx-auto max-w-6xl space-y-4 p-4">
+      <div className="mx-auto max-w-page space-y-4 p-4">
         <PageHeader title={t('corp.moons.title')} />
         <EmptyState
           title={t('corpTaxBook.moons.scope.title')}
@@ -333,7 +336,7 @@ export function CorpMoons() {
   if (access.state === 'unknown') return <MoonsLoading />;
   if (access.state !== 'ready') {
     return (
-      <div className="mx-auto max-w-6xl space-y-4 p-4">
+      <div className="mx-auto max-w-page space-y-4 p-4">
         <PageHeader title={t('corp.moons.title')} />
         <CorpDenied
           reason={access.state === 'none' ? 'none' : access.state}
@@ -346,7 +349,7 @@ export function CorpMoons() {
   const viewer = canViewCorpTaxBook(access.roles);
   if (!viewer && (ledger.state === 'unavailable' || ledger.state === 'unknown')) {
     return (
-      <div className="mx-auto max-w-6xl space-y-4 p-4">
+      <div className="mx-auto max-w-page space-y-4 p-4">
         <PageHeader title={t('corp.moons.title')} />
         <EmptyState title={t('corp.moons.noAccessTitle')} hint={t('corp.moons.noAccessHint')} />
       </div>

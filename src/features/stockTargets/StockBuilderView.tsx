@@ -15,7 +15,7 @@ import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import { db } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { runsToCover, timePerRunAtTe } from '@/engine/stockTargets/builder';
-import { splitForBuilders, type StockRow } from '@/engine/stockTargets/stockRows';
+import { splitForBuilders, stockStatusRank, type StockRow } from '@/engine/stockTargets/stockRows';
 import { useAssumedMe } from '@/features/industry/assumedMe';
 import { useAssumedTe } from '@/features/industry/assumedTe';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
@@ -246,6 +246,9 @@ export function StockBuilderView({
       headerCellClassName: 'sm:w-24',
       cardCorner: true,
       render: (row) => <StockStatusPill status={row.status} />,
+      // Worst first, as the Manager's.
+      sortValue: (row) => stockStatusRank(row.status),
+      sortFirst: 'asc',
     },
   ];
 

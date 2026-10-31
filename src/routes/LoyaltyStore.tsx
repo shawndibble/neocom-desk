@@ -63,7 +63,7 @@ import { resolveLoyaltyRowItem } from '@/features/loyalty/offerRowDisplay';
 import { LoyaltyStoreLanding } from '@/features/loyalty/LoyaltyStoreLanding';
 import { NearestStationLine } from '@/features/loyalty/NearestStationLine';
 import { LpStoreActions } from '@/features/loyalty/LpStoreChrome';
-import type { LpSearchCrumbState } from '@/features/loyalty/itemSearch';
+import type { LpSearchCrumbState } from '@/features/loyalty/lpStorePath';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
@@ -105,7 +105,7 @@ export function LoyaltyStore() {
     corporationIdParam !== undefined && Number.isInteger(corporationId) && corporationId > 0;
   return (
     <>
-      <LoyaltyStoreLanding />
+      <LoyaltyStoreLanding active={!valid} />
       {valid && <LoyaltyStoreView key={corporationId} corporationId={corporationId} />}
     </>
   );
@@ -149,6 +149,8 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     pricesUnreachable,
     useOwnMaterialsFor,
     toggleUseOwnMaterials,
+    skills,
+    standing,
   } = useLoyaltyStoreOffers(corporationId);
 
   const offersColumnVisibility = useColumnVisibility(
@@ -278,10 +280,9 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       navigate(-1);
       return;
     }
-    const q = arrivedState?.from === 'lp-search' && arrivedState.q ? arrivedState.q : null;
-    navigate(`/wallet/lp-store${q === null ? '' : `?q=${encodeURIComponent(q)}`}`, {
-      replace: true,
-    });
+    // Back to the landing view this store was opened from.
+    const search = arrivedState?.from === 'lp-search' ? arrivedState.search : undefined;
+    navigate(`/wallet/lp-store${search?.startsWith('?') ? search : ''}`, { replace: true });
   }
 
   const list = (
@@ -409,7 +410,11 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
 
   const detail = selectedRow ? (
     <OfferDetail
+      key={selectedRow.offer.offer_id}
       row={selectedRow}
+      hub={hub}
+      skills={skills}
+      standing={standing}
       catalog={catalog}
       hubId={hub.id}
       hubName={hub.name}

@@ -296,6 +296,7 @@ export function extractFittingStats(
   | 'support'
   | 'mining'
   | 'explore'
+  | 'moduleFigures'
   | 'fleetSupport'
   | 'fighters'
   | 'lockedTargets'

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import {
   Button,
+  ColumnPickerMenu,
   DataTable,
   EmptyState,
   FilterBar,
@@ -18,6 +19,7 @@ import {
   useDeferredCommits,
 } from '@/components/ui';
 import { db } from '@/db';
+import { useColumnVisibility } from '@/lib/columnVisibility';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { uidForCharacter } from '@/sync/uid';
 import {
@@ -37,6 +39,11 @@ import { jumpRangeLimit, type JumpRange } from '@/engine/route/jumpRange';
 import { useCurrentSystem } from '@/features/route/currentSystem';
 import { CurrentSystemPicker, JumpRangeSelect } from '@/features/route/JumpRangeControls';
 import { ComposeRequestDialog } from './ComposeRequestDialog';
+import {
+  REQUEST_COLUMN_IDS,
+  useVisibleRequestColumns,
+  type RequestColumnId,
+} from './requestColumns';
 import { MyPledgesPanel } from './MyPledgesPanel';
 import { PledgeBar } from './PledgeBar';
 import { RequestPanel } from './RequestPanel';
@@ -236,6 +243,13 @@ export function RequestsTab({
             unit="lines"
           />
         ),
+      // A standing Request has no lines to fill: it sinks, as a missing value does.
+      sortValue: ({ progress, request }) =>
+        request.standing || progress.lines === 0
+          ? undefined
+          : // Delivered lines first, pledged ones break the tie.
+            (progress.deliveredLines + progress.pledgedLines / (progress.lines + 1)) /
+            progress.lines,
     },
     {
       id: 'status',
@@ -259,6 +273,18 @@ export function RequestsTab({
       sortValue: ({ request }) => request.createdAt,
     },
   ];
+
+  const { visible, isVisible, toggle, reset } = useColumnVisibility(
+    useVisibleRequestColumns,
+    REQUEST_COLUMN_IDS
+  );
+  const columnsById = Object.fromEntries(columns.map((column) => [column.id, column])) as Record<
+    RequestColumnId,
+    DataTableColumn<Row>
+  >;
+  const shownColumns = columns.filter(
+    (column) => column.id === 'request' || isVisible(column.id as RequestColumnId)
+  );
 
   const reloadFailed = (
     <div className="flex flex-wrap items-center gap-2">
@@ -393,6 +419,18 @@ export function RequestsTab({
             setJumps(next.jumps);
           }}
           activeCount={(filter !== 'open' ? 1 : 0) + (shownJumps !== 'any' ? 1 : 0)}
+          actions={
+            <ColumnPickerMenu
+              available={REQUEST_COLUMN_IDS}
+              visible={visible}
+              columnsById={columnsById}
+              onToggle={toggle}
+              onReset={reset}
+              buttonLabel={t('common.columnsButton')}
+              menuTitle={t('common.columnsMenuTitle')}
+              resetLabel={t('common.resetColumns')}
+            />
+          }
           search={
             <SearchInput
               className="min-w-48 flex-1"
@@ -491,7 +529,7 @@ export function RequestsTab({
             label={t('communities.board.tableLabel')}
             rows={rows}
             rowKey={(row) => row.request.id}
-            columns={columns}
+            columns={shownColumns}
             selectedRowKey={openId}
             onRowClick={(row) => setOpenId(row.request.id)}
             stackLayout="dense"

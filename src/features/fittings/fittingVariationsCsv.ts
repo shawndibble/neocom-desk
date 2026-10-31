@@ -1,9 +1,11 @@
 import type { CsvColumn } from '@/lib/csv';
 import { formatSeconds } from '@/lib/duration';
-import { type StatChange, STAT_DIGITS } from '@/engine/fittings/variationDelta';
+import type { SwapChange } from '@/engine/fittings/swapChanges';
+import { type StatChange, FLAG_STATS, STAT_DIGITS } from '@/engine/fittings/variationDelta';
 import type { VariationRow } from './useModuleVariations';
 import { fixed0 } from '@/lib/fixedFormat';
 import type { Translate } from '@/lib/translate';
+import { flagWord } from './flagWord';
 
 function formatDelta(change: StatChange): number {
   const digits = STAT_DIGITS[change.key];
@@ -20,9 +22,21 @@ export function changeLabel(change: StatChange, t: Translate): string {
           time: formatSeconds(-change.after),
         });
   }
+  if (FLAG_STATS.has(change.key)) {
+    return t(`fittings.variations.stat.${change.key}`, {
+      value: `${flagWord(change.before, t)} → ${flagWord(change.after, t)}`,
+    });
+  }
   const delta = formatDelta(change);
   const value = delta > 0 ? `+${delta}` : `${delta}`;
   return t(`fittings.variations.stat.${change.key}`, { value });
+}
+
+/** A swap's change as the Variations table words it: a role figure reads before → after. */
+export function swapChangeLabel({ kind, change }: SwapChange, t: Translate): string {
+  return kind === 'role'
+    ? t(`fittings.whatToTrain.role.${change.key}`, { before: change.before, after: change.after })
+    : changeLabel(change, t);
 }
 
 /**
@@ -38,8 +52,8 @@ export function fittingVariationsCsvColumns(t: Translate): CsvColumn<VariationRo
       header: t('fittings.variations.changes'),
       value: (row) => {
         if (row.delta === null) return null;
-        if (row.delta.count === 0) return t('fittings.variations.noChanges');
-        return row.delta.changes.map((change) => changeLabel(change, t)).join('; ');
+        if (row.delta.length === 0) return t('fittings.variations.noChanges');
+        return row.delta.map((change) => swapChangeLabel(change, t)).join('; ');
       },
     },
     {

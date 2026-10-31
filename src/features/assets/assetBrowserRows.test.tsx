@@ -174,6 +174,7 @@ describe('blueprint badge', () => {
           href="/assets/60003760"
           characterBadge={null}
           blueprintKind="copy"
+          wrap={(children) => children}
           t={(key) => key}
         />
       </MemoryRouter>
@@ -208,6 +209,40 @@ describe('estimated value cell', () => {
     renderItemRow({ estimatedValue: 0, valueHint: 'MutaMarket has no estimate.' });
     expect(screen.getByText('MutaMarket has no estimate.')).toHaveClass('sr-only');
     expect(screen.queryByText('assets.noEstimate')).toBeNull();
+  });
+});
+
+describe('in-game names', () => {
+  it('puts the in-game name first and the type dim beneath, on an item row', () => {
+    renderItemRow({ name: 'Station Container', gameName: 'Loot can' });
+    expect(screen.getByText('Loot can')).toBeInTheDocument();
+    expect(screen.getByText('Station Container')).toHaveClass('text-text-dim');
+  });
+
+  it('reads as before when the item has no in-game name', () => {
+    renderItemRow({ name: 'Station Container' });
+    expect(screen.getByText('Station Container')).not.toHaveClass('text-text-dim');
+  });
+
+  it('names a search hit first, with the type beneath', () => {
+    render(
+      <MemoryRouter>
+        <SearchResultRow
+          name="Ferox"
+          gameName="Doctrine Ferox"
+          quantity={1}
+          estimatedValue={0}
+          trail={['Jita IV']}
+          security={0.9}
+          href="/assets/1"
+          characterBadge={null}
+          wrap={(children) => children}
+          t={(key) => key}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('Doctrine Ferox')).toHaveClass('font-medium');
+    expect(screen.getByText('Ferox')).toHaveClass('text-text-dim');
   });
 });
 

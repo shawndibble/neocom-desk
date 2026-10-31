@@ -34,7 +34,8 @@ const BADGE_URL = '/icons/badge-96.png';
 
 /** Where each event's notification lands. Falls back to `/alerts`, which redirects to the Overview's alerts panel. */
 export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
-  skillLevelComplete: '/skills/trained',
+  // The plans page, where the finished level sits above the queue.
+  skillLevelComplete: '/skills/plans',
   characterNotTraining: '/skills/trained',
   // Skill Plans, not the trained-skills read view: the fix this warning
   // prompts is queuing more steps from a plan before the queue goes idle.

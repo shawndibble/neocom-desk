@@ -22,6 +22,8 @@ import { MINUTE_MS, DAY_MS } from '@/lib/age';
 export interface CachedResult<T> {
   data: T;
   fetchedAt: Date;
+  /** ESI's own `Expires` for this copy, when stored: when ESI next updates the data. */
+  expiresAt?: Date;
   fromCache: boolean;
   /**
    * The list is missing pages. Stored on the row so it survives a cache hit —
@@ -372,6 +374,11 @@ function isRefreshInvalidated(fetchedAt: number, staleAfterMs: number, now: numb
   // fetch that landed in the same millisecond must still force the next call
   // live, not read the row it just invalidated as still-fresh.
   return fetchedAt <= freshnessInvalidatedAt && now - freshnessInvalidatedAt <= REFRESH_BYPASS_MS;
+}
+
+/** `{ expiresAt: Date }` for a stored expiry, nothing when absent (the field is optional). */
+function expiryField(ms: number | undefined): { expiresAt?: Date } {
+  return ms === undefined ? {} : { expiresAt: new Date(ms) };
 }
 
 function parseExpiresHeader(expires: string | null | undefined): number | undefined {
@@ -783,6 +790,7 @@ async function readStaleRow<T>(
   return {
     data: row.value as T,
     fetchedAt: new Date(row.fetchedAt),
+    ...expiryField(row.expiresAt),
     truncated: row.truncated === true,
     fromCache: false,
   };
@@ -910,7 +918,13 @@ async function loadWithCacheStatusLive<T>(
         ...(etag !== undefined ? { etag } : {}),
       });
       return {
-        cached: { data, fetchedAt: new Date(fetchedAt), fromCache: false, truncated: false },
+        cached: {
+          data,
+          fetchedAt: new Date(fetchedAt),
+          ...expiryField(expiresAt),
+          fromCache: false,
+          truncated: false,
+        },
         needsReauth: false,
       };
     }
@@ -936,6 +950,7 @@ async function loadWithCacheStatusLive<T>(
         cached: {
           data: cached.value as T,
           fetchedAt: new Date(cached.fetchedAt),
+          ...expiryField(cached.expiresAt),
           fromCache: true,
           truncated: cached.truncated,
         },
@@ -988,6 +1003,7 @@ async function applyNotModified<T>(
     return {
       data: row.value as T,
       fetchedAt: new Date(now),
+      ...expiryField(bumped.expiresAt),
       fromCache: false,
       truncated: row.truncated === true,
     };
@@ -1062,6 +1078,7 @@ async function readFreshRow<T>(
   return {
     data: row.value as T,
     fetchedAt: new Date(own.fetchedAt),
+    ...expiryField(own.expiresAt),
     fromCache: false,
     truncated: own.truncated === true,
   };
@@ -1241,7 +1258,13 @@ async function loadPaginatedWithCacheStatusLive<T>(
         ...(pages ? { pages, etag: pagedEtag(pages) } : {}),
       });
       return {
-        cached: { data: items, fetchedAt: new Date(fetchedAt), fromCache: false, truncated },
+        cached: {
+          data: items,
+          fetchedAt: new Date(fetchedAt),
+          ...expiryField(expiresAt),
+          fromCache: false,
+          truncated,
+        },
         needsReauth: false,
       };
     }
@@ -1249,6 +1272,7 @@ async function loadPaginatedWithCacheStatusLive<T>(
       cached: {
         data: existing.value as T[],
         fetchedAt: new Date(existing.fetchedAt),
+        ...expiryField(existing.expiresAt),
         fromCache: true,
         truncated: false,
       },
@@ -1273,6 +1297,7 @@ async function loadPaginatedWithCacheStatusLive<T>(
         cached: {
           data: cached.value as T[],
           fetchedAt: new Date(cached.fetchedAt),
+          ...expiryField(cached.expiresAt),
           fromCache: true,
           truncated: cached.truncated,
         },
@@ -1400,6 +1425,7 @@ async function revalidatePages<T>(
 interface StoredRow {
   value: unknown;
   fetchedAt: number;
+  expiresAt?: number;
   truncated: boolean;
 }
 
@@ -1430,9 +1456,11 @@ async function readStoredRow(characterId: number, key: string): Promise<StoredRo
     db.esiCacheMeta.get([characterId, key]),
   ]);
   if (!row) return undefined;
+  const expiresAt = meta?.expiresAt ?? row.expiresAt;
   return {
     value: row.value,
     fetchedAt: effectiveFetchedAt(meta, row),
+    ...(expiresAt !== undefined ? { expiresAt } : {}),
     truncated: row.truncated === true,
   };
 }

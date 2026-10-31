@@ -60,6 +60,19 @@ export function summarizeKills(kills: readonly KillRecord[], nowMs: number): Kil
   return { bySpace, recentCount };
 }
 
+/**
+ * How old a newest kill can be and still be dated: about six months, the span
+ * of the pilot's kill chart. "Last kill 390d ago" told the pilot nothing a
+ * blank does not (issue #5668).
+ */
+export const LAST_KILL_SHOWN_DAYS = 183;
+
+/** The newest kill's time if it is recent enough to date, else null. */
+export function shownLastKill(lastMs: number | null, nowMs: number): number | null {
+  if (lastMs === null) return null;
+  return nowMs - lastMs > LAST_KILL_SHOWN_DAYS * DAY_MS ? null : lastMs;
+}
+
 /** How loudly a kill's age is drawn: today, this week, older, or no kill. */
 export type AgeTone = 'fresh' | 'week' | 'old' | 'none';
 

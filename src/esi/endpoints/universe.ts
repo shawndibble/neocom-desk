@@ -1,11 +1,11 @@
 import type { SystemJumpsEntry, SystemKillsEntry } from '@/engine/route/routeSafety';
 import type { IncursionEntry } from '@/engine/incursions/incursionRows';
-import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
-import type { EndpointOptions } from './options';
-import type { EsiEndpointId } from '../registry';
 import { chunk } from '@/lib/chunk';
+import { mapWithConcurrencyLimit } from '@/lib/concurrency';
+import type { EndpointOptions } from './options';
+import { postChunked } from './postChunked';
 
 // --- GET /universe/types/{type_id} (public) ---
 
@@ -338,36 +338,6 @@ export interface CharacterAffiliation {
   faction_id?: number;
 }
 
-/** ESI's documented cap on ids per request (maxItems in the spec) — shared with `postUniverseNames`. */
-const AFFILIATION_BATCH_LIMIT = 1000;
-
-/** Batches in flight at once: ESI bills errors against a shared budget, so stay small. */
-const POST_CHUNK_CONCURRENCY = 2;
-
-/**
- * POSTs `ids` to a bulk-lookup endpoint in `AFFILIATION_BATCH_LIMIT`-sized
- * batches, a couple at a time, and returns the results in batch order.
- */
-async function postChunked<TIn, TOut>(
-  path: string,
-  endpointId: EsiEndpointId,
-  ids: TIn[],
-  signal: AbortSignal | undefined
-): Promise<TOut[]> {
-  const batches = chunk(ids, AFFILIATION_BATCH_LIMIT);
-  const results: TOut[][] = batches.map(() => []);
-  await mapWithConcurrencyLimit(batches, POST_CHUNK_CONCURRENCY, async (batch) => {
-    const result = await esiFetch<TOut[]>(path, {
-      method: 'POST',
-      body: batch,
-      signal,
-      endpointId,
-    });
-    results[batches.indexOf(batch)] = result.data ?? [];
-  });
-  return results.flat();
-}
-
 /**
  * Bulk corp/alliance lookup for many characters in one round trip (up to 1000
  * per request; more are chunked into sequential requests) — replaces N
@@ -401,19 +371,38 @@ export interface UniverseIds {
   alliances?: { id: number; name: string }[];
 }
 
-/** Exact-name (case-insensitive) lookup. Empty input never calls ESI. */
+/** ESI's cap on names per `/universe/ids` request (maxItems in the spec). */
+const UNIVERSE_IDS_BATCH = 500;
+
+/**
+ * Exact-name (case-insensitive) lookup. Empty input never calls ESI. More than
+ * 500 names (a busy pasted Local, issue #5668) go one batch at a time, their
+ * buckets merged in batch order.
+ */
 export async function postUniverseIds(
   names: string[],
   options: { signal?: AbortSignal } = {}
 ): Promise<UniverseIds> {
-  if (names.length === 0) return {};
-  const result = await esiFetch<UniverseIds>('/universe/ids', {
-    method: 'POST',
-    body: names,
-    signal: options.signal,
-    endpointId: 'postUniverseIds',
+  const batches = chunk(names, UNIVERSE_IDS_BATCH);
+  const answers: UniverseIds[] = batches.map(() => ({}));
+  // Two in flight, as `postChunked`: ESI bills errors against a shared budget.
+  await mapWithConcurrencyLimit(batches, 2, async (batch) => {
+    const result = await esiFetch<UniverseIds>('/universe/ids', {
+      method: 'POST',
+      body: batch,
+      signal: options.signal,
+      endpointId: 'postUniverseIds',
+    });
+    answers[batches.indexOf(batch)] = result.data ?? {};
   });
-  return result.data ?? {};
+  const merged: UniverseIds = {};
+  for (const answer of answers) {
+    for (const [bucket, entries] of Object.entries(answer)) {
+      const key = bucket as keyof UniverseIds;
+      merged[key] = [...(merged[key] ?? []), ...(entries as { id: number; name: string }[])];
+    }
+  }
+  return merged;
 }
 
 // --- GET /universe/structures/{structure_id} (esi-universe.read_structures.v1) ---

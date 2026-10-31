@@ -156,6 +156,7 @@ beforeEach(async () => {
   await db.tokens.clear();
   await db.settings.clear();
   await db.esiCache.clear();
+  await db.contractArchive.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   usePublicInfoModalStore.setState({ request: null });
@@ -315,6 +316,34 @@ describe('Contracts', () => {
     render(<App />);
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('This contract is older than 30 days and EVE no longer sends it.')
+    ).toBeInTheDocument();
+  });
+
+  it('lists an archived contract ESI no longer sends, and opens it from ?highlight=', async () => {
+    await db.contractArchive.put({
+      contract_id: 987654,
+      issuer_id: 500001,
+      issuer_corporation_id: 2,
+      assignee_id: 3,
+      acceptor_id: 0,
+      type: 'item_exchange',
+      status: 'finished',
+      for_corporation: false,
+      availability: 'personal',
+      date_issued: '2026-01-01T00:00:00Z',
+      date_expired: '2026-01-08T00:00:00Z',
+      title: 'Old archived deal',
+      characterId: CHAR_ID,
+      archiveDate: '2026-01-08T00:00:00Z',
+    });
+    window.history.pushState({}, '', '/contracts/history?highlight=987654');
+    render(<App />);
+    expect(await screen.findByRole('dialog', { name: /Item Exchange/ })).toBeInTheDocument();
+    expect(
+      screen.queryByText('This contract is older than 30 days and EVE no longer sends it.')
+    ).not.toBeInTheDocument();
   });
 
   it('opens nothing for ?highlight= on a non-History tab, even after switching to History', async () => {

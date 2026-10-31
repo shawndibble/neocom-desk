@@ -67,6 +67,13 @@ function openPricesOn(
 
 const CHAR_ID = 91;
 
+/**
+ * A station lookup that declines. Tests that don't care about the location answer with this, not a
+ * request that never resolves: a pending request stays in the ESI cache's in-flight map, so every
+ * later test reading the same station inherited it and waited out the full 1000ms cache settle.
+ */
+const NO_STATION = () => new HttpResponse(null, { status: 404 });
+
 const ITEM_EXCHANGE: Contract = {
   contract_id: 12345,
   issuer_id: 500001,
@@ -143,6 +150,8 @@ const server = mswServer(
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  await db.contractArchive.clear();
+  await db.contractItemArchive.clear();
   usePublicInfoModalStore.setState({ request: null });
   pricesMock.getHubPrices.mockReset().mockResolvedValue(new Map());
   snapshotMock.loadHubSnapshotRange
@@ -291,7 +300,7 @@ describe('ContractDetailModal System rows', () => {
 describe('ContractDetailModal', () => {
   it('renders the summary fields immediately from the contract prop, no fetch needed', () => {
     server.use(
-      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, NO_STATION),
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
         HttpResponse.json([])
       )
@@ -310,7 +319,7 @@ describe('ContractDetailModal', () => {
 
   it('opens a link from the description in a new tab, from a button', () => {
     server.use(
-      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, NO_STATION),
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
         HttpResponse.json([])
       )
@@ -405,7 +414,7 @@ describe('ContractDetailModal', () => {
     expect(within(included).getByText('744')).toBeInTheDocument();
   });
 
-  it('treats a 404 on the items as "no item data", with no Retry', async () => {
+  function itemsGone() {
     server.use(
       http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () =>
         HttpResponse.json({ station_id: 60003760, name: 'Jita', type_id: 1, system_id: 2 })
@@ -415,15 +424,50 @@ describe('ContractDetailModal', () => {
         () => new HttpResponse(null, { status: 404 })
       )
     );
+  }
+
+  it('says items were not kept for an old contract ESI no longer has, with no Retry', async () => {
+    itemsGone();
     renderModal({
       characterId: CHAR_ID,
       contract: ITEM_EXCHANGE,
       issuerName: 'Mero Otichoda',
       onClose: () => {},
     });
-    expect(await screen.findByText('No item data for this contract')).toBeInTheDocument();
+    expect(await screen.findByText('Items not kept for this contract')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Couldn't load/)).not.toBeInTheDocument();
+  });
+
+  it('treats a 404 on a recent contract as "no item data", with no Retry', async () => {
+    itemsGone();
+    const now = `${new Date().toISOString().slice(0, 19)}Z`;
+    renderModal({
+      characterId: CHAR_ID,
+      contract: { ...ITEM_EXCHANGE, date_issued: now, date_expired: now, date_completed: now },
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    expect(await screen.findByText('No item data for this contract')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+  });
+
+  it('shows the items kept when the pilot opened the contract before ESI dropped it', async () => {
+    itemsGone();
+    await db.contractArchive.put({ ...ITEM_EXCHANGE, characterId: CHAR_ID, archiveDate: '' });
+    await db.contractItemArchive.put({
+      characterId: CHAR_ID,
+      contract_id: 12345,
+      items: [{ record_id: 1, type_id: 34, quantity: 5, is_included: true, is_singleton: false }],
+    });
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    expect(await screen.findByText('Included')).toBeInTheDocument();
+    expect(screen.queryByText('Items not kept for this contract')).not.toBeInTheDocument();
   });
 
   /*
@@ -469,7 +513,7 @@ describe('ContractDetailModal', () => {
 
   it('links an item-exchange line item through to Market (issue #417)', async () => {
     server.use(
-      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, NO_STATION),
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
         HttpResponse.json([
           { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
@@ -488,7 +532,7 @@ describe('ContractDetailModal', () => {
 
   it('right-clicking a blueprint line item starts a Build Plan for what it builds', async () => {
     server.use(
-      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, NO_STATION),
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
         HttpResponse.json([
           { record_id: 1, type_id: 638, quantity: 1, is_included: true, is_singleton: true },
@@ -584,7 +628,7 @@ describe('ContractDetailModal', () => {
 
     function serve(items: unknown[]) {
       server.use(
-        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, NO_STATION),
         http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
           HttpResponse.json(items)
         )
@@ -869,7 +913,7 @@ describe('ContractDetailModal', () => {
 
     it('folds the volume into the Items figure instead of a chip of its own', async () => {
       server.use(
-        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, NO_STATION),
         http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
           HttpResponse.json([
             { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },

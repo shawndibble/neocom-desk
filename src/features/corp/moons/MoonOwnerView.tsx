@@ -338,7 +338,7 @@ export function MoonOwnerView({
         }
       : undefined;
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       {banner}
       {payeeNotice && !ended && (
         <PayeeChangeStrip

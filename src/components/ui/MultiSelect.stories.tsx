@@ -94,3 +94,26 @@ export const NoResults: Story = {
     await userEvent.type(within(document.body).getByRole('searchbox'), 'zzz');
   },
 };
+
+/** Tickable group headings: ticking a heading ticks every row under it. */
+export const TickableHeadings: Story = {
+  args: {
+    summary: undefined,
+    triggerAriaLabel: undefined,
+    options: undefined,
+    selected: new Set(['jita']),
+    groups: [
+      {
+        label: 'The Forge',
+        options: [{ id: 'jita', label: 'Jita' }],
+      },
+      {
+        label: 'Domain',
+        options: [{ id: 'amarr', label: 'Amarr' }],
+      },
+    ],
+    groupState: () => false,
+    onToggleGroup: () => {},
+  },
+  play: openPopover,
+};

@@ -13,19 +13,15 @@ export interface RosterRow {
   notFound: boolean;
 }
 
-/** /universe/ids takes at most 500 names per call. */
-const CHUNK = 500;
-
 export async function resolveFleetRoster(
   names: string[],
   members: { uid: string }[],
   options: { signal?: AbortSignal } = {}
 ): Promise<RosterRow[]> {
-  const byName = new Map<string, { id: number; name: string }>();
-  for (let i = 0; i < names.length; i += CHUNK) {
-    const found = await postUniverseIds(names.slice(i, i + CHUNK), { signal: options.signal });
-    for (const entry of found.characters ?? []) byName.set(entry.name.toLowerCase(), entry);
-  }
+  const found = await postUniverseIds(names, { signal: options.signal });
+  const byName = new Map(
+    (found.characters ?? []).map((entry) => [entry.name.toLowerCase(), entry] as const)
+  );
   const memberUids = new Set(members.map((member) => member.uid));
   return names.map((typed) => {
     const hit = byName.get(typed.toLowerCase());

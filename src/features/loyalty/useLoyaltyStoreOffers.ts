@@ -21,15 +21,17 @@ import {
   type BlueprintCatalog,
 } from '@/features/industry/blueprintCatalog';
 import { useMarketSnapshot } from '@/features/industry/useMarketSnapshot';
-import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { loadCorrectedSkills, skillLevelsOf } from '@/features/skills/correctedSkills';
 import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { usePriceBasis } from './priceBasis';
-import { loadLpStoreVolume, type LpStoreVolume } from './lpStoreVolume';
+import { revenuePricing, usePriceBasis } from './priceBasis';
+import { useLpStoreVolume } from './lpStoreVolume';
+import { useHaulingDemand } from '@/features/market/haulingDemand';
 import {
   useDetectedOwnedStock,
   useOwnedStockSnapshot,
 } from '@/features/industry/useDetectedOwnedStock';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import type { MaterialSourcingMap, SkillLevels } from '@/engine/industry/types';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
 import {
@@ -47,6 +49,9 @@ export interface LoyaltyStoreResult {
   offersError: boolean;
   reloadOffers: () => void;
   rows: LoyaltyOfferRow[];
+  /** The character's skills and hub standing the rows were priced with; Offer Detail's "How many" walk reuses them. */
+  skills: SkillLevels;
+  standing: ResolvedStandings | undefined;
   /** For resolving a blueprint's material names in the detail panel. */
   catalog: BlueprintCatalog | null;
   /** The blueprint catalog couldn't load: blueprint offers list as plain items, with no build-versus-buy figures. */
@@ -92,11 +97,6 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   const [playerLp, setPlayerLp] = useState<number | null>(null);
   const [skills, setSkills] = useState<SkillLevels>({});
   const [itemNames, setItemNames] = useState<ReadonlyMap<number, string>>(new Map());
-  // Tagged with its region so a hub change never reads the previous hub's volume.
-  const [loadedVolume, setLoadedVolume] = useState<{
-    regionId: number;
-    volume: LpStoreVolume | null;
-  } | null>(null);
   const [useOwnMaterialsFor, setUseOwnMaterialsFor] = useState<ReadonlySet<number>>(new Set());
 
   useEffect(() => {
@@ -155,9 +155,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
         const entry = lpResult.cached.data.find((e) => e.corporation_id === corporationId);
         setPlayerLp(entry?.loyalty_points ?? 0);
       }
-      const map: SkillLevels = {};
-      for (const [skillId, trained] of corrected.trained) map[skillId] = trained.level;
-      setSkills(map);
+      setSkills(skillLevelsOf(corrected));
     })();
     return () => {
       cancelled = true;
@@ -201,20 +199,9 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     };
   }, [nameableTypeIds]);
 
-  // The hub setting's region, once it hydrates: the default hub's volume would be the wrong number.
-  const volumeRegionId = hubHydrated ? hub.regionId : null;
-  useEffect(() => {
-    if (volumeRegionId === null) return;
-    let cancelled = false;
-    void loadLpStoreVolume(volumeRegionId).then((volume) => {
-      if (!cancelled) setLoadedVolume({ regionId: volumeRegionId, volume });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [volumeRegionId]);
-  // Null until this region's volume loads, and for good when it cannot.
-  const volume = loadedVolume?.regionId === volumeRegionId ? loadedVolume.volume : null;
+  const { volume } = useLpStoreVolume(hubHydrated ? hub.regionId : null);
+  // Recent trades check each sale; until they settle nothing is ranked, so a lone overpriced listing never flashes first.
+  const { demand, settled: demandSettled } = useHaulingDemand(hubHydrated ? hub.regionId : null);
 
   const ownedStockSnapshot = useOwnedStockSnapshot();
   const { stock } = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
@@ -243,11 +230,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
       offers,
       catalog,
       hubPrices: snapshot.hubPrices,
-      revenueHubPrices: priceBasis === 'buy' ? snapshot.hubBuyPrices : snapshot.hubPrices,
-      // The LP store's own vocabulary ('sell' / 'buy') maps onto the shared
-      // Liquidation Basis the fee engines speak: listing an order at the
-      // hub's sell price vs. dumping into its standing buy orders.
-      liquidationBasis: priceBasis === 'buy' ? 'instant' : 'order',
+      ...revenuePricing(snapshot, priceBasis),
       adjustedPrices: snapshot.adjustedPrices,
       systemCostIndex: snapshot.systemCostIndex,
       skills,
@@ -257,6 +240,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
       useOwnMaterialsFor,
       playerLp,
       sellsPerDayByType: volume,
+      tradedPrices: demand?.types,
     });
   }, [
     offers,
@@ -270,6 +254,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     useOwnMaterialsFor,
     playerLp,
     volume,
+    demand,
   ]);
 
   function toggleUseOwnMaterials(offerId: number): void {
@@ -295,11 +280,16 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     catalog,
     playerLp,
     hub,
+    skills,
+    standing,
     hubHydrated,
     catalogUnavailable: catalog === EMPTY_BLUEPRINT_CATALOG,
     // A store with no offers has no prices to wait for, so `snapshot` stays
     // null for good: that is "no offers", not still loading.
-    ready: offers !== null && catalog !== null && (typeIds.length === 0 || snapshot !== null),
+    ready:
+      offers !== null &&
+      catalog !== null &&
+      (typeIds.length === 0 || (snapshot !== null && demandSettled)),
     pricesUnreachable: snapshot?.hubPricesUnreachable === true,
     useOwnMaterialsFor,
     toggleUseOwnMaterials,

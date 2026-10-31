@@ -33,6 +33,7 @@ function corpAccess(state: CorpAccessState) {
 const mockSubscribe = vi.fn();
 import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 import { stubViewport } from '@/test/viewport';
+import { stubAnimate } from '@/test/animate';
 vi.mock('@/sync', () => ({
   getSyncStatus: () => IDLE_SYNC_STATUS,
   subscribeSyncStatus: (listener: (s: unknown) => void) => mockSubscribe(listener),
@@ -733,13 +734,13 @@ describe('Layout corp nav entry', () => {
 
 /**
  * jsdom implements no Web Animations API, so `animate` is stubbed and these
- * assert what `useRouteFade` is responsible for: that it fires on a real route
+ * assert what the route fade (`useFadeOnChange`) is responsible for: that it fires on a real route
  * change, stays quiet when only the query changed, honours reduced motion, and
  * — the reason it animates in place rather than re-keying the outlet — never
  * costs the route its component instance.
  */
 describe('Layout route fade', () => {
-  let animate: ReturnType<typeof vi.fn>;
+  let animate: ReturnType<typeof stubAnimate>['animate'];
   let reduceMotion: boolean;
 
   /**
@@ -782,12 +783,7 @@ describe('Layout route fade', () => {
     mockIsSyncConfigured.mockReturnValue(false);
     mockedCorpAccess.mockReturnValue(corpAccess('none'));
     reduceMotion = false;
-    animate = vi.fn(() => ({ cancel: vi.fn() }));
-    Object.defineProperty(Element.prototype, 'animate', {
-      value: animate,
-      writable: true,
-      configurable: true,
-    });
+    animate = stubAnimate().animate;
     // Only the reduced-motion query is steered; every other query Layout asks
     // (the `md` breakpoint behind the More sheet) keeps the setup's default.
     stubViewport((media) => (media.includes('prefers-reduced-motion') ? reduceMotion : false));
@@ -800,8 +796,8 @@ describe('Layout route fade', () => {
     await user.click(screen.getAllByRole('link', { name: 'Wallet' })[0]);
     await waitFor(() => expect(screen.getByText('wallet page')).toBeInTheDocument());
     expect(animate).toHaveBeenCalledWith([{ opacity: 0 }, { opacity: 1 }], {
-      duration: 140,
-      easing: 'ease-out',
+      duration: 220,
+      easing: 'cubic-bezier(0.33, 1, 0.68, 1)',
     });
   });
 

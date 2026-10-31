@@ -20,6 +20,7 @@ vi.mock('./inGameFittings', () => ({ loadInGameFittings: loadInGameFittingsMock 
 vi.mock('./popularFits', () => ({ usePopularFits: () => ({ ok: true, fits: [] }) }));
 vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({ '587': { name: 'Rifter' }, '24698': { name: 'Drake' } })),
+  loadTypeEffects: vi.fn(async () => ({})),
 }));
 // The preview's numbers are the compare hooks' job; here it only proves which row is picked.
 vi.mock('./FittingPreview', () => ({

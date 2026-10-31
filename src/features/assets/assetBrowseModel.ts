@@ -18,9 +18,24 @@ export function assetHref(
   return assetPathHref(stationId, segments) + query;
 }
 
+/**
+ * The query string for a link out of search results. Search and the All items
+ * view flatten every location into one list, so a link that kept them would
+ * land on the same list again; the rest (the Character filter) carries over.
+ */
+export function queryLeavingSearch(query: string): string {
+  const params = new URLSearchParams(query);
+  for (const key of ['q', 'all', 'min']) params.delete(key);
+  const rest = params.toString();
+  return rest ? `?${rest}` : '';
+}
+
 export interface AssetMatch {
   asset: CharacterAsset;
+  /** The type name. */
   name: string;
+  /** The in-game name the player gave this ship or container, when it has one. */
+  gameName?: string;
 }
 
 /**

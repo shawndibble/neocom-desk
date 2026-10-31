@@ -12,7 +12,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { invalidateFreshness, onCacheRevalidated } from '@/esi/cache';
-import { readRouteSnapshot, writeRouteSnapshot } from './routeSnapshotCache';
+import { readRouteSnapshot, routeSnapshotEpoch, writeRouteSnapshot } from './routeSnapshotCache';
+import { useRouteSnapshotHydration } from './useRouteSnapshotHydration';
 
 /**
  * Flipped by the effect cleanup when the character changes, a refresh starts,
@@ -276,13 +277,17 @@ export function useRouteSnapshot<T>(
       },
     };
     loadInFlight.current = true;
+    // A purge mid-load (an owner change) means the result may be the previous
+    // owner's: `writeRouteSnapshot` then neither keeps nor stores it.
+    const startedAt = routeSnapshotEpoch(characterId);
     void (async () => {
       try {
         const data = await loadRef.current(characterId, signal);
         if (!signal.cancelled) {
           setSnapshot({ epoch, data, error: null });
           if (staleWhileRevalidate) setLastGoodData(data);
-          if (cacheKey !== undefined) writeRouteSnapshot(cacheKey, characterId, data);
+          if (cacheKey !== undefined)
+            writeRouteSnapshot(cacheKey, characterId, data, { startedAt });
         }
       } catch (error) {
         // Stamping the failure is what clears `loading` and re-enables Refresh.
@@ -342,6 +347,11 @@ export function useRouteSnapshot<T>(
     cacheKey !== undefined && activeCharacterId !== null
       ? readRouteSnapshot<T>(cacheKey, activeCharacterId)
       : null;
+  // First visit after a reload: the stored snapshot, once it is in memory.
+  useRouteSnapshotHydration(
+    activeCharacterId,
+    cacheKey !== undefined && retained === null && current === null
+  );
 
   return {
     data: current?.data ?? (staleWhileRevalidate ? lastGoodData : null) ?? retained,

@@ -10,7 +10,7 @@ import {
  * ESI answers for the signed-in Character's wallet pages, built from
  * `sampleData`. A page story that reads another endpoint adds its route here
  * (or passes `routes` to the shell decorator): until it does, the request is
- * recorded as unexpected and `src/stories.test.tsx` fails.
+ * recorded as unexpected and `src/test/storySmoke.tsx` fails.
  */
 export function walletFixtureRoutes(): FixtureRoute[] {
   // Every sample Character answers alike: the net worth view reads the whole roster.

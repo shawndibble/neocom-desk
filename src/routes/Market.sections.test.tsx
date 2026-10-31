@@ -157,7 +157,7 @@ describe('Market top-level tabs', () => {
 
   it('opens Hauling from its URL and leaves its query behind on the way out', async () => {
     window.history.pushState({}, '', '/market/hauling?from=amarr&to=jita');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     expect(await screen.findByRole('tab', { name: 'Hauling' })).toHaveAttribute(
       'aria-selected',
@@ -170,7 +170,7 @@ describe('Market top-level tabs', () => {
 
   it('switches to Open Orders and History via the tab bar', async () => {
     window.history.pushState({}, '', '/market');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await screen.findByRole('tab', { name: 'Market' });
 
@@ -201,7 +201,7 @@ describe('Market top-level tabs', () => {
       )
     );
     window.history.pushState({}, '', '/market?type=34');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await screen.findByRole('tab', { name: 'Market' });
 
@@ -215,7 +215,7 @@ describe('Market top-level tabs', () => {
 
   it('an Open Orders item name opens the order details, whose Market link lands on the Market Browser tab', async () => {
     window.history.pushState({}, '', '/market/orders');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
 
     // The fixture order is healthy (Fine), so it's folded until revealed.
@@ -250,7 +250,7 @@ describe('Market top-level tabs', () => {
 describe('Market Open Orders tab', () => {
   it('shows open orders directly via a /market/orders deep link, with resolved item name', async () => {
     window.history.pushState({}, '', '/market/orders');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     // The fixture order has no problems, so it is Fine, folded under the
     // Needs you list — Show opens All to see the resolved item name.
@@ -274,7 +274,7 @@ describe('Market Open Orders tab', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders`, () => HttpResponse.error())
     );
     window.history.pushState({}, '', '/market/orders');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await user.click(await screen.findByRole('button', { name: 'Show' }));
     expect(
@@ -400,7 +400,7 @@ describe('Market History tab (Transactions)', () => {
       fetchedAt: STALE_FETCHED_AT,
     });
     window.history.pushState({}, '', '/market/history');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
 
     // Initial load succeeds live — no banner at all yet.

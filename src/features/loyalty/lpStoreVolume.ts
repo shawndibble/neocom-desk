@@ -5,6 +5,8 @@
  * One small object per hub region, read whole, so opening a store costs one
  * cached request, never a history call per row. `null` means unavailable.
  */
+import { useCallback } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
 import { HOUR_MS } from '@/lib/age';
@@ -51,4 +53,23 @@ export async function loadLpStoreVolume(regionId: number): Promise<LpStoreVolume
   } catch {
     return null;
   }
+}
+
+/**
+ * A hub region's volume, never another region's. `regionId` null loads
+ * nothing. `settled` once this region's read is done; `volume` null for good
+ * when it failed or is unavailable.
+ */
+export function useLpStoreVolume(regionId: number | null): {
+  volume: LpStoreVolume | null;
+  settled: boolean;
+} {
+  const load = useKeyedLoad(
+    regionId === null ? null : String(regionId),
+    useCallback(() => loadLpStoreVolume(regionId!), [regionId])
+  );
+  return {
+    volume: load.status === 'ready' ? load.data : null,
+    settled: load.status === 'ready' || load.status === 'failed',
+  };
 }

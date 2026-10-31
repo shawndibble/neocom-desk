@@ -26,6 +26,12 @@ vi.mock('@/features/route/useSolarSystems', () => ({
   useSolarSystemList: () => ({ systems: null, failed: false, retry: () => {} }),
   useSystemName: () => 'Uedama',
 }));
+// The board is FleetBoard's own to test; here only what the live paste hands it.
+vi.mock('./FleetBoard', () => ({
+  FleetBoard: ({ wormholeSpace }: { wormholeSpace?: boolean }) => (
+    <p>{wormholeSpace ? 'wormhole board' : 'k-space board'}</p>
+  ),
+}));
 vi.mock('./useHereSpace', () => ({
   useHereSpace: () => ({
     current: { systemId: 30002768, source: 'game', pick: vi.fn(), clearPick: vi.fn() },
@@ -34,6 +40,7 @@ vi.mock('./useHereSpace', () => ({
 }));
 
 import { DscanShareControl, PilotListView } from './PilotListView';
+import { LOCAL_GROUP_MODE_KEY, useLocalGroupMode } from './localGroupMode';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -259,6 +266,26 @@ describe('PilotListView (Local list)', () => {
   });
 });
 
+describe('PilotListView (D-Scan)', () => {
+  const dscan = { kind: 'dscan' as const, typeIds: [], rows: [], text: '' };
+
+  it('tells the board when the Current System is wormhole space', () => {
+    mocks.here.space = 'wormhole';
+    render(<PilotListView paste={dscan} />);
+    expect(screen.getByText('wormhole board')).toBeTruthy();
+  });
+
+  it('tells the board k-space, or an unknown system, is not', () => {
+    mocks.here.space = 'lowsec';
+    const first = render(<PilotListView paste={dscan} />);
+    expect(screen.getByText('k-space board')).toBeTruthy();
+    first.unmount();
+    mocks.here.space = null;
+    render(<PilotListView paste={dscan} />);
+    expect(screen.getByText('k-space board')).toBeTruthy();
+  });
+});
+
 describe('DscanShareControl', () => {
   const scan = (text: string) => ({ kind: 'dscan' as const, typeIds: [626], rows: [], text });
   const TAB = String.fromCharCode(9);
@@ -326,7 +353,7 @@ describe('PilotListView (new since last paste)', () => {
     await db.settings.put({ key: 'local.lastPaste', value: PREVIOUS });
     paste([...PREVIOUS, 'Eve']);
     expect(await screen.findByText('1 new since last paste')).toBeTruthy();
-    const tags = screen.getAllByText('New');
+    const tags = await screen.findAllByText('New');
     expect(tags).toHaveLength(1);
     expect(tags[0].parentElement?.textContent).toContain('Eve');
   });
@@ -352,6 +379,139 @@ describe('PilotListView (new since last paste)', () => {
     await db.settings.put({ key: 'local.lastPaste', value: PREVIOUS });
     paste([...PREVIOUS, 'Eve']);
     expect(await screen.findByText('1 new since last paste')).toBeTruthy();
-    expect(screen.getAllByText('New')).toHaveLength(1);
+    expect(await screen.findAllByText('New')).toHaveLength(1);
+  });
+});
+
+describe('PilotListView (Group by Organization, issue #5668)', () => {
+  const lotus = { allianceId: 501, allianceName: 'Black Lotus' };
+  const ORG_ROWS: PilotListRow[] = [
+    row('Kael', {
+      ...lotus,
+      corporationId: 601,
+      corporationName: 'Vanguard',
+      kills: ready(kill(2 * HOUR, 'highsec')),
+    }),
+    row('Mira', {
+      ...lotus,
+      corporationId: 601,
+      corporationName: 'Vanguard',
+      kills: ready(kill(3 * HOUR, 'highsec')),
+    }),
+    row('Bram', { ...lotus, corporationId: 602, corporationName: 'Harbor', kills: ready() }),
+    row('Wren', { corporationId: 701, corporationName: 'Ember', kills: ready() }),
+    // Stands in for a name past the 40-name zKillboard cap.
+    row('Imre', { corporationId: 701, corporationName: 'Ember', kills: { kind: 'notLookedUp' } }),
+    row('Varek', { corporationId: 801, corporationName: 'Quiet Orbit', kills: ready() }),
+    row('Corpmate', { corporationId: 901, ownOrganization: 'corporation' }),
+  ];
+
+  beforeEach(async () => {
+    await db.settings.clear();
+    useLocalGroupMode.setState({ value: 'kills', hydrated: false });
+    vi.resetAllMocks();
+    mocks.here.space = 'highsec';
+    mocks.phone = false;
+    mocks.loadPilotList.mockImplementation(
+      (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
+        onRows(ORG_ROWS);
+        return Promise.resolve();
+      }
+    );
+  });
+
+  function renderOrgList() {
+    return render(
+      <MemoryRouter>
+        <PilotListView paste={{ kind: 'local', names: ORG_ROWS.map((r) => r.name), overflow: 0 }} />
+      </MemoryRouter>
+    );
+  }
+
+  it('groups by Kills by default, and switches to Organization, remembering the pick on this device', async () => {
+    renderOrgList();
+    const group = await screen.findByRole('group', { name: 'Group by' });
+    expect(within(group).getByRole('button', { name: 'Kills' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+
+    fireEvent.click(within(group).getByRole('button', { name: 'Organization' }));
+
+    expect(await screen.findByRole('link', { name: 'Black Lotus' })).toBeInTheDocument();
+    await waitFor(async () =>
+      expect((await db.settings.get(LOCAL_GROUP_MODE_KEY))?.value).toBe('organization')
+    );
+  });
+
+  it('heads an alliance with a group per corporation, a lone corporation by itself, and lone pilots apart', async () => {
+    await db.settings.put({ key: LOCAL_GROUP_MODE_KEY, value: 'organization' });
+    renderOrgList();
+
+    const alliance = (await screen.findByRole('link', { name: 'Black Lotus' })).closest('h3');
+    expect(alliance?.textContent).toContain('3 pilots');
+    expect(screen.getByRole('table', { name: 'Vanguard' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Harbor' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Ember' })).toBeInTheDocument();
+    const alone = screen.getByRole('table', { name: 'On their own' });
+    expect(within(alone).getByText('Varek')).toBeInTheDocument();
+    // Friendly stays last and folded, as in the Kills view.
+    expect(screen.queryByText('Corpmate')).toBeNull();
+  });
+
+  it("shows a corporation's contact on that corporation, never on its alliance's heading", async () => {
+    const red = { band: 'red' as const, value: -10, via: 'corporation' as const };
+    mocks.loadPilotList.mockImplementation(
+      (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
+        onRows(ORG_ROWS.map((r) => (r.corporationId === 602 ? { ...r, standing: red } : r)));
+        return Promise.resolve();
+      }
+    );
+    await db.settings.put({ key: LOCAL_GROUP_MODE_KEY, value: 'organization' });
+    renderOrgList();
+    const alliance = (await screen.findByRole('link', { name: 'Black Lotus' })).closest('h3');
+    expect(within(alliance as HTMLElement).queryByRole('img')).toBeNull();
+    const harbor = screen.getByRole('link', { name: 'Harbor' }).closest('h4');
+    expect(within(harbor as HTMLElement).getByRole('img')).toBeInTheDocument();
+  });
+
+  it('places a pilot past the zKillboard cap by organization, saying the kills were not looked up', async () => {
+    await db.settings.put({ key: LOCAL_GROUP_MODE_KEY, value: 'organization' });
+    renderOrgList();
+    const ember = await screen.findByRole('table', { name: 'Ember' });
+    const imre = within(ember).getByText('Imre').closest('tr');
+    expect(imre?.textContent).toContain('Not looked up');
+  });
+});
+
+describe('PilotListView (old kills)', () => {
+  beforeEach(async () => {
+    await db.settings.clear();
+    useLocalGroupMode.setState({ value: 'kills', hydrated: false });
+    vi.resetAllMocks();
+    mocks.here.space = 'highsec';
+    mocks.phone = false;
+  });
+
+  it('dates a kill up to six months old, and leaves an older one undated', async () => {
+    const rows = [
+      row('Recent', { kills: ready(kill(100 * DAY, 'lowsec')) }),
+      row('Ancient', { kills: ready(kill(390 * DAY, 'nullsec')) }),
+    ];
+    mocks.loadPilotList.mockImplementation(
+      (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
+        onRows(rows);
+        return Promise.resolve();
+      }
+    );
+    render(
+      <MemoryRouter>
+        <PilotListView paste={{ kind: 'local', names: rows.map((r) => r.name), overflow: 0 }} />
+      </MemoryRouter>
+    );
+    const recent = (await screen.findByText('Recent')).closest('tr');
+    const ancient = screen.getByText('Ancient').closest('tr');
+    expect(recent?.textContent).toMatch(/\d+mo ago|\d+d ago/);
+    expect(ancient?.textContent).not.toMatch(/ago/);
   });
 });

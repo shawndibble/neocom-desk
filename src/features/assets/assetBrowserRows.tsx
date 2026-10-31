@@ -17,6 +17,7 @@ import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { NicknamedName } from '@/features/assets/PlaceName';
 import { IconButton, IskAmount, RowMoreActions, Tooltip } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
@@ -169,6 +170,8 @@ export function BlueprintBadge({ kind, t }: BlueprintBadgeProps) {
 interface LocationRowProps {
   href: string;
   label: string;
+  /** The pilot's Place Nickname (personal Assets only): shown first, the real label dim beneath. */
+  nickname?: string;
   security: number | null | undefined;
   jumpsAway: JumpsAwayResult | undefined;
   itemCount: number;
@@ -193,6 +196,7 @@ interface LocationRowProps {
 export function LocationRow({
   href,
   label,
+  nickname,
   security,
   jumpsAway,
   itemCount,
@@ -234,7 +238,12 @@ export function LocationRow({
           )}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-sm font-medium">{label}</span>
+          <NicknamedName
+            name={label}
+            nickname={nickname}
+            className="text-sm font-medium"
+            truncate
+          />
           <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim">
             {unresolvedParent ? (
               <span className="text-warning">{t('assets.unresolved.rowHint')}</span>
@@ -276,6 +285,8 @@ export function LocationRow({
 interface ContainerRowProps {
   href: string;
   label: string;
+  /** The player's in-game name: shown first, `label` (the type) dim beneath. */
+  gameName?: string;
   itemCount: number;
   estimatedValue: number;
   characterBadge: string | null;
@@ -291,6 +302,7 @@ interface ContainerRowProps {
 export function ContainerRow({
   href,
   label,
+  gameName,
   itemCount,
   estimatedValue,
   characterBadge,
@@ -318,7 +330,12 @@ export function ContainerRow({
       >
         <Icon.Container size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-faint" />
         <span className="flex min-w-0 flex-1 items-center">
-          {named ? (
+          {gameName !== undefined ? (
+            <span className="flex min-w-0 flex-col">
+              <h3 className="truncate text-sm font-medium">{gameName}</h3>
+              <span className="truncate text-xs text-text-dim">{label}</span>
+            </span>
+          ) : named ? (
             <h3 className="truncate text-sm font-medium">{label}</h3>
           ) : (
             <span className="truncate text-sm text-text-dim">{label}</span>
@@ -386,6 +403,8 @@ export function ItemColumnLabels({ t }: ItemColumnLabelsProps) {
 
 interface ItemRowProps {
   name: string;
+  /** The player's in-game name: shown first, `name` (the type) dim beneath. */
+  gameName?: string;
   quantity: number;
   unitVolume: number | undefined;
   estimatedValue: number;
@@ -455,6 +474,7 @@ function ValueFigure({
  */
 export function ItemRow({
   name,
+  gameName,
   quantity,
   unitVolume,
   estimatedValue,
@@ -493,7 +513,14 @@ export function ItemRow({
             <span className={cx('flex min-w-0 items-center', ITEM_NAME_CELL)}>
               {typeId === undefined ? (
                 <Tooltip content={name}>
-                  <span className="truncate text-sm">{name}</span>
+                  {gameName === undefined ? (
+                    <span className="truncate text-sm">{name}</span>
+                  ) : (
+                    <span className="flex min-w-0 flex-col text-sm">
+                      <span className="truncate">{gameName}</span>
+                      <span className="truncate text-xs text-text-dim">{name}</span>
+                    </span>
+                  )}
                 </Tooltip>
               ) : (
                 <ItemInfoLink
@@ -506,7 +533,14 @@ export function ItemRow({
                   }}
                 >
                   <Tooltip content={name}>
-                    <span className="truncate">{name}</span>
+                    {gameName === undefined ? (
+                      <span className="truncate">{name}</span>
+                    ) : (
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate">{gameName}</span>
+                        <span className="truncate text-xs text-text-dim">{name}</span>
+                      </span>
+                    )}
                   </Tooltip>
                 </ItemInfoLink>
               )}
@@ -545,6 +579,8 @@ export function ItemRow({
 
 interface SearchResultRowProps {
   name: string;
+  /** The player's in-game name: shown first, `name` (the type) dim beneath. */
+  gameName?: string;
   quantity: number;
   estimatedValue: number;
   /** Where this item lives, outermost first — the drill-down path it would take to reach it. */
@@ -556,6 +592,8 @@ interface SearchResultRowProps {
   blueprintKind?: BlueprintKind | null;
   /** Tooltip note on the value. */
   valueHint?: string;
+  /** Wraps the row in its item menu; its More actions button sits at the row's far right. */
+  wrap: (children: ReactElement) => ReactElement;
   t: Translate;
 }
 
@@ -564,11 +602,12 @@ interface SearchResultRowProps {
  * every location at once — filtering only the level you happen to be standing
  * in would make "Search all characters" meaningless — so each hit has to say
  * where it lives, and links straight to that place. The whole row is that
- * link, so its name stays plain text — a Show info button there would nest
- * one control inside another; the hit's own place has it one tap away.
+ * link, so its name stays plain text; Show info, and the places the hit can
+ * open, are in the row's menu at the far right.
  */
 export function SearchResultRow({
   name,
+  gameName,
   quantity,
   estimatedValue,
   trail,
@@ -577,43 +616,59 @@ export function SearchResultRow({
   characterBadge,
   blueprintKind = null,
   valueHint,
+  wrap,
   t,
 }: SearchResultRowProps) {
   return (
     <div className="border-b border-line hover:bg-panel-2">
-      <Link
-        to={href}
-        className={cx(
-          'group flex min-h-16 items-center gap-2.5 px-3 py-2',
-          focusRingInsetClassName
-        )}
-      >
-        <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="flex min-w-0 items-baseline gap-2">
-            <span className="flex min-w-0 flex-1 items-center">
-              <span className="truncate text-sm font-medium">{name}</span>
-              {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
-              {characterBadge && <CharacterBadge characterName={characterBadge} />}
+      {wrap(
+        <div className="flex items-center">
+          <Link
+            to={href}
+            className={cx(
+              'group flex min-h-16 min-w-0 flex-1 items-center gap-2.5 py-2 pl-3',
+              focusRingInsetClassName
+            )}
+          >
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="flex min-w-0 items-baseline gap-2">
+                <span className="flex min-w-0 flex-1 items-center">
+                  {gameName === undefined ? (
+                    <span className="truncate text-sm font-medium">{name}</span>
+                  ) : (
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate text-sm font-medium">{gameName}</span>
+                      <span className="truncate text-xs font-normal text-text-dim">{name}</span>
+                    </span>
+                  )}
+                  {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
+                  {characterBadge && <CharacterBadge characterName={characterBadge} />}
+                </span>
+                <span className="shrink-0 text-sm tabular-nums">×{formatCount(quantity)}</span>
+              </span>
+              <span className="flex min-w-0 items-baseline gap-2">
+                <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+                  <SecurityValue security={security} />
+                  <span className="truncate text-[0.6875rem] text-text-dim">
+                    {trail.join(' › ')}
+                  </span>
+                </span>
+                <span
+                  className={cx(
+                    'shrink-0 text-[0.6875rem] tabular-nums',
+                    estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos'
+                  )}
+                >
+                  <ValueFigure value={estimatedValue} hint={valueHint} inLink t={t} />
+                </span>
+              </span>
             </span>
-            <span className="shrink-0 text-sm tabular-nums">×{formatCount(quantity)}</span>
+          </Link>
+          <span className="shrink-0 px-2">
+            <RowMoreActions />
           </span>
-          <span className="flex min-w-0 items-baseline gap-2">
-            <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-              <SecurityValue security={security} />
-              <span className="truncate text-[0.6875rem] text-text-dim">{trail.join(' › ')}</span>
-            </span>
-            <span
-              className={cx(
-                'shrink-0 text-[0.6875rem] tabular-nums',
-                estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos'
-              )}
-            >
-              <ValueFigure value={estimatedValue} hint={valueHint} inLink t={t} />
-            </span>
-          </span>
-        </span>
-        <Icon.Descend size={Icon.ICON_SIZE.sm} className={rowCaretClassName} />
-      </Link>
+        </div>
+      )}
     </div>
   );
 }

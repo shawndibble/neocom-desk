@@ -87,7 +87,7 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       {/*
         Title, tabs, data age and Customize on one line. No Next deadline
         button: it squeezed the five tabs off the line, and Due soon already
@@ -200,7 +200,7 @@ export function Corp() {
   // that from Settings' Corporation Permission row.
   const content =
     gate.status === 'denied' ? (
-      <div className="mx-auto max-w-6xl space-y-4">
+      <div className="mx-auto max-w-page space-y-4">
         <PageHeader title={t('corp.title')} />
         <CorpDenied
           reason={gate.reason}

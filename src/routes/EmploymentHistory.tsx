@@ -95,7 +95,7 @@ export function EmploymentHistory() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       {/*
         The header carries this tab's Refresh and export (level with the bell, at
         the bell's size), as the Overview's does; its data age sits on the tab row. They stay here in
@@ -124,7 +124,11 @@ export function EmploymentHistory() {
           historyResult && (
             <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
               {t('employmentHistory.updated')}
-              <DataAgeBadge date={historyResult.fetchedAt} alwaysVisible />
+              <DataAgeBadge
+                date={historyResult.fetchedAt}
+                expiresAt={historyResult.expiresAt}
+                alwaysVisible
+              />
             </span>
           )
         }

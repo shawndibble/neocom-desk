@@ -8,13 +8,14 @@ import { useEffect, useMemo, useState } from 'react';
 import type { PiData } from '@/sde/types';
 import { planAccount, type AccountPlan } from '@/engine/pi/accountPlan';
 import type { PiTier } from '@/engine/pi/types';
-import { accountCandidates } from './accountPlanModel';
+import { accountCandidates, accountPool } from './accountPlanModel';
 import { chainPricing } from './chainEstimateModel';
 import { chainBasisKey } from './useChainEstimates';
 import { plannerPolicy } from './goalPlannerModel';
 import type { PlanAdvice } from './planAdviceModel';
 import { SLICE_MS } from './runSliced';
 import { coloniesKey, useChainInputs } from './useBiggerChains';
+import { useHubTradesPerDay } from './useHubTradesPerDay';
 
 export interface AccountPlanState {
   plan: AccountPlan | null;
@@ -34,9 +35,9 @@ export function resetAccountPlan(): void {
 export function useAccountPlan(
   advice: PlanAdvice,
   pi: PiData,
-  options: { haul: boolean; buyTiers: readonly PiTier[] }
+  options: { haul: boolean; buyTiers: readonly PiTier[]; regionId: number }
 ): AccountPlanState {
-  const { haul, buyTiers } = options;
+  const { haul, buyTiers, regionId } = options;
   const { colonies, jumps, key: inputsKey } = useChainInputs(advice, pi, haul);
   const { books, policy } = useMemo(() => {
     const pricing = chainPricing(advice.chainBasis);
@@ -46,15 +47,22 @@ export function useAccountPlan(
     () => new Map(advice.colonies.map((c) => [c.planetId, c.afterRebuildPerDay])),
     [advice.colonies]
   );
+  const prices = advice.chainBasis.books.revenuePrices;
+  const buying = buyTiers.length > 0;
+  const pool = useMemo(
+    () => accountPool(colonies, pi, prices, buying),
+    [colonies, pi, prices, buying]
+  );
+  // The plan waits for the hub's volumes: ranking and capping on a half-read set would plan twice.
+  const { trades, pending: tradesPending } = useHubTradesPerDay(pool, regionId);
   const candidates = useMemo(
-    () =>
-      accountCandidates(colonies, pi, advice.chainBasis.books.revenuePrices, buyTiers.length > 0),
-    [colonies, pi, advice.chainBasis, buyTiers]
+    () => accountCandidates(colonies, pi, prices, buying, trades),
+    [colonies, pi, prices, buying, trades]
   );
   // The colonies and assumptions the solver reads, and the SDE it reads them from. Without
   // hauling there are no distances to wait for, so the jump key is left out.
   const key = useMemo(() => {
-    if (haul && inputsKey === null) return null;
+    if ((haul && inputsKey === null) || tradesPending) return null;
     return JSON.stringify([
       chainBasisKey(advice.chainBasis, pi),
       coloniesKey(colonies),
@@ -63,8 +71,20 @@ export function useAccountPlan(
       buyTiers,
       candidates,
       [...soloPerDay],
+      candidates.map((id) => trades.get(id) ?? null),
     ]);
-  }, [haul, inputsKey, advice.chainBasis, pi, buyTiers, candidates, soloPerDay, colonies]);
+  }, [
+    haul,
+    inputsKey,
+    tradesPending,
+    advice.chainBasis,
+    pi,
+    buyTiers,
+    candidates,
+    soloPerDay,
+    colonies,
+    trades,
+  ]);
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
@@ -76,6 +96,7 @@ export function useAccountPlan(
       candidates,
       haul,
       soloPerDay,
+      hubTradesPerDay: trades,
       pi,
       ...(jumps ? { jumps } : {}),
     });

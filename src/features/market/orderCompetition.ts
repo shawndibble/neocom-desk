@@ -143,6 +143,8 @@ export async function loadRegionCompetition(
     systemId: o.system_id,
     volumeRemain: o.volume_remain,
     isBuyOrder: o.is_buy_order,
+    range: o.range,
+    minVolume: o.min_volume,
   }));
   return { competitors, fetchedAt, truncated };
 }

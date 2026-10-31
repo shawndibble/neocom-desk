@@ -39,6 +39,7 @@ import { CLONES_SORTS, type ClonesSort } from '@/features/character/clonesSort';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { loadClonesSnapshot } from '@/features/character/clonesSnapshot';
+import { PlaceLink, SystemLink } from '@/features/entities';
 import { CloneCard, TOUCH_LINK } from '@/features/character/CloneCard';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
@@ -167,7 +168,7 @@ export function Clones() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <CharacterHeader
         characterId={activeCharacterId}
         totalSp={sp.totalSp}
@@ -191,6 +192,9 @@ export function Clones() {
             wornValue={wornValue}
             homeLocationId={homeLocation?.location_id}
             homeLocationName={homeLocationName}
+            homeLocationResolved={
+              homeLocation?.location_id !== undefined && locationNames.has(homeLocation.location_id)
+            }
             homeSecurity={homeSecurity}
             homeJumps={homeJumps}
             lastStationChangeDate={lastStationChangeDate}
@@ -218,7 +222,9 @@ export function Clones() {
         title={t('clones.title')}
         actions={
           <span className="flex items-center gap-2">
-            {clonesResult && <DataAgeBadge date={clonesResult.fetchedAt} />}
+            {clonesResult && (
+              <DataAgeBadge date={clonesResult.fetchedAt} expiresAt={clonesResult.expiresAt} />
+            )}
             <IconButton
               size="sm"
               icon={<Icon.Refresh />}
@@ -302,7 +308,13 @@ export function Clones() {
                   <CloneCard
                     current
                     title={t('clones.wearingNow')}
-                    place={characterSystemName ?? t('clones.unknownPlace')}
+                    place={
+                      characterSystemName !== null && characterSystemId !== null ? (
+                        <SystemLink systemId={characterSystemId}>{characterSystemName}</SystemLink>
+                      ) : (
+                        (characterSystemName ?? t('clones.unknownPlace'))
+                      )
+                    }
                     security={
                       characterSystemId === null ? undefined : securities.get(characterSystemId)
                     }
@@ -327,7 +339,13 @@ export function Clones() {
                       rowKey={String(clone.jump_clone_id)}
                       highlighted={clone.jump_clone_id === highlightedCloneId}
                       title={name ?? place}
-                      place={name === undefined ? null : place}
+                      place={
+                        name === undefined ? null : locationNames.has(clone.location_id) ? (
+                          <PlaceLink id={clone.location_id}>{place}</PlaceLink>
+                        ) : (
+                          place
+                        )
+                      }
                       rename={
                         nicknamesHydrated
                           ? {

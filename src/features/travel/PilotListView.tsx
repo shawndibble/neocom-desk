@@ -2,7 +2,8 @@
  * What a pasted Local list or D-Scan becomes in Pilot Lookup (issue #2863 and
  * the intel rework): a Local list is grouped by what each pilot means to the
  * Character (contacts, kills in the space they are in, kills elsewhere,
- * quiet, friendly), with kills split by space and dated; a D-Scan is its
+ * quiet, friendly) or by alliance and corporation (issue #5668), with kills
+ * split by space and dated; a D-Scan is its
  * ships counted by class. A pilot's name opens Show Info, whose Character tab
  * has the six-month picture.
  *
@@ -11,7 +12,7 @@
  * list never calls a pilot safe or hostile.
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -19,6 +20,7 @@ import {
   EmptyState,
   IconButton,
   Panel,
+  SegmentedControl,
   Spinner,
   TextInput,
   type DataTableColumn,
@@ -30,8 +32,19 @@ import {
   dscanSnapshotReuseKey,
   MAX_DSCAN_SNAPSHOT_CHARS,
 } from '@/engine/pilotList/dscanSnapshot';
-import { groupOf, PILOT_GROUP_ORDER, type PilotGroupId } from '@/engine/pilotList/grouping';
-import { ageTone, topShips, windowStart, type KillSpace } from '@/engine/pilotList/killActivity';
+import {
+  groupOf,
+  isFriendly,
+  PILOT_GROUP_ORDER,
+  type PilotGroupId,
+} from '@/engine/pilotList/grouping';
+import {
+  ageTone,
+  shownLastKill,
+  topShips,
+  windowStart,
+  type KillSpace,
+} from '@/engine/pilotList/killActivity';
 import { CharacterLink } from '@/features/entities';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
@@ -42,10 +55,17 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useNow } from '@/lib/useNow';
-import type { PilotPaste } from '@/engine/pilotList/parsePilotPaste';
+import {
+  MAX_LIST_PILOTS,
+  MAX_LOCAL_NAMES,
+  type PilotPaste,
+} from '@/engine/pilotList/parsePilotPaste';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { newArrivals } from '@/engine/pilotList/localDiff';
 import { FleetBoard } from './FleetBoard';
+import { useLocalGroupMode, type LocalGroupMode } from './localGroupMode';
+import { LocalOrgGroups } from './LocalOrgGroups';
 import { useLastLocal } from './lastLocal';
 import { NewArrivalTag } from './NewArrivalTag';
 import { loadPilotList, loadViewerContext, type PilotListRow } from './pilotListData';
@@ -66,8 +86,14 @@ export function PilotListView({ paste }: { paste: PilotPaste }) {
   return paste.kind === 'local' ? (
     <LocalList key={paste.names.join('|')} paste={paste} />
   ) : (
-    <FleetBoard rows={paste.rows} trackHistory />
+    <LiveFleetBoard rows={paste.rows} />
   );
+}
+
+/** The live paste: it was taken where the pilot is, so their Current System says if it is wormhole space. */
+function LiveFleetBoard({ rows }: { rows: DscanPaste['rows'] }) {
+  const { space } = useHereSpace();
+  return <FleetBoard rows={rows} trackHistory wormholeSpace={space === 'wormhole'} />;
 }
 
 /** How many hulls a row names under "Flew on kills". */
@@ -93,7 +119,14 @@ function byRecentActivity(a: PilotListRow, b: PilotListRow): number {
     row.kills.kind === 'ready' ? row.kills.summary.recentCount : 0;
   const last = (row: PilotListRow) =>
     row.kills.kind === 'ready' ? (row.kills.kills[0]?.timeMs ?? 0) : 0;
-  return count(b) - count(a) || last(b) - last(a) || a.name.localeCompare(b.name);
+  // Pilots past the zKillboard cap know nothing of their kills: below those who do.
+  const unchecked = (row: PilotListRow) => Number(row.kills.kind === 'notLookedUp');
+  return (
+    unchecked(a) - unchecked(b) ||
+    count(b) - count(a) ||
+    last(b) - last(a) ||
+    a.name.localeCompare(b.name)
+  );
 }
 
 function LocalList({ paste }: { paste: LocalPaste }) {
@@ -104,6 +137,8 @@ function LocalList({ paste }: { paste: LocalPaste }) {
   const [failed, setFailed] = useState(false);
   const [hullNames, setHullNames] = useState<Map<number, string>>(new Map());
   const [showFriendly, setShowFriendly] = useState(false);
+  const groupMode = useLocalGroupMode((state) => state.value);
+  useHydratedStore(useLocalGroupMode);
   const now = useNow();
   const isPhone = useIsPhone();
   const previous = useLastLocal(paste.names);
@@ -115,14 +150,30 @@ function LocalList({ paste }: { paste: LocalPaste }) {
 
   useEffect(() => {
     const controller = new AbortController();
+    // One render per frame however many pilots settle in it: a 2,000-name
+    // Local re-renders every row on each update.
+    let frame = 0;
+    let latest: PilotListRow[] = [];
+    const onRows = (next: PilotListRow[]) => {
+      latest = next;
+      if (frame === 0) {
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          setRows(latest);
+        });
+      }
+    };
     loadPilotList(paste.names, {
       signal: controller.signal,
-      onRows: setRows,
+      onRows,
       viewer: loadViewerContext(characterId),
     }).catch(() => {
       if (!controller.signal.aborted) setFailed(true);
     });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      cancelAnimationFrame(frame);
+    };
   }, [paste, characterId]);
 
   const hullIds = useMemo(() => {
@@ -151,6 +202,9 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     };
   }, [hullKey]);
 
+  const found = useMemo(() => rows.filter((row) => !row.notFound), [rows]);
+  const strangers = useMemo(() => found.filter((row) => !isFriendly(row)), [found]);
+
   if (failed) {
     return (
       <EmptyState
@@ -160,12 +214,19 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     );
   }
 
-  const found = rows.filter((row) => !row.notFound);
-  const settled = found.filter((row) => row.kills.kind !== 'loading').length;
-  const notFound = rows.filter((row) => row.notFound).map((row) => row.name);
+  const byOrganization = groupMode === 'organization';
+  // The Kills view names only the misses among the names it lists.
+  const notFound = (byOrganization ? rows : rows.slice(0, MAX_LIST_PILOTS))
+    .filter((row) => row.notFound)
+    .map((row) => row.name);
+  // The Kills view lists the names zKillboard was asked about; the rest are
+  // only placed by organization (issue #5668).
+  const checked = rows.slice(0, MAX_LIST_PILOTS).filter((row) => !row.notFound);
+  const unchecked = Math.max(0, paste.names.length - MAX_LIST_PILOTS);
+  const settled = checked.filter((row) => row.kills.kind !== 'loading').length;
 
   const groups = new Map<PilotGroupId, PilotListRow[]>(PILOT_GROUP_ORDER.map((id) => [id, []]));
-  for (const row of found) {
+  for (const row of checked) {
     const id = groupOf(
       {
         standing: row.standing,
@@ -176,7 +237,6 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     );
     groups.get(id)?.push(row);
   }
-  for (const list of groups.values()) list.sort(byRecentActivity);
 
   const wormholeSeen =
     here.space === 'wormhole' ||
@@ -187,10 +247,11 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     ? ['highsec', 'lowsec', 'nullsec', 'wormhole']
     : ['highsec', 'lowsec', 'nullsec'];
 
-  const columns: DataTableColumn<PilotListRow>[] = [
+  const columns = (showAffiliation: boolean): DataTableColumn<PilotListRow>[] => [
     {
       id: 'pilot',
       header: t('travel.pilot.list.pilot'),
+      sortValue: (row) => row.name.toLowerCase(),
       render: (row) => {
         const threat = rowThreat(row, now);
         return (
@@ -204,7 +265,9 @@ function LocalList({ paste }: { paste: LocalPaste }) {
               {threat !== null && <ThreatBadge level={threat} solid />}
               {isNew(row) && <NewArrivalTag threat={threat} />}
             </span>
-            <PilotAffiliation row={row} className="text-[0.6875rem] text-text-dim" />
+            {showAffiliation && (
+              <PilotAffiliation row={row} className="text-[0.6875rem] text-text-dim" />
+            )}
           </>
         );
       },
@@ -213,6 +276,9 @@ function LocalList({ paste }: { paste: LocalPaste }) {
       id: 'standing',
       header: t('travel.pilot.list.standing'),
       headerCellClassName: STANDING_COLUMN_WIDTH,
+      // Worst standing first: the one to watch. No contact sinks.
+      sortValue: (row) => row.standing?.value,
+      sortFirst: 'asc',
       render: (row) => <StandingCell row={row} />,
     },
     ...spaces.map((space): DataTableColumn<PilotListRow> => ({
@@ -221,6 +287,9 @@ function LocalList({ paste }: { paste: LocalPaste }) {
       align: 'right',
       className: 'tabular-nums',
       headerCellClassName: COUNT_COLUMN_WIDTH,
+      // A pilot with no kill count (loading, unreachable, skipped) sinks.
+      sortValue: (row) =>
+        row.kills.kind === 'ready' ? row.kills.summary.bySpace[space].count : undefined,
       render: (row) => <SpaceCell row={row} space={space} now={now} />,
     })),
     {
@@ -262,10 +331,11 @@ function LocalList({ paste }: { paste: LocalPaste }) {
           .join(', ');
   };
 
-  const table = (id: PilotGroupId, list: PilotListRow[]) =>
-    isPhone ? (
-      <ul aria-label={groupTitle(id, t, here.space)} className="space-y-2">
-        {list.map((row) => (
+  const table = (label: string, list: PilotListRow[], showAffiliation = true) => {
+    const sorted = [...list].sort(byRecentActivity);
+    return isPhone ? (
+      <ul aria-label={label} className="space-y-2">
+        {sorted.map((row) => (
           <PilotCard
             key={row.name}
             row={row}
@@ -278,9 +348,9 @@ function LocalList({ paste }: { paste: LocalPaste }) {
       </ul>
     ) : (
       <DataTable
-        label={groupTitle(id, t, here.space)}
-        columns={columns}
-        rows={list}
+        label={label}
+        columns={columns(showAffiliation)}
+        rows={sorted}
         className="table-fixed"
         rowKey={(row) => row.name}
         rowClassName={(row) => {
@@ -290,49 +360,65 @@ function LocalList({ paste }: { paste: LocalPaste }) {
         responsive="stack"
       />
     );
+  };
+
+  const friendlySection = (list: PilotListRow[]) =>
+    list.length > 0 && (
+      <section className="space-y-2">
+        <GroupHeading id="friendly" count={list.length} space={here.space} />
+        <Button
+          size="sm"
+          aria-expanded={showFriendly}
+          onClick={() => setShowFriendly((open) => !open)}
+        >
+          {showFriendly ? t('travel.pilot.list.friendlyHide') : t('travel.pilot.list.friendlyShow')}
+        </Button>
+        {showFriendly && table(groupTitle('friendly', t, here.space), list)}
+      </section>
+    );
+
+  const friendly = found.filter(isFriendly);
 
   return (
     <Panel>
       <div className="flex flex-col gap-6">
-        <HereControl here={here} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <HereControl here={here} />
+          <GroupModeControl value={groupMode} />
+        </div>
         {arrivals !== null && arrivals.size > 0 && (
           <p className="text-xs text-text-dim">
             {t('travel.pilot.list.newSinceLastPaste', { count: arrivals.size })}
           </p>
         )}
-        {settled < found.length && (
+        {settled < checked.length && (
           <p role="status" className="flex items-center gap-2 text-xs text-text-dim">
             <Spinner label={t('common.loading')} />
-            {t('travel.pilot.list.progress', { done: settled, total: found.length })}
+            {t('travel.pilot.list.progress', { done: settled, total: checked.length })}
           </p>
         )}
-        {PILOT_GROUP_ORDER.map((id) => {
-          const list = groups.get(id) ?? [];
-          if (list.length === 0) return null;
-          if (id === 'friendly') {
+        {byOrganization ? (
+          <>
+            <LocalOrgGroups
+              rows={strangers}
+              threatOf={(row) => rowThreat(row, now)}
+              renderRows={table}
+            />
+            {friendlySection(friendly)}
+          </>
+        ) : (
+          PILOT_GROUP_ORDER.map((id) => {
+            const list = groups.get(id) ?? [];
+            if (list.length === 0) return null;
+            if (id === 'friendly') return <Fragment key={id}>{friendlySection(list)}</Fragment>;
             return (
               <section key={id} className="space-y-2">
                 <GroupHeading id={id} count={list.length} space={here.space} />
-                <Button
-                  size="sm"
-                  aria-expanded={showFriendly}
-                  onClick={() => setShowFriendly((open) => !open)}
-                >
-                  {showFriendly
-                    ? t('travel.pilot.list.friendlyHide')
-                    : t('travel.pilot.list.friendlyShow')}
-                </Button>
-                {showFriendly && table(id, list)}
+                {table(groupTitle(id, t, here.space), list)}
               </section>
             );
-          }
-          return (
-            <section key={id} className="space-y-2">
-              <GroupHeading id={id} count={list.length} space={here.space} />
-              {table(id, list)}
-            </section>
-          );
-        })}
+          })
+        )}
         {notFound.length > 0 && (
           <p className="text-xs text-text-dim">
             {t('travel.pilot.list.notFoundNames', {
@@ -341,13 +427,56 @@ function LocalList({ paste }: { paste: LocalPaste }) {
             })}
           </p>
         )}
-        {paste.overflow > 0 && (
+        {byOrganization
+          ? unchecked > 0 && (
+              <p className="text-xs text-text-dim">
+                {t('travel.pilot.list.overflowByOrganization', {
+                  shown: MAX_LIST_PILOTS,
+                  count: unchecked,
+                })}
+              </p>
+            )
+          : unchecked + paste.overflow > 0 && (
+              <p className="text-xs text-text-dim">
+                {t('travel.pilot.list.overflow', {
+                  shown: MAX_LIST_PILOTS,
+                  count: unchecked + paste.overflow,
+                })}
+              </p>
+            )}
+        {byOrganization && paste.overflow > 0 && (
           <p className="text-xs text-text-dim">
-            {t('travel.pilot.list.overflow', { shown: paste.names.length, count: paste.overflow })}
+            {t('travel.pilot.list.overflowUnread', {
+              count: paste.overflow,
+              max: MAX_LOCAL_NAMES,
+            })}
           </p>
         )}
       </div>
     </Panel>
+  );
+}
+
+function GroupModeControl({ value }: { value: LocalGroupMode }) {
+  const { t } = useTranslation();
+  const label = t('travel.pilot.list.groupBy');
+  const setMode = useLocalGroupMode((state) => state.setValue);
+  return (
+    <span className="flex items-center gap-2">
+      <span aria-hidden className="text-xs text-text-dim">
+        {label}
+      </span>
+      <SegmentedControl
+        label={label}
+        size="sm"
+        value={value}
+        onChange={(mode) => void setMode(mode)}
+        options={[
+          { value: 'kills', label: t('travel.pilot.list.groupByKills') },
+          { value: 'organization', label: t('travel.pilot.list.groupByOrganization') },
+        ]}
+      />
+    </span>
   );
 }
 
@@ -469,8 +598,16 @@ function SpaceCell({ row, space, now }: { row: PilotListRow; space: KillSpace; n
   if (row.kills.kind === 'unreachable') {
     return <span className="text-text-dim">{t('travel.pilot.list.stateUnreachable')}</span>;
   }
+  if (row.kills.kind === 'notLookedUp') {
+    return (
+      <span className="text-[0.6875rem] text-text-dim">
+        {t('travel.pilot.list.stateNotLookedUp')}
+      </span>
+    );
+  }
   if (row.kills.kind === 'skipped') return <span className="text-text-dim">—</span>;
-  const { count, lastMs } = row.kills.summary.bySpace[space];
+  const { count } = row.kills.summary.bySpace[space];
+  const lastMs = shownLastKill(row.kills.summary.bySpace[space].lastMs, now);
   const tone = ageTone(lastMs, now);
   return (
     <span className="block leading-tight">

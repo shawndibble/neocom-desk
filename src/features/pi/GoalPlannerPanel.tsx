@@ -29,11 +29,18 @@ import { EmptyState, Spinner } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { planBest, type BestPlan } from '@/engine/pi/planBest';
 import { planDiff } from '@/engine/pi/planDiff';
+import { salesCapPerDay, thinSales } from '@/engine/pi/salesCap';
 import type { Goal, JumpsFn } from '@/engine/pi/goalTypes';
 import { scheduleSync, setSyncedSetting } from '@/sync';
 import { useSharedJumpBasis, jumpsBetween } from '@/features/route/jumpBasis';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { PricesUnavailable } from './PricesUnavailable';
+import { commodityName } from './goalPlannerFormat';
+import { ThinSalesNote } from './ThinSalesNote';
+import { isPriceFlagged } from '@/engine/market/priceVsMedian';
+import { PriceVsMedianFlag } from './PriceVsMedianFlag';
+import { usePiPriceVsMedian } from './usePiPriceVsMedian';
+import { useHubTradesPerDay } from './useHubTradesPerDay';
 import { useCadence } from './cadencePref';
 import { PI_MAP_HREF, PLAN_CUSTOMS_HASH } from './piPlanLink';
 import { useSellHub } from './sellHub';
@@ -199,6 +206,28 @@ function GoalPlanner({
   const goalsKey = useDeferredValue(serializeGoals(plannableGoals(goals, plannable)) ?? '');
   const plannedGoals = useMemo(() => parseGoals(goalsKey), [goalsKey]);
 
+  // The hub only absorbs a share of a P2+ product's daily volume; the plan counts
+  // no more than that as sold. The plan does not wait: a product whose volume is
+  // unread is uncapped until it lands.
+  const goalTypeIds = useMemo(
+    () =>
+      plannedGoals
+        .filter((goal) => (products.find((p) => p.typeId === goal.typeId)?.tier ?? 0) >= 2)
+        .map((goal) => goal.typeId),
+    [plannedGoals, products]
+  );
+  const { trades } = useHubTradesPerDay(goalTypeIds, hub.regionId);
+  // Only the picked (goal) products cost a history read for the "vs 90d" flag.
+  const pickedTypeIds = useMemo(
+    () => plannedGoals.filter((goal) => goal.unitsPerDay > 0).map((goal) => goal.typeId),
+    [plannedGoals]
+  );
+  const vs90d = usePiPriceVsMedian(pickedTypeIds, hub.regionId);
+  const salesCaps = useMemo(
+    () => new Map([...trades].map(([typeId, perDay]) => [typeId, salesCapPerDay(perDay)!])),
+    [trades]
+  );
+
   // --- Jumps on the pilot's route basis: each colony's system to the hub, and
   // between colony systems for the host choice. The plan does not wait for
   // them: until they resolve every leg is unknown (no host is penalised) and
@@ -260,6 +289,7 @@ function GoalPlanner({
           policy: plannerPolicy({ maxP0Types: prefs.maxP0Types, buyTiers }),
           books: priceBooks(prices, snapshot.accountingLevel, buybackPct),
           jumps: jumpsFn,
+          salesCapPerDay: salesCaps,
         },
         pi
       );
@@ -267,7 +297,18 @@ function GoalPlanner({
     } catch {
       return { error: true };
     }
-  }, [pi, prices, snapshot, rows, plannedGoals, prefs.maxP0Types, buyTiers, buybackPct, jumpsFn]);
+  }, [
+    pi,
+    prices,
+    snapshot,
+    rows,
+    plannedGoals,
+    prefs.maxP0Types,
+    buyTiers,
+    buybackPct,
+    jumpsFn,
+    salesCaps,
+  ]);
 
   const names = useMemo((): PlanNames | null => {
     if (!snapshot || !pi) return null;
@@ -334,6 +375,17 @@ function GoalPlanner({
     const distancesPending = jumpsFn === undefined && rows.length > 0;
     const hasGoals = plannedGoals.some((goal) => goal.unitsPerDay > 0);
     const steps = changeSteps(best.plan, planDiff(best.plan, planned), rows);
+    // Only units sent to the hub are capped, so only those can be over the share.
+    const soldPerDay = new Map<number, number>();
+    for (const f of best.plan.flows) {
+      if (f.to === 'hub')
+        soldPerDay.set(f.typeId, (soldPerDay.get(f.typeId) ?? 0) + f.unitsPerHour * HOURS_PER_DAY);
+    }
+    const flaggedGoals = pickedTypeIds.filter((typeId) => isPriceFlagged(vs90d.get(typeId)));
+    const thinGoals = [...trades.keys()].flatMap((typeId) => {
+      const thin = thinSales(soldPerDay.get(typeId) ?? 0, trades.get(typeId));
+      return thin ? [{ typeId, thin }] : [];
+    });
     results = (
       <div className="space-y-4">
         {noColonies && (
@@ -356,6 +408,26 @@ function GoalPlanner({
           distancesPending={distancesPending}
           names={names}
         />
+        {hasGoals && thinGoals.length > 0 && (
+          <ul className="space-y-1">
+            {thinGoals.map(({ typeId, thin }) => (
+              <li key={typeId} className="text-xs">
+                <b className="font-semibold">{commodityName(typeId, pi)}</b>
+                <ThinSalesNote thin={thin} regionName={hub.regionName} />
+              </li>
+            ))}
+          </ul>
+        )}
+        {hasGoals && flaggedGoals.length > 0 && (
+          <ul className="space-y-1">
+            {flaggedGoals.map((typeId) => (
+              <li key={typeId} className="flex flex-wrap items-center gap-x-2 text-xs">
+                <b className="font-semibold">{commodityName(typeId, pi)}</b>
+                <PriceVsMedianFlag pct={vs90d.get(typeId)} />
+              </li>
+            ))}
+          </ul>
+        )}
         {hasGoals && (
           <>
             <Shortfalls

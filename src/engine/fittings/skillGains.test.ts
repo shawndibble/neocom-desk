@@ -8,6 +8,7 @@ import {
   levelOptions,
   pickedLevel,
   roleChanges,
+  roleSwapChanges,
   rankSkillGains,
   scheduledSkillTargets,
   skillGainCandidates,
@@ -293,6 +294,35 @@ describe('gainMetrics — weapon reach', () => {
       { key: 'falloff', before: 30, after: 33 },
       { key: 'tracking', before: 2, after: 2.1 },
     ]);
+  });
+
+  it("reports the loss when a swap raises one weapon's reach and cuts another's", () => {
+    const mixed = (turretOptimal: number, missileRange: number) =>
+      withStats({
+        applied: {
+          droneControlRange: 0,
+          weapons: [
+            turret(turretOptimal, 30000, 2),
+            {
+              kind: 'missile',
+              dps: 300,
+              range: missileRange,
+              explosionRadius: 100,
+              explosionVelocity: 100,
+              damageReductionFactor: 0.5,
+            },
+          ],
+        },
+      });
+    const [before, after] = [mixed(100000, 50000), mixed(110000, 40000)];
+    // A skill level never cuts reach, so What to Train keeps the gain…
+    expect(roleChanges(before, after)).toContainEqual({ key: 'optimal', before: 100, after: 110 });
+    // …but a module swap must not hide the missile range it costs.
+    expect(roleSwapChanges(before, after)).toContainEqual({
+      key: 'optimal',
+      before: 50,
+      after: 40,
+    });
   });
 
   it("takes a missile's flight range as its optimal", () => {

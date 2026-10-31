@@ -37,6 +37,7 @@ vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn().mockResolvedValue(un
 vi.mock('@/auth/session', () => ({ getValidAccessToken: vi.fn() }));
 
 import { db } from '@/db';
+import { READ_MODELS_SCHEMA } from '../../../../functions/src/corpTaxBookVersionKeys';
 import { clearBookCache } from './bookCache';
 import { mergeBookData, readBookData, readBookState, readRebills } from './bookClient';
 
@@ -54,7 +55,14 @@ const COLLECTIONS = [
   'writeOffs',
   'feeders',
   'meta',
+  'readModels',
 ];
+// The Overview and Miners tab docs (#5259), read with every book under their own stamp.
+const MODELS = {
+  minerList: { schema: READ_MODELS_SCHEMA, miners: [] },
+  overview: { schema: READ_MODELS_SCHEMA },
+};
+const MODEL_DOCS = [`${BOOK}/readModels/minerList`, `${BOOK}/readModels/overview`];
 
 function stamped(overrides: Record<string, string> = {}): Data {
   return {
@@ -83,6 +91,8 @@ beforeEach(async () => {
   store.docs.set(`${BOOK}/feeders/5`, { corporationId: 5, status: 'active' });
   store.docs.set(`${BOOK}/feeders/5/payouts/p1`, { amount: 1 });
   store.docs.set(`${BOOK}/meta/paid`, { ids: ['s0'] });
+  store.docs.set(MODEL_DOCS[0]!, MODELS.minerList);
+  store.docs.set(MODEL_DOCS[1]!, MODELS.overview);
 });
 
 describe('readBookData over the version marker', () => {
@@ -300,31 +310,39 @@ describe('readBookData over the version marker', () => {
 });
 
 describe('readBookData and the Overview/Miners read models (#5259)', () => {
-  const MODELS = { minerList: { schema: 1, miners: [] }, overview: { schema: 1 } };
-  beforeEach(() => {
-    store.docs.set(`${BOOK}/readModels/minerList`, MODELS.minerList);
-    store.docs.set(`${BOOK}/readModels/overview`, MODELS.overview);
-  });
-
-  it('never touches readModels with the switch off, the default', async () => {
+  it('reads the two docs, and reuses them while their stamp holds', async () => {
     const data = await readBookData(7, CORP);
-    expect(store.reads.some((p) => p.includes('/readModels'))).toBe(false);
-    expect(data?.readModels).toBeUndefined();
-  });
-
-  it('reads the two docs with the switch on, and reuses them while their stamp holds', async () => {
-    const stamp = { readModels: 'readModels-1' };
-    store.docs.set(BOOK, stamped(stamp));
-    const data = await readBookData(7, CORP, undefined, true);
     expect(data?.readModels).toEqual(MODELS);
-    expect(store.reads.filter((p) => p.includes('/readModels'))).toHaveLength(2);
+    expect(store.reads.filter((p) => p.includes('/readModels')).sort()).toEqual(MODEL_DOCS);
 
     store.reads.length = 0;
-    await readBookData(7, CORP, undefined, true);
+    await readBookData(7, CORP);
     expect(store.reads.some((p) => p.includes('/readModels'))).toBe(false);
 
     store.docs.set(BOOK, stamped({ readModels: 'readModels-2' }));
-    await readBookData(7, CORP, undefined, true);
-    expect(store.reads.filter((p) => p.includes('/readModels'))).toHaveLength(2);
+    await readBookData(7, CORP);
+    expect(store.reads.filter((p) => p.includes('/readModels')).sort()).toEqual(MODEL_DOCS);
+  });
+
+  it('opens the book without them while the server has not built them', async () => {
+    store.docs.delete(MODEL_DOCS[0]!);
+    store.docs.delete(MODEL_DOCS[1]!);
+    const data = await readBookData(7, CORP);
+    expect(data?.readModels).toEqual({ minerList: undefined, overview: undefined });
+    expect(data?.state.miners).toHaveLength(1);
+  });
+
+  it('opens the book without them, wiping nothing, when the rules refuse the docs', async () => {
+    await readBookData(7, CORP);
+    clearBookCache();
+    store.denied.add(MODEL_DOCS[0]!);
+    store.denied.add(MODEL_DOCS[1]!);
+    // A moved stamp, so the held copy is not served and the refused docs are read.
+    store.docs.set(BOOK, stamped({ readModels: 'readModels-2' }));
+
+    const data = await readBookData(7, CORP);
+    expect(data?.readModels).toBeUndefined();
+    expect(data?.state.miners).toBeDefined();
+    expect(await db.corpBookParts.count()).toBeGreaterThan(0);
   });
 });

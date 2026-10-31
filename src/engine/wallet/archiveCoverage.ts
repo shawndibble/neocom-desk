@@ -9,6 +9,11 @@
 import { DAY_MS, HOUR_MS } from '@/lib/age';
 
 export const ARCHIVE_DAYS = 365;
+
+/** The oldest ESI-style date (`…Z`, second resolution) an archive keeps, so string compares agree. */
+export function archiveCutoffIso(nowMs: number): string {
+  return `${new Date(nowMs - ARCHIVE_DAYS * DAY_MS).toISOString().slice(0, 19)}Z`;
+}
 export const ESI_WALLET_WINDOW_DAYS = 30;
 /** ESI may serve a wallet list cached up to this long, so a fetch proves nothing newer. */
 export const ESI_WALLET_CACHE_MS = HOUR_MS;

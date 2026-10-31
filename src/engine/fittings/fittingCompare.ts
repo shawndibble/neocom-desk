@@ -24,6 +24,7 @@ const STAT_DIRECTION: Readonly<Partial<Record<FittingStatKey, 'higher' | 'lower'
   capacitorDelta: 'higher',
   sensorStrength: 'higher',
   cargoCapacity: 'higher',
+  droneControlRange: 'higher',
   droneDps: 'higher',
   droneCapacity: 'higher',
   ehp: 'higher',
@@ -170,14 +171,32 @@ export function compareFittingStats(
   target?: TargetProfile,
   prices?: readonly (FittingPriceTotals | null)[]
 ): CompareTable {
-  const rows: CompareRow[] = NUMERIC_FIELDS.map((field) => {
+  const rows: CompareRow[] = NUMERIC_FIELDS.flatMap((field) => {
     const values = statsList.map((s) => round(field.value(s), field.digits));
-    return {
-      key: field.key,
-      values,
-      differs: new Set(values).size > 1,
-      bestIndices: bestIndicesFor(values, STAT_DIRECTION[field.key]),
-    };
+    if (!field.hideWhenNone)
+      return [
+        {
+          key: field.key,
+          values,
+          differs: new Set(values).size > 1,
+          bestIndices: bestIndicesFor(values, STAT_DIRECTION[field.key]),
+        },
+      ];
+    // A figure no Fitting has (no tackle, no analyzer) is a row of zeros.
+    if (values.every((value) => value === 0)) return [];
+    // Lower-is-better: a Fitting without the thing (0) is not the fastest or least wasteful.
+    const ranked = field.direction === 'lower' ? values.map((v) => v || Infinity) : values;
+    return [
+      {
+        key: field.key,
+        values,
+        differs: new Set(values).size > 1,
+        bestIndices: bestIndicesFor(
+          ranked,
+          field.direction === 'neutral' ? undefined : field.direction
+        ).filter((index) => values[index] !== 0),
+      },
+    ];
   });
   rows.push(capacitorRow(statsList));
   if (target) rows.push(...appliedRows(statsList, target));

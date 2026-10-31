@@ -1,6 +1,6 @@
 /**
  * One jump through a Thera / Turnur hole on a Route Safety route (issue
- * #2476), drawn between its two systems: "⤳ Wormhole · Kihtaled → Thera ·
+ * #2476), drawn between its two systems: "Wormhole · Kihtaled → Thera ·
  * Warp to EPK-530 in Kihtaled · Q063 · fits Medium · 11h 17m left ·
  * EVE-Scout, 1m ago", and Copy for the signature. A phone card keeps what a
  * pilot needs in space: where to warp, size, life left and Copy.
@@ -82,7 +82,7 @@ export function HoleStepLine({
   const names = { signature: shownSignature, system: warpSystem };
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xs border border-dashed border-line-bright px-2 py-1 sm:rounded-none sm:border-y-0 sm:border-r-0 sm:border-l-2">
-      <span aria-hidden="true">⤳</span>
+      <Icon.WormholeHop size={Icon.ICON_SIZE.sm} aria-hidden="true" />
       <span className="hidden font-semibold sm:inline">{t('travel.holes.wormhole')}</span>
       <span className="hidden sm:inline">
         <Dot />

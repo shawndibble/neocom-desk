@@ -91,6 +91,7 @@ import {
 import { ItemMarketTab } from './ItemMarketTab';
 import { RequiredSkillsSection } from './RequiredSkillsSection';
 import { skillNameOrFallback } from './skillNameOrFallback';
+import { MadeFromSection } from './MadeFromSection';
 import { UsedInSection } from './UsedInSection';
 import { AbyssalItemDetail } from '@/features/abyssal/AbyssalItemDetail';
 import { AbyssalEstimateLine } from '@/features/abyssal/AbyssalEstimateLine';
@@ -362,6 +363,7 @@ export function ItemDetailModal({
           {/* Local SDE data, so they outlive a type-info failure. */}
           <AbyssalItemDetail typeId={typeId} dynamic={dynamic} />
           <PlanetaryProduction pi={pi} typeId={typeId} />
+          <MadeFromSection typeId={typeId} />
           <UsedInSection typeId={typeId} onNavigate={leave} />
         </div>
       ) : (
@@ -457,6 +459,8 @@ export function ItemDetailModal({
               />
 
               <PlanetaryProduction pi={pi} typeId={typeId} />
+
+              <MadeFromSection typeId={typeId} />
 
               <UsedInSection typeId={typeId} onNavigate={leave} />
 

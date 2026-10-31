@@ -66,6 +66,7 @@ export function DangerAnswer({
   read,
   names,
   age,
+  holes,
   shipControl,
   notes,
 }: {
@@ -73,6 +74,8 @@ export function DangerAnswer({
   names: ReadonlyMap<number, string>;
   /** Null for a Shared D-Scan: nobody knows when it was taken. */
   age: ScanAge | null;
+  /** The smallest hole each ship needs, in wormhole space only; else null. */
+  holes: string | null;
   /** "Your ship" as an editable line of text, beside the level. */
   shipControl: ReactNode;
   /** Anything the card should say beneath the read, such as the Grant note. */
@@ -171,6 +174,11 @@ export function DangerAnswer({
         {headline}
       </h3>
       {parts.length > 0 && <p className="mt-1.5 text-sm text-text-dim">{parts.join(' ')}</p>}
+      {holes !== null && (
+        <p className="mt-1.5 text-sm text-text-dim tabular-nums">
+          {t(`${P}holes`, { counts: holes })}
+        </p>
+      )}
       {ageLine !== null && (
         <p className="mt-2.5 text-sm">
           <StatusMark tone={age?.stale ? 'warn' : 'ok'}>{ageLine}</StatusMark>

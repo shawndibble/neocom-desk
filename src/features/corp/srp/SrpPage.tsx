@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { PageHeader, Tabs, useTabsId } from '@/components/ui';
-import { cx } from '@/lib/cx';
+import { PageHeader, Tabs, useTabPanelProps, useTabsId } from '@/components/ui';
 import { usePageTab } from '@/lib/usePageTab';
 import { SRP_TABS } from './srpTabs';
 import { SRP_VIEWS } from './srpViews';
@@ -25,12 +24,14 @@ export function SrpPage({
   const [tab, selectTab] = usePageTab(SRP_TABS);
   const views = SRP_VIEWS.filter((v) => v.visible({ canManageSrp, srpOn, isDirector }));
   const view = views.find((v) => v.id === tab) ?? views[0];
+  const tabbed = views.length > 1;
+  const panel = useTabPanelProps(tabbed ? tabsId : null, view?.id ?? tab);
   if (!view) return null;
   const View = view.component;
   return (
-    <div className={cx('mx-auto grid gap-4 px-4 py-4', view.wide ? 'max-w-6xl' : 'max-w-5xl')}>
+    <div className="mx-auto grid max-w-page gap-4 px-4 py-4">
       <PageHeader title={t('srp.title')} />
-      {views.length > 1 && (
+      {tabbed && (
         <Tabs
           tabsId={tabsId}
           label={t('srp.title')}
@@ -45,7 +46,11 @@ export function SrpPage({
           }))}
         />
       )}
-      <View />
+      {/* One wrapper either way: a second view appearing (SRP turned on) must
+          not remount the first. */}
+      <div {...panel}>
+        <View />
+      </div>
     </div>
   );
 }

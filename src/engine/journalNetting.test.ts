@@ -165,3 +165,37 @@ describe('journalCoverage', () => {
     expect(cov).toEqual({ loaded: 2, total: 3, missing: [{ characterId: C, name: 'Gamma' }] });
   });
 });
+
+describe('classifyJournal Journal Party', () => {
+  const base = {
+    id: 1,
+    date: '2026-08-02T12:00:00Z',
+    ref_type: 'player_donation',
+    description: '',
+  };
+  const none = () => undefined;
+
+  it('is the side that is not the Character, whichever slot it sits in', () => {
+    const rows = classifyJournal(
+      [
+        { ...base, id: 1, amount: 10, first_party_id: 50, second_party_id: 1 },
+        { ...base, id: 2, amount: -10, first_party_id: 1, second_party_id: 60 },
+      ],
+      { trackedIds: new Set([1]), linkFor: none, defaultCharacterId: 1 }
+    );
+    expect(rows.map((r) => r.partyId)).toEqual([50, 60]);
+  });
+
+  it('uses the line own characterId over the default, and none for an own-Character transfer', () => {
+    const rows = classifyJournal(
+      [
+        { ...base, id: 1, amount: 10, first_party_id: 50, second_party_id: 2, characterId: 2 },
+        { ...base, id: 2, amount: 10, first_party_id: 1, second_party_id: 2, characterId: 2 },
+      ],
+      { trackedIds: new Set([1, 2]), linkFor: none, defaultCharacterId: 1 }
+    );
+    expect(rows[0].partyId).toBe(50);
+    expect(rows[1].internal).toBe(true);
+    expect(rows[1].partyId).toBeUndefined();
+  });
+});

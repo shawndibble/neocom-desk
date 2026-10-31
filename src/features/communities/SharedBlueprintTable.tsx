@@ -3,6 +3,7 @@ import { OpenInEveItemMenuItems } from '@/features/market/ItemContextMenu';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
+  ColumnPickerMenu,
   DataTable,
   DisabledMenuItem,
   EmptyState,
@@ -12,6 +13,7 @@ import {
 } from '@/components/ui';
 import { COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
 import { Pill } from '@/components/ui/Pill';
+import { useColumnVisibility } from '@/lib/columnVisibility';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { ItemInfoLink } from '@/features/entities/EntityLink';
 import { BuildPlanMenuItem } from '@/features/industry/BuildPlanContextMenu';
@@ -25,6 +27,11 @@ import { jumpsCellSortValue, renderJumpsCell } from '@/features/route/jumpsCell'
 import { routeToHref } from '@/features/route/routeSafetyLink';
 import { openItemInfo } from '@/stores/itemInfoModal';
 import { placeNamesSystem, type SharedBlueprintRow } from './sharedBlueprintCopies';
+import {
+  SHARED_BLUEPRINT_COLUMN_IDS,
+  useVisibleSharedBlueprintColumns,
+  type SharedBlueprintColumnId,
+} from './sharedBlueprintColumns';
 
 /**
  * A Shared Blueprint's ⋮ (and right-click) menu: Show info, a Build Plan
@@ -87,6 +94,36 @@ function SharedBlueprintMenu({
 }
 
 /**
+ * The table's column picker, for the Library's search row. Reads the same
+ * store as `SharedBlueprintTable`; the menu only needs each column's header.
+ */
+export function SharedBlueprintColumnPicker() {
+  const { t } = useTranslation();
+  const { visible, toggle, reset } = useColumnVisibility(
+    useVisibleSharedBlueprintColumns,
+    SHARED_BLUEPRINT_COLUMN_IDS
+  );
+  const columnsById = Object.fromEntries(
+    SHARED_BLUEPRINT_COLUMN_IDS.map((id) => [
+      id,
+      { id, header: t(`communities.library.columns.${id}`), render: () => null },
+    ])
+  ) as unknown as Record<SharedBlueprintColumnId, DataTableColumn<SharedBlueprintRow>>;
+  return (
+    <ColumnPickerMenu
+      available={SHARED_BLUEPRINT_COLUMN_IDS}
+      visible={visible}
+      columnsById={columnsById}
+      onToggle={toggle}
+      onReset={reset}
+      buttonLabel={t('common.columnsButton')}
+      menuTitle={t('common.columnsMenuTitle')}
+      resetLabel={t('common.resetColumns')}
+    />
+  );
+}
+
+/**
  * The Community Library's "Shared in the Community" view: each shared
  * blueprint with who shares it, where it is (station or structure; its
  * system only when the name does not start with it), how many jumps that is
@@ -107,6 +144,10 @@ export function SharedBlueprintTable({
   systemIds: ReadonlyMap<string, number> | null;
 }) {
   const { t } = useTranslation();
+  const { isVisible } = useColumnVisibility(
+    useVisibleSharedBlueprintColumns,
+    SHARED_BLUEPRINT_COLUMN_IDS
+  );
   // Measured as BPC Sourcing measures its offers: from the Current System,
   // over the pilot's own jump basis (Travel Settings, Route Safety's picks).
   const currentSystem = useCurrentSystem();
@@ -204,10 +245,13 @@ export function SharedBlueprintTable({
       sortValue: (row) => (row.runs < 0 ? Number.MAX_SAFE_INTEGER : row.runs),
     },
   ];
+  const shownColumns = columns.filter(
+    (column) => column.id === 'name' || isVisible(column.id as SharedBlueprintColumnId)
+  );
   return (
     <DataTable
       label={t('communities.library.sharedLabel')}
-      columns={columns}
+      columns={shownColumns}
       rows={rows}
       rowKey={(row) => row.key}
       rowClassName={(row) => (row.stale ? 'opacity-60' : undefined)}

@@ -57,7 +57,6 @@ import {
   type HeaderTotals,
 } from '@/engine/corpTaxBook/minerScope';
 import { forgetObservedCopy } from './observedStore';
-import { CORP_BOOK_READ_MODELS } from './readModelSwitch';
 import type { ReadModelDocs } from '@/engine/corpTaxBook/readModels';
 import { callRouted } from '@/sync/routedCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
@@ -501,8 +500,13 @@ export interface BookData {
   scheduledSync?: ScheduledSyncStatus | null;
   /** Which slices this read covered (bookParts.ts); the rest are empty. Absent: the whole book. */
   parts?: BookPartSet;
-  /** The Overview and Miners tab docs (ADR 0032); read only behind `CORP_BOOK_READ_MODELS`. */
+  /** The Overview and Miners tab docs (ADR 0032); absent until the server has built them. */
   readModels?: ReadModelDocs;
+  /**
+   * The Miner a one-Miner read (`readMinerBookData`) covered; absent for the whole book. Then
+   * `state.miners` holds that Miner only, so a dialog listing other Miners reads them itself.
+   */
+  scopedMiner?: string;
 }
 
 const feederPayouts = (characterId: number, book: number, feeder: number) =>
@@ -547,8 +551,7 @@ function feedersOf(
 export async function readBookData(
   characterId: number,
   corporationId: number,
-  parts: BookPartSet = ALL_BOOK_PART_SET,
-  withReadModels: boolean = CORP_BOOK_READ_MODELS
+  parts: BookPartSet = ALL_BOOK_PART_SET
 ): Promise<BookData | null> {
   const book = await openBook(characterId, corporationId);
   if (!book) return null;
@@ -597,19 +600,19 @@ export async function readBookData(
       undefined
     ),
     book.paidStatementIds(),
-    // Two docs, one stamp (ADR 0032). Off: not a single read.
-    withReadModels
-      ? part('readModels', async () => {
-          const docs = async (id: string) =>
-            (
-              await getDoc(
-                doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'readModels', id)
-              )
-            ).data();
-          const [minerList, overview] = await Promise.all([docs('minerList'), docs('overview')]);
-          return { minerList, overview } as ReadModelDocs;
-        })
-      : Promise.resolve(undefined),
+    // Two docs, one stamp (ADR 0032). Best effort, even on a refusal (rules not deployed): the
+    // screens fall back to the whole-book view, and the book's own reads above already surface
+    // a lost role.
+    part('readModels', async () => {
+      const docs = async (id: string) =>
+        (
+          await getDoc(
+            doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'readModels', id)
+          )
+        ).data();
+      const [minerList, overview] = await Promise.all([docs('minerList'), docs('overview')]);
+      return { minerList, overview } as ReadModelDocs;
+    }).catch(() => undefined),
   ]);
   return {
     settings,
@@ -794,8 +797,24 @@ export async function readMinerBookData(
       groupingAnswers: groupingAnswersFrom(answers),
       scheduledSync: scheduledSyncFrom(scheduled),
       parts: ALL_BOOK_PART_SET,
+      scopedMiner: minerId,
     },
   };
+}
+
+/**
+ * What the group dialog lists on a one-Miner page (#5704): the stored groups and the ledger
+ * rows, through the same copies the whole-book read uses, so a warm device reads only the
+ * book doc and what changed. Officer-only.
+ */
+export async function readGroupingSources(
+  characterId: number,
+  corporationId: number
+): Promise<{ miners: Miner[]; observed: ObservedRow[] } | null> {
+  const book = await openBook(characterId, corporationId);
+  if (!book) return null;
+  const [miners, observed] = await Promise.all([book.list<Miner>('miners'), book.observed()]);
+  return { miners, observed };
 }
 
 /** `extra`'s slices laid over `held`; everything else, and the settings, is `extra`'s fresher copy. */

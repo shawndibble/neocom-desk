@@ -19,6 +19,7 @@ import {
 import { formatDistanceKm as formatKm } from '@/engine/pilotList/formatDistanceKm';
 import type { DscanRow } from '@/engine/pilotList/parsePilotPaste';
 import type { HullCount } from '@/engine/pilotList/dscanWorth';
+import { wormholeSizeForShipGroup } from '@/engine/route/hullWormholeSize';
 import { GrantNote } from '@/app/GrantNote';
 import { useCharacterShipTypeId } from '@/features/character/ship';
 import { cx } from '@/lib/cx';
@@ -29,6 +30,7 @@ import { DscanMeta } from './DscanMeta';
 import { useLastScan } from './lastScan';
 import { OwnShipPicker } from './OwnShipPicker';
 import { useManualShip } from './ownShip';
+import { holeSizeCounts, useHoleSizes } from './useHoleSizes';
 import { HOUR_MS } from '@/lib/age';
 
 /**
@@ -82,10 +84,13 @@ const IDLE_TICK_MS = HOUR_MS;
 export function FleetBoard({
   rows,
   trackHistory = false,
+  wormholeSpace = false,
 }: {
   rows: readonly DscanRow[];
   /** Compare with, and then store as, this device's last scan. The live paste only. */
   trackHistory?: boolean;
+  /** The pilot's Current System is wormhole space. The live paste only: a shared scan was taken elsewhere. */
+  wormholeSpace?: boolean;
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
@@ -121,6 +126,7 @@ export function FleetBoard({
 
   const hulls = useMemo(() => (loaded === undefined ? [] : shipHulls(loaded.board)), [loaded]);
   const previous = useLastScan(hulls, trackHistory && loaded !== undefined);
+  const holes = useHoleSizes(hulls, wormholeSpace);
 
   const manual = useManualShip();
   const current = useCharacterShipTypeId();
@@ -175,10 +181,16 @@ export function FleetBoard({
       {(answer === null || !answer.promoteRoles) && roleShare}
       <div className="grid gap-3 md:grid-cols-2">
         {board.roles.map((r) => (
-          <RoleCard key={r.role} role={r} names={names} />
+          <RoleCard key={r.role} role={r} names={names} wormholeSpace={wormholeSpace} />
         ))}
       </div>
-      <DscanMeta hulls={hulls} names={names} trackHistory={trackHistory} previous={previous} />
+      <DscanMeta
+        hulls={hulls}
+        names={names}
+        trackHistory={trackHistory}
+        previous={previous}
+        holes={holes}
+      />
       {board.leftOut > 0 && (
         <p className="text-xs text-text-dim">
           {t('travel.pilot.dscan.leftOut', { count: board.leftOut })}
@@ -196,6 +208,7 @@ export function FleetBoard({
             read={answer}
             names={names}
             age={trackHistory ? scanAge(Math.max(0, now - loaded.at)) : null}
+            holes={holes === null ? null : holeSizeCounts(t, holes)}
             shipControl={
               <OwnShipPicker
                 typeId={manual.typeId}
@@ -311,7 +324,16 @@ function ShareBar({
   );
 }
 
-function RoleCard({ role, names }: { role: FleetRole; names: ReadonlyMap<number, string> }) {
+function RoleCard({
+  role,
+  names,
+  wormholeSpace,
+}: {
+  role: FleetRole;
+  names: ReadonlyMap<number, string>;
+  /** Name the smallest wormhole each hull needs (issue #5669). */
+  wormholeSpace: boolean;
+}) {
   const { t } = useTranslation();
   const label = t(`travel.pilot.dscan.role.${role.role}`);
   return (
@@ -331,8 +353,13 @@ function RoleCard({ role, names }: { role: FleetRole; names: ReadonlyMap<number,
             hull.groupId === null
               ? ''
               : t(`travel.pilot.dscan.group.${hull.groupId}`, { defaultValue: '' });
+          const holeSize =
+            wormholeSpace && hull.groupId !== null ? wormholeSizeForShipGroup(hull.groupId) : null;
           const sub = [
             group,
+            holeSize === null
+              ? ''
+              : t('travel.pilot.dscan.holeSize', { size: t(`travel.thera.size.${holeSize}`) }),
             hull.nameHint === null
               ? ''
               : t('travel.pilot.dscan.nameHint', {

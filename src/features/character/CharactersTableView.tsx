@@ -20,6 +20,8 @@ export function CharactersTableView({
   onSortChange,
   onSelect,
   onRemove,
+  spExtractionEnabled,
+  onToggleSpFarm,
 }: {
   rows: readonly CharacterRow[];
   columns: DataTableColumn<CharacterRow>[];
@@ -30,6 +32,9 @@ export function CharactersTableView({
   onSortChange: (next: DataTableSort) => void;
   onSelect: (characterId: number) => void;
   onRemove: (characterId: number, name: string) => void;
+  /** The SP Farm menu action only exists while SP extraction monitoring is on. */
+  spExtractionEnabled: boolean;
+  onToggleSpFarm: (characterId: number) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -56,6 +61,8 @@ export function CharactersTableView({
           <CharacterRowContextMenu
             characterId={row.character.characterId}
             name={row.character.name}
+            spFarm={spExtractionEnabled ? row.spFarm : undefined}
+            onToggleSpFarm={() => onToggleSpFarm(row.character.characterId)}
             onRemove={() => onRemove(row.character.characterId, row.character.name)}
           >
             {tr}

@@ -3,9 +3,12 @@
  * `public-data-lp-store` GitHub Actions job (`hauling-demand/<regionId>.json` in R2;
  * `functions/src/marketHistoryVolume.ts`): every type's 30-day demand folded from
  * EVE Ref's history files. One cached request per region replaces a history call
- * per item in the hauling scan's pass 2. `null` means unavailable or stale, and the
- * scan falls back to ESI history.
+ * per item in the hauling scan's pass 2, and gives LP offers their recent trades
+ * (`tradedPriceCheck.ts`). `null` means unavailable or stale: the scan falls back to
+ * ESI history, LP offers keep their listed prices.
  */
+import { useCallback } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
 import type { DemandAggregate } from '@/engine/market/haulingMarket';
@@ -88,4 +91,23 @@ export async function loadHaulingDemand(regionId: number): Promise<HaulingDemand
   } catch {
     return null;
   }
+}
+
+/**
+ * A hub region's demand, never another region's. `regionId` null loads
+ * nothing. `settled` once this region's read is done; `demand` null for good
+ * when it failed or is unavailable.
+ */
+export function useHaulingDemand(regionId: number | null): {
+  demand: HaulingDemand | null;
+  settled: boolean;
+} {
+  const load = useKeyedLoad(
+    regionId === null ? null : String(regionId),
+    useCallback(() => loadHaulingDemand(regionId!), [regionId])
+  );
+  return {
+    demand: load.status === 'ready' ? load.data : null,
+    settled: load.status === 'ready' || load.status === 'failed',
+  };
 }

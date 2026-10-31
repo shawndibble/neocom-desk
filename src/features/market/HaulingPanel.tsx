@@ -905,6 +905,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                 <SlideOver
                   open={detailOpen && selectedRow !== undefined}
                   onClose={closeDetail}
+                  contentKey={selectedRow?.typeId}
                   title={selectedRow?.name ?? t('market.hauling.title')}
                 >
                   {selectedRow &&

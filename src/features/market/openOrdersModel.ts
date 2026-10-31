@@ -391,7 +391,7 @@ function buildRow(
   };
 }
 
-function problemRank(problem: OrderProblem): number {
+export function problemRank(problem: OrderProblem): number {
   return ORDER_PROBLEMS.indexOf(problem);
 }
 

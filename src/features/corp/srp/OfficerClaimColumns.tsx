@@ -7,6 +7,7 @@ import { Button, type DataTableColumn } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import type { SrpClaim } from '../srpClaimTypes';
+import { SRP_STATE_RANK } from '../srpTypes';
 import { ownClaimReason, type ClaimColumnsContext } from './claimColumnsContext';
 import {
   AmountCell,
@@ -29,6 +30,7 @@ const when = (ctx: ClaimColumnsContext, ms: number) => formatTimestamp(new Date(
 const hullColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
   id: 'hull',
   header: ctx.t('srp.officer.columns.hull'),
+  sortValue: (row) => ctx.names.hull(row.hullTypeId),
   render: (row) => (
     <span className="block min-w-0">
       <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -44,12 +46,14 @@ const pilotColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
   id: 'pilot',
   header: ctx.t('srp.officer.columns.pilot'),
   primary: true,
+  sortValue: (row) => row.characterName,
   render: (row) => <Pilot claim={row} ctx={ctx} />,
 });
 
 const lostColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
   id: 'lost',
   header: ctx.t('srp.officer.columns.lost'),
+  sortValue: (row) => row.killedAt,
   className: 'whitespace-nowrap tabular-nums',
   render: (row) => (
     <span className="block">
@@ -64,7 +68,8 @@ const lostColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
 const fleetColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
   id: 'fleet',
   header: ctx.t('srp.officer.columns.fleetOrFc'),
-  className: 'max-w-48',
+  sortValue: (row) => row.fleetOrFc ?? undefined,
+  className: 'max-w-48 wrap-anywhere',
   render: (row) =>
     row.fleetOrFc ? (
       <span className="text-text-dim">{row.fleetOrFc}</span>
@@ -95,7 +100,9 @@ export function pendingColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpCla
       id: 'amount',
       header: ctx.t('srp.officer.columns.amount'),
       align: 'right',
-      className: 'min-w-44',
+      sortValue: (row) => row.amount ?? undefined,
+      // Capped so a long basis line wraps here, leaving the room to Pilot and Hull.
+      className: 'min-w-36 max-w-44 wrap-anywhere',
       render: (row) => <PendingAmount claim={row} ctx={ctx} />,
     },
     {
@@ -104,7 +111,7 @@ export function pendingColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpCla
       align: 'right',
       className: 'whitespace-nowrap',
       render: (row) => (
-        <span className="flex flex-wrap justify-end gap-2">
+        <span className="flex flex-nowrap justify-end gap-2">
           <ApproveReject claim={row} ctx={ctx} className="whitespace-nowrap" />
         </span>
       ),
@@ -120,6 +127,7 @@ export function owedColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpClaim>
     {
       id: 'approved',
       header: ctx.t('srp.officer.columns.approved'),
+      sortValue: (row) => row.decidedAt,
       className: 'whitespace-nowrap tabular-nums',
       render: (row) => (
         <span className="block">
@@ -136,6 +144,7 @@ export function owedColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpClaim>
       id: 'amount',
       header: ctx.t('srp.officer.columns.amount'),
       align: 'right',
+      sortValue: (row) => row.amount ?? undefined,
       className: 'min-w-44',
       render: (row) => (
         <span className="flex flex-wrap items-center justify-end gap-2">
@@ -172,11 +181,14 @@ export function historyColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpCla
     {
       id: 'state',
       header: ctx.t('srp.officer.columns.state'),
+      sortValue: (row) => SRP_STATE_RANK[row.state],
+      sortFirst: 'asc',
       render: (row) => <ClaimStatePill claim={row} ctx={ctx} />,
     },
     {
       id: 'decided',
       header: ctx.t('srp.officer.columns.decided'),
+      sortValue: (row) => decidedLine(row).at,
       className: 'whitespace-nowrap tabular-nums',
       render: (row) => {
         const { at, by } = decidedLine(row);
@@ -207,6 +219,7 @@ export function historyColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpCla
       id: 'amount',
       header: ctx.t('srp.officer.columns.amount'),
       align: 'right',
+      sortValue: (row) => row.amount ?? undefined,
       className: 'min-w-44',
       render: (row) => <AmountCell claim={row} ctx={ctx} />,
     },
@@ -234,6 +247,7 @@ const phonePilot = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
   id: 'pilot',
   header: ctx.t('srp.officer.columns.pilot'),
   primary: true,
+  sortValue: (row) => row.characterName,
   render: (row) => (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
       <span className="font-semibold">{row.characterName}</span>
@@ -246,6 +260,7 @@ const phoneAmount = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
   id: 'amount',
   header: ctx.t('srp.officer.columns.amount'),
   cardCorner: true,
+  sortValue: (row) => row.amount ?? undefined,
   render: (row) =>
     row.state === 'pending' && row.amount === null ? (
       <TypeAmountField claim={row} ctx={ctx} className="w-36" />
@@ -259,7 +274,12 @@ export function phonePendingColumns(ctx: ClaimColumnsContext): DataTableColumn<S
     phoneSelect(ctx, canBulkApprove),
     phonePilot(ctx),
     phoneAmount(ctx),
-    { id: 'meta', header: ctx.t('srp.officer.columns.lost'), render: (row) => metaLine(ctx, row) },
+    {
+      id: 'meta',
+      header: ctx.t('srp.officer.columns.lost'),
+      sortValue: (row) => row.killedAt,
+      render: (row) => metaLine(ctx, row),
+    },
     {
       id: 'actions',
       header: '',
@@ -284,6 +304,7 @@ export function phoneOwedColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpC
     {
       id: 'meta',
       header: ctx.t('srp.officer.columns.approved'),
+      sortValue: (row) => row.decidedAt,
       render: (row) =>
         [
           ctx.names.hull(row.hullTypeId),
@@ -322,6 +343,7 @@ export function phoneHistoryColumns(ctx: ClaimColumnsContext): DataTableColumn<S
       id: 'pilot',
       header: ctx.t('srp.officer.columns.pilot'),
       primary: true,
+      sortValue: (row) => row.characterName,
       render: (row) => (
         <span className="inline-flex items-center gap-2">
           <span className="font-semibold">{row.characterName}</span>
@@ -334,6 +356,7 @@ export function phoneHistoryColumns(ctx: ClaimColumnsContext): DataTableColumn<S
     {
       id: 'meta',
       header: ctx.t('srp.officer.columns.decided'),
+      sortValue: (row) => decidedLine(row).at,
       render: (row) => {
         const { at, by } = decidedLine(row);
         return [ctx.names.hull(row.hullTypeId), at !== undefined && when(ctx, at), by]

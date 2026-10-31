@@ -58,6 +58,9 @@ export function buildMaterialsColumns({
       align: 'right',
       // The field's own width plus the compact cell padding, and no more.
       headerCellClassName: 'w-24',
+      // A Blueprint Acquisition row owns nothing by typed quantity, so it sinks rather than sorting as zero.
+      sortValue: (material) =>
+        material.acquisitionTier ? undefined : (sourcing?.[material.typeID]?.ownedQuantity ?? 0),
       render: renderHave,
     },
     {
@@ -83,6 +86,11 @@ export function buildMaterialsColumns({
       align: 'right',
       // Wider only while a row carries a Depth Price's second line.
       headerCellClassName: anyDepth ? 'w-44' : 'w-28',
+      // The unit price shown; a built row has none and an unpriced one has nothing to rank, so both sink.
+      sortValue: (material) =>
+        material.subBuilds.length > 0
+          ? undefined
+          : (materialRowState(material, sourcing, pricesReady).unitPrice ?? undefined),
       render: renderPrice,
     },
     {

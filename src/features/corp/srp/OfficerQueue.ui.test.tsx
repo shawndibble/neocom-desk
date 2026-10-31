@@ -23,6 +23,7 @@ const mailResult = vi.hoisted(() => vi.fn());
 vi.mock('./useSrpResultMail', () => ({ useSrpResultMail: () => mailResult }));
 
 import { OfficerQueue } from './OfficerQueue';
+import { PENDING_DEFAULT_COLUMNS, useVisiblePendingColumns } from './srpPendingColumns';
 import { setSrpMemberBackendOverride, type SrpMemberBackend } from './srpMemberBackend';
 import type { SrpClaimValues } from '../srpTypes';
 import type { SrpHistoryState, SrpQueueData } from './useSrpQueue';
@@ -496,5 +497,40 @@ describe('OfficerQueue doctrine check', () => {
     await userEvent.click(screen.getAllByText('Pilot3')[0]!);
     await screen.findByRole('dialog');
     expect(screen.queryByText('Doctrine')).toBeNull();
+  });
+});
+
+describe('OfficerQueue Pending layout (md+)', () => {
+  it('keeps Approve and Reject on one line and reserves the bulk bar height', () => {
+    setup([claim(1)]);
+    const approve = screen.getAllByRole('button', { name: 'Approve' })[0]!;
+    const pair = approve.parentElement!.closest('span.flex')!;
+    expect(pair.className).toContain('flex-nowrap');
+    expect(pair.className).not.toContain('flex-wrap');
+    const selectAll = screen.getByRole('button', { name: /Select all/ });
+    expect(selectAll.parentElement!.className).toContain('min-h-12');
+  });
+});
+
+describe('OfficerQueue pending columns', () => {
+  afterEach(() => useVisiblePendingColumns.getState().setValue(PENDING_DEFAULT_COLUMNS));
+
+  it('starts with Lost and Fleet or FC off, and the Columns menu turns Lost on', async () => {
+    setup(pendingSet());
+    const table = screen.getByRole('table');
+    expect(within(table).getByRole('columnheader', { name: 'Hull' })).toBeInTheDocument();
+    expect(within(table).queryByRole('columnheader', { name: 'Lost' })).toBeNull();
+    expect(within(table).queryByRole('columnheader', { name: 'Fleet or FC' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    // Every catalog id names a real column: the menu reads each one's header.
+    for (const name of ['Hull', 'Lost', 'Fleet or FC']) {
+      expect(await screen.findByRole('menuitemcheckbox', { name })).toBeInTheDocument();
+    }
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Lost' }));
+    await userEvent.keyboard('{Escape}');
+    expect(
+      await within(screen.getByRole('table')).findByRole('columnheader', { name: 'Lost' })
+    ).toBeInTheDocument();
   });
 });

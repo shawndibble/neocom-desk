@@ -119,6 +119,39 @@ describe('planAccount', () => {
     }
   });
 
+  it('counts a thin product at the share the hub absorbs and flags it', () => {
+    const colonies = [colony(1, 'barren', [])];
+    const base = {
+      colonies,
+      candidates: [COOLANT],
+      policy: { ...POLICY, buyTiers: [1] as PiTier[] },
+      books: priced({ [COOLANT]: 5_000_000 }),
+    };
+    const open = run(base).groups.find((g) => g.typeId === COOLANT);
+    const thin = run({ ...base, hubTradesPerDay: new Map([[COOLANT, 2000]]) }).groups.find(
+      (g) => g.typeId === COOLANT
+    );
+    expect(open?.thin).toBeNull();
+    // 10% of 2,000 a day is 200 a day counted; the plan makes about 3,000.
+    expect(thin?.thin).toMatchObject({ tradesPerDay: 2000, countedPerDay: 200, sharePct: 10 });
+    expect(thin!.thin!.planPerDay).toBeGreaterThan(200);
+    expect(thin ? thin.iskPerDay : 0).toBeLessThan(open!.iskPerDay);
+  });
+
+  it('leaves a product uncapped and unflagged when its volume is unknown', () => {
+    const colonies = [colony(1, 'barren', [])];
+    const plan = run({
+      colonies,
+      candidates: [COOLANT],
+      policy: { ...POLICY, buyTiers: [1] as PiTier[] },
+      books: priced({ [COOLANT]: 5_000_000 }),
+      hubTradesPerDay: new Map([[CONDENSATES, 1]]),
+    });
+    const chain = plan.groups.find((g) => g.typeId === COOLANT);
+    expect(chain?.thin).toBeNull();
+    expect(plan.totalPerDay).toBeGreaterThan(0);
+  });
+
   it('with a buy tier, one colony runs a product from bought inputs', () => {
     const colonies = [colony(1, 'barren', [])];
     const none = run({ colonies, candidates: [COOLANT] });

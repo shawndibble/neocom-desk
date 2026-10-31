@@ -324,7 +324,7 @@ export function minerIdsOf(input: BookViewInput, charges: readonly DayCharge[]):
 
 /** Each character's latest recorded corporation, from the ledger rows. */
 export function latestCorporationOf(
-  entries: readonly ObservedMiningEntry[]
+  entries: readonly Pick<ObservedMiningEntry, 'characterId' | 'date' | 'recordedCorporationId'>[]
 ): Map<number, { date: string; corp: number }> {
   const latest = new Map<number, { date: string; corp: number }>();
   for (const e of entries) {

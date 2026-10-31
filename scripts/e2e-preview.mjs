@@ -26,12 +26,14 @@ const SOURCE_INPUTS = ['src', 'public', 'index.html', 'vite.config.ts', 'package
 
 /**
  * Editing a test never changes the bundle, so it must not mark it stale.
- * This mirrors `tsconfig.build.json`'s `exclude` rather than inventing its
+ * This mirrors `tsconfig.src.json`'s `exclude` rather than inventing its
  * own rule — the two answer the same question ("is this a bundle input?"),
  * and a looser rule here reports a stale `dist/` that a rebuild won't fix.
  */
-const isExcludedFile = (name) => /\.test\.tsx?$/.test(name) || name === 'test-helpers.ts';
-const isExcludedDir = (name) => name === '__tests__';
+const testSupportDir = join(repoRoot, 'src', 'test');
+const isExcludedFile = (name) =>
+  /\.test\.tsx?$/.test(name) || name === 'test-helpers.ts' || name.endsWith('.stories.tsx');
+const isExcludedDir = (dir, name) => name === '__tests__' || join(dir, name) === testSupportDir;
 
 function newestMtimeMs(path) {
   let stats;
@@ -43,7 +45,8 @@ function newestMtimeMs(path) {
   if (!stats.isDirectory()) return stats.mtimeMs;
   let newest = 0;
   for (const entry of readdirSync(path, { withFileTypes: true })) {
-    if (entry.isDirectory() ? isExcludedDir(entry.name) : isExcludedFile(entry.name)) continue;
+    if (entry.isDirectory() ? isExcludedDir(path, entry.name) : isExcludedFile(entry.name))
+      continue;
     newest = Math.max(newest, newestMtimeMs(join(path, entry.name)));
   }
   return newest;

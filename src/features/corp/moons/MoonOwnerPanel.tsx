@@ -173,7 +173,7 @@ export function MoonOwnerPanel({
     );
   }
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       {body}
       {/* Each accounting corporation it left keeps its own history until dismissed (#4621). */}
       {(owner.previousCollectorIds ?? []).map((id) => (

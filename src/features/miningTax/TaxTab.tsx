@@ -229,24 +229,31 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     systemName,
     actions
   );
-  const { showCharacterColumn, openColumns, historyColumns, taxSort, historySort, taxExport } =
-    useTaxTables({
-      visibleRows,
-      isPhone,
-      showOreColumn,
-      showValueColumn,
-      showSelectColumn: selection.selectableVisible.length > 0,
-      typeNames: data?.typeNames,
-      systemSecurity,
-      selection: selection.selection,
-      expandedCombined,
-      toggleRowSelected: selection.toggleRowSelected,
-      toggleCombinedExpanded,
-      estimatedValueOf,
-      systemName,
-      payeeDisplayName,
-      corpStateLabel,
-    });
+  const {
+    showCharacterColumn,
+    allColumns,
+    openColumns,
+    historyColumns,
+    taxSort,
+    historySort,
+    taxExport,
+  } = useTaxTables({
+    visibleRows,
+    isPhone,
+    showOreColumn,
+    showValueColumn,
+    showSelectColumn: selection.selectableVisible.length > 0,
+    typeNames: data?.typeNames,
+    systemSecurity,
+    selection: selection.selection,
+    expandedCombined,
+    toggleRowSelected: selection.toggleRowSelected,
+    toggleCombinedExpanded,
+    estimatedValueOf,
+    systemName,
+    payeeDisplayName,
+    corpStateLabel,
+  });
 
   /** What a book's rows owe the member right now (its Billed days). */
   const corpOwedNow = useCallback(
@@ -363,6 +370,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                   visibleRows={visibleRows}
                   openRows={openRows}
                   openColumns={openColumns}
+                  allColumns={allColumns}
                   taxSort={taxSort}
                   taxExport={taxExport}
                   rowProps={rowProps}

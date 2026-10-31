@@ -1,11 +1,6 @@
 {
-  "extends": "./tsconfig.base.json",
-  "compilerOptions": { "noEmit": true },
-  "include": ["src"],
-  "exclude": [
-    "src/**/*.test.ts",
-    "src/**/*.test.tsx",
-    "src/**/__tests__/**",
-    "src/**/test-helpers.ts"
-  ]
+  // Shipped code only. Inherits tsconfig.src.json's include/exclude so the
+  // deploy's typecheck can't drift from what `tsc -b` checks as production code.
+  "extends": "./tsconfig.src.json",
+  "compilerOptions": { "composite": false, "emitDeclarationOnly": false, "noEmit": true }
 }

@@ -15,6 +15,8 @@ import { piTier } from '@/engine/pi/chain';
 import type { PiData } from '@/sde/types';
 import { EstimateBadge, TierChip } from './DirectiveRow';
 import { PiProductLink } from './PiProductLink';
+import { PriceVsMedianFlag } from './PriceVsMedianFlag';
+import { ThinSalesNote } from './ThinSalesNote';
 import type { PlanAdvice } from './planAdviceModel';
 import type { AccountChange, AccountView } from './accountPlanModel';
 
@@ -35,10 +37,14 @@ function Row({
   group,
   nameOf,
   pi,
+  regionName,
+  vs90d,
 }: {
   group: AccountChange;
   nameOf: (planetId: number) => string;
   pi: PiData;
+  regionName: string;
+  vs90d: number | null | undefined;
 }) {
   const { t } = useTranslation();
   const { typeId } = group;
@@ -52,6 +58,7 @@ function Row({
             <b className="font-semibold">{pi.schematics[String(typeId)]?.name ?? `#${typeId}`}</b>
           </PiProductLink>
           <TierChip tier={piTier(typeId, pi)} />
+          <PriceVsMedianFlag pct={vs90d} />
         </span>
         <p className="text-xs text-text-dim">
           {group.planetIds.length === 1
@@ -60,6 +67,7 @@ function Row({
           {group.buys && ` ${t('piPlan.account.buysInputs')}`}
           {group.m3PerWeek > 0 && ` ${t('piPlan.account.hauls', { value: m3(group.m3PerWeek) })}`}
         </p>
+        <ThinSalesNote thin={group.thin} regionName={regionName} />
       </div>
       <span className="text-xs text-text-dim">
         {t('piPlan.account.apart')} <PerDay value={group.apartPerDay} />
@@ -82,6 +90,8 @@ export function AccountPlanPanel({
   pi,
   haul,
   buying,
+  regionName,
+  vs90d,
 }: {
   view: AccountView | null;
   pending: boolean;
@@ -90,6 +100,10 @@ export function AccountPlanPanel({
   pi: PiData;
   haul: boolean;
   buying: boolean;
+  /** The PI hub's region, named in a thin product's flag. */
+  regionName: string;
+  /** Each change's price against its 90-day median, by type id. */
+  vs90d: ReadonlyMap<number, number | null>;
 }) {
   const { t } = useTranslation();
   const names = new Map(advice.colonies.map((colony) => [colony.planetId, colony.name]));
@@ -145,7 +159,14 @@ export function AccountPlanPanel({
           {view.changes.length > 0 ? (
             <ul className="divide-y divide-line">
               {view.changes.map((group) => (
-                <Row key={group.planetIds.join('-')} group={group} nameOf={nameOf} pi={pi} />
+                <Row
+                  key={group.planetIds.join('-')}
+                  group={group}
+                  nameOf={nameOf}
+                  pi={pi}
+                  regionName={regionName}
+                  vs90d={vs90d.get(group.typeId)}
+                />
               ))}
             </ul>
           ) : (

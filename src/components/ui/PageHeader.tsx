@@ -42,8 +42,8 @@ interface PageHeaderProps {
   scope?: ReactNode;
   /**
    * The page's controls, after `scope`, in this fixed order: text-labelled
-   * page actions (Compose, Payees, a labelled Export…), then icon-only ones
-   * (a bare Export icon, then Refresh), then the `HeaderMoreMenu` ⋮ or a settings gear last. The
+   * page actions (Compose, Payees), then icon-only ones (Export, then
+   * Refresh), then the `HeaderMoreMenu` ⋮ or a settings gear last. The
    * `AlertsBell` follows on its own.
    *
    * @summary Right-aligned control cluster: text actions, icon actions (Export, then Refresh), then ⋮ or gear.

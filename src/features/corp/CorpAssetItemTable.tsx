@@ -17,6 +17,7 @@ import { assetBlueprintKind } from '@/engine/blueprintKind';
 import type { ItemLedgerRow, StockStatus } from '@/engine/corp/assetLedger';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { cx } from '@/lib/cx';
+import type { AssetNameMap } from '@/engine/assetNames';
 import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
 import { useUrlSort } from '@/lib/useUrlState';
@@ -61,6 +62,7 @@ const STATUS_TONE: Readonly<Record<StockStatus, string>> = {
 export function CorpAssetItemTable({
   rows,
   labels,
+  assetNames,
   below,
   blueprintTypeIds,
   selectMode,
@@ -75,6 +77,8 @@ export function CorpAssetItemTable({
 }: {
   rows: readonly ItemTableRow[];
   labels: LedgerLabels;
+  /** In-game ship/container names by item id, shown first on the stack that has one. */
+  assetNames: AssetNameMap;
   /** Below target is on: the table opens on the biggest shortfall. */
   below: boolean;
   blueprintTypeIds: ReadonlySet<number> | null;
@@ -311,7 +315,7 @@ export function CorpAssetItemTable({
             virtualize="auto"
             expandableRow={{
               leadingIcon: true,
-              renderDetail: (r) => <StackList row={r} labels={labels} />,
+              renderDetail: (r) => <StackList row={r} labels={labels} assetNames={assetNames} />,
             }}
             rowContextMenu={(r, tr) => (
               <ItemContextMenu
@@ -331,7 +335,15 @@ export function CorpAssetItemTable({
   );
 }
 
-function StackList({ row, labels }: { row: ItemTableRow; labels: LedgerLabels }) {
+function StackList({
+  row,
+  labels,
+  assetNames,
+}: {
+  row: ItemTableRow;
+  labels: LedgerLabels;
+  assetNames: AssetNameMap;
+}) {
   const { t } = useTranslation();
   const stacks = useMemo(
     () => [...row.ledger.stacks].sort((a, b) => b.estimatedValue - a.estimatedValue),
@@ -346,7 +358,12 @@ function StackList({ row, labels }: { row: ItemTableRow; labels: LedgerLabels })
       <ul className="divide-y divide-line text-sm">
         {shown.map((stack) => (
           <li key={stack.itemId} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1">
-            <span className="min-w-0 flex-1 text-text-dim">{stackPathText(stack, labels)}</span>
+            <span className="min-w-0 flex-1 text-text-dim">
+              {assetNames[stack.itemId] !== undefined && (
+                <span className="block font-medium text-text">{assetNames[stack.itemId]}</span>
+              )}
+              {stackPathText(stack, labels)}
+            </span>
             <span className="tabular-nums">×{formatCount(stack.quantity)}</span>
             <span className={cx('text-xs text-text-dim', stack.isSingleton === null && 'hidden')}>
               {stack.isSingleton ? t('corp.assets.assembled') : t('corp.assets.packaged')}

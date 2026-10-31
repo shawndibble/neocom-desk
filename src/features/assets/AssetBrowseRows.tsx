@@ -1,4 +1,8 @@
 import { useEffect, type ComponentProps } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { MenuItem } from '@/components/ui';
+import { assetShipEditLocation } from '@/features/fittings/assetShipLocation';
+import { useOpenInFittings } from '@/features/fittings/useOpenInFittings';
 import { assetBlueprintKind } from '@/engine/blueprintKind';
 import {
   assetStackValue,
@@ -7,7 +11,7 @@ import {
   type AssetTreeNode,
   type AssetTreeStation,
 } from '@/engine/assetTree';
-import { assetNodeSegment } from '@/engine/assetPath';
+import { assetNodeSegment, type FoundAssetNode } from '@/engine/assetPath';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { CharacterAsset } from '@/esi/endpoints';
 import type { AbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
@@ -21,6 +25,8 @@ import {
   SectionHeading,
 } from '@/features/assets/assetBrowserRows';
 import type { Translate } from '@/lib/translate';
+import type { PlaceNicknamesValue } from '@/features/assets/placeNicknames';
+import type { AssetNameMap } from '@/engine/assetNames';
 import { selectionStateForIds } from '@/features/assets/assetSelection';
 import type { PinState } from '@/features/assets/stationPins';
 import { planTargetForItem } from '@/features/industry/blueprintCatalog';
@@ -29,6 +35,7 @@ import {
   assetHref,
   characterBadgeFor,
   isUnresolvedParent,
+  queryLeavingSearch,
   useAssetItemActions,
   type AssetMatch,
   type BrowseRow,
@@ -51,6 +58,7 @@ export function NodeContainerRow({
   node,
   href,
   label,
+  gameName,
   characterBadge,
   selectMode,
   selectedIds,
@@ -60,12 +68,15 @@ export function NodeContainerRow({
   node: Exclude<AssetTreeNode, { kind: 'item' }>;
   href: string;
   label: string;
+  /** The player's in-game name for this ship or container. */
+  gameName?: string;
   characterBadge: string | null;
 }) {
   return (
     <ContainerRow
       href={href}
       label={label}
+      gameName={gameName}
       itemCount={node.itemCount}
       estimatedValue={node.estimatedValue}
       characterBadge={characterBadge}
@@ -85,6 +96,7 @@ export function NodeContainerRow({
 export function NodeItemRow({
   asset,
   label,
+  gameName,
   unitVolume,
   estimatedValue,
   valueHint,
@@ -99,6 +111,8 @@ export function NodeItemRow({
 }: RowSelectionProps & {
   asset: Pick<CharacterAsset, 'item_id' | 'type_id' | 'quantity'>;
   label: string;
+  /** The player's in-game name for this ship or container. */
+  gameName?: string;
   unitVolume: number | undefined;
   estimatedValue: number;
   valueHint?: string;
@@ -111,6 +125,7 @@ export function NodeItemRow({
   return (
     <ItemRow
       name={label}
+      gameName={gameName}
       quantity={asset.quantity}
       unitVolume={unitVolume}
       estimatedValue={estimatedValue}
@@ -132,11 +147,15 @@ interface BrowseRowViewProps {
   row: BrowseRow;
   t: Translate;
   typeNames: ReadonlyMap<number, string>;
+  /** In-game ship/container names by item id: shown first, the type name beneath. */
+  assetNames: AssetNameMap;
   characterBadges: CharacterBadgeContext;
   selectMode: boolean;
   selectedIds: ReadonlySet<number>;
   onToggleSelection: (ids: readonly number[]) => void;
   stationLabelFor: (station: AssetTreeStation) => string;
+  /** Place Nicknames by location id: the personal Assets display only. */
+  placeNicknames: PlaceNicknamesValue;
   nodeLabel: (node: AssetTreeNode) => string;
   locationNames: ReadonlyMap<number, string>;
   securityForStation: (locationId: number) => number | null | undefined;
@@ -146,6 +165,7 @@ interface BrowseRowViewProps {
   pathStationId: number | null;
   pathSegments: readonly string[];
   trailFor: (asset: CharacterAsset) => string[];
+  nodePathFor: (asset: CharacterAsset) => FoundAssetNode | null;
   rootStationIdFor: (asset: CharacterAsset) => number | null;
   /** The page's query string, carried onto every drill-down link. */
   query: string;
@@ -166,6 +186,7 @@ export function BrowseRowView(props: BrowseRowViewProps) {
       <LocationRow
         href={assetHref(station.locationId, [], props.query)}
         label={props.stationLabelFor(station)}
+        nickname={props.placeNicknames[station.locationId]}
         security={orphan ? undefined : props.securityForStation(station.locationId)}
         jumpsAway={orphan ? undefined : props.jumpsAwayFor(station.locationId)}
         itemCount={station.itemCount}
@@ -218,24 +239,85 @@ function SearchMatchRow({
   characterBadges,
   securityForStation,
   trailFor,
+  nodePathFor,
   rootStationIdFor,
+  placeNicknames,
   query,
 }: BrowseRowViewProps & { match: AssetMatch }) {
   const actions = useAssetItemActions();
+  const openInFittings = useOpenInFittings();
+  const navigate = useNavigate();
   const { asset, name } = match;
   const valueHint = useAbyssalValueHint(asset, actions.abyssal, t);
   const rootStationId = rootStationIdFor(asset);
+  // The trail's first segment is the station: its Place Nickname, display only.
+  const trail = trailFor(asset);
+  const stationNickname = rootStationId === null ? undefined : placeNicknames[rootStationId];
+  if (stationNickname !== undefined && trail.length > 0) trail[0] = stationNickname;
+  // Leaving search: the places below list their contents, not these matches again.
+  const nextQuery = queryLeavingSearch(query);
+  const stationHref = assetHref(rootStationId, [], nextQuery);
+  const found = nodePathFor(asset);
+  // A ship or container opens to its contents; anything else opens to where it sits.
+  const opensInside = found !== null && found.node.kind !== 'item';
+  const href =
+    found === null
+      ? stationHref
+      : assetHref(found.stationId, opensInside ? found.segments : found.parentSegments, nextQuery);
+  const locationHref =
+    found === null ? null : assetHref(found.stationId, found.parentSegments, nextQuery);
+  // Each place once: not the row's own link, and not the same place twice.
+  const places = [
+    { key: 'location', href: locationHref },
+    { key: 'station', href: stationHref },
+  ].filter(
+    (place, index, all): place is { key: string; href: string } =>
+      place.href !== null &&
+      place.href !== href &&
+      all.findIndex((other) => other.href === place.href) === index
+  );
+  const ship = found?.node.kind === 'ship' ? found.node : null;
+  const itemId = actions.abyssal.isAbyssalType?.(asset.type_id) ? asset.item_id : undefined;
   return (
     <SearchResultRow
       name={name}
+      gameName={match.gameName}
       quantity={asset.quantity}
       estimatedValue={assetStackValue(asset, actions.priceByTypeId, actions.itemValueByItemId)}
-      trail={trailFor(asset)}
+      trail={trail}
       security={rootStationId === null ? undefined : securityForStation(rootStationId)}
-      href={assetHref(rootStationId, [], query)}
+      href={href}
       characterBadge={characterBadgeFor(asset.item_id, characterBadges)}
       blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
       valueHint={valueHint}
+      wrap={(children) => (
+        <OreItemMenu
+          quantity={asset.quantity}
+          typeId={asset.type_id}
+          itemId={itemId}
+          itemName={name}
+          openHref={href}
+          extraItems={
+            <>
+              {places.map((place) => (
+                <MenuItem key={place.key} onSelect={() => void navigate(place.href)}>
+                  {t(`assets.search.menu.open_${place.key}`)}
+                </MenuItem>
+              ))}
+              {ship && (
+                <MenuItem
+                  disabled={openInFittings.pending}
+                  onSelect={() => openInFittings.open(() => assetShipEditLocation(ship, name))}
+                >
+                  {t('assets.openInFittings')}
+                </MenuItem>
+              )}
+            </>
+          }
+        >
+          {children}
+        </OreItemMenu>
+      )}
       t={t}
     />
   );
@@ -250,6 +332,7 @@ function NodeRowView({
   onToggleSelection,
   nodeLabel,
   characterBadges,
+  assetNames,
   pathStationId,
   pathSegments,
   query,
@@ -257,6 +340,7 @@ function NodeRowView({
   const actions = useAssetItemActions();
   const pageActions = useItemActions();
   const label = nodeLabel(node);
+  const gameName = node.kind === 'bay' ? undefined : assetNames[node.asset.item_id];
   const badge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, characterBadges);
 
   const valueHint = useAbyssalValueHint(
@@ -270,6 +354,7 @@ function NodeRowView({
         node={node}
         href={assetHref(pathStationId, [...pathSegments, assetNodeSegment(node)], query)}
         label={label}
+        gameName={gameName}
         characterBadge={badge}
         selectMode={selectMode}
         selectedIds={selectedIds}
@@ -297,6 +382,7 @@ function NodeRowView({
     <NodeItemRow
       asset={asset}
       label={label}
+      gameName={gameName}
       unitVolume={actions.volumeByTypeId.get(asset.type_id)}
       estimatedValue={estimatedValue}
       valueHint={valueHint}

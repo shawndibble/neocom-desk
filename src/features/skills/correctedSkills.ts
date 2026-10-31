@@ -10,6 +10,7 @@
  */
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import type { TrainedSkill } from '@/engine/types';
+import type { SkillLevels } from '@/engine/industry/types';
 import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
 import type { StatusResult } from '@/esi/cache';
@@ -141,4 +142,11 @@ export async function loadCorrectedSkills(
     totalSp,
     fetchedAt: olderOf(skillsResult?.fetchedAt, queueResult?.fetchedAt),
   };
+}
+
+/** Trained level by skill id, the shape the industry and loyalty engines price with. */
+export function skillLevelsOf(corrected: CorrectedSkills): SkillLevels {
+  const levels: SkillLevels = {};
+  for (const [skillId, trained] of corrected.trained) levels[skillId] = trained.level;
+  return levels;
 }

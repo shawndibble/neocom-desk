@@ -12,6 +12,7 @@
  * against `rankedSearch`'s ~1.5 ms. Either is well under the ticket's 8 ms
  * budget, so no worker and no debounce.
  */
+import { queryTokens, tokenPrefixMatch, wordsOf } from '@/lib/tokenSearch';
 import { isOnline } from '@/stores/network';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
@@ -24,6 +25,8 @@ interface IndexedItem {
   readonly typeId: number;
   readonly name: string;
   readonly lower: string;
+  /** `lower` split into words, once, for the any-order tier. */
+  readonly words: readonly string[];
 }
 
 /** Sorted by name, so each rank's matches come out alphabetical without a per-query sort. */
@@ -31,11 +34,20 @@ export type MarketItemIndex = readonly IndexedItem[];
 
 export function buildMarketItemIndex(catalogue: readonly MarketTypeEntry[]): MarketItemIndex {
   return catalogue
-    .map(({ typeId, name }) => ({ typeId, name, lower: name.toLowerCase() }))
+    .map(({ typeId, name }) => ({
+      typeId,
+      name,
+      lower: name.toLowerCase(),
+      words: wordsOf(name.toLowerCase()),
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Exact, then prefix, then substring match on the name; alphabetical within each. */
+/**
+ * Exact, then prefix, then substring match on the name, then every query word
+ * a prefix of a name word in any order (digit = roman numeral); alphabetical
+ * within each. Same tiers as `rankedSearch`.
+ */
 export function searchMarketItems(
   index: MarketItemIndex,
   query: string,
@@ -46,6 +58,8 @@ export function searchMarketItems(
   const exact: IndexedItem[] = [];
   const prefix: IndexedItem[] = [];
   const substring: IndexedItem[] = [];
+  const tokenPrefix: IndexedItem[] = [];
+  const tokens = queryTokens(q);
   for (const item of index) {
     const { lower } = item;
     if (lower === q) exact.push(item);
@@ -54,9 +68,16 @@ export function searchMarketItems(
       if (exact.length + prefix.length < limit) prefix.push(item);
     } else if (exact.length + prefix.length + substring.length < limit && lower.includes(q)) {
       substring.push(item);
+    } else if (
+      tokens &&
+      exact.length + prefix.length + substring.length + tokenPrefix.length < limit &&
+      !lower.includes(q) &&
+      tokenPrefixMatch(item.words, tokens)
+    ) {
+      tokenPrefix.push(item);
     }
   }
-  return [...exact, ...prefix, ...substring].slice(0, limit);
+  return [...exact, ...prefix, ...substring, ...tokenPrefix].slice(0, limit);
 }
 
 export interface MarketItemCatalogue {

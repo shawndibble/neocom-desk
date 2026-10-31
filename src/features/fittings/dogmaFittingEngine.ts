@@ -17,7 +17,7 @@ import {
 } from './dogmaEngineLoader';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import type { PlanEntry } from '@/engine/types';
-import { loadTypes } from '@/sde/loadSde';
+import { loadTypeEffects, loadTypes } from '@/sde/loadSde';
 import { racksWithSlots } from '@/engine/fittings/hullFitKey';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import type { MutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
@@ -49,7 +49,8 @@ import { chargesUsedPerMinute, type ChargeChoice } from '@/engine/fittings/charg
 import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
-import { extractExplore } from '@/engine/fittings/explore';
+import { COVERT_CLOAK_EFFECT, extractExplore } from '@/engine/fittings/explore';
+import { extractModuleFigures } from '@/engine/fittings/moduleFigures';
 import { extractCrystalFigures, extractMining, miningYield } from '@/engine/fittings/mining';
 import { extractFleetSupport } from '@/engine/fittings/fleetSupport';
 import { projectsNothing } from '@/engine/fittings/projection';
@@ -79,6 +80,8 @@ let enginePromise: Promise<DogmaEngine> | null = null;
 let readyMutaplasmids: MutaplasmidLookup | null = null;
 /** Loaded with the engine: each implant's own slot, for `fittingToDogmaFit`; null when it wouldn't load. */
 let readySlotOf: SlotOf | null = null;
+/** Loaded with the engine: the cloaks that warp cloaked, for `extractExplore`; empty when it wouldn't load. */
+let readyCovertCloaks: ReadonlySet<number> = new Set();
 
 function toDogmaFit(fitting: Fitting, profile: PilotProfile, damageProfile?: DamageProfile) {
   return fittingToDogmaFit(fitting, profile, damageProfile, readyMutaplasmids, readySlotOf);
@@ -138,7 +141,7 @@ export function loadDogmaEngine(
         for (const listener of [...progressListeners]) listener(lastProgress);
       };
 
-      const [wasmBytes, sdeBytes, mutaplasmids, slotOf] = await Promise.all([
+      const [wasmBytes, sdeBytes, mutaplasmids, slotOf, typeEffects] = await Promise.all([
         fetchWithProgress(WASM_URL, (loaded, total) => {
           wasmLoaded = loaded;
           wasmTotal = total;
@@ -153,12 +156,14 @@ export function loadDogmaEngine(
         loadImplantMarketEntries()
           .then((entries) => entries.slotOf)
           .catch(() => null),
+        loadTypeEffects().catch(() => null),
       ]);
 
       await wasmInit({ module_or_path: wasmBytes });
       load_sde(new Uint8Array(sdeBytes));
       readyMutaplasmids = mutaplasmids;
       readySlotOf = slotOf;
+      readyCovertCloaks = new Set(typeEffects?.[COVERT_CLOAK_EFFECT] ?? []);
       readyEngine = dogmaEngine;
       progressListeners.clear();
       setDogmaEngineStatus('ready');
@@ -590,7 +595,8 @@ function statsFrom(
     tank: extractTank(dogmaFit.items, shown.items, shown.ship.attributes, baseStats),
     support: extractSupport(dogmaFit.items, shown.items),
     mining: miningYield(extractMining(dogmaFit.items, shown.items)),
-    explore: extractExplore(dogmaFit.items, shown.items),
+    explore: extractExplore(dogmaFit.items, shown.items, readyCovertCloaks),
+    moduleFigures: extractModuleFigures(dogmaFit.items, shown.items),
     fleetSupport: extractFleetSupport(dogmaFit.items, shown.items),
     fighters: extractFighterStats(shown.ship.attributes),
     lockedTargets,

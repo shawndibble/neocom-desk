@@ -12,13 +12,12 @@ import { db, type ArchiveKind } from '@/db';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 import type { CachedResult } from '@/esi/cache';
 import {
-  ARCHIVE_DAYS,
   addCoverage,
+  archiveCutoffIso,
   archiveGaps,
   archiveSince,
   fetchWindow,
 } from '@/engine/wallet/archiveCoverage';
-import { DAY_MS } from '@/lib/age';
 
 interface ArchiveRow {
   characterId: number;
@@ -34,11 +33,6 @@ const KINDS: Record<ArchiveKind, { table: () => ArchiveTable; cursor: boolean }>
     cursor: true,
   },
 };
-
-/** ESI dates are second-resolution `…Z`; match that shape so string compares agree. */
-function cutoffIso(nowMs: number): string {
-  return `${new Date(nowMs - ARCHIVE_DAYS * DAY_MS).toISOString().slice(0, 19)}Z`;
-}
 
 function oldestMs(rows: ReadonlyArray<{ date: string }>): number | null {
   let oldest: number | null = null;
@@ -98,7 +92,7 @@ export async function archiveResult<T extends { date: string }>(
     await table.bulkPut(result.data.map((row) => ({ ...row, characterId })));
     await table
       .where('[characterId+date]')
-      .between([characterId, ''], [characterId, cutoffIso(Date.now())], true, false)
+      .between([characterId, ''], [characterId, archiveCutoffIso(Date.now())], true, false)
       .delete();
     await recordCoverage(characterId, kind, result);
   } catch (error) {

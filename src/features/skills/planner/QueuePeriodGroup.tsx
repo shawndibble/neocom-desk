@@ -1,5 +1,7 @@
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
+import { Pill } from '@/components/ui/Pill';
+import type { SkillQueueEntry } from '@/esi/endpoints';
 import { romanLevel } from '@/engine/projection';
 import { SkillLink } from '@/features/entities';
 import { formatCountdown } from '@/lib/duration';
@@ -14,6 +16,9 @@ const BADGE_STYLE: Partial<Record<SkillQueueStatus, string>> = {
   completed: 'bg-success/15 text-success',
   paused: 'bg-warning/15 text-warning',
 };
+
+const rowKey = (entry: SkillQueueEntry) =>
+  `${entry.skill_id}-${entry.finished_level}-${entry.queue_position}`;
 
 const BADGE_KEY: Partial<Record<SkillQueueStatus, string>> = {
   completed: 'plans.queueDoneBadge',
@@ -107,19 +112,14 @@ export function QueuePeriodGroup({ group, catalog, nowMs }: QueuePeriodGroupProp
       </div>
       <ul className="rounded-xs border border-line bg-panel">
         {group.rows.map((row) => (
-          <QueueRow
-            key={`${row.entry.skill_id}-${row.entry.finished_level}-${row.entry.queue_position}`}
-            row={row}
-            catalog={catalog}
-            nowMs={nowMs}
-          />
+          <QueueRow key={rowKey(row.entry)} row={row} catalog={catalog} nowMs={nowMs} />
         ))}
       </ul>
     </section>
   );
 }
 
-/** Levels that have no place on the clock: finished-but-unapplied, or paused. */
+/** Paused levels, which have no place on the clock. */
 export function QueueLooseRows({
   title,
   rows,
@@ -139,14 +139,48 @@ export function QueueLooseRows({
       </h3>
       <ul className="rounded-xs border border-line bg-panel">
         {rows.map((row) => (
-          <QueueRow
-            key={`${row.entry.skill_id}-${row.entry.finished_level}-${row.entry.queue_position}`}
-            row={row}
-            catalog={catalog}
-            nowMs={nowMs}
-          />
+          <QueueRow key={rowKey(row.entry)} row={row} catalog={catalog} nowMs={nowMs} />
         ))}
       </ul>
     </section>
+  );
+}
+
+/** Finished-but-unapplied levels: one narrow line each, clumped, no header. */
+export function QueueFinishedRows({
+  rows,
+  catalog,
+}: {
+  rows: Pick<QueueRowView, 'entry'>[];
+  catalog: SkillCatalog;
+}) {
+  const { t } = useTranslation();
+  if (rows.length === 0) return null;
+  return (
+    <ul
+      aria-label={t('plans.queueFinishedLabel')}
+      className="rounded-xs border border-line bg-panel"
+    >
+      {rows.map(({ entry }) => {
+        const skill = catalog.bySkillTypeID.get(entry.skill_id);
+        return (
+          <li
+            key={rowKey(entry)}
+            className="flex items-center gap-2 border-t border-line px-3 py-1 first:border-t-0"
+          >
+            <span aria-hidden className="shrink-0 text-text-dim">
+              {skillGroupIcon(skill?.groupName ?? '')}
+            </span>
+            <div className="flex min-w-0 flex-1 gap-1 text-sm">
+              <span className="truncate">
+                <SkillLink typeId={entry.skill_id}>{skill?.name ?? `#${entry.skill_id}`}</SkillLink>
+              </span>
+              <span className="shrink-0">{romanLevel(entry.finished_level)}</span>
+            </div>
+            <Pill tone="success">{t('plans.queueDoneBadge')}</Pill>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

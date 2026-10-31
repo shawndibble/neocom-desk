@@ -105,6 +105,12 @@
 // both are new, with no device-local life to seed from. See
 // features/character/spExtractionSettings.ts.
 //
+// sync.spFarmCharacters (issue #5658): the Character ids marked "SP Farm",
+// the only ones SP extraction readiness, its column and its alert apply to.
+// Its own key so a mark merges independently of the threshold. An emptied
+// list is stored as `[]`, never unset, so the tombstone-expiry edge does not
+// bite. No `legacyKey`: new.
+//
 // sync.industryBuildGroups (issue #626): a blob like the two above, and for
 // the same reason — the key space is unbounded (one entry per Build Group, per
 // Character), so one key per group is not expressible against an exact-match
@@ -136,6 +142,11 @@
 // the same exact-match reason as sync.skillCloneStates; clearing a name drops
 // its entry and the key is never deleted, so the tombstone-expiry edge does not
 // bite it. See features/character/cloneNicknames.ts.
+//
+// sync.placeNicknames (issue #5605): the pilot's own name for a station or
+// structure, shown on the Assets page only. A `Record<locationId, name>` blob
+// for the same exact-match reason; clearing a name drops its entry and the key
+// is never deleted. See features/assets/placeNicknames.ts.
 //
 // sync.miningTaxSurveyConnections (issue #4684): the moon Surveys the pilot
 // connected with "Assign Taxes", as {surveyId, characterId, payeeId,
@@ -365,6 +376,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpStockTargets',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
+  'sync.placeNicknames',
   'sync.podKillThreshold',
   'sync.reprocessingTaxRate',
   'sync.routeHoleHubs',
@@ -376,6 +388,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.skillCloneStates',
   'sync.spExtractionMonitoringEnabled',
   'sync.spExtractionThresholdSp',
+  'sync.spFarmCharacters',
   'sync.structureBrokerFees',
   'sync.stockLists',
   'sync.surveyHistory',

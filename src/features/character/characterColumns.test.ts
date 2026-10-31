@@ -29,9 +29,10 @@ describe('availableCharacterColumns', () => {
     expect(availableCharacterColumns(true, true)).toContain('spReady');
   });
 
-  it('excludes spReady when monitoring is off', () => {
+  it('excludes spReady and spFarm when monitoring is off', () => {
     expect(availableCharacterColumns(false, true)).not.toContain('spReady');
-    expect(availableCharacterColumns(false, true)).toHaveLength(CHARACTER_COLUMN_IDS.length - 1);
+    expect(availableCharacterColumns(false, true)).not.toContain('spFarm');
+    expect(availableCharacterColumns(false, true)).toHaveLength(CHARACTER_COLUMN_IDS.length - 2);
   });
 
   it('includes group when at least one Group exists', () => {
@@ -41,6 +42,21 @@ describe('availableCharacterColumns', () => {
   it('excludes group when no Groups exist', () => {
     expect(availableCharacterColumns(true, false)).not.toContain('group');
     expect(availableCharacterColumns(true, false)).toHaveLength(CHARACTER_COLUMN_IDS.length - 1);
+  });
+});
+
+describe('whereabouts columns', () => {
+  it('are in the picker but off by default', () => {
+    expect(CHARACTER_COLUMN_IDS).toContain('dockedAt');
+    expect(CHARACTER_COLUMN_IDS).toContain('ship');
+    expect(DEFAULT_VISIBLE_CHARACTER_COLUMNS).not.toContain('dockedAt');
+    expect(DEFAULT_VISIBLE_CHARACTER_COLUMNS).not.toContain('ship');
+  });
+
+  it('stay hidden for a stored preference that predates them', async () => {
+    await db.settings.put({ key: VISIBLE_CHARACTER_COLUMNS_KEY, value: ['name', 'alerts'] });
+    await useVisibleCharacterColumns.getState().hydrate();
+    expect(useVisibleCharacterColumns.getState().value).toEqual(['name', 'alerts']);
   });
 });
 

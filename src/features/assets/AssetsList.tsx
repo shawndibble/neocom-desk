@@ -15,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
-  IskInput,
   CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -35,9 +34,9 @@ import { AbyssalValueNote } from '@/features/abyssal/AbyssalValueNote';
 import { formatIsk } from '@/lib/isk';
 import { collectItemIds, collectStationItemIds, type StationSortField } from '@/engine/assetTree';
 import { assetNodeSegment } from '@/engine/assetPath';
-import { type AssetSortField } from '@/features/assets/assetSortPreference';
 import { ItemColumnLabels, JumpsAwayText, SecurityValue } from '@/features/assets/assetBrowserRows';
 import { BrowseRowView } from '@/features/assets/AssetBrowseRows';
+import { StationHeading } from '@/features/assets/StationHeading';
 import {
   AssetItemActionsContext,
   assetHref,
@@ -64,10 +63,10 @@ export function AssetsList({
     loading,
     activeCharacterId,
     refresh,
-    setView,
     setSearch,
     searchActive,
-    minValueInput,
+    activeFilterCount,
+    resetFilters,
     flatModeActive,
     activeCrossCharacterData,
     assetsResult,
@@ -79,7 +78,9 @@ export function AssetsList({
     mergedLocationNames,
     characterBadges,
     assetsByItemId,
+    assetNames,
     assetsExport,
+    placeNicknames,
     assetItemActions,
     pinStateFor,
     handleTogglePin,
@@ -96,8 +97,6 @@ export function AssetsList({
     routePreference,
     stationSortField,
     setStationSortField,
-    sortField,
-    setSortField,
     jumpsAwayOf,
     stationLabelFor,
     sortedTree,
@@ -113,6 +112,7 @@ export function AssetsList({
     toggleNodeSelection,
     nodeLabel,
     trailFor,
+    nodePathFor,
     rootStationIdFor,
     securityForStation,
   } = assetsRows;
@@ -127,9 +127,18 @@ export function AssetsList({
     resolved.station === null
       ? []
       : [
-          { label: stationLabelFor(resolved.station), href: assetHref(pathStationId, [], query) },
+          {
+            label: placeNicknames[resolved.station.locationId] ?? stationLabelFor(resolved.station),
+            // The real name, for a nicknamed station (screen readers and hover).
+            title:
+              placeNicknames[resolved.station.locationId] !== undefined
+                ? stationLabelFor(resolved.station)
+                : undefined,
+            href: assetHref(pathStationId, [], query),
+          },
           ...resolved.trail.map((node, index) => ({
             label: nodeLabel(node),
+            title: undefined,
             href: assetHref(
               pathStationId,
               resolved.trail.slice(0, index + 1).map(assetNodeSegment),
@@ -137,6 +146,16 @@ export function AssetsList({
             ),
           })),
         ];
+  // The station's own heading is the one place a Place Nickname is renamed. An
+  // orphan group (a parent that never resolved) is no place, so it has none.
+  const stationHeading =
+    resolved.station !== null &&
+    resolved.trail.length === 0 &&
+    !isUnresolvedParent(resolved.station, mergedLocationNames)
+      ? { locationId: resolved.station.locationId, name: stationLabelFor(resolved.station) }
+      : null;
+  const headingClassName =
+    'min-w-0 truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
   const parentHref =
     crumbs.length > 1 ? crumbs[crumbs.length - 2].href : assetHref(null, [], query);
   // A leaf item carries no aggregate of its own — there is nothing below it to
@@ -144,6 +163,13 @@ export function AssetsList({
   const deepest = resolved.trail[resolved.trail.length - 1] ?? resolved.station;
   const currentTotals =
     deepest && (!('kind' in deepest) || deepest.kind !== 'item') ? deepest : null;
+  const itemsSuffix = currentTotals && (
+    <span className="sr-only">
+      {t('assets.levelHeading.itemsSuffix', {
+        items: t('assets.itemCount', { count: currentTotals.itemCount }),
+      })}
+    </span>
+  );
 
   // How the abyssal modules in view are valued: every asset at the root, the
   // level's contents when drilled in, the matches in a flat list.
@@ -257,28 +283,6 @@ export function AssetsList({
                 </span>
               )}
               <div className="ml-auto flex items-center gap-2">
-                <IskInput
-                  size="sm"
-                  echo={false}
-                  value={minValueInput}
-                  onChange={(min) => setView({ min })}
-                  placeholder={t('assets.minValue.placeholder')}
-                  aria-label={t('assets.minValue.label')}
-                  className="w-24"
-                />
-                <Select
-                  value={sortField}
-                  onValueChange={(value) => void setSortField(value as AssetSortField)}
-                >
-                  <SelectTrigger size="sm" aria-label={t('assets.sort.label')} className="w-28">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name">{t('assets.sort.name')}</SelectItem>
-                    <SelectItem value="value">{t('assets.sort.value')}</SelectItem>
-                    <SelectItem value="quantity">{t('assets.sort.quantity')}</SelectItem>
-                  </SelectContent>
-                </Select>
                 {searchActive && (
                   <IconButton
                     icon={<Icon.Close />}
@@ -302,20 +306,23 @@ export function AssetsList({
                 onClick={() => void navigate(parentHref)}
               />
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <h2
-                  ref={levelHeadingRef}
-                  tabIndex={-1}
-                  className="truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
-                  {currentTotals && (
-                    <span className="sr-only">
-                      {t('assets.levelHeading.itemsSuffix', {
-                        items: t('assets.itemCount', { count: currentTotals.itemCount }),
-                      })}
-                    </span>
-                  )}
-                </h2>
+                {stationHeading ? (
+                  <StationHeading
+                    key={stationHeading.locationId}
+                    locationId={stationHeading.locationId}
+                    name={stationHeading.name}
+                    nickname={placeNicknames[stationHeading.locationId]}
+                    headingRef={levelHeadingRef}
+                    headingClassName={headingClassName}
+                  >
+                    {itemsSuffix}
+                  </StationHeading>
+                ) : (
+                  <h2 ref={levelHeadingRef} tabIndex={-1} className={headingClassName}>
+                    {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
+                    {itemsSuffix}
+                  </h2>
+                )}
                 {phoneFacts && (
                   <span className="flex flex-wrap items-center gap-x-1 text-[0.6875rem] text-text-dim tabular-nums">
                     {phoneFacts.map((fact, index) => (
@@ -331,7 +338,12 @@ export function AssetsList({
                     {crumbs.slice(0, -1).map((crumb, index) => (
                       <span key={crumb.href} className="flex min-w-0 items-center gap-1">
                         {index > 0 && <span aria-hidden="true">›</span>}
-                        <Link to={crumb.href} className="truncate hover:text-accent">
+                        <Link
+                          to={crumb.href}
+                          title={crumb.title}
+                          aria-label={crumb.title ? `${crumb.label} (${crumb.title})` : undefined}
+                          className="truncate hover:text-accent"
+                        >
                           {crumb.label}
                         </Link>
                       </span>
@@ -401,11 +413,30 @@ export function AssetsList({
                     </span>
                   )}
                 </h2>
-                {/* flex-wrap (issue #415): on a narrow phone the two Selects no
-                        longer share one row with no priority order — Sort stays put
-                        (it comes first in DOM order) and Route is the one that drops
-                        to its own line when both can't fit beside the label. */}
+                {/* Route only matters to the Jumps away sort, so it shows only
+                        then, left of Sort. flex-wrap: on a narrow phone the two wrap
+                        in DOM order, so focus order matches what's on screen. */}
                 <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                  {stationSortField === 'jumpsAway' && (
+                    <Select
+                      value={routePreference}
+                      onValueChange={(value) => setRouteOverride(value as RoutePreferenceKind)}
+                    >
+                      <SelectTrigger
+                        aria-label={t('assets.jumpsAway.routePreference.label')}
+                        className="w-40"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROUTE_PREFERENCES.map((preference) => (
+                          <SelectItem key={preference} value={preference}>
+                            {t(ROUTE_PREFERENCE_LABEL_KEYS[preference])}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <Select
                     value={stationSortField}
                     onValueChange={(value) => void setStationSortField(value as StationSortField)}
@@ -418,24 +449,6 @@ export function AssetsList({
                       <SelectItem value="value">{t('assets.stationSort.value')}</SelectItem>
                       <SelectItem value="itemCount">{t('assets.stationSort.itemCount')}</SelectItem>
                       <SelectItem value="jumpsAway">{t('assets.stationSort.jumpsAway')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={routePreference}
-                    onValueChange={(value) => setRouteOverride(value as RoutePreferenceKind)}
-                  >
-                    <SelectTrigger
-                      aria-label={t('assets.jumpsAway.routePreference.label')}
-                      className="w-40"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ROUTE_PREFERENCES.map((preference) => (
-                        <SelectItem key={preference} value={preference}>
-                          {t(ROUTE_PREFERENCE_LABEL_KEYS[preference])}
-                        </SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -476,6 +489,13 @@ export function AssetsList({
             <EmptyState
               title={flatModeActive ? t('assets.noResults') : t('assets.emptyLocation')}
               className="py-8"
+              action={
+                activeFilterCount > 0 ? (
+                  <Button size="sm" onClick={resetFilters}>
+                    {t('common.resetFilters')}
+                  </Button>
+                ) : undefined
+              }
             />
           ) : (
             <div
@@ -510,11 +530,13 @@ export function AssetsList({
                           row={row}
                           t={t}
                           typeNames={mergedTypeNames}
+                          assetNames={assetNames}
                           characterBadges={characterBadges}
                           selectMode={selectMode}
                           selectedIds={selectedIds}
                           onToggleSelection={toggleNodeSelection}
                           stationLabelFor={stationLabelFor}
+                          placeNicknames={placeNicknames}
                           nodeLabel={nodeLabel}
                           locationNames={mergedLocationNames}
                           securityForStation={securityForStation}
@@ -524,6 +546,7 @@ export function AssetsList({
                           pathStationId={pathStationId}
                           pathSegments={pathSegments}
                           trailFor={trailFor}
+                          nodePathFor={nodePathFor}
                           rootStationIdFor={rootStationIdFor}
                           query={query}
                         />

@@ -2,9 +2,11 @@ import { useMemo } from 'react';
 import type { PiData } from '@/sde/types';
 import { AccountPlanPanel } from './AccountPlanPanel';
 import { accountView } from './accountPlanModel';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { usePiSettings } from './piSettings';
 import type { PlanAdvice } from './planAdviceModel';
 import { useAccountPlan } from './useAccountPlan';
+import { usePiPriceVsMedian } from './usePiPriceVsMedian';
 
 /**
  * Plans the whole account and draws it. Its own component so the planning runs
@@ -14,8 +16,12 @@ import { useAccountPlan } from './useAccountPlan';
 export function AccountPlanSection({ advice, pi }: { advice: PlanAdvice; pi: PiData }) {
   const settings = usePiSettings((state) => state.value);
   const haul = settings.haulBetweenPlanets === true;
-  const account = useAccountPlan(advice, pi, { haul, buyTiers: settings.buyTiers });
+  const hub = getTradeHub(settings.hub) ?? DEFAULT_TRADE_HUB;
+  const regionId = hub.regionId;
+  const account = useAccountPlan(advice, pi, { haul, buyTiers: settings.buyTiers, regionId });
   const view = useMemo(() => (account.plan ? accountView(account.plan) : null), [account.plan]);
+  const pickedTypeIds = useMemo(() => view?.changes.map((change) => change.typeId) ?? [], [view]);
+  const vs90d = usePiPriceVsMedian(pickedTypeIds, regionId);
   return (
     <AccountPlanPanel
       view={view}
@@ -25,6 +31,8 @@ export function AccountPlanSection({ advice, pi }: { advice: PlanAdvice; pi: PiD
       pi={pi}
       haul={haul}
       buying={settings.buyTiers.length > 0}
+      regionName={hub.regionName}
+      vs90d={vs90d}
     />
   );
 }

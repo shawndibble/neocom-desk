@@ -6,7 +6,7 @@ import { GrantBanner } from '@/app/GrantNote';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { DoctrineCheckRecord, FileSrpClaimInput, HullRule } from '../srpTypes';
 import { ClaimDetailDialog, RefileDialog } from './MemberClaimDialogs';
-import { MemberClaimsList } from './MemberClaimsList';
+import { MemberClaimsColumnPicker, MemberClaimsList } from './MemberClaimsList';
 import { OffDoctrineFileDialog } from './OffDoctrineFileDialog';
 import { MemberFileForm, type FileFormErrors } from './MemberFileForm';
 import { LostShipsList } from './LostShipsList';
@@ -252,7 +252,11 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
     ) : null;
 
   const claimsPanel = (
-    <Panel title={t('srpMember.claims.title')} padded={claims.length === 0}>
+    <Panel
+      title={t('srpMember.claims.title')}
+      padded={claims.length === 0}
+      actions={claims.length > 0 ? <MemberClaimsColumnPicker /> : undefined}
+    >
       {data.claims.state === 'failed' ? (
         <LoadFailedState onRetry={data.retry} />
       ) : data.claims.state === 'loading' ? (

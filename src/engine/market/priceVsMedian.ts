@@ -61,3 +61,13 @@ export function priceVsMedianPct(
 export function isPriceSpike(pct: number | null): boolean {
   return pct !== null && Math.round(pct) >= PRICE_SPIKE_PCT;
 }
+
+/** Whether a percent flags as a drop: the mirror of `isPriceSpike`, at the negative of the same threshold. */
+export function isPriceDrop(pct: number | null): boolean {
+  return pct !== null && Math.round(pct) <= -PRICE_SPIKE_PCT;
+}
+
+/** Whether a figure earns a flag at all: a spike or a drop. */
+export function isPriceFlagged(pct: number | null | undefined): pct is number {
+  return pct != null && (isPriceSpike(pct) || isPriceDrop(pct));
+}

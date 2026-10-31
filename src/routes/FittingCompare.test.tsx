@@ -57,10 +57,10 @@ describe('FittingCompare', () => {
     await vi.waitFor(() => expect(add).toHaveFocus());
   });
 
-  it('caps the page content at the shared max-w-6xl width', async () => {
+  it('caps the page content at the shared max-w-page width', async () => {
     renderAt('/ships/fittings/compare');
     const heading = await screen.findByRole('heading', { name: 'Compare Fittings' });
-    expect(heading.closest('.max-w-6xl')).toBeInTheDocument();
+    expect(heading.closest('.max-w-page')).toBeInTheDocument();
   });
 
   it('shows exactly one primary Add Fitting button in the empty state', async () => {

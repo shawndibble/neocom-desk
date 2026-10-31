@@ -3,12 +3,13 @@
  * claim tables with their per-row and bulk actions, the claim detail and the activity feed. Pure
  * view of what `useSrpQueue` loaded; every change goes through its callables and reloads.
  */
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import {
   Button,
+  ColumnPickerMenu,
   DataTable,
   EmptyState,
   LoadFailedState,
@@ -17,9 +18,13 @@ import {
   Spinner,
   Tabs,
   Toast,
+  useTabPanelProps,
+  useTabsId,
   type DataTableColumn,
 } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useColumnVisibility } from '@/lib/columnVisibility';
+import { cx } from '@/lib/cx';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -42,6 +47,13 @@ import { SrpBulkBar } from './SrpBulkBar';
 import { SrpExportButton } from './SrpExportControls';
 import { SrpClaimDetail } from './SrpClaimDetail';
 import { OfficerRowMenu } from './OfficerRowMenu';
+import {
+  isPendingColumnId,
+  PENDING_COLUMN_IDS,
+  PENDING_DEFAULT_COLUMNS,
+  useVisiblePendingColumns,
+  type PendingColumnId,
+} from './srpPendingColumns';
 import { groupByPilot, withMailSummary, type SrpMailClaim } from './srpResultMail';
 import { failureText } from './srpClaimText';
 import {
@@ -69,7 +81,8 @@ function claimRowHasMenu(claim: SrpClaim): boolean {
 export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready }) {
   const { t } = useTranslation();
   const phone = useIsPhone();
-  const tabsId = useId();
+  const pendingShown = useColumnVisibility(useVisiblePendingColumns, PENDING_DEFAULT_COLUMNS);
+  const tabsId = useTabsId();
   const panelRef = useRef<HTMLDivElement>(null);
   const zone = useTimeZone();
   const names = useSrpClaimNames();
@@ -109,6 +122,20 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
   useEffect(() => {
     if (tab === 'history' && history.status === 'idle') loadHistory();
   }, [tab, history.status, loadHistory]);
+
+  // The phone's SegmentedControl has no tab to name a tabpanel; the queue still animates.
+  const {
+    ref: fadeRef,
+    className: panelRing,
+    ...panelAttrs
+  } = useTabPanelProps(phone ? null : tabsId, tab);
+  const setPanel = useCallback(
+    (node: HTMLDivElement | null) => {
+      panelRef.current = node;
+      fadeRef(node);
+    },
+    [fadeRef]
+  );
 
   const changeTab = (next: QueueTab) => {
     setTab(next);
@@ -228,9 +255,20 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     busy,
   };
 
+  // The phone card has no such columns; only the desktop Pending table picks them.
+  const picking = tab === 'pending' && !phone;
+  const pendingAll = pendingColumns(ctx);
+  const pickable = Object.fromEntries(
+    pendingAll.filter((c) => isPendingColumnId(c.id)).map((c) => [c.id, c])
+  ) as Record<PendingColumnId, DataTableColumn<SrpClaim>>;
+  const pendingTable = pendingAll.filter(
+    (c) => !isPendingColumnId(c.id) || pendingShown.isVisible(c.id)
+  );
   const columns: DataTableColumn<SrpClaim>[] =
     tab === 'pending'
-      ? (phone ? phonePendingColumns : pendingColumns)(ctx)
+      ? phone
+        ? phonePendingColumns(ctx)
+        : pendingTable
       : tab === 'owed'
         ? (phone ? phoneOwedColumns : owedColumns)(ctx)
         : (phone ? phoneHistoryColumns : historyColumns)(ctx);
@@ -316,8 +354,30 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           }))}
         />
       )}
-      <Panel title={t(`srp.officer.title.${tab}`)} padded={false}>
-        <div ref={panelRef} tabIndex={-1} className="grid gap-3 outline-none">
+      <Panel
+        title={t(`srp.officer.title.${tab}`)}
+        padded={false}
+        actions={
+          picking ? (
+            <ColumnPickerMenu
+              available={PENDING_COLUMN_IDS}
+              visible={pendingShown.visible}
+              columnsById={pickable}
+              onToggle={pendingShown.toggle}
+              onReset={pendingShown.reset}
+              buttonLabel={t('common.columnsButton')}
+              menuTitle={t('common.columnsMenuTitle')}
+              resetLabel={t('common.resetColumns')}
+            />
+          ) : undefined
+        }
+      >
+        <div
+          ref={setPanel}
+          tabIndex={-1}
+          {...panelAttrs}
+          className={cx('grid gap-3 outline-none', panelRing)}
+        >
           {tab !== 'history' && (
             <SrpBulkBar
               selected={ticked.length}
@@ -351,6 +411,8 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           ) : (
             <div className="overflow-x-auto">
               <DataTable
+                // A tab's columns differ, so a sort must not carry over to the same id on another tab.
+                key={tab}
                 label={t(`srp.officer.title.${tab}`)}
                 columns={columns}
                 rows={rows}
@@ -358,6 +420,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
                 onRowClick={(row) => setOpenId(row.killmailId)}
                 selectedRowKey={openId}
                 stackLayout={phone ? 'dense' : 'labelled'}
+                mobileSort
                 // Phone: tick box, title, amount and ⋮ share line one (Hauling's card).
                 className="dt-dense-tight"
                 rowContextMenu={

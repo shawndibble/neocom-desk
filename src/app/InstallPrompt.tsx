@@ -98,7 +98,7 @@ export function InstallPrompt() {
       ref={bannerRef}
       role="alert"
       data-testid="onboarding-banner"
-      className="fixed bottom-16 left-4 z-50 flex items-center gap-3 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-4"
+      className="motion-rise fixed bottom-16 left-4 z-50 flex items-center gap-3 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-4"
     >
       <span>{variant === 'native' ? t('pwa.installCta') : t(INSTRUCTION_KEYS[variant])}</span>
       {variant === 'native' && (

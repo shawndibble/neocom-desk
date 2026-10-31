@@ -76,7 +76,12 @@ export interface ItemContextMenuProps {
  * hands the menu down to children that only know a type ID — same shape as
  * `DataTable`'s `rowContextMenu`.
  */
-export type ItemMenuFor = (typeId: number, trigger: ReactElement) => ReactElement;
+export type ItemMenuFor = (
+  typeId: number,
+  trigger: ReactElement,
+  /** Entries for this one row, after the page's own (the Build Plan's "Used by"). */
+  extraItems?: ReactNode
+) => ReactElement;
 
 /** Everything the menu's entries need — the props minus the trigger wiring. */
 type ItemMenuProps = Omit<ItemContextMenuProps, 'children'>;

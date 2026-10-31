@@ -4,7 +4,13 @@ import { cx } from '@/lib/cx';
 import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import * as Icon from './icons';
 import { panelDomId, tabDomId, useTabPanelProps } from './tabPanel';
-import { pageScrollDelta, scrollEdges, wheelScrollDelta, type ScrollEdges } from './tabScroll';
+import {
+  pageScrollDelta,
+  revealInScroller,
+  scrollEdges,
+  wheelScrollDelta,
+  type ScrollEdges,
+} from './tabScroll';
 import {
   tabItemActiveClassName,
   tabItemClassName,
@@ -70,6 +76,12 @@ interface TabsProps {
    * `'automatic'` (default) would unmount this tablist mid-keypress.
    */
   activation?: 'automatic' | 'manual';
+  /**
+   * Called with a tab's id as the mouse rests on it or keyboard focus reaches
+   * it: start loading what it shows (a lazy tab's chunk), so the switch lands
+   * at once. Not on touch, where the first event is the tap itself.
+   */
+  onPreload?: (id: string) => void;
 }
 
 /**
@@ -91,6 +103,7 @@ export function Tabs({
   label,
   className = '',
   activation = 'automatic',
+  onPreload,
 }: TabsProps) {
   const { t } = useTranslation();
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -155,26 +168,14 @@ export function Tabs({
    * tab, a page selecting one in response to something else. A click or an
    * arrow key brings its own tab into view (you cannot click what you cannot
    * see, and `.focus()` scrolls to what it focuses), so this is only for the
-   * case nothing else covers.
-   *
-   * Slides only the bar's own `scrollLeft`, never `scrollIntoView`: that
-   * scrolls every ancestor too, even with `block: 'nearest'`, so a bar below
-   * the fold dragged the whole page down to it on load (the landing page's
-   * feature tabs). Honours the bar's `scroll-padding-inline` as
-   * `scrollIntoView` did, so the tab stops clear of the edge fade.
+   * case nothing else covers. `revealInScroller` explains why it never uses
+   * `scrollIntoView`.
    */
   useEffect(() => {
     const scroller = scrollerRef.current;
     const tab = listRef.current?.querySelector(`[data-tab-id="${focusedId}"]`);
     if (!scroller || !tab) return;
-    const bar = scroller.getBoundingClientRect();
-    const style = getComputedStyle(scroller);
-    // `auto` (no padding set) parses to NaN.
-    const start = bar.left + (parseFloat(style.scrollPaddingLeft) || 0);
-    const end = bar.right - (parseFloat(style.scrollPaddingRight) || 0);
-    const item = tab.getBoundingClientRect();
-    if (item.left < start) scroller.scrollLeft -= start - item.left;
-    else if (item.right > end) scroller.scrollLeft += item.right - end;
+    revealInScroller(scroller, tab);
   }, [focusedId]);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -239,6 +240,10 @@ export function Tabs({
                   if (activation === 'manual') setManualFocusId(tab.id);
                   onChange(tab.id);
                 }}
+                onPointerEnter={(event) => {
+                  if (event.pointerType !== 'touch') onPreload?.(tab.id);
+                }}
+                onFocus={() => onPreload?.(tab.id)}
                 className={cx(
                   tabItemClassName,
                   active ? tabItemActiveClassName : tabItemIdleClassName

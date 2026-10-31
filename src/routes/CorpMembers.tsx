@@ -320,7 +320,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   if (!snapshot.hydrated) return <Spinner />;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <PageHeader
         title={t('corp.members.title')}
         meta={
@@ -515,7 +515,7 @@ export function CorpMembers() {
 
   const content =
     gate.status === 'denied' ? (
-      <div className="mx-auto max-w-6xl space-y-4">
+      <div className="mx-auto max-w-page space-y-4">
         <PageHeader title={t('corp.members.title')} />
         <CorpDenied
           reason={gate.reason}

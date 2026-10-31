@@ -273,6 +273,14 @@ export function Contracts() {
     highlightedContractId !== null && !paramOpenDismissed
       ? (contracts.find((c) => c.contract_id === highlightedContractId) ?? null)
       : null;
+  // A linked contract in neither ESI's window nor the archive: say so, rather than open nothing.
+  const highlightGone =
+    tab === 'history' &&
+    source === 'current' &&
+    highlightParamId !== null &&
+    !loading &&
+    contractsResult !== null &&
+    !contracts.some((c) => c.contract_id === highlightParamId);
   const selectedContract = picked?.scope === selectionScope ? picked.contract : paramContract;
 
   const statusOptions = useMemo(() => contractStatusOptions(contracts), [contracts]);
@@ -326,7 +334,7 @@ export function Contracts() {
   }[source];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-2 sm:space-y-4">
+    <div className="mx-auto max-w-page space-y-2 sm:space-y-4">
       {/* Both tabs read something datable and reloadable, but not the same
           thing: History is the chosen source's contract list (this Character,
           all of them, or the corporation; the table looks the same for each),
@@ -338,7 +346,10 @@ export function Contracts() {
         meta={
           tab === 'history' ? (
             contractsResult && !sourceHeld ? (
-              <DataAgeBadge date={contractsResult.fetchedAt} />
+              <DataAgeBadge
+                date={contractsResult.fetchedAt}
+                expiresAt={contractsResult.expiresAt}
+              />
             ) : undefined
           ) : searchStatus?.lastSyncedAt != null ? (
             <DataAgeBadge date={new Date(searchStatus.lastSyncedAt)} />
@@ -363,12 +374,7 @@ export function Contracts() {
         actions={
           tab === 'history' ? (
             <>
-              <TableActionsMenu
-                name={t('contracts.title')}
-                tableExport={historyExport}
-                size="md"
-                showLabel
-              />
+              <TableActionsMenu name={t('contracts.title')} tableExport={historyExport} size="md" />
               <IconButton
                 icon={<Icon.Refresh />}
                 label={t('contracts.refresh')}
@@ -396,6 +402,7 @@ export function Contracts() {
       />
 
       <TabPanel tabsId={tabsId} tabId={tabId} className="space-y-2 sm:space-y-4">
+        {highlightGone && <p className="text-sm text-text-dim">{t('contracts.highlightGone')}</p>}
         {/* Switched outside the history chain below, not inside it: Search needs
           neither this character's contracts nor its `contracts` scope, so a
           character with an empty history or a 403 must still reach it. */}

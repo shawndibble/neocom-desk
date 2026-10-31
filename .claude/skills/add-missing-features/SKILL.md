@@ -111,8 +111,20 @@ and "I banked ISK" that the app does not cover?** "What page are we missing"
 produces weak candidates against a surface this broad; the pipeline question
 produces depth — discovery, scheduling, restocking, routing, competition decay.
 
-Draft **3–4** candidates, then gate each one. Grep by **domain concept**, using
-`GLOSSARY.md`'s vocabulary rather than your own phrasing:
+**Scale the draft to the source.** A broad sweep drafts 3–4 candidates. A rich
+source — a long changelog, a big release, a tool with many screens — drafts up
+to **10**. Go through it item by item; don't stop at the headline features.
+
+**Small ideas count.** A new column, a data point, a filter, a sort or a
+grouping on an existing table is a real candidate. So is a UI/UX pattern from
+the tool's screenshots: a layout, a summary line, a way of marking estimates.
+It must make an existing Neocom surface clearer or faster, and `docs/DESIGN.md`
+and the PI/page decisions still outrank the other tool's choices. A small idea
+gets the same prior-art gate and hostile review as a large one. One ticket can
+bundle several small ideas only when they touch the same page.
+
+Gate each candidate. Grep by **domain concept**, using `GLOSSARY.md`'s
+vocabulary rather than your own phrasing:
 
 1. `docs/context/decisions/` — scope decisions, one file each. Filenames carry
    the summary, so `ls | grep` on a concept usually lands it. A later decision
@@ -150,7 +162,7 @@ Spawn a **hostile reviewer** as a fresh sub-agent (Agent tool, `subagent_type:
 "general-purpose"` — never `fork`; the adversarial value is in the cold read).
 Its job is to kill candidates, not improve them. A reviewer that returns "all of
 these are good" has failed; require it to name the one it would cut if only two
-could ship.
+could ship (with more than 5 candidates: the bottom third it would cut).
 
 Its prompt must carry the full candidate text, the inventory from step 1, the
 prior-art hits from step 3, and — stated in the prompt itself, since it never

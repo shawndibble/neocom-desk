@@ -20,6 +20,8 @@ import {
   IconButton,
   LiveStatus,
   MenuItem,
+  MultiSelect,
+  RowActionsMenu,
   SearchInput,
   DataTableSortPicker,
   Select,
@@ -44,7 +46,9 @@ import {
   EMPTY_WALLET_JOURNAL_FILTER,
   activeWalletJournalFilterCount,
   journalNet,
+  journalPartyBreakdown,
   journalRefTypeBreakdown,
+  toggleBreakdownParty,
   toggleBreakdownRefType,
   type WalletJournalFilter,
 } from '@/features/character/walletJournalFilter';
@@ -73,12 +77,22 @@ export interface PlayerOption {
   name: string;
 }
 
+/** The personal journal's Journal Parties: the Party select, the By party list and the row menu. */
+export interface JournalPartyView {
+  options: readonly PlayerOption[];
+  nameFor: (id: number) => string;
+  /** The journal under every filter but the party: the By party list keeps every party. */
+  journal: readonly JournalRow[];
+}
+
 interface JournalFilterBarProps {
   filter: WalletJournalFilter;
   onChange: (filter: WalletJournalFilter) => void;
   refTypeOptions: string[];
   /** The corp journal's players, by name; absent on the personal journal, which has no Player filter. */
   playerOptions?: readonly PlayerOption[];
+  /** The personal journal's parties, by name; absent on the corp journal. */
+  partyOptions?: readonly PlayerOption[];
   /** The column picker, inline between the search box and the funnel. */
   actions?: ReactNode;
 }
@@ -96,6 +110,7 @@ function JournalFilterBar({
   onChange,
   refTypeOptions,
   playerOptions,
+  partyOptions,
   actions,
 }: JournalFilterBarProps) {
   const { t } = useTranslation();
@@ -104,7 +119,6 @@ function JournalFilterBar({
       value={filter}
       onChange={onChange}
       activeCount={activeWalletJournalFilterCount(filter)}
-      triggerLabel
       className="border-b border-line px-3 py-2"
       search={
         <SearchInput
@@ -166,6 +180,25 @@ function JournalFilterBar({
               </Select>
             </FilterField>
           )}
+          {partyOptions && (
+            <FilterField label={t('wallet.partyFilterLabel')}>
+              <MultiSelect
+                label={t('wallet.partyFilterLabel')}
+                triggerLabel={
+                  draft.party === null
+                    ? t('wallet.partyFilterAll')
+                    : (partyOptions.find((p) => p.id === draft.party)?.name ?? `#${draft.party}`)
+                }
+                triggerAriaLabel={t('wallet.partyFilterLabel')}
+                className="w-44"
+                options={partyOptions.map((p) => ({ id: p.id, label: p.name }))}
+                selected={new Set(draft.party === null ? [] : [draft.party])}
+                onToggle={(id) => setDraft({ ...draft, party: draft.party === id ? null : id })}
+                searchPlaceholder={t('wallet.partySearchPlaceholder')}
+                noResultsLabel={t('wallet.partyNoResults')}
+              />
+            </FilterField>
+          )}
           <DateRangeFields
             from={draft.startDate}
             to={draft.endDate}
@@ -193,6 +226,8 @@ interface JournalTableProps {
   refTypeOptions: string[];
   /** Set on the corp journal: adds the Player filter. */
   playerOptions?: readonly PlayerOption[];
+  /** Set on the personal journal: adds the Party filter, the By party list and the row menu. */
+  partyView?: JournalPartyView;
   filteredJournal: readonly JournalRow[];
   /** The journal under the date range and text filters only, for the panel's ref-type list. */
   breakdownJournal: readonly JournalRow[];
@@ -267,6 +302,7 @@ export function JournalTable({
   onFilterChange,
   refTypeOptions,
   playerOptions,
+  partyView,
   filteredJournal,
   breakdownJournal,
   chartJournal,
@@ -407,6 +443,10 @@ export function JournalTable({
         : undefined,
     [grouped, openDays, t, i18n.language]
   );
+  const partyRows = useMemo(
+    () => (partyView && panel.open ? journalPartyBreakdown(partyView.journal) : undefined),
+    [partyView, panel.open]
+  );
   // Corp journal only: a line with a Player offers that player's filter and actions,
   // and its ref type's filter; a line with none has one action, so no menu.
   const playerNames = useMemo(
@@ -415,6 +455,31 @@ export function JournalTable({
   );
   const rowContextMenu = useCallback(
     (entry: JournalRow, tr: ReactElement): ReactElement => {
+      if (!playerOptions) {
+        // Personal journal: a line with a Journal Party offers that party's filter and its
+        // ref type's; a line with none has one action, so no menu.
+        if (!partyView || entry.partyId === undefined) return tr;
+        const partyId = entry.partyId;
+        return (
+          <RowActionsMenu
+            name={partyView.nameFor(partyId)}
+            items={
+              <>
+                <MenuItem onSelect={() => onFilterChange({ ...filter, party: String(partyId) })}>
+                  {t('wallet.filterToParty', { party: partyView.nameFor(partyId) })}
+                </MenuItem>
+                <MenuItem
+                  onSelect={() => onFilterChange({ ...filter, refType: journalRefKey(entry) })}
+                >
+                  {t('wallet.filterToType')}
+                </MenuItem>
+              </>
+            }
+          >
+            {tr}
+          </RowActionsMenu>
+        );
+      }
       if (entry.playerId === undefined) return tr;
       const playerId = entry.playerId;
       const name = playerNames.get(String(playerId)) ?? null;
@@ -439,7 +504,7 @@ export function JournalTable({
         </CharacterRowMenu>
       );
     },
-    [playerNames, filter, onFilterChange, t]
+    [playerOptions, partyView, playerNames, filter, onFilterChange, t]
   );
   // A filter with no criteria active still runs (it's the identity filter), so
   // "is a filter active" is asked separately here rather than read off the result.
@@ -451,6 +516,7 @@ export function JournalTable({
         onChange={onFilterChange}
         refTypeOptions={refTypeOptions}
         playerOptions={playerOptions}
+        partyOptions={partyView?.options}
         actions={
           <>
             <IconButton
@@ -464,7 +530,6 @@ export function JournalTable({
               available={WALLET_JOURNAL_COLUMN_IDS}
               visible={visible}
               columnsById={columnsById}
-              showLabel
               onToggle={toggle}
               onReset={reset}
               buttonLabel={t('common.columnsButton')}
@@ -481,6 +546,7 @@ export function JournalTable({
           totals={totals}
           entryCount={filteredJournal.length}
           showInternal={panel.coverage !== undefined}
+          partyNameFor={partyView?.nameFor}
           // Phone: the sort is an icon at the row's end, so the table has no sort bar.
           sortControl={
             isPhone && filteredJournal.length > 0 ? (
@@ -512,6 +578,16 @@ export function JournalTable({
         breakdown={breakdown}
         selectedRefType={filter.refType}
         onSelectRefType={(refType) => onFilterChange(toggleBreakdownRefType(filter, refType))}
+        parties={
+          partyView && partyRows
+            ? {
+                rows: partyRows,
+                nameFor: partyView.nameFor,
+                selected: filter.party,
+                onSelect: (partyId) => onFilterChange(toggleBreakdownParty(filter, partyId)),
+              }
+            : undefined
+        }
         coverage={panel.coverage}
         chart={<IskFlowChart rows={chartJournal} filter={filter} onFilterChange={onFilterChange} />}
       />
@@ -548,9 +624,9 @@ export function JournalTable({
             // Every page of the journal, uncapped: thousands of rows for an
             // active trader.
             virtualize="auto"
-            // The corp journal's row menu (filters and the player's actions); the
+            // The row menu (filters, and the corp player's actions); the
             // pinned ⋮ keeps a dense card's first line at the title's height.
-            {...(playerOptions
+            {...(playerOptions || partyView
               ? {
                   className: 'dt-actions-pinned-only',
                   rowContextMenu,

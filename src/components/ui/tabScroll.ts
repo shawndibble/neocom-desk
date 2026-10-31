@@ -1,7 +1,8 @@
 /**
- * The pointer-only half of a scrolling `Tabs` bar: which ends still have tabs
- * beyond them, how a vertical wheel maps onto the bar, and how far a chevron
- * click travels. Pure so the rules are testable without a laid-out DOM.
+ * Scroll rules for a sideways tab bar (`Tabs`, and the route sub-navs): which
+ * ends still have tabs beyond them, how a vertical wheel maps onto the bar,
+ * how far a chevron click travels, and how far to slide to reveal a tab. Pure
+ * so they are testable without a laid-out DOM; only `revealInScroller` reads it.
  */
 
 export interface ScrollMetrics {
@@ -49,4 +50,37 @@ export function wheelScrollDelta(
 export function pageScrollDelta(direction: 'before' | 'after', clientWidth: number): number {
   const distance = Math.round(clientWidth * 0.75);
   return direction === 'after' ? distance : -distance;
+}
+
+/**
+ * How far to move a bar's `scrollLeft` so an item sits fully between its
+ * `start` and `end` (viewport x, already inset by the scroll padding): the
+ * part cut off at whichever edge, or 0 when it already fits.
+ */
+export function revealScrollDelta(
+  bar: { start: number; end: number },
+  item: { left: number; right: number }
+): number {
+  if (item.left < bar.start) return item.left - bar.start;
+  if (item.right > bar.end) return item.right - bar.end;
+  return 0;
+}
+
+/**
+ * Slides a sideways scroller so `item` (a tab inside it) is fully on screen —
+ * the selected `Tabs` tab, or a route sub-nav's current link on landing.
+ *
+ * Moves only the scroller's own `scrollLeft`, never `scrollIntoView`: that
+ * scrolls every ancestor too, even with `block: 'nearest'`, so a bar below
+ * the fold dragged the whole page down to it on load (the landing page's
+ * feature tabs). Honours the scroller's `scroll-padding-inline` as
+ * `scrollIntoView` did, so the item stops clear of the edge fade.
+ */
+export function revealInScroller(scroller: HTMLElement, item: Element): void {
+  const rect = scroller.getBoundingClientRect();
+  const style = getComputedStyle(scroller);
+  // `auto` (no padding set) parses to NaN.
+  const start = rect.left + (parseFloat(style.scrollPaddingLeft) || 0);
+  const end = rect.right - (parseFloat(style.scrollPaddingRight) || 0);
+  scroller.scrollLeft += revealScrollDelta({ start, end }, item.getBoundingClientRect());
 }

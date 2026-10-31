@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { DataAgeBadge } from './DataAgeBadge';
-import { formatTimestamp } from '@/lib/timestamp';
+import { formatTimeOfDay, formatTimestamp } from '@/lib/timestamp';
 
 const NOW = new Date('2026-08-29T12:00:00Z');
 
@@ -86,6 +86,31 @@ describe('DataAgeBadge', () => {
     render(<DataAgeBadge date={date} note="Corp data refreshes about hourly." />);
     fireEvent.focus(screen.getByText('5m ago'));
     expect(screen.getByRole('tooltip')).toHaveTextContent('Corp data refreshes about hourly.');
+  });
+
+  describe('expiresAt', () => {
+    const date = new Date(NOW.getTime() - 60_000);
+
+    it('adds when ESI next updates, in minutes and clock time', () => {
+      const expiresAt = new Date(NOW.getTime() + 23 * 60_000);
+      render(<DataAgeBadge date={date} expiresAt={expiresAt} />);
+      fireEvent.focus(screen.getByText('1m ago'));
+      expect(screen.getByRole('tooltip')).toHaveTextContent(
+        `ESI updates this in 23 min (${formatTimeOfDay(expiresAt)})`
+      );
+    });
+
+    it('says newer data may exist once the expiry has passed', () => {
+      render(<DataAgeBadge date={date} expiresAt={new Date(NOW.getTime() - 60_000)} />);
+      fireEvent.focus(screen.getByText('1m ago'));
+      expect(screen.getByRole('tooltip')).toHaveTextContent('ESI may have newer data; refresh');
+    });
+
+    it('adds nothing without an expiry, and leaves the badge text alone', () => {
+      render(<DataAgeBadge date={date} />);
+      fireEvent.focus(screen.getByText('1m ago'));
+      expect(screen.getByRole('tooltip')).not.toHaveTextContent('ESI');
+    });
   });
 
   describe('dotOnly', () => {

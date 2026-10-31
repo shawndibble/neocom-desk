@@ -42,6 +42,13 @@ import { unmaskNumber } from '@/lib/numberMask';
 import { useTimeZone } from '@/lib/timeFormat';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
+import { useColumnVisibility } from '@/lib/columnVisibility';
+import { ProductionColumnPicker } from './ProductionColumnPicker';
+import {
+  PLAN_RUN_COLUMN_IDS,
+  shownProductionColumns,
+  useVisiblePlanRunColumns,
+} from './productionColumnVisibility';
 import { productionRunsCsvColumns } from './productionRunsCsv';
 import { UnloggedDeliveriesBadge } from './UnloggedDeliveriesBadge';
 
@@ -109,6 +116,7 @@ export function ProductionRunsPanel({
 }: ProductionRunsPanelProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
+  const planColumnsShown = useColumnVisibility(useVisiblePlanRunColumns, PLAN_RUN_COLUMN_IDS);
   const runsCsvColumns = useMemo(() => productionRunsCsvColumns(t), [t]);
   const [loggingOpen, setLoggingOpen] = useState(false);
   // Closed until asked: the table is the record, and on a plan being priced
@@ -217,7 +225,7 @@ export function ProductionRunsPanel({
     columns: runsCsvColumns,
   });
 
-  const columns: DataTableColumn<ProductionRunSummary>[] = [
+  const allColumns: DataTableColumn<ProductionRunSummary>[] = [
     loggedAtColumn(t, timeZone),
     quantityColumn(t),
     totalCostColumn(t),
@@ -234,6 +242,11 @@ export function ProductionRunsPanel({
     statusColumn(t),
     soldActionsColumn(sale, runLoss),
   ];
+  const columns = shownProductionColumns(
+    allColumns,
+    PLAN_RUN_COLUMN_IDS,
+    planColumnsShown.isVisible
+  );
 
   return (
     <>
@@ -263,7 +276,15 @@ export function ProductionRunsPanel({
         actions={
           <span className="flex items-center gap-2">
             {runs.length > 0 && (
-              <TableActionsMenu name={t('industry.productionRuns')} tableExport={runsExport} />
+              <>
+                <TableActionsMenu name={t('industry.productionRuns')} tableExport={runsExport} />
+                <ProductionColumnPicker
+                  store={useVisiblePlanRunColumns}
+                  ids={PLAN_RUN_COLUMN_IDS}
+                  columns={allColumns}
+                  size="sm"
+                />
+              </>
             )}
             <Button size="sm" onClick={openLogProduction} disabled={productTypeID === null}>
               <Icon.AddToPlan /> {t('industry.logProduction')}

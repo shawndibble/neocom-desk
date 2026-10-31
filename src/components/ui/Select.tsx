@@ -76,7 +76,7 @@ export function SelectContent({
         position="popper"
         sideOffset={4}
         className={cx(
-          'z-50 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xs border border-line bg-panel text-text shadow-lg shadow-black/50',
+          'motion-pop z-50 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xs border border-line bg-panel text-text shadow-lg shadow-black/50',
           className
         )}
         {...props}

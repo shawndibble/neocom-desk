@@ -295,6 +295,8 @@ async function resetSession(): Promise<void> {
   window.history.pushState({}, '', '/planetary-industry/colonies');
 }
 
+// Perf note: every test mounts the whole `App`; Plan-tab tests (find-best, goals)
+// also run the real plan engine, so they sit near 0.6s locally by design.
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });
   // One throwaway render of the page, so no test pays for a worker's first
@@ -306,8 +308,21 @@ beforeAll(async () => {
   const { unmount } = render(<App />);
   await screen.findByRole('heading', { name: 'What do you want to do?' }, { timeout: 25_000 });
   unmount();
+  // The other tabs' lazy chunks and the Plan engine's first run are paid here
+  // too: CI's first Map / Plan-with-colonies render took seconds on a loaded
+  // shard, and landed on whichever test reached it first.
+  window.history.pushState({}, '', '/planetary-industry/map');
+  const warmMap = render(<App />);
+  await screen.findByRole('group', { name: /^Planet map/ }, { timeout: 25_000 });
+  warmMap.unmount();
+  window.history.pushState({}, '', '/planetary-industry/plan?q=find-best');
+  const warmPlan = render(<App />);
+  await waitFor(() => expect(document.querySelector('main a[href*="product="]')).not.toBeNull(), {
+    timeout: 25_000,
+  });
+  warmPlan.unmount();
   server.resetHandlers();
-}, 30_000);
+}, 60_000);
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
 beforeEach(async () => {
@@ -424,7 +439,7 @@ describe('PlanetaryIndustry', () => {
   });
 
   it('names the haul cadence beside the log-in time, and changes it from there', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await colonyPanelFor(/Jita IV/);
     const today = screen
@@ -493,7 +508,7 @@ describe('PlanetaryIndustry', () => {
     ).toBeGreaterThan(0);
     const toggle = await screen.findByRole('button', { name: /show \d+ alt/i });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(toggle);
     // No `universe/planets/{id}` mock is registered for the alt's planet in
     // this test, so it renders its "Planet #id" fallback — a real row for a
@@ -692,7 +707,7 @@ describe('PlanetaryIndustry', () => {
 
     const { unmount } = render(<App />);
     await colonyPanelFor(/Jita IV/);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     // Grouped by character: the active Character's own group heading plus
@@ -729,7 +744,7 @@ describe('PlanetaryIndustry', () => {
 
     render(<App />);
     await colonyPanelFor(/Jita IV/);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     expect(scopelessFetch).not.toHaveBeenCalled();
@@ -754,7 +769,7 @@ describe('PlanetaryIndustry', () => {
   });
 
   it('opens the planner on the Plan tab and records it in the URL', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await colonyPanelFor(/Jita IV/);
 
@@ -792,7 +807,7 @@ describe('PlanetaryIndustry', () => {
     expect(
       within(goals).queryByRole('button', { name: `Remove ${TRANSMITTER_NAME}` })
     ).not.toBeInTheDocument();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(
       within(goals).getByRole('button', { name: `More actions for ${TRANSMITTER_NAME}` })
     );
@@ -855,7 +870,9 @@ describe('PlanetaryIndustry', () => {
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     // Colonies fold away below `md` (jsdom matches no media query): open them.
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Show colonies' }));
+    await userEvent
+      .setup({ delay: null })
+      .click(screen.getByRole('button', { name: 'Show colonies' }));
     // The colony's customs is its system's highsec rate after level 4.
     expect(
       screen.getByLabelText(
@@ -875,7 +892,9 @@ describe('PlanetaryIndustry', () => {
     window.history.pushState({}, '', `/planetary-industry/plan?goals=${WATER}:24`);
     render(<App />);
 
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'Show colonies' }));
+    await userEvent
+      .setup({ delay: null })
+      .click(await screen.findByRole('button', { name: 'Show colonies' }));
     expect(
       await screen.findByText(/Left out: no link on any of your colonies/)
     ).toBeInTheDocument();
@@ -906,7 +925,9 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     const option = await screen.findByRole('button', { name: /Make more from my planets/ });
     expect(option).toHaveAttribute('aria-current', 'true');
-    await userEvent.setup().hover(screen.getByRole('button', { name: 'About this question' }));
+    await userEvent
+      .setup({ delay: null })
+      .hover(screen.getByRole('button', { name: 'About this question' }));
     expect(
       (await screen.findAllByText(/Opened “Make more from my planets” because we found 1 colony/))
         .length
@@ -920,7 +941,9 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     const option = await screen.findByRole('button', { name: /Find the best thing to build/ });
     expect(option).toHaveAttribute('aria-current', 'true');
-    await userEvent.setup().hover(screen.getByRole('button', { name: 'About this question' }));
+    await userEvent
+      .setup({ delay: null })
+      .hover(screen.getByRole('button', { name: 'About this question' }));
     expect(
       (await screen.findAllByText(/You have no colonies yet, so we opened/)).length
     ).toBeGreaterThan(0);
@@ -941,7 +964,7 @@ describe('PlanetaryIndustry', () => {
   });
 
   it('opens the Goal Planner on #customs, and a pick writes ?q= and drops the hash', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     window.history.pushState({}, '', '/planetary-industry/plan#customs');
     render(<App />);
     await screen.findByRole('heading', { name: 'Goals' });
@@ -952,7 +975,7 @@ describe('PlanetaryIndustry', () => {
   });
 
   it('writes the picked question to ?q= without adding history entries', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     window.history.pushState({}, '', '/planetary-industry/plan');
     const before = window.history.length;
     render(<App />);
@@ -965,7 +988,9 @@ describe('PlanetaryIndustry', () => {
     window.history.pushState({}, '', `/planetary-industry/plan?goals=${WATER}:24`);
     render(<App />);
     await screen.findByRole('heading', { name: 'Goals' });
-    await userEvent.setup().hover(screen.getByRole('button', { name: 'About this question' }));
+    await userEvent
+      .setup({ delay: null })
+      .hover(screen.getByRole('button', { name: 'About this question' }));
     expect(
       (
         await screen.findAllByText(
@@ -981,7 +1006,7 @@ describe('PlanetaryIndustry', () => {
   });
 
   it('opens the 60-second explainer from "New to PI?" on every tab', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     window.history.pushState({}, '', '/planetary-industry/colonies');
     render(<App />);
     await user.click(await screen.findByRole('button', { name: 'New to PI?' }));
@@ -1050,7 +1075,7 @@ describe('PlanetaryIndustry', () => {
       async (_tab, path) => {
         server.use(down());
         window.history.pushState({}, '', path);
-        const user = userEvent.setup();
+        const user = userEvent.setup({ delay: null });
         render(<App />);
         expect(await screen.findByText(NOTICE, {}, { timeout: 15_000 })).toBeInTheDocument();
         expect(screen.queryByText('No colonies yet')).toBeNull();
@@ -1124,7 +1149,7 @@ describe('PlanetaryIndustry', () => {
     });
 
     it('closes on Back: a tile click pushes the entry, Back pops it', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       window.history.pushState({}, '', '/planetary-industry/map');
       render(<App />);
       const board = await screen.findByRole('group', { name: /^Planet map/ });
@@ -1148,7 +1173,7 @@ describe('PlanetaryIndustry', () => {
     });
 
     it("keeps Plan's ?q= beside ?product=: a name on Plan opens the drawer, Back returns to the question", async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       window.history.pushState({}, '', '/planetary-industry/plan?q=find-best');
       render(<App />);
       const link = await waitFor(() => {
@@ -1176,7 +1201,7 @@ describe('PlanetaryIndustry', () => {
     });
 
     it('drops ?product= when a tab switch leaves the Map', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       window.history.pushState({}, '', `/planetary-industry/map?product=${BIOFUELS}`);
       render(<App />);
       await drawer();
@@ -1186,7 +1211,7 @@ describe('PlanetaryIndustry', () => {
     });
 
     it('drops ?planet= when a tab switch leaves the Map', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       window.history.pushState({}, '', `/planetary-industry/map?planet=${PLANET_ID}`);
       render(<App />);
       expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
@@ -1234,7 +1259,7 @@ describe('PlanetaryIndustry', () => {
 
     render(<App />);
     await colonyPanelFor(/Jita IV/);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     const unread = screen.getByText(/^Unread Alt:/);
@@ -1250,7 +1275,7 @@ describe('PlanetaryIndustry', () => {
 
     render(<App />);
     await colonyPanelFor(/Jita IV/);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     // One row, and one action, per not-loaded character.
@@ -1274,7 +1299,7 @@ describe('PlanetaryIndustry', () => {
 
     render(<App />);
     await colonyPanelFor(/Jita IV/);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
     await user.click(screen.getByRole('button', { name: 'Switch to Alt Two' }));
 
@@ -1329,7 +1354,7 @@ describe('PlanetaryIndustry', () => {
 
     render(<App />);
     await colonyPanelFor(/Jita IV/);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     // One planet already stopped, the other's soonest expiry is what "next"
@@ -1361,7 +1386,7 @@ describe('PlanetaryIndustry', () => {
 
     render(<App />);
     await colonyPanelFor(/Jita IV/);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     // The header is the row holding the alt's Switch action.
@@ -1437,7 +1462,7 @@ describe('PlanetaryIndustry', () => {
 
     render(<App />);
     await colonyPanelFor(/Jita IV/);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     const panel = coloniesPanel();

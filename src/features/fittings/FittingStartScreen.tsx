@@ -245,13 +245,13 @@ export function FittingStartScreen({
   const showImport = page || importInline;
 
   return (
-    <div className="space-y-3">
+    <div className={cx('space-y-3', pageTitle && 'mx-auto max-w-page')}>
       {pageTitle && (
         <PageHeader
           title={pageTitle}
           meta={
             hasCharacter && inGame.granted === true && inGame.result ? (
-              <DataAgeBadge date={inGame.result.fetchedAt} />
+              <DataAgeBadge date={inGame.result.fetchedAt} expiresAt={inGame.result.expiresAt} />
             ) : undefined
           }
           actions={refreshInGameButton ?? undefined}

@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { changeVerdict, STAT_DIGITS } from '@/engine/fittings/variationDelta';
+import { changeVerdict, FLAG_STATS, STAT_DIGITS } from '@/engine/fittings/variationDelta';
 import type { StatChange as StatChangeValue } from '@/engine/fittings/variationDelta';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { formatSeconds } from '@/lib/duration';
 import { cx } from '@/lib/cx';
+import { flagWord } from '@/features/fittings/flagWord';
 
 interface StatChangeProps {
   change: StatChangeValue;
@@ -36,6 +37,7 @@ function useStatChangeParts(change: StatChangeValue) {
   const { t } = useTranslation();
   const verdict = changeVerdict(change);
   const isCapacitor = change.key === 'capacitor';
+  const isFlag = FLAG_STATS.has(change.key);
   const digits = STAT_DIGITS[change.key];
   // Capacitor values are stable % (positive) or a negated depletion time.
   const show = (value: number) =>
@@ -43,7 +45,9 @@ function useStatChangeParts(change: StatChangeValue) {
       ? value >= 0
         ? t('fittings.statChange.stable', { pct: formatAt(0, value) })
         : t('fittings.statChange.depletes', { time: formatSeconds(-value) })
-      : formatAt(digits, value);
+      : isFlag
+        ? flagWord(value, t)
+        : formatAt(digits, value);
   const before = show(change.before);
   const after = show(change.after);
   const named = (value: string) =>

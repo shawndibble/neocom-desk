@@ -217,6 +217,7 @@ export function MinerDetail({ id }: { id: string }) {
   // The three day tables share one grid (select, day, moon, character, ore, rate, tax), so a
   // reader's eye keeps its column from one section to the next: Earlier days keeps the select
   // gutter (empty) and says each day's status under its ore instead of in a column of its own.
+  const dayMoon = (d: DayRow) => moonName(d.moonId ?? moonOf.get(d.structureId));
   const dayColumns = (
     withSelect: boolean,
     withStatus: boolean,
@@ -263,10 +264,11 @@ export function MinerDetail({ id }: { id: string }) {
       render: (d) => (
         <PlaceCell
           refinery={names.refinery(d.structureId)}
-          moon={moonName(d.moonId ?? moonOf.get(d.structureId))}
+          moon={dayMoon(d)}
           to={d.extractionId === undefined ? undefined : extractionPath(d.extractionId)}
         />
       ),
+      sortValue: (d) => dayMoon(d) ?? names.refinery(d.structureId),
     },
     // One character mined every day: a column repeating the page's own name is width for nothing.
     ...(row.characterIds.length > 1
@@ -276,6 +278,7 @@ export function MinerDetail({ id }: { id: string }) {
             className: 'w-44',
             header: t('corpTaxBook.moons.cols.character'),
             render: (d: DayRow) => names.character(d.characterId),
+            sortValue: (d: DayRow) => names.character(d.characterId),
           } satisfies DataTableColumn<DayRow>,
         ]
       : []),
@@ -307,6 +310,7 @@ export function MinerDetail({ id }: { id: string }) {
       align: 'right',
       className: 'w-20 tabular-nums',
       render: (d) => `${d.taxPct}%`,
+      sortValue: (d) => d.taxPct,
     },
     {
       id: 'tax',
@@ -360,6 +364,7 @@ export function MinerDetail({ id }: { id: string }) {
             rowKey={(d) => d.key}
             density="compact"
             stackLayout="dense"
+            mobileSort
             {...table}
           />
         )}
@@ -421,6 +426,8 @@ export function MinerDetail({ id }: { id: string }) {
       id: 'at',
       header: t('corpTaxBook.moons.cols.when'),
       render: (r) => shortDateTime(r.at),
+      sortValue: (r) => r.at,
+      sortFirst: 'desc',
     },
     {
       id: 'from',
@@ -447,6 +454,8 @@ export function MinerDetail({ id }: { id: string }) {
             </span>
           </span>
         ),
+      sortValue: (r) =>
+        r.kind === 'payment' ? names.character(r.payment.characterId) : r.correction.reason,
     },
     {
       id: 'amount',
@@ -462,6 +471,7 @@ export function MinerDetail({ id }: { id: string }) {
             {signedIsk(r.correction.amount)}
           </span>
         ),
+      sortValue: (r) => (r.kind === 'payment' ? r.payment.amount : r.correction.amount),
     },
     {
       id: 'credited',
@@ -725,6 +735,7 @@ export function MinerDetail({ id }: { id: string }) {
         noun={noun('payments')}
         empty={t('corpTaxBook.moons.miner.empty.payments')}
         rows={ledger}
+        sortColumns={paymentColumns}
         meta={
           <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.paymentsHint')}</span>
         }
@@ -744,7 +755,8 @@ export function MinerDetail({ id }: { id: string }) {
               rowKey={(r) => `${r.kind}-${r.id}`}
               density="compact"
               stackLayout="dense"
-              stacked={table.stacked}
+              mobileSort
+              {...table}
             />
             <p className="border-t border-line px-3 py-2 text-xs text-text-dim tabular-nums">
               {t('corpTaxBook.moons.miner.sum', {

@@ -57,4 +57,20 @@ describe('ContractPriceCheck', () => {
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.queryByText('512,319,400 ISK')).not.toBeInTheDocument();
   });
+
+  it('tints a row by its tone and leaves a row without one neutral', () => {
+    render(
+      <ContractPriceCheck
+        heading="Price check"
+        rows={[
+          { label: 'Saving', value: '+4.0%', tone: 'good' },
+          { label: 'Loss', value: '−4.0%', tone: 'bad' },
+          { label: 'Plain', value: '1.0%' },
+        ]}
+      />
+    );
+    expect(screen.getByText('+4.0%')).toHaveClass('text-isk-pos');
+    expect(screen.getByText('−4.0%')).toHaveClass('text-isk-neg');
+    expect(screen.getByText('1.0%')).not.toHaveClass('text-isk-pos', 'text-isk-neg');
+  });
 });

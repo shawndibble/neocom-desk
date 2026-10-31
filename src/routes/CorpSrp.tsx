@@ -22,7 +22,7 @@ export function CorpSrp() {
   }
   const content =
     gate.status === 'denied' ? (
-      <div className="mx-auto max-w-5xl space-y-4 px-4 py-4">
+      <div className="mx-auto max-w-page space-y-4 px-4 py-4">
         <PageHeader title={t('srp.title')} />
         <CorpDenied
           reason={gate.reason}

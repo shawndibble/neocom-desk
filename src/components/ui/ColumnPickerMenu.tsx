@@ -30,8 +30,8 @@ interface ColumnPickerMenuProps<Id extends string, Row> {
   resetLabel?: string;
   /** Trigger size; defaults to `IconButton`'s own default so existing callers are unchanged. */
   size?: ComponentProps<typeof IconButton>['size'];
-  /** Tier 2: show "Columns" beside the icon from `md` up. */
-  showLabel?: boolean;
+  /** Checkable picks that aren't columns (a heading figure), below a separator after the columns. */
+  extraItems?: readonly { id: string; label: string; checked: boolean; onToggle: () => void }[];
 }
 
 /**
@@ -54,19 +54,14 @@ export function ColumnPickerMenu<Id extends string, Row>({
   onReset,
   resetLabel,
   size,
-  showLabel,
+  extraItems,
 }: ColumnPickerMenuProps<Id, Row>) {
   const visibleSet = new Set(visible);
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton
-          icon={<Icon.ColumnsPicker />}
-          label={buttonLabel}
-          size={size}
-          visibleLabel={showLabel ? buttonLabel : undefined}
-        />
+        <IconButton icon={<Icon.ColumnsPicker />} label={buttonLabel} size={size} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
         <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{menuTitle}</p>
@@ -82,6 +77,21 @@ export function ColumnPickerMenu<Id extends string, Row>({
             {columnsById[id].header}
           </DropdownMenuCheckboxItem>
         ))}
+        {extraItems && extraItems.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            {extraItems.map((item) => (
+              <DropdownMenuCheckboxItem
+                key={item.id}
+                checked={item.checked}
+                onSelect={(event) => event.preventDefault()}
+                onCheckedChange={item.onToggle}
+              >
+                {item.label}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </>
+        )}
         {onReset && (
           <>
             <DropdownMenuSeparator />

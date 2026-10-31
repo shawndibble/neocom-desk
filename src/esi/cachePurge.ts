@@ -236,6 +236,20 @@ function hydratePending(): Promise<void> {
  * then behave as if nothing were cached for it. One Set lookup after the first
  * call, which pays a single indexed prefix scan of `db.settings`.
  */
+/**
+ * True while any Character's purge is outstanding: for a value pooled across
+ * the account (`ACCOUNT_SNAPSHOT_ID`), which carries every Character's data.
+ */
+export async function isAnyCachePurgePending(): Promise<boolean> {
+  if (pending.size > 0) return true;
+  try {
+    await hydratePending();
+  } catch {
+    // As `isCachePurgePending`: fails in the same direction.
+  }
+  return pending.size > 0;
+}
+
 export async function isCachePurgePending(characterId: number): Promise<boolean> {
   if (characterId === GLOBAL_CACHE_CHARACTER_ID) return false;
   if (pending.has(characterId)) return true;

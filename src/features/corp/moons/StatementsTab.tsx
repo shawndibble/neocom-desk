@@ -1,16 +1,40 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { DataTable, InfoTooltip, Panel, type DataTableColumn } from '@/components/ui';
+import {
+  ColumnPickerMenu,
+  DataTable,
+  InfoTooltip,
+  Panel,
+  type DataTableColumn,
+} from '@/components/ui';
 import { isIssuedPeriod, periodRows, type PeriodRow } from '@/engine/corpTaxBook/bookView';
 import { wholeIsk } from '@/engine/corpTaxBook/wholeIsk';
+import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useBook } from './useBook';
 import { caretColumn } from './caretColumn';
 import { DueWord } from './moonsParts';
 import { statementPeriodPath } from './moonsPaths';
 import { isk, periodLabel, shortDate } from './moonsFormat';
+import {
+  STATEMENTS_COLUMN_IDS,
+  useVisibleStatementsColumns,
+  type StatementsColumnId,
+} from './moonsColumns';
 import { StatementRun } from './StatementRun';
 import { useCards } from './sectionHelpers';
+
+/** Period statuses in the order the Status column sorts them: what needs a move first, then what is done. */
+const STATUS_RANK: Record<PeriodRow['status'], number> = {
+  overdue: 0,
+  ready: 1,
+  issued: 2,
+  sent: 3,
+  open: 4,
+  rollover: 5,
+  paid: 6,
+  closed: 7,
+};
 
 export function StatementsTab() {
   const { t } = useTranslation();
@@ -24,12 +48,16 @@ export function StatementsTab() {
     .filter((w) => wholeIsk(w.amount) >= 1);
   const late = [...view.internals.byMiner.values()].flatMap((m) => m.draft.writtenOff);
 
-  const columns: DataTableColumn<PeriodRow>[] = [
+  const columnVisibility = useColumnVisibility(useVisibleStatementsColumns, STATEMENTS_COLUMN_IDS);
+
+  const allColumns: DataTableColumn<PeriodRow>[] = [
     {
       id: 'period',
       header: t('corpTaxBook.moons.cols.period'),
       primary: true,
       render: (r) => <span className="font-semibold">{periodLabel(r.start, r.end)}</span>,
+      sortValue: (r) => r.start,
+      sortFirst: 'desc',
     },
     {
       id: 'status',
@@ -49,6 +77,8 @@ export function StatementsTab() {
           {t(`corpTaxBook.moons.periodStatus.${r.status}`)}
         </span>
       ),
+      sortValue: (r) => STATUS_RANK[r.status],
+      sortFirst: 'asc',
     },
     {
       id: 'miners',
@@ -56,6 +86,7 @@ export function StatementsTab() {
       align: 'right',
       className: 'tabular-nums',
       render: (r) => r.miners,
+      sortValue: (r) => r.miners,
     },
     {
       id: 'billed',
@@ -63,6 +94,7 @@ export function StatementsTab() {
       align: 'right',
       className: 'tabular-nums',
       render: (r) => (r.billed ? isk(r.billed) : '—'),
+      sortValue: (r) => r.billed,
     },
     {
       id: 'paid',
@@ -70,6 +102,7 @@ export function StatementsTab() {
       align: 'right',
       className: 'tabular-nums',
       render: (r) => (r.paid ? isk(r.paid) : '—'),
+      sortValue: (r) => r.paid,
     },
     {
       id: 'outstanding',
@@ -78,6 +111,7 @@ export function StatementsTab() {
       className: 'tabular-nums',
       cardCorner: true,
       render: (r) => (r.outstanding ? isk(r.outstanding) : '—'),
+      sortValue: (r) => r.outstanding,
     },
     {
       id: 'mailed',
@@ -93,17 +127,33 @@ export function StatementsTab() {
         ) : (
           '—'
         ),
+      // The share of Statements mailed, least first: the periods with mail still to send lead.
+      sortValue: (r) => (r.statements ? r.mailed / r.statements : undefined),
+      sortFirst: 'asc',
     },
     {
       id: 'due',
       header: t('corpTaxBook.moons.cols.due'),
       render: (r) => <DueWord dueAt={r.dueAt} now={view.input.now} pausedUntil={r.pausedUntil} />,
+      sortValue: (r) => r.dueAt ?? undefined,
+      sortFirst: 'asc',
     },
     {
       id: 'issued',
       header: t('corpTaxBook.moons.cols.issued'),
       render: (r) => (r.issuedAt ? shortDate(r.issuedAt) : '—'),
+      sortValue: (r) => r.issuedAt ?? undefined,
+      sortFirst: 'desc',
     },
+  ];
+  const columnsById = Object.fromEntries(allColumns.map((c) => [c.id, c])) as Record<
+    StatementsColumnId,
+    DataTableColumn<PeriodRow>
+  >;
+  const columns = [
+    ...allColumns.filter(
+      (c) => c.id === 'period' || columnVisibility.isVisible(c.id as StatementsColumnId)
+    ),
     // Only an issued period has Statements to open; the rest carry no caret (hidden = no caret).
     ...(cards ? [] : [caretColumn<PeriodRow>((r) => !isIssuedPeriod(r))]),
   ];
@@ -122,6 +172,19 @@ export function StatementsTab() {
           </span>
         }
         padded={false}
+        actions={
+          <ColumnPickerMenu
+            available={STATEMENTS_COLUMN_IDS}
+            visible={columnVisibility.visible}
+            columnsById={columnsById}
+            onToggle={columnVisibility.toggle}
+            onReset={columnVisibility.reset}
+            buttonLabel={t('common.columnsButton')}
+            menuTitle={t('common.columnsMenuTitle')}
+            resetLabel={t('common.resetColumns')}
+            size="sm"
+          />
+        }
       >
         <div ref={tableRef} className="@container overflow-x-auto">
           <DataTable
@@ -134,6 +197,7 @@ export function StatementsTab() {
             density="compact"
             stacked={cards}
             stackColumns={2}
+            mobileSort
           />
         </div>
         {(tolerance.length > 0 || late.length > 0) && (

@@ -11,13 +11,10 @@ function variation(overrides: Partial<VariationRow> = {}): VariationRow {
     typeId: 1,
     name: 'Small Shield Booster II',
     metaGroupName: 'Tech II',
-    delta: {
-      count: 2,
-      changes: [
-        { key: 'cpuUsed', before: 10, after: 15 },
-        { key: 'capacitor', before: 40, after: -120 },
-      ],
-    },
+    delta: [
+      { kind: 'stat', change: { key: 'cpuUsed', before: 10, after: 15 } },
+      { kind: 'stat', change: { key: 'capacitor', before: 40, after: -120 } },
+    ],
     fits: true,
     overage: null,
     canFly: false,
@@ -47,6 +44,15 @@ describe('fittingVariationsCsvColumns', () => {
     ]);
   });
 
+  it('words a role figure before → after (a remote repairer swap)', () => {
+    const row = variation({
+      delta: [{ kind: 'role', change: { key: 'remoteRepair', before: 40, after: 32 } }],
+    });
+    expect(fittingVariationsCsvColumns(t)[1].value(row)).toBe(
+      'fittings.whatToTrain.role.remoteRepair(40,32)'
+    );
+  });
+
   it('names the overage when the swap does not fit', () => {
     const fits = fittingVariationsCsvColumns(t)[2];
     expect(
@@ -56,9 +62,7 @@ describe('fittingVariationsCsvColumns', () => {
 
   it('says no change for an empty delta, and leaves still-loading cells blank', () => {
     const columns = fittingVariationsCsvColumns(t);
-    expect(columns[1].value(variation({ delta: { count: 0, changes: [] } }))).toBe(
-      'fittings.variations.noChanges'
-    );
+    expect(columns[1].value(variation({ delta: [] }))).toBe('fittings.variations.noChanges');
     const loading = variation({ delta: null, fits: null, canFly: null, price: null });
     expect(toCsv([loading], columns).split('\r\n')[1]).toBe('"Small Shield Booster II",,,,');
   });

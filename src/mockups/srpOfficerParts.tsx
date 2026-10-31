@@ -61,7 +61,7 @@ const noop = () => {};
 export type SrpTab = 'pending' | 'approved' | 'history';
 
 export function Page({ children }: { children: ReactNode }) {
-  return <div className="mx-auto max-w-6xl space-y-4 px-4 py-4">{children}</div>;
+  return <div className="mx-auto max-w-page space-y-4 px-4 py-4">{children}</div>;
 }
 
 function CorpSubNav() {

@@ -3,7 +3,7 @@ import { ESI_REGISTRY } from '@/esi/registry';
 import type { CachedResult } from '@/esi/cache';
 import type { Contract } from '@/esi/endpoints';
 import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
-import { loadContracts } from '@/features/character/contracts';
+import { loadContractsWithArchive } from '@/features/character/contracts';
 import type { ContactStandingIndex } from '@/features/character/contactStandings';
 import type { NameCategory } from '@/features/character/names';
 import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -70,7 +70,7 @@ export interface AllContractsSnapshot {
 
 /**
  * Contracts › History across every Character holding the contracts scope: one
- * `loadContracts` read each, the scope checked up front so an ungranted alt is
+ * `loadContractsWithArchive` read each, the scope checked up front so an ungranted alt is
  * skipped rather than raising a re-auth banner (`fanOutAllCharacters`).
  */
 export async function loadAllContractsSnapshot(
@@ -80,7 +80,7 @@ export async function loadAllContractsSnapshot(
   const { entries, skipped } = await fanOutAllCharacters<CharacterContracts>({
     scope: CONTRACTS_SCOPE,
     load: async ({ characterId, name }) => {
-      const { cached, needsReauth } = await loadContracts(characterId);
+      const { cached, needsReauth } = await loadContractsWithArchive(characterId);
       return {
         characterId,
         characterName: name,

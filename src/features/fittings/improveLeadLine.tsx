@@ -23,7 +23,8 @@ import {
 } from '@/engine/fittings/skillGains';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { FittingStats } from '@/engine/fittings/types';
-import { capacitorChange, type StatChangeKey } from '@/engine/fittings/variationDelta';
+import { capacitorChange, STAT_DIGITS, type StatChangeKey } from '@/engine/fittings/variationDelta';
+import { round } from '@/engine/fittings/fittingStatFields';
 import { m3sFormat, moveLine, oreLine, twoDecimals } from './improveLineText';
 
 /** What a row leads with: the figure, and the detail-line stats it already shows. */
@@ -45,6 +46,13 @@ export interface LeadContext {
   target?: TargetProfile;
 }
 
+/** The stat rows a goal's worded lead already covers, so the rows under it do not repeat them. */
+const WORDED_LEAD_KEYS: Partial<Record<ImproveGoal, readonly StatChangeKey[]>> = {
+  transfer: ['capTransfer'],
+  tackle: ['tacklePoints', 'webStrength', 'pointRange', 'webRange'],
+  ewar: ['ecmStrength', 'dampStrength', 'disruptorStrength', 'painterStrength'],
+};
+
 /** How many figures Best overall's lead line shows: the two that moved the score most. */
 const OVERALL_LEAD_FIGURES = 2;
 
@@ -64,10 +72,14 @@ export function leadLine(
     change: { key, before, after },
     rows: [{ key, before, after }],
   });
-  const text = (key: string, line: string | null): Lead | null => {
+  const text = (
+    key: string,
+    line: string | null,
+    keys: readonly StatChangeKey[] = []
+  ): Lead | null => {
     if (line === null) return null;
     const node = <span key={key}>{line}</span>;
-    return { node, keys: [], worded: node };
+    return { node, keys: [...keys], worded: node };
   };
   const dps = (): Lead => {
     const [was, now] = [damageOf(own, target), damageOf(option.after, target)];
@@ -87,7 +99,7 @@ export function leadLine(
         })}
       </span>
     );
-    return { node, keys: [], worded: node };
+    return { node, keys: [metric], worded: node };
   };
   // One figure that earned Best overall's score, worded as the row's other lines word it.
   const term = (metric: GainMetric): Lead | null => {
@@ -189,20 +201,33 @@ export function leadLine(
       // One row per figure, like the stat rows under it, and only the figures the swap changes: none, no lead.
       const [was, now] = [own.explore, option.after.explore];
       const figures: { key: StatChangeKey; before: number; after: number }[] = [
-        { key: 'hackingStrength', before: was.hacking.strength, after: now.hacking.strength },
+        { key: 'dataStrength', before: was.dataStrength, after: now.dataStrength },
+        { key: 'relicStrength', before: was.relicStrength, after: now.relicStrength },
         { key: 'virusCoherence', before: was.hacking.coherence, after: now.hacking.coherence },
         { key: 'hackingCycle', before: was.hacking.cycleSeconds, after: now.hacking.cycleSeconds },
         { key: 'scanStrength', before: was.scanning.strength, after: now.scanning.strength },
         { key: 'scanTimeCut', before: was.scanning.duration, after: now.scanning.duration },
         { key: 'deviationCut', before: was.scanning.deviation, after: now.scanning.deviation },
       ];
-      const changed = figures.filter((figure) => figure.before !== figure.after);
+      // Compared as shown, so a sub-rounding change never reads "X → X".
+      const changed = figures
+        .map((figure) => ({
+          ...figure,
+          before: round(figure.before, STAT_DIGITS[figure.key]),
+          after: round(figure.after, STAT_DIGITS[figure.key]),
+        }))
+        .filter((figure) => figure.before !== figure.after);
       return changed.length > 0
-        ? { node: <StatChangeList changes={changed} />, keys: [], rows: changed }
+        ? {
+            node: <StatChangeList changes={changed} />,
+            // The rows below are the shared stat diff, which carries these figures too.
+            keys: changed.map((figure) => figure.key),
+            rows: changed,
+          }
         : null;
     }
     default:
-      return text(goal, moveLine(t, goal, hold, option, own));
+      return text(goal, moveLine(t, goal, hold, option, own), WORDED_LEAD_KEYS[goal]);
   }
 }
 

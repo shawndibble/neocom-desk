@@ -122,11 +122,6 @@ interface FilterBarProps<T> {
    */
   triggerSize?: ComponentProps<typeof IconButton>['size'];
   /**
-   * Tier 2 (DESIGN.md §6c Header controls): from `md` up the funnel shows the
-   * word "Filters" beside the icon. Below `md` it stays icon-only.
-   */
-  triggerLabel?: boolean;
-  /**
    * Where the controls open on a pointer-width screen. `row` (default) is the
    * box under the row. `popover` anchors them to the funnel instead, for a
    * funnel that sits where no box can open beneath it — a panel's title bar,
@@ -172,7 +167,6 @@ export function FilterBar<T>({
   className = '',
   rowAlign = 'center',
   triggerSize,
-  triggerLabel,
   pointerSurface = 'row',
 }: FilterBarProps<T>) {
   const isNarrow = useIsNarrow();
@@ -188,7 +182,6 @@ export function FilterBar<T>({
         className={className}
         rowAlign={rowAlign}
         triggerSize={triggerSize}
-        triggerLabel={triggerLabel}
       >
         {children(value, onChange)}
       </FilterPopover>
@@ -206,7 +199,6 @@ export function FilterBar<T>({
         className={className}
         rowAlign={rowAlign}
         triggerSize={triggerSize}
-        triggerLabel={triggerLabel}
       >
         {children(value, onChange)}
       </CollapsibleFilterRow>
@@ -225,7 +217,6 @@ export function FilterBar<T>({
       className={className}
       rowAlign={rowAlign}
       triggerSize={triggerSize}
-      triggerLabel={triggerLabel}
     >
       {children}
     </FilterSheet>
@@ -247,7 +238,6 @@ function FilterTrigger({
   controls,
   onClick,
   size,
-  showLabel,
 }: {
   activeCount: number;
   /** All of these omitted for a `PopoverTrigger` child, which Radix wires itself. */
@@ -258,7 +248,6 @@ function FilterTrigger({
   controls?: string;
   onClick?: () => void;
   size?: ComponentProps<typeof IconButton>['size'];
-  showLabel?: boolean;
 }) {
   const { t } = useTranslation();
   const button = (
@@ -268,7 +257,6 @@ function FilterTrigger({
         activeCount > 0 ? t('filters.openWithCount', { count: activeCount }) : t('filters.open')
       }
       size={size}
-      visibleLabel={showLabel ? t('filters.open') : undefined}
       // Spread, not passed as `undefined`: `asChild` merges the trigger's own
       // aria-expanded/onClick under the child's, so an explicit undefined
       // would erase them.
@@ -315,7 +303,6 @@ function CollapsibleFilterRow({
   className = '',
   rowAlign = 'center',
   triggerSize,
-  triggerLabel,
 }: {
   search?: ReactNode;
   activeCount: number;
@@ -326,7 +313,6 @@ function CollapsibleFilterRow({
   className?: string;
   rowAlign?: 'center' | 'end';
   triggerSize?: ComponentProps<typeof IconButton>['size'];
-  triggerLabel?: boolean;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -345,7 +331,6 @@ function CollapsibleFilterRow({
           expanded={open}
           controls={open ? groupId : undefined}
           size={triggerSize}
-          showLabel={triggerLabel}
           onClick={() => setOpen((was) => !was)}
         />
         {trailing}
@@ -379,7 +364,6 @@ function FilterPopover({
   className = '',
   rowAlign = 'center',
   triggerSize,
-  triggerLabel,
 }: {
   search?: ReactNode;
   activeCount: number;
@@ -390,7 +374,6 @@ function FilterPopover({
   className?: string;
   rowAlign?: 'center' | 'end';
   triggerSize?: ComponentProps<typeof IconButton>['size'];
-  triggerLabel?: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -404,7 +387,7 @@ function FilterPopover({
       {search}
       {actions}
       <Popover>
-        <FilterTrigger activeCount={activeCount} size={triggerSize} showLabel={triggerLabel} />
+        <FilterTrigger activeCount={activeCount} size={triggerSize} />
         <PopoverContent
           align="end"
           aria-label={title ?? t('filters.title')}
@@ -442,7 +425,6 @@ function FilterSheet<T>({
   className = '',
   rowAlign = 'center',
   triggerSize,
-  triggerLabel,
 }: FilterBarProps<T>) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -478,7 +460,6 @@ function FilterSheet<T>({
           expanded={open}
           haspopup="dialog"
           size={triggerSize}
-          showLabel={triggerLabel}
           onClick={() => setOpen(true)}
         />
         {trailing}

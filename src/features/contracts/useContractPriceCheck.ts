@@ -21,7 +21,7 @@ import {
 import type { PriceSide } from '@/engine/miningTax/priceBasis';
 import type { TradeHub } from '@/market/hubs';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
-import { formatSignedPercent, percentDirection } from '@/lib/formatSignedPercent';
+import { formatSignedPercent, percentDirection, savingTone } from '@/lib/formatSignedPercent';
 import { formatContractIsk } from '@/lib/isk';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import type { PriceCheckFlip, PriceCheckRowModel } from './ContractPriceCheck';
@@ -64,6 +64,13 @@ export interface ContractPriceCheckArgs {
    * elsewhere.
    */
   otherValue?: { value: number; lines: number } | null;
+  /**
+   * The reader would accept this contract (Contract Search, the public
+   * modal): the last row is a Saving, green when it is not a loss. Absent, the
+   * panel is neutral, since an own contract does not say which side the reader
+   * is on.
+   */
+  asBuyer?: boolean;
 }
 
 /** The UTC day as "Aug 25": Open Prices are per UTC day, so it is never shifted to the viewer's zone. */
@@ -88,6 +95,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
     sellOverrides,
     searchedTypeIds = null,
     otherValue = null,
+    asBuyer = false,
   } = args;
   const { t } = useTranslation();
   const unavailableLabel = usePricesUnavailableLabel();
@@ -163,15 +171,26 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
     if (asking > 0)
       rows.push({ label: t('contractDetail.priceCheckAsking'), value: formatContractIsk(asking) });
     if (check.diff !== null) {
-      const sentence = pick(check.diff, {
-        below: t('contractDetail.priceCheckIncludedBelow'),
-        above: t('contractDetail.priceCheckIncludedAbove'),
-        level: t('contractDetail.priceCheckIncludedLevel'),
-      });
+      // Included against Requested is already the buyer's gain: more in than out.
+      const saving = check.diff;
+      const sentence = asBuyer
+        ? pick(saving, {
+            below: t('contractDetail.priceCheckSwapLoss'),
+            above: t('contractDetail.priceCheckSwapGain'),
+            level: t('contractDetail.priceCheckSwapLevel'),
+          })
+        : pick(saving, {
+            below: t('contractDetail.priceCheckIncludedBelow'),
+            above: t('contractDetail.priceCheckIncludedAbove'),
+            level: t('contractDetail.priceCheckIncludedLevel'),
+          });
       rows.push({
-        label: t('contractDetail.priceCheckDifference'),
-        value: formatSignedPercent(check.diff),
+        label: t(
+          asBuyer ? 'contractDetail.priceCheckSaving' : 'contractDetail.priceCheckDifference'
+        ),
+        value: formatSignedPercent(saving),
         note: unpricedNote ? `${sentence} ${unpricedNote}` : sentence,
+        ...(asBuyer ? { tone: savingTone(saving) } : {}),
       });
     }
   } else {
@@ -223,15 +242,26 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
     }
     if (check.diff !== null) {
       const sideLower = sideWord.toLowerCase();
-      rows.push({
-        label: t('contractDetail.priceCheckDifference'),
-        value: formatSignedPercent(check.diff),
-        note: [
-          pick(check.diff, {
+      // The ask below the hub is money kept, so the Saving is the diff turned over.
+      const saving = -check.diff;
+      const sentence = asBuyer
+        ? pick(saving, {
+            below: t('contractDetail.priceCheckSavingLoss', { side: sideLower }),
+            above: t('contractDetail.priceCheckSavingGain', { side: sideLower }),
+            level: t('contractDetail.priceCheckSavingLevel', { side: sideLower }),
+          })
+        : pick(check.diff, {
             below: t('contractDetail.priceCheckAskingBelow', { side: sideLower }),
             above: t('contractDetail.priceCheckAskingAbove', { side: sideLower }),
             level: t('contractDetail.priceCheckAskingLevel', { side: sideLower }),
-          }),
+          });
+      rows.push({
+        label: t(
+          asBuyer ? 'contractDetail.priceCheckSaving' : 'contractDetail.priceCheckDifference'
+        ),
+        value: formatSignedPercent(asBuyer ? saving : check.diff),
+        note: [
+          sentence,
           ...(check.unpricedLines > 0
             ? [
                 t('contractDetail.priceCheckAgainstPriced', {
@@ -241,6 +271,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
               ]
             : []),
         ].join(' '),
+        ...(asBuyer ? { tone: savingTone(saving) } : {}),
       });
     }
   }

@@ -261,13 +261,18 @@ export function Contacts() {
     />
   );
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <PageHeader
         title={t('contacts.title')}
         meta={
           tab === 'standings'
             ? standings.meta
-            : contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />
+            : contactsResult && (
+                <DataAgeBadge
+                  date={contactsResult.fetchedAt}
+                  expiresAt={contactsResult.expiresAt}
+                />
+              )
         }
         // Not on Standings: that tab reads the active Character's standings only.
         // Always the control otherwise, so the header's one-line lock never flips:

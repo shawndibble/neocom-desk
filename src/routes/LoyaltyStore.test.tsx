@@ -17,17 +17,21 @@ vi.mock('@/features/loyalty/useLoyaltyStoreOffers', () => ({
   useLoyaltyStoreOffers: (corporationId: number) => useLoyaltyStoreOffers(corporationId),
 }));
 
-// The landing's cross-store search has its own tests (`LpStoreSearch.test.tsx`).
-vi.mock('@/features/loyalty/useLpStoreSearch', () => ({
-  useLpStoreSearch: () => ({
+// The landing's views have their own tests (`lpLanding.test.ts`); here it is an empty, ready page.
+vi.mock('@/features/loyalty/useLpStoreLanding', () => ({
+  useLpStoreLanding: () => ({
     status: 'ready',
     syncedAt: null,
-    result: { groups: [], corporations: [], totalItemMatches: 0 },
-    heldStores: [],
-    rowFor: () => null,
-    systemName: () => null,
-    jumpsStatus: 'ready',
+    stores: [],
+    offers: [],
     pricing: false,
+    valuing: false,
+    balancesKnown: true,
+    systemName: () => null,
+    factionName: () => null,
+    jumpsStatus: 'ready',
+    factions: [],
+    categories: [],
   }),
 }));
 
@@ -111,9 +115,14 @@ function renderStore(search = '') {
   );
 }
 
+/** The store's funnel, not the landing's behind the modal. */
+function storeFiltersButton() {
+  return within(screen.getByRole('dialog')).getByRole('button', { name: /^Filters/ });
+}
+
 /** Every filter now sits behind the funnel (FilterBar, issue #1282). */
 function openFilters() {
-  fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
+  fireEvent.click(storeFiltersButton());
 }
 
 function offer(overrides: Partial<LoyaltyStoreOffer>): LoyaltyStoreOffer {
@@ -149,6 +158,7 @@ const ITEM_ROW: LoyaltyOfferRow = {
   sellsPerDay: null,
   requiredItems: [],
   requiredItemsCost: 0,
+  revenueCheck: null,
 };
 
 const BLUEPRINT_ROW: LoyaltyOfferRow = {
@@ -162,6 +172,7 @@ const BLUEPRINT_ROW: LoyaltyOfferRow = {
   sellsPerDay: null,
   requiredItems: [],
   requiredItemsCost: 0,
+  revenueCheck: null,
 };
 
 const UNRESOLVED_BLUEPRINT_ROW: LoyaltyOfferRow = {
@@ -175,6 +186,7 @@ const UNRESOLVED_BLUEPRINT_ROW: LoyaltyOfferRow = {
   sellsPerDay: null,
   requiredItems: [],
   requiredItemsCost: 0,
+  revenueCheck: null,
 };
 
 describe('LoyaltyStore LP Value cog', () => {
@@ -267,7 +279,7 @@ describe('LoyaltyStore filters', () => {
     const user = userEvent.setup();
     renderStore();
 
-    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await user.click(storeFiltersButton());
     await user.click(screen.getByRole('combobox', { name: /Market hub/i }));
     await user.click(screen.getByRole('option', { name: OTHER_HUB.systemName }));
     expect(useMarketHub.getState().value).toBe(OTHER_HUB.id);
@@ -279,11 +291,11 @@ describe('LoyaltyStore filters', () => {
     renderStore();
 
     // "Affordable only" is on by default, so turning it off is one active filter.
-    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await user.click(storeFiltersButton());
     await user.click(screen.getByRole('button', { name: /Affordable/i }));
     await user.keyboard('{Escape}');
 
-    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await user.click(storeFiltersButton());
     expect(screen.getByRole('button', { name: /Affordable/i })).toHaveAttribute(
       'aria-pressed',
       'false'
@@ -605,6 +617,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
       { typeId: 40_001, name: 'Shadow Serpentis Gold Tag', quantity: 1, unitPrice: 5_000_000 },
     ],
     requiredItemsCost: 5_800_000,
+    revenueCheck: null,
   };
 
   const UNPRICED_REQUIRED_ITEM_ROW: LoyaltyOfferRow = {
@@ -618,6 +631,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     sellsPerDay: null,
     requiredItems: [{ typeId: 40_002, name: 'Unpriced Faction Tag', quantity: 3, unitPrice: null }],
     requiredItemsCost: null,
+    revenueCheck: null,
   };
 
   const UNPRICED_MATERIAL_ROW: LoyaltyOfferRow = {
@@ -631,6 +645,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     sellsPerDay: null,
     requiredItems: [],
     requiredItemsCost: 0,
+    revenueCheck: null,
   };
 
   function mockRows(rows: LoyaltyOfferRow[]) {
@@ -669,6 +684,28 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     // fed into `loyaltyOfferProfit`, so there's nothing here to recompute or
     // let drift.
     expect(screen.getByText('5,800,000')).toBeInTheDocument();
+  });
+
+  it('says when a sale counts at recent trades, not the listing far above them', async () => {
+    mockRows([
+      {
+        ...ITEM_ROW,
+        revenueCheck: {
+          price: 17_300_000,
+          listed: 1_000_000_000,
+          ceiling: 17_300_000,
+          capped: true,
+        },
+      },
+    ]);
+    const user = userEvent.setup();
+    renderStore();
+
+    await user.click(screen.getByText('Scourge Fury Heavy Missile').closest('tr')!);
+
+    expect(screen.getByText(/Counted at recent trades/)).toHaveTextContent(
+      'Counted at recent trades, 17,300,000 ISK each: the cheapest listing asks 1,000,000,000 ISK, 57.8× that.'
+    );
   });
 
   it('shows no Required items line for an offer with none', async () => {
@@ -836,11 +873,11 @@ describe('LoyaltyStore switching stores through the search', () => {
     );
   }
 
-  it('lands on a pick-a-corporation state with no store chosen, loading no offers', () => {
+  it('lands on the Stores view with no store chosen, loading no store offers', () => {
     renderAt('/loyalty');
     expect(screen.getByRole('heading', { level: 1, name: 'LP Store' })).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: 'Search LP Stores' })).toBeInTheDocument();
-    expect(screen.getByText('Search every LP Store')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stores', pressed: true })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Change store' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /corporation/i })).not.toBeInTheDocument();
     expect(useLoyaltyStoreOffers).not.toHaveBeenCalled();
@@ -929,7 +966,7 @@ describe('LoyaltyStore switching stores through the search', () => {
     render(
       <MemoryRouter
         initialEntries={[
-          { pathname: '/loyalty/1000168', state: { from: 'lp-search', q: 'tritanium' } },
+          { pathname: '/loyalty/1000168', state: { from: 'lp-search', search: '?q=tritanium' } },
         ]}
       >
         <Routes>
@@ -949,6 +986,36 @@ describe('LoyaltyStore switching stores through the search', () => {
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(probe.pathname).toBe('/wallet/lp-store'));
     expect(probe.search).toBe('?q=tritanium');
+  });
+
+  it('closes back to the whole landing view the store was opened from', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/loyalty/1000168',
+            state: { from: 'lp-search', search: '?view=offers&q=cap&noFw=1' },
+          },
+        ]}
+      >
+        <Routes>
+          <Route
+            path="/loyalty/:corporationId"
+            element={
+              <>
+                <LoyaltyStore />
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route path="*" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(probe.pathname).toBe('/wallet/lp-store'));
+    expect(probe.search).toBe('?view=offers&q=cap&noFw=1');
   });
 
   it('sets the trade hub from the gear, the same setting as the filter row', async () => {

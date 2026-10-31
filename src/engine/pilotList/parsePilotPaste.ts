@@ -8,8 +8,11 @@
  */
 import { parseLocalizedNumber } from '@/engine/numbers/parseLocalizedNumber';
 
-/** Names looked up per paste; the rest are counted, never silently dropped. */
+/** Names looked up on zKillboard per paste; the rest are placed by organization only. */
 export const MAX_LIST_PILOTS = 40;
+
+/** Names a Local paste keeps; the rest are counted, never silently dropped (issue #5668). */
+export const MAX_LOCAL_NAMES = 2000;
 
 /** EVE character names are at most 37 characters. */
 const MAX_NAME_LENGTH = 37;
@@ -91,7 +94,7 @@ export function classifyPilotPaste(text: string): PilotPaste | null {
   if (names.length < 2) return null;
   return {
     kind: 'local',
-    names: names.slice(0, MAX_LIST_PILOTS),
-    overflow: Math.max(0, names.length - MAX_LIST_PILOTS),
+    names: names.slice(0, MAX_LOCAL_NAMES),
+    overflow: Math.max(0, names.length - MAX_LOCAL_NAMES),
   };
 }

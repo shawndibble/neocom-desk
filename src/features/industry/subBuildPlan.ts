@@ -246,3 +246,41 @@ export const subBuildSeconds = resolvedSubBuildSeconds;
 export function hasSubBuilds(materials: readonly ResolvedMaterial[]): boolean {
   return materials.some((material) => material.subBuild !== undefined);
 }
+
+/** One job that consumes a material: the product it makes, its runs, and how much of the material it takes. */
+export interface MaterialConsumer {
+  typeID: number;
+  runs: number;
+  quantity: number;
+}
+
+/**
+ * Every job in the plan that consumes one material — the plan's own job
+ * first (`mainJob`, which is not in the resolved tree), then each built job at
+ * any depth, in table order. This is the "which job is this quantity from"
+ * the flat table gives up (see this module's comment), read upward from a
+ * material instead of down from the product.
+ */
+export function materialConsumers(
+  materials: readonly ResolvedMaterial[],
+  typeID: number,
+  mainJob: { typeID: number; runs: number }
+): MaterialConsumer[] {
+  const consumers: MaterialConsumer[] = [];
+  const own = materials.find((material) => material.typeID === typeID);
+  if (own) consumers.push({ ...mainJob, quantity: own.quantity });
+
+  let level = materials;
+  while (level.length > 0) {
+    const next: ResolvedMaterial[] = [];
+    for (const material of level) {
+      const job = material.subBuild;
+      if (!job) continue;
+      const input = job.inputs.find((candidate) => candidate.typeID === typeID);
+      if (input) consumers.push({ typeID: job.typeID, runs: job.runs, quantity: input.quantity });
+      next.push(...job.inputs);
+    }
+    level = next;
+  }
+  return consumers;
+}

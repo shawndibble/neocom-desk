@@ -86,12 +86,67 @@ describe('orderExits', () => {
       kind: 'dumpToBuyOrder',
       price: 350,
       netPerUnit: -30,
+      dump: { topBid: 350, topBidTakes: 10, units: 10, unsold: 0, movedPrice: false },
     });
   });
 
-  it('ignores buy orders elsewhere in the region, whose range may not reach my stock', () => {
+  it('ignores buy orders elsewhere whose range does not reach my station', () => {
     const competitors = [buyOrder({ orderId: 5, price: 490, locationId: 60003761 })];
     expect(orderExits({ row: BASE_ROW, competitors }).map((e) => e.kind)).toEqual(['hold']);
+  });
+
+  it('walks past a thin top bid and prices the average, naming what the top bid takes', () => {
+    const row = { ...BASE_ROW, volumeRemain: 500 };
+    const competitors = [
+      buyOrder({ orderId: 2, price: 400, volumeRemain: 40 }),
+      buyOrder({ orderId: 3, price: 300, volumeRemain: 460 }),
+    ];
+    const dump = orderExits({ row, competitors }).find((e) => e.kind === 'dumpToBuyOrder');
+    expect(dump?.price).toBeCloseTo((40 * 400 + 460 * 300) / 500);
+    expect(dump?.dump).toMatchObject({ topBid: 400, topBidTakes: 40, unsold: 0, movedPrice: true });
+  });
+
+  it('counts a buy order elsewhere whose range reaches, and one whose range falls short', () => {
+    const competitors = [
+      buyOrder({
+        orderId: 2,
+        price: 450,
+        locationId: 9,
+        systemId: 30000143,
+        range: '5',
+        volumeRemain: 10,
+      }),
+      buyOrder({
+        orderId: 3,
+        price: 440,
+        locationId: 8,
+        systemId: 30000144,
+        range: '2',
+        volumeRemain: 10,
+      }),
+    ];
+    const jumps = new Map([
+      [30000142, 0],
+      [30000143, 3],
+      [30000144, 3],
+    ]);
+    const dump = orderExits({ row: BASE_ROW, competitors, buyJumps: jumps }).find(
+      (e) => e.kind === 'dumpToBuyOrder'
+    );
+    expect(dump?.price).toBe(450);
+    expect(orderExits({ row: BASE_ROW, competitors }).map((e) => e.kind)).toEqual(['hold']);
+  });
+
+  it('skips an order whose min volume exceeds the units on the order and reports unsold units', () => {
+    const competitors = [
+      buyOrder({ orderId: 2, price: 450, minVolume: 50, volumeRemain: 100 }),
+      buyOrder({ orderId: 3, price: 300, volumeRemain: 4 }),
+    ];
+    const dump = orderExits({ row: BASE_ROW, competitors }).find(
+      (e) => e.kind === 'dumpToBuyOrder'
+    );
+    expect(dump?.price).toBe(300);
+    expect(dump?.dump).toMatchObject({ units: 4, unsold: 6 });
   });
 
   it('offers nothing without a floor to price the exits against', () => {

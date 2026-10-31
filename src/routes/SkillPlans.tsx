@@ -198,9 +198,13 @@ export function SkillPlans() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <SkillsPageHeader
-        meta={queueResult?.fetchedAt && <DataAgeBadge date={queueResult.fetchedAt} />}
+        meta={
+          queueResult?.fetchedAt && (
+            <DataAgeBadge date={queueResult.fetchedAt} expiresAt={queueResult.expiresAt} />
+          )
+        }
       />
       <SkillsSubNav />
 

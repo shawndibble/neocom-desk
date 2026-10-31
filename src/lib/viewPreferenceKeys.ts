@@ -54,8 +54,10 @@ export const VIEW_PREFERENCE_KEYS: readonly string[] = [
   'marketWideSalesShare',
   'piColoniesShowAlts',
   'piPlanControls',
+  'pilotLookupLocalGrouping',
   'planColumnVisibility.v2',
   'planGroupingMode',
   'walletJournalBreakdownOpen',
+  'walletJournalBreakdownView',
   'walletJournalFlowChartHidden',
 ];

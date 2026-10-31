@@ -31,6 +31,7 @@ const REVIEWED = new Set<string>([
   'src/features/industry/ProductionLogPanel.tsx',
   'src/features/market/HaulingItemDetail.tsx',
   'src/features/market/TransactionsPanel.tsx',
+  'src/features/market/MadeFromSection.tsx',
   'src/features/market/UsedInSection.tsx',
   'src/features/travel/PilotShips.tsx',
   'src/features/travel/ZkillStatsSection.tsx',

@@ -5,6 +5,8 @@
  * Neutral home for `variationDelta.ts` (2-way before/after) and
  * `fittingCompare.ts` (N-way compare) to both import from.
  */
+import { isMobileDrone } from './appliedDps';
+import type { SupportKind, SupportRow } from './support';
 import { resistPct } from './stats';
 import type { FittingStats } from './types';
 
@@ -57,10 +59,48 @@ export type FittingStatKey =
   | 'agility'
   | 'mass'
   | 'warpSpeed'
-  | 'cargoCapacity';
+  | 'cargoCapacity'
+  | 'tacklePoints'
+  | 'pointRange'
+  | 'webStrength'
+  | 'webRange'
+  | 'ecmStrength'
+  | 'dampStrength'
+  | 'disruptorStrength'
+  | 'painterStrength'
+  | 'neutralizer'
+  | 'nosferatu'
+  | 'capTransfer'
+  | 'droneControlRange'
+  | 'miningWaste'
+  | 'dataStrength'
+  | 'relicStrength'
+  | 'utilitySlots'
+  | 'probeStrength'
+  | 'probeLauncherBonus'
+  | 'probeLauncherCycle'
+  | 'cloakRecalibration'
+  | 'warpsCloaked'
+  | 'reactivationDelay'
+  | 'reloadTime'
+  | 'salvageChance'
+  | 'salvagerRange'
+  | 'tractorSpeed'
+  | 'tractorRange'
+  | 'cargoScanRange'
+  | 'shipScanRange'
+  | 'droneSpeed'
+  | 'droneTracking'
+  | 'missileExplosionVelocity'
+  | 'missileExplosionRadius'
+  | 'ecmRange'
+  | 'dampRange'
+  | 'disruptorRange'
+  | 'painterRange'
+  | ImproveExploreKey;
 
 /** `capacitor` is a discriminated union (`CapacitorStatus`), handled separately from the plain-numeric fields below. */
-export type StatChangeKey = FittingStatKey | 'capacitor' | ImproveDamageKey | ImproveExploreKey;
+export type StatChangeKey = FittingStatKey | 'capacitor' | ImproveDamageKey;
 
 /**
  * The damage figure an Improve row leads with, which no Fitting-diff view
@@ -69,14 +109,9 @@ export type StatChangeKey = FittingStatKey | 'capacitor' | ImproveDamageKey | Im
  */
 export type ImproveDamageKey = 'appliedDps';
 
-/** Explore better's figures, as Improve rows show them: the best analyzer's hacking figures and the arrays' scan bonuses. Not in `NUMERIC_FIELDS`. */
+/** Explore better's figures: the best analyzer's hacking figures and the arrays' scan bonuses. */
 export type ImproveExploreKey =
-  | 'hackingStrength'
-  | 'virusCoherence'
-  | 'hackingCycle'
-  | 'scanStrength'
-  | 'scanTimeCut'
-  | 'deviationCut';
+  'virusCoherence' | 'hackingCycle' | 'scanStrength' | 'scanTimeCut' | 'deviationCut';
 
 /** Which way a change is an improvement; `neutral` stats only move with the hull, so no change is good or bad. */
 export type StatDirection = 'higher' | 'lower' | 'neutral';
@@ -90,12 +125,54 @@ export interface NumericField {
   /**
    * Only Fitting Compare shows it; a Variations swap's diff lists what it
    * always has. Overheated DPS because Variations is worked out without heat
-   * (it would only repeat total DPS); the tank, cap-delta, sensor and hold
-   * rows because they restate a field the diff already shows (the repairs,
-   * the capacitor) or are no module swap's question (the hold).
+   * (it would only repeat total DPS); the tank, cap-delta and hold rows
+   * because they restate a field the diff already shows (the repairs, the
+   * capacitor) or are no module swap's question (a hauler's hold comes
+   * through `skillGains`' hold role).
    */
   compareOnly?: boolean;
+  /**
+   * A figure only a fit doing the job has (tackle, EWAR, hacking), zero meaning
+   * none: Compare drops the row while every Fitting is at zero, and a
+   * lower-is-better one counts no change to or from zero as better or worse.
+   */
+  hideWhenNone?: boolean;
 }
+
+/** The strongest (or longest-reaching) module of `kinds`: what a single swap moves; 0 with none. */
+const supportMax = (
+  s: FittingStats,
+  kinds: readonly SupportKind[],
+  pick: (row: SupportRow) => number
+) => Math.max(0, ...s.support.rows.filter((row) => kinds.includes(row.kind)).map(pick));
+
+/** Reach of the longest `kinds` module, optimal plus falloff, km. */
+const supportReach = (s: FittingStats, kinds: readonly SupportKind[]) =>
+  supportMax(s, kinds, (row) => row.optimal + row.falloff) / 1000;
+
+/** The best figure among mobile combat drones (a sentry's speed is 0); 0 with none. */
+const fastestDroneFigure = (
+  s: FittingStats,
+  pick: (drone: { speed: number; tracking: number }) => number
+) =>
+  Math.max(
+    0,
+    ...s.applied.weapons.flatMap((weapon) =>
+      weapon.kind === 'drone' && isMobileDrone(weapon.speed) ? [pick(weapon)] : []
+    )
+  );
+
+/** A missile figure over every missile weapon, `worst` of them: a loss on any launcher shows. */
+const missileFigure = (
+  s: FittingStats,
+  pick: (missile: { explosionVelocity: number; explosionRadius: number }) => number,
+  worst: (...values: number[]) => number
+) => {
+  const values = s.applied.weapons.flatMap((weapon) =>
+    weapon.kind === 'missile' ? [pick(weapon)] : []
+  );
+  return values.length ? worst(...values) : 0;
+};
 
 export const NUMERIC_FIELDS: readonly NumericField[] = [
   { key: 'cpuUsed', direction: 'lower', digits: 1, value: (s) => s.cpuUsed },
@@ -254,13 +331,7 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     digits: 0,
     value: (s) => s.targeting.scanResolution,
   },
-  {
-    key: 'sensorStrength',
-    direction: 'higher',
-    digits: 1,
-    value: (s) => s.sensor.strength,
-    compareOnly: true,
-  },
+  { key: 'sensorStrength', direction: 'higher', digits: 1, value: (s) => s.sensor.strength },
   {
     key: 'signatureRadius',
     direction: 'lower',
@@ -278,6 +349,309 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => s.holds.cargo,
     compareOnly: true,
   },
+  {
+    key: 'tacklePoints',
+    direction: 'higher',
+    digits: 0,
+    value: (s) =>
+      s.support.rows
+        .filter((row) => row.kind === 'warpDisruption')
+        .reduce((sum, row) => sum + row.amount, 0),
+    hideWhenNone: true,
+  },
+  {
+    key: 'pointRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => supportMax(s, ['warpDisruption'], (row) => row.optimal) / 1000,
+    hideWhenNone: true,
+  },
+  {
+    key: 'webStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => supportMax(s, ['web'], (row) => row.amount),
+    hideWhenNone: true,
+  },
+  {
+    key: 'webRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => supportMax(s, ['web'], (row) => row.optimal) / 1000,
+    hideWhenNone: true,
+  },
+  // One figure per EWAR kind: a jam strength and a damp % are not one scale.
+  {
+    key: 'ecmStrength',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => supportMax(s, ['ecm'], (row) => row.amount),
+    hideWhenNone: true,
+  },
+  {
+    key: 'dampStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => supportMax(s, ['sensorDampener'], (row) => row.amount),
+    hideWhenNone: true,
+  },
+  {
+    key: 'disruptorStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => supportMax(s, ['trackingDisruptor', 'guidanceDisruptor'], (row) => row.amount),
+    hideWhenNone: true,
+  },
+  {
+    key: 'painterStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => supportMax(s, ['targetPainter'], (row) => row.amount),
+    hideWhenNone: true,
+  },
+  {
+    key: 'neutralizer',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.support.neutralizer,
+    hideWhenNone: true,
+  },
+  {
+    key: 'nosferatu',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.support.nosferatu,
+    hideWhenNone: true,
+  },
+  {
+    key: 'capTransfer',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.support.capTransfer,
+    hideWhenNone: true,
+  },
+  {
+    key: 'droneControlRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.applied.droneControlRange / 1000,
+  },
+  {
+    key: 'miningWaste',
+    direction: 'lower',
+    digits: 1,
+    value: (s) => s.mining.wastePct,
+    hideWhenNone: true,
+  },
+  // Per site, so an Integrated → Data Analyzer swap names the relic sites it can no longer open.
+  {
+    key: 'dataStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.dataStrength,
+    hideWhenNone: true,
+  },
+  {
+    key: 'relicStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.relicStrength,
+    hideWhenNone: true,
+  },
+  {
+    key: 'utilitySlots',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.utilitySlots,
+    hideWhenNone: true,
+  },
+  {
+    key: 'virusCoherence',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.hacking.coherence,
+    hideWhenNone: true,
+  },
+  // A shorter analyzer cycle is a faster hack.
+  {
+    key: 'hackingCycle',
+    direction: 'lower',
+    digits: 1,
+    value: (s) => s.explore.hacking.cycleSeconds,
+    hideWhenNone: true,
+  },
+  {
+    key: 'scanStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.scanning.strength,
+    hideWhenNone: true,
+  },
+  {
+    key: 'scanTimeCut',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.scanning.duration,
+    hideWhenNone: true,
+  },
+  {
+    key: 'deviationCut',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.scanning.deviation,
+    hideWhenNone: true,
+  },
+  {
+    key: 'probeStrength',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.explore.probe.strength,
+    hideWhenNone: true,
+  },
+  {
+    key: 'probeLauncherBonus',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.probe.launcherBonus,
+    hideWhenNone: true,
+  },
+  {
+    key: 'probeLauncherCycle',
+    direction: 'lower',
+    digits: 1,
+    value: (s) => s.explore.probe.cycleSeconds,
+    hideWhenNone: true,
+  },
+  {
+    key: 'cloakRecalibration',
+    direction: 'lower',
+    digits: 1,
+    value: (s) => s.explore.cloakRecalibrationSeconds,
+    hideWhenNone: true,
+  },
+  // A yes/no (`FLAG_STATS`); display only, so it joins no gain metric.
+  {
+    key: 'warpsCloaked',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => (s.explore.warpsCloaked ? 1 : 0),
+    hideWhenNone: true,
+  },
+  {
+    key: 'reactivationDelay',
+    direction: 'lower',
+    digits: 0,
+    value: (s) => s.moduleFigures.reactivationSeconds,
+    hideWhenNone: true,
+  },
+  {
+    key: 'reloadTime',
+    direction: 'lower',
+    digits: 0,
+    value: (s) => s.moduleFigures.reloadSeconds,
+    hideWhenNone: true,
+  },
+  {
+    key: 'salvageChance',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.moduleFigures.salvageChance,
+    hideWhenNone: true,
+  },
+  {
+    key: 'salvagerRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.moduleFigures.salvagerRange / 1000,
+    hideWhenNone: true,
+  },
+  {
+    key: 'tractorSpeed',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.moduleFigures.tractorVelocity,
+    hideWhenNone: true,
+  },
+  {
+    key: 'tractorRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.moduleFigures.tractorRange / 1000,
+    hideWhenNone: true,
+  },
+  {
+    key: 'cargoScanRange',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.moduleFigures.cargoScanRange / 1000,
+    hideWhenNone: true,
+  },
+  {
+    key: 'shipScanRange',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.moduleFigures.shipScanRange / 1000,
+    hideWhenNone: true,
+  },
+  // The fastest mobile combat drone; a sentry's speed is 0, so it never counts.
+  {
+    key: 'droneSpeed',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => fastestDroneFigure(s, (drone) => drone.speed),
+    hideWhenNone: true,
+  },
+  {
+    key: 'droneTracking',
+    direction: 'higher',
+    digits: 3,
+    value: (s) => fastestDroneFigure(s, (drone) => drone.tracking),
+    hideWhenNone: true,
+  },
+  // Worst launcher, so one that gets worse reads as a loss.
+  {
+    key: 'missileExplosionVelocity',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => missileFigure(s, (missile) => missile.explosionVelocity, Math.min),
+    hideWhenNone: true,
+  },
+  {
+    key: 'missileExplosionRadius',
+    direction: 'lower',
+    digits: 0,
+    value: (s) => missileFigure(s, (missile) => missile.explosionRadius, Math.max),
+    hideWhenNone: true,
+  },
+  // Reach per EWAR kind, longest module: never one mean across kinds.
+  {
+    key: 'ecmRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => supportReach(s, ['ecm']),
+    hideWhenNone: true,
+  },
+  {
+    key: 'dampRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => supportReach(s, ['sensorDampener']),
+    hideWhenNone: true,
+  },
+  {
+    key: 'disruptorRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => supportReach(s, ['trackingDisruptor', 'guidanceDisruptor']),
+    hideWhenNone: true,
+  },
+  {
+    key: 'painterRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => supportReach(s, ['targetPainter']),
+    hideWhenNone: true,
+  },
 ];
 
 /** Same rounding every diff view compares/displays at, keyed by `StatChangeKey` including `capacitor`. */
@@ -285,12 +659,6 @@ export const STAT_DIGITS: Readonly<Record<StatChangeKey, number>> = {
   ...Object.fromEntries(NUMERIC_FIELDS.map((field) => [field.key, field.digits])),
   capacitor: 0,
   appliedDps: 1,
-  hackingStrength: 0,
-  virusCoherence: 0,
-  hackingCycle: 1,
-  scanStrength: 0,
-  scanTimeCut: 0,
-  deviationCut: 0,
 } as Readonly<Record<StatChangeKey, number>>;
 
 export function round(value: number, digits: number): number {
@@ -307,13 +675,6 @@ export const STAT_DIRECTION: Readonly<Record<StatChangeKey, StatDirection>> = {
   ...Object.fromEntries(NUMERIC_FIELDS.map((field) => [field.key, field.direction])),
   capacitor: 'higher',
   appliedDps: 'higher',
-  hackingStrength: 'higher',
-  virusCoherence: 'higher',
-  // A shorter analyzer cycle is a faster hack.
-  hackingCycle: 'lower',
-  scanStrength: 'higher',
-  scanTimeCut: 'higher',
-  deviationCut: 'higher',
 } as Readonly<Record<StatChangeKey, StatDirection>>;
 
 /** Role stats (`skillGains`) where less is better: a reload, a fuel bill. Absent: higher. */
@@ -323,6 +684,14 @@ export function statDirection(key: string): StatDirection {
   if (key in STAT_DIRECTION) return STAT_DIRECTION[key as StatChangeKey];
   return LOWER_ROLE_KEYS.has(key) ? 'lower' : 'higher';
 }
+
+/** Stats that are a yes/no, 1 or 0, shown as words rather than a number. */
+export const FLAG_STATS: ReadonlySet<string> = new Set(['warpsCloaked']);
+
+/** Stats where zero means the fit has none of the thing (`hideWhenNone`). */
+export const NONE_AT_ZERO: ReadonlySet<string> = new Set(
+  NUMERIC_FIELDS.filter((field) => field.hideWhenNone).map((field) => field.key)
+);
 
 export type ChangeVerdict = 'better' | 'worse' | 'neutral';
 
@@ -334,6 +703,13 @@ export function changeVerdict(change: {
 }): ChangeVerdict {
   const direction = statDirection(change.key);
   if (direction === 'neutral' || change.before === change.after) return 'neutral';
+  // A first analyzer's cycle, or a miner's residue, is not a slower hack or more waste than none.
+  if (
+    direction === 'lower' &&
+    NONE_AT_ZERO.has(change.key) &&
+    (change.before === 0 || change.after === 0)
+  )
+    return 'neutral';
   // Unstable capacitor is stored as a negated depletion time: longer (more negative) is better.
   const unstable = change.key === 'capacitor' && change.before < 0 && change.after < 0;
   const rose = unstable ? change.after < change.before : change.after > change.before;

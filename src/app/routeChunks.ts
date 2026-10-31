@@ -38,10 +38,10 @@ type RouteModule = { default: ComponentType };
  * reload lands; if that recovery gives up, or none is running, `guarded` rejects
  * into the route's error boundary instead.
  */
-export function named<K extends string>(
-  importer: () => Promise<Record<K, ComponentType>>,
+export function named<M extends Record<K, unknown>, K extends keyof M & string>(
+  importer: () => Promise<M>,
   key: K
-): () => Promise<RouteModule> {
+): () => Promise<{ default: M[K] }> {
   return () => guarded(importer).then((m) => ({ default: m[key] }));
 }
 
@@ -250,7 +250,23 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
  * `lazy()` render, which is where an error belongs.
  */
 export function preloadRouteChunk(path: AppRoutePath): void {
-  void PRELOADERS[path]().catch(() => {});
+  preloadChunk(PRELOADERS[path]);
+}
+
+/**
+ * Start fetching any lazy chunk (a page's lazy tab) on the same fire-and-forget
+ * contract as `preloadRouteChunk`. The module cache makes the later `lazy()`
+ * render reuse the fetch.
+ */
+export function preloadChunk(load: () => Promise<unknown>): void {
+  void load().catch(() => {});
+}
+
+/** A `Tabs` `onPreload` for a page whose lazy tabs load through `loaders`, keyed by tab id. */
+export function preloadFrom(loaders: Record<string, () => Promise<unknown>>): (id: string) => void {
+  return (id) => {
+    if (Object.hasOwn(loaders, id)) preloadChunk(loaders[id]);
+  };
 }
 
 /**

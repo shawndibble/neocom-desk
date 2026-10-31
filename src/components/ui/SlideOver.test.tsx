@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { stubAnimate } from '@/test/animate';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -7,6 +8,34 @@ import { Modal } from './Modal';
 import { SlideOver } from './SlideOver';
 
 describe('SlideOver', () => {
+  it('fades its body in when the record it shows changes', () => {
+    const stub = stubAnimate();
+    try {
+      const { rerender } = render(
+        <SlideOver open onClose={() => undefined} title="Contract" contentKey="1">
+          <p>First</p>
+        </SlideOver>
+      );
+      stub.animate.mockClear();
+      rerender(
+        <SlideOver open onClose={() => undefined} title="Contract" contentKey="2">
+          <p>Second</p>
+        </SlideOver>
+      );
+      expect(stub.animate).toHaveBeenCalledTimes(1);
+      expect(stub.animate.mock.contexts[0]).toBe(screen.getByText('Second').parentElement);
+      stub.animate.mockClear();
+      rerender(
+        <SlideOver open onClose={() => undefined} title="Contract" contentKey="2">
+          <p>Second, updated</p>
+        </SlideOver>
+      );
+      expect(stub.animate).not.toHaveBeenCalled();
+    } finally {
+      stub.restore();
+    }
+  });
+
   it('leaves the page behind live: an outside click neither closes it nor is blocked', () => {
     const onClose = vi.fn();
     const onPageClick = vi.fn();

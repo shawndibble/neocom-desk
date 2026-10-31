@@ -112,6 +112,24 @@ describe('compareFittingStats', () => {
     expect(row('sensorStrength').differs).toBe(false);
   });
 
+  it('drops a role row every Fitting is at zero, keeps it when one has the role', () => {
+    const keys = (table: ReturnType<typeof compareFittingStats>) => table.rows.map((r) => r.key);
+    expect(keys(compareFittingStats([stats(), stats()]))).not.toContain('dataStrength');
+    const analyzer = { ...stats().explore, modules: 1, dataStrength: 30 };
+    const table = compareFittingStats([stats(), stats({ explore: analyzer })]);
+    const row = table.rows.find((r) => r.key === 'dataStrength')!;
+    expect(row.values).toEqual([0, 30]);
+    expect(row.bestIndices).toEqual([1]);
+  });
+
+  it('never highlights a Fitting with none as the least mining residue', () => {
+    const miner = (wastePct: number) => stats({ mining: { ...stats().mining, wastePct } });
+    const row = compareFittingStats([miner(0), miner(10), miner(5)]).rows.find(
+      (r) => r.key === 'miningWaste'
+    )!;
+    expect(row.bestIndices).toEqual([2]);
+  });
+
   it('marks a stat as not differing when every fitting rounds to the same value', () => {
     const table = compareFittingStats([stats(), stats()]);
     const ehpRow = table.rows.find((row) => row.key === 'ehp')!;

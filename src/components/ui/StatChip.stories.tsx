@@ -22,6 +22,22 @@ export const WithTooltip: Story = {
 /** @summary Larger, semibold value for the one figure that matters most. */
 export const Emphasis: Story = { args: { emphasis: true } };
 
+/** @summary `truncate` caps a free-text value at its row and ends it in an ellipsis. */
+export const Truncated: Story = {
+  args: {
+    label: 'Longest stay',
+    value: '3y The Extraordinarily Long Named Corporation Of Many Words',
+    truncate: true,
+  },
+  render: (args) => (
+    <div className="w-72">
+      <StatChips>
+        <StatChip {...args} />
+      </StatChips>
+    </div>
+  ),
+};
+
 /** @summary A strip of chips with hairlines between; it wraps at narrow widths. */
 export const Strip: Story = {
   render: () => (

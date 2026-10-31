@@ -242,6 +242,26 @@ describe('loadPilotList', () => {
     const [alpha] = await run(['Alpha']);
     expect(alpha).toMatchObject({ corporationId: null, standing: null, kills: { kind: 'ready' } });
   });
+
+  it('looks up kills for the first 40 names only, and places every name by organization', async () => {
+    const names = Array.from({ length: 45 }, (_, i) => `Pilot ${i}`);
+    mocks.postUniverseIds.mockResolvedValue({
+      characters: names.map((name, i) => ({ id: 1000 + i, name })),
+    });
+    mocks.resolveAffiliations.mockImplementation((ids: number[]) =>
+      Promise.resolve(
+        new Map(ids.map((id) => [id, { character_id: id, corporation_id: 50, alliance_id: 60 }]))
+      )
+    );
+
+    const rows = await run(names);
+
+    expect(mocks.fetchPilotKillHistory).toHaveBeenCalledTimes(40);
+    expect(mocks.fetchPilotKillHistory).not.toHaveBeenCalledWith(1040);
+    expect(rows.slice(0, 40).every((row) => row.kills.kind === 'ready')).toBe(true);
+    expect(rows.slice(40).map((row) => row.kills.kind)).toEqual(Array(5).fill('notLookedUp'));
+    expect(rows.every((row) => row.corporationId === 50 && row.allianceId === 60)).toBe(true);
+  });
 });
 
 describe('loadViewerContext', () => {

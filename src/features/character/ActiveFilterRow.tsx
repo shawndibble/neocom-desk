@@ -24,6 +24,8 @@ interface ActiveFilterRowProps {
   entryCount: number;
   /** Where own-Character lines are netted (personal only): the corp journal says nothing of it. */
   showInternal: boolean;
+  /** Names a Journal Party id for its chip; absent on the corp journal, which has no party filter. */
+  partyNameFor?: (id: number) => string;
   /** Sits at the row's right end, level with the stats (the phone's sort icon). */
   sortControl?: ReactNode;
 }
@@ -34,6 +36,7 @@ export function ActiveFilterRow({
   totals,
   entryCount,
   showInternal,
+  partyNameFor,
   sortControl,
 }: ActiveFilterRowProps) {
   const { t } = useTranslation();
@@ -43,6 +46,14 @@ export function ActiveFilterRow({
       key: 'type',
       label: t('wallet.journalChipType', { type: journalRefLabel(filter.refType, t) }),
       clear: { refType: null },
+    });
+  if (filter.party !== null)
+    chips.push({
+      key: 'party',
+      label: t('wallet.journalChipParty', {
+        party: partyNameFor?.(Number(filter.party)) ?? `#${filter.party}`,
+      }),
+      clear: { party: null },
     });
   if (filter.startDate !== null && filter.startDate === filter.endDate)
     chips.push({

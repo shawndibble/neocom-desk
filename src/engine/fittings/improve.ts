@@ -43,10 +43,10 @@ import { commandGain, commandOf, hasCommand } from './improveCommand';
 import { hullRoleOf, roleUnlocks, type HullRef } from './improveRole';
 import { ewarOf, tackleOf } from './improveTackle';
 import { changeVerdict } from './fittingStatFields';
-import { gainMetrics, improveOverall, roleChanges, type RoleChange } from './skillGains';
+import { gainMetrics, improveOverall } from './skillGains';
 import { fitsResourceBudget } from './skillGaps';
 import type { TargetProfile } from './targetProfile';
-import { diffFittingStats, type StatChange } from './variationDelta';
+import { swapChanges, type SwapChange } from './swapChanges';
 import { alignTimeSeconds } from './stats';
 import type { Fitting, FittingModule, FittingSlotKind, FittingStats, HoldStats } from './types';
 
@@ -187,8 +187,8 @@ export interface ImproveOption {
   lost: LostStat[];
 }
 
-/** A stat a swap makes worse: a stats-panel change, or a weapon-reach and mining one. */
-export type LostStat = { kind: 'stat'; change: StatChange } | { kind: 'role'; change: RoleChange };
+/** A stat a swap makes worse: a stats-panel change, or a role one (weapon reach, mining, remote repair…). */
+export type LostStat = SwapChange;
 
 /** A fit this full of CPU, powergrid or calibration has no room left, so using more is a cost. */
 const TIGHT_BUDGET = 0.9;
@@ -199,31 +199,17 @@ const BUDGET_USED = {
   calibrationUsed: 'calibrationTotal',
 } as const;
 
-/** Role stats a swap is told it gives up, whatever the goal. */
-const LOST_ROLE_KEYS: ReadonlySet<string> = new Set([
-  'optimal',
-  'falloff',
-  'tracking',
-  'miningYield',
-]);
-
 /**
  * Every shown stat the swap makes worse. Fitting resources count only when the
  * fit ends within `TIGHT_BUDGET` of its budget.
  */
 export function lostStats(before: FittingStats, after: FittingStats): LostStat[] {
-  const shown = diffFittingStats(before, after).changes.filter((change) => {
+  return swapChanges(before, after).filter(({ kind, change }) => {
     if (changeVerdict(change) !== 'worse') return false;
+    if (kind === 'role') return true;
     const total = BUDGET_USED[change.key as keyof typeof BUDGET_USED];
     return total === undefined || (after[total] > 0 && change.after > after[total] * TIGHT_BUDGET);
   });
-  const roles = roleChanges(before, after).filter(
-    (change) => LOST_ROLE_KEYS.has(change.key) && changeVerdict(change) === 'worse'
-  );
-  return [
-    ...shown.map((change): LostStat => ({ kind: 'stat', change })),
-    ...roles.map((change): LostStat => ({ kind: 'role', change })),
-  ];
 }
 
 export interface RejectedOption extends ImproveOption {

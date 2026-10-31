@@ -4,6 +4,16 @@ import '@/i18n';
 import { StatChange, StatChangeList } from './StatChange';
 
 describe('StatChange', () => {
+  it('words a yes/no stat as yes → no, worse when it is lost', () => {
+    const { container } = render(
+      <StatChange change={{ key: 'warpsCloaked', before: 1, after: 0 }} />
+    );
+
+    expect(container).toHaveTextContent('Warps cloaked: yes → no');
+    expect(container.querySelector('[data-verdict]')).toHaveClass('text-danger');
+    expect(screen.getByText('Warps cloaked: yes to no, worse')).toBeInTheDocument();
+  });
+
   it('tints the after value success when a higher-is-better stat rises', () => {
     const { container } = render(
       <StatChange change={{ key: 'totalDps', before: 400, after: 525 }} />

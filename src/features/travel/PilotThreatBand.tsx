@@ -9,7 +9,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip } from '@/components/ui';
-import type { KillSpace } from '@/engine/pilotList/killActivity';
+import { shownLastKill, type KillSpace } from '@/engine/pilotList/killActivity';
 import {
   ACTIVE_MIN_KILLS,
   DANGEROUS_MIN_DANGER_RATIO,
@@ -63,7 +63,8 @@ export function PilotThreatBand({
 }) {
   const { t } = useTranslation();
   const tone = THREAT_LEVEL_TONE[verdict.level];
-  const age = verdict.lastKillMs === null ? null : formatAge(nowMs - verdict.lastKillMs, t);
+  const lastKillMs = shownLastKill(verdict.lastKillMs, nowMs);
+  const age = lastKillMs === null ? null : formatAge(nowMs - lastKillMs, t);
   const days = THREAT_WINDOW_DAYS;
   let sentence: string;
   if (verdict.recentKills === 0 && verdict.recentLosses > 0 && verdict.lastLossMs !== null) {

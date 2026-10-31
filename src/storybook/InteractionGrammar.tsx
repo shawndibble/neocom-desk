@@ -145,6 +145,7 @@ export function InteractionGrammar() {
   const [expanded, setExpanded] = useState(false);
   const [selected, setSelected] = useState<number | null>(2);
   const [fly, setFly] = useState('all');
+  const [grouping, setGrouping] = useState('kills');
 
   return (
     <div className="space-y-6">
@@ -364,6 +365,23 @@ export function InteractionGrammar() {
             value={fly}
             onChange={setFly}
           />
+        </Cue>
+        <Cue rule={k('rules.groupBySegments')}>
+          <span className="flex items-center gap-2">
+            <span aria-hidden className="text-xs text-text-dim">
+              {k('samples.groupByLabel')}
+            </span>
+            <SegmentedControl
+              label={k('samples.groupByLabel')}
+              size="sm"
+              options={[
+                { value: 'kills', label: k('samples.groupByKills') },
+                { value: 'organization', label: k('samples.groupByOrganization') },
+              ]}
+              value={grouping}
+              onChange={setGrouping}
+            />
+          </span>
         </Cue>
         <Cue rule={k('rules.dimmedZeroChip')}>
           {[

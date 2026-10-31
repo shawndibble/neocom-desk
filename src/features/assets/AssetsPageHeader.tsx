@@ -81,7 +81,9 @@ export function AssetsPageHeader({
               characterName={viewedCharacter.name}
             />
           )}
-          {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
+          {assetsResult && (
+            <DataAgeBadge date={assetsResult.fetchedAt} expiresAt={assetsResult.expiresAt} />
+          )}
         </>
       }
       scope={scope}

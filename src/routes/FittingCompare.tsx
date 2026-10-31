@@ -314,7 +314,7 @@ export function FittingCompare() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl space-y-3">
+    <div className="mx-auto max-w-page space-y-3">
       <PageHeader
         title={t('fittings.compare.title')}
         actions={
@@ -329,7 +329,7 @@ export function FittingCompare() {
         }
       />
 
-      {/* One wrapping toolbar from `md` up (label + select stay adjacent per group); phones keep the stacked rows. */}
+      {/* One wrapping toolbar from `md` up (label + select stay adjacent per group); phones keep the stacked rows. The differences toggle lives in the Stats panel header so loading fits never wraps this row. */}
       <div
         data-testid="compare-controls"
         className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-start md:gap-x-2 md:gap-y-2"
@@ -337,7 +337,6 @@ export function FittingCompare() {
         <DamageProfilePicker damageProfiles={damageProfiles} />
         <AbyssalWeatherPicker />
         <TargetProfilePicker targetProfiles={targetProfiles} />
-        {!isPhone && count > 0 && differencesToggle}
       </div>
 
       {count === 0 ? (
@@ -424,12 +423,15 @@ export function FittingCompare() {
               <Panel
                 title={t('fittings.compare.statsTitle')}
                 actions={
-                  statsCsvRows.length > 0 && (
-                    <TableActionsMenu
-                      name={t('fittings.compare.statsTitle')}
-                      tableExport={statsExport}
-                    />
-                  )
+                  <>
+                    {!isPhone && differencesToggle}
+                    {statsCsvRows.length > 0 && (
+                      <TableActionsMenu
+                        name={t('fittings.compare.statsTitle')}
+                        tableExport={statsExport}
+                      />
+                    )}
+                  </>
                 }
               >
                 {/* The column headers' Fitting menus grow "Export table" too. */}

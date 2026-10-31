@@ -17,6 +17,9 @@ export interface CharacterRowContextMenuProps {
   characterId: number;
   /** The character's name, for the row's "More actions" button label. */
   name: string;
+  /** Marked SP Farm; undefined hides the action (SP extraction monitoring is off). */
+  spFarm?: boolean;
+  onToggleSpFarm: () => void;
   /** Opens the remove-confirm dialog: the menu's one danger item (decision 20261005-202754). */
   onRemove: () => void;
   /** The `<tr>` `DataTable`'s `rowContextMenu` hands back — the menu's trigger. */
@@ -34,6 +37,8 @@ const DESTINATIONS = [
 export function CharacterRowContextMenu({
   characterId,
   name,
+  spFarm,
+  onToggleSpFarm,
   onRemove,
   children,
 }: CharacterRowContextMenuProps) {
@@ -56,6 +61,11 @@ export function CharacterRowContextMenu({
               {t(destination.labelKey)}
             </MenuItem>
           ))}
+          {spFarm !== undefined && (
+            <MenuItem onSelect={onToggleSpFarm}>
+              {t(spFarm ? 'characters.unmarkSpFarmMenuLabel' : 'characters.markSpFarmMenuLabel')}
+            </MenuItem>
+          )}
           <MenuSeparator />
           <MenuItem className="text-danger" onSelect={onRemove}>
             {t('characters.removeMenuLabel', { name })}

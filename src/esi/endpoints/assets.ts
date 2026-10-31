@@ -1,6 +1,7 @@
 import { fetchAllPagesStatus } from '../paginated';
 import type { PaginatedResult } from '../paginated';
 import type { EndpointOptions } from './options';
+import { postChunked } from './postChunked';
 
 // --- GET /characters/{character_id}/assets (esi-assets.read_assets.v1) ---
 
@@ -80,4 +81,49 @@ export function getCorporationAssets(
     endpointId: 'getCorporationAssets',
     maxPages: MAX_ASSET_PAGES,
   });
+}
+
+// --- POST /characters/{character_id}/assets/names (esi-assets.read_assets.v1) ---
+
+/** One in-game item name. ESI echoes the type name or `None` for an item the player never named. */
+export interface AssetName {
+  item_id: number;
+  name: string;
+}
+
+/**
+ * The names players gave their assembled ships and containers. Up to 1000 ids
+ * per request (more are batched); ESI fails a whole batch on one id it cannot
+ * name, so callers send singleton, nameable items only.
+ */
+export function postCharacterAssetNames(
+  characterId: number,
+  itemIds: number[],
+  options: { signal?: AbortSignal } = {}
+): Promise<AssetName[]> {
+  return postChunked<number, AssetName>(
+    `/characters/${characterId}/assets/names`,
+    'postCharacterAssetNames',
+    itemIds,
+    options.signal,
+    characterId
+  );
+}
+
+// --- POST /corporations/{corporation_id}/assets/names (esi-assets.read_corporation_assets.v1) ---
+
+/** The corp twin of `postCharacterAssetNames`; Director-only like the corp assets read. */
+export function postCorporationAssetNames(
+  characterId: number,
+  corporationId: number,
+  itemIds: number[],
+  options: { signal?: AbortSignal } = {}
+): Promise<AssetName[]> {
+  return postChunked<number, AssetName>(
+    `/corporations/${corporationId}/assets/names`,
+    'postCorporationAssetNames',
+    itemIds,
+    options.signal,
+    characterId
+  );
 }

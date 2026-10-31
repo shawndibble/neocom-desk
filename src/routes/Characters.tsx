@@ -51,6 +51,8 @@ import {
 import {
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,
+  useSpFarmCharacters,
+  withToggledSpFarm,
 } from '@/features/character/spExtractionSettings';
 import { extractorCount, isSpExtractionReady } from '@/engine/skills/spExtraction';
 import { formatIskCompact } from '@/lib/isk';
@@ -75,6 +77,7 @@ import { useCharactersHousekeeping } from '@/features/character/useCharactersHou
 import { characterLastSynced } from '@/features/character/rosterQueueChip';
 import { useCharactersView, activeRosterFilterCount } from '@/features/character/useCharactersView';
 import { buildColumns } from '@/features/character/charactersTableColumns';
+import { useCharacterWhereabouts } from '@/features/character/useCharacterWhereabouts';
 import { useCharacterAchievements } from '@/features/character/useCharacterAchievements';
 import { returnPathAfterSwitch } from '@/features/character/characterSwitchReturn';
 
@@ -133,6 +136,9 @@ export function Characters() {
   useHydratedStore(useSpExtractionMonitoringEnabled);
   const spExtractionThreshold = useSpExtractionThresholdSp((state) => state.value);
   useHydratedStore(useSpExtractionThresholdSp);
+  const spFarm = useSpFarmCharacters((state) => state.value);
+  const setSpFarm = useSpFarmCharacters((state) => state.setValue);
+  const spFarmHydrated = useHydratedStore(useSpFarmCharacters);
 
   const extractionPrices = useExtractionPrices();
   const alertCounts = useAlertCountsByCharacter();
@@ -168,6 +174,12 @@ export function Characters() {
   }, [removeFailedName]);
   const [customizingPermissions, setCustomizingPermissions] = useState(false);
 
+  // Read only while the table shows one of the two optional columns.
+  const whereabouts = useCharacterWhereabouts(
+    useMemo(() => (characters ?? []).map((character) => character.characterId), [characters]),
+    viewMode === 'table' && (visibleColumns.includes('dockedAt') || visibleColumns.includes('ship'))
+  );
+
   const {
     search,
     sortKey,
@@ -194,10 +206,12 @@ export function Characters() {
     attentionById,
     groups: groupsValue.groups,
     starred,
+    spFarm,
     alertCounts,
     notTrainingAlertEnabledFor,
     visibleColumns,
     spExtractionEnabled,
+    whereabouts,
   });
 
   // One batched read for the roster: every card's line, or the table's column while it shows.
@@ -215,6 +229,7 @@ export function Characters() {
     spExtractionThreshold,
     extractionPrices.net,
     (id) => void handleToggleStar(id),
+    (id) => void handleToggleSpFarm(id),
     timeZone,
     groupsValue.groups,
     (id, groupId) => void handleMoveToGroup(id, groupId),
@@ -262,6 +277,10 @@ export function Characters() {
     void setVisibleColumns(next);
   }
 
+  async function handleToggleSpFarm(characterId: number) {
+    await setSpFarm(withToggledSpFarm(spFarm, characterId));
+  }
+
   async function handleToggleStar(characterId: number) {
     await setStarred(withToggledStar(starred, characterId));
   }
@@ -289,28 +308,35 @@ export function Characters() {
 
   const extractorsReady = tableRows.reduce(
     (sum, row) =>
-      row.totalSp !== undefined && isSpExtractionReady(row.totalSp, spExtractionThreshold)
+      row.spFarm &&
+      row.totalSp !== undefined &&
+      isSpExtractionReady(row.totalSp, spExtractionThreshold)
         ? sum + extractorCount(row.totalSp)
         : sum,
     0
   );
   const extractionSummary =
-    !spExtractionEnabled || !extractionPrices.loaded || extractorsReady === 0
-      ? null
-      : extractionPrices.net === null
-        ? t('characters.extractionUnpriced', { hub: extractionPrices.hubName })
-        : t('characters.extractionTotal', {
-            isk: formatIskCompact(extractionPrices.net * extractorsReady),
-            each: formatIskCompact(extractionPrices.net),
-            hub: extractionPrices.hubName,
-          });
+    spExtractionEnabled &&
+    spFarmHydrated &&
+    spFarm.length === 0 &&
+    activeColumnIds.includes('spReady')
+      ? t('characters.spFarmHint')
+      : !spExtractionEnabled || !extractionPrices.loaded || extractorsReady === 0
+        ? null
+        : extractionPrices.net === null
+          ? t('characters.extractionUnpriced', { hub: extractionPrices.hubName })
+          : t('characters.extractionTotal', {
+              isk: formatIskCompact(extractionPrices.net * extractorsReady),
+              each: formatIskCompact(extractionPrices.net),
+              hub: extractionPrices.hubName,
+            });
 
   if (!characters) {
     return <Spinner block="page" label={t('common.loading')} />;
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <PageHeader
         title={t('characters.title')}
         actions={
@@ -509,6 +535,8 @@ export function Characters() {
               rows={tableRows}
               columns={activeColumnIds.map((id) => columnsById[id])}
               extractionSummary={extractionSummary}
+              spExtractionEnabled={spExtractionEnabled}
+              onToggleSpFarm={(id) => void handleToggleSpFarm(id)}
               tableProps={charactersExport.tableProps}
               sort={tableSort}
               onSortChange={setTableSort}

@@ -5,19 +5,18 @@ import { Spinner, Tabs, useTabsId } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePageTab } from '@/lib/usePageTab';
 import { MINING_TABS } from '@/app/pageTabs';
-import { guarded } from '@/app/routeChunks';
+import { named, preloadFrom } from '@/app/routeChunks';
 
-const TaxTab = lazy(() =>
-  guarded(() => import('@/features/miningTax/TaxTab')).then((m) => ({ default: m.TaxTab }))
-);
-const OverviewTab = lazy(() =>
-  guarded(() => import('@/features/miningTax/OverviewTab')).then((m) => ({
-    default: m.OverviewTab,
-  }))
-);
-const SurveyTab = lazy(() =>
-  guarded(() => import('@/features/survey/SurveyTab')).then((m) => ({ default: m.SurveyTab }))
-);
+// Each tab loads on first visit, or as the pilot reaches for it (`preloadTab`).
+const TAB_LOADERS = {
+  tax: named(() => import('@/features/miningTax/TaxTab'), 'TaxTab'),
+  overview: named(() => import('@/features/miningTax/OverviewTab'), 'OverviewTab'),
+  survey: named(() => import('@/features/survey/SurveyTab'), 'SurveyTab'),
+};
+const TaxTab = lazy(TAB_LOADERS.tax);
+const OverviewTab = lazy(TAB_LOADERS.overview);
+const SurveyTab = lazy(TAB_LOADERS.survey);
+const preloadTab = preloadFrom(TAB_LOADERS);
 
 /**
  * Mining (issue #671): renamed from "Moon Mining" — every internal
@@ -67,12 +66,13 @@ export function MoonMiningTax() {
       value={tab}
       // Transition: a cold tab chunk keeps the old tab (and focus) until it lands.
       onChange={(id) => startTransition(() => setTab(id as typeof tab))}
+      onPreload={preloadTab}
       tabs={MINING_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }))}
     />
   );
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <Suspense fallback={<Spinner block="page" label={t('common.loading')} />}>
         {tab === 'overview' && <OverviewTab tabBar={tabBar} tabsId={tabsId} />}
         {tab === 'tax' && <TaxTab tabBar={tabBar} tabsId={tabsId} />}

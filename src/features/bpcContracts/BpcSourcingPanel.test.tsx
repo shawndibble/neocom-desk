@@ -433,7 +433,7 @@ describe('BpcSourcingPanel', () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002, isMultiType: true })])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
@@ -460,7 +460,7 @@ describe('BpcSourcingPanel', () => {
         row({ contractId: 2, typeId: 870, price: 2_000_000_000 }),
       ])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
@@ -485,7 +485,7 @@ describe('BpcSourcingPanel', () => {
         row({ contractId: 2, typeId: 870, regionId: 10000043 }),
       ])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
@@ -548,7 +548,7 @@ describe('BpcSourcingPanel', () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
@@ -601,7 +601,7 @@ describe('BpcSourcingPanel', () => {
         row({ contractId: 3, typeId: 870 }),
       ])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const { unmount } = render(<App />);
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -642,7 +642,7 @@ describe('BpcSourcingPanel', () => {
       ])
     );
     window.history.pushState({}, '', '/industry/sourcing?sourcing.type=638&sourcing.minMe=10');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
 
     expect(await screen.findByText('1 offer on contract')).toBeInTheDocument();
@@ -662,7 +662,7 @@ describe('BpcSourcingPanel', () => {
         row({ contractId: 3, typeId: 870 }),
       ])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -678,7 +678,7 @@ describe('BpcSourcingPanel', () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638 }), row({ contractId: 2, typeId: 638 })])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -704,7 +704,7 @@ describe('BpcSourcingPanel', () => {
 
   it('hides the suggestions on Escape without clearing the typed text', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -726,7 +726,7 @@ describe('BpcSourcingPanel', () => {
         row({ contractId: 4, typeId: 870 }),
       ])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -755,7 +755,7 @@ describe('BpcSourcingPanel', () => {
         row({ contractId: 3, typeId: 638, price: 12_000_000, runs: 10 }),
       ])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -793,7 +793,7 @@ describe('BpcSourcingPanel', () => {
           row({ contractId: 4, typeId: 638, price: 1_000_000, regionId: 10000032 }),
         ])
       );
-      const strip = await pickRifter(userEvent.setup());
+      const strip = await pickRifter(userEvent.setup({ delay: null }));
 
       const cells = within(strip).getAllByRole('listitem');
       expect(cells).toHaveLength(1);
@@ -810,7 +810,7 @@ describe('BpcSourcingPanel', () => {
             row({ contractId: 1, typeId: 638, price: 5_000_000, regionId: 10000002 }),
           ])
         );
-        const strip = await pickRifter(userEvent.setup());
+        const strip = await pickRifter(userEvent.setup({ delay: null }));
 
         await waitFor(() => expect(within(strip).getAllByRole('listitem')).toHaveLength(2));
         const [forge, domain] = within(strip).getAllByRole('listitem');
@@ -827,7 +827,7 @@ describe('BpcSourcingPanel', () => {
         cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000, regionId: 10000002 })])
       );
       window.history.pushState({}, '', '/industry/sourcing?sourcing.region=10000002');
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<App />);
       await screen.findByRole('table', { name: 'BPC Sourcing' });
       await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
@@ -864,7 +864,7 @@ describe('BpcSourcingPanel', () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638 }), row({ contractId: 2, typeId: 870 })])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -917,7 +917,7 @@ describe('BpcSourcingPanel active filter chips', () => {
       ])
     );
     window.history.pushState({}, '', '/industry/sourcing?sourcing.minMe=8&sourcing.hidePlex=1');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
@@ -949,7 +949,7 @@ describe('BpcSourcingPanel search matching', () => {
         row({ contractId: 2, typeId: 870, regionId: 10000043 }),
       ])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
@@ -972,7 +972,7 @@ describe('BpcSourcingPanel search matching', () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
 
     await screen.findByRole('table', { name: 'BPC Sourcing' });
@@ -1010,7 +1010,7 @@ describe('BpcSourcingPanel row identity', () => {
         row({ contractId: 2, typeId: 870, price: 9_000_000 }),
       ])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
@@ -1027,7 +1027,7 @@ describe('BpcSourcingPanel row identity', () => {
 describe('BpcSourcingPanel page header', () => {
   it('puts Refresh in the Industry header, re-reading the snapshot, and no panel title bar', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await screen.findByRole('table', { name: 'BPC Sourcing' });
     const calls = loadPublicBpcContracts.mock.calls.length;
@@ -1052,7 +1052,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await openFilters(user);
     expect(await filterOptionChecked(user, 'Contracts')).toBe('true');
     expect(await filterOptionChecked(user, 'Owned')).toBe('true');
@@ -1063,7 +1063,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     loadCharacterBlueprints.mockResolvedValue(
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
@@ -1080,7 +1080,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     loadCharacterBlueprints.mockResolvedValue(
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 870, quantity: 2 })])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
@@ -1133,7 +1133,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     loadCharacterBlueprints.mockResolvedValue(
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 638, runs: -1 })])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
@@ -1153,7 +1153,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     // just goes empty here.
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     loadCharacterBlueprints.mockResolvedValue(ownedResult([], true));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
@@ -1180,7 +1180,7 @@ describe('BpcSourcingPanel source multiselect', () => {
 
   it('shows a dedicated empty state when every source is deselected', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -1206,7 +1206,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     loadCharacterBlueprints.mockResolvedValue(
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
@@ -1235,7 +1235,7 @@ describe('BpcSourcingPanel source multiselect', () => {
       regionId: 10000002,
       space: 'highsec',
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
@@ -1257,7 +1257,7 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
         row({ contractId: 2, typeId: 870, isAuction: true }),
       ])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
@@ -1276,7 +1276,7 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
         row({ contractId: 2, typeId: 870, price: 0, requestedPlex: 1000 }),
       ])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
@@ -1315,7 +1315,7 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
         row({ contractId: 2, typeId: 870, price: 0, requestedPlex: 1000 }),
       ])
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -1340,7 +1340,7 @@ describe('BpcSourcingPanel remembered Source', () => {
 
   it('keeps the Source picks on a bare revisit, without writing them into the URL', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const { unmount } = render(<App />);
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -1363,7 +1363,7 @@ describe('BpcSourcingPanel remembered Source', () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     await db.settings.put({ key: BPC_SOURCES_SETTING_KEY, value: ['contract', 'market', 'owned'] });
     window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -1380,7 +1380,7 @@ describe('BpcSourcingPanel remembered Source', () => {
 
   it('forgets the remembered Source when Reset filters puts the defaults back', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const { unmount } = render(<App />);
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -1427,7 +1427,7 @@ describe('BpcSourcingPanel Location/Space', () => {
         ? { name: 'J105443', regionId: 11000001, space: 'wormhole' as const }
         : { name: 'Jita IV - Moon 4', regionId: 10000002, space: 'highsec' as const }
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
@@ -1464,7 +1464,7 @@ describe('BpcSourcingPanel Location/Space', () => {
       regionId: 10000002,
       space: 'highsec',
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     await within(table).findByText('Caracal Blueprint');
@@ -1504,7 +1504,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       loadPublicBpcContracts.mockResolvedValue(
         cachedSnapshot([row({ contractId: 1, typeId: 638 })])
       );
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<App />);
       await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -1534,7 +1534,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       loadCharacterBlueprints.mockResolvedValue(
         ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
       );
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
       expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
@@ -1559,7 +1559,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       loadCharacterBlueprints.mockResolvedValue(
         ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
       );
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -1583,7 +1583,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       loadPublicBpcContracts.mockResolvedValue(
         cachedSnapshot([row({ contractId: 1, typeId: 638 })])
       );
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<App />);
       await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -1681,7 +1681,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         fetchedAt: 0,
       }));
       loadContractLocationInfo.mockResolvedValue({ name: 'Jita IV - Moon 4', space: 'highsec' });
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -1768,7 +1768,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       }));
       loadContractLocationInfo.mockResolvedValue({ name: 'Jita IV - Moon 4', space: 'highsec' });
       window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,owned');
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -1806,7 +1806,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       }));
       loadContractLocationInfo.mockResolvedValue({ name: 'Jita IV - Moon 4', space: 'highsec' });
       window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,owned');
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
       await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
@@ -1857,7 +1857,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       await db.settings.put({ key: 'sync.loyaltyLpValue', value: 1_000 });
       useLpValue.setState({ value: 1_000, hydrated: true });
       window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,lp');
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -1887,7 +1887,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000 })])
       );
       getOrderBook.mockRejectedValue(new Error('420'));
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<App />);
       await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -1904,7 +1904,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       loadPublicBpcContracts.mockResolvedValue(
         cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000 })])
       );
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<App />);
       await screen.findByRole('table', { name: 'BPC Sourcing' });
 
@@ -1922,7 +1922,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         ownedResult([ownedBlueprint({ item_id: 1, type_id: 638 })])
       );
       window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,owned');
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
       expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
@@ -1960,7 +1960,7 @@ describe('BpcSourcingPanel Jump Range', () => {
 
   it('keeps only rows within range of the game location, counting the range as active', async () => {
     loadCharacterSolarSystemId.mockResolvedValue(JITA);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getAllByText('Caracal Blueprint')).toHaveLength(2);
@@ -2081,7 +2081,7 @@ describe('Ask to copy on a Community Offer row', () => {
   it('turns a Shared BPO into a button that opens the dialog for that Community', async () => {
     communityRows.value = [offerRow({ typeId: 638, runs: -1 })];
     openCommunity();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 

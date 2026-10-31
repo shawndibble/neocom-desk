@@ -175,6 +175,26 @@ describe('ProductionRunsPanel', () => {
     expect(row).not.toBeNull();
   });
 
+  it('hides a column unticked in the Columns menu', async () => {
+    await addRun();
+    const user = userEvent.setup();
+    renderPanel(null);
+    await expandRuns(user);
+    expect(await screen.findByRole('columnheader', { name: /total cost/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: /total cost/i }));
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('columnheader', { name: /total cost/i })).toBeNull();
+
+    // The choice is stored on the device, so put it back for the tests after this one.
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitem', { name: /reset to default/i }));
+    await user.keyboard('{Escape}');
+    expect(await screen.findByRole('columnheader', { name: /total cost/i })).toBeInTheDocument();
+  });
+
   it('edits a run by clicking its row, recomputing total cost', async () => {
     await addRun();
     const user = userEvent.setup();

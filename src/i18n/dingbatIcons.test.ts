@@ -4,10 +4,7 @@ import { describe, it, expect } from 'vitest';
 import en from './locales/en.json';
 
 /** DESIGN.md §5: a typed dingbat is never an icon — use an `Icon.*` glyph. */
-const DINGBATS = /[●▲⇉⤳]/;
-
-/** Travel's bridge/wormhole markers still need their own glyph aliases; the follow-up removes this. */
-const ALLOWED = ['src/features/travel/'];
+const DINGBATS = /[●▲⇉⤳✓☑☐]/;
 
 function walk(dir: string, out: string[]) {
   for (const name of readdirSync(dir)) {
@@ -25,11 +22,11 @@ function collectStrings(node: unknown, path: string, out: [string, string][]) {
 }
 
 describe('typed dingbats', () => {
-  it('feature components never type ● ▲ ⇉ ⤳ (Planetary Industry is being overhauled)', () => {
+  it('feature components never type ● ▲ ⇉ ⤳ ✓ ☑ ☐ (Planetary Industry is being overhauled)', () => {
     const files: string[] = [];
     walk('src/features', files);
     const bad = files
-      .filter((f) => !f.startsWith('src/features/pi/') && !ALLOWED.some((a) => f.startsWith(a)))
+      .filter((f) => !f.startsWith('src/features/pi/'))
       .filter((f) => DINGBATS.test(readFileSync(f, 'utf8')));
     expect(bad).toEqual([]);
   });

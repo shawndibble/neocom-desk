@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import {
   ItemContextMenu,
   ItemMoreActions,
@@ -25,9 +25,9 @@ export function buildItemMenuProps(
   onSearchBpcSourcing?: (blueprintTypeID: number) => void
 ): {
   itemMenuFor: ItemMenuFor;
-  itemActionsFor: (typeId: number, bordered?: boolean) => ReactElement;
+  itemActionsFor: (typeId: number, bordered?: boolean, extraItems?: ReactNode) => ReactElement;
 } {
-  const menuProps = (typeId: number) => {
+  const menuProps = (typeId: number, rowItems?: ReactNode) => {
     const blueprintTypeID = catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null;
     const sourcingBlueprint = catalog.byBlueprintTypeID.has(typeId) ? typeId : blueprintTypeID;
     return {
@@ -36,23 +36,34 @@ export function buildItemMenuProps(
       blueprintTypeID,
       hideBuildPlan: true,
       hideCompare: true,
-      extraItems:
-        onSearchBpcSourcing && sourcingBlueprint !== null ? (
-          <BpcSourcingMenuItem blueprintTypeID={sourcingBlueprint} onSearch={onSearchBpcSourcing} />
-        ) : undefined,
+      extraItems: (
+        <>
+          {onSearchBpcSourcing && sourcingBlueprint !== null && (
+            <BpcSourcingMenuItem
+              blueprintTypeID={sourcingBlueprint}
+              onSearch={onSearchBpcSourcing}
+            />
+          )}
+          {rowItems}
+        </>
+      ),
     };
   };
 
   /** The menu on every item name the page shows — product heading, the recipe and acquisition modals. */
-  const itemMenuFor: ItemMenuFor = (typeId, trigger) => (
-    <ItemContextMenu {...menuProps(typeId)}>{trigger}</ItemContextMenu>
+  const itemMenuFor: ItemMenuFor = (typeId, trigger, extraItems) => (
+    <ItemContextMenu {...menuProps(typeId, extraItems)}>{trigger}</ItemContextMenu>
   );
 
-  const itemActionsFor = (typeId: number, bordered = false): ReactElement => (
+  const itemActionsFor = (
+    typeId: number,
+    bordered = false,
+    extraItems?: ReactNode
+  ): ReactElement => (
     <ItemMoreActions
       variant={bordered ? 'ghost' : undefined}
       size={bordered ? 'sm' : undefined}
-      {...menuProps(typeId)}
+      {...menuProps(typeId, extraItems)}
     />
   );
 
