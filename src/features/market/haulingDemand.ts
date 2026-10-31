@@ -6,6 +6,7 @@
  * per item in the hauling scan's pass 2. `null` means unavailable or stale, and the
  * scan falls back to ESI history.
  */
+import { useEffect, useState } from 'react';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
 import type { DemandAggregate } from '@/engine/market/haulingMarket';
@@ -88,4 +89,30 @@ export async function loadHaulingDemand(regionId: number): Promise<HaulingDemand
   } catch {
     return null;
   }
+}
+
+/**
+ * A hub region's demand, tagged with its region so a hub change never reads
+ * the previous hub's. `regionId` null loads nothing. `settled` once this
+ * region's read is done; `demand` null for good when it is missing or stale.
+ */
+export function useHaulingDemand(regionId: number | null): {
+  demand: HaulingDemand | null;
+  settled: boolean;
+} {
+  const [loaded, setLoaded] = useState<{ regionId: number; demand: HaulingDemand | null } | null>(
+    null
+  );
+  useEffect(() => {
+    if (regionId === null) return;
+    let cancelled = false;
+    void loadHaulingDemand(regionId).then((demand) => {
+      if (!cancelled) setLoaded({ regionId, demand });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [regionId]);
+  const settled = loaded !== null && loaded.regionId === regionId;
+  return { demand: settled ? loaded.demand : null, settled };
 }

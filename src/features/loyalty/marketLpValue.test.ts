@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getTradeHub } from '@/market/hubs';
 import { loadMarketSnapshots } from '@/features/industry/marketData';
 import { loadLoyaltyStoreOffers } from './store';
+import { loadHaulingDemand } from '@/features/market/haulingDemand';
 
 vi.mock('./store', () => ({ loadLoyaltyStoreOffers: vi.fn() }));
 vi.mock('@/features/industry/marketData', () => ({ loadMarketSnapshots: vi.fn() }));
+vi.mock('@/features/market/haulingDemand', () => ({ loadHaulingDemand: vi.fn(async () => null) }));
 // One blueprint: BPC 900 builds 100 units of product 901 from mineral 34.
 vi.mock('@/features/industry/blueprintCatalog', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -105,6 +107,40 @@ describe('loadMarketLpValues', () => {
     // Remembered like any other read: the ESI path answers it next.
     expect(await loadMarketLpValue(60, JITA)).toBe(values.get(60));
     expect(loadLoyaltyStoreOffers).not.toHaveBeenCalled();
+  });
+});
+
+describe('loadMarketLpValues against recent trades', () => {
+  it('values a lone listing far above its trades at the trades', async () => {
+    vi.mocked(loadMarketSnapshots).mockImplementation((requests) =>
+      requests.map(() =>
+        Promise.resolve(
+          snapshot({ 71: 50_000_000, 72: 40_000_000, 73: 100_000 }, { 71: 50, 72: 50, 73: 50 })
+        )
+      )
+    );
+    const traded = (price: number) => ({
+      volume: 100,
+      daysWithTrades: 30,
+      orderSum: 300,
+      recentSalePrice: price,
+      latestDay: { date: '2026-10-29', highest: price, lowest: price },
+    });
+    vi.mocked(loadHaulingDemand).mockResolvedValue({
+      asOf: '2026-10-29',
+      lastSyncedAt: 1,
+      types: new Map([
+        [71, traded(200_000)],
+        [72, traded(150_000)],
+      ]),
+    });
+    const offers = new Map([
+      [70, [itemOffer(1, 71, 100), itemOffer(2, 72, 100), itemOffer(3, 73, 100)]],
+    ]);
+    const values = await loadMarketLpValues([70], JITA, { held: offers });
+    // Two of three listings far above their trades: counted at the trades, not 50M and 40M.
+    expect(values.get(70)).toBeGreaterThan(1_300);
+    expect(values.get(70)).toBeLessThan(1_500);
   });
 });
 

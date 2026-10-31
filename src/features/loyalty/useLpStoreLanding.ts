@@ -35,6 +35,7 @@ import type { CharacterLoyaltyPoints, LoyaltyStoreOffer, UniverseFaction } from 
 import type { SkillLevels } from '@/engine/industry/types';
 import { revenuePricing, usePriceBasis } from './priceBasis';
 import { useLpStoreVolume } from './lpStoreVolume';
+import { useHaulingDemand } from '@/features/market/haulingDemand';
 import { loadMarketLpValues } from './marketLpValue';
 import {
   loadLpStoreSnapshot,
@@ -232,6 +233,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
   }, [activeCharacterId]);
 
   const { volume, settled: volumeSettled } = useLpStoreVolume(hubHydrated ? hub.regionId : null);
+  const { demand, settled: demandSettled } = useHaulingDemand(hubHydrated ? hub.regionId : null);
 
   const offersByCorp = useMemo(() => {
     const map = new Map<number, LoyaltyStoreOffer[]>();
@@ -325,7 +327,8 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     [snapshotRows, corporationById, balanceByCorp, militias, jumps, valuesForHub]
   );
 
-  const ready = catalog !== null && snapshot !== null && itemNames !== null && volumeSettled;
+  const ready =
+    catalog !== null && snapshot !== null && itemNames !== null && volumeSettled && demandSettled;
   const rows = useMemo(() => {
     if (!ready) return null;
     return computeLoyaltyOfferRows({
@@ -342,8 +345,20 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
       // Affordability is per store here (`lpLanding.ts`), from each balance.
       playerLp: null,
       sellsPerDayByType: volume,
+      tradedPrices: demand?.types,
     });
-  }, [ready, allOffers, catalog, snapshot, priceBasis, skills, standing, itemNames, volume]);
+  }, [
+    ready,
+    allOffers,
+    catalog,
+    snapshot,
+    priceBasis,
+    skills,
+    standing,
+    itemNames,
+    volume,
+    demand,
+  ]);
 
   const offers = useMemo<LpLandingOffer[]>(() => {
     if (!rows) return [];

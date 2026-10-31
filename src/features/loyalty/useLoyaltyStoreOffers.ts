@@ -26,6 +26,7 @@ import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { revenuePricing, usePriceBasis } from './priceBasis';
 import { useLpStoreVolume } from './lpStoreVolume';
+import { useHaulingDemand } from '@/features/market/haulingDemand';
 import {
   useDetectedOwnedStock,
   useOwnedStockSnapshot,
@@ -199,6 +200,8 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   }, [nameableTypeIds]);
 
   const { volume } = useLpStoreVolume(hubHydrated ? hub.regionId : null);
+  // Recent trades check each sale; until they settle nothing is ranked, so a lone overpriced listing never flashes first.
+  const { demand, settled: demandSettled } = useHaulingDemand(hubHydrated ? hub.regionId : null);
 
   const ownedStockSnapshot = useOwnedStockSnapshot();
   const { stock } = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
@@ -237,6 +240,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
       useOwnMaterialsFor,
       playerLp,
       sellsPerDayByType: volume,
+      tradedPrices: demand?.types,
     });
   }, [
     offers,
@@ -250,6 +254,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     useOwnMaterialsFor,
     playerLp,
     volume,
+    demand,
   ]);
 
   function toggleUseOwnMaterials(offerId: number): void {
@@ -281,7 +286,10 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     catalogUnavailable: catalog === EMPTY_BLUEPRINT_CATALOG,
     // A store with no offers has no prices to wait for, so `snapshot` stays
     // null for good: that is "no offers", not still loading.
-    ready: offers !== null && catalog !== null && (typeIds.length === 0 || snapshot !== null),
+    ready:
+      offers !== null &&
+      catalog !== null &&
+      (typeIds.length === 0 || (snapshot !== null && demandSettled)),
     pricesUnreachable: snapshot?.hubPricesUnreachable === true,
     useOwnMaterialsFor,
     toggleUseOwnMaterials,
