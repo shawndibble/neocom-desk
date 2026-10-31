@@ -16,10 +16,7 @@ const ALLOWLIST: Record<string, string> = {
 };
 
 // Columns passed in as props from a hook the file doesn't import.
-const EXTRA_COLUMN_SOURCES: Record<string, string[]> = {
-  // The columns arrive as a prop from useWalletLoyalty (via WalletBalanceTab).
-  'src/features/character/WalletLoyaltyPanel.tsx': ['src/features/character/useWalletLoyalty.tsx'],
-};
+const EXTRA_COLUMN_SOURCES: Record<string, string[]> = {};
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {

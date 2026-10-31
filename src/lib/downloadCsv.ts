@@ -79,8 +79,7 @@ export type CsvSurface =
   | 'activity-log'
   | 'data-age'
   | 'skill-compare'
-  | 'wallet-balances'
-  | 'loyalty-points';
+  | 'wallet-balances';
 
 /** Every surface exports in every format; the name reads better at the menu. */
 export type ExportSurface = CsvSurface;
