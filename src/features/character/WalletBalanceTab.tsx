@@ -7,6 +7,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { GrantBanner } from '@/app/GrantNote';
 import { NetWorthPanel, type NetWorthCharacter } from '@/features/netWorth/NetWorthPanel';
+import { CashFlowPanel } from '@/features/netWorth/CashFlowPanel';
 import { WalletWaitingGoal } from '@/features/netWorth/WalletWaitingGoal';
 import type { useWalletBalances } from '@/features/character/useWalletBalances';
 import type { useWalletDrill } from '@/features/character/useWalletDrill';
@@ -92,15 +93,18 @@ export function WalletBalanceTab({
     return map;
   }, [balances.snapshot, activeCharacterId, balanceResult, balanceNeedsReauth]);
 
-  const waitingIds = useMemo(
+  const scopeCharacters = useMemo(
     () =>
       drilledCharacter
-        ? [drilledCharacter.characterId]
+        ? [drilledCharacter]
         : showingBeyondActive
-          ? pickedCharacters.map((c) => c.characterId)
-          : [activeCharacterId],
-    [drilledCharacter, showingBeyondActive, pickedCharacters, activeCharacterId]
+          ? pickedCharacters
+          : activeCharacter
+            ? [activeCharacter]
+            : [],
+    [drilledCharacter, showingBeyondActive, pickedCharacters, activeCharacter]
   );
+  const scopeIds = useMemo(() => scopeCharacters.map((c) => c.characterId), [scopeCharacters]);
 
   // Summed over the same picked Characters as the net worth panel.
   const everMarksStat = (
@@ -215,7 +219,8 @@ export function WalletBalanceTab({
         />
       )}
 
-      <WalletWaitingGoal characterIds={waitingIds} />
+      <CashFlowPanel key={scopeIds.join(',')} characters={scopeCharacters} />
+      <WalletWaitingGoal characterIds={scopeIds} />
     </div>
   );
 }

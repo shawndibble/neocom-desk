@@ -41,11 +41,12 @@ export interface AllJournalsSnapshot {
 
 /**
  * `characters` is the pick; omitted, every stored Character. `typeNames: false`
- * skips resolving item names (an empty map), for a reader of amounts only.
+ * skips resolving item names (an empty map), for a reader of amounts only;
+ * `fills: false` also skips each Character's recent fills (no `transactions`).
  */
 export async function loadAllCharactersJournals(
   characters?: readonly FanOutCharacter[],
-  options: { typeNames?: boolean } = {}
+  options: { typeNames?: boolean; fills?: boolean } = {}
 ): Promise<AllJournalsSnapshot> {
   const { entries, skipped } = await fanOutAllCharacters<CharacterJournal>({
     scope: JOURNAL_SCOPE,
@@ -54,7 +55,10 @@ export async function loadAllCharactersJournals(
       const { cached, needsReauth } = await loadWalletJournalHistory(characterId);
       if (!cached || needsReauth) return null;
       // The fills only name PLEX lines and items: a failed read costs those, not the journal.
-      const fills = await loadWalletTransactionsHistory(characterId).catch(() => null);
+      const fills =
+        options.fills === false
+          ? null
+          : await loadWalletTransactionsHistory(characterId).catch(() => null);
       return {
         characterId,
         name,
