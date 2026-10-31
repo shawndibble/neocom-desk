@@ -14424,6 +14424,8 @@
     }
   },
   "commandPalette": {
+    "setWaypoint": "Set waypoint",
+    "systemSublabel": "System · {{security}}",
     "emptyTitle": "Search a page, item, asset, pilot or command",
     "emptyHint": "Or paste a fit, item list, Local list or D-Scan",
     "title": "Command palette",
@@ -14450,6 +14452,7 @@
       "contacts": "Contacts",
       "lpStores": "LP Stores",
       "ships": "Ships",
+      "places": "Places",
       "marketItems": "Market items"
     },
     "commands": {
@@ -18381,6 +18384,7 @@
       "groupBySegments": "SegmentedControl after a dim \"Group by\" label, on a list's top line: regroups the same rows, remembered on this device",
       "dimmedZeroChip": "Count chip dimmed but live: no matches under the current filters",
       "rowMenu": "⋮: a row's menu of two or more real actions",
+      "altAction": "A small button, with ⇧↵ on desktop, on the highlighted result",
       "menuOpensDialog": "Menu item that opens a dialog: focus comes back to the menu button",
       "tabCount": "Round count badge after a tab label: how many things the tab holds",
       "selectedRow": "Accent 2px left border: selected row",
@@ -18401,6 +18405,7 @@
       "textAction": "Actions only. Navigation is a link or a row.",
       "iskAmount": "Hover, focus or tap reveals the exact figure.",
       "rowMenu": "Only where the row has two or more actions nothing else reaches. Right-click and touch-and-hold open the same menu.",
+      "altAction": "The Command Palette's second action (Places: Set waypoint). Enter does the row's main thing; this does the other and keeps the palette open to show the outcome. The button is the touch path.",
       "menuOpensDialog": "The dialog opens after the menu closes (useOpenAfterMenu). Open it with the keyboard and press Escape.",
       "tabCount": "Part of the tab's name (Members 12). Never a control, a status or a waiting count.",
       "selectedRow": "Click a row. Selected never looks like hover.",
@@ -18416,6 +18421,8 @@
       "fieldCaret": "The box is a control (§6); the caret says it opens a list."
     },
     "samples": {
+      "altActionRow": "Jita IV - Moon 4",
+      "altActionButton": "Set waypoint",
       "tabsLabel": "Community",
       "tabContent": "Blueprints",
       "tabMembers": "Members",
