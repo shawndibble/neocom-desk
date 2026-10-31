@@ -9,6 +9,7 @@ import { GrantNote } from '@/app/GrantNote';
 import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import {
   Button,
+  ColumnPickerMenu,
   DataTable,
   EmptyState,
   LoadFailedState,
@@ -22,6 +23,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useColumnVisibility } from '@/lib/columnVisibility';
 import { cx } from '@/lib/cx';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -45,6 +47,13 @@ import { SrpBulkBar } from './SrpBulkBar';
 import { SrpExportButton } from './SrpExportControls';
 import { SrpClaimDetail } from './SrpClaimDetail';
 import { OfficerRowMenu } from './OfficerRowMenu';
+import {
+  isPendingColumnId,
+  PENDING_COLUMN_IDS,
+  PENDING_DEFAULT_COLUMNS,
+  useVisiblePendingColumns,
+  type PendingColumnId,
+} from './pendingColumns';
 import { groupByPilot, withMailSummary, type SrpMailClaim } from './srpResultMail';
 import { failureText } from './srpClaimText';
 import {
@@ -72,6 +81,7 @@ function claimRowHasMenu(claim: SrpClaim): boolean {
 export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready }) {
   const { t } = useTranslation();
   const phone = useIsPhone();
+  const pendingShown = useColumnVisibility(useVisiblePendingColumns, PENDING_DEFAULT_COLUMNS);
   const tabsId = useTabsId();
   const panelRef = useRef<HTMLDivElement>(null);
   const zone = useTimeZone();
@@ -245,9 +255,14 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     busy,
   };
 
+  // The phone card has no such columns; only the desktop Pending table picks them.
+  const picking = tab === 'pending' && !phone;
+  const pendingAll = pendingColumns(ctx);
   const columns: DataTableColumn<SrpClaim>[] =
     tab === 'pending'
-      ? (phone ? phonePendingColumns : pendingColumns)(ctx)
+      ? phone
+        ? phonePendingColumns(ctx)
+        : pendingAll.filter((c) => !isPendingColumnId(c.id) || pendingShown.isVisible(c.id))
       : tab === 'owed'
         ? (phone ? phoneOwedColumns : owedColumns)(ctx)
         : (phone ? phoneHistoryColumns : historyColumns)(ctx);
@@ -333,7 +348,29 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           }))}
         />
       )}
-      <Panel title={t(`srp.officer.title.${tab}`)} padded={false}>
+      <Panel
+        title={t(`srp.officer.title.${tab}`)}
+        padded={false}
+        actions={
+          picking ? (
+            <ColumnPickerMenu
+              available={PENDING_COLUMN_IDS}
+              visible={pendingShown.visible}
+              columnsById={
+                Object.fromEntries(
+                  pendingAll.filter((c) => isPendingColumnId(c.id)).map((c) => [c.id, c])
+                ) as Record<PendingColumnId, DataTableColumn<SrpClaim>>
+              }
+              onToggle={pendingShown.toggle}
+              onReset={pendingShown.reset}
+              buttonLabel={t('common.columnsButton')}
+              menuTitle={t('common.columnsMenuTitle')}
+              resetLabel={t('common.resetColumns')}
+              showLabel
+            />
+          ) : undefined
+        }
+      >
         <div
           ref={setPanel}
           tabIndex={-1}

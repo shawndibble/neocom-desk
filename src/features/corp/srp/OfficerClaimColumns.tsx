@@ -61,12 +61,10 @@ const lostColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
   ),
 });
 
-/** Steps aside below `xl` so Approve and Reject fit at 1024; the claim detail still shows it. */
 const fleetColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
   id: 'fleet',
   header: ctx.t('srp.officer.columns.fleetOrFc'),
-  className: 'hidden max-w-48 wrap-anywhere xl:table-cell',
-  headerCellClassName: 'hidden xl:table-cell',
+  className: 'max-w-48 wrap-anywhere',
   render: (row) =>
     row.fleetOrFc ? (
       <span className="text-text-dim">{row.fleetOrFc}</span>
@@ -97,7 +95,8 @@ export function pendingColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpCla
       id: 'amount',
       header: ctx.t('srp.officer.columns.amount'),
       align: 'right',
-      className: 'min-w-36 wrap-anywhere',
+      // Capped so a long basis line wraps here, leaving the room to Pilot and Hull.
+      className: 'min-w-36 max-w-44 wrap-anywhere',
       render: (row) => <PendingAmount claim={row} ctx={ctx} />,
     },
     {

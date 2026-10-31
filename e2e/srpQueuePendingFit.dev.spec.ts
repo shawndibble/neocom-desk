@@ -1,7 +1,7 @@
 /**
  * The officer SRP Queue's Pending table fits its panel from 1024 up (#5701):
- * no sideways scroll and Reject fully inside the panel. Below `xl` the Fleet
- * or FC column steps aside to make the room.
+ * no sideways scroll and Reject fully inside the panel. Lost and Fleet or FC
+ * start off in the table's column picker to make the room.
  *
  * Dev server only: the page reads its claims from the Storybook stand-ins
  * (`srpBackendOverride.ts` + `srpOfficerBackendOverride.ts` and their
@@ -32,7 +32,7 @@ async function openQueue(page: Page): Promise<void> {
   });
   await signInAndGoto(page, './settings', [...SCOPES, ...scopesForGroup('corp')]);
   await expect(page.locator('main')).toBeVisible();
-  await page.evaluate(
+  const seeded = await page.evaluate(
     async ({ characterId, corporationId }) => {
       // Indirected through variables so `tsc` leaves them alone: dev-server URLs,
       // not paths this spec's module graph resolves. The casts are checked
@@ -58,7 +58,7 @@ async function openQueue(page: Page): Promise<void> {
       };
       // The queue reads for the active pilot's corporation, as the story's seed sets it.
       const store = (await import(/* @vite-ignore */ urls.db)) as { db: typeof db };
-      await store.db.characters.update(characterId, { corporationId });
+      const updated = await store.db.characters.update(characterId, { corporationId });
       // The fixture speaks for the Storybook sample corp; this pilot is in another.
       const backend = srpFixture.createSrpFixture('director', 'configured');
       const verify = backend.verify;
@@ -66,23 +66,25 @@ async function openQueue(page: Page): Promise<void> {
       officer.setSrpOfficerBackendOverride(officerFixture.createSrpOfficerFixture('queue'));
       window.history.pushState(null, '', '/corp/srp/queue');
       window.dispatchEvent(new PopStateEvent('popstate'));
+      return updated;
     },
     { characterId: CHARACTER_ID, corporationId: CORPORATION_ID }
   );
+  expect(seeded, 'pilot row seeded with a corporation').toBe(1);
 }
 
-/** The table's own sideways scroller: its nearest ancestor that scrolls on x. */
-const scroller = (table: Locator) =>
+/** Fit metrics of the table's own sideways scroller: its nearest ancestor that scrolls on x. */
+const scrollerFit = (table: Locator) =>
   table.evaluate((el) => {
     let node = el.parentElement;
     while (node && !/auto|scroll/.test(getComputedStyle(node).overflowX)) {
       node = node.parentElement;
     }
-    const box = (node ?? el).getBoundingClientRect();
+    if (!node) return null;
     return {
-      scrollWidth: (node ?? el).scrollWidth,
-      clientWidth: (node ?? el).clientWidth,
-      right: box.right,
+      scrollWidth: node.scrollWidth,
+      clientWidth: node.clientWidth,
+      right: node.getBoundingClientRect().right,
     };
   });
 
@@ -92,14 +94,27 @@ for (const width of [1024, 1280]) {
     await openQueue(page);
     const table = page.locator('main table').first();
     const row = table.locator('tbody tr', { hasText: 'Varro Kestane' }).first();
-    await expect(row).toBeVisible();
+    // Measured once the hull and system names have loaded, at their real widths.
+    await expect(row).toContainText('Gila');
 
-    const fit = await scroller(table);
-    expect(fit.scrollWidth, 'table scrolls sideways').toBeLessThanOrEqual(fit.clientWidth);
+    const fit = await scrollerFit(table);
+    expect(fit, 'no sideways scroller around the table').not.toBeNull();
+    expect(fit!.scrollWidth, 'table scrolls sideways').toBeLessThanOrEqual(fit!.clientWidth);
 
-    const reject = row.getByRole('button', { name: 'Reject' });
-    const rejectBox = await reject.boundingBox();
+    const rejectBox = await row.getByRole('button', { name: 'Reject' }).boundingBox();
     expect(rejectBox).not.toBeNull();
-    expect(rejectBox!.x + rejectBox!.width).toBeLessThanOrEqual(fit.right);
+    expect(rejectBox!.x + rejectBox!.width).toBeLessThanOrEqual(fit!.right);
+
+    if (width !== 1024) return;
+    // A row with no amount to type stays one line per cell, the pilot's name unbroken.
+    const name = row.getByText('Varro Kestane', { exact: true });
+    const lineHeight = await name.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+    expect((await name.boundingBox())!.height, 'pilot name on one line').toBeLessThan(
+      lineHeight * 1.5
+    );
+    for (const tr of await table.locator('tbody tr').all()) {
+      if ((await tr.getByRole('textbox').count()) > 0) continue;
+      expect((await tr.boundingBox())!.height, await tr.innerText()).toBeLessThan(56);
+    }
   });
 }

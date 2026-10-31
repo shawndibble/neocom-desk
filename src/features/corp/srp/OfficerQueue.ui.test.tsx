@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { SrpClaim, SrpClaimOutcome } from '../srpClaimTypes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { stubViewport } from '@/test/viewport';
 
 vi.mock('./useSrpClaimNames', () => ({
   useSrpClaimNames: () => ({
@@ -23,6 +24,7 @@ const mailResult = vi.hoisted(() => vi.fn());
 vi.mock('./useSrpResultMail', () => ({ useSrpResultMail: () => mailResult }));
 
 import { OfficerQueue } from './OfficerQueue';
+import { PENDING_DEFAULT_COLUMNS, useVisiblePendingColumns } from './pendingColumns';
 import { setSrpMemberBackendOverride, type SrpMemberBackend } from './srpMemberBackend';
 import type { SrpClaimValues } from '../srpTypes';
 import type { SrpHistoryState, SrpQueueData } from './useSrpQueue';
@@ -508,5 +510,26 @@ describe('OfficerQueue Pending layout (md+)', () => {
     expect(pair.className).not.toContain('flex-wrap');
     const selectAll = screen.getByRole('button', { name: /Select all/ });
     expect(selectAll.parentElement!.className).toContain('min-h-12');
+  });
+});
+
+describe('OfficerQueue pending columns', () => {
+  afterEach(() => void useVisiblePendingColumns.getState().setValue(PENDING_DEFAULT_COLUMNS));
+
+  it('starts with Lost and Fleet or FC off, and the Columns menu turns Lost on', async () => {
+    // A desktop viewport: the table, not the phone's cards.
+    stubViewport((query) => !query.includes('max-width'));
+    setup(pendingSet());
+    const table = screen.getByRole('table');
+    expect(within(table).getByRole('columnheader', { name: 'Hull' })).toBeInTheDocument();
+    expect(within(table).queryByRole('columnheader', { name: 'Lost' })).toBeNull();
+    expect(within(table).queryByRole('columnheader', { name: 'Fleet or FC' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Lost' }));
+    await userEvent.keyboard('{Escape}');
+    expect(
+      await within(screen.getByRole('table')).findByRole('columnheader', { name: 'Lost' })
+    ).toBeInTheDocument();
   });
 });
