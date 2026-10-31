@@ -1,7 +1,8 @@
 /**
  * Select all / Select none and the count-labelled bulk button (DESIGN.md §6c Bulk selection) for
  * a claim list. From `sm` up it is one row above the table; on a phone Select all stays in the
- * list and the bar that appears once a row is ticked pins above the tab bar.
+ * list and the bar that appears once a row is ticked pins above the tab bar. The row reserves the
+ * height of its button (`pt-3` + an `h-9` control) so ticking the first row never moves the table.
  */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -63,7 +64,7 @@ export function SrpBulkBar({
     );
   }
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 pt-3">
+    <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 px-3 pt-3">
       <button type="button" className={textActionClassName()} onClick={onSelectAll}>
         {t('srp.officer.bulk.selectAll', { count: selectable })}
       </button>
