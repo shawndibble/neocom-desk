@@ -14,9 +14,12 @@ import {
 } from '@/components/ui';
 import { utcDay } from '@/engine/localDay';
 import { GOAL_MAX_TARGET, goalProgress, iskWaiting, walletChange } from '@/engine/netWorth/waiting';
+import { cx } from '@/lib/cx';
 import { formatIsk, parseIskAmount } from '@/lib/isk';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { openOrdersHref } from '@/features/market/openOrdersFilter';
 import { useNetWorthData } from './useNetWorthData';
+import { useSellOrderHealth } from './useSellOrderHealth';
 import { useWalletGoal } from './walletGoalSetting';
 
 interface WalletWaitingGoalProps {
@@ -33,6 +36,7 @@ export function WalletWaitingGoal({ characterIds }: WalletWaitingGoalProps) {
   const goal = useWalletGoal((s) => s.value);
   const setGoal = useWalletGoal((s) => s.setValue);
   useHydratedStore(useWalletGoal);
+  const health = useSellOrderHealth(characterIds);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
@@ -90,6 +94,39 @@ export function WalletWaitingGoal({ characterIds }: WalletWaitingGoalProps) {
               </li>
             ))}
           </ul>
+          {health && health.total.orders > 0 && (
+            <div className="mt-3 border-t border-line pt-3 text-sm">
+              <Eyebrow>
+                {t('wallet.waiting.healthTitle')}: {formatIsk(health.total.isk)} ISK
+              </Eyebrow>
+              <ul className="mt-1 space-y-1">
+                {(['healthy', 'needsYou', 'watch', 'notChecked'] as const)
+                  .filter((key) => health[key].orders > 0)
+                  .map((key) => (
+                    <li key={key} className="flex justify-between gap-3">
+                      <span>
+                        {t(`wallet.waiting.health.${key}`)}{' '}
+                        <span className="text-text-dim">
+                          {t('wallet.waiting.orderCount', { count: health[key].orders })}
+                        </span>
+                      </span>
+                      <span className="tabular-nums">{formatIsk(health[key].isk)} ISK</span>
+                    </li>
+                  ))}
+              </ul>
+              {health.needsYou.orders > 0 && (
+                <Link
+                  to={openOrdersHref({
+                    characterIds: characterIds.length > 0 ? [...characterIds] : undefined,
+                    workThrough: true,
+                  })}
+                  className={cx(textActionClassName(), 'mt-2')}
+                >
+                  {t('wallet.waiting.fixOrders')}
+                </Link>
+              )}
+            </div>
+          )}
           {change !== null && (
             <p className="mt-3 flex flex-wrap items-baseline justify-between gap-2 text-sm">
               <span className="text-text-dim">
