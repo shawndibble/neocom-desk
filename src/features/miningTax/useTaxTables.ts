@@ -1,12 +1,14 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTableExport } from '@/components/ui/useTableExport';
+import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useUrlSort } from '@/lib/useUrlState';
 import type { DisplayRow } from '@/features/miningTax/groupRows';
 import { statusColumnWidthClass } from '@/features/miningTax/statusColumnWidth';
 import { taxCsvColumns } from '@/features/miningTax/taxCsv';
 import { dateLabel, taxOwedOf } from '@/features/miningTax/taxRowFormat';
 import { statusLabel, useTaxColumns } from '@/features/miningTax/useTaxColumns';
+import { TAX_COLUMN_IDS, useVisibleTaxColumns } from './taxColumns';
 import { TAX_DEFAULT_SORT } from './useTaxUrlFilters';
 
 type TaxColumnsInput = Parameters<typeof useTaxColumns>[0];
@@ -60,8 +62,10 @@ export function useTaxTables({
     [visibleRows, corpStateLabel, t]
   );
 
-  const { baseColumns, openColumns, historyColumns } = useTaxColumns({
+  const { visible: visibleColumns } = useColumnVisibility(useVisibleTaxColumns, TAX_COLUMN_IDS);
+  const { allColumns, openColumns, historyColumns } = useTaxColumns({
     ...columnInput,
+    visibleColumns,
     showCharacterColumn,
     estimatedValueOf,
     systemName,
@@ -70,16 +74,10 @@ export function useTaxTables({
     statusWidthClass,
   });
 
-  const taxSort = useUrlSort(
-    'tax.sort',
-    TAX_DEFAULT_SORT,
-    openColumns.map((c) => c.id)
-  );
-  const historySort = useUrlSort(
-    'tax.historySort',
-    TAX_DEFAULT_SORT,
-    baseColumns.map((c) => c.id)
-  );
+  // Validated against every column on offer, so a sort on an unticked one survives.
+  const sortableIds = allColumns.map((c) => c.id);
+  const taxSort = useUrlSort('tax.sort', TAX_DEFAULT_SORT, sortableIds);
+  const historySort = useUrlSort('tax.historySort', TAX_DEFAULT_SORT, sortableIds);
 
   // The table's own cell helpers, so the export reads each row exactly as it
   // is shown.
@@ -108,5 +106,13 @@ export function useTaxTables({
     source: 'sorted-rows',
   });
 
-  return { showCharacterColumn, openColumns, historyColumns, taxSort, historySort, taxExport };
+  return {
+    showCharacterColumn,
+    allColumns,
+    openColumns,
+    historyColumns,
+    taxSort,
+    historySort,
+    taxExport,
+  };
 }

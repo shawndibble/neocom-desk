@@ -21,6 +21,7 @@ import { extractionDetail, type ExtractionRow } from '@/engine/corpTaxBook/bookV
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useBook } from './useBook';
 import { ReasonDialog } from './BookDialogs';
+import { FILTER_STATES } from './extractionStates';
 import { FullyMinedPanel } from './FullyMinedPanel';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { dateTimeUtc, extractionWindowLabel, isk, periodLabel } from './moonsFormat';
@@ -117,11 +118,16 @@ export function MoonDetail({ id }: { id: string }) {
       id: 'fractured',
       header: t('corpTaxBook.moons.cols.fractured'),
       render: (r) => (r.fracturedAt ? dateTimeUtc(r.fracturedAt) : '—'),
+      sortValue: (r) => r.fracturedAt,
+      sortFirst: 'desc',
     },
     {
       id: 'state',
       header: t('corpTaxBook.moons.cols.state'),
       render: (r) => <StateWord state={r.state} />,
+      // What is minable first, the order the Extractions list uses.
+      sortValue: (r) => FILTER_STATES.indexOf(r.state),
+      sortFirst: 'asc',
     },
     {
       id: 'est',
@@ -129,6 +135,7 @@ export function MoonDetail({ id }: { id: string }) {
       align: 'right',
       className: 'tabular-nums',
       render: (r) => (r.estimatedValue ? isk(r.estimatedValue) : '—'),
+      sortValue: (r) => r.estimatedValue ?? 0,
     },
     {
       id: 'mined',
@@ -136,6 +143,7 @@ export function MoonDetail({ id }: { id: string }) {
       align: 'right',
       className: 'tabular-nums',
       render: (r) => (r.minedPct === null ? '—' : `${r.minedPct}%`),
+      sortValue: (r) => r.minedPct ?? undefined,
     },
     {
       id: 'tax',
@@ -144,6 +152,7 @@ export function MoonDetail({ id }: { id: string }) {
       className: 'tabular-nums',
       cardCorner: true,
       render: (r) => isk(r.tax),
+      sortValue: (r) => r.tax,
     },
     {
       id: 'miners',
@@ -151,6 +160,7 @@ export function MoonDetail({ id }: { id: string }) {
       align: 'right',
       className: 'tabular-nums',
       render: (r) => r.minerCount,
+      sortValue: (r) => r.minerCount,
     },
   ];
   return (
@@ -291,6 +301,7 @@ export function MoonDetail({ id }: { id: string }) {
         noun={t('corpTaxBook.moons.sections.nouns.cycles')}
         empty={t('corpTaxBook.moons.moon.noOtherCycles')}
         rows={detail.otherCycles}
+        sortColumns={cycleColumns}
         meta={
           <span className="text-xs text-text-dim">
             {t('corpTaxBook.moons.moon.pastHint')}
@@ -310,7 +321,8 @@ export function MoonDetail({ id }: { id: string }) {
       >
         {(shown, table) => (
           <DataTable
-            stacked={table.stacked}
+            {...table}
+            mobileSort
             label={t('corpTaxBook.moons.moon.past')}
             columns={[...cycleColumns, ...(table.stacked ? [] : [caretColumn<ExtractionRow>()])]}
             rows={[...shown]}

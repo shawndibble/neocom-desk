@@ -4,6 +4,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Panel } from '@/components/ui/Panel';
 import type { BookRowView, PersonalOverlay } from '@/engine/corpTaxBook/personal';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { TAX_COLUMN_IDS } from '../taxColumns';
 import { useTaxColumns } from '../useTaxColumns';
 import { buildDisplayRows } from './corpRows';
 import { useCorpStateLabel } from './useCorpStateText';
@@ -86,6 +87,7 @@ function MinerLines() {
     showValueColumn: true,
     showCharacterColumn: false,
     showSelectColumn: false,
+    visibleColumns: TAX_COLUMN_IDS,
     typeNames: new Map([[ZEO, 'Zeolites']]),
     systemSecurity: new Map([[30003838, -0.1]]),
     selection: new Set(),

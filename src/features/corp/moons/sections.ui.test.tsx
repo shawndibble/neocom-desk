@@ -79,6 +79,13 @@ describe('Miner page', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
+  it('sorts the Payments ledger by When, From, Amount and Credited to', () => {
+    renderBook(<MinerDetail id={VARRO_ID} />);
+    const payments = screen.getByRole('table', { name: 'Payments' });
+    for (const name of [/^When/, /^From/, /^Amount/, /^Credited to/])
+      expect(within(payments).getByRole('button', { name })).toBeInTheDocument();
+  });
+
   it('keeps the characters panel reachable from the header', async () => {
     renderBook(<MinerDetail id={VARRO_ID} />);
     await userEvent.click(screen.getByRole('button', { name: '2 characters' }));

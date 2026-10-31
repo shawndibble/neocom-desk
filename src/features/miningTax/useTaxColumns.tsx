@@ -32,6 +32,7 @@ import type { CorpRowInfo } from '@/features/miningTax/corpBook/corpRows';
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
 import { OreIcon } from './OreIcon';
 import { formatCount } from '@/lib/formatCount';
+import type { TaxColumnId } from './taxColumns';
 
 /** The tick-box column (and History's matching spacer): little room left of the box, the date cell's own padding as the gap after it. */
 const SELECT_COLUMN_CLASS = 'w-9 pl-2 pr-0';
@@ -57,6 +58,8 @@ interface UseTaxColumnsInput {
   showValueColumn: boolean;
   showCharacterColumn: boolean;
   showSelectColumn: boolean;
+  /** The optional columns the pilot has ticked; Date always shows. */
+  visibleColumns: readonly TaxColumnId[];
   typeNames: ReadonlyMap<number, string> | undefined;
   systemSecurity: ReadonlyMap<number, number> | undefined;
   selection: ReadonlySet<string>;
@@ -72,7 +75,8 @@ interface UseTaxColumnsInput {
 }
 
 /**
- * The Open and History tables' column sets. `baseColumns` is what both share;
+ * The Open and History tables' column sets. `allColumns` is every column on
+ * offer at this width, `baseColumns` the ticked ones both tables share;
  * Open adds the select column, History an equal-width spacer so the two
  * fixed-layout tables line up. Memoised on what the cells actually read, so a
  * toast or dialog change hands the tables the very same arrays.
@@ -83,6 +87,7 @@ export function useTaxColumns({
   showValueColumn,
   showCharacterColumn,
   showSelectColumn,
+  visibleColumns,
   typeNames,
   systemSecurity,
   selection,
@@ -196,7 +201,7 @@ export function useTaxColumns({
       sortValue: (dr) => estimatedValueOf(dr),
     };
 
-    const baseColumns: DataTableColumn<DisplayRow>[] = [
+    const allColumns: DataTableColumn<DisplayRow>[] = [
       ...(showCharacterColumn
         ? [
             {
@@ -352,6 +357,10 @@ export function useTaxColumns({
       },
     ];
 
+    const baseColumns = allColumns.filter(
+      (column) => column.id === 'date' || visibleColumns.includes(column.id as TaxColumnId)
+    );
+
     const openColumns: DataTableColumn<DisplayRow>[] = [
       ...(showSelectColumn
         ? [
@@ -399,7 +408,7 @@ export function useTaxColumns({
         : []),
       ...baseColumns,
     ];
-    return { baseColumns, openColumns, historyColumns };
+    return { allColumns, baseColumns, openColumns, historyColumns };
   }, [
     t,
     isPhone,
@@ -407,6 +416,7 @@ export function useTaxColumns({
     showValueColumn,
     showCharacterColumn,
     showSelectColumn,
+    visibleColumns,
     typeNames,
     systemSecurity,
     selection,
