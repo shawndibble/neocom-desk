@@ -3,7 +3,7 @@
  * claim tables with their per-row and bulk actions, the claim detail and the activity feed. Pure
  * view of what `useSrpQueue` loaded; every change goes through its callables and reloads.
  */
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
@@ -17,9 +17,12 @@ import {
   Spinner,
   Tabs,
   Toast,
+  useTabPanelProps,
+  useTabsId,
   type DataTableColumn,
 } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { cx } from '@/lib/cx';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -69,7 +72,7 @@ function claimRowHasMenu(claim: SrpClaim): boolean {
 export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready }) {
   const { t } = useTranslation();
   const phone = useIsPhone();
-  const tabsId = useId();
+  const tabsId = useTabsId();
   const panelRef = useRef<HTMLDivElement>(null);
   const zone = useTimeZone();
   const names = useSrpClaimNames();
@@ -109,6 +112,20 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
   useEffect(() => {
     if (tab === 'history' && history.status === 'idle') loadHistory();
   }, [tab, history.status, loadHistory]);
+
+  // The phone's SegmentedControl has no tab to name a tabpanel; the queue still animates.
+  const {
+    ref: fadeRef,
+    className: panelRing,
+    ...panelAttrs
+  } = useTabPanelProps(phone ? null : tabsId, tab);
+  const setPanel = useCallback(
+    (node: HTMLDivElement | null) => {
+      panelRef.current = node;
+      fadeRef(node);
+    },
+    [fadeRef]
+  );
 
   const changeTab = (next: QueueTab) => {
     setTab(next);
@@ -317,7 +334,12 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
         />
       )}
       <Panel title={t(`srp.officer.title.${tab}`)} padded={false}>
-        <div ref={panelRef} tabIndex={-1} className="grid gap-3 outline-none">
+        <div
+          ref={setPanel}
+          tabIndex={-1}
+          {...panelAttrs}
+          className={cx('grid gap-3 outline-none', panelRing)}
+        >
           {tab !== 'history' && (
             <SrpBulkBar
               selected={ticked.length}
