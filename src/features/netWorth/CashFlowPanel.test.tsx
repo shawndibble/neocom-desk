@@ -55,24 +55,21 @@ const renderPanel = () =>
 beforeEach(() => vi.clearAllMocks());
 
 describe('CashFlowPanel', () => {
-  it('shows earned, spent and net for 30 days, and a Journal link', async () => {
+  it('shows earned, spent and net for 30 days, with no unit after the figures', async () => {
     load([line(0, 1000), line(3, -250), line(40, 500), line(55, 800)]);
     renderPanel();
-    expect(await screen.findByText('1,000 ISK')).toBeInTheDocument();
-    expect(screen.getByText('250 ISK')).toBeInTheDocument();
+    expect(await screen.findByText('1,000')).toBeInTheDocument();
+    expect(screen.getByText('250')).toBeInTheDocument();
     expect(screen.getByText(/\+750/)).toBeInTheDocument();
     expect(await screen.findByTestId('bars')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open Journal' })).toHaveAttribute(
-      'href',
-      '/wallet/journal'
-    );
+    expect(screen.queryByRole('link', { name: 'Open Journal' })).not.toBeInTheDocument();
   });
 
   it('compares with the 30 days before when the history reaches that far', async () => {
     load([line(0, 1500), line(40, 1000), line(59, 0)]);
     renderPanel();
     expect(
-      await screen.findByText(/Earned is \+50% on the 30 days before \(1,000 ISK\)/)
+      await screen.findByText(/Earned is \+50% on the 30 days before \(1,000\)/)
     ).toBeInTheDocument();
   });
 
@@ -80,10 +77,10 @@ describe('CashFlowPanel', () => {
     load([line(0, 1000), line(10, 4000)]);
     const user = userEvent.setup();
     renderPanel();
-    expect(await screen.findByText('5,000 ISK')).toBeInTheDocument();
+    expect(await screen.findByText('5,000')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '7d' }));
-    expect(screen.getByText('1,000 ISK')).toBeInTheDocument();
-    expect(screen.queryByText('5,000 ISK')).not.toBeInTheDocument();
+    expect(screen.getByText('1,000')).toBeInTheDocument();
+    expect(screen.queryByText('5,000')).not.toBeInTheDocument();
   });
 
   it('says when the history starts inside the period', async () => {
@@ -101,6 +98,6 @@ describe('CashFlowPanel', () => {
     renderPanel();
     await vi.waitFor(() => expect(loadAllCharactersJournals).toHaveBeenCalled());
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(screen.queryByRole('heading', { name: 'Cash flow' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'ISK flow' })).not.toBeInTheDocument();
   });
 });

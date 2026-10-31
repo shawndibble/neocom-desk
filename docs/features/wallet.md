@@ -11,7 +11,7 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 | `transactions` alias tab                 | `pageTabs.ts:90-94`, `Wallet.tsx:522`     | not a tab; redirects to `/market/history`                                                                              |
 | Cross-character balance (`?char=`)       | `Wallet.tsx:570`                          | per-Character table + total, picker, CSV/XLSX/clipboard export                                                         |
 | Net worth chart                          | `features/netWorth/NetWorthPanel.tsx`     | lazy Recharts stack (one Character) or lines (several), layer legend, drill                                            |
-| Cash flow                                | `features/netWorth/CashFlowPanel.tsx`     | earned, spent, net, per day, daily bars for 7/30/90 days; day opens the Journal                                        |
+| ISK flow                                 | `features/netWorth/CashFlowPanel.tsx`     | earned, spent, net, per day, daily bars for 7/30/90 days; day opens the Journal                                        |
 | ISK waiting and Goal                     | `features/netWorth/WalletWaitingGoal.tsx` | sell orders, buy escrow, contracts from the newest Net Worth Snapshot; one device-local wallet Goal with pace and date |
 | LP Store picker                          | `features/loyalty/LpStorePicker.tsx`      | select-box over every NPC corp with an LP Store; no longer mounted since Balance dropped its LP panel                  |
 | Journal filters                          | `WalletJournalTable.tsx`                  | ref type, date range, free text; filtered count + net total; ref-type breakdown (in/out/net, row click filters)        |
@@ -120,9 +120,9 @@ Replaces the old journal balance-history chart. Maths in `src/engine/netWorth/` 
 - **Export:** surface `wallet-balances`; columns Character, one per layer, Net worth of the shown layers; blank (not 0) for an excluded Character.
 - Sync status is the shell-wide `SyncStatusDot` / `SyncErrorNote`; the panel adds no control.
 
-### Cash flow panel (`features/netWorth/CashFlowPanel.tsx`)
+### ISK flow panel (`features/netWorth/CashFlowPanel.tsx`)
 
-- Above ISK waiting on Balance: earned, spent, net and average per day over 7, 30 or 90 UTC days (`cashFlow`, `engine/netWorth/waiting` sibling `cashFlow.ts`), the earned change against the period before (only when the journal history reaches that far back), and the Journal's own daily bars (`IskFlowChartBars`). A day on the bars opens the Journal on that day.
+- Above ISK waiting on Balance: earned, spent, net and average per day over 7, 30 or 90 UTC days (`cashFlow`, `engine/netWorth/waiting` sibling `cashFlow.ts`), the earned change against the period before (only when the journal history reaches that far back), and the Journal's own daily bars (`IskFlowChartBars`). A day on the bars opens the Journal on that day (no separate Journal link). Figures are full ISK with no unit after them; the other Balance panels use shorthand (`IskAmount`).
 - Reads the picked, drilled or active Characters' cached journals (`loadAllCharactersJournals`); transfers between the pilot's own Characters are left out. A period the history only partly covers says so. By-source breakdown stays on the Journal tab.
 
 ### ISK waiting and Goal panels (`features/netWorth/WalletWaitingGoal.tsx`)
@@ -130,7 +130,7 @@ Replaces the old journal balance-history chart. Maths in `src/engine/netWorth/` 
 - Replaced the Loyalty Points table on Balance: the LP Store tab lists LP, so Balance shows money instead. Both panels read stored Net Worth Snapshots for the picked, drilled or active Characters, and use only Characters whose newest snapshot is under a week old. The sell-orders health split below is the exception: it reads the Open Orders snapshot (live orders and station prices, cache key `market:open-orders`, shared with the Orders page and the Overview card).
 - **ISK waiting**: sell-order stock, buy-order escrow, contracts (`iskWaiting`, `engine/netWorth/waiting.ts`), the wallet change over 30 days, and an "Open Journal" link.
 - **Sell orders now, live prices**: sell-order ISK split Fine / Needs you / Watch / Not checked by `sellOrderHealth` (`features/market/orderHealthSplit.ts`), the Orders page's own urgency. Rows come from `openOrderRowsFromSnapshot` (station prices and standings only), so an order can read healthier here than on Orders; structure orders read Not checked. "Fix in Open Orders" links the work-through when any order Needs you.
-- **Goal**: one name and ISK target in a dialog (`walletGoal`, device-local, not synced, capped at 1e15). Progress is summed wallet ISK; pace is wallet gain per day over the last 30 days (needs 7+ days of snapshots); the date follows (`goalProgress`).
+- **Goals** (`WalletGoalsPanel.tsx`, `walletGoalSetting.ts`): any number of Goals, device-local and not synced (key `walletGoal`, which also reads the old single Goal). Each is a name and either a typed target (`IskInput`, capped at 1e15) or, with the target left blank, a Fitting whose sell price at the default Trade Hub is the target (`useGoalPrices`, so it follows the market). Progress is summed wallet ISK; each row reads `30 day avg: <shorthand> ISK` and `ETA: <date>` from the last 30 days of snapshots (needs 7+ days).
 - The loyalty reauth banner left with the table: EverMarks reads "unknown" when the loyalty scope is missing.
 
 ### LP Store picker (`features/loyalty/LpStorePicker.tsx`)
