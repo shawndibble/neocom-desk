@@ -10,18 +10,18 @@ import { DataTableDenseCell, IskAmount, type DataTableColumn } from '@/component
 import { COL_ISK } from '@/components/ui/dataTableWidths';
 import { HintText } from '@/components/ui/HintText';
 import { concordRate, iskPerConcordLp } from '@/engine/loyalty/concordExchange';
+import { lpRate } from '@/engine/loyalty/marketLpValue';
+import { cx } from '@/lib/cx';
 import { fixed1 } from '@/lib/fixedFormat';
 import { formatCount } from '@/lib/formatCount';
 import type { LpLandingOfferColumnId, LpLandingStoreColumnId } from './loyaltyStoreColumns';
 import type { LpLandingOffer, LpLandingStore } from './lpLanding';
-import { iskPerLpTone } from './offerRowDisplay';
-import { FactionWarfareTag, Nearest } from './LpLandingCells';
+import { LoyaltyOfferItemCell } from './OfferDetail';
+import { formatSellsPerDay, iskPerLpTone } from './offerRowDisplay';
+import { FactionWarfareTag, NearestStationCell } from './LpLandingCells';
 
 const CAPTION = 'text-[0.6875rem] text-text-dim';
-
-function sellsPerDayText(value: number): string {
-  return value < 10 ? fixed1(value) : formatCount(value);
-}
+const RANK_FIGURE = 'font-semibold tabular-nums';
 
 export function useLpLandingStoreColumns({
   systemName,
@@ -29,6 +29,7 @@ export function useLpLandingStoreColumns({
   distancesKnown,
   pricing,
   valuing,
+  ownLpValue,
 }: {
   systemName: (systemId: number) => string | null;
   factionName: (factionId: number) => string | null;
@@ -38,6 +39,8 @@ export function useLpLandingStoreColumns({
   pricing: boolean;
   /** LP Values are still being worked out. */
   valuing: boolean;
+  /** The pilot's own LP Value (0 = each store's), so a balance's worth matches the summary's. */
+  ownLpValue: number;
 }) {
   const { t } = useTranslation();
   return useMemo(() => {
@@ -45,20 +48,22 @@ export function useLpLandingStoreColumns({
       id: 'store',
       header: t('loyaltyStore.landing.colStore'),
       primary: true,
-      minWidth: '14rem',
+      minWidth: '13rem',
       sortValue: (row) => row.name,
-      render: (row) => (
-        <span className="flex flex-col">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="text-accent">{row.name}</span>
-            {row.factionWarfare && <FactionWarfareTag />}
+      render: (row) => {
+        // An unread faction list leaves the caption blank rather than saying "No faction".
+        const faction =
+          row.factionId === null ? t('loyaltyStore.landing.noFaction') : factionName(row.factionId);
+        return (
+          <span className="flex flex-col">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="text-accent">{row.name}</span>
+              {row.factionWarfare && <FactionWarfareTag />}
+            </span>
+            {faction && <span className={cx(CAPTION, 'max-sm:hidden')}>{faction}</span>}
           </span>
-          <span className={`${CAPTION} max-sm:hidden`}>
-            {(row.factionId !== null ? factionName(row.factionId) : null) ??
-              t('loyaltyStore.landing.noFaction')}
-          </span>
-        </span>
-      ),
+        );
+      },
     };
     const lpValue: DataTableColumn<LpLandingStore> = {
       id: 'lpValue',
@@ -70,7 +75,7 @@ export function useLpLandingStoreColumns({
       cardCorner: true,
       sortValue: (row) => row.lpValue ?? undefined,
       sortFirst: 'desc',
-      cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(row.lpValue)}`,
+      cellClassName: (row) => cx(RANK_FIGURE, iskPerLpTone(row.lpValue)),
       render: (row) => {
         if (row.lpValue !== null) return formatCount(Math.round(row.lpValue));
         return valuing ? '…' : '—';
@@ -87,28 +92,33 @@ export function useLpLandingStoreColumns({
         sortFirst: 'desc',
         cellClassName: () => 'tabular-nums',
         stackAffix: { after: t('loyaltyStore.landing.lpSuffix') },
-        render: (row) =>
-          row.yourLp === null ? (
-            <span className="text-text-dim" data-dense-omit>
-              —
-            </span>
-          ) : (
+        render: (row) => {
+          if (row.yourLp === null) {
+            return (
+              <span className="text-text-dim" data-dense-omit>
+                —
+              </span>
+            );
+          }
+          const { rate } = lpRate(ownLpValue, row.lpValue);
+          return (
             <DataTableDenseCell>
               <span className="inline-flex flex-col items-start sm:items-end">
                 <span>{formatCount(row.yourLp)}</span>
-                {row.lpValue !== null && (
-                  <span className={`${CAPTION} max-sm:hidden`}>
-                    ≈ <IskAmount value={row.yourLp * row.lpValue} decimals={0} />
+                {rate !== null && (
+                  <span className={cx(CAPTION, 'max-sm:hidden')}>
+                    ≈ <IskAmount value={row.yourLp * rate} decimals={0} />
                   </span>
                 )}
               </span>
             </DataTableDenseCell>
-          ),
+          );
+        },
       },
       bestOffer: {
         id: 'bestOffer',
         header: t('loyaltyStore.landing.colBestOffer'),
-        minWidth: '14rem',
+        minWidth: '13rem',
         sortValue: (row) => row.best?.row.profit.iskPerLp ?? undefined,
         sortFirst: 'desc',
         stackAffix: { before: t('loyaltyStore.landing.bestPrefix') },
@@ -126,12 +136,12 @@ export function useLpLandingStoreColumns({
           return (
             <span className="inline-flex flex-col">
               <span>{itemName}</span>
-              <span className={`${CAPTION} max-sm:hidden`}>
+              <span className={cx(CAPTION, 'max-sm:hidden')}>
                 {sellsPerDay === null
                   ? t('loyaltyStore.landing.bestOfferMetaNoVolume', { iskPerLp })
                   : t('loyaltyStore.landing.bestOfferMeta', {
                       iskPerLp,
-                      sells: sellsPerDayText(sellsPerDay),
+                      sells: formatSellsPerDay(sellsPerDay),
                     })}
               </span>
             </span>
@@ -157,11 +167,9 @@ export function useLpLandingStoreColumns({
         headerClassName: 'whitespace-nowrap',
         sortValue: (row) => concordValue(row) ?? undefined,
         sortFirst: 'desc',
-        cellClassName: (row) => `tabular-nums ${iskPerLpTone(concordValue(row))}`,
+        cellClassName: (row) => cx('tabular-nums', iskPerLpTone(concordValue(row))),
         render: (row) => {
-          if (
-            concordRate({ id: row.corporationId, factionId: row.factionId ?? undefined }) === null
-          ) {
+          if (concordRateOf(row) === null) {
             return <span className="text-text-dim">{t('loyaltyStore.noConcordExchange')}</span>;
           }
           const value = concordValue(row);
@@ -173,28 +181,39 @@ export function useLpLandingStoreColumns({
         header: t('loyaltyStore.landing.colNearest'),
         align: 'right',
         width: '16ch',
+        // Nearest first on the first click (DESIGN.md: a distance sorts ascending).
         sortValue: (row) => row.nearest?.jumps,
-        render: (row) =>
-          row.nearest !== null ? (
-            <Nearest store={row} systemName={systemName} align="end" />
-          ) : distancesKnown ? (
+        sortFirst: 'asc',
+        render: (row) => {
+          if (row.nearest !== null) {
+            return <NearestStationCell nearest={row.nearest} systemName={systemName} align="end" />;
+          }
+          if (!distancesKnown) {
+            return (
+              <span className="text-text-dim" data-dense-omit>
+                —
+              </span>
+            );
+          }
+          return (
             <HintText content={t('loyaltyStore.landing.noRouteHelp')} className="text-text-dim">
               {t('loyaltyStore.landing.noRoute')}
             </HintText>
-          ) : (
-            <span className="text-text-dim" data-dense-omit>
-              —
-            </span>
-          ),
+          );
+        },
       },
     };
     return { fixed: [store, lpValue] as const, optional };
-  }, [t, systemName, factionName, distancesKnown, pricing, valuing]);
+  }, [t, systemName, factionName, distancesKnown, pricing, valuing, ownLpValue]);
+}
+
+function concordRateOf(row: LpLandingStore) {
+  return concordRate({ id: row.corporationId, factionId: row.factionId ?? undefined });
 }
 
 /** The store's LP Value per CONCORD LP; null with no exchange or no LP Value. */
 function concordValue(row: LpLandingStore): number | null {
-  const rate = concordRate({ id: row.corporationId, factionId: row.factionId ?? undefined });
+  const rate = concordRateOf(row);
   return rate === null ? null : iskPerConcordLp(row.lpValue, rate.rate);
 }
 
@@ -209,24 +228,9 @@ export function useLpLandingOfferColumns({
       id: 'item',
       header: t('loyaltyStore.colItem'),
       primary: true,
-      minWidth: '14rem',
+      minWidth: '13rem',
       sortValue: (offer) => offer.row.itemName,
-      render: ({ row }) => (
-        <span className="flex flex-col">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="text-accent">{row.itemName}</span>
-            {row.isBlueprint && (
-              <span className="shrink-0 px-1 text-[0.6875rem] font-bold tracking-widest whitespace-nowrap text-warning uppercase">
-                BP
-              </span>
-            )}
-          </span>
-          <span className={CAPTION}>
-            {formatCount(row.offer.lp_cost)} LP +{' '}
-            <IskAmount value={row.offer.isk_cost} decimals={0} />
-          </span>
-        </span>
-      ),
+      render: ({ row }) => <LoyaltyOfferItemCell row={row} />,
     };
     const iskPerLp: DataTableColumn<LpLandingOffer> = {
       id: 'iskPerLp',
@@ -237,8 +241,7 @@ export function useLpLandingOfferColumns({
       cardCorner: true,
       sortValue: (offer) => offer.row.profit.iskPerLp ?? undefined,
       sortFirst: 'desc',
-      cellClassName: (offer) =>
-        `font-semibold tabular-nums ${iskPerLpTone(offer.row.profit.iskPerLp)}`,
+      cellClassName: (offer) => cx(RANK_FIGURE, iskPerLpTone(offer.row.profit.iskPerLp)),
       render: (offer) =>
         offer.row.profit.iskPerLp === null ? '—' : fixed1(offer.row.profit.iskPerLp),
     };
@@ -246,38 +249,27 @@ export function useLpLandingOfferColumns({
       store: {
         id: 'store',
         header: t('loyaltyStore.landing.colStore'),
-        minWidth: '12rem',
-        // Nearest first: sorted by Store, a searched item lists its closest seller on top.
+        minWidth: '11rem',
+        // By distance, nearest first: a searched item lists its closest seller on top.
         sortValue: (offer) => offer.store.nearest?.jumps,
-        render: ({ store }) => {
-          const system = store.nearest ? systemName(store.nearest.systemId) : null;
-          return (
-            <DataTableDenseCell>
-              <span className="flex flex-col">
-                <span className="inline-flex items-center gap-1.5">
-                  {store.name}
-                  {store.factionWarfare && <FactionWarfareTag />}
-                </span>
-                {store.nearest !== null && (
-                  <span className={`${CAPTION} max-sm:hidden`}>
-                    {system ?? `#${store.nearest.systemId}`} ·{' '}
-                    {t('loyaltyStore.landing.jumps', { count: store.nearest.jumps })}
-                  </span>
-                )}
-              </span>
-              {store.nearest !== null && (
-                <span className="sm:hidden">
-                  {t('loyaltyStore.landing.jumpsShort', { count: store.nearest.jumps })}
-                </span>
-              )}
-            </DataTableDenseCell>
-          );
-        },
+        sortFirst: 'asc',
+        render: ({ store }) => (
+          <NearestStationCell
+            nearest={store.nearest}
+            systemName={systemName}
+            label={
+              <>
+                {store.name}
+                {store.factionWarfare && <FactionWarfareTag />}
+              </>
+            }
+          />
+        ),
       },
       turnIns: {
         id: 'turnIns',
         header: t('loyaltyStore.landing.colTurnIns'),
-        width: '11ch',
+        width: '10ch',
         headerClassName: 'whitespace-nowrap',
         sortValue: (offer) => offer.row.requiredItems.length,
         stackAffix: { before: t('loyaltyStore.landing.turnInsPrefix') },
@@ -300,7 +292,7 @@ export function useLpLandingOfferColumns({
         id: 'sellsPerDay',
         header: t('loyaltyStore.colSellsPerDay'),
         align: 'right',
-        width: '12ch',
+        width: '11ch',
         headerClassName: 'whitespace-nowrap',
         // Unavailable sorts last, apart from a real zero.
         sortValue: (offer) => offer.row.sellsPerDay ?? undefined,
@@ -310,7 +302,7 @@ export function useLpLandingOfferColumns({
         render: ({ row }) => {
           if (row.sellsPerDay === null) return <span data-dense-omit>—</span>;
           if (row.sellsPerDay === 0) return t('loyaltyStore.sellsNone');
-          return sellsPerDayText(row.sellsPerDay);
+          return formatSellsPerDay(row.sellsPerDay);
         },
       },
       profit: {

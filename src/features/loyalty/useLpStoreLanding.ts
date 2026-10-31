@@ -109,7 +109,15 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     clear: clearCatalogFailure,
   } = useRetryableLoad();
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
-  const [skills, setSkills] = useState<SkillLevels>({});
+  // Keyed like the balances: a switch never prices with the previous Character's skills.
+  const [skillsFor, setSkillsFor] = useState<{ characterId: number | null; skills: SkillLevels }>({
+    characterId: activeCharacterId,
+    skills: {},
+  });
+  if (skillsFor.characterId !== activeCharacterId) {
+    setSkillsFor({ characterId: activeCharacterId, skills: {} });
+  }
+  const skills = skillsFor.skills;
 
   useEffect(() => {
     let cancelled = false;
@@ -139,10 +147,12 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     void loadFactions().then((list) => {
       if (!cancelled) setFactionList(list);
     });
-    void loadSolarSystemsById().then((byId) => {
-      if (cancelled || !byId) return;
-      setSystemNames(new Map([...byId].map(([id, entry]) => [id, entry.name])));
-    });
+    void loadSolarSystemsById()
+      .then((byId) => {
+        if (cancelled || !byId) return;
+        setSystemNames(new Map([...byId].map(([id, entry]) => [id, entry.name])));
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -213,14 +223,15 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
   useEffect(() => {
     if (activeCharacterId === null) return;
     let cancelled = false;
-    void loadCorrectedSkills(activeCharacterId, Date.now(), { skipQueueWithoutScope: true }).then(
-      (corrected) => {
+    // Unread skills price at untrained, the same as no Character.
+    void loadCorrectedSkills(activeCharacterId, Date.now(), { skipQueueWithoutScope: true })
+      .then((corrected) => {
         if (cancelled) return;
         const map: SkillLevels = {};
         for (const [skillId, trained] of corrected.trained) map[skillId] = trained.level;
-        setSkills(map);
-      }
-    );
+        setSkillsFor({ characterId: activeCharacterId, skills: map });
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -257,9 +268,14 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
   useEffect(() => {
     if (!active || allOffers.length === 0) return;
     let cancelled = false;
-    void loadTypeNames(collectNameableTypeIds(allOffers)).then((names) => {
-      if (!cancelled) setItemNames(names);
-    });
+    // Unnamed offers still price; they fall back to the catalogue's names or `#typeId`.
+    void loadTypeNames(collectNameableTypeIds(allOffers))
+      .then((names) => {
+        if (!cancelled) setItemNames(names);
+      })
+      .catch(() => {
+        if (!cancelled) setItemNames(new Map());
+      });
     return () => {
       cancelled = true;
     };
@@ -279,11 +295,14 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
   useEffect(() => {
     if (!active || !hubHydrated || offersByCorp.size === 0) return;
     let cancelled = false;
-    void loadMarketLpValues(offersByCorp.keys(), hub, Date.now, offersByCorp)
+    void loadMarketLpValues(offersByCorp.keys(), hub, { held: offersByCorp })
       .then((values) => {
         if (!cancelled) setLpValues({ hubId: hub.id, values });
       })
-      .catch(() => {});
+      // Unvalued, not still valuing: every LP Value reads "—".
+      .catch(() => {
+        if (!cancelled) setLpValues({ hubId: hub.id, values: new Map() });
+      });
     return () => {
       cancelled = true;
     };

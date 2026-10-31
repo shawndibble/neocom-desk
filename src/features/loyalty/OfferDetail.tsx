@@ -26,7 +26,7 @@ import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
 import type { PriceBasis } from './priceBasis';
 import type { LpBasis } from './lpBasis';
 import type { LoyaltyOfferRow } from './offerRows';
-import { iskPerLpTone, resolveLoyaltyRowItem } from './offerRowDisplay';
+import { iskPerLpTone, resolveLoyaltyRowItem, tagWordClassName } from './offerRowDisplay';
 import { loyaltyOfferMaterialsCsvColumns } from './loyaltyStoreCsv';
 import { formatCount } from '@/lib/formatCount';
 import type { SkillLevels } from '@/engine/industry/types';
@@ -45,6 +45,21 @@ import { useRedemptionPricing } from './useRedemptionPricing';
 export function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
   const { typeId, itemName } = resolveLoyaltyRowItem(row);
   return <span className={entityLinkClassName()}>{typeId === null ? row.itemName : itemName}</span>;
+}
+
+/** An offers table's item cell: the name, a BP marker for a blueprint, and its LP + ISK price. */
+export function LoyaltyOfferItemCell({ row }: { row: LoyaltyOfferRow }) {
+  return (
+    <span className="flex flex-col">
+      <span className="inline-flex items-center gap-1.5">
+        <LoyaltyItemName row={row} />
+        {row.isBlueprint && <span className={tagWordClassName}>BP</span>}
+      </span>
+      <span className="text-[0.6875rem] text-text-dim">
+        {formatCount(row.offer.lp_cost)} LP + <IskAmount value={row.offer.isk_cost} decimals={0} />
+      </span>
+    </span>
+  );
 }
 
 interface OfferDetailProps {

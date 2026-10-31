@@ -704,6 +704,14 @@ rather than narrowing it — Contract Search's Below market, one row per
 contract instead of one per item line. It acts at once and is not behind the
 funnel, for the column picker's reason; see §6c.
 
+One sanctioned view switch in `search`: a `SegmentedControl` before the
+search box when the table has two row grains the box searches differently
+(the LP Store landing's Stores | Offers: one row per store, or one per
+offer). Two named views, not one on/off grain, so it is the segmented
+control rather than a view chip; it sits with the search because it changes
+what the box searches. One `FilterBar` and one filter set serve both views.
+Below `sm` it takes its own full-width line above the search box.
+
 One sanctioned reorder: `trailing` view controls after the funnel, so the
 funnel sits right beside the search box, for a row where the filters narrow
 the list and the view controls only arrange it (the

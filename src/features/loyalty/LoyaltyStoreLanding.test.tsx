@@ -191,6 +191,30 @@ describe('LoyaltyStoreLanding', () => {
     );
   });
 
+  it('lists one offer id sold by two stores as two rows', () => {
+    const sisters = offer(SISTERS, 21, 'Navy Cap Booster 800', 1100, 410);
+    landing.mockReturnValue(state({ offers: [OFFERS[1]!, sisters] }));
+    renderLanding('?view=offers');
+    expect(rowNames(screen.getByRole('table', { name: 'LP Store offers' }))).toHaveLength(2);
+  });
+
+  it('sorts by Store nearest first on the first click', async () => {
+    const far = store({ corporationId: 3, name: 'Far Navy', nearest: { systemId: 1, jumps: 30 } });
+    landing.mockReturnValue(state({ offers: [offer(far, 31, 'Far Thing', 1500, 50), OFFERS[1]!] }));
+    const user = userEvent.setup();
+    renderLanding('?view=offers');
+    const table = screen.getByRole('table', { name: 'LP Store offers' });
+    await user.click(within(table).getByRole('button', { name: /^Store/ }));
+    expect(rowNames(table)[0]).toContain('Navy Cap Booster 800');
+  });
+
+  it('waits for the balances before applying a linked I can afford', () => {
+    landing.mockReturnValue(state({ balancesKnown: false }));
+    renderLanding('?view=offers&affordable=1');
+    expect(screen.queryByText('Nothing matches')).toBeNull();
+    expect(screen.queryByRole('table', { name: 'LP Store offers' })).toBeNull();
+  });
+
   it('says why the page is empty when the snapshot is unavailable', () => {
     landing.mockReturnValue(state({ status: 'unavailable', stores: [], offers: [] }));
     renderLanding();

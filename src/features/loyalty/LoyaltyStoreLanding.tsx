@@ -23,8 +23,15 @@ import { useTicker } from '@/lib/ticker';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { formatCount } from '@/lib/formatCount';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
-import { boolParam, enumParam, idListParam, textParam, type UrlParamCodec } from '@/lib/urlState';
+import { useUrlFilter, useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import {
+  boolParam,
+  defineUrlFilter,
+  enumParam,
+  idListParam,
+  textParam,
+  type UrlParamCodec,
+} from '@/lib/urlState';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 
 import {
@@ -42,9 +49,7 @@ import {
   lpLandingHoldings,
   lpLandingOffers,
   lpLandingStores,
-  lpStorePath,
   type LpLandingFilters,
-  type LpSearchCrumbState,
   type LpLandingOffer,
   type LpLandingStore,
   type MinSellsPerDay,
@@ -54,6 +59,7 @@ import {
   type LpLandingFilterValue,
   type LpLandingView,
 } from './LpLandingFilterBar';
+import { lpStorePath, type LpSearchCrumbState } from './lpStorePath';
 import { useLpValue } from './lpValue';
 import { usePriceBasis } from './priceBasis';
 import { useLpLandingOfferColumns, useLpLandingStoreColumns } from './useLpLandingColumns';
@@ -71,21 +77,31 @@ function factionParam(): UrlParamCodec<LpLandingFilters['faction']> {
   };
 }
 
-const MIN_SELLS_VALUES = MIN_SELLS_PER_DAY_OPTIONS.map(String) as `${MinSellsPerDay}`[];
+function minSellsParam(): UrlParamCodec<MinSellsPerDay> {
+  const fallback = DEFAULT_LP_LANDING_FILTERS.minSellsPerDay;
+  return {
+    parse: (raw) => MIN_SELLS_PER_DAY_OPTIONS.find((n) => String(n) === raw) ?? fallback,
+    serialize: (value) => (value === fallback ? null : String(value)),
+  };
+}
 
-/** The view, search and every filter in the URL (ADR 0015), so a view can be linked and Back returns to it. */
-const LANDING_PARAMS = {
+/** The view and search box, in the URL (ADR 0015), so a view can be linked and Back returns to it. */
+const VIEW_PARAMS = {
   view: enumParam<LpLandingView>(['stores', 'offers'], 'stores'),
   q: textParam(),
-  faction: factionParam(),
-  range: enumParam(JUMP_RANGES, DEFAULT_LP_LANDING_FILTERS.range),
-  minSells: enumParam(MIN_SELLS_VALUES, `${DEFAULT_LP_LANDING_FILTERS.minSellsPerDay}`),
-  mine: boolParam(),
-  noFw: boolParam(),
-  noTurnIns: boolParam(),
-  affordable: boolParam(),
-  cat: idListParam(),
 };
+
+/** Every filter in the URL too; hub and price basis are app-wide settings instead. */
+const FILTER = defineUrlFilter<LpLandingFilters>({
+  faction: { key: 'faction', codec: factionParam() },
+  range: { key: 'range', codec: enumParam(JUMP_RANGES, DEFAULT_LP_LANDING_FILTERS.range) },
+  minSellsPerDay: { key: 'minSells', codec: minSellsParam() },
+  mineOnly: { key: 'mine', codec: boolParam() },
+  hideFactionWarfare: { key: 'noFw', codec: boolParam() },
+  noTurnIns: { key: 'noTurnIns', codec: boolParam() },
+  affordableOnly: { key: 'affordable', codec: boolParam() },
+  categories: { key: 'cat', codec: idListParam() },
+});
 
 const STORES_SORT = { columnId: 'lpValue', direction: 'desc' } as const;
 const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
@@ -93,7 +109,9 @@ const STORE_SORT_IDS = ['store', 'lpValue', ...LP_LANDING_STORE_COLUMN_IDS];
 const OFFER_SORT_IDS = ['item', 'iskPerLp', ...LP_LANDING_OFFER_COLUMN_IDS];
 
 const storeRowKey = (store: LpLandingStore) => store.corporationId;
-const offerRowKey = (offer: LpLandingOffer) => offer.row.offer.offer_id;
+// Stores share offer ids (one navy offer runs in several corporations' stores).
+const offerRowKey = (offer: LpLandingOffer) =>
+  `${offer.store.corporationId}:${offer.row.offer.offer_id}`;
 
 /**
  * `/wallet/lp-store` with no store open: every LP Store ranked by LP Value
@@ -107,7 +125,13 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
   const tabsId = useTabsId();
-  const [params, setParams] = useUrlParams(LANDING_PARAMS);
+  const [params, setParams] = useUrlParams(VIEW_PARAMS);
+  const [filters, setFilters] = useUrlFilter<LpLandingFilters>(
+    'lp-landing',
+    FILTER.schema,
+    FILTER.fieldToParam,
+    FILTER.emptyParams
+  );
   const data = useLpStoreLanding(active);
   const now = useTicker(MINUTE_MS);
 
@@ -121,43 +145,13 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
 
   const view = params.view;
   const query = params.q;
-  const filters = useMemo<LpLandingFilters>(
-    () => ({
-      faction: params.faction,
-      range: params.range,
-      minSellsPerDay: Number(params.minSells) as MinSellsPerDay,
-      mineOnly: params.mine,
-      hideFactionWarfare: params.noFw,
-      noTurnIns: params.noTurnIns,
-      affordableOnly: params.affordable,
-      categories: params.cat,
-    }),
-    [
-      params.faction,
-      params.range,
-      params.minSells,
-      params.mine,
-      params.noFw,
-      params.noTurnIns,
-      params.affordable,
-      params.cat,
-    ]
-  );
   const filterValue: LpLandingFilterValue = { ...filters, hubId, priceBasis };
   function onFilterChange(next: LpLandingFilterValue) {
     // Hub and basis are the app-wide settings, written where they are edited and nowhere else.
     if (next.hubId !== hubId) void setHubId(next.hubId);
     if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
-    setParams({
-      faction: next.faction,
-      range: next.range,
-      minSells: `${next.minSellsPerDay}`,
-      mine: next.mineOnly,
-      noFw: next.hideFactionWarfare,
-      noTurnIns: next.noTurnIns,
-      affordable: next.affordableOnly,
-      cat: next.categories,
-    });
+    // Only the filter's own fields reach the URL.
+    setFilters(next);
   }
 
   const shownStores = useMemo(
@@ -179,6 +173,7 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
     distancesKnown: data.jumpsStatus === 'ready',
     pricing: data.pricing,
     valuing: data.valuing,
+    ownLpValue,
   });
   const offerColumns = useLpLandingOfferColumns({ systemName: data.systemName });
   const storeVisibility = useColumnVisibility(
@@ -229,9 +224,11 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
   const shown = view === 'stores' ? shownStores.length : shownOffers.length;
   const total = view === 'stores' ? data.stores.length : data.offers.length;
   const offersPending = view === 'offers' && data.pricing;
+  // A linked "I can afford" / "Stores I hold LP with" waits for the balances, not "Nothing matches".
+  const balancesPending = (filters.mineOnly || filters.affordableOnly) && !data.balancesKnown;
 
   let body;
-  if (data.status === 'loading' || offersPending) {
+  if (data.status === 'loading' || offersPending || balancesPending) {
     body = (
       <div className="flex flex-col items-center gap-2 p-6 text-xs text-text-dim">
         <Spinner />
@@ -353,7 +350,7 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
             onChange={onFilterChange}
             factions={data.factions}
             categories={data.categories}
-            heldStores={holdings?.stores ?? 0}
+            heldStores={data.balancesKnown ? (holdings?.stores ?? 0) : null}
             columnPicker={columnPicker}
           />
           <LiveStatus>
@@ -400,7 +397,10 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
               )}
             </p>
           )}
-          <Panel padded={false}>{body}</Panel>
+          {/* Sideways scroll, not a clipped last column, where the table is wider than the page (768px). */}
+          <Panel padded={false}>
+            <div className="overflow-x-auto">{body}</div>
+          </Panel>
         </div>
       </TabPanel>
     </div>

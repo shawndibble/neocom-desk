@@ -84,12 +84,13 @@ export function LpLandingFilterBar({
   onChange: (next: LpLandingFilterValue) => void;
   factions: readonly LpLandingOption[];
   categories: readonly LpLandingOption[];
-  /** Stores the Character holds LP with; 0 disables the chips that need a balance. */
-  heldStores: number;
+  /** Stores the Character holds LP with; 0 disables the chips that need a balance, null while unread. */
+  heldStores: number | null;
   columnPicker: ReactNode;
 }) {
   const { t } = useTranslation();
   const noLp = heldStores === 0;
+  const heldCount = heldStores ?? undefined;
   return (
     <FilterBar
       value={value}
@@ -214,7 +215,7 @@ export function LpLandingFilterBar({
                 label={t('loyaltyStore.landing.mineOnly')}
                 selected={draft.mineOnly}
                 onToggle={() => setDraft({ ...draft, mineOnly: !draft.mineOnly })}
-                count={noLp ? undefined : heldStores}
+                count={noLp ? undefined : heldCount}
                 countLabel={t('loyaltyStore.landing.mineOnlyCount')}
                 disabled={noLp && !draft.mineOnly}
                 tooltip={noLp ? t('loyaltyStore.landing.noLpHeld') : undefined}

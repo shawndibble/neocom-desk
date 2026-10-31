@@ -91,8 +91,7 @@ async function computeMany(
 export async function loadMarketLpValues(
   corporationIds: Iterable<number>,
   hub: TradeHub,
-  now: () => number = Date.now,
-  held?: HeldLpOffers
+  { now = Date.now, held }: { now?: () => number; held?: HeldLpOffers } = {}
 ): Promise<Map<number, number | null>> {
   const ids = [...new Set(corporationIds)];
   const keyOf = (id: number) => `${id}|${hub.id}`;
@@ -123,5 +122,5 @@ export async function loadMarketLpValue(
   hub: TradeHub,
   now: () => number = Date.now
 ): Promise<number | null> {
-  return (await loadMarketLpValues([corporationId], hub, now)).get(corporationId) ?? null;
+  return (await loadMarketLpValues([corporationId], hub, { now })).get(corporationId) ?? null;
 }

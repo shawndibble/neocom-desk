@@ -63,7 +63,7 @@ import { resolveLoyaltyRowItem } from '@/features/loyalty/offerRowDisplay';
 import { LoyaltyStoreLanding } from '@/features/loyalty/LoyaltyStoreLanding';
 import { NearestStationLine } from '@/features/loyalty/NearestStationLine';
 import { LpStoreActions } from '@/features/loyalty/LpStoreChrome';
-import type { LpSearchCrumbState } from '@/features/loyalty/lpLanding';
+import type { LpSearchCrumbState } from '@/features/loyalty/lpStorePath';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
@@ -284,7 +284,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     // string, or (from an older entry) just its search.
     let back = '';
     if (arrivedState?.from === 'lp-search') {
-      if (arrivedState.search) back = arrivedState.search;
+      if (arrivedState.search?.startsWith('?')) back = arrivedState.search;
       else if (arrivedState.q) back = `?q=${encodeURIComponent(arrivedState.q)}`;
     }
     navigate(`/wallet/lp-store${back}`, { replace: true });

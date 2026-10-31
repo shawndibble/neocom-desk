@@ -51,7 +51,7 @@ export interface LpLandingStoreFacts {
   name: string;
   /** Null for a factionless corporation (Sisters of EVE, Mordu's Legion). */
   factionId: number | null;
-  /** One of the four empire militias. */
+  /** A faction's militia corporation (ESI `militia_corporation_id`). */
   factionWarfare: boolean;
   /** Null until distances resolve, or when no station is reachable. */
   nearest: NearestStation | null;
@@ -186,17 +186,4 @@ export function lpLandingHoldings(
     if (store.lpValue !== null && (best === null || store.lpValue > best.lpValue!)) best = store;
   }
   return { stores: held.length, lp, worth, unpriced, best };
-}
-
-/** What the store view reads from the location state to draw its crumb back to the search. */
-export interface LpSearchCrumbState {
-  from: 'lp-search';
-  q: string;
-  /** The landing's whole query string (view, search, filters), so Close rebuilds the view. */
-  search?: string;
-}
-
-export function lpStorePath(corporationId: number, offerId?: number): string {
-  const base = `/wallet/lp-store/${corporationId}`;
-  return offerId === undefined ? base : `${base}?offer=${offerId}`;
 }
