@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { marketNeed, rankMarkets, type MarketSummary } from './markets';
+import { marketNeed, marketNeedRank, rankMarkets, type MarketSummary } from './markets';
 
 const market = (over: Partial<MarketSummary> & { listId: string }): MarketSummary => ({
   items: 10,
@@ -34,5 +34,17 @@ describe('marketNeed', () => {
     expect(marketNeed(market({ listId: 'a', out: 2, low: 3 }))).toBe('out');
     expect(marketNeed(market({ listId: 'a', low: 3 }))).toBe('low');
     expect(marketNeed(market({ listId: 'a' }))).toBe('stocked');
+  });
+});
+
+describe('marketNeedRank', () => {
+  it('ranks out before low before stocked', () => {
+    const ranks = [
+      market({ listId: 'a', out: 1 }),
+      market({ listId: 'b', low: 1 }),
+      market({ listId: 'c' }),
+    ].map(marketNeedRank);
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+    expect(new Set(ranks).size).toBe(3);
   });
 });

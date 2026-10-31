@@ -247,7 +247,9 @@ export function RequestsTab({
       sortValue: ({ progress, request }) =>
         request.standing || progress.lines === 0
           ? undefined
-          : (progress.deliveredLines * 2 + progress.pledgedLines) / progress.lines,
+          : // Delivered lines first, pledged ones break the tie.
+            (progress.deliveredLines + progress.pledgedLines / (progress.lines + 1)) /
+            progress.lines,
     },
     {
       id: 'status',

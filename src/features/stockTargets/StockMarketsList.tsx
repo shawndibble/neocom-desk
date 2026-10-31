@@ -21,7 +21,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { marketNeed, type MarketNeed } from '@/engine/stockTargets/markets';
+import { marketNeed, marketNeedRank } from '@/engine/stockTargets/markets';
 import type { StockList } from '@/engine/stockTargets/stockLists';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useRetryFocus } from '@/lib/useRetryFocus';
@@ -35,9 +35,6 @@ import {
 import { STOCK_PATH } from './StockMarketPage';
 import { loadStockMarkets, type StockMarketRow, type StockMarketsData } from './stockTargetsData';
 import { formatNumber } from '@/lib/numberLocale';
-
-/** Worst first, the page's own order. */
-const NEED_RANK: Record<MarketNeed, number> = { out: 0, low: 1, stocked: 2 };
 
 export function StockMarketsList({
   lists,
@@ -205,7 +202,7 @@ export function StockMarketsList({
       render: (market) => (
         <StockNeedPill need={marketNeed(market)}>{needWord(market)}</StockNeedPill>
       ),
-      sortValue: (market) => NEED_RANK[marketNeed(market)],
+      sortValue: marketNeedRank,
       sortFirst: 'asc',
     },
     {
