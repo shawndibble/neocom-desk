@@ -273,7 +273,7 @@ export function LocationRow({
           </span>
         </span>
         {pinned && !unresolvedParent && showPin && (
-          <span className="shrink-0 text-accent" title={t(`assets.pin.${pinState}`)}>
+          <span className="shrink-0 text-accent">
             <Icon.Pin size={Icon.ICON_SIZE.sm} weight="fill" />
             <span className="sr-only">{t(`assets.pin.${pinState}`)}</span>
           </span>
@@ -296,7 +296,6 @@ export function LocationRow({
           actions={actions}
           placeId={locationId}
           placeName={label}
-          copyName={label}
           pinState={pinState}
           onTogglePin={onTogglePin}
           t={t}
@@ -395,15 +394,7 @@ export function ContainerRow({
   return (
     <RowActionsMenu
       name={name}
-      items={
-        <PlaceRowMenuItems
-          actions={actions}
-          placeId={stationId}
-          placeName={name}
-          copyName={name}
-          t={t}
-        />
-      }
+      items={<PlaceRowMenuItems actions={actions} placeId={stationId} placeName={name} t={t} />}
     >
       {row}
     </RowActionsMenu>

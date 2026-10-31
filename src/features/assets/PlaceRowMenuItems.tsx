@@ -1,7 +1,7 @@
 import { MenuItem } from '@/components/ui';
+import { CopyMenuItem } from '@/features/corp/corpRowMenus';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
-import { writeToClipboard } from '@/lib/clipboard';
 import type { Translate } from '@/lib/translate';
 import type { PinState } from './stationPins';
 import { nextPinLabelKey, type PlaceMenuAction } from './placeRowMenu';
@@ -14,7 +14,6 @@ export function PlaceRowMenuItems({
   actions,
   placeId,
   placeName,
-  copyName,
   pinState,
   onTogglePin,
   t,
@@ -22,8 +21,6 @@ export function PlaceRowMenuItems({
   actions: readonly PlaceMenuAction[];
   placeId: number | null;
   placeName: string;
-  /** What "Copy name" copies: the row's own name. */
-  copyName: string;
   pinState?: PinState;
   onTogglePin?: () => void;
   t: Translate;
@@ -42,9 +39,9 @@ export function PlaceRowMenuItems({
             );
           case 'copyName':
             return (
-              <MenuItem key={action} onSelect={() => void writeToClipboard(copyName)}>
-                {t('assets.menu.copyName')}
-              </MenuItem>
+              <CopyMenuItem key={action} text={placeName}>
+                {t('market.contextMenu.copyName')}
+              </CopyMenuItem>
             );
           case 'togglePin':
             return pinState === undefined || onTogglePin === undefined ? null : (
