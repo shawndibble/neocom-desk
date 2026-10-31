@@ -23,6 +23,7 @@ export type CsvSurface =
   | 'wallet-transactions'
   | 'corp-wallet-transactions'
   | 'assets'
+  | 'my-ships'
   | 'corp-assets'
   | 'contracts'
   | 'contacts'

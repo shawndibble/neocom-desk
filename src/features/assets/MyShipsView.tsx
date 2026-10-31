@@ -44,6 +44,9 @@ import { placeKey, usePlaceDetails } from '@/features/places';
 import { loadGroupNames } from '@/features/market/groupNames';
 import { JumpsAwayText, SecurityValue } from './assetBrowserRows';
 import { PlaceName } from './PlaceName';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { shipsCsvColumns, type ShipCsvRow } from './shipsCsv';
 import type { JumpBasis } from '@/features/route/jumpBasis';
 
 /** SDE category 6. */
@@ -135,8 +138,12 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
 /** Flags worth naming; a container's own flag (Unlocked) adds nothing, so it reads as the holder name alone. */
 const NAMED_HOLD_FLAGS = new Set(['ShipHangar', 'FleetHangar', 'Cargo']);
 
-/** What holds a ship inside another asset, outermost first: "inside Orca (Ship Maintenance Bay) › Cargo Container". Empty for a free-standing ship. */
-function holderTrail(row: ShipRow, holderNames: ReadonlyMap<number, string>, t: TFunction): string {
+/** The holders of a ship, outermost first: "Orca (Ship Maintenance Bay) › Cargo Container". Empty for a free-standing ship. */
+function holderTrailText(
+  row: ShipRow,
+  holderNames: ReadonlyMap<number, string>,
+  t: TFunction
+): string {
   const parts = row.trail.flatMap((itemId, i) => {
     const holder = holderNames.get(itemId);
     if (!holder) return [];
@@ -147,7 +154,13 @@ function holderTrail(row: ShipRow, holderNames: ReadonlyMap<number, string>, t: 
         : holder,
     ];
   });
-  return parts.length === 0 ? '' : t('assets.myShips.inside', { holder: parts.join(' › ') });
+  return parts.join(' › ');
+}
+
+/** What holds a ship inside another asset: "inside Orca (Ship Maintenance Bay) › Cargo Container". Empty for a free-standing ship. */
+function holderTrail(row: ShipRow, holderNames: ReadonlyMap<number, string>, t: TFunction): string {
+  const text = holderTrailText(row, holderNames, t);
+  return text === '' ? '' : t('assets.myShips.inside', { holder: text });
 }
 
 /** The kind a ship's location resolves under: a station, a system, else a structure (`other`, or the parent of an item ESI never returned as an asset). */
@@ -496,6 +509,40 @@ export function MyShipsView({
     });
     return items.map((item) => item.row);
   }, [staticKeys, places, query, sort]);
+  // The export is the list as shown (the search narrows it, the sort orders it), with every column
+  // whatever the layout hides: the Character column, the class and Packaged tags, the holder trail.
+  const shipCsvRows = useMemo<ShipCsvRow[]>(() => {
+    if (state.status !== 'ready') return [];
+    const { data } = state;
+    return sorted.map((row) => {
+      const place = places.get(placeKey(row));
+      const known = typeof place?.systemId === 'number';
+      const jumps = place?.jumps;
+      return {
+        ship: data.typeNames.get(row.typeId) ?? t('assets.myShips.unknownType', { id: row.typeId }),
+        gameName: (!row.packaged && data.gameNames[row.itemId]) || '',
+        shipClass: shipClasses.get(data.groupIdByType.get(row.typeId) ?? -1) ?? '',
+        packaged: row.packaged,
+        quantity: row.quantity,
+        character: data.characterNames.get(row.characterId) ?? '',
+        location: place?.name ?? '',
+        heldInside: holderTrailText(row, data.holderNames, t),
+        security: known ? (place.security ?? null) : null,
+        jumps: jumps?.kind === 'known' ? jumps.jumps : null,
+        itemId: row.itemId,
+        typeId: row.typeId,
+        locationId: row.locationId,
+      };
+    });
+  }, [state, sorted, places, shipClasses, t]);
+  const shipsCsvColumnList = useMemo(() => shipsCsvColumns(t), [t]);
+  const shipsExport = useTableExport({
+    surface: 'my-ships',
+    // Not a DataTable: `rows` already carries the sort.
+    source: 'rows',
+    rows: shipCsvRows,
+    columns: shipsCsvColumnList,
+  });
   // One Character's ships need no Character column.
   const showCharacter = characterIds.length > 1;
   const columns = (
@@ -525,6 +572,9 @@ export function MyShipsView({
             aria-label={t('assets.myShips.searchLabel')}
             className="w-full sm:ml-auto sm:w-64"
           />
+          {state.status === 'ready' && shipCsvRows.length > 0 && (
+            <TableActionsMenu name={t('assets.myShips.title')} tableExport={shipsExport} />
+          )}
         </div>
         <DataGate
           status={
