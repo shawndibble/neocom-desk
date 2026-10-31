@@ -218,13 +218,11 @@ export function useCorpBook(
             scopedMoon === undefined
               ? undefined
               : await readMoonBookData(characterId, corporationId, scopedMoon);
-          if (one && one !== 'fallback') moon = { docs: one.docs, fromDocs: one.fromDocs };
-          data =
-            one === null
-              ? null
-              : one && one !== 'fallback'
-                ? one.data
-                : await readBookData(characterId, corporationId, wantedRef.current);
+          if (one === null) data = null;
+          else if (one && one !== 'fallback') {
+            moon = { docs: one.docs, fromDocs: one.fromDocs };
+            data = one.data;
+          } else data = await readBookData(characterId, corporationId, wantedRef.current);
           // The page moved on while this read ran: take the slices it now wants.
           const late = data ? missingBookParts(wantedRef.current, data.parts) : undefined;
           if (data && late && late.size > 0) {

@@ -27,7 +27,9 @@ export function moonDocUsable(doc: MoonDoc | undefined): doc is MoonDoc {
     doc !== undefined &&
     doc.schema === MOON_DOC_SCHEMA &&
     Array.isArray(doc.mined) &&
+    doc.mined.every((m) => typeof m?.typeId === 'number' && Number.isFinite(m.quantity)) &&
     Array.isArray(doc.miners) &&
+    doc.miners.every((m) => typeof m?.minerId === 'string') &&
     Number.isFinite(doc.minerCount) &&
     Number.isFinite(doc.frozenTax)
   );

@@ -239,6 +239,9 @@ describe('the moon page from the moon docs', () => {
     expect(moonDocUsable({ ...docs.get(ids[0]!)!, miners: undefined } as unknown as MoonDoc)).toBe(
       false
     );
+    expect(moonDocUsable({ ...docs.get(ids[0]!)!, miners: [null] } as unknown as MoonDoc)).toBe(
+      false
+    );
     expect(moonDocUsable(docs.get(ids[0]!))).toBe(true);
   });
 });
