@@ -2,11 +2,15 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { IskAmount } from '@/components/ui';
+import { buildHoleSizes } from '@/engine/pilotList/dscanHoleSize';
 import { buildWorth, diffHulls, type HullCount } from '@/engine/pilotList/dscanWorth';
 import { useMarketHub } from '@/features/market/hub';
 import { cx } from '@/lib/cx';
+import { formatNumber } from '@/lib/numberLocale';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
+import { loadShipMass } from '@/sde/loadSde';
 import { hullsKey } from './lastScan';
 
 const SHOWN_LINES = 4;
@@ -25,16 +29,21 @@ export function DscanMeta({
   names,
   trackHistory,
   previous,
+  wormholeSpace,
+  groupOf,
 }: {
   hulls: readonly HullCount[];
   names: ReadonlyMap<number, string>;
   trackHistory: boolean;
   /** The earlier scan from `useLastScan`; only read when `trackHistory` is set. */
   previous: HullCount[] | null | undefined;
+  /** The Current System is wormhole space: the Worth card adds the hole sizes. */
+  wormholeSpace: boolean;
+  groupOf: (typeId: number) => number | undefined;
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      <WorthCard hulls={hulls} names={names} />
+      <WorthCard hulls={hulls} names={names} groupOf={wormholeSpace ? groupOf : undefined} />
       {trackHistory && <SinceLastScanCard hulls={hulls} previous={previous} names={names} />}
     </div>
   );
@@ -43,9 +52,11 @@ export function DscanMeta({
 function WorthCard({
   hulls,
   names,
+  groupOf,
 }: {
   hulls: readonly HullCount[];
   names: ReadonlyMap<number, string>;
+  groupOf: ((typeId: number) => number | undefined) | undefined;
 }) {
   const { t } = useTranslation();
   const hubId = useMarketHub((s) => s.value);
@@ -113,6 +124,7 @@ function WorthCard({
           </tbody>
         </table>
       )}
+      {groupOf !== undefined && <HoleSizes hulls={hulls} groupOf={groupOf} />}
       <p className="text-xs text-text-dim">
         {worth !== null && worth.unpriced > 0
           ? t('travel.pilot.dscan.worth.unpriced', { count: worth.unpriced })
@@ -120,6 +132,47 @@ function WorthCard({
         {t('travel.pilot.dscan.worth.note', { hub: hub.systemName })}
       </p>
     </section>
+  );
+}
+
+/**
+ * The smallest wormhole each ship needs and the hulls' base mass (issue #5669):
+ * a hull too heavy for a hole can never pass it, and the mass is a floor.
+ * Neither says the fleet can pass a hole.
+ */
+function HoleSizes({
+  hulls,
+  groupOf,
+}: {
+  hulls: readonly HullCount[];
+  groupOf: (typeId: number) => number | undefined;
+}) {
+  const { t } = useTranslation();
+  // Without the table there is simply no block.
+  const table = useKeyedLoad('shipMass', loadShipMass).data;
+  if (table === undefined) return null;
+  const read = buildHoleSizes(hulls, groupOf, (typeId) => table[String(typeId)]?.[2]);
+  if (read === null) return null;
+  const counts = [
+    ...read.sizes.map(({ size, count }) =>
+      t('travel.pilot.dscan.worth.holes.size', { size: t(`travel.thera.size.${size}`), count })
+    ),
+    ...(read.unsized > 0
+      ? [t('travel.pilot.dscan.worth.holes.unsized', { count: read.unsized })]
+      : []),
+  ];
+  return (
+    <div className="space-y-0.5 border-t border-line pt-2 text-sm">
+      <h4 className="font-semibold text-text">{t('travel.pilot.dscan.worth.holes.title')}</h4>
+      <p className="tabular-nums">{counts.join(' · ')}</p>
+      <p className="text-text-dim">
+        {t('travel.pilot.dscan.worth.holes.mass', {
+          mass: formatNumber(Math.floor(read.massKg / 1000)),
+        })}
+        {read.massLeftOut > 0 &&
+          ` ${t('travel.pilot.dscan.worth.holes.massLeftOut', { count: read.massLeftOut })}`}
+      </p>
+    </div>
   );
 }
 
