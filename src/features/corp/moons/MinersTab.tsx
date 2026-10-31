@@ -1,21 +1,36 @@
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  ColumnPickerMenu,
   DataTable,
   FilterChip,
   Panel,
   SearchInput,
   StatChip,
   StatChips,
+  sortRows,
   useOpenAfterMenu,
   type DataTableColumn,
+  type DataTableSort,
 } from '@/components/ui';
-import { minerDetail, type BookView, type MinerRow } from '@/engine/corpTaxBook/bookView';
+import {
+  minerDetail,
+  type BookView,
+  type MinerRow,
+  type MinerStanding,
+} from '@/engine/corpTaxBook/bookView';
+import { useColumnVisibility } from '@/lib/columnVisibility';
 import { boolParam, textParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useBook } from './useBook';
 import { useTabsProjection } from './useTabsProjection';
 import { isk, shortDate } from './moonsFormat';
+import {
+  MINERS_COLUMN_IDS,
+  MINERS_PHONE_OFF,
+  useVisibleMinersColumns,
+  type MinersColumnId,
+} from './moonsColumns';
 import { OverdueWord, StandingWord } from './moonsParts';
 import { MinerExpandedRow } from './MinerExpandedRow';
 import { MinerRowMenu } from './MinerRowMenu';
@@ -30,6 +45,11 @@ const PARAMS = {
 
 /** A Miner is listed while it owes, is owed, or has days waiting; the rest are only counted. */
 const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 || m.credit > 0;
+
+/** Standings in the order the Standing column sorts them. */
+const STANDING_RANK: readonly MinerStanding[] = ['member', 'guest', 'left'];
+
+const DEFAULT_SORT: DataTableSort = { columnId: 'overdue', direction: 'desc' };
 
 const OPEN_MINER_KEY = 'corpTaxBook.minersTab.openMiner.';
 
@@ -110,7 +130,12 @@ export function MinersTab() {
   const hiddenGuestOwed = hiddenGuests.reduce((sum, m) => sum + m.owed, 0);
   const hidden = miners.length - miners.filter(isActive).length;
 
-  const columns: DataTableColumn<MinerRow>[] = [
+  const columnVisibility = useColumnVisibility(
+    useVisibleMinersColumns,
+    MINERS_COLUMN_IDS,
+    MINERS_PHONE_OFF
+  );
+  const allColumns: DataTableColumn<MinerRow>[] = [
     {
       id: 'miner',
       header: t('corpTaxBook.moons.cols.miner'),
@@ -131,6 +156,9 @@ export function MinersTab() {
       id: 'standing',
       header: t('corpTaxBook.moons.cols.inCorp'),
       render: (m) => <StandingWord standing={m.standing} />,
+      // Members first, then guests, then those who left: the order the standing chips list them.
+      sortValue: (m) => STANDING_RANK.indexOf(m.standing),
+      sortFirst: 'asc',
     },
     {
       id: 'owed',
@@ -160,10 +188,10 @@ export function MinersTab() {
       header: t('corpTaxBook.moons.cols.credit'),
       align: 'right',
       className: 'tabular-nums',
-      phoneHidden: true,
       // isk() rounds: a sub-ISK remainder is no credit, not a green 0.
       render: (m) =>
         Math.round(m.credit) > 0 ? <span className="text-isk-pos">{isk(m.credit)}</span> : '—',
+      sortValue: (m) => m.credit,
     },
     {
       id: 'paid',
@@ -172,6 +200,19 @@ export function MinersTab() {
       sortValue: (m) => m.lastPaidAt ?? '',
     },
   ];
+  const columnsById = Object.fromEntries(allColumns.map((c) => [c.id, c])) as Record<
+    MinersColumnId,
+    DataTableColumn<MinerRow>
+  >;
+  const columns = allColumns.filter(
+    (c) => c.id === 'miner' || columnVisibility.isVisible(c.id as MinersColumnId)
+  );
+  // The table can only sort by a column it shows: while the sorted one is unticked, sort the rows here.
+  const [sort, setSort] = useState<DataTableSort>(DEFAULT_SORT);
+  const hiddenSortColumn = columns.some((c) => c.id === sort.columnId)
+    ? undefined
+    : allColumns.find((c) => c.id === sort.columnId);
+  const sortedRows = hiddenSortColumn ? sortRows(rows, hiddenSortColumn, sort.direction) : rows;
 
   return (
     <div className="space-y-4">
@@ -214,12 +255,23 @@ export function MinersTab() {
             onToggle={() => setParams({ guests: !params.guests })}
             count={counts.guests}
           />
+          <ColumnPickerMenu
+            available={MINERS_COLUMN_IDS}
+            visible={columnVisibility.visible}
+            columnsById={columnsById}
+            onToggle={columnVisibility.toggle}
+            onReset={columnVisibility.reset}
+            buttonLabel={t('common.columnsButton')}
+            menuTitle={t('common.columnsMenuTitle')}
+            resetLabel={t('common.resetColumns')}
+            size="sm"
+          />
         </div>
         <div ref={tableRef} className="@container overflow-x-auto">
           <DataTable
             label={t('corpTaxBook.moons.tabs.miners')}
             columns={columns}
-            rows={rows}
+            rows={sortedRows}
             rowKey={(m) => m.id}
             expandableRow={{
               renderDetail: (m) => <MinerExpandedRow miner={m} />,
@@ -232,7 +284,8 @@ export function MinersTab() {
             rowClassName={() => 'group'}
             rowContextMenu={rowContextMenu}
             rowMoreActions={canEdit}
-            defaultSort={{ columnId: 'overdue', direction: 'desc' }}
+            sort={hiddenSortColumn ? null : sort}
+            onSortChange={setSort}
             mobileSort
             stackSummary={t('corpTaxBook.moons.miners.summary', {
               shown: rows.length,

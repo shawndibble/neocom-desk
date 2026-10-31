@@ -10,6 +10,7 @@ import type { TrackedCharacter } from '@/features/miningTax/snapshot';
 import { dateRangeOf, taxOwedOf } from '@/features/miningTax/taxRowFormat';
 import type { useUrlSort } from '@/lib/useUrlState';
 import { HistoryMonthHeader } from './HistoryMonthHeader';
+import { TaxColumnPicker } from './TaxColumnPicker';
 import { PayeeFilterMenu } from './PayeeFilterMenu';
 import type { PayeeFilter } from './payeeFilter';
 import type { TaxRowProps } from './useTaxRowInteractions';
@@ -26,6 +27,8 @@ interface TaxOpenLedgerProps {
   visibleRows: readonly DisplayRow[];
   openRows: DisplayRow[];
   openColumns: DataTableColumn<DisplayRow>[];
+  /** Every column on offer, ticked or not: what the picker lists. */
+  allColumns: DataTableColumn<DisplayRow>[];
   taxSort: UrlSortState;
   taxExport: UseTableExport<DisplayRow>;
   rowProps: TaxRowProps;
@@ -45,6 +48,7 @@ export function TaxOpenLedger({
   visibleRows,
   openRows,
   openColumns,
+  allColumns,
   taxSort,
   taxExport,
   rowProps,
@@ -76,7 +80,8 @@ export function TaxOpenLedger({
         )}
 
         {visibleRows.length > 0 && (
-          <span className="ml-auto">
+          <span className="ml-auto inline-flex items-center gap-1">
+            <TaxColumnPicker columns={allColumns} />
             <TableActionsMenu name={t('miningTax.title')} tableExport={taxExport} />
           </span>
         )}

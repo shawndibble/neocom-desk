@@ -14,6 +14,7 @@ import {
 import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
 import { BookProvider } from './BookContext';
 import { MinersTab } from './MinersTab';
+import { MINERS_COLUMN_IDS, useVisibleMinersColumns } from './moonsColumns';
 import { StatementRun } from './StatementRun';
 import type { BookSettings, OfficerVerdict } from '../taxBook/bookClient';
 
@@ -119,6 +120,7 @@ function renderBook(ui: ReactElement, overrides: Partial<BookViewInput> = {}) {
 }
 
 beforeEach(() => {
+  useVisibleMinersColumns.setState({ value: MINERS_COLUMN_IDS, hydrated: false });
   corpName.value = 'Ore & Glory';
   editBook.mockReset().mockResolvedValue({});
   enqueueStatements.mockReset().mockResolvedValue({ queued: 1, skipped: 0, missingLink: [] });
@@ -133,6 +135,18 @@ describe('MinersTab', () => {
     await userEvent.click(screen.getByRole('button', { name: /Non-members/ }));
     expect(within(table).queryByText('Pilot 2')).not.toBeInTheDocument();
     expect(screen.getByText(/1 non-member hidden · .* owed/)).toBeInTheDocument();
+  });
+
+  it('sorts by Standing and Credit, and the Columns menu hides a column but never the Miner', async () => {
+    renderBook(<MinersTab />);
+    const table = screen.getByRole('table', { name: 'Miners' });
+    expect(within(table).getByRole('button', { name: /In corp/ })).toBeInTheDocument();
+    expect(within(table).getByRole('button', { name: /^Credit/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Miner' })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Credit' }));
+    expect(within(table).queryByRole('button', { name: /^Credit/ })).not.toBeInTheDocument();
+    expect(within(table).getByText('Pilot 1')).toBeInTheDocument();
   });
 
   it('the row ⋮ holds Record payment, Dismiss tax and Mark not tax; the last says why it is inert', async () => {

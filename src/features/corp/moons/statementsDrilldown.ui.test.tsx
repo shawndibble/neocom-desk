@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation, useParams } from 'react-router-dom';
@@ -14,6 +14,7 @@ import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
 import { BookProvider } from './BookContext';
 import { StatementPeriodDetail } from './StatementPeriodDetail';
 import { enqueueReminder } from '@/features/corpTaxBook/mailQueue';
+import { STATEMENTS_COLUMN_IDS, useVisibleStatementsColumns } from './moonsColumns';
 import { StatementsTab } from './StatementsTab';
 import { writeToClipboard } from '@/lib/clipboard';
 import { readVerifyTokens, type BookSettings, type OfficerVerdict } from '../taxBook/bookClient';
@@ -155,6 +156,10 @@ function renderAt(
   );
 }
 
+afterEach(() => {
+  useVisibleStatementsColumns.setState({ value: STATEMENTS_COLUMN_IDS, hydrated: false });
+});
+
 describe('Statements drill-down (#5285)', () => {
   it('an issued period row shows Mailed n/N and opens its period page', async () => {
     renderAt('/corp/moons/statements');
@@ -163,6 +168,18 @@ describe('Statements drill-down (#5285)', () => {
     expect(within(row).getByText('2/2')).toBeInTheDocument();
     await userEvent.click(within(row).getByText('Aug 2026'));
     expect(await screen.findByRole('table', { name: 'Statements' })).toBeInTheDocument();
+  });
+
+  it('sorts every data column, and the Columns menu hides one but never Period', async () => {
+    renderAt('/corp/moons/statements');
+    const table = screen.getByRole('table', { name: 'All periods' });
+    for (const name of [/^Period/, /^Status/, /^Billed/, /^Mailed/, /^Due/, /^Issued/])
+      expect(within(table).getByRole('button', { name })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Period' })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Billed' }));
+    expect(within(table).queryByRole('button', { name: /^Billed/ })).not.toBeInTheDocument();
+    expect(within(table).getByText('Aug 2026')).toBeInTheDocument();
   });
 
   it('open and ready rows do not click through', async () => {

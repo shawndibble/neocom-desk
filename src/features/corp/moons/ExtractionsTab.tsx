@@ -127,6 +127,7 @@ export function ExtractionsTab() {
       id: 'mined',
       header: t('corpTaxBook.moons.cols.mined'),
       render: (row) => <MinedBar pct={row.minedPct} label={names.refinery(row.structureId)} />,
+      sortValue: (row) => row.minedPct ?? undefined,
     },
     caretColumn<ExtractionRow>((row) => hasMenu(row)),
   ];

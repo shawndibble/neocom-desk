@@ -15,6 +15,7 @@ import type {
   MoonOwnerMinedLine,
   MoonOwnerPayout,
 } from '@/engine/corpTaxBook/moonOwners';
+import type { PayoutStatus } from '@/engine/corpTaxBook/feederAccrual';
 import type { Payee } from '@/engine/corpTaxBook/payouts';
 import { CharacterLink, CorporationLink } from '@/features/entities/EntityLink';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
@@ -26,6 +27,9 @@ import { RemovalStrip } from './RemovalStrip';
 import { MoonOwnerStatusPill } from './MoonOwnersTable';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.page.${key}`;
+
+/** Payout states in the order the Status column sorts them: what needs a look first. */
+const PAYOUT_STATE_RANK: readonly PayoutStatus[] = ['waiting-for-journal', 'recorded', 'matched'];
 
 /** Their rate beside the miner rate and the margin, with what they asked for. */
 export function RateReadout({
@@ -173,6 +177,7 @@ export function MoonOwnerPage({
   const { row } = detail;
   const payouts = detail.payouts;
 
+  const methodLabel = (p: MoonOwnerPayout) => t(k(`payouts.method.${p.method}`));
   const payoutColumns: DataTableColumn<MoonOwnerPayout>[] = [
     {
       id: 'date',
@@ -193,13 +198,18 @@ export function MoonOwnerPage({
     {
       id: 'how',
       header: t(k('payouts.how')),
-      render: (p) => t(k(`payouts.method.${p.method}`)),
+      render: (p) => methodLabel(p),
+      sortValue: (p) => methodLabel(p),
     },
     {
       id: 'status',
       header: t(k('payouts.status')),
       render: (p) =>
         t(k(p.notAPayout ? 'payouts.state.not-a-payout' : `payouts.state.${p.status}`)),
+      // Needs-a-look first: waiting on the journal, then recorded, matched, and last what is not counted.
+      sortValue: (p) =>
+        p.notAPayout ? PAYOUT_STATE_RANK.length : PAYOUT_STATE_RANK.indexOf(p.status),
+      sortFirst: 'asc',
     },
     ...(onMarkPayout
       ? [
