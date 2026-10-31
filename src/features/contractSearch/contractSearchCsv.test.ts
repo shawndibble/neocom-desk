@@ -11,6 +11,13 @@ const lookups: ContractSearchCsvLookups = {
   systemName: (row) => (row.locationId === 60003760 ? 'Jita' : null),
   jumps: (row) => (row.locationId === 60003760 ? 4 : null),
   plexPrice: 5_000_000,
+  security: (row) => (row.locationId === 60003760 ? 0.95 : null),
+  flagFor: (row) =>
+    row.contractId === 9
+      ? { kind: 'overpriced', multiple: 25, hubSell: 100, quantity: 3 }
+      : row.contractId === 8
+        ? { kind: 'copy-above-original', original: 100, asking: 250 }
+        : null,
 };
 
 function offer(overrides: Partial<PublicContractOfferRow> = {}): PublicContractOfferRow {
@@ -38,13 +45,17 @@ describe('contractSearchCsvColumns', () => {
       'contractSearch.itemsJumpsColumn',
       'contractSearch.regionColumn',
       'contractSearch.expiresColumn',
+      'contractSearch.auctionKindColumn',
+      'contractSearch.securityColumn',
+      'contractSearch.priceFlagColumn',
+      'contractSearch.priceFlagMultipleColumn',
     ]);
   });
 
   it('writes numbers raw, names as text and the expiry as a UTC date', () => {
     const csv = toCsv([offer()], contractSearchCsvColumns(t, lookups));
     expect(csv.split('\r\n')[1]).toBe(
-      '"Damage Control II",3,1500000,,"Jita",4,"The Forge",2026-09-30 12:00:00'
+      '"Damage Control II",3,1500000,,"Jita",4,"The Forge",2026-09-30 12:00:00,,0.95,,'
     );
   });
 
@@ -58,7 +69,9 @@ describe('contractSearchCsvColumns', () => {
       [offer({ price: 0, locationId: 1_000_000_000_000 })],
       contractSearchCsvColumns(t, lookups)
     );
-    expect(csv.split('\r\n')[1]).toBe('"Damage Control II",3,,,,,"The Forge",2026-09-30 12:00:00');
+    expect(csv.split('\r\n')[1]).toBe(
+      '"Damage Control II",3,,,,,"The Forge",2026-09-30 12:00:00,,,,'
+    );
   });
 
   it('counts a PLEX ask into Price at the PLEX price, and lists the PLEX raw beside it', () => {
@@ -68,5 +81,26 @@ describe('contractSearchCsvColumns', () => {
     expect(plex.value(row)).toBe(10);
     const [, , unknownPrice] = contractSearchCsvColumns(t, { ...lookups, plexPrice: null });
     expect(unknownPrice.value(row)).toBeNull();
+  });
+
+  it('names an auction as buyout or starting bid, blank for a plain sale', () => {
+    const kind = contractSearchCsvColumns(t, lookups).find(
+      (c) => c.header === 'contractSearch.auctionKindColumn'
+    )!;
+    expect(kind.value(offer())).toBeNull();
+    expect(kind.value(offer({ isAuction: true, buyout: 900 }))).toBe('contractSearch.buyoutShort');
+    expect(kind.value(offer({ isAuction: true }))).toBe('contractSearch.startingBidShort');
+  });
+
+  it('exports the price flag and the multiple behind it, blank when unflagged', () => {
+    const columns = contractSearchCsvColumns(t, lookups);
+    const flag = columns.find((c) => c.header === 'contractSearch.priceFlagColumn')!;
+    const multiple = columns.find((c) => c.header === 'contractSearch.priceFlagMultipleColumn')!;
+    expect(flag.value(offer({ contractId: 9 }))).toBe('contractSearch.flag.overpricedLabel');
+    expect(multiple.value(offer({ contractId: 9 }))).toBe(25);
+    expect(flag.value(offer({ contractId: 8 }))).toBe('contractSearch.flag.copyLabel');
+    expect(multiple.value(offer({ contractId: 8 }))).toBe(2.5);
+    expect(flag.value(offer())).toBeNull();
+    expect(multiple.value(offer())).toBeNull();
   });
 });

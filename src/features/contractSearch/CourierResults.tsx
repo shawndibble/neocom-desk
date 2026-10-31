@@ -924,8 +924,9 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       courierContractsCsvColumns(t, {
         regionName: (regionId) => regionLabel(regionId, regionNames),
         jumps: (row) => jumpsByContract.get(row.contractId) ?? null,
+        goingRateMultiple: multipleFor,
       }),
-    [t, regionNames, jumpsByContract]
+    [t, regionNames, jumpsByContract, multipleFor]
   );
   const courierExport = useTableExport({
     surface: 'courier-contracts',

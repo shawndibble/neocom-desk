@@ -11,6 +11,7 @@ import { COL_DATETIME, COL_QUANTITY, COL_SMALL_NUMBER } from '@/components/ui/da
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
+import type { ContractFlag } from '@/engine/contracts/contractFlags';
 import { isUnpricedOffer, offerAskingPrice } from '@/engine/contracts/contractSearch';
 import {
   CONTRACT_SEARCH_ITEMS_COLUMN_IDS,
@@ -47,6 +48,8 @@ interface ItemsColumnsInput {
   visibleItemsColumns: readonly ContractSearchItemsColumnId[];
   /** The marker before a row's price, or nothing: the flag judgement lives with the caller. */
   priceFlag?: (row: PublicContractOfferRow) => ReactNode;
+  /** The flag itself, for the export. */
+  flagFor?: (row: PublicContractOfferRow) => ContractFlag | null;
 }
 
 export function useItemsColumns({
@@ -57,6 +60,7 @@ export function useItemsColumns({
   plexPrice,
   visibleItemsColumns,
   priceFlag,
+  flagFor,
 }: ItemsColumnsInput) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -273,8 +277,10 @@ export function useItemsColumns({
           return cell.kind === 'value' ? cell.count : null;
         },
         plexPrice,
+        security: (row) => offerLocations.get(row.locationId)?.security ?? null,
+        flagFor: (row) => flagFor?.(row) ?? null,
       }),
-    [t, typeNames, regionNames, offerLocations, offerJumps, plexPrice]
+    [t, typeNames, regionNames, offerLocations, offerJumps, plexPrice, flagFor]
   );
 
   return { columns, itemsColumnsById, itemsCsvColumns, offerJumps, plexAskLabel };
