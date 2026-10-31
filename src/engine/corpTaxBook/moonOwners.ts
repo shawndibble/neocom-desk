@@ -204,7 +204,12 @@ export function summaryFor(
   const s = input.summaries?.get(f.corporationId);
   if (!s || s.schemaVersion !== 1 || s.unpricedDays > 0 || s.status !== f.status) return undefined;
   const today = input.now.slice(0, 10);
-  const settledNow = isSettledOn(deriveModeChanges(f), today);
+  const modes = deriveModeChanges(f);
+  // The summary carries only today's mode and the outer coverage bounds: a closed settled window
+  // or an interior coverage period could have moved without a rebuild and cannot be told apart.
+  if (modes.length > 1 || modes[0]?.mode === 'normal' || f.coveragePeriods.length > 2)
+    return undefined;
+  const settledNow = isSettledOn(modes, today);
   if ((s.balanceKind === 'none') !== settledNow) return undefined;
   const read = f.lastReadWellAt === undefined ? null : Date.parse(f.lastReadWellAt);
   if (s.lastReadWellAt !== read) return undefined;

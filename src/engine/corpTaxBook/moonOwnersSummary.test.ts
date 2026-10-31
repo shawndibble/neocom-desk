@@ -229,6 +229,25 @@ describe('summaryFor', () => {
     ],
     ['the ledger was read again after it', { lastReadWellAt: '2026-10-20T11:00:00Z' }],
     ['the status moved after it', { status: 'pending-removal' as const }],
+    [
+      'a settled window has closed, which the summary cannot show',
+      {
+        modeChanges: [
+          { from: '2026-10-02', mode: 'settled-otherwise' as const },
+          { from: '2026-10-08', mode: 'normal' as const },
+        ],
+      },
+    ],
+    [
+      'it has interior coverage periods',
+      {
+        coveragePeriods: [
+          { from: '2026-10-01', to: '2026-10-02' },
+          { from: '2026-10-04', to: '2026-10-06' },
+          { from: '2026-10-08' },
+        ],
+      },
+    ],
     ['coverage changed after it', { coveragePeriods: [{ from: '2026-10-03' }] }],
   ])('is undefined when %s: the entries price the row instead', (_n, over) => {
     const i = base();
