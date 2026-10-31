@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import en from '../i18n/locales/en.json';
 import { buildPwaShortcuts } from './pwaShortcuts';
@@ -30,5 +30,14 @@ describe('buildPwaShortcuts', () => {
       expect(s.name.length).toBeGreaterThan(0);
       expect(s.name.length).toBeLessThanOrEqual(14);
     }
+  });
+
+  it('is mirrored in twa/twa-manifest.json (docs/ANDROID-TWA.md)', () => {
+    const twa = JSON.parse(readFileSync('twa/twa-manifest.json', 'utf-8')) as {
+      shortcuts: { name: string; url: string }[];
+    };
+    expect(twa.shortcuts.map((s) => [s.name, s.url])).toEqual(
+      shortcuts.map((s) => [s.name, `https://neocomdesk.com${s.url}`])
+    );
   });
 });
