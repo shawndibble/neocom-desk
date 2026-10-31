@@ -2,6 +2,8 @@ import type { SystemJumpsEntry, SystemKillsEntry } from '@/engine/route/routeSaf
 import type { IncursionEntry } from '@/engine/incursions/incursionRows';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
+import { chunk } from '@/lib/chunk';
+import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { EndpointOptions } from './options';
 import { postChunked } from './postChunked';
 
@@ -369,19 +371,38 @@ export interface UniverseIds {
   alliances?: { id: number; name: string }[];
 }
 
-/** Exact-name (case-insensitive) lookup. Empty input never calls ESI. */
+/** ESI's cap on names per `/universe/ids` request (maxItems in the spec). */
+const UNIVERSE_IDS_BATCH = 500;
+
+/**
+ * Exact-name (case-insensitive) lookup. Empty input never calls ESI. More than
+ * 500 names (a busy pasted Local, issue #5668) go one batch at a time, their
+ * buckets merged in batch order.
+ */
 export async function postUniverseIds(
   names: string[],
   options: { signal?: AbortSignal } = {}
 ): Promise<UniverseIds> {
-  if (names.length === 0) return {};
-  const result = await esiFetch<UniverseIds>('/universe/ids', {
-    method: 'POST',
-    body: names,
-    signal: options.signal,
-    endpointId: 'postUniverseIds',
+  const batches = chunk(names, UNIVERSE_IDS_BATCH);
+  const answers: UniverseIds[] = batches.map(() => ({}));
+  // Two in flight, as `postChunked`: ESI bills errors against a shared budget.
+  await mapWithConcurrencyLimit(batches, 2, async (batch) => {
+    const result = await esiFetch<UniverseIds>('/universe/ids', {
+      method: 'POST',
+      body: batch,
+      signal: options.signal,
+      endpointId: 'postUniverseIds',
+    });
+    answers[batches.indexOf(batch)] = result.data ?? {};
   });
-  return result.data ?? {};
+  const merged: UniverseIds = {};
+  for (const answer of answers) {
+    for (const [bucket, entries] of Object.entries(answer)) {
+      const key = bucket as keyof UniverseIds;
+      merged[key] = [...(merged[key] ?? []), ...(entries as { id: number; name: string }[])];
+    }
+  }
+  return merged;
 }
 
 // --- GET /universe/structures/{structure_id} (esi-universe.read_structures.v1) ---

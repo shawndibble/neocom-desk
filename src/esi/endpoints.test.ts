@@ -1367,6 +1367,28 @@ describe('entity name search and resolution', () => {
     expect(result.corporations).toEqual([{ id: 2, name: 'Moon Corp' }]);
     expect(result.alliances).toEqual([{ id: 3, name: 'Moon Corp' }]);
   });
+
+  it('postUniverseIds sends at most 500 names a request and merges the buckets', async () => {
+    const sizes: number[] = [];
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/ids`, async ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        const names = (await request.json()) as string[];
+        sizes.push(names.length);
+        return HttpResponse.json({
+          characters: names.map((name) => ({ id: Number(name.slice(6)), name })),
+        });
+      })
+    );
+
+    const names = Array.from({ length: 1201 }, (_, i) => `Pilot ${i}`);
+    const result = await postUniverseIds(names);
+
+    expect(sizes.sort((a, b) => b - a)).toEqual([500, 500, 201]);
+    expect(result.characters).toHaveLength(1201);
+    expect(result.characters?.map((c) => c.id)).toEqual(names.map((_, i) => i));
+  });
 });
 
 describe('asset names', () => {

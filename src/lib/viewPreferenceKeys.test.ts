@@ -36,6 +36,7 @@ const PINNED = [
   'marketWideSalesShare',
   'piColoniesShowAlts',
   'piPlanControls',
+  'pilotLookupLocalGrouping',
   'planColumnVisibility.v2',
   'planGroupingMode',
   'walletJournalBreakdownOpen',

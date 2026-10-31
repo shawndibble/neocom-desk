@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyPilotPaste, MAX_LIST_PILOTS, parseDscanDistance } from './parsePilotPaste';
+import { classifyPilotPaste, MAX_LOCAL_NAMES, parseDscanDistance } from './parsePilotPaste';
 
 describe('classifyPilotPaste', () => {
   it('reads two or more plain name lines as a Local list', () => {
@@ -25,12 +25,20 @@ describe('classifyPilotPaste', () => {
     expect(classifyPilotPaste('https://example.com\nAlpha')).toBeNull();
   });
 
-  it('keeps the first 40 names and counts the rest', () => {
+  it('keeps every name of a busy Local, past the 40 that get kills looked up', () => {
     const text = Array.from({ length: 52 }, (_, i) => `Pilot ${i}`).join('\n');
     const result = classifyPilotPaste(text);
     if (result?.kind !== 'local') throw new Error('expected a Local list');
-    expect(result.names).toHaveLength(MAX_LIST_PILOTS);
-    expect(result.overflow).toBe(12);
+    expect(result.names).toHaveLength(52);
+    expect(result.overflow).toBe(0);
+  });
+
+  it('keeps the first 2,000 names and counts the rest', () => {
+    const text = Array.from({ length: MAX_LOCAL_NAMES + 7 }, (_, i) => `Pilot ${i}`).join('\n');
+    const result = classifyPilotPaste(text);
+    if (result?.kind !== 'local') throw new Error('expected a Local list');
+    expect(result.names).toHaveLength(MAX_LOCAL_NAMES);
+    expect(result.overflow).toBe(7);
   });
 
   it('reads tab-separated lines starting with a type id as a D-Scan', () => {

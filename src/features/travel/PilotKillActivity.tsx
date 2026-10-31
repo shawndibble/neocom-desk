@@ -16,6 +16,7 @@ import {
   ageTone,
   KILL_SPACES,
   monthlyBySpace,
+  shownLastKill,
   summarizeKills,
 } from '@/engine/pilotList/killActivity';
 import { resolveStanding } from '@/engine/pilotList/standing';
@@ -208,7 +209,8 @@ export function PilotKillActivityView({
       <h4 className={eyebrowClassName}>{t('travel.pilot.activity.last30')}</h4>
       <ul className={cx('grid gap-2', spaces.length === 4 ? 'grid-cols-4' : 'grid-cols-3')}>
         {spaces.map((space) => {
-          const { count, lastMs } = summary.bySpace[space];
+          const { count } = summary.bySpace[space];
+          const lastMs = shownLastKill(summary.bySpace[space].lastMs, now);
           const tone = ageTone(lastMs, now);
           return (
             <li

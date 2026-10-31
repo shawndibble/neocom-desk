@@ -1,9 +1,10 @@
 /**
  * Data for a pasted Local list (issues #2863, and the intel rework that put
- * kills by space and contact standing on every row): one batch name -> id
- * lookup (`POST /universe/ids`, exact match only), each found pilot's current
+ * kills by space and contact standing on every row): a batched name -> id
+ * lookup (`POST /universe/ids`, exact match only), every found pilot's current
  * corporation and alliance, the viewer's own contacts and affiliation, and one
- * zKillboard kill list per pilot who is not already friendly.
+ * zKillboard kill list per non-friendly pilot among the first
+ * `MAX_LIST_PILOTS` names (issue #5668: the rest are placed by organization).
  *
  * Rows are reported as they settle so the table fills in while zKillboard
  * answers. zKillboard calls are made a few at a time, not all 40 at once, with
@@ -14,6 +15,8 @@ import { resolveAffiliations } from '@/features/character/affiliations';
 import { loadContacts } from '@/features/character/contacts';
 import { resolveNames } from '@/features/character/names';
 import { summarizeKills, type KillRecord, type KillSummary } from '@/engine/pilotList/killActivity';
+import { isFriendly } from '@/engine/pilotList/grouping';
+import { MAX_LIST_PILOTS } from '@/engine/pilotList/parsePilotPaste';
 import { resolveStanding, type ContactStanding } from '@/engine/pilotList/standing';
 import { needsDangerRatio, needsLossHistory } from '@/engine/pilotList/threatVerdict';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -64,6 +67,8 @@ export type PilotKillsState =
   | { kind: 'skipped' }
   /** zKillboard could not be reached. */
   | { kind: 'unreachable' }
+  /** Past the first `MAX_LIST_PILOTS` names: placed by organization only. */
+  | { kind: 'notLookedUp' }
   | { kind: 'ready'; kills: KillRecord[]; summary: KillSummary };
 
 /**
@@ -109,10 +114,6 @@ export interface LoadPilotListOptions {
   viewer?: Promise<ViewerContext>;
 }
 
-function isFriendly(row: PilotListRow): boolean {
-  return row.ownOrganization !== null || row.standing?.band === 'blue';
-}
-
 function isKnownBad(row: PilotListRow): boolean {
   return row.standing?.band === 'red' || row.standing?.band === 'orange';
 }
@@ -121,7 +122,7 @@ export async function loadPilotList(
   names: readonly string[],
   { signal, onRows, viewer = Promise.resolve(NO_VIEWER) }: LoadPilotListOptions
 ): Promise<void> {
-  let rows: PilotListRow[] = names.map((name) => ({
+  let rows: PilotListRow[] = names.map((name, index) => ({
     name,
     characterId: null,
     notFound: false,
@@ -131,7 +132,7 @@ export async function loadPilotList(
     allianceName: null,
     standing: null,
     ownOrganization: null,
-    kills: { kind: 'loading' },
+    kills: index < MAX_LIST_PILOTS ? { kind: 'loading' } : { kind: 'notLookedUp' },
     extras: { kind: 'idle' },
   }));
   onRows(rows);
@@ -147,9 +148,14 @@ export async function loadPilotList(
   if (signal?.aborted) return;
   onRows(rows);
 
+  // A 2,000-name Local takes ~80 updates: patch one slot, not a scan of every row.
+  const indexOf = new Map(rows.map((row, i) => [row.characterId, i]));
   function update(characterId: number, patch: Partial<PilotListRow>) {
     if (signal?.aborted) return;
-    rows = rows.map((row) => (row.characterId === characterId ? { ...row, ...patch } : row));
+    const i = indexOf.get(characterId);
+    if (i === undefined) return;
+    rows = rows.slice();
+    rows[i] = { ...rows[i], ...patch };
     onRows(rows);
   }
 

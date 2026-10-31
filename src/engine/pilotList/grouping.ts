@@ -28,16 +28,20 @@ export interface GroupableRow {
   activity: KillSummary | null;
 }
 
+/** Your own corporation or alliance, or a blue contact: never looked up, listed last. */
+export function isFriendly(row: Pick<GroupableRow, 'standing' | 'ownOrganization'>): boolean {
+  return row.ownOrganization !== null || row.standing?.band === 'blue';
+}
+
 /**
  * Order of the checks matters: being in your own organisation beats a contact
- * (a red contact on a corpmate is still a corpmate), a red or orange contact
- * beats what they have killed, and a blue contact is friendly.
+ * (a red contact on a corpmate is still a corpmate), and a red or orange
+ * contact beats what they have killed.
  */
 export function groupOf(row: GroupableRow, here: KillSpace | null): PilotGroupId {
-  if (row.ownOrganization !== null) return 'friendly';
+  if (isFriendly(row)) return 'friendly';
   const band = row.standing?.band;
   if (band === 'red' || band === 'orange') return 'marked';
-  if (band === 'blue') return 'friendly';
   if (row.activity === null) return 'pending';
   if (row.activity.recentCount === 0) return 'quiet';
   if (here !== null && row.activity.bySpace[here].count > 0) return 'here';
