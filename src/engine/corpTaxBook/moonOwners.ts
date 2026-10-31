@@ -382,6 +382,24 @@ const NEEDS_A_LOOK: readonly MoonOwnerStatus[] = [
   'disconnected',
 ];
 
+/**
+ * Whether the Moon owners tab must have the ledger rows (#5717): a moon owner whose summary no
+ * longer says what its record says (`summaryFor`), or whose miner rate depends on an entry
+ * (`minerRateWithoutEntries`), is priced from rows. Anything else renders from the summaries,
+ * and the tab never reads `observed`.
+ */
+export function moonOwnersNeedRows(input: Omit<MoonOwnersInput, 'entries' | 'pricesOn'>): boolean {
+  const full: MoonOwnersInput = { ...input, entries: [], pricesOn: () => new Map() };
+  const today = input.now.slice(0, 10);
+  return input.feeders.some((f) => {
+    const s = summaryFor(full, f);
+    return (
+      !s ||
+      minerRateWithoutEntries(full, f.corporationId, today, s.refineryCount === 0) === 'depends'
+    );
+  });
+}
+
 export function buildMoonOwners(input: MoonOwnersInput): {
   rows: MoonOwnerRow[];
   totals: MoonOwnerTotals;
@@ -509,6 +527,18 @@ export function moonOwnerDetail(input: MoonOwnersInput, id: number): MoonOwnerDe
     payee: payeeOf(f),
     ...(period ? { period } : {}),
   };
+}
+
+/**
+ * What `hasOwnRefineries` says without any ledger row, when the held records settle it: an
+ * Extraction exists, or there are no moon owners (the tab is kept). `undefined`: only the rows
+ * can tell (#5717).
+ */
+export function ownRefineriesFromStored(
+  extractionCount: number,
+  feederCount: number
+): boolean | undefined {
+  return extractionCount > 0 || feederCount === 0 ? true : undefined;
 }
 
 /**

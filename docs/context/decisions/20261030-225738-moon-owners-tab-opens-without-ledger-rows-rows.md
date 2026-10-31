@@ -1,0 +1,8 @@
+# Scope decisions — Moon owners tab opens without ledger rows; rows only when a summary cannot stand in (issue #5717)
+
+_Recorded 2026-10-30 · issue #5717._
+
+- **`observed` is a book part of its own; only the Moon owners tab opens without it.** Every other route (Overview, Miners, Statements, Extractions, every detail page including a moon owner's) keeps reading it through the ADR 0031 Dexie delta, so no warm open reads more than before. The Moon owners tab reads `core` and one `feederViews` summary per owner. It asks for `observed` after all (one extra part read, repriced) when a moon owner's summary cannot stand in (`moonOwnersNeedRows`: missing, stale, unpriced, or a miner rate that depends on an entry) or when has-own-refineries is undecided (no Extraction and at least one moon owner, `ownRefineriesFromStored`). On those books the tab reads what it read before this change.
+- **No server change, no new stored fact.** The shell facts the tab needs come from records it already holds: an Extraction or no moon owner settles the Extractions tab (the same answer the rows gave), and member ids come from the Miners' `characterIds`. A stored refinery or own-refinery fact would need the read-model builder to scan `observed` on every refresh, which costs more reads than it saves.
+- **The unrated-days warning shows only on a tab that holds the rows.** It was a count over every row; the Moon owners tab no longer counts it rather than showing none. No stored unrated count exists to read.
+- **Dialogs that price from rows ask for them.** The Pay dialog (balance and period) and the settings dialog (refinery list for per-refinery rates) call `requestRows`; the page stays ready and the dialog waits for the rows (one `observed` part read, repriced).

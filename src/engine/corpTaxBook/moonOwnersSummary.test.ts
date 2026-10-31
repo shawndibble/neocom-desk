@@ -7,6 +7,9 @@ import { describe, expect, it } from 'vitest';
 import * as server from '../../../functions/src/corpTaxBookEngine';
 import {
   buildMoonOwners,
+  hasOwnRefineries,
+  moonOwnersNeedRows,
+  ownRefineriesFromStored,
   summaryFor,
   type MoonOwnerFeeder,
   type MoonOwnerPayout,
@@ -288,5 +291,74 @@ describe('summaryFor', () => {
     const s = withSummaries(i);
     const onlyA = { ...s, summaries: new Map([[A, s.summaries!.get(A)!]]) };
     expect(buildMoonOwners(onlyA).rows).toEqual(buildMoonOwners(i).rows);
+  });
+});
+
+describe('moonOwnersNeedRows (#5717)', () => {
+  const bare = (i: MoonOwnersInput): Omit<MoonOwnersInput, 'entries' | 'pricesOn'> => ({
+    now: i.now,
+    graceHours: i.graceHours,
+    bookCorporationId: i.bookCorporationId,
+    rates: i.rates,
+    feeders: i.feeders,
+    ...(i.summaries ? { summaries: i.summaries } : {}),
+  });
+
+  it.each(Object.entries(FEEDERS))(
+    '%s: asks for rows only when the tab would differ without them',
+    (_n, feeders) => {
+      const i = withSummaries(input(feeders));
+      const same =
+        JSON.stringify(buildMoonOwners({ ...i, entries: [] }).rows) ===
+        JSON.stringify(buildMoonOwners(i).rows);
+      // A tab that renders the same with no rows must not ask for them; one that differs must.
+      if (!same) expect(moonOwnersNeedRows(bare(i))).toBe(true);
+    }
+  );
+
+  it('needs none for a plain owner with a current summary', () => {
+    expect(moonOwnersNeedRows(bare(withSummaries(input([feeder(A)]))))).toBe(false);
+  });
+
+  it('needs rows for an owner with no summary, or a stale or unpriced one', () => {
+    const i = input([feeder(A), feeder(B, { agreedRatePct: 5 })]);
+    expect(moonOwnersNeedRows(bare(i))).toBe(true);
+    const s = withSummaries(i);
+    const onlyA = { ...s, summaries: new Map([[A, s.summaries!.get(A)!]]) };
+    expect(moonOwnersNeedRows(bare(onlyA))).toBe(true);
+    const unpriced = new Map(s.summaries!);
+    unpriced.set(A, { ...unpriced.get(A)!, unpricedDays: 1 });
+    expect(moonOwnersNeedRows(bare({ ...s, summaries: unpriced }))).toBe(true);
+  });
+
+  it('needs rows when a miner rate depends on the entry', () => {
+    const rates: TaxRate[] = [
+      { scope: 'corp', pct: 12, effectiveFrom: '2026-01-01' },
+      { scope: 'guest', pct: 20, effectiveFrom: '2026-01-01' },
+    ];
+    expect(moonOwnersNeedRows(bare(withSummaries(input([feeder(A)], { rates }))))).toBe(true);
+  });
+});
+
+describe('ownRefineriesFromStored (#5717)', () => {
+  const rows = (...sources: (number | undefined)[]) =>
+    sources.map((sourceCorporationId) => ({ sourceCorporationId }));
+
+  it('settles the answer the rows give whenever an Extraction exists or there is no moon owner', () => {
+    for (const entries of [rows(), rows(A), rows(undefined), rows(BOOK)]) {
+      for (const [extractions, feeders] of [
+        [1, 1],
+        [3, 0],
+        [0, 0],
+      ] as const) {
+        expect(ownRefineriesFromStored(extractions, feeders)).toBe(true);
+        // The tab's own rule: own refineries, or no moon owner yet.
+        expect(hasOwnRefineries(entries, extractions, BOOK) || feeders === 0).toBe(true);
+      }
+    }
+  });
+
+  it('is undecided when only the rows can tell', () => {
+    expect(ownRefineriesFromStored(0, 2)).toBeUndefined();
   });
 });

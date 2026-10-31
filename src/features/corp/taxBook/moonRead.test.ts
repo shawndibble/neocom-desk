@@ -176,7 +176,7 @@ describe('readMoonBookData', () => {
     expect(reads('moonDocs')).toEqual(
       [`${BOOK}/moonDocs/${ID.new}`, `${BOOK}/moonDocs/${ID.old}`].sort()
     );
-    expect(read.data.parts).toEqual(new Set(['core', 'ledger']));
+    expect(read.data.parts).toEqual(new Set(['core', 'observed', 'ledger']));
   });
 
   it('warm: the docs and records come from this tab, only the window rows are read', async () => {
