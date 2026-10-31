@@ -14,6 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { phosphorWeightsPlugin } from './src/components/ui/phosphorWeightsPlugin.ts';
 import { localeSplitPlugin } from './src/i18n/localeSplitPlugin.ts';
+import { buildPwaShortcuts, type PwaShortcutStrings } from './src/app/pwaShortcuts.ts';
 import { deferEntryHtml, importMapProblem } from './src/app/deferredEntry.ts';
 import { lazySdeGlobIgnores } from './src/sde/lazySdeFiles.ts';
 import {
@@ -97,7 +98,7 @@ function sdeDataVersions(): Record<string, string> {
  */
 const { app: appStrings } = JSON.parse(
   readFileSync(new URL('./src/i18n/locales/en.json', import.meta.url), 'utf-8')
-) as { app: { name: string; tagline: string } };
+) as { app: { name: string; tagline: string; shortcuts: PwaShortcutStrings } };
 
 /**
  * Plain `.ts` tests that need a real `document`/`window` — a `renderHook`
@@ -610,6 +611,7 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         scope: '/',
+        shortcuts: buildPwaShortcuts(appStrings.shortcuts),
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },

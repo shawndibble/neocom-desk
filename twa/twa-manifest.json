@@ -25,7 +25,52 @@
   "appVersionName": "3",
   "appVersion": "3",
   "appVersionCode": 3,
-  "shortcuts": [],
+  "shortcuts": [
+    {
+      "name": "Route planner",
+      "shortName": "Route planner",
+      "url": "https://neocomdesk.com/travel",
+      "icons": [
+        {
+          "src": "https://neocomdesk.com/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Pilot lookup",
+      "shortName": "Pilot lookup",
+      "url": "https://neocomdesk.com/travel/pilot",
+      "icons": [
+        {
+          "src": "https://neocomdesk.com/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Alerts",
+      "shortName": "Alerts",
+      "url": "https://neocomdesk.com/alerts",
+      "icons": [
+        {
+          "src": "https://neocomdesk.com/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Open orders",
+      "shortName": "Open orders",
+      "url": "https://neocomdesk.com/market/orders",
+      "icons": [
+        {
+          "src": "https://neocomdesk.com/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://neocomdesk.com/manifest.webmanifest",
   "fallbackType": "customtabs",
