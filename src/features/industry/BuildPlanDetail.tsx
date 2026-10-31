@@ -236,7 +236,8 @@ export function BuildPlanDetail({
     catalog,
     visibleMaterials,
     pricesReady,
-    materialAdvice
+    materialAdvice,
+    boughtDepth
   );
 
   const cheaperSystems = useCheaperNearbySystems(

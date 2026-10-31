@@ -1,21 +1,37 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
-import type { EngineSkill, ScheduledStep } from '@/engine/types';
+import type { EngineSkill, PlanMilestone, TrainedSkill } from '@/engine/types';
+import type { SkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
 import { writeToClipboard } from '@/lib/clipboard';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { useTableExport } from '@/components/ui/useTableExport';
+import type { ExportFormat } from '@/lib/downloadCsv';
 import { useAutoDismiss } from '@/lib/useAutoDismiss';
-import { queueCsvColumns } from '../queueCsv';
+import { queueCsvColumns, queueCsvRows } from '../queueCsv';
+import type { MergedRow, PinnedInProgressEntry } from '../queueRows';
 
-/** Export to clipboard and CSV, with the beside-the-button "copied" confirmation. */
+/**
+ * Export to clipboard (EVE format) and the queue table (`useTableExport`, shown
+ * as the menu's Export table submenu), with the beside-the-button "copied" confirmation.
+ */
 export function usePlanExport({
-  scheduled,
+  schedule,
+  mergedRows,
+  milestones,
+  trainedSkills,
   engineSkills,
+  pinnedInProgress,
+  loadedAtMs,
   nameFor,
   userSkillTypeIDs,
 }: {
-  scheduled: readonly ScheduledStep[];
+  schedule: SkillPlanSchedule;
+  mergedRows: readonly MergedRow[];
+  milestones: readonly PlanMilestone[];
+  trainedSkills: ReadonlyMap<number, TrainedSkill>;
   engineSkills: ReadonlyMap<number, EngineSkill>;
+  pinnedInProgress: PinnedInProgressEntry | null;
+  loadedAtMs: number;
   nameFor: (skillTypeID: number) => string;
   userSkillTypeIDs: ReadonlySet<number>;
 }) {
@@ -23,6 +39,25 @@ export function usePlanExport({
   const [copyConfirm, setCopyConfirm] = useState(false);
   const { show: showCopyConfirm } = useAutoDismiss<boolean>(setCopyConfirm, false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const { scheduled } = schedule;
+  const columns = useMemo(
+    () => queueCsvColumns(t, nameFor, userSkillTypeIDs, { schedule, engineSkills }),
+    [t, nameFor, userSkillTypeIDs, schedule, engineSkills]
+  );
+  const tableExport = useTableExport({
+    surface: 'skill-queue', // Built when an export runs, not on every plan edit.
+    rows: () =>
+      queueCsvRows({
+        mergedRows,
+        schedule,
+        trainedSkills,
+        pinned: pinnedInProgress,
+        nowMs: loadedAtMs,
+        milestones,
+      }),
+    columns,
+    source: 'rows',
+  });
 
   async function handleExport() {
     const text = exportPlanToClipboard(
@@ -33,9 +68,17 @@ export function usePlanExport({
     showCopyConfirm(true);
   }
 
-  function handleExportCsv() {
-    downloadCsv('skill-queue', scheduled, queueCsvColumns(t, nameFor, userSkillTypeIDs));
+  /** A table copy confirms beside the button, as the EVE-format copy does. */
+  function handleTableDone(format: ExportFormat) {
+    if (format === 'clipboard') showCopyConfirm(true);
   }
 
-  return { copyConfirm, exportMenuOpen, setExportMenuOpen, handleExport, handleExportCsv };
+  return {
+    copyConfirm,
+    exportMenuOpen,
+    setExportMenuOpen,
+    handleExport,
+    handleTableDone,
+    tableExport,
+  };
 }

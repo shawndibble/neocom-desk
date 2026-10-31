@@ -68,7 +68,6 @@ export function AssetsList({
     activeFilterCount,
     resetFilters,
     flatModeActive,
-    activeCrossCharacterData,
     assetsResult,
     assetsTruncated,
     assetsNeedsReauth,
@@ -273,15 +272,6 @@ export function AssetsList({
               <span className={eyebrowClassName}>
                 {t('assets.search.resultCount', { count: flatMatches.length })}
               </span>
-              {/* CSV export always stays scoped to the active Character's own
-                      assets (see buildCsvGroups above) — this is the only UI surface
-                      that explains why (issue #415), shown exactly when cross-
-                      character results are actually on screen to be confused by. */}
-              {activeCrossCharacterData && (
-                <span className="text-[0.6875rem] text-text-dim">
-                  {t('assets.crossCharacterCsvNote')}
-                </span>
-              )}
               <div className="ml-auto flex items-center gap-2">
                 {searchActive && (
                   <IconButton

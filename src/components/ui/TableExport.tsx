@@ -54,6 +54,9 @@ interface ExportItemsProps<T> {
  */
 export function ExportTableItems<T>({ tableExport, onDone }: ExportItemsProps<T>) {
   const { t } = useTranslation();
+  // The items exist only while a menu is open: opening one is the intent to export.
+  const { onExportIntent } = tableExport;
+  useEffect(() => onExportIntent?.(), [onExportIntent]);
   const select = (format: ExportFormat) => {
     // Started inside the select handler, while the document still has focus:
     // the clipboard write is refused once focus has moved on.

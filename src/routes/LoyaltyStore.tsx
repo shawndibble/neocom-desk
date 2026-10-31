@@ -267,7 +267,10 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     ...LOYALTY_STORE_OFFERS_COLUMN_IDS,
   ]);
   // Every column, whatever the picker hides.
-  const offersCsvColumns = useMemo(() => loyaltyOfferCsvColumns(t), [t]);
+  const offersCsvColumns = useMemo(
+    () => loyaltyOfferCsvColumns(t, { concordRate: concord?.rate ?? null }),
+    [t, concord]
+  );
   const offersExport = useTableExport({
     surface: 'lp-offers',
     rows: filteredRows,

@@ -417,21 +417,31 @@ describe('cross-character search (issue #85)', () => {
     expect(fetchCount).toBe(1);
   });
 
-  it('explains why cross-character results are excluded from CSV export, only while they’re actually showing', async () => {
+  it('no longer carries a note that CSV export leaves other characters out', async () => {
     const user = userEvent.setup({ delay: null });
     render(<App />);
     await screen.findByText(JITA);
 
-    await user.type(screen.getByPlaceholderText(/search items/i), 'tritanium');
-    await screen.findByText('Tritanium');
-    expect(screen.queryByText(/CSV export only includes this character/i)).not.toBeInTheDocument();
-
     await selectAllCharacters(user);
-    await user.clear(screen.getByPlaceholderText(/search items/i));
     await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
 
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
-    expect(screen.getByText(/CSV export only includes this character/i)).toBeInTheDocument();
+    expect(screen.queryByText(/CSV export only includes this character/i)).not.toBeInTheDocument();
+  });
+
+  it("exports other characters' matches too while their results are on screen", async () => {
+    vi.mocked(exportRows).mockClear();
+    const user = userEvent.setup({ delay: null });
+    render(<App />);
+    await screen.findByText(JITA);
+
+    await selectAllCharacters(user);
+    await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+    await downloadCsv(user);
+
+    await waitFor(() => expect(exportRows).toHaveBeenCalledTimes(1));
+    expect(JSON.stringify(vi.mocked(exportRows).mock.calls[0][2])).toContain('Pyerite');
   });
 
   it('exports only what the search matches, and nothing when nothing does', async () => {

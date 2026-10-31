@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -8,6 +8,7 @@ import { buildBookView, type BookViewInput } from '@/engine/corpTaxBook/bookView
 import type { MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
 import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
 import type { BookData, BookFeeder, BookSettings, OfficerVerdict } from '../taxBook/bookClient';
+import type { FeederViewSummary } from '../taxBook/feederViewClient';
 import { BookProvider } from './BookContext';
 import { InviteMoonOwnerDialog } from './InviteMoonOwnerDialog';
 import { MoonOwnerDetail } from './MoonOwnerDetail';
@@ -148,7 +149,8 @@ function renderBook(
   ui: ReactElement,
   feeders: BookFeeder[],
   path = '/corp/moons/moon-owners',
-  over: Partial<BookViewInput> = {}
+  over: Partial<BookViewInput> = {},
+  bookData: Partial<BookData> = {}
 ) {
   const input: BookViewInput = {
     corporationId: BOOK,
@@ -196,7 +198,7 @@ function renderBook(
             graceHours: 6,
             rates: input.rates as BookSettings['rates'],
           } as BookSettings,
-          data: { feeders, state: { extractions: [] } } as unknown as BookData,
+          data: { feeders, state: { extractions: [] }, ...bookData } as unknown as BookData,
           verdict,
           reload,
         }}
@@ -240,6 +242,71 @@ describe('MoonOwnersTab', () => {
     // 1000 ore at the page's 50 ISK, 8%: 4,000, not the miner line's 8,000.
     expect(within(table).getByText(/4,000/)).toBeInTheDocument();
     expect(within(table).queryByText(/8,000/)).toBeNull();
+  });
+
+  describe('from the moon owner summaries (#5717)', () => {
+    const summary = (over: Partial<FeederViewSummary> = {}) =>
+      ({
+        schemaVersion: 1,
+        status: 'active',
+        builtAt: Date.parse('2026-10-20T07:00:00Z'),
+        coverageFrom: '2026-10-01',
+        coverageTo: null,
+        lastReadWellAt: Date.parse('2026-10-20T06:00:00Z'),
+        rateHistory: [{ kind: 'agreed', pct: 8, effectiveFrom: '2026-10-01', recordedAt: 'x' }],
+        minedVolume: 1000,
+        minedValueIsk: 100_000,
+        accruedIsk: 8_000,
+        paidIsk: 0,
+        balanceKind: 'owed',
+        balanceIsk: 8_000,
+        refineryCount: 1,
+        unpricedDays: 0,
+        ...over,
+      }) as FeederViewSummary;
+    const ash = () => feeder(ASH, { agreedRatePct: 8 });
+    const summaries = (s: FeederViewSummary) => ({ feederSummaries: new Map([[ASH, s]]) });
+
+    it('shows what each owner is owed with no ledger row held at all', () => {
+      renderBook(
+        <MoonOwnersTab />,
+        [ash()],
+        '/corp/moons/moon-owners',
+        { entries: [] },
+        summaries(summary())
+      );
+      const table = screen.getByRole('table', { name: 'Moon owners' });
+      expect(within(table).getByText('Ashfall Mining')).toBeInTheDocument();
+      expect(within(table).getByText(/8,000/)).toBeInTheDocument();
+    });
+
+    it('shows the same table as the ledger rows give', () => {
+      renderBook(<MoonOwnersTab />, [ash()]);
+      const fromRows = screen.getByRole('table', { name: 'Moon owners' }).textContent;
+      cleanup();
+      renderBook(
+        <MoonOwnersTab />,
+        [ash()],
+        '/corp/moons/moon-owners',
+        { entries: [] },
+        summaries(summary())
+      );
+      expect(screen.getByRole('table', { name: 'Moon owners' }).textContent).toBe(fromRows);
+    });
+
+    it('prices from the ledger rows once an officer changed the rate after the summary was built', () => {
+      renderBook(
+        <MoonOwnersTab />,
+        [feeder(ASH, { agreedRatePct: 9 })],
+        '/corp/moons/moon-owners',
+        {},
+        summaries(summary())
+      );
+      const table = screen.getByRole('table', { name: 'Moon owners' });
+      // 1000 ore at 100 ISK, 9%, not the summary's 8%.
+      expect(within(table).getByText(/9,000/)).toBeInTheDocument();
+      expect(within(table).queryByText(/8,000/)).toBeNull();
+    });
   });
 
   it('says so when the book has no moon owners', () => {

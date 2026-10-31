@@ -77,7 +77,7 @@ import { Vs90dFigure } from './Vs90dFigure';
 import { vs90dTooltip } from './vs90d';
 import { StartPlanButton } from './StartPlanButton';
 import { COL_ICON, COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
-import { opportunitiesCsvColumns } from './opportunitiesCsv';
+import { opportunitiesCsvColumns, skillGateExport } from './opportunitiesCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { useIndustryCharacterFilter } from './industryCharacterFilter';
@@ -376,7 +376,14 @@ export function OpportunitiesPanel({
 
   const showCharacterColumn = new Set(rows.map((r) => r.candidate.characterId)).size > 1;
 
-  const csvColumns = useMemo(() => opportunitiesCsvColumns(t), [t]);
+  const csvColumns = useMemo(
+    () =>
+      opportunitiesCsvColumns(
+        t,
+        skillGateExport(skillGateByProductTypeID, catalog, characterNames)
+      ),
+    [t, skillGateByProductTypeID, catalog, characterNames]
+  );
   const opportunitiesExport = useTableExport({
     surface: 'industry-opportunities',
     rows,

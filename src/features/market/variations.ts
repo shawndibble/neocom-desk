@@ -6,6 +6,8 @@
  * synchronous; the route resolves each row's own price.
  */
 import { getVariations, type VariationIndex } from '@/engine/market/variations';
+import type { OrderBookSummary } from '@/engine/market/orderBook';
+import { priceComparison, type PriceComparison } from '@/engine/market/orderBookDepth';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 
 export interface VariationRow {
@@ -60,4 +62,13 @@ export function getVariationRows(
   }
   if (rows.length > 0) return { rows };
   return { rows: siblingRows(typesByGroup, selected) };
+}
+
+/** A variation's best sell against the item it varies, at the same location; null when either has none. */
+export function versusSelf(
+  selfSummary: OrderBookSummary | undefined,
+  prices: ReadonlyMap<number, OrderBookSummary | undefined>,
+  typeId: number
+): PriceComparison | null {
+  return priceComparison(selfSummary?.bestSell ?? null, prices.get(typeId)?.bestSell ?? null);
 }

@@ -7,6 +7,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo } from 'react';
 import { db } from '@/db';
+import type { Translate } from '@/lib/translate';
 
 export interface BuybackLinkInfo {
   requestId: string;
@@ -45,6 +46,11 @@ export async function rememberBuybackLinks(
   const keys = Object.keys(merged);
   for (const key of keys.slice(0, Math.max(0, keys.length - MAX_LINKS))) delete merged[key];
   await db.settings.put({ key: keyOf(characterId), value: merged });
+}
+
+/** The words of the Community cue on a buyback contract: which request and Community it answers. */
+export function buybackCueText(t: Translate, link: BuybackLinkInfo): string {
+  return t('contracts.buyback.cue', { title: link.requestTitle, community: link.communityName });
 }
 
 /** This Character's remembered buyback contracts, by contract id; empty until read. */

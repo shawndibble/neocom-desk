@@ -1,6 +1,9 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { isUnpricedOffer, offerAskingPrice } from '@/engine/contracts/contractSearch';
+import { memoByRow } from '@/lib/memoByRow';
+import { auctionKindLabel, flagLabel, flagMultiple, flagReferencePrice } from './contractFlagText';
+import type { ContractFlag } from '@/engine/contracts/contractFlags';
 
 /** The panel's own spellings, so the export names things the way the table does. */
 export interface ContractSearchCsvLookups {
@@ -12,6 +15,10 @@ export interface ContractSearchCsvLookups {
   jumps: (row: PublicContractOfferRow) => number | null;
   /** ISK per PLEX, folded into a PLEX-asking row's price; `null` leaves that price blank. */
   plexPrice: number | null;
+  /** The system's security status, or `null` when unplaced or still resolving. */
+  security: (row: PublicContractOfferRow) => number | null;
+  /** The price flag the table marks the row with (overpriced, copy above original), or `null`. */
+  flagFor: (row: PublicContractOfferRow) => ContractFlag | null;
 }
 
 /**
@@ -20,12 +27,15 @@ export interface ContractSearchCsvLookups {
  * unpriced barter — its 0 ISK is the absence of a price, not a price
  * (issue #1080). A PLEX ask is counted into Price at `plexPrice` and also
  * listed raw in its own column, so the figure can be re-derived. The expiry is epoch ms in the row, handed on as an ISO UTC
- * timestamp so it lands as a date.
+ * timestamp so it lands as a date. Every column the table can show is here
+ * whichever the picker has ticked, plus the facts it keeps in sub-lines and
+ * marks: auction kind, system security and the price flag with its multiple.
  */
 export function contractSearchCsvColumns(
   t: CsvTranslate,
   lookups: ContractSearchCsvLookups
 ): CsvColumn<PublicContractOfferRow>[] {
+  const flagOf = memoByRow(lookups.flagFor);
   return [
     { header: t('contractSearch.itemColumn'), value: (row) => lookups.typeName(row.typeId) },
     { header: t('contractSearch.qtyColumn'), value: (row) => row.quantity },
@@ -41,6 +51,33 @@ export function contractSearchCsvColumns(
     {
       header: t('contractSearch.expiresColumn'),
       value: (row) => new Date(row.dateExpired).toISOString(),
+    },
+    {
+      // An auction's price is a starting bid unless the seller set a buyout.
+      header: t('contracts.typeAuction'),
+      value: (row) => (row.isAuction ? auctionKindLabel(t, row.buyout) : null),
+    },
+    { header: t('market.securityColumn'), value: (row) => lookups.security(row) },
+    {
+      header: t('contractSearch.priceFlagColumn'),
+      value: (row) => {
+        const flag = flagOf(row);
+        return flag ? flagLabel(flag, t) : null;
+      },
+    },
+    {
+      header: t('contractSearch.priceFlagMultipleColumn'),
+      value: (row) => {
+        const flag = flagOf(row);
+        return flag ? flagMultiple(flag) : null;
+      },
+    },
+    {
+      header: t('contractSearch.priceFlagReferenceColumn'),
+      value: (row) => {
+        const flag = flagOf(row);
+        return flag ? flagReferencePrice(flag) : null;
+      },
     },
   ];
 }

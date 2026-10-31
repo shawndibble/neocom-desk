@@ -136,8 +136,22 @@ export function BookSettingsDialog({
   initialTab?: SettingsTab;
 }) {
   const { t } = useTranslation();
-  const { settings, view, names, edit, canEdit, verdict, data, characterId, corporationId } =
-    useBook();
+  const {
+    settings,
+    view,
+    names,
+    edit,
+    canEdit,
+    verdict,
+    data,
+    characterId,
+    corporationId,
+    requestRows,
+  } = useBook();
+  // The refinery list below includes a moon owner's, which only its ledger rows name.
+  useEffect(() => {
+    if (open) requestRows?.();
+  }, [open, requestRows]);
   const divisionNames = useWalletDivisionNames(characterId, corporationId);
   const [hubId, setHubId] = useState(settings.hubId);
   const [oreForm, setOreForm] = useState(settings.oreForm);

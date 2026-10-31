@@ -13,6 +13,10 @@ export interface ScopeOrderCsvRow {
   price: number | null;
   gapIsk: number | null;
   gapPct: number | null;
+  /** Rival orders priced better than mine; null where the scope only has an aggregate price (no order count) or no rival. */
+  ordersBeatingMe: number | null;
+  /** Units on those orders; null alongside `ordersBeatingMe`. */
+  unitsBeatingMe: number | null;
   /** "Same station", "3 jumps"… — words on screen, words here. */
   distance: string | null;
 }
@@ -25,6 +29,8 @@ export function scopeOrdersCsvColumns(t: CsvTranslate): CsvColumn<ScopeOrderCsvR
     { header: t('market.orders.scopeTheirPrice'), value: (row) => row.price },
     { header: t('market.orders.scopeOverBy'), value: (row) => row.gapIsk },
     { header: t('market.orders.scopeOverByPct'), value: (row) => row.gapPct },
+    { header: t('market.orders.scopeOrdersBeating'), value: (row) => row.ordersBeatingMe },
+    { header: t('market.orders.scopeUnitsBeating'), value: (row) => row.unitsBeatingMe },
     { header: t('market.orders.scopeDistance'), value: (row) => row.distance },
   ];
 }

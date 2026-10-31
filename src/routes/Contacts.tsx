@@ -128,9 +128,13 @@ export function Contacts() {
   const acrossLists = data?.acrossLists ?? NO_LISTS;
   const ownAffiliation = data?.ownAffiliation ?? NO_OWN_AFFILIATION;
 
+  // Set on the first open of the export menu: Title / Score are read only once asked for.
+  const [exportArmed, setExportArmed] = useState(false);
   const contacts = useMemo(() => contactsResult?.data ?? [], [contactsResult]);
   const {
     affiliationRows,
+    achievements,
+    achievementsPending,
     optionalCharacterColumns,
     availableCharacterColumnIds,
     columns,
@@ -142,6 +146,7 @@ export function Contacts() {
     contactLabels,
     affiliations,
     ownAffiliation,
+    exportArmed,
   });
 
   const counts = useMemo(
@@ -220,14 +225,16 @@ export function Contacts() {
   // One export button in the page header, exporting whichever tab's table is showing —
   // each tab keeps its own surface so the two files never share a name.
   const characterCsvColumns = useMemo(
-    () => contactsCsvColumns(t, contactNames, affiliationRows),
-    [t, contactNames, affiliationRows]
+    () => contactsCsvColumns(t, contactNames, affiliationRows, contactLabels, achievements),
+    [t, contactNames, affiliationRows, contactLabels, achievements]
   );
   const characterExport = useTableExport({
     surface: 'contacts',
     rows: filteredContacts,
     columns: characterCsvColumns,
-    truncated: contactsTruncated,
+    truncated: contactsTruncated || achievementsPending,
+    // Title / Score are read once any export menu opens (header or a row's).
+    onExportIntent: () => setExportArmed(true),
   });
   const acrossCsvColumns = useMemo(
     () => contactsAcrossCsvColumns(t, contactNames),

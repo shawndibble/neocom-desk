@@ -25,4 +25,10 @@ describe('loyaltyPointsCsvColumns', () => {
     expect(concord).toBe('"CONCORD",12500');
     expect(unknown).toBe('"#42",0');
   });
+
+  it('lists the Paragon entry as an EverMarks row', () => {
+    const columns = loyaltyPointsCsvColumns(t, nameFor);
+    const csv = toCsv([{ corporation_id: 1000419, loyalty_points: 800 }], columns);
+    expect(csv.split('\r\n')[1]).toBe('"wallet.everMarks",800');
+  });
 });

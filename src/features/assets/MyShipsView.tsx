@@ -44,6 +44,9 @@ import { placeKey, usePlaceDetails } from '@/features/places';
 import { loadGroupNames } from '@/features/market/groupNames';
 import { JumpsAwayText, SecurityValue } from './assetBrowserRows';
 import { PlaceName } from './PlaceName';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { shipsCsvColumns } from './shipsCsv';
 import type { JumpBasis } from '@/features/route/jumpBasis';
 
 /** SDE category 6. */
@@ -135,8 +138,12 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
 /** Flags worth naming; a container's own flag (Unlocked) adds nothing, so it reads as the holder name alone. */
 const NAMED_HOLD_FLAGS = new Set(['ShipHangar', 'FleetHangar', 'Cargo']);
 
-/** What holds a ship inside another asset, outermost first: "inside Orca (Ship Maintenance Bay) › Cargo Container". Empty for a free-standing ship. */
-function holderTrail(row: ShipRow, holderNames: ReadonlyMap<number, string>, t: TFunction): string {
+/** The holders of a ship, outermost first: "Orca (Ship Maintenance Bay) › Cargo Container". Empty for a free-standing ship. */
+function holderTrailText(
+  row: ShipRow,
+  holderNames: ReadonlyMap<number, string>,
+  t: TFunction
+): string {
   const parts = row.trail.flatMap((itemId, i) => {
     const holder = holderNames.get(itemId);
     if (!holder) return [];
@@ -147,7 +154,13 @@ function holderTrail(row: ShipRow, holderNames: ReadonlyMap<number, string>, t: 
         : holder,
     ];
   });
-  return parts.length === 0 ? '' : t('assets.myShips.inside', { holder: parts.join(' › ') });
+  return parts.join(' › ');
+}
+
+/** What holds a ship inside another asset: "inside Orca (Ship Maintenance Bay) › Cargo Container". Empty for a free-standing ship. */
+function holderTrail(row: ShipRow, holderNames: ReadonlyMap<number, string>, t: TFunction): string {
+  const text = holderTrailText(row, holderNames, t);
+  return text === '' ? '' : t('assets.myShips.inside', { holder: text });
 }
 
 /** The kind a ship's location resolves under: a station, a system, else a structure (`other`, or the parent of an item ESI never returned as an asset). */
@@ -496,6 +509,35 @@ export function MyShipsView({
     });
     return items.map((item) => item.row);
   }, [staticKeys, places, query, sort]);
+  const shipsCsvColumnList = useMemo(() => {
+    if (state.status !== 'ready') return [];
+    const { data } = state;
+    const placeOf = (row: ShipRow) => places.get(placeKey(row));
+    return shipsCsvColumns(t, {
+      shipName: (row) =>
+        data.typeNames.get(row.typeId) ?? t('assets.myShips.unknownType', { id: row.typeId }),
+      gameName: (row) => (!row.packaged && data.gameNames[row.itemId]) || '',
+      shipClass: (row) => shipClasses.get(data.groupIdByType.get(row.typeId) ?? -1) ?? '',
+      characterName: (row) => data.characterNames.get(row.characterId) ?? '',
+      location: (row) => placeOf(row)?.name ?? '',
+      heldInside: (row) => holderTrailText(row, data.holderNames, t),
+      security: (row) => {
+        const place = placeOf(row);
+        return typeof place?.systemId === 'number' ? (place.security ?? null) : null;
+      },
+      jumps: (row) => {
+        const jumps = placeOf(row)?.jumps;
+        return jumps?.kind === 'known' ? jumps.jumps : null;
+      },
+    });
+  }, [state, places, shipClasses, t]);
+  const shipsExport = useTableExport({
+    surface: 'my-ships',
+    // Not a DataTable: `sorted` already carries the search and the sort.
+    source: 'rows',
+    rows: sorted,
+    columns: shipsCsvColumnList,
+  });
   // One Character's ships need no Character column.
   const showCharacter = characterIds.length > 1;
   const columns = (
@@ -525,6 +567,9 @@ export function MyShipsView({
             aria-label={t('assets.myShips.searchLabel')}
             className="w-full sm:ml-auto sm:w-64"
           />
+          {state.status === 'ready' && sorted.length > 0 && (
+            <TableActionsMenu name={t('assets.myShips.title')} tableExport={shipsExport} />
+          )}
         </div>
         <DataGate
           status={

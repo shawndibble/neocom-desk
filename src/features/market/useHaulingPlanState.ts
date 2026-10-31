@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { planTrip, type TripOverride } from '@/engine/market/haulingPlan';
+import { isOnTrip, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
 import type { CargoHold } from '@/engine/market/cargoHolds';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { TRADE_HUBS } from '@/market/hubs';
@@ -87,8 +87,7 @@ export function useHaulingPlanState({
   const clearAll = () =>
     setOverrides(new Map(tableRows.map((r) => [r.typeId, { selected: false }])));
 
-  const allSelected =
-    tableRows.length > 0 && tableRows.every((r) => overrides.get(r.typeId)?.selected !== false);
+  const allSelected = tableRows.length > 0 && tableRows.every((r) => isOnTrip(overrides, r.typeId));
 
   return {
     overrides,
@@ -109,8 +108,10 @@ interface HaulingExportInput {
   mode: HaulMode;
   anyEnd: HaulingAnyEnd;
   tableRows: readonly HaulingViewRow[];
-  lineOf: ReadonlyMap<number, { quantity: number }>;
+  lineOf: ReadonlyMap<number, { quantity: number; profit: number; volumeM3: number }>;
   overrides: ReadonlyMap<number, TripOverride>;
+  /** Rows added by the fill, and the category each came from. */
+  addedFromOf: (typeId: number) => string | null;
 }
 
 /** The table's CSV/clipboard export: Bring is the planned quantity, blank for an unticked row. */
@@ -120,6 +121,7 @@ export function useHaulingExport({
   tableRows,
   lineOf,
   overrides,
+  addedFromOf,
 }: HaulingExportInput) {
   const { t } = useTranslation();
   const csvColumns = useMemo(
@@ -127,14 +129,21 @@ export function useHaulingExport({
       haulingCsvColumns(t, {
         mode,
         anyEnd,
+        profitFor: (row) => {
+          const line = lineOf.get(row.typeId);
+          return !line || line.quantity === 0 ? null : line.profit;
+        },
+        holdM3For: (row) => lineOf.get(row.typeId)?.volumeM3 ?? null,
+        addedFromFor: (row) => addedFromOf(row.typeId),
+        selectedFor: (row) => isOnTrip(overrides, row.typeId),
         flagText: (flag) => t(`market.hauling.flags.${HAULING_FLAG_KEY[flag]}`),
         bringFor: (row) => {
           const line = lineOf.get(row.typeId);
-          if (!line || overrides.get(row.typeId)?.selected === false) return null;
+          if (!line || !isOnTrip(overrides, row.typeId)) return null;
           return line.quantity;
         },
       }),
-    [t, mode, anyEnd, lineOf, overrides]
+    [t, mode, anyEnd, lineOf, overrides, addedFromOf]
   );
   return useTableExport({ surface: 'hauling', rows: tableRows, columns: csvColumns });
 }

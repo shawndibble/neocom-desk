@@ -57,3 +57,15 @@ export function corpWideRoles(
 export function corpRoleLabel(role: string): string {
   return role.replace(/_/g, ' ');
 }
+
+/**
+ * A member's roles as one line; null when there are none to print. Sorted
+ * because ESI's order is not, and one role set must print and sort one way.
+ */
+export function rolesText(roles: readonly string[] | null): string | null {
+  if (roles === null || roles.length === 0) return null;
+  return roles
+    .map(corpRoleLabel)
+    .sort((a, b) => a.localeCompare(b))
+    .join(', ');
+}

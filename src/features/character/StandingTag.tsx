@@ -12,8 +12,8 @@
  */
 import { useTranslation } from 'react-i18next';
 import { StandingIcon } from '@/components/ui/StandingIcon';
-import { standingTier } from '@/components/ui/standingTier';
 import type { EffectiveStanding } from './contactStandings';
+import { standingLabel } from './standingLabel';
 
 interface StandingTagProps {
   standing: EffectiveStanding | null;
@@ -22,14 +22,7 @@ interface StandingTagProps {
 
 export function StandingTag({ standing, className }: StandingTagProps) {
   const { t } = useTranslation();
-  if (standing === null) return null;
-  const tier = t(`contacts.tier.${standingTier(standing.standing)}`);
-  const label = standing.inherited
-    ? t('contacts.standingSummaryInherited', {
-        tier,
-        value: standing.standing,
-        source: t(`contacts.source.${standing.source}`),
-      })
-    : t('contacts.standingSummaryOwn', { tier, value: standing.standing });
+  const label = standingLabel(t, standing);
+  if (standing === null || label === null) return null;
   return <StandingIcon value={standing.standing} label={label} className={className} />;
 }

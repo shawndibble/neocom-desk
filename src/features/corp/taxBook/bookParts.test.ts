@@ -1,37 +1,55 @@
 import { describe, expect, it } from 'vitest';
 import { ALL_BOOK_PARTS, bookPartsFor, mergeBookParts, missingBookParts } from './bookParts';
 
+const sorted = (tab: string, detail: Parameters<typeof bookPartsFor>[1] = null) =>
+  [...bookPartsFor(tab, detail)].sort();
+
 describe('bookPartsFor', () => {
-  it('reads only the core for Extractions and Moon owners', () => {
-    for (const route of ['extractions', 'moon-owners'] as const) {
-      expect([...bookPartsFor(route, null)]).toEqual(['core']);
-    }
+  it('names the parts every route reads (#5717)', () => {
+    // Only the Moon owners tab opens without ledger rows; every other route keeps `observed`.
+    expect(sorted('overview')).toEqual(['core', 'ledger', 'observed']);
+    expect(sorted('extractions')).toEqual(['core', 'observed']);
+    expect(sorted('miners')).toEqual(['answers', 'core', 'ledger', 'observed']);
+    expect(sorted('statements')).toEqual(['core', 'ledger', 'observed']);
+    expect(sorted('moon-owners')).toEqual(['core', 'owners']);
+    expect(sorted('anything-else')).toEqual(['core', 'observed']);
   });
 
-  it('adds the ledger for Miners and Statements, and the answers for Miners', () => {
-    expect(new Set(bookPartsFor('statements', null))).toEqual(new Set(['core', 'ledger']));
-    expect(new Set(bookPartsFor('miners', null))).toEqual(new Set(['core', 'ledger', 'answers']));
+  it('reads no rows for the Moon owners tab only, and its detail page keeps them', () => {
+    expect(bookPartsFor('moon-owners', null).has('observed')).toBe(false);
+    expect(sorted('moon-owners', 'moonOwner')).toEqual(['core', 'observed']);
+    expect(ALL_BOOK_PARTS).toContain('observed');
+    expect(ALL_BOOK_PARTS).not.toContain('owners');
   });
 
   it('follows a detail page, not the tab it hangs under', () => {
-    expect(new Set(bookPartsFor('extractions', 'miner'))).toEqual(
-      new Set(['core', 'ledger', 'answers'])
-    );
-    expect([...bookPartsFor('miners', 'extraction')]).toEqual(['core', 'ledger']);
-    expect([...bookPartsFor('miners', 'moonOwner')]).toEqual(['core']);
+    expect(sorted('extractions', 'miner')).toEqual(['answers', 'core', 'ledger', 'observed']);
+    expect(sorted('miners', 'extraction')).toEqual(['core', 'ledger', 'observed']);
+    expect(sorted('miners', 'moonOwner')).toEqual(['core', 'observed']);
+    expect(sorted('moon-owners', 'statementPeriod')).toEqual(['core', 'ledger', 'observed']);
   });
 });
 
 describe('missingBookParts', () => {
   it('names what a tab needs beyond what is already held', () => {
-    expect([...missingBookParts(bookPartsFor('statements', null), new Set(['core']))]).toEqual([
-      'ledger',
-    ]);
+    expect([
+      ...missingBookParts(bookPartsFor('statements', null), new Set(['core', 'observed'])),
+    ]).toEqual(['ledger']);
+  });
+
+  it('reads only the rows when the Moon owners tab falls back to them', () => {
+    expect([
+      ...missingBookParts(
+        new Set(['core', 'owners', 'observed']),
+        bookPartsFor('moon-owners', null)
+      ),
+    ]).toEqual(['observed']);
   });
 
   it('is empty when the held parts cover the tab', () => {
     expect(
-      missingBookParts(bookPartsFor('extractions', null), new Set(['core', 'ledger'])).size
+      missingBookParts(bookPartsFor('extractions', null), new Set(['core', 'observed', 'ledger']))
+        .size
     ).toBe(0);
   });
 
@@ -49,11 +67,5 @@ describe('mergeBookParts', () => {
 
   it('keeps the everything marker', () => {
     expect(new Set(mergeBookParts(undefined, new Set(['core'])))).toEqual(new Set(ALL_BOOK_PARTS));
-  });
-});
-
-describe('bookPartsFor the Overview (#5259)', () => {
-  it('reads core and ledger: owed and Needs you derive from payments and declarations', () => {
-    expect([...bookPartsFor('overview', null)].sort()).toEqual(['core', 'ledger']);
   });
 });

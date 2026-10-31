@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { moonOwnerDetail } from '@/engine/corpTaxBook/moonOwners';
 import { recordFeederPayout } from '../taxBook/feederClient';
 import { PayMoonOwnerDialog } from './PayMoonOwnerDialog';
@@ -19,10 +20,12 @@ export function PayMoonOwnerHost({
   manual?: boolean;
   onClose: () => void;
 }) {
-  const { names, characterId, corporationId, reload } = useBook();
+  const { names, characterId, corporationId, reload, data, requestRows } = useBook();
   const input = useMoonOwnersInput();
+  // The balance and the period come from the ledger rows, which the Moon owners tab may not hold.
+  useEffect(() => requestRows?.(), [requestRows]);
   const detail = moonOwnerDetail(input, owner);
-  if (!detail) return null;
+  if (!detail || !(data.parts?.has('observed') ?? true)) return null;
   const payeeName =
     detail.payee.kind === 'character'
       ? names.character(detail.payee.id)

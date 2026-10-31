@@ -15,13 +15,13 @@ import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
 import { useUrlSort } from '@/lib/useUrlState';
 import { formatCubicMetres } from '@/lib/volume';
-import type { CsvColumn } from '@/lib/csv';
 import {
   CORP_ASSET_LOCATION_COLUMN_IDS,
   useVisibleCorpAssetLocationColumns,
   type CorpAssetLocationColumnId,
 } from './corpAssetsColumns';
 import type { LedgerLabels, LocationRow } from './assetLedgerView';
+import { corpAssetLocationCsvColumns } from './corpAssetsCsv';
 
 /** `undefined` sinks a row to the end of its group in either sort direction: Corp deliveries always lists after the divisions. */
 function sinkDeliveries<V extends string | number | undefined>(
@@ -61,21 +61,7 @@ export function CorpAssetLocationTable({
       .map((s) => `${labels.typeName(s.typeId)} ×${formatCount(s.quantity)}`)
       .join(', ');
 
-  const csvColumns = useMemo<CsvColumn<LocationRow>[]>(
-    () => [
-      { header: t('corp.assets.csv.place'), value: (r) => r.groupLabel },
-      { header: t('corp.assets.column.place'), value: (r) => r.label },
-      { header: t('corp.assets.column.items'), value: (r) => r.cell.itemCount },
-      {
-        header: t('corp.assets.column.largest'),
-        value: (r) =>
-          r.cell.topStacks.map((s) => `${labels.typeName(s.typeId)} ×${s.quantity}`).join('; '),
-      },
-      { header: t('corp.assets.column.value'), value: (r) => r.cell.estimatedValue },
-      { header: t('corp.assets.column.volume'), value: (r) => r.cell.volume },
-    ],
-    [t, labels]
-  );
+  const csvColumns = useMemo(() => corpAssetLocationCsvColumns(t, labels), [t, labels]);
   const tableExport = useTableExport({
     surface: 'corp-assets',
     columns: csvColumns,

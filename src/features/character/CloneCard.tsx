@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { IconButton, IskFigureGroup, TextInput, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { type ImplantDetail } from '@/features/character/clones';
+import { bySlot, implantBonusText } from '@/features/character/implantDisplay';
 import { CLONE_NICKNAME_MAX } from '@/features/character/cloneNicknames';
 import { ItemInfoLink } from '@/features/entities';
 import { SecurityStatus } from '@/components/SecurityStatus';
@@ -37,13 +38,6 @@ function ImplantLink({
 }
 
 export type PriceMap = ReadonlyMap<number, number | null>;
-
-/** Slot order, the way the game lists them; a type with no slot goes last, in ESI's order. */
-function bySlot(ids: readonly number[], details: ReadonlyMap<number, ImplantDetail>): number[] {
-  // A stable sort; Infinity − Infinity is NaN, which sorts as a tie.
-  const slot = (id: number) => details.get(id)?.slot ?? Number.POSITIVE_INFINITY;
-  return [...ids].sort((a, b) => slot(a) - slot(b));
-}
 
 /** One implant: slot, name (Show info), then what it adds and what it is worth. */
 function ImplantRow({
@@ -83,12 +77,7 @@ function ImplantRow({
       />
       <span className="flex shrink-0 items-center gap-x-2 text-xs whitespace-nowrap text-text-dim tabular-nums">
         {bonuses.map(([attribute, value]) => (
-          <span key={attribute}>
-            {t('clones.implantBonus', {
-              value,
-              attribute: t(`clones.verdict.attribute.${attribute}`),
-            })}
-          </span>
+          <span key={attribute}>{implantBonusText(t, attribute, value)}</span>
         ))}
         {price != null && price > 0 && <IskAmount value={price} />}
       </span>

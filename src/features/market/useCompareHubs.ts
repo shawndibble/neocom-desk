@@ -38,6 +38,9 @@ function allHubs<T>(value: T): Record<HubId, T> {
   return Object.fromEntries(TRADE_HUBS.map((hub) => [hub.id, value])) as Record<HubId, T>;
 }
 
+/** One frozen object for "no counts yet", so a consumer's memo on `jumps` holds. */
+const NO_JUMPS: Readonly<Record<HubId, number | null>> = Object.freeze(allHubs(null));
+
 export function useCompareHubs(
   items: readonly CompareSetItem[],
   enabled: boolean,
@@ -126,6 +129,6 @@ export function useCompareHubs(
 
   return {
     hubs,
-    jumps: counted?.key === jumpsKey ? counted.jumps : allHubs(null),
+    jumps: counted?.key === jumpsKey ? counted.jumps : NO_JUMPS,
   };
 }

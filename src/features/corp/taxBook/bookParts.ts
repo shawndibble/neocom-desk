@@ -3,17 +3,22 @@
  * Opening a tab reads only its slices; a later tab reads the ones it adds, and
  * the slices already held are reused.
  *
- * - `core`: miners, statements, extractions, observed rows, feeders (with payouts)
- *   and the scheduled-sync status. Every tab's figures, the health strip, the
- *   Activity feed and the settings dialog join these.
+ * - `core`: miners, statements, extractions, feeders (with payouts) and the scheduled-sync
+ *   status. Every tab joins these.
+ * - `observed`: the ledger rows (a Dexie delta on a device that holds a copy, ADR 0031). Every
+ *   tab reads them except Moon owners, whose figures come from the `owners` summaries (#5717);
+ *   that tab asks for them only when a summary cannot stand in (`needsRowsFallback`).
  * - `ledger`: payments, dismissals, declarations, adjustments and write-offs.
  *   A Miner's balance, a Statement's state and an Extraction page's per-day billing read them.
  * - `answers`: guests' answers to a hand-made grouping, shown beside a Miner.
+ * - `owners`: each moon owner's server-built view summary (one doc per moon owner), which the
+ *   Moon owners tab shows in place of accrual worked from every ledger row (#5717). Not in
+ *   `ALL_BOOK_PARTS`: a whole-book read (the export) has no use for it.
  *
  * The settings document and `meta/paid` are not slices: every read takes them fresh.
  */
-export const ALL_BOOK_PARTS = ['core', 'ledger', 'answers'] as const;
-export type BookPart = (typeof ALL_BOOK_PARTS)[number];
+export const ALL_BOOK_PARTS = ['core', 'observed', 'ledger', 'answers'] as const;
+export type BookPart = (typeof ALL_BOOK_PARTS)[number] | 'owners';
 
 export type BookPartSet = ReadonlySet<BookPart>;
 
@@ -29,17 +34,19 @@ export function bookPartsFor(tab: string, detail: BookDetailKind | null): BookPa
     // days) still reads dismissals and corrections, and a book whose docs are missing falls
     // back to the whole-book view, which needs the ledger.
     case 'overview':
-      return new Set<BookPart>(['core', 'ledger']);
+      return new Set<BookPart>(['core', 'observed', 'ledger']);
     case 'miner':
     case 'miners':
-      return new Set<BookPart>(['core', 'ledger', 'answers']);
+      return new Set<BookPart>(['core', 'observed', 'ledger', 'answers']);
     // An Extraction's page says whether its days are billed, dismissed or in Today's mining.
+    case 'moon-owners':
+      return new Set<BookPart>(['core', 'owners']);
     case 'extraction':
     case 'statements':
     case 'statementPeriod':
-      return new Set<BookPart>(['core', 'ledger']);
+      return new Set<BookPart>(['core', 'observed', 'ledger']);
     default:
-      return new Set<BookPart>(['core']);
+      return new Set<BookPart>(['core', 'observed']);
   }
 }
 

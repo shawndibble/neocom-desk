@@ -5,6 +5,7 @@
  * Colour never carries the meaning alone: the mark is an icon with a spoken
  * and hover label.
  */
+import { priceMarkKey } from './priceStateLabel';
 import { useTranslation } from 'react-i18next';
 import { ProgressBar, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -104,9 +105,10 @@ export function PriceMark({
   silent?: boolean;
 }) {
   const { t } = useTranslation();
-  if (state === undefined || state === 'live') return null;
+  const markKey = priceMarkKey(state);
+  if (markKey === null) return null;
   const failed = state === 'failed';
-  const label = t(failed ? 'market.appraisal.live.markFailed' : 'market.appraisal.live.markCached');
+  const label = t(markKey);
   return (
     <Tooltip content={label}>
       <span

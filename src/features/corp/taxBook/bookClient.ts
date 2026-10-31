@@ -28,12 +28,13 @@ import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { Adjustment, Statement, StatementCadence } from '@/engine/corpTaxBook/statements';
-import type {
-  JournalDonation,
-  LastSync,
-  SettlePayment,
-  SyncExtraction,
-  SyncGap,
+import {
+  extractionId as extractionIdOf,
+  type JournalDonation,
+  type LastSync,
+  type SettlePayment,
+  type SyncExtraction,
+  type SyncGap,
 } from '@/engine/corpTaxBook/sync';
 import { scheduledSyncFrom, type ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import type {
@@ -50,6 +51,7 @@ import { getSyncFirestore } from '@/sync/firebaseApp';
 import { bookVersionsOf, cachedPart } from './bookCache';
 import { bookPartStore } from './bookPartStore';
 import { ALL_BOOK_PART_SET, mergeBookParts, type BookPart, type BookPartSet } from './bookParts';
+import type { FeederViewSummary } from './feederViewClient';
 import { readObservedRows } from './observedRead';
 import {
   minerScopedRows,
@@ -58,6 +60,8 @@ import {
 } from '@/engine/corpTaxBook/minerScope';
 import { forgetObservedCopy } from './observedStore';
 import type { ReadModelDocs } from '@/engine/corpTaxBook/readModels';
+import { moonDocUsable, planMoonScope } from '@/engine/corpTaxBook/pullFigures';
+import type { MoonDoc } from '../../../../functions/src/corpTaxBookMoonDocs';
 import { callRouted } from '@/sync/routedCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -503,6 +507,11 @@ export interface BookData {
   /** The Overview and Miners tab docs (ADR 0032); absent until the server has built them. */
   readModels?: ReadModelDocs;
   /**
+   * Each moon owner's view summary by corporation id (ADR 0032, #5717); read with the `owners`
+   * part. Absent when that part was not read; a moon owner without one is priced from `observed`.
+   */
+  feederSummaries?: ReadonlyMap<number, FeederViewSummary>;
+  /**
    * The Miner a one-Miner read (`readMinerBookData`) covered; absent for the whole book. Then
    * `state.miners` holds that Miner only, so a dialog listing other Miners reads them itself.
    */
@@ -545,6 +554,32 @@ function feedersOf(
 }
 
 /**
+ * The book's moon owners' view summaries, one doc each, nothing under them. An officer of the
+ * book may read them (rules, #5717). One that is missing, or that the rules do not yet let this
+ * officer read, is left out: the caller prices that moon owner from its ledger rows instead.
+ */
+async function readFeederSummaries(
+  characterId: number,
+  corporationId: number,
+  feederCorporationIds: readonly number[]
+): Promise<Map<number, FeederViewSummary>> {
+  const db = getSyncFirestore(characterId);
+  const found = await Promise.all(
+    feederCorporationIds.map(async (id) => {
+      try {
+        const snap = await getDoc(
+          doc(db, 'corps', String(corporationId), 'feederViews', String(id))
+        );
+        return snap.exists() ? ([id, snap.data() as FeederViewSummary] as const) : undefined;
+      } catch {
+        return undefined;
+      }
+    })
+  );
+  return new Map(found.flatMap((f) => (f ? [f] : [])));
+}
+
+/**
  * `parts` limits the read to those slices (bookParts.ts); the others come back
  * empty, and `parts` on the result says which were read. Default: the whole book.
  */
@@ -563,7 +598,8 @@ export async function readBookData(
     parts.has(name) ? readSlice() : Promise.resolve(empty);
   const none: never[] = [];
   const [
-    [miners, statements, extractions, observed, scheduled, feederRows],
+    [miners, statements, extractions, scheduled, feederRows],
+    observed,
     [payments, dismissals, declarations, adjustments, writeOffs],
     answers,
     paidStatementIds,
@@ -576,12 +612,13 @@ export async function readBookData(
           list<Miner>('miners'),
           list<Statement>('statements'),
           list<SyncExtraction>('extractions'),
-          book.observed(),
           part('meta', async () => (await meta('scheduledSync')).data(), 'meta:schedule'),
           feedersOf(book, characterId, corporationId),
         ] as const),
-      [none, none, none, none, undefined, none] as const
+      [none, none, none, undefined, none] as const
     ),
+    // The ledger rows are a part of their own: a tab that needs none never reads them (#5717).
+    slice('observed', () => book.observed(), [] as ObservedRow[]),
     slice(
       'ledger',
       () =>
@@ -614,6 +651,16 @@ export async function readBookData(
       return { minerList, overview } as ReadModelDocs;
     }).catch(() => undefined),
   ]);
+  // One doc per moon owner, from the cached record list when `core` was read earlier.
+  const feederSummaries = parts.has('owners')
+    ? await readFeederSummaries(
+        characterId,
+        corporationId,
+        (parts.has('core') ? feederRows : await feedersOf(book, characterId, corporationId)).map(
+          (f) => f.corporationId
+        )
+      )
+    : undefined;
   return {
     settings,
     state: {
@@ -634,6 +681,7 @@ export async function readBookData(
     scheduledSync: scheduledSyncFrom(scheduled),
     parts,
     ...(readModels ? { readModels } : {}),
+    ...(feederSummaries ? { feederSummaries } : {}),
   };
 }
 
@@ -802,6 +850,132 @@ export async function readMinerBookData(
   };
 }
 
+// --- One moon's page from the moon docs (issue #5716, ADR 0032) ----------------
+
+/** What a moon page reads, scoped to one pull and its moon's cycles. */
+export interface MoonBookRead {
+  /** A whole-book shape without the ledger: the rows are the planned pulls' windows only. */
+  data: BookData;
+  /** The moon docs of the shown pull's refinery, by extraction id. */
+  docs: ReadonlyMap<string, MoonDoc>;
+  /** Cycles whose figures come from their docs, not from rows. */
+  fromDocs: ReadonlySet<string>;
+}
+
+const isPermissionDenied = (error: unknown) =>
+  String((error as { code?: unknown } | null)?.code ?? '').endsWith('permission-denied');
+
+/**
+ * A moon page: the book's records without the ledger, the refinery's moon docs, and the
+ * rows of the shown pull's window (plus any earlier cycle of the moon that can still have an
+ * open day; pullFigures.ts). `'fallback'` when a doc the page needs is missing, on another
+ * schema or unreadable: the caller then reads the whole book. A missing composite index
+ * (observed: structureId + date) reads the window's days at every refinery and filters here,
+ * so an undeployed index costs reads, not the page. Officer-only.
+ */
+export async function readMoonBookData(
+  characterId: number,
+  corporationId: number,
+  extractionId: string
+): Promise<MoonBookRead | 'fallback' | null> {
+  const book = await openBook(characterId, corporationId);
+  if (!book) return null;
+  const settings = settingsFrom(book.data);
+  const { db, list, part } = book;
+  const under = (name: string) => collection(db, 'corps', String(corporationId), name);
+  const meta = (id: string) => getDoc(doc(db, 'corps', String(corporationId), 'meta', id));
+  const none: never[] = [];
+  const [miners, statements, extractions, scheduled, feeders] = await Promise.all([
+    list<Miner>('miners'),
+    list<Statement>('statements'),
+    list<SyncExtraction>('extractions'),
+    part('meta', async () => (await meta('scheduledSync')).data(), 'meta:schedule'),
+    feedersOf(book, characterId, corporationId),
+  ] as const);
+  const [payments, dismissals, declarations, adjustments, writeOffs, paidStatementIds] =
+    await Promise.all([
+      list<SettlePayment>('payments'),
+      list<Dismissal>('dismissals'),
+      list<BookDeclaration>('declarations'),
+      list<Adjustment>('adjustments'),
+      list<RecordedWriteOff>('writeOffs'),
+      book.paidStatementIds(),
+    ] as const);
+
+  const shown = extractions.find((x) => extractionIdOf(x) === extractionId);
+  const docList = shown
+    ? await part(
+        'moonDocs',
+        async () =>
+          (
+            await getDocs(query(under('moonDocs'), where('structureId', '==', shown.structureId)))
+          ).docs.map((d) => {
+            // The server's timestamp is not part of the figures, and a class instance does not clone into the copy.
+            const fields = { ...d.data() };
+            delete fields.updatedAt;
+            return fields as unknown as MoonDoc;
+          }),
+        `moonDocs:s:${shown.structureId}`
+      ).catch((error) => {
+        if (isPermissionDenied(error)) throw error;
+        return undefined;
+      })
+    : [];
+  if (!docList) return 'fallback';
+  const docs = new Map(docList.filter(moonDocUsable).map((d) => [d.extractionId, d]));
+  const scope = planMoonScope({
+    extractionId,
+    extractions,
+    docs,
+    statements,
+    startDate: settings.startDate,
+    expiryHours: settings.structureExpiryHours,
+  });
+  if (!scope.ok) return 'fallback';
+
+  const windowRows = async (w: { structureId: number; from: string; to: string }) => {
+    const days = [where('date', '>=', w.from), where('date', '<=', w.to)] as const;
+    try {
+      const snap = await getDocs(
+        query(under('observed'), where('structureId', '==', w.structureId), ...days)
+      );
+      return snap.docs.map((d) => d.data() as ObservedRow);
+    } catch (error) {
+      if (!isMissingIndex(error)) throw error;
+      const snap = await getDocs(query(under('observed'), ...days));
+      return snap.docs
+        .map((d) => d.data() as ObservedRow)
+        .filter((r) => r.structureId === w.structureId);
+    }
+  };
+  const observed = (await Promise.all(scope.rows.map(windowRows))).flat();
+  return {
+    docs,
+    fromDocs: scope.fromDocs,
+    data: {
+      settings,
+      state: {
+        book: settings,
+        miners,
+        statements,
+        payments,
+        dismissals,
+        extractions,
+        paidStatementIds,
+        writeOffs,
+      },
+      observed,
+      declarations,
+      adjustments,
+      feeders,
+      groupingAnswers: none,
+      scheduledSync: scheduledSyncFrom(scheduled),
+      // The shown pull's window stands in for the ledger rows.
+      parts: new Set<BookPart>(['core', 'observed', 'ledger']),
+    },
+  };
+}
+
 /**
  * What the group dialog lists on a one-Miner page (#5704): the stored groups and the ledger
  * rows, through the same copies the whole-book read uses, so a warm device reads only the
@@ -834,7 +1008,7 @@ export function mergeBookData(held: BookData, extra: BookData): BookData {
       dismissals: pick('ledger', held.state.dismissals, extra.state.dismissals),
       writeOffs: pick('ledger', held.state.writeOffs, extra.state.writeOffs),
     },
-    observed: pick('core', held.observed, extra.observed),
+    observed: pick('observed', held.observed, extra.observed),
     feeders: pick('core', held.feeders, extra.feeders),
     scheduledSync: pick('core', held.scheduledSync, extra.scheduledSync),
     declarations: pick('ledger', held.declarations, extra.declarations),
@@ -843,6 +1017,9 @@ export function mergeBookData(held: BookData, extra: BookData): BookData {
     parts,
     ...((extra.readModels ?? held.readModels)
       ? { readModels: extra.readModels ?? held.readModels }
+      : {}),
+    ...(pick('owners', held.feederSummaries, extra.feederSummaries)
+      ? { feederSummaries: pick('owners', held.feederSummaries, extra.feederSummaries) }
       : {}),
   };
 }

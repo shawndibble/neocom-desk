@@ -11,10 +11,9 @@ import {
   sellBrokerFee,
   sellSalesTax,
   splitEach,
-  type AppraisalRow,
 } from '@/engine/market/appraisal';
 import { looksLikeEftFit } from '@/engine/import/eftFit';
-import { subtractOwned, type WithOwned } from '@/engine/market/appraisalOwned';
+import { subtractOwned, type OwnedRow } from '@/engine/market/appraisalOwned';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { removeItemFromPaste } from '@/engine/market/appraisalPaste';
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
@@ -35,8 +34,6 @@ import { ItemContextMenu } from './ItemContextMenu';
 import { PriceMark } from './LivePriceStatus';
 import { MarketItemLink } from './MarketItemLink';
 import type { AppraisalController } from './useAppraisal';
-
-type OwnedRow = AppraisalRow & Partial<Pick<WithOwned<AppraisalRow>, 'owned' | 'need'>>;
 
 /** `lg` up to (not including) `xl`: paste card and results share a row but the results card is narrow. A min-and-max pair never matches under the test `matchMedia` stub, so tests see the full default. */
 const COMPACT_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 79.999rem)';
@@ -97,8 +94,6 @@ export function useAppraisalColumns({
       ...withOwned.filter((r) => r.need === 0),
     ];
   }, [rows, owned]);
-  const csvColumns = useMemo(() => appraisalCsvColumns(t), [t]);
-  const tableExport = useTableExport({ surface: 'market-appraisal', rows, columns: csvColumns });
   const hasRefine = rows.some((row) => row.refineTotal !== undefined);
   // Undefined per row when nothing the active Character holds LP with sells
   // this item — same "only earns its place once something has it" rule as
@@ -157,10 +152,24 @@ export function useAppraisalColumns({
   // the picker, as Refine does without refine data.
   const accountingLevel = result?.accountingLevel ?? null;
   const brokerRelationsLevel = result?.brokerRelationsLevel ?? null;
-  const feeInputs =
-    accountingLevel === null || brokerRelationsLevel === null
-      ? null
-      : { accountingLevel, brokerRelationsLevel, standing };
+  const feeInputs = useMemo(
+    () =>
+      accountingLevel === null || brokerRelationsLevel === null
+        ? null
+        : { accountingLevel, brokerRelationsLevel, standing },
+    [accountingLevel, brokerRelationsLevel, standing]
+  );
+  // Every column, whichever the picker shows; fees blank until the skills load.
+  const csvColumns = useMemo(
+    () => appraisalCsvColumns(t, { fees: feeInputs, live: true }),
+    [t, feeInputs]
+  );
+  // The rows as the table holds them (need/owned, covered lines last), in the table's sort.
+  const tableExport = useTableExport({
+    surface: 'market-appraisal',
+    rows: tableRows,
+    columns: csvColumns,
+  });
   const taxFor = (row: OwnedRow) =>
     accountingLevel === null ? null : sellSalesTax(row, accountingLevel);
   const brokerFor = (row: OwnedRow) =>

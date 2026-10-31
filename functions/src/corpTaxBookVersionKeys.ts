@@ -54,7 +54,7 @@ export const VERSIONED_COLLECTIONS = [
   'meta',
   // Server-built running totals per Miner (#5255, ADR 0032); the Miner page reads one (#5258).
   'minerTotals',
-  // Server-built per-pull moon docs (#5256, ADR 0032); shadow mode, no client reads yet.
+  // Server-built per-pull moon docs (#5256, ADR 0032); the moon page reads them (#5716).
   'moonDocs',
   // Server-built Overview and Miners tab docs (#5259, ADR 0032); the Overview and Miners tab read them.
   'readModels',

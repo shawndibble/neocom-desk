@@ -10,7 +10,9 @@
  * is the caller's: Firestore here is the `lite` build, with no listeners.
  *
  * `options.minerId` names the Miner whose page is open. The book is then that Miner's read-model
- * slice (#5258, `readMinerBookData`) instead of the whole ledger.
+ * slice (#5258, `readMinerBookData`) instead of the whole ledger. `options.extractionId` names the
+ * pull whose moon page is open: the book is then its window's rows plus the moon docs
+ * (#5716, `readMoonBookData`), or the whole book when a doc is missing.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
@@ -44,16 +46,25 @@ import {
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
 import { withMinerTotals, type HeaderTotals } from '@/engine/corpTaxBook/minerScope';
+import { withMoonDocs } from '@/engine/corpTaxBook/pullFigures';
+import type { MoonDoc } from '../../../../functions/src/corpTaxBookMoonDocs';
 import {
   mergeBookData,
   readBookData,
   readMinerBookData,
+  readMoonBookData,
   verifyOfficer,
   type BookData,
   type BookSettings,
   type OfficerVerdict,
 } from '../taxBook/bookClient';
-import { ALL_BOOK_PART_SET, missingBookParts, type BookPartSet } from '../taxBook/bookParts';
+import {
+  ALL_BOOK_PART_SET,
+  missingBookParts,
+  type BookPart,
+  type BookPartSet,
+} from '../taxBook/bookParts';
+import { moonOwnersNeedRows, ownRefineriesFromStored } from '@/engine/corpTaxBook/moonOwners';
 import { forgetObservedCopy } from '../taxBook/observedStore';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 import { refineryPlaceholder } from './moonsFormat';
@@ -94,6 +105,10 @@ type Fetched =
       moonOwnerPricesOn: NonNullable<BookViewInput['moonOwnerPricesOn']>;
       /** Set when the book is one Miner's read-model slice (#5258), not the whole book. */
       scope?: { minerId: string; totals?: HeaderTotals };
+      /** The moon page this read was for (#5716), whether or not it could read the docs. */
+      forMoon?: string;
+      /** Set when the book is one pull's window plus the moon docs, not the whole book. */
+      moon?: { docs: ReadonlyMap<string, MoonDoc>; fromDocs: ReadonlySet<string> };
     };
 
 export type CorpBookState =
@@ -120,6 +135,8 @@ export interface CorpBook {
   state: CorpBookState;
   /** Re-reads the book; call after an edit. */
   reload: () => void;
+  /** Reads the ledger rows a tab opened without; see `BookContextValue.requestRows`. */
+  requestRows: () => void;
   characterId: number | null;
   corporationId: number | null;
 }
@@ -155,9 +172,10 @@ async function failedFetch(
 export function useCorpBook(
   sync: CorpTaxBookSync,
   wanted: BookPartSet = ALL_BOOK_PART_SET,
-  options: { minerId?: string } = {}
+  options: { minerId?: string; extractionId?: string } = {}
 ): CorpBook {
   const scopedMiner = options.minerId;
+  const scopedMoon = options.extractionId;
   const characterId = useActiveCharacter((s) => s.activeCharacterId);
   const corporationId = useActiveCorporationId();
   const [fetched, setFetched] = useState<Fetched>({ status: 'loading' });
@@ -167,12 +185,26 @@ export function useCorpBook(
   const [memberIds, setMemberIds] = useState<ReadonlySet<number> | undefined>(undefined);
   const [surveyOreLines, setSurveyOreLines] = useState<BookViewInput['surveyOreLines']>(undefined);
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
-  const wantedKey = [...wanted].sort().join(',');
+  // The Moon owners tab reads no ledger rows unless its summaries cannot stand in (#5717).
+  const needsRows =
+    fetched.status === 'loaded' && needsRowsFallback(wanted, fetched.data, now, corporationId);
+  // A dialog that prices from rows asks for them (`requestRows`); the page stays ready meanwhile.
+  const [rowsAsked, setRowsAsked] = useState(false);
+  const requestRows = useCallback(() => setRowsAsked(true), []);
+  const required = useMemo(
+    () => (needsRows ? new Set<BookPart>([...wanted, 'observed']) : wanted),
+    [wanted, needsRows]
+  );
+  const asked = useMemo(
+    () => (rowsAsked ? new Set<BookPart>([...required, 'observed']) : required),
+    [required, rowsAsked]
+  );
+  const wantedKey = [...asked].sort().join(',');
   // A stable copy: the full read below and the tab-switch read both start from the latest ask.
-  const wantedRef = useRef(wanted);
+  const wantedRef = useRef(asked);
   useEffect(() => {
-    wantedRef.current = wanted;
-  }, [wanted]);
+    wantedRef.current = asked;
+  }, [asked]);
 
   // A page left open turns stale and rolls a day over (the sync hook's known gap).
   useEffect(() => {
@@ -198,12 +230,21 @@ export function useCorpBook(
         }
         let data: BookData | null;
         let scope: { minerId: string; from: string; totals?: HeaderTotals } | undefined;
+        let moon: { docs: ReadonlyMap<string, MoonDoc>; fromDocs: ReadonlySet<string> } | undefined;
         if (scopedMiner !== undefined) {
           const miner = await readMinerBookData(characterId, corporationId, scopedMiner);
           data = miner?.data ?? null;
           if (miner) scope = { minerId: scopedMiner, from: miner.from, totals: miner.totals };
         } else {
-          data = await readBookData(characterId, corporationId, wantedRef.current);
+          const one =
+            scopedMoon === undefined
+              ? undefined
+              : await readMoonBookData(characterId, corporationId, scopedMoon);
+          if (one === null) data = null;
+          else if (one && one !== 'fallback') {
+            moon = { docs: one.docs, fromDocs: one.fromDocs };
+            data = one.data;
+          } else data = await readBookData(characterId, corporationId, wantedRef.current);
           // The page moved on while this read ran: take the slices it now wants.
           const late = data ? missingBookParts(wantedRef.current, data.parts) : undefined;
           if (data && late && late.size > 0) {
@@ -218,34 +259,17 @@ export function useCorpBook(
         }
         // Prices for every ore on every day it was mined, at the book's hub and Ore Form. A Miner's
         // slice prices only its open window: a day on a Statement is frozen and needs no price.
-        const priced = scope ? data.observed.filter((r) => r.date >= scope.from) : data.observed;
-        const typeIds = new Set<number>(priced.map((r) => r.typeId));
-        for (const x of data.state.extractions)
-          for (const l of x.oreLines ?? []) typeIds.add(l.typeId);
-        const dates = new Set<string>(priced.map((r) => r.date));
-        const loadedOn = utcNow().slice(0, 10);
-        dates.add(loadedOn);
-        const prices = await loadDatedUnitPricesByHub(
-          [...typeIds],
-          [data.settings.hubId],
-          [...dates],
-          data.settings.oreForm === 'compressed',
-          { moonOwner: true }
-        );
+        const { pricesOn, moonOwnerPricesOn } = await loadBookPrices(data, scope?.from);
         if (cancelled) return;
         setFetched({
           status: 'loaded',
           verdict,
           data,
           ...(scope ? { scope: { minerId: scope.minerId, totals: scope.totals } } : {}),
-          // A page left open past midnight asks for a day it never priced: use the last loaded one.
-          pricesOn: (date) => {
-            const day = priceDay(prices, data.settings.hubId, date);
-            return day.prices.size > 0 ? day : priceDay(prices, data.settings.hubId, loadedOn);
-          },
-          // No fallback day: the moon owner's page prices an unsaved day at 0, so this does too.
-          moonOwnerPricesOn: (date) =>
-            moonOwnerPricesAtHubOnDate(prices, hubForPayee(data.settings.hubId).id, date),
+          ...(scopedMoon !== undefined ? { forMoon: scopedMoon } : {}),
+          ...(moon ? { moon } : {}),
+          pricesOn,
+          moonOwnerPricesOn,
         });
       } catch (error) {
         if (cancelled) return;
@@ -255,7 +279,7 @@ export function useCorpBook(
     return () => {
       cancelled = true;
     };
-  }, [characterId, corporationId, attempt, finishedAt, scopedMiner]);
+  }, [characterId, corporationId, attempt, finishedAt, scopedMiner, scopedMoon]);
 
   // A page that wants slices the book was opened without reads just those.
   useEffect(() => {
@@ -263,24 +287,23 @@ export function useCorpBook(
     const missing = missingBookParts(wantedRef.current, fetched.data.parts);
     if (missing.size === 0) return;
     let cancelled = false;
-    readBookData(characterId, corporationId, missing).then(
-      (extra) => {
+    const held = fetched.data;
+    readBookData(characterId, corporationId, missing)
+      .then(async (extra) => {
         if (cancelled || !extra) return;
+        // The prices were built for the settings this page opened with: keep both.
+        const merged = { ...mergeBookData(held, extra), settings: held.settings };
+        // Rows that arrive late (the Moon owners tab's fallback) need their own prices.
+        const prices = missing.has('observed') ? await loadBookPrices(merged) : undefined;
+        if (cancelled) return;
         setFetched((prev) =>
-          prev.status === 'loaded'
-            ? // The prices were built for the settings this page opened with: keep both.
-              {
-                ...prev,
-                data: { ...mergeBookData(prev.data, extra), settings: prev.data.settings },
-              }
-            : prev
+          prev.status === 'loaded' ? { ...prev, data: merged, ...prices } : prev
         );
-      },
-      async (error) => {
+      })
+      .catch(async (error) => {
         const next = await failedFetch(error, characterId, corporationId);
         if (!cancelled) setFetched(next);
-      }
-    );
+      });
     return () => {
       cancelled = true;
     };
@@ -383,6 +406,7 @@ export function useCorpBook(
       memberIds,
       surveyOreLines,
     });
+    if (fetched.moon) return withMoonDocs(built, fetched.moon.docs, fetched.moon.fromDocs);
     return fetched.scope
       ? withMinerTotals(built, fetched.scope.minerId, fetched.scope.totals)
       : built;
@@ -485,7 +509,8 @@ export function useCorpBook(
       ? // A book read for another page's scope is not this page's: wait for the right one.
         view &&
         fetched.scope?.minerId === scopedMiner &&
-        missingBookParts(wanted, fetched.data.parts).size === 0
+        fetched.forMoon === scopedMoon &&
+        missingBookParts(required, fetched.data.parts).size === 0
         ? {
             status: 'ready',
             verdict: fetched.verdict,
@@ -496,7 +521,60 @@ export function useCorpBook(
           }
         : { status: 'loading' }
       : fetched;
-  return { state, reload, characterId, corporationId };
+  return { state, reload, requestRows, characterId, corporationId };
+}
+
+/**
+ * Whether the Moon owners tab, read without ledger rows, must read them after all: a moon owner
+ * its summary cannot stand in for, or a shell fact only the rows can tell (#5717).
+ */
+export function needsRowsFallback(
+  wanted: BookPartSet,
+  data: BookData,
+  now: string,
+  corporationId: number | null
+): boolean {
+  if (wanted.has('observed') || !wanted.has('owners') || corporationId === null) return false;
+  if (!data.parts?.has('core') || !data.parts.has('owners')) return false;
+  const feeders = data.feeders ?? [];
+  return (
+    ownRefineriesFromStored(data.state.extractions.length, feeders.length) === undefined ||
+    moonOwnersNeedRows({
+      now,
+      graceHours: data.settings.graceHours,
+      bookCorporationId: corporationId,
+      rates: data.settings.rates,
+      feeders,
+      ...(data.feederSummaries ? { summaries: data.feederSummaries } : {}),
+    })
+  );
+}
+
+/** The unit prices every loaded row and Extraction needs, as the view's two lookups. */
+async function loadBookPrices(data: BookData, from?: string) {
+  const priced = from !== undefined ? data.observed.filter((r) => r.date >= from) : data.observed;
+  const typeIds = new Set<number>(priced.map((r) => r.typeId));
+  for (const x of data.state.extractions) for (const l of x.oreLines ?? []) typeIds.add(l.typeId);
+  const dates = new Set<string>(priced.map((r) => r.date));
+  const loadedOn = utcNow().slice(0, 10);
+  dates.add(loadedOn);
+  const prices = await loadDatedUnitPricesByHub(
+    [...typeIds],
+    [data.settings.hubId],
+    [...dates],
+    data.settings.oreForm === 'compressed',
+    { moonOwner: true }
+  );
+  return {
+    // A page left open past midnight asks for a day it never priced: use the last loaded one.
+    pricesOn: (date: string) => {
+      const day = priceDay(prices, data.settings.hubId, date);
+      return day.prices.size > 0 ? day : priceDay(prices, data.settings.hubId, loadedOn);
+    },
+    // No fallback day: the moon owner's page prices an unsaved day at 0, so this does too.
+    moonOwnerPricesOn: (date: string) =>
+      moonOwnerPricesAtHubOnDate(prices, hubForPayee(data.settings.hubId).id, date),
+  };
 }
 
 function priceDay(

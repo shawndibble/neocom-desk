@@ -228,18 +228,15 @@ export function CompareDrawer({
     [skillLevels, characterId, standing]
   );
   const attributes = useCompareAttributes(items, mode !== 'closed' && view === 'attributes');
-  const pricesCsvColumns = useMemo(() => compareCsvColumns(t), [t]);
-  const pricesExport = useTableExport({
-    surface: 'market-compare',
-    rows,
-    columns: pricesCsvColumns,
-  });
   const attributesExport = useCompareAttributesExport(rows, attributes.data);
   const ownHubId = useMarketHub((state) => state.value);
   const ownHubName = TRADE_HUBS.find((candidate) => candidate.id === ownHubId)?.systemName ?? '';
   const hubsData = useCompareHubs(items, mode !== 'closed' && view === 'hubs', refreshTick);
   const hubRows = useMemo(() => buildCompareHubRows(items, hubsData), [items, hubsData]);
-  const hubsCsvColumns = useMemo(() => compareHubsCsvColumns(t), [t]);
+  const hubsCsvColumns = useMemo(
+    () => compareHubsCsvColumns(t, { jumps: hubsData.jumps, ownHub: ownHubId }),
+    [t, hubsData.jumps, ownHubId]
+  );
   const hubsExport = useTableExport({
     surface: 'market-compare-hubs',
     rows: hubRows,
@@ -336,6 +333,12 @@ export function CompareDrawer({
     [fees]
   );
 
+  const pricesCsvColumns = useMemo(() => compareCsvColumns(t, marginFor), [t, marginFor]);
+  const pricesExport = useTableExport({
+    surface: 'market-compare',
+    rows,
+    columns: pricesCsvColumns,
+  });
   const columns = useMemo<DataTableColumn<CompareRow>[]>(
     () => [
       {

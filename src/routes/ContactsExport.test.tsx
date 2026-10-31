@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
 import { App } from '@/app/App';
 import * as download from '@/lib/download';
+import { loadCharacterAchievement } from '@/features/character/achievement';
 import {
   CHAR_ID,
   CHAR_ID_2,
@@ -22,6 +23,12 @@ vi.mock('virtual:pwa-register/react', () => ({
     offlineReady: [false, vi.fn()],
     updateServiceWorker: vi.fn(),
   }),
+}));
+
+// Title/Score load on the first export-menu open; answered at once here.
+vi.mock('@/features/character/achievement', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/character/achievement')>()),
+  loadCharacterAchievement: vi.fn(async () => null),
 }));
 
 vi.mock('@/sde/loadSde', () => ({
@@ -45,12 +52,25 @@ async function exportCsv(menuName: string) {
   await waitFor(() => expect(vi.mocked(download.downloadTextFile)).toHaveBeenCalled());
 }
 
+/** Opens and closes the export menu, then waits out the Title/Score load it starts. */
+async function armExport(menuName: string) {
+  fireEvent.pointerDown(screen.getByRole('button', { name: menuName }), {
+    button: 0,
+    pointerType: 'mouse',
+  });
+  await screen.findByRole('menuitem', { name: 'Download CSV' });
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+  await waitFor(() => expect(vi.mocked(loadCharacterAchievement)).toHaveBeenCalled());
+  await waitFor(() => expect(screen.queryByRole('menuitem')).toBeNull());
+}
+
 describe('CSV export (issue #2164)', () => {
   it('exports the Character tab visible rows, with a raw standing number', async () => {
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
     render(<App />);
     await screen.findByText('Good Friend');
 
+    await armExport('Export Contacts');
     await exportCsv('Export Contacts');
 
     expect(spy).toHaveBeenCalledTimes(1);
@@ -60,6 +80,21 @@ describe('CSV export (issue #2164)', () => {
     // The standing tag replaces the printed number on screen, but the CSV
     // still carries the raw value the table sorts on.
     expect(content).toContain('10');
+  });
+
+  it('marks the file -partial while the Title/Score load the menu started is still out', async () => {
+    let finish: (value: null) => void = () => {};
+    vi.mocked(loadCharacterAchievement).mockImplementationOnce(
+      () => new Promise<null>((resolve) => (finish = resolve))
+    );
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    await exportCsv('Export Contacts');
+
+    expect(spy.mock.calls[0][0]).toMatch(/^neocom-contacts-\d{4}-\d{2}-\d{2}-partial\.csv$/);
+    finish(null);
   });
 
   it('exports only what the search/type/standing filters currently show', async () => {

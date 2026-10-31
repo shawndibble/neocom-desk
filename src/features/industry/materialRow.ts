@@ -13,7 +13,10 @@
  *   entirely owned row costs zero whether anything is priced or not.
  */
 
+import type { DepthPrice } from '@/engine/industry/depthPrice';
+import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import type { HubPrices, MaterialCostLine, MaterialSourcingMap } from '@/engine/industry/types';
+import type { MaterialTableRow } from './subBuildPlan';
 
 /** Where a displayed unit price came from. `none` means there is nothing to show. */
 export type PriceSource = 'hub' | 'override' | 'none';
@@ -76,4 +79,51 @@ export function buyPricedLine(
       ? candidate
       : null;
   return unitPrice === null ? material : { ...material, unitPrice };
+}
+
+/** A material being built here rather than bought. */
+export function isBuilt(material: MaterialTableRow): boolean {
+  return material.subBuilds.length > 0;
+}
+
+/** What kind of price a row carries; `hub` is a plain market price, which the table leaves untagged. */
+export type PriceTag = 'override' | 'hub' | 'owned' | 'unpriced';
+
+/**
+ * The price kind the table's Price cell announces. A built row has no
+ * purchase price: it is `unpriced` only when something under it has none (a
+ * warning about the plan's totals), else null.
+ */
+export function materialPriceTag(
+  material: MaterialTableRow,
+  sourcing: MaterialSourcingMap | undefined,
+  pricesReady: boolean
+): PriceTag | null {
+  if (isBuilt(material)) return material.unpriced ? 'unpriced' : null;
+  const state = materialRowState(material, sourcing, pricesReady);
+  if (state.priceSource === 'override') return 'override';
+  if (state.unitPrice !== null) return 'hub';
+  return state.fullyOwned ? 'owned' : 'unpriced';
+}
+
+/** What building saves over buying, when the advice says building is cheaper and something is left to buy. */
+export function buildSavings(
+  material: Pick<MaterialCostLine, 'remainingQuantity'>,
+  advice: MakeOrBuy | undefined
+): number | null {
+  return advice?.verdict === 'build' && advice.savings > 0 && material.remainingQuantity > 0
+    ? advice.savings
+    : null;
+}
+
+/** The walked-book price a row shows: none on a built row or one the pilot priced themselves. */
+export function shownDepth(
+  material: MaterialTableRow,
+  sourcing: MaterialSourcingMap | undefined,
+  depthFor: ((typeID: number) => DepthPrice | undefined) | undefined
+): DepthPrice | undefined {
+  if (isBuilt(material) || sourcing?.[material.typeID]?.overridePrice !== undefined) {
+    return undefined;
+  }
+  return depthFor?.(material.typeID);
 }

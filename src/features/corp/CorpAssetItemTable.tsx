@@ -22,7 +22,6 @@ import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
 import { useUrlSort } from '@/lib/useUrlState';
 import { formatCubicMetres } from '@/lib/volume';
-import type { CsvColumn } from '@/lib/csv';
 import {
   CORP_ASSET_ITEM_COLUMN_IDS,
   CORP_ASSET_ITEM_DEFAULT_COLUMNS,
@@ -35,6 +34,7 @@ import {
   stackPathText,
   type LedgerLabels,
 } from './assetLedgerView';
+import { corpAssetItemCsvColumns } from './corpAssetsCsv';
 import { StockTargetCell } from './StockTargetCell';
 
 export interface ItemTableRow {
@@ -101,28 +101,9 @@ export function CorpAssetItemTable({
   );
   const sortProps = useUrlSort('sort', below ? BY_SHORT_BY : BY_VALUE, SORTABLE_IDS);
 
-  const csvColumns = useMemo<CsvColumn<ItemTableRow>[]>(
-    () => [
-      { header: t('corp.assets.column.item'), value: (r) => r.name },
-      {
-        header: t('corp.assets.csv.kind'),
-        value: (r) => (r.ledger.isBlueprintCopy ? t('assets.blueprintBadge.copy.label') : ''),
-      },
-      { header: t('corp.assets.column.quantity'), value: (r) => r.ledger.quantity },
-      { header: t('corp.assets.column.target'), value: (r) => r.ledger.stock?.target ?? null },
-      { header: t('corp.assets.column.shortBy'), value: (r) => r.ledger.stock?.shortBy ?? null },
-      {
-        header: t('corp.assets.column.where'),
-        value: (r) =>
-          placementLabels(r.ledger.placements, labels)
-            .map((text, i) => `${text} ×${r.ledger.placements[i].quantity}`)
-            .join('; '),
-      },
-      { header: t('corp.assets.column.value'), value: (r) => r.ledger.estimatedValue },
-      { header: t('corp.assets.column.volume'), value: (r) => r.ledger.volume },
-      { header: t('corp.assets.column.group'), value: (r) => r.categoryName ?? '' },
-    ],
-    [t, labels]
+  const csvColumns = useMemo(
+    () => corpAssetItemCsvColumns(t, { labels, assetNames, blueprintTypeIds }, rows),
+    [t, labels, assetNames, blueprintTypeIds, rows]
   );
   const tableExport = useTableExport({
     surface: 'corp-assets',

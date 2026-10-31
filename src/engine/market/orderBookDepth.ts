@@ -91,3 +91,8 @@ export function priceComparison(base: number | null, other: number | null): Pric
   const delta = other - base;
   return { delta, ratio: delta / base };
 }
+
+/** A comparison's `ratio` as a percentage (-35 is "35% less"); null where there is none. */
+export function comparisonPct(comparison: PriceComparison | null): number | null {
+  return comparison === null ? null : comparison.ratio * 100;
+}

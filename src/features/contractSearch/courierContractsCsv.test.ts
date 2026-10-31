@@ -9,6 +9,7 @@ const lookups: CourierCsvLookups = {
   regionName: (regionId) =>
     regionId === null ? null : regionId === 10000002 ? 'The Forge' : `#${regionId}`,
   jumps: (row) => (row.contractId === 1 ? 9 : null),
+  goingRateMultiple: (row) => (row.contractId === 1 ? 9.5 : row.contractId === 3 ? 2 : null),
 };
 
 function endpoint(overrides: Partial<CourierEndpoint> = {}): CourierEndpoint {
@@ -56,13 +57,19 @@ describe('courierContractsCsvColumns', () => {
       'contractSearch.iskPerJumpColumn',
       'contractSearch.iskPerVolumeColumn',
       'contractSearch.expiresColumn',
+      'contractSearch.originSecurityColumn',
+      'contractSearch.destinationSecurityColumn',
+      'contractSearch.originRiskColumn',
+      'contractSearch.destinationRiskColumn',
+      'contractSearch.rateMultipleColumn',
+      'contractSearch.overRateColumn',
     ]);
   });
 
   it('writes raw numbers, both ends by name and the expiry as a UTC date', () => {
     const csv = toCsv([haul()], courierContractsCsvColumns(t, lookups));
     expect(csv.split('\r\n')[1]).toBe(
-      '"Jita","The Forge","Amarr","#10000043",18000000,250000000,12000,9,2000000,1500,2026-10-01 08:30:00'
+      '"Jita","The Forge","Amarr","#10000043",18000000,250000000,12000,9,2000000,1500,2026-10-01 08:30:00,0.95,0.95,,,9.5,"common.exportFlagYes"'
     );
   });
 
@@ -90,5 +97,26 @@ describe('courierContractsCsvColumns', () => {
       courierContractsCsvColumns(t, lookups)
     );
     expect(csv.split('\r\n')[1].split(',').slice(0, 2)).toEqual(['"#1035000000000"', '']);
+  });
+
+  it('exports a going-rate multiple under the over-rate line as not flagged, and blank when unstatable', () => {
+    const columns = courierContractsCsvColumns(t, lookups);
+    const multiple = columns.find((c) => c.header === 'contractSearch.rateMultipleColumn')!;
+    const over = columns.find((c) => c.header === 'contractSearch.overRateColumn')!;
+    expect(over.value(haul({ contractId: 3 }))).toBe('common.exportFlagNo');
+    expect(multiple.value(haul({ contractId: 2 }))).toBeNull();
+    expect(over.value(haul({ contractId: 2 }))).toBeNull();
+  });
+
+  it('names the warnings each end wears, a structure only at the drop off', () => {
+    const columns = courierContractsCsvColumns(t, lookups);
+    const origin = columns.find((c) => c.header === 'contractSearch.originRiskColumn')!;
+    const destination = columns.find((c) => c.header === 'contractSearch.destinationRiskColumn')!;
+    const row = haul({
+      origin: endpoint({ resolution: 'structure' }),
+      destination: endpoint({ resolution: 'structure' }),
+    });
+    expect(origin.value(row)).toBeNull();
+    expect(destination.value(row)).toBe('contractSearch.risk.structureShort');
   });
 });

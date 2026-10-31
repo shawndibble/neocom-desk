@@ -83,6 +83,8 @@ export function OrderWhoCheaperSection({
       price: row.price,
       gapIsk: null,
       gapPct: null,
+      ordersBeatingMe: null,
+      unitsBeatingMe: null,
       distance: null,
     },
   ];

@@ -50,7 +50,8 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       detail: <p>{t('corpTaxBook.moons.health.scheduledStoppedDetail')}</p>,
     });
   }
-  if (view.unrated.length > 0) {
+  // Counted from the ledger rows, so only on a tab that reads them (the Moon owners tab does not).
+  if ((data.parts?.has('observed') ?? true) && view.unrated.length > 0) {
     items.push({
       id: 'unrated',
       tone: 'warning',

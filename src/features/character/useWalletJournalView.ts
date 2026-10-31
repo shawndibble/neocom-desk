@@ -284,8 +284,12 @@ export function useWalletJournalView({
   // The title-bar export button and the row menus export the same rows, in
   // the order the table shows them.
   const journalCsvColumns = useMemo(
-    () => walletJournalCsvColumns(t, showingBeyondActive ? characterNameFor : undefined),
-    [t, showingBeyondActive, characterNameFor]
+    () =>
+      walletJournalCsvColumns(t, {
+        characterName: showingBeyondActive ? characterNameFor : undefined,
+        fills: { linkFor: personalLinkFor, nameFor: personalNameFor },
+      }),
+    [t, showingBeyondActive, characterNameFor, personalLinkFor, personalNameFor]
   );
   const journalExport = useTableExport({
     surface: 'wallet-journal',

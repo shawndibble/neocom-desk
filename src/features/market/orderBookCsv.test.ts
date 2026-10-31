@@ -32,6 +32,15 @@ function order(overrides: Partial<RegionOrder> = {}): RegionOrder {
   };
 }
 
+const base = {
+  npcStations,
+  solarSystems,
+  jumpsFor: (systemId: number) => (systemId === 30000142 ? 4 : null),
+  feeContext: null,
+  myOrderIds: new Set<number>([1]),
+  best: 400,
+};
+
 describe('rangeLabel', () => {
   it('maps the known enum values to translated labels', () => {
     expect(rangeLabel('station', t)).toBe('market.rangeStation');
@@ -49,18 +58,63 @@ describe('rangeLabel', () => {
 });
 
 describe('orderBookCsvColumns (sell)', () => {
-  it('orders columns price, quantity, location, expiry — no range/min volume', () => {
-    const columns = orderBookCsvColumns(t, { npcStations, solarSystems, isBuy: false });
+  it('exports every column the table can show plus the badge and row-expand facts, no range/min volume', () => {
+    const columns = orderBookCsvColumns(t, { ...base, isBuy: false });
     expect(columns.map((c) => c.header)).toEqual([
       'market.price',
       'market.quantity',
       'market.location',
+      'market.securityColumn',
+      'market.jumpsColumn',
+      'market.feesColumn',
+      'market.finalPriceColumn',
+      'market.exportMyOrder',
+      'market.exportVolumeTotal',
+      'market.exportIssued',
+      'market.orderDetail.orderValue',
+      'market.exportVsBest',
+      'market.exportVsBestPct',
       'market.expiry',
+      'market.exportBait',
     ]);
   });
 
+  it('exports security, jumps, order value, vs-best and the my-order and bait flags', () => {
+    const columns = orderBookCsvColumns(t, { ...base, isBuy: false });
+    const at = (header: string, row: RegionOrder) =>
+      columns.find((c) => c.header === header)!.value(row);
+    expect(at('market.securityColumn', order())).toBeCloseTo(0.9459);
+    expect(at('market.jumpsColumn', order())).toBe(4);
+    expect(at('market.jumpsColumn', order({ system_id: 1 }))).toBeNull();
+    expect(at('market.exportVolumeTotal', order())).toBe(200);
+    expect(at('market.orderDetail.orderValue', order())).toBe(50_000);
+    expect(at('market.exportVsBest', order())).toBe(100);
+    expect(at('market.exportVsBestPct', order())).toBe(25);
+    expect(at('market.exportMyOrder', order())).toBe('common.exportFlagYes');
+    expect(at('market.exportMyOrder', order({ order_id: 2 }))).toBe('common.exportFlagNo');
+    expect(at('market.exportBait', order({ price: 4000 }))).toBe('common.exportFlagYes');
+    expect(at('market.exportBait', order())).toBe('common.exportFlagNo');
+  });
+
+  it('prices fees when the skills are known, blank when not', () => {
+    const feeContext = {
+      accountingLevel: 0,
+      brokerRelationsLevel: 0,
+      standing: { factionStanding: 0, corpStanding: 0 },
+    };
+    const priced = orderBookCsvColumns(t, { ...base, feeContext, isBuy: true });
+    const fees = priced.find((c) => c.header === 'market.feesColumn')!;
+    const final = priced.find((c) => c.header === 'market.finalPriceColumn')!;
+    expect(fees.value(order({ is_buy_order: true }))).toBeGreaterThan(0);
+    expect(final.value(order({ is_buy_order: true }))).toBeLessThan(500);
+    const blank = orderBookCsvColumns(t, { ...base, isBuy: true }).find(
+      (c) => c.header === 'market.feesColumn'
+    )!;
+    expect(blank.value(order())).toBeNull();
+  });
+
   it('emits raw numbers for price and quantity', () => {
-    const columns = orderBookCsvColumns(t, { npcStations, solarSystems, isBuy: false });
+    const columns = orderBookCsvColumns(t, { ...base, isBuy: false });
     const row = order({ price: 12345.5, volume_remain: 42 });
     const csv = toCsv([row], columns);
     const fields = csv.split('\r\n')[1].split(',');
@@ -69,7 +123,7 @@ describe('orderBookCsvColumns (sell)', () => {
   });
 
   it('resolves location to the same station · system (security) text the location cell shows', () => {
-    const columns = orderBookCsvColumns(t, { npcStations, solarSystems, isBuy: false });
+    const columns = orderBookCsvColumns(t, { ...base, isBuy: false });
     const locationColumn = columns.find((c) => c.header === 'market.location')!;
     expect(locationColumn.value(order())).toBe(
       'Jita IV - Moon 4 - Caldari Navy Assembly Plant · Jita (0.9)'
@@ -77,7 +131,7 @@ describe('orderBookCsvColumns (sell)', () => {
   });
 
   it('emits the computed expiry as a raw ISO string', () => {
-    const columns = orderBookCsvColumns(t, { npcStations, solarSystems, isBuy: false });
+    const columns = orderBookCsvColumns(t, { ...base, isBuy: false });
     const expiryColumn = columns.find((c) => c.header === 'market.expiry')!;
     const row = order({ issued: '2026-08-20T12:00:00.000Z', duration: 1 });
     expect(expiryColumn.value(row)).toBe('2026-08-21T12:00:00.000Z');
@@ -86,19 +140,14 @@ describe('orderBookCsvColumns (sell)', () => {
 
 describe('orderBookCsvColumns (buy)', () => {
   it('appends range and min volume columns', () => {
-    const columns = orderBookCsvColumns(t, { npcStations, solarSystems, isBuy: true });
-    expect(columns.map((c) => c.header)).toEqual([
-      'market.price',
-      'market.quantity',
-      'market.location',
-      'market.expiry',
-      'market.range',
-      'market.minVolume',
-    ]);
+    const columns = orderBookCsvColumns(t, { ...base, isBuy: true });
+    const headers = columns.map((c) => c.header);
+    expect(headers.slice(-2)).toEqual(['market.range', 'market.minVolume']);
+    expect(headers).not.toContain('market.exportBait');
   });
 
   it('emits a raw number for min volume', () => {
-    const columns = orderBookCsvColumns(t, { npcStations, solarSystems, isBuy: true });
+    const columns = orderBookCsvColumns(t, { ...base, isBuy: true });
     const minVolumeColumn = columns.find((c) => c.header === 'market.minVolume')!;
     expect(minVolumeColumn.value(order({ min_volume: 250 }))).toBe(250);
   });

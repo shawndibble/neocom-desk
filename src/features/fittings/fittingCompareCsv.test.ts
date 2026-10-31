@@ -27,6 +27,7 @@ describe('fittingCompareCsvColumns', () => {
       'Fit A',
       'Fit B',
       'Fit C',
+      'fittings.compare.csvBestColumn',
     ]);
   });
 
@@ -37,6 +38,7 @@ describe('fittingCompareCsvColumns', () => {
       512.3,
       498,
       null,
+      'Fit A',
     ]);
   });
 
@@ -45,7 +47,7 @@ describe('fittingCompareCsvColumns', () => {
       [compareRow('priceSell', [NaN, 150000000])],
       fittingCompareCsvColumns(t, fittings)
     );
-    expect(csv.split('\r\n')[1]).toBe('"fittings.compare.stat.priceSell",,150000000,');
+    expect(csv.split('\r\n')[1]).toBe('"fittings.compare.stat.priceSell",,150000000,,"Fit A"');
   });
 
   it('words the capacitor as the table does — its sign means stable vs depleting', () => {
@@ -55,7 +57,42 @@ describe('fittingCompareCsvColumns', () => {
       'fittings.compare.stat.capacitorStable(42)',
       'fittings.compare.stat.capacitorUnstable(1m 35s)',
       null,
+      'Fit A',
     ]);
+  });
+});
+
+describe('fittingCompareCsvColumns header facts and best', () => {
+  const withFacts: FittingCompareCsvFitting[] = [
+    { name: 'Fit A', statsIndex: 0, fits: 'Fits', canFly: 'Can fly' },
+    { name: 'Fit B', statsIndex: 1, fits: 'Over by 12 CPU', canFly: null },
+    { name: 'Fit C', statsIndex: null },
+  ];
+
+  it('exports the Fits and Can fly header facts as rows, one cell per Fitting', () => {
+    const columns = fittingCompareCsvColumns(t, withFacts);
+    expect(columns.map((c) => c.value({ fact: 'fits' }))).toEqual([
+      'fittings.compare.csvFitsRow',
+      'Fits',
+      'Over by 12 CPU',
+      null,
+      null,
+    ]);
+    expect(columns.map((c) => c.value({ fact: 'canFly' }))).toEqual([
+      'fittings.compare.csvCanFlyRow',
+      'Can fly',
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it('names every Fitting tied for best, and leaves the marker blank when nothing differs', () => {
+    const best = fittingCompareCsvColumns(t, withFacts).at(-1)!;
+    expect(best.value({ ...compareRow('totalDps', [1, 1]), bestIndices: [0, 1] })).toBe(
+      'Fit A; Fit B'
+    );
+    expect(best.value({ ...compareRow('totalDps', [1, 1]), bestIndices: [] })).toBeNull();
   });
 });
 

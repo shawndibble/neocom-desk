@@ -30,25 +30,55 @@ describe('loyaltyOfferCsvColumns', () => {
     const columns = loyaltyOfferCsvColumns(t);
     expect(columns.map((c) => c.header)).toEqual([
       'loyaltyStore.colItem',
+      'loyaltyStore.csvBlueprint',
+      'loyaltyStore.csvProduct',
       'loyaltyStore.csvLpCost',
       'loyaltyStore.csvIskCost',
       'loyaltyStore.colSellsPerDay',
       'loyaltyStore.colProfit',
       'loyaltyStore.colIskPerLp',
+      'loyaltyStore.colIskPerConcordLp',
     ]);
     expect(columns.map((c) => c.value(offer(7500000.5, 1234.56)))).toEqual([
       'Mid-grade Amulet Alpha',
+      'common.exportFlagNo',
+      null,
       12500,
       5000000,
       12.5,
       7500000.5,
       1234.56,
+      null,
     ]);
   });
 
   it('blanks profit and ISK/LP for an offer that cannot be priced', () => {
     const csv = toCsv([offer(null, null)], loyaltyOfferCsvColumns(t));
-    expect(csv.split('\r\n')[1]).toBe('"Mid-grade Amulet Alpha",12500,5000000,12.5,,');
+    expect(csv.split('\r\n')[1]).toBe(
+      '"Mid-grade Amulet Alpha","common.exportFlagNo",,12500,5000000,12.5,,,'
+    );
+  });
+});
+
+describe('loyaltyOfferCsvColumns CONCORD basis and blueprints', () => {
+  it('exports ISK per CONCORD LP at the rate, beside the plain ISK/LP', () => {
+    const columns = loyaltyOfferCsvColumns(t, { concordRate: 0.5 });
+    const values = Object.fromEntries(columns.map((c) => [c.header, c.value(offer(1, 1000))]));
+    expect(values['loyaltyStore.colIskPerLp']).toBe(1000);
+    expect(values['loyaltyStore.colIskPerConcordLp']).toBe(500);
+  });
+
+  it('flags a blueprint offer and names its product', () => {
+    const row = {
+      ...offer(1, 1),
+      isBlueprint: true,
+      productName: 'Vexor',
+    } as LoyaltyOfferRow;
+    const values = Object.fromEntries(
+      loyaltyOfferCsvColumns(t).map((c) => [c.header, c.value(row)])
+    );
+    expect(values['loyaltyStore.csvBlueprint']).toBe('common.exportFlagYes');
+    expect(values['loyaltyStore.csvProduct']).toBe('Vexor');
   });
 });
 

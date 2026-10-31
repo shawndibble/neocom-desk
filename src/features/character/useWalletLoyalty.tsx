@@ -10,6 +10,7 @@ import { loyaltyPointsCsvColumns } from '@/features/character/loyaltyPointsCsv';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterLoyaltyPoints } from '@/esi/endpoints';
 
+const NO_LOYALTY: readonly CharacterLoyaltyPoints[] = [];
 const LOYALTY_SORT = { columnId: 'points', direction: 'desc' } as const;
 
 /**
@@ -72,7 +73,9 @@ export function useWalletLoyalty(
   );
   const tableExport = useTableExport({
     surface: 'loyalty-points',
-    rows: otherLoyalty,
+    // The whole list, not the table's slice, in the table's sort.
+    rows: loyaltyResult?.data ?? NO_LOYALTY,
+    source: 'sorted-rows',
     columns: csvColumns,
   });
 

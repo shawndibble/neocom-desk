@@ -17,17 +17,11 @@ export interface WhereaboutsLookup {
   hasShipGrant: (characterId: number) => boolean;
 }
 
-/**
- * Each Character's docked place and ship. With `enabled` false
- * nothing is read: the columns are off by default.
- */
-export function useCharacterWhereabouts(
-  characterIds: readonly number[],
-  enabled: boolean
-): WhereaboutsLookup {
+/** Each Character's docked place and ship, a few at a time. */
+export function useCharacterWhereabouts(characterIds: readonly number[]): WhereaboutsLookup {
   const withLocation = useCharacterIdsWithScopes([LOCATION_SCOPE], characterIds);
   const withShip = useCharacterIdsWithScopes([SHIP_SCOPE], characterIds);
-  const ready = enabled && withLocation !== undefined && withShip !== undefined;
+  const ready = withLocation !== undefined && withShip !== undefined;
   // Keyed by value: any token write re-runs the live query into a fresh Set,
   // which would otherwise reload every row from ESI.
   const locationKey = withLocation ? idSetKey(withLocation) : '';

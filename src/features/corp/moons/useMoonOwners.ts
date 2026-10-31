@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import {
   buildMoonOwners,
   hasOwnRefineries,
+  ownRefineriesFromStored,
   type MoonOwnersInput,
 } from '@/engine/corpTaxBook/moonOwners';
 import { useBook } from './useBook';
@@ -17,22 +18,27 @@ export function useMoonOwnersInput(): MoonOwnersInput {
       rates: settings.rates,
       entries: view.input.entries,
       feeders: data.feeders ?? [],
+      // Read with the Moon owners tab's `owners` part; absent elsewhere, then priced from entries.
+      ...(data.feederSummaries ? { summaries: data.feederSummaries } : {}),
       // The moon owner's page's prices (#4621), so the tab, Pay and that page owe one figure.
       pricesOn: view.input.moonOwnerPricesOn ?? ((date) => view.input.pricesOn(date).prices),
     }),
-    [view, settings, data.feeders, corporationId]
+    [view, settings, data.feeders, data.feederSummaries, corporationId]
   );
 }
 
 /** Whether the Extractions tab shows: the corporation has refineries of its own. */
 export function useShowExtractions(): boolean {
   const { view, data, corporationId } = useBook();
-  const ownRefineries = useMemo(
-    () => hasOwnRefineries(view.input.entries, data.state.extractions.length, corporationId),
-    [view.input.entries, data.state.extractions.length, corporationId]
+  const feederCount = (data.feeders ?? []).length;
+  // An Extraction or no moon owner settles it from the held records, so the Moon owners tab
+  // needs no ledger row for it; otherwise the page holds the rows (`useCorpBook`, #5717).
+  const stored = ownRefineriesFromStored(data.state.extractions.length, feederCount);
+  return useMemo(
+    () =>
+      stored ?? hasOwnRefineries(view.input.entries, data.state.extractions.length, corporationId),
+    [stored, view.input.entries, data.state.extractions.length, corporationId]
   );
-  // A book with no moon owners yet may simply not have synced its own refineries: keep the tab.
-  return ownRefineries || (data.feeders ?? []).length === 0;
 }
 
 /** The book's moon owners (feeders) as the tab reads them; only the tab builds every row. */

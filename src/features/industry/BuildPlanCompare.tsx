@@ -162,27 +162,34 @@ export function BuildPlanCompare({
     }
     return byPlan;
   }, [pricedPlans, catalog]);
-  const hubOrders = useHubOrderCounts([...targets.values()], showBookColumns);
+  // The export holds the hub columns even while the picker hides them, so both
+  // reads run once a plan has resolved: one Fuzzwork call per hub, and one ESI
+  // history read per product (cached until the daily rollover).
+  const anyResolved = rows.some((row) => !row.loading);
+  const wantHub = anyResolved || showBookColumns;
+  const hubOrders = useHubOrderCounts([...targets.values()], wantHub);
   const hubCountsFor = (row: ComparedBuildRow) => {
     const target = targets.get(row.planId);
     return target ? hubOrders.counts.get(hubOrderKey(target.hubId, target.typeId)) : undefined;
   };
 
-  const dailyOrders = useHubDailyOrders([...targets.values()], isVisible('hubOrdersPerDay'));
+  const dailyOrders = useHubDailyOrders([...targets.values()], wantHub);
   const ordersPerDayFor = (row: ComparedBuildRow) => {
     const target = targets.get(row.planId);
     return target ? dailyOrders.perDay.get(hubOrderKey(target.hubId, target.typeId)) : undefined;
   };
 
   const csvColumns = buildPlanCompareCsvColumns(t, {
-    visible,
     hubCounts: hubCountsFor,
     ordersPerDay: ordersPerDayFor,
+    unresolvedReason: (row) => unresolvedReason(row, t),
   });
   const compareExport = useTableExport({
     surface: 'build-plan-compare',
     rows,
     columns: csvColumns,
+    // Partial only while a read is still in flight; one that failed leaves its cells blank.
+    truncated: hubOrders.loading || dailyOrders.loading,
   });
 
   /** A hub-book cell: "…" while loading, "—" when the plan has no product or the read failed. */

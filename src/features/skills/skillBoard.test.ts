@@ -95,14 +95,16 @@ describe('buildSkillBoard', () => {
 });
 
 describe('boardCsvGroups', () => {
-  it('keeps only the skills ESI lists (level 0 included, as today), dropping groups with none', () => {
+  it('keeps every skill the board lists, flagging the ones ESI does not list as not injected', () => {
     const csv = boardCsvGroups(board());
     expect(csv.map((g) => g.groupName)).toEqual(['Gunnery', 'Spaceship Command']);
-    expect(boardCsvGroups(board({ trained: new Map() }))).toEqual([]);
-    expect(csv[0]?.skills.map((s) => [s.name, s.level, s.sp])).toEqual([
-      ['Gunnery', 5, 256000],
-      ['Small Hybrid Turret', 3, 8000],
+    expect(csv[0]?.skills.map((s) => [s.name, s.level, s.sp, s.injected, s.queuedLevel])).toEqual([
+      ['Gunnery', 5, 256000, true, null],
+      ['Sharpshooter', 0, null, false, null],
+      ['Small Hybrid Turret', 3, 8000, true, 5],
     ]);
+    // With nothing trained the whole catalog is still there.
+    expect(boardCsvGroups(board({ trained: new Map() })).flatMap((g) => g.skills)).toHaveLength(5);
   });
 });
 
