@@ -48,7 +48,7 @@ interface ValueRowProps {
   tone?: StatChipTone;
 }
 
-/** One line of a `ValueList`. */
+/** One line of a `ValueList`; it takes its spacing from the list's `variant`, so render it inside one. */
 export function ValueRow({ label, value, note, tone = 'default' }: ValueRowProps) {
   const variant = useContext(VariantContext);
   return (
@@ -60,7 +60,12 @@ export function ValueRow({ label, value, note, tone = 'default' }: ValueRowProps
     >
       <dt className="min-w-0">
         {label}
-        {note !== undefined && note !== null && <span className="ml-1 text-text-dim">{note}</span>}
+        {note !== undefined && note !== null && (
+          <span className="ml-1 text-text-dim">
+            <span className="sr-only">, </span>
+            {note}
+          </span>
+        )}
       </dt>
       <dd className={cx('shrink-0 tabular-nums', STAT_CHIP_TONE_TEXT_CLASS[tone])}>{value}</dd>
     </div>

@@ -13,7 +13,7 @@ describe('ValueList', () => {
     const term = screen.getByText('Fine').closest('dt') as HTMLElement;
     expect(within(term).getByText('3 orders')).toBeInTheDocument();
     expect(screen.getByText('1M').tagName).toBe('DD');
-    expect(screen.getByText('400K')).toHaveClass('tabular-nums');
+    expect(screen.getByText('400K')).toHaveClass('tabular-nums', 'text-warning');
   });
 
   it('draws hairlines only in the divided variant', () => {
