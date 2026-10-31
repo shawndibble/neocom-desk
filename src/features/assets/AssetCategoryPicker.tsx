@@ -30,10 +30,14 @@ import {
  */
 export function AssetCategoryPicker({
   index,
+  visibleIndex = index,
   pick,
   onChange,
 }: {
+  /** The full index: toggles run against it so an `'all'` pick stays "everything". */
   index: AssetCategoryIndex;
+  /** What the list shows (e.g. only categories with assets); defaults to `index`. */
+  visibleIndex?: AssetCategoryIndex;
   pick: CategoryPick;
   onChange: (pick: CategoryPick) => void;
 }) {
@@ -41,32 +45,33 @@ export function AssetCategoryPicker({
 
   const headingByLabel = useMemo(() => {
     const map = new Map<string, CategoryHeading>();
-    for (const heading of index.headings) map.set(heading.name, heading);
+    for (const heading of visibleIndex.headings) map.set(heading.name, heading);
     return map;
-  }, [index]);
+  }, [visibleIndex]);
   // A heading holding one row of its own name ("Not on the market") is just that row.
   const groups = useMemo<readonly MultiSelectGroup<number>[]>(
     () =>
-      index.headings.map((heading) => ({
+      visibleIndex.headings.map((heading) => ({
         label:
           heading.options.length === 1 && heading.options[0].name === heading.name
             ? ''
             : heading.name,
         options: heading.options.map((option) => ({ id: option.id, label: option.name })),
       })),
-    [index]
+    [visibleIndex]
   );
 
+  const visibleIds = useMemo(() => allOptionIds(visibleIndex), [visibleIndex]);
   const selected = useMemo<ReadonlySet<number>>(
-    () => (pickIsAll(pick) ? new Set(allOptionIds(index)) : pick),
-    [pick, index]
+    () => (pickIsAll(pick) ? new Set(visibleIds) : pick),
+    [pick, visibleIds]
   );
-  const total = allOptionIds(index).length;
+  const ticked = pickIsAll(pick) ? 0 : visibleIds.filter((id) => pick.has(id)).length;
   const summary = pickIsAll(pick)
     ? t('assets.category.all')
-    : pick.size === 0
+    : ticked === 0
       ? t('assets.category.none')
-      : `${pick.size} / ${total}`;
+      : `${ticked} / ${visibleIds.length}`;
 
   return (
     <MultiSelect<number>

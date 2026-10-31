@@ -8,6 +8,7 @@ import {
   categoryPickParam,
   expandLegacyCategoryIds,
   headingState,
+  pruneCategoryIndex,
   toggleHeading,
   toggleOption,
 } from './assetCategoryFilter';
@@ -139,5 +140,33 @@ describe('categoryPickParam malformed ids', () => {
   it('reads an empty segment or zero as all', () => {
     expect(categoryPickParam().parse('1,')).toBe('all');
     expect(categoryPickParam().parse('0')).toBe('all');
+  });
+});
+
+describe('pruneCategoryIndex', () => {
+  it('drops options and headings with no owned type', () => {
+    const pruned = pruneCategoryIndex(index, [100], 'all');
+    expect(pruned.headings.map((h) => [h.name, h.options.map((o) => o.name)])).toEqual([
+      ['Ships', ['Frigates']],
+    ]);
+  });
+
+  it('maps an unknown type to Not on the market', () => {
+    const pruned = pruneCategoryIndex(index, [999], 'all');
+    expect(pruned.headings.map((h) => h.name)).toEqual(['Not on the market']);
+  });
+
+  it('keeps an option that is ticked even when nothing is owned in it', () => {
+    const pruned = pruneCategoryIndex(index, [100], new Set([12]));
+    expect(pruned.headings[0].options.map((o) => o.name)).toEqual(['Cruisers', 'Frigates']);
+  });
+});
+
+describe('pruneCategoryIndex blueprints', () => {
+  it('drops blueprint options nobody owns, so the Blueprints select hides', () => {
+    const pruned = pruneCategoryIndex(index, [100], 'all');
+    expect(pruned.blueprintOptionIds.size).toBe(0);
+    expect(blueprintsTicked(pruned, 'all')).toBe(false);
+    expect(blueprintsTicked(pruneCategoryIndex(index, [200], 'all'), 'all')).toBe(true);
   });
 });
