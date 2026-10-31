@@ -7,6 +7,7 @@ import {
   isUnpricedOffer,
   listedContractTypeOptions,
   offerAskingPrice,
+  offerUnitPrice,
 } from '@/engine/contracts/contractSearch';
 
 function offer(over: Partial<PublicContractOfferRow> = {}): PublicContractOfferRow {
@@ -238,5 +239,36 @@ describe('exclude filters', () => {
     expect(filterContractOffers(rows, { hideAuctions: true, hidePlexRequests: true })).toEqual([
       exchange,
     ]);
+  });
+});
+
+describe('offerUnitPrice', () => {
+  const single = (over: Partial<PublicContractOfferRow> = {}) => offer({ lineCount: 1, ...over });
+
+  it('divides the asking price by the quantity of a single-type contract', () => {
+    expect(offerUnitPrice(single({ price: 1_000, quantity: 4 }), null)).toBe(250);
+  });
+
+  it('is unknowable for a bundle or a row whose line count is unknown', () => {
+    expect(offerUnitPrice(offer({ lineCount: 2, quantity: 4 }), null)).toBeUndefined();
+    expect(offerUnitPrice(offer({ quantity: 4 }), null)).toBeUndefined();
+  });
+
+  it('uses the buyout of an auction, else its starting bid — same as the Price column', () => {
+    expect(
+      offerUnitPrice(single({ isAuction: true, price: 100, buyout: 800, quantity: 4 }), null)
+    ).toBe(200);
+    expect(offerUnitPrice(single({ isAuction: true, price: 100, quantity: 4 }), null)).toBe(25);
+  });
+
+  it('folds requested PLEX in at the PLEX price, and is unknowable without one', () => {
+    const row = single({ price: 20_000_000, requestedPlex: 10, quantity: 2 });
+    expect(offerUnitPrice(row, 5_000_000)).toBe(35_000_000);
+    expect(offerUnitPrice(row, null)).toBeUndefined();
+  });
+
+  it('is unknowable for an unpriced barter or a zero quantity', () => {
+    expect(offerUnitPrice(single({ price: 0, quantity: 3 }), null)).toBeUndefined();
+    expect(offerUnitPrice(single({ quantity: 0 }), null)).toBeUndefined();
   });
 });

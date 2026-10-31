@@ -8,6 +8,7 @@ import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 
 export const CONTRACT_SEARCH_ITEMS_COLUMN_IDS = [
   'qty',
+  'iskPerUnit',
   'price',
   'system',
   'jumps',
