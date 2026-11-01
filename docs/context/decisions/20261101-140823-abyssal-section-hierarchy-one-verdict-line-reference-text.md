@@ -1,0 +1,5 @@
+# Scope decisions — Abyssal section hierarchy: one verdict line, reference text in a tooltip (issue #5811)
+
+_Recorded 2026-11-01 · issue #5811._
+
+- **The Abyssal section is ordered by payoff, with one verdict line and reference text behind an info tooltip** (supersedes only the layout wording of `20261016-172332-abyssal-is-one-stats-section.md`; every planner rule, weather maths and warning cause is unchanged). With a weather: picker with its effect, the effect on this fit, tier, security, one verdict line ("Clear to run · Cruiser, solo · no suspect flag"; only problems use warning colour and name the cause), then one Buy row ("Buy: filament x N · ISK at hub", the cargo offset and nothing-when-unpriced rules of #5802 kept). The tier strength range, the run timer and the source note live in an info tooltip beside the weather label (the section row itself is a toggle, so a tooltip button cannot sit inside it). In Normal space only the picker and one hint show; tier, security, verdict and Buy wait for a weather. The share view and Compare behave the same.
