@@ -93,6 +93,26 @@ describe('MoonOwnersTable', () => {
     await sort('Owed to them', ['Corp 1', 'Corp 3', 'Corp 2']);
   });
 
+  it('pairs facts two per line on a phone, Owed beside Pay (#5778)', () => {
+    render(
+      <MoonOwnersTable
+        rows={ROWS}
+        totals={TOTALS}
+        name={NAME}
+        now={0}
+        onOpen={() => {}}
+        onPay={() => {}}
+      />
+    );
+    const table = screen.getByRole('table', { name: 'Moon owners' });
+    expect(table.className).toContain('dt-stack-2col');
+    const cells = within(within(table).getAllByRole('row')[1]!).getAllByRole('cell');
+    const owed = cells.findIndex((c) => c.getAttribute('data-label') === 'Owed to them');
+    const pay = cells.findIndex((c) => c.classList.contains('dt-action-row'));
+    expect(pay).toBe(owed + 1);
+    expect(within(cells[pay]!).getByRole('button', { name: /^Pay / })).toBeInTheDocument();
+  });
+
   it('opens a moon owner when its row is clicked', async () => {
     const onOpen = vi.fn();
     render(<MoonOwnersTable rows={ROWS} totals={TOTALS} name={NAME} now={0} onOpen={onOpen} />);

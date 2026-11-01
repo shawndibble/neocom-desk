@@ -405,6 +405,7 @@ export function MoonOwnerPage({
             rowKey={minedKey}
             defaultSort={{ columnId: 'value', direction: 'desc' }}
             mobileSort
+            stackColumns={2}
           />
         )}
       </Panel>
