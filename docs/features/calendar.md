@@ -2,7 +2,7 @@
 
 `/calendar` (nav: Social group, phone tab). The Character's "Coming Up" surface: the in-game calendar events plus every other clock the Character can read (skill queue, industry jobs, PI extractors, moon chunks, contracts, market orders, optional projected skill plan), shown as a **Calendar Map** (grid) beside the **Coming Up Rail** (list). Replaced the old Month/Week/Agenda tabs (scope decision `20260907-123312-calendar-becomes-the-characters-coming-up-surface`).
 
-Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,calendarBoardSources,calendar,calendarMoonChunks,calendarSkillPlan,calendarKindFilter,calendarKindLabels,calendarViewPref,calendarWeekStart,calendarCsv,calendarResponseTone}.ts`; components `CalendarMap`, `CalendarDayTicker`, `ComingUpRail`, `CharacterBoardRow`, `CalendarKindFilterMenu`, `EventDetailModal`, `EventContextMenu`; engine `src/engine/character/{board,deadlines,calendarRetention}.ts`; grid math `src/lib/calendarGrid.ts`; export `src/lib/calendarExport.ts`.
+Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,calendarBoardSources,calendar,calendarMoonChunks,calendarSkillPlan,calendarKindFilter,calendarKindLabels,calendarViewPref,calendarWeekStart,calendarCsv,calendarResponseTone}.ts`; components `CalendarMap`, `CalendarDayTicker`, `ComingUpRail`, `CharacterBoardRow`, `CalendarKindFilterMenu`, `EventDetailModal`; engine `src/engine/character/{board,deadlines,calendarRetention}.ts`; grid math `src/lib/calendarGrid.ts`; export `src/lib/calendarExport.ts`.
 
 ## Summary
 
@@ -20,7 +20,6 @@ Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,cale
 | RSVP                  | Accept / Decline / Tentative (ESI write)                                                         | `respondToCalendarEvent`                    |
 | Add to calendar       | `.ics` download, Google Calendar URL                                                             | `EventDetailModal.tsx`, `calendarExport.ts` |
 | CSV export            | Calendar events only: date, title, response                                                      | `calendarCsv.ts`, `TableActionsMenu`        |
-| Row context menu      | Calendar event rows: Copy event ID                                                               | `EventContextMenu.tsx`                      |
 | Contract row link     | Contract expiry rows link to `/contracts/history?highlight=<id>`                                 | `CharacterBoardRow.tsx`                     |
 | Week start            | Monday or Sunday, Settings > Display                                                             | `calendarWeekStart.ts`, `Settings.tsx:1057` |
 | Refresh / Data Age    | Header refresh icon; badge = oldest source fetch time                                            | `Calendar.tsx:~355`                         |

@@ -45,6 +45,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   EmptyState,
+  RowMoreActions,
   SlideOver,
   Spinner,
   StatChip,
@@ -650,6 +651,7 @@ function ContractItemRow({
             )}
           </span>
           <span className="shrink-0 tabular-nums">×{formatCount(line.quantity)}</span>
+          <RowMoreActions />
         </li>
       }
     />

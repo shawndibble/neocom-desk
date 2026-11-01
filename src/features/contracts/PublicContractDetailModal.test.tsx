@@ -439,6 +439,14 @@ describe('PublicContractDetailModal — item actions', () => {
 
     expect(await screen.findByRole('menu')).toBeInTheDocument();
   });
+
+  it('shows a visible More actions button on each item line', async () => {
+    showItems([item({ record_id: 1 })]);
+    renderModal();
+
+    const rows = await itemRows();
+    expect(within(rows[0]).getByRole('button', { name: /more actions/i })).toBeInTheDocument();
+  });
 });
 
 describe('PublicContractDetailModal — system row', () => {
