@@ -28,6 +28,7 @@ import {
 } from '@/lib/urlState';
 import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 import type { WhereaboutsLookup } from '@/features/character/useCharacterWhereabouts';
+import type { LatestNetWorth } from '@/engine/netWorth/latest';
 import type { CharacterRow } from '@/features/character/charactersTableColumns';
 
 export const SORT_KEYS: readonly CharacterSortKey[] = [
@@ -110,6 +111,8 @@ interface CharactersViewInput {
   visibleColumns: readonly CharacterColumnId[];
   spExtractionEnabled: boolean;
   whereabouts: WhereaboutsLookup;
+  /** Newest Net Worth Snapshot per Character; none for one never snapshotted. */
+  netWorthById: ReadonlyMap<number, LatestNetWorth>;
 }
 
 /**
@@ -133,6 +136,7 @@ export function useCharactersView(input: CharactersViewInput) {
     visibleColumns,
     spExtractionEnabled,
     whereabouts,
+    netWorthById,
   } = input;
   const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
   const { q: search, sort: sortKey, dir: sortDirection } = filterParams;
@@ -269,6 +273,7 @@ export function useCharactersView(input: CharactersViewInput) {
         whereabouts: whereabouts.of(character.characterId),
         locationGranted: whereabouts.hasLocationGrant(character.characterId),
         shipGranted: whereabouts.hasShipGrant(character.characterId),
+        netWorth: netWorthById.get(character.characterId),
       };
     });
   const allIds = (characters ?? []).map((character) => character.characterId);

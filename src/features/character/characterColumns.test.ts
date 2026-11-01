@@ -45,6 +45,16 @@ describe('availableCharacterColumns', () => {
   });
 });
 
+describe('ISK and Net worth columns', () => {
+  it('shows ISK by default and keeps Net worth, right after it, in the picker but off', () => {
+    expect(DEFAULT_VISIBLE_CHARACTER_COLUMNS).toContain('wallet');
+    expect(DEFAULT_VISIBLE_CHARACTER_COLUMNS).not.toContain('netWorth');
+    expect(CHARACTER_COLUMN_IDS.indexOf('netWorth')).toBe(
+      CHARACTER_COLUMN_IDS.indexOf('wallet') + 1
+    );
+  });
+});
+
 describe('whereabouts columns', () => {
   it('are in the picker but off by default', () => {
     expect(CHARACTER_COLUMN_IDS).toContain('dockedAt');
