@@ -113,19 +113,10 @@ import {
   type HaulMode,
 } from './haulingData';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { TABLE_WIDTHS } from './haulingTableWidths';
 import { VIRTUALIZE_THRESHOLD } from '@/components/ui/DataTable';
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 
-/**
- * Table widths (rem), measured in Chrome: below `compact` figures go compact
- * (full columns ~35.8rem + ~9rem for a two-line Item), below `cards` rows
- * become cards (compact columns ~34.3rem + Item's 7rem floor). Header marks,
- * not figures, set most widths, so the two sit close. Hub adds ~5.3rem.
- */
-const TABLE_WIDTHS = {
-  oneHub: { compact: 45, cards: 42.5 },
-  anyHub: { compact: 50.5, cards: 48 },
-} as const;
 /** Rail 20rem + 1rem gap. */
 const RAIL_REM = 21;
 /**
