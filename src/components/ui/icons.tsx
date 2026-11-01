@@ -84,6 +84,7 @@ import { FileText } from '@phosphor-icons/react/dist/csr/FileText';
 import { Flag } from '@phosphor-icons/react/dist/csr/Flag';
 import { Note } from '@phosphor-icons/react/dist/csr/Note';
 import { Flask } from '@phosphor-icons/react/dist/csr/Flask';
+import { Lightning } from '@phosphor-icons/react/dist/csr/Lightning';
 import { FolderSimple } from '@phosphor-icons/react/dist/csr/FolderSimple';
 import { Funnel } from '@phosphor-icons/react/dist/csr/Funnel';
 import { Gear } from '@phosphor-icons/react/dist/csr/Gear';
@@ -334,6 +335,8 @@ export const Build = withWeight(Hammer);
 export const Buy = withWeight(ShoppingCart);
 /** A build plan material this character is better off reacting than buying (issue #460) — its own glyph, not the manufacturing hammer or the planetary globe. */
 export const Reaction = withWeight(Flask);
+/** A running cerebral accelerator: the Calendar's "Accelerator expires" clock. */
+export const Accelerator = withWeight(Lightning);
 /** Promote a derived prereq row into a real Skill Plan entry (GLOSSARY.md "Prereq Promotion"). */
 export const AddToPlan = withWeight(Plus);
 /** Append a new row to an editable list, e.g. another Booster (#1407). */

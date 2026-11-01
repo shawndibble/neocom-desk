@@ -8,6 +8,7 @@ import type {
   SkillQueueEntry,
 } from '@/esi/endpoints';
 import {
+  toAcceleratorSources,
   toCalendarEventSources,
   toContractExpirySources,
   toIndustryJobSources,
@@ -539,5 +540,25 @@ describe('toMercenaryDenSources', () => {
       NOW
     );
     expect(source.subject).toBe('#40000001');
+  });
+});
+
+describe('toAcceleratorSources', () => {
+  const NOW = 1_000_000;
+  const subject = (bonus: number) => `Cerebral accelerator +${bonus}`;
+
+  it('is one clock at the typed-in expiry, named by its bonus', () => {
+    expect(
+      toAcceleratorSources({ characterId: 7, bonus: 12, expiresAt: NOW + 5_000 }, NOW, subject)
+    ).toEqual([
+      { id: '7', subject: 'Cerebral accelerator +12', detail: '', deadlineMs: NOW + 5_000 },
+    ]);
+  });
+
+  it('is nothing with none typed in, or once it has run out', () => {
+    expect(toAcceleratorSources(undefined, NOW, subject)).toEqual([]);
+    expect(
+      toAcceleratorSources({ characterId: 7, bonus: 12, expiresAt: NOW }, NOW, subject)
+    ).toEqual([]);
   });
 });

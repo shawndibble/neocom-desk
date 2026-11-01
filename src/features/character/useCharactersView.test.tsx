@@ -37,6 +37,8 @@ function view(
           hasShipGrant: () => true,
         },
         netWorthById,
+        acceleratorById: new Map(),
+        detectedAcceleratorById: new Map(),
       }),
     { wrapper }
   ).result.current;

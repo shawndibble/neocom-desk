@@ -25,6 +25,7 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
   skillLevelComplete: 'skills',
   characterNotTraining: 'skills',
   skillQueueEnding: 'skills',
+  acceleratorExpiring: 'skills',
   spExtractionReady: 'skills',
   cloneJumpReady: 'skills',
   industryJobComplete: 'industryPi',

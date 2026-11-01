@@ -24,7 +24,6 @@ import {
   toCustomSelection,
   WHAT_IF_IMPLANT_PRESETS,
 } from '../whatIfImplants';
-import type { PlanEditorProps } from './types';
 import type { usePlanAssumptions } from './usePlanAssumptions';
 
 /** The Assumptions section's controls: Alpha Clone, What-If Implants (preset or per-slot) and Boosters. */
@@ -32,12 +31,10 @@ export function AssumptionControls({
   assumptions,
   alphaCappedCount,
   implants,
-  onUpdate,
 }: {
   assumptions: ReturnType<typeof usePlanAssumptions>;
   alphaCappedCount: number;
   implants: Implants;
-  onUpdate: PlanEditorProps['onUpdate'];
 }) {
   const { t } = useTranslation();
   const {
@@ -50,6 +47,7 @@ export function AssumptionControls({
     matchedCloneId,
     effectiveImplants,
     planBoosters,
+    setPlanBoosters,
     detectedAccelerator,
   } = assumptions;
   return (
@@ -171,7 +169,7 @@ export function AssumptionControls({
       <BoosterList
         boosters={planBoosters}
         detectedAccelerator={detectedAccelerator}
-        onChange={(boosters) => onUpdate({ boosters })}
+        onChange={setPlanBoosters}
       />
     </div>
   );

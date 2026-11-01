@@ -39,6 +39,10 @@ import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale'
 import { useRosterData } from '@/features/character/useRosterData';
 import { useLatestNetWorth } from '@/features/character/useLatestNetWorth';
 import {
+  useCharacterAccelerators,
+  useDetectedAccelerators,
+} from '@/features/accelerator/useAccelerators';
+import {
   RemoveCharacterDialog,
   type RemoveTarget,
 } from '@/features/character/RemoveCharacterDialog';
@@ -80,6 +84,8 @@ import { buildColumns } from '@/features/character/charactersTableColumns';
 import { useCharacterWhereabouts } from '@/features/character/useCharacterWhereabouts';
 import { useCharacterAchievements } from '@/features/character/useCharacterAchievements';
 import { returnPathAfterSwitch } from '@/features/character/characterSwitchReturn';
+
+const NO_CHARACTER_IDS: readonly number[] = [];
 
 const DENSITY_LABEL_KEYS = {
   0.875: 'characters.densityCompact',
@@ -180,6 +186,13 @@ export function Characters() {
   );
 
   const netWorthById = useLatestNetWorth();
+  const acceleratorById = useCharacterAccelerators();
+  // Detection reads each Character's cached attribute sheet, so only pay for it while the column shows.
+  const detectedAcceleratorById = useDetectedAccelerators(
+    visibleColumns.includes('accelerator')
+      ? (characters ?? []).map((character) => character.characterId)
+      : NO_CHARACTER_IDS
+  );
 
   const {
     search,
@@ -214,6 +227,8 @@ export function Characters() {
     spExtractionEnabled,
     whereabouts,
     netWorthById,
+    acceleratorById,
+    detectedAcceleratorById,
   });
 
   // One batched read for the roster (public records): the cards' line, the table's column and

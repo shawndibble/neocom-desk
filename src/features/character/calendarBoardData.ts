@@ -41,6 +41,8 @@ import { loadCharacterSkillQueueWithStatus } from '@/features/skills/data';
 import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import { loadCharacterPlanets, readCachedColonyDetails } from '@/features/pi/data';
 import { readCachedPlanetNames } from '@/features/pi/names';
+import { db } from '@/db';
+import { acceleratorId } from '@/features/accelerator/characterAccelerators';
 import { loadSkillPlanBoard, type SkillPlanChoice } from './calendarSkillPlan';
 import { loadMoonChunks } from './calendarMoonChunks';
 import { loadSkyhookRaids } from './calendarSkyhooks';
@@ -52,6 +54,7 @@ import {
   toIndustryJobSources,
   toMercenaryDenSources,
   toOrderExpirySources,
+  toAcceleratorSources,
   toPlanetExtractionSources,
   toSkillPlanSources,
   toSkillTrainingSources,
@@ -72,6 +75,8 @@ export interface CalendarBoardData {
   skyhookRaidDetails: SkyhookRaid[];
   contractExpiries?: BoardClockSource[];
   orderExpiries?: BoardClockSource[];
+  /** The pilot's typed-in accelerator running out; empty when none is running. */
+  accelerator?: BoardClockSource[];
   /** Projected steps of the chosen Skill Plan. Left `undefined` when none is chosen or it could not be costed. */
   skillPlan?: BoardClockSource[];
   /** The Character's Skill Plans, for the picker under the filter menu. */
@@ -170,6 +175,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     moonChunkRead,
     skyhookRead,
     densResult,
+    typedAccelerator,
   ] = await Promise.all([
     loadCalendarEvents(characterId),
     loadCharacterSkillQueueWithStatus(characterId),
@@ -181,8 +187,12 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     loadMoonChunks(characterId, loadedAtMs),
     loadSkyhookRaids(characterId, loadedAtMs),
     loadCharacterDenRows(characterId),
+    db.characterAccelerators.get(acceleratorId(characterId)),
   ]);
 
+  const acceleratorSources = toAcceleratorSources(typedAccelerator, loadedAtMs, (bonus) =>
+    i18n.t('calendar.acceleratorSubject', { bonus })
+  );
   const events = readRows(eventsResult);
   const queue = readRows(queueResult);
   const jobs = readRows(jobsResult);
@@ -265,6 +275,12 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     { kind: 'industryJob', result: jobsResult, rows: jobs },
     { kind: 'planetExtraction', result: planetsResult, rows: planets },
     { kind: 'mercenaryDen', result: densResult, rows: dens },
+    // The pilot's own answer, from Dexie: no cache metadata, nothing to re-authorise.
+    {
+      kind: 'accelerator',
+      result: { cached: null, needsReauth: false },
+      rows: acceleratorSources,
+    },
     { kind: 'moonChunk', result: moonChunkRead.result, rows: moonChunkRead.sources },
     { kind: 'skyhookRaid', result: skyhookRead.result, rows: skyhookRead.sources },
     { kind: 'contractExpiry', result: contractsResult, rows: contracts },
@@ -298,6 +314,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     contractExpiries:
       contracts && toContractExpirySources(contracts, contractTypeLabel, contractRouteName),
     orderExpiries: orders && toOrderExpirySources(orders, typeName),
+    accelerator: acceleratorSources,
     skillPlan: planSchedule && toSkillPlanSources(planSchedule, queue ?? [], typeName),
     skillPlanChoices: skillPlanBoard.choices,
     chosenSkillPlanId: skillPlanBoard.chosenId,

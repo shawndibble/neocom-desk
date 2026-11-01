@@ -55,6 +55,15 @@ describe('ISK and Net worth columns', () => {
   });
 });
 
+describe('Accelerator column', () => {
+  it('is in the picker right after Training, off by default', () => {
+    expect(CHARACTER_COLUMN_IDS.indexOf('accelerator')).toBe(
+      CHARACTER_COLUMN_IDS.indexOf('training') + 1
+    );
+    expect(DEFAULT_VISIBLE_CHARACTER_COLUMNS).not.toContain('accelerator');
+  });
+});
+
 describe('whereabouts columns', () => {
   it('are in the picker but off by default', () => {
     expect(CHARACTER_COLUMN_IDS).toContain('dockedAt');

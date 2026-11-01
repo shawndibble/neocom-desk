@@ -15,6 +15,7 @@ import type {
   BuildPlanRecord,
   FittingRecord,
   NetWorthSnapshotRecord,
+  CharacterAcceleratorRecord,
   MiningTaxAssignmentRecord,
   PayeeRecord,
   PlanetRichnessRecord,
@@ -228,6 +229,14 @@ export const FULL_NET_WORTH_SNAPSHOT: Required<NetWorthSnapshotRecord> = {
   updatedAt: UPDATED_AT,
 };
 
+export const FULL_CHARACTER_ACCELERATOR: Required<CharacterAcceleratorRecord> = {
+  id: '1',
+  characterId: 1,
+  bonus: 12,
+  expiresAt: 1_800_000_000_000,
+  updatedAt: UPDATED_AT,
+};
+
 /** One full record per synced Dexie table, keyed by table name. */
 export const FULL_RECORDS = {
   skillPlans: FULL_SKILL_PLAN,
@@ -240,6 +249,7 @@ export const FULL_RECORDS = {
   productionOrderWatches: FULL_PRODUCTION_ORDER_WATCH,
   productionLosses: FULL_PRODUCTION_LOSS,
   netWorthSnapshots: FULL_NET_WORTH_SNAPSHOT,
+  characterAccelerators: FULL_CHARACTER_ACCELERATOR,
   payees: FULL_PAYEE,
   fittings: FULL_FITTING,
   miningTaxAssignments: FULL_MINING_TAX_ASSIGNMENT,

@@ -6,6 +6,7 @@ import {
   MAX_BOOSTER_BONUS,
   clampBoosterBonus,
   clampBoosterOverlaps,
+  composePlanBoosters,
   hasOverlappingBoosters,
   boosterDurationBase,
   joinBoosterDuration,
@@ -16,6 +17,7 @@ import {
   normalizePlanBoosterRow,
   normalizePlanBoosters,
   resolvePlanBoosters,
+  splitPlanBoosters,
   toBoosters,
 } from './planBooster';
 
@@ -429,5 +431,59 @@ describe('clampBoosterBonus', () => {
     expect(clampBoosterBonus(-3)).toBe(0);
     expect(clampBoosterBonus(2.6)).toBe(3);
     expect(clampBoosterBonus(Number.NaN)).toBe(0);
+  });
+});
+
+describe('composePlanBoosters', () => {
+  const NOW = 1_000;
+  const live = { bonus: 12, expiresAt: NOW + 500 };
+
+  it('puts a running accelerator first, whatever first row the plan stored', () => {
+    const stale = booster({ enabled: true, bonus: 5, startsAt: null, expiresAt: NOW + 50 });
+    const rows = composePlanBoosters([stale], undefined, live, 3);
+    expect(rows).toEqual([{ enabled: true, bonus: 12, startsAt: null, expiresAt: NOW + 500 }]);
+  });
+
+  it('keeps what the plan queued behind it', () => {
+    const queued = booster({ enabled: true, bonus: 9, startsAt: NOW + 500, expiresAt: NOW + 900 });
+    const rows = composePlanBoosters(
+      [booster({ enabled: true, startsAt: null, expiresAt: NOW + 400 }), queued],
+      undefined,
+      live,
+      null
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).toEqual(queued);
+  });
+
+  it('is the plain plan resolution with no running accelerator', () => {
+    const stored = [booster({ enabled: true, bonus: 7, expiresAt: NOW + 10 })];
+    expect(composePlanBoosters(stored, undefined, null, null)).toEqual(
+      resolvePlanBoosters(stored, undefined, null)
+    );
+    expect(composePlanBoosters(undefined, undefined, null, 4)).toEqual(
+      resolvePlanBoosters(undefined, undefined, 4)
+    );
+  });
+});
+
+describe('splitPlanBoosters', () => {
+  it('sends a first row that runs from now with an expiry to the Character', () => {
+    const queued = booster({ enabled: true, startsAt: 900, expiresAt: 1_200 });
+    expect(
+      splitPlanBoosters([
+        booster({ enabled: true, bonus: 12, startsAt: null, expiresAt: 900 }),
+        queued,
+      ])
+    ).toEqual({
+      accelerator: { bonus: 12, expiresAt: 900 },
+      planRows: [queued],
+    });
+  });
+
+  it('keeps a first row with no expiry on the plan, so a typed bonus is not lost', () => {
+    const rows = [booster({ enabled: true, bonus: 8, startsAt: null, expiresAt: null })];
+    expect(splitPlanBoosters(rows)).toEqual({ accelerator: null, planRows: rows });
+    expect(splitPlanBoosters([])).toEqual({ accelerator: null, planRows: [] });
   });
 });

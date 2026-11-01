@@ -211,6 +211,66 @@ export function resolvePlanBoosters(
 }
 
 /**
+ * What a Character is running, as the Skill Plan sees it: the typed-in
+ * accelerator (`features/accelerator`), shared by every plan and the
+ * Characters table.
+ */
+export interface CharacterAcceleratorInput {
+  bonus: number;
+  expiresAt: number;
+}
+
+/**
+ * The plan's Boosters with the Character's own accelerator in front. `accelerator`
+ * is one that is still running (the caller checks the clock, which keeps this
+ * pure and its result stable between ticks). While there is one it IS the first (live) row, and the plan keeps only what it
+ * queues behind it (rows with a start); a row the plan itself stored with no
+ * start is superseded. With none running this is `resolvePlanBoosters`
+ * unchanged, so a plan that never met a typed-in accelerator costs as before.
+ */
+export function composePlanBoosters(
+  storedBoosters: unknown | undefined,
+  storedLegacyBooster: unknown | undefined,
+  accelerator: CharacterAcceleratorInput | null | undefined,
+  detectedAccelerator: number | null
+): PlanBooster[] {
+  if (!accelerator) {
+    return resolvePlanBoosters(storedBoosters, storedLegacyBooster, detectedAccelerator);
+  }
+  const queued = normalizePlanBoosters(storedBoosters, storedLegacyBooster).filter(
+    (row) => row.startsAt !== null
+  );
+  const live: PlanBooster = {
+    enabled: true,
+    bonus: clampBoosterBonus(accelerator.bonus),
+    startsAt: null,
+    expiresAt: accelerator.expiresAt,
+  };
+  return [live, ...queued];
+}
+
+/**
+ * The inverse of {@link composePlanBoosters} for an edit: a first row that runs
+ * from now and has an expiry is the Character's accelerator (saved there, not
+ * on the plan), and the rest stays the plan's. Anything else — an empty list,
+ * a first row with no expiry — stays on the plan whole, so a bonus typed
+ * before its expiry is not lost.
+ */
+export function splitPlanBoosters(next: readonly PlanBooster[]): {
+  accelerator: CharacterAcceleratorInput | null;
+  planRows: PlanBooster[];
+} {
+  const first = next[0];
+  if (first && first.startsAt === null && first.expiresAt !== null) {
+    return {
+      accelerator: { bonus: first.bonus, expiresAt: first.expiresAt },
+      planRows: next.slice(1),
+    };
+  }
+  return { accelerator: null, planRows: [...next] };
+}
+
+/**
  * The engine-native Boosters this plan schedules with: one per row that is
  * enabled, has an expiry, and (after overlap-clamping) still starts before
  * that expiry — a row fully swallowed by an earlier one contributes nothing.

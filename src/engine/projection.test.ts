@@ -9,6 +9,7 @@ import {
   projectCalendar,
   projectStructureFuel,
   projectMercenaryDens,
+  projectAccelerators,
   projectSkyhookRaids,
   projectEveNotificationReinforcementExit,
   reinforcementExitStructureIds,
@@ -24,6 +25,7 @@ import {
   eveNotificationCopy,
   industryJobCopy,
   mercenaryDenReinforcedCopy,
+  acceleratorExpiringCopy,
   skyhookRaidableCopy,
   skillQueueCopy,
   structureFuelCopy,
@@ -41,6 +43,7 @@ describe('projectionWording', () => {
     'planetaryExtractorExpiring',
     'skillQueueEnding',
     'mercenaryDenReinforced',
+    'acceleratorExpiring',
     'skyhookRaidable',
   ] as const)(
     'hedges %s, which an ordinary in-game action can falsify before it fires',
@@ -793,5 +796,41 @@ describe('reinforcementExitStructureIds', () => {
       T0
     );
     expect(ids).toEqual([111]);
+  });
+});
+
+describe('projectAccelerators', () => {
+  const rec = (expiresAtMs: number) => ({ expiresAtMs, bonus: 10, leadMs: HOUR_MS });
+  const project = (entries: ReturnType<typeof rec>[], nowMs = T0) =>
+    projectAccelerators(7, 'Kestrel', entries, acceleratorExpiringCopy.push, nowMs);
+
+  it('projects one hedged push a lead time before the expiry', () => {
+    const rows = project([rec(T0 + 10 * HOUR_MS)]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].fireAt).toEqual(T0 + 9 * HOUR_MS);
+    expect(rows[0].body).toContain('should run out');
+  });
+
+  it('projects nothing for an expired accelerator, one past its warning time, or beyond the horizon', () => {
+    expect(project([rec(T0 - HOUR_MS)])).toEqual([]);
+    expect(project([rec(T0 + 30 * 60_000)])).toEqual([]);
+    expect(project([rec(T0 + PROJECTION_HORIZON_MS + 2 * HOUR_MS)])).toEqual([]);
+    expect(project([])).toEqual([]);
+  });
+
+  it('keys a row like the live poll fire for the same expiry', () => {
+    const [row] = project([rec(T0 + 10 * HOUR_MS)]);
+    expect(row.occurrenceKey).toEqual(
+      occurrenceKey(
+        {
+          eventId: 'acceleratorExpiring',
+          characterId: 7,
+          expiresAtMs: T0 + 10 * HOUR_MS,
+          bonus: 10,
+          thresholdMs: HOUR_MS,
+        },
+        T0 + 9 * HOUR_MS
+      )
+    );
   });
 });

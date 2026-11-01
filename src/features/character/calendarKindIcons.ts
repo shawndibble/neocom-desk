@@ -13,6 +13,7 @@ import * as Icon from '@/components/ui/icons';
 export const KIND_ICON: Record<CharacterBoardItemKind, typeof Icon.Skills> = {
   calendarEvent: Icon.CalendarEvent,
   skillTraining: Icon.Skills,
+  accelerator: Icon.Accelerator,
   industryJob: Icon.Industry,
   planetExtraction: Icon.Planetary,
   mercenaryDen: Icon.MercenaryDen,

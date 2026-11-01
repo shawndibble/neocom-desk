@@ -9,6 +9,12 @@ alphabetical position lands mid-file, so two agents adding terms at once do not
 collide the way appending to the end always did. Scope decisions do not belong
 here — they go one per file in `docs/context/decisions/`.
 
+- **Accelerator**: A Character's running cerebral accelerator as the pilot told us
+  about it: a bonus to all five attributes and the instant it runs out, saved
+  once per Character and shared by every **Skill Plan** and the Characters
+  table's Accelerator column. Typed-in wins while it has not run out; after
+  that it is deleted and a **Detected Accelerator** (a guess, no expiry) applies
+  again. It is the first **Booster** of the plans costed for that Character.
 - **Abyssal type**: The item type a **Mutaplasmid** makes — "Heavy Abyssal
   Energy Neutralizer", "Light Mutated Drone". One abyssal type is made from
   many base modules, so the type alone never says which base an item came
@@ -123,7 +129,9 @@ here — they go one per file in `docs/context/decisions/`.
   the boot screen on a cold start or browser reload, never mid-session: no
   route-change reload, and no "update ready" indicator.
 - **Booster**: Cerebral accelerator; user adds it manually, entering the time
-  left as EVE's tooltip shows it, for training-time math. A Skill Plan holds
+  left as EVE's tooltip shows it, for training-time math. The one running now
+  is the Character's **Accelerator**, shared across plans; a plan holds only the
+  Boosters it queues behind it. A Skill Plan holds
   an ordered list of Boosters run one after another, since EVE has a single
   booster slot; a queued one starts when the one before it expires.
 - **BPC**: An owned Blueprint Copy — an ESI blueprint instance with a finite

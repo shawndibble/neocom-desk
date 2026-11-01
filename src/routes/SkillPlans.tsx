@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { acceleratorId } from '@/features/accelerator/characterAccelerators';
 import { DataAgeBadge, Spinner, CachedNotice, Toast } from '@/components/ui';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -57,6 +59,14 @@ export function SkillPlans() {
     fetchedAt,
     fromCache,
   } = usePlanEditorData(activeCharacterId);
+  // The Character's typed-in accelerator, shared with the Characters table.
+  const accelerator = useLiveQuery(
+    () =>
+      activeCharacterId === null
+        ? undefined
+        : db.characterAccelerators.get(acceleratorId(activeCharacterId)),
+    [activeCharacterId]
+  );
   // Memoised: the list pane's per-plan costing re-runs when this changes.
   const scheduleInputs = useMemo(
     () =>
@@ -69,6 +79,7 @@ export function SkillPlans() {
             attributes,
             attributeBaseline,
             implants,
+            accelerator,
           }
         : undefined,
     [
@@ -79,6 +90,7 @@ export function SkillPlans() {
       attributes,
       attributeBaseline,
       implants,
+      accelerator,
     ]
   );
   const queueResult = useSkillQueue(activeCharacterId ?? 0);

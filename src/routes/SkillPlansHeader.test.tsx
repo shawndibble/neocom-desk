@@ -116,9 +116,11 @@ describe('SkillPlans editor: plan header (#21)', () => {
 });
 
 describe('SkillPlans editor: remaps available from ESI', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-08-29T12:00:00Z'));
+    // A typed-in accelerator lives in Dexie, shared across plans: one test's must not leak into the next.
+    await db.characterAccelerators.clear();
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -340,6 +342,9 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     const first = render(<App />);
     await openPlanTools();
     await openAssumptions();
+    // The previous test's last keystroke can still be landing its write in Dexie: start from none.
+    await db.characterAccelerators.clear();
+    await screen.findByRole('button', { name: 'Add accelerator' });
 
     await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
     await user.click(await screen.findByRole('option', { name: '+5' }));
@@ -349,9 +354,10 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     await waitFor(async () => {
       const stored = await db.skillPlans.get('plan-1');
       expect(stored?.whatIfImplants).toEqual({ kind: 'preset', preset: '+5' });
-      expect(stored?.boosters).toHaveLength(1);
-      expect(stored?.boosters?.[0]).toMatchObject({ enabled: true, bonus: 3, startsAt: null });
-      const left = (stored?.boosters?.[0].expiresAt ?? 0) - Date.now();
+      // The running accelerator is the Character's, shared with the Characters table.
+      const accelerator = await db.characterAccelerators.get(String(CHAR_ID));
+      expect(accelerator).toMatchObject({ bonus: 3 });
+      const left = (accelerator?.expiresAt ?? 0) - Date.now();
       expect(left).toBeGreaterThan(5 * 24 * 60 * 60 * 1000 - 60_000);
       expect(left).toBeLessThanOrEqual(5 * 24 * 60 * 60 * 1000);
     });

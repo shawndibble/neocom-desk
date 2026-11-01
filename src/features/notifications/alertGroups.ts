@@ -108,6 +108,8 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   mercenaryDenAnarchy: 'warning',
   // A lead-time warning, same shape as the extractor one above.
   skillQueueEnding: 'warning',
+  // A lead-time warning too: a typed-in accelerator ending.
+  acceleratorExpiring: 'warning',
   // A lead-time warning too (issue #1713) — the collateral is still recoverable.
   courierDeliveryDue: 'warning',
   // A loss already happened — the same "standing fault" reasoning as the
