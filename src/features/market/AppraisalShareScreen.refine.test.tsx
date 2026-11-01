@@ -76,7 +76,7 @@ describe('a Shared Appraisal with refine figures', () => {
     const user = userEvent.setup();
     renderShared();
     await user.click(
-      screen.getByRole('button', { name: 'Show how the Refine figure is worked out' })
+      screen.getByRole('button', { name: /Show how the Refine figure is worked out/ })
     );
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('Shared with you')).toBeInTheDocument();
@@ -97,7 +97,7 @@ describe('a Shared Appraisal with refine figures', () => {
     const user = userEvent.setup();
     renderShared();
     await user.click(
-      screen.getByRole('button', { name: 'Show how the Refine figure is worked out' })
+      screen.getByRole('button', { name: /Show how the Refine figure is worked out/ })
     );
     const dialog = screen.getByRole('dialog');
     // The button is replaced while it loads, so look it up again on every try.
@@ -132,7 +132,7 @@ describe('a Shared Appraisal from before refine travelled with the link', () => 
     );
     expect(screen.queryByRole('columnheader', { name: /Refine/ })).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Show how the Refine figure is worked out' })
+      screen.queryByRole('button', { name: /Show how the Refine figure is worked out/ })
     ).not.toBeInTheDocument();
   });
 });

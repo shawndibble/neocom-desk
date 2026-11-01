@@ -52,6 +52,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { CharacterLink, SkillLink, SystemLink } from '@/features/entities';
 import { MyOrderMark } from '@/features/market/marketOrderCells';
+import { refineOpenerClassName } from '@/features/market/refineOpener';
 import { cx } from '@/lib/cx';
 import { OfflineStrip } from '@/app/OfflineBanner';
 import { MissingGrantBadge } from '@/features/notifications/ScheduledPushBadge';
@@ -219,11 +220,7 @@ export function InteractionGrammar() {
           </button>
         </Cue>
         <Cue rule={k('rules.figureBreakdown')}>
-          <button
-            type="button"
-            className={`inline-flex items-center gap-1 rounded-xs ${focusRingClassName}`}
-          >
-            <Icon.Info aria-hidden className="size-3 text-text-dim" />
+          <button type="button" className={refineOpenerClassName}>
             {k('samples.figureBreakdown')}
           </button>
         </Cue>
