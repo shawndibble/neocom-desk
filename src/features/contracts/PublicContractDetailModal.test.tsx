@@ -441,11 +441,16 @@ describe('PublicContractDetailModal — item actions', () => {
   });
 
   it('shows a visible More actions button on each item line', async () => {
+    const user = userEvent.setup();
     showItems([item({ record_id: 1 })]);
     renderModal();
 
     const rows = await itemRows();
-    expect(within(rows[0]).getByRole('button', { name: /more actions/i })).toBeInTheDocument();
+    await user.click(within(rows[0]).getByRole('button', { name: /more actions/i }));
+
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByText('View in Market')).toBeInTheDocument();
+    expect(within(menu).getByText('Copy name')).toBeInTheDocument();
   });
 });
 
