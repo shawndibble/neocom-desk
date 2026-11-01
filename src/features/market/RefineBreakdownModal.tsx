@@ -113,6 +113,7 @@ export function RefineBreakdownModal({
   const mineralColumns: DataTableColumn<RefineMineralLine>[] = [
     {
       id: 'mineral',
+      stickyStart: true,
       header: t('market.appraisal.breakdown.columnMineral'),
       render: (line) => nameOf(line.typeId),
     },
@@ -143,6 +144,7 @@ export function RefineBreakdownModal({
   const itemColumns: DataTableColumn<RefineItemLine>[] = [
     {
       id: 'item',
+      stickyStart: true,
       header: t('market.appraisal.columnItem'),
       // The row is the control (a click or Enter opens that item); the accent marks it.
       render: (line) => <span className="text-accent">{line.name}</span>,
