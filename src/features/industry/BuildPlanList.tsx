@@ -19,6 +19,8 @@ import { BuildPlanFilterBar } from './BuildPlanFilterBar';
 import {
   BUILD_PLAN_FILTER,
   DEFAULT_BUILD_PLAN_FILTER,
+  GROUP_ANY,
+  GROUP_NONE,
   activePlanFilterCount,
   filterPlans,
   type BuildPlanFilterState,
@@ -185,12 +187,26 @@ export function BuildPlanList({
   } | null>(null);
 
   // The filter lives in the URL, so a reload or a shared link keeps it.
-  const [filter, setFilter] = useUrlFilter<BuildPlanFilterState>(
+  const [urlFilter, setFilter] = useUrlFilter<BuildPlanFilterState>(
     'build-plans',
     BUILD_PLAN_FILTER.schema,
     BUILD_PLAN_FILTER.fieldToParam,
     BUILD_PLAN_FILTER.emptyParams
   );
+  // A link can carry a value its control cannot show or answer: an ownership
+  // pick with no pilot to own anything, or a group since deleted. Those read as
+  // "any" rather than silently emptying or no-op'ing the list.
+  const filter = useMemo<BuildPlanFilterState>(() => {
+    const knownGroup =
+      urlFilter.group === GROUP_ANY ||
+      urlFilter.group === GROUP_NONE ||
+      groups.some((group) => group.id === urlFilter.group);
+    return {
+      ...urlFilter,
+      ownership: ownedBlueprints === undefined ? 'any' : urlFilter.ownership,
+      group: knownGroup ? urlFilter.group : GROUP_ANY,
+    };
+  }, [urlFilter, ownedBlueprints, groups]);
   const filtering = activePlanFilterCount(filter) > 0;
   // Two plans may share a name (one blueprint, two stations). Only those rows
   // say where they run, so a unique name stays a single clean line.
@@ -461,8 +477,6 @@ export function BuildPlanList({
                 item" before every single plan. */}
               {groups.map((group) => {
                 const members = membersByGroup.get(group.id) ?? [];
-                // A group with nothing left under the filter is noise, not an answer.
-                if (filtering && members.length === 0) return null;
                 const selectedCount = members.filter((p) => compareSelectedIds.has(p.id)).length;
                 return (
                   <Fragment key={group.id}>

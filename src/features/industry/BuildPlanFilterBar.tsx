@@ -14,6 +14,8 @@ import {
 import { toggleInSet } from '@/lib/sets';
 import type { BuildGroup } from './buildGroups';
 import {
+  GROUP_ANY,
+  GROUP_NONE,
   PLAN_ACTIVITIES,
   PLAN_OWNERSHIPS,
   PLAN_VERDICTS,
@@ -126,8 +128,8 @@ export function BuildPlanFilterBar({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="any">{t('industry.planFilters.groupAny')}</SelectItem>
-                  <SelectItem value="none">{t('industry.planFilters.groupNone')}</SelectItem>
+                  <SelectItem value={GROUP_ANY}>{t('industry.planFilters.groupAny')}</SelectItem>
+                  <SelectItem value={GROUP_NONE}>{t('industry.planFilters.groupNone')}</SelectItem>
                   {groups.map((group) => (
                     <SelectItem key={group.id} value={group.id}>
                       {group.name}

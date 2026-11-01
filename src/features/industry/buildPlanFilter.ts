@@ -18,7 +18,10 @@ export const PLAN_VERDICTS = [
 export const PLAN_ACTIVITIES = ['any', 'manufacturing', 'reaction'] as const;
 export type PlanActivityFilter = (typeof PLAN_ACTIVITIES)[number];
 
-/** `group` is `any`, `none` (ungrouped) or a Build Group id. */
+/** `GROUP_ANY` / `GROUP_NONE` stand beside real Build Group ids in `group`; ids are UUIDs, so they cannot collide. */
+export const GROUP_ANY = 'any';
+export const GROUP_NONE = 'none';
+
 export interface BuildPlanFilterState {
   ownership: PlanOwnership;
   verdicts: ReadonlySet<PlanVerdictTag>;
@@ -32,7 +35,7 @@ export const BUILD_PLAN_FILTER = defineUrlFilter<BuildPlanFilterState>({
   verdicts: { key: 'plans.verdicts', codec: enumSetParam(PLAN_VERDICTS) },
   profitableOnly: { key: 'plans.profitable', codec: boolParam() },
   activity: { key: 'plans.activity', codec: enumParam(PLAN_ACTIVITIES, 'any') },
-  group: { key: 'plans.group', codec: textParam({ defaultValue: 'any' }) },
+  group: { key: 'plans.group', codec: textParam({ defaultValue: GROUP_ANY }) },
 });
 
 export const DEFAULT_BUILD_PLAN_FILTER: BuildPlanFilterState = {
@@ -40,7 +43,7 @@ export const DEFAULT_BUILD_PLAN_FILTER: BuildPlanFilterState = {
   verdicts: new Set(PLAN_VERDICTS),
   profitableOnly: false,
   activity: 'any',
-  group: 'any',
+  group: GROUP_ANY,
 };
 
 export function activePlanFilterCount(filter: BuildPlanFilterState): number {
@@ -49,7 +52,7 @@ export function activePlanFilterCount(filter: BuildPlanFilterState): number {
     filter.verdicts.size !== PLAN_VERDICTS.length,
     filter.profitableOnly,
     filter.activity !== 'any',
-    filter.group !== 'any',
+    filter.group !== GROUP_ANY,
   ].filter(Boolean).length;
 }
 
@@ -87,12 +90,13 @@ export function filterPlans(
       if (!stats || stats.verdict === 'fixLocation' || (stats.profit ?? 0) <= 0) return false;
     }
     if (filter.activity !== 'any' && ctx.activityOf(plan) !== filter.activity) return false;
-    if (filter.group !== 'any') {
+    if (filter.group !== GROUP_ANY) {
       const groupId =
         plan.buildGroupId !== undefined && (ctx.knownGroupIds?.has(plan.buildGroupId) ?? true)
           ? plan.buildGroupId
           : undefined;
-      if (filter.group === 'none' ? groupId !== undefined : groupId !== filter.group) return false;
+      if (filter.group === GROUP_NONE ? groupId !== undefined : groupId !== filter.group)
+        return false;
     }
     return true;
   });
