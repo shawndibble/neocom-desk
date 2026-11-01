@@ -1,4 +1,4 @@
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { figureOpenerClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { AddPreviewReadout } from '@/features/fittings/AddPreviewReadout';
 import { useState, type ReactNode } from 'react';
@@ -52,7 +52,6 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { CharacterLink, SkillLink, SystemLink } from '@/features/entities';
 import { MyOrderMark } from '@/features/market/marketOrderCells';
-import { refineOpenerClassName } from '@/features/market/refineOpener';
 import { cx } from '@/lib/cx';
 import { OfflineStrip } from '@/app/OfflineBanner';
 import { MissingGrantBadge } from '@/features/notifications/ScheduledPushBadge';
@@ -220,7 +219,7 @@ export function InteractionGrammar() {
           </button>
         </Cue>
         <Cue rule={k('rules.figureBreakdown')}>
-          <button type="button" className={refineOpenerClassName}>
+          <button type="button" className={figureOpenerClassName}>
             {k('samples.figureBreakdown')}
           </button>
         </Cue>

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { refineOpenerClassName } from './refineOpener';
+import { figureOpenerClassName } from '@/components/ui/controlStyles';
 
 /**
  * The Refine chip's value: the figure, dashed underlined when it opens its
@@ -22,7 +22,7 @@ export function RefineChipValue({
   return (
     <span className="inline-flex items-center gap-1">
       {onOpen ? (
-        <button type="button" onClick={onOpen} className={refineOpenerClassName}>
+        <button type="button" onClick={onOpen} className={figureOpenerClassName}>
           <span className="sr-only">{t('market.appraisal.breakdown.open')}</span>
           {amount}
         </button>

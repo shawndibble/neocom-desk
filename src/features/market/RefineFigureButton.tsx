@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { refineOpenerClassName } from './refineOpener';
+import { figureOpenerClassName } from '@/components/ui/controlStyles';
 
 /**
  * A row's Refine figure as the control that opens its breakdown: the figure
@@ -23,7 +23,7 @@ export function RefineFigureButton({
         event.stopPropagation();
         onOpen();
       }}
-      className={refineOpenerClassName}
+      className={figureOpenerClassName}
     >
       <span className="sr-only">{t('market.appraisal.breakdown.openRow', { name })}</span>
       {children}
