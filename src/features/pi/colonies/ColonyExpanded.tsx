@@ -146,7 +146,7 @@ export function ColonyExpanded({
     <div className="border-t border-line bg-panel-2">
       <div className="grid divide-line md:grid-cols-3 md:divide-x max-md:divide-y">
         <Section
-          icon={<Icon.Extraction size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
+          icon={<Icon.PiExtractor size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
           title={t('piColonies.expanded.extractors')}
           help={t('piColonies.help.extractors')}
         >
@@ -225,7 +225,7 @@ export function ColonyExpanded({
         </Section>
 
         <Section
-          icon={<Icon.Industry size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
+          icon={<Icon.PiFactory size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
           title={t('piColonies.expanded.production')}
         >
           {factories.length === 0 && (
@@ -263,7 +263,7 @@ export function ColonyExpanded({
           )}
 
           <h4 className={`flex items-center gap-1.5 pt-2 ${MICRO}`}>
-            <Icon.Planetary size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+            <Icon.PiCommandCenter size={Icon.ICON_SIZE.sm} aria-hidden="true" />
             {t('piColonies.expanded.commandCenter')}
             <span className="ml-auto font-normal tracking-normal normal-case">
               {t('piColonies.ccLevel', { level: load.ccLevel })}

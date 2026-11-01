@@ -770,6 +770,9 @@ Rules:
 - A typed character ("+", "−", "Aa", "✓") is not an icon; icon-only controls
   take an `Icon.*` glyph (`Icon.Decrease` / `Icon.Increase` for a stepper). Lint
   rejects JSX text that is only "−", "+" or "Aa".
+- A Planetary Industry building is always its `Icon.Pi*` alias (`PiCommandCenter`,
+  `PiExtractor`, `PiFactory`, `PiLaunchpad`), never a generic glyph that happens to
+  look similar: `Planetary` means the planet or its management, not the Command Center.
 - Sort direction is always the glyph trio: `Icon.Sort` (faint) on a sortable
   column that isn't sorting, `Icon.Ascending` / `Icon.Descending` (accent) on
   the active one, sized `ICON_SIZE.sm`, with the direction in the accessible

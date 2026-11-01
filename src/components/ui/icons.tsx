@@ -86,7 +86,6 @@ import { Note } from '@phosphor-icons/react/dist/csr/Note';
 import { Flask } from '@phosphor-icons/react/dist/csr/Flask';
 import { FolderSimple } from '@phosphor-icons/react/dist/csr/FolderSimple';
 import { Funnel } from '@phosphor-icons/react/dist/csr/Funnel';
-import { Gauge } from '@phosphor-icons/react/dist/csr/Gauge';
 import { Gear } from '@phosphor-icons/react/dist/csr/Gear';
 import { GearSix } from '@phosphor-icons/react/dist/csr/GearSix';
 import { GraduationCap } from '@phosphor-icons/react/dist/csr/GraduationCap';
@@ -380,8 +379,6 @@ export const Location = withWeight(MapPin);
 export const Wallet = withWeight(WalletGlyph);
 /** Colonies and extraction timers. */
 export const Planetary = withWeight(Planet);
-/** An extractor program's live telemetry — the one PI card with real-time data. */
-export const Extraction = withWeight(Gauge);
 /** Planetary Industry buildings, for the explainer and the in-game checklist. */
 export const PiExtractor = withWeight(ArrowLineDown);
 export const PiFactory = withWeight(Factory);
