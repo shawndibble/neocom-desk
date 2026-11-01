@@ -7,6 +7,7 @@
  * are applied together as one unsaved edit.
  */
 import { useMemo, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
 import type { ImproveGoal, ImproveOption, RejectedOption } from '@/engine/fittings/improve';
 import { optionKey } from '@/engine/fittings/improveKeys';
@@ -85,6 +86,7 @@ export function ImprovePanel({
   onPreview,
   footerTarget,
 }: Props) {
+  const { t } = useTranslation();
   const panels = useImprovePanels(goal);
   const { state, before, hull } = search;
   const result = state.status === 'done' ? state.result : null;
@@ -185,6 +187,14 @@ export function ImprovePanel({
       >
         {freeSections}
       </ImproveSkillsSlotContext.Provider>
+
+      {state.status === 'done' && search.mutatedKept.kept > 0 && (
+        <p className="text-text-dim text-sm" data-testid="improve-mutated-kept">
+          {t('fittings.improve.mutatedKept', { count: search.mutatedKept.kept })}
+          {search.mutatedKept.unflyable > 0 &&
+            ` ${t('fittings.improve.mutatedUnflyable', { count: search.mutatedKept.unflyable })}`}
+        </p>
+      )}
 
       {state.status === 'done' && state.sides && (
         <ImproveSidesLine sides={state.sides} neutral={state.neutral} />

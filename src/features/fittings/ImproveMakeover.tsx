@@ -228,6 +228,9 @@ export function ImproveMakeover({
                       )}
                 </span>
               </p>
+              {source.rows.some((row) => row.losesRoll) && (
+                <p className="text-warning text-xs">{t('fittings.improve.rollLost')}</p>
+              )}
               <ul className="border-line ml-2 mt-1 space-y-1 border-l pl-2">
                 {source.rows.map((row) => {
                   const key = moveKey(row);

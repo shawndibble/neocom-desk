@@ -52,6 +52,7 @@ function search(state: ImproveState, own: FittingStats | null = before): Improve
     restart: vi.fn(),
     recalc: null,
     completion: null,
+    mutatedKept: { kept: 0, unflyable: 0 },
   };
 }
 
@@ -93,6 +94,8 @@ const settings = (patch: Partial<ImproveSettings> = {}): ImproveSettings => ({
   onIncludeRigsChange: vi.fn(),
   includeOfficer: false,
   onIncludeOfficerChange: vi.fn(),
+  allowMutated: false,
+  onAllowMutatedChange: vi.fn(),
   oreFamily: 'Simple Asteroid',
   onOreFamilyChange: vi.fn(),
   hold: 'cargo',
@@ -173,6 +176,44 @@ describe('ImprovePanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Fix calibration' }));
     expect(onFixFirst).toHaveBeenCalledWith('calibration');
     expect(screen.getByRole('button', { name: 'Fix CPU' })).toBeInTheDocument();
+  });
+
+  it('says how many mutated modules were kept, and nothing when none were (#5800)', () => {
+    const found = done({ noDownside: [option(10, { ehp: before.ehp * 2 })] });
+    renderPanel({ ...search(found), mutatedKept: { kept: 2, unflyable: 1 } });
+    expect(screen.getByTestId('improve-mutated-kept')).toHaveTextContent(
+      "2 mutated modules kept You can't fly it yet, so it is not replaced."
+    );
+    cleanup();
+    renderPanel({ ...search(found), mutatedKept: { kept: 1, unflyable: 0 } });
+    expect(screen.getByTestId('improve-mutated-kept')).toHaveTextContent(/^1 mutated module kept$/);
+    cleanup();
+    renderPanel(search(found));
+    expect(screen.queryByTestId('improve-mutated-kept')).not.toBeInTheDocument();
+  });
+
+  it('states the roll is lost on a row that swaps a mutated module away', () => {
+    renderPanel(
+      search(
+        done({
+          noDownside: [
+            option(
+              10,
+              { ehp: before.ehp * 2 },
+              {
+                candidate: {
+                  fromTypeId: 900,
+                  toTypeId: 10,
+                  at: [{ slot: 'low', slotIndex: 0 }],
+                  losesRoll: true,
+                },
+              }
+            ),
+          ],
+        })
+      )
+    );
+    expect(screen.getByText('The roll on your mutated module is lost.')).toBeInTheDocument();
   });
 
   it('shows the free sections above the swaps when the fit fits', () => {

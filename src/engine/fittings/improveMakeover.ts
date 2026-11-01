@@ -11,6 +11,7 @@
  *
  * Pure: no DOM, fetch or Dexie.
  */
+import { isMutated, placeKey } from './improveMutated';
 import type { VariationIndex } from '../market/variations';
 import {
   commonPropulsionKind,
@@ -56,6 +57,8 @@ export interface MakeoverMoveOptions {
   goal: ImproveGoal;
   defense: DefenseChoice;
   includeRigs: boolean;
+  /** A fitted mutated module may be swapped away, losing its roll; absent: it is left alone (#5800). */
+  allowMutated?: boolean;
   /** The Improve Job and, for Explore, its space: its freed jobs may go, Dangerous keeps tank modules tank modules. Absent: today's guard. */
   jobSetting?: JobSetting;
   /** What the hull's community fits say for the job (#5581): the groups on enough of them join Rework's. Absent: today's. */
@@ -120,7 +123,16 @@ export function makeoverMoves(
   modules: readonly FittingModule[],
   index: VariationIndex,
   rackOf: Readonly<Record<string, string>>,
-  { goal, defense, includeRigs, pool, slotCounts, jobSetting, commonality }: MakeoverMoveOptions
+  {
+    goal,
+    defense,
+    includeRigs,
+    allowMutated,
+    pool,
+    slotCounts,
+    jobSetting,
+    commonality,
+  }: MakeoverMoveOptions
 ): ImproveCandidate[] {
   const filter = candidateFilter(modules, pool.groupOf, {
     goal,
@@ -144,8 +156,12 @@ export function makeoverMoves(
   const seen = new Set<string>();
   for (const module of [...modules].sort((a, b) => a.slotIndex - b.slotIndex)) {
     const { slot, slotIndex, typeId: fromTypeId } = module;
-    if (!filter.usesRack(slot) || seen.has(`${slot}:${fromTypeId}`)) continue;
-    seen.add(`${slot}:${fromTypeId}`);
+    const mutated = isMutated(module);
+    if (mutated && !allowMutated) continue;
+    // A mutated module has its own roll: it never stands for another copy (#5800).
+    const copyKey = `${slot}:${fromTypeId}${mutated ? `@${slotIndex}` : ''}`;
+    if (!filter.usesRack(slot) || seen.has(copyKey)) continue;
+    seen.add(copyKey);
     const from = groupOf(fromTypeId);
     const offered = new Set<number>([fromTypeId]);
     const offerGroups = (groups: Iterable<number>, into: ImproveCandidate[]) => {
@@ -154,7 +170,12 @@ export function makeoverMoves(
         for (const toTypeId of representatives(group, slot)) {
           if (offered.has(toTypeId) || filter.kindBlocks(toTypeId, fromTypeId)) continue;
           offered.add(toTypeId);
-          into.push({ fromTypeId, toTypeId, at: [{ slot, slotIndex }] });
+          into.push({
+            fromTypeId,
+            toTypeId,
+            at: [{ slot, slotIndex }],
+            ...(mutated ? { losesRoll: true } : {}),
+          });
         }
       }
     };
@@ -240,7 +261,16 @@ export function propulsionTiers(
 export function propulsionStart(
   index: VariationIndex,
   rackOf: Readonly<Record<string, string>>,
-  { goal, defense, includeRigs, pool, slotCounts, jobSetting, commonality }: MakeoverMoveOptions
+  {
+    goal,
+    defense,
+    includeRigs,
+    allowMutated,
+    pool,
+    slotCounts,
+    jobSetting,
+    commonality,
+  }: MakeoverMoveOptions
 ): PropulsionStart | null {
   if (propulsionNeedOf(jobSetting) === null || !jobSetting) return null;
   const nameOf = pool.nameOf;
@@ -269,7 +299,7 @@ export function propulsionStart(
         nameOf,
       });
       const mids = [...fitting.modules]
-        .filter((m) => m.slot === 'medium')
+        .filter((m) => m.slot === 'medium' && (allowMutated || !isMutated(m)))
         .sort((a, b) => a.slotIndex - b.slotIndex);
       const free = slotCounts ? filter.firstFreeSlot('medium', slotCounts) : null;
       return kindTiers.map((kinds) => {
@@ -297,6 +327,7 @@ export function propulsionStart(
               fromTypeId: module.typeId,
               toTypeId,
               at: [{ slot: 'medium', slotIndex: module.slotIndex }],
+              ...(isMutated(module) ? { losesRoll: true } : {}),
               addsPropulsionFor: jobSetting.job,
             });
           }
@@ -823,11 +854,14 @@ export async function findMakeover({
  */
 export function rowsBetween(from: Fitting, to: Fitting): ImproveCandidate[] {
   const rows = new Map<string, ImproveCandidate>();
+  const rolled = new Set(from.modules.filter(isMutated).map(placeKey));
   const add = (fromTypeId: number | null, toTypeId: number, where: ModuleAt) => {
-    const key = `${fromTypeId ?? '-'}>${toTypeId}`;
+    // A swapped-away mutated module is its own row, so the roll it loses is named once (#5800).
+    const lost = fromTypeId !== null && rolled.has(placeKey(where));
+    const key = `${fromTypeId ?? '-'}>${toTypeId}${lost ? `@${placeKey(where)}` : ''}`;
     const row = rows.get(key);
     if (row) row.at.push(where);
-    else rows.set(key, { fromTypeId, toTypeId, at: [where] });
+    else rows.set(key, { fromTypeId, toTypeId, at: [where], ...(lost ? { losesRoll: true } : {}) });
   };
   const racks = new Set([...from.modules, ...to.modules].map((m) => m.slot));
   for (const rack of racks) {

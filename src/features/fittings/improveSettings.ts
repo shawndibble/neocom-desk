@@ -30,6 +30,9 @@ export interface ImproveSettings {
   onIncludeRigsChange: (on: boolean) => void;
   includeOfficer: boolean;
   onIncludeOfficerChange: (on: boolean) => void;
+  /** Swap fitted mutated modules too, losing their rolls; off: they are kept (#5800). */
+  allowMutated: boolean;
+  onAllowMutatedChange: (on: boolean) => void;
   /** Mine more: the crystal family (ore) the miners are scored with. */
   oreFamily: string;
   onOreFamilyChange: (family: string) => void;
