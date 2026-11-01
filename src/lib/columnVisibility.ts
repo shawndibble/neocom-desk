@@ -77,15 +77,17 @@ export interface ColumnVisibility<Id extends string> {
  * `phoneOffByDefault` names columns that start unticked on a phone with no
  * stored selection — the compact default a wide table used to get from
  * `phoneHidden`. They are only a default: ticking one shows it, and a stored
- * selection is read exactly as saved at every width.
+ * selection is read exactly as saved at every width. `compact` applies the same
+ * default at a width other than a phone's (a table pane too narrow for every column).
  */
 export function useColumnVisibility<Id extends string>(
   store: LocalSettingStore<readonly Id[]>,
   defaultVisible: readonly Id[],
-  phoneOffByDefault: readonly Id[] = NONE
+  phoneOffByDefault: readonly Id[] = NONE,
+  compact = false
 ): ColumnVisibility<Id> {
   const stored = store((state) => state.value);
-  const isPhone = useIsPhone();
+  const isPhone = useIsPhone() || compact;
   const phoneDefault = useMemo(
     () => defaultVisible.filter((id) => !phoneOffByDefault.includes(id)),
     [defaultVisible, phoneOffByDefault]

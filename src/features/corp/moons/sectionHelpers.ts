@@ -10,11 +10,20 @@ export const tapTargetClassName = cx('inline-flex items-center', tappableRowClas
 /** Below this width (rem) a section's table shows as cards: its columns no longer fit side by side. */
 const CARDS_BELOW_REM = 56;
 
-/** Whether a table in the element behind `ref` shows as cards: a phone, or a container too narrow for its columns. */
-export function useCards(): [ref: (element: HTMLDivElement | null) => void, cards: boolean] {
+/**
+ * Whether a table in the element behind `ref` shows as cards: a phone, or a container too narrow
+ * for its columns. A table that sheds columns instead passes a lower `cardsBelowRem`; `compact`
+ * is then true below the default width, where it should show its compact column set.
+ */
+export function useCards(
+  cardsBelowRem: number = CARDS_BELOW_REM
+): [ref: (element: HTMLDivElement | null) => void, cards: boolean, compact: boolean] {
   const phone = useIsPhone();
-  const [ref, [narrow]] = useElementNarrowerThan<HTMLDivElement>([CARDS_BELOW_REM]);
-  return [ref, phone || narrow];
+  const [ref, [narrow, compact]] = useElementNarrowerThan<HTMLDivElement>([
+    cardsBelowRem,
+    CARDS_BELOW_REM,
+  ]);
+  return [ref, phone || narrow, phone || compact];
 }
 
 /** A moon's name, or its refinery's while the moon is unknown: what a row calls the place. */
