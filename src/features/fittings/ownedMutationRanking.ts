@@ -52,12 +52,12 @@ export function effectScore(delta: readonly SwapChange[]): number {
   return score;
 }
 
+export const byQuality = (a: OwnedItem, b: OwnedItem) => (b.quality ?? -1) - (a.quality ?? -1);
+
 /** The owned items worth evaluating: the `RANK_CAP` best-rolled. */
 export function topByQuality(items: readonly OwnedItem[]): OwnedItem[] {
   return [...items].sort(byQuality).slice(0, RANK_CAP);
 }
-
-const byQuality = (a: OwnedItem, b: OwnedItem) => (b.quality ?? -1) - (a.quality ?? -1);
 
 /**
  * Each of `items` fitted into the slot, one worker compare at a time. An item

@@ -16,12 +16,14 @@ import { AbyssalEstimateLine } from '@/features/abyssal/AbyssalEstimateLine';
 import { mutationsForItems } from '@/features/abyssal/dynamicItems';
 import { loadCharacterAssets } from '@/features/assets/assets';
 import { fixed1 } from '@/lib/fixedFormat';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import type { VariantEvaluator } from './evaluationBasis';
 import { ChangesCell } from './FittingVariationsPanel';
 import { loadBaseValues } from './loadBaseValues';
 import {
   RANK_CAP,
+  byQuality,
   evaluateOwned,
   sortOwned,
   topByQuality,
@@ -97,7 +99,7 @@ async function findOwned(
   );
   // Best-rolled first until the fit's effect is known.
   return {
-    items: sortOwned(items, new Map(), 'quality'),
+    items: items.sort(byQuality),
     unread: refs.length - items.length,
     truncated,
   };
@@ -134,6 +136,7 @@ export function MutationFromAssets({
   } | null>(null);
   // Rows whose price the pilot asked for: nothing calls MutaMarket until then.
   const [estimating, setEstimating] = useState<ReadonlySet<number>>(new Set());
+  const focusAfterCommit = useFocusAfterCommit();
   const doneItems = found.kind === 'done' ? found.items : null;
 
   // The top `RANK_CAP` by quality, one worker compare each, once the list is
@@ -282,7 +285,11 @@ export function MutationFromAssets({
                 )}
                 {abyssalTypeId !== null &&
                   (estimating.has(item.itemId) ? (
-                    <div className="px-1">
+                    <div
+                      id={`owned-estimate-${item.itemId}`}
+                      tabIndex={-1}
+                      className="px-1 focus:outline-none"
+                    >
                       <AbyssalEstimateLine
                         typeId={abyssalTypeId}
                         itemId={item.itemId}
@@ -292,7 +299,13 @@ export function MutationFromAssets({
                   ) : (
                     <Button
                       size="sm"
-                      onClick={() => setEstimating((open) => new Set(open).add(item.itemId))}
+                      onClick={() => {
+                        setEstimating((open) => new Set(open).add(item.itemId));
+                        // The button that ran this unmounts: focus the estimate that replaces it.
+                        focusAfterCommit(() =>
+                          document.getElementById(`owned-estimate-${item.itemId}`)
+                        );
+                      }}
                     >
                       {t('fittings.mutation.estimatePrice')}
                     </Button>
