@@ -70,7 +70,8 @@ import { LocalOrgGroups } from './LocalOrgGroups';
 import { useLastLocal } from './lastLocal';
 import { NewArrivalTag } from './NewArrivalTag';
 import { loadPilotList, loadViewerContext, type PilotListRow } from './pilotListData';
-import { rowThreat } from './rowThreat';
+import { rowThreat, rowThreatRead } from './rowThreat';
+import { orgMatesOf, useLocalThreatContext } from './localThreatContext';
 import { PilotAffiliation } from './PilotAffiliation';
 import { PilotCard } from './PilotCard';
 import { ThreatBadge } from './ThreatBadge';
@@ -206,6 +207,14 @@ function LocalList({ paste }: { paste: LocalPaste }) {
   const found = useMemo(() => rows.filter((row) => !row.notFound), [rows]);
   const strangers = useMemo(() => found.filter((row) => !isFriendly(row)), [found]);
   const friendly = useMemo(() => found.filter(isFriendly), [found]);
+  // Who else of their alliance or corporation is in this Local: it moves a group
+  // killer's Threat, here and in a profile opened from the list.
+  const orgMates = useMemo(() => orgMatesOf(found), [found]);
+  const publishOrgMates = useLocalThreatContext((state) => state.set);
+  useEffect(() => {
+    publishOrgMates(orgMates);
+    return () => publishOrgMates(new Map());
+  }, [orgMates, publishOrgMates]);
 
   if (failed) {
     return (
@@ -217,6 +226,16 @@ function LocalList({ paste }: { paste: LocalPaste }) {
   }
 
   const byOrganization = groupMode === 'organization';
+  const contextOf = (row: PilotListRow) => ({
+    hereSpace: here.space,
+    orgMatesHere: row.characterId === null ? null : (orgMates.get(row.characterId) ?? null),
+  });
+  const threatOf = (row: PilotListRow) => rowThreat(row, now, contextOf(row));
+  const adjustedOf = (row: PilotListRow): 'down' | 'up' | null => {
+    const read = rowThreatRead(row, now, contextOf(row));
+    if (read === null || read === 'pending' || read.shift === 0) return null;
+    return read.shift < 0 ? 'down' : 'up';
+  };
   // The Kills view names only the misses among the names it lists.
   const notFound = (byOrganization ? rows : rows.slice(0, MAX_LIST_PILOTS))
     .filter((row) => row.notFound)
@@ -256,7 +275,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
       header: t('travel.pilot.list.pilot'),
       sortValue: (row) => row.name.toLowerCase(),
       render: (row) => {
-        const threat = rowThreat(row, now);
+        const threat = threatOf(row);
         return (
           <>
             <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -265,7 +284,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
               ) : (
                 <CharacterLink id={row.characterId}>{row.name}</CharacterLink>
               )}
-              {threat !== null && <ThreatBadge level={threat} solid />}
+              {threat !== null && <ThreatBadge level={threat} solid adjusted={adjustedOf(row)} />}
               {isNew(row) && <NewArrivalTag threat={threat} />}
             </span>
             {showAffiliation && (
@@ -350,7 +369,8 @@ function LocalList({ paste }: { paste: LocalPaste }) {
           <PilotCard
             key={row.name}
             row={row}
-            threat={rowThreat(row, now)}
+            threat={threatOf(row)}
+            adjusted={adjustedOf(row)}
             spaces={spaces}
             flew={flewOf(row)}
             isNew={isNew(row)}
@@ -365,7 +385,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
         className="table-fixed"
         rowKey={(row) => row.name}
         rowClassName={(row) => {
-          const threat = rowThreat(row, now);
+          const threat = threatOf(row);
           return threat === null ? undefined : THREAT_ROW_CLASS[THREAT_LEVEL_TONE[threat]];
         }}
         responsive="stack"
@@ -388,7 +408,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
           (byOrganization ? (
             <LocalOrgGroups
               rows={list}
-              threatOf={(row) => rowThreat(row, now)}
+              threatOf={threatOf}
               renderRows={(label, rows, showAffiliation) =>
                 table(`${groupTitle('friendly', t, here.space)} · ${label}`, rows, showAffiliation)
               }
@@ -424,11 +444,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
         )}
         {byOrganization ? (
           <>
-            <LocalOrgGroups
-              rows={strangers}
-              threatOf={(row) => rowThreat(row, now)}
-              renderRows={table}
-            />
+            <LocalOrgGroups rows={strangers} threatOf={threatOf} renderRows={table} />
             {friendlySection(friendly)}
           </>
         ) : (

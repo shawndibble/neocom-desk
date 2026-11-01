@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   resolveNames: vi.fn(),
   loadTypes: vi.fn(),
   encodeFittingShare: vi.fn(),
+  hereSpace: null as 'highsec' | 'lowsec' | 'nullsec' | 'wormhole' | null,
 }));
 
 vi.mock('@/app/useGrantedScopes', () => ({
@@ -69,7 +70,7 @@ vi.mock('./pilotListData', () => ({
 vi.mock('./useHereSpace', () => ({
   useHereSpace: () => ({
     current: { systemId: null, source: null, pick: () => undefined, clearPick: () => undefined },
-    space: null,
+    space: mocks.hereSpace,
   }),
 }));
 
@@ -125,6 +126,7 @@ function renderTab(url = '/travel/pilot') {
 describe('PilotLookupPanel', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.hereSpace = null;
     mocks.granted = false;
     mocks.loadTypeNames.mockResolvedValue(new Map([[19724, 'Kronos']]));
     mocks.loadPilotProfile.mockResolvedValue(PROFILE);
@@ -193,6 +195,35 @@ describe('PilotLookupPanel', () => {
     expect(screen.getByText(/12 kills in the last 90 days/)).toBeTruthy();
     expect(screen.getByText('Nullsec hunter')).toBeTruthy();
     expect(screen.getByText(/33% of kills are pods/)).toBeTruthy();
+  });
+
+  it('reads a nullsec killer one level lower in highsec, and says why', async () => {
+    mocks.hereSpace = 'highsec';
+    const day = 86_400_000;
+    mocks.fetchPilotKillHistory.mockResolvedValue({
+      ok: true,
+      kills: Array.from({ length: 12 }, (_, i) => ({
+        timeMs: Date.now() - (i + 1) * day,
+        space: 'nullsec',
+        systemId: 1,
+        victimShipTypeId: 587,
+        ownShipTypeId: 20,
+        attackerCount: 1,
+      })),
+    });
+    mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
+    renderTab();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
+      target: { value: 'some pilot' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+    const band = await screen.findByRole('region', { name: 'Threat' });
+    expect(await within(band).findByText('Active')).toBeTruthy();
+    expect(
+      within(band).getByText(
+        /None of their recent kills were in highsec, where you are\. Without that it reads Dangerous\./
+      )
+    ).toBeTruthy();
   });
 
   describe('a pilot with no recent kill', () => {

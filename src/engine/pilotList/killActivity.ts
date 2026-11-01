@@ -23,6 +23,11 @@ export interface KillRecord {
   victimShipTypeId: number | null;
   /** The hull this pilot flew on the kill. */
   ownShipTypeId: number | null;
+  /**
+   * How many pilots were on the killmail's attacker side, this one included.
+   * Absent on a history stored before this was read, and on a body with no attackers.
+   */
+  attackerCount?: number | null;
 }
 
 export interface SpaceActivity {

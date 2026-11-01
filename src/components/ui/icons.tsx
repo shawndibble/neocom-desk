@@ -196,6 +196,9 @@ export const Sort = withWeight(CaretUpDown);
 export const Ascending = withWeight(ArrowUp);
 /** Descending: a sorted-descending column, or "move this row down". */
 export const Descending = withWeight(ArrowDown);
+/** LevelLower / LevelHigher: a Threat badge read one level lower or higher for where you are and who is in Local. */
+export const LevelLower = withWeight(ArrowDown);
+export const LevelHigher = withWeight(ArrowUp);
 /** Re-fetch from ESI. */
 export const Refresh = withWeight(ArrowClockwise);
 /** Sync status: everything is saved to the cloud. One shape per state, so the sync dot never relies on colour alone. */

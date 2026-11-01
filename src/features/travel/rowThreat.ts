@@ -7,6 +7,11 @@ import {
   threatVerdict,
   type ThreatLevel,
 } from '@/engine/pilotList/threatVerdict';
+import {
+  threatInContext,
+  type ThreatContext,
+  type ThreatRead,
+} from '@/engine/pilotList/threatContext';
 import type { PilotListRow } from './pilotListData';
 
 /**
@@ -16,7 +21,17 @@ import type { PilotListRow } from './pilotListData';
  * kill whose losses could not be read or dated gets none either: "inactive" would
  * be a guess, and a wrong one for a pilot who just lost a ship.
  */
-export function rowThreat(row: PilotListRow, nowMs: number): ThreatLevel | 'pending' | null {
+/**
+ * The row's Threat as `rowThreat` reads it, plus how context moved it: the
+ * level shown, the level before context, which way it moved and why. Context
+ * is where you are and who of their organization is in Local; without it the
+ * level is the pilot's own.
+ */
+export function rowThreatRead(
+  row: PilotListRow,
+  nowMs: number,
+  context?: ThreatContext
+): ThreatRead | 'pending' | null {
   if (row.kills.kind !== 'ready') return null;
   if (row.extras.kind === 'loading') return 'pending';
   if (
@@ -26,11 +41,24 @@ export function rowThreat(row: PilotListRow, nowMs: number): ThreatLevel | 'pend
   ) {
     return null;
   }
-  return threatVerdict({
+  const base = threatVerdict({
     kills: row.kills.kills,
     dangerRatio: row.extras.kind === 'ready' ? row.extras.dangerRatio : null,
     killerRatio: row.extras.kind === 'ready' ? row.extras.killerRatio : null,
     lossTimesMs: row.extras.kind === 'ready' ? row.extras.lossTimesMs : null,
     nowMs,
   }).level;
+  return context === undefined
+    ? { level: base, base, shift: 0, reasons: [] }
+    : threatInContext(base, row.kills.kills, nowMs, context);
+}
+
+/** `rowThreatRead`'s level alone, for what only sorts, groups or tints by it. */
+export function rowThreat(
+  row: PilotListRow,
+  nowMs: number,
+  context?: ThreatContext
+): ThreatLevel | 'pending' | null {
+  const read = rowThreatRead(row, nowMs, context);
+  return read === null || read === 'pending' ? read : read.level;
 }
