@@ -40,7 +40,7 @@ describe('PilotThreatBand', () => {
     rerender(
       <PilotThreatBand verdict={verdict({ level: 'inactive' })} gangRatio={null} nowMs={NOW} />
     );
-    expect(screen.getByText('Inactive')).toHaveClass('text-text-dim');
+    expect(screen.getByText('No recent kills')).toHaveClass('text-text-dim');
     expect(document.body.innerHTML).not.toContain('success');
   });
 

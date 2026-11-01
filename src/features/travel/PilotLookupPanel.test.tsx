@@ -225,7 +225,7 @@ describe('PilotLookupPanel', () => {
       await lookUp();
       const band = await screen.findByRole('region', { name: 'Threat' });
       expect(await within(band).findByText('Low threat')).toBeTruthy();
-      expect(within(band).queryByText('Inactive')).toBeNull();
+      expect(within(band).queryByText('No recent kills')).toBeNull();
       expect(
         await screen.findByText(/No kills in the last 90 days. 1 loss in that time/)
       ).toBeTruthy();
@@ -237,7 +237,7 @@ describe('PilotLookupPanel', () => {
       expect(
         await screen.findByText(/recent losses for this pilot could not be read/)
       ).toBeTruthy();
-      expect(screen.queryByText('Inactive')).toBeNull();
+      expect(screen.queryByText('No recent kills')).toBeNull();
       expect(screen.queryByText('Checking')).toBeNull();
       expect(screen.queryByRole('region', { name: 'Threat' })).toBeNull();
     });
@@ -251,14 +251,16 @@ describe('PilotLookupPanel', () => {
       expect(
         await screen.findByText(/recent losses for this pilot could not be read/)
       ).toBeTruthy();
-      expect(screen.queryByText('Inactive')).toBeNull();
+      expect(screen.queryByText('No recent kills')).toBeNull();
     });
 
     it('is inactive when their only losses are older than that', async () => {
       mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [lossAt(200)] });
       await lookUp();
       expect(
-        await within(await screen.findByRole('region', { name: 'Threat' })).findByText('Inactive')
+        await within(await screen.findByRole('region', { name: 'Threat' })).findByText(
+          'No recent kills'
+        )
       ).toBeTruthy();
     });
   });
