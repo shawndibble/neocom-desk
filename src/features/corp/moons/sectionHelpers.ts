@@ -13,7 +13,7 @@ const CARDS_BELOW_REM = 56;
 /**
  * Whether a table in the element behind `ref` shows as cards: a phone, or a container too narrow
  * for its columns. A table that sheds columns instead passes a lower `cardsBelowRem`; `compact`
- * is then true below the default width, where it should show its compact column set.
+ * is then true between the two widths, where it shows its compact column set as a table.
  */
 export function useCards(
   cardsBelowRem: number = CARDS_BELOW_REM
@@ -23,7 +23,7 @@ export function useCards(
     cardsBelowRem,
     CARDS_BELOW_REM,
   ]);
-  return [ref, phone || narrow, phone || compact];
+  return [ref, phone || narrow, phone || (compact && !narrow)];
 }
 
 /** A moon's name, or its refinery's while the moon is unknown: what a row calls the place. */
