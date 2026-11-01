@@ -60,7 +60,7 @@ export function AcceleratorCell({
   }
 
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
       {value}
       <Popover>
         <PopoverTrigger asChild>
