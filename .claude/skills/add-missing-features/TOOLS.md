@@ -23,10 +23,10 @@ Adam4EVE, Ravworks/Slipway (Jobs view = Active Jobs), EVE Tycoon, Janice
 (#5006), jEveAssets, GESI, Dr.MoonGoo, EVE Horizon, EVE Forge,
 EVE-HUB, RIFT (desktop; wallet Insights, asset filters, What's new list v2.2–6.2 read in full; #5601, #5602, #5605), EVE Industry Scanner Tool (#5007), Blizbor's skill trio (#2390; no
 licence, data unusable), Quantum Anomaly (#1040), Uedama Scout (#1043), EQM
-(2.0 changelog + Local Scan/D-Scan docs read; #5668, #5669).
+(2.0 changelog + Local Scan/D-Scan docs read; #5668, #5669), EVE Retroindustry (v0.11.27–41 release notes read; #5797 rejected), Canopus (1.2 post: PI calculator, colony siting, My colonies, My trades = all covered).
 
 **Examined, nothing left:** EVE Blue Desk, SolCore Dynamics, EvE Blueprint, EVE
-Courier, EVE Retroindustry, ISK.GG, EVE Miner Hub, EVE-Industry-Scanner,
+Courier, ISK.GG, EVE Miner Hub, EVE-Industry-Scanner,
 EVE TradeLooper, EVE Night Trade Tools, SquadB Excel workbooks (EVE Online
 Excel Workbook v1.6, EVE Market Analysis v1.1; CCP's Excel add-in), TradeRelay, EVEAIO, MONW, Mudoteve,
 Solo Industry App, ArmedATLAS V2, PlanetFlow.APP, Cradle of War, EVE Balance,
@@ -35,7 +35,7 @@ EVE Fleet Mining & Ratting Tool, FW LP Store cart tool, EVE ONE, EVE Buddy,
 CLI Metenox Calculator, Eden Buyback, Lazy Blacksmith, EVE Orchestra,
 Alysii's PI Scheme, EVE Planetary Planner, Upwell Fuel Monitor, ETM v2,
 AllianceAuth Market Manager, EVE Tycoon MCP server, EVE Metro, EVE Omni,
-Canopus, Eve Deep Industry, SNOW//OPS, New Eden Command, eve-hub.ru,
+Eve Deep Industry, SNOW//OPS, New Eden Command, eve-hub.ru,
 Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas, Gatewatch, EVE
 PvP Corp Activity Search, Forge Ledger, New Eden Trade, Keystar, AstraCore,
 evehelper.pages.dev, eve-webtools PI, LedgerParser, IntelParser and Fitlab (roadmap.json and changelog.json per app; every item shipped here or killed: mining history = 90-day overview, PI alerts/forecast/ISK-hr = Advisor, Local threat/Pilot lookup, fit cost + Improve). EVE Crews (lore roleplay layer, no
@@ -246,7 +246,7 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 
 **Owner-rejected, do not re-pitch without new evidence:** #643 restock points;
 #722 unowned-blueprint coverage; #725 PI Production Run/Log (no PI cost basis);
-#822/#827/#925 Skill ROI panels; #858 Quickbar unrealized P&L vs typed cost.
+#822/#827/#925 Skill ROI panels; #858 Quickbar unrealized P&L vs typed cost. #5797 Quickbar sold/day (the Quickbar row is too narrow for another figure).
 
 **Open ordering:** #1048 before #1058; #1050 blocks #1068; #1051 blocks #1084.
 Other open: #642, #718, #819, #821, #824, #880, #926, #1015, #1017, #1018,
@@ -386,6 +386,7 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   cache 1200s); region sells/day in book heading (scope mismatch); Janice
   shipping/collateral (47); A4E crawls (1, 14). Lead, unverified: FW industry
   bonus (EVE Tycoon calculator field); check the current mechanic first.
+- **Retroindustry leftovers:** Transactions "N journal sales not listed yet" count (KILL: `DataAgeBadge` + wallet `lagNote` exist; transactions are page-capped, so old journal lines false-positive); ISK/7d column (units shipped as #5797); traded types missing from the SDE (SDE refresh cadence, names resolve via ESI); net worth sell/escrow/contracts/jobs layers (shipped, #5128); frozen saved-plan figures (Production Run is the snapshot); Map overlays (intel; cost indices covered). Canopus: Abyss planner, trial skill levels, kill radar, AI assistant = non-ISK or client-reading.
 - **Housekeeping only:** Mining Yield `specialisationLevel: 0`, dead i18n keys.
 - **RIFT ratting rollup** (kills by faction/system, ISK per kill): per-line `BountyFactionSummary`/`killsByFaction` exists; a bounty line's ISK is shared across NPC types, so per-class ISK is an estimate. RIFT daily-goals tab: ref-type breakdown + `dailyGoalMessageIdOf` cover it. "Open ship in Fittings" from Assets: shipped (`assetShipLocation.ts`).
 - **RIFT What's new leftovers:** freelance jobs (#4609), cost indices (`cheaperNearbySystems`), skyhooks, clones, LP totals = covered; PI time seek = kill-tests 3/17; intel, overlay, chat, combat/log alerts, settings copying, map markers = kill-test 2 (client-reading).
