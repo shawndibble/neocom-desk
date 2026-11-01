@@ -8,6 +8,7 @@ import { useCallback } from 'react';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import {
   recordOutcome as recordRunOutcome,
+  retry as retryRun,
   skip as skipRun,
   startRun,
   stop as stopRun,
@@ -88,6 +89,8 @@ export interface UseAddCorpsRun {
   skip: () => Promise<void>;
   /** End the run; its outcomes stay for the result screen. */
   stop: () => Promise<void>;
+  /** Put one corporation back on the sign-in list (its outcome is forgotten). */
+  retry: (corporationId: number) => Promise<void>;
   /** Forget the run and its outcomes. */
   clear: () => Promise<void>;
 }
@@ -108,6 +111,7 @@ export function useAddCorpsRun(): UseAddCorpsRun {
     recordOutcome: useCallback((o) => update((r) => recordRunOutcome(r, o)), [update]),
     skip: useCallback(() => update(skipRun), [update]),
     stop: useCallback(() => update(stopRun), [update]),
+    retry: useCallback((id) => update((r) => retryRun(r, id)), [update]),
     clear: useCallback(() => setValue(null), [setValue]),
   };
 }

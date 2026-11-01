@@ -6,6 +6,7 @@ import {
   isDone,
   progress,
   recordOutcome,
+  retry,
   skip,
   startRun,
   stop,
@@ -128,5 +129,24 @@ describe('coverageFromForChoice', () => {
     expect(coverageFromForChoice(7, '2026-11-01')).toBe('2026-10-25');
     expect(coverageFromForChoice(30, '2026-11-01')).toBe('2026-10-02');
     expect(coverageFromForChoice(14, '2026-03-05')).toBe('2026-02-19');
+  });
+});
+
+describe('retry', () => {
+  it('reopens a skipped corp, then moves past the ones already finished', () => {
+    let run = skip(fresh());
+    run = recordOutcome(run, { kind: 'connected' });
+    run = recordOutcome(run, { kind: 'connected' });
+    expect(isDone(run)).toBe(true);
+    const again = retry(run, 1);
+    expect(current(again)?.corporationId).toBe(1);
+    expect(again.outcomes[1]).toBeUndefined();
+    expect(again.lastOutcome).toBeUndefined();
+    expect(isDone(recordOutcome(again, { kind: 'connected' }))).toBe(true);
+  });
+
+  it('ignores a corp that is not in the run', () => {
+    const run = fresh();
+    expect(retry(run, 99)).toBe(run);
   });
 });

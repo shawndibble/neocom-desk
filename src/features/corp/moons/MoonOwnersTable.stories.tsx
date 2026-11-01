@@ -33,3 +33,31 @@ export const Single: Story = {
 
 /** @summary A viewer who may not record payments: no Pay column. */
 export const ReadOnly: Story = { args: { onPay: undefined } };
+
+/** @summary His own corps (one per Athanor) carry a Yours pill and read "no owner rate · no payouts", with no Pay. */
+export const WithYours: Story = {
+  args: {
+    rows: [
+      ...ROWS.slice(0, 2),
+      {
+        ...ROWS[0]!,
+        id: 'y1',
+        corporationId: 9001,
+        mode: 'settled-otherwise',
+        sameOwner: true,
+        owed: 0,
+      },
+      {
+        ...ROWS[0]!,
+        id: 'y2',
+        corporationId: 9002,
+        mode: 'settled-otherwise',
+        sameOwner: true,
+        owed: 0,
+        refineryCount: 2,
+      },
+    ],
+    name: (id: number) =>
+      ({ 9001: 'Ironvale Reach', 9002: 'Ashen Harbor Mining' })[id] ?? NAMES[id] ?? `#${id}`,
+  },
+};

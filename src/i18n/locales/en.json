@@ -17455,6 +17455,108 @@
         "startHint": "EVE time (UTC). Mining before this day is kept as history and owes nothing. Once Statements cover days, the start can't move over them."
       },
       "addCorps": {
+        "open": "Add my other corps",
+        "resume": "Continue ({{done}} of {{total}})",
+        "resumeHint": "You were connecting your corps. {{done}} of {{total}} are done.",
+        "bannerTitle": "New corp found: {{name}}.",
+        "bannerHint": "{{ceo}} is its CEO. If it owns moons, connect it so they show up in this book.",
+        "connectIt": "Connect it",
+        "notNow": "Not now",
+        "dontAsk": "Don't ask again",
+        "pick": {
+          "title": "Add my other corps",
+          "intro": "These are corps where one of your characters is CEO. Tick the ones that own moons. We can't see moons from here, the login on the next step confirms it.",
+          "tickAll": "Tick all",
+          "clear": "Clear",
+          "connect": "Connect {{name}}",
+          "dontAskNamed": "Don't ask again about {{name}}",
+          "ceo": "CEO: {{name}}",
+          "hiddenButton": "Hidden corps ({{count}})",
+          "continue_one": "Continue with {{count}} corp",
+          "continue_other": "Continue with {{count}} corps",
+          "loading": "Looking for your corps",
+          "empty": "None of your characters is CEO of another corp.",
+          "error": "Could not load your corps. Try again in a moment."
+        },
+        "hidden": {
+          "title": "Hidden corps",
+          "intro": "You chose not to be asked about these. Add one back and it appears in the list again.",
+          "add": "Add",
+          "addNamed": "Add {{name}} back",
+          "done": "Done"
+        },
+        "confirm": {
+          "title_one": "Connect {{count}} corp",
+          "title_other": "Connect {{count}} corps",
+          "seesTitle": "What this book will see",
+          "sees1": "Each corp's mining ledger: who mined what, and where.",
+          "sees2": "The names of its refineries.",
+          "notTitle": "What it will not see",
+          "not1": "Wallets, mail or notifications.",
+          "not2": "Anything you can't see in this book already.",
+          "yours": "Because you own these corps, they are marked <pill>Yours</pill>: no owner rate and no payouts between them. You can stop any corp later from its row.",
+          "how": "How far back should we count mining?",
+          "back": {
+            "label": "How far back",
+            "today": "From today",
+            "7": "The last 7 days",
+            "14": "The last 14 days",
+            "30": "The last 30 days"
+          },
+          "backHint": "Applies to all {{count}} corps. EVE only keeps about 30 days of mining, so anything older can't be recovered; you would have to record it yourself. Mining already taxed by a previous owner would be counted again if you go back.",
+          "batch": "Corps in this batch ({{count}})",
+          "back_button": "Back",
+          "go_one": "Connect {{count}} corp",
+          "go_other": "Connect {{count}} corps"
+        },
+        "signIn": {
+          "title": "Logging in: corp {{n}} of {{total}}",
+          "progress": "Corps done",
+          "choose": "Choose this character on EVE's login page",
+          "ceoOf": "CEO of {{name}}",
+          "hint": "Logged in to EVE as someone else? Pick {{ceo}} from the account list, or use \"Log in with a different character\". EVE brings you back here and this window opens on the next corp. You can close the tab between corps; your place is kept.",
+          "footnote": "If a login fails it is skipped and listed under Needs you, so you never have to start over.",
+          "connected": "Connected {{name}}. Next up is {{next}}.",
+          "connectedLast": "Connected {{name}}.",
+          "wrong": "You logged in as {{signedInAs}}. {{corp}} needs {{ceo}}. Nothing was connected; try again with the character below.",
+          "notConnected": "{{name}} was not connected. {{reason}} It is listed under Needs you.",
+          "cancelled": "The EVE login did not finish.",
+          "stop": "Stop here",
+          "action": "Log in as {{ceo}} with EVE",
+          "failed": "Could not open EVE's login. Try again.",
+          "now": "Now",
+          "state": {
+            "ready": "Ready",
+            "connected": "Connected",
+            "needs-sign-in": "Needs login",
+            "needs-role": "Needs a role",
+            "own-book": "Has its own book",
+            "gone-quiet": "Gone quiet"
+          }
+        },
+        "needs": {
+          "title": "Needs you ({{count}})",
+          "meta": "{{connected}} of {{total}} connected",
+          "needs-sign-in": {
+            "text": "The EVE login did not finish.",
+            "action": "Log in again"
+          },
+          "needs-role": {
+            "text": "EVE refused the mining ledger for this character. It needs the CEO, Director or Accountant role.",
+            "action": "Log in again"
+          },
+          "own-book": {
+            "text": "Delete its book first, then connect it here."
+          },
+          "gone-quiet": {
+            "text": "EVE has not answered for this corp for a while. It may be closed.",
+            "keeps": "Removing keeps its past mining and billing records.",
+            "action": "Remove"
+          },
+          "removeNamed": "Remove {{name}}",
+          "signInNamed": "Log in again for {{name}}",
+          "removeFailed": "Could not remove this corp. Try again."
+        },
         "failed": {
           "wrong-corp": "That Character is not in this corporation.",
           "not-yours": "You are not the CEO of this corporation.",
@@ -17952,6 +18054,8 @@
         "failed": "That did not go through. Try again."
       },
       "moonOwners": {
+        "yours": "Yours",
+        "yoursNote": "no owner rate · no payouts",
         "label": "Moon owners",
         "invite": "Invite a moon owner",
         "cols": {

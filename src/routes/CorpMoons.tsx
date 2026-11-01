@@ -60,6 +60,7 @@ import { StatementPeriodDetail } from '@/features/corp/moons/StatementPeriodDeta
 import { StatementsTab } from '@/features/corp/moons/StatementsTab';
 import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
+import { useAddMyCorps } from '@/features/corp/moons/addCorps/useAddMyCorps';
 import { useMoonOwners, useShowExtractions } from '@/features/corp/moons/useMoonOwners';
 import { setMoonsTabsHidden } from '@/features/corp/moons/moonsTabsHidden';
 
@@ -84,7 +85,9 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { view, canEdit, characterId, corporationId, names } = useBook();
   const showExtractions = useShowExtractions();
   // With no moon owners the empty state carries the invite button itself.
-  const hasMoonOwners = useMoonOwners().rows.length > 0;
+  const { rows: moonOwnerRows } = useMoonOwners();
+  const hasMoonOwners = moonOwnerRows.length > 0;
+  const addCorps = useAddMyCorps(moonOwnerRows);
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
   // Back from EVE's page after the Automatic sync opt-in: show the settings it was pressed in.
@@ -121,10 +124,15 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
               ) : undefined
             }
             actions={
-              <span className="flex items-center gap-1">
+              <span className="flex flex-wrap items-center justify-end gap-1">
                 {tab === 'moon-owners' && canEdit && hasMoonOwners && (
                   <Button variant="ghost" onClick={() => setInviteOpen(true)}>
                     {t('corpTaxBook.moons.moonOwners.invite')}
+                  </Button>
+                )}
+                {tab === 'moon-owners' && addCorps.showButton && (
+                  <Button variant="primary" onClick={addCorps.open}>
+                    {t('corpTaxBook.moons.addCorps.open')}
                   </Button>
                 )}
                 <Button variant="ghost" onClick={() => setActivityOpen(true)}>
@@ -165,7 +173,13 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             {tab === 'extractions' && <ExtractionsTab />}
             {tab === 'miners' && <MinersTab />}
             {tab === 'statements' && <StatementsTab />}
-            {tab === 'moon-owners' && <MoonOwnersTab onInvite={() => setInviteOpen(true)} />}
+            {tab === 'moon-owners' && (
+              <div className="space-y-4">
+                {addCorps.notices}
+                {addCorps.needsYou}
+                <MoonOwnersTab onInvite={() => setInviteOpen(true)} />
+              </div>
+            )}
           </TabPanel>
         </>
       )}
@@ -193,6 +207,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           onClose={() => setInviteOpen(false)}
         />
       )}
+      {addCorps.dialogs}
       {activityOpen && <ActivityPanel open onClose={() => setActivityOpen(false)} />}
     </div>
   );

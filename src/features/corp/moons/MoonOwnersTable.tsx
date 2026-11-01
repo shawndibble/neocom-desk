@@ -68,15 +68,20 @@ export function MoonOwnersTable({
       primary: true,
       render: (r) => (
         <span className="block min-w-0">
-          <span className="text-accent">{name(r.corporationId)}</span>
+          <span className="inline-flex max-w-full items-center gap-2">
+            <span className="truncate text-accent">{name(r.corporationId)}</span>
+            {r.sameOwner && <Pill tone="accent">{t(k('yours'))}</Pill>}
+          </span>
           <span className="block text-xs text-text-dim">
             {t(k('refineries'), { count: r.refineryCount })}
             {' · '}
-            {r.status === 'cant-read' && r.staleSince !== undefined
-              ? t(k('cantReadSince'), { date: shortDate(new Date(r.staleSince).toISOString()) })
-              : r.lastReadWellAt !== undefined
-                ? t(k('synced'), { age: formatAge(now - Date.parse(r.lastReadWellAt), t) })
-                : ''}
+            {r.sameOwner
+              ? t(k('yoursNote'))
+              : r.status === 'cant-read' && r.staleSince !== undefined
+                ? t(k('cantReadSince'), { date: shortDate(new Date(r.staleSince).toISOString()) })
+                : r.lastReadWellAt !== undefined
+                  ? t(k('synced'), { age: formatAge(now - Date.parse(r.lastReadWellAt), t) })
+                  : ''}
           </span>
         </span>
       ),

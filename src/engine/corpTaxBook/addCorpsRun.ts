@@ -107,3 +107,18 @@ export function stop(run: AddCorpsRun): AddCorpsRun {
 export function coverageFromForChoice(choice: CoverageChoice, today: string): string {
   return choice === 'today' ? today : shiftUtcDate(today, -choice);
 }
+
+/**
+ * Put one corporation back on the sign-in list: its outcome is forgotten and
+ * the run is on it again. A run that had ended is open again; later corporations
+ * that already finished stay finished, so `advance` skips past them afterwards.
+ */
+export function retry(run: AddCorpsRun, corporationId: number): AddCorpsRun {
+  const index = run.queue.findIndex((c) => c.corporationId === corporationId);
+  if (index < 0) return run;
+  const outcomes = { ...run.outcomes };
+  delete outcomes[corporationId];
+  const next: AddCorpsRun = { ...run, index, outcomes };
+  delete next.lastOutcome;
+  return next;
+}
