@@ -179,7 +179,14 @@ function ImproveOptionRow({
             <span className="font-medium">{labels.swapLabel(option)}</span>
             {leadContext.goal !== 'cheaper' && !option.candidate.fixesUnflyable && (
               <span className="text-success shrink-0 text-xs font-medium">
-                {t('fittings.improve.gain', { percent: m3sFormat(option.score * 100) })}
+                {t(
+                  leadContext.goal === 'overall'
+                    ? 'fittings.improve.gainOverall'
+                    : 'fittings.improve.gain',
+                  {
+                    percent: m3sFormat(option.score * 100),
+                  }
+                )}
               </span>
             )}
           </span>
