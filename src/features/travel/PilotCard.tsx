@@ -59,11 +59,9 @@ export function PilotCard({
   const status =
     row.kills.kind === 'loading'
       ? t('travel.pilot.list.stateLoading')
-      : row.kills.kind === 'unreachable'
-        ? t('travel.pilot.list.stateUnreachable')
-        : row.kills.kind === 'notLookedUp'
-          ? t('travel.pilot.list.stateNotLookedUp')
-          : null;
+      : row.kills.kind === 'notLookedUp'
+        ? t('travel.pilot.list.stateNotLookedUp')
+        : null;
   const own = row.ownOrganization;
   const mainSpace = ready === null ? null : mainSpaceOf(ready.bySpace);
 
