@@ -758,8 +758,10 @@ describe('AppraisalPanel', () => {
       };
       renderPanel({ controller: controller({ result: partBatch }) });
       const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
-      const refineCell = within(oreRow).getByText('15,436,890 ISK', { selector: '.sr-only' })
-        .parentElement?.parentElement;
+      // The figure is a button inside the highlighted span (it opens the breakdown).
+      const refineCell = within(oreRow)
+        .getByText('15,436,890 ISK', { selector: '.sr-only' })
+        .closest('button')?.parentElement;
       const buyCell = within(oreRow).getByText('15,984,000 ISK', { selector: '.sr-only' })
         .parentElement?.parentElement;
       expect(refineCell?.className).toContain('text-isk-pos');
