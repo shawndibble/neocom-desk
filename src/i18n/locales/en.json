@@ -12863,7 +12863,8 @@
       "refineTax": "Reprocessing tax",
       "refineTaxHelp": "The facility's fee, taken from the refined value in ISK. An NPC station's depends on your standings; a structure's is set by its owner. Check the structure in the Structures browser.",
       "breakdown": {
-        "titleAll": "Refine breakdown, {{count}} items",
+        "titleAll_one": "Refine breakdown, {{count}} item",
+        "titleAll_other": "Refine breakdown, {{count}} items",
         "titleItem": "Refine breakdown, {{name}}",
         "open": "Show how the Refine figure is worked out",
         "atEfficiency": "@ {{efficiency}}",
@@ -12903,7 +12904,7 @@
         "unpriced": "A mineral has no buy order here, so this total is a floor.",
         "perItemTitle": "By item",
         "columnAsIs": "Sell as is",
-        "columnRefined": "Refined",
+        "columnRefined": "Refined, with leftover",
         "columnBetter": "Better",
         "betterRefine": "Refine",
         "betterSell": "Sell as is",

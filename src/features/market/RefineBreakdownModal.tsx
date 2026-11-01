@@ -34,6 +34,7 @@ import {
   type RefineItemLine,
   type RefineMineralLine,
 } from '@/engine/market/refineBreakdown';
+import { createNumberFormat } from '@/lib/numberLocale';
 import { formatVolume } from './format';
 import { efficiencyText, pct, skillsText } from './refineFormat';
 
@@ -64,6 +65,9 @@ interface RefineBreakdownModalProps {
   /** Shared page only. */
   shared?: SharedRefineView;
 }
+
+/** The unrounded yield, so the line shows what "rounding down" rounds. */
+const oneDecimal = createNumberFormat({ minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 export function RefineBreakdownModal({
   open,
@@ -141,15 +145,8 @@ export function RefineBreakdownModal({
     {
       id: 'item',
       header: t('market.appraisal.columnItem'),
-      render: (line) => (
-        <button
-          type="button"
-          className={textActionClassName('normal-case')}
-          onClick={() => setTypeId(line.typeId)}
-        >
-          {line.name}
-        </button>
-      ),
+      // The row is the control (a click or Enter opens that item); the accent marks it.
+      render: (line) => <span className="text-accent">{line.name}</span>,
     },
     {
       id: 'quantity',
@@ -170,7 +167,7 @@ export function RefineBreakdownModal({
       header: t('market.appraisal.breakdown.columnRefined'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (line) => formatIsk(line.refined, 0),
+      render: (line) => formatIsk(line.refined + line.leftoverValue, 0),
     },
     {
       id: 'better',
@@ -353,12 +350,14 @@ export function RefineBreakdownModal({
                     value={-breakdown.tax}
                   />
                 )}
+                {breakdown.tax > 0 && breakdown.unitsLeftOver > 0 && (
+                  <Total
+                    label={t('market.appraisal.breakdown.refineFigure')}
+                    value={breakdown.net}
+                  />
+                )}
                 {breakdown.unitsLeftOver > 0 && (
                   <>
-                    <Total
-                      label={t('market.appraisal.breakdown.refineFigure')}
-                      value={breakdown.net}
-                    />
                     <Total
                       dim
                       label={t('market.appraisal.breakdown.leftoverLine', {
@@ -401,6 +400,7 @@ export function RefineBreakdownModal({
                     columns={itemColumns}
                     rows={breakdown.items}
                     rowKey={(line) => line.typeId}
+                    onRowClick={(line) => setTypeId(line.typeId)}
                     label={t('market.appraisal.breakdown.perItemTitle')}
                     responsive="table"
                   />
@@ -514,9 +514,7 @@ function ItemMath({ line, nameOf }: { line: RefineItemLine; nameOf: (typeId: num
             perPortion: formatVolume(output.perPortion),
             batches: formatVolume(line.batches),
             efficiency: line.efficiency.toFixed(4),
-            exact: formatVolume(
-              Math.round(output.perPortion * line.batches * line.efficiency * 10) / 10
-            ),
+            exact: oneDecimal(output.perPortion * line.batches * line.efficiency),
             floored: formatVolume(output.quantity),
           })}
         </span>

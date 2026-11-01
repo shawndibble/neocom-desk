@@ -102,7 +102,7 @@ describe('RefineBreakdownModal', () => {
   it('drills from the by-item table into one item', async () => {
     const user = userEvent.setup();
     open();
-    await user.click(screen.getByRole('button', { name: 'Coesite' }));
+    await user.click(screen.getByRole('cell', { name: 'Coesite' }));
     expect(screen.getByText('Refine breakdown, Coesite')).toBeInTheDocument();
   });
 
@@ -177,7 +177,8 @@ describe('RefineBreakdownModal, when the chosen item stops refining', () => {
 
   it('keeps the leftover apart from the figure the table and chip show', () => {
     open({ appraisal: buildAppraisal([ore(1, 'Zeolites', 1038, 0.9)], 100) });
-    expect(screen.getByText('Refined minerals, less tax')).toBeInTheDocument();
     expect(screen.getByText('Total with leftover')).toBeInTheDocument();
+    // With no tax, the minerals line already is the figure the table shows.
+    expect(screen.queryByText('Refined minerals, less tax')).not.toBeInTheDocument();
   });
 });
