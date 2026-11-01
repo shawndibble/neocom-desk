@@ -71,7 +71,7 @@ export function MapHelp() {
         </li>
         <li className="flex items-center gap-2.5">
           <Sample className="border-map-whatif bg-map-whatif/12 text-map-whatif">
-            <Icon.Increase size="10" aria-hidden="true" />
+            <Icon.Increase className="size-3" aria-hidden="true" />
           </Sample>
           {t('piMap.help.legend.whatIf')}
         </li>

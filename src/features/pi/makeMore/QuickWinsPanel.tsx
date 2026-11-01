@@ -11,11 +11,11 @@ import type { PlanView, QuickWinAction, QuickWinRow } from '../planView';
 import { ItemLink, Minutes, type Ticks } from './shared';
 
 const ACTION_BADGE: Record<QuickWinAction, ReactNode> = {
-  restart: <Icon.Refresh size={10} />,
-  storage: <Icon.Container size={10} />,
-  idle: <Icon.PiFactory size={10} />,
-  extractors: <Icon.PiExtractor size={10} />,
-  factories: <Icon.PiFactory size={10} />,
+  restart: <Icon.Refresh className="size-3" />,
+  storage: <Icon.Container className="size-3" />,
+  idle: <Icon.PiFactory className="size-3" />,
+  extractors: <Icon.PiExtractor className="size-3" />,
+  factories: <Icon.PiFactory className="size-3" />,
 };
 
 function QuickWinSentence({ win, names }: { win: QuickWinRow; names: Map<number, string> }) {

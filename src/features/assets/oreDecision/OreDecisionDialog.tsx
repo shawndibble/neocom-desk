@@ -116,7 +116,7 @@ function Card({
             aria-hidden="true"
             className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold tracking-wide text-accent uppercase"
           >
-            <Icon.Done size={12} className="shrink-0" />
+            <Icon.Done className="size-3 shrink-0" />
             {t('assets.oreDecision.suggested')}
           </span>
         )}

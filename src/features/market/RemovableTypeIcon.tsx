@@ -52,7 +52,7 @@ export function RemovableTypeIcon({
           focusRingClassName
         )}
       >
-        <Icon.Close size="0.625rem" aria-hidden="true" />
+        <Icon.Close className="size-3" aria-hidden="true" />
       </button>
     </span>
   );

@@ -63,6 +63,25 @@ const numberFormatSyntax = [
 ];
 const withoutNumberFormat = (list) => list.filter((r) => !numberFormatSyntax.includes(r));
 
+// A glyph is sized by `Icon.ICON_SIZE.*` (rem, scales with the root font-size)
+// or, below `sm` inside a chip, `className="size-3"` (DESIGN.md §5) — never a
+// numeric or rem-string `size` literal. `"100%"` (fill a fixed cell) is legal.
+// Pinned by scripts/lib/iconSizeLint.test.mjs.
+const iconSizeMessage =
+  'Size a glyph with Icon.ICON_SIZE.*, or className="size-3" for a chip glyph below sm — not a numeric/rem `size` literal (DESIGN.md §5).';
+const iconSizeSyntax = [
+  {
+    selector:
+      "JSXOpeningElement[name.object.name='Icon'] > JSXAttribute[name.name='size'] > Literal[raw=/^[\"']?[0-9.]+(rem|px)?[\"']?$/]",
+    message: iconSizeMessage,
+  },
+  {
+    selector:
+      "JSXOpeningElement[name.object.name='Icon'] > JSXAttribute[name.name='size'] > JSXExpressionContainer > Literal[raw=/^[\"']?[0-9.]+(rem|px)?[\"']?$/]",
+    message: iconSizeMessage,
+  },
+];
+
 // Shared by every non-primitive file. Flat config replaces a rule's options
 // rather than merging them, so a later block that adds selectors for a
 // narrower glob must re-list these.
@@ -113,6 +132,7 @@ const restrictedSyntax = [
     message:
       'There is no `surface-*` colour in the theme — use a token from src/styles/index.css (panel, panel-2, line …).',
   },
+  ...iconSizeSyntax,
 ];
 
 // Sort direction is always Icon.Sort / Icon.Ascending / Icon.Descending
@@ -299,14 +319,19 @@ export default tseslint.config(
       'src/components/ui/DataTable.test.tsx',
     ],
     rules: {
-      'no-restricted-syntax': ['error', ...sortArrowSyntax, ...numberFormatSyntax],
+      'no-restricted-syntax': [
+        'error',
+        ...sortArrowSyntax,
+        ...numberFormatSyntax,
+        ...iconSizeSyntax,
+      ],
     },
   },
   {
     files: ['src/components/ui/**/*.test.tsx', 'src/components/ui/**/*.stories.tsx'],
     ignores: ['src/components/ui/DataTable.test.tsx'],
     rules: {
-      'no-restricted-syntax': ['error', ...sortArrowSyntax],
+      'no-restricted-syntax': ['error', ...sortArrowSyntax, ...iconSizeSyntax],
     },
   },
   {
@@ -319,7 +344,7 @@ export default tseslint.config(
     ],
     ignores: ['src/components/ui/**/*.test.ts'],
     rules: {
-      'no-restricted-syntax': ['error', ...numberFormatSyntax],
+      'no-restricted-syntax': ['error', ...numberFormatSyntax, ...iconSizeSyntax],
     },
   },
   {

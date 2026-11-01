@@ -173,7 +173,11 @@ export function Tabs({
             onClick={() => pageScroll(side)}
             className={cx(tabChevronClassName, side === 'before' ? 'left-0.5' : 'right-0.5')}
           >
-            {side === 'before' ? <Icon.Back size={14} /> : <Icon.Descend size={14} />}
+            {side === 'before' ? (
+              <Icon.Back className="size-3.5" />
+            ) : (
+              <Icon.Descend className="size-3.5" />
+            )}
           </button>
         ) : null
       )}
