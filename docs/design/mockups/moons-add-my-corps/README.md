@@ -25,3 +25,16 @@ New components: `NewCorpBanner`, `PickCorps`, `ConfirmBatch`, `SignInSequence`, 
 | 3. Wrong character: nothing connected, same corp again | ![](sign-in-wrong-character-1440.png) | ![](sign-in-wrong-character-390.png) |
 | 4. Result: Needs you, then Moon owners with Yours | ![](result-1440.png) | ![](result-390.png) |
 | Hidden corps (opened from the picker footer) | ![](hidden-1440.png) | ![](hidden-390.png) |
+
+## Phone revision (chosen)
+The first built phone views were hard to read (a two-column label/value grid per moon owner; full-height boxed buttons in Needs you). Revised layouts, story `mockups/MoonsAddCorpsPhone`:
+
+- **Moon owners: Stacked.** The name gets the full row width, then the state pill and one muted note, then the amount owed (large, tabular) on the left and Pay on the right. Survives a 55-character name and an 11-digit amount. Mined and the rates live on the detail page the row opens. Your own corps read "Settled", no Pay.
+- **Needs you: Action on the right.** The small action sits on the name line, the state pill under it, then the hint. Own book has no action.
+
+Rejected: Figure grid (dense), Left rule (busy), side-by-side Figures first (cramped with long names).
+
+| View | 390 |
+|---|---|
+| Moon owners, Stacked, worst case | ![](phone-owners-stacked-stress-390.png) |
+| Needs you, Action on the right | ![](phone-needs-you-390.png) |
