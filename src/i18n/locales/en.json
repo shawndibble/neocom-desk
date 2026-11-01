@@ -3192,6 +3192,34 @@
     "sortedAsc": "{{column}}, sorted ascending",
     "sortedDesc": "{{column}}, sorted descending",
     "blueprintOwned": "Owned",
+    "planFilters": {
+      "title": "Filter plans",
+      "ownership": "Blueprint",
+      "ownerships": {
+        "any": "Any",
+        "owned": "I own it (BPO or BPC)",
+        "bpo": "I own the BPO",
+        "bpc": "I own a BPC",
+        "none": "I don't own it"
+      },
+      "verdict": "Verdict",
+      "verdicts": {
+        "build": "Build",
+        "buy": "Buy",
+        "unknown": "Can't price",
+        "fixLocation": "Fix location"
+      },
+      "activity": "Activity",
+      "activities": { "any": "Any", "manufacturing": "Manufacturing", "reaction": "Reactions" },
+      "group": "Group",
+      "groupAny": "Any",
+      "groupNone": "Ungrouped",
+      "profitableOnly": "Profitable only",
+      "count": "{{shown}} of {{total}} plans",
+      "noMatchTitle": "No plans match these filters",
+      "noMatchHint": "Loosen a filter to see the rest.",
+      "clear": "Clear filters"
+    },
     "verdictColumn": "Verdict",
     "runsColumn": "Runs",
     "verdictTagBuild": "Build",
