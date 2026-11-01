@@ -23,6 +23,7 @@ import type {
   MiningLedgerHistoryRecord,
   MiningTaxAssignmentRecord,
   NetWorthSnapshotRecord,
+  CharacterAcceleratorRecord,
   NotificationFeedRecord,
   OrderProblemSampleRecord,
   PayeeRecord,
@@ -73,6 +74,7 @@ export const db = new Dexie('neocom') as Dexie & {
   contractItemArchive: Dexie.Table<ContractItemArchiveRecord, [number, number]>;
   industryJobHistory: EntityTable<IndustryJobHistoryRecord, 'characterId'>;
   netWorthSnapshots: EntityTable<NetWorthSnapshotRecord, 'id'>;
+  characterAccelerators: EntityTable<CharacterAcceleratorRecord, 'id'>;
   hullFitCache: EntityTable<HullFitCacheRecord, 'key'>;
   ansiblexGates: EntityTable<AnsiblexGateRecord, 'id'>;
   dynamicItems: EntityTable<DynamicItemRecord, 'itemId'>;
@@ -324,4 +326,10 @@ db.version(30).stores({
 db.version(31).stores({
   contractArchive: '[characterId+contract_id], characterId, [characterId+archiveDate]',
   contractItemArchive: '[characterId+contract_id], characterId',
+});
+
+// Adds `characterAccelerators`, each Character's running cerebral accelerator (bonus and expiry),
+// synced as Editable Data and dropped once it expires.
+db.version(32).stores({
+  characterAccelerators: 'id, characterId',
 });

@@ -16,6 +16,7 @@ import type {
   EveNotificationFire,
   StructureFuelLowFire,
   MercenaryDenReinforcedFire,
+  AcceleratorExpiringFire,
   SkyhookRaidableFire,
   CorpIndustryJobNotificationFire,
   CorpMemberJoinedFire,
@@ -344,6 +345,23 @@ describe('occurrenceKey', () => {
     expect(occurrenceKey(soon, T0)).not.toEqual(occurrenceKey({ ...soon, phase: 'out' }, T0));
     expect(occurrenceKey(soon, T0)).not.toEqual(
       occurrenceKey({ ...soon, reinforcedUntilMs: T0 + 90_000_000 }, T0)
+    );
+  });
+
+  it('keys acceleratorExpiring on the expiry and the lead time, stable across polls', () => {
+    const fire: AcceleratorExpiringFire = {
+      eventId: 'acceleratorExpiring',
+      characterId: 7,
+      expiresAtMs: T0 + 3_600_000,
+      bonus: 10,
+      thresholdMs: 3_600_000,
+    };
+    expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey({ ...fire }, T0 + 1000));
+    expect(occurrenceKey(fire, T0)).not.toEqual(
+      occurrenceKey({ ...fire, expiresAtMs: T0 + 90_000_000 }, T0)
+    );
+    expect(occurrenceKey(fire, T0)).not.toEqual(
+      occurrenceKey({ ...fire, thresholdMs: 7_200_000 }, T0)
     );
   });
 

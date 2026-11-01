@@ -7,7 +7,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import type { SkillType } from '@/sde/types';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
-import { db, type PlanBooster, type SkillPlanRecord } from '@/db';
+import { db, type SkillPlanRecord } from '@/db';
 import { seedGrant } from '@/test/seed';
 import type { CachedResult } from '@/features/skills/data';
 import type { CharacterAttributes, SkillQueueEntry } from '@/esi/endpoints';
@@ -264,6 +264,11 @@ function withDesktopViewport(body: () => void) {
   stubViewport(() => true);
   body();
 }
+// A typed-in accelerator lives in Dexie (shared with the Characters table), so one test's must not leak into the next.
+beforeEach(async () => {
+  await db.characterAccelerators.clear();
+});
+
 describe('PlanEditor tools pane', () => {
   let clipboardWriteText: ReturnType<typeof vi.fn<ClipboardWriter>>;
 
@@ -1716,7 +1721,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
 
     await user.type(screen.getByLabelText('Days'), '5');
 
-    expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
+    await waitFor(() => expect(screen.queryByText(/costed as if you had none/i)).toBeNull());
   });
 
   it('sets the expiry in one click from a quick pick, clearing the warning', async () => {
@@ -1727,7 +1732,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
 
     await user.click(screen.getByRole('button', { name: '+12h' }));
 
-    expect(screen.getByLabelText<HTMLInputElement>('Hours').value).toBe('12');
+    await waitFor(() => expect(screen.getByLabelText<HTMLInputElement>('Hours').value).toBe('12'));
     expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
   });
 });
@@ -1801,7 +1806,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
 
   it('stores the time left as the instant that long from now, not as the typed text', async () => {
     const user = userEvent.setup();
-    const { onUpdate } = renderEditor();
+    renderEditor();
     await openTools(user);
     await openAssumptions(user);
 
@@ -1809,11 +1814,13 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     const before = Date.now();
     await user.type(screen.getByLabelText('Days'), '3');
 
-    // An instant, because the plan syncs to devices that will read it later.
-    const [update] = onUpdate.mock.calls.at(-1) as [{ boosters: PlanBooster[] }];
-    expect(update.boosters).toHaveLength(1);
-    expect(update.boosters[0].expiresAt).toBeGreaterThanOrEqual(before + 3 * DAY);
-    expect(update.boosters[0].expiresAt).toBeLessThan(before + 3 * DAY + 10_000);
+    // An instant, because it syncs to devices that will read it later. It is the
+    // Character's accelerator now, not a plan row, so the Characters table sees it too.
+    await waitFor(async () => {
+      const saved = await db.characterAccelerators.get('1');
+      expect(saved?.expiresAt).toBeGreaterThanOrEqual(before + 3 * DAY);
+      expect(saved?.expiresAt).toBeLessThan(before + 3 * DAY + 10_000);
+    });
   });
 
   it('reopens on the Booster the plan was saved with', async () => {
@@ -1882,7 +1889,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
 
   it('replaces a saved expiry in one write, never through an expiry of zero in between', async () => {
     const user = userEvent.setup();
-    const { onUpdate } = renderEditor(vi.fn(), {
+    renderEditor(vi.fn(), {
       plan: {
         ...PLAN,
         booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: Date.now() + 5 * DAY },
@@ -1898,10 +1905,13 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
 
     // One write, carrying the new instant. The emptied box on the way there
     // must not land on the plan.
-    expect(onUpdate).toHaveBeenCalledTimes(1);
-    const [update] = onUpdate.mock.calls[0] as [{ boosters: PlanBooster[] }];
-    expect(update.boosters[0].expiresAt).toBeGreaterThan(Date.now() + 4 * DAY - 10_000);
-    expect(update.boosters[0].expiresAt).toBeLessThan(Date.now() + 4 * DAY + 10_000);
+    await waitFor(async () => {
+      const saved = await db.characterAccelerators.get('1');
+      expect(saved?.expiresAt).toBeGreaterThan(Date.now() + 4 * DAY - 10_000);
+      expect(saved?.expiresAt).toBeLessThan(Date.now() + 4 * DAY + 10_000);
+    });
+    // No write ever carried an expiry of zero days on the way there.
+    expect(await db.characterAccelerators.count()).toBe(1);
   });
 
   it('clamps the bonus where it is written, not only where it is read', async () => {

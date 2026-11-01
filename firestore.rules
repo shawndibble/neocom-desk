@@ -172,6 +172,14 @@ service cloud.firestore {
         allow delete: if isOwner();
       }
 
+      match /characterAccelerators/{acceleratorId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
+
       match /productionRuns/{runId} {
         allow get: if isOwner() && hashMatches();
         allow list: if isOwner();

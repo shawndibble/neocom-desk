@@ -204,7 +204,7 @@ Per event row (all Characters): two checkboxes (Device, Alerts), default both on
 
 Events (`NOTIFICATION_EVENTS`, `events.ts`), with scope endpoint:
 
-- Skills: `skillLevelComplete`, `characterNotTraining`, `skillQueueEnding` (queue); `spExtractionReady` (skills; opt-in via SP extraction monitoring setting)
+- Skills: `skillLevelComplete`, `characterNotTraining`, `skillQueueEnding` (queue); `acceleratorExpiring` (typed-in accelerator, no scope); `spExtractionReady` (skills; opt-in via SP extraction monitoring setting)
 - Industry: `industryJobComplete`; `cloneJumpReady` (clones); `newMail`; `planetaryExtractionDone`, `planetaryExtractorExpiring`, `mercenaryDenReinforced`, `mercenaryDenAnarchy` (planets; the anarchy row says it fires only while the app is open)
 - Market/contracts: `marketOrderFilled`, `marketOrderUndercut` (orders); `contractAccepted`, `contractCompleted`, `contractFailed`, `courierDeliveryDue`, `contractExpiring` (contracts); `ordersLapsing` (orders); `walletBalanceChanged` (wallet)
 - Calendar: `newCalendarEvent`, `calendarEventStarting`

@@ -67,6 +67,7 @@ Registry (`src/sync/syncedCollections.ts:651`, order = sync order), remoteName -
 | `productionOrderWatches`       | `productionOrderWatches`            | delete                                 |
 | `productionLosses`             | `productionLosses`                  | delete                                 |
 | `netWorthSnapshots`            | `netWorthSnapshots`                 | delete                                 |
+| `characterAccelerators`        | `characterAccelerators`             | delete                                 |
 | `payees`                       | `payees`                            | delete                                 |
 | `fittings`                     | `fittings`                          | delete                                 |
 | `miningTaxAssignments`         | `miningTaxAssignments`              | delete                                 |

@@ -36,6 +36,7 @@ import {
   DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
   DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
   DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+  DEFAULT_ACCELERATOR_EXPIRING_LEAD_HOURS,
   DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
   DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
   DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
@@ -88,6 +89,7 @@ export {
   DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS,
   DEFAULT_SHIP_LOST_MINIMUM_ISK,
   DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+  DEFAULT_ACCELERATOR_EXPIRING_LEAD_HOURS,
   DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
   DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
   DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
@@ -110,6 +112,7 @@ const DEFAULT_PROJECTION_ENTRY = JSON.stringify([
   DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
   DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
   DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+  DEFAULT_ACCELERATOR_EXPIRING_LEAD_HOURS,
   DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
   DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
 ]);
@@ -151,6 +154,7 @@ function projectionInputs(value: NotificationPreferencesValue): string {
       contractExpiringLeadHours,
       ordersLapsingLeadHours,
       mercenaryDenReinforcedLeadHours,
+      acceleratorExpiringLeadHours,
       skyhookRaidableLeadHours,
       skyhookRaidableMinUnits,
     } = characterEventThresholds(value, characterId);
@@ -164,6 +168,7 @@ function projectionInputs(value: NotificationPreferencesValue): string {
       contractExpiringLeadHours,
       ordersLapsingLeadHours,
       mercenaryDenReinforcedLeadHours,
+      acceleratorExpiringLeadHours,
       skyhookRaidableLeadHours,
       skyhookRaidableMinUnits,
     ]);

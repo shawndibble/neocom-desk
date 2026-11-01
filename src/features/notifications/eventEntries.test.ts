@@ -53,6 +53,7 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
       incursionNearbyJumps: ['incursionNearby'],
       skyhookRaidableNearbyJumps: ['skyhookRaidableNearby'],
       shipLostMinimumIsk: ['shipLost'],
+      acceleratorExpiringLeadHours: ['acceleratorExpiring'],
       mercenaryDenReinforcedLeadHours: ['mercenaryDenReinforced'],
       mercenaryDenAnarchyPercent: ['mercenaryDenAnarchy'],
       skyhookRaidableLeadHours: ['skyhookRaidable'],
@@ -208,6 +209,27 @@ describe('one event through its entry', () => {
     expect(entry.thresholds.fields.map((field) => field.key)).toEqual([
       'skyhookRaidableLeadHours',
       'skyhookRaidableMinUnits',
+    ]);
+  });
+
+  it('acceleratorExpiring: warns inside the lead window, pushes hedged, owns the lead-hours threshold', () => {
+    const entry = NOTIFICATION_EVENT_ENTRIES.acceleratorExpiring;
+    const record = { bonus: 10, leadMs: 3_600_000 };
+    const end = T0 + 3_600_000 * 3;
+    const fires = entry.diff(
+      C,
+      { entries: [{ ...record, expiresAtMs: end }], nowMs: T0 },
+      { entries: [{ ...record, expiresAtMs: end }], nowMs: end - 1_800_000 }
+    );
+    expect(fires).toHaveLength(1);
+    expect(entry.copy.poll(fires[0], PILOT, {}).body).toBe(
+      "Kestrel's cerebral accelerator should run out in about 1 hour."
+    );
+    expect(entry.projection.push(fires[0], PILOT, {}).body).toBe(
+      "Kestrel's cerebral accelerator should run out in about 1 hour."
+    );
+    expect(entry.thresholds.fields.map((field) => field.key)).toEqual([
+      'acceleratorExpiringLeadHours',
     ]);
   });
 

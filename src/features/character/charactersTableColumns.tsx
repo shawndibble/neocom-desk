@@ -24,6 +24,8 @@ import { ATTENTION_RANK, ATTENTION_TONE as PI_ATTENTION_TONE } from '@/engine/pi
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { formatIsk } from '@/lib/isk';
+import type { CharacterAcceleratorRecord } from '@/db';
+import { AcceleratorCell } from '@/features/character/AcceleratorCell';
 import {
   placeLabel,
   placeSortText,
@@ -67,6 +69,10 @@ export interface CharacterRow {
   shipGranted: boolean;
   /** Newest Net Worth Snapshot; undefined until the app has snapshotted this Character. */
   netWorth: LatestNetWorth | undefined;
+  /** The accelerator the pilot typed in for this Character, if any. */
+  acceleratorRecord: CharacterAcceleratorRecord | undefined;
+  /** The bonus the attribute sheet implies; null when not cached or legal. */
+  detectedAccelerator: number | null;
 }
 
 /**
@@ -270,6 +276,19 @@ export function buildColumns(
         ) : (
           <IskAmount value={row.stats.wallet} />
         ),
+    },
+    accelerator: {
+      id: 'accelerator',
+      header: t('characters.column.accelerator'),
+      render: (row) => (
+        <AcceleratorCell
+          characterId={row.character.characterId}
+          name={row.character.name}
+          record={row.acceleratorRecord}
+          detectedBonus={row.detectedAccelerator}
+          timeZone={timeZone}
+        />
+      ),
     },
     netWorth: {
       id: 'netWorth',

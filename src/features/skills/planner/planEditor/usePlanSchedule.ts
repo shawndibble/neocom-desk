@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { SkillPlanRecord, WhatIfImplantSelection } from '@/db';
+import type { CharacterAcceleratorRecord, SkillPlanRecord, WhatIfImplantSelection } from '@/db';
 import type { AttributeBaseline } from '@/engine/attributeBaseline';
 import { projectQueueEnd } from '@/engine/skills/queueStatus';
 import type { Attributes, CloneState, Implants, TrainedSkill } from '@/engine/types';
@@ -22,6 +22,7 @@ export function usePlanSchedule({
   implants,
   cloneState,
   whatIf,
+  accelerator,
 }: {
   plan: SkillPlanRecord;
   catalog: SkillCatalog;
@@ -30,6 +31,8 @@ export function usePlanSchedule({
   attributes: Attributes;
   attributeBaseline: AttributeBaseline | null;
   implants: Implants;
+  /** The Character's running typed-in accelerator, shared with the Characters table. */
+  accelerator: CharacterAcceleratorRecord | null;
   cloneState: CloneState;
   whatIf: WhatIfImplantSelection;
 }) {
@@ -79,8 +82,18 @@ export function usePlanSchedule({
       attributeBaseline,
       implants,
       cloneState,
+      accelerator,
     }),
-    [catalog, trainedSkills, queueEntries, attributes, attributeBaseline, implants, cloneState]
+    [
+      catalog,
+      trainedSkills,
+      queueEntries,
+      attributes,
+      attributeBaseline,
+      implants,
+      cloneState,
+      accelerator,
+    ]
   );
   // Costed by `schedulePlanWith`, the same costing the Calendar makes, so the
   // two can never quote different dates for one plan.

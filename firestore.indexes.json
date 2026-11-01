@@ -257,6 +257,20 @@
       ]
     },
     {
+      "collectionGroup": "characterAccelerators",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "ownerHash",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "settings",
       "queryScope": "COLLECTION",
       "fields": [
@@ -789,7 +803,24 @@
       "indexes": []
     },
     {
+      "collectionGroup": "characterAccelerators",
+      "fieldPath": "*",
+      "ttl": false,
+      "indexes": []
+    },
+    {
       "collectionGroup": "netWorthSnapshots",
+      "fieldPath": "ownerHash",
+      "ttl": false,
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "characterAccelerators",
       "fieldPath": "ownerHash",
       "ttl": false,
       "indexes": [

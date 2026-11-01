@@ -2669,6 +2669,14 @@
       "loadFailed": "Couldn’t load the certificates."
     }
   },
+  "accelerator": {
+    "entryMode": "How to enter when it ends",
+    "clear": "Clear",
+    "autoDetectHint": "Cleared or run out, it goes back to being guessed from the attribute sheet.",
+    "modeRemaining": "Time remaining",
+    "modeExpires": "Expires at",
+    "expiresAt": "Ends at"
+  },
   "plans": {
     "closest": {
       "title": "Who's closest",
@@ -4731,6 +4739,12 @@
     "activeLabel": "Active",
     "spLabel": "SP",
     "walletLabel": "ISK",
+    "acceleratorManual": "Yes · +{{bonus}} · {{left}}",
+    "acceleratorDetected": "Yes · +{{bonus}}",
+    "acceleratorNone": "No",
+    "acceleratorEnds": "Ends {{at}}",
+    "acceleratorDetectedHint": "Guessed from this Character's attribute sheet; EVE doesn't say when it ends. Use the pencil to enter that.",
+    "acceleratorEdit": "Edit accelerator for {{name}}",
     "netWorthTooltip": "Snapshot of {{day}}: ISK {{isk}} · assets {{assets}} · buy orders {{escrow}} · sell orders {{sellOrders}} · contracts {{contracts}}",
     "queueState": "Queue",
     "queueStates": {
@@ -4790,6 +4804,7 @@
       "spTotal": "SP",
       "wallet": "ISK",
       "netWorth": "Net worth",
+      "accelerator": "Accelerator",
       "lastSynced": "Last synced",
       "training": "Training",
       "pi": "PI",
@@ -8842,6 +8857,7 @@
     "nextFortnight": "Next fortnight",
     "projected": "Projected",
     "projectedKind": "{{kind}} (projected)",
+    "acceleratorSubject": "Cerebral accelerator +{{bonus}}",
     "skillPlan": {
       "title": "Skill plan to project",
       "none": "No Skill Plans for this character",
@@ -8852,6 +8868,7 @@
     "kind": {
       "calendarEvent": "Calendar events",
       "skillTraining": "Skill queue",
+      "accelerator": "Accelerator expires",
       "industryJob": "Industry jobs",
       "planetExtraction": "Planets",
       "mercenaryDen": "Mercenary dens",
@@ -11987,6 +12004,11 @@
         "title": "Skill queue ending soon",
         "body": "{{character}}'s skill queue will run dry in under {{hours}} hours."
       },
+      "acceleratorExpiring": {
+        "title": "Accelerator running out soon",
+        "body_one": "{{character}}'s cerebral accelerator should run out in about {{count}} hour.",
+        "body_other": "{{character}}'s cerebral accelerator should run out in about {{count}} hours."
+      },
       "incursionNearby": {
         "title_one": "Incursion {{count}} jump away",
         "title_other": "Incursion {{count}} jumps away",
@@ -13880,6 +13902,7 @@
           "miningTax": "Moon Mining payees and assignments.",
           "fittings": "Fittings saved to My Fittings: name and share code.",
           "netWorthSnapshots": "Your daily net worth history: wallet, asset value, PLEX and order escrow per day, as plain numbers.",
+          "characterAccelerators": "Which cerebral accelerator you told us is running on each Character: its bonus and when it ends.",
           "miningTaxNote": "Includes the ore and ISK snapshot, because that snapshot is the invoice.",
           "notificationFeed": "Alerts you've already seen.",
           "notificationFeedNote": "Kept 30 days, so your other devices catch up.",
@@ -14129,6 +14152,7 @@
         "skillLevelComplete": "Skill level complete",
         "characterNotTraining": "Character not training",
         "skillQueueEnding": "Skill queue ending",
+        "acceleratorExpiring": "Accelerator expiring",
         "spExtractionReady": "SP extraction ready",
         "industryJobComplete": "Industry job complete",
         "cloneJumpReady": "Clone jump ready",
@@ -14203,6 +14227,9 @@
       "skillQueueEndingLeadTimeLabel": "Warn this far before the skill queue runs dry:",
       "skillQueueEndingLeadTimeOption_one": "{{count}} hour",
       "skillQueueEndingLeadTimeOption_other": "{{count}} hours",
+      "acceleratorExpiringLeadTimeLabel": "Warn this far before an accelerator runs out:",
+      "acceleratorExpiringLeadTimeOption_one": "{{count}} hour",
+      "acceleratorExpiringLeadTimeOption_other": "{{count}} hours",
       "shipLostMinimumIskLabel": "Minimum loss value (ISK):",
       "shipLostMinimumIskHint": "Leave at 0 to hear about every loss. Shorthand works: 500m, 1.5b (b billion, m million, t thousand). Read from zKillboard while the app is open.",
       "incursionNearbyJumpsLabel": "Alert when an Incursion is within:",

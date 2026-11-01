@@ -877,6 +877,25 @@ export interface NetWorthSnapshotRecord {
 }
 
 /**
+ * A Character's running cerebral accelerator (GLOSSARY.md **Accelerator**): the
+ * pilot's own answer to "what is active and until when", since no ESI endpoint
+ * says one is running. At most one per Character (`id` is the Character id),
+ * deleted once `expiresAt` passes so detection from the attribute sheet takes
+ * over again. Synced as Editable Data; last write wins.
+ */
+export interface CharacterAcceleratorRecord {
+  /** `String(characterId)`. */
+  id: string;
+  characterId: number;
+  /** Uniform bonus to all five attributes. */
+  bonus: number;
+  /** Epoch ms the accelerator runs out. An instant, so every device agrees. */
+  expiresAt: number;
+  /** Epoch ms of the write — the sync merge's last-write-wins key. */
+  updatedAt: number;
+}
+
+/**
  * One past wallet sale linked to a Production Run's output ("Link Past
  * Sale", issue #525) — a picker over the character's already-cached
  * `WalletTransaction[]` (`features/character/wallet.ts`), never a new ESI

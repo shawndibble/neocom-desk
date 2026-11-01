@@ -8,7 +8,7 @@
  * is pure; `loadPlanScheduleInputs` is the fetch side for callers with no
  * hook to lean on.
  */
-import { db, type SkillPlanRecord } from '@/db';
+import { db, type CharacterAcceleratorRecord, type SkillPlanRecord } from '@/db';
 import {
   computeSkillPlanSchedule,
   type SkillPlanSchedule,
@@ -32,7 +32,9 @@ import {
 } from '@/features/skills/cloneState';
 import { normalizeMarkerAttributes } from './markers';
 import { normalizeWhatIfSelection, whatIfImplants } from './whatIfImplants';
-import { resolvePlanBoosters, toBoosters } from './planBooster';
+import { isAcceleratorLive } from '@/engine/accelerator';
+import { acceleratorId } from '@/features/accelerator/characterAccelerators';
+import { composePlanBoosters, toBoosters } from './planBooster';
 
 /** What the scheduler costs against when ESI's attribute sheet cannot be read or explained. */
 export const DEFAULT_ATTRIBUTES: Attributes = {
@@ -60,6 +62,8 @@ export interface PlanScheduleInputs {
   attributeBaseline: AttributeBaseline | null;
   implants: Implants;
   cloneState: CloneState;
+  /** The Character's typed-in accelerator, shared by every plan (`features/accelerator`). */
+  accelerator?: CharacterAcceleratorRecord | null;
 }
 
 /** The plan's schedule, started when the live queue's lead ends (`nowMs` if there is none). */
@@ -73,8 +77,9 @@ export function schedulePlan(
     inputs.attributeBaseline?.kind === 'accelerated'
       ? inputs.attributeBaseline.acceleratorBonus
       : null;
+  const running = isAcceleratorLive(inputs.accelerator, nowMs) ? inputs.accelerator : null;
   const boosters = toBoosters(
-    resolvePlanBoosters(plan.boosters, plan.booster, detectedAccelerator)
+    composePlanBoosters(plan.boosters, plan.booster, running, detectedAccelerator)
   );
   const queue = projectQueueEnd(inputs.trained, inputs.queueEntries, nowMs, plan.entries);
   return computeSkillPlanSchedule({
@@ -114,12 +119,13 @@ export async function loadPlanScheduleInputs(
   characterId: number,
   nowMs: number
 ): Promise<PlanScheduleInputs> {
-  const [catalog, corrected, attrs, implants, cloneRecord] = await Promise.all([
+  const [catalog, corrected, attrs, implants, cloneRecord, accelerator] = await Promise.all([
     loadSkillCatalog(),
     loadCorrectedSkills(characterId, nowMs),
     loadCharacterAttributes(characterId),
     loadImplantBonuses(characterId),
     db.settings.get(SYNCED_CLONE_STATES_KEY),
+    db.characterAccelerators.get(acceleratorId(characterId)),
   ]);
   const attributeBaseline = attrs?.data ? toAttributeBaseline(attrs.data, implants) : null;
   return {
@@ -130,5 +136,6 @@ export async function loadPlanScheduleInputs(
     attributeBaseline,
     implants,
     cloneState: cloneStateFor(parseCloneStates(cloneRecord?.value), characterId),
+    accelerator: accelerator ?? null,
   };
 }

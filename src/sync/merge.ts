@@ -19,6 +19,7 @@ import type {
   ProductionOrderWatchRecord,
   ProductionRunRecord,
   NetWorthSnapshotRecord,
+  CharacterAcceleratorRecord,
   ProductionSaleLinkRecord,
   QuickbarRecord,
   SkillPlanRecord,
@@ -94,6 +95,9 @@ export type RemoteProductionLossDoc = ProductionLossRecord & RemoteDoc;
 
 /** Remote Firestore doc at /characters/{uid}/netWorthSnapshots/{id} (issue #2865). */
 export type RemoteNetWorthSnapshotDoc = NetWorthSnapshotRecord & RemoteDoc;
+
+/** Remote Firestore doc at /characters/{uid}/characterAccelerators/{characterId}. */
+export type RemoteCharacterAcceleratorDoc = CharacterAcceleratorRecord & RemoteDoc;
 
 /** Locally recorded deletion awaiting propagation to the remote store. */
 export interface LocalTombstone {

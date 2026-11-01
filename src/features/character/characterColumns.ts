@@ -23,6 +23,7 @@ export const CHARACTER_COLUMN_IDS = [
   'netWorth',
   'lastSynced',
   'training',
+  'accelerator',
   'openJobsManufacturing',
   'openJobsScience',
   'openJobsReaction',

@@ -38,6 +38,7 @@ import { incursionDomain } from './pollDomains/incursions';
 import { communitiesDomain } from './pollDomains/communities';
 import { killsDomain } from './pollDomains/kills';
 import { mercenaryDensDomain } from './pollDomains/mercenaryDens';
+import { acceleratorDomain } from './pollDomains/accelerator';
 import { skyhookDomain } from './pollDomains/corp';
 
 type Entry = Record<string, unknown>;
@@ -225,6 +226,11 @@ const CASES: Case[] = [
     domain: killsDomain,
     base: { killmailId: 1, timeMs: 1000, thresholdIsk: 0 },
     optional: { shipTypeId: 587, systemId: 30000142, value: 1_000_000 },
+  },
+  {
+    name: 'accelerator',
+    domain: acceleratorDomain,
+    base: { expiresAtMs: 100, bonus: 10, leadMs: 5 },
   },
   {
     name: 'mercenary dens',

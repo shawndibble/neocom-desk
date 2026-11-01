@@ -1,11 +1,19 @@
 import { useMemo } from 'react';
-import type { PlanBooster, SkillPlanRecord, WhatIfImplantSelection } from '@/db';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type PlanBooster, type SkillPlanRecord, type WhatIfImplantSelection } from '@/db';
+import { isAcceleratorLive } from '@/engine/accelerator';
+import {
+  acceleratorId,
+  clearCharacterAccelerator,
+  setCharacterAccelerator,
+} from '@/features/accelerator/characterAccelerators';
+import { useNow } from '@/lib/useNow';
 import type { AttributeBaseline } from '@/engine/attributeBaseline';
 import type { CloneState, Implants } from '@/engine/types';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { cloneStateFor, useCloneStates, withCloneState } from '../../cloneState';
 import { useJumpCloneImplantSets } from '../jumpCloneImplants';
-import { resolvePlanBoosters, toBoosters } from '../planBooster';
+import { composePlanBoosters, splitPlanBoosters, toBoosters } from '../planBooster';
 import {
   matchingCloneId,
   normalizeWhatIfSelection,
@@ -88,11 +96,35 @@ export function usePlanAssumptions({
   // whole answer is written back through `onChange` in `AssumptionControls`. Field-level
   // editing state (draft text, the blur-commit rule, quick picks) lives in
   // `BoosterList` itself, which owns rendering this control.
+  //
+  // The first row is the Character's own accelerator (`features/accelerator`),
+  // shared with the Characters table: editing its time here edits it there, and
+  // the plan keeps only the rows it queues behind it.
+  const storedAccelerator = useLiveQuery(
+    () => db.characterAccelerators.get(acceleratorId(characterId)),
+    [characterId]
+  );
+  const now = useNow();
+  const runningAccelerator =
+    storedAccelerator && isAcceleratorLive(storedAccelerator, now) ? storedAccelerator : null;
   const planBoosters = useMemo<PlanBooster[]>(
-    () => resolvePlanBoosters(plan.boosters, plan.booster, detectedAccelerator),
-    [plan.boosters, plan.booster, detectedAccelerator]
+    () => composePlanBoosters(plan.boosters, plan.booster, runningAccelerator, detectedAccelerator),
+    [plan.boosters, plan.booster, runningAccelerator, detectedAccelerator]
   );
   const activeBoosters = useMemo(() => toBoosters(planBoosters), [planBoosters]);
+  const setPlanBoosters = (next: PlanBooster[]): void => {
+    const { accelerator, planRows } = splitPlanBoosters(next);
+    if (accelerator) {
+      void setCharacterAccelerator(characterId, accelerator.bonus, accelerator.expiresAt);
+      // A plan that has never answered stays unanswered: writing `[]` would
+      // read as "no accelerators" and keep detection from prefilling it.
+      const answered = plan.boosters !== undefined || plan.booster !== undefined;
+      if (answered || planRows.length > 0) void onUpdate({ boosters: planRows });
+      return;
+    }
+    if (runningAccelerator) void clearCharacterAccelerator(characterId);
+    void onUpdate({ boosters: planRows });
+  };
 
   return {
     cloneState,
@@ -106,6 +138,8 @@ export function usePlanAssumptions({
     implantsAssumed,
     detectedAccelerator,
     planBoosters,
+    runningAccelerator,
+    setPlanBoosters,
     activeBoosters,
   };
 }

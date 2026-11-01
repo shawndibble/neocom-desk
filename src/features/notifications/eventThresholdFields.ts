@@ -44,6 +44,8 @@ export interface CharacterEventThresholds {
   mercenaryDenReinforcedLeadHours?: number;
   /** Anarchy % (within the den's level) at which `mercenaryDenAnarchy` fires (issue #4782) — one of `MERCENARY_DEN_ANARCHY_PERCENT_OPTIONS`. */
   mercenaryDenAnarchyPercent?: number;
+  /** Hours before a typed-in cerebral accelerator runs out that trigger `acceleratorExpiring` — one of `ACCELERATOR_EXPIRING_LEAD_HOUR_OPTIONS`. */
+  acceleratorExpiringLeadHours?: number;
   /** Hours before a skyhook's theft window opens that trigger `skyhookRaidable` (issue #4784) — one of `SKYHOOK_RAIDABLE_LEAD_HOUR_OPTIONS`. */
   skyhookRaidableLeadHours?: number;
   /** Least unsecured reagent units that make an open window a danger Alert (issue #4784); 0 makes every open window one. */
@@ -73,6 +75,9 @@ export const CONTRACT_EXPIRING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 1
 
 /** The lead times `ordersLapsing`'s inline control offers (issue #3797), all within the 72-hour Projection Horizon. */
 export const ORDERS_LAPSING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 12, 6];
+
+/** The lead times `acceleratorExpiring`'s inline control offers, all within the 72-hour Projection Horizon. */
+export const ACCELERATOR_EXPIRING_LEAD_HOUR_OPTIONS: readonly number[] = [12, 6, 3, 2, 1];
 
 /** The lead times `mercenaryDenReinforced`'s inline control offers (issue #4782), all within the 72-hour Projection Horizon. */
 export const MERCENARY_DEN_REINFORCED_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6, 1];
@@ -107,6 +112,7 @@ export const DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS = 2;
 export const DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS = 1;
 
 export const DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS = 1;
+export const DEFAULT_ACCELERATOR_EXPIRING_LEAD_HOURS = 1;
 export const DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT = 50;
 /** Close enough to fly to on a whim, without an alert for every Incursion in the region. */
 export const DEFAULT_INCURSION_NEARBY_JUMPS = 5;
@@ -285,6 +291,16 @@ export const THRESHOLD_FIELDS: { readonly [K in ThresholdKey]: ThresholdField<K>
       kind: 'iskAmount',
       labelKey: 'settings.notifications.shipLostMinimumIskLabel',
       inputIdPrefix: 'ship-lost-minimum',
+    },
+  },
+  acceleratorExpiringLeadHours: {
+    key: 'acceleratorExpiringLeadHours',
+    defaultValue: DEFAULT_ACCELERATOR_EXPIRING_LEAD_HOURS,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.acceleratorExpiringLeadTimeLabel',
+      options: ACCELERATOR_EXPIRING_LEAD_HOUR_OPTIONS,
+      optionKey: 'settings.notifications.acceleratorExpiringLeadTimeOption',
     },
   },
   mercenaryDenReinforcedLeadHours: {

@@ -67,6 +67,8 @@ import {
   type CalendarEventStartingFire,
   type StructureFuelLowFire,
   type MercenaryDenReinforcedFire,
+  type AcceleratorEntrySnapshot,
+  type AcceleratorExpiringFire,
   type SkyhookRaidableFire,
   type SkyhookEntrySnapshot,
   openPhase,
@@ -108,6 +110,7 @@ export const PROJECTABLE_EVENT_IDS = [
   'calendarEventStarting',
   'structureFuelLow',
   'mercenaryDenReinforced',
+  'acceleratorExpiring',
   'skyhookRaidable',
   'corpIndustryJobReady',
   'eveNotification',
@@ -123,7 +126,7 @@ export type ProjectionWording = 'assert' | 'hedge';
  * hedges when an ordinary in-game action, taken while the app is closed,
  * routinely falsifies that prediction before it lands.
  *
- * Eight do. `courierDeliveryDue` (issue #1713) is falsified by delivering the
+ * Nine do. `courierDeliveryDue` (issue #1713) is falsified by delivering the
  * haul — the very thing it prompts. `contractExpiring` and `ordersLapsing`
  * (issue #3797) are falsified by relisting or accepting — likewise the very
  * thing they prompt. `structureFuelLow` is falsified by a refuel.
@@ -152,6 +155,7 @@ export function projectionWording(eventId: ProjectableEventId): ProjectionWordin
   switch (eventId) {
     case 'structureFuelLow':
     case 'mercenaryDenReinforced':
+    case 'acceleratorExpiring':
     case 'skyhookRaidable':
     case 'planetaryExtractionDone':
     case 'planetaryExtractorExpiring':
@@ -674,6 +678,38 @@ export function projectStructureFuel(
     };
     rows.push(
       buildRow(characterId, 'structureFuelLow', fire, fireAt, copy(fire, characterName, {}))
+    );
+  }
+  return rows;
+}
+
+/**
+ * `acceleratorExpiring` (hedged: the pilot can swap a fresh accelerator in
+ * with the app closed). One row a lead time before the typed-in expiry; an
+ * expiry already inside its lead window, or already past, projects nothing —
+ * the foreground poll reports the former, the latter is gone.
+ */
+export function projectAccelerators(
+  characterId: number,
+  characterName: string,
+  entries: readonly AcceleratorEntrySnapshot[],
+  copy: PushCopy<AcceleratorExpiringFire, Record<string, never>>,
+  nowMs: number,
+  horizonMs: number = PROJECTION_HORIZON_MS
+): ProjectionRow[] {
+  const rows: ProjectionRow[] = [];
+  for (const entry of entries) {
+    const fireAt = entry.expiresAtMs - entry.leadMs;
+    if (!inHorizon(fireAt, nowMs, horizonMs)) continue;
+    const fire: AcceleratorExpiringFire = {
+      eventId: 'acceleratorExpiring',
+      characterId,
+      expiresAtMs: entry.expiresAtMs,
+      bonus: entry.bonus,
+      thresholdMs: entry.leadMs,
+    };
+    rows.push(
+      buildRow(characterId, 'acceleratorExpiring', fire, fireAt, copy(fire, characterName, {}))
     );
   }
   return rows;

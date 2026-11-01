@@ -114,6 +114,7 @@ export function PlanEditor({
     implants,
     cloneState,
     whatIf,
+    accelerator: assumptions.runningAccelerator,
   });
   const { scheduled, error, startDate, boostedSteps, alphaCappedSteps, stepByKey } = schedule;
 
@@ -249,7 +250,6 @@ export function PlanEditor({
     toolActions,
     markersVerdict,
     onAddFitGoal: () => milestones.setFitGoalOpen(true),
-    onUpdate,
   });
 
   return (

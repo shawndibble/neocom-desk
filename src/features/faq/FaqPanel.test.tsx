@@ -143,6 +143,7 @@ describe('FaqPanel — What We Store', () => {
       'miningTax',
       'fittings',
       'netWorthSnapshots',
+      'characterAccelerators',
       'notificationFeed',
       'settings',
     ]);

@@ -100,6 +100,9 @@ import {
   type EveNotificationFire,
   type StructureFuelLowFire,
   type MercenaryDenReinforcedFire,
+  type AcceleratorExpiringFire,
+  type AcceleratorSnapshot,
+  diffAcceleratorExpiring,
   type SkyhookRaidableFire,
   type SkyhookSnapshot,
   diffSkyhookRaidable,
@@ -149,6 +152,7 @@ import {
   eveNotificationCopy,
   structureFuelCopy,
   mercenaryDenReinforcedCopy,
+  acceleratorExpiringCopy,
   skyhookRaidableCopy,
   mercenaryDenAnarchyCopy,
   corpIndustryJobCopy,
@@ -196,6 +200,7 @@ export type AnyNotificationFire =
   | EveNotificationFire
   | StructureFuelLowFire
   | MercenaryDenReinforcedFire
+  | AcceleratorExpiringFire
   | SkyhookRaidableFire
   | MercenaryDenAnarchyFire
   | CorpIndustryJobNotificationFire
@@ -247,6 +252,7 @@ export const SNAPSHOT_SOURCES = {
   eveNotification: source<EveNotificationSnapshot, EveNotificationNames>('eveNotification'),
   structureFuel: source<StructureFuelSnapshot>('structureFuel'),
   mercenaryDens: source<DenSnapshot, PlanetNames>('mercenaryDens'),
+  accelerator: source<AcceleratorSnapshot>('accelerator'),
   skyhooks: source<SkyhookSnapshot, PlanetNames>('skyhooks'),
   corpIndustryJobs: source<CorpIndustryJobSnapshot, ItemNames>('corpIndustryJobs'),
   corpRoster: source<CorpRosterSnapshot, MemberNames>('corpRoster'),
@@ -435,6 +441,15 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     // Projection Horizon, not the Character's grants, so it shows even
     // before authorization.
     rowHintKey: 'settings.notifications.extractorExpiringHint',
+  }),
+  // Local data (the typed-in accelerator), so no scope; per Character like the rest.
+  acceleratorExpiring: defineEvent({
+    source: SNAPSHOT_SOURCES.accelerator,
+    diff: diffAcceleratorExpiring,
+    copy: acceleratorExpiringCopy,
+    projection: { push: acceleratorExpiringCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.acceleratorExpiringLeadHours], hintKey: null },
+    rowHintKey: null,
   }),
   // Per Character (issue #4782): ESI has no corporation den route.
   mercenaryDenReinforced: defineEvent({

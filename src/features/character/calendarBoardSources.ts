@@ -35,6 +35,8 @@ import type { BoardCalendarEventSource, BoardClockSource } from '@/engine/charac
 import type { BoardExtractionSource } from '@/engine/corp/board';
 import { stepKey, type SkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
 import { DAY_MS } from '@/lib/age';
+import type { CharacterAcceleratorRecord } from '@/db';
+import { isAcceleratorLive } from '@/engine/accelerator';
 
 /** Resolves a type id to its SDE name; supplied by the caller, which owns the catalog. */
 export type TypeNamer = (typeId: number) => string;
@@ -312,6 +314,26 @@ export function toContractExpirySources(
     });
   }
   return sources;
+}
+
+/**
+ * The pilot's typed-in cerebral accelerator running out (GLOSSARY.md
+ * **Accelerator**). A Character has at most one; an expired one is not a clock.
+ */
+export function toAcceleratorSources(
+  record: Pick<CharacterAcceleratorRecord, 'characterId' | 'bonus' | 'expiresAt'> | undefined,
+  nowMs: number,
+  subjectFor: (bonus: number) => string
+): BoardClockSource[] {
+  if (!record || !isAcceleratorLive(record, nowMs)) return [];
+  return [
+    {
+      id: String(record.characterId),
+      subject: subjectFor(record.bonus),
+      detail: '',
+      deadlineMs: record.expiresAt,
+    },
+  ];
 }
 
 /**

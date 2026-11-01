@@ -410,7 +410,7 @@ describe('NotificationEventList Topics', () => {
     const user = userEvent.setup();
     render(<Harness />);
 
-    expect(screen.getByRole('tab', { name: /^Skills\s*5$/ })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: /^Skills\s*6$/ })).toHaveAttribute(
       'aria-selected',
       'true'
     );

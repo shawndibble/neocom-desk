@@ -177,6 +177,7 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
       },
       { id: 'fittings', labelKey: 'settings.faq.store.synced.fittings' },
       { id: 'netWorthSnapshots', labelKey: 'settings.faq.store.synced.netWorthSnapshots' },
+      { id: 'characterAccelerators', labelKey: 'settings.faq.store.synced.characterAccelerators' },
       {
         id: 'notificationFeed',
         labelKey: 'settings.faq.store.synced.notificationFeed',

@@ -48,6 +48,7 @@ import type {
   EveNotificationFire,
   StructureFuelLowFire,
   MercenaryDenReinforcedFire,
+  AcceleratorExpiringFire,
   SkyhookRaidableFire,
   MercenaryDenAnarchyFire,
   CorpIndustryJobNotificationFire,
@@ -94,6 +95,7 @@ export type OccurrenceFire =
   | EveNotificationFire
   | StructureFuelLowFire
   | MercenaryDenReinforcedFire
+  | AcceleratorExpiringFire
   | SkyhookRaidableFire
   | MercenaryDenAnarchyFire
   | CorpIndustryJobNotificationFire
@@ -191,6 +193,9 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
       return [characterId, fire.eventId, fire.notificationId].join(':');
     case 'structureFuelLow':
       return [characterId, fire.eventId, fire.structureId, fire.fuelExpiresMs].join(':');
+    // One expiry, one lead time: a swapped-in accelerator is a new countdown.
+    case 'acceleratorExpiring':
+      return [characterId, fire.eventId, fire.expiresAtMs, fire.thresholdMs].join(':');
     // A reinforcement is identified by its exit instant, so a fresh one is a new countdown; the
     // lead warning and the "out now" fire of one exit are different occurrences.
     case 'mercenaryDenReinforced':
@@ -344,6 +349,7 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     case 'structureFuelLow':
     case 'mercenaryDenReinforced':
     case 'skyhookRaidable':
+    case 'acceleratorExpiring':
     case 'mercenaryDenAnarchy':
     case 'corpMemberJoined':
     case 'corpMemberLeft':
