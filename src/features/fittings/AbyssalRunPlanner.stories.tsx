@@ -3,12 +3,15 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { AbyssalRunPlanner } from './AbyssalRunPlanner';
 import { useAbyssalRunPlan } from './abyssalRunPlan';
 import { useAbyssalWeather } from './abyssalWeatherSelection';
+import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { FittingStats } from '@/engine/fittings/types';
 
-const stats = (maxVelocity: number) =>
-  ({ ehp: 20000, maxVelocity, offense: { weapons: [] } }) as unknown as FittingStats;
-
-const compare = () => Promise.resolve({ before: stats(1200), after: stats(1518) });
+const before = baseFittingStats();
+const after: FittingStats = {
+  ...before,
+  navigation: { ...before.navigation, maxVelocity: before.navigation.maxVelocity + 318 },
+};
+const compare = () => Promise.resolve({ before, after });
 const typeName = (typeId: number) => `Filament #${typeId}`;
 
 /** Sets the session weather (and tier / security) before the planner mounts. */
