@@ -163,6 +163,24 @@ export function modChordDisplayKey(
   return `Ctrl ${options.shift ? 'Shift ' : ''}${key}`;
 }
 
+/**
+ * Alt+`code` (Option on Apple), for an action with no browser-reserved
+ * Ctrl/Cmd chord to borrow (Ctrl+Shift+J is DevTools). Matches the physical
+ * key (`KeyJ`), not `event.key`, because Option+J types `∆` on a Mac. Ctrl,
+ * Meta and Shift narrow.
+ */
+export function isAltChord(
+  event: Pick<KeyboardEvent, 'code' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>,
+  code: string
+): boolean {
+  return event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.code === code;
+}
+
+/** An Alt chord as the pilot's own keyboard labels it: `⌥J` / `Alt J`. */
+export function altChordDisplayKey(apple: boolean, key: string): string {
+  return apple ? `⌥${key}` : `Alt ${key}`;
+}
+
 /** The chord as the pilot's own keyboard labels it. */
 export function commandPaletteDisplayKey(apple: boolean): string {
   return modChordDisplayKey(apple, 'K');

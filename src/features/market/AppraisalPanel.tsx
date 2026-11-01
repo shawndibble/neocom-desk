@@ -67,6 +67,7 @@ import { DEFAULT_REFINING_SETUP } from '@/engine/industry/refiningSetup';
 import { refineEfficiencyRange } from '@/engine/market/refineBreakdown';
 import type { AppraisalItem } from '@/engine/market/appraisal';
 import type { AppraisalController } from './useAppraisal';
+import { useAltChord } from '@/lib/useChord';
 
 interface AppraisalPanelProps {
   controller: AppraisalController;
@@ -210,6 +211,11 @@ export function AppraisalPanel({
     hub,
     pricePercent,
   });
+  useAltChord(
+    'KeyJ',
+    () => void handleOpenInJanice(),
+    text.trim() !== '' && janice.status !== 'fetching'
+  );
 
   /*
    * The percent field is a string while it is being typed. Committing on every

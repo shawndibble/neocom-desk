@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useChord } from './useChord';
+import { useAltChord, useChord } from './useChord';
 
 function Probe(props: { onChord: () => void; enabled?: boolean; shift?: boolean }) {
   useChord('s', props.onChord, { enabled: props.enabled, shift: props.shift });
@@ -59,5 +59,41 @@ describe('useChord', () => {
     );
     expect(shifted).toHaveBeenCalledTimes(1);
     expect(plain).not.toHaveBeenCalled();
+  });
+});
+
+describe('useAltChord', () => {
+  function AltProbe(props: { onChord: () => void; enabled?: boolean }) {
+    useAltChord('KeyJ', props.onChord, props.enabled);
+    return <input aria-label="field" />;
+  }
+  const press = (init: KeyboardEventInit) =>
+    new KeyboardEvent('keydown', { code: 'KeyJ', altKey: true, cancelable: true, ...init });
+
+  it('fires on Alt+J by physical key (Option+J types ∆), even from a field', () => {
+    const onChord = vi.fn();
+    render(<AltProbe onChord={onChord} />);
+    const event = press({ key: '∆' });
+    document.dispatchEvent(event);
+    expect(onChord).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('ignores Alt+Shift+J, Ctrl+Alt+J and a held key', () => {
+    const onChord = vi.fn();
+    render(<AltProbe onChord={onChord} />);
+    document.dispatchEvent(press({ shiftKey: true }));
+    document.dispatchEvent(press({ ctrlKey: true }));
+    document.dispatchEvent(press({ repeat: true }));
+    expect(onChord).not.toHaveBeenCalled();
+  });
+
+  it('does nothing and leaves the key alone when disabled', () => {
+    const onChord = vi.fn();
+    render(<AltProbe onChord={onChord} enabled={false} />);
+    const event = press({});
+    document.dispatchEvent(event);
+    expect(onChord).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
   });
 });

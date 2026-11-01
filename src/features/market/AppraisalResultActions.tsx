@@ -5,6 +5,7 @@ import * as Icon from '@/components/ui/icons';
 import { ExternalMark } from '@/components/ui/ExternalLink';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { isSyncConfigured } from '@/app/syncStatus';
+import { altChordDisplayKey, isApplePlatform } from '@/lib/shortcuts';
 import { MAX_SNAPSHOT_ITEMS } from '@/engine/market/appraisalSnapshot';
 import type { AppraisalController } from './useAppraisal';
 import { useAppraisalColumns } from './useAppraisalColumns';
@@ -126,6 +127,9 @@ export function AppraisalResultActions({
         >
           {t('market.appraisal.openInJanice')}
           <ExternalMark />
+          <span className="ml-auto pl-4 text-text-dim">
+            {altChordDisplayKey(isApplePlatform(), 'J')}
+          </span>
         </MenuItem>
       </TableActionsMenu>
     </>
