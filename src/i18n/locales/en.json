@@ -3226,6 +3226,7 @@
       "group": "Group",
       "groupAny": "Any",
       "groupNone": "Ungrouped",
+      "profit": "Profit",
       "profitableOnly": "Profitable only",
       "count": "{{shown}} of {{total}} plans",
       "noMatchTitle": "No plans match these filters",

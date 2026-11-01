@@ -62,6 +62,13 @@ export function FilterField({ label, children, stretch = true, className = '' }:
   );
 }
 
+type RowAlign = 'center' | 'end' | 'start';
+const ROW_ALIGN_CLASS: Record<RowAlign, string> = {
+  center: 'items-center',
+  end: 'items-end',
+  start: 'items-start',
+};
+
 interface FilterBarProps<T> {
   /** @summary The committed filter state. On desktop edits land here at once. */
   value: T;
@@ -111,9 +118,11 @@ interface FilterBarProps<T> {
    * from labelled fields (a caption above each control, Hauling's From/To/
    * Category) is taller than those buttons, so `end` lines every control's
    * own bottom edge up instead of centering the icons against the taller
-   * block's full height.
+   * block's full height. `start` pins the controls to the top for a `search`
+   * that grows downward (a picker listing results under its input), so the
+   * funnel stays beside the input instead of drifting to the middle.
    */
-  rowAlign?: 'center' | 'end';
+  rowAlign?: RowAlign;
   /**
    * Size of the funnel trigger's `IconButton`. Defaults to `IconButton`'s
    * own default (`md`) so existing callers are unchanged; pass `sm` to match
@@ -311,7 +320,7 @@ function CollapsibleFilterRow({
   trailing?: ReactNode;
   children: ReactNode;
   className?: string;
-  rowAlign?: 'center' | 'end';
+  rowAlign?: RowAlign;
   triggerSize?: ComponentProps<typeof IconButton>['size'];
 }) {
   const { t } = useTranslation();
@@ -319,9 +328,7 @@ function CollapsibleFilterRow({
   const groupId = useId();
   return (
     <div className={cx('flex flex-col gap-2', className)}>
-      <div
-        className={cx('flex flex-wrap gap-2', rowAlign === 'end' ? 'items-end' : 'items-center')}
-      >
+      <div className={cx('flex flex-wrap gap-2', ROW_ALIGN_CLASS[rowAlign])}>
         {search}
         {/* Before the trigger, so Tab runs straight from the funnel into the
             group it just revealed. */}
@@ -372,18 +379,12 @@ function FilterPopover({
   trailing?: ReactNode;
   children: ReactNode;
   className?: string;
-  rowAlign?: 'center' | 'end';
+  rowAlign?: RowAlign;
   triggerSize?: ComponentProps<typeof IconButton>['size'];
 }) {
   const { t } = useTranslation();
   return (
-    <div
-      className={cx(
-        'flex flex-wrap gap-2',
-        rowAlign === 'end' ? 'items-end' : 'items-center',
-        className
-      )}
-    >
+    <div className={cx('flex flex-wrap gap-2', ROW_ALIGN_CLASS[rowAlign], className)}>
       {search}
       {actions}
       <Popover>
@@ -446,13 +447,7 @@ function FilterSheet<T>({
 
   return (
     <>
-      <div
-        className={cx(
-          'flex flex-wrap gap-2',
-          rowAlign === 'end' ? 'items-end' : 'items-center',
-          className
-        )}
-      >
+      <div className={cx('flex flex-wrap gap-2', ROW_ALIGN_CLASS[rowAlign], className)}>
         {search}
         {actions}
         <FilterTrigger
