@@ -124,7 +124,7 @@ export function PilotThreatBand({
       >
         <span className={eyebrowClassName}>{t('travel.pilot.threat.label')}</span>
         <span className={cx('text-lg font-bold tracking-wider uppercase', THREAT_TEXT_CLASS[tone])}>
-          {t(`travel.pilot.threat.level.${verdict.level}`)}
+          {t(`travel.pilot.threat.levelFull.${verdict.level}`)}
         </span>
       </div>
       <div className="min-w-0 space-y-1.5 px-4 py-3">

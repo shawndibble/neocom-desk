@@ -119,13 +119,14 @@ describe('PilotListView (Local list)', () => {
     renderList();
     await screen.findByRole('table', { name: 'Killed in highsec, last 30 days' });
     const badgeOf = (name: string) =>
-      screen.getByText(name).closest('td')?.querySelector('span.inline-flex')?.textContent;
-    expect(badgeOf('Nullbear')).toContain('Low threat');
-    expect(badgeOf('Sleeper')).toContain('Inactive');
+      screen.getByText(name).closest('td')?.querySelector('span.inline-flex span[aria-hidden]')
+        ?.textContent;
+    expect(badgeOf('Nullbear')).toBe('Low');
+    expect(badgeOf('Sleeper')).toBe('Quiet');
     expect(badgeOf('Offline') ?? null).toBeNull();
   });
 
-  it('washes a Dangerous row red and fills its badge, and leaves an Inactive one plain', async () => {
+  it('washes a Dangerous row red and fills its badge, and leaves a Quiet one plain', async () => {
     const killedLately = Array.from({ length: 10 }, (_, i) => kill((i + 1) * HOUR, 'highsec'));
     const rows = [
       row('Reaper', {
@@ -161,7 +162,7 @@ describe('PilotListView (Local list)', () => {
     expect(inCard.getAllByText('2').length).toBeGreaterThan(0);
     expect(inCard.getByText('Kills, 30 days')).toBeTruthy();
     expect(inCard.getByText('Highsec')).toBeTruthy();
-    expect(inCard.getByText('Low threat')).toBeTruthy();
+    expect(inCard.getByText('Low')).toBeTruthy();
   });
 
   describe('a kill history read in an earlier paste (issue #5812)', () => {

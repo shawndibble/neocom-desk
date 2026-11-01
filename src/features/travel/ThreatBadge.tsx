@@ -42,10 +42,20 @@ export function ThreatBadge({
       )}
     >
       <LevelIcon size={12} aria-hidden />
-      <span className="sr-only">{t('travel.pilot.threat.label')}: </span>
-      {level === 'pending'
-        ? t('travel.pilot.threat.pending')
-        : t(`travel.pilot.threat.level.${level}`)}
+      {level === 'pending' ? (
+        <>
+          <span className="sr-only">{t('travel.pilot.threat.label')}: </span>
+          {t('travel.pilot.threat.pending')}
+        </>
+      ) : (
+        <>
+          {/* One short word on screen; the full wording for a screen reader. */}
+          <span className="sr-only">
+            {t('travel.pilot.threat.label')}: {t(`travel.pilot.threat.levelFull.${level}`)}
+          </span>
+          <span aria-hidden>{t(`travel.pilot.threat.level.${level}`)}</span>
+        </>
+      )}
     </span>
   );
 }

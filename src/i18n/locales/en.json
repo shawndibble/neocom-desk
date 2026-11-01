@@ -15538,10 +15538,16 @@
         "level": {
           "dangerous": "Dangerous",
           "active": "Active",
-          "low": "Low threat",
-          "inactive": "Inactive"
+          "low": "Low",
+          "inactive": "Quiet"
         },
-        "help": "Read from their kills in the last {{days}} days and zKillboard's all-time ratios. Dangerous: {{dangerousKills}} or more recent kills and either a danger ratio of {{dangerRatio}} or more, or {{killerRatio}}% or more of their kills and losses being kills. Active: {{activeKills}} or more recent kills. Low threat: fewer, or no kills but a ship lost in that time. Inactive: neither. Low threat never means safe.",
+        "levelFull": {
+          "dangerous": "Dangerous",
+          "active": "Active",
+          "low": "Low threat",
+          "inactive": "No recent kills"
+        },
+        "help": "Read from their kills in the last {{days}} days and zKillboard's all-time ratios. Dangerous: {{dangerousKills}} or more recent kills and either a danger ratio of {{dangerRatio}} or more, or {{killerRatio}}% or more of their kills and losses being kills. Active: {{activeKills}} or more recent kills. Low: fewer, or no kills but a ship lost in that time. Quiet: neither. Low never means safe.",
         "inactive": "No kills in the last {{days}} days.",
         "inactiveLast": "No kills in the last {{days}} days. Last kill {{age}}.",
         "lossesOnly_one": "No kills in the last {{days}} days. {{count}} loss in that time, the latest {{age}}.",
