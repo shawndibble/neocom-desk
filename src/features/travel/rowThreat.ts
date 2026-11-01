@@ -21,6 +21,12 @@ import type { PilotListRow } from './pilotListData';
  * kill whose losses could not be read or dated gets none either: "inactive" would
  * be a guess, and a wrong one for a pilot who just lost a ship.
  */
+/**
+ * The row's Threat as `rowThreat` reads it, plus how context moved it: the
+ * level shown, the level before context, which way it moved and why. Context
+ * is where you are and who of their organization is in Local; without it the
+ * level is the pilot's own.
+ */
 export function rowThreatRead(
   row: PilotListRow,
   nowMs: number,
@@ -43,7 +49,7 @@ export function rowThreatRead(
     nowMs,
   }).level;
   return context === undefined
-    ? { level: base, base, reasons: [] }
+    ? { level: base, base, shift: 0, reasons: [] }
     : threatInContext(base, row.kills.kills, nowMs, context);
 }
 

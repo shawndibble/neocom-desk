@@ -38,6 +38,8 @@ export interface ThreatRead {
   level: ThreatLevel;
   /** The level before context. */
   base: ThreatLevel;
+  /** Which way context moved the level: -1 lower, 1 higher, 0 not at all. */
+  shift: -1 | 0 | 1;
   /** What moved the level; empty when it did not move. */
   reasons: ContextReason[];
 }
@@ -50,7 +52,7 @@ export function threatInContext(
   nowMs: number,
   context: ThreatContext
 ): ThreatRead {
-  const unchanged: ThreatRead = { level: base, base, reasons: [] };
+  const unchanged: ThreatRead = { level: base, base, shift: 0, reasons: [] };
   if (!LADDER.includes(base)) return unchanged;
   const recent = recentKillsOf(kills, nowMs);
 
@@ -82,6 +84,7 @@ export function threatInContext(
   return {
     level,
     base,
+    shift: net < 0 ? -1 : 1,
     reasons: moves.filter((move) => Math.sign(move.step) === Math.sign(net)).map((m) => m.reason),
   };
 }

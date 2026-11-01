@@ -70,7 +70,7 @@ import { LocalOrgGroups } from './LocalOrgGroups';
 import { useLastLocal } from './lastLocal';
 import { NewArrivalTag } from './NewArrivalTag';
 import { loadPilotList, loadViewerContext, type PilotListRow } from './pilotListData';
-import { rowThreatRead } from './rowThreat';
+import { rowThreat, rowThreatRead } from './rowThreat';
 import { orgMatesOf, useLocalThreatContext } from './localThreatContext';
 import { PilotAffiliation } from './PilotAffiliation';
 import { PilotCard } from './PilotCard';
@@ -226,19 +226,15 @@ function LocalList({ paste }: { paste: LocalPaste }) {
   }
 
   const byOrganization = groupMode === 'organization';
-  const readOf = (row: PilotListRow) =>
-    rowThreatRead(row, now, {
-      hereSpace: here.space,
-      orgMatesHere: row.characterId === null ? null : (orgMates.get(row.characterId) ?? null),
-    });
-  const threatOf = (row: PilotListRow) => {
-    const read = readOf(row);
-    return read === null || read === 'pending' ? read : read.level;
-  };
+  const contextOf = (row: PilotListRow) => ({
+    hereSpace: here.space,
+    orgMatesHere: row.characterId === null ? null : (orgMates.get(row.characterId) ?? null),
+  });
+  const threatOf = (row: PilotListRow) => rowThreat(row, now, contextOf(row));
   const adjustedOf = (row: PilotListRow): 'down' | 'up' | null => {
-    const read = readOf(row);
-    if (read === null || read === 'pending' || read.level === read.base) return null;
-    return LEVEL_RANK[read.level] < LEVEL_RANK[read.base] ? 'down' : 'up';
+    const read = rowThreatRead(row, now, contextOf(row));
+    if (read === null || read === 'pending' || read.shift === 0) return null;
+    return read.shift < 0 ? 'down' : 'up';
   };
   // The Kills view names only the misses among the names it lists.
   const notFound = (byOrganization ? rows : rows.slice(0, MAX_LIST_PILOTS))
@@ -646,8 +642,6 @@ function StaleKillsBadge({ row }: { row: PilotListRow }) {
     />
   );
 }
-
-const LEVEL_RANK = { inactive: 0, low: 1, active: 2, dangerous: 3 } as const;
 
 function SpaceCell({ row, space, now }: { row: PilotListRow; space: KillSpace; now: number }) {
   const { t } = useTranslation();

@@ -23,7 +23,7 @@ const here = (space: KillSpace | null, orgMatesHere: number | null = null) => ({
 describe('threatInContext: where you are', () => {
   it('reads a nullsec-only killer one level lower in highsec', () => {
     const read = threatInContext('active', many(6), NOW, here('highsec'));
-    expect(read).toEqual({ level: 'low', base: 'active', reasons: ['elsewhere'] });
+    expect(read).toEqual({ level: 'low', base: 'active', shift: -1, reasons: ['elsewhere'] });
   });
 
   it('leaves them alone in nullsec, where they kill', () => {
@@ -66,12 +66,12 @@ describe('threatInContext: groups', () => {
 
   it('reads a group killer alone in Local one level lower', () => {
     const read = threatInContext('active', gang(6), NOW, here('nullsec', 0));
-    expect(read).toEqual({ level: 'low', base: 'active', reasons: ['gangAlone'] });
+    expect(read).toEqual({ level: 'low', base: 'active', shift: -1, reasons: ['gangAlone'] });
   });
 
   it('reads a group killer with three of their own here one level higher, up to Active', () => {
     const read = threatInContext('low', gang(6), NOW, here('nullsec', 3));
-    expect(read).toEqual({ level: 'active', base: 'low', reasons: ['gangHere'] });
+    expect(read).toEqual({ level: 'active', base: 'low', shift: 1, reasons: ['gangHere'] });
     expect(threatInContext('dangerous', gang(12), NOW, here('nullsec', 5)).level).toBe('dangerous');
     expect(threatInContext('active', gang(6), NOW, here('nullsec', 5)).level).toBe('active');
   });
@@ -95,6 +95,6 @@ describe('threatInContext: groups', () => {
 
   it('cancels out when one rule lowers and the other raises, and reports nothing', () => {
     const read = threatInContext('low', gang(6), NOW, here('highsec', 4));
-    expect(read).toEqual({ level: 'low', base: 'low', reasons: [] });
+    expect(read).toEqual({ level: 'low', base: 'low', shift: 0, reasons: [] });
   });
 });

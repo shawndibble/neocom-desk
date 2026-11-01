@@ -62,9 +62,9 @@ export function ThreatBadge({
       {adjusted !== null && (
         <>
           {adjusted === 'down' ? (
-            <Icon.Descending className="size-3" aria-hidden />
+            <Icon.LevelLower className="size-3" aria-hidden />
           ) : (
-            <Icon.Ascending className="size-3" aria-hidden />
+            <Icon.LevelHigher className="size-3" aria-hidden />
           )}
           <span className="sr-only">{t(`travel.pilot.threat.adjusted.${adjusted}`)}</span>
         </>
