@@ -475,7 +475,7 @@ describe('PilotListView (Group by Organization, issue #5668)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show' }));
     const heading = screen.getByRole('link', { name: 'Home Corp' }).closest('h3');
     expect(heading?.textContent).toContain('2 pilots');
-    expect(screen.getByRole('table', { name: 'Home Corp' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: /Friendly · Home Corp/ })).toBeInTheDocument();
   });
 
   it("shows a corporation's contact on that corporation, never on its alliance's heading", async () => {

@@ -204,6 +204,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
 
   const found = useMemo(() => rows.filter((row) => !row.notFound), [rows]);
   const strangers = useMemo(() => found.filter((row) => !isFriendly(row)), [found]);
+  const friendly = useMemo(() => found.filter(isFriendly), [found]);
 
   if (failed) {
     return (
@@ -379,15 +380,15 @@ function LocalList({ paste }: { paste: LocalPaste }) {
             <LocalOrgGroups
               rows={list}
               threatOf={(row) => rowThreat(row, now)}
-              renderRows={table}
+              renderRows={(label, rows, showAffiliation) =>
+                table(`${groupTitle('friendly', t, here.space)} · ${label}`, rows, showAffiliation)
+              }
             />
           ) : (
             table(groupTitle('friendly', t, here.space), list)
           ))}
       </section>
     );
-
-  const friendly = found.filter(isFriendly);
 
   return (
     <Panel>

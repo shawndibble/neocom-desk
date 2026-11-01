@@ -15539,7 +15539,6 @@
         "newSinceLastPaste_one": "{{count}} new since last paste",
         "newSinceLastPaste_other": "{{count}} new since last paste",
         "stateLoading": "Loading…",
-        "stateUnreachable": "zKillboard couldn't be reached",
         "unreachableSummary_one": "zKillboard couldn't be reached for {{count}} pilot, so their kill counts are blank.",
         "unreachableSummary_other": "zKillboard couldn't be reached for {{count}} pilots, so their kill counts are blank.",
         "noContact": "No contact",

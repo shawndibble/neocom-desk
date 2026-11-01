@@ -36,7 +36,7 @@ export function LocalOrgGroups({
   threatOf,
   renderRows,
 }: {
-  /** Found, non-friendly pilots. */
+  /** Found pilots: the non-friendly ones, or the Friendly section's. */
   rows: PilotListRow[];
   threatOf: (row: PilotListRow) => Threat;
   renderRows: RenderPilotRows;
