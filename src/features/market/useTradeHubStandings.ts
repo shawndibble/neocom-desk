@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react';
 import { loadCharacterStandings } from '@/features/character/standings';
 import { resolveLocationStandings } from './locationStandings';
 import { ZERO_STANDINGS, type ResolvedStandings } from '@/engine/market/standings';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { useWarmLoad } from '@/lib/useWarmLoad';
 
@@ -91,10 +91,16 @@ export function useTradeHubStandingsByCharacter(
   return standingsByCharacter;
 }
 
+/** No standing at a hub, but still the hub's own surcharge: it is the market's, not the pilot's. */
+export function zeroStandingsAt(hubId: TradeHub['id']): ResolvedStandings {
+  const brokerSurchargePct = getTradeHub(hubId)?.brokerSurchargePct ?? 0;
+  return brokerSurchargePct > 0 ? { ...ZERO_STANDINGS, brokerSurchargePct } : ZERO_STANDINGS;
+}
+
 /** `standings.get(hubId)`, defaulting to zero for a hub not yet resolved. */
 export function tradeHubStanding(
   standings: TradeHubStandingsMap,
   hubId: TradeHub['id']
 ): ResolvedStandings {
-  return standings.get(hubId) ?? ZERO_STANDINGS;
+  return standings.get(hubId) ?? zeroStandingsAt(hubId);
 }

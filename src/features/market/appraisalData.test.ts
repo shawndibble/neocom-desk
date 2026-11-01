@@ -6,7 +6,7 @@ import { resetMarketOpenPricesCache } from '@/features/market/marketOpenPrices';
 import { fallbackSourcesDown } from '@/test/fallbackSourcesDown';
 import { FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
 import { clearMarketPriceCache } from '@/market/prices';
-import { DEFAULT_TRADE_HUB, TRADE_HUBS } from '@/market/hubs';
+import { COMPARED_HUBS, DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadMutaplasmids, loadReprocessing, loadTypes } from '@/sde/loadSde';
 import { loadCorrectedSkills, type CorrectedSkills } from '@/features/skills/correctedSkills';
@@ -630,8 +630,8 @@ describe('compareHubs', () => {
 
     const rows = await compareHubs('Damage Control II\t3', 90);
 
-    expect(hits).toBe(TRADE_HUBS.length);
-    expect(rows.map((row) => row.hub)).toEqual(TRADE_HUBS);
+    expect(hits).toBe(COMPARED_HUBS.length);
+    expect(rows.map((row) => row.hub)).toEqual(COMPARED_HUBS);
     // Same aggregate served for every hub in this fixture, so every row
     // matches the primary appraisal's own totals at the same percentage.
     for (const row of rows) {
@@ -676,7 +676,7 @@ describe('compareHubs', () => {
     const rows = await compareHubs('Nope\t1', 100);
 
     expect(hits).toBe(0);
-    expect(rows).toHaveLength(TRADE_HUBS.length);
+    expect(rows).toHaveLength(COMPARED_HUBS.length);
     expect(rows.every((row) => row.buy === null && row.sell === null)).toBe(true);
   });
 

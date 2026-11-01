@@ -322,6 +322,7 @@ function onPlanHeroBasis(
     brokerRelationsLevel: modifiers.skills[SKILL_IDS.brokerRelations] ?? 0,
     factionStanding: standing?.factionStanding,
     corpStanding: standing?.corpStanding,
+    brokerSurchargePct: standing?.brokerSurchargePct,
   });
   return {
     result: {

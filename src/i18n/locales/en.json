@@ -13293,7 +13293,7 @@
         "topBid": "Nobody bids higher where this order sits"
       },
       "offHub": "Off hub",
-      "offHubHelp": "This order is not at one of the five NPC trade hubs, so fewer buyers pass it.",
+      "offHubHelp": "This order is not at one of the NPC trade hubs, so fewer buyers pass it.",
       "legendColourRule": "Colour marks distance only — station, system, region. Everything else is grey. Every badge also carries its own words.",
       "group": {
         "belowFloor": "Priced below cost",

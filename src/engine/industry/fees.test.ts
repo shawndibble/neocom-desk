@@ -70,6 +70,21 @@ describe('brokerFeePct and brokerFee with a hub surcharge', () => {
   });
 });
 
+describe('break-even and relist with a hub surcharge', () => {
+  it('needs a higher break-even price when the hub adds broker points', () => {
+    const plain = breakEvenPrice(1_000_000, 10, 5, 5)!;
+    const surcharged = breakEvenPrice(1_000_000, 10, 5, 5, 0, 0, 5)!;
+    expect(surcharged).toBeGreaterThan(plain);
+  });
+
+  it('puts the surcharge through the Relist Discount like the rest of the broker rate', () => {
+    const plain = relistBrokerFeePct(5, 5, 0, 0);
+    const surcharged = relistBrokerFeePct(5, 5, 0, 0, 5);
+    const discount = relistDiscountPct(5);
+    expect(surcharged - plain).toBeCloseTo((5 * (100 - discount)) / 100, 10);
+  });
+});
+
 describe('salesTax', () => {
   it('is order value times the tax rate', () => {
     expect(salesTax(1_000_000, 5)).toBeCloseTo(33_750, 6);

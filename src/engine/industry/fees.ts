@@ -97,9 +97,10 @@ export function relistBrokerFeePct(
   brokerRelationsLevel: number,
   advancedBrokerRelationsLevel: number,
   factionStanding = 0,
-  corpStanding = 0
+  corpStanding = 0,
+  surchargePct = 0
 ): number {
-  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding);
+  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding, surchargePct);
   const discountPct = relistDiscountPct(advancedBrokerRelationsLevel);
   return (brokerPct * (100 - discountPct)) / 100;
 }
@@ -118,16 +119,18 @@ export function relistFee(
   brokerRelationsLevel: number,
   advancedBrokerRelationsLevel: number,
   factionStanding = 0,
-  corpStanding = 0
+  corpStanding = 0,
+  surchargePct = 0
 ): number {
   if (quantity <= 0 || newPrice <= 0) return 0;
 
-  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding);
+  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding, surchargePct);
   const discountedPct = relistBrokerFeePct(
     brokerRelationsLevel,
     advancedBrokerRelationsLevel,
     factionStanding,
-    corpStanding
+    corpStanding,
+    surchargePct
   );
 
   const increaseIncrement = Math.max(0, newPrice - oldPrice) * quantity;
@@ -171,10 +174,11 @@ export function breakEvenPrice(
   accountingLevel: number,
   brokerRelationsLevel: number,
   factionStanding = 0,
-  corpStanding = 0
+  corpStanding = 0,
+  surchargePct = 0
 ): number | null {
   const taxPct = salesTaxPct(accountingLevel);
-  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding);
+  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding, surchargePct);
   return breakEvenPriceAtRate(totalCost, quantity, taxPct, brokerPct);
 }
 
@@ -192,14 +196,16 @@ export function relistBreakEvenPrice(
   brokerRelationsLevel: number,
   advancedBrokerRelationsLevel: number,
   factionStanding = 0,
-  corpStanding = 0
+  corpStanding = 0,
+  surchargePct = 0
 ): number | null {
   const taxPct = salesTaxPct(accountingLevel);
   const brokerPct = relistBrokerFeePct(
     brokerRelationsLevel,
     advancedBrokerRelationsLevel,
     factionStanding,
-    corpStanding
+    corpStanding,
+    surchargePct
   );
   return breakEvenPriceAtRate(totalCost, quantity, taxPct, brokerPct);
 }

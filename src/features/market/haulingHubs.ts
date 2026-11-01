@@ -38,7 +38,7 @@ export interface HaulingLane {
 export type HaulingEnd = TradeHub | typeof ANY_HUB;
 
 export function haulingEnd(id: HaulingHubChoice): HaulingEnd {
-  return id === ANY_HUB ? ANY_HUB : (TRADE_HUBS.find((h) => h.id === id) ?? TRADE_HUBS[0]!);
+  return id === ANY_HUB ? ANY_HUB : (DAILY_JOB_HUBS.find((h) => h.id === id) ?? TRADE_HUBS[0]!);
 }
 
 export function haulingEndId(end: HaulingEnd): HaulingHubChoice {
@@ -74,7 +74,7 @@ export interface HubLane {
  */
 export function expandHaulingLane(from: HaulingHubChoice, to: HaulingHubChoice): HubLane[] {
   const ends = (choice: HaulingHubChoice) =>
-    choice === ANY_HUB ? COMPARED_HUBS : TRADE_HUBS.filter((h) => h.id === choice);
+    choice === ANY_HUB ? COMPARED_HUBS : DAILY_JOB_HUBS.filter((h) => h.id === choice);
   if (from === ANY_HUB && to === ANY_HUB) return [];
   return ends(from).flatMap((f) =>
     ends(to)

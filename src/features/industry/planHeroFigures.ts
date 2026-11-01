@@ -58,6 +58,7 @@ export function planHeroFigures({
         brokerRelationsLevel: skills[SKILL_IDS.brokerRelations] ?? 0,
         factionStanding: standing?.factionStanding,
         corpStanding: standing?.corpStanding,
+        brokerSurchargePct: standing?.brokerSurchargePct,
       })
     : null;
   // The product sold into buy orders instead, on the hero's basis so it reads
