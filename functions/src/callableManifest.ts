@@ -45,6 +45,8 @@ export const CALLABLE_ACTIONS = {
     'acceptCorpTaxBookFeederInviteCallable',
     'saveCorpTaxBookSyncGrantCallable',
     'saveCorpTaxBookFeederGrantCallable',
+    'addOwnCorpTaxBookFeederCallable',
+    'removeOwnCorpTaxBookFeederCallable',
     'leaveCorpTaxBookFeederCallable',
     'getCorpTaxBookFeederStatusCallable',
     'getCorpTaxBookFeederViewAccessCallable',

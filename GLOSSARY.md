@@ -804,3 +804,6 @@ here — they go one per file in `docs/context/decisions/`.
   its one feed, e.g. the Wallet on Balance or on Flow.
 - **Widget State**: Which of five things a **Widget** is showing: loading,
   needs permission, failed, empty or ok.
+- **Yours**: The pill on a **Feeder** whose corporation is one of the viewer's own, joined through "Add my other
+  corps" (the CEO is a Character on the viewer's account) rather than an invite. It owes no owner rate and takes no
+  payouts: the row is always settled otherwise.

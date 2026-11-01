@@ -166,6 +166,14 @@ const FEEDERS: Record<string, MoonOwnerFeeder[]> = {
       modeChanges: [{ from: '2026-10-01', mode: 'settled-otherwise' }],
     }),
   ],
+  'a same-owner corp, settled otherwise from its first day': [
+    feeder(A, {
+      sameOwner: true,
+      mode: 'settled-otherwise',
+      modeChanges: [{ from: '2026-10-01', mode: 'settled-otherwise' }],
+      agreedRatePct: undefined,
+    }),
+  ],
   'a stale owner': [feeder(A, { staleSince: Date.parse('2026-10-11T09:12:00Z') })],
   'an owner with a closed coverage': [
     feeder(A, { coveragePeriods: [{ from: '2026-10-01', to: '2026-10-05' }] }),

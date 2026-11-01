@@ -177,7 +177,7 @@ export async function listFeederInvites(
     .get();
   const invites = snap.docs
     .map((d) => ({ id: d.id, doc: d.data() as FeederInviteDoc }))
-    .filter(({ doc }) => !doc.revokedAt && !doc.acceptedAt)
+    .filter(({ doc }) => !doc.revokedAt && !doc.acceptedAt && !doc.selfInvite)
     .sort((a, b) => b.doc.createdAt - a.doc.createdAt)
     .map(({ id, doc }) => ({
       inviteId: id,

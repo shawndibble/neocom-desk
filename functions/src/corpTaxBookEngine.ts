@@ -483,6 +483,27 @@ export function reopenPeriod(periods: readonly CoveragePeriod[], day: string): C
   return [...periods, { from: day }];
 }
 
+/** Engine `MAX_COVERAGE_BACKDATE_DAYS`. */
+export const MAX_COVERAGE_BACKDATE_DAYS = 30;
+
+/** Engine `clampCoverageFrom`: a join's first covered day, within 30 days back and never before a rejoin's gap. */
+export function clampCoverageFrom(
+  periods: readonly CoveragePeriod[],
+  requested: string | undefined,
+  today: string
+): string {
+  const earliest = shiftDate(today, -MAX_COVERAGE_BACKDATE_DAYS);
+  let day = requested ?? today;
+  if (day > today) day = today;
+  if (day < earliest) day = earliest;
+  for (const p of periods) {
+    if (p.to === undefined) continue;
+    const next = shiftDate(p.to, 1);
+    if (day < next) day = next;
+  }
+  return day;
+}
+
 // --- Feeder ledger health (#4509) --------------------------------------------
 
 const DAY_MS = 86_400_000;

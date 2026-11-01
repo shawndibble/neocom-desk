@@ -54,6 +54,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.corpStockTargets',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
+  'sync.moonsHiddenCorps',
   'sync.placeNicknames',
   'sync.reprocessingTaxRate',
   'sync.skillCloneStates',

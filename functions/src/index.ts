@@ -100,6 +100,12 @@ import {
   revokeFeederInvite,
 } from './corpTaxBookFeeders.js';
 import {
+  addOwnFeeder,
+  parseAddOwnFeederInput,
+  parseRemoveOwnFeederInput,
+  removeOwnFeeder,
+} from './corpTaxBookOwnFeeder.js';
+import {
   dropBookGrants,
   getFeederStatus,
   leaveFeeder,
@@ -921,6 +927,20 @@ corpTaxBookAction('saveCorpTaxBookFeederGrantCallable', (request) =>
     callerOf(request),
     parseSaveFeederGrantInput(request.data)
   )
+);
+
+// "Add my other corps": an editor adds (or removes) one of their own corporations as a moon
+// owner without an invite link; the CEO alt's mining-scope tokens travel in the same request.
+corpTaxBookAction('addOwnCorpTaxBookFeederCallable', (request) =>
+  addOwnFeeder(
+    { ...corpSyncDeps(), esi: esiSyncReader(), lookupCorporation: esiCorporationLookup() },
+    callerOf(request),
+    parseAddOwnFeederInput(request.data)
+  )
+);
+
+corpTaxBookAction('removeOwnCorpTaxBookFeederCallable', (request) =>
+  removeOwnFeeder(corpSyncDeps(), callerOf(request), parseRemoveOwnFeederInput(request.data))
 );
 
 corpTaxBookAction('leaveCorpTaxBookFeederCallable', (request) =>
