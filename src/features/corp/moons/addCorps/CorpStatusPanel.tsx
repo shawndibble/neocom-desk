@@ -52,11 +52,8 @@ export function CorpStatusPanel({
       <ul className="divide-y divide-line">
         {items.map((item) => (
           <li key={item.corporationId} className="space-y-1 py-2 text-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="truncate font-medium">{item.name}</span>
-                <CorpStatePill state={item.state} />
-              </span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="min-w-0 truncate font-medium">{item.name}</span>
               {item.state === 'gone-quiet' ? (
                 <Button
                   size="sm"
@@ -77,6 +74,9 @@ export function CorpStatusPanel({
                   {t(k(`${item.state}.action`))}
                 </Button>
               )}
+            </div>
+            <div>
+              <CorpStatePill state={item.state} />
             </div>
             <p className="text-xs text-text-dim">
               {item.reason ? addCorpsErrorText(t, item.reason) : t(k(`${item.state}.text`))}
