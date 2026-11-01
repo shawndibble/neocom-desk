@@ -8,6 +8,7 @@
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
+import { DataAgeBadge } from '@/components/ui';
 import type { KillSpace, KillSummary } from '@/engine/pilotList/killActivity';
 import type { ThreatLevel } from '@/engine/pilotList/threatVerdict';
 import { CharacterLink } from '@/features/entities';
@@ -62,6 +63,7 @@ export function PilotCard({
       : row.kills.kind === 'notLookedUp'
         ? t('travel.pilot.list.stateNotLookedUp')
         : null;
+  const staleSinceMs = row.kills.kind === 'ready' ? row.kills.staleSinceMs : undefined;
   const own = row.ownOrganization;
   const mainSpace = ready === null ? null : mainSpaceOf(ready.bySpace);
 
@@ -113,7 +115,11 @@ export function PilotCard({
         </div>
       </div>
 
-      {(threat !== null || row.standing !== null || own !== null || status !== null) && (
+      {(threat !== null ||
+        row.standing !== null ||
+        own !== null ||
+        status !== null ||
+        staleSinceMs !== undefined) && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-text-dim">
           {threat !== null && <ThreatBadge level={threat} solid />}
           {mainSpace !== null && (
@@ -132,6 +138,16 @@ export function PilotCard({
           {own !== null && <span>{t(`travel.pilot.list.own.${own}`)}</span>}
           {row.standing !== null && <PilotStandingTag standing={row.standing} />}
           {status !== null && <span>{status}</span>}
+          {staleSinceMs !== undefined && (
+            <span className="inline-flex items-center gap-1.5">
+              {t('travel.pilot.list.staleKills')}
+              <DataAgeBadge
+                date={new Date(staleSinceMs)}
+                alwaysVisible
+                note={t('travel.pilot.list.staleNote')}
+              />
+            </span>
+          )}
         </div>
       )}
 

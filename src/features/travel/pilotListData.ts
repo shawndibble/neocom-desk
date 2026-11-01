@@ -22,6 +22,13 @@ import { needsDangerRatio, needsLossHistory } from '@/engine/pilotList/threatVer
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { lossTimesMs } from './pilotLossTimes';
 import { killerRatio } from './zkillFigures';
+import {
+  classifyKillHistoryAge,
+  readStoredCharacterIds,
+  readStoredKillHistories,
+  storeCharacterIds,
+  storeKillHistory,
+} from './pilotHistoryStore';
 import { fetchPilotKillHistory, fetchPilotKillmails, fetchPilotStats } from '@/lib/zkillboard';
 
 /** zKillboard is a volunteer-run service: keep the fan-out well under ESI's. */
@@ -69,7 +76,16 @@ export type PilotKillsState =
   | { kind: 'unreachable' }
   /** Past the first `MAX_LIST_PILOTS` names: placed by organization only. */
   | { kind: 'notLookedUp' }
-  | { kind: 'ready'; kills: KillRecord[]; summary: KillSummary };
+  | {
+      kind: 'ready';
+      kills: KillRecord[];
+      summary: KillSummary;
+      /**
+       * Set while these kills come from an earlier paste, older than the fresh
+       * window, and a refresh is still to land (or failed): when they were read.
+       */
+      staleSinceMs?: number;
+    };
 
 /**
  * What the Threat verdict needs beyond the kills, looked up only for a pilot
@@ -114,6 +130,10 @@ export interface LoadPilotListOptions {
   viewer?: Promise<ViewerContext>;
 }
 
+function extrasNeeded(kills: KillRecord[], now: number): boolean {
+  return needsDangerRatio(kills, now) || needsLossHistory(kills, now);
+}
+
 function isKnownBad(row: PilotListRow): boolean {
   return row.standing?.band === 'red' || row.standing?.band === 'orange';
 }
@@ -137,8 +157,13 @@ export async function loadPilotList(
   }));
   onRows(rows);
 
-  const ids = await postUniverseIds([...names], { signal });
-  const byName = new Map((ids.characters ?? []).map((c) => [c.name.toLowerCase(), c]));
+  // A name answered in the last day is not asked again (issue #5812).
+  const knownIds = await readStoredCharacterIds(names, Date.now()).catch(() => new Map());
+  const unknownNames = [...new Set(names.filter((n) => !knownIds.has(n.toLowerCase())))];
+  const ids = unknownNames.length > 0 ? await postUniverseIds(unknownNames, { signal }) : {};
+  const resolved = ids.characters ?? [];
+  await storeCharacterIds(resolved, Date.now());
+  const byName = new Map([...knownIds, ...resolved.map((c) => [c.name.toLowerCase(), c] as const)]);
   rows = rows.map((row) => {
     const hit = byName.get(row.name.toLowerCase());
     return hit === undefined
@@ -210,28 +235,62 @@ export async function loadPilotList(
     })
     .catch(() => undefined);
 
-  // Red and orange contacts go last: the viewer already knows they are bad news,
-  // so the unknowns and neutrals are the ones worth waiting on. Array sort is
-  // stable, so each group keeps its pasted order.
-  const toLookUp = rows
-    .filter((row) => row.characterId !== null && row.kills.kind === 'loading')
-    .sort((a, b) => Number(isKnownBad(a)) - Number(isKnownBad(b)))
-    .flatMap((row) => (row.characterId === null ? [] : [row.characterId]));
-  await mapWithConcurrencyLimit(toLookUp, ZKILL_CONCURRENCY, async (characterId) => {
-    if (signal?.aborted) return;
-    const result = await fetchPilotKillHistory(characterId).catch(() => ({
-      ok: false as const,
-      reason: 'offline' as const,
-    }));
-    const now = Date.now();
-    const wantsRatios = result.ok && needsDangerRatio(result.kills, now);
-    const wantsLosses = result.ok && needsLossHistory(result.kills, now);
-    update(characterId, {
-      kills: result.ok
-        ? { kind: 'ready', kills: result.kills, summary: summarizeKills(result.kills, now) }
-        : { kind: 'unreachable' },
-      extras: wantsRatios || wantsLosses ? { kind: 'loading' } : { kind: 'idle' },
+  // Kill histories come from the last paste when they are recent enough
+  // (issue #5812): fresh ones are used as they are, up-to-a-day-old ones are
+  // shown at once, marked stale, and asked for again behind the list.
+  const lookUp = rows.flatMap((row) =>
+    row.characterId !== null && row.kills.kind === 'loading' ? [row.characterId] : []
+  );
+  const stored = await readStoredKillHistories(lookUp).catch(() => new Map());
+  if (signal?.aborted) return;
+  const readAt = Date.now();
+  interface Job {
+    characterId: number;
+    /** 'fetch': nothing usable stored. 'refresh': stale copy shown. 'extras': fresh copy, no request for kills. */
+    mode: 'fetch' | 'refresh' | 'extras';
+    kills?: KillRecord[];
+  }
+  const jobs = new Map<number, Job>();
+  const patches = new Map<number, Partial<PilotListRow>>();
+  for (const characterId of lookUp) {
+    const copy = stored.get(characterId);
+    const age = copy === undefined ? 'expired' : classifyKillHistoryAge(readAt - copy.fetchedAt);
+    if (copy === undefined || age === 'expired') {
+      jobs.set(characterId, { characterId, mode: 'fetch' });
+      continue;
+    }
+    jobs.set(characterId, {
+      characterId,
+      mode: age === 'fresh' ? 'extras' : 'refresh',
+      kills: copy.kills,
     });
+    patches.set(characterId, {
+      kills: {
+        kind: 'ready',
+        kills: copy.kills,
+        summary: summarizeKills(copy.kills, readAt),
+        ...(age === 'stale' ? { staleSinceMs: copy.fetchedAt } : {}),
+      },
+      extras: extrasNeeded(copy.kills, readAt) ? { kind: 'loading' } : { kind: 'idle' },
+    });
+  }
+  if (patches.size > 0) {
+    rows = rows.map((row) => {
+      const patch = row.characterId === null ? undefined : patches.get(row.characterId);
+      return patch === undefined ? row : { ...row, ...patch };
+    });
+    onRows(rows);
+  }
+
+  // The threat verdict's extra reads (ratios, loss dates) for a pilot it can change.
+  async function runExtras(characterId: number, kills: KillRecord[]) {
+    const now = Date.now();
+    const wantsRatios = needsDangerRatio(kills, now);
+    const wantsLosses = needsLossHistory(kills, now);
+    if (!wantsRatios && !wantsLosses) {
+      update(characterId, { extras: { kind: 'idle' } });
+      return;
+    }
     // The same slot reads what the verdict still needs, so a pilot never doubles the fan-out.
     if (wantsRatios) {
       const stats = await fetchPilotStats(characterId).catch(() => ({
@@ -246,7 +305,7 @@ export async function loadPilotList(
           lossTimesMs: null,
         },
       });
-    } else if (wantsLosses) {
+    } else {
       const killmails = await fetchPilotKillmails(characterId).catch(() => ({
         ok: false as const,
         reason: 'offline' as const,
@@ -260,6 +319,43 @@ export async function loadPilotList(
         },
       });
     }
+  }
+
+  // Pilots with nothing usable first, then stale ones, then fresh ones that
+  // only need their extras. Red and orange contacts go last within each: the
+  // viewer already knows they are bad news, so the unknowns and neutrals are
+  // the ones worth waiting on. Array sort is stable, so each keeps pasted order.
+  const MODE_ORDER = { fetch: 0, refresh: 1, extras: 2 } as const;
+  const rowOf = new Map(rows.map((row) => [row.characterId, row]));
+  const queue = [...jobs.values()].sort((a, b) => {
+    const badA = Number(isKnownBad(rowOf.get(a.characterId) as PilotListRow));
+    const badB = Number(isKnownBad(rowOf.get(b.characterId) as PilotListRow));
+    return badA - badB || MODE_ORDER[a.mode] - MODE_ORDER[b.mode];
+  });
+  await mapWithConcurrencyLimit(queue, ZKILL_CONCURRENCY, async (job) => {
+    if (signal?.aborted) return;
+    const { characterId } = job;
+    let kills = job.kills;
+    if (job.mode !== 'extras') {
+      const result = await fetchPilotKillHistory(characterId).catch(() => ({
+        ok: false as const,
+        reason: 'offline' as const,
+      }));
+      if (result.ok) {
+        kills = result.kills;
+        const now = Date.now();
+        await storeKillHistory(characterId, kills, now);
+        update(characterId, {
+          kills: { kind: 'ready', kills, summary: summarizeKills(kills, now) },
+          extras: extrasNeeded(kills, now) ? { kind: 'loading' } : { kind: 'idle' },
+        });
+      } else if (job.mode === 'fetch') {
+        update(characterId, { kills: { kind: 'unreachable' } });
+        return;
+      }
+      // A failed refresh keeps the stale copy and its mark: never "unreachable" while a copy exists.
+    }
+    if (kills !== undefined && !signal?.aborted) await runExtras(characterId, kills);
   });
   await orgNames;
 }

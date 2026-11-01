@@ -16,6 +16,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  DataAgeBadge,
   DataTable,
   EmptyState,
   IconButton,
@@ -315,6 +316,14 @@ function LocalList({ paste }: { paste: LocalPaste }) {
               .join(', ');
       },
     },
+    {
+      id: 'asOf',
+      header: t('travel.pilot.list.asOf'),
+      phoneHidden: true,
+      headerCellClassName: COUNT_COLUMN_WIDTH,
+      // Only a copy from an earlier paste says anything; a fresh read leaves the cell empty.
+      render: (row) => <StaleKillsBadge row={row} />,
+    },
   ];
 
   const flewOf = (row: PilotListRow): string | null => {
@@ -603,6 +612,18 @@ function StandingCell({ row }: { row: PilotListRow }) {
         </span>
       )}
     </span>
+  );
+}
+
+function StaleKillsBadge({ row }: { row: PilotListRow }) {
+  const { t } = useTranslation();
+  if (row.kills.kind !== 'ready' || row.kills.staleSinceMs === undefined) return null;
+  return (
+    <DataAgeBadge
+      date={new Date(row.kills.staleSinceMs)}
+      alwaysVisible
+      note={t('travel.pilot.list.staleNote')}
+    />
   );
 }
 

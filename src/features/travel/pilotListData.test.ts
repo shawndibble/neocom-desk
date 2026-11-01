@@ -21,7 +21,9 @@ vi.mock('@/lib/zkillboard', () => ({
   fetchPilotKillmails: mocks.fetchPilotKillmails,
 }));
 
+import { db } from '@/db';
 import { rowThreat } from './rowThreat';
+import { storeCharacterIds, storeKillHistory } from './pilotHistoryStore';
 import { summarizeKills } from '@/engine/pilotList/killActivity';
 import {
   loadPilotList,
@@ -40,7 +42,9 @@ const kill = (agoMs: number) => ({
 });
 
 describe('loadPilotList', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await db.esiCache.clear();
+    await db.esiCacheMeta.clear();
     vi.resetAllMocks();
     mocks.postUniverseIds.mockResolvedValue({
       characters: [
@@ -96,6 +100,88 @@ describe('loadPilotList', () => {
       ['Nobody', true, 'skipped'],
     ]);
     expect(rows[0]).toMatchObject({ corporationName: 'Corp', allianceName: 'Alliance' });
+  });
+
+  describe('what an earlier paste left behind (issue #5812)', () => {
+    const MIN = 60_000;
+    const stored = (agoMs: number) => Date.now() - agoMs;
+
+    it('pastes the same Local again without asking zKillboard or ESI for names', async () => {
+      await run(['Alpha']);
+      expect(mocks.fetchPilotKillHistory).toHaveBeenCalledTimes(1);
+      vi.clearAllMocks();
+      const rows = await run(['Alpha']);
+      expect(mocks.fetchPilotKillHistory).not.toHaveBeenCalled();
+      expect(mocks.postUniverseIds).not.toHaveBeenCalled();
+      expect(rows[0].kills).toMatchObject({ kind: 'ready' });
+      expect((rows[0].kills as { staleSinceMs?: number }).staleSinceMs).toBeUndefined();
+    });
+
+    it('fetches only the pilot it has not seen, and only asks ESI for that name', async () => {
+      mocks.postUniverseIds.mockResolvedValue({ characters: [{ id: 1, name: 'Alpha' }] });
+      await run(['Alpha']);
+      vi.clearAllMocks();
+      mocks.postUniverseIds.mockResolvedValue({ characters: [{ id: 2, name: 'Beta' }] });
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [] });
+      mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [] });
+      await run(['Alpha', 'Beta']);
+      expect(mocks.postUniverseIds).toHaveBeenCalledWith(['Beta'], expect.objectContaining({}));
+      expect(mocks.fetchPilotKillHistory.mock.calls.map(([id]) => id)).toEqual([2]);
+    });
+
+    it('shows a copy over 30 minutes old at once, marked stale, then replaces it', async () => {
+      const at = stored(2 * HOUR);
+      await storeKillHistory(1, [kill(5 * HOUR)], at);
+      await storeCharacterIds([{ id: 1, name: 'Alpha' }], Date.now());
+      const seen: PilotListRow[][] = [];
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [kill(HOUR)] });
+      await loadPilotList(['Alpha'], {
+        onRows: (rows) => seen.push(rows),
+        viewer: Promise.resolve(viewer),
+      });
+      const staleFrames = seen.filter(
+        (rows) => rows[0].kills.kind === 'ready' && rows[0].kills.staleSinceMs === at
+      );
+      expect(staleFrames.length).toBeGreaterThan(0);
+      const last = seen[seen.length - 1][0].kills;
+      expect(last.kind === 'ready' && last.staleSinceMs).toBeUndefined();
+      expect(last.kind === 'ready' && last.kills).toEqual([expect.objectContaining({})]);
+      expect(mocks.fetchPilotKillHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the stale copy, never "unreachable", when the refresh fails', async () => {
+      const at = stored(2 * HOUR);
+      await storeKillHistory(1, [kill(5 * HOUR)], at);
+      await storeCharacterIds([{ id: 1, name: 'Alpha' }], Date.now());
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: false, reason: 'rate-limited' });
+      const rows = await run(['Alpha']);
+      expect(rows[0].kills).toMatchObject({ kind: 'ready', staleSinceMs: at });
+    });
+
+    it('does not show a copy older than a day: the pilot loads again', async () => {
+      await storeKillHistory(1, [kill(5 * HOUR)], stored(25 * HOUR));
+      await storeCharacterIds([{ id: 1, name: 'Alpha' }], Date.now());
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: false, reason: 'offline' });
+      const rows = await run(['Alpha']);
+      expect(mocks.fetchPilotKillHistory).toHaveBeenCalledTimes(1);
+      expect(rows[0].kills.kind).toBe('unreachable');
+    });
+
+    it('treats 29 minutes as fresh and 31 as stale', async () => {
+      await storeCharacterIds(
+        [
+          { id: 1, name: 'Alpha' },
+          { id: 2, name: 'Beta' },
+        ],
+        Date.now()
+      );
+      await storeKillHistory(1, [], stored(29 * MIN));
+      await storeKillHistory(2, [], stored(31 * MIN));
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [] });
+      mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [] });
+      await run(['Alpha', 'Beta']);
+      expect(mocks.fetchPilotKillHistory.mock.calls.map(([id]) => id)).toEqual([2]);
+    });
   });
 
   it('reads contact standing and skips the kill list of friendly pilots', async () => {
