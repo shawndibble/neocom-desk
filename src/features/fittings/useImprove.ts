@@ -513,7 +513,8 @@ function compensationSwaps(
   const index = buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups);
   const pool = modulePool(catalogue, variants);
   return variants.fitting.modules.flatMap((module) => {
-    if (module.slot === 'subsystem') return [];
+    // A compensating swap never costs a mutated module its roll (#5800).
+    if (module.slot === 'subsystem' || module.mutation) return [];
     return getVariations(index, module.typeId)
       .members.filter(
         (member) =>

@@ -965,25 +965,17 @@ export function improveCandidates(
   // A fit tanking the other side may convert whole, which no single swap scores well.
   // One that strips a mutated module is dropped, or (opted in) says its roll is lost (#5800).
   const rolls = new Set(modules.filter(isMutated).map(placeKey));
+  const stripsRoll = (candidate: ImproveCandidate) =>
+    candidate.conversion?.removes.some((removed) =>
+      removed.at.some((at) => rolls.has(placeKey(at)))
+    ) ?? false;
   const conversions = (
     o.pool && o.slotCounts && freesTank && o.reach !== 'upgrade' && o.defense !== 'keep'
       ? tankConversions(modules, o.defense, o.goal, o.pool, o.slotCounts, index, allowed)
       : []
   )
-    .filter(
-      (candidate) =>
-        o.allowMutated ||
-        !candidate.conversion?.removes.some((removed) =>
-          removed.at.some((at) => rolls.has(placeKey(at)))
-        )
-    )
-    .map((candidate) =>
-      candidate.conversion?.removes.some((removed) =>
-        removed.at.some((at) => rolls.has(placeKey(at)))
-      )
-        ? { ...candidate, losesRoll: true }
-        : candidate
-    );
+    .filter((candidate) => o.allowMutated || !stripsRoll(candidate))
+    .map((candidate) => (stripsRoll(candidate) ? { ...candidate, losesRoll: true } : candidate));
 
   // Empty slots are always free to fill: the first one in each rack, from the goal's groups.
   if (o.pool && o.slotCounts) {
