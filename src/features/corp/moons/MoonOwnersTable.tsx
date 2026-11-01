@@ -186,6 +186,7 @@ export function MoonOwnersTable({
           rowClassName={() => 'group'}
           defaultSort={{ columnId: 'owed', direction: 'desc' }}
           mobileSort
+          stackColumns={2}
           stackSummary={t(k('summary'), { shown: rows.length })}
         />
       </Panel>
