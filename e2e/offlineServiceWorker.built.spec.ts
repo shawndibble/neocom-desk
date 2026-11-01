@@ -47,9 +47,8 @@ test('boots, deep-links and serves a cached lazy SDE file with no network', asyn
   // The first load ran before the worker controlled the page, so the lazy chunks the landing
   // page needs (the Login demo board) never passed through the worker's cache. Only the boot
   // graph is precached; the rest waits for the idle warm, which the offline reload below must
-  // not race. Reload under the worker's control and wait until the page's demo-board chunks
-  // are in Cache Storage.
-  await page.reload();
+  // not race. Do what the warm does for the chunks this page loaded: fetch them again under the
+  // worker's control (its CacheFirst route stores them), then wait until they are in Cache Storage.
   await expect(page.getByRole('button', { name: 'Log in with EVE Online' }).first()).toBeVisible();
   // The demo board mounts after the button, so let its chunks finish loading before listing them.
   await page.waitForLoadState('networkidle');
@@ -60,6 +59,10 @@ test('boots, deep-links and serves a cached lazy SDE file with no network', asyn
       .filter((url) => /\/assets\/(DemoBoard|samplePilot|series)-[^/]+\.js$/.test(url))
   );
   expect(landingChunks.length).toBeGreaterThan(0);
+  await page.evaluate(
+    (urls) => Promise.all(urls.map((url) => fetch(url).then((response) => response.arrayBuffer()))),
+    landingChunks
+  );
   await expect
     .poll(() =>
       page.evaluate(
