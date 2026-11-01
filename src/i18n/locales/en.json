@@ -15550,6 +15550,17 @@
         "help": "Read from their kills in the last {{days}} days and zKillboard's all-time ratios. Dangerous: {{dangerousKills}} or more recent kills and either a danger ratio of {{dangerRatio}} or more, or {{killerRatio}}% or more of their kills and losses being kills. Active: {{activeKills}} or more recent kills. Low: fewer, or no kills but a ship lost in that time. Quiet: neither. Low never means safe.",
         "inactive": "No kills in the last {{days}} days.",
         "inactiveLast": "No kills in the last {{days}} days. Last kill {{age}}.",
+        "adjusted": {
+          "down": "Read one level lower for where you are or who is in Local.",
+          "up": "Read one level higher for who is in Local."
+        },
+        "context": {
+          "base": "Without that it reads {{level}}.",
+          "elsewhere": "None of their recent kills were in {{space}}, where you are.",
+          "gangAlone": "They mostly kill in groups and none of their corporation or alliance is in Local.",
+          "gangHere_one": "They mostly kill in groups and {{count}} other of their corporation or alliance is in Local.",
+          "gangHere_other": "They mostly kill in groups and {{count}} others of their corporation or alliance are in Local."
+        },
         "lossesOnly_one": "No kills in the last {{days}} days. {{count}} loss in that time, the latest {{age}}.",
         "lossesOnly_other": "No kills in the last {{days}} days. {{count}} losses in that time, the latest {{age}}.",
         "summary_one": "{{count}} kill in the last {{days}} days. Last kill {{age}}.",

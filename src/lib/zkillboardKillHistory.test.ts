@@ -30,8 +30,16 @@ describe('parseKillHistory', () => {
         systemId: 30002187,
         victimShipTypeId: 629,
         ownShipTypeId: 24698,
+        attackerCount: 2,
       },
     ]);
+  });
+
+  it('counts the attackers, and says nothing when the body has none', () => {
+    const [solo] = parseKillHistory([entry({ attackers: [{ character_id: PILOT }] })], PILOT);
+    expect(solo.attackerCount).toBe(1);
+    const [bare] = parseKillHistory([entry({ attackers: undefined })], PILOT);
+    expect(bare.attackerCount).toBeNull();
   });
 
   it.each([

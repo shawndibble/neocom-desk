@@ -615,6 +615,7 @@ export function parseKillHistory(body: unknown, characterId: number): KillRecord
       systemId: finiteOrNull(entry.solar_system_id),
       victimShipTypeId: isRecord(entry.victim) ? finiteOrNull(entry.victim.ship_type_id) : null,
       ownShipTypeId: isRecord(own) ? finiteOrNull(own.ship_type_id) : null,
+      attackerCount: Array.isArray(entry.attackers) ? entry.attackers.length : null,
     });
   }
   return kills;

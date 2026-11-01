@@ -1,0 +1,9 @@
+# Scope decisions — Threat is read against where you are and who is in Local
+
+_Recorded 2026-11-01._
+
+- **The Threat level is read against where you are and who is in Local, by at most one level.** `threatVerdict` stays the pilot's record anywhere; `threatInContext` (`src/engine/pilotList/threatContext.ts`) moves it for relevance to you. A wrong "low" costs more than a wrong "high", so it needs a real record (5+ kills that say what the rule needs), only moves a pilot who already has a level from kills (Quiet stays Quiet), never lowers below Low and never raises above Active, and the net move is clamped to one level.
+- **Where you are:** a pilot with 5+ placed kills in 90 days and none in the kind of space you are in reads one level lower ("kills only in nullsec" while you are in highsec). Unknown location or unplaced kills: no change.
+- **Groups:** a pilot whose recent kills are mostly group kills (4+ attackers, 70%+ of counted kills) reads one level lower when none of their alliance (or corporation, with no alliance) is in Local, and one level higher (Low to Active only) when 3 or more of them are. With 1 or 2 here, or with no Local list in view, no change. Attacker counts come from the killmails already fetched; a stored history from before this has none and is not moved until it is read again.
+- **It is always visible.** The badge carries a small arrow when moved and a screen-reader sentence; the profile band says why in plain words and what it would read without it. A profile opened from the Local list reads the same context as its row (`useLocalThreatContext`, written by the list); one opened elsewhere uses your location but has no group context.
+- **Ruled out:** a fifth level, hiding or re-sorting by relevance, and moving Dangerous up (it keeps its own strict evidence: the ratios).

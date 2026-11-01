@@ -5,6 +5,7 @@ import '@/i18n';
 import { db } from '@/db';
 import type { KillSpace } from '@/engine/pilotList/killActivity';
 import { summarizeKills } from '@/engine/pilotList/killActivity';
+import { useLocalThreatContext } from './localThreatContext';
 import type { PilotListRow } from './pilotListData';
 
 const mocks = vi.hoisted(() => ({
@@ -163,6 +164,66 @@ describe('PilotListView (Local list)', () => {
     expect(inCard.getByText('Kills, 30 days')).toBeTruthy();
     expect(inCard.getByText('Highsec')).toBeTruthy();
     expect(inCard.getByText('Low')).toBeTruthy();
+  });
+
+  describe('read against where you are and who is in Local', () => {
+    const roamer = () =>
+      row('Roamer', {
+        kills: ready(
+          ...Array.from({ length: 6 }, (_, i) => kill((i + 1) * DAY, 'nullsec')).map((k) => ({
+            ...k,
+            attackerCount: 1,
+          }))
+        ),
+      });
+    const show = (rows: PilotListRow[]) =>
+      mocks.loadPilotList.mockImplementation(
+        (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
+          onRows(rows);
+          return Promise.resolve();
+        }
+      );
+    const badge = (name: string) =>
+      screen.getAllByText(name)[0].closest('td')?.querySelector('span.inline-flex') as HTMLElement;
+
+    it('reads a nullsec-only killer one level lower while you are in highsec, with an arrow', async () => {
+      show([roamer()]);
+      render(
+        <MemoryRouter>
+          <PilotListView paste={{ kind: 'local', names: ['Roamer'], overflow: 0 }} />
+        </MemoryRouter>
+      );
+      await screen.findByRole('table');
+      expect(within(badge('Roamer')).getByText('Low')).toBeTruthy();
+      expect(within(badge('Roamer')).getByText(/one level lower/)).toBeTruthy();
+    });
+
+    it("publishes who of each pilot's organization is in Local, for a profile opened from the list", async () => {
+      show([
+        row('Roamer', { ...roamer(), corporationId: 5, allianceId: 9 }),
+        row('Wingman', { corporationId: 6, allianceId: 9, kills: ready() }),
+      ]);
+      render(
+        <MemoryRouter>
+          <PilotListView paste={{ kind: 'local', names: ['Roamer', 'Wingman'], overflow: 0 }} />
+        </MemoryRouter>
+      );
+      await screen.findAllByRole('table');
+      expect(useLocalThreatContext.getState().matesById.get('Roamer'.length)).toBe(1);
+    });
+
+    it('leaves them at Active when you are in nullsec, where they kill', async () => {
+      mocks.here.space = 'nullsec';
+      show([roamer()]);
+      render(
+        <MemoryRouter>
+          <PilotListView paste={{ kind: 'local', names: ['Roamer'], overflow: 0 }} />
+        </MemoryRouter>
+      );
+      await screen.findByRole('table');
+      expect(within(badge('Roamer')).getByText('Active')).toBeTruthy();
+      expect(within(badge('Roamer')).queryByText(/one level/)).toBeNull();
+    });
   });
 
   describe('a kill history read in an earlier paste (issue #5812)', () => {

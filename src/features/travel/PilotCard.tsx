@@ -40,12 +40,15 @@ function mainSpaceOf(bySpace: KillSummary['bySpace']): KillSpace | null {
 export function PilotCard({
   row,
   threat,
+  adjusted = null,
   spaces,
   flew,
   isNew = false,
 }: {
   row: PilotListRow;
   threat: ThreatLevel | 'pending' | null;
+  /** The Threat was moved one level by where you are or who is in Local. */
+  adjusted?: 'down' | 'up' | null;
   spaces: readonly KillSpace[];
   /** Hull names already joined for display; null when there are none to show. */
   flew: string | null;
@@ -121,7 +124,7 @@ export function PilotCard({
         status !== null ||
         staleSinceMs !== undefined) && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-text-dim">
-          {threat !== null && <ThreatBadge level={threat} solid />}
+          {threat !== null && <ThreatBadge level={threat} solid adjusted={adjusted} />}
           {mainSpace !== null && (
             <span
               className={cx(
