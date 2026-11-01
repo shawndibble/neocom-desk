@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconButton } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
+import { figureOpenerClassName } from '@/components/ui/controlStyles';
 
 /**
- * The Refine chip's value: the figure, the total efficiency it was worked out
- * at (so a default is never silent), and the ⓘ that opens its breakdown. A
- * `StatChip` can't be pressed (§6c), so the control sits inside its value.
+ * The Refine chip's value: the figure, dashed underlined when it opens its
+ * breakdown, and the total efficiency it was worked out at beside it (so a
+ * default is never silent). A `StatChip` can't be pressed (§6c), so the
+ * control sits inside its value.
  */
 export function RefineChipValue({
   amount,
@@ -21,20 +21,18 @@ export function RefineChipValue({
   const { t } = useTranslation();
   return (
     <span className="inline-flex items-center gap-1">
-      {amount}
+      {onOpen ? (
+        <button type="button" onClick={onOpen} className={figureOpenerClassName}>
+          <span className="sr-only">{t('market.appraisal.breakdown.open')}</span>
+          {amount}
+        </button>
+      ) : (
+        amount
+      )}
       {efficiency && (
         <span className="font-normal text-text-dim">
           {t('market.appraisal.breakdown.atEfficiency', { efficiency })}
         </span>
-      )}
-      {onOpen && (
-        <IconButton
-          icon={<Icon.Info aria-hidden="true" size={Icon.ICON_SIZE.sm} />}
-          label={t('market.appraisal.breakdown.open')}
-          variant="plain"
-          size="sm"
-          onClick={onOpen}
-        />
       )}
     </span>
   );

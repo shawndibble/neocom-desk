@@ -1,4 +1,4 @@
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { figureOpenerClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { AddPreviewReadout } from '@/features/fittings/AddPreviewReadout';
 import { useState, type ReactNode } from 'react';
@@ -219,11 +219,7 @@ export function InteractionGrammar() {
           </button>
         </Cue>
         <Cue rule={k('rules.figureBreakdown')}>
-          <button
-            type="button"
-            className={`inline-flex items-center gap-1 rounded-xs ${focusRingClassName}`}
-          >
-            <Icon.Info aria-hidden className="size-3 text-text-dim" />
+          <button type="button" className={figureOpenerClassName}>
             {k('samples.figureBreakdown')}
           </button>
         </Cue>

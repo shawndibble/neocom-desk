@@ -200,6 +200,18 @@ export const popoverValueClassName = cx(
 );
 
 /**
+ * A figure that opens how it is worked out — the Appraisal's Refine chip and
+ * each row's Refine figure open the refine breakdown. The number itself, dashed
+ * underlined (DESIGN.md §6c: dashed opens something, dotted explains); it keeps
+ * its own colour, so a figure that won a comparison stays green. No glyph, so
+ * the column is no wider than the number.
+ */
+export const figureOpenerClassName = cx(
+  'cursor-pointer rounded-xs underline decoration-dashed decoration-current/70 underline-offset-2 hover:text-accent',
+  focusRingInsetClassName
+);
+
+/**
  * A bordered toggle chip's on/off state, per DESIGN.md §4: `FilterChip`'s
  * accent tint when on, the input fill with dim text when off. `FilterChip`
  * takes it from here, and so does any hand-built toggle chip whose content

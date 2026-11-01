@@ -18558,7 +18558,7 @@
       "missingGrantMark": "Red slashed broadcast icon: this row needs a grant the Character lacks",
       "channelOff": "Greyed checkbox that keeps its tick: its channel is off",
       "figureHistory": "Small dim glyph after a figure: click or tap for its history in a popover",
-      "figureBreakdown": "Small dim ⓘ before a figure: click or tap opens how that figure is worked out",
+      "figureBreakdown": "Dashed underline on a figure: click or tap opens how it is worked out",
       "infoTooltip": "? circle: explains a term (InfoTooltip)",
       "chartPoint": "Highlighted column or dot on a chart: hover or tap reads that point (ChartHover)",
       "addPreview": "Readout under the Add panel list: hover or keyboard-focus a module row to see what adding it changes (never on touch)",
