@@ -95,8 +95,10 @@ export function RefineBreakdownModal({
           taxRate: setup.taxRate,
           onlyTypeId: typeId,
         });
+  // A chosen item that stops refining (the appraisal changed, or the visitor's numbers have no
+  // recipe for it) falls back to the whole pile rather than leaving an empty scope with no way out.
   const single = typeId === null ? null : (scoped.items[0] ?? null);
-  const breakdown = scoped;
+  const breakdown = single === null ? all : scoped;
 
   const nameOf = (id: number): string => mineralNames.get(id) || `#${id}`;
 
@@ -168,7 +170,7 @@ export function RefineBreakdownModal({
       header: t('market.appraisal.breakdown.columnRefined'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (line) => formatIsk(line.refined + line.leftoverValue, 0),
+      render: (line) => formatIsk(line.refined, 0),
     },
     {
       id: 'better',
@@ -183,7 +185,7 @@ export function RefineBreakdownModal({
   ];
 
   const usingMine = shared?.source === 'mine';
-  const assumingDefault = !shared && setup.yieldRate === 0.5 && setupFields !== undefined;
+  const assumingDefault = setup.yieldRate === 0.5;
 
   return (
     <Modal open={open} onClose={onClose} title={title} placement="wide">
@@ -262,7 +264,9 @@ export function RefineBreakdownModal({
         {assumingDefault && (
           <p className="flex items-start gap-1.5 text-xs text-warning">
             <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} className="mt-px shrink-0" />
-            {t('market.appraisal.breakdown.assumingNpc')}
+            {shared
+              ? t('market.appraisal.breakdown.assumingNpcShared')
+              : t('market.appraisal.breakdown.assumingNpc')}
           </p>
         )}
 
@@ -302,7 +306,11 @@ export function RefineBreakdownModal({
 
             <p className="border-l-2 border-accent pl-2.5 text-xs text-text-dim">
               {breakdown.breakEvenEfficiency === null
-                ? t('market.appraisal.breakdown.neverWins')
+                ? t(
+                    breakdown.asIs <= 0
+                      ? 'market.appraisal.breakdown.nothingToCompare'
+                      : 'market.appraisal.breakdown.neverWins'
+                  )
                 : t(
                     breakdown.refineWins
                       ? 'market.appraisal.breakdown.breakEvenWin'
@@ -340,30 +348,45 @@ export function RefineBreakdownModal({
                   <Total
                     dim
                     label={t('market.appraisal.breakdown.taxLine', {
-                      percent: (setup.taxRate * 100).toFixed(1),
+                      percent: pct(setup.taxRate).replace('%', ''),
                     })}
                     value={-breakdown.tax}
                   />
                 )}
                 {breakdown.unitsLeftOver > 0 && (
-                  <Total
-                    dim
-                    label={t('market.appraisal.breakdown.leftoverLine', {
-                      count: breakdown.unitsLeftOver,
-                    })}
-                    value={breakdown.leftoverValue}
-                    plus
-                  />
+                  <>
+                    <Total
+                      label={t('market.appraisal.breakdown.refineFigure')}
+                      value={breakdown.net}
+                    />
+                    <Total
+                      dim
+                      label={t('market.appraisal.breakdown.leftoverLine', {
+                        count: breakdown.unitsLeftOver,
+                      })}
+                      value={breakdown.leftoverValue}
+                      plus
+                    />
+                  </>
                 )}
                 <Total
                   strong
-                  label={t('market.appraisal.breakdown.total')}
+                  label={t(
+                    breakdown.unitsLeftOver > 0
+                      ? 'market.appraisal.breakdown.totalWithLeftover'
+                      : 'market.appraisal.breakdown.total'
+                  )}
                   value={breakdown.total}
                 />
               </dl>
               {!breakdown.pricedAll && (
                 <p className="text-[0.6875rem] text-warning">
                   {t('market.appraisal.breakdown.unpriced')}
+                </p>
+              )}
+              {breakdown.unbuyable > 0 && (
+                <p className="text-[0.6875rem] text-warning">
+                  {t('market.appraisal.breakdown.unbuyable', { count: breakdown.unbuyable })}
                 </p>
               )}
             </section>
@@ -404,7 +427,7 @@ export function RefineBreakdownModal({
                 </button>
               </div>
             )}
-            {breakdown.skipped > 0 && typeId === null && (
+            {breakdown.skipped > 0 && single === null && (
               <p className="text-xs text-text-dim">
                 {t('market.appraisal.breakdown.skipped', { count: breakdown.skipped })}
               </p>

@@ -15,6 +15,7 @@
  * against its buy total, and this does the same over the whole pile.
  */
 import { reprocessingYield } from '@/engine/industry/reprocessing';
+import { netOfReprocessingTax } from '@/engine/industry/refiningSetup';
 import type { Appraisal, AppraisalItem, AppraisalRow } from './appraisal';
 
 export interface RefineBreakdownInput {
@@ -61,9 +62,11 @@ export interface RefineBreakdown {
   /** Minerals at `pricePercent`, before tax. */
   mineralValue: number;
   tax: number;
+  /** Minerals less tax: what the table's Refine figure and the header chip sum to. */
+  net: number;
   unitsLeftOver: number;
   leftoverValue: number;
-  /** Minerals less tax, plus leftover units. */
+  /** `net` plus the leftover units sold as is: what refining the pile leaves you holding. */
   total: number;
   /** The same pile sold as is into the buy orders. */
   asIs: number;
@@ -81,6 +84,8 @@ export interface RefineBreakdown {
   pricedAll: boolean;
   /** Items left out for carrying no refine data. */
   skipped: number;
+  /** Items nobody buys as is here, so selling them as is counts for 0. */
+  unbuyable: number;
 }
 
 interface Refinable {
@@ -111,7 +116,7 @@ function netMineralValue(
     value += (gross * pricePercent) / 100;
     leftover += yielded.unitsLeftOver * (row.buyEach ?? 0);
   }
-  return { value: value * (1 - taxRate), leftover };
+  return { value: netOfReprocessingTax(value, taxRate), leftover };
 }
 
 /** The lowest and highest efficiency the items were refined at; null when none carries refine detail. */
@@ -152,6 +157,7 @@ export function buildRefineBreakdown({
   let leftoverValue = 0;
   let asIs = 0;
   let pricedAll = true;
+  let unbuyable = 0;
 
   for (const { item, row, detail } of refinables) {
     const yielded = reprocessingYield({
@@ -176,9 +182,10 @@ export function buildRefineBreakdown({
       line.value += value;
       minerals.set(output.typeId, line);
     }
-    const refined = gross * (1 - taxRate);
+    const refined = netOfReprocessingTax(gross, taxRate);
     const itemLeftover = yielded.unitsLeftOver * (row.buyEach ?? 0);
     const itemAsIs = row.buyTotal ?? 0;
+    if (row.buyTotal === null || row.buyEach === null) unbuyable += 1;
     mineralValue += gross;
     unitsLeftOver += yielded.unitsLeftOver;
     leftoverValue += itemLeftover;
@@ -203,8 +210,9 @@ export function buildRefineBreakdown({
     });
   }
 
-  const tax = mineralValue * taxRate;
-  const total = mineralValue - tax + leftoverValue;
+  const net = netOfReprocessingTax(mineralValue, taxRate);
+  const tax = mineralValue - net;
+  const total = net + leftoverValue;
   const efficiencies = items.map((line) => line.efficiency);
 
   return {
@@ -212,6 +220,7 @@ export function buildRefineBreakdown({
     minerals: [...minerals.values()].sort((a, b) => b.value - a.value),
     mineralValue,
     tax,
+    net,
     unitsLeftOver,
     leftoverValue,
     total,
@@ -223,6 +232,7 @@ export function buildRefineBreakdown({
     breakEvenEfficiency: breakEvenEfficiency(items, refinables, asIs, pricePercent, taxRate),
     pricedAll,
     skipped,
+    unbuyable,
   };
 }
 

@@ -1,8 +1,9 @@
-/** How the refine breakdown writes a yield or efficiency: a share of each portion, one decimal. */
+/** How the refine breakdown writes a yield or efficiency: a share of each portion, to the two places another tool's figure (0.9063) is given in. */
+import { formatPercent } from '@/features/refining/formatPercent';
 
 /** A fraction as a percentage: 0.683 -> "68.3%". */
 export function pct(fraction: number): string {
-  return `${(fraction * 100).toFixed(1)}%`;
+  return formatPercent(fraction);
 }
 
 /** One efficiency, or the span when items differ in the specialisation skill that applies to them. */

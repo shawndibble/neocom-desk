@@ -68,6 +68,8 @@ describe('buildRefineBreakdown', () => {
     expect(breakdown.unitsLeftOver).toBe(38);
     expect(breakdown.leftoverValue).toBeCloseTo(38 * 900, 6);
     expect(breakdown.total).toBeCloseTo(breakdown.mineralValue + 38 * 900, 6);
+    // `net` is what the table's Refine column and the chip sum to: minerals only, no leftover.
+    expect(breakdown.net).toBeCloseTo(appraisal.totals.refine, 6);
   });
 
   it('takes the tax off the mineral value only and reports it', () => {
@@ -175,6 +177,17 @@ describe('buildRefineBreakdown', () => {
     });
     expect(breakdown.items.map((item) => item.typeId)).toEqual([2]);
     expect(breakdown.asIs).toBe(500_000);
+  });
+
+  it('counts an item nobody buys as is, and never claims a break-even against nothing', () => {
+    const breakdown = buildRefineBreakdown({
+      appraisal: buildAppraisal([ore({ buy: null, quantity: 1000 })], 100),
+      pricePercent: 100,
+      taxRate: 0,
+    });
+    expect(breakdown.unbuyable).toBe(1);
+    expect(breakdown.asIs).toBe(0);
+    expect(breakdown.breakEvenEfficiency).toBeNull();
   });
 
   it('has no breakdown when nothing carries refine detail', () => {

@@ -1,3 +1,4 @@
+import { captureException } from '@sentry/react';
 import { useEffect, useMemo, useState } from 'react';
 import type { AppraisalItem } from '@/engine/market/appraisal';
 import type { RefiningSetup } from '@/engine/industry/refiningSetup';
@@ -27,7 +28,12 @@ export function useMyRefine(view: AppraisalShareView | null, enabled: boolean): 
     setup: RefiningSetup;
     items: AppraisalItem[];
   } | null>(null);
-  const [failed, setFailed] = useState(false);
+  // Keyed to what failed, so a later view, Character or setup starts clean instead of staying failed.
+  const [failedFor, setFailedFor] = useState<{
+    view: AppraisalShareView;
+    characterId: number;
+    setup: RefiningSetup;
+  } | null>(null);
 
   useEffect(() => {
     if (enabled && !hydrated) void useActiveCharacter.getState().hydrate();
@@ -46,16 +52,16 @@ export function useMyRefine(view: AppraisalShareView | null, enabled: boolean): 
           loadCharacterModifiers(characterId, Date.now()),
         ]);
         if (cancelled) return;
-        setFailed(false);
         setLoaded({
           view,
           characterId,
           setup,
           items: itemsWithMyRefine(view, { reprocessing, modifiers, refining: setup }),
         });
-      } catch {
+      } catch (error) {
         // Offline or a failed skill read: the shared numbers stay on screen and the button says why.
-        if (!cancelled) setFailed(true);
+        captureException(error);
+        if (!cancelled) setFailedFor({ view, characterId, setup });
       }
     })();
     return () => {
@@ -66,6 +72,11 @@ export function useMyRefine(view: AppraisalShareView | null, enabled: boolean): 
   if (!enabled) return { status: 'idle' };
   if (!hydrated) return { status: 'loading' };
   if (characterId === null) return { status: 'signedOut' };
+  const failed =
+    failedFor !== null &&
+    failedFor.view === view &&
+    failedFor.characterId === characterId &&
+    failedFor.setup === setup;
   if (failed) return { status: 'failed' };
   if (
     loaded &&

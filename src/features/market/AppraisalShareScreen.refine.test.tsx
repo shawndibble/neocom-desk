@@ -68,7 +68,7 @@ afterEach(cleanup);
 describe('a Shared Appraisal with refine figures', () => {
   it("shows the sharer's Refine total with the efficiency it was worked out at", () => {
     renderShared();
-    expect(screen.getByText('@ 90.0%')).toBeInTheDocument();
+    expect(screen.getByText('@ 90%')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /Refine/ })).toBeInTheDocument();
   });
 

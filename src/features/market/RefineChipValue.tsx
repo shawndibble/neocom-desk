@@ -22,7 +22,11 @@ export function RefineChipValue({
   return (
     <span className="inline-flex items-center gap-1">
       {amount}
-      {efficiency && <span className="font-normal text-text-dim">@ {efficiency}</span>}
+      {efficiency && (
+        <span className="font-normal text-text-dim">
+          {t('market.appraisal.breakdown.atEfficiency', { efficiency })}
+        </span>
+      )}
       {onOpen && (
         <IconButton
           icon={<Icon.Info aria-hidden="true" size={Icon.ICON_SIZE.sm} />}

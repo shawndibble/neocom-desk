@@ -17,6 +17,7 @@ import {
   buildAppraisal,
   refineBeatsSellAsIs,
   splitEach,
+  type AppraisalItem,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
 import { refineEfficiencyRange } from '@/engine/market/refineBreakdown';
@@ -32,8 +33,10 @@ import { comparisonCell } from './appraisalCells';
 import { RefineFigureButton } from './RefineFigureButton';
 import { efficiencyText } from './refineFormat';
 import { useMyRefine } from './useMyRefine';
+import { useRefineMineralNames } from './useRefineMineralNames';
 
 const NO_ROWS: readonly AppraisalRow[] = [];
+const NO_ITEMS: readonly AppraisalItem[] = [];
 
 /**
  * A per-unit price, exact — same split as `AppraisalPanel`, so a share link
@@ -93,6 +96,13 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
   const refineRange = hasRefine && appraisal ? refineEfficiencyRange(appraisal.items) : null;
   const refineEfficiency = refineRange ? efficiencyText(refineRange.min, refineRange.max) : null;
   const shareRows = appraisal ? appraisal.rows : NO_ROWS;
+  // A link made before the names had loaded carries empty ones; read them here rather than show "#id".
+  const loadedNames = useRefineMineralNames(appraisal?.items ?? NO_ITEMS);
+  const mineralNames = useMemo(() => {
+    const names = new Map(loadedNames);
+    for (const [typeId, name] of view?.mineralNames ?? []) if (name !== '') names.set(typeId, name);
+    return names;
+  }, [loadedNames, view]);
   const csvColumns = useMemo(() => appraisalCsvColumns(t), [t]);
   const tableExport = useTableExport({
     surface: 'appraisal-shared',
@@ -275,7 +285,7 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
               pricePercent={view.pricePercent}
               hubName={view.hub.systemName}
               setup={setup}
-              mineralNames={view.mineralNames}
+              mineralNames={mineralNames}
               initialTypeId={refineModal.typeId}
               shared={{
                 generatedAt: view.generatedAt,

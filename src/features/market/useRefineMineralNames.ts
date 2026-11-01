@@ -1,3 +1,4 @@
+import { captureException } from '@sentry/react';
 import { useEffect, useMemo, useState } from 'react';
 import type { AppraisalItem } from '@/engine/market/appraisal';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -30,7 +31,8 @@ export function useRefineMineralNames(
       .then((names) => {
         if (!cancelled) setLoaded({ key, names });
       })
-      .catch(() => undefined);
+      // Reported, not swallowed: the figures stand without names, but a failing read is worth knowing about.
+      .catch((error: unknown) => captureException(error));
     return () => {
       cancelled = true;
     };

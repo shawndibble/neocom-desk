@@ -4,6 +4,10 @@
  * rather than whatever the market says when it is opened. Rebuilding the rows
  * and totals is `buildAppraisal`'s job, the same engine the live tab runs, so
  * only its inputs are stored — never derived figures that could drift from it.
+ * The one resolved figure is each refinable item's `efficiency`: the sharer's
+ * skills are not stored, so their outcome has to be, and the recipe and mineral
+ * prices ride along so the refine figure is rebuilt by the same
+ * `refineFromDetail` the live tab uses.
  *
  * Pure: the Firestore read/write around it lives in `features/share`.
  */
@@ -18,8 +22,12 @@ export const APPRAISAL_SNAPSHOT_VERSION = 1;
  */
 export const MAX_SNAPSHOT_ITEMS = 1000;
 
-/** Far past any item's reprocessing recipe (an ore returns three to nine materials). */
-const MAX_REFINE_MATERIALS = 50;
+/**
+ * Far past any item's reprocessing recipe (an ore returns three to nine
+ * materials). With the items cap this keeps a share under Firestore's 1 MiB:
+ * 1000 items x 16 x ~30 bytes is under 0.5 MB on top of the ~100 bytes an item.
+ */
+const MAX_REFINE_MATERIALS = 16;
 /** Every mineral the whole paste refines into; the game has well under this many. */
 const MAX_REFINE_MINERALS = 200;
 

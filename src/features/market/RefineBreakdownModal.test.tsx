@@ -111,7 +111,7 @@ describe('RefineBreakdownModal', () => {
     expect(screen.getByText(/Assuming an NPC station's 50% yield/)).toBeInTheDocument();
   });
 
-  it('does not assume anything on a shared link, where the numbers are the sharer', () => {
+  it('names the NPC default on a shared link too, as the sharer numbers', () => {
     open({
       setup: { yieldRate: 0.5, taxRate: 0 },
       shared: {
@@ -121,7 +121,7 @@ describe('RefineBreakdownModal', () => {
         onToggleSource: vi.fn(),
       },
     });
-    expect(screen.queryByText(/Assuming an NPC station/)).not.toBeInTheDocument();
+    expect(screen.getByText(/These numbers use an NPC station's 50% yield/)).toBeInTheDocument();
     expect(screen.getByText('Shared with you')).toBeInTheDocument();
   });
 
@@ -166,5 +166,18 @@ describe('RefineBreakdownModal', () => {
       appraisal: buildAppraisal([{ typeId: 9, name: 'Hull', quantity: 1, buy: 5, sell: 6 }], 100),
     });
     expect(screen.getByText(/Nothing in this list refines/)).toBeInTheDocument();
+  });
+});
+
+describe('RefineBreakdownModal, when the chosen item stops refining', () => {
+  it('falls back to the whole pile instead of an empty scope', () => {
+    open({ initialTypeId: 999 });
+    expect(screen.getByText('Refine breakdown, 2 items')).toBeInTheDocument();
+  });
+
+  it('keeps the leftover apart from the figure the table and chip show', () => {
+    open({ appraisal: buildAppraisal([ore(1, 'Zeolites', 1038, 0.9)], 100) });
+    expect(screen.getByText('Refined minerals, less tax')).toBeInTheDocument();
+    expect(screen.getByText('Total with leftover')).toBeInTheDocument();
   });
 });
