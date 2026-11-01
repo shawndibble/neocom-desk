@@ -280,16 +280,15 @@ export function buildColumns(
       render: (row) => {
         const worth = row.netWorth;
         if (!worth) return t('common.unknown');
-        const isk = (value: number) => formatIsk(value);
         return (
           <HintText
             content={t('characters.netWorthTooltip', {
               day: worth.day,
-              isk: isk(worth.layers.isk),
-              assets: isk(worth.layers.assets),
-              escrow: isk(worth.layers.escrow),
-              sellOrders: isk(worth.layers.sellOrders),
-              contracts: isk(worth.layers.contracts),
+              isk: formatIsk(worth.layers.isk),
+              assets: formatIsk(worth.layers.assets),
+              escrow: formatIsk(worth.layers.escrow),
+              sellOrders: formatIsk(worth.layers.sellOrders),
+              contracts: formatIsk(worth.layers.contracts),
             })}
           >
             <IskAmount value={worth.total} />
