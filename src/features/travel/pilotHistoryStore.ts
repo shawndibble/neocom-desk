@@ -26,8 +26,17 @@ export function classifyKillHistoryAge(ageMs: number): KillHistoryAge {
   return ageMs < KILL_HISTORY_USABLE_MS ? 'stale' : 'expired';
 }
 
+/** What the Threat verdict read beyond the kills, kept so a repeat paste does not ask again. */
+export interface StoredExtras {
+  dangerRatio: number | null;
+  killerRatio: number | null;
+  lossTimesMs: number[] | null;
+}
+
 export interface StoredKillHistory {
   kills: KillRecord[];
+  /** Null until the verdict needed (and got) them. */
+  extras: StoredExtras | null;
   fetchedAt: number;
 }
 
@@ -38,15 +47,19 @@ const nameKey = (name: string) => `pilot-id:${name.toLowerCase()}`;
 export async function readStoredKillHistories(
   characterIds: readonly number[]
 ): Promise<Map<number, StoredKillHistory>> {
-  const rows = await readCachedEntries<KillRecord[]>(
+  const rows = await readCachedEntries<{ kills: KillRecord[]; extras: StoredExtras | null }>(
     GLOBAL_CACHE_CHARACTER_ID,
     characterIds.map(killsKey)
   );
   const found = new Map<number, StoredKillHistory>();
   for (const id of characterIds) {
     const row = rows.get(killsKey(id));
-    if (row !== undefined && Array.isArray(row.value)) {
-      found.set(id, { kills: row.value, fetchedAt: row.fetchedAt });
+    if (row !== undefined && Array.isArray(row.value?.kills)) {
+      found.set(id, {
+        kills: row.value.kills,
+        extras: row.value.extras ?? null,
+        fetchedAt: row.fetchedAt,
+      });
     }
   }
   return found;
@@ -56,10 +69,15 @@ export async function readStoredKillHistories(
 export async function storeKillHistory(
   characterId: number,
   kills: readonly KillRecord[],
-  fetchedAt: number
+  fetchedAt: number,
+  extras: StoredExtras | null = null
 ): Promise<void> {
   try {
-    await writeCachedMany(GLOBAL_CACHE_CHARACTER_ID, [[killsKey(characterId), kills]], fetchedAt);
+    await writeCachedMany(
+      GLOBAL_CACHE_CHARACTER_ID,
+      [[killsKey(characterId), { kills, extras }]],
+      fetchedAt
+    );
   } catch {
     // Storage full or blocked: the list still shows what was just fetched.
   }

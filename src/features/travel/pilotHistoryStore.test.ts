@@ -37,8 +37,14 @@ describe('stored kill history', () => {
   it('round-trips a pilot and leaves unknown pilots out', async () => {
     await storeKillHistory(7, [kill], 5_000);
     const read = await readStoredKillHistories([7, 8]);
-    expect(read.get(7)).toEqual({ kills: [kill], fetchedAt: 5_000 });
+    expect(read.get(7)).toEqual({ kills: [kill], extras: null, fetchedAt: 5_000 });
     expect(read.has(8)).toBe(false);
+  });
+
+  it('keeps the verdict extras beside the kills', async () => {
+    const extras = { dangerRatio: 0.8, killerRatio: 0.4, lossTimesMs: null };
+    await storeKillHistory(7, [kill], 5_000, extras);
+    expect((await readStoredKillHistories([7])).get(7)?.extras).toEqual(extras);
   });
 
   it('keeps an empty history: a pilot with no kills is an answer, not a miss', async () => {

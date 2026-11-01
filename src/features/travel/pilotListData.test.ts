@@ -227,6 +227,45 @@ describe('loadPilotList', () => {
       expect(rowThreat(beta, Date.now())).toBe('low');
     });
 
+    it('asks zKillboard for nothing on a repeat paste, even for a dangerous pilot', async () => {
+      mocks.postUniverseIds.mockResolvedValue({ characters: [{ id: 1, name: 'Alpha' }] });
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: busy });
+      mocks.fetchPilotStats.mockResolvedValue({
+        kind: 'stats',
+        stats: { dangerRatio: 60, kills: 10, losses: 10 },
+      });
+      await run(['Alpha'], { ...viewer, contacts: new Map() });
+      vi.clearAllMocks();
+      const [alpha] = await run(['Alpha'], { ...viewer, contacts: new Map() });
+      expect(mocks.fetchPilotKillHistory).not.toHaveBeenCalled();
+      expect(mocks.fetchPilotStats).not.toHaveBeenCalled();
+      expect(mocks.fetchPilotKillmails).not.toHaveBeenCalled();
+      expect(rowThreat(alpha, Date.now())).toBe('dangerous');
+    });
+
+    it('never reads a stale copy as a stronger threat than the fresh list', async () => {
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: busy });
+      mocks.fetchPilotStats.mockResolvedValue({
+        kind: 'stats',
+        stats: { dangerRatio: 60, kills: 10, losses: 10 },
+      });
+      const [fresh] = await run(['Alpha'], { ...viewer, contacts: new Map() });
+      if (fresh.kills.kind !== 'ready') throw new Error('expected a ready row');
+      const rank = ['inactive', 'low', 'active', 'dangerous'];
+      for (let n = 0; n <= busy.length; n++) {
+        // An earlier read lacks the newest kills: it holds only the oldest n of the fresh list.
+        const older = busy.slice(busy.length - n);
+        const stale: PilotListRow = {
+          ...fresh,
+          kills: { ...fresh.kills, kills: older, staleSinceMs: 1 },
+        };
+        const staleLevel = rowThreat(stale, Date.now());
+        const freshLevel = rowThreat(fresh, Date.now());
+        if (staleLevel === 'pending' || staleLevel === null) continue;
+        expect(rank.indexOf(staleLevel)).toBeLessThanOrEqual(rank.indexOf(freshLevel as string));
+      }
+    });
+
     it('counts a high share of kills as dangerous even when the danger ratio is low', async () => {
       mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: busy });
       mocks.fetchPilotStats.mockResolvedValue({
