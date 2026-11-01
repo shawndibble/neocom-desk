@@ -11,6 +11,7 @@ import { db } from '@/db';
 import {
   AVOID_ROUTE_RETENTION_MS,
   MARKET_RETENTION_MS,
+  PILOT_KILLS_RETENTION_MS,
   PRUNE_FIRST_RUN_KEY,
   PRUNE_LEGACY_CLEARED_KEY,
   PRUNE_LAST_RUN_KEY,
@@ -92,6 +93,11 @@ describe('pruneRuleFor', () => {
     'marketHistory:2026-09-01:2026-09-28',
   ])('%s is a market-tier per-id key', (key) => {
     expect(pruneRuleFor(key)?.maxAgeMs).toBe(MARKET_RETENTION_MS);
+  });
+
+  it('a pilot kill history goes after a week, a pasted name -> id after thirty days', () => {
+    expect(pruneRuleFor('pilot-kills:2112625428')?.maxAgeMs).toBe(PILOT_KILLS_RETENTION_MS);
+    expect(pruneRuleFor('pilot-id:blue tractor')?.maxAgeMs).toBe(STATIC_RETENTION_MS);
   });
 
   /*
