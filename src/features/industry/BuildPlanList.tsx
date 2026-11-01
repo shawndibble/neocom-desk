@@ -14,6 +14,17 @@ import {
 import { Button, EmptyState, IconButton, Panel } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useStableCallback } from './useStableCallback';
+import { useUrlFilter } from '@/lib/useUrlState';
+import { BuildPlanFilterBar } from './BuildPlanFilterBar';
+import {
+  BUILD_PLAN_FILTER,
+  DEFAULT_BUILD_PLAN_FILTER,
+  GROUP_ANY,
+  GROUP_NONE,
+  activePlanFilterCount,
+  filterPlans,
+  type BuildPlanFilterState,
+} from './buildPlanFilter';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { BlueprintPicker } from './BlueprintPicker';
@@ -175,6 +186,52 @@ export function BuildPlanList({
     groupId: string | null;
   } | null>(null);
 
+  // The filter lives in the URL, so a reload or a shared link keeps it.
+  const [urlFilter, setFilter] = useUrlFilter<BuildPlanFilterState>(
+    'build-plans',
+    BUILD_PLAN_FILTER.schema,
+    BUILD_PLAN_FILTER.fieldToParam,
+    BUILD_PLAN_FILTER.emptyParams
+  );
+  // A link can carry a value its control cannot show or answer: an ownership
+  // pick with no pilot to own anything, or a group since deleted. Those read as
+  // "any" rather than silently emptying or no-op'ing the list.
+  const filter = useMemo<BuildPlanFilterState>(() => {
+    const knownGroup =
+      urlFilter.group === GROUP_ANY ||
+      urlFilter.group === GROUP_NONE ||
+      groups.some((group) => group.id === urlFilter.group);
+    return {
+      ...urlFilter,
+      ownership: ownedBlueprints === undefined ? 'any' : urlFilter.ownership,
+      group: knownGroup ? urlFilter.group : GROUP_ANY,
+    };
+  }, [urlFilter, ownedBlueprints, groups]);
+  const filtering = activePlanFilterCount(filter) > 0;
+  // Two plans may share a name (one blueprint, two stations). Only those rows
+  // say where they run, so a unique name stays a single clean line.
+  const sharedNames = useMemo(() => {
+    const seen = new Set<string>();
+    const shared = new Set<string>();
+    for (const plan of plans) {
+      const key = plan.name.trim().toLowerCase();
+      if (seen.has(key)) shared.add(key);
+      seen.add(key);
+    }
+    return shared;
+  }, [plans]);
+  const visiblePlans = useMemo(
+    () =>
+      filterPlans(plans, filter, {
+        owned: ownedBlueprints ?? [],
+        activityOf: (plan) =>
+          catalog.byBlueprintTypeID.get(plan.blueprintTypeID)?.blueprint.activity,
+        statsByPlanId,
+        knownGroupIds: new Set(groups.map((group) => group.id)),
+      }),
+    [plans, filter, ownedBlueprints, catalog, statsByPlanId, groups]
+  );
+
   // One pass, rather than a `filter` per group plus a `some` per plan.
   //
   // A plan whose group is gone — deleted here, or a sync race delivering the
@@ -189,7 +246,7 @@ export function BuildPlanList({
     const byGroup = new Map<string, BuildPlanRecord[]>();
     const loose: BuildPlanRecord[] = [];
     const ofPlan = new Map<string, string>();
-    for (const plan of plans) {
+    for (const plan of visiblePlans) {
       const groupId = plan.buildGroupId;
       if (groupId === undefined || !known.has(groupId)) {
         loose.push(plan);
@@ -208,7 +265,7 @@ export function BuildPlanList({
       ungrouped: [...sortPlans(loose, sort, statsByPlanId)],
       groupOfPlan: ofPlan,
     };
-  }, [plans, groups, sort, statsByPlanId]);
+  }, [visiblePlans, groups, sort, statsByPlanId]);
 
   const draggingPlan =
     draggingPlanId === null ? undefined : plans.find((p) => p.id === draggingPlanId);
@@ -262,8 +319,15 @@ export function BuildPlanList({
       groups,
       onMovePlan,
       stats: statsByPlanId.get(plan.id),
+      locationHint: sharedNames.has(plan.name.trim().toLowerCase())
+        ? (plan.buildLocationName ?? plan.buildSystemName)
+        : undefined,
     };
   }
+
+  const picker = (
+    <BlueprintPicker catalog={catalog} onPick={onCreate} ownedBlueprints={ownedBlueprints} />
+  );
 
   return (
     <Panel
@@ -315,13 +379,39 @@ export function BuildPlanList({
     >
       {note}
       <div className="space-y-2">
-        <BlueprintPicker catalog={catalog} onPick={onCreate} ownedBlueprints={ownedBlueprints} />
+        {plans.length === 0 ? (
+          picker
+        ) : (
+          <BuildPlanFilterBar
+            filter={filter}
+            onChange={setFilter}
+            groups={groups}
+            search={picker}
+            canFilterOwnership={ownedBlueprints !== undefined}
+          />
+        )}
+        {filtering && plans.length > 0 && (
+          <p className="text-xs text-text-dim" aria-live="polite">
+            {t('industry.planFilters.count', { shown: visiblePlans.length, total: plans.length })}
+          </p>
+        )}
 
         {plans.length === 0 && groups.length === 0 ? (
           <EmptyState
             title={t('industry.emptyTitle')}
             hint={t('industry.emptyHint')}
             className="py-6"
+          />
+        ) : filtering && visiblePlans.length === 0 ? (
+          <EmptyState
+            title={t('industry.planFilters.noMatchTitle')}
+            hint={t('industry.planFilters.noMatchHint')}
+            className="py-6"
+            action={
+              <Button size="sm" onClick={() => setFilter(DEFAULT_BUILD_PLAN_FILTER)}>
+                {t('industry.planFilters.clear')}
+              </Button>
+            }
           />
         ) : (
           <DndContext
