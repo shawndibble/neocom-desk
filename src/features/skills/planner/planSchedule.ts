@@ -31,6 +31,7 @@ import {
   parseCloneStates,
 } from '@/features/skills/cloneState';
 import { normalizeMarkerAttributes } from './markers';
+import { pinnedInProgressEntry } from './queueRows';
 import { normalizeWhatIfSelection, whatIfImplants } from './whatIfImplants';
 import { isAcceleratorLive } from '@/engine/accelerator';
 import { acceleratorId } from '@/features/accelerator/characterAccelerators';
@@ -82,7 +83,7 @@ export function schedulePlan(
     composePlanBoosters(plan.boosters, plan.booster, running, detectedAccelerator)
   );
   const queue = projectQueueEnd(inputs.trained, inputs.queueEntries, nowMs, plan.entries);
-  return computeSkillPlanSchedule({
+  const schedule = computeSkillPlanSchedule({
     entries: plan.entries,
     skills: inputs.catalog.engineSkills,
     trainedSkills: queue.trained,
@@ -98,6 +99,24 @@ export function schedulePlan(
     cloneState: inputs.cloneState,
     startDate: new Date(queue.startMs),
   });
+  // The level training right now, when the plan also lists it, is the plan's
+  // own time: the queue pins it as lead (so the steps start after it), but a
+  // plan copied from the queue must still total what the game shows. The
+  // finish date already includes the lead; only the total needs it.
+  const pinned = pinnedInProgressEntry(plan.entries, queue, nowMs);
+  if (!pinned) return schedule;
+  // The marker result's totals share the total's basis, so a "saved" figure
+  // (total minus the remap total) is not inflated by the lead.
+  const { markersResult } = schedule;
+  return {
+    ...schedule,
+    totalSeconds: schedule.totalSeconds + pinned.seconds,
+    markersResult: markersResult && {
+      ...markersResult,
+      totalSeconds: markersResult.totalSeconds + pinned.seconds,
+      currentSeconds: markersResult.currentSeconds + pinned.seconds,
+    },
+  };
 }
 
 /**

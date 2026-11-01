@@ -123,6 +123,42 @@ describe('schedulePlan', () => {
     expect(s.scheduled).toHaveLength(1);
     expect(s.scheduled[0]).toMatchObject({ skillTypeID: 10, level: 2 });
   });
+
+  it('counts the in-progress head the plan lists in the total, so a copy of the queue matches the game', () => {
+    const queueEnd = NOW + 2 * 3_600_000;
+    const plan = { entries: [entry(10, 1), entry(20, 1)] };
+    const s = schedulePlan(plan, inputs({ queueEntries: [queued(queueEnd)] }), NOW);
+    const own = s.scheduled[s.scheduled.length - 1].cumulativeSeconds;
+    expect(s.totalSeconds).toBeCloseTo(2 * 3600 + own, 5);
+    // The finish date was already right: lead + own steps.
+    expect(s.finish?.getTime()).toBe(queueEnd + own * 1000);
+  });
+
+  it('keeps the remap result on the same basis as the total', () => {
+    const queueEnd = NOW + 2 * 3_600_000;
+    const plan = { entries: [entry(10, 1), entry(20, 1)], markers: [1], markerAttributes: [null] };
+    const s = schedulePlan(plan, inputs({ queueEntries: [queued(queueEnd)] }), NOW);
+    const bare = schedulePlan(plan, inputs(), NOW);
+    expect(s.markersResult).not.toBeNull();
+    expect(s.markersResult!.totalSeconds - s.markersResult!.currentSeconds).toBeCloseTo(
+      bare.markersResult!.totalSeconds - bare.markersResult!.currentSeconds,
+      5
+    );
+    expect(s.markersResult!.savingsSeconds).toBeCloseTo(
+      s.markersResult!.currentSeconds - s.markersResult!.totalSeconds,
+      5
+    );
+  });
+
+  it('does not count queue levels the plan does not list', () => {
+    const queueEnd = NOW + 2 * 3_600_000;
+    const s = schedulePlan(
+      { entries: [entry(10, 2)] },
+      inputs({ queueEntries: [{ ...queued(queueEnd), skill_id: 99 }] }),
+      NOW
+    );
+    expect(s.totalSeconds).toBe(s.scheduled[s.scheduled.length - 1].cumulativeSeconds);
+  });
 });
 
 describe('schedulePlanWith', () => {
