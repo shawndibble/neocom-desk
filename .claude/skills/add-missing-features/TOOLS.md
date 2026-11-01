@@ -23,7 +23,7 @@ Adam4EVE, Ravworks/Slipway (Jobs view = Active Jobs), EVE Tycoon, Janice
 (#5006), jEveAssets, GESI, Dr.MoonGoo, EVE Horizon, EVE Forge,
 EVE-HUB, RIFT (desktop; wallet Insights, asset filters, What's new list v2.2–6.2 read in full; #5601, #5602, #5605), EVE Industry Scanner Tool (#5007), Blizbor's skill trio (#2390; no
 licence, data unusable), Quantum Anomaly (#1040), Uedama Scout (#1043), EQM
-(2.0 changelog + Local Scan/D-Scan docs read; #5668, #5669), EVE Retroindustry (v0.11.27–41 release notes read; #5797), Canopus (1.2 post: PI calculator, colony siting, My colonies, My trades = all covered).
+(2.0 changelog + Local Scan/D-Scan docs read; #5668, #5669), EVE Retroindustry (v0.11.27–41 release notes read; #5797 rejected), Canopus (1.2 post: PI calculator, colony siting, My colonies, My trades = all covered).
 
 **Examined, nothing left:** EVE Blue Desk, SolCore Dynamics, EvE Blueprint, EVE
 Courier, ISK.GG, EVE Miner Hub, EVE-Industry-Scanner,
@@ -212,7 +212,6 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
   net worth; #5658 SP Farm mark; #5659 LP Redeem ×N; #5660 History By station;
   #5661 PI vs 90d spike/drop; #5663 data age "ESI updates in N min"; #5664 order
   book units/ISK listed.
-- #5797 NARROW Quickbar rows show units sold a day (Retroindustry ISK/7d, ISK weighting dropped, kill-test 3).
 - EQM 2.0: #5668 NARROW Local list org tally strip over the whole paste (ids
   chunked at 500, zKill cap stays 40, no click-filter; mockups first). #5669
   NARROW D-Scan hull mass floor, J-space only (baked `shipMass.json`).
@@ -247,7 +246,7 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 
 **Owner-rejected, do not re-pitch without new evidence:** #643 restock points;
 #722 unowned-blueprint coverage; #725 PI Production Run/Log (no PI cost basis);
-#822/#827/#925 Skill ROI panels; #858 Quickbar unrealized P&L vs typed cost.
+#822/#827/#925 Skill ROI panels; #858 Quickbar unrealized P&L vs typed cost. #5797 Quickbar sold/day (the Quickbar row is too narrow for another figure).
 
 **Open ordering:** #1048 before #1058; #1050 blocks #1068; #1051 blocks #1084.
 Other open: #642, #718, #819, #821, #824, #880, #926, #1015, #1017, #1018,
