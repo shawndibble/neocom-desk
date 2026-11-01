@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pill } from '@/components/ui/Pill';
 import {
@@ -19,8 +20,6 @@ import { MoonOwnerStatusPill } from './MoonOwnerStatusPill';
 import { MoonOwnerCards } from './MoonOwnerCards';
 import { caretColumn } from './caretColumn';
 import { isk, shortDate } from './moonsFormat';
-
-export { MoonOwnerStatusPill } from './MoonOwnerStatusPill';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.${key}`;
 
@@ -49,6 +48,8 @@ export function MoonOwnersTable({
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
+  // The phone list has no sort control (the "Stacked" design); most owed first, as the table's default.
+  const mostOwedFirst = useMemo(() => [...rows].sort((x, y) => y.owed - x.owed), [rows]);
   const columns: DataTableColumn<MoonOwnerRow>[] = [
     {
       id: 'owner',
@@ -171,7 +172,7 @@ export function MoonOwnersTable({
       </StatChips>
       {isPhone ? (
         <MoonOwnerCards
-          rows={[...rows].sort((x, y) => y.owed - x.owed)}
+          rows={mostOwedFirst}
           name={name}
           now={now}
           onOpen={onOpen}

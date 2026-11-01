@@ -3,7 +3,9 @@ import { Pill } from '@/components/ui/Pill';
 import { Button, Panel } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { canPayMoonOwner, type MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
+import { focusRingClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { formatAge } from '@/lib/age';
+import { cx } from '@/lib/cx';
 import { MoonOwnerStatusPill } from './MoonOwnerStatusPill';
 import { isk, shortDate } from './moonsFormat';
 
@@ -40,23 +42,25 @@ export function MoonOwnerCards({
           ? t(k('synced'), { age: formatAge(now - Date.parse(r.lastReadWellAt), t) })
           : '';
   return (
-    <Panel
-      padded={false}
-      title={t('corpTaxBook.moons.moonOwners.cardsTitle')}
-      meta={t(k('summary'), { shown: rows.length })}
-    >
+    <Panel padded={false} title={t(k('label'))} meta={t(k('summary'), { shown: rows.length })}>
       <ul className="divide-y divide-line">
         {rows.map((r) => (
           <li
             key={r.id}
-            className="flex cursor-pointer items-center gap-3 px-3 py-3"
+            className={cx(
+              'flex cursor-pointer items-center gap-3 px-3 py-3',
+              rowInteractiveClassName
+            )}
             onClick={() => onOpen(r)}
           >
             <div className="min-w-0 flex-1 space-y-1">
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <button
                   type="button"
-                  className="min-w-0 text-left text-sm font-semibold text-accent"
+                  className={cx(
+                    'min-w-0 rounded-xs text-left text-sm font-semibold text-accent',
+                    focusRingClassName
+                  )}
                   onClick={(e) => {
                     e.stopPropagation();
                     onOpen(r);
@@ -73,7 +77,7 @@ export function MoonOwnerCards({
               </p>
               <OwedLine r={r} name={name} onPay={onPay} />
             </div>
-            <Icon.Descend
+            <Icon.GoTo
               size={Icon.ICON_SIZE.sm}
               aria-hidden="true"
               className="shrink-0 text-text-dim"
