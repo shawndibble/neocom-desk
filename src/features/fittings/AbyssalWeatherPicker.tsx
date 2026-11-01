@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Select,
@@ -27,9 +28,12 @@ const NORMAL_SPACE = 'none';
  */
 export function AbyssalWeatherPicker({
   field = false,
+  info,
 }: {
   /** In the stats column's `StatFields` grid: the label in its column, the weather's effect beneath. */
   field?: boolean;
+  /** With `field`: beside the label, an `InfoTooltip` for the section's reference text. */
+  info?: ReactNode;
 } = {}) {
   const { t } = useTranslation();
   const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
@@ -66,7 +70,19 @@ export function AbyssalWeatherPicker({
   );
   if (field)
     return (
-      <StatField label={label} note={effect}>
+      <StatField
+        label={
+          info ? (
+            <span className="inline-flex items-center gap-1.5">
+              {label}
+              {info}
+            </span>
+          ) : (
+            label
+          )
+        }
+        note={effect}
+      >
         {select}
       </StatField>
     );
