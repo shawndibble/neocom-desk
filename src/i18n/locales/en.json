@@ -1456,6 +1456,7 @@
       "flyableNoCover": "Needs {{short}}, and no module or rig swap frees it.",
       "noPrice": "No price",
       "gain": "+{{percent}}%",
+      "gainOverall": "+{{percent}}% overall",
       "moreOptions_one": "{{count}} more option",
       "moreOptions_other": "{{count}} more options",
       "bestFound": "Now → best found",

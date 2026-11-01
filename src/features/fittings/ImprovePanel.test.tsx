@@ -437,6 +437,19 @@ describe('ImprovePanel', () => {
     expect(rows.join('|')).not.toMatch(/DPS|EHP/);
   });
 
+  it('labels the gain percent "overall" on Best overall only', () => {
+    const gain = option(11, { ehp: 1100 }, { score: 0.15 });
+    renderPanel(search(done({ noDownside: [gain] })), vi.fn(), vi.fn(), settings(), {
+      goal: 'overall',
+    });
+    expect(screen.getByText('+15% overall')).toBeInTheDocument();
+    cleanup();
+    renderPanel(search(done({ noDownside: [gain] })), vi.fn(), vi.fn(), settings(), {
+      goal: 'tank',
+    });
+    expect(screen.getByText('+15%')).toBeInTheDocument();
+  });
+
   it('heads the results with the goal figure now → best found, hidden with no result', () => {
     const own = { ...before, offense: { ...before.offense, sustainedDps: 90.7 } };
     const small = option(11, { offense: { ...before.offense, sustainedDps: 100 } }, { score: 0.1 });
