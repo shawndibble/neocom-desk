@@ -75,6 +75,7 @@ const HISTORY: [number, Record<string, string | null>][] = [
       contractItemArchive: '[characterId+contract_id], characterId',
     },
   ],
+  [32, { characterAccelerators: 'id, characterId' }],
 ];
 
 /** The complete schema at `version`: every delta up to it, drops removed. */
