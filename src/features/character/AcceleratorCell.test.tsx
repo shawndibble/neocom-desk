@@ -29,14 +29,14 @@ beforeEach(async () => {
 });
 
 describe('AcceleratorCell', () => {
-  it('says Yes with the bonus and a countdown for an accelerator the pilot typed in', () => {
+  it('shows the bonus and a countdown for an accelerator the pilot typed in', () => {
     renderCell({ bonus: 12, expiresAt: Date.now() + 5 * HOUR + 30 * 60_000 });
-    expect(screen.getByText(/^Yes · \+12 · 5h/)).toBeInTheDocument();
+    expect(screen.getByText(/^\+12 · 5h/)).toBeInTheDocument();
   });
 
-  it('says Yes with no countdown for one only guessed from the attribute sheet', () => {
+  it('shows the bonus alone, with no countdown, for one only guessed from the attribute sheet', () => {
     renderCell(undefined, 12);
-    expect(screen.getByText('Yes · +12')).toBeInTheDocument();
+    expect(screen.getByText('+12')).toBeInTheDocument();
   });
 
   it('says No with nothing typed in and nothing detected, and for one that has run out', () => {
