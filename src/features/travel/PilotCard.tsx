@@ -125,7 +125,7 @@ export function PilotCard({
                 SPACE_TEXT[mainSpace]
               )}
             >
-              <Icon.Combat size={12} />
+              <Icon.Combat className="size-3" />
               {t('travel.pilot.list.mainSpace', {
                 space: t(`common.spaceOption.${mainSpace}`).toLowerCase(),
               })}

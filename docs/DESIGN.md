@@ -735,6 +735,12 @@ glyph in the app matches, and it's the one place to touch if the pack ever
 changes. Add a re-export there for a glyph the app doesn't have yet, rather
 than reaching for a one-off import.
 
+A glyph inside a chip or tag below `sm` uses `className="size-3"` on the
+`Icon.*` element (`size-3.5` where it must read larger), never a `size`
+literal: the class is rem-based, so it scales like its label. A glyph filling a
+fixed cell may take `size="100%"`. ESLint rejects a numeric or rem-string
+`size` on `Icon.*`.
+
 Why Phosphor `light` over the alternatives: it's the only shortlisted pack
 (Phosphor, Lucide, Tabler, Radix Icons) with a genuinely 1px-native stroke
 face rather than a thinned-down 2px default, which is what this system's

@@ -398,7 +398,7 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
                 <span className="absolute inset-0 flex items-center justify-center">{spinner}</span>
               )}
             </span>
-            <Icon.Expanded size="0.75rem" aria-hidden="true" className="shrink-0" />
+            <Icon.Expanded aria-hidden="true" className="size-3 shrink-0" />
             {isPartial && (
               // The trigger has no words, so the dot is the visible cue. Inset inside the
               // trigger box: as the last control on a phone header it must not spill past the edge.

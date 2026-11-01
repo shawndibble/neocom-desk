@@ -63,7 +63,7 @@ const scopeStandIn = (
     className="inline-flex h-9 shrink-0 items-center gap-0.5 rounded-xs border border-line bg-panel-2 px-1 text-text-dim"
   >
     <Icon.AllCharacters aria-hidden="true" />
-    <Icon.Expanded aria-hidden="true" size="0.75rem" />
+    <Icon.Expanded aria-hidden="true" className="size-3" />
   </button>
 );
 

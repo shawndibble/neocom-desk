@@ -128,9 +128,8 @@ export function PriorityPill({
           >
             {t(priorityLabelKey(priority))}
             <Icon.Expanded
-              size="0.75rem"
               aria-hidden="true"
-              className="ml-0.5 inline-block align-[-0.125em]"
+              className="ml-0.5 inline-block size-3 align-[-0.125em]"
             />
           </span>
         </button>
