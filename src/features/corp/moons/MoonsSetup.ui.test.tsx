@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { OfficerVerdict } from '../taxBook/bookClient';
 import type { FeederSetupStatus } from '../taxBook/feederClient';
+import { utcDay } from '@/engine/localDay';
 import { MoonsSetup } from './MoonsSetup';
 import { fixtureView } from './ownerViewFixtures';
 
@@ -141,15 +142,17 @@ describe('MoonsSetup', () => {
   });
 
   it("starts a former moon owner's own book on the day its coverage ended", async () => {
-    getFeederStatus.mockResolvedValue({ status: 'none', ownBookFrom: '2026-10-12' });
+    // Today, so the leave day is always later than the start of the month (a fixed date stopped qualifying on the 1st of the next month).
+    const leaveDay = utcDay();
+    getFeederStatus.mockResolvedValue({ status: 'none', ownBookFrom: leaveDay });
     renderSetup();
     const user = userEvent.setup();
     await user.click(
       await screen.findByRole('button', { name: "Turn on your corporation's book" })
     );
     const date = screen.getByLabelText('Start date (EVE time)');
-    expect(date).toHaveValue('2026-10-12');
-    expect(date).toHaveAttribute('min', '2026-10-12');
+    expect(date).toHaveValue(leaveDay);
+    expect(date).toHaveAttribute('min', leaveDay);
   });
 
   it('explains a refused non-Accountant alt in plain words', async () => {
