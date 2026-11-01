@@ -29,7 +29,7 @@ import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { formatIskExact } from './chargeFormat';
+import { formatIsk } from '@/lib/isk';
 import { abyssalWeatherLabel, useAbyssalWeather, useWeatherName } from './abyssalWeatherSelection';
 import { AbyssalWeatherPicker } from './AbyssalWeatherPicker';
 import { useAbyssalRunPlan } from './abyssalRunPlan';
@@ -141,7 +141,7 @@ export function AbyssalRunPlanner({
 }) {
   const { t } = useTranslation();
   const hubId = useMarketHub((state) => state.value);
-  useHydratedStore(useMarketHub);
+  const hubHydrated = useHydratedStore(useMarketHub);
   const { tier, security, setTier, setSecurity } = useAbyssalRunPlan();
   const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
   const setWeather = useAbyssalWeather((state) => state.setWeather);
@@ -152,7 +152,7 @@ export function AbyssalRunPlanner({
   const activation = abyssalActivation(tier, security);
   const filamentId = weather ? abyssalFilamentTypeId(tier, weather.kind) : null;
   const hubPrice = useFilamentPrice(
-    filamentId !== null && hull.eligible ? filamentId : null,
+    filamentId !== null && hull.eligible && hubHydrated ? filamentId : null,
     hubId
   );
   const cost =
@@ -255,7 +255,7 @@ export function AbyssalRunPlanner({
                   count: cost.count,
                   name: typeName(filamentId),
                   hub: hubName,
-                  isk: formatIskExact(cost.total),
+                  isk: formatIsk(cost.total),
                   inCargo: cost.inCargo,
                 })}
           </li>
