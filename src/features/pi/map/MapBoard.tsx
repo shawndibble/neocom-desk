@@ -43,7 +43,9 @@ import { cx } from '@/lib/cx';
 import { onPlanLinkClick } from '@/features/industry/planLinkClick';
 import { clickOnSpace } from '@/lib/clickOnSpace';
 import { formatIskCompact } from '@/lib/isk';
-import { useTouchContext } from '@/lib/useMediaQuery';
+import { useMediaQuery, useTouchContext } from '@/lib/useMediaQuery';
+import { tabChevronClassName } from '@/components/ui/tabStyles';
+import { useScrollEdges } from '@/components/ui/useScrollEdges';
 import { PlanetImage } from '../PlanetImage';
 import { ChainTileFigure } from './ChainTileFigure';
 import {
@@ -117,6 +119,9 @@ export function MapBoard(props: MapBoardProps) {
   const { t } = useTranslation();
   const headingId = useId();
   const boardRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const wide = useMediaQuery('(min-width: 48rem)');
+  const { edges, pageScroll } = useScrollEdges(scrollerRef, boardRef);
   const nodes = useRef(new Map<Key, HTMLElement>());
   const [focusKey, setFocusKey] = useState<Key | null>(null);
   /** The node under the pointer or focus: its own wires stand out, the rest step back. */
@@ -357,253 +362,279 @@ export function MapBoard(props: MapBoardProps) {
   const inTrace = (typeId: number) => trace?.ids.has(typeId) ?? false;
 
   return (
-    <div
-      className="relative overflow-x-auto overflow-y-hidden overscroll-x-contain"
-      data-testid="pi-map-scroll"
-    >
+    // The frame holds the edge chevrons outside the scroller: its fade mask
+    // would fade a chevron inside it. Both are md+ only; the phone layout
+    // owns a clipped board there ("Show full map").
+    <div className="relative">
+      {wide &&
+        (['before', 'after'] as const).map((side) =>
+          edges[side] ? (
+            <button
+              key={side}
+              type="button"
+              tabIndex={-1}
+              aria-hidden="true"
+              aria-label={t(side === 'before' ? 'piMap.scrollBefore' : 'piMap.scrollAfter')}
+              data-testid={`pi-map-scroll-${side}`}
+              onClick={() => pageScroll(side)}
+              className={cx(tabChevronClassName, side === 'before' ? 'left-0.5' : 'right-0.5')}
+            >
+              {side === 'before' ? <Icon.Back size={14} /> : <Icon.Descend size={14} />}
+            </button>
+          ) : null
+        )}
       <div
-        ref={boardRef}
-        role="group"
-        onBlur={(event) => {
-          // The what-if preview lives while focus moves within the board (a
-          // planet to a tile it unlocked); it ends only when focus leaves.
-          if (!event.currentTarget.contains(event.relatedTarget)) props.onPreview(null);
-        }}
-        aria-labelledby={headingId}
-        className="relative mx-auto grid w-max grid-cols-[6rem_8.25rem_9.125rem_12.25rem_11.5rem_12.125rem] gap-x-4 py-3 pr-3"
+        ref={scrollerRef}
+        className={cx(
+          'overflow-x-auto overflow-y-hidden overscroll-x-contain',
+          wide && 'edge-fade-x'
+        )}
+        data-testid="pi-map-scroll"
       >
-        <h3 id={headingId} className="sr-only">
-          {t('piMap.boardLabel')}
-        </h3>
-        <svg
-          aria-hidden="true"
-          focusable="false"
-          width={size.w}
-          height={size.h}
-          className="pointer-events-none absolute inset-0 overflow-visible fill-none"
+        <div
+          ref={boardRef}
+          role="group"
+          onBlur={(event) => {
+            // The what-if preview lives while focus moves within the board (a
+            // planet to a tile it unlocked); it ends only when focus leaves.
+            if (!event.currentTarget.contains(event.relatedTarget)) props.onPreview(null);
+          }}
+          aria-labelledby={headingId}
+          className="relative mx-auto grid w-max grid-cols-[6rem_8.25rem_9.125rem_12.25rem_11.5rem_12.125rem] gap-x-4 py-3 pr-3"
         >
-          {wires.map((wire, i) => (
-            <path key={i} d={wire.d} className={wire.cls} />
-          ))}
-          {wires.flatMap((wire, i) =>
-            (wire.ends ?? []).map((end, j) => (
-              <circle
-                key={`${i}-${j}`}
-                cx={end.x}
-                cy={end.y}
-                r={3.5}
-                className={cx(
-                  'stroke-bg stroke-1',
-                  wire.cls.includes('warning') ? 'fill-warning' : 'fill-accent'
-                )}
-              />
-            ))
-          )}
-        </svg>
-
-        {/* Planets */}
-        <section
-          aria-labelledby={`${headingId}-planets`}
-          className="sticky left-0 z-10 box-content flex flex-col bg-panel pl-3 shadow-[1px_0_0_var(--color-line)]"
-        >
-          <ColumnHead
-            id={`${headingId}-planets`}
-            title={t('piMap.planetsTitle')}
-            sub={t('piMap.planetsSub')}
-            info={t('piMap.planetsInfo', { context: touchCtx })}
-            infoLabel={t('piMap.infoLabel', { name: t('piMap.planetsTitle') })}
-          />
-          <ul className="flex flex-1 flex-col justify-between">
-            {graph.planetTypes.map((type) => (
-              <li key={type} className="flex justify-center" {...aimEvents(planetKey(type))}>
-                <PlanetToggle
-                  type={type}
-                  have={owned.has(type)}
-                  togglable={props.noColonies || owned.has(type)}
-                  pressed={
-                    props.noColonies || owned.has(type)
-                      ? ticked.has(type)
-                      : props.whatIfTicked.has(type)
-                  }
-                  names={props.colonyNames.get(type) ?? []}
-                  ranks={props.pickPlanets.get(type) ?? []}
-                  tracedNeed={trace?.planets.find((p) => p.type === type) ?? null}
-                  registerNode={register(planetKey(type))}
-                  tabbable={activeKey === planetKey(type)}
-                  onFocusKey={() => setFocusKey(planetKey(type))}
-                  boardRef={boardRef}
-                  onKeyDown={(e) => move(planetKey(type), e)}
-                  onClick={() => props.onPlanet(type)}
-                  onPreview={props.onPreview}
-                  needed={props.needTypes.has(type)}
-                  whatIf={props.whatIfTypes.has(type) && !owned.has(type) && !props.noColonies}
-                />
-              </li>
+          <h3 id={headingId} className="sr-only">
+            {t('piMap.boardLabel')}
+          </h3>
+          <svg
+            aria-hidden="true"
+            focusable="false"
+            width={size.w}
+            height={size.h}
+            className="pointer-events-none absolute inset-0 overflow-visible fill-none"
+          >
+            {wires.map((wire, i) => (
+              <path key={i} d={wire.d} className={wire.cls} />
             ))}
-          </ul>
-        </section>
+            {wires.flatMap((wire, i) =>
+              (wire.ends ?? []).map((end, j) => (
+                <circle
+                  key={`${i}-${j}`}
+                  cx={end.x}
+                  cy={end.y}
+                  r={3.5}
+                  className={cx(
+                    'stroke-bg stroke-1',
+                    wire.cls.includes('warning') ? 'fill-warning' : 'fill-accent'
+                  )}
+                />
+              ))
+            )}
+          </svg>
 
-        {TIERS.map((tier) => (
+          {/* Planets */}
           <section
-            key={tier}
-            aria-labelledby={`${headingId}-${tier}`}
-            className="relative flex flex-col"
-            data-tier={tier}
+            aria-labelledby={`${headingId}-planets`}
+            className="sticky left-0 z-10 box-content flex flex-col bg-panel pl-3 shadow-[1px_0_0_var(--color-line)]"
           >
             <ColumnHead
-              id={`${headingId}-${tier}`}
-              title={tierName(t, tier)}
-              sub={t(`piMap.tier.${tier}.sub`)}
-              info={t(`piMap.tier.${tier}.info`)}
-              infoLabel={t('piMap.infoLabel', { name: tierName(t, tier) })}
-              count={t('piMap.tierCount', {
-                shown: graph.tiers[tier].filter((p) => visible(p.typeId)).length,
-                total: graph.tiers[tier].length,
-              })}
+              id={`${headingId}-planets`}
+              title={t('piMap.planetsTitle')}
+              sub={t('piMap.planetsSub')}
+              info={t('piMap.planetsInfo', { context: touchCtx })}
+              infoLabel={t('piMap.infoLabel', { name: t('piMap.planetsTitle') })}
             />
-            <ul className="flex flex-1 flex-col justify-center gap-[0.1875rem]">
-              {graph.tiers[tier].map((product) => {
-                if (!visible(product.typeId)) {
+            <ul className="flex flex-1 flex-col justify-between">
+              {graph.planetTypes.map((type) => (
+                <li key={type} className="flex justify-center" {...aimEvents(planetKey(type))}>
+                  <PlanetToggle
+                    type={type}
+                    have={owned.has(type)}
+                    togglable={props.noColonies || owned.has(type)}
+                    pressed={
+                      props.noColonies || owned.has(type)
+                        ? ticked.has(type)
+                        : props.whatIfTicked.has(type)
+                    }
+                    names={props.colonyNames.get(type) ?? []}
+                    ranks={props.pickPlanets.get(type) ?? []}
+                    tracedNeed={trace?.planets.find((p) => p.type === type) ?? null}
+                    registerNode={register(planetKey(type))}
+                    tabbable={activeKey === planetKey(type)}
+                    onFocusKey={() => setFocusKey(planetKey(type))}
+                    boardRef={boardRef}
+                    onKeyDown={(e) => move(planetKey(type), e)}
+                    onClick={() => props.onPlanet(type)}
+                    onPreview={props.onPreview}
+                    needed={props.needTypes.has(type)}
+                    whatIf={props.whatIfTypes.has(type) && !owned.has(type) && !props.noColonies}
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {TIERS.map((tier) => (
+            <section
+              key={tier}
+              aria-labelledby={`${headingId}-${tier}`}
+              className="relative flex flex-col"
+              data-tier={tier}
+            >
+              <ColumnHead
+                id={`${headingId}-${tier}`}
+                title={tierName(t, tier)}
+                sub={t(`piMap.tier.${tier}.sub`)}
+                info={t(`piMap.tier.${tier}.info`)}
+                infoLabel={t('piMap.infoLabel', { name: tierName(t, tier) })}
+                count={t('piMap.tierCount', {
+                  shown: graph.tiers[tier].filter((p) => visible(p.typeId)).length,
+                  total: graph.tiers[tier].length,
+                })}
+              />
+              <ul className="flex flex-1 flex-col justify-center gap-[0.1875rem]">
+                {graph.tiers[tier].map((product) => {
+                  if (!visible(product.typeId)) {
+                    return (
+                      <li
+                        key={product.typeId}
+                        aria-hidden="true"
+                        className="h-9 flex-none md:h-[2.125rem] touch:h-9"
+                      />
+                    );
+                  }
+                  const key = productKey(product.typeId);
+                  const figure = props.figureOf(product.typeId);
+                  const isNew = newIds.has(product.typeId);
+                  const rank = props.pickRanks.get(product.typeId) ?? null;
+                  const goal = trace?.product === product.typeId;
+                  const onPath = inTrace(product.typeId);
+                  const glyph = verdictGlyph(figure);
+                  const tip = [
+                    product.tier === 0
+                      ? t('piMap.rawYields', {
+                          types: product.hosts.map((type) => planetName(t, type)).join(', '),
+                        })
+                      : comparisonSentence(t, figure),
+                    figureSentence(t, figure),
+                    figure.kind !== 'unranked'
+                      ? null
+                      : figure.whatIf
+                        ? t('piMap.add.chainsTip')
+                        : figure.chain
+                          ? t('piMap.chainTip', { context: touchCtx })
+                          : null,
+                  ]
+                    .filter(Boolean)
+                    .map((line) => `• ${line}`)
+                    .join('\n');
+                  const unlockedBy = isNew
+                    ? [...props.whatIfTypes].filter(
+                        (type) => product.tier > 0 || product.hosts.includes(type)
+                      )
+                    : [];
+                  const chainIsk = tileChainIsk(figure);
                   return (
-                    <li
-                      key={product.typeId}
-                      aria-hidden="true"
-                      className="h-9 flex-none md:h-[2.125rem] touch:h-9"
-                    />
-                  );
-                }
-                const key = productKey(product.typeId);
-                const figure = props.figureOf(product.typeId);
-                const isNew = newIds.has(product.typeId);
-                const rank = props.pickRanks.get(product.typeId) ?? null;
-                const goal = trace?.product === product.typeId;
-                const onPath = inTrace(product.typeId);
-                const glyph = verdictGlyph(figure);
-                const tip = [
-                  product.tier === 0
-                    ? t('piMap.rawYields', {
-                        types: product.hosts.map((type) => planetName(t, type)).join(', '),
-                      })
-                    : comparisonSentence(t, figure),
-                  figureSentence(t, figure),
-                  figure.kind !== 'unranked'
-                    ? null
-                    : figure.whatIf
-                      ? t('piMap.add.chainsTip')
-                      : figure.chain
-                        ? t('piMap.chainTip', { context: touchCtx })
-                        : null,
-                ]
-                  .filter(Boolean)
-                  .map((line) => `• ${line}`)
-                  .join('\n');
-                const unlockedBy = isNew
-                  ? [...props.whatIfTypes].filter(
-                      (type) => product.tier > 0 || product.hosts.includes(type)
-                    )
-                  : [];
-                const chainIsk = tileChainIsk(figure);
-                return (
-                  <li key={product.typeId} className="relative flex-none" {...aimEvents(key)}>
-                    <Tooltip content={tip}>
-                      <Link
-                        to={props.productHref(product.typeId)}
-                        ref={register(key)}
-                        data-map-key={key}
-                        tabIndex={activeKey === key ? 0 : -1}
-                        aria-current={goal ? 'true' : undefined}
-                        aria-label={productAccessibleName(t, product, figure, {
-                          rank,
-                          unlockedBy,
-                          traced: goal,
-                        })}
-                        onFocus={() => setFocusKey(key)}
-                        onKeyDown={(e) => clickOnSpace(e) || move(key, e)}
-                        onClick={onPlanLinkClick(() => props.onProduct(product.typeId))}
-                        className={cx(
-                          'grid min-h-9 w-full md:min-h-[2.125rem] touch:min-h-9 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0.5 pr-[0.3125rem] pl-[0.1875rem] text-left text-xs',
-                          interactiveClassName,
-                          focusRingClassName,
-                          goal
-                            ? 'border-line border-l-2 border-l-accent bg-panel-2'
-                            : isNew
-                              ? 'border-map-whatif bg-map-whatif/12'
-                              : onPath
-                                ? 'border-accent-dim bg-accent/12'
-                                : 'border-line bg-panel-2 [@media(hover:hover)]:hover:border-line-bright',
-                          dimOthers && trace !== null && !onPath && !isNew && 'opacity-40'
-                        )}
-                      >
-                        <TypeIcon typeId={product.typeId} size={64} width={24} height={24} />
-                        <span
+                    <li key={product.typeId} className="relative flex-none" {...aimEvents(key)}>
+                      <Tooltip content={tip}>
+                        <Link
+                          to={props.productHref(product.typeId)}
+                          ref={register(key)}
+                          data-map-key={key}
+                          tabIndex={activeKey === key ? 0 : -1}
+                          aria-current={goal ? 'true' : undefined}
+                          aria-label={productAccessibleName(t, product, figure, {
+                            rank,
+                            unlockedBy,
+                            traced: goal,
+                          })}
+                          onFocus={() => setFocusKey(key)}
+                          onKeyDown={(e) => clickOnSpace(e) || move(key, e)}
+                          onClick={onPlanLinkClick(() => props.onProduct(product.typeId))}
                           className={cx(
-                            'min-w-0 text-xs leading-[0.8125rem] whitespace-normal',
-                            goal || onPath ? 'font-semibold text-text' : 'text-text',
-                            goal && 'text-accent'
+                            'grid min-h-9 w-full md:min-h-[2.125rem] touch:min-h-9 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0.5 pr-[0.3125rem] pl-[0.1875rem] text-left text-xs',
+                            interactiveClassName,
+                            focusRingClassName,
+                            goal
+                              ? 'border-line border-l-2 border-l-accent bg-panel-2'
+                              : isNew
+                                ? 'border-map-whatif bg-map-whatif/12'
+                                : onPath
+                                  ? 'border-accent-dim bg-accent/12'
+                                  : 'border-line bg-panel-2 [@media(hover:hover)]:hover:border-line-bright',
+                            dimOthers && trace !== null && !onPath && !isNew && 'opacity-40'
                           )}
                         >
-                          {product.name}
-                        </span>
-                        {glyph && figure.kind === 'ranked' ? (
+                          <TypeIcon typeId={product.typeId} size={64} width={24} height={24} />
                           <span
-                            aria-hidden="true"
-                            className="flex items-center gap-1 text-[0.6875rem] tabular-nums"
-                          >
-                            <span
-                              className={cx(
-                                'text-[0.6875rem] leading-[0.6875rem] font-bold',
-                                VERDICT_TONE[glyph]
-                              )}
-                            >
-                              {glyph}
-                            </span>
-                            <span className="font-semibold">
-                              {formatIskCompact(figure.iskPerDay)}
-                            </span>
-                            {figure.needsCcLevel && (
-                              <span className="rounded-xs border border-warning/60 px-1 text-[0.625rem] leading-[0.875rem] font-semibold text-warning">
-                                {t('piMap.needsCcShort', { level: figure.needsCcLevel })}
-                              </span>
+                            className={cx(
+                              'min-w-0 text-xs leading-[0.8125rem] whitespace-normal',
+                              goal || onPath ? 'font-semibold text-text' : 'text-text',
+                              goal && 'text-accent'
                             )}
+                          >
+                            {product.name}
                           </span>
-                        ) : chainIsk !== null ? (
-                          <ChainTileFigure iskPerDay={chainIsk} stacked />
-                        ) : (
-                          <span aria-hidden="true" />
-                        )}
-                      </Link>
-                    </Tooltip>
-                    {rank !== null && (
-                      <span
-                        aria-hidden="true"
-                        className={cx(
-                          'pointer-events-none absolute top-1/2 -left-[0.9375rem] z-[1] grid h-[1.125rem] min-w-[1.375rem] -translate-y-1/2 place-items-center rounded-xs border border-warning px-[0.1875rem] text-[0.6875rem] font-bold',
-                          goal ? 'bg-warning text-bg' : 'bg-bg text-warning'
-                        )}
-                      >
-                        #{rank}
-                      </span>
-                    )}
-                    {isNew && (
-                      <span
-                        aria-hidden="true"
-                        className="pointer-events-none absolute top-0 right-0 z-[1] grid size-[0.875rem] -translate-y-1/3 translate-x-1/3 place-items-center rounded-xs bg-map-whatif p-px text-bg"
-                      >
-                        <Icon.Increase size="100%" aria-hidden="true" />
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            {/* Gaps carry no fill (a grey box read as a broken tile); a column left with none says why. */}
-            {graph.tiers[tier].every((product) => !visible(product.typeId)) && (
-              <p className="pointer-events-none absolute inset-x-0 top-1/2 px-2 text-center text-[0.6875rem] text-text-dim">
-                {t('piMap.columnNone')}
-              </p>
-            )}
-          </section>
-        ))}
+                          {glyph && figure.kind === 'ranked' ? (
+                            <span
+                              aria-hidden="true"
+                              className="flex items-center gap-1 text-[0.6875rem] tabular-nums"
+                            >
+                              <span
+                                className={cx(
+                                  'text-[0.6875rem] leading-[0.6875rem] font-bold',
+                                  VERDICT_TONE[glyph]
+                                )}
+                              >
+                                {glyph}
+                              </span>
+                              <span className="font-semibold">
+                                {formatIskCompact(figure.iskPerDay)}
+                              </span>
+                              {figure.needsCcLevel && (
+                                <span className="rounded-xs border border-warning/60 px-1 text-[0.625rem] leading-[0.875rem] font-semibold text-warning">
+                                  {t('piMap.needsCcShort', { level: figure.needsCcLevel })}
+                                </span>
+                              )}
+                            </span>
+                          ) : chainIsk !== null ? (
+                            <ChainTileFigure iskPerDay={chainIsk} stacked />
+                          ) : (
+                            <span aria-hidden="true" />
+                          )}
+                        </Link>
+                      </Tooltip>
+                      {rank !== null && (
+                        <span
+                          aria-hidden="true"
+                          className={cx(
+                            'pointer-events-none absolute top-1/2 -left-[0.9375rem] z-[1] grid h-[1.125rem] min-w-[1.375rem] -translate-y-1/2 place-items-center rounded-xs border border-warning px-[0.1875rem] text-[0.6875rem] font-bold',
+                            goal ? 'bg-warning text-bg' : 'bg-bg text-warning'
+                          )}
+                        >
+                          #{rank}
+                        </span>
+                      )}
+                      {isNew && (
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute top-0 right-0 z-[1] grid size-[0.875rem] -translate-y-1/3 translate-x-1/3 place-items-center rounded-xs bg-map-whatif p-px text-bg"
+                        >
+                          <Icon.Increase size="100%" aria-hidden="true" />
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              {/* Gaps carry no fill (a grey box read as a broken tile); a column left with none says why. */}
+              {graph.tiers[tier].every((product) => !visible(product.typeId)) && (
+                <p className="pointer-events-none absolute inset-x-0 top-1/2 px-2 text-center text-[0.6875rem] text-text-dim">
+                  {t('piMap.columnNone')}
+                </p>
+              )}
+            </section>
+          ))}
+        </div>
       </div>
     </div>
   );
