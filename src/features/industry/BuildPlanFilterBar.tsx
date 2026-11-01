@@ -54,7 +54,7 @@ export function BuildPlanFilterBar({
       {(draft, setDraft) => (
         <div className="grid w-full grid-cols-2 gap-3 lg:contents">
           {canFilterOwnership && (
-            <FilterField label={t('industry.planFilters.ownership')}>
+            <FilterField captionInline label={t('industry.planFilters.ownership')}>
               <Select
                 value={draft.ownership}
                 onValueChange={(value) =>
@@ -78,7 +78,7 @@ export function BuildPlanFilterBar({
               </Select>
             </FilterField>
           )}
-          <FilterField label={t('industry.planFilters.verdict')}>
+          <FilterField captionInline label={t('industry.planFilters.verdict')}>
             <CheckboxSelect
               label={t('industry.planFilters.verdict')}
               className="w-44"
@@ -92,7 +92,7 @@ export function BuildPlanFilterBar({
               }
             />
           </FilterField>
-          <FilterField label={t('industry.planFilters.activity')}>
+          <FilterField captionInline label={t('industry.planFilters.activity')}>
             <Select
               value={draft.activity}
               onValueChange={(value) =>
@@ -116,7 +116,7 @@ export function BuildPlanFilterBar({
             </Select>
           </FilterField>
           {groups.length > 0 && (
-            <FilterField label={t('industry.planFilters.group')}>
+            <FilterField captionInline label={t('industry.planFilters.group')}>
               <Select
                 value={draft.group}
                 onValueChange={(value) => setDraft({ ...draft, group: value })}
@@ -140,7 +140,7 @@ export function BuildPlanFilterBar({
               </Select>
             </FilterField>
           )}
-          <FilterField label={t('industry.planFilters.profit')}>
+          <FilterField captionInline label={t('industry.planFilters.profit')}>
             <FilterChip
               label={t('industry.planFilters.profitableOnly')}
               selected={draft.profitableOnly}
