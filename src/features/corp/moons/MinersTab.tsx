@@ -20,6 +20,7 @@ import {
   type MinerStanding,
 } from '@/engine/corpTaxBook/bookView';
 import { useColumnVisibility } from '@/lib/columnVisibility';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { boolParam, textParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useBook } from './useBook';
@@ -27,6 +28,8 @@ import { useTabsProjection } from './useTabsProjection';
 import { isk, shortDate } from './moonsFormat';
 import {
   MINERS_COLUMN_IDS,
+  MINERS_CARDS_BELOW_REM,
+  MINERS_NARROW_OFF,
   MINERS_PHONE_OFF,
   useVisibleMinersColumns,
   type MinersColumnId,
@@ -81,7 +84,8 @@ export function MinersTab() {
     | null
   >(null);
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
-  const [tableRef, cards] = useCards();
+  const [tableRef, cards, compact] = useCards(MINERS_CARDS_BELOW_REM);
+  const phone = useIsPhone();
   // Read once; a stored miner the list no longer holds opens nothing and is cleared on mount.
   const [openMiner] = useState(() => {
     const id = readOpenMiner(corporationId);
@@ -133,7 +137,8 @@ export function MinersTab() {
   const columnVisibility = useColumnVisibility(
     useVisibleMinersColumns,
     MINERS_COLUMN_IDS,
-    MINERS_PHONE_OFF
+    phone ? MINERS_PHONE_OFF : MINERS_NARROW_OFF,
+    compact
   );
   const allColumns: DataTableColumn<MinerRow>[] = [
     {

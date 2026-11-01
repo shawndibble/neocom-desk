@@ -177,4 +177,18 @@ describe('useColumnVisibility phoneOffByDefault', () => {
     act(() => result.current.reset());
     expect(result.current.visible).toEqual(['a', 'c']);
   });
+
+  it('compact applies the compact default away from a phone, and widening restores the full set', async () => {
+    setPhone(false);
+    const store = createColumnVisibilitySetting({ key: freshKey(), ids: ALL });
+    const { result, rerender } = renderHook(
+      ({ compact }) => useColumnVisibility(store, ALL, ['b'], compact),
+      { initialProps: { compact: true } }
+    );
+    await waitFor(() => expect(store.getState().hydrated).toBe(true));
+    expect(result.current.visible).toEqual(['a', 'c']);
+
+    rerender({ compact: false });
+    expect(result.current.visible).toEqual(['a', 'b', 'c']);
+  });
 });
