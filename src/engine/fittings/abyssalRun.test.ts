@@ -3,6 +3,7 @@ import {
   ABYSSAL_RUN_MINUTES,
   ABYSSAL_TIERS,
   abyssalActivation,
+  abyssalFilamentCost,
   abyssalFilamentTypeId,
   abyssalHullRule,
   abyssalTierLevels,
@@ -151,5 +152,53 @@ describe('weaponReachChange', () => {
         stats([droneAfter, turret(1, 5000, 8000)])
       )
     ).toBeNull();
+  });
+});
+
+describe('abyssalFilamentCost', () => {
+  const FIL = 47905;
+  it('prices every filament the hull needs when the cargo holds none', () => {
+    expect(abyssalFilamentCost(3, FIL, 1_000_000, [])).toEqual({
+      kind: 'priced',
+      count: 3,
+      inCargo: 0,
+      total: 3_000_000,
+    });
+    expect(abyssalFilamentCost(1, FIL, 250_000, [])).toMatchObject({ count: 1, total: 250_000 });
+  });
+  it('prices only the shortfall and reports what the cargo covers', () => {
+    expect(abyssalFilamentCost(3, FIL, 1_000_000, [{ typeId: FIL, quantity: 1 }])).toEqual({
+      kind: 'priced',
+      count: 2,
+      inCargo: 1,
+      total: 2_000_000,
+    });
+  });
+  it('sums split stacks of the same type', () => {
+    expect(
+      abyssalFilamentCost(3, FIL, 10, [
+        { typeId: FIL, quantity: 1 },
+        { typeId: FIL, quantity: 1 },
+      ])
+    ).toMatchObject({ count: 1, inCargo: 2, total: 10 });
+  });
+  it('is covered, with no ISK, once the cargo holds enough', () => {
+    expect(abyssalFilamentCost(2, FIL, 5, [{ typeId: FIL, quantity: 5 }])).toEqual({
+      kind: 'covered',
+    });
+    expect(abyssalFilamentCost(2, FIL, null, [{ typeId: FIL, quantity: 2 }])).toEqual({
+      kind: 'covered',
+    });
+  });
+  it('ignores other filament types in the cargo', () => {
+    expect(abyssalFilamentCost(2, FIL, 7, [{ typeId: 47904, quantity: 9 }])).toMatchObject({
+      count: 2,
+      inCargo: 0,
+      total: 14,
+    });
+  });
+  it('is null when the hub has no price and the cargo does not cover it', () => {
+    expect(abyssalFilamentCost(2, FIL, null, [])).toBeNull();
+    expect(abyssalFilamentCost(2, FIL, 0, [])).toBeNull();
   });
 });

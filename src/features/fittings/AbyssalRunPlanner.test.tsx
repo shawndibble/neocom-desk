@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import type { FittingStats } from '@/engine/fittings/types';
+import type { FittingCargoItem, FittingStats } from '@/engine/fittings/types';
 import { AbyssalRunPlanner } from './AbyssalRunPlanner';
 import { useAbyssalRunPlan } from './abyssalRunPlan';
 import { useAbyssalWeather } from './abyssalWeatherSelection';
@@ -13,19 +13,33 @@ vi.mock('@/engine/fittings/variationDelta', async (original) => ({
   diffFittingStats: () => ({ changes: [{ key: 'ehp', before: 1000, after: 900 }], count: 1 }),
 }));
 
+const getHubPrices = vi.hoisted(() => vi.fn());
+vi.mock('@/market/prices', async (original) => ({
+  ...(await original<object>()),
+  getHubPrices,
+}));
+
+const FILAMENT = 47905;
+const quote = (sellMin: number | null) =>
+  getHubPrices.mockResolvedValue(new Map(sellMin === null ? [] : [[FILAMENT, { sellMin }]]));
+
+beforeEach(() => quote(null));
+
 afterEach(() => {
+  getHubPrices.mockReset();
   useAbyssalWeather.setState({ weatherTypeId: null });
   useAbyssalRunPlan.setState({ tier: 3, security: 5 });
 });
 
 const stats = (ehp: number) => ({ ehp, offense: { weapons: [] } }) as unknown as FittingStats;
 
-function setup(hullGroupId: number | undefined, compare = vi.fn()) {
+function setup(hullGroupId: number | undefined, compare = vi.fn(), cargo: FittingCargoItem[] = []) {
   render(
     <MemoryRouter>
       <AbyssalRunPlanner
         hullGroupId={hullGroupId}
         compare={compare}
+        cargo={cargo}
         typeName={(id) => (id === 47905 ? 'Fierce Electrical Filament' : `#${id}`)}
       />
     </MemoryRouter>
@@ -80,5 +94,65 @@ describe('AbyssalRunPlanner', () => {
   it('marks an Interdictor as unconfirmed', async () => {
     setup(541);
     expect(screen.getByText(/No source names this hull type/)).toBeTruthy();
+  });
+
+  describe('filament cost line', () => {
+    const run = async (group: number, cargo: FittingCargoItem[] = []) => {
+      useAbyssalWeather.setState({ weatherTypeId: 47382 });
+      setup(group, vi.fn().mockResolvedValue({ before: stats(1000), after: stats(900) }), cargo);
+    };
+
+    it('prices three for a frigate and one for a cruiser, naming the hub', async () => {
+      quote(1_000_000);
+      await run(25);
+      expect(
+        await screen.findByText(
+          'Filament cost: 3 x Fierce Electrical Filament at Jita = 3,000,000 ISK'
+        )
+      ).toBeTruthy();
+    });
+
+    it('prices one for a cruiser', async () => {
+      quote(1_000_000);
+      await run(26);
+      expect(
+        await screen.findByText(
+          'Filament cost: 1 x Fierce Electrical Filament at Jita = 1,000,000 ISK'
+        )
+      ).toBeTruthy();
+    });
+
+    it('offsets matching cargo and ignores other types', async () => {
+      quote(1_000_000);
+      await run(25, [
+        { typeId: FILAMENT, quantity: 1 },
+        { typeId: 47904, quantity: 9 },
+      ]);
+      expect(
+        await screen.findByText(
+          'Filament cost: 2 more x Fierce Electrical Filament at Jita = 2,000,000 ISK (1 in cargo)'
+        )
+      ).toBeTruthy();
+    });
+
+    it('says covered by cargo with no ISK figure', async () => {
+      quote(1_000_000);
+      await run(25, [{ typeId: FILAMENT, quantity: 3 }]);
+      expect(await screen.findByText('Filament cost: covered by cargo')).toBeTruthy();
+    });
+
+    it('shows nothing when the hub has no price or the hull cannot enter', async () => {
+      quote(null);
+      await run(26);
+      await screen.findByRole('link', { name: 'Fierce Electrical Filament' });
+      await vi.waitFor(() => expect(getHubPrices).toHaveBeenCalled());
+      expect(screen.queryByText(/Filament cost/)).toBeNull();
+    });
+
+    it('shows nothing for a hull that cannot enter', async () => {
+      quote(1_000_000);
+      await run(27);
+      expect(screen.queryByText(/Filament cost/)).toBeNull();
+    });
   });
 });

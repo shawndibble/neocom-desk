@@ -4,6 +4,7 @@ import { Button } from '@/components/ui';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
 import type {
   Fitting,
+  FittingCargoItem,
   FittingModuleResult,
   FittingStats,
   StatsErrorReason,
@@ -80,7 +81,12 @@ interface FittingStatsSectionsProps {
    * (`AbyssalRunPlanner`). Its body mounts only while open, which is what keeps
    * the weather's delta from being worked out while it is shut.
    */
-  abyssal?: { hullGroupId: number | undefined; compare: WeatherCompare | null };
+  abyssal?: {
+    hullGroupId: number | undefined;
+    compare: WeatherCompare | null;
+    /** The open fit's cargo, which offsets the planner's filament cost. */
+    cargo: readonly FittingCargoItem[];
+  };
   /** The implant controls, grouped with the skills override under "Implants & skills" — absent where a Fitting has no implants to choose. */
   implants?: ReactNode;
   /** "What to train" (`FittingWhatToTrainPanel`) — absent where there's no Character to train. Collapsed by default: it only works anything out once opened. */
@@ -398,6 +404,7 @@ export function FittingStatsSections({
                   <AbyssalRunPlanner
                     hullGroupId={abyssal.hullGroupId}
                     compare={abyssal.compare}
+                    cargo={abyssal.cargo}
                     typeName={typeName}
                   />,
                   undefined,

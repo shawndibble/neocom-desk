@@ -1,0 +1,5 @@
+# Scope decisions — Abyssal planner filament cost line reads the run-profit exclusion narrowly (issue #5802)
+
+_Recorded 2026-11-01 · issue #5802._
+
+- **Decision 20261016-085801's "run profit" exclusion is read narrowly: it bars income and net outcome, not the entry cost.** The planner shows one cost-only line, "Filament cost: N x <filament> at <hub> = X ISK", from the hull rule's count (1, 2 or 3 of one type in one hold, paid once, no per-pilot or fleet split) and the Settings hub's sell price (`getHubPrices`). It stays inside the exclusion's spirit: no loot, no profit, no ISK/hr, no run logging, no comparison with anything earned. Nothing is shown when the hull can't enter or the hub has no price (never 0). Matching filaments in the open fit's own cargo reduce the priced count ("N more", "covered by cargo" with no ISK when enough); the pilot's assets are never read, and cargo is mentioned nowhere else in the planner. The line appears only once the pilot has opened the Abyssal section and picked a weather and tier; the app never infers an Abyssal fit.

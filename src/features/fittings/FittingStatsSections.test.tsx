@@ -1407,7 +1407,7 @@ describe('FittingStatsSections — Abyssal', () => {
           damageProfiles={damageProfiles()}
           targetProfiles={targetProfiles()}
           typeName={typeName}
-          abyssal={{ hullGroupId: 26, compare }}
+          abyssal={{ hullGroupId: 26, compare, cargo: [] }}
         />
       </MemoryRouter>
     );
@@ -1604,7 +1604,7 @@ describe('FittingStatsSections — column and side panels', () => {
           damageProfiles={damageProfiles()}
           targetProfiles={targetProfiles()}
           typeName={typeName}
-          abyssal={{ hullGroupId: 26, compare }}
+          abyssal={{ hullGroupId: 26, compare, cargo: [] }}
         />
       </MemoryRouter>
     );

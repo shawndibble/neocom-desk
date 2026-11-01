@@ -142,3 +142,28 @@ export function weaponReachChange(
   }
   return found;
 }
+
+export type AbyssalFilamentCost =
+  { kind: 'covered' } | { kind: 'priced'; count: number; inCargo: number; total: number };
+
+/**
+ * What the run's filaments cost at the hub: the hull's `ships` count of one
+ * type, less matching filaments in the open fit's own cargo. `covered` when
+ * the cargo already holds enough; null when the hub has no price for what is
+ * still missing, so the caller shows nothing rather than 0.
+ */
+export function abyssalFilamentCost(
+  ships: number,
+  filamentTypeId: number,
+  price: number | null,
+  cargo: readonly { typeId: number; quantity: number }[]
+): AbyssalFilamentCost | null {
+  const inCargo = cargo.reduce(
+    (sum, item) => (item.typeId === filamentTypeId ? sum + item.quantity : sum),
+    0
+  );
+  const count = Math.max(0, ships - inCargo);
+  if (count === 0) return { kind: 'covered' };
+  if (price === null || !(price > 0)) return null;
+  return { kind: 'priced', count, inCargo: Math.min(inCargo, ships), total: count * price };
+}

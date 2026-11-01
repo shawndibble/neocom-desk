@@ -318,7 +318,11 @@ export function FittingShareView({
             </div>
             <div className="min-w-0 lg:min-w-80 lg:flex-1">
               <FittingStatsSections
-                abyssal={{ hullGroupId: shipGroupId, compare: compareWeather }}
+                abyssal={{
+                  hullGroupId: shipGroupId,
+                  compare: compareWeather,
+                  cargo: state.fitting.cargo,
+                }}
                 statsWeatherTypeId={statsWeatherTypeId}
                 stats={stats}
                 statsProgress={statsProgress}
