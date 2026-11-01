@@ -3,25 +3,32 @@
  * types this module can be, each with its real base, mutaplasmid and rolls
  * (`features/abyssal/dynamicItems.ts`). Only on a press, so opening the dialog never reads assets or ESI.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { Button } from '@/components/ui';
+import { Button, SegmentedControl } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import type { MutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
 import { rollRows, type BaseValue } from '@/engine/fittings/mutationEdit';
-import type { ItemMutation } from '@/engine/fittings/types';
+import type { FittingSlotKind, ItemMutation } from '@/engine/fittings/types';
+import { AbyssalEstimateLine } from '@/features/abyssal/AbyssalEstimateLine';
 import { mutationsForItems } from '@/features/abyssal/dynamicItems';
 import { loadCharacterAssets } from '@/features/assets/assets';
+import { fixed1 } from '@/lib/fixedFormat';
 import { useRetryFocus } from '@/lib/useRetryFocus';
+import type { VariantEvaluator } from './evaluationBasis';
+import { ChangesCell } from './FittingVariationsPanel';
 import { loadBaseValues } from './loadBaseValues';
-
-interface OwnedItem {
-  itemId: number;
-  mutation: ItemMutation;
-  /** Mean roll quality, 0–1; null when the base's values won't load. */
-  quality: number | null;
-}
+import {
+  RANK_CAP,
+  evaluateOwned,
+  sortOwned,
+  topByQuality,
+  type OwnedEffect,
+  type OwnedItem,
+  type OwnedSort,
+} from './ownedMutationRanking';
 
 type Found =
   { kind: 'idle' } | { kind: 'loading' } | { kind: 'failed' } | ({ kind: 'done' } & Owned);
@@ -88,9 +95,12 @@ async function findOwned(
       ];
     })
   );
-  // Best first: the one a pilot most likely fits.
-  items.sort((a, b) => (b.quality ?? -1) - (a.quality ?? -1));
-  return { items, unread: refs.length - items.length, truncated };
+  // Best-rolled first until the fit's effect is known.
+  return {
+    items: sortOwned(items, new Map(), 'quality'),
+    unread: refs.length - items.length,
+    truncated,
+  };
 }
 
 export function MutationFromAssets({
@@ -99,6 +109,9 @@ export function MutationFromAssets({
   lookup,
   nameOf,
   onApply,
+  variants,
+  slot,
+  slotIndex,
 }: {
   characterId: number;
   /** The abyssal types to look for. */
@@ -106,9 +119,40 @@ export function MutationFromAssets({
   lookup: MutaplasmidLookup;
   nameOf: (typeId: number) => string;
   onApply: (mutation: ItemMutation) => void;
+  /** The open Fitting's evaluator; null (still loading) leaves the list in quality order. */
+  variants: VariantEvaluator | null;
+  slot: FittingSlotKind;
+  slotIndex: number;
 }) {
   const { t } = useTranslation();
   const [found, setFound] = useState<Found>({ kind: 'idle' });
+  const [sort, setSort] = useState<OwnedSort>('effect');
+  const [ranked, setRanked] = useState<{
+    items: readonly OwnedItem[];
+    variants: VariantEvaluator;
+    effects: ReadonlyMap<number, OwnedEffect>;
+  } | null>(null);
+  // Rows whose price the pilot asked for: nothing calls MutaMarket until then.
+  const [estimating, setEstimating] = useState<ReadonlySet<number>>(new Set());
+  const doneItems = found.kind === 'done' ? found.items : null;
+
+  // The top `RANK_CAP` by quality, one worker compare each, once the list is
+  // up (so only after the press that loaded it).
+  useEffect(() => {
+    if (!doneItems || !variants || doneItems.length === 0) return;
+    const controller = new AbortController();
+    void evaluateOwned({
+      variants,
+      slot,
+      slotIndex,
+      items: topByQuality(doneItems),
+      lookup,
+      signal: controller.signal,
+    }).then((effects) => {
+      if (!controller.signal.aborted) setRanked({ items: doneItems, variants, effects });
+    });
+    return () => controller.abort();
+  }, [doneItems, variants, slot, slotIndex, lookup]);
   const lacksScope = useCharacterLacksEndpoints(characterId, ['getCharacterAssets']);
   // The button stays mounted until the list replaces it; then focus moves to the list.
   const [listRef, armListFocus] = useRetryFocus(
@@ -147,6 +191,10 @@ export function MutationFromAssets({
       </div>
     );
   }
+  const current = ranked?.items === found.items && ranked.variants === variants ? ranked : null;
+  const effects = current?.effects ?? new Map<number, OwnedEffect>();
+  const evaluating = variants !== null && current === null;
+  const topIds = new Set(topByQuality(found.items).map((item) => item.itemId));
   return (
     <div ref={listRef} tabIndex={-1} className="w-full space-y-1 focus:outline-none">
       <p className="text-text-dim">
@@ -156,30 +204,102 @@ export function MutationFromAssets({
         {found.unread > 0 && ` ${t('fittings.mutation.fromAssetsUnread', { count: found.unread })}`}
         {found.truncated && ` ${t('fittings.mutation.fromAssetsTruncated')}`}
       </p>
+      {found.items.length > 0 && variants && (
+        <div className="flex flex-wrap items-center gap-2">
+          {found.items.length > 1 && (
+            <SegmentedControl
+              size="sm"
+              label={t('fittings.mutation.sortLabel')}
+              value={sort}
+              onChange={setSort}
+              options={[
+                { value: 'effect', label: t('fittings.mutation.sortEffect') },
+                { value: 'quality', label: t('fittings.mutation.sortQuality') },
+              ]}
+            />
+          )}
+          {found.items.length > RANK_CAP && (
+            <span className="text-text-dim">
+              {t('fittings.mutation.rankedCap', { shown: RANK_CAP, count: found.items.length })}
+            </span>
+          )}
+        </div>
+      )}
       {found.items.length > 0 && (
-        <ul className="space-y-1">
-          {found.items.map((item) => (
-            <li key={item.itemId}>
-              <Button
-                size="sm"
-                align="start"
-                className="w-full max-w-md"
-                onClick={() => onApply(item.mutation)}
-              >
-                <span className="min-w-0 truncate">
-                  {t('fittings.mutation.ownedItem', {
-                    base: nameOf(item.mutation.baseTypeId),
-                    mutaplasmid: nameOf(item.mutation.mutaplasmidTypeId),
-                  })}
-                </span>
-                {item.quality !== null && (
-                  <span className="ml-auto shrink-0 pl-2 text-text-dim tabular-nums">
-                    {t('fittings.mutation.ownedQuality', { pct: Math.round(item.quality * 100) })}
+        <ul className="space-y-2">
+          {sortOwned(found.items, effects, sort).map((item) => {
+            const effect = effects.get(item.itemId);
+            const abyssalTypeId = lookup.resultingType(
+              item.mutation.baseTypeId,
+              item.mutation.mutaplasmidTypeId
+            );
+            return (
+              <li key={item.itemId} className="max-w-md space-y-1">
+                <Button
+                  size="sm"
+                  align="start"
+                  className="w-full"
+                  onClick={() => onApply(item.mutation)}
+                >
+                  <span className="min-w-0 truncate">
+                    {t('fittings.mutation.ownedItem', {
+                      base: nameOf(item.mutation.baseTypeId),
+                      mutaplasmid: nameOf(item.mutation.mutaplasmidTypeId),
+                    })}
                   </span>
+                  {item.quality !== null && (
+                    <Pill className="ml-auto shrink-0">
+                      {t('fittings.mutation.ownedQuality', {
+                        pct: Math.round(item.quality * 100),
+                      })}
+                    </Pill>
+                  )}
+                </Button>
+                {variants && (
+                  <div className="px-1">
+                    {effect ? (
+                      <>
+                        <ChangesCell delta={effect.delta} t={t} />
+                        {!effect.fits && (
+                          <p className="text-warning">
+                            {effect.overage
+                              ? t('fittings.variations.stillOverBy', {
+                                  amount: fixed1(effect.overage.amount),
+                                  resource: t(`fittings.list.${effect.overage.resource}`),
+                                })
+                              : t('fittings.variations.fitsNo')}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-text-dim">
+                        {evaluating && topIds.has(item.itemId)
+                          ? t('common.loading')
+                          : t('fittings.mutation.notRanked')}
+                      </span>
+                    )}
+                  </div>
                 )}
-              </Button>
-            </li>
-          ))}
+                {abyssalTypeId !== null &&
+                  (estimating.has(item.itemId) ? (
+                    <div className="px-1">
+                      <AbyssalEstimateLine
+                        typeId={abyssalTypeId}
+                        itemId={item.itemId}
+                        characterId={characterId}
+                      />
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => setEstimating((open) => new Set(open).add(item.itemId))}
+                    >
+                      {t('fittings.mutation.estimatePrice')}
+                    </Button>
+                  ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

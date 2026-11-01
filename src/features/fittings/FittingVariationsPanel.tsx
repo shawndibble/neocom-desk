@@ -7,22 +7,24 @@ import { IskAmount, TypeIcon } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import type { SwapChange } from '@/engine/fittings/swapChanges';
 import { fittingVariationsCsvColumns, swapChangeLabel } from './fittingVariationsCsv';
 import type { VariationRow } from './useModuleVariations';
 import { fixed1 } from '@/lib/fixedFormat';
 import type { Translate } from '@/lib/translate';
 
-function ChangesCell({ row, t }: { row: VariationRow; t: Translate }) {
-  if (row.delta === null) return <span className="text-text-dim">{t('common.loading')}</span>;
-  if (row.delta.length === 0)
+/** A swap's whole-fit changes: the Variations "Changes" cell, and an owned module's row in the mutation dialog. */
+export function ChangesCell({ delta, t }: { delta: SwapChange[] | null; t: Translate }) {
+  if (delta === null) return <span className="text-text-dim">{t('common.loading')}</span>;
+  if (delta.length === 0)
     return <span className="text-text-dim">{t('fittings.variations.noChanges')}</span>;
   return (
     <div className="space-y-0.5">
       <p className="text-text-dim">
-        {t('fittings.variations.changedCount', { count: row.delta.length })}
+        {t('fittings.variations.changedCount', { count: delta.length })}
       </p>
       <div className="flex flex-wrap gap-x-2 gap-y-0.5">
-        {row.delta.map((change) => (
+        {delta.map((change) => (
           <span key={change.change.key}>{swapChangeLabel(change, t)}</span>
         ))}
       </div>
@@ -89,7 +91,7 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
       id: 'changes',
       header: t('fittings.variations.changes'),
       className: 'text-xs',
-      render: (row) => <ChangesCell row={row} t={t} />,
+      render: (row) => <ChangesCell delta={row.delta} t={t} />,
     },
     {
       id: 'fits',

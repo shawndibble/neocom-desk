@@ -2499,6 +2499,12 @@
       "fromAssetsNeedsPermission": "Loading rolls from your assets needs the Assets Permission.",
       "ownedItem": "{{base}} · {{mutaplasmid}}",
       "ownedQuality": "avg {{pct}}%",
+      "sortLabel": "Order my modules by",
+      "sortEffect": "Effect on fit",
+      "sortQuality": "Roll quality",
+      "rankedCap": "Showing the best {{shown}} of {{count}} by roll quality; the rest aren't compared.",
+      "notRanked": "Not compared",
+      "estimatePrice": "Estimate price",
       "badge": {
         "rollsUnknown": "Rolls unknown",
         "baseUnknown": "Base unknown",

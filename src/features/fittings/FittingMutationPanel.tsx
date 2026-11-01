@@ -41,6 +41,7 @@ import {
 import type { FittingModule, ItemMutation } from '@/engine/fittings/types';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
+import type { VariantEvaluator } from './evaluationBasis';
 import { attributeValueText, formatAttributeNumber } from './attributeValueText';
 import { loadBaseValues } from './loadBaseValues';
 import { useAttributeDictionary } from './useAttributeDictionary';
@@ -78,6 +79,8 @@ export interface FittingMutationPanelProps {
   edit: (change: FittingChange, coalesceKey?: string) => void;
   /** The active Character, whose assets "Load rolls from my assets" reads; null hides it. */
   characterId: number | null;
+  /** The open Fitting's evaluator, which ranks the owned modules by effect on the fit; null until ready. */
+  variants?: VariantEvaluator | null;
 }
 
 export function FittingMutationPanel(props: FittingMutationPanelProps) {
@@ -93,6 +96,7 @@ function MutationEditor({
   catalogue,
   edit,
   characterId,
+  variants = null,
   lookup,
 }: FittingMutationPanelProps & { lookup: MutaplasmidLookup }) {
   const { t } = useTranslation();
@@ -133,6 +137,9 @@ function MutationEditor({
         typeIds={assetTypes}
         lookup={lookup}
         nameOf={nameOf}
+        variants={variants}
+        slot={slot}
+        slotIndex={slotIndex}
         onApply={(owned) => {
           apply(owned);
           focusPicker();
