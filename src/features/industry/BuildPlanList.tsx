@@ -326,7 +326,14 @@ export function BuildPlanList({
   }
 
   const picker = (
-    <BlueprintPicker catalog={catalog} onPick={onCreate} ownedBlueprints={ownedBlueprints} />
+    <BlueprintPicker
+      catalog={catalog}
+      onPick={onCreate}
+      ownedBlueprints={ownedBlueprints}
+      // Takes the row's remaining width beside the funnel; `basis-48` lets the
+      // funnel wrap rather than squeeze it on the narrowest phones.
+      className="min-w-0 flex-1 basis-48"
+    />
   );
 
   return (

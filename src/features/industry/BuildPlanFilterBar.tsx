@@ -47,6 +47,7 @@ export function BuildPlanFilterBar({
       value={filter}
       onChange={onChange}
       search={search}
+      rowAlign="start"
       activeCount={activePlanFilterCount(filter)}
       title={t('industry.planFilters.title')}
     >
@@ -139,13 +140,13 @@ export function BuildPlanFilterBar({
               </Select>
             </FilterField>
           )}
-          <div className="flex flex-wrap items-center gap-2 max-lg:order-1" role="group">
+          <FilterField label={t('industry.planFilters.profit')}>
             <FilterChip
               label={t('industry.planFilters.profitableOnly')}
               selected={draft.profitableOnly}
               onToggle={() => setDraft({ ...draft, profitableOnly: !draft.profitableOnly })}
             />
-          </div>
+          </FilterField>
         </div>
       )}
     </FilterBar>
