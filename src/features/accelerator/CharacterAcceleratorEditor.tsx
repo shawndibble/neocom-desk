@@ -40,6 +40,8 @@ export function CharacterAcceleratorEditor({
         expiresAt={record?.expiresAt ?? null}
         startsAt={null}
         onBonusChange={(next) => {
+          // An emptied box reads as 0: not a bonus anyone means to save.
+          if (next < 1) return;
           setDraftBonus(next);
           if (record) void setCharacterAccelerator(characterId, next, record.expiresAt);
         }}

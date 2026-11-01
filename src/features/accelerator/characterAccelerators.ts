@@ -43,11 +43,24 @@ async function removeRecord(characterId: number): Promise<void> {
   ]);
 }
 
+/** `removeRecord` in one transaction, so a crash cannot leave the row gone and the removal unsynced. */
+function removeRecordAtomically(
+  characterId: number,
+  onlyIf?: (row: CharacterAcceleratorRecord) => boolean
+) {
+  return db.transaction('rw', db.characterAccelerators, db.settings, async () => {
+    const row = await db.characterAccelerators.get(acceleratorId(characterId));
+    if (!row || (onlyIf && !onlyIf(row))) return false;
+    await removeRecord(characterId);
+    return true;
+  });
+}
+
 /** Forgets the typed-in accelerator, so detection from the attribute sheet applies again. */
 export async function clearCharacterAccelerator(characterId: number): Promise<void> {
-  if ((await db.characterAccelerators.get(acceleratorId(characterId))) === undefined) return;
-  await removeRecord(characterId);
-  scheduleSync(characterId, { collections: ['characterAccelerators'] });
+  if (await removeRecordAtomically(characterId)) {
+    scheduleSync(characterId, { collections: ['characterAccelerators'] });
+  }
 }
 
 /** Deletes every accelerator that has run out, returning the Characters it touched. */
@@ -55,9 +68,16 @@ export async function purgeExpiredAccelerators(nowMs: number = Date.now()): Prom
   const expired = (await db.characterAccelerators.toArray()).filter(
     (record) => !isAcceleratorLive(record, nowMs)
   );
+  const purged: number[] = [];
   for (const record of expired) {
-    await removeRecord(record.characterId);
+    // Re-checked inside the transaction: the pilot may have just saved a new expiry.
+    const removed = await removeRecordAtomically(
+      record.characterId,
+      (row) => !isAcceleratorLive(row, nowMs)
+    );
+    if (!removed) continue;
+    purged.push(record.characterId);
     scheduleSync(record.characterId, { collections: ['characterAccelerators'] });
   }
-  return expired.map((record) => record.characterId);
+  return purged;
 }

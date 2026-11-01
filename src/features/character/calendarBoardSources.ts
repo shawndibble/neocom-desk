@@ -317,12 +317,6 @@ export function toContractExpirySources(
 }
 
 /**
- * ESI gives `issued` and a `duration` in whole days and never an absolute
- * expiry, so this is arithmetic rather than a field read — and getting it
- * wrong would be invisible, putting the row somewhere plausible but incorrect
- * in an otherwise sensible list. `calendarBoardSources.test.ts` pins it.
- */
-/**
  * The pilot's typed-in cerebral accelerator running out (GLOSSARY.md
  * **Accelerator**). A Character has at most one; an expired one is not a clock.
  */
@@ -342,6 +336,12 @@ export function toAcceleratorSources(
   ];
 }
 
+/**
+ * ESI gives `issued` and a `duration` in whole days and never an absolute
+ * expiry, so this is arithmetic rather than a field read — and getting it
+ * wrong would be invisible, putting the row somewhere plausible but incorrect
+ * in an otherwise sensible list. `calendarBoardSources.test.ts` pins it.
+ */
 export function toOrderExpirySources(
   orders: readonly MarketOrder[],
   typeName: TypeNamer

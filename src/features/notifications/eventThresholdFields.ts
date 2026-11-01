@@ -76,10 +76,10 @@ export const CONTRACT_EXPIRING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 1
 /** The lead times `ordersLapsing`'s inline control offers (issue #3797), all within the 72-hour Projection Horizon. */
 export const ORDERS_LAPSING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 12, 6];
 
-/** The lead times `mercenaryDenReinforced`'s inline control offers (issue #4782), all within the 72-hour Projection Horizon. */
 /** The lead times `acceleratorExpiring`'s inline control offers, all within the 72-hour Projection Horizon. */
 export const ACCELERATOR_EXPIRING_LEAD_HOUR_OPTIONS: readonly number[] = [12, 6, 3, 2, 1];
 
+/** The lead times `mercenaryDenReinforced`'s inline control offers (issue #4782), all within the 72-hour Projection Horizon. */
 export const MERCENARY_DEN_REINFORCED_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6, 1];
 
 /** The anarchy percentages `mercenaryDenAnarchy`'s inline control offers (issue #4782). */

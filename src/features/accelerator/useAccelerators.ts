@@ -21,7 +21,7 @@ const NONE: ReadonlyMap<number, CharacterAcceleratorRecord> = new Map();
 export function useCharacterAccelerators(): ReadonlyMap<number, CharacterAcceleratorRecord> {
   const rows = useLiveQuery(() => db.characterAccelerators.toArray(), []);
   useEffect(() => {
-    void purgeExpiredAccelerators();
+    if (rows !== undefined) void purgeExpiredAccelerators();
   }, [rows]);
   return useMemo(() => (rows ? new Map(rows.map((row) => [row.characterId, row])) : NONE), [rows]);
 }

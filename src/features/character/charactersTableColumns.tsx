@@ -25,7 +25,6 @@ import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { formatIsk } from '@/lib/isk';
 import type { CharacterAcceleratorRecord } from '@/db';
-import { resolveAccelerator } from '@/engine/accelerator';
 import { AcceleratorCell } from '@/features/character/AcceleratorCell';
 import {
   placeLabel,
@@ -281,14 +280,6 @@ export function buildColumns(
     accelerator: {
       id: 'accelerator',
       header: t('characters.column.accelerator'),
-      sortValue: (row) => {
-        const state = resolveAccelerator(
-          row.acceleratorRecord,
-          row.detectedAccelerator,
-          Date.now()
-        );
-        return state.kind === 'manual' ? state.expiresAt : undefined;
-      },
       render: (row) => (
         <AcceleratorCell
           characterId={row.character.characterId}
