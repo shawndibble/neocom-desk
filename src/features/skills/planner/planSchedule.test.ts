@@ -134,6 +134,22 @@ describe('schedulePlan', () => {
     expect(s.finish?.getTime()).toBe(queueEnd + own * 1000);
   });
 
+  it('keeps the remap result on the same basis as the total', () => {
+    const queueEnd = NOW + 2 * 3_600_000;
+    const plan = { entries: [entry(10, 1), entry(20, 1)], markers: [1], markerAttributes: [null] };
+    const s = schedulePlan(plan, inputs({ queueEntries: [queued(queueEnd)] }), NOW);
+    const bare = schedulePlan(plan, inputs(), NOW);
+    expect(s.markersResult).not.toBeNull();
+    expect(s.markersResult!.totalSeconds - s.markersResult!.currentSeconds).toBeCloseTo(
+      bare.markersResult!.totalSeconds - bare.markersResult!.currentSeconds,
+      5
+    );
+    expect(s.markersResult!.savingsSeconds).toBeCloseTo(
+      s.markersResult!.currentSeconds - s.markersResult!.totalSeconds,
+      5
+    );
+  });
+
   it('does not count queue levels the plan does not list', () => {
     const queueEnd = NOW + 2 * 3_600_000;
     const s = schedulePlan(

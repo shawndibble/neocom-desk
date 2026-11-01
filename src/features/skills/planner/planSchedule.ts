@@ -104,7 +104,19 @@ export function schedulePlan(
   // plan copied from the queue must still total what the game shows. The
   // finish date already includes the lead; only the total needs it.
   const pinned = pinnedInProgressEntry(plan.entries, queue, nowMs);
-  return pinned ? { ...schedule, totalSeconds: schedule.totalSeconds + pinned.seconds } : schedule;
+  if (!pinned) return schedule;
+  // The marker result's totals share the total's basis, so a "saved" figure
+  // (total minus the remap total) is not inflated by the lead.
+  const { markersResult } = schedule;
+  return {
+    ...schedule,
+    totalSeconds: schedule.totalSeconds + pinned.seconds,
+    markersResult: markersResult && {
+      ...markersResult,
+      totalSeconds: markersResult.totalSeconds + pinned.seconds,
+      currentSeconds: markersResult.currentSeconds + pinned.seconds,
+    },
+  };
 }
 
 /**
