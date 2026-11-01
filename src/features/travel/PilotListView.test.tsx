@@ -403,7 +403,16 @@ describe('PilotListView (Group by Organization, issue #5668)', () => {
     // Stands in for a name past the 40-name zKillboard cap.
     row('Imre', { corporationId: 701, corporationName: 'Ember', kills: { kind: 'notLookedUp' } }),
     row('Varek', { corporationId: 801, corporationName: 'Quiet Orbit', kills: ready() }),
-    row('Corpmate', { corporationId: 901, ownOrganization: 'corporation' }),
+    row('Corpmate', {
+      corporationId: 901,
+      corporationName: 'Home Corp',
+      ownOrganization: 'corporation',
+    }),
+    row('Corpmate Two', {
+      corporationId: 901,
+      corporationName: 'Home Corp',
+      ownOrganization: 'corporation',
+    }),
   ];
 
   beforeEach(async () => {
@@ -457,6 +466,16 @@ describe('PilotListView (Group by Organization, issue #5668)', () => {
     expect(within(alone).getByText('Varek')).toBeInTheDocument();
     // Friendly stays last and folded, as in the Kills view.
     expect(screen.queryByText('Corpmate')).toBeNull();
+  });
+
+  it('groups the Friendly section by organization too, once it is opened', async () => {
+    await db.settings.put({ key: LOCAL_GROUP_MODE_KEY, value: 'organization' });
+    renderOrgList();
+    await screen.findByRole('link', { name: 'Black Lotus' });
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }));
+    const heading = screen.getByRole('link', { name: 'Home Corp' }).closest('h3');
+    expect(heading?.textContent).toContain('2 pilots');
+    expect(screen.getByRole('table', { name: 'Home Corp' })).toBeInTheDocument();
   });
 
   it("shows a corporation's contact on that corporation, never on its alliance's heading", async () => {

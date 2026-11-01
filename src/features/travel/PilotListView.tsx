@@ -224,6 +224,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
   const checked = rows.slice(0, MAX_LIST_PILOTS).filter((row) => !row.notFound);
   const unchecked = Math.max(0, paste.names.length - MAX_LIST_PILOTS);
   const settled = checked.filter((row) => row.kills.kind !== 'loading').length;
+  const unreachable = checked.filter((row) => row.kills.kind === 'unreachable').length;
 
   const groups = new Map<PilotGroupId, PilotListRow[]>(PILOT_GROUP_ORDER.map((id) => [id, []]));
   for (const row of checked) {
@@ -373,7 +374,16 @@ function LocalList({ paste }: { paste: LocalPaste }) {
         >
           {showFriendly ? t('travel.pilot.list.friendlyHide') : t('travel.pilot.list.friendlyShow')}
         </Button>
-        {showFriendly && table(groupTitle('friendly', t, here.space), list)}
+        {showFriendly &&
+          (byOrganization ? (
+            <LocalOrgGroups
+              rows={list}
+              threatOf={(row) => rowThreat(row, now)}
+              renderRows={table}
+            />
+          ) : (
+            table(groupTitle('friendly', t, here.space), list)
+          ))}
       </section>
     );
 
@@ -395,6 +405,11 @@ function LocalList({ paste }: { paste: LocalPaste }) {
           <p role="status" className="flex items-center gap-2 text-xs text-text-dim">
             <Spinner label={t('common.loading')} />
             {t('travel.pilot.list.progress', { done: settled, total: checked.length })}
+          </p>
+        )}
+        {settled === checked.length && unreachable > 0 && (
+          <p role="status" className="text-xs text-text-dim">
+            {t('travel.pilot.list.unreachableSummary', { count: unreachable })}
           </p>
         )}
         {byOrganization ? (
@@ -596,7 +611,8 @@ function SpaceCell({ row, space, now }: { row: PilotListRow; space: KillSpace; n
     return <span className="text-text-dim">{t('travel.pilot.list.stateLoading')}</span>;
   }
   if (row.kills.kind === 'unreachable') {
-    return <span className="text-text-dim">{t('travel.pilot.list.stateUnreachable')}</span>;
+    // One request feeds all three space cells; the list-level summary says it once.
+    return <span className="text-text-dim">—</span>;
   }
   if (row.kills.kind === 'notLookedUp') {
     return (
