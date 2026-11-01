@@ -23,11 +23,9 @@ import { RowTappableContext } from '@/components/ui/tooltipHold';
 import * as Icon from '@/components/ui/icons';
 import type { CharacterRecord } from '@/db';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { isPiExpired, type AttentionEntry } from '@/features/character/rosterAttention';
 import type { QueueInfo } from '@/features/character/rosterView';
 import type { CharacterGroup, CharacterSortStats } from '@/features/character/groups';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { formatDuration } from '@/lib/duration';
 import { AchievementLine } from '@/features/character/AchievementLine';
 import type { AchievementParts } from '@/features/character/achievement';
 import {
@@ -47,9 +45,6 @@ interface CharacterCardProps {
   starred: boolean;
   isActive: boolean;
   alertCount: number;
-  attention: AttentionEntry | undefined;
-  /** One clock shared by every card (`useNow()` called once in `Characters`), not one interval per card — a large roster would otherwise re-render every card every tick regardless of whether it has anything counting down. */
-  now: number;
   onSelect: (characterId: number) => void;
   onToggleStar: (characterId: number) => void;
   onMoveToGroup: (characterId: number, groupId: string | null) => void;
@@ -58,20 +53,6 @@ interface CharacterCardProps {
   achievement: AchievementParts | null | undefined;
 }
 
-type PiCardAttention = { kind: 'stopped' } | { kind: 'expiring'; expiryMs: number };
-
-/** Card view's narrower PI signal (decision `20260925-230353`): only `idle`/`expiring-soon` reach a card, gated *before* `isPiExpired` — `decayed` also carries a real `piSoonestExpiryMs` and must stay table-only even once it's passed. */
-function piCardAttention(
-  attention: AttentionEntry | undefined,
-  nowMs: number
-): PiCardAttention | null {
-  const piAttention = attention?.piAttention;
-  if (piAttention !== 'idle' && piAttention !== 'expiring-soon') return null;
-  if (piAttention === 'idle') return { kind: 'stopped' };
-  const expiryMs = attention?.piSoonestExpiryMs;
-  if (isPiExpired(expiryMs, nowMs)) return { kind: 'stopped' };
-  return expiryMs != null ? { kind: 'expiring', expiryMs } : null;
-}
 /**
  * A corp or alliance name, plain: a roster row or card selects the Character,
  * so its Show Info links live in the selected Character's header (§6c).
@@ -91,8 +72,6 @@ export function CharacterCard({
   starred,
   isActive,
   alertCount,
-  attention,
-  now,
   onSelect,
   onToggleStar,
   onMoveToGroup,
@@ -106,7 +85,6 @@ export function CharacterCard({
   // complaint — three "Xm ago"s in a row): the oldest of whichever fields
   // this character has cached, so the card never overstates its freshness.
   const lastSynced = characterLastSynced(stats, queue);
-  const piChip = piCardAttention(attention, now);
 
   // Pointer convenience for the whole card; the name button stays the keyboard
   // control. React events bubble out of portals (the group Select's menu), so
@@ -259,17 +237,6 @@ export function CharacterCard({
           )}
           {alertCount > 0 && (
             <StatChip label={t('characters.column.alerts')} tone="warning" value={alertCount} />
-          )}
-          {piChip && (
-            <StatChip
-              label={t('characters.column.pi')}
-              tone="warning"
-              value={
-                piChip.kind === 'stopped'
-                  ? t('pi.attention.idle')
-                  : formatDuration((piChip.expiryMs - now) / 1000)
-              }
-            />
           )}
         </StatChips>
       </RowTappableContext.Provider>

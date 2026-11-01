@@ -4724,13 +4724,14 @@
     "sortKeys": {
       "name": "Name",
       "skillPoints": "Skill points",
-      "wallet": "Wallet",
+      "wallet": "ISK",
       "group": "Group",
       "alerts": "Alerts"
     },
     "activeLabel": "Active",
     "spLabel": "SP",
-    "walletLabel": "Wallet",
+    "walletLabel": "ISK",
+    "netWorthTooltip": "Snapshot of {{day}}: ISK {{isk}} · assets {{assets}} · buy orders {{escrow}} · sell orders {{sellOrders}} · contracts {{contracts}}",
     "queueState": "Queue",
     "queueStates": {
       "training": "Training",
@@ -4787,7 +4788,8 @@
       "ship": "Ship",
       "group": "Group",
       "spTotal": "SP",
-      "wallet": "Wallet",
+      "wallet": "ISK",
+      "netWorth": "Net worth",
       "lastSynced": "Last synced",
       "training": "Training",
       "pi": "PI",

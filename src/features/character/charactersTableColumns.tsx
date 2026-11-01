@@ -18,10 +18,12 @@ import { type QueueInfo } from '@/features/character/rosterView';
 import { isPiExpired, type AttentionEntry } from '@/features/character/rosterAttention';
 import { extractionTotalIsk, isSpExtractionReady } from '@/engine/skills/spExtraction';
 import { maxJobSlots, type JobSlotCategory, type JobSlotSkills } from '@/engine/industry/jobSlots';
+import type { LatestNetWorth } from '@/engine/netWorth/latest';
 import { type CharacterColumnId } from '@/features/character/characterColumns';
 import { ATTENTION_RANK, ATTENTION_TONE as PI_ATTENTION_TONE } from '@/engine/pi/colonyStatus';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
+import { formatIsk } from '@/lib/isk';
 import {
   placeLabel,
   placeSortText,
@@ -63,6 +65,8 @@ export interface CharacterRow {
   /** False when the stored grant lacks the scope: the cell says which Permission, not "unknown". */
   locationGranted: boolean;
   shipGranted: boolean;
+  /** Newest Net Worth Snapshot; undefined until the app has snapshotted this Character. */
+  netWorth: LatestNetWorth | undefined;
 }
 
 /**
@@ -266,6 +270,31 @@ export function buildColumns(
         ) : (
           <IskAmount value={row.stats.wallet} />
         ),
+    },
+    netWorth: {
+      id: 'netWorth',
+      header: t('characters.column.netWorth'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => row.netWorth?.total,
+      render: (row) => {
+        const worth = row.netWorth;
+        if (!worth) return t('common.unknown');
+        return (
+          <HintText
+            content={t('characters.netWorthTooltip', {
+              day: worth.day,
+              isk: formatIsk(worth.layers.isk),
+              assets: formatIsk(worth.layers.assets),
+              escrow: formatIsk(worth.layers.escrow),
+              sellOrders: formatIsk(worth.layers.sellOrders),
+              contracts: formatIsk(worth.layers.contracts),
+            })}
+          >
+            <IskAmount value={worth.total} />
+          </HintText>
+        );
+      },
     },
     lastSynced: {
       id: 'lastSynced',

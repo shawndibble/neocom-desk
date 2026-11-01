@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { returnPathAfterSwitch } from './characterSwitchReturn';
 
 describe('returnPathAfterSwitch', () => {
-  it('falls back to Overview with no origin, or when the origin is Characters itself', () => {
-    expect(returnPathAfterSwitch(undefined)).toBe('/overview');
-    expect(returnPathAfterSwitch('')).toBe('/overview');
-    expect(returnPathAfterSwitch('/characters')).toBe('/overview');
-    expect(returnPathAfterSwitch('/characters?view=table')).toBe('/overview');
+  it('stays put (null) with no origin, or when the origin is Characters itself', () => {
+    expect(returnPathAfterSwitch(undefined)).toBeNull();
+    expect(returnPathAfterSwitch('')).toBeNull();
+    expect(returnPathAfterSwitch('/characters')).toBeNull();
+    expect(returnPathAfterSwitch('/characters?view=table')).toBeNull();
   });
 
   it('returns to the origin page with its filters, sort and tab intact', () => {
