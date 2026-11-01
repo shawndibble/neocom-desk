@@ -5,7 +5,7 @@
  * read directly by the proposed view (a mockup draws, it does not fetch).
  */
 import type { RegionOrder } from '@/esi/endpoints';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { COMPARED_HUBS, type ComparedHub, type ComparedHubId } from '@/market/hubs';
 import { walletFixtureRoutes } from '@/storybook/esiFixtureRoutes';
 import type { FixtureRoute } from '@/storybook/fixtureFetch';
 import { sampleDate } from '@/storybook/sampleData';
@@ -31,7 +31,7 @@ export interface HubQuote {
   sellVolume: number;
 }
 
-type HubId = TradeHub['id'];
+type HubId = ComparedHubId;
 
 /** Plausible October 2026 figures: Jita cheapest for most, a Rens dip, an empty Hek book. */
 export const HUB_QUOTES: Readonly<Record<number, Readonly<Record<HubId, HubQuote>>>> = {
@@ -74,10 +74,10 @@ export const HUB_JUMPS: Readonly<Record<HubId, number>> = {
   hek: 16,
 };
 
-function ordersAt(hub: TradeHub, typeId: number, now: number): RegionOrder[] {
+function ordersAt(hub: ComparedHub, typeId: number, now: number): RegionOrder[] {
   const quote = HUB_QUOTES[typeId]?.[hub.id];
   if (!quote) return [];
-  let orderId = 7_100_000_000 + typeId * 10 + TRADE_HUBS.indexOf(hub) * 1_000_000;
+  let orderId = 7_100_000_000 + typeId * 10 + COMPARED_HUBS.indexOf(hub) * 1_000_000;
   const order = (isBuy: boolean, price: number, units: number, ageHours: number): RegionOrder => ({
     order_id: orderId++,
     type_id: typeId,
@@ -138,7 +138,7 @@ export function compareHubFixtureRoutes(): FixtureRoute[] {
     {
       path: /^\/markets\/\d+\/orders$/,
       respond: ({ url }) => {
-        const hub = TRADE_HUBS.find((h) => h.regionId === regionOf(url));
+        const hub = COMPARED_HUBS.find((h) => h.regionId === regionOf(url));
         const typeId = Number(url.searchParams.get('type_id'));
         return { body: hub ? ordersAt(hub, typeId, Date.now()) : [], headers: { 'X-Pages': '1' } };
       },

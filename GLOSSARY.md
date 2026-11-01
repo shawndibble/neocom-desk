@@ -46,7 +46,7 @@ here — they go one per file in `docs/context/decisions/`.
   Distinct from **Compare**, which puts the items in the **Compare Set** side
   by side on their own prices: an Appraisal answers "what is this pile
   worth", Compare answers "which of these is cheaper". Its "Compare hubs"
-  section prices the same pile at all 5 Trade Hubs ("where is it worth the
+  section prices the same pile at the five empire Trade Hubs ("where is it worth the
   most") and is not the **Compare** drawer. Its optional "Split each" column
   is the **split**: the midpoint of a line's buy and sell price, also shown
   on a **Shared Appraisal**.
@@ -294,7 +294,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Compare**: A resizable bottom drawer over the **Compare Set**, not a tab —
   it opens beside the order book, since comparing happens _while_ browsing.
   Shows Prices, Trade hubs and Attributes views. Distinct from **Appraisal**'s **Compare
-  hubs**, which prices one pasted pile across the five trade hubs, and from
+  hubs**, which prices one pasted pile across the five empire trade hubs, and from
   **Fitting Compare**, which never touches the Compare Set.
 - **Compare Set**: The short-lived selection of items being priced against each
   other right now — usually variants of one thing. Distinct from the
@@ -761,7 +761,7 @@ here — they go one per file in `docs/context/decisions/`.
   with one card per domain. Retired; the Overview is now an **Overview Layout**
   the pilot builds. Distinct from the **Corp Board** (`/corp`), which
   answers the same question for a corporation.
-- **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan.
+- **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan. Five empire hubs (Jita, Amarr, Dodixie, Rens, Hek) plus **Manifest**, Exordium's starter hub, which every-hub views leave out.
 - **Hauling Opportunities**: The Market page's Hauling tab: items worth buying at one **Trade Hub** to sell at another, scanned per market category, priced at an **Expected Sell Price** and sized to a **Trip Plan**. Not a price-gap list.
 - **Selling into buy orders**: (`instant` mode in code.) The **Hauling Opportunities** mode that sells the cargo instantly into the destination hub station's standing buy orders instead of listing it: priced at what those orders actually pay, after sales tax only, with no **Days to Sell** or demand.
 - **Expected Sell Price**: What a hauler should expect per unit at the destination hub if they list to sell: the lower of one tick under the cheapest listing and the volume-weighted median price the item sold at recently. Never above today's cheapest listing.

@@ -17,7 +17,7 @@ import {
   type PriceState,
 } from '@/engine/market/appraisal';
 import { applyLiveBooks, liveStationBook, type LiveBookLookup } from '@/engine/market/liveBook';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { COMPARED_HUBS, type TradeHub } from '@/market/hubs';
 import type { AppraisalOutcome, HubComparisonRow } from './appraisalData';
 import { loadLiveBooks, peekLiveBook, type LiveBook, type LiveBookRequest } from './liveBooks';
 import { loadHubJumps } from './hubJumps';
@@ -167,7 +167,7 @@ export function useAppraisalLive({
   );
   const compareRequests = useMemo<LiveBookRequest[]>(
     () =>
-      TRADE_HUBS.filter((h) => h.id !== hub.id).flatMap((other) =>
+      COMPARED_HUBS.filter((h) => h.id !== hub.id).flatMap((other) =>
         typeIds.map((typeId) => ({ hub: other, typeId }))
       ),
     [typeIds, hub]
@@ -262,7 +262,7 @@ export function useAppraisalLive({
     if (base === null || !compareOpen || compareRequests.length === 0) return;
     let cancelled = false;
     const isCancelled = () => cancelled;
-    for (const other of TRADE_HUBS) {
+    for (const other of COMPARED_HUBS) {
       void loadHubJumps(other.systemId).then((jumps) => {
         if (!cancelled && jumps)
           setHubJumps((previous) =>

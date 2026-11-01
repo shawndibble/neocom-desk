@@ -6,7 +6,7 @@
  */
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import { salesTax } from '@/engine/industry/fees';
-import { TRADE_HUBS } from '@/market/hubs';
+import { COMPARED_HUBS } from '@/market/hubs';
 import type { ReprocessingType } from '@/sde/types';
 import type { OpenOrdersPageSnapshot } from './openOrdersPageSnapshot';
 import type { CharacterSkills, OpenOrderRow } from './openOrdersModel';
@@ -215,7 +215,7 @@ export function assembleOrderDetailView(
           }
         : undefined,
     hubs: byHub
-      ? TRADE_HUBS.map((hub) => ({
+      ? COMPARED_HUBS.map((hub) => ({
           hubId: hub.id,
           systemName: hub.systemName,
           stationId: hub.stationId,

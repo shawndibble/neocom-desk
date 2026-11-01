@@ -17,7 +17,7 @@ import {
 import type { AppraisalCatalogue } from '@/engine/market/appraisalMatch';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { TRADE_HUBS } from '@/market/hubs';
+import { COMPARED_HUBS } from '@/market/hubs';
 import { addType, removeType, toggleGroup, type BuybackDraft } from './buybackDraft';
 import { namedLike, needleOf } from './shareLists';
 
@@ -94,7 +94,7 @@ export function BuybackFields({
             value={draft.hubId}
             onChange={(e) => onChange({ ...draft, hubId: e.target.value as BuybackHubId })}
           >
-            {TRADE_HUBS.map((hub) => (
+            {COMPARED_HUBS.map((hub) => (
               <option key={hub.id} value={hub.id}>
                 {hub.systemName}
               </option>

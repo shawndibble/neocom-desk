@@ -29,7 +29,12 @@ export function orderFees(
   const taxPct = salesTaxPct(accountingLevel);
   const brokerPct = order.is_buy_order
     ? 0
-    : brokerFeePct(brokerRelationsLevel, standing.factionStanding, standing.corpStanding);
+    : brokerFeePct(
+        brokerRelationsLevel,
+        standing.factionStanding,
+        standing.corpStanding,
+        standing.brokerSurchargePct
+      );
   const fees = (order.price * (taxPct + brokerPct)) / 100;
   return { fees, finalPrice: order.price - fees };
 }

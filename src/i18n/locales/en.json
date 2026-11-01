@@ -13010,7 +13010,7 @@
       "seriesAverage": "Average",
       "averageNoOrderData": "Average Price (no order data)",
       "regionAverageNoOrderData": "{{region}} average (no order data)",
-      "noOrderDataTip": "Buy and Sell lines are the best orders at the five Trade Hub stations (Jita 4-4, Amarr VIII, Dodixie IX-20, Rens VI-8, Hek VIII-12); other regions show EVE's daily traded average.",
+      "noOrderDataTip": "Buy and Sell lines are the best orders at the Trade Hub stations (Jita 4-4, Amarr VIII, Dodixie IX-20, Rens VI-8, Hek VIII-12, Manifest V); other regions show EVE's daily traded average.",
       "summaryBuyMedian": "Median buy",
       "summarySellMedian": "Median sell",
       "compareRegions": "Compare regions",

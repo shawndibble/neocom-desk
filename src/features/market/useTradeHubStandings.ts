@@ -25,12 +25,21 @@ export type TradeHubStandingsMap = ReadonlyMap<TradeHub['id'], ResolvedStandings
 
 const NO_STANDINGS: TradeHubStandingsMap = new Map();
 
+/** The standings at a hub's station, plus the hub's own broker surcharge so fee sites need no hub lookup. */
+async function resolveHubStandings(
+  hub: TradeHub,
+  entries: Parameters<typeof resolveLocationStandings>[1]
+): Promise<ResolvedStandings> {
+  const standing = await resolveLocationStandings(hub.stationId, entries);
+  return hub.brokerSurchargePct > 0
+    ? { ...standing, brokerSurchargePct: hub.brokerSurchargePct }
+    : standing;
+}
+
 async function loadTradeHubStandings(characterId: number): Promise<TradeHubStandingsMap> {
   const entries = await loadCharacterStandings(characterId);
   const resolved = await Promise.all(
-    TRADE_HUBS.map(
-      async (hub) => [hub.id, await resolveLocationStandings(hub.stationId, entries)] as const
-    )
+    TRADE_HUBS.map(async (hub) => [hub.id, await resolveHubStandings(hub, entries)] as const)
   );
   return new Map(resolved);
 }
@@ -67,9 +76,7 @@ export function useTradeHubStandingsByCharacter(
     void mapWithConcurrencyLimit(characterIds, ESI_FANOUT_CONCURRENCY, async (characterId) => {
       const entries = await loadCharacterStandings(characterId);
       const resolved = await Promise.all(
-        TRADE_HUBS.map(
-          async (hub) => [hub.id, await resolveLocationStandings(hub.stationId, entries)] as const
-        )
+        TRADE_HUBS.map(async (hub) => [hub.id, await resolveHubStandings(hub, entries)] as const)
       );
       byCharacter.set(characterId, new Map(resolved));
     }).then(() => {

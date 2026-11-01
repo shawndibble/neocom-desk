@@ -25,7 +25,7 @@ import { RemovableTypeIcon } from '@/features/market/RemovableTypeIcon';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatMarketIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { COMPARED_HUBS, type ComparedHub, type ComparedHubId } from '@/market/hubs';
 import { NewComponent } from './NewComponent';
 import {
   HUB_JUMPS,
@@ -34,7 +34,7 @@ import {
   type SampleCompareItem,
 } from './compareTradeHubsFixtures';
 
-type HubId = TradeHub['id'];
+type HubId = ComparedHubId;
 
 /** The pilot's saved Market hub, marked in its column header. */
 const OWN_HUB: HubId = 'jita';
@@ -53,7 +53,7 @@ function bestHub(
 ): HubId | null {
   let best: HubId | null = null;
   let bestValue: number | null = null;
-  for (const hub of TRADE_HUBS) {
+  for (const hub of COMPARED_HUBS) {
     if (loading.has(hub.id)) continue;
     const value = quotes[hub.id][side];
     if (value === null) continue;
@@ -70,11 +70,11 @@ function bestHub(
  * Short enough to be the phone card's gutter label too: "Amarr · 12j". The
  * own hub is named in the drawer's subtitle and its header is accent.
  */
-function hubHeader(hub: TradeHub): string {
+function hubHeader(hub: ComparedHub): string {
   return `${hub.systemName} · ${HUB_JUMPS[hub.id]}j`;
 }
 
-const OWN_HUB_NAME = TRADE_HUBS.find((hub) => hub.id === OWN_HUB)!.systemName;
+const OWN_HUB_NAME = COMPARED_HUBS.find((hub) => hub.id === OWN_HUB)!.systemName;
 
 /** A best figure carries the word, not just the colour (DESIGN.md "New since last time" rule). */
 function BestTag({ children }: { children: string }) {
@@ -90,7 +90,7 @@ function BestTag({ children }: { children: string }) {
  * link, DESIGN.md §6c "Item names": accent, solid underline, into the Market
  * browser at that hub), best buy dim beneath it.
  */
-function TradeHubCell({ row, hub, loading }: { row: HubRow; hub: TradeHub; loading: boolean }) {
+function TradeHubCell({ row, hub, loading }: { row: HubRow; hub: ComparedHub; loading: boolean }) {
   if (loading) return <span className="text-text-dim">…</span>;
   const quote = row.quotes[hub.id];
   const isBestSell = row.bestSellHub === hub.id;
@@ -154,7 +154,7 @@ export function TradeHubsTable({
         </span>
       ),
     },
-    ...TRADE_HUBS.map((hub): DataTableColumn<HubRow> => ({
+    ...COMPARED_HUBS.map((hub): DataTableColumn<HubRow> => ({
       id: hub.id,
       header: hubHeader(hub),
       headerTooltip: `${HUB_JUMPS[hub.id]} jumps from you${hub.id === OWN_HUB ? ' · your Market hub' : ''}`,
