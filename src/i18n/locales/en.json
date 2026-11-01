@@ -18057,6 +18057,7 @@
       "moonOwners": {
         "yours": "Yours",
         "yoursNote": "no owner rate · no payouts",
+        "settled": "Settled",
         "label": "Moon owners",
         "invite": "Invite a moon owner",
         "cols": {

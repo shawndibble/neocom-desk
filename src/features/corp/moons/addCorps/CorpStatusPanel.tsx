@@ -52,9 +52,9 @@ export function CorpStatusPanel({
       <ul className="divide-y divide-line">
         {items.map((item) => (
           <li key={item.corporationId} className="space-y-1 py-2 text-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="truncate font-medium">{item.name}</span>
+            <div className="flex items-start justify-between gap-2 sm:items-center">
+              <span className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
+                <span className="max-w-full truncate font-medium">{item.name}</span>
                 <CorpStatePill state={item.state} />
               </span>
               {item.state === 'gone-quiet' ? (

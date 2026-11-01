@@ -61,3 +61,23 @@ export const WithYours: Story = {
       ({ 9001: 'Ironvale Reach', 9002: 'Ashen Harbor Mining' })[id] ?? NAMES[id] ?? `#${id}`,
   },
 };
+
+/** @summary The phone list ("Stacked"): name, state and note, then the amount owed with Pay; a long name and a huge amount fit. */
+export const Phone: Story = {
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
+  args: {
+    rows: [
+      {
+        ...ROWS[0]!,
+        id: 'long',
+        corporationId: 9100,
+        owed: 48_123_456_789,
+      },
+      ...ROWS.slice(0, 2),
+    ],
+    name: (id: number) =>
+      id === 9100
+        ? 'Brinewater Deep Space Extraction and Hauling Collective'
+        : (NAMES[id] ?? `#${id}`),
+  },
+};

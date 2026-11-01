@@ -1,5 +1,6 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pill, type PillTone } from '@/components/ui/Pill';
+import { Pill } from '@/components/ui/Pill';
 import {
   Button,
   DataTable,
@@ -11,31 +12,16 @@ import {
 import {
   canPayMoonOwner,
   type MoonOwnerRow,
-  type MoonOwnerStatus,
   type MoonOwnerTotals,
 } from '@/engine/corpTaxBook/moonOwners';
 import { formatAge } from '@/lib/age';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { MoonOwnerStatusPill } from './MoonOwnerStatusPill';
+import { MoonOwnerCards } from './MoonOwnerCards';
 import { caretColumn } from './caretColumn';
 import { isk, shortDate } from './moonsFormat';
 
-const STATUS_TONE: Record<MoonOwnerStatus, PillTone> = {
-  active: 'success',
-  'cant-read': 'warning',
-  'removal-pending': 'danger',
-  'settled-otherwise': 'neutral',
-  'no-rate': 'neutral',
-  disconnected: 'danger',
-  left: 'neutral',
-  removed: 'neutral',
-};
-
 const k = (key: string) => `corpTaxBook.moons.moonOwners.${key}`;
-
-/** A moon owner's status as a word on a tint (readable without the colour). */
-export function MoonOwnerStatusPill({ status }: { status: MoonOwnerStatus }) {
-  const { t } = useTranslation();
-  return <Pill tone={STATUS_TONE[status]}>{t(k(`status.${status}`))}</Pill>;
-}
 
 const pct = (value: number | undefined) => (value === undefined ? undefined : `${value}%`);
 
@@ -61,6 +47,9 @@ export function MoonOwnersTable({
   onPay?: (row: MoonOwnerRow) => void;
 }) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
+  // The phone list has no sort control (the "Stacked" design); most owed first, as the table's default.
+  const mostOwedFirst = useMemo(() => [...rows].sort((x, y) => y.owed - x.owed), [rows]);
   const columns: DataTableColumn<MoonOwnerRow>[] = [
     {
       id: 'owner',
@@ -181,20 +170,30 @@ export function MoonOwnersTable({
           {...(totals.needALook > 0 ? { tone: 'warning' as const } : {})}
         />
       </StatChips>
-      <Panel padded={false}>
-        <DataTable
-          label={t(k('label'))}
-          columns={columns}
-          rows={rows}
-          rowKey={(r) => r.id}
-          onRowClick={onOpen}
-          rowClassName={() => 'group'}
-          defaultSort={{ columnId: 'owed', direction: 'desc' }}
-          mobileSort
-          stackColumns={2}
-          stackSummary={t(k('summary'), { shown: rows.length })}
+      {isPhone ? (
+        <MoonOwnerCards
+          rows={mostOwedFirst}
+          name={name}
+          now={now}
+          onOpen={onOpen}
+          {...(onPay ? { onPay } : {})}
         />
-      </Panel>
+      ) : (
+        <Panel padded={false}>
+          <DataTable
+            label={t(k('label'))}
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => r.id}
+            onRowClick={onOpen}
+            rowClassName={() => 'group'}
+            defaultSort={{ columnId: 'owed', direction: 'desc' }}
+            mobileSort
+            stackColumns={2}
+            stackSummary={t(k('summary'), { shown: rows.length })}
+          />
+        </Panel>
+      )}
     </div>
   );
 }
