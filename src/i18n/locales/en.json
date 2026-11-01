@@ -17454,6 +17454,22 @@
         "confirm": "Turn the book on",
         "startHint": "EVE time (UTC). Mining before this day is kept as history and owes nothing. Once Statements cover days, the start can't move over them."
       },
+      "addCorps": {
+        "failed": {
+          "wrong-corp": "That Character is not in this corporation.",
+          "not-yours": "You are not the CEO of this corporation.",
+          "own-book-exists": "This corp runs its own tax book. Delete it first, then connect it here.",
+          "already-feeder": "This corporation is already a moon owner of a book.",
+          "is-a-feeder": "This corporation is a moon owner of another book.",
+          "not-an-accountant": "EVE refused the mining ledger for this character. It needs the CEO, Director or Accountant role.",
+          "ledger-unavailable": "Could not read the mining ledger just now. Try again in a few minutes.",
+          "collector-gone": "This book is no longer running.",
+          "invite-invalid": "This connection could not be set up. Try again.",
+          "invite-revoked": "This connection could not be set up. Try again.",
+          "invite-used": "This connection could not be set up. Try again.",
+          "unknown": "Could not connect this corporation. Try again later."
+        }
+      },
       "setup": {
         "back": "Back",
         "paste": "Paste an invite link or code",

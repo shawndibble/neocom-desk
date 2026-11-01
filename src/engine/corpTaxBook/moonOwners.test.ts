@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildMoonOwners,
+  canPayMoonOwner,
   deriveModeChanges,
   deriveOwnerRateHistory,
   hasOwnRefineries,
@@ -361,5 +362,41 @@ describe('hasOwnRefineries', () => {
     expect(hasOwnRefineries([], 1, BOOK)).toBe(true);
     expect(hasOwnRefineries([entry(undefined, '2026-10-05', 1)], 0, BOOK)).toBe(true);
     expect(hasOwnRefineries([entry(BOOK, '2026-10-05', 1)], 0, BOOK)).toBe(true);
+  });
+});
+
+describe('a same-owner moon owner', () => {
+  const mine = feeder(A, {
+    sameOwner: true,
+    mode: 'settled-otherwise',
+    modeChanges: [{ from: '2026-10-01', mode: 'settled-otherwise' }],
+    agreedRatePct: undefined,
+  });
+
+  it('reads as settled otherwise: owed nothing, not payable, not a thing to look at', () => {
+    const { rows, totals } = buildMoonOwners(input({ feeders: [mine] }));
+    expect(rows[0]).toMatchObject({
+      status: 'settled-otherwise',
+      mode: 'settled-otherwise',
+      owed: 0,
+      sameOwner: true,
+    });
+    expect(canPayMoonOwner(rows[0]!)).toBe(false);
+    expect(totals.needALook).toBe(0);
+    expect(totals.owed).toBe(0);
+  });
+
+  it('stays settled even if the stored mode somehow says normal', () => {
+    const odd = { ...mine, mode: 'normal' as const, modeChanges: undefined };
+    expect(buildMoonOwners(input({ feeders: [odd] })).rows[0]).toMatchObject({
+      status: 'settled-otherwise',
+      owed: 0,
+      sameOwner: true,
+    });
+  });
+
+  it('carries the flag into the detail, and a normal owner has none', () => {
+    expect(moonOwnerDetail(input({ feeders: [mine] }), A)?.row.sameOwner).toBe(true);
+    expect(buildMoonOwners(input()).rows[0]).not.toHaveProperty('sameOwner');
   });
 });

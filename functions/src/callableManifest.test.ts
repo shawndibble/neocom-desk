@@ -47,6 +47,8 @@ const WIRE_NAMES = [
   'corpTaxBook:acceptCorpTaxBookFeederInviteCallable',
   'corpTaxBook:saveCorpTaxBookSyncGrantCallable',
   'corpTaxBook:saveCorpTaxBookFeederGrantCallable',
+  'corpTaxBook:addOwnCorpTaxBookFeederCallable',
+  'corpTaxBook:removeOwnCorpTaxBookFeederCallable',
   'corpTaxBook:leaveCorpTaxBookFeederCallable',
   'corpTaxBook:getCorpTaxBookFeederStatusCallable',
   'corpTaxBook:getCorpTaxBookFeederViewAccessCallable',

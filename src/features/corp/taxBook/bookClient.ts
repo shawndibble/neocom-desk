@@ -439,6 +439,7 @@ export type FeederPayoutRow = FeederPayout & { id: string };
 export interface BookFeeder extends FeederReadClock {
   status: 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
   mode: FeederMode;
+  sameOwner?: boolean;
   note?: string;
   invitedBy: number;
   joinedAt: number;
