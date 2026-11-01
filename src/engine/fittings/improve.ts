@@ -25,6 +25,7 @@ import {
 } from './improveGroups';
 import { breakTies, type JobCommonality } from './hullCommonality';
 import { candidateFilter, FILL_RACKS } from './improveCandidateFilter';
+import { isMutated, placeKey } from './improveMutated';
 import {
   dropLimitsOf,
   firstLimitBreach,
@@ -144,6 +145,8 @@ export interface ImproveCandidate {
   toTypeId: number;
   at: ModuleAt[];
   pairedWith?: ImproveCandidate;
+  /** Swaps away a fitted mutated module (an opt-in): its roll is lost, and the row says so (#5800). */
+  losesRoll?: boolean;
   /** Replaces a fitted module the pilot cannot fly yet: accepted even when it scores worse on the goal. */
   fixesUnflyable?: boolean;
   /** What the swaps chained behind a fix put right: the fit's budget, or its capacitor. */
@@ -549,6 +552,8 @@ export interface CandidateOptions {
   includeRigs: boolean;
   /** Officer and Deadspace modules, left out unless ticked. */
   includeOfficer: boolean;
+  /** A fitted mutated module may be swapped away, losing its roll; absent: it is left alone (#5800). */
+  allowMutated?: boolean;
   /** The hull's slots per rack, to find the empty ones; absent: no fills. */
   slotCounts?: Readonly<Record<FittingSlotKind, number>>;
   /** Absent: only a module's own variations are offered. */
@@ -843,13 +848,17 @@ export function improveCandidates(
   // The table's own groups; the community's extras (`filter.commonGroups`) are tried after them.
   const tableGroups = goalGroups.filter((group) => !filter.commonGroups.includes(group));
 
-  const copies = new Map<number, ModuleAt[]>();
+  // Copies of one type share a candidate; a mutated module has its own roll, so it never joins them (#5800).
+  const copies = new Map<string, { typeId: number; at: ModuleAt[]; mutated: boolean }>();
   for (const module of modules) {
     if (!filter.usesRack(module.slot)) continue;
-    const at = copies.get(module.typeId);
+    const mutated = isMutated(module);
+    if (mutated && !o.allowMutated) continue;
+    const key = mutated ? `${module.typeId}@${placeKey(module)}` : String(module.typeId);
     const where = { slot: module.slot, slotIndex: module.slotIndex };
-    if (at) at.push(where);
-    else copies.set(module.typeId, [where]);
+    const found = copies.get(key);
+    if (found) found.at.push(where);
+    else copies.set(key, { typeId: module.typeId, at: [where], mutated });
   }
 
   const allowed = (
@@ -868,7 +877,7 @@ export function improveCandidates(
   };
 
   const tiers: ImproveCandidate[][] = Array.from({ length: COMMON_TIER + 1 }, () => []);
-  for (const [fromTypeId, at] of copies) {
+  for (const { typeId: fromTypeId, at, mutated } of copies.values()) {
     const slot = at[0].slot;
     // A fitted module the pilot cannot fly is replaced by one they can, whatever the Reach.
     const canFly = o.pool?.pilotCanFly ?? o.pool?.flyable;
@@ -897,6 +906,7 @@ export function improveCandidates(
         toTypeId: typeId,
         at,
         ...(unflyable ? { fixesUnflyable: true } : {}),
+        ...(mutated ? { losesRoll: true } : {}),
         ...(dropsResourceRig ? { dropsResourceRig } : {}),
       });
     };
@@ -953,10 +963,27 @@ export function improveCandidates(
   }
 
   // A fit tanking the other side may convert whole, which no single swap scores well.
-  const conversions =
+  // One that strips a mutated module is dropped, or (opted in) says its roll is lost (#5800).
+  const rolls = new Set(modules.filter(isMutated).map(placeKey));
+  const conversions = (
     o.pool && o.slotCounts && freesTank && o.reach !== 'upgrade' && o.defense !== 'keep'
       ? tankConversions(modules, o.defense, o.goal, o.pool, o.slotCounts, index, allowed)
-      : [];
+      : []
+  )
+    .filter(
+      (candidate) =>
+        o.allowMutated ||
+        !candidate.conversion?.removes.some((removed) =>
+          removed.at.some((at) => rolls.has(placeKey(at)))
+        )
+    )
+    .map((candidate) =>
+      candidate.conversion?.removes.some((removed) =>
+        removed.at.some((at) => rolls.has(placeKey(at)))
+      )
+        ? { ...candidate, losesRoll: true }
+        : candidate
+    );
 
   // Empty slots are always free to fill: the first one in each rack, from the goal's groups.
   if (o.pool && o.slotCounts) {

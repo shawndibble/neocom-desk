@@ -193,6 +193,9 @@ function ImproveOptionRow({
           {option.candidate.fixesUnflyable && (
             <span className="text-warning block text-xs">{t('fittings.improve.unflyable')}</span>
           )}
+          {option.candidate.losesRoll && (
+            <span className="text-warning block text-xs">{t('fittings.improve.rollLost')}</span>
+          )}
           {option.candidate.fixesUnflyable && option.candidate.pairedWith && (
             <span className="block text-xs">
               {t(

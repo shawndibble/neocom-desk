@@ -26,6 +26,7 @@ import {
   type ImproveResult,
 } from '@/engine/fittings/improve';
 import { overBudgetResources } from '@/engine/fittings/improveFree';
+import { mutatedKept, type MutatedKept } from '@/engine/fittings/improveMutated';
 import {
   DEFAULT_GOAL_OF_ROLE,
   HULL_ROLES,
@@ -312,6 +313,8 @@ export interface ImproveConfig {
   defense: DefenseChoice;
   includeRigs: boolean;
   includeOfficer: boolean;
+  /** Swap fitted mutated modules too, losing their rolls; off: they are kept (#5800). */
+  allowMutated: boolean;
   /** Mine more: the crystal family (ore) every miner is scored with. */
   oreFamily: string;
   /** Carry more: the hold scored. */
@@ -377,6 +380,8 @@ export interface ImproveSearch {
    * powergrid or calibration, fetched on the first ask (most sets never need them); null before a search has run.
    */
   completion: (() => Promise<CompletionPool>) | null;
+  /** The fitted mutated modules this search leaves alone (#5800); none counted when swaps of them are allowed. */
+  mutatedKept: MutatedKept;
 }
 
 /** What `findCompletions` needs beyond the ticked set. */
@@ -419,6 +424,7 @@ function searchCandidates(
     defense: config.defense,
     includeRigs: config.includeRigs,
     includeOfficer: config.includeOfficer,
+    allowMutated: config.allowMutated,
     jobSetting: jobSettingOf(
       config.job,
       searchSpace(config.job, config.space, variants.fitting, catalogue),
@@ -572,6 +578,7 @@ export function useImprove(
     defense,
     includeRigs,
     includeOfficer,
+    allowMutated,
     oreFamily,
     hold,
   } = config;
@@ -661,6 +668,7 @@ export function useImprove(
               defense: side,
               includeRigs,
               includeOfficer,
+              allowMutated,
               oreFamily,
               hold,
             },
@@ -680,6 +688,7 @@ export function useImprove(
           goal: searched,
           defense: sets[0].side,
           includeRigs,
+          allowMutated,
           jobSetting,
           commonality,
           slotCounts: own.slotCounts,
@@ -925,6 +934,7 @@ export function useImprove(
     defense,
     includeRigs,
     includeOfficer,
+    allowMutated,
     oreFamily,
     hold,
     job,
@@ -940,6 +950,20 @@ export function useImprove(
   }, []);
   const restart = useCallback(() => setAttempt((n) => n + 1), []);
 
+  const kept = useMemo(() => {
+    const modules = variants?.fitting.modules ?? [];
+    // Asked of the engine only when a mutated module is fitted.
+    const pool =
+      catalogue && variants && modules.some((m) => m.mutation)
+        ? modulePool(catalogue, variants)
+        : null;
+    return mutatedKept(
+      modules,
+      allowMutated,
+      pool?.pilotCanFly ? (module) => pool.pilotCanFly!(module.slot, module.typeId) : undefined
+    );
+  }, [variants, catalogue, allowMutated]);
+
   return {
     goal: before ? searchableGoal(goal, before, hull) : goal,
     hull,
@@ -950,5 +974,6 @@ export function useImprove(
     restart,
     recalc: enabled ? recalc : null,
     completion: enabled ? completion : null,
+    mutatedKept: kept,
   };
 }
