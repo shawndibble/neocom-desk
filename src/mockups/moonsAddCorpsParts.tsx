@@ -1,5 +1,14 @@
 import { useState, type ReactNode } from 'react';
-import { Button, Checkbox, Modal, NativeSelect, Panel, ProgressBar } from '@/components/ui';
+import {
+  Button,
+  CharacterAvatar,
+  Checkbox,
+  Disclosure,
+  Modal,
+  NativeSelect,
+  Panel,
+  ProgressBar,
+} from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import { MAIN_CORP, type CorpState, type MyCorp } from './moonsAddCorpsFixtures';
 
@@ -26,7 +35,7 @@ const FIX: Partial<Record<CorpState, { text: string; action: string }>> = {
     action: 'Sign in as another character',
   },
   'own-book': {
-    text: 'This corp runs its own tax book. A corp can run its own or feed this one, not both.',
+    text: 'This corp runs its own tax book. A corp can run its own book or be a moon owner here, not both.',
     action: 'Move it into this book…',
   },
   'gone-quiet': {
@@ -35,7 +44,7 @@ const FIX: Partial<Record<CorpState, { text: string; action: string }>> = {
   },
 };
 
-export function StatePill({ state }: { state: CorpState }) {
+function StatePill({ state }: { state: CorpState }) {
   return <Pill tone={STATE[state].tone}>{STATE[state].label}</Pill>;
 }
 
@@ -71,9 +80,7 @@ export function NewCorpBanner({ corp }: { corp: MyCorp }) {
         </span>
       </p>
       <div className="flex flex-wrap gap-2">
-        <Button variant="primary" size="sm">
-          Connect it
-        </Button>
+        <Button size="sm">Connect it</Button>
         <Button size="sm">Not now</Button>
         <Button size="sm">Don’t ask again</Button>
       </div>
@@ -82,7 +89,7 @@ export function NewCorpBanner({ corp }: { corp: MyCorp }) {
 }
 
 /** Moon owners list as the book shows it afterwards: his own corps carry a Yours pill. */
-export function MoonOwnersAfter({ corps }: { corps: MyCorp[] }) {
+function MoonOwnersAfter({ corps }: { corps: MyCorp[] }) {
   const rows = corps.filter((c) => c.state === 'connected');
   return (
     <Panel title="Moon owners" meta={`${rows.length} corps`}>
@@ -229,32 +236,45 @@ export function ConfirmBatch({ corps }: { corps: MyCorp[] }) {
             a previous owner would be counted again if you go back.
           </span>
         </label>
-        <details className="text-xs text-text-dim">
-          <summary className="cursor-pointer">Corps in this batch ({corps.length})</summary>
-          <ul className="mt-1 columns-2 space-y-0.5">
+        <Disclosure
+          label={`Corps in this batch (${corps.length})`}
+          expanded={false}
+          onToggle={noop}
+        >
+          <ul className="columns-2 space-y-0.5 text-xs text-text-dim">
             {corps.map((c) => (
               <li key={c.id}>
                 {c.name} · {c.ceo}
               </li>
             ))}
           </ul>
-        </details>
+        </Disclosure>
       </div>
     </Modal>
   );
 }
 
-/** Step 3: the guided sign-in sequence. `done` corps are finished, the next one is current. */
+/** What happened on the last return from EVE, shown above the next sign-in. */
+export type SignInOutcome =
+  { kind: 'connected'; corp: string } | { kind: 'wrong-character'; signedInAs: string };
+
+/**
+ * Step 3: the guided sign-in sequence. `done` corps are finished and the next is
+ * current. The run lives in the browser, so EVE's redirect back reopens this
+ * dialog on the next corp (or the same one after a wrong character).
+ */
 export function SignInSequence({
   corps,
   done,
   skipped,
+  outcome,
 }: {
   corps: MyCorp[];
   done: number;
   skipped: number[];
+  outcome?: SignInOutcome;
 }) {
-  const current = corps[done];
+  const current = corps[done]!;
   return (
     <Modal
       open
@@ -264,15 +284,38 @@ export function SignInSequence({
       footer={
         <div className="flex items-center justify-between gap-2">
           <Button>Stop here</Button>
-          <Button variant="primary">Sign in as {current?.ceo} with EVE</Button>
+          <Button variant="primary">Sign in as {current.ceo} with EVE</Button>
         </div>
       }
     >
       <div className="space-y-3 text-sm">
+        {outcome?.kind === 'connected' && (
+          <p role="status" className="rounded-xs border border-success/40 p-2 text-success">
+            Connected {outcome.corp}. Next up is {current.name}.
+          </p>
+        )}
+        {outcome?.kind === 'wrong-character' && (
+          <p role="alert" className="rounded-xs border border-danger/40 p-2 text-danger">
+            You signed in as {outcome.signedInAs}. {current.name} needs {current.ceo}. Nothing was
+            connected; try again with the character below.
+          </p>
+        )}
         <ProgressBar label="Corps connected" value={done} max={corps.length} />
-        <p>
-          Next: <span className="font-semibold">{current?.name}</span>. EVE will ask you to choose{' '}
-          <span className="font-semibold">{current?.ceo}</span> on its login page.
+        <div className="flex items-center gap-3 rounded-xs border border-accent/40 bg-panel p-3">
+          <CharacterAvatar characterId={current.ceoId} size="lg" alt={current.ceo} />
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-wide text-text-dim">
+              Choose this character on EVE’s login page
+            </p>
+            <p className="truncate text-lg font-semibold">{current.ceo}</p>
+            <p className="truncate text-text-dim">CEO of {current.name}</p>
+          </div>
+        </div>
+        <p className="text-xs text-text-dim">
+          Signed in to EVE as someone else? Pick{' '}
+          <span className="font-semibold">{current.ceo}</span> from the account list, or use “Log in
+          with a different character”. EVE brings you back here and this window opens on the next
+          corp. You can close the tab between corps; your place is kept.
         </p>
         <ul className="divide-y divide-line">
           {corps.map((c, i) => {
@@ -291,8 +334,8 @@ export function SignInSequence({
           })}
         </ul>
         <p className="text-xs text-text-dim">
-          Each sign-in sends you straight to the next corp. If one fails it is skipped and listed
-          under Needs sign-in, so you never have to start over.
+          If a sign-in fails it is skipped and listed under Needs sign-in, so you never have to
+          start over.
         </p>
       </div>
     </Modal>
@@ -301,7 +344,10 @@ export function SignInSequence({
 
 /** After the run: every corp with its status and, where there is one, the one-line fix. */
 export function CorpStatusList({ corps }: { corps: MyCorp[] }) {
-  const attention = corps.filter((c) => FIX[c.state]);
+  const attention = corps.flatMap((c) => {
+    const fix = FIX[c.state];
+    return fix ? [{ corp: c, fix }] : [];
+  });
   const ok = corps.filter((c) => !FIX[c.state]);
   return (
     <div className="space-y-4">
@@ -310,7 +356,7 @@ export function CorpStatusList({ corps }: { corps: MyCorp[] }) {
         meta={`${ok.length} of ${corps.length} connected`}
       >
         <ul className="divide-y divide-line">
-          {attention.map((c) => (
+          {attention.map(({ corp: c, fix }) => (
             <li key={c.id} className="space-y-1 py-2 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2">
@@ -318,10 +364,10 @@ export function CorpStatusList({ corps }: { corps: MyCorp[] }) {
                   <StatePill state={c.state} />
                 </span>
                 <Button size="sm" variant={c.state === 'gone-quiet' ? 'danger' : 'ghost'}>
-                  {FIX[c.state]!.action}
+                  {fix.action}
                 </Button>
               </div>
-              <p className="text-xs text-text-dim">{FIX[c.state]!.text}</p>
+              <p className="text-xs text-text-dim">{fix.text}</p>
               {c.state === 'gone-quiet' && (
                 <p className="text-xs text-text-dim">
                   Removing keeps its past mining and billing records.
@@ -336,16 +382,32 @@ export function CorpStatusList({ corps }: { corps: MyCorp[] }) {
   );
 }
 
-/** The list a corp can be brought back from after “Don’t ask again”. */
+/**
+ * Opened from the picker's "Hidden corps (N)" button, never shown on the page: a
+ * corp dismissed with "Don't ask again" stays out of the banner and the picker
+ * until it is added back here.
+ */
 export function HiddenCorps({ corps }: { corps: MyCorp[] }) {
   const hidden = corps.filter((c) => c.state === 'hidden');
   return (
-    <Panel title="Hidden corps" meta="You chose not to be asked about these">
+    <Modal
+      open
+      onClose={noop}
+      title="Hidden corps"
+      footer={
+        <div className="flex justify-end">
+          <Button>Done</Button>
+        </div>
+      }
+    >
+      <p className="mb-2 text-sm text-text-dim">
+        You chose not to be asked about these. Add one back and it appears in the list again.
+      </p>
       <ul className="divide-y divide-line">
         {hidden.map((c) => (
           <CorpRow key={c.id} corp={c} trailing={<Button size="sm">Add</Button>} />
         ))}
       </ul>
-    </Panel>
+    </Modal>
   );
 }
