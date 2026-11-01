@@ -17456,6 +17456,7 @@
       },
       "addCorps": {
         "open": "Add my other corps",
+        "openShort": "Add corps",
         "resume": "Continue ({{done}} of {{total}})",
         "resumeHint": "You were connecting your corps. {{done}} of {{total}} are done.",
         "bannerTitle": "New corp found: {{name}}.",

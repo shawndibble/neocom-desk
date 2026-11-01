@@ -75,10 +75,10 @@ export function MoonOwnersTable({
           <span className="block text-xs text-text-dim">
             {t(k('refineries'), { count: r.refineryCount })}
             {' · '}
-            {r.sameOwner
-              ? t(k('yoursNote'))
-              : r.status === 'cant-read' && r.staleSince !== undefined
-                ? t(k('cantReadSince'), { date: shortDate(new Date(r.staleSince).toISOString()) })
+            {r.status === 'cant-read' && r.staleSince !== undefined
+              ? t(k('cantReadSince'), { date: shortDate(new Date(r.staleSince).toISOString()) })
+              : r.sameOwner
+                ? t(k('yoursNote'))
                 : r.lastReadWellAt !== undefined
                   ? t(k('synced'), { age: formatAge(now - Date.parse(r.lastReadWellAt), t) })
                   : ''}

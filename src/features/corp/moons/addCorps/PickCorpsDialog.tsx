@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { InlineError } from '@/components/ui/InlineError';
 import { Button, Checkbox, Modal, Spinner } from '@/components/ui';
 import type { AddCorpsCandidate } from '@/engine/corpTaxBook/addCorpsRun';
 import { CorpRow } from './CorpRow';
@@ -68,9 +69,7 @@ export function PickCorpsDialog({
       {loading && corps.length === 0 ? (
         <Spinner label={t(k('loading'))} />
       ) : error && corps.length === 0 ? (
-        <p role="alert" className="text-sm text-danger">
-          {t(k('error'))}
-        </p>
+        <InlineError>{t(k('error'))}</InlineError>
       ) : corps.length === 0 ? (
         <p className="text-sm text-text-dim">{t(k('empty'))}</p>
       ) : (

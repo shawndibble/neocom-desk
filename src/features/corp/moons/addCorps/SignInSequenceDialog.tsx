@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, CharacterAvatar, Modal, ProgressBar } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
@@ -6,6 +6,24 @@ import { current, progress, type AddCorpsRun } from '@/engine/corpTaxBook/addCor
 import { addCorpsErrorText } from '../addCorpsErrorText';
 import { stateOfOutcome } from './addCorpsStatus';
 import { CorpRow, CorpStatePill } from './CorpRow';
+
+const NOTE_TONE = {
+  danger: 'border-danger/40 text-danger',
+  success: 'border-success/40 text-success',
+  warning: 'border-warning/40 text-warning',
+} as const;
+
+/** One outcome line above the log-in card: what the last return from EVE did. */
+function OutcomeNote({ tone, children }: { tone: keyof typeof NOTE_TONE; children: ReactNode }) {
+  return (
+    <p
+      role={tone === 'danger' ? 'alert' : 'status'}
+      className={`rounded-xs border p-2 ${NOTE_TONE[tone]}`}
+    >
+      {children}
+    </p>
+  );
+}
 
 const k = (key: string) => `corpTaxBook.moons.addCorps.signIn.${key}`;
 
@@ -61,30 +79,26 @@ export function SignInSequenceDialog({
       }
     >
       <div className="space-y-3 text-sm">
-        {failed && (
-          <p role="alert" className="rounded-xs border border-danger/40 p-2 text-danger">
-            {t(k('failed'))}
-          </p>
-        )}
+        {failed && <OutcomeNote tone="danger">{t(k('failed'))}</OutcomeNote>}
         {last?.outcome.kind === 'connected' && lastCorp && (
-          <p role="status" className="rounded-xs border border-success/40 p-2 text-success">
+          <OutcomeNote tone="success">
             {t(k('connected'), { name: lastCorp.name, next: cur.name })}
-          </p>
+          </OutcomeNote>
         )}
         {last?.outcome.kind === 'wrong-character' && (
-          <p role="alert" className="rounded-xs border border-danger/40 p-2 text-danger">
+          <OutcomeNote tone="danger">
             {t(k('wrong'), {
               signedInAs: last.outcome.signedInAs,
               corp: cur.name,
               ceo: cur.ceoName,
             })}
-          </p>
+          </OutcomeNote>
         )}
         {last &&
           lastCorp &&
           last.outcome.kind !== 'connected' &&
           last.outcome.kind !== 'wrong-character' && (
-            <p role="status" className="rounded-xs border border-warning/40 p-2 text-warning">
+            <OutcomeNote tone="warning">
               {t(k('notConnected'), {
                 name: lastCorp.name,
                 reason:
@@ -92,7 +106,7 @@ export function SignInSequenceDialog({
                     ? addCorpsErrorText(t, last.outcome.reason)
                     : t(k('cancelled')),
               })}
-            </p>
+            </OutcomeNote>
           )}
         <ProgressBar label={t(k('progress'))} value={done} max={total} />
         <div className="flex items-center gap-3 rounded-xs border border-accent/40 bg-panel p-3">

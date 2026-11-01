@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { InlineError } from '@/components/ui/InlineError';
 import { Button, Panel } from '@/components/ui';
 import { addCorpsErrorText } from '../addCorpsErrorText';
 import type { NeedsYouItem } from './addCorpsStatus';
@@ -83,11 +84,7 @@ export function CorpStatusPanel({
             {item.state === 'gone-quiet' && (
               <p className="text-xs text-text-dim">{t(k('gone-quiet.keeps'))}</p>
             )}
-            {failedId === item.corporationId && (
-              <p role="alert" className="text-xs text-danger">
-                {t(k('removeFailed'))}
-              </p>
-            )}
+            {failedId === item.corporationId && <InlineError>{t(k('removeFailed'))}</InlineError>}
           </li>
         ))}
       </ul>
