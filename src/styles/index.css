@@ -233,7 +233,7 @@
   }
 
   /*
-   * Edge fade: a bar that overflows fades out at whichever end still has
+   * Edge fade (`.tab-scroller`, and `.edge-fade-x` for a non-tab scroller that keeps its scrollbar): a bar that overflows fades out at whichever end still has
    * tabs beyond it (right at rest, left once scrolled, both mid-way), so a
    * tab cut off at the edge reads as "swipe for more" and not as a clipped
    * label. Driven by the scroller's own scroll position, so a bar that fits
@@ -273,7 +273,8 @@
   }
 
   @supports (animation-timeline: scroll()) {
-    .tab-scroller {
+    .tab-scroller,
+    .edge-fade-x {
       /* A tab scrolled into view stops clear of the fade, not under it. */
       scroll-padding-inline: 1.5rem;
       animation:

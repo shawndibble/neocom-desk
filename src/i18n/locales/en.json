@@ -9159,6 +9159,8 @@
     "picksNoteLabel": "About these picks",
     "chainTip": "Click for the planets, haul and assumptions.",
     "chainTip_touch": "Tap for the planets, haul and assumptions.",
+    "scrollBefore": "Scroll the map left",
+    "scrollAfter": "Scroll the map right",
     "boardLabel": "Planet map: planet types, then raw, processed, refined, specialized and advanced products",
     "planetsTitle": "Planets",
     "planetsSub": "Tick yours",
