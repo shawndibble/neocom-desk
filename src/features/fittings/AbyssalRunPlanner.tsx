@@ -290,7 +290,7 @@ export function AbyssalRunPlanner({
           </li>
         )}
       </ul>
-      {filamentId !== null && hull.eligible && hull.shipClass !== 'cruiser' && (
+      {hull.eligible && hull.shipClass !== 'cruiser' && (
         <StatNote>{t(`fittings.abyssalRun.fleetNote.${hull.shipClass}`)}</StatNote>
       )}
     </div>
@@ -315,13 +315,17 @@ function buyDetail(
     : `${t('fittings.abyssalRun.buyCount', { count: cost.count })} · ${t('fittings.abyssalRun.buyIsk', { isk, hub })}`;
 }
 
-function strengthRange(t: Translate, tier: AbyssalTier, weather: AbyssalWeather): string {
+function tierRange(tier: AbyssalTier, weather: AbyssalWeather) {
   const levels = abyssalTierLevels(tier);
-  return t('fittings.abyssalRun.strengthNote', {
+  return {
     tier,
     low: abyssalWeatherOf(weather.kind, levels[0]).penaltyPercent,
     high: abyssalWeatherOf(weather.kind, levels[1]).penaltyPercent,
-  });
+  };
+}
+
+function strengthRange(t: Translate, tier: AbyssalTier, weather: AbyssalWeather): string {
+  return t('fittings.abyssalRun.strengthNote', tierRange(tier, weather));
 }
 
 /**
@@ -337,9 +341,7 @@ function StrengthOffNote({ tier, weather }: { tier: AbyssalTier; weather: Abyssa
   return (
     <li className="text-warning">
       {t('fittings.abyssalRun.strengthOff', {
-        tier,
-        low: abyssalWeatherOf(weather.kind, levels[0]).penaltyPercent,
-        high: abyssalWeatherOf(weather.kind, levels[1]).penaltyPercent,
+        ...tierRange(tier, weather),
         picked: weather.penaltyPercent,
         from: rolling[0],
         to: rolling[rolling.length - 1],
