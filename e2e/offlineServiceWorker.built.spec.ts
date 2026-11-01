@@ -44,6 +44,31 @@ test('boots, deep-links and serves a cached lazy SDE file with no network', asyn
     .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))
     .toBe(true);
 
+  // The first load ran before the worker controlled the page, so the lazy chunks the landing
+  // page needs (the Login demo board) never passed through the worker's cache. Only the boot
+  // graph is precached; the rest waits for the idle warm, which the offline reload below must
+  // not race. Reload under the worker's control, then wait until every script the page loaded
+  // is in Cache Storage.
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Log in with EVE Online' }).first()).toBeVisible();
+  // The demo board mounts after the button, so let its chunks finish loading before listing them.
+  await page.waitForLoadState('networkidle');
+  const scriptUrls = await page.evaluate(() =>
+    performance
+      .getEntriesByType('resource')
+      .map((entry) => entry.name)
+      .filter((url) => /\/assets\/[^/]+\.js$/.test(url))
+  );
+  expect(scriptUrls.length).toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async (urls) => (await Promise.all(urls.map((url) => caches.match(url)))).every(Boolean),
+        scriptUrls
+      )
+    )
+    .toBe(true);
+
   // Fetch the lazy file online once: the worker's CacheFirst route stores it
   // (asynchronously, after the response is handed back).
   const online = await page.evaluate(async (url) => (await fetch(url)).status, LAZY_SDE_URL);
