@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InlineError } from '@/components/ui/InlineError';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { Button, Checkbox, Modal, Spinner } from '@/components/ui';
 import type { AddCorpsCandidate } from '@/engine/corpTaxBook/addCorpsRun';
 import { CorpRow } from './CorpRow';
@@ -89,11 +90,13 @@ export function PickCorpsDialog({
                 name={c.name}
                 ceoName={c.ceoName}
                 leading={
-                  <Checkbox
-                    checked={picked.includes(c.corporationId)}
-                    onChange={() => toggle(c.corporationId)}
-                    aria-label={t(k('connect'), { name: c.name })}
-                  />
+                  <label className={touchCheckboxLabelClassName}>
+                    <Checkbox
+                      checked={picked.includes(c.corporationId)}
+                      onChange={() => toggle(c.corporationId)}
+                      aria-label={t(k('connect'), { name: c.name })}
+                    />
+                  </label>
                 }
                 trailing={
                   <Button
