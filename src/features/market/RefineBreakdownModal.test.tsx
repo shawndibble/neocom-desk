@@ -107,7 +107,10 @@ describe('RefineBreakdownModal', () => {
   });
 
   it('says so when the yield is the NPC default on the live tab, never silently', () => {
-    open({ setup: { yieldRate: 0.5, taxRate: 0 }, setupFields: <span>fields</span> });
+    open({
+      setup: { yieldRate: 0.5, taxRate: 0 },
+      editSetup: { onYield: vi.fn(), onTax: vi.fn() },
+    });
     expect(screen.getByText(/Assuming an NPC station's 50% yield/)).toBeInTheDocument();
   });
 

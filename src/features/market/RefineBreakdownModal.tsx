@@ -11,15 +11,14 @@
  * All the figures come from `buildRefineBreakdown`; this only lays them out.
  */
 import { useState, type ReactNode } from 'react';
+import { InlinePercent } from '@/features/refining/InlinePercent';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   DataTable,
-  Fields,
   IskAmount,
   Modal,
-  StatChip,
-  StatChips,
+  InfoTooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -60,8 +59,8 @@ interface RefineBreakdownModalProps {
   mineralNames: ReadonlyMap<number, string>;
   /** The item to open on, or null for the whole pile. */
   initialTypeId: number | null;
-  /** Live tab only: the editable Refining Setup fields, shown in place of the plain readout. */
-  setupFields?: ReactNode;
+  /** Live tab only: makes the facility yield and tax editable in place; each change is saved as it is made. */
+  editSetup?: { onYield: (fraction: number) => void; onTax: (fraction: number) => void };
   /** Shared page only. */
   shared?: SharedRefineView;
 }
@@ -78,7 +77,7 @@ export function RefineBreakdownModal({
   setup,
   mineralNames,
   initialTypeId,
-  setupFields,
+  editSetup,
   shared,
 }: RefineBreakdownModalProps) {
   const { t } = useTranslation();
@@ -229,35 +228,53 @@ export function RefineBreakdownModal({
           </div>
         )}
 
-        {setupFields ? (
-          <Fields variant="form">{setupFields}</Fields>
-        ) : (
-          <StatChips>
-            <StatChip
-              label={t('market.appraisal.refineYield')}
-              value={pct(setup.yieldRate)}
-              tooltip={t('market.appraisal.refineYieldHelp')}
-            />
-            <StatChip
-              label={t('market.appraisal.refineTax')}
-              value={pct(setup.taxRate)}
-              tooltip={t('market.appraisal.refineTaxHelp')}
-            />
-          </StatChips>
-        )}
-        <StatChips>
-          <StatChip
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <SetupBox
+            label={t('market.appraisal.refineYield')}
+            tooltip={t('market.appraisal.refineYieldHelp')}
+          >
+            {editSetup ? (
+              <InlinePercent
+                fraction={setup.yieldRate}
+                name={t('market.appraisal.refineYield')}
+                min={1}
+                max={100}
+                onCommit={editSetup.onYield}
+              />
+            ) : (
+              pct(setup.yieldRate)
+            )}
+          </SetupBox>
+          <SetupBox
+            label={t('market.appraisal.refineTax')}
+            tooltip={t('market.appraisal.refineTaxHelp')}
+          >
+            {editSetup ? (
+              <InlinePercent
+                fraction={setup.taxRate}
+                name={t('market.appraisal.refineTax')}
+                min={0}
+                max={100}
+                onCommit={editSetup.onTax}
+              />
+            ) : (
+              pct(setup.taxRate)
+            )}
+          </SetupBox>
+          <SetupBox
             label={t('market.appraisal.breakdown.skills')}
-            value={skillsText(breakdown.efficiencyMin, breakdown.efficiencyMax, setup.yieldRate)}
             tooltip={t('market.appraisal.breakdown.skillsHelp')}
-          />
-          <StatChip
+          >
+            {skillsText(breakdown.efficiencyMin, breakdown.efficiencyMax, setup.yieldRate)}
+          </SetupBox>
+          <SetupBox
             label={t('market.appraisal.breakdown.efficiency')}
-            value={efficiencyText(breakdown.efficiencyMin, breakdown.efficiencyMax)}
-            tone="accent"
             tooltip={t('market.appraisal.breakdown.efficiencyHelp')}
-          />
-        </StatChips>
+            accent
+          >
+            {efficiencyText(breakdown.efficiencyMin, breakdown.efficiencyMax)}
+          </SetupBox>
+        </div>
         {assumingDefault && (
           <p className="flex items-start gap-1.5 text-xs text-warning">
             <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} className="mt-px shrink-0" />
@@ -436,6 +453,32 @@ export function RefineBreakdownModal({
         )}
       </div>
     </Modal>
+  );
+}
+
+/** One of the four setup readouts: a label, its explanation, and the figure (or the field that edits it). */
+function SetupBox({
+  label,
+  tooltip,
+  accent = false,
+  children,
+}: {
+  label: string;
+  tooltip: string;
+  accent?: boolean;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5 rounded-xs border border-line bg-panel px-2.5 py-1.5">
+      <span className="flex items-center gap-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+        {label}
+        <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />
+      </span>
+      <span className={cx('text-sm font-medium tabular-nums', accent && 'text-accent')}>
+        {children}
+      </span>
+    </div>
   );
 }
 

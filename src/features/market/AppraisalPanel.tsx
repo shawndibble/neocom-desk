@@ -62,7 +62,6 @@ import { useAppraisalShare } from './useAppraisalShare';
 import { RefineBreakdownModal } from './RefineBreakdownModal';
 import { efficiencyText } from './refineFormat';
 import { useRefineMineralNames } from './useRefineMineralNames';
-import { RefiningSetupFields } from '@/features/refining/RefiningSetupFields';
 import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 import { DEFAULT_REFINING_SETUP } from '@/engine/industry/refiningSetup';
 import { refineEfficiencyRange } from '@/engine/market/refineBreakdown';
@@ -494,7 +493,10 @@ export function AppraisalPanel({
           setup={{ yieldRate: refineSetup.stationRate, taxRate: refineSetup.taxRate }}
           mineralNames={mineralNames}
           initialTypeId={refineModal.typeId}
-          setupFields={<RefiningSetupFields refining={refiningSetup} />}
+          editSetup={{
+            onYield: (fraction) => void refiningSetup.setYieldRate(fraction),
+            onTax: (fraction) => void refiningSetup.setTaxRate(fraction),
+          }}
         />
       )}
       {janice.status === 'fetching' && <Toast message={t('market.appraisal.janiceFetching')} />}
