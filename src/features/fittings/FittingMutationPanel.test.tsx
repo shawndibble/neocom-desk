@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { newFitting } from '@/engine/fittings/fittingEdit';
 import type { Fitting, FittingModule } from '@/engine/fittings/types';
+import type { VariantEvaluator } from './evaluationBasis';
 import { FittingMutationPanel } from './FittingMutationPanel';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
@@ -76,6 +77,17 @@ vi.mock('@/features/assets/assets', () => ({
 vi.mock('@/features/abyssal/dynamicItems', () => ({
   mutationsForItems: assets.mutationsForItems,
 }));
+const rank = vi.hoisted(() => ({ evaluate: vi.fn(), estimate: vi.fn() }));
+vi.mock('./ownedMutationRanking', async (original) => ({
+  ...(await original<typeof import('./ownedMutationRanking')>()),
+  evaluateOwned: rank.evaluate,
+}));
+vi.mock('@/features/abyssal/AbyssalEstimateLine', () => ({
+  AbyssalEstimateLine: ({ itemId }: { itemId: number }) => {
+    rank.estimate(itemId);
+    return <p>estimate for {itemId}</p>;
+  },
+}));
 const scope = vi.hoisted(() => ({ lacks: false }));
 vi.mock('@/app/useGrantedScopes', () => ({
   useCharacterLacksEndpoints: () => scope.lacks,
@@ -92,7 +104,11 @@ const catalogue = {
   types: Object.fromEntries(Object.entries(NAMES).map(([id, name]) => [id, { name }])),
 } as unknown as FittingCatalogue;
 
-function setup(module: FittingModule, characterId: number | null = null) {
+function setup(
+  module: FittingModule,
+  characterId: number | null = null,
+  variants: VariantEvaluator | null = null
+) {
   const edit = vi.fn<(change: FittingChange, coalesceKey?: string) => void>();
   const panel = (shown: FittingModule, character: number | null) => (
     <MemoryRouter>
@@ -101,6 +117,7 @@ function setup(module: FittingModule, characterId: number | null = null) {
         catalogue={catalogue}
         edit={edit}
         characterId={character}
+        variants={variants}
       />
     </MemoryRouter>
   );
@@ -128,6 +145,8 @@ beforeEach(() => {
   scope.lacks = false;
   assets.loadCharacterAssets.mockReset();
   assets.mutationsForItems.mockReset();
+  rank.evaluate.mockReset();
+  rank.estimate.mockReset();
 });
 
 describe('FittingMutationPanel', () => {
@@ -244,6 +263,89 @@ describe('FittingMutationPanel', () => {
       })
     );
     expect(after()).toMatchObject({ typeId: ABYSSAL, mutation: owned });
+  });
+
+  it('ranks the owned modules by effect on the fit, offers quality order, and prices only on a press', async () => {
+    const user = userEvent.setup();
+    const rolls = (power: number) => ({
+      baseTypeId: GREMLIN,
+      mutaplasmidTypeId: GRAVID,
+      attributes: { [CAP]: 100, [POWER]: power },
+    });
+    assets.loadCharacterAssets.mockResolvedValue({
+      cached: {
+        truncated: false,
+        data: [
+          { type_id: ABYSSAL, item_id: 501, quantity: 1, location_flag: 'Hangar' },
+          { type_id: ABYSSAL, item_id: 502, quantity: 1, location_flag: 'Hangar' },
+        ],
+      },
+      needsReauth: false,
+    });
+    // 501 rolls closer to the good end (lower power) so it has the higher quality,
+    // but 502 is what the fit likes better.
+    assets.mutationsForItems.mockResolvedValue(
+      new Map([
+        [501, rolls(850)],
+        [502, rolls(1200)],
+      ])
+    );
+    const effect = (score: number) => ({ delta: [], fits: true, overage: null, score });
+    rank.evaluate.mockResolvedValue(
+      new Map([
+        [501, effect(1)],
+        [502, effect(5)],
+      ])
+    );
+    const variants = { fitting: newFitting(1, 'Test') } as unknown as VariantEvaluator;
+    setup(plain, 90000001, variants);
+
+    await user.click(await screen.findByRole('button', { name: 'Load rolls from my assets' }));
+    await vi.waitFor(() => expect(rank.evaluate).toHaveBeenCalled());
+    const order = () =>
+      screen
+        .getAllByRole('listitem')
+        .map((li) => Number(/avg (\d+)%/.exec(li.textContent ?? '')?.[1]));
+    // By effect, the lower-quality 502 leads.
+    await vi.waitFor(() => expect(order()[0]).toBeLessThan(order()[1]!));
+    await user.click(screen.getByRole('button', { name: 'Roll quality' }));
+    expect(order()[0]).toBeGreaterThan(order()[1]!);
+    // No MutaMarket call until a row asks.
+    expect(rank.estimate).not.toHaveBeenCalled();
+    await user.click(screen.getAllByRole('button', { name: 'Estimate price' })[0]!);
+    expect(rank.estimate).toHaveBeenCalledTimes(1);
+  });
+
+  it('evaluates only the best-rolled eight and says so', async () => {
+    const user = userEvent.setup();
+    const data = Array.from({ length: 10 }, (_, i) => ({
+      type_id: ABYSSAL,
+      item_id: 600 + i,
+      quantity: 1,
+      location_flag: 'Hangar',
+    }));
+    assets.loadCharacterAssets.mockResolvedValue({
+      cached: { truncated: false, data },
+      needsReauth: false,
+    });
+    assets.mutationsForItems.mockResolvedValue(
+      new Map(
+        data.map((d, i) => [
+          d.item_id,
+          {
+            baseTypeId: GREMLIN,
+            mutaplasmidTypeId: GRAVID,
+            attributes: { [CAP]: 100, [POWER]: 850 + i * 30 },
+          },
+        ])
+      )
+    );
+    rank.evaluate.mockResolvedValue(new Map());
+    setup(plain, 90000001, { fitting: newFitting(1, 'Test') } as unknown as VariantEvaluator);
+    await user.click(await screen.findByRole('button', { name: 'Load rolls from my assets' }));
+    await vi.waitFor(() => expect(rank.evaluate).toHaveBeenCalled());
+    expect(rank.evaluate.mock.calls[0]![0].items).toHaveLength(8);
+    expect(screen.getByText(/Showing the best 8 of 10/)).toBeInTheDocument();
   });
 
   it("drops another Character's results", async () => {
