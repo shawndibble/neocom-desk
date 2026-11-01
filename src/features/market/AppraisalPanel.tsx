@@ -59,6 +59,14 @@ import { useAppraisalColumns } from './useAppraisalColumns';
 import { useAppraisalCopyLists } from './useAppraisalCopyLists';
 import { useAppraisalJanice } from './useAppraisalJanice';
 import { useAppraisalShare } from './useAppraisalShare';
+import { RefineBreakdownModal } from './RefineBreakdownModal';
+import { efficiencyText } from './refineFormat';
+import { useRefineMineralNames } from './useRefineMineralNames';
+import { RefiningSetupFields } from '@/features/refining/RefiningSetupFields';
+import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
+import { DEFAULT_REFINING_SETUP } from '@/engine/industry/refiningSetup';
+import { refineEfficiencyRange } from '@/engine/market/refineBreakdown';
+import type { AppraisalItem } from '@/engine/market/appraisal';
 import type { AppraisalController } from './useAppraisal';
 
 interface AppraisalPanelProps {
@@ -75,6 +83,8 @@ interface AppraisalPanelProps {
   /** Opens the Compare Hubs panel already expanded — the Quickbar's "View in Appraisal" action (#726) lands directly on the multi-hub view rather than a collapsed one. */
   defaultCompareExpanded?: boolean;
 }
+
+const NO_ITEMS: readonly AppraisalItem[] = [];
 
 export function AppraisalPanel({
   controller,
@@ -139,6 +149,11 @@ export function AppraisalPanel({
   const setCargo = useHaulingCargo((state) => state.setValue);
   useHydratedStore(useRecentAppraisals, useAppraisalOwnedPref, useHaulingCargo);
 
+  // The refine breakdown: null closed, `typeId: null` the whole pile, else one item's.
+  const [refineModal, setRefineModal] = useState<{ typeId: number | null } | null>(null);
+  const refiningSetup = useRefiningSetup();
+  const mineralNames = useRefineMineralNames(result?.appraisal.items ?? NO_ITEMS);
+
   const lacksAssets = useCharacterLacksEndpoints(characterId, ASSETS_ENDPOINTS);
   const minusOwned = ownedPref.enabled && !lacksAssets && characterId !== null;
   const ownedStationId = ownedPref.stationId ?? hub.stationId;
@@ -174,7 +189,12 @@ export function AppraisalPanel({
     rowContextMenu,
     hasRefine,
     hasLpOption,
-  } = useAppraisalColumns({ controller, owned, standing });
+  } = useAppraisalColumns({
+    controller,
+    owned,
+    standing,
+    onOpenRefine: (typeId) => setRefineModal({ typeId }),
+  });
   const { share, handleShare, handleCopyShareUrl, shareItemCount } = useAppraisalShare({
     result,
     hub,
@@ -216,6 +236,13 @@ export function AppraisalPanel({
     const parsed = Number(next);
     if (next.trim() !== '' && isValidPricePercent(parsed)) onPricePercentChange(parsed);
   }
+
+  const refineRange = useMemo(
+    () => (result ? refineEfficiencyRange(result.appraisal.items) : null),
+    [result]
+  );
+  const refineEfficiency = refineRange ? efficiencyText(refineRange.min, refineRange.max) : null;
+  const refineSetup = result?.refining ?? DEFAULT_REFINING_SETUP;
 
   const totals = result?.appraisal.totals;
   const unmatched = result?.unmatched ?? [];
@@ -346,6 +373,8 @@ export function AppraisalPanel({
             hubId={hub.id}
             onHubChange={onHubChange}
             compareLive={controller.compareLive}
+            refineEfficiency={refineEfficiency}
+            onOpenRefine={() => setRefineModal({ typeId: null })}
           />
         )}
 
@@ -455,6 +484,19 @@ export function AppraisalPanel({
           </Panel>
         </div>
       </div>
+      {refineModal !== null && result !== null && (
+        <RefineBreakdownModal
+          open
+          onClose={() => setRefineModal(null)}
+          appraisal={result.appraisal}
+          pricePercent={pricePercent}
+          hubName={hubName}
+          setup={{ yieldRate: refineSetup.stationRate, taxRate: refineSetup.taxRate }}
+          mineralNames={mineralNames}
+          initialTypeId={refineModal.typeId}
+          setupFields={<RefiningSetupFields refining={refiningSetup} />}
+        />
+      )}
       {janice.status === 'fetching' && <Toast message={t('market.appraisal.janiceFetching')} />}
       {janice.status === 'failed' && (
         <Toast

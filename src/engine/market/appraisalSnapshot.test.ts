@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildAppraisal, type AppraisalItem } from './appraisal';
 import { parseAppraisalPaste } from './appraisalPaste';
 import {
+  appraisalItemsFromSnapshot,
   appraisalSnapshotPasteText,
   appraisalSnapshotReuseKey,
   buildAppraisalSnapshot,
@@ -56,12 +57,13 @@ describe('buildAppraisalSnapshot', () => {
   });
 
   it('rebuilds to the same buy, sell and volume totals the panel showed', () => {
-    // Refine-then-sell is primary-tab only (it depends on the sharer's skills),
-    // so the snapshot drops it — the totals the share view shows must still match.
+    // These fixtures carry no refine detail, so the snapshot has none to drop or keep.
     const items = [TRITANIUM, PLEX];
     const snapshot = snapshotOf(items);
     const { buy, sell, volume } = buildAppraisal(items, 90).totals;
-    expect(buildAppraisal(snapshot.items, snapshot.pricePercent).totals).toMatchObject({
+    expect(
+      buildAppraisal(appraisalItemsFromSnapshot(snapshot), snapshot.pricePercent).totals
+    ).toMatchObject({
       buy,
       sell,
       volume,
@@ -135,5 +137,127 @@ describe('appraisalSnapshotReuseKey', () => {
     expect(
       appraisalSnapshotReuseKey({ ...a, items: [{ ...a.items[0], sell: 9 }, a.items[1]] })
     ).not.toBe(key);
+  });
+});
+
+describe('a snapshot that carries the refine figures', () => {
+  const ZEOLITES: AppraisalItem = {
+    typeId: 62467,
+    name: 'Compressed Glistening Zeolites',
+    quantity: 1038,
+    buy: 2812,
+    sell: 2990,
+    unitVolume: 0.1,
+    refine: {
+      valueAtFullPrice: 0,
+      pricedAll: true,
+      unitsLeftOver: 38,
+      detail: {
+        portionSize: 100,
+        materials: [
+          { typeId: 35, quantity: 16_000 },
+          { typeId: 36, quantity: 800 },
+        ],
+        efficiency: 0.9063,
+        materialPrices: { 35: 16.75, 36: 50.69 },
+      },
+    },
+  };
+  const refining = { yieldRate: 0.664, taxRate: 0.02 };
+  const mineralNames = new Map([
+    [35, 'Pyerite'],
+    [36, 'Mexallon'],
+  ]);
+
+  function refinedSnapshot(): AppraisalSnapshot {
+    const built = buildAppraisalSnapshot({
+      hub: 'jita',
+      pricePercent: 90,
+      generatedAt: 1,
+      items: [ZEOLITES, PLEX],
+      refining,
+      mineralNames,
+    });
+    if (!built.ok) throw new Error(built.reason);
+    return built.value;
+  }
+
+  it("stores the sharer's resolved yield, tax, recipe and mineral prices, not their skills", () => {
+    const snapshot = refinedSnapshot();
+    expect(snapshot.refine).toEqual({
+      yieldRate: 0.664,
+      taxRate: 0.02,
+      minerals: [
+        { typeId: 35, name: 'Pyerite', price: 16.75 },
+        { typeId: 36, name: 'Mexallon', price: 50.69 },
+      ],
+    });
+    expect(snapshot.items[0].refine).toEqual({
+      portionSize: 100,
+      materials: [
+        { typeId: 35, quantity: 16_000 },
+        { typeId: 36, quantity: 800 },
+      ],
+      efficiency: 0.9063,
+    });
+    // Firestore refuses undefined: an item with nothing to refine has no key at all.
+    expect('refine' in snapshot.items[1]).toBe(false);
+  });
+
+  it('stores nothing about refining when no item carries it', () => {
+    const built = buildAppraisalSnapshot({
+      hub: 'jita',
+      pricePercent: 90,
+      generatedAt: 1,
+      items: [PLEX],
+      refining,
+      mineralNames,
+    });
+    if (!built.ok) throw new Error(built.reason);
+    expect('refine' in built.value).toBe(false);
+  });
+
+  it('round-trips through parse', () => {
+    const snapshot = refinedSnapshot();
+    expect(parseAppraisalSnapshot(JSON.parse(JSON.stringify(snapshot)))).toEqual(snapshot);
+  });
+
+  it('shows the appraisal without a refine view when the stored refine is malformed', () => {
+    const broken = JSON.parse(JSON.stringify(refinedSnapshot())) as Record<string, unknown>;
+    broken.refine = { yieldRate: 'high' };
+    const parsed = parseAppraisalSnapshot(broken);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.refine).toBeUndefined();
+    expect(parsed?.items[0].refine).toBeUndefined();
+  });
+
+  it('rebuilds the items with the same refine figure the sharer saw', () => {
+    const items = appraisalItemsFromSnapshot(refinedSnapshot());
+    // 10 batches x floor(16,000 x 10 x 0.9063) Pyerite x 16.75 + the same for Mexallon, less 2% tax
+    const pyerite = Math.floor(16_000 * 10 * 0.9063);
+    const mexallon = Math.floor(800 * 10 * 0.9063);
+    expect(items[0].refine?.valueAtFullPrice).toBeCloseTo(
+      (pyerite * 16.75 + mexallon * 50.69) * 0.98,
+      4
+    );
+    expect(items[0].refine?.unitsLeftOver).toBe(38);
+    expect(items[1].refine).toBeUndefined();
+  });
+
+  it('keeps an old snapshot, with no refine at all, readable', () => {
+    const old = {
+      v: 1,
+      hub: 'jita',
+      pricePercent: 90,
+      generatedAt: 1,
+      items: snapshotOf([PLEX]).items,
+    };
+    expect(parseAppraisalSnapshot(old)?.refine).toBeUndefined();
+  });
+
+  it('changes the reuse key when the refining setup changes', () => {
+    const a = refinedSnapshot();
+    const b = { ...a, refine: a.refine && { ...a.refine, taxRate: 0.05 } };
+    expect(appraisalSnapshotReuseKey(a)).not.toBe(appraisalSnapshotReuseKey(b));
   });
 });

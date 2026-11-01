@@ -78,6 +78,23 @@ export interface AppraisalRefine {
   pricedAll: boolean;
   /** Units that could not fill a whole reprocessing portion, and so refined into nothing. */
   unitsLeftOver: number;
+  /**
+   * What the figure above was worked out from, kept so the refine breakdown
+   * can show the arithmetic and a shared link can carry it. Absent on a
+   * refine built before it existed (an old fixture), which has no breakdown.
+   */
+  detail?: AppraisalRefineDetail;
+}
+
+/** The inputs behind one item's refine value: the recipe, the yield applied, the prices read. */
+export interface AppraisalRefineDetail {
+  portionSize: number;
+  /** Units returned per whole portion at 100% efficiency. */
+  materials: readonly ReprocessingMaterial[];
+  /** Facility yield x skills x implant for this type: what `reprocessingYield` multiplied by. */
+  efficiency: number;
+  /** Material type id -> ISK a unit at the appraisal's hub, at 100%. A material nobody buys is absent. */
+  materialPrices: Readonly<Record<number, number>>;
 }
 
 /** One resolved, priced item to appraise. Prices are per unit, at 100%. */
@@ -609,16 +626,41 @@ export function computeAppraisalRefine({
     reprocessing.specialisationSkillId,
     refining.stationRate
   );
+  return refineFromDetail(
+    quantity,
+    {
+      portionSize: reprocessing.portionSize,
+      materials: reprocessing.materials,
+      efficiency,
+      materialPrices,
+    },
+    refining.taxRate
+  );
+}
+
+/**
+ * One item's refine figure from the inputs it is worked out from: the recipe,
+ * the yield already applied and the mineral prices. `computeAppraisalRefine`
+ * resolves the yield from a character's skills and then comes through here; a
+ * shared link, which carries the sharer's resolved yield instead of their
+ * skills, comes through here directly, so the two cannot disagree.
+ */
+export function refineFromDetail(
+  quantity: number,
+  detail: AppraisalRefineDetail,
+  taxRate: number
+): AppraisalRefine {
   const yielded = reprocessingYield({
-    portionSize: reprocessing.portionSize,
-    materials: reprocessing.materials,
+    portionSize: detail.portionSize,
+    materials: detail.materials,
     units: quantity,
-    efficiency,
+    efficiency: detail.efficiency,
   });
-  const value = reprocessingValue(yielded.outputs, materialPrices);
+  const value = reprocessingValue(yielded.outputs, detail.materialPrices);
   return {
-    valueAtFullPrice: netOfReprocessingTax(value.total, refining.taxRate),
+    valueAtFullPrice: netOfReprocessingTax(value.total, taxRate),
     pricedAll: value.pricedAll,
     unitsLeftOver: yielded.unitsLeftOver,
+    detail,
   };
 }
