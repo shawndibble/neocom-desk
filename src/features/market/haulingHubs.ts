@@ -12,7 +12,8 @@ export function haulingHubDefaults(hubId: TradeHub['id']): {
   to: TradeHub['id'];
 } {
   // A hub the daily hauling books do not cover has no lane to open on: start
-  // from Jita rather than on an empty scan.
+  // from Jita rather than on an empty scan. (Every hub is covered today; this
+  // keeps a hub added ahead of its backend job from opening on an empty scan.)
   const from = DAILY_JOB_HUBS.some((hub) => hub.id === hubId) ? hubId : 'jita';
   return { from, to: from === 'jita' ? 'amarr' : 'jita' };
 }

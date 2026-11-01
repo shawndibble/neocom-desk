@@ -169,7 +169,7 @@ describe('publishLpStoreVolume', () => {
         .filter((k) => k.startsWith('lp-store-volume/'))
         .sort()
     ).toEqual(
-      [10000002, 10000043, 10000032, 10000030, 10000042]
+      [10000002, 10000043, 10000032, 10000030, 10000042, 10001004]
         .map((r) => `lp-store-volume/${r}.json`)
         .sort()
     );
@@ -200,7 +200,7 @@ describe('publishLpStoreVolume', () => {
         .filter((k) => k.startsWith('hauling-demand/'))
         .sort()
     ).toEqual(
-      [10000002, 10000043, 10000032, 10000030, 10000042]
+      [10000002, 10000043, 10000032, 10000030, 10000042, 10001004]
         .map((r) => `hauling-demand/${r}.json`)
         .sort()
     );

@@ -44,9 +44,9 @@ export interface TradeHub {
   ownerFactionId: number;
   /**
    * Whether the daily backend jobs (open prices, hauling books, LP store
-   * volume) publish this hub's region. Manifest is listed and priced live like
-   * the others, but those jobs still cover only the original five regions, so
-   * a feature that reads their output skips a hub where this is false.
+   * volume) publish this hub's region (`functions/src/marketOpenPrices.ts`,
+   * mirrored by `functionsParity.test.ts`). A feature that reads their output
+   * skips a hub where this is false.
    */
   dailyJobs: boolean;
   /**
@@ -160,7 +160,7 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     regionName: 'Exordium',
     ownerCorporationId: 1000413, // AIR Laboratories
     ownerFactionId: 500028, // AIR Laboratories (the SDE's faction for the corp)
-    dailyJobs: false,
+    dailyJobs: true,
     compared: false,
     brokerSurchargePct: 5,
   },

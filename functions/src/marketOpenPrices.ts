@@ -15,13 +15,22 @@
 /** Days kept per document; the oldest entries drop first. */
 export const MARKET_OPEN_PRICES_MAX_DAYS = 400;
 
+/** Exordium, the PvP-free starter region whose hub is Manifest. */
+export const EXORDIUM_REGION_ID = 10001004;
+
 /**
  * Tracked regions: the five Trade Hub regions (The Forge, Domain, Sinq
- * Laison, Heimatar, Metropolis), mirroring `TRADE_HUBS` in src/market/hubs.ts.
- * The one place to widen the set.
+ * Laison, Heimatar, Metropolis) and Exordium, mirroring the hubs with
+ * `dailyJobs` in `TRADE_HUBS` in src/market/hubs.ts. The one place to widen
+ * the set.
  */
 export const MARKET_OPEN_PRICES_REGION_IDS: readonly number[] = [
-  10000002, 10000043, 10000032, 10000030, 10000042,
+  10000002,
+  10000043,
+  10000032,
+  10000030,
+  10000042,
+  EXORDIUM_REGION_ID,
 ];
 
 /**
@@ -30,8 +39,18 @@ export const MARKET_OPEN_PRICES_REGION_IDS: readonly number[] = [
  * Laison, Heimatar, Metropolis) measured 11k to 17k priced types on a real day,
  * so 2,000 cannot block a healthy region; it only catches a near-empty file.
  * The comparison with the previous run (`shrunkRegion`) catches a half-sized one.
+ * Exordium has its own, lower floor (`MIN_PAIRS_EXORDIUM`).
  */
 export const MIN_PAIRS_PER_REGION = 2000;
+
+/**
+ * Exordium trades far less than an empire hub region: about 4,200 types had
+ * orders on 2026-11-01 against 11k to 17k in the smaller hub regions. A floor of
+ * 2,000 would sit uncomfortably close and would hold back every other hub's
+ * snapshot on a quiet day, so the starter region gets a lower one. It still
+ * catches a near-empty file; `shrunkRegion` catches a half-sized one.
+ */
+export const MIN_PAIRS_EXORDIUM = 1000;
 
 const EVEREF_ORDERS_BASE = 'https://data.everef.net/market-orders/history';
 
@@ -210,10 +229,12 @@ export class OpenPriceFold {
  * when every tracked region has at least `MIN_PAIRS_PER_REGION` priced types.
  * Returns the reason it is not, or `null` when it is fine.
  */
-export function implausibleReason(fold: OpenPriceFold, minPerRegion = MIN_PAIRS_PER_REGION) {
+export function implausibleReason(fold: OpenPriceFold, minPerRegion?: number) {
   for (const [regionId, count] of fold.pairsByRegion()) {
-    if (count < minPerRegion) {
-      return `region ${regionId} has ${count} priced types, expected at least ${minPerRegion}`;
+    const min =
+      minPerRegion ?? (regionId === EXORDIUM_REGION_ID ? MIN_PAIRS_EXORDIUM : MIN_PAIRS_PER_REGION);
+    if (count < min) {
+      return `region ${regionId} has ${count} priced types, expected at least ${min}`;
     }
   }
   return null;
@@ -245,13 +266,14 @@ export function shrunkRegion(
   return null;
 }
 
-/** The five Trade Hubs, mirroring `TRADE_HUBS` in src/market/hubs.ts (`functionsParity.test.ts`). */
+/** The hubs the daily jobs cover (the five empire hubs and Manifest), mirroring `DAILY_JOB_HUBS` in src/market/hubs.ts (`functionsParity.test.ts`). */
 export const SNAPSHOT_HUBS = [
   { id: 'jita', stationId: 60003760, regionId: 10000002 },
   { id: 'amarr', stationId: 60008494, regionId: 10000043 },
   { id: 'dodixie', stationId: 60011866, regionId: 10000032 },
   { id: 'rens', stationId: 60004588, regionId: 10000030 },
   { id: 'hek', stationId: 60005686, regionId: 10000042 },
+  { id: 'manifest', stationId: 60015249, regionId: EXORDIUM_REGION_ID },
 ] as const;
 
 export interface SnapshotHub {

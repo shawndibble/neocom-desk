@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MARKET_OPEN_PRICES_MAX_DAYS,
+  MARKET_OPEN_PRICES_REGION_IDS,
   OpenPriceFold,
   SNAPSHOT_HUBS,
   StationPriceFold,
@@ -9,6 +10,9 @@ import {
   dayIndexUrl,
   groupByDocument,
   implausibleReason,
+  EXORDIUM_REGION_ID,
+  MIN_PAIRS_EXORDIUM,
+  MIN_PAIRS_PER_REGION,
   isIsoDate,
   mergeDays,
   openPriceDocId,
@@ -182,6 +186,35 @@ describe('OpenPriceFold', () => {
     fold.add(DOMAIN, 3, true, 1);
     expect(implausibleReason(fold, 3)).toBeNull();
     expect(implausibleReason(new OpenPriceFold([FORGE]), 1)).toContain(String(FORGE));
+  });
+});
+
+describe('the guard for Exordium', () => {
+  const FORGE_ONLY_DAY = (fold: OpenPriceFold, regionId: number, count: number) => {
+    for (let t = 1; t <= count; t++) fold.add(regionId, t, true, 1);
+  };
+
+  it('tracks Exordium alongside the five Trade Hub regions', () => {
+    expect(MARKET_OPEN_PRICES_REGION_IDS).toContain(EXORDIUM_REGION_ID);
+    expect(SNAPSHOT_HUBS.map((hub) => hub.id)).toContain('manifest');
+  });
+
+  it('holds the starter region to its own, lower minimum', () => {
+    expect(MIN_PAIRS_EXORDIUM).toBeLessThan(MIN_PAIRS_PER_REGION);
+    const fold = new OpenPriceFold([FORGE, EXORDIUM_REGION_ID]);
+    FORGE_ONLY_DAY(fold, FORGE, MIN_PAIRS_PER_REGION);
+    FORGE_ONLY_DAY(fold, EXORDIUM_REGION_ID, MIN_PAIRS_EXORDIUM);
+    expect(implausibleReason(fold)).toBeNull();
+  });
+
+  it('still rejects a near-empty Exordium day, and a thin Forge day is still too thin', () => {
+    const empty = new OpenPriceFold([FORGE, EXORDIUM_REGION_ID]);
+    FORGE_ONLY_DAY(empty, FORGE, MIN_PAIRS_PER_REGION);
+    FORGE_ONLY_DAY(empty, EXORDIUM_REGION_ID, MIN_PAIRS_EXORDIUM - 1);
+    expect(implausibleReason(empty)).toContain(String(EXORDIUM_REGION_ID));
+    const thinForge = new OpenPriceFold([FORGE]);
+    FORGE_ONLY_DAY(thinForge, FORGE, MIN_PAIRS_EXORDIUM);
+    expect(implausibleReason(thinForge)).toContain(String(FORGE));
   });
 });
 

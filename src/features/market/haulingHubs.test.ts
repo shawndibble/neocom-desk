@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { expandHaulingLane, haulingHubDefaults, pickHaulingHub } from './haulingHubs';
 
 describe('haulingHubDefaults', () => {
-  it('opens on Jita for a hub the daily hauling books do not cover yet', () => {
-    expect(haulingHubDefaults('manifest')).toEqual({ from: 'jita', to: 'amarr' });
+  it('opens on Manifest for a pilot whose hub is Manifest, heading to Jita', () => {
+    expect(haulingHubDefaults('manifest')).toEqual({ from: 'manifest', to: 'jita' });
   });
 
   it('keeps the original Jita to Amarr lane for a Jita pilot', () => {
@@ -46,6 +46,23 @@ describe('pickHaulingHub, Any hub', () => {
       to: 'any',
       from: 'amarr',
     });
+  });
+});
+
+describe('expandHaulingLane and Manifest', () => {
+  it('runs a lane to or from Manifest as one lane', () => {
+    expect(expandHaulingLane('jita', 'manifest').map((l) => [l.from.id, l.to.id])).toEqual([
+      ['jita', 'manifest'],
+    ]);
+    expect(expandHaulingLane('manifest', 'amarr').map((l) => [l.from.id, l.to.id])).toEqual([
+      ['manifest', 'amarr'],
+    ]);
+  });
+
+  it('never fans Any hub out to Manifest', () => {
+    const ids = expandHaulingLane('any', 'jita').map((l) => l.from.id);
+    expect(ids).toEqual(['amarr', 'dodixie', 'rens', 'hek']);
+    expect(expandHaulingLane('jita', 'any').map((l) => l.to.id)).not.toContain('manifest');
   });
 });
 

@@ -79,13 +79,14 @@ describe('compared and daily-job hubs', () => {
     expect(getTradeHub('manifest')?.compared).toBe(false);
   });
 
-  it('keeps Manifest out of the daily backend jobs until they cover Exordium', () => {
+  it('has the daily backend jobs cover Manifest as well as the five empire hubs', () => {
     expect(DAILY_JOB_HUBS.map((hub) => hub.id)).toEqual([
       'jita',
       'amarr',
       'dodixie',
       'rens',
       'hek',
+      'manifest',
     ]);
   });
 
