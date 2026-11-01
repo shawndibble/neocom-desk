@@ -29,7 +29,6 @@ import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { RESPONSE_KEY, RESPONSE_TEXT_TONE } from './calendarResponseTone';
-import { EventContextMenu } from './EventContextMenu';
 import { KIND_LABEL } from './calendarKindLabels';
 import { KIND_ICON } from './calendarKindIcons';
 import { KIND_TEXT } from '@/components/ui/kindTone';
@@ -155,18 +154,16 @@ export function CharacterBoardRow({
   }
 
   return (
-    <EventContextMenu eventId={Number(item.sourceId)}>
-      <button
-        type="button"
-        onClick={() => onSelectEvent(Number(item.sourceId))}
-        className={cx(
-          'flex min-h-9 w-full items-start gap-2.5 px-3 py-2 text-left',
-          rowInteractiveClassName,
-          focusRingInsetClassName
-        )}
-      >
-        {body}
-      </button>
-    </EventContextMenu>
+    <button
+      type="button"
+      onClick={() => onSelectEvent(Number(item.sourceId))}
+      className={cx(
+        'flex min-h-9 w-full items-start gap-2.5 px-3 py-2 text-left',
+        rowInteractiveClassName,
+        focusRingInsetClassName
+      )}
+    >
+      {body}
+    </button>
   );
 }

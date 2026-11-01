@@ -7,8 +7,6 @@ import { describe, it, expect } from 'vitest';
  * allowlist — which lists only the legitimate exceptions.
  */
 const ALLOWED = new Set([
-  // Single Copy event ID on a fixed-height board row.
-  'src/features/character/EventContextMenu.tsx',
   // Table-only shortcuts to pages the nav already reaches.
   'src/features/character/CharacterRowContextMenu.tsx',
 ]);
