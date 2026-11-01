@@ -125,6 +125,7 @@ export function FittingStatsColumn({
         abyssal={{
           hullGroupId: catalogue?.types[String(fitting.shipTypeId)]?.groupID,
           compare: workspace.compareWeather,
+          cargo: fitting.cargo,
         }}
         statsWeatherTypeId={workspace.statsWeatherTypeId}
         tacticalMode={

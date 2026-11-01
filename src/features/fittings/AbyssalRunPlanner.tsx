@@ -8,6 +8,7 @@ import {
   ABYSSAL_SECURITY_BANDS,
   ABYSSAL_TIERS,
   abyssalActivation,
+  abyssalFilamentCost,
   abyssalFilamentTypeId,
   abyssalHullRule,
   abyssalTierLevels,
@@ -23,7 +24,12 @@ import {
   type AbyssalWeather,
 } from '@/engine/fittings/abyssalWeather';
 import { diffFittingStats, type StatChange } from '@/engine/fittings/variationDelta';
-import type { FittingStats } from '@/engine/fittings/types';
+import type { FittingCargoItem, FittingStats } from '@/engine/fittings/types';
+import { useMarketHub } from '@/features/market/hub';
+import { getTradeHub } from '@/market/hubs';
+import { getHubPrices } from '@/market/prices';
+import { useHydratedStore } from '@/lib/useHydratedStore';
+import { formatIskExact } from './chargeFormat';
 import { abyssalWeatherLabel, useAbyssalWeather, useWeatherName } from './abyssalWeatherSelection';
 import { AbyssalWeatherPicker } from './AbyssalWeatherPicker';
 import { useAbyssalRunPlan } from './abyssalRunPlan';
@@ -79,6 +85,34 @@ function useRunDelta(
     : null;
 }
 
+/**
+ * The hub's sell price for one filament type, via the same `getHubPrices` path
+ * the Variations Jita price uses, at the Settings hub. Null while loading, on
+ * a failed read, or when the hub quotes none; a stale answer for another
+ * filament or hub is never shown.
+ */
+function useFilamentPrice(typeId: number | null, hubId: string): number | null {
+  const [result, setResult] = useState<{ key: string; price: number | null } | null>(null);
+  const key = `${hubId}:${typeId}`;
+  useEffect(() => {
+    const hub = getTradeHub(hubId);
+    if (typeId === null || !hub) return;
+    let cancelled = false;
+    void getHubPrices(hub, [typeId]).then(
+      (prices) => {
+        if (!cancelled) setResult({ key, price: prices.get(typeId)?.sellMin ?? null });
+      },
+      () => {
+        if (!cancelled) setResult({ key, price: null });
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [typeId, hubId, key]);
+  return result?.key === key ? result.price : null;
+}
+
 /** What the stats column's Abyssal row says closed: the session weather's name, else normal space. */
 export function AbyssalWeatherMeta() {
   const { t } = useTranslation();
@@ -95,14 +129,19 @@ export function AbyssalWeatherMeta() {
 export function AbyssalRunPlanner({
   hullGroupId,
   compare,
+  cargo,
   typeName,
 }: {
   /** The open fit's hull's inventory group; undefined while the catalogue loads hides the hull rule. */
   hullGroupId: number | undefined;
   compare: WeatherCompare | null;
+  /** The open fit's own cargo: matching filaments in it reduce the cost line. Never the pilot's assets. */
+  cargo: readonly FittingCargoItem[];
   typeName: (typeId: number) => string;
 }) {
   const { t } = useTranslation();
+  const hubId = useMarketHub((state) => state.value);
+  useHydratedStore(useMarketHub);
   const { tier, security, setTier, setSecurity } = useAbyssalRunPlan();
   const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
   const setWeather = useAbyssalWeather((state) => state.setWeather);
@@ -112,6 +151,15 @@ export function AbyssalRunPlanner({
   const hull = abyssalHullRule(hullGroupId);
   const activation = abyssalActivation(tier, security);
   const filamentId = weather ? abyssalFilamentTypeId(tier, weather.kind) : null;
+  const hubPrice = useFilamentPrice(
+    filamentId !== null && hull.eligible ? filamentId : null,
+    hubId
+  );
+  const cost =
+    filamentId !== null && hull.eligible
+      ? abyssalFilamentCost(hull.ships, filamentId, hubPrice, cargo)
+      : null;
+  const hubName = getTradeHub(hubId)?.systemName ?? hubId;
 
   return (
     <div className="space-y-2">
@@ -197,6 +245,19 @@ export function AbyssalRunPlanner({
           <li>
             {t('fittings.abyssalRun.buy', { count: hull.ships })}{' '}
             <ItemInfoLink typeId={filamentId}>{typeName(filamentId)}</ItemInfoLink>
+          </li>
+        )}
+        {filamentId !== null && cost !== null && (
+          <li className="text-text-dim tabular-nums">
+            {cost.kind === 'covered'
+              ? t('fittings.abyssalRun.costCovered')
+              : t(cost.inCargo > 0 ? 'fittings.abyssalRun.costShort' : 'fittings.abyssalRun.cost', {
+                  count: cost.count,
+                  name: typeName(filamentId),
+                  hub: hubName,
+                  isk: formatIskExact(cost.total),
+                  inCargo: cost.inCargo,
+                })}
           </li>
         )}
       </ul>
