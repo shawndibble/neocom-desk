@@ -190,7 +190,7 @@ describe('OpenPriceFold', () => {
 });
 
 describe('the guard for Exordium', () => {
-  const FORGE_ONLY_DAY = (fold: OpenPriceFold, regionId: number, count: number) => {
+  const fillRegion = (fold: OpenPriceFold, regionId: number, count: number) => {
     for (let t = 1; t <= count; t++) fold.add(regionId, t, true, 1);
   };
 
@@ -202,18 +202,18 @@ describe('the guard for Exordium', () => {
   it('holds the starter region to its own, lower minimum', () => {
     expect(MIN_PAIRS_EXORDIUM).toBeLessThan(MIN_PAIRS_PER_REGION);
     const fold = new OpenPriceFold([FORGE, EXORDIUM_REGION_ID]);
-    FORGE_ONLY_DAY(fold, FORGE, MIN_PAIRS_PER_REGION);
-    FORGE_ONLY_DAY(fold, EXORDIUM_REGION_ID, MIN_PAIRS_EXORDIUM);
+    fillRegion(fold, FORGE, MIN_PAIRS_PER_REGION);
+    fillRegion(fold, EXORDIUM_REGION_ID, MIN_PAIRS_EXORDIUM);
     expect(implausibleReason(fold)).toBeNull();
   });
 
   it('still rejects a near-empty Exordium day, and a thin Forge day is still too thin', () => {
     const empty = new OpenPriceFold([FORGE, EXORDIUM_REGION_ID]);
-    FORGE_ONLY_DAY(empty, FORGE, MIN_PAIRS_PER_REGION);
-    FORGE_ONLY_DAY(empty, EXORDIUM_REGION_ID, MIN_PAIRS_EXORDIUM - 1);
+    fillRegion(empty, FORGE, MIN_PAIRS_PER_REGION);
+    fillRegion(empty, EXORDIUM_REGION_ID, MIN_PAIRS_EXORDIUM - 1);
     expect(implausibleReason(empty)).toContain(String(EXORDIUM_REGION_ID));
     const thinForge = new OpenPriceFold([FORGE]);
-    FORGE_ONLY_DAY(thinForge, FORGE, MIN_PAIRS_EXORDIUM);
+    fillRegion(thinForge, FORGE, MIN_PAIRS_EXORDIUM);
     expect(implausibleReason(thinForge)).toContain(String(FORGE));
   });
 });
@@ -352,7 +352,7 @@ describe('mergeDays', () => {
     });
   });
 
-  it('keeps an object of 400 days x 5 stations well under 1 MB', () => {
+  it('keeps an object of 400 days x 6 stations well under 1 MB', () => {
     const stations = SNAPSHOT_HUBS.map((h) => h.stationId);
     const days = dateRange('2025-09-14', '2026-10-17').map((date) =>
       day(date, Object.fromEntries(stations.map((s) => [s, { buy: 1234567.89, sell: 1234567.99 }])))

@@ -226,8 +226,9 @@ export class OpenPriceFold {
 
 /**
  * The 'publish nothing' guard (the LP sync's style): a day is plausible only
- * when every tracked region has at least `MIN_PAIRS_PER_REGION` priced types.
- * Returns the reason it is not, or `null` when it is fine.
+ * when every tracked region has at least `MIN_PAIRS_PER_REGION` priced types
+ * (`MIN_PAIRS_EXORDIUM` for Exordium). `minPerRegion` overrides that one floor
+ * for every region (tests). Returns the reason it is not, or `null` when it is fine.
  */
 export function implausibleReason(fold: OpenPriceFold, minPerRegion?: number) {
   for (const [regionId, count] of fold.pairsByRegion()) {
@@ -275,6 +276,13 @@ export const SNAPSHOT_HUBS = [
   { id: 'hek', stationId: 60005686, regionId: 10000042 },
   { id: 'manifest', stationId: 60015249, regionId: EXORDIUM_REGION_ID },
 ] as const;
+
+/**
+ * Hubs whose thin snapshot is skipped rather than failing the whole job: the
+ * starter hub trades far less than an empire hub, so one quiet day there must
+ * not hold back the five empire hubs' books. Its last object just ages.
+ */
+export const STARTER_HUB_IDS: ReadonlySet<string> = new Set(['manifest']);
 
 export interface SnapshotHub {
   readonly id: string;

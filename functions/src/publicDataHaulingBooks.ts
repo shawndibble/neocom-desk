@@ -10,7 +10,7 @@
 import { gzipSync } from 'node:zlib';
 import { ESI_USER_AGENT } from './esiClient.js';
 import { HaulingBookFold } from './haulingBooks.js';
-import { SNAPSHOT_HUBS } from './marketOpenPrices.js';
+import { SNAPSHOT_HUBS, STARTER_HUB_IDS } from './marketOpenPrices.js';
 import { foldOrderBooksUrl } from './marketOrdersArchive.js';
 import { createR2Get, createR2Put, r2ConfigFromEnv, type R2Get, type R2Put } from './r2Client.js';
 
@@ -92,14 +92,22 @@ export async function publishHaulingBooks(deps: PublicHaulingBooksDeps): Promise
   );
   console.info('Hauling books fold', { rows, asOf, types: counts });
   const thin = SNAPSHOT_HUBS.filter((hub) => books.typeCount(hub.stationId) < MIN_TYPES_PER_HUB);
-  if (thin.length > 0) {
+  const thinRequired = thin.filter((hub) => !STARTER_HUB_IDS.has(hub.id));
+  if (thinRequired.length > 0) {
     throw new Error(
-      `Hauling books: nothing published, too few types at ${thin.map((hub) => hub.id).join(', ')}`
+      `Hauling books: nothing published, too few types at ${thinRequired.map((hub) => hub.id).join(', ')}`
     );
+  }
+  // A thin starter hub is left out of this run; its previous object stays and ages.
+  const skipped = thin.filter((hub) => STARTER_HUB_IDS.has(hub.id));
+  if (skipped.length > 0) {
+    console.warn('Hauling books: starter hub skipped, too few types', {
+      hubs: skipped.map((hub) => hub.id),
+    });
   }
   const lastSyncedAt = now();
   const failures: string[] = [];
-  for (const hub of SNAPSHOT_HUBS) {
+  for (const hub of SNAPSHOT_HUBS.filter((candidate) => !skipped.includes(candidate))) {
     try {
       const body = gzipSync(JSON.stringify(books.toObject(hub.stationId, { lastSyncedAt, asOf })));
       await deps.put(haulingBooksR2Key(hub.stationId), body, BOOK_HEADERS);

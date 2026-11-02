@@ -1,7 +1,7 @@
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import type { HaulingBookFold } from './haulingBooks.js';
-import { SNAPSHOT_HUBS } from './marketOpenPrices.js';
+import { SNAPSHOT_HUBS, STARTER_HUB_IDS } from './marketOpenPrices.js';
 import {
   HAULING_BOOKS_STATE_R2_KEY,
   haulingBooksR2Key,
@@ -26,11 +26,12 @@ function fakeR2() {
   };
 }
 
-/** A fold stand-in: fills every hub with `types` types of one sell and one buy order. */
-function fold(types: number, publishedAt: number | null = PUBLISHED) {
+/** A fold stand-in: fills every hub with `types` types of one sell and one buy order; a starter hub with `starterTypes` when given. */
+function fold(types: number, publishedAt: number | null = PUBLISHED, starterTypes = types) {
   return async (_url: string, books: HaulingBookFold) => {
     for (const hub of SNAPSHOT_HUBS) {
-      for (let t = 1; t <= types; t += 1) {
+      const count = STARTER_HUB_IDS.has(hub.id) ? starterTypes : types;
+      for (let t = 1; t <= count; t += 1) {
         books.add(hub.stationId, t, false, 10, 5);
         books.add(hub.stationId, t, true, 9, 5);
       }
@@ -93,6 +94,36 @@ describe('publishHaulingBooks', () => {
         now: () => NOW,
         publishedAtImpl: async () => null,
         foldUrlImpl: fold(MIN_TYPES_PER_HUB - 1),
+      })
+    ).rejects.toThrow(/too few types/);
+    expect(r2.objects.size).toBe(0);
+  });
+
+  it('skips a thin starter hub but still publishes the others', async () => {
+    const r2 = fakeR2();
+    const ran = await publishHaulingBooks({
+      get: r2.get,
+      put: r2.put,
+      now: () => NOW,
+      publishedAtImpl: async () => null,
+      foldUrlImpl: fold(MIN_TYPES_PER_HUB, PUBLISHED, 3),
+    });
+    expect(ran).toBe(true);
+    for (const hub of SNAPSHOT_HUBS) {
+      expect(r2.objects.has(haulingBooksR2Key(hub.stationId))).toBe(!STARTER_HUB_IDS.has(hub.id));
+    }
+    expect(r2.objects.has(HAULING_BOOKS_STATE_R2_KEY)).toBe(true);
+  });
+
+  it('still publishes nothing when an empire hub is thin, whatever the starter hub holds', async () => {
+    const r2 = fakeR2();
+    await expect(
+      publishHaulingBooks({
+        get: r2.get,
+        put: r2.put,
+        now: () => NOW,
+        publishedAtImpl: async () => null,
+        foldUrlImpl: fold(MIN_TYPES_PER_HUB - 1, PUBLISHED, MIN_TYPES_PER_HUB),
       })
     ).rejects.toThrow(/too few types/);
     expect(r2.objects.size).toBe(0);

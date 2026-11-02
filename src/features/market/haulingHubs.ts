@@ -20,7 +20,7 @@ export function haulingHubDefaults(hubId: TradeHub['id']): {
 
 /**
  * One end of the lane may be _Any hub_: the scan then picks, per item, the
- * best of the five empire Trade Hubs for that end. Never both ends (v1: 20 lanes
+ * best of the five empire Trade Hubs (`COMPARED_HUBS`) for that end. Never both ends (v1: 20 lanes
  * would blow the request budget).
  */
 export const ANY_HUB = 'any';
