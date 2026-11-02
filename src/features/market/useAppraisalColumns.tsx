@@ -5,8 +5,6 @@ import { MenuItem, MenuSeparator, type DataTableColumn } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import { useTableExport } from '@/components/ui/useTableExport';
 import {
-  asIsEachFor,
-  asIsTotalFor,
   lpBeatsMarket,
   refineBeatsSellAsIs,
   refinePricedAllFor,
@@ -32,7 +30,7 @@ import {
   useVisibleAppraisalColumns,
   type AppraisalColumnId,
 } from './appraisalColumns';
-import { comparisonCell, eachCell, leftoverTipsRefine, totalCell } from './appraisalCells';
+import { comparisonCell, eachCell, totalCell } from './appraisalCells';
 import { RefineFigureButton } from './RefineFigureButton';
 import { appraisalCsvColumns } from './appraisalCsv';
 import { appraisalIskPerM3Column, appraisalVolumeColumn } from './appraisalVolume';
@@ -318,21 +316,6 @@ export function useAppraisalColumns({
               className="ml-0.5 text-warning"
             >
               *
-            </HintText>
-          ),
-          // Left of the number, so the right-aligned digits stay in line down the column.
-          leftoverTipsRefine(row, refineBasis) && (
-            <HintText
-              content={t('market.appraisal.refineLeftoverHint', {
-                count: row.refineUnitsLeftOver,
-                isk: formatIskAuto(
-                  (row.refineUnitsLeftOver ?? 0) * (asIsEachFor(row, refineBasis) ?? 0)
-                ),
-                asIsTotal: formatIskAuto(asIsTotalFor(row, refineBasis) ?? 0),
-              })}
-              className="mr-1 text-warning"
-            >
-              !
             </HintText>
           )
         );

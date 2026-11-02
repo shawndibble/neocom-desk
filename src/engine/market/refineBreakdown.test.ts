@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildAppraisal, refineBeatsSellAsIs, type AppraisalItem } from '@/engine/market/appraisal';
+import {
+  buildAppraisal,
+  refineBeatsSellAsIs,
+  refineFromDetail,
+  refineTotalFor,
+  refineTotalOfRows,
+  type AppraisalItem,
+} from '@/engine/market/appraisal';
 import {
   buildRefineBreakdown,
   buildRefineComparison,
@@ -333,18 +340,18 @@ describe('Janice parity', () => {
     quantity,
     buy,
     sell,
-    refine: {
-      valueAtFullPrice: 0,
-      pricedAll: true,
-      unitsLeftOver: quantity % 100,
-      detail: {
+    // Built as the app builds it, so the table's figures and the breakdown's come from the same inputs.
+    refine: refineFromDetail(
+      quantity,
+      {
         portionSize: 100,
         materials,
         efficiency: 0.6831,
         materialPrices: buyPrices,
         materialSellPrices: sellPrices,
       },
-    },
+      0
+    ),
   });
   const items = [
     item(62454, 'Compressed Bitumens', 186, 1279, 1280, BIT),
@@ -381,6 +388,24 @@ describe('Janice parity', () => {
     const [sellAsIs, sellRefined] = figures('sell');
     expect(sellAsIs).toBeCloseTo(292_512_244, 1);
     expect(sellRefined).toBeCloseTo(146_101_941.79, 1);
+  });
+
+  it('shows the same refine total on the page as in the breakdown, on every basis, and per item', () => {
+    const appraisal = buildAppraisal(items, 100);
+    for (const basis of ['buy', 'split', 'sell'] as const) {
+      // The Refine chip is the sum of the table's Refine total column; the breakdown's total is the same pile.
+      expect(refineTotalOfRows(appraisal.rows, basis)).toBeCloseTo(
+        comparison[basis]?.total ?? NaN,
+        2
+      );
+      appraisal.rows.forEach((row, index) => {
+        const line = comparison[basis]?.items[index];
+        expect(refineTotalFor(row, basis)).toBeCloseTo(
+          (line?.refined ?? NaN) + (line?.leftoverValue ?? NaN),
+          2
+        );
+      });
+    }
   });
 
   it('finds the 82.89% break-even on the buy side, and none up to 100% on the others', () => {

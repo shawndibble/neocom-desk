@@ -17,7 +17,7 @@ import {
   buildAppraisal,
   refineBeatsSellAsIs,
   refineTotalFor,
-  refineTotalsFor,
+  refineTotalOfRows,
   splitEach,
   type AppraisalItem,
   type AppraisalRow,
@@ -248,7 +248,7 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
                     <RefineChipValue
                       amount={
                         <IskAmount
-                          value={refineTotalsFor(appraisal.totals, refineBasis)}
+                          value={refineTotalOfRows(appraisal.rows, refineBasis)}
                           decimals={0}
                         />
                       }

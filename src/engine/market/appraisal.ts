@@ -183,11 +183,11 @@ export interface AppraisalRow {
   sellEach: number | null;
   buyTotal: number | null;
   sellTotal: number | null;
-  /** Undefined when this type carries no reprocessing data at all. */
+  /** The minerals' net value at the price percent, on the buy side, leaving the leftover units out. The figure shown is `refineTotalFor`. Undefined when this type carries no reprocessing data at all. */
   refineTotal?: number;
   refinePricedAll?: boolean;
   refineUnitsLeftOver?: number;
-  /** `refineTotal` on the sell side; undefined where the sell prices were never read. */
+  /** `refineTotal` on the sell side (minerals only); undefined where the sell prices were never read. */
   refineSellTotal?: number;
   refineSellPricedAll?: boolean;
   /** Undefined when nothing the character holds LP with sells this item. */
@@ -316,49 +316,55 @@ function scale(price: number | null, percent: number): number | null {
 /**
  * Does refining this row beat selling it as is?
  *
- * "Sell-as-is" is `buyTotal` in this engine's own vocabulary — what the list
- * fetches sold into buy orders right now —
- * so that is what the refine-then-sell comparison is judged against, the same
- * axis `orderExits.ts` prices its own refine exit on.
- *
- * The refine side is what the player actually ends up holding: the whole
- * batches refined, **plus** the units that could not fill a batch, which are
- * still there to sell at the same price the sell side quotes. Comparing the
- * refine total alone against the full quantity charged the refine path for
- * units it never consumed, and recommended the worse option across a
- * measured band of ordinary ore (issue #1048). Both sides are already scaled
- * by the appraisal's Price Percent, so they stay on one axis.
+ * Both sides are on one Price Basis (`refineTotalFor` and `asIsTotalFor`) and
+ * already scaled by the appraisal's Price Percent. The refine side is what the
+ * player actually ends up holding: the whole batches refined, **plus** the
+ * units that could not fill a batch, which are still there to sell as is.
+ * Comparing the minerals alone against the full quantity charged the refine
+ * path for units it never consumed, and recommended the worse option across a
+ * measured band of ordinary ore (issue #1048).
  *
  * Strictly greater, because a tie is not a win: a quantity below one whole
  * batch refines into nothing, leaving the leftover equal to the whole paste,
  * and both paths come to exactly the same ISK. That case must read as sell.
  *
- * False whenever no comparison exists — no reprocessing data, or nobody
- * buying. `buyEach` prices both the sell side and the leftover, so a row with
- * no buy price cannot value either; answering false leaves the leftover
- * unpriced rather than silently free.
+ * False whenever no comparison exists: no reprocessing data, or nobody
+ * buying on the basis. The as-is unit price prices both the pile and the
+ * leftover, so a row without one cannot value either; answering false leaves
+ * the leftover unpriced rather than silently free.
  */
 export function refineBeatsSellAsIs(row: AppraisalRow, basis: RefineBasis = 'buy'): boolean {
   const refine = refineTotalFor(row, basis);
-  const each = asIsEachFor(row, basis);
   const asIs = asIsTotalFor(row, basis);
-  if (refine === undefined || each === null || asIs === null) return false;
-  // `?? 0` reads a row with no leftover, the same as none recorded.
-  const leftOverValue = (row.refineUnitsLeftOver ?? 0) * each;
-  return refine + leftOverValue > asIs;
+  if (refine === undefined || asIs === null || asIsEachFor(row, basis) === null) return false;
+  return refine > asIs;
 }
 
 /**
- * A row's refine figure on a price basis: undefined where it has none, or where
- * the basis needs a side that was never read. A split is only given where both
- * sides priced every mineral, so a mineral nobody trades on one side is never
+ * What refining a row yields in minerals on a price basis, net of tax and with
+ * the leftover units left out: undefined where it has none, or where the basis
+ * needs a side that was never read. A split is only given where both sides
+ * priced every mineral, so a mineral nobody trades on one side is never
  * counted at half its other price.
  */
-export function refineTotalFor(row: AppraisalRow, basis: RefineBasis): number | undefined {
+export function refineMineralsFor(row: AppraisalRow, basis: RefineBasis): number | undefined {
   if (basis === 'split' && (row.refinePricedAll === false || row.refineSellPricedAll === false)) {
     return undefined;
   }
   return priceOnBasis(basis, row.refineTotal, row.refineSellTotal) ?? undefined;
+}
+
+/**
+ * A row's refine figure on a price basis, the one the Appraisal shows: the
+ * minerals (`refineMineralsFor`) **plus** the units too few to fill a portion,
+ * which stay yours and sell as is at that basis's unit price. Undefined where
+ * the row has no minerals figure on the basis. A leftover with no as-is price
+ * counts for nothing rather than for a guess.
+ */
+export function refineTotalFor(row: AppraisalRow, basis: RefineBasis): number | undefined {
+  const minerals = refineMineralsFor(row, basis);
+  if (minerals === undefined) return undefined;
+  return minerals + (row.refineUnitsLeftOver ?? 0) * (asIsEachFor(row, basis) ?? 0);
 }
 
 /** `refineTotalFor`'s pricing flag: false where a mineral had no price on that basis, so the figure is a floor. */
@@ -380,12 +386,9 @@ export function asIsEachFor(row: AppraisalRow, basis: RefineBasis): number | nul
   return priceOnBasis(basis, row.buyEach, row.sellEach);
 }
 
-/** The pile's refine total on a basis, over the rows that have one. */
-export function refineTotalsFor(
-  totals: Pick<AppraisalTotals, 'refine' | 'refineSell'>,
-  basis: RefineBasis
-): number {
-  return priceOnBasis(basis, totals.refine, totals.refineSell) ?? 0;
+/** The pile's refine total on a basis (minerals plus leftover, `refineTotalFor`), over the rows that have one. */
+export function refineTotalOfRows(rows: readonly AppraisalRow[], basis: RefineBasis): number {
+  return rows.reduce((sum, row) => sum + (refineTotalFor(row, basis) ?? 0), 0);
 }
 
 /**
