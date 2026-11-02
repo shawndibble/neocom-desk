@@ -7,6 +7,7 @@ import type { MoonMiningTaxRow } from './snapshot';
 import {
   assignmentsForLinkTarget,
   autoMatchRecordedPayments,
+  coPaidAssignments,
   exactAmountMatches,
   labelForLinkedRef,
   linkedTransactionsFor,
@@ -567,5 +568,30 @@ describe('assignmentsForLinkTarget', () => {
 
   it('is empty for an unassigned residual', () => {
     expect(assignmentsForLinkTarget(displayRow(null), [])).toEqual([]);
+  });
+});
+
+describe('coPaidAssignments', () => {
+  const pay = (paymentId: string) => ({
+    paymentId,
+    paidOn: '2026-09-06',
+    method: 'donation' as const,
+    amount: 300,
+  });
+
+  it('lists the other entries settled by the same payment, oldest first', () => {
+    const self = assignment({ id: 'a', date: '2026-09-05', payment: pay('p1') });
+    const early = assignment({ id: 'b', date: '2026-09-01', payment: pay('p1') });
+    const late = assignment({ id: 'c', date: '2026-09-04', payment: pay('p1') });
+    const other = assignment({ id: 'd', date: '2026-09-02', payment: pay('p2') });
+    expect(coPaidAssignments(self, [self, late, other, early]).map((a) => a.id)).toEqual([
+      'b',
+      'c',
+    ]);
+  });
+
+  it('is empty for an entry with no payment record', () => {
+    const self = assignment({ id: 'a' });
+    expect(coPaidAssignments(self, [self, assignment({ id: 'b' })])).toEqual([]);
   });
 });

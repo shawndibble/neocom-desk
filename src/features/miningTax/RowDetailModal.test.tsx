@@ -214,6 +214,12 @@ describe('RowDetailModal payment', () => {
     expect(screen.getByText(/auto-linked/)).toBeInTheDocument();
   });
 
+  it('lists the other entries the same payment settled', () => {
+    renderPaid({ alsoCovers: [{ id: 'x', date: '2026-09-02', taxOwed: 1_234_567 }] });
+    expect(screen.getByText(/also settled/)).toBeInTheDocument();
+    expect(screen.getByText(/2026-09-02 · 1,234,567 ISK/)).toBeInTheDocument();
+  });
+
   it('calls onUnlinkTransaction with the clicked transaction', async () => {
     const onUnlink = vi.fn();
     const transaction = {

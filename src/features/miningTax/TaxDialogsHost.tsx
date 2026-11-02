@@ -35,6 +35,7 @@ import { paidOnFromIso } from '@/features/miningTax/madePayments';
 import type { LinkedTransaction } from '@/features/miningTax/PaymentLinksCard';
 import {
   assignmentsForLinkTarget,
+  coPaidAssignments,
   linkedTransactionsFor,
   unlinkedPayments,
   type MadePayment,
@@ -367,6 +368,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     if (!detailTarget?.assignment?.payment) return undefined;
     return linkedTransactionsFor([detailTarget.assignment], madePayments, t);
   }, [detailTarget, madePayments, t]);
+
+  const detailAlsoCovers = useMemo(
+    () =>
+      detailTarget?.assignment ? coPaidAssignments(detailTarget.assignment, everyAssignment) : [],
+    [detailTarget, everyAssignment]
+  );
 
   const groupLinkedTransactions: LinkedTransaction[] | undefined = useMemo(() => {
     if (!detailTarget?.groupMembers) return undefined;
@@ -751,6 +758,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 : undefined
             }
             linkedTransactions={detailLinkedTransactions}
+            alsoCovers={detailAlsoCovers}
             onLinkTransaction={
               detailTarget.status === 'paid'
                 ? () => actions.openLinkTransaction(detailTarget)
