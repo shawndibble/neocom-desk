@@ -35,8 +35,9 @@
  */
 import { loadWithCache, STALE_AFTER } from '@/esi/cache';
 import { lookupNpcStation } from '@/sde/npcStations';
-import { loadStationName } from './stations';
-import { loadStructureName } from './structures';
+import { loadStationName, loadStationSystemId } from './stations';
+import { loadStructureName, loadStructureSystemId } from './structures';
+import { loadSystemName } from './systemSecurity';
 
 function cacheKey(locationId: number): string {
   return `contract-location:${locationId}`;
@@ -65,4 +66,23 @@ export async function loadContractLocationName(
     { staleAfterMs: STALE_AFTER.static }
   );
   return result?.data ?? null;
+}
+
+/**
+ * The solar system a contract's start or end location sits in, by name — a
+ * courier's History row reads system to system, not station to station. Same
+ * station-vs-structure discriminator as `loadContractLocationName`; `null`
+ * means "don't know" (an unreadable structure, or offline and uncached).
+ */
+export async function loadContractSystemName(
+  characterId: number,
+  locationId: number
+): Promise<string | null> {
+  const snapshot = await lookupNpcStation(locationId);
+  const systemId =
+    snapshot === null
+      ? await loadStructureSystemId(characterId, locationId)
+      : ((await loadStationSystemId(locationId)) ??
+        (await loadStructureSystemId(characterId, locationId)));
+  return systemId ? loadSystemName(systemId) : null;
 }
