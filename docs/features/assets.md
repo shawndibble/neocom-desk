@@ -157,7 +157,7 @@ Toggle (`?all=1`). Same flat list as search with every item across every locatio
 
 Triggers: right-click, touch long-press, Shift+F10, or the row's visible **More actions** button (WCAG 2.1.1, `RowMoreActions`). The name link keeps right-click for the menu (not the browser's). A touch hold-lift guard stops the link following (`useLiftAfterHoldGuard`).
 
-Entries: Add to Quickbar (disabled with reason if no Character), Price alert (opens `PriceAlertDialog`), Show info, Add to Compare, View in Market (keeps page region/hub), Copy name, Build Plan (disabled "checking…" or "no blueprint options"; for a blueprint row plans the product it builds, `planProductTypeID`), View in Industry as material (only when one of the Character's own Build Plans consumes it), PI Plan (only when the type is PI-plannable), and an "Export table ▸" submenu (the export context via `TableExportProvider`).
+Entries: Add to Quickbar (disabled with reason if no Character), Price alert (opens `PriceAlertDialog`), Show info, Add to Compare, View in Market (keeps page region/hub), Copy name, Build Plan (disabled "checking…" or "no blueprint options"; for a blueprint row plans the product it builds, `planProductTypeID`), View in Industry as material (only when one of the Character's own Build Plans consumes it), PI Plan (only when the type is PI-plannable) (Export is not a row action: it is in the page's Tools menu).
 
 Blueprint catalog loads lazily on first menu open (`usePageItemActions({lazyBlueprints:true})`).
 
