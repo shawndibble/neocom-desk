@@ -33,7 +33,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import type { CsvColumn } from '@/lib/csv';
 import { Effect, Footer as BaseFooter } from './corpTaxBookDialogs';
 import { caretColumn } from './corpTaxBookColumns';
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { MINING_PARAMS, MOONS_PARAMS, PHONE_GLOBALS, isk, isk2 } from './corpTaxBookFormat';
 import { Crumb, MoonsHeader, MoonsTabs, OverdueWord } from './corpTaxBookParts';
 import {
@@ -1107,7 +1107,10 @@ function ChangeTaxDialog({ open, who = 'all' }: { open: boolean; who?: Who }) {
             <Field label="Leave out" note="They stay at 10%.">
               <div className="grid w-full grid-cols-2 gap-x-3 gap-y-2">
                 {FOCUS_MINERS.map((m) => (
-                  <label key={m.miner} className="flex items-center justify-start gap-2">
+                  <label
+                    key={m.miner}
+                    className={cx('flex items-center justify-start gap-2', tappableRowClassName)}
+                  >
                     <Checkbox
                       aria-label={`Leave out ${m.miner}`}
                       checked={LEFT_OUT.includes(m.miner)}
