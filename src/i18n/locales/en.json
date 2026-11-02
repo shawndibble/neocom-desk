@@ -13516,6 +13516,8 @@
         "headline_one": "{{count}} order needs you",
         "headline_other": "{{count}} orders need you",
         "tiedUp": "<isk/> ISK tied up in them",
+        "acrossMatching_one": "<isk/> ISK in the matching order",
+        "acrossMatching_other": "<isk/> ISK across all {{count}} matching",
         "toWatch": "{{count}} to watch",
         "fine": "{{count}} fine",
         "views": "Which orders",

@@ -670,6 +670,14 @@ export function OpenOrdersPanel({
                 actIskTiedUp={fixList.actIskTiedUp}
                 watchCount={fixList.watch.length}
                 fineCount={fixList.fine.length}
+                {...(activeCount > 0
+                  ? {
+                      matching: {
+                        count: fixList.matching.length,
+                        iskTiedUp: fixList.matchingIskTiedUp,
+                      },
+                    }
+                  : {})}
               />
 
               <div className="flex min-w-0 flex-wrap items-center gap-2">
