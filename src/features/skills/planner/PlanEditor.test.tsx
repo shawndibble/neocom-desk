@@ -1993,7 +1993,8 @@ describe('an attribute sheet nothing explains', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.getByText(/totalling 160/i)).toBeInTheDocument();
+    expect(screen.getByText(/don't add up to a legal sheet/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy diagnostics' })).toBeInTheDocument();
     // No accelerator was recovered, so nothing is prefilled either — the
     // list stays empty, same as the no-accelerator case above.
     expect(screen.queryByRole('button', { name: 'Remove accelerator 1' })).toBeNull();

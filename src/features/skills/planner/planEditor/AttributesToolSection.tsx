@@ -1,4 +1,8 @@
 import { useTranslation } from 'react-i18next';
+import { textActionClassName } from '@/components/ui';
+import { writeToClipboard } from '@/lib/clipboard';
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
+import { attributeDiagnostics } from '@/features/skills/attributeDiagnostics';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
 import type { Implants } from '@/engine/types';
 import type { CharacterAttributes } from '@/esi/endpoints';
@@ -16,6 +20,7 @@ export function AttributesToolSection({
   attributeBaseline: AttributeBaseline | null;
 }) {
   const { t } = useTranslation();
+  const { copied, flash } = useCopyFeedback<'ok' | 'failed'>(2000);
   return (
     <div className="space-y-2 text-xs">
       {/* The clone's real sheet, never re-rendered through the what-if
@@ -34,9 +39,33 @@ export function AttributesToolSection({
               scheduler is running on the placeholder spread, and a
               number presented without that caveat is the bug this fixes. */}
       {attributeBaseline?.kind === 'impossible' && (
-        <p className="text-warning">
-          {t('plans.attributesImpossible', { total: attributeBaseline.reportedTotal })}
-        </p>
+        <div className="space-y-1">
+          <p className="text-warning">{t('plans.attributesImpossible')}</p>
+          {attributesResult && (
+            <button
+              type="button"
+              className={textActionClassName()}
+              onClick={() =>
+                void writeToClipboard(
+                  attributeDiagnostics({
+                    attributes: attributesResult.data,
+                    implants,
+                    baseline: attributeBaseline,
+                    fetchedAt: attributesResult.fetchedAt,
+                    fromCache: attributesResult.fromCache,
+                  })
+                ).then(
+                  () => flash('ok'),
+                  () => flash('failed')
+                )
+              }
+            >
+              {copied
+                ? t('plans.attributesDiagnosticsCopied')
+                : t('plans.attributesCopyDiagnostics')}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
