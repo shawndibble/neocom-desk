@@ -49,6 +49,9 @@ import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry } from './types';
 import { MINUTE_MS } from '@/lib/age';
 
+/** What made a day Paid: the member's own mark, the corporation's settled Statement, or a donation. */
+export type BookSettledBy = 'yourMark' | 'statement' | 'donation';
+
 export type BookRowState = 'billed' | 'conflict' | 'dismissed' | 'waived' | 'paid';
 /** A relabel of a personal row that has no Payee yet, not a row of its own. */
 export type BookLabelState = 'pending' | 'unattributed';
@@ -167,6 +170,10 @@ export interface BookRowView {
   taxOwed: number | null;
   /** The whole bill of the day, before payments. */
   billed: number;
+  /** How a Paid day was settled; absent while it is owed, dismissed or waived. */
+  settledBy?: BookSettledBy;
+  /** The member's own paid Assignments this row stands in for, so the member can unmark them. */
+  markedPaidIds?: string[];
   statementId?: string;
   dismissalReason?: string;
   /** A conflict: when it resolves to the corp. */
@@ -491,10 +498,11 @@ function takeOwnAllocations(
   pool: OverlapPool,
   ownPayeeIds: readonly string[] | undefined,
   share: readonly OreLine[]
-): { lines: OreLine[]; paidLines: OreLine[]; ids: string[] } {
+): { lines: OreLine[]; paidLines: OreLine[]; ids: string[]; paidIds: string[] } {
   const lines: OreLine[][] = [];
   const paid: OreLine[][] = [];
   const ids: string[] = [];
+  const paidIds: string[] = [];
   let room = sumLines(share);
   for (let i = 0; i < pool.length; i++) {
     const { allocation } = pool[i];
@@ -505,11 +513,14 @@ function takeOwnAllocations(
     if (listed.some((l) => l.quantity > quantityOfTypes(room, new Set([l.typeId])))) continue;
     room = minusLines(room, listed);
     lines.push(listed);
-    if (allocation.status === 'paid') paid.push(listed);
+    if (allocation.status === 'paid') {
+      paid.push(listed);
+      paidIds.push(allocation.id);
+    }
     ids.push(allocation.id);
     pool.splice(i--, 1);
   }
-  return { lines: sumLines(...lines), paidLines: sumLines(...paid), ids };
+  return { lines: sumLines(...lines), paidLines: sumLines(...paid), ids, paidIds };
 }
 
 /**
@@ -586,6 +597,8 @@ export function overlayCorpBooks(input: {
   const absorbed: PersonalOverlay['absorbed'] = new Map();
   // Per book, per entry key: the ore the member already paid under the corporation's own Payee.
   const memberPaid = new Map<number, Map<string, OreLine[]>>();
+  // The ids of those paid Assignments, kept so a row they paid can offer to unmark them.
+  const memberPaidIds = new Map<number, Map<string, string[]>>();
 
   // The ore each personal entry still has free after the books, per entry key.
   const free = new Map(
@@ -723,6 +736,9 @@ export function overlayCorpBooks(input: {
         const paidOf = memberPaid.get(p.book.corporationId) ?? new Map<string, OreLine[]>();
         paidOf.set(key, sumLines(paidOf.get(key) ?? [], own.paidLines));
         memberPaid.set(p.book.corporationId, paidOf);
+        const idsOf = memberPaidIds.get(p.book.corporationId) ?? new Map<string, string[]>();
+        idsOf.set(key, [...(idsOf.get(key) ?? []), ...own.paidIds]);
+        memberPaidIds.set(p.book.corporationId, idsOf);
       }
       const resolved = resolveBookShare({
         share,
@@ -856,6 +872,7 @@ export function overlayCorpBooks(input: {
       if (parts.every((part) => settledParts.has(part) && part.owed === 0)) {
         const waived = forgiven !== undefined && (billedOf.get(row) ?? 0) - forgiven.amount < 0.01;
         row.state = waived ? 'waived' : 'paid';
+        if (!waived) row.settledBy = 'statement';
         row.taxOwed = 0;
         if (waived) row.dismissalReason = forgiven.reasons.join(' · ');
       } else {
@@ -885,7 +902,10 @@ export function overlayCorpBooks(input: {
         const owed = Math.max(0, (row.taxOwed ?? 0) - taxOwed);
         creditedByMark += (row.taxOwed ?? 0) - owed;
         row.taxOwed = owed < 0.01 ? 0 : owed;
-        if (row.taxOwed === 0) row.state = 'paid';
+        if (row.taxOwed === 0) {
+          row.state = 'paid';
+          row.settledBy = 'yourMark';
+        }
       }
     }
     // Donations sent and not yet credited, and credit the book holds for no
@@ -904,7 +924,17 @@ export function overlayCorpBooks(input: {
       const row = open.find((r) => r.id === id);
       if (row) {
         row.state = 'paid';
+        row.settledBy = 'donation';
         row.taxOwed = 0;
+      }
+    }
+    // Whatever settled the day, the member's own paid mark under the corporation's Payee stays
+    // theirs to undo: the book row hides it, so the row has to carry it.
+    const markedIds = memberPaidIds.get(p.book.corporationId);
+    if (markedIds) {
+      for (const row of mine) {
+        const ids = markedIds.get(entryKey(row.characterId, row.date, row.solarSystemId));
+        if (ids?.length && row.state !== 'conflict') row.markedPaidIds = [...ids];
       }
     }
   }

@@ -142,6 +142,79 @@ describe('CorpRowDetailModal', () => {
     expect(screen.queryByRole('button', { name: /settle up/i })).not.toBeInTheDocument();
   });
 
+  it('says why the day is locked and keeps the billed amount once it is paid', () => {
+    const paid: BookRowView = {
+      ...view,
+      state: 'paid',
+      taxOwed: 0,
+      settledBy: 'statement',
+      statementId: 's1',
+      dispute: undefined,
+    };
+    renderModal({ corp: { ...corp, view: paid } });
+    expect(screen.getByText('957,001 ISK')).toBeInTheDocument();
+    expect(screen.getByText(/can't be edited here/)).toBeInTheDocument();
+    expect(screen.getByText(/It is on Brass Meridian Logistics's Statement/)).toBeInTheDocument();
+  });
+
+  it('shows a dismissal as 0 ISK and says what the corporation originally billed', () => {
+    const dismissed: BookRowView = {
+      ...view,
+      state: 'dismissed',
+      taxOwed: 0,
+      dismissalReason: 'No tax on this moon',
+      dispute: undefined,
+    };
+    renderModal({ corp: { ...corp, view: dismissed } });
+    expect(screen.getByText('0 ISK')).toBeInTheDocument();
+    expect(
+      screen.getByText(/set this day to 0 ISK\. It originally billed 957,001 ISK/)
+    ).toBeInTheDocument();
+  });
+
+  it('lets the member unmark a payment they marked, and says it was theirs', async () => {
+    const user = userEvent.setup();
+    const onUnmarkPaid = vi.fn();
+    const paid: BookRowView = {
+      ...view,
+      state: 'paid',
+      taxOwed: 0,
+      settledBy: 'yourMark',
+      markedPaidIds: ['a1'],
+      dispute: undefined,
+    };
+    renderModal({ corp: { ...corp, view: paid }, onUnmarkPaid });
+    expect(screen.getByText(/You marked this day paid \(957,001 ISK\)/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /mark as unpaid/i }));
+    expect(onUnmarkPaid).toHaveBeenCalledOnce();
+  });
+
+  it('says so when the member also marked a day the Statement settled, and offers the unmark', () => {
+    const paid: BookRowView = {
+      ...view,
+      state: 'paid',
+      taxOwed: 0,
+      settledBy: 'statement',
+      markedPaidIds: ['a1'],
+      dispute: undefined,
+    };
+    renderModal({ corp: { ...corp, view: paid }, onUnmarkPaid: vi.fn() });
+    expect(screen.getByText(/You also marked this day paid/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /mark as unpaid/i })).toBeInTheDocument();
+  });
+
+  it('offers no unmark when the corporation, not the member, settled the day', () => {
+    const paid: BookRowView = {
+      ...view,
+      state: 'paid',
+      taxOwed: 0,
+      settledBy: 'statement',
+      dispute: undefined,
+    };
+    renderModal({ corp: { ...corp, view: paid }, onUnmarkPaid: vi.fn() });
+    expect(screen.queryByRole('button', { name: /mark as unpaid/i })).not.toBeInTheDocument();
+  });
+
   it("gives the corporation's reason for a correction (#4622)", () => {
     const corrected = {
       ...corp,

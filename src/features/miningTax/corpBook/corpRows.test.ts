@@ -160,6 +160,29 @@ describe('buildDisplayRows', () => {
     expect(byId.p.status).toBe('paid');
     expect(byId.d.status).toBe('dismissed');
   });
+
+  it('a Paid day keeps the tax it was billed at, like every other Paid row; a dismissal stays 0', () => {
+    const rows = buildDisplayRows(
+      [],
+      overlay({
+        rows: [
+          view({ id: 'p', state: 'paid', taxOwed: 0 }),
+          view({
+            id: 'pc',
+            state: 'paid',
+            taxOwed: 0,
+            correction: { before: 15_000, after: 9_000, reasons: ['Goodwill'] },
+          }),
+          view({ id: 'd', state: 'dismissed', taxOwed: 0 }),
+        ],
+      }),
+      nameOf
+    );
+    const byId = Object.fromEntries(rows.map((r) => [r.key, r]));
+    expect(byId.p.assignment?.taxOwed).toBe(15_000);
+    expect(byId.pc.assignment?.taxOwed).toBe(9_000);
+    expect(byId.d.assignment?.taxOwed).toBe(0);
+  });
   it('names the refinery on the line, beside the corporation (#4622)', () => {
     const [row] = buildDisplayRows(
       [],
