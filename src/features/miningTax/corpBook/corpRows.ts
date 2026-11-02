@@ -127,10 +127,10 @@ export function buildDisplayRows(
   });
   // A Payee that is the corporation: its rows give way to the book's, which bills the same ore.
   const taken = (dr: DisplayRow) =>
-    dr.assignment?.payeeId !== undefined &&
+    dr.assignment != null &&
     overlay.absorbed
       .get(entryKey(dr.row.characterId, dr.row.entry.date, dr.row.entry.solarSystemId))
-      ?.has(dr.assignment.payeeId) === true;
+      ?.has(dr.assignment.id) === true;
   const flat = flatten(adjusted)
     .filter((dr) => !taken(dr))
     .map((dr): DisplayRow => {
@@ -168,6 +168,7 @@ export function personalEntriesOf(rows: readonly MoonMiningTaxRow[]): PersonalEn
     allocations: row.assignments
       .filter((a) => a.status !== 'dismissed')
       .map((a) => ({
+        id: a.id,
         payeeId: a.payeeId ?? '',
         taxPct: a.taxPct,
         oreLines: a.oreLines,

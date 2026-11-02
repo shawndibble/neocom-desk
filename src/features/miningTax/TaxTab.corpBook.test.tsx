@@ -146,13 +146,11 @@ describe('TaxTab with a Corp Tax Book', () => {
         characterNames: new Map([[ME, 'Kestrel Vane']]),
         now: '2026-10-18T14:00:00Z',
       },
-      (corp) => `${corp} (Corp Tax Book)`
+      (corp) => `${corp}`
     );
     const user = userEvent.setup();
     renderTab();
-    expect(screen.getAllByText('Brass Meridian Logistics (Corp Tax Book)').length).toBeGreaterThan(
-      0
-    );
+    expect(screen.getAllByText('Brass Meridian Logistics').length).toBeGreaterThan(0);
     expect(screen.getByText('Billed')).toBeInTheDocument();
     // The 13 Oct ore is free and no book observed it at all: still the member's to assign (D12).
     expect(screen.queryByText('Unattributed')).not.toBeInTheDocument();

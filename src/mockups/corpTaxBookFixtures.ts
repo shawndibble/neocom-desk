@@ -824,7 +824,7 @@ export interface PersonalRow {
   note: string;
 }
 
-export const CORP_PAYEE = `${CORP.name} (Corp Tax Book)`;
+export const CORP_PAYEE = `${CORP.name}`;
 export const MEMBER_ALT = 'Ilsa Verne';
 
 export const PERSONAL_ROWS: PersonalRow[] = [

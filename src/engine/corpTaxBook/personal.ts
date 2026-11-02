@@ -55,6 +55,8 @@ export type BookLabelState = 'pending' | 'unattributed';
 
 /** What the member gave a Payee of one Mining Ledger Entry. */
 export interface PersonalAllocation {
+  /** The Assignment's id; an allocation without one is never taken over by a book. */
+  id?: string;
   payeeId: string;
   taxPct: number;
   oreLines: OreLine[];
@@ -202,7 +204,7 @@ export interface PersonalOverlay {
   /** Per Mining Ledger Entry key, the free ore the books took — the residual row shrinks by it. */
   takenFromFree: Map<string, OreLine[]>;
   /**
-   * Per Mining Ledger Entry key, the Payees whose allocation the book took over whole: the tab
+   * Per Mining Ledger Entry key, the ids of the Assignments the book took over whole: the tab
    * hides those rows, the book's row stands in for them.
    */
   absorbed: Map<string, Set<string>>;
@@ -485,27 +487,29 @@ function takeOverlap(pool: OverlapPool, observed: readonly OreLine[]): BookOverl
  * share resolves from. `paidLines` is the part the member already paid: their side is done, and the
  * corporation confirms it against its wallet. One that lists more than the corporation observed stays another Payee's.
  */
-function absorbOwn(
+function takeOwnAllocations(
   pool: OverlapPool,
   ownPayeeIds: readonly string[] | undefined,
   share: readonly OreLine[]
-): { lines: OreLine[]; paidLines: OreLine[]; payeeIds: string[] } {
+): { lines: OreLine[]; paidLines: OreLine[]; ids: string[] } {
   const lines: OreLine[][] = [];
   const paid: OreLine[][] = [];
-  const payeeIds: string[] = [];
+  const ids: string[] = [];
   let room = sumLines(share);
   for (let i = 0; i < pool.length; i++) {
     const { allocation } = pool[i];
-    if (!ownPayeeIds?.includes(allocation.payeeId)) continue;
+    if (!ownPayeeIds?.includes(allocation.payeeId) || allocation.id === undefined) continue;
+    // A row needing review is the member's to sort out, not the book's to take.
+    if (allocation.status !== 'paid' && allocation.status !== 'outstanding') continue;
     const listed = sumLines(allocation.oreLines);
     if (listed.some((l) => l.quantity > quantityOfTypes(room, new Set([l.typeId])))) continue;
     room = minusLines(room, listed);
     lines.push(listed);
     if (allocation.status === 'paid') paid.push(listed);
-    payeeIds.push(allocation.payeeId);
+    ids.push(allocation.id);
     pool.splice(i--, 1);
   }
-  return { lines: sumLines(...lines), paidLines: sumLines(...paid), payeeIds };
+  return { lines: sumLines(...lines), paidLines: sumLines(...paid), ids };
 }
 
 /**
@@ -711,9 +715,9 @@ export function overlayCorpBooks(input: {
       const here = chargesOf(p, key);
       const onStatement = here.every((c) => c.statement !== undefined);
       // What the member listed under this corporation's own Payee is the book's to bill.
-      const own = absorbOwn(pool, p.book.ownPayeeIds, share);
-      if (own.payeeIds.length > 0) {
-        absorbed.set(key, new Set([...(absorbed.get(key) ?? []), ...own.payeeIds]));
+      const own = takeOwnAllocations(pool, p.book.ownPayeeIds, share);
+      if (own.ids.length > 0) {
+        absorbed.set(key, new Set([...(absorbed.get(key) ?? []), ...own.ids]));
       }
       if (own.paidLines.length > 0) {
         const paidOf = memberPaid.get(p.book.corporationId) ?? new Map<string, OreLine[]>();
@@ -861,6 +865,8 @@ export function overlayCorpBooks(input: {
     // What the member paid under the corporation's own Payee is paid on their side, day by day;
     // the corporation still confirms it against its wallet.
     const paidOf = memberPaid.get(p.book.corporationId);
+    // The same payment may also be a donation in flight or credit the book holds: count it once.
+    let creditedByMark = 0;
     if (paidOf) {
       for (const row of mine) {
         if (row.state !== 'billed' || (row.taxOwed ?? 0) <= 0) continue;
@@ -877,6 +883,7 @@ export function overlayCorpBooks(input: {
         paidOf.set(key, minusLines(left, covered));
         const { taxOwed } = computeAssignmentValue(covered, priceMap(row.unitPrices), row.taxPct);
         const owed = Math.max(0, (row.taxOwed ?? 0) - taxOwed);
+        creditedByMark += (row.taxOwed ?? 0) - owed;
         row.taxOwed = owed < 0.01 ? 0 : owed;
         if (row.taxOwed === 0) row.state = 'paid';
       }
@@ -885,7 +892,10 @@ export function overlayCorpBooks(input: {
     // Statement yet, pay the oldest Billed days: the member's side is done,
     // and a corp that disagrees bills them again. Counting the credit keeps a
     // day Paid once the book credits the donation that paid it.
-    const paidAhead = p.book.inFlight.reduce((sum, d) => sum + d.amount, p.credit);
+    const paidAhead = Math.max(
+      0,
+      p.book.inFlight.reduce((sum, d) => sum + d.amount, p.credit) - creditedByMark
+    );
     const open = mine.filter((r) => r.state === 'billed' && (r.taxOwed ?? 0) > 0);
     for (const id of coverInFlight(
       open.map((r) => ({ id: r.id, date: r.date, taxOwed: r.taxOwed ?? 0 })),

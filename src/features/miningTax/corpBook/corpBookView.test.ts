@@ -73,7 +73,7 @@ const input = (over = {}) => ({
   ...over,
 });
 
-const payeeName = (corp: string) => `${corp} (Corp Tax Book)`;
+const payeeName = (corp: string) => `${corp}`;
 
 describe('buildCorpBookView', () => {
   it('is null until a book has its prices (the tab stays as it was)', () => {
@@ -88,7 +88,7 @@ describe('buildCorpBookView', () => {
     expect(view.overlay.rows[0].taxOwed).toBeCloseTo(1000 * 148 * 0.15, 4);
     expect(view.payees).toHaveLength(1);
     expect(view.payees[0]).toMatchObject({
-      name: 'Brass Meridian Logistics (Corp Tax Book)',
+      name: 'Brass Meridian Logistics',
       hubId: 'jita',
     });
     expect(view.books[0]).toMatchObject({ corpName: 'Brass Meridian Logistics', left: false });
@@ -143,7 +143,7 @@ describe('buildCorpBookView', () => {
       )!;
       seen.push([...view.overlay.absorbed.values()].flatMap((s) => [...s]));
     }
-    expect(seen).toEqual([['verified'], [], [], []]);
+    expect(seen).toEqual([['a'], [], [], []]);
   });
 
   it('marks a book none of the tracked Characters is in any more as left', () => {

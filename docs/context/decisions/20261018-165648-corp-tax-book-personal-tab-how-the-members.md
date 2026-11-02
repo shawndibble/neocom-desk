@@ -15,7 +15,7 @@ _Recorded 2026-10-18 · issue #4065._
   devices would disagree on.
 - **A day on an issued Statement is never a conflict.** The Statement is the
   corp's frozen decision; it is owed in full.
-- **The corp Payee is virtual.** "<Corp> (Corp Tax Book)" exists only in the
+- **The corp Payee is virtual.** "<Corp>" (named for the corporation since 20261101-234443; it was "<Corp> (Corp Tax Book)") exists only in the
   tab, never in Dexie, and is excluded from every assign, split, join, continue
   and settle-up path, so no Assignment can point at it. Settle up for it is a
   how-to-pay dialog: the book credits the donation from its own wallet journal.

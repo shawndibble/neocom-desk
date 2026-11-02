@@ -111,7 +111,7 @@ describe('buildDisplayRows', () => {
     };
     const out = buildDisplayRows(
       [row],
-      overlay({ absorbed: new Map([[key, new Set(['bmw'])]]) }),
+      overlay({ absorbed: new Map([[key, new Set(['a1'])]]) }),
       nameOf
     );
     expect(out.map((d) => d.assignment?.payeeId)).toEqual(['ashfall']);
@@ -177,7 +177,7 @@ describe('corp Payee ids', () => {
     expect(corporationOfPayee(corpPayeeId(98000001))).toBe(98000001);
     expect(isCorpPayeeId('some-uuid')).toBe(false);
     expect(isCorpPayeeId(undefined)).toBe(false);
-    expect(corpPayee(98000001, ME, 'Brass (Corp Tax Book)', 15, 'jita')).toMatchObject({
+    expect(corpPayee(98000001, ME, 'Brass', 15, 'jita')).toMatchObject({
       id: corpPayeeId(98000001),
       entityId: 98000001,
       entityKind: 'corporation',
@@ -213,6 +213,7 @@ describe('personalEntriesOf', () => {
     expect(entry.freeOreLines).toEqual([{ typeId: ZEO, quantity: 400 }]);
     expect(entry.allocations).toEqual([
       {
+        id: 'a',
         payeeId: 'p1',
         taxPct: 10,
         oreLines: [{ typeId: ZEO, quantity: 600 }],
