@@ -693,16 +693,18 @@ describe('AppraisalPanel', () => {
     it('adds a refine column and total when a row carries refine data', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
-      expect(
-        within(veldsparRow).getByText('8,000 ISK', { selector: '.sr-only' })
-      ).toBeInTheDocument();
+      // With no leftover units the two refine columns agree.
+      expect(within(veldsparRow).getAllByText('8,000 ISK', { selector: '.sr-only' })).toHaveLength(
+        2
+      );
       expect(screen.getAllByText('Refine total').length).toBeGreaterThan(0);
+      expect(screen.getByText('Refine + ore')).toBeInTheDocument();
     });
 
     it('flags the refine value with a dash on a row with no reprocessing data', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       const dcuRow = screen.getByRole('row', { name: /Damage Control II/ });
-      expect(within(dcuRow).getByText('—')).toBeInTheDocument();
+      expect(within(dcuRow).getAllByText('—')).toHaveLength(2);
     });
 
     it('marks a partially priced refine value', async () => {
@@ -710,7 +712,7 @@ describe('AppraisalPanel', () => {
       partial.appraisal.rows[0].refinePricedAll = false;
       renderPanel({ controller: controller({ result: partial }) });
       const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
-      await userEvent.hover(within(veldsparRow).getByText('*'));
+      await userEvent.hover(within(veldsparRow).getAllByText('*')[0]);
       expect(await screen.findByRole('tooltip')).toHaveTextContent(/no price on this basis/);
     });
 
@@ -749,8 +751,8 @@ describe('AppraisalPanel', () => {
       renderPanel({ controller: controller({ result: withSell }) });
       const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
       expect(
-        within(oreRow).getByText('2,000,000 ISK', { selector: '.sr-only' })
-      ).toBeInTheDocument();
+        within(oreRow).getAllByText('2,000,000 ISK', { selector: '.sr-only' }).length
+      ).toBeGreaterThan(0);
       expect(within(oreRow).queryByText('1,000,000 ISK', { selector: '.sr-only' })).toBeNull();
       expect(screen.getByText('sell')).toBeInTheDocument();
       useRefineBasis.setState({ value: 'buy', hydrated: true });
@@ -785,7 +787,7 @@ describe('AppraisalPanel', () => {
       const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
       // The figure is a button inside the highlighted span (it opens the breakdown).
       const refineCell = within(oreRow)
-        .getByText('17,020,890 ISK', { selector: '.sr-only' })
+        .getByText('15,436,890 ISK', { selector: '.sr-only' })
         .closest('button')?.parentElement;
       const buyCell = within(oreRow).getByText('15,984,000 ISK', { selector: '.sr-only' })
         .parentElement?.parentElement;
@@ -793,7 +795,7 @@ describe('AppraisalPanel', () => {
       expect(buyCell?.className).not.toContain('text-isk-pos');
     });
 
-    it('shows the minerals plus the leftover units as the Refine total, the number the breakdown shows', () => {
+    it('shows the minerals alone as the Refine total, and with the leftover units as Refine + ore', () => {
       const partBatch = refineOutcome();
       partBatch.appraisal.rows[0] = {
         ...partBatch.appraisal.rows[0],
@@ -806,11 +808,13 @@ describe('AppraisalPanel', () => {
       };
       renderPanel({ controller: controller({ result: partBatch }) });
       const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
-      // 15,436,890 of minerals + 99 leftover units at 16,000 each.
+      // 15,436,890 of minerals; with the 99 leftover units at 16,000 each, 17,020,890.
+      expect(
+        within(oreRow).getByText('15,436,890 ISK', { selector: '.sr-only' })
+      ).toBeInTheDocument();
       expect(
         within(oreRow).getByText('17,020,890 ISK', { selector: '.sr-only' })
       ).toBeInTheDocument();
-      expect(within(oreRow).queryByText('!')).not.toBeInTheDocument();
     });
 
     /**

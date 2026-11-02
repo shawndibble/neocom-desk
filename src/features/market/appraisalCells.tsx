@@ -1,6 +1,5 @@
 import type { ReactElement, ReactNode } from 'react';
 import { IskAmount } from '@/components/ui';
-
 import { formatIskAuto } from '@/lib/isk';
 
 /**

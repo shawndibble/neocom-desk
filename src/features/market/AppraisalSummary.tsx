@@ -5,7 +5,11 @@ import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
-import { refineTotalOfRows, type RefineBasis, type appraisalNet } from '@/engine/market/appraisal';
+import {
+  refineMineralsOfRows,
+  type RefineBasis,
+  type appraisalNet,
+} from '@/engine/market/appraisal';
 import { AppraisalHeaderStats } from './AppraisalHeaderStats';
 import { AppraisalHoldBar } from './AppraisalHoldBar';
 import { HubCompareCards } from './HubCompareCards';
@@ -76,7 +80,7 @@ export function AppraisalSummary({
           net={net}
           itemCount={itemCount}
           showRefine={showRefine}
-          refineValue={refineTotalOfRows(result.appraisal.rows, refineBasis)}
+          refineValue={refineMineralsOfRows(result.appraisal.rows, refineBasis)}
           refineBasis={refineBasis}
           showCheapest={hasLpOption}
           implantBonusPct={implantBonusPct}
