@@ -13089,7 +13089,6 @@
       "title": "Quickbar",
       "empty": "No items yet — open an item's menu (⋮) and choose Add to Quickbar.",
       "viewInAppraisal": "View in Appraisal",
-      "removeItem": "Remove {{name}} from Quickbar",
       "removeFromQuickbar": "Remove from Quickbar",
       "removeMenu": "Remove",
       "removed": "Quickbar item {{name}} removed.",

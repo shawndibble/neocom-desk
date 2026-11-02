@@ -646,6 +646,10 @@ export function Market() {
     setStationFilter(locationId);
   }
 
+  const itemMenu = useOpenAfterMenu();
+  const selectedBlueprintTypeId =
+    selectedTypeId === null ? null : itemActions.actions.blueprintFor(selectedTypeId);
+
   /**
    * A blueprint *original* can be sold on the market; a **copy** cannot — BPCs
    * are contract-only. So an empty order book on a blueprint is the one case
@@ -653,9 +657,6 @@ export function Market() {
    * point at the BPC search rather than leave the pilot to conclude the item
    * is unavailable.
    */
-  const itemMenu = useOpenAfterMenu();
-  const selectedBlueprintTypeId =
-    selectedTypeId === null ? null : itemActions.actions.blueprintFor(selectedTypeId);
   const selectedIsBlueprint =
     selectedTypeId !== null &&
     (itemActions.actions.blueprints?.byBlueprintTypeID.has(selectedTypeId) ?? false);
@@ -1170,7 +1171,12 @@ export function Market() {
                         disabled={activeCharacterId === null}
                         onPin={handlePinWithTarget}
                       />
-                      <DropdownMenu>
+                      <DropdownMenu
+                        onOpenChange={(open) => {
+                          // Market loads the blueprint catalog lazily; Build Plan needs it.
+                          if (open) itemActions.actions.requestBlueprints();
+                        }}
+                      >
                         <DropdownMenuTrigger asChild>
                           <IconButton
                             size="md"
