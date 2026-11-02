@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { PayeeRecord } from '@/db';
 import type { TaxSnapshot } from './taxSnapshot';
 import type { CorpBookView } from './corpBook/corpBookView';
+import { corpPayeeAliases } from './corpBook/corpRows';
 
 /** The Payees the Tax tab knows: the member's own, and the ledger-wide list that adds each Corp Tax Book's. */
 export function useTaxPayees(data: TaxSnapshot | null, corpView: CorpBookView | null) {
@@ -23,5 +24,15 @@ export function useTaxPayees(data: TaxSnapshot | null, corpView: CorpBookView | 
     () => [...allPayees, ...(corpView?.payees ?? [])],
     [allPayees, corpView]
   );
-  return { allPayees, payeeById, ledgerPayees };
+  // The Payee filter lists a corporation once: where the member's own Payee is that corporation, the
+  // book's virtual one is merged into it.
+  const payeeAliases = useMemo(
+    () => corpPayeeAliases(allPayees, corpView?.payees ?? []),
+    [allPayees, corpView]
+  );
+  const filterPayees = useMemo(
+    () => ledgerPayees.filter((p) => !payeeAliases.has(p.id)),
+    [ledgerPayees, payeeAliases]
+  );
+  return { allPayees, payeeById, ledgerPayees, filterPayees, payeeAliases };
 }

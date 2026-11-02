@@ -135,7 +135,10 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   useHydratedStore(useSurveyPayeeId);
   usePaymentRefDeepLink(Boolean(data), allDisplayRows, loading, actions.openDetail);
 
-  const { allPayees, payeeById, ledgerPayees } = useTaxPayees(data, corpView);
+  const { allPayees, payeeById, ledgerPayees, filterPayees, payeeAliases } = useTaxPayees(
+    data,
+    corpView
+  );
   const {
     payeeManagerCharacterId,
     openPayeeManager,
@@ -156,11 +159,12 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const { resolvedPayeeFilter, togglePayee, isSolePayee, filterToPayee } = usePayeeFilter(
     payeeFilter,
     setPayeeFilter,
-    ledgerPayees
+    filterPayees,
+    payeeAliases
   );
   const visibleRows = useMemo(
-    () => filterRowsByPayee(characterFiltered, resolvedPayeeFilter),
-    [characterFiltered, resolvedPayeeFilter]
+    () => filterRowsByPayee(characterFiltered, resolvedPayeeFilter, payeeAliases),
+    [characterFiltered, resolvedPayeeFilter, payeeAliases]
   );
 
   const { balances, unassigned, everyAssignment, linkSuggestions, payeeSystems, owedByPayee } =
@@ -361,7 +365,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                 )}
 
                 <TaxOpenLedger
-                  ledgerPayees={ledgerPayees}
+                  ledgerPayees={filterPayees}
                   characters={characters}
                   resolvedPayeeFilter={resolvedPayeeFilter}
                   onPayeeFilterChange={setPayeeFilter}
