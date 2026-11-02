@@ -49,6 +49,9 @@ jobs:
         run: |
           if ! timeout --kill-after=10s 6m npm run build; then
             echo "::warning::Build with Sentry source-map upload failed or timed out; rebuilding without it"
+            # Vite empties dist/ itself; this is belt and braces so a map from the
+            # failed build can never be published.
+            find dist -name '*.map' -delete 2>/dev/null || true
             SENTRY_AUTH_TOKEN= npm run build
           fi
         env:
