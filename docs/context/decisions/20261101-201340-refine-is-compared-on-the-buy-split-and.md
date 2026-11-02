@@ -1,0 +1,9 @@
+# Scope decisions — Refine is compared on the buy, split and sell price basis, and the pick is remembered
+
+_Recorded 2026-11-02._
+
+- **The Refine breakdown compares refining with selling as is on all three Price Bases at once** (buy orders, split, sell orders) and says once, top right, what to do on the selected one ("Suggested action"), with a note only where the other bases disagree. There is no per-row Better column in that comparison: three identical verdicts say nothing. The per-item table keeps its own, because it varies by item.
+- **The selected basis is remembered on the device and drives the page's single refine figures.** Choosing a row in the breakdown sets it for every later appraisal: the Refine total column (priced on it, highlighted against the same basis's as-is total), the Refine chip (which says which basis), the "refine" copy list and the break-even. The table keeps one Refine total column rather than separate Buy and Sell columns; the breakdown is where the bases sit side by side. Default: buy orders.
+- **Mineral sell prices are fetched with the buy prices and ride in share links** (`sellPrice` on each stored mineral, additive on snapshot version 1). A link from before they travelled has none: the sell and split bases are shown as unavailable and everything prices on the buy side, never as a zero.
+- **A lopsided book is called out, not hidden.** An item whose sell price is over 10× its buy price props up the Sell and Split rows (an uncompressed ore sat at 46× its compressed price), so the breakdown says so in one line. The figures stay as the market shows them.
+- **The minerals table's totals are the table's own rows**, in the same columns, so they share its edges and padding; both the buy and sell unit prices are listed on every mineral so each can be checked against another tool on either side.

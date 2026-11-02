@@ -16,7 +16,15 @@
  */
 import { reprocessingYield } from '@/engine/industry/reprocessing';
 import { netOfReprocessingTax } from '@/engine/industry/refiningSetup';
-import type { Appraisal, AppraisalItem, AppraisalRow } from './appraisal';
+import {
+  asIsEachFor,
+  asIsTotalFor,
+  type Appraisal,
+  type AppraisalItem,
+  type AppraisalRow,
+  type AppraisalRefineDetail,
+  type RefineBasis,
+} from './appraisal';
 
 export interface RefineBreakdownInput {
   appraisal: Pick<Appraisal, 'rows' | 'items'>;
@@ -26,13 +34,18 @@ export interface RefineBreakdownInput {
   taxRate: number;
   /** Narrow to one item for a single row's breakdown. */
   onlyTypeId?: number;
+  /** Which side of the book the minerals and the as-is pile are priced on; default the buy orders. */
+  basis?: RefineBasis;
 }
 
 export interface RefineMineralLine {
   typeId: number;
   quantity: number;
-  /** ISK a unit at 100% of market; null where nobody buys it. */
+  /** ISK a unit at 100% of market on the breakdown's basis; null where that side has no price. */
   price: number | null;
+  /** The same mineral's buy and sell unit prices, whatever the basis; null where that side has none. */
+  buyPrice: number | null;
+  sellPrice: number | null;
   /** The quantity at `pricePercent` of that price, before tax; 0 where unpriced. */
   value: number;
 }
@@ -50,12 +63,14 @@ export interface RefineItemLine {
   /** Minerals at `pricePercent`, less tax. */
   refined: number;
   leftoverValue: number;
-  /** Selling the pasted quantity to buy orders as is. */
+  /** Selling the pasted quantity as is, on the breakdown's basis. */
   asIs: number;
   wins: boolean;
 }
 
 export interface RefineBreakdown {
+  /** The side of the book everything here is priced on. */
+  basis: RefineBasis;
   items: RefineItemLine[];
   /** Largest value first. */
   minerals: RefineMineralLine[];
@@ -68,7 +83,7 @@ export interface RefineBreakdown {
   leftoverValue: number;
   /** `net` plus the leftover units sold as is: what refining the pile leaves you holding. */
   total: number;
-  /** The same pile sold as is into the buy orders. */
+  /** The same pile sold as is, on the basis. */
   asIs: number;
   difference: number;
   refineWins: boolean;
@@ -94,8 +109,22 @@ interface Refinable {
   detail: NonNullable<NonNullable<AppraisalItem['refine']>['detail']>;
 }
 
+/** One mineral's unit price on a basis; undefined where a side it needs has none. */
+function mineralPrice(
+  detail: AppraisalRefineDetail,
+  typeId: number,
+  basis: RefineBasis
+): number | undefined {
+  const buy = detail.materialPrices[typeId];
+  const sell = detail.materialSellPrices?.[typeId];
+  if (basis === 'buy') return buy;
+  if (basis === 'sell') return sell;
+  return buy === undefined || sell === undefined ? undefined : (buy + sell) / 2;
+}
+
 function netMineralValue(
   refinables: readonly Refinable[],
+  basis: RefineBasis,
   efficiencyScale: number,
   pricePercent: number,
   taxRate: number
@@ -111,10 +140,10 @@ function netMineralValue(
     });
     let gross = 0;
     for (const output of yielded.outputs) {
-      gross += output.quantity * (detail.materialPrices[output.typeId] ?? 0);
+      gross += output.quantity * (mineralPrice(detail, output.typeId, basis) ?? 0);
     }
     value += (gross * pricePercent) / 100;
-    leftover += yielded.unitsLeftOver * (row.buyEach ?? 0);
+    leftover += yielded.unitsLeftOver * (asIsEachFor(row, basis) ?? 0);
   }
   return { value: netOfReprocessingTax(value, taxRate), leftover };
 }
@@ -136,6 +165,7 @@ export function buildRefineBreakdown({
   pricePercent,
   taxRate,
   onlyTypeId,
+  basis = 'buy',
 }: RefineBreakdownInput): RefineBreakdown {
   const refinables: Refinable[] = [];
   let skipped = 0;
@@ -168,7 +198,7 @@ export function buildRefineBreakdown({
     });
     let gross = 0;
     for (const output of yielded.outputs) {
-      const price = detail.materialPrices[output.typeId];
+      const price = mineralPrice(detail, output.typeId, basis);
       const value = price === undefined ? 0 : (output.quantity * price * pricePercent) / 100;
       if (price === undefined) pricedAll = false;
       gross += value;
@@ -176,6 +206,8 @@ export function buildRefineBreakdown({
         typeId: output.typeId,
         quantity: 0,
         price: price ?? null,
+        buyPrice: detail.materialPrices[output.typeId] ?? null,
+        sellPrice: detail.materialSellPrices?.[output.typeId] ?? null,
         value: 0,
       };
       line.quantity += output.quantity;
@@ -183,9 +215,9 @@ export function buildRefineBreakdown({
       minerals.set(output.typeId, line);
     }
     const refined = netOfReprocessingTax(gross, taxRate);
-    const itemLeftover = yielded.unitsLeftOver * (row.buyEach ?? 0);
-    const itemAsIs = row.buyTotal ?? 0;
-    if (row.buyTotal === null || row.buyEach === null) unbuyable += 1;
+    const itemLeftover = yielded.unitsLeftOver * (asIsEachFor(row, basis) ?? 0);
+    const itemAsIs = asIsTotalFor(row, basis) ?? 0;
+    if (asIsTotalFor(row, basis) === null || asIsEachFor(row, basis) === null) unbuyable += 1;
     mineralValue += gross;
     unitsLeftOver += yielded.unitsLeftOver;
     leftoverValue += itemLeftover;
@@ -216,6 +248,7 @@ export function buildRefineBreakdown({
   const efficiencies = items.map((line) => line.efficiency);
 
   return {
+    basis,
     items,
     minerals: [...minerals.values()].sort((a, b) => b.value - a.value),
     mineralValue,
@@ -229,7 +262,7 @@ export function buildRefineBreakdown({
     refineWins: total > asIs,
     efficiencyMin: efficiencies.length > 0 ? Math.min(...efficiencies) : null,
     efficiencyMax: efficiencies.length > 0 ? Math.max(...efficiencies) : null,
-    breakEvenEfficiency: breakEvenEfficiency(items, refinables, asIs, pricePercent, taxRate),
+    breakEvenEfficiency: breakEvenEfficiency(items, refinables, basis, asIs, pricePercent, taxRate),
     pricedAll,
     skipped,
     unbuyable,
@@ -245,13 +278,14 @@ export function buildRefineBreakdown({
 function breakEvenEfficiency(
   items: readonly RefineItemLine[],
   refinables: readonly Refinable[],
+  basis: RefineBasis,
   asIs: number,
   pricePercent: number,
   taxRate: number
 ): number | null {
   if (items.length === 0 || asIs <= 0) return null;
   const totalAt = (scale: number): number => {
-    const { value, leftover } = netMineralValue(refinables, scale, pricePercent, taxRate);
+    const { value, leftover } = netMineralValue(refinables, basis, scale, pricePercent, taxRate);
     return value + leftover;
   };
   if (totalAt(MAX_BREAK_EVEN_SCALE) <= asIs) return null;
@@ -268,4 +302,42 @@ function breakEvenEfficiency(
       ? items.reduce((sum, line) => sum + line.efficiency * line.refined, 0) / weight
       : items.reduce((sum, line) => sum + line.efficiency, 0) / items.length;
   return high * mean;
+}
+
+/**
+ * Whether a basis can be priced for these items: the sell and split sides need
+ * the minerals' sell prices, which a share link from before they travelled
+ * with it does not carry. The buy side is always there.
+ */
+export function basisAvailable(
+  appraisal: Pick<Appraisal, 'items'>,
+  basis: RefineBasis,
+  onlyTypeId?: number
+): boolean {
+  if (basis === 'buy') return true;
+  return appraisal.items
+    .filter((item) => onlyTypeId === undefined || item.typeId === onlyTypeId)
+    .every((item) => !item.refine?.detail || item.refine.detail.materialSellPrices !== undefined);
+}
+
+export interface RefineComparison {
+  buy: RefineBreakdown;
+  /** Null where the sell prices were never read, which is also what split needs. */
+  split: RefineBreakdown | null;
+  sell: RefineBreakdown | null;
+}
+
+/** The breakdown on every price basis at once, for the side-by-side comparison. */
+export function buildRefineComparison(
+  input: Omit<RefineBreakdownInput, 'basis'>
+): RefineComparison {
+  const on = (basis: RefineBasis): RefineBreakdown | null =>
+    basisAvailable(input.appraisal, basis, input.onlyTypeId)
+      ? buildRefineBreakdown({ ...input, basis })
+      : null;
+  return {
+    buy: buildRefineBreakdown({ ...input, basis: 'buy' }),
+    split: on('split'),
+    sell: on('sell'),
+  };
 }

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
-import type { appraisalNet } from '@/engine/market/appraisal';
+import { refineTotalsFor, type RefineBasis, type appraisalNet } from '@/engine/market/appraisal';
 import { AppraisalHeaderStats } from './AppraisalHeaderStats';
 import { AppraisalHoldBar } from './AppraisalHoldBar';
 import { HubCompareCards } from './HubCompareCards';
@@ -37,6 +37,8 @@ interface AppraisalSummaryProps {
   /** The Refine figure's total efficiency, and the control that opens its breakdown. */
   refineEfficiency?: string | null;
   onOpenRefine?: () => void;
+  /** The remembered price basis the Refine figures are on. */
+  refineBasis?: RefineBasis;
 }
 
 export function AppraisalSummary({
@@ -57,6 +59,7 @@ export function AppraisalSummary({
   compareLive,
   refineEfficiency,
   onOpenRefine,
+  refineBasis = 'buy',
 }: AppraisalSummaryProps) {
   const { t } = useTranslation();
   const totals = result.appraisal.totals;
@@ -73,6 +76,8 @@ export function AppraisalSummary({
           net={net}
           itemCount={itemCount}
           showRefine={showRefine}
+          refineValue={refineTotalsFor(totals, refineBasis)}
+          refineBasis={refineBasis}
           showCheapest={hasLpOption}
           implantBonusPct={implantBonusPct}
           refineEfficiency={refineEfficiency}

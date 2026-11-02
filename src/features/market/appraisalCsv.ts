@@ -54,6 +54,8 @@ export function appraisalCsvColumns(
     columns.push(
       // Blank where the type has no reprocessing data / no held LP store sells it.
       { header: t('market.appraisal.columnRefineTotal'), value: (row) => row.refineTotal },
+      // The sell-orders side of the same refine, blank where the sell prices were never read.
+      { header: t('market.appraisal.columnRefineSellTotal'), value: (row) => row.refineSellTotal },
       { header: t('market.appraisal.columnLpTotal'), value: (row) => row.lpIskCost },
       { header: t('market.appraisal.columnLpCost'), value: (row) => row.lpCost },
       { header: t('market.appraisal.columnLpCorp'), value: (row) => row.lpCorpName },

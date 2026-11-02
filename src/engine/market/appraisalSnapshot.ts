@@ -48,8 +48,8 @@ export interface AppraisalSnapshotRefine {
   yieldRate: number;
   /** The facility's fee, a fraction of the refined value. */
   taxRate: number;
-  /** Every mineral the items refine into, priced at 100% of the hub's buy side. */
-  minerals: { typeId: number; name: string; price: number | null }[];
+  /** Every mineral the items refine into, priced at 100% of the hub's buy side, with its sell side beside it. */
+  minerals: { typeId: number; name: string; price: number | null; sellPrice?: number | null }[];
 }
 
 export interface AppraisalSnapshotItem {
@@ -93,6 +93,7 @@ export function buildAppraisalSnapshot(input: {
   if (input.items.length === 0) return { ok: false, reason: 'empty' };
   if (input.items.length > MAX_SNAPSHOT_ITEMS) return { ok: false, reason: 'too-large' };
   const mineralPrices = new Map<number, number | null>();
+  const mineralSellPrices = new Map<number, number | null>();
   const items = input.items.map((item): AppraisalSnapshotItem => {
     const base: AppraisalSnapshotItem = {
       typeId: item.typeId,
@@ -108,6 +109,15 @@ export function buildAppraisalSnapshot(input: {
       const price = detail.materialPrices[material.typeId] ?? null;
       if (!mineralPrices.has(material.typeId) || mineralPrices.get(material.typeId) === null) {
         mineralPrices.set(material.typeId, price);
+      }
+      if (detail.materialSellPrices) {
+        const sellPrice = detail.materialSellPrices[material.typeId] ?? null;
+        if (
+          !mineralSellPrices.has(material.typeId) ||
+          mineralSellPrices.get(material.typeId) === null
+        ) {
+          mineralSellPrices.set(material.typeId, sellPrice);
+        }
       }
     }
     return {
@@ -134,6 +144,10 @@ export function buildAppraisalSnapshot(input: {
         typeId,
         name: input.mineralNames?.get(typeId) ?? '',
         price,
+        // Absent, not null, where the sell side was never read: null means nobody sells it.
+        ...(mineralSellPrices.has(typeId)
+          ? { sellPrice: mineralSellPrices.get(typeId) ?? null }
+          : {}),
       })),
     };
   }
@@ -175,7 +189,14 @@ function parseRefine(raw: unknown): AppraisalSnapshotRefine | null {
     const { typeId, name, price } = mineral as Record<string, unknown>;
     if (!Number.isInteger(typeId) || (typeId as number) <= 0) return null;
     if (typeof name !== 'string' || !isPrice(price)) return null;
-    minerals.push({ typeId: typeId as number, name, price });
+    const { sellPrice } = mineral as Record<string, unknown>;
+    minerals.push({
+      typeId: typeId as number,
+      name,
+      price,
+      // A sell price that is not a price reads as not sent, so the link keeps its buy side.
+      ...(sellPrice !== undefined && isPrice(sellPrice) ? { sellPrice } : {}),
+    });
   }
   return { yieldRate: refine.yieldRate, taxRate: refine.taxRate, minerals };
 }
@@ -243,16 +264,23 @@ export function parseAppraisalSnapshot(raw: unknown): AppraisalSnapshot | null {
 export function appraisalItemsFromSnapshot(snapshot: AppraisalSnapshot): AppraisalItem[] {
   const refine = snapshot.refine;
   const priceOf = new Map<number, number>();
+  const sellPriceOf = new Map<number, number>();
+  // The sell side travelled only if the link says so for some mineral; otherwise it was never read.
+  const hasSellSide = (refine?.minerals ?? []).some((mineral) => mineral.sellPrice !== undefined);
   for (const mineral of refine?.minerals ?? []) {
     if (mineral.price !== null) priceOf.set(mineral.typeId, mineral.price);
+    if (mineral.sellPrice != null) sellPriceOf.set(mineral.typeId, mineral.sellPrice);
   }
   return snapshot.items.map((item) => {
     const { refine: stored, ...rest } = item;
     if (!refine || !stored) return rest;
     const materialPrices: Record<number, number> = {};
+    const materialSellPrices: Record<number, number> = {};
     for (const material of stored.materials) {
       const price = priceOf.get(material.typeId);
       if (price !== undefined) materialPrices[material.typeId] = price;
+      const sellPrice = sellPriceOf.get(material.typeId);
+      if (sellPrice !== undefined) materialSellPrices[material.typeId] = sellPrice;
     }
     return {
       ...rest,
@@ -263,6 +291,7 @@ export function appraisalItemsFromSnapshot(snapshot: AppraisalSnapshot): Apprais
           materials: stored.materials,
           efficiency: stored.efficiency,
           materialPrices,
+          ...(hasSellSide ? { materialSellPrices } : {}),
         },
         refine.taxRate
       ),

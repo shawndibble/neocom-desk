@@ -36,6 +36,8 @@ export interface AppraisalShareView {
   mineralNames: ReadonlyMap<number, string>;
   /** Mineral prices as shared (100% of the hub's buy side), kept for recomputing at the visitor's own numbers. */
   mineralPrices: ReadonlyMap<number, number>;
+  /** The same on the sell side; undefined on a link from before the sell side travelled with it. */
+  mineralSellPrices?: ReadonlyMap<number, number>;
 }
 
 export type AppraisalShareViewResult =
@@ -57,6 +59,13 @@ export function appraisalShareViewFromSnapshot(
         ? { yieldRate: snapshot.refine.yieldRate, taxRate: snapshot.refine.taxRate }
         : null,
       mineralNames: new Map((snapshot.refine?.minerals ?? []).map((m) => [m.typeId, m.name])),
+      mineralSellPrices: (snapshot.refine?.minerals ?? []).some((m) => m.sellPrice !== undefined)
+        ? new Map(
+            (snapshot.refine?.minerals ?? []).flatMap((m): [number, number][] =>
+              m.sellPrice == null ? [] : [[m.typeId, m.sellPrice]]
+            )
+          )
+        : undefined,
       mineralPrices: new Map(
         (snapshot.refine?.minerals ?? []).flatMap((m): [number, number][] =>
           m.price === null ? [] : [[m.typeId, m.price]]
@@ -73,7 +82,7 @@ export function appraisalShareViewFromSnapshot(
  * reprocessing data on this side has no refine figure.
  */
 export function itemsWithMyRefine(
-  view: Pick<AppraisalShareView, 'appraisal' | 'mineralPrices'>,
+  view: Pick<AppraisalShareView, 'appraisal' | 'mineralPrices' | 'mineralSellPrices'>,
   mine: {
     reprocessing: Readonly<Record<string, ReprocessingType>>;
     modifiers: CharacterModifiers;
@@ -86,9 +95,12 @@ export function itemsWithMyRefine(
     const entry = mine.reprocessing[String(item.typeId)];
     if (!entry) return rest;
     const materialPrices: Record<number, number> = {};
+    const materialSellPrices: Record<number, number> = {};
     for (const material of entry.materials) {
       const price = view.mineralPrices.get(material.typeID);
       if (price !== undefined) materialPrices[material.typeID] = price;
+      const sellPrice = view.mineralSellPrices?.get(material.typeID);
+      if (sellPrice !== undefined) materialSellPrices[material.typeID] = sellPrice;
     }
     const refine = computeAppraisalRefine({
       quantity: item.quantity,
@@ -100,6 +112,7 @@ export function itemsWithMyRefine(
       modifiers: mine.modifiers,
       refining: mine.refining,
       materialPrices,
+      materialSellPrices: view.mineralSellPrices ? materialSellPrices : undefined,
     });
     return refine ? { ...rest, refine } : rest;
   });

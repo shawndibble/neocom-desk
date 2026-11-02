@@ -5,8 +5,13 @@ import { MenuItem, MenuSeparator, type DataTableColumn } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import { useTableExport } from '@/components/ui/useTableExport';
 import {
+  asIsEachFor,
+  asIsTotalFor,
   lpBeatsMarket,
   refineBeatsSellAsIs,
+  refinePricedAllFor,
+  refineTotalFor,
+  type RefineBasis,
   sellAfterFees,
   sellBrokerFee,
   sellSalesTax,
@@ -54,6 +59,7 @@ export function useAppraisalColumns({
   owned,
   standing,
   onOpenRefine,
+  refineBasis = 'buy',
 }: {
   controller: AppraisalController;
   owned: ReadonlyMap<number, number> | null;
@@ -61,6 +67,8 @@ export function useAppraisalColumns({
   standing: ResolvedStandings;
   /** Opens the refine breakdown on one item; absent, the Refine figure is plain text. */
   onOpenRefine?: (typeId: number) => void;
+  /** The side of the book the Refine total column is priced on (the remembered pick). */
+  refineBasis?: RefineBasis;
 }) {
   const { t } = useTranslation();
   const { text, result } = controller;
@@ -98,7 +106,7 @@ export function useAppraisalColumns({
       ...withOwned.filter((r) => r.need === 0),
     ];
   }, [rows, owned]);
-  const hasRefine = rows.some((row) => row.refineTotal !== undefined);
+  const hasRefine = rows.some((row) => refineTotalFor(row, refineBasis) !== undefined);
   // Undefined per row when nothing the active Character holds LP with sells
   // this item — same "only earns its place once something has it" rule as
   // the refine column, and also why this never shows with no active
@@ -239,7 +247,9 @@ export function useAppraisalColumns({
       render: (row) =>
         comparisonCell(
           totalCell(row.buyTotal),
-          row.refineTotal !== undefined && !refineBeatsSellAsIs(row),
+          refineBasis === 'buy' &&
+            refineTotalFor(row, 'buy') !== undefined &&
+            !refineBeatsSellAsIs(row, 'buy'),
           undefined,
           <>
             {row.buyWalk && (
@@ -274,7 +284,12 @@ export function useAppraisalColumns({
       render: (row) => (
         <>
           {priceMark(row, 'sellTotal')}
-          {totalCell(row.sellTotal)}
+          {comparisonCell(
+            totalCell(row.sellTotal),
+            refineBasis === 'sell' &&
+              refineTotalFor(row, 'sell') !== undefined &&
+              !refineBeatsSellAsIs(row, 'sell')
+          )}
         </>
       ),
       sortValue: (row) => row.sellTotal ?? undefined,
@@ -284,41 +299,44 @@ export function useAppraisalColumns({
       header: t('market.appraisal.columnRefineTotal'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) =>
-        row.refineTotal === undefined
-          ? '—'
-          : comparisonCell(
-              onOpenRefine ? (
-                <RefineFigureButton name={row.name} onOpen={() => onOpenRefine(row.typeId)}>
-                  {totalCell(row.refineTotal)}
-                </RefineFigureButton>
-              ) : (
-                totalCell(row.refineTotal)
-              ),
-              refineBeatsSellAsIs(row),
-              row.refinePricedAll === false && (
-                <HintText
-                  content={t('market.appraisal.refinePartialHint')}
-                  className="ml-0.5 text-warning"
-                >
-                  *
-                </HintText>
-              ),
-              // Left of the number, so the right-aligned digits stay in line down the column.
-              leftoverTipsRefine(row) && (
-                <HintText
-                  content={t('market.appraisal.refineLeftoverHint', {
-                    count: row.refineUnitsLeftOver,
-                    isk: formatIskAuto((row.refineUnitsLeftOver ?? 0) * (row.buyEach ?? 0)),
-                    buyTotal: formatIskAuto(row.buyTotal ?? 0),
-                  })}
-                  className="mr-1 text-warning"
-                >
-                  !
-                </HintText>
-              )
-            ),
-      sortValue: (row) => row.refineTotal ?? undefined,
+      render: (row) => {
+        const refine = refineTotalFor(row, refineBasis);
+        if (refine === undefined) return '—';
+        return comparisonCell(
+          onOpenRefine ? (
+            <RefineFigureButton name={row.name} onOpen={() => onOpenRefine(row.typeId)}>
+              {totalCell(refine)}
+            </RefineFigureButton>
+          ) : (
+            totalCell(refine)
+          ),
+          refineBeatsSellAsIs(row, refineBasis),
+          refinePricedAllFor(row, refineBasis) === false && (
+            <HintText
+              content={t('market.appraisal.refinePartialHint')}
+              className="ml-0.5 text-warning"
+            >
+              *
+            </HintText>
+          ),
+          // Left of the number, so the right-aligned digits stay in line down the column.
+          leftoverTipsRefine(row, refineBasis) && (
+            <HintText
+              content={t('market.appraisal.refineLeftoverHint', {
+                count: row.refineUnitsLeftOver,
+                isk: formatIskAuto(
+                  (row.refineUnitsLeftOver ?? 0) * (asIsEachFor(row, refineBasis) ?? 0)
+                ),
+                buyTotal: formatIskAuto(asIsTotalFor(row, refineBasis) ?? 0),
+              })}
+              className="mr-1 text-warning"
+            >
+              !
+            </HintText>
+          )
+        );
+      },
+      sortValue: (row) => refineTotalFor(row, refineBasis),
     },
     lpTotal: {
       id: 'lpTotal',

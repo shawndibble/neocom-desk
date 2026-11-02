@@ -18,6 +18,7 @@ function outcome(sell: number): AppraisalOutcome {
         spread: sell,
         unpricedRows: 0,
         refine: 0,
+        refineSell: 0,
         refineUnpricedRows: 0,
         cheapestBuy: sell,
         cheapestBuyViaLp: 0,

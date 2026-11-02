@@ -64,6 +64,9 @@ import { efficiencyText } from './refineFormat';
 import { useRefineMineralNames } from './useRefineMineralNames';
 import { useAltChord } from '@/lib/useChord';
 import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
+import { useRefineBasis } from './refineBasis';
+import { basisAvailable } from '@/engine/market/refineBreakdown';
+import type { RefineBasis } from '@/engine/market/appraisal';
 import { DEFAULT_REFINING_SETUP } from '@/engine/industry/refiningSetup';
 import { refineEfficiencyRange } from '@/engine/market/refineBreakdown';
 import type { AppraisalItem } from '@/engine/market/appraisal';
@@ -152,6 +155,13 @@ export function AppraisalPanel({
   // The refine breakdown: null closed, `typeId: null` the whole pile, else one item's.
   const [refineModal, setRefineModal] = useState<{ typeId: number | null } | null>(null);
   const refiningSetup = useRefiningSetup();
+  // The price basis the Refine figures are on, remembered across appraisals. A result that
+  // never carried the sell side (a link from before it did) cannot be priced on it, so it reads as buy.
+  const storedBasis = useRefineBasis((state) => state.value);
+  const setStoredBasis = useRefineBasis((state) => state.setValue);
+  useHydratedStore(useRefineBasis);
+  const refineBasis: RefineBasis =
+    result !== null && basisAvailable(result.appraisal, storedBasis) ? storedBasis : 'buy';
   const mineralNames = useRefineMineralNames(result?.appraisal.items ?? NO_ITEMS);
 
   const lacksAssets = useCharacterLacksEndpoints(characterId, ASSETS_ENDPOINTS);
@@ -194,6 +204,7 @@ export function AppraisalPanel({
     owned,
     standing,
     onOpenRefine: (typeId) => setRefineModal({ typeId }),
+    refineBasis,
   });
   const { share, handleShare, handleCopyShareUrl, shareItemCount } = useAppraisalShare({
     result,
@@ -205,6 +216,7 @@ export function AppraisalPanel({
     result,
     owned,
     settleLive: controller.settleLive,
+    refineBasis,
   });
   const { janice, handleOpenInJanice, dismissJanice } = useAppraisalJanice({
     text,
@@ -376,6 +388,7 @@ export function AppraisalPanel({
             onHubChange={onHubChange}
             compareLive={controller.compareLive}
             refineEfficiency={refineEfficiency}
+            refineBasis={refineBasis}
             onOpenRefine={() => setRefineModal({ typeId: null })}
           />
         )}
@@ -496,6 +509,8 @@ export function AppraisalPanel({
           setup={{ yieldRate: refineSetup.stationRate, taxRate: refineSetup.taxRate }}
           mineralNames={mineralNames}
           initialTypeId={refineModal.typeId}
+          basis={refineBasis}
+          onBasisChange={(next) => void setStoredBasis(next)}
           editSetup={{
             onYield: (fraction) => void refiningSetup.setYieldRate(fraction),
             onTax: (fraction) => void refiningSetup.setTaxRate(fraction),

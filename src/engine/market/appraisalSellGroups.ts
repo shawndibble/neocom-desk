@@ -18,6 +18,7 @@ import {
   refineBeatsSellAsIs,
   type Appraisal,
   type AppraisalItem,
+  type RefineBasis,
 } from './appraisal';
 
 export interface AppraisalSellGroups {
@@ -27,13 +28,14 @@ export interface AppraisalSellGroups {
 }
 
 export function appraisalSellGroups(
-  appraisal: Pick<Appraisal, 'rows' | 'items'>
+  appraisal: Pick<Appraisal, 'rows' | 'items'>,
+  refineBasis: RefineBasis = 'buy'
 ): AppraisalSellGroups {
   const groups: AppraisalSellGroups = { sellNow: [], list: [], refine: [] };
 
   appraisal.items.forEach((item, index) => {
     const row = appraisal.rows[index];
-    if (row !== undefined && refineBeatsSellAsIs(row)) {
+    if (row !== undefined && refineBeatsSellAsIs(row, refineBasis)) {
       groups.refine.push(item);
       return;
     }

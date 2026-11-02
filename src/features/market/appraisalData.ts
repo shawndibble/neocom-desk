@@ -233,6 +233,17 @@ export async function appraisePaste(
 
   let implantApplied = false;
   let refinesOreOrIce = false;
+  /** A refinable type's materials priced on one side of the book; a material nobody trades on that side is left out. */
+  const materialPricesOf = (
+    reprocessing: ReprocessingType,
+    side: (aggregate: ReturnType<typeof prices.get>) => number | null | undefined
+  ): Record<number, number> =>
+    Object.fromEntries(
+      reprocessing.materials
+        .map((m): [number, number | null | undefined] => [m.typeID, side(prices.get(m.typeID))])
+        .filter((entry): entry is [number, number] => entry[1] !== undefined && entry[1] !== null)
+    );
+
   const items: AppraisalItem[] = matched.map((match) => {
     const aggregate = prices.get(match.typeId);
     const reprocessing = reprocessingByTypeId.get(match.typeId);
@@ -250,14 +261,8 @@ export async function appraisePaste(
             },
             modifiers,
             refining,
-            materialPrices: Object.fromEntries(
-              reprocessing.materials
-                .map((m): [number, number | undefined] => [
-                  m.typeID,
-                  prices.get(m.typeID)?.buyMax ?? undefined,
-                ])
-                .filter((entry): entry is [number, number] => entry[1] !== undefined)
-            ),
+            materialPrices: materialPricesOf(reprocessing, (agg) => agg?.buyMax),
+            materialSellPrices: materialPricesOf(reprocessing, (agg) => agg?.sellMin),
           })
         : undefined;
     if (refine && reprocessing && modifiers) {

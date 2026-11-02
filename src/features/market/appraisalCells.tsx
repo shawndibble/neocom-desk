@@ -1,6 +1,12 @@
 import type { ReactElement, ReactNode } from 'react';
 import { IskAmount } from '@/components/ui';
-import { refineBeatsSellAsIs, type AppraisalRow } from '@/engine/market/appraisal';
+import {
+  asIsTotalFor,
+  refineBeatsSellAsIs,
+  refineTotalFor,
+  type AppraisalRow,
+  type RefineBasis,
+} from '@/engine/market/appraisal';
 import { formatIskAuto } from '@/lib/isk';
 
 /**
@@ -21,13 +27,15 @@ export function totalCell(value: number | null): ReactNode {
 }
 
 /** Refine wins only because the leftover units sell on top; the refine total alone is below buy total. */
-export function leftoverTipsRefine(row: AppraisalRow) {
+export function leftoverTipsRefine(row: AppraisalRow, basis: RefineBasis = 'buy') {
+  const refine = refineTotalFor(row, basis);
+  const asIs = asIsTotalFor(row, basis);
   return (
-    refineBeatsSellAsIs(row) &&
+    refineBeatsSellAsIs(row, basis) &&
     (row.refineUnitsLeftOver ?? 0) > 0 &&
-    row.refineTotal !== undefined &&
-    row.buyTotal !== null &&
-    row.refineTotal <= row.buyTotal
+    refine !== undefined &&
+    asIs !== null &&
+    refine <= asIs
   );
 }
 

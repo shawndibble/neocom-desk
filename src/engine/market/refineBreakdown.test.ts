@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { buildAppraisal, type AppraisalItem } from '@/engine/market/appraisal';
-import { buildRefineBreakdown, refineEfficiencyRange } from '@/engine/market/refineBreakdown';
+import {
+  buildRefineBreakdown,
+  buildRefineComparison,
+  refineEfficiencyRange,
+} from '@/engine/market/refineBreakdown';
 
 const PYERITE = 35;
 const MEXALLON = 36;
@@ -212,5 +216,79 @@ describe('refineEfficiencyRange', () => {
       max: 0.7,
     });
     expect(refineEfficiencyRange([plain])).toBeNull();
+  });
+});
+
+describe('refine on each price basis', () => {
+  /** Minerals sell for 8 and 70 where they buy for 10 and 50; the ore buys for 1,000 and sells for 1,500. */
+  function withSell(item: AppraisalItem): AppraisalItem {
+    const refine = item.refine;
+    const detail = refine?.detail;
+    if (!refine || !detail) throw new Error('fixture');
+    return {
+      ...item,
+      sell: 1500,
+      refine: {
+        ...refine,
+        detail: { ...detail, materialSellPrices: { [PYERITE]: 8, [MEXALLON]: 70 } },
+      },
+    };
+  }
+  const build = (item: AppraisalItem, basis: 'buy' | 'split' | 'sell') =>
+    buildRefineBreakdown({
+      appraisal: buildAppraisal([item], 100),
+      pricePercent: 100,
+      taxRate: 0,
+      basis,
+    });
+
+  it('prices the minerals and the as-is pile on the chosen side', () => {
+    const item = withSell(ore({ quantity: 1000, efficiency: 0.9 }));
+    // 10 portions at 0.9: 144,000 Pyerite and 7,200 Mexallon.
+    const buy = build(item, 'buy');
+    expect(buy.asIs).toBe(1_000_000);
+    expect(buy.mineralValue).toBe(144_000 * 10 + 7_200 * 50);
+    const sell = build(item, 'sell');
+    expect(sell.asIs).toBe(1_500_000);
+    expect(sell.mineralValue).toBe(144_000 * 8 + 7_200 * 70);
+    const split = build(item, 'split');
+    expect(split.asIs).toBe(1_250_000);
+    expect(split.mineralValue).toBeCloseTo(144_000 * 9 + 7_200 * 60, 6);
+  });
+
+  it('lists both unit prices on every mineral line, whatever the basis', () => {
+    const item = withSell(ore({ quantity: 1000, efficiency: 0.9 }));
+    const pyerite = build(item, 'buy').minerals.find((m) => m.typeId === PYERITE);
+    expect(pyerite).toMatchObject({ buyPrice: 10, sellPrice: 8, price: 10 });
+    expect(build(item, 'sell').minerals.find((m) => m.typeId === PYERITE)?.price).toBe(8);
+  });
+
+  it('judges the verdict on the basis it prices', () => {
+    const item = withSell(ore({ quantity: 1000, efficiency: 0.9 }));
+    // Buy: 1,800,000 refined against 1,000,000 as is. Sell: 1,656,000 against 1,500,000.
+    expect(build(item, 'buy').refineWins).toBe(true);
+    expect(build(item, 'sell').refineWins).toBe(true);
+    const poor = withSell(ore({ quantity: 1000, efficiency: 0.5 }));
+    expect(build(poor, 'sell').refineWins).toBe(false);
+  });
+
+  it('compares all three bases at once, and has no sell or split where the sell prices were never read', () => {
+    const full = buildRefineComparison({
+      appraisal: buildAppraisal([withSell(ore({ quantity: 1000, efficiency: 0.9 }))], 100),
+      pricePercent: 100,
+      taxRate: 0,
+    });
+    expect(full.buy?.asIs).toBe(1_000_000);
+    expect(full.split?.asIs).toBe(1_250_000);
+    expect(full.sell?.asIs).toBe(1_500_000);
+
+    const old = buildRefineComparison({
+      appraisal: buildAppraisal([ore({ quantity: 1000, efficiency: 0.9 })], 100),
+      pricePercent: 100,
+      taxRate: 0,
+    });
+    expect(old.buy).not.toBeNull();
+    expect(old.split).toBeNull();
+    expect(old.sell).toBeNull();
   });
 });
