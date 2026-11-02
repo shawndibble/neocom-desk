@@ -1,9 +1,13 @@
-import { useState, type ReactElement, type ReactNode } from 'react';
+import { useState, type ComponentProps, type ReactElement, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
   Button,
   Checkbox,
   DataTable,
+  Field,
+  FieldError,
+  Fields,
+  FilterBar,
   FilterChip,
   IconButton,
   Modal,
@@ -11,9 +15,12 @@ import {
   Panel,
   SearchInput,
   SegmentedControl,
+  SlideOver,
   StatChip,
   StatChips,
   TextInput,
+  ValueList,
+  ValueRow,
   textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
@@ -21,7 +28,10 @@ import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatNumber } from '@/lib/numberLocale';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { Effect, Footer, Label, LOGGED } from './corpTaxBookDialogs';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import type { CsvColumn } from '@/lib/csv';
+import { Effect, Footer as BaseFooter } from './corpTaxBookDialogs';
 import { caretColumn } from './corpTaxBookColumns';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { MINING_PARAMS, MOONS_PARAMS, PHONE_GLOBALS, isk, isk2 } from './corpTaxBookFormat';
@@ -63,7 +73,8 @@ import {
  * - **Miner** (step 1): chips for the whole position; one table of pops,
  *   folded by month with each month's Statement and what is owed in its
  *   header; Payments say which pops they cleared.
- * - **Miner x pop** (step 2): the days of one pop, with its payments.
+ * - **Miner x pop** (step 2): a side panel over the Miner or pop page (it is
+ *   four lines and two payments, not a page): the days of one pop and its payments.
  * - **Pop** (step 3): who mined it and what each still owes, the moon's other
  *   pops with their outstanding, and the moon's rate going forward.
  * - **Dialogs** (steps 4 to 6): change this pop's tax, dismiss it, change a
@@ -71,8 +82,10 @@ import {
  * - **Miners** (step 7): filter to who gets a Statement, who is overdue, who
  *   is below the minimum.
  *
- * New components in this mockup: none; Panel, DataTable (month `groupBy`),
- * StatChips, FilterChip and Modal as they ship.
+ * Proposed new component: a percent field (the % sits inside the input's
+ * edge, so nobody types it). Everything else ships today: Panel, DataTable
+ * (month `groupBy`, dense phone cards), StatChips, FilterBar, SlideOver,
+ * Fields, TableActionsMenu and Modal.
  */
 const meta = {
   title: 'mockups/Moon mining at scale',
@@ -89,6 +102,20 @@ function Page({ children }: { children: ReactNode }) {
 }
 
 const num = 'tabular-nums';
+
+/** Columns an accountant reads on a desktop and a phone card has no room for. */
+const PHONE_DROPPED = new Set(['paid-on', 'reminder', 'overdue']);
+
+/** A phone card is already a tap target, and a trailing caret would print as one more value on its meta line. */
+function cardColumns<T>(columns: DataTableColumn<T>[], phone: boolean): DataTableColumn<T>[] {
+  if (!phone) return columns;
+  return columns
+    .filter((c) => c.id !== 'go' && !PHONE_DROPPED.has(c.id))
+    .map((c) =>
+      // "Paid —" on a card says nothing; leave it out until something was paid.
+      c.id === 'paid' ? { ...c, render: (r: T) => (c.render(r) === '—' ? null : c.render(r)) } : c
+    );
+}
 const dash = (n: number) => (n ? isk(n) : '—');
 
 function More({ label }: { label: string }) {
@@ -167,6 +194,7 @@ function PopTags({ row }: { row: PopRow }) {
   );
 }
 
+/** Phone cards for a pop: the name line, Owed in the corner, the rest as one labelled line. */
 const popColumns: DataTableColumn<PopRow>[] = [
   {
     id: 'pop',
@@ -185,7 +213,7 @@ const popColumns: DataTableColumn<PopRow>[] = [
     header: 'Mined',
     align: 'right',
     className: num,
-    phoneHidden: true,
+    stackAffix: { before: 'Mined ' },
     render: (row) => isk(row.value),
     sortValue: (row) => row.value,
   },
@@ -194,6 +222,7 @@ const popColumns: DataTableColumn<PopRow>[] = [
     header: 'Tax',
     align: 'right',
     className: num,
+    stackAffix: { before: 'Tax ' },
     render: (row) =>
       row.status === 'Dismissed' ? (
         <span className="text-text-dim line-through decoration-text-faint">{isk(row.waived)}</span>
@@ -207,7 +236,7 @@ const popColumns: DataTableColumn<PopRow>[] = [
     header: 'Paid',
     align: 'right',
     className: num,
-    phoneHidden: true,
+    stackAffix: { before: 'Paid ' },
     render: (row) => dash(row.paid),
     sortValue: (row) => row.paid,
   },
@@ -221,6 +250,17 @@ const popColumns: DataTableColumn<PopRow>[] = [
     sortValue: (row) => row.owed,
   },
   caretColumn<PopRow>(),
+];
+
+const popCsv: CsvColumn<PopRow>[] = [
+  { header: 'Moon', value: (r) => r.pop.moon },
+  { header: 'Pop', value: (r) => r.fractured },
+  { header: 'Month', value: (r) => r.month },
+  { header: 'Mined', value: (r) => r.value },
+  { header: 'Tax', value: (r) => r.tax },
+  { header: 'Paid', value: (r) => r.paid },
+  { header: 'Owed', value: (r) => r.owed },
+  { header: 'Status', value: (r) => r.status },
 ];
 
 type PopFilter = 'all' | 'owed' | 'next' | 'paid' | 'dismissed';
@@ -241,9 +281,10 @@ function monthHeader(rows: readonly PopRow[]) {
   const { month } = rows[0];
   const owed = rows.reduce((t, r) => t + r.owed, 0);
   return (
-    <span className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-left">
+    <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5 text-left">
       <span className="font-semibold">{month} 2026</span>
-      <span className="text-xs text-text-dim">
+      <span className="text-xs text-text-dim">{MONTH_STATEMENT[month]}</span>
+      <span className="text-xs text-text-dim tabular-nums">
         {rows.length} pops · tax {isk(rows.reduce((t, r) => t + r.tax, 0))}
         {owed ? (
           <span className="text-danger"> · {isk(owed)} owed</span>
@@ -251,7 +292,6 @@ function monthHeader(rows: readonly PopRow[]) {
           <span className="text-success"> · all paid</span>
         )}
       </span>
-      <span className="text-xs text-text-dim">{MONTH_STATEMENT[month]}</span>
     </span>
   );
 }
@@ -271,9 +311,9 @@ const paymentColumns: DataTableColumn<Payment>[] = [
     id: 'covers',
     header: 'Cleared',
     render: (row) => (
-      <span className="block">
+      <span>
         <span className="text-accent">{row.statement}</span> · {row.popIds.length} pops
-        <span className="block text-xs text-text-dim">
+        <span className="block text-xs text-text-dim max-sm:hidden">
           {row.covers.split(', ').slice(1).join(', ')}
         </span>
       </span>
@@ -281,21 +321,34 @@ const paymentColumns: DataTableColumn<Payment>[] = [
   },
 ];
 
+/** The shape of every page's title-bar buttons: one height, matching the bell and ⋮ beside them. */
+function HeaderActions({ children }: { children: ReactNode }) {
+  return <span className="flex items-center gap-2">{children}</span>;
+}
+
 function MinerAtScale({
   initial = 'all',
   payment: initialPayment = null,
+  slide = false,
+  adjust = false,
 }: {
   initial?: PopFilter;
   payment?: number | null;
+  /** The Miner x pop side panel, open over the page. */
+  slide?: boolean;
+  adjust?: boolean;
 }) {
   const [filter, setFilter] = useState<PopFilter>(initial);
   const [query, setQuery] = useState('');
   const [paymentId, setPaymentId] = useState<number | null>(initialPayment);
+  const [slideOpen, setSlideOpen] = useState(slide);
   const payment = PAYMENTS.find((p) => p.id === paymentId) ?? null;
   const count = (f: PopFilter) => POP_ROWS.filter(FILTERS.find((x) => x.id === f)!.match).length;
   const rows = POP_ROWS.filter(FILTERS.find((x) => x.id === filter)!.match)
     .filter((r) => !payment || payment.popIds.includes(r.pop.id))
     .filter((r) => !query || r.pop.moon.toLowerCase().includes(query.toLowerCase()));
+  const phone = useIsPhone();
+  const tableExport = useTableExport({ surface: 'corp-members', rows, columns: popCsv });
   const t = VARRO_TOTALS;
   const grossTax = t.tax + t.waived + t.rateCut;
   return (
@@ -305,16 +358,11 @@ function MinerAtScale({
         title="Varro Kestane"
         meta={<span className="text-xs text-text-dim">Member · Varro Kestane, Lysa Kestane</span>}
         actions={
-          <span className="flex items-center gap-1">
-            <Button size="sm">Record payment…</Button>
-            <Button size="sm" variant="ghost">
-              Send reminder…
-            </Button>
-            <Button size="sm" variant="ghost">
-              Export CSV
-            </Button>
-            <More label="More actions" />
-          </span>
+          <HeaderActions>
+            <Button>Record payment…</Button>
+            {!phone && <Button variant="ghost">Send reminder…</Button>}
+            <More label={phone ? 'More: send reminder, export' : 'More actions'} />
+          </HeaderActions>
         }
       />
       <StatChips>
@@ -342,41 +390,60 @@ function MinerAtScale({
       <Panel
         title="Moon pops"
         meta={<span className="text-xs text-text-dim">Billable through 17 Oct</span>}
+        actions={<TableActionsMenu name="Moon pops" tableExport={tableExport} />}
         padded={false}
       >
-        <div className="flex flex-wrap items-center gap-2 p-3">
-          <SearchInput
-            className="min-w-40 flex-1"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search moons…"
-            aria-label="Search moons"
-          />
-          {FILTERS.map((f) => (
-            <FilterChip
-              key={f.id}
-              label={f.label}
-              selected={filter === f.id}
-              count={count(f.id)}
-              onToggle={() => setFilter(f.id)}
-            />
-          ))}
+        <div className="space-y-2 p-3">
+          <FilterBar
+            value={filter}
+            onChange={setFilter}
+            activeCount={(filter !== 'all' ? 1 : 0) + (payment ? 1 : 0)}
+            title="Filter pops"
+            search={
+              <SearchInput
+                className="min-w-40 flex-1"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search moons…"
+                aria-label="Search moons"
+              />
+            }
+          >
+            {(value, onChange) =>
+              FILTERS.map((f) => (
+                <FilterChip
+                  key={f.id}
+                  label={f.label}
+                  selected={value === f.id}
+                  count={count(f.id)}
+                  onToggle={() => onChange(f.id)}
+                />
+              ))
+            }
+          </FilterBar>
           {payment && (
-            <FilterChip
-              label={`Cleared by ${payment.date} payment`}
-              selected
-              onToggle={() => setPaymentId(null)}
-            />
+            <p className="text-xs text-text-dim">
+              Showing the {rows.length} pops the {payment.date} payment cleared.{' '}
+              <button
+                type="button"
+                className={textActionClassName()}
+                onClick={() => setPaymentId(null)}
+              >
+                Show all
+              </button>
+            </p>
           )}
         </div>
         <DataTable
           label="Moon pops"
-          columns={popColumns}
+          columns={cardColumns(popColumns, phone)}
           rows={rows}
           rowKey={(row) => row.pop.id}
-          onRowClick={() => {}}
+          onRowClick={() => setSlideOpen(true)}
+          selectedRowKey={slideOpen ? FOCUS_ROW.pop.id : null}
           rowClassName={() => 'group'}
           density="compact"
+          stackLayout="dense"
           groupBy={{
             key: (row) => row.month,
             renderHeader: monthHeader,
@@ -403,6 +470,7 @@ function MinerAtScale({
           onRowClick={(row) => setPaymentId(row.id === paymentId ? null : row.id)}
           rowClassName={(row) => cx('group', row.id === paymentId && 'bg-panel-2')}
           density="compact"
+          stackLayout="dense"
         />
       </Panel>
       <ActivityPanel
@@ -430,139 +498,156 @@ function MinerAtScale({
           { when: '1 Oct', who: 'Kestrel Vane', what: 'sent the Sep Statement' },
         ]}
       />
+      <MinerPopSlide open={slideOpen} onClose={() => setSlideOpen(false)} adjust={adjust} />
     </Page>
   );
 }
 
 // ---------------------------------------------------------------- 2 Miner x pop
 
-function MinerPop({ dialog }: { dialog?: 'adjust' }) {
+/**
+ * One Miner's days on one pop. A side panel, not a page: it is four lines and
+ * two payments, it is opened from a row on the Miner page or the pop's page,
+ * and closing it leaves the reader exactly where they were.
+ */
+function MinerPopSlide({
+  open,
+  onClose,
+  adjust = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  adjust?: boolean;
+}) {
   const row = FOCUS_ROW;
   const days = [...row.lines].sort(
     (a, b) => b.day - a.day || a.character.localeCompare(b.character)
   );
   const paidBy = PAYMENTS.filter((p) => p.popIds.includes(row.pop.id));
   return (
-    <Page>
-      <Crumb label="Varro Kestane" />
-      <PageHeader
+    <>
+      <SlideOver
+        open={open}
+        onClose={onClose}
         title={row.pop.moon}
-        meta={
-          <span className="text-xs text-text-dim">
-            Pop of {row.fractured} · {row.pop.refinery} · Varro Kestane
-          </span>
-        }
-        actions={
-          <span className="flex items-center gap-1">
-            <Button size="sm">Adjust for Varro…</Button>
-            <Button size="sm" variant="ghost">
-              Everyone on this pop
-            </Button>
-          </span>
-        }
-      />
-      <StatChips>
-        <StatChip
-          label="Owed"
-          value={dash(row.owed)}
-          tone={row.owed ? 'danger' : undefined}
-          emphasis
-        />
-        <StatChip label="Tax" value={isk(row.tax)} />
-        <StatChip label="Paid" value={dash(row.paid)} />
-        <StatChip label="Mined" value={isk(row.value)} />
-        <StatChip label="Status" value={row.status} />
-      </StatChips>
-      <Panel
-        title="Days"
-        meta={
-          <span className="text-xs text-text-dim">
-            {row.pop.ore} · Jita buy, Compressed, priced at each day · {row.pop.rate}% ·{' '}
-            {row.lines.length} lines
-          </span>
-        }
-        padded={false}
+        subtitle={`Pop of ${row.fractured} · ${row.pop.refinery} · Varro Kestane`}
+        maxWidthClassName="max-w-2xl"
       >
-        <DataTable
-          label="Days"
-          density="compact"
-          columns={[
-            { id: 'day', header: 'Day', render: (l) => dateOf(l.day) },
-            { id: 'ch', header: 'Character', primary: true, render: (l) => l.character },
-            {
-              id: 'price',
-              header: 'Unit price',
-              align: 'right',
-              className: num,
-              phoneHidden: true,
-              render: () => isk2(row.pop.price),
-            },
-            {
-              id: 'units',
-              header: 'Units',
-              align: 'right',
-              className: num,
-              render: (l) => formatNumber(l.units),
-            },
-            {
-              id: 'value',
-              header: 'Value',
-              align: 'right',
-              className: num,
-              phoneHidden: true,
-              render: (l) => isk(l.value),
-            },
-            {
-              id: 'tax',
-              header: 'Tax',
-              align: 'right',
-              className: num,
-              cardCorner: true,
-              render: (l) => isk(l.tax),
-            },
-          ]}
-          rows={days}
-          rowKey={(l) => l.id}
-        />
-      </Panel>
-      {paidBy.length > 0 && (
-        <Panel title="Paid by" padded={false}>
-          <DataTable
-            label="Payments toward this pop"
-            density="compact"
-            columns={[
-              { id: 'date', header: 'When', render: (r: Payment) => r.date },
-              { id: 'from', header: 'From', primary: true, render: (r: Payment) => r.from },
-              {
-                id: 'applied',
-                header: 'Applied here',
-                align: 'right',
-                className: num,
-                cardCorner: true,
-                render: (r: Payment) => (
-                  <span className="text-isk-pos">+{isk(r.applied[row.pop.id])}</span>
-                ),
-              },
-              {
-                id: 'of',
-                header: 'Payment',
-                align: 'right',
-                className: num,
-                phoneHidden: true,
-                render: (r: Payment) => (
-                  <span className="text-text-dim">
-                    {isk(r.amount)} · {r.statement}
-                  </span>
-                ),
-              },
-            ]}
-            rows={paidBy}
-            rowKey={(p) => p.id}
-          />
-        </Panel>
-      )}
-      <ChangeTaxDialog open={dialog === 'adjust'} who="one" />
-    </Page>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm">Adjust tax…</Button>
+            <Button size="sm" variant="ghost">
+              Open the pop
+            </Button>
+          </div>
+          <ValueList>
+            <ValueRow label="Owed" value={dash(row.owed)} tone={row.owed ? 'danger' : 'default'} />
+            <ValueRow label="Tax" value={isk(row.tax)} note={`${row.pop.rate}%`} />
+            <ValueRow label="Paid" value={dash(row.paid)} />
+            <ValueRow label="Mined" value={isk(row.value)} />
+            <ValueRow label="Status" value={row.status} />
+          </ValueList>
+          <Panel
+            title="Days"
+            meta={
+              <span className="text-xs text-text-dim">
+                {row.pop.ore} · {isk2(row.pop.price)} per unit, Jita buy, Compressed
+              </span>
+            }
+            padded={false}
+          >
+            <DataTable
+              label="Days"
+              density="compact"
+              stackLayout="dense"
+              columns={[
+                {
+                  id: 'day',
+                  header: 'Day',
+                  primary: true,
+                  render: (l) => (
+                    <span>
+                      {dateOf(l.day)} <span className="text-text-dim">· {l.character}</span>
+                    </span>
+                  ),
+                },
+                {
+                  id: 'units',
+                  header: 'Units',
+                  align: 'right',
+                  className: num,
+                  stackAffix: { after: ' units' },
+                  render: (l) => formatNumber(l.units),
+                },
+                {
+                  id: 'value',
+                  header: 'Value',
+                  align: 'right',
+                  className: num,
+                  stackAffix: { before: 'Value ' },
+                  render: (l) => isk(l.value),
+                },
+                {
+                  id: 'tax',
+                  header: 'Tax',
+                  align: 'right',
+                  className: num,
+                  cardCorner: true,
+                  render: (l) => isk(l.tax),
+                },
+              ]}
+              rows={days}
+              rowKey={(l) => l.id}
+            />
+          </Panel>
+          {paidBy.length > 0 && (
+            <Panel title="Paid by" padded={false}>
+              <DataTable
+                label="Payments toward this pop"
+                density="compact"
+                stackLayout="dense"
+                columns={[
+                  {
+                    id: 'from',
+                    header: 'From',
+                    primary: true,
+                    render: (r: Payment) => (
+                      <span>
+                        {r.date} <span className="text-text-dim">· {r.from}</span>
+                      </span>
+                    ),
+                  },
+                  {
+                    id: 'of',
+                    header: 'Payment',
+                    className: num,
+                    stackAffix: { before: 'Of ' },
+                    render: (r: Payment) => (
+                      <span className="text-text-dim">
+                        {isk(r.amount)} · {r.statement}
+                      </span>
+                    ),
+                  },
+                  {
+                    id: 'applied',
+                    header: 'Applied here',
+                    align: 'right',
+                    className: num,
+                    cardCorner: true,
+                    render: (r: Payment) => (
+                      <span className="text-isk-pos">+{isk(r.applied[row.pop.id])}</span>
+                    ),
+                  },
+                ]}
+                rows={paidBy}
+                rowKey={(p) => p.id}
+              />
+            </Panel>
+          )}
+        </div>
+      </SlideOver>
+      <ChangeTaxDialog open={adjust} who="one" />
+    </>
   );
 }
 
@@ -580,7 +665,7 @@ const minerColumns: DataTableColumn<PopMiner>[] = [
     header: 'Mined',
     align: 'right',
     className: num,
-    phoneHidden: true,
+    stackAffix: { before: 'Mined ' },
     render: (m) => isk(m.value),
     sortValue: (m) => m.value,
   },
@@ -589,6 +674,7 @@ const minerColumns: DataTableColumn<PopMiner>[] = [
     header: 'Tax',
     align: 'right',
     className: num,
+    stackAffix: { before: 'Tax ' },
     render: (m) => isk(m.tax),
     sortValue: (m) => m.tax,
   },
@@ -597,7 +683,7 @@ const minerColumns: DataTableColumn<PopMiner>[] = [
     header: 'Paid',
     align: 'right',
     className: num,
-    phoneHidden: true,
+    stackAffix: { before: 'Paid ' },
     render: (m) => dash(m.paid),
     sortValue: (m) => m.paid,
   },
@@ -635,7 +721,7 @@ const moonPopColumns: DataTableColumn<MoonPop>[] = [
     header: 'Miners',
     align: 'right',
     className: num,
-    phoneHidden: true,
+    stackAffix: { after: ' Miners' },
     render: (p) => p.miners,
   },
   {
@@ -643,7 +729,7 @@ const moonPopColumns: DataTableColumn<MoonPop>[] = [
     header: 'Mined',
     align: 'right',
     className: num,
-    phoneHidden: true,
+    stackAffix: { before: 'Mined ' },
     render: (p) => isk(p.value),
     sortValue: (p) => p.value,
   },
@@ -652,6 +738,7 @@ const moonPopColumns: DataTableColumn<MoonPop>[] = [
     header: 'Tax',
     align: 'right',
     className: num,
+    stackAffix: { before: 'Tax ' },
     render: (p) => isk(p.tax),
     sortValue: (p) => p.tax,
   },
@@ -692,10 +779,46 @@ const RATE_CHANGES: RateChange[] = [
   { from: '1 Aug', scope: 'All moons', rates: '10% / 15%', by: 'Kestrel Vane', pending: false },
 ];
 
-type MoonDialog = 'change' | 'except' | 'dismiss' | 'rate' | 'rate-all';
+type MoonDialog = 'change' | 'except' | 'dismiss' | 'rate' | 'rate-all' | 'rate-backdated';
 
-function PopPage({ dialog, scheduled }: { dialog?: MoonDialog; scheduled?: boolean }) {
+const minerCsv: CsvColumn<PopMiner>[] = [
+  { header: 'Miner', value: (m) => m.miner },
+  { header: 'Mined', value: (m) => m.value },
+  { header: 'Tax', value: (m) => m.tax },
+  { header: 'Paid', value: (m) => m.paid },
+  { header: 'Owed', value: (m) => m.owed },
+];
+
+function PopPage({
+  dialog,
+  scheduled,
+  slide = false,
+}: {
+  dialog?: MoonDialog;
+  scheduled?: boolean;
+  slide?: boolean;
+}) {
   const row = FOCUS_ROW;
+  const phone = useIsPhone();
+  const [slideOpen, setSlideOpen] = useState(slide);
+  const sortedMiners = [...FOCUS_MINERS].sort((a, b) => b.owed - a.owed);
+  const minerExport = useTableExport({
+    surface: 'corp-members',
+    rows: sortedMiners,
+    columns: minerCsv,
+  });
+  const minerActions = (
+    <span className="flex items-center gap-2">
+      <Button size="sm" variant="ghost">
+        Adjust…
+      </Button>
+      <Button size="sm" variant="ghost">
+        Dismiss…
+      </Button>
+      <TableActionsMenu name="Who mined this pop" tableExport={minerExport} />
+    </span>
+  );
+
   return (
     <Page>
       <Crumb label="Extractions" />
@@ -717,31 +840,19 @@ function PopPage({ dialog, scheduled }: { dialog?: MoonDialog; scheduled?: boole
       </StatChips>
       <Panel
         title={`Who mined the ${row.fractured} pop`}
-        meta={
-          <span className="text-xs text-text-dim tabular-nums">
-            Tax {isk(FOCUS_TOTALS.tax)} · owed {isk(FOCUS_TOTALS.owed)}
-          </span>
-        }
-        actions={
-          <span className="flex items-center gap-1">
-            <Button size="sm" variant="ghost">
-              Adjust this pop…
-            </Button>
-            <Button size="sm" variant="ghost">
-              Dismiss tax…
-            </Button>
-          </span>
-        }
+        actions={phone ? undefined : minerActions}
         padded={false}
       >
+        {phone && <div className="border-b border-line p-3">{minerActions}</div>}
         <DataTable
           label="Who mined this pop"
-          columns={minerColumns}
-          rows={[...FOCUS_MINERS].sort((a, b) => b.owed - a.owed)}
+          columns={cardColumns(minerColumns, phone)}
+          rows={sortedMiners}
           rowKey={(m) => m.miner}
-          onRowClick={() => {}}
+          onRowClick={() => setSlideOpen(true)}
           rowClassName={() => 'group'}
           density="compact"
+          stackLayout="dense"
         />
         <Footing>
           Tax {isk(FOCUS_TOTALS.tax)} = paid {isk(FOCUS_TOTALS.paid)} + owed{' '}
@@ -749,7 +860,7 @@ function PopPage({ dialog, scheduled }: { dialog?: MoonDialog; scheduled?: boole
         </Footing>
       </Panel>
       <Panel
-        title="All pops of this moon"
+        title="All pops"
         padded={false}
         actions={
           <Button size="sm" variant="ghost">
@@ -759,12 +870,13 @@ function PopPage({ dialog, scheduled }: { dialog?: MoonDialog; scheduled?: boole
       >
         <DataTable
           label="Pops of this moon"
-          columns={moonPopColumns}
+          columns={cardColumns(moonPopColumns, phone)}
           rows={MOON_POPS}
           rowKey={(p) => p.pop.id}
           onRowClick={() => {}}
           rowClassName={() => 'group'}
           density="compact"
+          stackLayout="dense"
         />
       </Panel>
       {scheduled && (
@@ -776,6 +888,7 @@ function PopPage({ dialog, scheduled }: { dialog?: MoonDialog; scheduled?: boole
           <DataTable
             label="Rate changes"
             density="compact"
+            stackLayout="dense"
             columns={[
               { id: 'from', header: 'From', primary: true, render: (r: RateChange) => r.from },
               { id: 'scope', header: 'Applies to', render: (r: RateChange) => r.scope },
@@ -784,13 +897,20 @@ function PopPage({ dialog, scheduled }: { dialog?: MoonDialog; scheduled?: boole
                 header: 'Member / Guest',
                 align: 'right',
                 className: num,
+                cardCorner: true,
                 render: (r: RateChange) => r.rates,
               },
-              { id: 'by', header: 'By', phoneHidden: true, render: (r: RateChange) => r.by },
+              {
+                id: 'by',
+                header: 'By',
+                stackAffix: { before: 'By ' },
+                render: (r: RateChange) => r.by,
+              },
               {
                 id: 'act',
                 header: '',
                 align: 'right',
+                stackEdge: 'end',
                 render: (r: RateChange) =>
                   r.pending ? (
                     <button type="button" className={textActionClassName()}>
@@ -831,9 +951,11 @@ function PopPage({ dialog, scheduled }: { dialog?: MoonDialog; scheduled?: boole
       />
       <DismissPopDialog open={dialog === 'dismiss'} />
       <MoonRateDialog
-        open={dialog === 'rate' || dialog === 'rate-all'}
+        open={dialog === 'rate' || dialog === 'rate-all' || dialog === 'rate-backdated'}
         all={dialog === 'rate-all'}
+        backdated={dialog === 'rate-backdated'}
       />
+      <MinerPopSlide open={slideOpen} onClose={() => setSlideOpen(false)} />
     </Page>
   );
 }
@@ -892,6 +1014,49 @@ function halved(who: Who) {
   };
 }
 
+/**
+ * A percent the officer types: the % rides inside the field's right edge, so
+ * the value is just a number and the unit is never typed. Proposed as a
+ * shared primitive; there is none yet.
+ */
+/** The dialogs' footer: on a phone Cancel and the action share the row equally. */
+function Footer(props: ComponentProps<typeof BaseFooter>) {
+  return (
+    <div className="max-sm:[&>div]:grid max-sm:[&>div]:grid-cols-2">
+      <BaseFooter {...props} />
+    </div>
+  );
+}
+
+function PercentField({
+  value,
+  label,
+  invalid,
+}: {
+  value: string;
+  label: string;
+  invalid?: boolean;
+}) {
+  return (
+    <span className="relative inline-block w-24">
+      <TextInput
+        value={value}
+        onChange={() => {}}
+        aria-label={label}
+        inputMode="decimal"
+        aria-invalid={invalid || undefined}
+        className="w-full pr-7 text-right tabular-nums"
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-text-dim"
+      >
+        %
+      </span>
+    </span>
+  );
+}
+
 function ChangeTaxDialog({ open, who = 'all' }: { open: boolean; who?: Who }) {
   const phone = useIsPhone();
   const row = FOCUS_ROW;
@@ -902,76 +1067,82 @@ function ChangeTaxDialog({ open, who = 'all' }: { open: boolean; who?: Who }) {
       onClose={() => {}}
       title={
         who === 'one'
-          ? `Adjust the ${row.fractured} pop for Varro Kestane`
-          : `Adjust the ${row.fractured} pop`
+          ? `Adjust ${row.pop.moon}, ${row.fractured} pop, for Varro Kestane`
+          : `Adjust ${row.pop.moon}, ${row.fractured} pop`
       }
       placement={phone ? 'sheet' : 'center'}
       footer={<Footer confirm={<Button variant="primary">Set to 5%</Button>} />}
     >
-      <div className="space-y-3 text-sm">
-        <p className="text-text-dim">
-          {row.pop.moon} ·{' '}
-          {who === 'one' ? 'this pop only' : `${FOCUS_TOTALS.miners} Miners · this pop only`}
-        </p>
-        <Label text="Applies to">
+      <div className="space-y-4 text-sm">
+        <Fields variant="form">
           {who === 'one' ? (
-            <SegmentedControl
-              label="Applies to"
-              value="both"
-              onChange={() => {}}
-              options={[
-                { value: 'both', label: 'Both characters' },
-                { value: 'varro', label: 'Varro' },
-                { value: 'lysa', label: 'Lysa' },
-              ]}
-              uppercase={false}
-            />
+            <Field label="Character">
+              <SegmentedControl
+                label="Character"
+                value="both"
+                onChange={() => {}}
+                options={[
+                  { value: 'both', label: 'Both' },
+                  { value: 'varro', label: 'Varro' },
+                  { value: 'lysa', label: 'Lysa' },
+                ]}
+                uppercase={false}
+              />
+            </Field>
           ) : (
+            <Field label="Applies to">
+              <SegmentedControl
+                label="Applies to"
+                value={who}
+                onChange={() => {}}
+                options={[
+                  { value: 'all', label: 'Everyone' },
+                  { value: 'except', label: 'Everyone except…' },
+                ]}
+                uppercase={false}
+              />
+            </Field>
+          )}
+          {who === 'except' && (
+            <Field label="Leave out" note="They stay at 10%.">
+              <div className="grid w-full grid-cols-2 gap-x-3 gap-y-2">
+                {FOCUS_MINERS.map((m) => (
+                  <label key={m.miner} className="flex items-center justify-start gap-2">
+                    <Checkbox
+                      aria-label={`Leave out ${m.miner}`}
+                      checked={LEFT_OUT.includes(m.miner)}
+                      onChange={() => {}}
+                    />
+                    <span className="text-xs">{m.miner}</span>
+                  </label>
+                ))}
+              </div>
+            </Field>
+          )}
+          <Field label="Tax">
             <SegmentedControl
-              label="Applies to"
-              value={who}
+              label="Tax"
+              value="rate"
               onChange={() => {}}
               options={[
-                { value: 'all', label: 'Everyone' },
-                { value: 'except', label: 'Everyone except…' },
+                { value: 'rate', label: 'Set a rate' },
+                { value: 'dismiss', label: 'No tax' },
               ]}
               uppercase={false}
             />
-          )}
-        </Label>
-        {who === 'except' && (
-          <fieldset className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-xs border border-line p-2">
-            <legend className="px-1 text-xs text-text-dim">Leave out (they stay at 10%)</legend>
-            {FOCUS_MINERS.map((m) => (
-              <label key={m.miner} className="flex items-center justify-start gap-2">
-                <Checkbox
-                  aria-label={`Leave out ${m.miner}`}
-                  checked={LEFT_OUT.includes(m.miner)}
-                  onChange={() => {}}
-                />
-                <span className="text-xs">{m.miner}</span>
-              </label>
-            ))}
-          </fieldset>
-        )}
-        <Label text="Tax for this pop">
-          <SegmentedControl
-            label="Tax for this pop"
-            value="rate"
-            onChange={() => {}}
-            options={[
-              { value: 'rate', label: 'Set a rate' },
-              { value: 'dismiss', label: 'No tax' },
-            ]}
-            uppercase={false}
-          />
-        </Label>
-        <Label text="Rate">
-          <TextInput value="5%" onChange={() => {}} aria-label="Rate" />
-        </Label>
-        <Label text="Reason (required, shown to Miners)">
-          <TextInput value="Alliance mining op" onChange={() => {}} aria-label="Reason" />
-        </Label>
+          </Field>
+          <Field label="Rate" htmlFor="pop-rate">
+            <PercentField value="5" label="Rate" />
+          </Field>
+          <Field label="Reason" htmlFor="pop-reason" note="Shown to Miners.">
+            <TextInput
+              id="pop-reason"
+              value="Alliance mining op"
+              onChange={() => {}}
+              className="w-full"
+            />
+          </Field>
+        </Fields>
         <Effect>
           <span className="block space-y-1">
             <span className="block text-xs text-text-dim">
@@ -990,7 +1161,6 @@ function ChangeTaxDialog({ open, who = 'all' }: { open: boolean; who?: Who }) {
         <p className="text-xs text-warning">
           The Sep Statement is already sent. It is not re-mailed.
         </p>
-        <p className="text-xs text-text-dim">{LOGGED}</p>
       </div>
     </Modal>
   );
@@ -1003,21 +1173,26 @@ function DismissPopDialog({ open }: { open: boolean }) {
     <Modal
       open={open}
       onClose={() => {}}
-      title={`Dismiss the ${row.fractured} pop's tax?`}
+      title={`Dismiss ${row.pop.moon}, ${row.fractured} pop?`}
       placement={phone ? 'sheet' : 'center'}
       footer={
         <Footer confirm={<Button variant="primary">Dismiss {isk(FOCUS_TOTALS.tax)}</Button>} />
       }
     >
-      <div className="space-y-3 text-sm">
-        <p className="text-text-dim">
-          {row.pop.moon} · {FOCUS_TOTALS.miners} Miners. Stays on the record; Reverse undoes it.
-        </p>
-        <Label text="Reason (required, shown to Miners)">
-          <TextInput value="Corp capital build haul" onChange={() => {}} aria-label="Reason" />
-        </Label>
+      <div className="space-y-4 text-sm">
+        <Fields variant="form">
+          <Field label="Reason" htmlFor="dismiss-reason" note="Shown to Miners.">
+            <TextInput
+              id="dismiss-reason"
+              value="Corp capital build haul"
+              onChange={() => {}}
+              className="w-full"
+            />
+          </Field>
+        </Fields>
         <Effect>
           <span className="block space-y-1">
+            <span className="block text-xs text-text-dim">{FOCUS_TOTALS.miners} Miners</span>
             <Before label="Tax" from={isk(FOCUS_TOTALS.tax)} to={isk(0)} />
             <Before label="Owed" from={isk(FOCUS_TOTALS.owed)} to={isk(0)} />
             <Before
@@ -1028,13 +1203,20 @@ function DismissPopDialog({ open }: { open: boolean }) {
             />
           </span>
         </Effect>
-        <p className="text-xs text-text-dim">{LOGGED}</p>
       </div>
     </Modal>
   );
 }
 
-function MoonRateDialog({ open, all }: { open: boolean; all: boolean }) {
+function MoonRateDialog({
+  open,
+  all,
+  backdated,
+}: {
+  open: boolean;
+  all: boolean;
+  backdated?: boolean;
+}) {
   const phone = useIsPhone();
   return (
     <Modal
@@ -1042,46 +1224,72 @@ function MoonRateDialog({ open, all }: { open: boolean; all: boolean }) {
       onClose={() => {}}
       title={all ? 'Change the rate for all moons' : 'Change the rate for Efa V - Moon 3'}
       placement={phone ? 'sheet' : 'center'}
-      footer={<Footer confirm={<Button variant="primary">Save rate</Button>} />}
+      footer={
+        <Footer
+          confirm={
+            <Button variant="primary" disabled={backdated}>
+              Save rate
+            </Button>
+          }
+        />
+      }
     >
-      <div className="space-y-3 text-sm">
-        <Label text="Applies to">
-          <SegmentedControl
-            label="Applies to"
-            value={all ? 'all' : 'moon'}
-            onChange={() => {}}
-            options={[
-              { value: 'moon', label: 'This moon' },
-              { value: 'all', label: 'All 20 moons' },
-            ]}
-            uppercase={false}
-          />
-        </Label>
-        <div className="grid grid-cols-2 gap-3">
-          <Label text="Member">
-            <TextInput value="8%" onChange={() => {}} aria-label="Member rate" />
-          </Label>
-          <Label text="Guest">
-            <TextInput value="12%" onChange={() => {}} aria-label="Guest rate" />
-          </Label>
-        </div>
-        <Label text="From (EVE date, today or later)">
-          <TextInput value="19 Oct 2026" onChange={() => {}} aria-label="From date" />
-        </Label>
-        <Label text="Reason (shown in the Activity log)">
-          <TextInput value="Cheaper to keep miners home" onChange={() => {}} aria-label="Reason" />
-        </Label>
+      <div className="space-y-4 text-sm">
+        <Fields variant="form">
+          <Field label="Applies to">
+            <SegmentedControl
+              label="Applies to"
+              value={all ? 'all' : 'moon'}
+              onChange={() => {}}
+              options={[
+                { value: 'moon', label: 'This moon' },
+                { value: 'all', label: 'All 20 moons' },
+              ]}
+              uppercase={false}
+            />
+          </Field>
+          <Field label="Member" htmlFor="rate-member">
+            <PercentField value="8" label="Member rate" />
+          </Field>
+          <Field label="Guest" htmlFor="rate-guest">
+            <PercentField value="12" label="Guest rate" />
+          </Field>
+          <Field label="Starting from" htmlFor="rate-from">
+            <span className="flex flex-col gap-1">
+              <TextInput
+                id="rate-from"
+                value={backdated ? '12 Oct 2026' : '18 Oct 2026'}
+                onChange={() => {}}
+                aria-invalid={backdated || undefined}
+                aria-describedby={backdated ? 'rate-from-error' : undefined}
+                className="w-full sm:w-40"
+              />
+              {backdated && (
+                <FieldError id="rate-from-error" className="text-xs">
+                  Taxes can’t be backdated. Pick today or later.
+                </FieldError>
+              )}
+            </span>
+          </Field>
+          <Field label="Reason" htmlFor="rate-reason" note="Shown in the Activity log.">
+            <TextInput
+              id="rate-reason"
+              value="Cheaper to keep miners home"
+              onChange={() => {}}
+              className="w-full"
+            />
+          </Field>
+        </Fields>
         <Effect>
           <span className="block space-y-1">
             <Before label="Member" from={`${MEMBER_RATE}%`} to="8%" />
             <Before label="Guest" from="15%" to="12%" />
             <span className="block text-xs text-text-dim">
-              {all ? 'All 20 moons' : 'Efa V - Moon 3'} · mining from 19 Oct. Earlier days keep
+              {all ? 'All 20 moons' : 'Efa V - Moon 3'} · mining from 18 Oct. Earlier days keep
               their rate.
             </span>
           </span>
         </Effect>
-        <p className="text-xs text-text-dim">{LOGGED}</p>
       </div>
     </Modal>
   );
@@ -1104,6 +1312,10 @@ const listColumns: DataTableColumn<ListMiner>[] = [
         <span className="text-accent">{m.main}</span>
         <span className="block text-xs text-text-dim">
           {m.pops} pops{m.standing === 'Guest' ? ` · Guest, ${m.corp}` : ''}
+          {below(m) && <span className="text-warning"> · Under the minimum</span>}
+          {m.overdueDays !== null && (
+            <span className="font-semibold text-danger sm:hidden"> · Overdue {m.overdueDays}d</span>
+          )}
         </span>
       </span>
     ),
@@ -1128,16 +1340,12 @@ const listColumns: DataTableColumn<ListMiner>[] = [
     id: 'next',
     header: 'Not billed yet',
     align: 'right',
-    className: num,
-    render: (m) => (
-      <span className="block">
-        {dash(m.nextStatement)}
-        {below(m) && <span className="block text-xs text-text-dim">Under the minimum</span>}
-      </span>
-    ),
+    className: cx(num, 'whitespace-nowrap'),
+    stackAffix: { before: 'Not billed ' },
+    render: (m) => dash(m.nextStatement),
     sortValue: (m) => m.nextStatement,
   },
-  { id: 'paid', header: 'Last paid', phoneHidden: true, render: (m) => m.lastPaid },
+  { id: 'paid-on', header: 'Last paid', render: (m) => m.lastPaid },
   {
     id: 'reminder',
     header: 'Last reminder',
@@ -1147,7 +1355,17 @@ const listColumns: DataTableColumn<ListMiner>[] = [
   caretColumn<ListMiner>(),
 ];
 
+const listCsv: CsvColumn<ListMiner>[] = [
+  { header: 'Miner', value: (m) => m.main },
+  { header: 'Pops', value: (m) => m.pops },
+  { header: 'Owed', value: (m) => m.owed },
+  { header: 'Overdue days', value: (m) => m.overdueDays ?? '' },
+  { header: 'Not billed yet', value: (m) => m.nextStatement },
+  { header: 'Last paid', value: (m) => m.lastPaid },
+];
+
 function MinersList({ initial = 'bill', ticked = 0 }: { initial?: MinerFilter; ticked?: number }) {
+  const phone = useIsPhone();
   const [filter, setFilter] = useState<MinerFilter>(initial);
   const matchers: Record<MinerFilter, (m: ListMiner) => boolean> = {
     bill: willBill,
@@ -1170,6 +1388,7 @@ function MinersList({ initial = 'bill', ticked = 0 }: { initial?: MinerFilter; t
     id: 'select',
     header: '',
     className: 'w-8',
+    stackEdge: 'start',
     render: (m) => (
       <label className={touchCheckboxLabelClassName}>
         <Checkbox
@@ -1181,6 +1400,8 @@ function MinersList({ initial = 'bill', ticked = 0 }: { initial?: MinerFilter; t
     ),
   };
   const overdueCount = LIST_TOTALS.overdue + 6;
+  const listCardColumns = cardColumns(bulk ? [selectColumn, ...listColumns] : listColumns, phone);
+  const tableExport = useTableExport({ surface: 'corp-members', rows, columns: listCsv });
   return (
     <Page>
       <MoonsHeader />
@@ -1202,41 +1423,55 @@ function MinersList({ initial = 'bill', ticked = 0 }: { initial?: MinerFilter; t
         />
       </StatChips>
       <Panel padded={false}>
-        <div className="flex flex-wrap items-center gap-2 p-3">
-          <SearchInput
-            className="min-w-40 flex-1"
-            value=""
-            onChange={() => {}}
-            placeholder="Search Miners or characters…"
-            aria-label="Search Miners"
-          />
-          <FilterChip
-            label="Gets a Statement"
-            selected={filter === 'bill'}
-            count={LIST_TOTALS.willBill}
-            onToggle={() => setFilter('bill')}
-          />
-          <FilterChip
-            label="Overdue"
-            selected={filter === 'overdue'}
-            count={overdueCount}
-            onToggle={() => setFilter('overdue')}
-          />
-          <FilterChip
-            label="Under the minimum"
-            selected={filter === 'below'}
-            count={LIST_TOTALS.below}
-            onToggle={() => setFilter('below')}
-          />
-          <FilterChip
-            label="Everyone"
-            selected={filter === 'all'}
-            count={LIST_TOTALS.miners}
-            onToggle={() => setFilter('all')}
-          />
+        <div className="p-3">
+          <FilterBar
+            value={filter}
+            onChange={setFilter}
+            activeCount={filter !== 'bill' ? 1 : 0}
+            title="Filter Miners"
+            actions={<TableActionsMenu name="Miners" size="md" tableExport={tableExport} />}
+            search={
+              <SearchInput
+                className="min-w-40 flex-1"
+                value=""
+                onChange={() => {}}
+                placeholder="Search Miners…"
+                aria-label="Search Miners"
+              />
+            }
+          >
+            {(value, onChange) => (
+              <>
+                <FilterChip
+                  label="Gets a Statement"
+                  selected={value === 'bill'}
+                  count={LIST_TOTALS.willBill}
+                  onToggle={() => onChange('bill')}
+                />
+                <FilterChip
+                  label="Overdue"
+                  selected={value === 'overdue'}
+                  count={overdueCount}
+                  onToggle={() => onChange('overdue')}
+                />
+                <FilterChip
+                  label="Under the minimum"
+                  selected={value === 'below'}
+                  count={LIST_TOTALS.below}
+                  onToggle={() => onChange('below')}
+                />
+                <FilterChip
+                  label="Everyone"
+                  selected={value === 'all'}
+                  count={LIST_TOTALS.miners}
+                  onToggle={() => onChange('all')}
+                />
+              </>
+            )}
+          </FilterBar>
         </div>
         {bulk && (
-          <div className="flex flex-wrap items-center gap-2 border-t border-line px-3 py-2 text-xs">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line px-3 py-2 text-xs">
             <button
               type="button"
               className={textActionClassName()}
@@ -1247,21 +1482,20 @@ function MinersList({ initial = 'bill', ticked = 0 }: { initial?: MinerFilter; t
             <button type="button" className={textActionClassName()} onClick={() => setPicked([])}>
               Select none
             </button>
-            <Button size="sm" variant="ghost" className={selected.length ? '' : 'ml-auto'}>
-              Export CSV
-            </Button>
             {selected.length > 0 && (
               <Button size="sm" variant="primary" className="ml-auto">
-                {filter === 'bill'
-                  ? `Send Statements (${selected.length})…`
-                  : `Send reminders (${selected.length})…`}
+                {phone
+                  ? `Send (${selected.length})…`
+                  : filter === 'bill'
+                    ? `Send Statements (${selected.length})…`
+                    : `Send reminders (${selected.length})…`}
               </Button>
             )}
           </div>
         )}
         <DataTable
           label="Miners"
-          columns={bulk ? [selectColumn, ...listColumns] : listColumns}
+          columns={listCardColumns}
           rows={rows}
           rowKey={(m) => m.main}
           onRowClick={() => {}}
@@ -1269,6 +1503,7 @@ function MinersList({ initial = 'bill', ticked = 0 }: { initial?: MinerFilter; t
           defaultSort={{ columnId: 'owed', direction: 'desc' }}
           mobileSort
           density="compact"
+          stackLayout="dense"
         />
         <p className="border-t border-line px-3 py-2 text-xs text-text-dim">
           Showing {rows.length} of {LIST_TOTALS.miners} Miners.
@@ -1295,10 +1530,10 @@ export const MinerPhone = corp(() => <MinerAtScale />, true);
 export const MinerOwed = corp(() => <MinerAtScale initial="owed" />);
 /** @summary 1c · Miner with a payment selected: the pop table shows only the pops it cleared. */
 export const MinerPaymentSelected = corp(() => <MinerAtScale payment={4} />);
-/** @summary 2 · Miner x pop: the days of one pop and the payments that cleared it. */
-export const MinerOnPop = corp(() => <MinerPop />);
+/** @summary 2 · Miner x pop: a side panel over the Miner page, with the days of one pop and the payments that cleared it. */
+export const MinerOnPop = corp(() => <MinerAtScale slide />);
 /** @summary 2 · Miner x pop, phone. */
-export const MinerOnPopPhone = corp(() => <MinerPop />, true);
+export const MinerOnPopPhone = corp(() => <MinerAtScale slide />, true);
 /** @summary 3 · Pop: who mined it and owes what, the moon's other pops with outstanding, the moon's rate. */
 export const Pop = corp(() => <PopPage />);
 /** @summary 3 · Pop, phone. */
@@ -1308,7 +1543,7 @@ export const PopScheduledRate = corp(() => <PopPage scheduled />);
 /** @summary 4b · Adjust a pop for everyone except chosen Miners; the effect counts only who is affected. */
 export const ChangePopTaxExcept = corp(() => <PopPage dialog="except" />);
 /** @summary 4c · Adjust a pop for one Miner, by character, from the Miner x pop page. */
-export const AdjustForOneMiner = corp(() => <MinerPop dialog="adjust" />);
+export const AdjustForOneMiner = corp(() => <MinerAtScale slide adjust />);
 /** @summary 4 · Change this pop's tax: a rate or none, with the effect on owed. */
 export const ChangePopTax = corp(() => <PopPage dialog="change" />);
 /** @summary 4 · Change this pop's tax, phone. */
@@ -1319,6 +1554,8 @@ export const DismissPop = corp(() => <PopPage dialog="dismiss" />);
 export const ChangeMoonRate = corp(() => <PopPage dialog="rate" />);
 /** @summary 6b · Change the rate for all moons. */
 export const ChangeAllMoonsRate = corp(() => <PopPage dialog="rate-all" />);
+/** @summary 6c · A start date in the past is refused: taxes cannot be backdated. */
+export const ChangeMoonRateBackdated = corp(() => <PopPage dialog="rate-backdated" />);
 /** @summary 6 · Change a moon's rate going forward, phone. */
 export const ChangeMoonRatePhone = corp(() => <PopPage dialog="rate" />, true);
 /** @summary 7 · Miners: filtered to who gets the next Statement. */
