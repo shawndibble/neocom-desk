@@ -9,7 +9,10 @@ import { importOutcome, type ClipboardImportPreview } from './clipboardImport';
 import { previewImportFile, previewImportText } from './importPreview';
 
 interface ImportClipboardDialogProps {
+  /** Add the read skills to the plan (the only commit when `onReplace` is absent). */
   onApply: (entries: PlanEntry[]) => void;
+  /** Swap the plan for the read skills. Given only when the plan has entries to lose; adds the Replace choice. */
+  onReplace?: (entries: PlanEntry[]) => void;
   onClose: () => void;
   /** Skill name for display — the EFT path's entries are raw skillTypeIDs the user has never seen. */
   nameFor: (skillTypeID: number) => string;
@@ -48,6 +51,7 @@ const DOCUMENT_ERROR_KEYS: Record<PlanXmlDocumentErrorCode, string> = {
  */
 export function ImportClipboardDialog({
   onApply,
+  onReplace,
   onClose,
   nameFor,
   trainedSkills,
@@ -66,22 +70,23 @@ export function ImportClipboardDialog({
   const needsReview = preview !== null && importOutcome(preview) === 'review';
 
   /** Preview, then apply straight away unless something needs a look. */
-  async function run(previewing: Promise<ClipboardImportPreview>) {
+  async function run(previewing: Promise<ClipboardImportPreview>, commit = onApply) {
     setImporting(true);
     try {
       const result = await previewing;
-      if (importOutcome(result) === 'apply') onApply(result.entries);
+      if (importOutcome(result) === 'apply') commit(result.entries);
       else setPreview(result);
     } finally {
       setImporting(false);
     }
   }
 
-  function handleImport() {
+  function handleImport(commit = onApply) {
     if (importing || text.trim() === '') return;
-    void run(previewImportText(text));
+    void run(previewImportText(text), commit);
   }
 
+  // A file goes in as an append; the textarea's Replace button is the way to swap the plan.
   function handleFile(file: File) {
     if (importing) return;
     void run(previewImportFile(file));
@@ -100,26 +105,52 @@ export function ImportClipboardDialog({
           <Button size="sm" onClick={onClose}>
             {t('plans.importCancel')}
           </Button>
-          {/* One primary: Import until something needs a look, then Apply commits what was read. */}
+          {/* One primary: Import until something needs a look, then Apply commits what was read.
+              With a plan to lose, each commit is a pair: Append to plan, Replace plan. */}
           {needsReview ? (
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => onApply(preview.entries)}
-              disabled={preview.entries.length === 0}
-            >
-              {t('plans.importApply')}
-            </Button>
+            <>
+              {onReplace && (
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => onReplace(preview.entries)}
+                  disabled={preview.entries.length === 0}
+                >
+                  {t('plans.importQueueReplace')}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => onApply(preview.entries)}
+                disabled={preview.entries.length === 0}
+              >
+                {onReplace ? t('plans.importAppendToPlan') : t('plans.importApply')}
+              </Button>
+            </>
           ) : (
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={handleImport}
-              disabled={text.trim() === ''}
-              loading={importing}
-            >
-              {t('plans.importAction')}
-            </Button>
+            <>
+              {onReplace && (
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => handleImport(onReplace)}
+                  disabled={text.trim() === ''}
+                  loading={importing}
+                >
+                  {t('plans.importQueueReplace')}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => handleImport()}
+                disabled={text.trim() === ''}
+                loading={importing}
+              >
+                {onReplace ? t('plans.importAppendToPlan') : t('plans.importAction')}
+              </Button>
+            </>
           )}
         </div>
       }

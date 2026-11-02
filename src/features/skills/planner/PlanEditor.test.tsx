@@ -408,7 +408,7 @@ describe('PlanEditor tools pane', () => {
     });
 
     const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
-    expect(within(dialog).getByRole('button', { name: 'Apply' })).toBeEnabled();
+    expect(within(dialog).getByRole('button', { name: 'Append to plan' })).toBeEnabled();
     expect(onUpdate).not.toHaveBeenCalled();
   });
 

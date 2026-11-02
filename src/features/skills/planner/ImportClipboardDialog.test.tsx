@@ -69,6 +69,28 @@ describe('ImportClipboardDialog', () => {
     expect(screen.queryByText('Preview')).not.toBeInTheDocument();
   });
 
+  it('offers Append to plan and Replace plan when the plan has entries to lose', async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    const onReplace = vi.fn();
+    render(
+      <ImportClipboardDialog
+        onApply={onApply}
+        onReplace={onReplace}
+        onClose={vi.fn()}
+        nameFor={(id) => `#${id}`}
+        trainedSkills={new Map()}
+      />
+    );
+    expect(screen.queryByRole('button', { name: 'Import' })).toBeNull();
+    await user.type(screen.getByLabelText(/paste an eft fit/i), 'Gunnery 4');
+    await user.click(screen.getByRole('button', { name: 'Replace plan' }));
+    await waitFor(() => expect(onReplace).toHaveBeenCalledWith([GUNNERY_IV]));
+    expect(onApply).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Append to plan' }));
+    await waitFor(() => expect(onApply).toHaveBeenCalledWith([GUNNERY_IV]));
+  });
+
   it('Ctrl+Enter imports like the button', async () => {
     const user = userEvent.setup();
     const { onApply } = renderDialog();
