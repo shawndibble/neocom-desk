@@ -149,8 +149,9 @@ export function RefineBreakdownModal({
               )}
             />
             {basisName(row.key)}
+            {/* The radio dot already marks it on a phone; screen readers keep the word. */}
             {row.key === activeBasis && (
-              <span className="text-[0.625rem] font-semibold tracking-widest text-accent uppercase">
+              <span className="text-[0.625rem] font-semibold tracking-widest text-accent uppercase max-sm:sr-only">
                 {t('market.appraisal.breakdown.selected')}
               </span>
             )}
@@ -479,7 +480,9 @@ export function RefineBreakdownModal({
               label={t('market.appraisal.breakdown.skills')}
               tooltip={t('market.appraisal.breakdown.skillsHelp')}
             >
-              {skillsText(breakdown.efficiencyMin, breakdown.efficiencyMax, setup.yieldRate)}
+              <span className="px-1">
+                {skillsText(breakdown.efficiencyMin, breakdown.efficiencyMax, setup.yieldRate)}
+              </span>
             </SetupBox>
             <SetupBox
               label={t('market.appraisal.refineTax')}
@@ -708,7 +711,13 @@ function SetupBox({
         {label}
         <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />
       </span>
-      <span className={cx('text-sm font-medium tabular-nums', accent && 'text-accent')}>
+      {/* min-h-9 matches an editable value's phone touch target, so a read-only box (Skills) lines up with its neighbours. */}
+      <span
+        className={cx(
+          'flex min-h-9 items-center text-sm font-medium tabular-nums md:min-h-0',
+          accent && 'text-accent'
+        )}
+      >
         {children}
       </span>
     </div>
