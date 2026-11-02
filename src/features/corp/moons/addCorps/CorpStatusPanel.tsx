@@ -81,6 +81,11 @@ export function CorpStatusPanel({
             <p className="text-xs text-text-dim">
               {item.reason ? addCorpsErrorText(t, item.reason) : t(k(`${item.state}.text`))}
             </p>
+            {item.state === 'failed' && item.reason && (
+              <p className="text-xs text-text-dim">
+                {t(k('failed.code'), { reason: item.reason })}
+              </p>
+            )}
             {item.state === 'gone-quiet' && (
               <p className="text-xs text-text-dim">{t(k('gone-quiet.keeps'))}</p>
             )}

@@ -17531,7 +17531,8 @@
             "needs-sign-in": "Needs login",
             "needs-role": "Needs a role",
             "own-book": "Has its own book",
-            "gone-quiet": "Gone quiet"
+            "gone-quiet": "Gone quiet",
+            "failed": "Could not connect"
           }
         },
         "needs": {
@@ -17547,6 +17548,11 @@
           },
           "own-book": {
             "text": "Delete its book first, then connect it here."
+          },
+          "failed": {
+            "text": "Something went wrong while connecting this corp.",
+            "code": "Reason: {{reason}}",
+            "action": "Try again"
           },
           "gone-quiet": {
             "text": "EVE has not answered for this corp for a while. It may be closed.",

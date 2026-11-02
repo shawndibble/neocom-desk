@@ -6,7 +6,7 @@
 import type { AddCorpsOutcome, AddCorpsRun } from '@/engine/corpTaxBook/addCorpsRun';
 
 export type CorpState =
-  'ready' | 'connected' | 'needs-sign-in' | 'needs-role' | 'own-book' | 'gone-quiet';
+  'ready' | 'connected' | 'needs-sign-in' | 'needs-role' | 'own-book' | 'gone-quiet' | 'failed';
 
 export type NeedsYouState = Exclude<CorpState, 'ready' | 'connected'>;
 
@@ -23,7 +23,9 @@ export function stateOfOutcome(outcome: AddCorpsOutcome | undefined): CorpState 
       if (CONNECTED_REASONS.has(outcome.reason)) return 'connected';
       if (outcome.reason === 'not-an-accountant') return 'needs-role';
       if (outcome.reason === 'own-book-exists') return 'own-book';
-      return 'needs-sign-in';
+      // A wrong character is the player's to fix at the login page; anything else is a
+      // failure on the way through (the server, the ledger), not a login that did not finish.
+      return outcome.reason === 'wrong-corp' ? 'needs-sign-in' : 'failed';
     default:
       return 'needs-sign-in';
   }
@@ -71,7 +73,7 @@ export function needsYou(
         corporationId: c.corporationId,
         name: c.name,
         state: state as NeedsYouState,
-        ...(outcome?.kind === 'refused' && state === 'needs-sign-in'
+        ...(outcome?.kind === 'refused' && (state === 'needs-sign-in' || state === 'failed')
           ? { reason: outcome.reason }
           : {}),
       });
