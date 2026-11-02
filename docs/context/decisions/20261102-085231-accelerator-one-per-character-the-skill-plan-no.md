@@ -1,0 +1,8 @@
+# Scope decisions — Accelerator: one per Character, the Skill Plan no longer keeps a Booster list
+
+_Recorded 2026-11-02._
+
+- **EVE has one booster slot, so a Character has one Accelerator and a Skill Plan has none.** The plan editor's Assumptions shows the Character's Accelerator (the same record the Characters table edits) and nothing else. There is no ordered list of Boosters, no "queue one behind another", no overlap check. It supersedes the Booster list of #1407 and the "plan keeps the rows it queues behind it" rule of `20261101-103946`.
+- **Nothing running and nothing detected: "Add accelerator". Detected: its bonus is a fact, the pilot sets the time left. Typed in: bonus and time are editable, and Clear forgets it.** A detected bonus is read off the attribute sheet by arithmetic, so it is shown but not an input; saving a time with it stores the typed-in record at that bonus, after which the pilot may correct it. When a typed-in one runs out the existing purge deletes it, and the next sync's detection, or a new typed-in one, applies.
+- **Costing reads the Character's running Accelerator only.** A plan's stored `booster` / `boosters` fields from older builds stay in Dexie and Firestore, untouched and additive so dev and prod can share the Firebase project, but no longer feed the schedule, so a plan that queued a second accelerator is now costed under the Character's one. Plan Copy and sync still carry the fields; they are dead data to remove in a later cleanup once no build reads them.
+- **The UI says Accelerator everywhere.** "Booster" stays as the name of a fitting's combat boosters and of the GLOSSARY **Booster** entry's retired meaning only.

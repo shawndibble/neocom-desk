@@ -2887,11 +2887,8 @@
     "whatIfAttributeBonus": "{{attribute}} implant bonus",
     "whatIfMarketLink": "View attribute enhancer implants in Market",
     "assumesNoImplantsHint": "Training time is calculated without this character's fitted implants. Grant Character details for an accurate estimate.",
-    "booster": "Booster",
-    "boosterRowLabel": "Accelerator {{position}}",
+    "accelerator": "Accelerator",
     "boosterAdd": "Add accelerator",
-    "boosterRemove": "Remove accelerator",
-    "boosterRemoveNamed": "Remove accelerator {{position}}",
     "boosterMarketLink": "View cerebral accelerators in Market",
     "boosterBonus": "Bonus",
     "boosterExpiresIn": "Time left",
@@ -2905,11 +2902,8 @@
       "hours": "h",
       "minutes": "m"
     },
-    "boosterStartsAfterPrevious": "Starts when the accelerator before it runs out.",
-    "boosterExpired": "Expired",
-    "boosterOverlap": "This accelerator overlaps another one — EVE only has one booster slot, so they can't both run at once.",
-    "boosterDetected": "EVE reports your attributes with a +{{bonus}} cerebral accelerator already included. It has been taken back out of your base sheet and filled in here instead.",
-    "boosterDetectedNoExpiry": "EVE does not report when an accelerator runs out. Until you set an expiry above, this plan is costed as if you had none.",
+    "acceleratorDetected": "EVE's attributes already include a +{{bonus}} cerebral accelerator. It is taken back out of your base sheet; set how long it has left.",
+    "acceleratorNoExpiry": "EVE does not say when it runs out. Until you set the time left, this plan is costed as if you had none.",
     "boosterQuickPicks": "Quick picks for the time left",
     "boosterQuickPickHours": "+{{hours}}h",
     "boosterQuickPickDays": "+{{days}}d",
@@ -3061,7 +3055,7 @@
       "noImplants": "No implants",
       "customImplants": "Custom implants",
       "jumpCloneImplants": "Jump clone implants",
-      "booster": "Booster"
+      "booster": "Accelerator"
     },
     "skillsToBuy": {
       "title": "Skills to buy",

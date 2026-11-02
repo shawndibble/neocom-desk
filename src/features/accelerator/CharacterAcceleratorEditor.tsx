@@ -2,14 +2,14 @@
  * Edits one Character's accelerator (GLOSSARY.md **Accelerator**) through the
  * shared `AcceleratorFields`: every change is saved as it is made, and Clear
  * forgets it so detection from the attribute sheet applies again. The
- * Characters table's popover hosts it; the Skill Plan edits the same record
- * through its Booster list.
+ * Characters table's popover and the Skill Plan's Assumptions both host it, so
+ * they edit the same record.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { CharacterAcceleratorRecord } from '@/db';
-import { DEFAULT_PLAN_BOOSTER } from '@/features/skills/planner/planBooster';
+import { DEFAULT_ACCELERATOR_BONUS } from '@/features/skills/planner/planBooster';
 import { AcceleratorFields } from './AcceleratorFields';
 import { clearCharacterAccelerator, setCharacterAccelerator } from './characterAccelerators';
 
@@ -29,16 +29,18 @@ export function CharacterAcceleratorEditor({
   const { t } = useTranslation();
   // Only the bonus can be typed before there is an expiry to save it with.
   const [draftBonus, setDraftBonus] = useState(
-    record?.bonus ?? detectedBonus ?? DEFAULT_PLAN_BOOSTER.bonus
+    record?.bonus ?? detectedBonus ?? DEFAULT_ACCELERATOR_BONUS
   );
-  const bonus = record?.bonus ?? draftBonus;
+  // A bonus read off the attribute sheet is a fact, not an input: only the
+  // time left is missing. Once a typed-in record exists the pilot may correct it.
+  const bonus = record?.bonus ?? detectedBonus ?? draftBonus;
 
   return (
     <div className="space-y-3">
       <AcceleratorFields
         bonus={bonus}
         expiresAt={record?.expiresAt ?? null}
-        startsAt={null}
+        bonusLocked={!record && detectedBonus !== null}
         onBonusChange={(next) => {
           // An emptied box reads as 0: not a bonus anyone means to save.
           if (next < 1) return;

@@ -51,8 +51,9 @@ describe('AcceleratorCell', () => {
     const user = userEvent.setup();
     renderCell(undefined, 12);
     await user.click(screen.getByRole('button', { name: 'Edit accelerator for Pilot Seven' }));
-    // The bonus is prefilled from detection.
-    expect(await screen.findByRole('spinbutton')).toHaveValue(12);
+    // The bonus is a fact read from the attribute sheet: shown, not an input.
+    await screen.findByRole('button', { name: /^24\s?h|1 ?d/i });
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^24\s?h|1 ?d/i }));
     await waitFor(async () => {
       const row = await db.characterAccelerators.get('7');

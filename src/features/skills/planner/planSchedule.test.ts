@@ -57,15 +57,21 @@ const queued = (finishMs: number): SkillQueueEntry => ({
 });
 
 describe('schedulePlan', () => {
-  it('costs the plan with its Booster and Remap Marker, as the editor does', () => {
+  it('costs the plan under the running Accelerator and Remap Marker, as the editor does', () => {
     const plan = {
       entries: [entry(10, 2), entry(20, 2)],
       markers: [1],
       markerAttributes: [null],
-      booster: { enabled: true, bonus: 5, startsAt: null, expiresAt: NOW + 30 * 86_400_000 },
     };
-    const got = schedulePlan(plan, inputs(), NOW);
-    const bare = schedulePlan({ ...plan, booster: undefined }, inputs(), NOW);
+    const accelerator = {
+      id: '1',
+      characterId: 1,
+      bonus: 5,
+      expiresAt: NOW + 30 * 86_400_000,
+      updatedAt: NOW,
+    };
+    const got = schedulePlan(plan, inputs({ accelerator }), NOW);
+    const bare = schedulePlan(plan, inputs(), NOW);
     const expected = computeSkillPlanSchedule({
       entries: plan.entries,
       skills: catalog.engineSkills,
@@ -81,7 +87,7 @@ describe('schedulePlan', () => {
             willpower: 5,
             charisma: 5,
           },
-          expiresAt: new Date(plan.booster.expiresAt),
+          expiresAt: new Date(accelerator.expiresAt),
         },
       ],
       markers: [1],
