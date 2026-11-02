@@ -26,8 +26,7 @@ export const MAX_BOOSTER_BONUS = 30;
 /**
  * Not the input's floor — that is 1, because a +0 accelerator is not a thing
  * anyone means to enter. This is the floor a *stored or cleared* value lands
- * on, which is why it is private: an emptied field reports `0`, and so can a
- * row written by an older build.
+ * on, which is why it is private: an emptied field reports `0`.
  */
 const MIN_BOOSTER_BONUS = 0;
 
@@ -95,23 +94,11 @@ export const BOOSTER_QUICK_PICKS: readonly BoosterQuickPick[] = [
 ];
 
 /**
- * Where a row's duration is measured from: its own start, but never before
- * now. A row with no start is already running, so it counts from now; a
- * queued row counts from when the one before it lapses — unless that moment
- * has passed, in which case it is running now too.
- *
- * Takes `now` rather than reading the clock, so the caller's own impurity is
- * the only one on record and this stays unit-testable without faking `Date`.
+ * The expiry a quick pick sets: `hours` past `now`. Takes `now` rather than
+ * reading the clock, so this stays unit-testable without faking `Date`.
  */
-export function boosterDurationBase(startsAt: number | null, now: number): number {
-  return startsAt === null ? now : Math.max(startsAt, now);
-}
-
-/**
- * The expiry a quick pick sets: `hours` past the row's duration base.
- */
-export function boosterExpiryFromNow(hours: number, startsAt: number | null, now: number): number {
-  return boosterDurationBase(startsAt, now) + hours * HOUR_MS;
+export function boosterExpiryFromNow(hours: number, now: number): number {
+  return now + hours * HOUR_MS;
 }
 
 /** Whole days, hours (0-23) and minutes (0-59) — the units EVE's tooltip uses. */
@@ -122,16 +109,12 @@ export interface BoosterDuration {
 }
 
 /**
- * What the Expires boxes show: the time from the row's duration base to its
+ * What the Expires boxes show: the time from now to the
  * expiry, rounded **up** to the minute (so a just-set "1 day" does not read
  * back as 23h 59m a heartbeat later). An expiry already past reads as zero.
  */
-export function splitBoosterDuration(
-  expiresAt: number,
-  startsAt: number | null,
-  now: number
-): BoosterDuration {
-  const remaining = Math.max(0, expiresAt - boosterDurationBase(startsAt, now));
+export function splitBoosterDuration(expiresAt: number, now: number): BoosterDuration {
+  const remaining = Math.max(0, expiresAt - now);
   const total = Math.ceil(remaining / MINUTE_MS);
   return {
     days: Math.floor(total / (24 * 60)),

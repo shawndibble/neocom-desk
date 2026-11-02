@@ -29,7 +29,6 @@ import { inputValueToInstant, instantToInputValue } from '@/lib/zonedInput';
 import {
   BOOSTER_QUICK_PICKS,
   MAX_BOOSTER_BONUS,
-  boosterDurationBase,
   boosterExpiryFromNow,
   clampBoosterBonus,
   joinBoosterDuration,
@@ -54,7 +53,7 @@ function useDurationFields(
   if (draft !== null && draft.syncedTo === expiresAt) {
     text = draft.text;
   } else if (expiresAt !== null) {
-    const d = splitBoosterDuration(expiresAt, null, now);
+    const d = splitBoosterDuration(expiresAt, now);
     text = { days: String(d.days), hours: String(d.hours), minutes: String(d.minutes) };
   }
 
@@ -70,7 +69,7 @@ function useDurationFields(
       setDraft({ syncedTo: expiresAt, text: next });
       return;
     }
-    const nextExpiry = boosterDurationBase(null, Date.now()) + duration;
+    const nextExpiry = Date.now() + duration;
     setDraft({ syncedTo: onCommit(nextExpiry) ? nextExpiry : expiresAt, text: next });
   };
 
@@ -186,7 +185,7 @@ export function AcceleratorFields({
           <button
             key={hours}
             type="button"
-            onClick={() => onExpiresChange(boosterExpiryFromNow(hours, null, Date.now()))}
+            onClick={() => onExpiresChange(boosterExpiryFromNow(hours, Date.now()))}
             className={cx(
               tappableRowClassName,
               'rounded-xs border px-1.5 text-[0.6875rem]',

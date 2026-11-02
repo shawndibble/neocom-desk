@@ -8,8 +8,9 @@
  *   pilot sets the time left (EVE does not report it).
  * - Typed in: bonus and time are editable; Clear forgets it.
  *
- * An accelerator that has run out is deleted by the Characters/plan loaders, so
- * the section falls back to the first two states by itself.
+ * An accelerator that has run out is deleted when this section mounts
+ * (`useCharacterAccelerators` purges), so it falls back to the first two states
+ * by itself: a new one is typed in, or the next sync's detection applies.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { CharacterAcceleratorRecord } from '@/db';
 import { CharacterAcceleratorEditor } from '@/features/accelerator/CharacterAcceleratorEditor';
+import { useCharacterAccelerators } from '@/features/accelerator/useAccelerators';
 import { MarketGroupLink } from './MarketGroupLink';
 import { CEREBRAL_ACCELERATORS_MARKET_GROUP_ID } from './plannerMarketGroups';
 
@@ -31,6 +33,7 @@ export function AcceleratorSection({
   detectedBonus: number | null;
 }) {
   const { t } = useTranslation();
+  useCharacterAccelerators();
   const [adding, setAdding] = useState(false);
   const shown = running !== null || detectedBonus !== null || adding;
 
