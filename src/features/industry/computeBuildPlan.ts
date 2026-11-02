@@ -43,6 +43,8 @@ export interface ComputeBuildPlanInput {
   blueprint: IndustryBlueprint;
   /** Manufacturing system cost index; pass 0 when unavailable (gate display on pricesReady instead). */
   systemCostIndex: number;
+  /** The job system's region's own tax, percent of EIV; a reaction pays none (unmeasured). */
+  regionalTaxPct?: number;
   adjustedPrices: AdjustedPrices;
   hubPrices: HubPrices;
   /** The plan's material price basis, already resolved by `priceBasis.ts`. */
@@ -88,6 +90,7 @@ export function computeBuildPlan({
   plan,
   blueprint,
   systemCostIndex,
+  regionalTaxPct,
   adjustedPrices,
   hubPrices,
   materialPrices,
@@ -122,6 +125,7 @@ export function computeBuildPlan({
       security: plan.security,
       facilityTaxPct,
       systemCostIndex,
+      regionalTaxPct: isReaction ? undefined : regionalTaxPct,
       adjustedPrices,
       hubPrices,
       materialPrices,

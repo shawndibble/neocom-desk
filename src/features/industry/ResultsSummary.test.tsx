@@ -111,6 +111,22 @@ describe('ResultsSummary: jargon tooltips (UX-REVIEW #8)', () => {
   });
 });
 
+describe('ResultsSummary: the Exordium Industrial Tax line', () => {
+  it('shows its own row under Total job cost only when the job pays one', async () => {
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: /^total job cost/i }));
+    expect(screen.queryByText('Exordium Industrial Tax')).not.toBeInTheDocument();
+  });
+
+  it('lists the tax beside the SCC surcharge when the job pays one', async () => {
+    renderSummary({
+      result: { ...RESULT, jobFee: { ...RESULT.jobFee, regionalTax: 50, total: 115 } },
+    });
+    await userEvent.click(screen.getByRole('button', { name: /^total job cost/i }));
+    expect(screen.getByText('Exordium Industrial Tax').closest('div')).toHaveTextContent('50');
+  });
+});
+
 describe('ResultsSummary: the ledger', () => {
   it('reads from the sale down to the profit', () => {
     renderSummary();

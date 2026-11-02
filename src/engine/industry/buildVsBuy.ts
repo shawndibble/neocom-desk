@@ -33,6 +33,7 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     me,
     te,
     systemCostIndex,
+    regionalTaxPct,
     adjustedPrices,
     hubPrices,
     modifiers,
@@ -45,6 +46,7 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     security: inputs.security,
     facilityTaxPct: inputs.facilityTaxPct,
     systemCostIndex,
+    regionalTaxPct,
     adjustedPrices,
     modifiers,
   };
@@ -94,7 +96,8 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     estimatedItemValue(blueprint, runs, adjustedPrices),
     systemCostIndex,
     inputs.facility,
-    inputs.facilityTaxPct
+    inputs.facilityTaxPct,
+    regionalTaxPct
   );
 
   // The actual blocking typeIDs, however deep they sit — a built material's

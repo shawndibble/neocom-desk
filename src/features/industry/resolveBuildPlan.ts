@@ -297,6 +297,7 @@ function prepareResolution(
       ? {
           ...facilityContextFor(plan),
           systemCostIndex: snapshot.systemCostIndex,
+          regionalTaxPct: snapshot.regionalTaxPct,
           adjustedPrices: snapshot.adjustedPrices,
           materialPrices,
           modifiers: sources.modifiers,
@@ -407,6 +408,7 @@ export function resolveBuildPlan(
     plan: { ...plan, me: resolvedMe, te: resolvedTe },
     blueprint,
     systemCostIndex: snapshot?.systemCostIndex ?? 0,
+    regionalTaxPct: snapshot?.regionalTaxPct,
     adjustedPrices: snapshot?.adjustedPrices ?? {},
     hubPrices: snapshot?.hubPrices ?? {},
     materialPrices,
