@@ -58,10 +58,10 @@ export function SignInSequenceDialog({
   const signIn = () => {
     setBusy(true);
     setFailed(false);
-    onSignIn().catch(() => {
-      setBusy(false);
-      setFailed(true);
-    });
+    // A login that works leaves the page, so a settled promise means we are still here.
+    onSignIn()
+      .catch(() => setFailed(true))
+      .finally(() => setBusy(false));
   };
   return (
     <Modal

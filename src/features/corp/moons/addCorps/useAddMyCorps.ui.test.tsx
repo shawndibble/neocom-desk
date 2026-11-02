@@ -23,8 +23,10 @@ vi.mock('../useBook', () => ({
     names: { corporation: (id: number) => corpName(id) },
   }),
 }));
+const verifyOwnCeoCorp = vi.fn(async (): Promise<'ok' | 'stale' | 'unreachable'> => 'ok');
 vi.mock('../useOwnCeoCorps', () => ({
   useOwnCeoCorps: () => ({ corps: candidates, loading: false, error: false }),
+  verifyOwnCeoCorp: (...a: unknown[]) => verifyOwnCeoCorp(...(a as [])),
 }));
 vi.mock('@/app/loginFlow', () => ({
   beginOwnCorpGrantLogin: (...a: unknown[]) => beginOwnCorpGrantLogin(...a),
@@ -209,5 +211,54 @@ describe('Add my other corps on the page', () => {
       collectorCorporationId: BOOK_CORPORATION_ID,
       feederCorporationId: CORPS[2]!.corporationId,
     });
+  });
+
+  it('does not send a stale corporation to EVE: it is recorded as not connected', async () => {
+    verifyOwnCeoCorp.mockResolvedValueOnce('stale');
+    render(at());
+    await userEvent.click(await screen.findByRole('button', { name: 'Add my other corps' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Connect Ashen Harbor Mining' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Continue with 1 corp' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Connect 1 corp' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Log in as Mira Soltane with EVE' })
+    );
+    expect(beginOwnCorpGrantLogin).not.toHaveBeenCalled();
+    expect(await screen.findByText(/different CEO now/i)).toBeInTheDocument();
+  });
+  it('after a stale corp the next one is not stuck loading and the note is shown', async () => {
+    verifyOwnCeoCorp.mockResolvedValueOnce('stale');
+    render(at());
+    await userEvent.click(await screen.findByRole('button', { name: 'Add my other corps' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Connect Ashen Harbor Mining' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Connect Cobalt Drift Syndicate' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Continue with 2 corps' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Connect 2 corps' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Log in as Mira Soltane with EVE' })
+    );
+    expect(beginOwnCorpGrantLogin).not.toHaveBeenCalled();
+    const next = await screen.findByRole('button', { name: 'Log in as Dax Orlen with EVE' });
+    expect(next).toBeEnabled();
+    // In the dialog's note and again in the Needs you list behind it.
+    expect(screen.getAllByText(/different CEO now/i).length).toBeGreaterThanOrEqual(1);
+    await userEvent.click(next);
+    expect(beginOwnCorpGrantLogin).toHaveBeenCalledTimes(1);
+  });
+
+  it('when ESI cannot be asked it says so and records nothing', async () => {
+    verifyOwnCeoCorp.mockResolvedValueOnce('unreachable');
+    render(at());
+    await userEvent.click(await screen.findByRole('button', { name: 'Add my other corps' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Connect Ashen Harbor Mining' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Continue with 1 corp' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Connect 1 corp' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Log in as Mira Soltane with EVE' })
+    );
+    expect(await screen.findByText(/Could not open EVE's login/)).toBeInTheDocument();
+    expect(beginOwnCorpGrantLogin).not.toHaveBeenCalled();
+    expect(useAddCorpsRunStore.getState().value!.outcomes).toEqual({});
+    expect(screen.getByRole('button', { name: 'Log in as Mira Soltane with EVE' })).toBeEnabled();
   });
 });
