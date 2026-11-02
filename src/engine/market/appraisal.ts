@@ -254,7 +254,7 @@ export function sellBrokerFee(
     brokerRelationsLevel,
     standing.factionStanding,
     standing.corpStanding,
-    standing.brokerSurchargePct
+    standing.safetyTaxPct
   );
 }
 
@@ -610,7 +610,7 @@ export function appraisalNet(
         brokerRelationsLevel,
         standing.factionStanding,
         standing.corpStanding,
-        standing.brokerSurchargePct
+        standing.safetyTaxPct
       );
       listNet += listValue - salesTax(listValue, accountingLevel) - fee;
     }
@@ -624,7 +624,7 @@ export function appraisalNet(
       brokerRelationsLevel,
       standing.factionStanding,
       standing.corpStanding,
-      standing.brokerSurchargePct
+      standing.safetyTaxPct
     ),
   };
 }
@@ -660,7 +660,7 @@ export function compareMargin(
       brokerRelationsLevel,
       standing.factionStanding,
       standing.corpStanding,
-      standing.brokerSurchargePct
+      standing.safetyTaxPct
     );
   return {
     spread,

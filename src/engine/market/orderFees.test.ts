@@ -19,7 +19,7 @@ describe('orderFees', () => {
   it('adds a hub’s broker surcharge to a listed price but not to a buy order', () => {
     const surcharged: OrderFeeContext = {
       ...ctx,
-      standing: { ...ctx.standing, brokerSurchargePct: 5 },
+      standing: { ...ctx.standing, safetyTaxPct: 5 },
     };
     const sell = orderFees({ price: 1_000, is_buy_order: false }, surcharged);
     const plain = orderFees({ price: 1_000, is_buy_order: false }, ctx);

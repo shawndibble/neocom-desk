@@ -27,11 +27,11 @@ export interface ResolvedStandings {
   /** Unmodified standing toward the station owner's corporation, -10..10. */
   corpStanding: number;
   /**
-   * The market's own extra broker-fee points (`TradeHub.brokerSurchargePct`).
+   * The market's own extra broker-fee points (`TradeHub.safetyTaxPct`).
    * Carried here because every fee site already holds the standing resolved
    * for its hub; absent means none.
    */
-  brokerSurchargePct?: number;
+  safetyTaxPct?: number;
 }
 
 export const ZERO_STANDINGS: ResolvedStandings = { factionStanding: 0, corpStanding: 0 };

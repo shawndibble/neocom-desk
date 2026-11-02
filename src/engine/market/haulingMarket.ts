@@ -490,7 +490,7 @@ export function lotEconomics(input: {
           brokerRelationsLevel,
           standing.factionStanding,
           standing.corpStanding,
-          standing.brokerSurchargePct
+          standing.safetyTaxPct
         )
       : 0;
   const profit = revenue - tax - broker - cost;
@@ -508,7 +508,7 @@ export function lotEconomics(input: {
           brokerRelationsLevel,
           standing.factionStanding,
           standing.corpStanding,
-          standing.brokerSurchargePct
+          standing.safetyTaxPct
         ),
     profit,
     marginPct: cost > 0 ? (profit / cost) * 100 : 0,

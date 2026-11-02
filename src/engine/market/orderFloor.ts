@@ -40,8 +40,6 @@ export interface OrderFloorInputs {
   /** Advanced Broker Relations (typeID 16597): +6 points/level to the 50% base Relist Discount. */
   advancedBrokerRelationsLevel: number;
   factionStanding?: number;
-  /** The market's extra broker-fee points (`TradeHub.brokerSurchargePct`); none when absent. */
-  brokerSurchargePct?: number;
   corpStanding?: number;
   /** Total broker fee % when the order sits at a player structure (SCC surcharge + the owner's rate). Replaces the skill/standing-derived NPC rate; 0 is a real rate, so test for undefined. */
   structureBrokerPct?: number;
@@ -64,7 +62,6 @@ export function orderFloor(inputs: OrderFloorInputs): OrderFloor | null {
     advancedBrokerRelationsLevel,
     factionStanding,
     corpStanding,
-    brokerSurchargePct,
     structureBrokerPct,
   } = inputs;
 
@@ -80,8 +77,7 @@ export function orderFloor(inputs: OrderFloorInputs): OrderFloor | null {
           brokerRelationsLevel,
           advancedBrokerRelationsLevel,
           factionStanding,
-          corpStanding,
-          brokerSurchargePct
+          corpStanding
         )
       : relistBreakEvenPriceAtBrokerPct(
           unitCost * remainingQuantity,

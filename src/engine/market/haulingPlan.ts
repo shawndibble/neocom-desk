@@ -164,7 +164,7 @@ export function profitableDepth(
         brokerRelationsLevel,
         standing.factionStanding,
         standing.corpStanding,
-        standing.brokerSurchargePct
+        standing.safetyTaxPct
       )) /
     100;
   const breakEven = (candidate.expectedPrice * (1 - feeRate)) / (1 + minMarginPct / 100);
@@ -215,7 +215,7 @@ export function maxBuyPrice(
         brokerRelationsLevel,
         standing.factionStanding,
         standing.corpStanding,
-        standing.brokerSurchargePct
+        standing.safetyTaxPct
       )) /
     100;
   const limit = (candidate.expectedPrice * (1 - feeRate)) / (1 + minMarginPct / 100);

@@ -31,9 +31,7 @@ async function resolveHubStandings(
   entries: Parameters<typeof resolveLocationStandings>[1]
 ): Promise<ResolvedStandings> {
   const standing = await resolveLocationStandings(hub.stationId, entries);
-  return hub.brokerSurchargePct > 0
-    ? { ...standing, brokerSurchargePct: hub.brokerSurchargePct }
-    : standing;
+  return hub.safetyTaxPct > 0 ? { ...standing, safetyTaxPct: hub.safetyTaxPct } : standing;
 }
 
 async function loadTradeHubStandings(characterId: number): Promise<TradeHubStandingsMap> {
@@ -93,8 +91,8 @@ export function useTradeHubStandingsByCharacter(
 
 /** No standing at a hub, but still the hub's own surcharge: it is the market's, not the pilot's. */
 export function zeroStandingsAt(hubId: TradeHub['id']): ResolvedStandings {
-  const brokerSurchargePct = getTradeHub(hubId)?.brokerSurchargePct ?? 0;
-  return brokerSurchargePct > 0 ? { ...ZERO_STANDINGS, brokerSurchargePct } : ZERO_STANDINGS;
+  const safetyTaxPct = getTradeHub(hubId)?.safetyTaxPct ?? 0;
+  return safetyTaxPct > 0 ? { ...ZERO_STANDINGS, safetyTaxPct } : ZERO_STANDINGS;
 }
 
 /** `standings.get(hubId)`, defaulting to zero for a hub not yet resolved. */
