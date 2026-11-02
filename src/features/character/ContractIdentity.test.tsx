@@ -6,7 +6,8 @@ import type { Contract } from '@/esi/endpoints';
 import { ContractIdentity } from './ContractIdentity';
 
 vi.mock('./contractLocationName', () => ({
-  loadContractSystemName: async (_c: number, id: number) => (id === 1 ? 'Badivefi' : 'Gonan'),
+  loadContractSystemName: async (_c: number, id: number) =>
+    id === 1 ? 'Badivefi' : id === 3 ? null : 'Gonan',
 }));
 
 const contract = {
@@ -62,5 +63,17 @@ describe('ContractIdentity courier route', () => {
     } as Contract;
     render(<ContractIdentity contract={courier} characterId={91} />);
     expect(await screen.findByText('Badivefi → Gonan')).toBeInTheDocument();
+  });
+
+  it('keeps the generic label when a system cannot be resolved', async () => {
+    const courier = {
+      ...contract,
+      type: 'courier',
+      start_location_id: 1,
+      end_location_id: 3,
+    } as Contract;
+    render(<ContractIdentity contract={courier} characterId={91} />);
+    expect(await screen.findByText('Courier')).toBeInTheDocument();
+    expect(screen.queryByText(/→/)).not.toBeInTheDocument();
   });
 });
