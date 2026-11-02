@@ -68,7 +68,7 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 | Loyalty points / EverMarks         | `features/character/loyalty.ts`                                   | `getCharacterLoyaltyPoints`                                                                      | `esi-characters.read_loyalty.v1`      |
 | Corp names for LP rows             | `features/character/names` `resolveNames`                         | `postUniverseNames`                                                                              | public                                |
 | Item names on journal lines        | `features/character/typeNames.ts`                                 | local SDE `types.json`, then `postUniverseNames`/`getUniverseType`                               | public                                |
-| Mining tax links                   | Dexie `miningTaxAssignments` (`linkedRefIds`)                     | local                                                                                            | none                                  |
+| Mining tax links                   | Dexie `miningTaxAssignments` (`linkedAssignmentsByRef`)           | local                                                                                            | none                                  |
 | LP-store corp list                 | `loadLpCorporations` (`@/sde/loadMarketSde`)                      | local SDE                                                                                        | none                                  |
 
 - Cache keys: `wallet:balance`, `wallet:journal`, `wallet:transactions`, `loyalty` (`wallet.ts:24-28`, `loyalty.ts`).
@@ -179,7 +179,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 - Bounty lines: reason replaced with kills summed per pirate faction (`BountyFactionSummary`).
 - Other `reason` (e.g. corp memo): dim second line.
 - Contract context (`context_id_type === contract_id`): "Contract" link to `/contracts/history?highlight=<id>`.
-- Mining-tax link: "Mining tax" to `/mining/tax?tax.payment=journal:<id>` or `contract:<id>` when a Moon Mining Tax Assignment links that payment (`miningTaxHrefFor`, reads every Character's Assignments).
+- Mining-tax links: when Moon Mining Tax Assignments link that payment, one "Mining tax <date> · <ISK>" line per entry it settled, each to `/mining/tax?tax.entry=<assignmentId>` (`miningTaxEntriesFor`, reads every Character's Assignments). A single entry with a memo makes the memo the link.
 - Market line: when the journal line's fill is loaded (by `journal_ref_id` or `market_transaction_id` context; `journalTransactionLinks`), shows item icon + name ×qty as `ItemInfoLink` (Show info). Tooltip: "Bought/Sold N × unit = total". Escrow and broker-fee lines carry no key so stay unlinked.
 
 ### Journal export (CSV / XLSX / copy)

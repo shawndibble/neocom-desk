@@ -1,47 +1,23 @@
 /**
  * The wallet journal → Moon Mining Tax link: a journal entry (or contract) a
- * pilot linked to a tax payment opens the Tax tab on the row it settled.
- * The URL names the transaction, not the row — which row that is depends on
- * the Tax tab's own grouping, so `findRowForPaymentRef` resolves it there.
+ * pilot linked to a tax payment lists each entry it settled, and each link
+ * opens that entry's detail on the Tax tab. The URL names the Assignment;
+ * `findRowForEntry` resolves the Tax tab row that holds it.
  */
-import { normalizePaymentInfo } from './paymentLinks';
 import { allMembers, type DisplayRow } from './groupRows';
 
 /** `tax.`-scoped like the Tax tab's other params, which `usePageTab` carries across tabs. */
-export const PAYMENT_REF_PARAM = 'tax.payment';
+export const PAYMENT_ENTRY_PARAM = 'tax.entry';
 
-export type PaymentRef = { kind: 'journal' | 'contract'; id: number };
-
-export function miningTaxPaymentHref(ref: PaymentRef): string {
-  const params = new URLSearchParams({ [PAYMENT_REF_PARAM]: `${ref.kind}:${ref.id}` });
+export function miningTaxEntryHref(assignmentId: string): string {
+  const params = new URLSearchParams({ [PAYMENT_ENTRY_PARAM]: assignmentId });
   return `/mining/tax?${params.toString()}`;
 }
 
-export function parsePaymentRefParam(raw: string | null): PaymentRef | null {
-  const match = /^(journal|contract):(\d+)$/.exec(raw ?? '');
-  if (!match) return null;
-  const id = Number(match[2]);
-  return id > 0 ? { kind: match[1] as PaymentRef['kind'], id } : null;
-}
-
-/**
- * The row a transaction was applied to. One lump sum often settles several
- * days, so more than one row can match: the newest wins, and its payment card
- * shows the rest of the sum.
- */
-export function findRowForPaymentRef(
+/** The row holding this Assignment: its own row, or the joined row it was combined into. */
+export function findRowForEntry(
   rows: readonly DisplayRow[],
-  ref: PaymentRef
+  assignmentId: string
 ): DisplayRow | null {
-  let best: DisplayRow | null = null;
-  for (const dr of rows) {
-    const linked = allMembers(dr).some(({ assignment }) => {
-      if (!assignment.payment) return false;
-      const payment = normalizePaymentInfo(assignment.payment);
-      const links = ref.kind === 'journal' ? payment.journalLinks : payment.contractLinks;
-      return (links ?? []).some((link) => link.refId === ref.id);
-    });
-    if (linked && (best === null || dr.row.entry.date > best.row.entry.date)) best = dr;
-  }
-  return best;
+  return rows.find((dr) => allMembers(dr).some((m) => m.assignment.id === assignmentId)) ?? null;
 }

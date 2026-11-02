@@ -7118,7 +7118,7 @@
     "journalItemBought": "Bought {{quantity}} × {{unitPrice}} = {{total}}",
     "journalItemSold": "Sold {{quantity}} × {{unitPrice}} = {{total}}",
     "journalContractLink": "Contract",
-    "journalMiningTaxLink": "Mining tax",
+    "journalMiningTaxEntryLink": "Mining tax {{date}} · {{amount}} ISK",
     "journalInsuranceLossLink": "View loss",
     "insuranceLoss": {
       "title": "Insured loss",
@@ -8189,7 +8189,9 @@
       "autoLinked": "auto-linked",
       "unlinkNamed": "Unlink transaction #{{id}}",
       "notCached": "Transaction #{{id}} · no longer in the cached wallet journal",
-      "paidLine": "Paid {{amount}} ISK · {{date}}"
+      "paidLine": "Paid {{amount}} ISK · {{date}}",
+      "alsoCovers": "The same payment also settled:",
+      "alsoCoversLine": "{{date}} · {{amount}} ISK"
     },
     "suggestedPayeeHint": "Last used in {{system}}.",
     "assignToAction": "Assign to {{payee}} · {{amount}} ISK",

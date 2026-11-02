@@ -30,7 +30,7 @@ import { cx } from '@/lib/cx';
 import { AssignDialog } from './AssignDialog';
 import { PriceBreakdownCard } from './PriceBreakdownCard';
 import { usePriceBreakdown } from './usePriceBreakdown';
-import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
+import { PaymentLinksCard, type CoveredEntry, type LinkedTransaction } from './PaymentLinksCard';
 import { StatusPill } from './StatusPill';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
@@ -90,6 +90,10 @@ interface RowDetailModalProps {
    * when there is no payment to show, so the section renders nothing.
    */
   linkedTransactions?: readonly LinkedTransaction[];
+  /** The other entries this entry's payment also settled. */
+  alsoCovers?: readonly CoveredEntry[];
+  /** Opens one of the `alsoCovers` entries in place of this one. */
+  onOpenCovered?: (id: string) => void;
   /** Opens the manual "Link transaction" picker (issue #540 follow-up) — offered whenever there is a payment to link against, paid or not. */
   onLinkTransaction?: () => void;
   onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
@@ -157,6 +161,8 @@ export function RowDetailModal({
   onSplit,
   onAddPayee,
   linkedTransactions,
+  alsoCovers,
+  onOpenCovered,
   onLinkTransaction,
   onUnlinkTransaction,
   suggestion,
@@ -327,6 +333,8 @@ export function RowDetailModal({
             onLinkTransaction={onLinkTransaction}
             onUnlinkTransaction={onUnlinkTransaction}
             busy={busy}
+            alsoCovers={alsoCovers}
+            onOpenCovered={onOpenCovered}
             paid={assignment?.payment}
           />
         )}

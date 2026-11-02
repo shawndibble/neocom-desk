@@ -20,7 +20,7 @@ import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
 import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatDateRange } from './groupRows';
-import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
+import { PaymentLinksCard, type CoveredEntry, type LinkedTransaction } from './PaymentLinksCard';
 import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
 import { LedgerActionError } from './LedgerActionError';
@@ -65,6 +65,10 @@ interface GroupSummaryModalProps {
    * nothing.
    */
   linkedTransactions?: readonly LinkedTransaction[];
+  /** Entries outside this group that its payment also settled. */
+  alsoCovers?: readonly CoveredEntry[];
+  /** Opens one of the `alsoCovers` entries in place of this group. */
+  onOpenCovered?: (id: string) => void;
   /** Opens the manual "Link transaction" picker, scoped to every member of this group at once — offered whenever the whole group is Paid. */
   onLinkTransaction?: () => void;
   onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
@@ -100,6 +104,8 @@ export function GroupSummaryModal({
   onLinkWalletPayment,
   onUnassignAll,
   linkedTransactions,
+  alsoCovers,
+  onOpenCovered,
   onLinkTransaction,
   onUnlinkTransaction,
   startWithUnassignConfirm = false,
@@ -188,6 +194,8 @@ export function GroupSummaryModal({
             (linkedTransactions && linkedTransactions.length > 0)) && (
             <PaymentLinksCard
               linkedTransactions={linkedTransactions}
+              alsoCovers={alsoCovers}
+              onOpenCovered={onOpenCovered}
               onLinkTransaction={onLinkTransaction}
               onUnlinkTransaction={onUnlinkTransaction}
               busy={busy}

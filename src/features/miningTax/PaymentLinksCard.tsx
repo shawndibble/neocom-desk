@@ -18,6 +18,13 @@ export interface LinkedTransaction {
   label: string | null;
 }
 
+/** Another entry the same payment settled, as the card lists it. */
+export interface CoveredEntry {
+  id: string;
+  date: string;
+  taxOwed: number;
+}
+
 interface PaymentLinksCardProps {
   /**
    * Every linked transaction, resolved for display. Absent (rather than an
@@ -33,6 +40,10 @@ interface PaymentLinksCardProps {
   busy: boolean;
   /** A single Assignment's own amount/paidOn line — `RowDetailModal` passes one, `GroupSummaryModal` doesn't (no one payment record to summarize for the whole group). */
   summary?: ReactNode;
+  /** Other entries the same payment settled — shown so one entry's detail still says what the total covers. */
+  alsoCovers?: readonly CoveredEntry[];
+  /** Opens one of the listed entries; without it they are plain text. */
+  onOpenCovered?: (id: string) => void;
   /** The recorded payment, read as one sentence: "Paid 4,309,281 ISK · 2026-10-04 · auto-linked". */
   paid?: { amount: number; paidOn: string };
 }
@@ -57,6 +68,8 @@ export function PaymentLinksCard({
   onUnlinkTransaction,
   busy,
   summary,
+  alsoCovers,
+  onOpenCovered,
   paid,
 }: PaymentLinksCardProps) {
   const { t } = useTranslation();
@@ -89,6 +102,30 @@ export function PaymentLinksCard({
         <p className="text-xs text-text-dim">{t('miningTax.payment.autoLinked')}</p>
       )}
       {summary}
+      {alsoCovers && alsoCovers.length > 0 && (
+        <div className="text-xs text-text-dim">
+          <p>{t('miningTax.payment.alsoCovers')}</p>
+          <ul className="tabular-nums">
+            {alsoCovers.map((c) => {
+              const line = t('miningTax.payment.alsoCoversLine', {
+                date: c.date,
+                amount: formatIsk(c.taxOwed, 0),
+              });
+              return (
+                <li key={c.id}>
+                  {onOpenCovered ? (
+                    <Button size="sm" onClick={() => onOpenCovered(c.id)} disabled={busy}>
+                      {line}
+                    </Button>
+                  ) : (
+                    line
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       {links.length > 0 ? (
         <ul className="space-y-0.5 text-xs">
           {links.map((tx) => (
