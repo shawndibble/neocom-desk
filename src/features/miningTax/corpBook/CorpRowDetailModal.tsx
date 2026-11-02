@@ -185,6 +185,11 @@ export function CorpRowDetailModal({
             {view.state === 'paid' && view.settledBy === 'yourMark' && (
               <>{t('miningTax.corpBook.detail.settled.yourMark', { amount: formatIsk(owed) })} </>
             )}
+            {view.settledBy !== 'yourMark' &&
+              view.markedPaidIds &&
+              view.markedPaidIds.length > 0 && (
+                <>{t('miningTax.corpBook.detail.settled.alsoMarked')} </>
+              )}
             {view.state === 'paid' && view.settledBy === 'donation' && (
               <>{t('miningTax.corpBook.detail.settled.donation', { corp: corp.corpName })} </>
             )}

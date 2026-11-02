@@ -7752,7 +7752,8 @@
         "locked": "{{corp}}'s Corp Tax Book records this day, so it can't be edited here. Ask a corp officer about any difference.",
         "settled": {
           "yourMark": "You marked this day paid ({{amount}} ISK). The corporation confirms it against its wallet.",
-          "donation": "A donation you sent to {{corp}} covers this day."
+          "donation": "A donation you sent to {{corp}} covers this day.",
+          "alsoMarked": "You also marked this day paid. Unmark it if that was a mistake."
         },
         "overridden": "The corporation set this day to 0 ISK. It originally billed {{billed}} ISK.",
         "terms": "Terms are locked to the book: {{hub}} buy, {{form}} ore, {{pct}}% {{scope}} from {{from}}.",

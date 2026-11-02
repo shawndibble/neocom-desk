@@ -906,8 +906,6 @@ export function overlayCorpBooks(input: {
           row.state = 'paid';
           row.settledBy = 'yourMark';
         }
-        const ids = memberPaidIds.get(p.book.corporationId)?.get(key);
-        if (ids?.length) row.markedPaidIds = [...ids];
       }
     }
     // Donations sent and not yet credited, and credit the book holds for no
@@ -928,6 +926,15 @@ export function overlayCorpBooks(input: {
         row.state = 'paid';
         row.settledBy = 'donation';
         row.taxOwed = 0;
+      }
+    }
+    // Whatever settled the day, the member's own paid mark under the corporation's Payee stays
+    // theirs to undo: the book row hides it, so the row has to carry it.
+    const markedIds = memberPaidIds.get(p.book.corporationId);
+    if (markedIds) {
+      for (const row of mine) {
+        const ids = markedIds.get(entryKey(row.characterId, row.date, row.solarSystemId));
+        if (ids?.length && row.state !== 'conflict') row.markedPaidIds = [...ids];
       }
     }
   }

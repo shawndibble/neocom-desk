@@ -1423,6 +1423,42 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
     expect(row.correction).toEqual({ before: 900_000, after: 400_000, reasons: ['Goodwill'] });
   });
 
+  it('still carries the mark to unmark when a Statement settled the day first', () => {
+    const marked = entry({
+      freeOreLines: [],
+      allocations: [
+        {
+          id: 'a-bmw',
+          payeeId: 'bmw',
+          taxPct: 10,
+          oreLines: [{ typeId: ZEO, quantity: 41_200 }],
+          status: 'paid',
+        },
+      ],
+    });
+    const row = overlay(
+      [marked],
+      [
+        book({
+          ownPayeeIds: ['bmw'],
+          statements: [issued([mined])],
+          payments: [
+            {
+              id: 'p1',
+              minerId: MINER,
+              characterId: ME,
+              amount: 900_000,
+              at: '2026-10-21T00:00:00Z',
+              source: 'donation' as const,
+            },
+          ],
+        }),
+      ]
+    ).rows[0];
+    expect(row).toMatchObject({ state: 'paid', settledBy: 'statement' });
+    expect(row.markedPaidIds).toEqual(['a-bmw']);
+  });
+
   it('records the settled Statement as how the day was settled, and keeps what it billed', () => {
     const row = overlay(
       [entry()],

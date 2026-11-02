@@ -189,6 +189,20 @@ describe('CorpRowDetailModal', () => {
     expect(onUnmarkPaid).toHaveBeenCalledOnce();
   });
 
+  it('says so when the member also marked a day the Statement settled, and offers the unmark', () => {
+    const paid: BookRowView = {
+      ...view,
+      state: 'paid',
+      taxOwed: 0,
+      settledBy: 'statement',
+      markedPaidIds: ['a1'],
+      dispute: undefined,
+    };
+    renderModal({ corp: { ...corp, view: paid }, onUnmarkPaid: vi.fn() });
+    expect(screen.getByText(/You also marked this day paid/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /mark as unpaid/i })).toBeInTheDocument();
+  });
+
   it('offers no unmark when the corporation, not the member, settled the day', () => {
     const paid: BookRowView = {
       ...view,
