@@ -23,8 +23,10 @@ vi.mock('../useBook', () => ({
     names: { corporation: (id: number) => corpName(id) },
   }),
 }));
+const verifyOwnCeoCorp = vi.fn(async () => true);
 vi.mock('../useOwnCeoCorps', () => ({
   useOwnCeoCorps: () => ({ corps: candidates, loading: false, error: false }),
+  verifyOwnCeoCorp: (...a: unknown[]) => verifyOwnCeoCorp(...(a as [])),
 }));
 vi.mock('@/app/loginFlow', () => ({
   beginOwnCorpGrantLogin: (...a: unknown[]) => beginOwnCorpGrantLogin(...a),
@@ -209,5 +211,19 @@ describe('Add my other corps on the page', () => {
       collectorCorporationId: BOOK_CORPORATION_ID,
       feederCorporationId: CORPS[2]!.corporationId,
     });
+  });
+
+  it('does not send a stale corporation to EVE: it is recorded as not connected', async () => {
+    verifyOwnCeoCorp.mockResolvedValueOnce(false);
+    render(at());
+    await userEvent.click(await screen.findByRole('button', { name: 'Add my other corps' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Connect Ashen Harbor Mining' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Continue with 1 corp' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Connect 1 corp' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Log in as Mira Soltane with EVE' })
+    );
+    expect(beginOwnCorpGrantLogin).not.toHaveBeenCalled();
+    expect(await screen.findByText(/not in this corporation/i)).toBeInTheDocument();
   });
 });

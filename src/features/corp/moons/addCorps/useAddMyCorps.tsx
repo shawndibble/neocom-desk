@@ -23,7 +23,7 @@ import type { OwnCorpGrantCallbackState, OwnCorpGrantOutcome } from '../../taxBo
 import { useBook } from '../useBook';
 import { useAddCorpsRun, useAddCorpsRunStore } from '../useAddCorpsRun';
 import { newCorps, useMoonsHiddenCorps, useMoonsHiddenCorpsStore } from '../moonsHiddenCorps';
-import { useOwnCeoCorps } from '../useOwnCeoCorps';
+import { useOwnCeoCorps, verifyOwnCeoCorp } from '../useOwnCeoCorps';
 import { connectedInRun, needsYou } from './addCorpsStatus';
 import { NewCorpBanner, ResumeNotice } from './AddCorpsNotices';
 import { ConfirmBatchDialog } from './ConfirmBatchDialog';
@@ -222,8 +222,14 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
           showOutcome={showOutcome}
           onClose={() => setStage({ kind: 'closed' })}
           onStop={() => void stop().then(() => setStage({ kind: 'closed' }))}
-          onSignIn={() => {
+          onSignIn={async () => {
             const cur = current(run)!;
+            // Read live right before leaving for EVE: a corporation or CEO that changed since
+            // the list was built is recorded as not connected, with no login wasted on it.
+            if (!(await verifyOwnCeoCorp(cur))) {
+              await recordOutcome({ kind: 'refused', reason: 'wrong-corp' });
+              return;
+            }
             return beginOwnCorpGrantLogin({
               characterId: run.editorCharacterId,
               expectedCeoCharacterId: cur.ceoCharacterId,
