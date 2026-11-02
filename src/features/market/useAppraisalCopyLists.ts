@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { RefineBasis } from '@/engine/market/appraisal';
 import { subtractOwned } from '@/engine/market/appraisalOwned';
 import { appraisalSellGroups } from '@/engine/market/appraisalSellGroups';
 import { writeToClipboardLater } from '@/lib/clipboard';
@@ -22,9 +23,10 @@ type Result = AppraisalController['result'];
 /** Each list's items and clipboard text for `result`; an empty list has no text and its menu item is disabled. */
 function listsFor(
   result: Result,
-  owned: ReadonlyMap<number, number> | null
+  owned: ReadonlyMap<number, number> | null,
+  refineBasis: RefineBasis
 ): Record<CopyList, { count: number; text: string }> {
-  const sellGroups = result === null ? null : appraisalSellGroups(result.appraisal);
+  const sellGroups = result === null ? null : appraisalSellGroups(result.appraisal, refineBasis);
   const items = result?.appraisal.items ?? [];
   const multibuyItems = owned ? subtractOwned(items, owned) : items;
   return {
@@ -39,9 +41,12 @@ export function useAppraisalCopyLists({
   result,
   owned,
   settleLive,
+  refineBasis = 'buy',
 }: {
   result: Result;
   owned: ReadonlyMap<number, number> | null;
+  /** The remembered price basis, which decides what counts as "refine" in the copy lists. */
+  refineBasis?: RefineBasis;
   /** Resolves with the result once every row has settled on its live book. */
   settleLive: AppraisalController['settleLive'];
 }) {
@@ -55,7 +60,10 @@ export function useAppraisalCopyLists({
     return () => clearTimeout(timer);
   }, [copied]);
 
-  const copyLists = useMemo(() => listsFor(result, owned), [result, owned]);
+  const copyLists = useMemo(
+    () => listsFor(result, owned, refineBasis),
+    [result, owned, refineBasis]
+  );
 
   async function handleCopy(list: CopyList) {
     if (copyLists[list].text === '' || busy.current) return;
@@ -69,7 +77,7 @@ export function useAppraisalCopyLists({
       await writeToClipboardLater(
         (async () => {
           const settled = (await settleLive()) ?? result;
-          const lists = settled === result ? copyLists : listsFor(settled, owned);
+          const lists = settled === result ? copyLists : listsFor(settled, owned, refineBasis);
           if (lists[list].text === '') throw new Error('nothing to copy');
           count = lists[list].count;
           return lists[list].text;

@@ -6,6 +6,7 @@ import '@/i18n';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import type { AppraisalSnapshot } from '@/engine/market/appraisalSnapshot';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useRefineBasis } from './refineBasis';
 import { AppraisalShareScreen } from './AppraisalShareScreen';
 import { appraisalShareViewFromSnapshot } from './appraisalShareData';
 
@@ -44,7 +45,11 @@ const snapshot: AppraisalSnapshot = {
       refine: { portionSize: 100, materials: [{ typeId: 35, quantity: 16_000 }], efficiency: 0.9 },
     },
   ],
-  refine: { yieldRate: 0.66, taxRate: 0, minerals: [{ typeId: 35, name: 'Pyerite', price: 10 }] },
+  refine: {
+    yieldRate: 0.66,
+    taxRate: 0,
+    minerals: [{ typeId: 35, name: 'Pyerite', price: 10, sellPrice: 8 }],
+  },
 };
 
 function renderShared() {
@@ -62,13 +67,14 @@ function renderShared() {
 
 beforeEach(() => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
+  useRefineBasis.setState({ value: 'buy', hydrated: true });
 });
 afterEach(cleanup);
 
 describe('a Shared Appraisal with refine figures', () => {
   it("shows the sharer's Refine total with the efficiency it was worked out at", () => {
     renderShared();
-    expect(screen.getByText('@ 90%')).toBeInTheDocument();
+    expect(screen.getByText('buy @ 90%')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /Refine/ })).toBeInTheDocument();
   });
 
@@ -112,6 +118,31 @@ describe('a Shared Appraisal with refine figures', () => {
     expect(within(dialog).getByText('Shared with you')).toBeInTheDocument();
     // The sharer's 90%: 10 portions x floor(16,000 x 0.9).
     expect(within(dialog).getByRole('cell', { name: '144,000' })).toBeInTheDocument();
+  });
+});
+
+describe('a Shared Appraisal and the remembered price basis', () => {
+  it("prices the Refine figures on the visitor's own remembered basis", () => {
+    useRefineBasis.setState({ value: 'sell', hydrated: true });
+    renderShared();
+    expect(screen.getByText('sell @ 90%')).toBeInTheDocument();
+  });
+
+  it('reads as the buy basis on a link that never carried the sell side', () => {
+    useRefineBasis.setState({ value: 'sell', hydrated: true });
+    const old = structuredClone(snapshot);
+    for (const mineral of old.refine?.minerals ?? []) delete mineral.sellPrice;
+    const result = appraisalShareViewFromSnapshot(old);
+    if (!result.ok) throw new Error('view');
+    render(
+      <MemoryRouter>
+        <AppraisalShareScreen
+          state={{ status: 'ready', view: result.value }}
+          expiresAt={Date.UTC(2026, 10, 8)}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('buy @ 90%')).toBeInTheDocument();
   });
 });
 

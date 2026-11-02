@@ -15,7 +15,7 @@ import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { IskAmount, StatChip, StatChips } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
-import type { AppraisalNetTotals, AppraisalTotals } from '@/engine/market/appraisal';
+import type { AppraisalNetTotals, AppraisalTotals, RefineBasis } from '@/engine/market/appraisal';
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
 import { RefineChipValue } from './RefineChipValue';
@@ -28,6 +28,9 @@ interface AppraisalHeaderStatsProps {
   net: AppraisalNetTotals | null;
   itemCount: number;
   showRefine: boolean;
+  /** The pile's refine total on the remembered price basis, and that basis, for the chip. */
+  refineValue: number;
+  refineBasis: RefineBasis;
   showCheapest: boolean;
   implantBonusPct: number;
   /** The total efficiency the Refine figure was worked out at ("68.3%"), shown beside it so the default is never silent. */
@@ -119,6 +122,8 @@ export function AppraisalHeaderStats({
   net,
   itemCount,
   showRefine,
+  refineValue,
+  refineBasis,
   showCheapest,
   implantBonusPct,
   refineEfficiency = null,
@@ -136,7 +141,8 @@ export function AppraisalHeaderStats({
           label={t('market.appraisal.refineTotal')}
           value={
             <RefineChipValue
-              amount={<IskAmount value={totals.refine} decimals={0} />}
+              amount={<IskAmount value={refineValue} decimals={0} />}
+              basis={t(`market.appraisal.refineBasisShort.${refineBasis}`)}
               efficiency={refineEfficiency}
               onOpen={onOpenRefine}
             />

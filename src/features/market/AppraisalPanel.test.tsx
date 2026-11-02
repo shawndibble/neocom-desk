@@ -18,6 +18,7 @@ import { JANICE_PROXY_URL } from './janice';
 import { AppraisalPanel } from './AppraisalPanel';
 import { DEFAULT_APPRAISAL_OWNED_PREF, useAppraisalOwnedPref } from './appraisalOwnedPref';
 import { useRecentAppraisals } from './appraisalRecent';
+import { useRefineBasis } from './refineBasis';
 import { useHaulingCargo } from './haulingCargo';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import type { AppraisalController } from './useAppraisal';
@@ -93,6 +94,7 @@ const APPRAISAL: Appraisal = {
     spread: 40_450,
     unpricedRows: 1,
     refine: 0,
+    refineSell: 0,
     refineUnpricedRows: 0,
     cheapestBuy: 0,
     cheapestBuyViaLp: 0,
@@ -333,6 +335,7 @@ describe('AppraisalPanel', () => {
         spread: 4_500,
         unpricedRows: 1,
         refine: 0,
+        refineSell: 0,
         refineUnpricedRows: 0,
         cheapestBuy: 0,
         cheapestBuyViaLp: 0,
@@ -668,6 +671,7 @@ describe('AppraisalPanel', () => {
             spread: 37_450,
             unpricedRows: 0,
             refine: 8_000,
+            refineSell: 0,
             refineUnpricedRows: 0,
             cheapestBuy: 0,
             cheapestBuyViaLp: 0,
@@ -707,7 +711,7 @@ describe('AppraisalPanel', () => {
       renderPanel({ controller: controller({ result: partial }) });
       const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
       await userEvent.hover(within(veldsparRow).getByText('*'));
-      expect(await screen.findByRole('tooltip')).toHaveTextContent(/no price at this hub/);
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/no price on this basis/);
     });
 
     it('hides the Refine total chip with the Refine column, and brings it back with it', async () => {
@@ -729,6 +733,27 @@ describe('AppraisalPanel', () => {
       await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Refine total' }));
       await userEvent.keyboard('{Escape}');
       expect(screen.getByText('Refine total')).toBeInTheDocument();
+    });
+
+    it('prices the Refine total and chip on the remembered price basis', () => {
+      useRefineBasis.setState({ value: 'sell', hydrated: true });
+      const withSell = refineOutcome();
+      withSell.appraisal.rows[0] = {
+        ...withSell.appraisal.rows[0],
+        name: 'Mercoxit III-Grade',
+        refineTotal: 1_000_000,
+        refineSellTotal: 2_000_000,
+      };
+      withSell.appraisal.totals.refine = 1_000_000;
+      withSell.appraisal.totals.refineSell = 2_000_000;
+      renderPanel({ controller: controller({ result: withSell }) });
+      const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
+      expect(
+        within(oreRow).getByText('2,000,000 ISK', { selector: '.sr-only' })
+      ).toBeInTheDocument();
+      expect(within(oreRow).queryByText('1,000,000 ISK', { selector: '.sr-only' })).toBeNull();
+      expect(screen.getByText('sell')).toBeInTheDocument();
+      useRefineBasis.setState({ value: 'buy', hydrated: true });
     });
 
     it('omits the refine column entirely with no active Character', () => {
@@ -890,6 +915,7 @@ describe('AppraisalPanel', () => {
             spread: -58_522_600,
             unpricedRows: 0,
             refine: 0,
+            refineSell: 0,
             refineUnpricedRows: 0,
             cheapestBuy: 2_232_400,
             cheapestBuyViaLp: 1,
@@ -1027,6 +1053,7 @@ describe('AppraisalPanel', () => {
               spread: 0,
               unpricedRows: 0,
               refine: 0,
+              refineSell: 0,
               refineUnpricedRows: 0,
               cheapestBuy: 0,
               cheapestBuyViaLp: 0,
@@ -1197,6 +1224,7 @@ describe('AppraisalPanel — result header controls', () => {
         spread: 0,
         unpricedRows: 0,
         refine: 0,
+        refineSell: 0,
         refineUnpricedRows: 0,
         cheapestBuy: 0,
         cheapestBuyViaLp: 0,

@@ -12,14 +12,23 @@ const NAMES = new Map([
   [MEXALLON, 'Mexallon'],
 ]);
 
-/** A 100-portion ore returning 16,000 Pyerite and 800 Mexallon per portion, priced 10 and 50 a unit. */
-function ore(typeId: number, name: string, quantity: number, efficiency: number): AppraisalItem {
+/**
+ * A 100-portion ore returning 16,000 Pyerite and 800 Mexallon per portion. The minerals buy for 10 and
+ * 50 and sell for 8 and 70; the ore buys for 1,000 and sells for `sell`.
+ */
+function ore(
+  typeId: number,
+  name: string,
+  quantity: number,
+  efficiency: number,
+  { sell = 1200, withSellSide = true } = {}
+): AppraisalItem {
   return {
     typeId,
     name,
     quantity,
     buy: 1000,
-    sell: 1200,
+    sell,
     refine: {
       valueAtFullPrice: 0,
       pricedAll: true,
@@ -32,6 +41,7 @@ function ore(typeId: number, name: string, quantity: number, efficiency: number)
         ],
         efficiency,
         materialPrices: { [PYERITE]: 10, [MEXALLON]: 50 },
+        ...(withSellSide ? { materialSellPrices: { [PYERITE]: 8, [MEXALLON]: 70 } } : {}),
       },
     },
   };
@@ -41,6 +51,7 @@ const appraisal = buildAppraisal([ore(1, 'Zeolites', 1000, 0.9), ore(2, 'Coesite
 
 function open(props: Partial<React.ComponentProps<typeof RefineBreakdownModal>> = {}) {
   const onClose = vi.fn();
+  const onBasisChange = vi.fn();
   render(
     <RefineBreakdownModal
       open
@@ -51,37 +62,102 @@ function open(props: Partial<React.ComponentProps<typeof RefineBreakdownModal>> 
       setup={{ yieldRate: 0.66, taxRate: 0 }}
       mineralNames={NAMES}
       initialTypeId={null}
+      basis="buy"
+      onBasisChange={onBasisChange}
       {...props}
     />
   );
-  return { onClose };
+  return { onClose, onBasisChange };
 }
 
 afterEach(cleanup);
 
 describe('RefineBreakdownModal', () => {
-  it('compares refining with selling as is and names the winner', () => {
+  it('compares refining with selling as is on every price basis, with the selected one marked', () => {
     open();
-    const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText('Refine, then sell minerals')).toBeInTheDocument();
-    // The label is also a column header and a verdict in the by-item table.
-    expect(within(dialog).getAllByText('Sell as is').length).toBeGreaterThan(0);
-    // 90% efficiency refines to far more than the 1.5M the pile sells for as is.
-    expect(within(dialog).getByText(/Refining beats selling as is above/)).toBeInTheDocument();
-    const refineCard = within(dialog).getByText('Refine, then sell minerals').closest('div');
-    expect(refineCard).toHaveTextContent('Better');
-    const asIsCard = within(dialog).getAllByText('Sell as is')[0].closest('div');
-    expect(asIsCard).not.toHaveTextContent('Better');
+    const table = screen.getByRole('table', { name: 'Refine or sell as is, on each price basis' });
+    for (const name of ['Buy orders', 'Split', 'Sell orders']) {
+      expect(within(table).getByText(name)).toBeInTheDocument();
+    }
+    // 1,500 units, 90%: 1.0M + 0.5M sold as is on buy; refined 2.7M.
+    expect(within(table).getAllByText('Selected')).toHaveLength(1);
+    expect(within(table).getByRole('row', { name: /Buy orders/ })).toHaveTextContent('Selected');
+    expect(within(table).getByRole('row', { name: /Sell orders/ })).not.toHaveTextContent(
+      'Selected'
+    );
   });
 
-  it('lists the minerals with their quantities, prices and the total', () => {
+  it('says once what to do on the selected basis, and what the others say where they differ', () => {
+    // The ore sells for 5,000: listing it as is beats refining on the sell side, though refining wins on buy.
+    const lopsided = buildAppraisal(
+      [ore(1, 'Zeolites', 1000, 0.9, { sell: 5000 }), ore(2, 'Coesite', 500, 0.9, { sell: 5000 })],
+      100
+    );
+    open({ appraisal: lopsided });
+    const action = screen.getByText('Suggested action:').parentElement as HTMLElement;
+    expect(within(action).getByText('Refine')).toBeInTheDocument();
+    expect(within(action).getByText(/sell as is on split and sell orders/)).toBeInTheDocument();
+  });
+
+  it('adds no note when every basis agrees', () => {
     open();
-    const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByRole('cell', { name: 'Pyerite' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('cell', { name: 'Mexallon' })).toBeInTheDocument();
-    // 10 + 5 portions x floor(16,000 x 0.9) Pyerite
-    expect(within(dialog).getByRole('cell', { name: '216,000' })).toBeInTheDocument();
-    expect(within(dialog).getByText('Refine total')).toBeInTheDocument();
+    const action = screen.getByText('Suggested action:').parentElement as HTMLElement;
+    expect(within(action).getByText('Refine')).toBeInTheDocument();
+    expect(action.querySelector('small')).toBeNull();
+  });
+
+  it('warns once when an item sells for many times its buy price', () => {
+    open({
+      appraisal: buildAppraisal(
+        [ore(1, 'Zeolites', 1000, 0.9, { sell: 50_000 }), ore(2, 'Coesite', 500, 0.9)],
+        100
+      ),
+    });
+    expect(screen.getByText(/1 item sells for over 10× the buy price/)).toBeInTheDocument();
+  });
+
+  it('saves the basis you pick, so later appraisals use it', async () => {
+    const user = userEvent.setup();
+    const { onBasisChange } = open();
+    await user.click(screen.getByRole('row', { name: /Sell orders/ }));
+    expect(onBasisChange).toHaveBeenCalledWith('sell');
+  });
+
+  it('prices everything below on the selected basis', () => {
+    open({ basis: 'sell' });
+    const minerals = screen.getByRole('table', { name: 'Minerals you get' });
+    // 15 portions refine into 216,000 Pyerite (x8) and 10,800 Mexallon (x70) on the sell side.
+    expect(within(minerals).getByRole('cell', { name: '1,728,000' })).toBeInTheDocument();
+    expect(within(minerals).getByRole('cell', { name: '756,000' })).toBeInTheDocument();
+    expect(screen.getByText('Minerals you get, on sell orders')).toBeInTheDocument();
+  });
+
+  it('shows both unit prices on every mineral, and the totals in the same table', () => {
+    open();
+    const minerals = screen.getByRole('table', { name: 'Minerals you get' });
+    const pyerite = within(minerals).getByRole('row', { name: /Pyerite/ });
+    expect(pyerite).toHaveTextContent('10');
+    expect(pyerite).toHaveTextContent('8');
+    expect(within(minerals).getByRole('cell', { name: 'Refine total' })).toBeInTheDocument();
+    expect(within(minerals).getByRole('cell', { name: 'Minerals' })).toBeInTheDocument();
+  });
+
+  it('leaves the sell and split bases out where the sell prices were never carried', async () => {
+    const user = userEvent.setup();
+    const { onBasisChange } = open({
+      appraisal: buildAppraisal([ore(1, 'Zeolites', 1000, 0.9, { withSellSide: false })], 100),
+    });
+    expect(screen.getAllByText("Sell prices weren't saved with this link")).toHaveLength(2);
+    await user.click(screen.getByRole('row', { name: /Sell orders/ }));
+    expect(onBasisChange).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the buy basis when the remembered one cannot be priced', () => {
+    open({
+      basis: 'sell',
+      appraisal: buildAppraisal([ore(1, 'Zeolites', 1000, 0.9, { withSellSide: false })], 100),
+    });
+    expect(screen.getByRole('row', { name: /Buy orders/ })).toHaveTextContent('Selected');
   });
 
   it('opens on one item with its batch arithmetic, and goes back to all', async () => {
@@ -93,7 +169,7 @@ describe('RefineBreakdownModal', () => {
       within(dialog).getByText(/1,000 units ÷ 100 per portion = 10 portions/)
     ).toBeInTheDocument();
     expect(
-      within(dialog).getByText(/Pyerite: 16,000 × 10 × 0\.9000 = 144,000/)
+      within(dialog).getByText(/Pyerite: 16,000 × 10 × 0\.9000 = 144,000\.0/)
     ).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'All items' }));
     expect(within(dialog).getByText('Refine breakdown, 2 items')).toBeInTheDocument();
@@ -172,19 +248,18 @@ describe('RefineBreakdownModal', () => {
     });
     expect(screen.getByText(/Nothing in this list refines/)).toBeInTheDocument();
   });
-});
 
-describe('RefineBreakdownModal, when the chosen item stops refining', () => {
-  it('falls back to the whole pile instead of an empty scope', () => {
+  it('falls back to the whole pile when the chosen item stops refining', () => {
     open({ initialTypeId: 999 });
     expect(screen.getByText('Refine breakdown, 2 items')).toBeInTheDocument();
   });
 
   it('keeps the leftover apart from the figure the table and chip show', () => {
     open({ appraisal: buildAppraisal([ore(1, 'Zeolites', 1038, 0.9)], 100) });
-    expect(screen.getByText('Total with leftover')).toBeInTheDocument();
-    // With no tax, the minerals line already is the figure the table shows.
-    expect(screen.queryByText('Refined minerals, less tax')).not.toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'Total with leftover' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('cell', { name: 'Refined minerals, less tax' })
+    ).not.toBeInTheDocument();
   });
 });
 

@@ -16,11 +16,14 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import {
   buildAppraisal,
   refineBeatsSellAsIs,
+  refineTotalFor,
+  refineTotalsFor,
   splitEach,
   type AppraisalItem,
   type AppraisalRow,
+  type RefineBasis,
 } from '@/engine/market/appraisal';
-import { refineEfficiencyRange } from '@/engine/market/refineBreakdown';
+import { basisAvailable, refineEfficiencyRange } from '@/engine/market/refineBreakdown';
 import { ShareShell, type OpenInApp } from '@/features/share/ShareShell';
 import { formatIskAuto } from '@/lib/isk';
 import { appraisalCsvColumns } from './appraisalCsv';
@@ -33,6 +36,8 @@ import { comparisonCell } from './appraisalCells';
 import { RefineFigureButton } from './RefineFigureButton';
 import { efficiencyText } from './refineFormat';
 import { useMyRefine } from './useMyRefine';
+import { useRefineBasis } from './refineBasis';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useRefineMineralNames } from './useRefineMineralNames';
 
 const NO_ROWS: readonly AppraisalRow[] = [];
@@ -91,8 +96,17 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
   const setup = usingMine
     ? { yieldRate: mine.setup.stationRate, taxRate: mine.setup.taxRate }
     : (view?.refining ?? null);
+  // The visitor's own remembered price basis, like on the live tab; a link from before the sell
+  // side was carried can only be priced on the buy orders.
+  const storedBasis = useRefineBasis((state) => state.value);
+  const setStoredBasis = useRefineBasis((state) => state.setValue);
+  const basisReady = useHydratedStore(useRefineBasis);
+  const refineBasis: RefineBasis =
+    appraisal !== null && basisAvailable(appraisal, storedBasis) ? storedBasis : 'buy';
   const hasRefine =
-    setup !== null && (appraisal?.rows.some((row) => row.refineTotal !== undefined) ?? false);
+    basisReady &&
+    setup !== null &&
+    (appraisal?.rows.some((row) => refineTotalFor(row, refineBasis) !== undefined) ?? false);
   const refineRange = hasRefine && appraisal ? refineEfficiencyRange(appraisal.items) : null;
   const refineEfficiency = refineRange ? efficiencyText(refineRange.min, refineRange.max) : null;
   const shareRows = appraisal ? appraisal.rows : NO_ROWS;
@@ -183,18 +197,18 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
             align: 'right' as const,
             className: 'whitespace-nowrap tabular-nums',
             render: (row: AppraisalRow) =>
-              row.refineTotal === undefined
+              refineTotalFor(row, refineBasis) === undefined
                 ? '—'
                 : comparisonCell(
                     <RefineFigureButton
                       name={row.name}
                       onOpen={() => setRefineModal({ typeId: row.typeId })}
                     >
-                      {totalCell(row.refineTotal)}
+                      {totalCell(refineTotalFor(row, refineBasis) ?? null)}
                     </RefineFigureButton>,
-                    refineBeatsSellAsIs(row)
+                    refineBeatsSellAsIs(row, refineBasis)
                   ),
-            sortValue: (row: AppraisalRow) => row.refineTotal ?? undefined,
+            sortValue: (row: AppraisalRow) => refineTotalFor(row, refineBasis),
           },
         ]
       : []),
@@ -232,7 +246,13 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
                   label={t('market.appraisal.refineTotal')}
                   value={
                     <RefineChipValue
-                      amount={<IskAmount value={appraisal.totals.refine} decimals={0} />}
+                      amount={
+                        <IskAmount
+                          value={refineTotalsFor(appraisal.totals, refineBasis)}
+                          decimals={0}
+                        />
+                      }
+                      basis={t(`market.appraisal.refineBasisShort.${refineBasis}`)}
                       efficiency={refineEfficiency}
                       onOpen={() => setRefineModal({ typeId: null })}
                     />
@@ -287,6 +307,8 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
               setup={setup}
               mineralNames={mineralNames}
               initialTypeId={refineModal.typeId}
+              basis={refineBasis}
+              onBasisChange={(next) => void setStoredBasis(next)}
               shared={{
                 generatedAt: view.generatedAt,
                 source: usingMine ? 'mine' : 'shared',
