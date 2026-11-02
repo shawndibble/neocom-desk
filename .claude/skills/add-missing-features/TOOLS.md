@@ -69,7 +69,7 @@ kill-test 2.
    margin finder, evetools.dev, evetrade.space, Oracle Market Genius, Trading
    Matrix, EveBoosters.com, ETT. All-in-one companion apps are the same set,
    their extras dropping on remit: EVE Online Tooling, EVE Tools Suite, Koru
-   Desktop, EveTogether, ECT EVE Assets, Pod, EVE Empire (changelog 1.4–1.6.3
+   Desktop, EveTogether, ECT EVE Assets (v3.0.1 read: resizable columns = #5866; no column reorder/picker), Pod, EVE Empire (changelog 1.4–1.6.3
    read in full, PI planner screenshots; #5642–#5646), Esparto Industries,
    Capsuleers.app/eHub, ISKONOMY, Vigilant, EVE Flipper.
 
@@ -221,6 +221,8 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 `SHIP` is the hostile review's verdict, not the ticket's fate (#858 carried
 `SHIP` and was closed). Check `gh api repos/shawndibble/neocom-desk/issues/<n>`.
 
+- #5866 NARROW: drag-to-resize columns on windowed tables (ECT; widths per table,
+  keyboard + double-click reset).
 - Small/UI re-sweep of RIFT, jEveAssets, EVE Farm, Omnitool, MoMa, EveLens,
   Adam4EVE, Janice, EVE Tycoon (ready-for-agent, owner-reviewed): #5652 in-game
   asset names; #5653 Dump/Appraisal walk reachable buy orders (range,
@@ -281,6 +283,8 @@ Other open: #642, #718, #819, #821, #824, #880, #926, #1015, #1017, #1018,
 
 The reason is what stops a re-pitch. Numbers are kill-tests.
 
+- Column reordering (ECT thread): changes the meaning of ~37 stored id lists, hide + sort
+  already cover it; if ever built it lives in the Columns picker, never header drag.
 - **By kill-test.** **1**: hub arbitrage/trade finder (`hubHaulGaps`), corp
   buyback/payout split, EQM Corporate Exchange, dd24tool.de, route sequencing
   (also 14), OCR appraisal, structured WTS/WTB board (TradeRelay). **2**: bulk
