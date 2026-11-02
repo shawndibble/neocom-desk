@@ -5,6 +5,7 @@ import {
   jobTimeMultiplier,
   refiningEfficiency,
   baselineRefiningEfficiency,
+  referenceSkillsMultiplier,
   appliedRefiningImplantPct,
   refiningImplantApplies,
   MANUFACTURING_TIME_IMPLANT_TYPE_IDS,
@@ -244,5 +245,46 @@ describe('appliedRefiningImplantPct', () => {
 
   it('is 0 with no implant fitted', () => {
     expect(appliedRefiningImplantPct(NO_CHARACTER_MODIFIERS, SIMPLE_ORE_PROCESSING)).toBe(0);
+  });
+});
+
+describe('referenceSkillsMultiplier', () => {
+  const ORES = [SIMPLE_ORE_PROCESSING, ICE_PROCESSING, 12185];
+
+  it("is the client's multiplier for a pilot whose ore skills are all at one level", () => {
+    // Reprocessing V x Efficiency V x ore skills IV: the x1.366 the EVE client shows.
+    const skills = {
+      [SKILL_IDS.reprocessing]: 5,
+      [SKILL_IDS.reprocessingEfficiency]: 5,
+      [SIMPLE_ORE_PROCESSING]: 4,
+      [ICE_PROCESSING]: 4,
+      12185: 4,
+    };
+    expect(referenceSkillsMultiplier(mods(skills), ORES)).toBeCloseTo(1.15 * 1.1 * 1.08, 10);
+  });
+
+  it('averages the ore skills that are trained, and ignores those at 0', () => {
+    const skills = {
+      [SKILL_IDS.reprocessing]: 5,
+      [SKILL_IDS.reprocessingEfficiency]: 5,
+      [SIMPLE_ORE_PROCESSING]: 5,
+      [ICE_PROCESSING]: 3,
+      // 12185 untrained.
+    };
+    expect(referenceSkillsMultiplier(mods(skills), ORES)).toBeCloseTo(1.15 * 1.1 * 1.08, 10);
+  });
+
+  it('counts a refining implant', () => {
+    const base = { [SKILL_IDS.reprocessing]: 5, [SKILL_IDS.reprocessingEfficiency]: 5 };
+    const withImplant = characterModifiers({ skills: base, implantTypeIds: [BX_801] });
+    expect(referenceSkillsMultiplier(withImplant, ORES)).toBeCloseTo(
+      1.15 * 1.1 * (1 + withImplant.refiningImplantPct / 100),
+      10
+    );
+  });
+
+  it('is 1 with nothing trained: no skills means no bonus, never zero', () => {
+    expect(referenceSkillsMultiplier(NO_CHARACTER_MODIFIERS, ORES)).toBe(1);
+    expect(referenceSkillsMultiplier(NO_CHARACTER_MODIFIERS, [])).toBe(1);
   });
 });

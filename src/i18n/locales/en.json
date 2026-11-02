@@ -14525,6 +14525,8 @@
     "bpcHideAuctionsHint": "Hides auction contracts when BPC Sourcing opens.",
     "bpcHideHint": "Hides PLEX contracts when BPC Sourcing opens. Toggle it in the filter bar per search.",
     "tradeHubHint": "Prices LP offers and item lookups; Hauling Opportunities starts here. Moon mining tax uses each payee’s own hub.",
+    "reprocessingYieldLabel": "Reprocessing yield",
+    "reprocessingYieldHint": "The yield your EVE client shows in its Reprocessing window. Your skills (x{{multiplier}}: Reprocessing, Reprocessing Efficiency and your ore skills on average) are divided out to save the facility's base yield, now {{base}}. Type it in the Refine breakdown for an exact figure for the ores you paste.",
     "refiningYieldLabel": "Facility base yield",
     "refiningYieldHint": "Where you refine, before your skills and implants: 50% at an NPC station. At a structure, use the 'base yield' line in its Reprocessing window's tooltip, not the 'yield' headline, which already has your skills in it.",
     "refiningTaxLabel": "Reprocessing tax",
