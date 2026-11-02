@@ -482,13 +482,25 @@ async function bumpMarkerQuietly(
  * always push. A marker the rules refuse (not deployed yet) or that fails to
  * bump only costs the shortcut, never the sync.
  */
+/**
+ * A pass queued for a Character that was removed (or never existed) on this
+ * device. Not a fault, so `reportFailure` ignores it by `name`; the sync status
+ * line still shows the message.
+ */
+class UnknownCharacterError extends Error {
+  override readonly name = 'UnknownCharacterError';
+  constructor(characterId: number) {
+    super(`Unknown character ${characterId}`);
+  }
+}
+
 async function syncCharacter(
   characterId: number,
   requested: SyncScope,
   priority: SyncPriority
 ): Promise<SyncScope> {
   const character = await db.characters.get(characterId);
-  if (!character) throw new Error(`Unknown character ${characterId}`);
+  if (!character) throw new UnknownCharacterError(characterId);
   // A new owner's wipe empties every collection and clears every cursor:
   // whatever the request named, only a full pass refills them.
   const scope: SyncScope = (await handleOwnerHashChange(character)) ? 'all' : requested;
