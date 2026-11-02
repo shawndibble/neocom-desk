@@ -428,6 +428,8 @@ export interface DataTableProps<T> {
    * width-less columns, never to the sized ones. Off by default.
    */
   hugColumns?: boolean;
+  /** Phone `responsive="table"` only: false keeps the header in the table instead of floating a copy that follows the page. Default true. */
+  stickyHeader?: boolean;
   /**
    * Hands the caller the rows in on-screen order — the table sorts
    * internally, so an export that wants to match what the reader sees reads

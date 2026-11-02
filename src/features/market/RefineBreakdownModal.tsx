@@ -105,9 +105,8 @@ export function RefineBreakdownModal({
   editSetup,
   shared,
 }: RefineBreakdownModalProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const timeZone = useTimeZone();
-  const listFormat = new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' });
   const [typeId, setTypeId] = useState<number | null>(initialTypeId);
 
   const input = { appraisal, pricePercent, taxRate: setup.taxRate };
@@ -203,13 +202,7 @@ export function RefineBreakdownModal({
     },
   ];
 
-  // What to do on the selected basis, and what the others say where they differ.
-  const elsewhere = REFINE_BASES.flatMap((key) => {
-    const other = comparison[key];
-    return key !== activeBasis && other !== null && other.refineWins !== breakdown.refineWins
-      ? [basisInline(key)]
-      : [];
-  });
+  // What to do on the selected basis.
   const action = t(
     breakdown.refineWins
       ? 'market.appraisal.breakdown.actionRefine'
@@ -544,16 +537,6 @@ export function RefineBreakdownModal({
                     >
                       {action}
                     </b>
-                    {elsewhere.length > 0 && (
-                      <small className="text-[0.6875rem] text-text-dim">
-                        {t(
-                          breakdown.refineWins
-                            ? 'market.appraisal.breakdown.elsewhereSell'
-                            : 'market.appraisal.breakdown.elsewhereRefine',
-                          { bases: listFormat.format(elsewhere) }
-                        )}
-                      </small>
-                    )}
                   </span>
                 </p>
               </div>
@@ -566,6 +549,7 @@ export function RefineBreakdownModal({
                 onRowClick={(row) => onBasisChange(row.key)}
                 label={t('market.appraisal.breakdown.comparisonTitle')}
                 responsive="table"
+                stickyHeader={false}
               />
               {lopsided.length > 0 && comparison.sell !== null && (
                 <p className="flex items-start gap-1.5 text-xs text-warning">
