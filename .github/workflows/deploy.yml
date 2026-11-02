@@ -35,7 +35,22 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run build
+      # Sentry must never be able to hold production back. The build uploads
+      # source maps through the Sentry Vite plugin, and when Sentry's API
+      # degrades (gateway timeouts, 2026-11-02) `sentry-cli` hangs for minutes
+      # per call with no limit of its own, which stalled a deploy for 18+
+      # minutes. A normal build takes about a minute, so bound the Sentry
+      # build, and if it fails or times out rebuild with the token blanked
+      # (the plugin and the `hidden` source maps are both gated on it): the
+      # site ships without source maps for that release rather than not at all.
+      # A real build error fails the rebuild too, so it is still reported.
+      - name: npm run build
+        shell: bash
+        run: |
+          if ! timeout --kill-after=10s 6m npm run build; then
+            echo "::warning::Build with Sentry source-map upload failed or timed out; rebuilding without it"
+            SENTRY_AUTH_TOKEN= npm run build
+          fi
         env:
           VITE_EVE_CLIENT_ID: ${{ vars.VITE_EVE_CLIENT_ID }}
           VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
