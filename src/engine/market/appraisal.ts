@@ -79,7 +79,15 @@ export interface AppraisalRefine {
   /** Units that could not fill a whole reprocessing portion, and so refined into nothing. */
   unitsLeftOver: number;
   /**
-   * What the figure above was worked out from, kept so the refine breakdown
+   * The same pile's minerals valued at the sell side (what listing them would
+   * ask), net of the same tax. Absent where the sell prices were never read
+   * (a share link from before they travelled with it), never a zero.
+   */
+  sellValueAtFullPrice?: number;
+  /** False when at least one output material had no sell price. Set with `sellValueAtFullPrice`. */
+  sellPricedAll?: boolean;
+  /**
+   * What the figures above were worked out from, kept so the refine breakdown
    * can show the arithmetic and a shared link can carry it. Absent on a
    * refine built before it existed (an old fixture), which has no breakdown.
    */
@@ -95,6 +103,32 @@ export interface AppraisalRefineDetail {
   efficiency: number;
   /** Material type id -> ISK a unit at the appraisal's hub, at 100%. A material nobody buys is absent. */
   materialPrices: Readonly<Record<number, number>>;
+  /** The same, at the sell side. Absent where the sell prices were never read. */
+  materialSellPrices?: Readonly<Record<number, number>>;
+}
+
+/** Every price basis, in the order they are shown. The one list the type and the comparison are built from. */
+export const REFINE_BASES = ['buy', 'split', 'sell'] as const;
+
+/** Which side of the book a refine comparison prices on: the buy orders, the sell orders, or halfway. */
+export type RefineBasis = (typeof REFINE_BASES)[number];
+
+/**
+ * A price on a basis from its two sides: the buy side, the sell side, or their
+ * midpoint, which needs both. Null where a side the basis needs has no price.
+ * The one place the three bases are told apart; every `…For` selector below,
+ * and the breakdown's mineral prices, go through it.
+ */
+export function priceOnBasis(
+  basis: RefineBasis,
+  buy: number | null | undefined,
+  sell: number | null | undefined
+): number | null {
+  const buySide = buy ?? null;
+  const sellSide = sell ?? null;
+  if (basis === 'buy') return buySide;
+  if (basis === 'sell') return sellSide;
+  return buySide === null || sellSide === null ? null : (buySide + sellSide) / 2;
 }
 
 /** One resolved, priced item to appraise. Prices are per unit, at 100%. */
@@ -149,10 +183,13 @@ export interface AppraisalRow {
   sellEach: number | null;
   buyTotal: number | null;
   sellTotal: number | null;
-  /** Undefined when this type carries no reprocessing data at all. */
+  /** The minerals' net value at the price percent, on the buy side, leaving the leftover units out. The figure the page shows is `refineMineralsFor`; the verdict compares `refineWithLeftoverFor`. Undefined when this type carries no reprocessing data at all. */
   refineTotal?: number;
   refinePricedAll?: boolean;
   refineUnitsLeftOver?: number;
+  /** `refineTotal` on the sell side (minerals only); undefined where the sell prices were never read. */
+  refineSellTotal?: number;
+  refineSellPricedAll?: boolean;
   /** Undefined when nothing the character holds LP with sells this item. */
   lpCorporationId?: number;
   /** The store `offer_id` the LP option priced — the Appraisal's link opens the store on it. */
@@ -240,8 +277,10 @@ export interface AppraisalTotals {
   spread: number;
   /** Rows missing a price on at least one side, so the totals are a subset. */
   unpricedRows: number;
-  /** Summed over rows carrying reprocessing data, whatever their pricing. */
+  /** The buy side of the refine total (see `refineSell`): summed over rows carrying reprocessing data, whatever their pricing. */
   refine: number;
+  /** `refine` on the sell side, over rows that have it. */
+  refineSell: number;
   /** Rows with reprocessing data where at least one output material had no price. */
   refineUnpricedRows: number;
   /**
@@ -277,34 +316,89 @@ function scale(price: number | null, percent: number): number | null {
 /**
  * Does refining this row beat selling it as is?
  *
- * "Sell-as-is" is `buyTotal` in this engine's own vocabulary — what the list
- * fetches sold into buy orders right now —
- * so that is what the refine-then-sell comparison is judged against, the same
- * axis `orderExits.ts` prices its own refine exit on.
- *
- * The refine side is what the player actually ends up holding: the whole
- * batches refined, **plus** the units that could not fill a batch, which are
- * still there to sell at the same price the sell side quotes. Comparing the
- * refine total alone against the full quantity charged the refine path for
- * units it never consumed, and recommended the worse option across a
- * measured band of ordinary ore (issue #1048). Both sides are already scaled
- * by the appraisal's Price Percent, so they stay on one axis.
+ * Both sides are on one Price Basis (`refineWithLeftoverFor` and `asIsTotalFor`) and
+ * already scaled by the appraisal's Price Percent. The refine side is what the
+ * player actually ends up holding: the whole batches refined, **plus** the
+ * units that could not fill a batch, which are still there to sell as is.
+ * Comparing the minerals alone against the full quantity charged the refine
+ * path for units it never consumed, and recommended the worse option across a
+ * measured band of ordinary ore (issue #1048).
  *
  * Strictly greater, because a tie is not a win: a quantity below one whole
  * batch refines into nothing, leaving the leftover equal to the whole paste,
  * and both paths come to exactly the same ISK. That case must read as sell.
  *
- * False whenever no comparison exists — no reprocessing data, or nobody
- * buying. `buyEach` prices both the sell side and the leftover, so a row with
- * no buy price cannot value either; answering false leaves the leftover
- * unpriced rather than silently free.
+ * False whenever no comparison exists: no reprocessing data, or nobody
+ * buying on the basis. The as-is unit price prices both the pile and the
+ * leftover, so a row without one cannot value either; answering false leaves
+ * the leftover unpriced rather than silently free.
  */
-export function refineBeatsSellAsIs(row: AppraisalRow): boolean {
-  if (row.refineTotal === undefined || row.buyEach === null || row.buyTotal === null) return false;
-  // Set together with `refineTotal` in `buildAppraisal`, which the types do
-  // not say; `?? 0` reads a row with no leftover, the same as none recorded.
-  const leftOverValue = (row.refineUnitsLeftOver ?? 0) * row.buyEach;
-  return row.refineTotal + leftOverValue > row.buyTotal;
+export function refineBeatsSellAsIs(row: AppraisalRow, basis: RefineBasis = 'buy'): boolean {
+  const refine = refineWithLeftoverFor(row, basis);
+  const asIs = asIsTotalFor(row, basis);
+  if (refine === undefined || asIs === null || asIsEachFor(row, basis) === null) return false;
+  return refine > asIs;
+}
+
+/**
+ * What refining a row yields in minerals on a price basis, net of tax and with
+ * the leftover units left out: undefined where it has none, or where the basis
+ * needs a side that was never read. A split is only given where both sides
+ * priced every mineral, so a mineral nobody trades on one side is never
+ * counted at half its other price.
+ */
+export function refineMineralsFor(row: AppraisalRow, basis: RefineBasis): number | undefined {
+  if (basis === 'split' && (row.refinePricedAll === false || row.refineSellPricedAll === false)) {
+    return undefined;
+  }
+  return priceOnBasis(basis, row.refineTotal, row.refineSellTotal) ?? undefined;
+}
+
+/**
+ * What refining a row leaves you holding on a price basis: the minerals
+ * (`refineMineralsFor`) **plus** the units too few to fill a portion, which
+ * stay yours and sell as is at that basis's unit price. This is the figure
+ * the refine-versus-sell verdict compares, and the breakdown's "Refined +
+ * leftover ore"; the Appraisal page itself shows the minerals alone. Undefined
+ * where the row has no minerals figure on the basis. A leftover with no as-is
+ * price counts for nothing rather than for a guess.
+ */
+export function refineWithLeftoverFor(row: AppraisalRow, basis: RefineBasis): number | undefined {
+  const minerals = refineMineralsFor(row, basis);
+  if (minerals === undefined) return undefined;
+  return minerals + (row.refineUnitsLeftOver ?? 0) * (asIsEachFor(row, basis) ?? 0);
+}
+
+/** `refineWithLeftoverFor`'s pricing flag: false where a mineral had no price on that basis, so the figure is a floor. */
+export function refinePricedAllFor(row: AppraisalRow, basis: RefineBasis): boolean | undefined {
+  if (basis === 'buy') return row.refinePricedAll;
+  if (basis === 'sell') return row.refineSellPricedAll;
+  return row.refinePricedAll === undefined || row.refineSellPricedAll === undefined
+    ? undefined
+    : row.refinePricedAll && row.refineSellPricedAll;
+}
+
+/** What the whole pasted quantity fetches sold as is, on a basis; null where a side it needs has no price. */
+export function asIsTotalFor(row: AppraisalRow, basis: RefineBasis): number | null {
+  return priceOnBasis(basis, row.buyTotal, row.sellTotal);
+}
+
+/** One unit's as-is price on a basis, which also prices the leftover units; null where a side it needs has no price. */
+export function asIsEachFor(row: AppraisalRow, basis: RefineBasis): number | null {
+  return priceOnBasis(basis, row.buyEach, row.sellEach);
+}
+
+/** The pile's refine figure on a basis, the one the Refine chip shows: the minerals alone (`refineMineralsFor`), over the rows that have one. */
+export function refineMineralsOfRows(rows: readonly AppraisalRow[], basis: RefineBasis): number {
+  return rows.reduce((sum, row) => sum + (refineMineralsFor(row, basis) ?? 0), 0);
+}
+
+/**
+ * The row has a refine figure on this basis and selling it as is wins: the
+ * as-is total on that basis is the one to mark.
+ */
+export function sellAsIsBeatsRefine(row: AppraisalRow, basis: RefineBasis): boolean {
+  return refineWithLeftoverFor(row, basis) !== undefined && !refineBeatsSellAsIs(row, basis);
 }
 
 /**
@@ -331,6 +425,7 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
   let sell = 0;
   let unpricedRows = 0;
   let refine = 0;
+  let refineSell = 0;
   let refineUnpricedRows = 0;
   let cheapestBuy = 0;
   let cheapestBuyViaLp = 0;
@@ -350,11 +445,18 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
     let refineTotal: number | undefined;
     let refinePricedAll: boolean | undefined;
     let refineUnitsLeftOver: number | undefined;
+    let refineSellTotal: number | undefined;
+    let refineSellPricedAll: boolean | undefined;
     if (item.refine) {
       refineTotal = (item.refine.valueAtFullPrice * pricePercent) / 100;
       refinePricedAll = item.refine.pricedAll;
       refineUnitsLeftOver = item.refine.unitsLeftOver;
       refine += refineTotal;
+      if (item.refine.sellValueAtFullPrice !== undefined) {
+        refineSellTotal = (item.refine.sellValueAtFullPrice * pricePercent) / 100;
+        refineSellPricedAll = item.refine.sellPricedAll;
+        refineSell += refineSellTotal;
+      }
       if (!refinePricedAll) refineUnpricedRows += 1;
     }
 
@@ -377,6 +479,8 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       refineTotal,
       refinePricedAll,
       refineUnitsLeftOver,
+      refineSellTotal,
+      refineSellPricedAll,
       lpCorporationId: item.lpOption?.corporationId,
       lpOfferId: item.lpOption?.offerId,
       lpCorpName: item.lpOption?.corpName,
@@ -403,6 +507,7 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       spread: sell - buy,
       unpricedRows,
       refine,
+      refineSell,
       refineUnpricedRows,
       cheapestBuy,
       cheapestBuyViaLp,
@@ -607,6 +712,8 @@ export interface ComputeAppraisalRefineInput {
   modifiers: CharacterModifiers;
   /** materialTypeId -> ISK a unit at the appraisal's Trade Hub. */
   materialPrices: Readonly<Record<number, number>>;
+  /** The same, at the sell side; absent = the sell side is not valued. */
+  materialSellPrices?: Readonly<Record<number, number>>;
   /** The pilot's facility yield and tax; absent = an NPC station at 50%, no tax. */
   refining?: RefiningSetup;
 }
@@ -627,6 +734,7 @@ export function computeAppraisalRefine({
   reprocessing,
   modifiers,
   materialPrices,
+  materialSellPrices,
   refining = DEFAULT_REFINING_SETUP,
 }: ComputeAppraisalRefineInput): AppraisalRefine | undefined {
   if (!reprocessing) return undefined;
@@ -642,6 +750,7 @@ export function computeAppraisalRefine({
       materials: reprocessing.materials,
       efficiency,
       materialPrices,
+      materialSellPrices,
     },
     refining.taxRate
   );
@@ -666,10 +775,19 @@ export function refineFromDetail(
     efficiency: detail.efficiency,
   });
   const value = reprocessingValue(yielded.outputs, detail.materialPrices);
+  const sellValue = detail.materialSellPrices
+    ? reprocessingValue(yielded.outputs, detail.materialSellPrices)
+    : undefined;
   return {
     valueAtFullPrice: netOfReprocessingTax(value.total, taxRate),
     pricedAll: value.pricedAll,
     unitsLeftOver: yielded.unitsLeftOver,
+    ...(sellValue
+      ? {
+          sellValueAtFullPrice: netOfReprocessingTax(sellValue.total, taxRate),
+          sellPricedAll: sellValue.pricedAll,
+        }
+      : {}),
     detail,
   };
 }

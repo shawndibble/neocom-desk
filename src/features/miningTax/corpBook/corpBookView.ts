@@ -42,7 +42,7 @@ export interface CorpClaim {
 export interface CorpBookView {
   overlay: PersonalOverlay;
   books: CorpBookViewBook[];
-  /** The virtual "<Corp> (Corp Tax Book)" Payees, for balances and the Payee filter only. */
+  /** The virtual Payees, named for the corporation, for balances and the Payee filter only. */
   payees: PayeeRecord[];
   claims: CorpClaim[];
 }
@@ -53,6 +53,8 @@ export interface CorpBookViewInput {
   /** Prices at each book's hub and Ore Form, per corporation. */
   pricesByCorp: ReadonlyMap<number, DatedUnitPrices>;
   corpNames: ReadonlyMap<number, string>;
+  /** The member's stored Payees: one verified as a book's corporation is that book's own Payee. */
+  payees: readonly PayeeRecord[];
   made: readonly MadePayment[];
   characterNames: ReadonlyMap<number, string>;
   now: string;
@@ -89,6 +91,9 @@ export function buildCorpBookView(
       ...(book.structureNames ? { structureNames: book.structureNames } : {}),
       hubId: book.hubId,
       oreForm: book.oreForm,
+      ownPayeeIds: input.payees
+        .filter((p) => p.entityKind === 'corporation' && p.entityId === book.corporationId)
+        .map((p) => p.id),
       pricesOn: (date) => ({
         prices: new Map(pricesAtHubOnDate(dated, book.hubId, date)),
         sources: new Map(sourcesAtHubOnDate(dated, book.hubId, date)),

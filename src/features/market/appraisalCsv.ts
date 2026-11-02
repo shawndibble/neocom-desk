@@ -6,7 +6,11 @@ import {
   sellSalesTax,
   splitEach,
 } from '@/engine/market/appraisal';
-import type { AppraisalNetFees } from '@/engine/market/appraisal';
+import {
+  refineMineralsFor,
+  refineWithLeftoverFor,
+  type AppraisalNetFees,
+} from '@/engine/market/appraisal';
 import type { OwnedRow } from '@/engine/market/appraisalOwned';
 import { priceMarkKey } from './priceStateLabel';
 
@@ -53,7 +57,14 @@ export function appraisalCsvColumns(
   if (live) {
     columns.push(
       // Blank where the type has no reprocessing data / no held LP store sells it.
-      { header: t('market.appraisal.columnRefineTotal'), value: (row) => row.refineTotal },
+      {
+        header: t('market.appraisal.columnRefineTotal'),
+        value: (row) => refineMineralsFor(row, 'buy'),
+      },
+      {
+        header: t('market.appraisal.columnRefineWithLeftover'),
+        value: (row) => refineWithLeftoverFor(row, 'buy'),
+      },
       { header: t('market.appraisal.columnLpTotal'), value: (row) => row.lpIskCost },
       { header: t('market.appraisal.columnLpCost'), value: (row) => row.lpCost },
       { header: t('market.appraisal.columnLpCorp'), value: (row) => row.lpCorpName },

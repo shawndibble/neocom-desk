@@ -7,6 +7,11 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import {
   lpBeatsMarket,
   refineBeatsSellAsIs,
+  refinePricedAllFor,
+  refineMineralsFor,
+  refineWithLeftoverFor,
+  sellAsIsBeatsRefine,
+  type RefineBasis,
   sellAfterFees,
   sellBrokerFee,
   sellSalesTax,
@@ -26,7 +31,7 @@ import {
   useVisibleAppraisalColumns,
   type AppraisalColumnId,
 } from './appraisalColumns';
-import { comparisonCell, eachCell, leftoverTipsRefine, totalCell } from './appraisalCells';
+import { comparisonCell, eachCell, totalCell } from './appraisalCells';
 import { RefineFigureButton } from './RefineFigureButton';
 import { appraisalCsvColumns } from './appraisalCsv';
 import { appraisalIskPerM3Column, appraisalVolumeColumn } from './appraisalVolume';
@@ -39,6 +44,14 @@ import type { AppraisalController } from './useAppraisal';
 /** `lg` up to (not including) `xl`: paste card and results share a row but the results card is narrow. A min-and-max pair never matches under the test `matchMedia` stub, so tests see the full default. */
 const COMPACT_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 79.999rem)';
 const COMPACT_OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyEach', 'sellEach', 'volume'];
+/**
+ * `lg` up to 1440px: there is room for the default columns but not for a second refine column on top
+ * (the row menu would slip out of the table at 1280px), so Refine + ore starts ticked off here and
+ * is one tick away in the Columns menu. From 1440px it is on. Like the compact range, a min-and-max
+ * pair never matches under the test `matchMedia` stub, so tests see the full default.
+ */
+const MEDIUM_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 89.999rem)';
+const MEDIUM_OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['refineWithLeftover'];
 /** A phone starts with Item, Buy and Sell; the Columns menu swaps others in. */
 /** The columns whose cells wear the live-price mark. */
 const PRICE_MARK_COLUMNS: ReadonlySet<AppraisalColumnId> = new Set([
@@ -54,6 +67,8 @@ export function useAppraisalColumns({
   owned,
   standing,
   onOpenRefine,
+  refineBasis = 'buy',
+  refineReady = true,
 }: {
   controller: AppraisalController;
   owned: ReadonlyMap<number, number> | null;
@@ -61,6 +76,10 @@ export function useAppraisalColumns({
   standing: ResolvedStandings;
   /** Opens the refine breakdown on one item; absent, the Refine figure is plain text. */
   onOpenRefine?: (typeId: number) => void;
+  /** The side of the book the Refine total column is priced on (the remembered pick). */
+  refineBasis?: RefineBasis;
+  /** False until the remembered basis has loaded, so the Refine figures do not show on buy first and then switch. */
+  refineReady?: boolean;
 }) {
   const { t } = useTranslation();
   const { text, result } = controller;
@@ -70,6 +89,7 @@ export function useAppraisalColumns({
   // the same thing) rather than pushing the row menu out of reach. Only a
   // default: ticking one shows it, and a stored selection is read as saved.
   const compactResults = useMediaQuery(COMPACT_RESULTS_QUERY);
+  const mediumResults = useMediaQuery(MEDIUM_RESULTS_QUERY);
   const isPhone = useIsPhone();
   const visibleColumns =
     storedColumns !== DEFAULT_VISIBLE_APPRAISAL_COLUMNS
@@ -77,8 +97,12 @@ export function useAppraisalColumns({
       : isPhone
         ? DEFAULT_VISIBLE_APPRAISAL_COLUMNS.filter((id) => PHONE_ON_BY_DEFAULT.includes(id))
         : compactResults
-          ? DEFAULT_VISIBLE_APPRAISAL_COLUMNS.filter((id) => !COMPACT_OFF_BY_DEFAULT.includes(id))
-          : storedColumns;
+          ? DEFAULT_VISIBLE_APPRAISAL_COLUMNS.filter(
+              (id) => !COMPACT_OFF_BY_DEFAULT.includes(id) && !MEDIUM_OFF_BY_DEFAULT.includes(id)
+            )
+          : mediumResults
+            ? DEFAULT_VISIBLE_APPRAISAL_COLUMNS.filter((id) => !MEDIUM_OFF_BY_DEFAULT.includes(id))
+            : storedColumns;
   const setVisibleColumns = useVisibleAppraisalColumns((state) => state.setValue);
   useHydratedStore(useVisibleAppraisalColumns);
   function toggleColumn(id: AppraisalColumnId) {
@@ -98,7 +122,8 @@ export function useAppraisalColumns({
       ...withOwned.filter((r) => r.need === 0),
     ];
   }, [rows, owned]);
-  const hasRefine = rows.some((row) => row.refineTotal !== undefined);
+  const hasRefine =
+    refineReady && rows.some((row) => refineMineralsFor(row, refineBasis) !== undefined);
   // Undefined per row when nothing the active Character holds LP with sells
   // this item — same "only earns its place once something has it" rule as
   // the refine column, and also why this never shows with no active
@@ -239,7 +264,7 @@ export function useAppraisalColumns({
       render: (row) =>
         comparisonCell(
           totalCell(row.buyTotal),
-          row.refineTotal !== undefined && !refineBeatsSellAsIs(row),
+          refineBasis === 'buy' && sellAsIsBeatsRefine(row, 'buy'),
           undefined,
           <>
             {row.buyWalk && (
@@ -274,7 +299,10 @@ export function useAppraisalColumns({
       render: (row) => (
         <>
           {priceMark(row, 'sellTotal')}
-          {totalCell(row.sellTotal)}
+          {comparisonCell(
+            totalCell(row.sellTotal),
+            refineBasis === 'sell' && sellAsIsBeatsRefine(row, 'sell')
+          )}
         </>
       ),
       sortValue: (row) => row.sellTotal ?? undefined,
@@ -284,41 +312,53 @@ export function useAppraisalColumns({
       header: t('market.appraisal.columnRefineTotal'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) =>
-        row.refineTotal === undefined
-          ? '—'
-          : comparisonCell(
-              onOpenRefine ? (
-                <RefineFigureButton name={row.name} onOpen={() => onOpenRefine(row.typeId)}>
-                  {totalCell(row.refineTotal)}
-                </RefineFigureButton>
-              ) : (
-                totalCell(row.refineTotal)
-              ),
-              refineBeatsSellAsIs(row),
-              row.refinePricedAll === false && (
-                <HintText
-                  content={t('market.appraisal.refinePartialHint')}
-                  className="ml-0.5 text-warning"
-                >
-                  *
-                </HintText>
-              ),
-              // Left of the number, so the right-aligned digits stay in line down the column.
-              leftoverTipsRefine(row) && (
-                <HintText
-                  content={t('market.appraisal.refineLeftoverHint', {
-                    count: row.refineUnitsLeftOver,
-                    isk: formatIskAuto((row.refineUnitsLeftOver ?? 0) * (row.buyEach ?? 0)),
-                    buyTotal: formatIskAuto(row.buyTotal ?? 0),
-                  })}
-                  className="mr-1 text-warning"
-                >
-                  !
-                </HintText>
-              )
-            ),
-      sortValue: (row) => row.refineTotal ?? undefined,
+      render: (row) => {
+        const refine = refineMineralsFor(row, refineBasis);
+        if (refine === undefined) return '—';
+        return comparisonCell(
+          onOpenRefine ? (
+            <RefineFigureButton name={row.name} onOpen={() => onOpenRefine(row.typeId)}>
+              {totalCell(refine)}
+            </RefineFigureButton>
+          ) : (
+            totalCell(refine)
+          ),
+          refineBeatsSellAsIs(row, refineBasis),
+          refinePricedAllFor(row, refineBasis) === false && (
+            <HintText
+              content={t('market.appraisal.refinePartialHint')}
+              className="ml-0.5 text-warning"
+            >
+              *
+            </HintText>
+          )
+        );
+      },
+      sortValue: (row) => refineMineralsFor(row, refineBasis),
+    },
+    refineWithLeftover: {
+      id: 'refineWithLeftover',
+      header: t('market.appraisal.columnRefineWithLeftover'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      // The refined minerals plus the units too few to refine, sold as is: what the verdict compares.
+      render: (row) => {
+        const refine = refineWithLeftoverFor(row, refineBasis);
+        if (refine === undefined) return '—';
+        return comparisonCell(
+          totalCell(refine),
+          refineBeatsSellAsIs(row, refineBasis),
+          refinePricedAllFor(row, refineBasis) === false && (
+            <HintText
+              content={t('market.appraisal.refinePartialHint')}
+              className="ml-0.5 text-warning"
+            >
+              *
+            </HintText>
+          )
+        );
+      },
+      sortValue: (row) => refineWithLeftoverFor(row, refineBasis),
     },
     lpTotal: {
       id: 'lpTotal',
@@ -387,7 +427,7 @@ export function useAppraisalColumns({
   };
   const availableColumns = APPRAISAL_COLUMN_IDS.filter(
     (id) =>
-      (id !== 'refineTotal' || hasRefine) &&
+      ((id !== 'refineTotal' && id !== 'refineWithLeftover') || hasRefine) &&
       (id !== 'lpTotal' || hasLpOption) &&
       (feeInputs !== null || (id !== 'salesTax' && id !== 'brokerFee' && id !== 'sellAfterFees'))
   );

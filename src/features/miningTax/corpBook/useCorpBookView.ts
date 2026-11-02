@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { PayeeRecord } from '@/db';
 import { useTicker } from '@/lib/ticker';
 import { resolveNames } from '@/features/character/names';
 import { loadDatedUnitPricesByHub, type DatedUnitPrices } from '@/features/miningTax/pricing';
@@ -20,6 +21,8 @@ interface Args {
   characters: readonly TrackedCharacter[];
   activeCharacterId: number | null;
   madePayments: readonly MadePayment[];
+  /** The member's stored Payees, to connect the one that is a book's corporation. */
+  payees: readonly PayeeRecord[];
   /** Changes whenever the ledger was reloaded, so the books are read again with it. */
   reloadKey: number | undefined;
 }
@@ -35,6 +38,7 @@ export function useCorpBookView({
   characters,
   activeCharacterId,
   madePayments,
+  payees,
   reloadKey,
 }: Args): { view: CorpBookView | null; reload: () => void } {
   const { t } = useTranslation();
@@ -114,13 +118,14 @@ export function useCorpBookView({
               loaded,
               pricesByCorp,
               corpNames,
+              payees,
               made: madePayments,
               characterNames: new Map(characters.map((c) => [c.characterId, c.characterName])),
               now: new Date(nowMs).toISOString(),
             },
             (corp) => t('miningTax.corpBook.payeeName', { corp })
           ),
-    [rows, loaded, pricesByCorp, corpNames, madePayments, characters, nowMs, t]
+    [rows, loaded, pricesByCorp, corpNames, payees, madePayments, characters, nowMs, t]
   );
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   return { view, reload };

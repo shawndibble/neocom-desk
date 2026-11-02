@@ -156,6 +156,7 @@ describe('Market Appraisal tab navigation', () => {
           spread: 10,
           unpricedRows: 0,
           refine: 0,
+          refineSell: 0,
           refineUnpricedRows: 0,
           cheapestBuy: 0,
           cheapestBuyViaLp: 0,

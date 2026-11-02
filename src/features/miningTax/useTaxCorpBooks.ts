@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { NO_NAMES } from '@/lib/emptyCollections';
 import { useMadePayments } from '@/features/miningTax/useMadePayments';
 import { useAutoClaimDonations } from '@/features/miningTax/corpBook/useAutoClaimDonations';
@@ -18,6 +19,10 @@ export function useTaxCorpBooks(
     characters.map((c) => c.characterId).join(',')
   );
 
+  const payees = useMemo(
+    () => [...(data?.payeesByCharacter.values() ?? [])].flat(),
+    [data?.payeesByCharacter]
+  );
   // The member's Corp Tax Books (D24: only when their corp has an active one; otherwise null and
   // the tab is exactly what it was).
   const { view: corpView, reload: reloadCorpBooks } = useCorpBookView({
@@ -25,6 +30,7 @@ export function useTaxCorpBooks(
     characters,
     activeCharacterId,
     madePayments,
+    payees,
     reloadKey: data?.fetchedAt?.getTime(),
   });
   // The player's own Unmatched donations are claimed for them; only a failed claim is left to retry.

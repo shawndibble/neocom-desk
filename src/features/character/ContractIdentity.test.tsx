@@ -1,9 +1,14 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@/i18n';
 import { db } from '@/db';
 import type { Contract } from '@/esi/endpoints';
 import { ContractIdentity } from './ContractIdentity';
+
+vi.mock('./contractLocationName', () => ({
+  loadContractSystemName: async (_c: number, id: number) =>
+    id === 1 ? 'Badivefi' : id === 3 ? null : 'Gonan',
+}));
 
 const contract = {
   contract_id: 12345,
@@ -45,5 +50,30 @@ describe('ContractIdentity buyback cue', () => {
     });
     render(<ContractIdentity contract={contract} characterId={91} />);
     expect(await screen.findByRole('img', { name: 'Buyback contract' })).toBeInTheDocument();
+  });
+});
+
+describe('ContractIdentity courier route', () => {
+  it('reads system to system for an untitled courier', async () => {
+    const courier = {
+      ...contract,
+      type: 'courier',
+      start_location_id: 1,
+      end_location_id: 2,
+    } as Contract;
+    render(<ContractIdentity contract={courier} characterId={91} />);
+    expect(await screen.findByText('Badivefi → Gonan')).toBeInTheDocument();
+  });
+
+  it('keeps the generic label when a system cannot be resolved', async () => {
+    const courier = {
+      ...contract,
+      type: 'courier',
+      start_location_id: 1,
+      end_location_id: 3,
+    } as Contract;
+    render(<ContractIdentity contract={courier} characterId={91} />);
+    expect(await screen.findByText('Courier')).toBeInTheDocument();
+    expect(screen.queryByText(/→/)).not.toBeInTheDocument();
   });
 });

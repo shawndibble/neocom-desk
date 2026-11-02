@@ -9,15 +9,18 @@ export function PlanImportDialogs({
   imports,
   nameFor,
   trainedSkills,
+  planEntryCount,
 }: {
   imports: ReturnType<typeof usePlanImport>;
   nameFor: (skillTypeID: number) => string;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
+  planEntryCount: number;
 }) {
   const { t } = useTranslation();
   const {
     importOpen,
     applyTextImport,
+    replaceTextImport,
     closeImportDialog,
     importSeed,
     importPreview,
@@ -31,6 +34,7 @@ export function PlanImportDialogs({
       {importOpen && (
         <ImportClipboardDialog
           onApply={applyTextImport}
+          onReplace={planEntryCount > 0 ? replaceTextImport : undefined}
           onClose={closeImportDialog}
           initialText={importSeed ?? undefined}
           initialPreview={importPreview}

@@ -150,9 +150,9 @@ test('a long plan scrolls the page, with the summary strip pinned above it', asy
         'Gunnery III',
       ].join('\n')
     );
-  await dialog.getByRole('button', { name: 'Import' }).click();
+  await dialog.getByRole('button', { name: 'Append to plan' }).click();
   // The e2e catalog doesn't know two of those names, so the preview comes up first.
-  await dialog.getByRole('button', { name: 'Apply' }).click();
+  await dialog.getByRole('button', { name: 'Append to plan' }).click();
   await expect(dialog).toBeHidden();
 
   // No nested scroller: the entries grow the page instead.

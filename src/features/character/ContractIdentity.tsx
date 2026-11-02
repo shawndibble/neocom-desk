@@ -1,6 +1,6 @@
 /**
  * A History row's identity: the contract's title, or — for an untitled
- * courier, which is most of them — its route, so three in-progress hauls
+ * courier, which is most of them — its route (system to system), so three in-progress hauls
  * don't all read "Courier" (issue #1706). The names come from the same
  * resolver the detail modal uses. Until both resolve (or if either can't) the
  * generic type label stands, as before; collateral rides on a meta line.
@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { buybackCueText, useBuybackLinks } from '@/features/communities/buybackLinks';
-import { loadContractLocationName } from './contractLocationName';
+import { loadContractSystemName } from './contractLocationName';
 import { CONTRACT_TYPE_KEY } from './contractLabels';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
@@ -34,8 +34,8 @@ export function ContractIdentity({
   const eligible = untitledCourier && characterId !== null && !!startId && !!endId;
   const loadRoute = useCallback(async () => {
     const [start, end] = await Promise.all([
-      loadContractLocationName(characterId ?? 0, startId ?? 0),
-      loadContractLocationName(characterId ?? 0, endId ?? 0),
+      loadContractSystemName(characterId ?? 0, startId ?? 0),
+      loadContractSystemName(characterId ?? 0, endId ?? 0),
     ]);
     return { start, end };
   }, [characterId, startId, endId]);

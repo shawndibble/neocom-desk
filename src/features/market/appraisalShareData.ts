@@ -34,8 +34,10 @@ export interface AppraisalShareView {
   refining: { yieldRate: number; taxRate: number } | null;
   /** Mineral names as shared, for the breakdown's table. */
   mineralNames: ReadonlyMap<number, string>;
-  /** Mineral prices as shared (100% of the hub's buy side), kept for recomputing at the visitor's own numbers. */
+  /** Mineral buy prices as shared (100% of the hub's buy side), kept for recomputing at the visitor's own numbers. */
   mineralPrices: ReadonlyMap<number, number>;
+  /** The same on the sell side; undefined on a link from before the sell side travelled with it. */
+  mineralSellPrices?: ReadonlyMap<number, number>;
 }
 
 export type AppraisalShareViewResult =
@@ -46,6 +48,7 @@ export function appraisalShareViewFromSnapshot(
 ): AppraisalShareViewResult {
   const hub = getTradeHub(snapshot.hub);
   if (!hub) return { ok: false, reason: 'unknown-hub' };
+  const minerals = snapshot.refine?.minerals ?? [];
   return {
     ok: true,
     value: {
@@ -56,12 +59,18 @@ export function appraisalShareViewFromSnapshot(
       refining: snapshot.refine
         ? { yieldRate: snapshot.refine.yieldRate, taxRate: snapshot.refine.taxRate }
         : null,
-      mineralNames: new Map((snapshot.refine?.minerals ?? []).map((m) => [m.typeId, m.name])),
+      mineralNames: new Map(minerals.map((m) => [m.typeId, m.name])),
       mineralPrices: new Map(
-        (snapshot.refine?.minerals ?? []).flatMap((m): [number, number][] =>
-          m.price === null ? [] : [[m.typeId, m.price]]
-        )
+        minerals.flatMap((m): [number, number][] => (m.price === null ? [] : [[m.typeId, m.price]]))
       ),
+      // Absent, not empty, on a link from before the sell side travelled with it.
+      mineralSellPrices: minerals.some((m) => m.sellPrice !== undefined)
+        ? new Map(
+            minerals.flatMap((m): [number, number][] =>
+              m.sellPrice == null ? [] : [[m.typeId, m.sellPrice]]
+            )
+          )
+        : undefined,
     },
   };
 }
@@ -73,7 +82,7 @@ export function appraisalShareViewFromSnapshot(
  * reprocessing data on this side has no refine figure.
  */
 export function itemsWithMyRefine(
-  view: Pick<AppraisalShareView, 'appraisal' | 'mineralPrices'>,
+  view: Pick<AppraisalShareView, 'appraisal' | 'mineralPrices' | 'mineralSellPrices'>,
   mine: {
     reprocessing: Readonly<Record<string, ReprocessingType>>;
     modifiers: CharacterModifiers;
@@ -86,9 +95,12 @@ export function itemsWithMyRefine(
     const entry = mine.reprocessing[String(item.typeId)];
     if (!entry) return rest;
     const materialPrices: Record<number, number> = {};
+    const materialSellPrices: Record<number, number> = {};
     for (const material of entry.materials) {
       const price = view.mineralPrices.get(material.typeID);
       if (price !== undefined) materialPrices[material.typeID] = price;
+      const sellPrice = view.mineralSellPrices?.get(material.typeID);
+      if (sellPrice !== undefined) materialSellPrices[material.typeID] = sellPrice;
     }
     const refine = computeAppraisalRefine({
       quantity: item.quantity,
@@ -100,6 +112,7 @@ export function itemsWithMyRefine(
       modifiers: mine.modifiers,
       refining: mine.refining,
       materialPrices,
+      materialSellPrices: view.mineralSellPrices ? materialSellPrices : undefined,
     });
     return refine ? { ...rest, refine } : rest;
   });

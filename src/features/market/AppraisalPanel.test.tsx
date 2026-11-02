@@ -18,6 +18,7 @@ import { JANICE_PROXY_URL } from './janice';
 import { AppraisalPanel } from './AppraisalPanel';
 import { DEFAULT_APPRAISAL_OWNED_PREF, useAppraisalOwnedPref } from './appraisalOwnedPref';
 import { useRecentAppraisals } from './appraisalRecent';
+import { useRefineBasis } from './refineBasis';
 import { useHaulingCargo } from './haulingCargo';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import type { AppraisalController } from './useAppraisal';
@@ -93,6 +94,7 @@ const APPRAISAL: Appraisal = {
     spread: 40_450,
     unpricedRows: 1,
     refine: 0,
+    refineSell: 0,
     refineUnpricedRows: 0,
     cheapestBuy: 0,
     cheapestBuyViaLp: 0,
@@ -333,6 +335,7 @@ describe('AppraisalPanel', () => {
         spread: 4_500,
         unpricedRows: 1,
         refine: 0,
+        refineSell: 0,
         refineUnpricedRows: 0,
         cheapestBuy: 0,
         cheapestBuyViaLp: 0,
@@ -668,6 +671,7 @@ describe('AppraisalPanel', () => {
             spread: 37_450,
             unpricedRows: 0,
             refine: 8_000,
+            refineSell: 0,
             refineUnpricedRows: 0,
             cheapestBuy: 0,
             cheapestBuyViaLp: 0,
@@ -689,16 +693,18 @@ describe('AppraisalPanel', () => {
     it('adds a refine column and total when a row carries refine data', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
-      expect(
-        within(veldsparRow).getByText('8,000 ISK', { selector: '.sr-only' })
-      ).toBeInTheDocument();
+      // With no leftover units the two refine columns agree.
+      expect(within(veldsparRow).getAllByText('8,000 ISK', { selector: '.sr-only' })).toHaveLength(
+        2
+      );
       expect(screen.getAllByText('Refine total').length).toBeGreaterThan(0);
+      expect(screen.getByText('Refine + ore')).toBeInTheDocument();
     });
 
     it('flags the refine value with a dash on a row with no reprocessing data', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       const dcuRow = screen.getByRole('row', { name: /Damage Control II/ });
-      expect(within(dcuRow).getByText('—')).toBeInTheDocument();
+      expect(within(dcuRow).getAllByText('—')).toHaveLength(2);
     });
 
     it('marks a partially priced refine value', async () => {
@@ -706,8 +712,8 @@ describe('AppraisalPanel', () => {
       partial.appraisal.rows[0].refinePricedAll = false;
       renderPanel({ controller: controller({ result: partial }) });
       const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
-      await userEvent.hover(within(veldsparRow).getByText('*'));
-      expect(await screen.findByRole('tooltip')).toHaveTextContent(/no price at this hub/);
+      await userEvent.hover(within(veldsparRow).getAllByText('*')[0]);
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/no price on this basis/);
     });
 
     it('hides the Refine total chip with the Refine column, and brings it back with it', async () => {
@@ -729,6 +735,27 @@ describe('AppraisalPanel', () => {
       await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Refine total' }));
       await userEvent.keyboard('{Escape}');
       expect(screen.getByText('Refine total')).toBeInTheDocument();
+    });
+
+    it('prices the Refine total and chip on the remembered price basis', () => {
+      useRefineBasis.setState({ value: 'sell', hydrated: true });
+      const withSell = refineOutcome();
+      withSell.appraisal.rows[0] = {
+        ...withSell.appraisal.rows[0],
+        name: 'Mercoxit III-Grade',
+        refineTotal: 1_000_000,
+        refineSellTotal: 2_000_000,
+      };
+      withSell.appraisal.totals.refine = 1_000_000;
+      withSell.appraisal.totals.refineSell = 2_000_000;
+      renderPanel({ controller: controller({ result: withSell }) });
+      const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
+      expect(
+        within(oreRow).getAllByText('2,000,000 ISK', { selector: '.sr-only' }).length
+      ).toBeGreaterThan(0);
+      expect(within(oreRow).queryByText('1,000,000 ISK', { selector: '.sr-only' })).toBeNull();
+      expect(screen.getByText('sell')).toBeInTheDocument();
+      useRefineBasis.setState({ value: 'buy', hydrated: true });
     });
 
     it('omits the refine column entirely with no active Character', () => {
@@ -768,7 +795,7 @@ describe('AppraisalPanel', () => {
       expect(buyCell?.className).not.toContain('text-isk-pos');
     });
 
-    it('explains the leftover that tips refine over the buy total', async () => {
+    it('shows the minerals alone as the Refine total, and with the leftover units as Refine + ore', () => {
       const partBatch = refineOutcome();
       partBatch.appraisal.rows[0] = {
         ...partBatch.appraisal.rows[0],
@@ -781,22 +808,13 @@ describe('AppraisalPanel', () => {
       };
       renderPanel({ controller: controller({ result: partBatch }) });
       const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
-      await userEvent.hover(within(oreRow).getByText('!'));
-      expect(await screen.findByRole('tooltip')).toHaveTextContent(/99 units are too few/);
-    });
-
-    it('shows no leftover mark when refine wins without the leftover', () => {
-      const clean = refineOutcome();
-      clean.appraisal.rows[0] = {
-        ...clean.appraisal.rows[0],
-        name: 'Mercoxit III-Grade',
-        buyTotal: 1_000,
-        refineTotal: 2_000,
-        refineUnitsLeftOver: 5,
-      };
-      renderPanel({ controller: controller({ result: clean }) });
-      const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
-      expect(within(oreRow).queryByText('!')).not.toBeInTheDocument();
+      // 15,436,890 of minerals; with the 99 leftover units at 16,000 each, 17,020,890.
+      expect(
+        within(oreRow).getByText('15,436,890 ISK', { selector: '.sr-only' })
+      ).toBeInTheDocument();
+      expect(
+        within(oreRow).getByText('17,020,890 ISK', { selector: '.sr-only' })
+      ).toBeInTheDocument();
     });
 
     /**
@@ -890,6 +908,7 @@ describe('AppraisalPanel', () => {
             spread: -58_522_600,
             unpricedRows: 0,
             refine: 0,
+            refineSell: 0,
             refineUnpricedRows: 0,
             cheapestBuy: 2_232_400,
             cheapestBuyViaLp: 1,
@@ -1027,6 +1046,7 @@ describe('AppraisalPanel', () => {
               spread: 0,
               unpricedRows: 0,
               refine: 0,
+              refineSell: 0,
               refineUnpricedRows: 0,
               cheapestBuy: 0,
               cheapestBuyViaLp: 0,
@@ -1197,6 +1217,7 @@ describe('AppraisalPanel — result header controls', () => {
         spread: 0,
         unpricedRows: 0,
         refine: 0,
+        refineSell: 0,
         refineUnpricedRows: 0,
         cheapestBuy: 0,
         cheapestBuyViaLp: 0,

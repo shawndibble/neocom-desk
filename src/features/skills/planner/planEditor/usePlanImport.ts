@@ -143,6 +143,15 @@ export function usePlanImport({
     setImportPreview(undefined);
   }
 
+  /** Text/file import's Replace: swaps the entries and clears Remap Markers, leaving the same Undo. */
+  function replaceTextImport(entries: PlanEntry[]) {
+    const { patch, undo } = replaceWithImport(editable, entries);
+    setUndoImport(undo);
+    onUpdate(patch);
+    showImportConfirm(t('plans.importTextReplaced'), 10000);
+    closeImportDialog();
+  }
+
   const applyTextImportRef = useRef(applyTextImport);
   useEffect(() => {
     applyTextImportRef.current = applyTextImport;
@@ -236,6 +245,7 @@ export function usePlanImport({
     confirmQueueImportReplace,
     undoQueueImportReplace,
     applyTextImport,
+    replaceTextImport,
     closeImportDialog,
     handleEditorDrop,
   };

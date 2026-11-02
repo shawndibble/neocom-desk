@@ -128,7 +128,7 @@ test.describe('contracts history — detail opener', () => {
 test.describe('contracts history — untitled courier route (issue #1706)', () => {
   test.use({ viewport: PHONE });
 
-  test('shows start → end with collateral instead of a bare "Courier"', async ({ page }) => {
+  test('shows system → system with collateral instead of a bare "Courier"', async ({ page }) => {
     await signInAndGoto(page);
     await page.route(`https://esi.evetech.net/characters/${CHARACTER_ID}/contracts*`, (route) =>
       route.fulfill({
@@ -149,7 +149,7 @@ test.describe('contracts history — untitled courier route (issue #1706)', () =
       .getByRole('table')
       .first()
       .locator('tbody tr:not(.dt-group-header) td:first-child button');
-    await expect(opener).toContainText(/Jita.+ → Amarr/);
+    await expect(opener).toContainText('Jita → Amarr');
     await expect(opener).toContainText('Collateral');
     const box = await opener.boundingBox();
     expect(box?.width ?? 0).toBeLessThanOrEqual(PHONE.width);

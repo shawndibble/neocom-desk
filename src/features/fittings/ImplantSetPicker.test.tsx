@@ -59,7 +59,63 @@ vi.mock('@/features/market/ItemDetailModal', () => ({
   ),
 }));
 
+// The suggestions behind the add box.
+vi.mock('./implantSlotLookup', () => ({
+  loadImplantMarketEntries: async () => ({
+    implants: [
+      { typeId: 13283, name: 'Squire EG-602', slot: 6 },
+      { typeId: 13284, name: 'Squire EG-603', slot: 6 },
+    ],
+    boosters: [{ typeId: 9950, name: 'Standard Blue Pill Booster', slot: 1, kind: 'booster' }],
+    slotOf: (id: number) => SLOTS.get(id),
+  }),
+}));
+
 const { ImplantSetPicker } = await import('./ImplantSetPicker');
+
+describe('ImplantSetPicker — add box suggestions', () => {
+  it('lists matches as you type and adds the one picked', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderInRouter(
+      <ImplantSetPicker
+        open
+        onClose={vi.fn()}
+        implantSet={{ implants: [], boosters: [] }}
+        onChange={onChange}
+      />
+    );
+
+    await user.type(await screen.findByRole('combobox'), 'squire');
+    expect(await screen.findAllByRole('option')).toHaveLength(2);
+
+    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith({ implants: [13284], boosters: [] }));
+  });
+
+  it('adds the top match on Enter, and Escape closes the list but keeps the text', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderInRouter(
+      <ImplantSetPicker
+        open
+        onClose={vi.fn()}
+        implantSet={{ implants: [], boosters: [] }}
+        onChange={onChange}
+      />
+    );
+    const box = await screen.findByRole('combobox');
+
+    await user.type(box, 'squire');
+    await screen.findAllByRole('option');
+    await user.keyboard('{Escape}');
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    expect(box).toHaveValue('squire');
+
+    await user.type(box, ' eg-602{Enter}');
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith({ implants: [13283], boosters: [] }));
+  });
+});
 
 describe('ImplantSetPicker — booster side effects', () => {
   it('switches a carried booster’s side effect on, and off again', async () => {
@@ -199,13 +255,13 @@ describe('ImplantSetPicker — one add box', () => {
 
   it('has a single search box for implants and boosters', () => {
     renderEmpty();
-    expect(screen.getAllByRole('searchbox')).toHaveLength(1);
+    expect(screen.getAllByRole('combobox')).toHaveLength(1);
   });
 
   it('adds a booster to the boosters', async () => {
     const user = userEvent.setup();
     const onChange = renderEmpty();
-    await user.type(screen.getByRole('searchbox'), 'Standard Blue Pill Booster{Enter}');
+    await user.type(screen.getByRole('combobox'), 'Standard Blue Pill Booster{Enter}');
     await waitFor(() =>
       expect(onChange).toHaveBeenLastCalledWith({ implants: [], boosters: [9950] })
     );
@@ -214,7 +270,7 @@ describe('ImplantSetPicker — one add box', () => {
   it('adds an implant to the implants', async () => {
     const user = userEvent.setup();
     const onChange = renderEmpty();
-    await user.type(screen.getByRole('searchbox'), 'Squire EG-602{Enter}');
+    await user.type(screen.getByRole('combobox'), 'Squire EG-602{Enter}');
     await waitFor(() =>
       expect(onChange).toHaveBeenLastCalledWith({ implants: [13283], boosters: [] })
     );
@@ -223,7 +279,7 @@ describe('ImplantSetPicker — one add box', () => {
   it('refuses an item that is neither', async () => {
     const user = userEvent.setup();
     const onChange = renderEmpty();
-    await user.type(screen.getByRole('searchbox'), 'Damage Control II{Enter}');
+    await user.type(screen.getByRole('combobox'), 'Damage Control II{Enter}');
     expect(await screen.findByText('Damage Control II isn’t an implant or booster.')).toBeVisible();
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -231,7 +287,7 @@ describe('ImplantSetPicker — one add box', () => {
   it('replaces what already holds that slot', async () => {
     const user = userEvent.setup();
     const onChange = renderEmpty({ implants: [13283], boosters: [] });
-    await user.type(screen.getByRole('searchbox'), 'Squire EG-603{Enter}');
+    await user.type(screen.getByRole('combobox'), 'Squire EG-603{Enter}');
     await waitFor(() =>
       expect(onChange).toHaveBeenLastCalledWith({ implants: [13284], boosters: [] })
     );
@@ -240,7 +296,7 @@ describe('ImplantSetPicker — one add box', () => {
   it('keeps both of two quick adds', async () => {
     const user = userEvent.setup();
     const onChange = renderEmpty();
-    const box = screen.getByRole('searchbox');
+    const box = screen.getByRole('combobox');
     await user.type(box, 'Standard Blue Pill Booster{Enter}');
     await user.type(box, 'Squire EG-602{Enter}');
     await waitFor(() =>

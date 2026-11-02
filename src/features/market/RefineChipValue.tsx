@@ -10,10 +10,13 @@ import { figureOpenerClassName } from '@/components/ui/controlStyles';
  */
 export function RefineChipValue({
   amount,
+  basis,
   efficiency,
   onOpen,
 }: {
   amount: ReactNode;
+  /** The price basis the figure is on, already translated ("buy"); omitted where there is only one. */
+  basis?: string;
   /** "68.3%", or a span; null when nothing carries one. */
   efficiency: string | null;
   onOpen?: () => void;
@@ -29,9 +32,11 @@ export function RefineChipValue({
       ) : (
         amount
       )}
-      {efficiency && (
+      {(basis || efficiency) && (
         <span className="font-normal text-text-dim">
-          {t('market.appraisal.breakdown.atEfficiency', { efficiency })}
+          {[basis, efficiency && t('market.appraisal.breakdown.atEfficiency', { efficiency })]
+            .filter(Boolean)
+            .join(' ')}
         </span>
       )}
     </span>

@@ -10,9 +10,12 @@ import {
   compareMargin,
   buildAppraisal,
   buildHubComparison,
+  asIsTotalFor,
   computeAppraisalRefine,
   lpBeatsMarket,
   refineBeatsSellAsIs,
+  refineMineralsFor,
+  refineWithLeftoverFor,
   type AppraisalItem,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
@@ -145,6 +148,7 @@ describe('buildAppraisal', () => {
       spread: 0,
       unpricedRows: 0,
       refine: 0,
+      refineSell: 0,
       refineUnpricedRows: 0,
       cheapestBuy: 0,
       cheapestBuyViaLp: 0,
@@ -836,5 +840,104 @@ describe('sellAfterFees', () => {
 
   it('is null where nothing sells', () => {
     expect(sellAfterFees({ sellTotal: null }, fees)).toBeNull();
+  });
+});
+
+describe('refine on each price basis', () => {
+  const veldspar = { portionSize: 100, materials: [{ typeId: 34, quantity: 400 }] };
+  const base = {
+    quantity: 1050,
+    reprocessing: veldspar,
+    modifiers: NO_CHARACTER_MODIFIERS,
+    refining: { stationRate: 0.5, taxRate: 0.1 },
+    materialPrices: { 34: 5 },
+    materialSellPrices: { 34: 8 },
+  };
+  // 10 portions x floor(400 x 0.5) = 2,000 Tritanium; 50 units left over.
+  const item = (): AppraisalItem => ({
+    typeId: 1230,
+    name: 'Veldspar',
+    quantity: 1050,
+    buy: 10,
+    sell: 14,
+    refine: computeAppraisalRefine(base),
+  });
+
+  it('values the minerals at the sell side too, net of the same tax', () => {
+    const refine = computeAppraisalRefine(base);
+    expect(refine?.valueAtFullPrice).toBeCloseTo(2000 * 5 * 0.9, 6);
+    expect(refine?.sellValueAtFullPrice).toBeCloseTo(2000 * 8 * 0.9, 6);
+    expect(refine?.sellPricedAll).toBe(true);
+  });
+
+  it('has no sell figure when the sell prices were never read, rather than a zero', () => {
+    const refine = computeAppraisalRefine({ ...base, materialSellPrices: undefined });
+    expect(refine?.sellValueAtFullPrice).toBeUndefined();
+    expect(buildAppraisal([{ ...item(), refine }], 100).rows[0].refineSellTotal).toBeUndefined();
+  });
+
+  it('flags a mineral nobody sells as a floor on the sell side only', () => {
+    const refine = computeAppraisalRefine({ ...base, materialSellPrices: {} });
+    expect(refine?.pricedAll).toBe(true);
+    expect(refine?.sellPricedAll).toBe(false);
+  });
+
+  it('scales the sell figure by the price percent, like the buy one', () => {
+    const { rows, totals } = buildAppraisal([item()], 90);
+    expect(rows[0].refineTotal).toBeCloseTo(2000 * 5 * 0.9 * 0.9, 6);
+    expect(rows[0].refineSellTotal).toBeCloseTo(2000 * 8 * 0.9 * 0.9, 6);
+    expect(totals.refineSell).toBeCloseTo(rows[0].refineSellTotal ?? NaN, 6);
+  });
+
+  it('picks the refine figure, the as-is total and the verdict by basis', () => {
+    const { rows } = buildAppraisal([item()], 100);
+    const row = rows[0];
+    // The figure shown is the minerals plus the 50 leftover units at the basis's as-is unit price.
+    expect(refineMineralsFor(row, 'buy')).toBe(row.refineTotal);
+    expect(refineWithLeftoverFor(row, 'buy')).toBeCloseTo(9_000 + 50 * 10, 6);
+    expect(refineWithLeftoverFor(row, 'sell')).toBeCloseTo(14_400 + 50 * 14, 6);
+    expect(refineWithLeftoverFor(row, 'split')).toBeCloseTo((9_000 + 14_400) / 2 + 50 * 12, 6);
+    expect(asIsTotalFor(row, 'buy')).toBe(10_500);
+    expect(asIsTotalFor(row, 'sell')).toBe(14_700);
+    expect(asIsTotalFor(row, 'split')).toBe(12_600);
+    // Buy: 9,000 + 50 x 10 = 9,500 against 10,500. Sell: 14,400 + 50 x 14 = 15,100 against 14,700.
+    expect(refineBeatsSellAsIs(row)).toBe(false);
+    expect(refineBeatsSellAsIs(row, 'buy')).toBe(false);
+    expect(refineBeatsSellAsIs(row, 'sell')).toBe(true);
+  });
+
+  it('has no split or sell answer where a side is missing', () => {
+    const noSell: AppraisalItem = { ...item(), sell: null };
+    const row = buildAppraisal([noSell], 100).rows[0];
+    expect(asIsTotalFor(row, 'sell')).toBeNull();
+    expect(asIsTotalFor(row, 'split')).toBeNull();
+    expect(refineBeatsSellAsIs(row, 'sell')).toBe(false);
+  });
+});
+
+describe('split refine figure', () => {
+  it('is not given where a mineral had no price on one side, rather than half of the other', () => {
+    const base = {
+      quantity: 1050,
+      reprocessing: { portionSize: 100, materials: [{ typeId: 34, quantity: 400 }] },
+      modifiers: NO_CHARACTER_MODIFIERS,
+      refining: { stationRate: 0.5, taxRate: 0 },
+      materialPrices: { 34: 5 },
+    };
+    const item = (materialSellPrices: Record<number, number>): AppraisalItem => ({
+      typeId: 1230,
+      name: 'Veldspar',
+      quantity: 1050,
+      buy: 10,
+      sell: 14,
+      refine: computeAppraisalRefine({ ...base, materialSellPrices }),
+    });
+    const priced = buildAppraisal([item({ 34: 8 })], 100).rows[0];
+    // (10,000 + 16,000) / 2 of minerals, plus 50 leftover units at the split unit price of 12.
+    expect(refineWithLeftoverFor(priced, 'split')).toBeCloseTo(13_000 + 50 * 12, 6);
+    const oneSided = buildAppraisal([item({})], 100).rows[0];
+    expect(refineWithLeftoverFor(oneSided, 'split')).toBeUndefined();
+    // The minerals 10,000 plus the 50 leftover units at 10 each.
+    expect(refineWithLeftoverFor(oneSided, 'buy')).toBeCloseTo(10_500, 6);
   });
 });

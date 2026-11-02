@@ -1,6 +1,5 @@
 import type { ReactElement, ReactNode } from 'react';
 import { IskAmount } from '@/components/ui';
-import { refineBeatsSellAsIs, type AppraisalRow } from '@/engine/market/appraisal';
 import { formatIskAuto } from '@/lib/isk';
 
 /**
@@ -18,17 +17,6 @@ export function eachCell(value: number | null): string {
 export function totalCell(value: number | null): ReactNode {
   if (value === null) return '—';
   return <IskAmount value={value} decimals={0} />;
-}
-
-/** Refine wins only because the leftover units sell on top; the refine total alone is below buy total. */
-export function leftoverTipsRefine(row: AppraisalRow) {
-  return (
-    refineBeatsSellAsIs(row) &&
-    (row.refineUnitsLeftOver ?? 0) > 0 &&
-    row.refineTotal !== undefined &&
-    row.buyTotal !== null &&
-    row.refineTotal <= row.buyTotal
-  );
 }
 
 /** Bolds a total only when it actually won a real comparison — never on a row with nothing to compare against. */

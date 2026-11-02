@@ -160,6 +160,7 @@ describe('a snapshot that carries the refine figures', () => {
         ],
         efficiency: 0.9063,
         materialPrices: { 35: 16.75, 36: 50.69 },
+        materialSellPrices: { 35: 17.05, 36: 52.34 },
       },
     },
   };
@@ -188,8 +189,8 @@ describe('a snapshot that carries the refine figures', () => {
       yieldRate: 0.664,
       taxRate: 0.02,
       minerals: [
-        { typeId: 35, name: 'Pyerite', price: 16.75 },
-        { typeId: 36, name: 'Mexallon', price: 50.69 },
+        { typeId: 35, name: 'Pyerite', price: 16.75, sellPrice: 17.05 },
+        { typeId: 36, name: 'Mexallon', price: 50.69, sellPrice: 52.34 },
       ],
     });
     expect(snapshot.items[0].refine).toEqual({
@@ -242,6 +243,27 @@ describe('a snapshot that carries the refine figures', () => {
     );
     expect(items[0].refine?.unitsLeftOver).toBe(38);
     expect(items[1].refine).toBeUndefined();
+  });
+
+  it('rebuilds the sell side too, so the sell and split bases are there for a signed-out visitor', () => {
+    const [item] = appraisalItemsFromSnapshot(refinedSnapshot());
+    const pyerite = Math.floor(16_000 * 10 * 0.9063);
+    const mexallon = Math.floor(800 * 10 * 0.9063);
+    expect(item.refine?.sellValueAtFullPrice).toBeCloseTo(
+      (pyerite * 17.05 + mexallon * 52.34) * 0.98,
+      4
+    );
+    expect(item.refine?.detail?.materialSellPrices).toEqual({ 35: 17.05, 36: 52.34 });
+  });
+
+  it('reads a link from before sell prices travelled with it as buy-side only, never as a zero', () => {
+    const old = JSON.parse(JSON.stringify(refinedSnapshot())) as AppraisalSnapshot;
+    for (const mineral of old.refine?.minerals ?? []) delete mineral.sellPrice;
+    const parsed = parseAppraisalSnapshot(old);
+    const [item] = appraisalItemsFromSnapshot(parsed as AppraisalSnapshot);
+    expect(item.refine?.valueAtFullPrice).toBeGreaterThan(0);
+    expect(item.refine?.sellValueAtFullPrice).toBeUndefined();
+    expect(item.refine?.detail?.materialSellPrices).toBeUndefined();
   });
 
   it('keeps an old snapshot, with no refine at all, readable', () => {
