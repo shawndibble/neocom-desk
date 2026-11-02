@@ -1680,7 +1680,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.getByText(/\+12 cerebral accelerator/i)).toBeInTheDocument();
+    expect(screen.getByText(/\+12 from the EVE API has been auto applied/i)).toBeInTheDocument();
     expect(screen.getByText('+12')).toBeInTheDocument();
     expect(screen.queryByLabelText('Bonus')).toBeNull();
   });

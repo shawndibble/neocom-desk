@@ -2902,7 +2902,7 @@
       "hours": "h",
       "minutes": "m"
     },
-    "acceleratorDetected": "EVE's attributes already include a +{{bonus}} cerebral accelerator. It is taken back out of your base sheet; set how long it has left.",
+    "acceleratorDetected": "+{{bonus}} from the EVE API has been auto applied.",
     "acceleratorNoExpiry": "EVE does not say when it runs out. Until you set the time left, this plan is costed as if you had none.",
     "boosterQuickPicks": "Quick picks for the time left",
     "boosterQuickPickHours": "+{{hours}}h",
