@@ -100,6 +100,26 @@ describe('SetWaypointMenuItem', () => {
     expect(screen.queryByRole('menuitem', { name: /view route/i })).toBeNull();
   });
 
+  it('leaves View route out when the menu places it itself', async () => {
+    await seed([WAYPOINT_SCOPE]);
+    render(
+      <MemoryRouter>
+        <RowActionsMenu
+          name="row"
+          items={
+            <SetWaypointMenuItem locationId={JITA_4_4} placeName={PLACE} withViewRoute={false} />
+          }
+        >
+          <div>row</div>
+        </RowActionsMenu>
+      </MemoryRouter>
+    );
+    fireEvent.contextMenu(screen.getByText('row'));
+
+    expect(await screen.findByRole('menuitem', { name: 'Set waypoint in game' })).toBeVisible();
+    expect(screen.queryByRole('menuitem', { name: /view route/i })).toBeNull();
+  });
+
   it('reports a refusal in the menu rather than failing silently', async () => {
     await seed([WAYPOINT_SCOPE]);
     const { EsiError } = await import('@/esi/errors');

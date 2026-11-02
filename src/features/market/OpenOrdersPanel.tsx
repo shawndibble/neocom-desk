@@ -73,6 +73,7 @@ import { OrderDetailModal } from './OrderDetailModal';
 import { useOrderDetail } from './useOrderDetail';
 import { useStructureFees } from './structureFees';
 import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
+import { ViewRouteMenuItem } from '@/features/travel/ViewRouteMenuItem';
 import { itemKey } from './orderDetailView';
 import { WorkThroughListSlot } from './WorkThroughControls';
 import { WorkThroughContext } from './workThroughContext';
@@ -566,9 +567,19 @@ export function OpenOrdersPanel({
             )}
             {/* Only where the station is named: an unnamed structure has nothing to show. */}
             {row.stationName !== null && (
-              <MenuGroup id="game" size={2}>
-                <SetWaypointMenuItem locationId={row.locationId} placeName={row.stationName} />
-              </MenuGroup>
+              <>
+                {/* View route opens Route Safety, so it sits with View in Market, not under In game. */}
+                <MenuGroup id="primary">
+                  <ViewRouteMenuItem locationId={row.locationId} />
+                </MenuGroup>
+                <MenuGroup id="game">
+                  <SetWaypointMenuItem
+                    locationId={row.locationId}
+                    placeName={row.stationName}
+                    withViewRoute={false}
+                  />
+                </MenuGroup>
+              </>
             )}
           </>
         }
