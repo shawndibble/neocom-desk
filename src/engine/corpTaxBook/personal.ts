@@ -89,6 +89,12 @@ export interface PersonalBook {
   payments: TaxPayment[];
   hubId: string;
   oreForm: 'compressed' | 'raw';
+  /**
+   * The member's stored Payees that are this corporation (their verified entity id is its id). Ore
+   * given to one of them is the book's own, not another Payee's: it is no conflict, and the book's
+   * row replaces the Payee's (`PersonalOverlay.absorbed`).
+   */
+  ownPayeeIds?: readonly string[];
   /** The day's prices at the book's hub and Ore Form, by raw type id (`priceObservedDay`). */
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   /** Donations the member has sent the corp that the book has not credited yet. */
@@ -195,6 +201,11 @@ export interface PersonalOverlay {
   rows: BookRowView[];
   /** Per Mining Ledger Entry key, the free ore the books took — the residual row shrinks by it. */
   takenFromFree: Map<string, OreLine[]>;
+  /**
+   * Per Mining Ledger Entry key, the Payees whose allocation the book took over whole: the tab
+   * hides those rows, the book's row stands in for them.
+   */
+  absorbed: Map<string, Set<string>>;
   /** Per Mining Ledger Entry key, how its remaining free ore reads. */
   labels: Map<string, { state: BookLabelState; corporationId: number; corpName: string }>;
   books: BookSummary[];
@@ -469,6 +480,35 @@ function takeOverlap(pool: OverlapPool, observed: readonly OreLine[]): BookOverl
 }
 
 /**
+ * The allocations to the corporation's own Payees that the book's share covers whole. They leave
+ * `pool`, so they overlap nothing and conflict with nothing; their ore joins the free ore the
+ * share resolves from. `paidLines` is the part the member already paid: their side is done, and the
+ * corporation confirms it against its wallet. One that lists more than the corporation observed stays another Payee's.
+ */
+function absorbOwn(
+  pool: OverlapPool,
+  ownPayeeIds: readonly string[] | undefined,
+  share: readonly OreLine[]
+): { lines: OreLine[]; paidLines: OreLine[]; payeeIds: string[] } {
+  const lines: OreLine[][] = [];
+  const paid: OreLine[][] = [];
+  const payeeIds: string[] = [];
+  let room = sumLines(share);
+  for (let i = 0; i < pool.length; i++) {
+    const { allocation } = pool[i];
+    if (!ownPayeeIds?.includes(allocation.payeeId)) continue;
+    const listed = sumLines(allocation.oreLines);
+    if (listed.some((l) => l.quantity > quantityOfTypes(room, new Set([l.typeId])))) continue;
+    room = minusLines(room, listed);
+    lines.push(listed);
+    if (allocation.status === 'paid') paid.push(listed);
+    payeeIds.push(allocation.payeeId);
+    pool.splice(i--, 1);
+  }
+  return { lines: sumLines(...lines), paidLines: sumLines(...paid), payeeIds };
+}
+
+/**
  * "Let the corporation bill it": each unpaid allocation of the miner's entry
  * before and after the overlapping ore comes off it, in order (`index` is its place in `allocations`). Only the
  * overlap goes; anything else the miner listed stays.
@@ -539,6 +579,9 @@ export function overlayCorpBooks(input: {
   const rows: BookRowView[] = [];
   const takenFromFree = new Map<string, OreLine[]>();
   const labels: PersonalOverlay['labels'] = new Map();
+  const absorbed: PersonalOverlay['absorbed'] = new Map();
+  // Per book, per entry key: the ore the member already paid under the corporation's own Payee.
+  const memberPaid = new Map<number, Map<string, OreLine[]>>();
 
   // The ore each personal entry still has free after the books, per entry key.
   const free = new Map(
@@ -667,14 +710,26 @@ export function overlayCorpBooks(input: {
       const share = split.byBook.get(String(p.book.corporationId)) ?? [];
       const here = chargesOf(p, key);
       const onStatement = here.every((c) => c.statement !== undefined);
+      // What the member listed under this corporation's own Payee is the book's to bill.
+      const own = absorbOwn(pool, p.book.ownPayeeIds, share);
+      if (own.payeeIds.length > 0) {
+        absorbed.set(key, new Set([...(absorbed.get(key) ?? []), ...own.payeeIds]));
+      }
+      if (own.paidLines.length > 0) {
+        const paidOf = memberPaid.get(p.book.corporationId) ?? new Map<string, OreLine[]>();
+        paidOf.set(key, sumLines(paidOf.get(key) ?? [], own.paidLines));
+        memberPaid.set(p.book.corporationId, paidOf);
+      }
       const resolved = resolveBookShare({
         share,
-        free: left,
+        free: sumLines(left, own.lines),
         conflictSince: dayClosesAt(entry.date, p.book.graceHours),
         now,
       });
-      left = resolved.freeLeft;
-      addTaken(takenFromFree, key, resolved.fromFree);
+      // Own ore is not free ore: only the free part comes off the residual row.
+      const freeTaken = minusLines(resolved.fromFree, own.lines);
+      left = minusLines(left, freeTaken);
+      addTaken(takenFromFree, key, freeTaken);
       // A day on a Statement is the corp's decision, owed in full; so is a conflict that ran its 14 days.
       const contested =
         onStatement || resolved.conflict.length === 0 || resolved.conflictOwed
@@ -803,6 +858,29 @@ export function overlayCorpBooks(input: {
         row.taxOwed = parts.reduce((sum, part) => sum + part.owed, 0);
       }
     }
+    // What the member paid under the corporation's own Payee is paid on their side, day by day;
+    // the corporation still confirms it against its wallet.
+    const paidOf = memberPaid.get(p.book.corporationId);
+    if (paidOf) {
+      for (const row of mine) {
+        if (row.state !== 'billed' || (row.taxOwed ?? 0) <= 0) continue;
+        const key = entryKey(row.characterId, row.date, row.solarSystemId);
+        const left = paidOf.get(key);
+        if (!left) continue;
+        const covered = row.oreLines
+          .map((l) => ({
+            typeId: l.typeId,
+            quantity: Math.min(l.quantity, left.find((x) => x.typeId === l.typeId)?.quantity ?? 0),
+          }))
+          .filter((l) => l.quantity > 0);
+        if (covered.length === 0) continue;
+        paidOf.set(key, minusLines(left, covered));
+        const { taxOwed } = computeAssignmentValue(covered, priceMap(row.unitPrices), row.taxPct);
+        const owed = Math.max(0, (row.taxOwed ?? 0) - taxOwed);
+        row.taxOwed = owed < 0.01 ? 0 : owed;
+        if (row.taxOwed === 0) row.state = 'paid';
+      }
+    }
     // Donations sent and not yet credited, and credit the book holds for no
     // Statement yet, pay the oldest Billed days: the member's side is done,
     // and a corp that disagrees bills them again. Counting the credit keeps a
@@ -880,7 +958,7 @@ export function overlayCorpBooks(input: {
   });
 
   rows.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
-  return { rows, takenFromFree, labels, books: summaries };
+  return { rows, takenFromFree, absorbed, labels, books: summaries };
 }
 
 // --- Corrections -------------------------------------------------------------

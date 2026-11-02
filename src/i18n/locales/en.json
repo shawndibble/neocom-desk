@@ -7687,7 +7687,7 @@
     "payeesSelected_other": "{{count}} payees",
     "payeeOptionWithCharacter": "{{payee}} ({{character}})",
     "corpBook": {
-      "payeeName": "{{corp}} (Corp Tax Book)",
+      "payeeName": "{{corp}}",
       "grouping": {
         "title": "A corporation wants to group a character of yours",
         "ask": "{{corp}} grouped {{name}} with {{main}} so one Statement and one payment cover them. Only you can agree, and you can say no.",

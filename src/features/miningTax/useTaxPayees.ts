@@ -18,7 +18,7 @@ export function useTaxPayees(data: TaxSnapshot | null, corpView: CorpBookView | 
   const payeeById = useMemo(() => new Map(allPayees.map((p) => [p.id, p])), [allPayees]);
 
   // The Payees balances and the Payee filter know: the member's own, plus each Corp Tax Book's
-  // virtual "<Corp> (Corp Tax Book)" Payee. Never offered to an Assign dialog.
+  // virtual Payee, named for the corporation. Never offered to an Assign dialog.
   const ledgerPayees = useMemo(
     () => [...allPayees, ...(corpView?.payees ?? [])],
     [allPayees, corpView]

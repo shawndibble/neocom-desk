@@ -257,6 +257,74 @@ describe('overlayCorpBooks', () => {
     expect(out.rows[0].resolvesAt).toBe('2026-11-01T00:30:00.000Z');
   });
 
+  describe('a Payee that is the corporation', () => {
+    const own = (over: Partial<PersonalEntry['allocations'][number]> = {}) =>
+      entry({
+        freeOreLines: [],
+        oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+        allocations: [
+          {
+            payeeId: 'bmw',
+            taxPct: 10,
+            oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+            status: 'outstanding',
+            ...over,
+          },
+        ],
+      });
+    const KEY = `${ME}:2026-10-17:${SYSTEM}`;
+
+    it('is no conflict: the book bills the day and the Payee row it replaces is absorbed', () => {
+      const out = overlay([own()], [book({ ownPayeeIds: ['bmw'] })]);
+      expect(out.rows).toHaveLength(1);
+      expect(out.rows[0]).toMatchObject({ state: 'billed' });
+      expect(out.rows[0].taxOwed).toBeGreaterThan(0);
+      expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['bmw']);
+      // The ore was the Payee's, not free: nothing comes off the residual row.
+      expect(out.takenFromFree.size).toBe(0);
+    });
+
+    it('reads Paid on the member side when they paid it; the corp confirms it from its wallet', () => {
+      const out = overlay([own({ status: 'paid' })], [book({ ownPayeeIds: ['bmw'] })]);
+      expect(out.rows).toHaveLength(1);
+      expect(out.rows[0]).toMatchObject({ state: 'paid', taxOwed: 0 });
+      expect(out.absorbed.get(KEY)?.has('bmw')).toBe(true);
+    });
+
+    it('owes only what a part payment did not cover', () => {
+      const half = own({ status: 'paid' });
+      half.allocations[0].oreLines = [{ typeId: ZEO, quantity: 20_000 }];
+      half.freeOreLines = [{ typeId: ZEO, quantity: 23_050 }];
+      const out = overlay([half], [book({ ownPayeeIds: ['bmw'] })]);
+      expect(out.rows[0].state).toBe('billed');
+      expect(out.rows[0].taxOwed).toBeCloseTo((43_050 - 20_000) * 148 * 0.15, 4);
+    });
+
+    it('keeps a conflict for ore the Payee listed beyond what the corp observed', () => {
+      const big = entry({
+        freeOreLines: [],
+        oreLines: [{ typeId: ZEO, quantity: 50_000 }],
+        allocations: [
+          {
+            payeeId: 'bmw',
+            taxPct: 10,
+            oreLines: [{ typeId: ZEO, quantity: 50_000 }],
+            status: 'outstanding',
+          },
+        ],
+      });
+      const out = overlay([big], [book({ ownPayeeIds: ['bmw'] })]);
+      expect(out.rows[0].state).toBe('conflict');
+      expect(out.absorbed.size).toBe(0);
+    });
+
+    it('is still a conflict when the book does not name it as its own', () => {
+      const out = overlay([own()], [book()]);
+      expect(out.rows[0].state).toBe('conflict');
+      expect(out.absorbed.size).toBe(0);
+    });
+  });
+
   it('resolves a conflict to the corp after 14 days', () => {
     const assigned = entry({
       freeOreLines: [],

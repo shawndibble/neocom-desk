@@ -141,6 +141,7 @@ describe('TaxTab with a Corp Tax Book', () => {
         loaded: [book],
         pricesByCorp: new Map([[CORP, prices]]),
         corpNames: new Map([[CORP, 'Brass Meridian Logistics']]),
+        payees: [],
         made: [],
         characterNames: new Map([[ME, 'Kestrel Vane']]),
         now: '2026-10-18T14:00:00Z',

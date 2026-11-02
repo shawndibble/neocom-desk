@@ -2,7 +2,7 @@
  * Folds the engine's overlay (`overlayCorpBooks`) into the Tax tab's own row
  * model (#4065): the personal rows with the ore a book took removed from their
  * unassigned residual, plus one synthetic `DisplayRow` per decision the book
- * made, owed to a virtual "<Corp> (Corp Tax Book)" Payee. Nothing here is
+ * made, owed to a virtual Payee named for the corporation. Nothing here is
  * written to Dexie: the synthetic rows are display-only, and the tab keeps
  * every write action away from them (`DisplayRow.corp`).
  */
@@ -125,23 +125,31 @@ export function buildDisplayRows(
     );
     return taken ? { ...row, unassignedOreLines: minusLines(row.unassignedOreLines, taken) } : row;
   });
-  const flat = flatten(adjusted).map((dr): DisplayRow => {
-    if (dr.assignment) return dr;
-    const label = overlay.labels.get(
-      entryKey(dr.row.characterId, dr.row.entry.date, dr.row.entry.solarSystemId)
-    );
-    return label
-      ? {
-          ...dr,
-          corp: {
-            kind: 'label',
-            state: label.state,
-            corporationId: label.corporationId,
-            corpName: label.corpName,
-          },
-        }
-      : dr;
-  });
+  // A Payee that is the corporation: its rows give way to the book's, which bills the same ore.
+  const taken = (dr: DisplayRow) =>
+    dr.assignment?.payeeId !== undefined &&
+    overlay.absorbed
+      .get(entryKey(dr.row.characterId, dr.row.entry.date, dr.row.entry.solarSystemId))
+      ?.has(dr.assignment.payeeId) === true;
+  const flat = flatten(adjusted)
+    .filter((dr) => !taken(dr))
+    .map((dr): DisplayRow => {
+      if (dr.assignment) return dr;
+      const label = overlay.labels.get(
+        entryKey(dr.row.characterId, dr.row.entry.date, dr.row.entry.solarSystemId)
+      );
+      return label
+        ? {
+            ...dr,
+            corp: {
+              kind: 'label',
+              state: label.state,
+              corporationId: label.corporationId,
+              corpName: label.corpName,
+            },
+          }
+        : dr;
+    });
   const own = overlay.rows.map((view) =>
     syntheticRow(view, characterNameOf(view.characterId), view.corpName)
   );
