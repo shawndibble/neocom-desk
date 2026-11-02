@@ -150,7 +150,7 @@ interface MaterialsTableProps {
    */
   skillGates?: ReadonlyMap<number, SkillGateVerdict>;
   characterNameFor?: (characterId: number) => string;
-  /** `useTableExport(...).tableProps` — makes the table exportable from its row menus. */
+  /** `useTableExport(...).tableProps` — exports the table (a row menu never carries export). */
   exportProps?: UseTableExport<MaterialTableRow>['tableProps'];
   /** The page's item menu (`buildItemMenuProps`): Show info, View in Market and the rest, ahead of the export items. Omitted, rows have no item menu. */
   itemMenuFor?: ItemMenuFor;

@@ -6,7 +6,7 @@ import { configureClipboard } from '@/lib/clipboard';
 import * as download from '@/lib/download';
 import { DataTable, type DataTableColumn } from './DataTable';
 import { MenuItem, RowActionsMenu, RowMoreActions } from './RowActions';
-import { TableActionsMenu, TableExportProvider } from './TableExport';
+import { TableActionsMenu } from './TableExport';
 import { useTableExport } from './useTableExport';
 
 interface Row {
@@ -190,26 +190,6 @@ describe('TableActionsMenu', () => {
   });
 });
 
-describe('TableExportProvider', () => {
-  it("gives a non-DataTable list's row menus the Export submenu, exporting the whole list", async () => {
-    const user = userEvent.setup();
-    render(
-      <TableExportProvider
-        tableExport={{ surface: 'assets', columns: csvColumns, getRows: () => rows }}
-      >
-        <RowActionsMenu name="Tritanium" items={<MenuItem>Show info</MenuItem>}>
-          <div>Tritanium</div>
-        </RowActionsMenu>
-      </TableExportProvider>
-    );
-    fireEvent.contextMenu(screen.getByText('Tritanium'));
-    await openExportSub(user);
-    await choose(user, 'Copy for Google Sheets / Excel');
-    await waitFor(() => expect(copied).toHaveLength(1));
-    expect(copied[0].trim().split('\n')).toHaveLength(3);
-  });
-});
-
 describe("useTableExport source: 'sorted-rows'", () => {
   const all: Row[] = [
     { id: 1, item: 'Tritanium', amount: 250 },
@@ -264,26 +244,22 @@ describe('DataTable exportable', () => {
     await waitFor(() => expect(copied).toHaveLength(1));
   });
 
-  it("appends Export to every row's right-click menu, after the row's own items", async () => {
-    const user = userEvent.setup();
+  it("keeps Export out of a row's right-click menu: it is a table action", async () => {
     render(<Harness withRowMenu />);
     const [, firstRow] = screen.getAllByRole('row');
     fireEvent.contextMenu(firstRow);
     expect(await screen.findByRole('menuitem', { name: /^View / })).toBeInTheDocument();
-    await openExportSub(user);
-    await choose(user, 'Copy for Google Sheets / Excel');
-    await waitFor(() => expect(copied).toHaveLength(1));
-    // The whole table, not just the row that was right-clicked.
-    expect(copied[0].trim().split('\n')).toHaveLength(3);
+    expect(screen.queryByRole('menuitem', { name: 'Export table' })).not.toBeInTheDocument();
   });
 
-  it("appends Export to the row's More actions dropdown too", async () => {
+  it("keeps Export out of the row's More actions dropdown too", async () => {
     render(<Harness withRowMenu />);
     fireEvent.pointerDown(
       screen.getByRole('button', { name: 'More actions for Cap Booster 200' }),
       { button: 0, pointerType: 'mouse' }
     );
-    expect(await screen.findByRole('menuitem', { name: 'Export table' })).toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: /^View / })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Export table' })).not.toBeInTheDocument();
   });
 
   it('leaves a RowMoreActions outside an exportable table untouched', async () => {

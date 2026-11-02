@@ -27,13 +27,6 @@ export interface RowActions {
 export const RowActionsContext = createContext<RowActions | null>(null);
 
 /**
- * Items a surrounding table appends to every row menu under it — DataTable's
- * "Export table" submenu (`TableExport.tsx`). Kept here rather than imported
- * by `RowActions.tsx`, so the row menu needn't know what the table adds.
- */
-export const RowMenuExtrasContext = createContext<ReactNode>(null);
-
-/**
  * The page a click on the current `DataTable` row navigates to (its `rowHref`).
  * A `RowActionsMenu` under it picks the href up as its `openHref`.
  */

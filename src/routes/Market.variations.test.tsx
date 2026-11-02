@@ -176,7 +176,8 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     kestrelRow.focus();
     fireEvent.contextMenu(kestrelRow);
 
-    expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).toBeInTheDocument();
+    // Quickbar, price alert and stock target fold into one submenu.
+    expect(screen.getByRole('menuitem', { name: 'Track' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Compare Variations' })).toBeInTheDocument();

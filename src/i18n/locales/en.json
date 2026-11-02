@@ -6901,6 +6901,10 @@
     "rowHint_touch": "Tip: touch and hold any row to open its actions",
     "hintGotIt": "Got it",
     "moreActions": "More actions",
+    "menuGroup": {
+      "track": "Track",
+      "game": "In game"
+    },
     "tableExport": {
       "menuLabel": "{{name}} actions",
       "exportButtonLabel": "Export {{name}}",

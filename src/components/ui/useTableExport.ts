@@ -3,7 +3,7 @@
  * a table exports, the context DataTable publishes it through, and the hook
  * that wires a table and its title-bar menu to the same rows.
  */
-import { createContext, useContext, useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
+import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
 import type { CsvColumn } from '@/lib/csv';
 import type { ExportSurface } from '@/lib/downloadCsv';
 /** What `DataTable`'s `exportRef` exposes: its rows, filtered by the caller and sorted as displayed. */
@@ -42,17 +42,6 @@ export interface TableExportConfig<T> {
 /** A config plus where its rows come from, read at export time. */
 export interface TableExport<T> extends Omit<TableExportConfig<T>, 'getRows'> {
   getRows: () => readonly T[];
-}
-
-/**
- * Published by DataTable to its rows, so `RowActionsMenu` can append the
- * submenu to every row's menu without each row wrapper knowing about it.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- rows are opaque here; the pair is typed where it's built
-export const TableExportContext = createContext<TableExport<any> | null>(null);
-
-export function useTableExportContext(): TableExport<unknown> | null {
-  return useContext(TableExportContext);
 }
 
 export interface UseTableExport<T> extends TableExport<T> {
