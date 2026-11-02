@@ -85,7 +85,7 @@ Contract Bot (dead; prior art for #1091) are the only examples.
   expansion's mechanic nouns). The web-search leg is worthless.
 - **Forum category JSON** paginates (`more_topics_url`): fetch pages 0 **and**
   1 minimum, sort by `last_posted_at` (a bumped thread can carry a new feature).
-  Individual tool threads (`/t/<id>.json?print=true`) list every update post.
+  Individual tool threads (`/t/<id>.json`, NOT `print=true`, which rate-limits after a few calls) list every update post.
 - **Services category (id 61) is swept and spent**: buyback, freight and
   wormhole real estate are cross-player commerce (kill-test 1). Do **not**
   build a directory of third-party rate cards; they go stale and the app lies.
@@ -271,6 +271,7 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
   headline totals the gross ISK listed on sell orders and held in buy escrow
   (filter-aware, no net-of-fees; the reviewer's KILL on the drafted net figure
   stands).
+- Nov 2 last-24h sweep (Omnitool, ECT EVE Assets 3.0, EVE Omni 5.5.1, EVE Empire 1.6.5, Industry Scanner 1.1.6): #5870 NARROW Price History "Orders per day" divides by traded days, not range days (moving-average half cut: index vs calendar window needs its own decision beside `20260910-091729`).
 - **Abyssal:** #5800 SHIP Improve keeps fitted mutated modules (probe first;
   swap helper drops the roll). #5801 NARROW rank owned rolled modules by fit
   effect (no MutaMarket estimate in the ranking, top 8 cap). #5802 NARROW
@@ -418,6 +419,7 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   bonus (EVE Tycoon calculator field); check the current mechanic first.
 - **Retroindustry leftovers:** Transactions "N journal sales not listed yet" count (KILL: `DataAgeBadge` + wallet `lagNote` exist; transactions are page-capped, so old journal lines false-positive); ISK/7d column (units shipped as #5797); traded types missing from the SDE (SDE refresh cadence, names resolve via ESI); net worth sell/escrow/contracts/jobs layers (shipped, #5128); frozen saved-plan figures (Production Run is the snapshot); Map overlays (intel; cost indices covered). Canopus: Abyss planner, trial skill levels, kill radar, AI assistant = non-ISK or client-reading.
 - **Thread-sweep leftovers (Omni, Industry Scanner, Canopus, EQM, Retroindustry):** plan-vs-reported job fee / implied facility tax (49); Open Orders net-of-fees total (no fee engine under `src/engine/market`; 27, 30); Storyline/Cosmic production tab and gas site picker (niche reach, hand-kept mission data; unverified beyond that); Freelance Jobs board filters (ESI projects are corp-scoped, `getCorporationProjects`; the member's own projects are in Opportunities, #4786); "gain vs selling directly" for own reaction/gas material (`ownedStockSale`, `oreDecision`; gas sell-vs-react already weak); PI storage as owned stock (17); Industry Report/Inventory Report share links, ship analytics over time (1, 5, 7); PLEX FIFO ledger (10); HyperNet; wormhole mapper (weak J-space gap above); setup role picker (rail defaults are settled, `20261009-230259`). Already built, don't re-pitch: reactions apply no ME (`computeBuildPlan`), invention base ME2/TE4 (`INVENTED_BASE_ME`), an omitted history day is a zero (`averageDailyVolume`), infrastructure hold in hauling (`cargoHolds.ts`), max buy price / min margin (`haulingPlan`), J-space cost-index override (`costIndexOverride.ts`), Assets jumps away, net worth keeps stale characters out of the day's row (`20261008-081039`).
+- **Nov 2 sweep leftovers:** Omnitool Mineral optimizer (KILL: Ranked + "Use my stock" #2847, `ownedStockSale`, #5134 cover most; a solver must mirror every pricing-basis change; small audience); ECT installer-on-corp-jobs (Active Jobs) and assets jumps sort (`jumpsAway`) covered; Omni infrastructure hold (`cargoHolds.ts`) covered, maps/wormholes non-ISK.
 - **Housekeeping only:** Mining Yield `specialisationLevel: 0`, dead i18n keys.
 - **RIFT ratting rollup** (kills by faction/system, ISK per kill): per-line `BountyFactionSummary`/`killsByFaction` exists; a bounty line's ISK is shared across NPC types, so per-class ISK is an estimate. RIFT daily-goals tab: ref-type breakdown + `dailyGoalMessageIdOf` cover it. "Open ship in Fittings" from Assets: shipped (`assetShipLocation.ts`).
 - **RIFT What's new leftovers:** freelance jobs (#4609), cost indices (`cheaperNearbySystems`), skyhooks, clones, LP totals = covered; PI time seek = kill-tests 3/17; intel, overlay, chat, combat/log alerts, settings copying, map markers = kill-test 2 (client-reading).
