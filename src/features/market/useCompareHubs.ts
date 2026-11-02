@@ -12,12 +12,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CompareSetItem } from './compareSet';
 import type { HubAggregate } from '@/market/fuzzwork';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { COMPARED_HUBS, type ComparedHubId } from '@/market/hubs';
 import { getHubPricesWithStatus, invalidateHubPrices } from '@/market/prices';
 import { jumpsBetween, useJumpBasis } from '@/features/route/jumpBasis';
 import { useCurrentSystem } from '@/features/route/currentSystem';
 
-export type HubId = TradeHub['id'];
+export type HubId = ComparedHubId;
 
 export interface HubPrices {
   loading: boolean;
@@ -35,7 +35,7 @@ export interface UseCompareHubsResult {
 const EMPTY_PRICES: HubPrices = { loading: false, unreachable: false, prices: new Map() };
 
 function allHubs<T>(value: T): Record<HubId, T> {
-  return Object.fromEntries(TRADE_HUBS.map((hub) => [hub.id, value])) as Record<HubId, T>;
+  return Object.fromEntries(COMPARED_HUBS.map((hub) => [hub.id, value])) as Record<HubId, T>;
 }
 
 /** One frozen object for "no counts yet", so a consumer's memo on `jumps` holds. */
@@ -69,12 +69,12 @@ export function useCompareHubs(
     // A bumped refresh tick forces a read past the price cache's TTL.
     if (tickRef.current !== refreshTick) {
       tickRef.current = refreshTick;
-      for (const hub of TRADE_HUBS) invalidateHubPrices(hub.stationId, typeIds);
+      for (const hub of COMPARED_HUBS) invalidateHubPrices(hub.stationId, typeIds);
     }
     let cancelled = false;
     const key = `${itemsKey}|${refreshTick}`;
     setFetched({ key, hubs: allHubs({ ...EMPTY_PRICES, loading: true }) });
-    for (const hub of TRADE_HUBS) {
+    for (const hub of COMPARED_HUBS) {
       void getHubPricesWithStatus(hub, typeIds)
         .then(({ prices, unreachable }): HubPrices => ({ loading: false, unreachable, prices }))
         .catch((): HubPrices => ({ ...EMPTY_PRICES, unreachable: true }))
@@ -102,7 +102,7 @@ export function useCompareHubs(
     if (!enabled || !basis.hydrated || originSystemId === null) return;
     let cancelled = false;
     void Promise.all(
-      TRADE_HUBS.map((hub) =>
+      COMPARED_HUBS.map((hub) =>
         jumpsBetween(originSystemId, hub.systemId, basis)
           .then((result) => (result.kind === 'known' ? result.jumps : null))
           .catch(() => null)
@@ -111,7 +111,7 @@ export function useCompareHubs(
       if (cancelled) return;
       setCounted({
         key: jumpsKey,
-        jumps: Object.fromEntries(TRADE_HUBS.map((hub, i) => [hub.id, counts[i]])) as Record<
+        jumps: Object.fromEntries(COMPARED_HUBS.map((hub, i) => [hub.id, counts[i]])) as Record<
           HubId,
           number | null
         >,

@@ -58,6 +58,15 @@ export async function withCheckedMutations(fitting: Fitting): Promise<Fitting> {
   return normaliseFittingMutations(fitting, await loadMutaplasmidLookup().catch(() => null));
 }
 
+/**
+ * The lookup if it is already loaded, else null: never starts a load, never
+ * subscribes. For a row-level guess (how many items a menu will render) that
+ * must not pull the data in per row.
+ */
+export function loadedMutaplasmidLookup(): MutaplasmidLookup | null {
+  return ready;
+}
+
 /** The lookup once loaded; null while it loads or if it failed (a later render retries). */
 export function useMutaplasmidLookup(): MutaplasmidLookup | null {
   const [lookup, setLookup] = useState<MutaplasmidLookup | null>(ready);

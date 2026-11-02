@@ -34,6 +34,11 @@ import {
   SelectTrigger,
   SelectValue,
   LiveStatus,
+  DropdownMenuItem,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  useOpenAfterMenu,
   Spinner,
   TabPanel,
   Tabs,
@@ -42,6 +47,7 @@ import {
   useTabsId,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { industryTabHref } from '@/features/industry/industryTabs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOrderFeeSkills } from '@/features/market/useOrderFeeSkills';
 import { ZERO_STANDINGS } from '@/engine/market/standings';
@@ -640,6 +646,10 @@ export function Market() {
     setStationFilter(locationId);
   }
 
+  const itemMenu = useOpenAfterMenu();
+  const selectedBlueprintTypeId =
+    selectedTypeId === null ? null : itemActions.actions.blueprintFor(selectedTypeId);
+
   /**
    * A blueprint *original* can be sold on the market; a **copy** cannot — BPCs
    * are contract-only. So an empty order book on a blueprint is the one case
@@ -1127,18 +1137,17 @@ export function Market() {
                 className={`min-w-0 ${isDesktop || selectedTypeId !== null ? '' : 'hidden'}`}
                 title={selectedItem?.name}
                 headingRef={itemHeadingRef}
-                meta={
+                actions={
                   selectedItem &&
                   selectedTypeId !== null && (
-                    <span className="flex flex-wrap items-center gap-1 max-md:shrink-0 max-md:flex-nowrap">
+                    <span className="flex items-center gap-1 max-md:shrink-0 max-md:flex-nowrap">
                       <IconButton
                         size="md"
                         icon={<Icon.Pin weight={selectedPinned ? 'fill' : 'light'} />}
                         label={t(
-                          selectedPinned ? 'market.quickbar.removeItem' : 'market.quickbar.addItem',
-                          {
-                            name: selectedItem.name,
-                          }
+                          selectedPinned
+                            ? 'market.quickbar.removeFromQuickbar'
+                            : 'market.contextMenu.addToQuickbar'
                         )}
                         tooltip={
                           activeCharacterId === null
@@ -1155,22 +1164,6 @@ export function Market() {
                           else itemActions.actions.addToQuickbar(selectedTypeId, selectedItem.name);
                         }}
                       />
-                      <IconButton
-                        size="md"
-                        icon={<Icon.Compare />}
-                        label={t(
-                          selectedInCompare
-                            ? 'market.compare.removeItem'
-                            : 'market.compare.addItem',
-                          { name: selectedItem.name }
-                        )}
-                        pressed={selectedInCompare}
-                        onClick={() =>
-                          selectedInCompare
-                            ? removeFromCompare(selectedTypeId)
-                            : addToCompare({ typeId: selectedTypeId, itemName: selectedItem.name })
-                        }
-                      />
                       <ItemPriceAlertBell
                         typeId={selectedTypeId}
                         name={selectedItem.name}
@@ -1178,14 +1171,62 @@ export function Market() {
                         disabled={activeCharacterId === null}
                         onPin={handlePinWithTarget}
                       />
-                      <IconButton
-                        size="md"
-                        icon={<Icon.Info />}
-                        label={t('market.contextMenu.showInfo')}
-                        onClick={() =>
-                          itemActions.actions.showInfo(selectedTypeId, selectedItem.name)
-                        }
-                      />
+                      <DropdownMenu
+                        onOpenChange={(open) => {
+                          // Market loads the blueprint catalog lazily; Build Plan needs it.
+                          if (open) itemActions.actions.requestBlueprints();
+                        }}
+                      >
+                        <DropdownMenuTrigger asChild>
+                          <IconButton
+                            size="md"
+                            icon={<Icon.More />}
+                            label={t('common.moreActions')}
+                          />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          onCloseAutoFocus={itemMenu.onCloseAutoFocus}
+                        >
+                          <DropdownMenuItem
+                            onSelect={() =>
+                              selectedInCompare
+                                ? removeFromCompare(selectedTypeId)
+                                : addToCompare({
+                                    typeId: selectedTypeId,
+                                    itemName: selectedItem.name,
+                                  })
+                            }
+                          >
+                            {t(
+                              selectedInCompare
+                                ? 'market.compare.removeFromCompare'
+                                : 'market.contextMenu.addToCompare'
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() =>
+                              itemMenu.run(() =>
+                                itemActions.actions.showInfo(selectedTypeId, selectedItem.name)
+                              )
+                            }
+                          >
+                            {t('market.contextMenu.showInfo')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={!selectedBlueprintTypeId}
+                            onSelect={() =>
+                              navigate(`${industryTabHref('plans')}?product=${selectedTypeId}`)
+                            }
+                          >
+                            {selectedBlueprintTypeId === undefined
+                              ? t('industry.contextMenu.buildPlanChecking')
+                              : selectedBlueprintTypeId === null
+                                ? t('industry.contextMenu.noBlueprintOptions')
+                                : t('industry.contextMenu.buildPlan')}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </span>
                   )
                 }

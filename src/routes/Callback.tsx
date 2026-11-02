@@ -35,6 +35,8 @@ import {
 import { beginAddCharacterLogin, retryLastLogin, retryLastLoginOnce } from '@/app/loginFlow';
 import { Button, NeedsConnection, Panel, Spinner } from '@/components/ui';
 import { isOfflineFailure } from '@/esi/client';
+import { callableErrorReason } from '@/lib/callableError';
+import { reportFailure } from '@/observability/reportFailure';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 /**
@@ -171,7 +173,16 @@ export function Callback() {
         return;
       }
       void completeOwnCorpGrant({ code, state })
-        .catch((): OwnCorpGrantOutcome => ({ status: 'refused', corporationId, reason: 'unknown' }))
+        .catch((error: unknown): OwnCorpGrantOutcome => {
+          // Without this the real cause (a missing server action, a rejected token) was
+          // swallowed and read as "log in again".
+          reportFailure('auth', error);
+          return {
+            status: 'refused',
+            corporationId,
+            reason: callableErrorReason(error) ?? 'unknown',
+          };
+        })
         .then(land);
       return;
     }

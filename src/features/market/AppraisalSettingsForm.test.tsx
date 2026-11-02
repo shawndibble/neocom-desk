@@ -12,7 +12,7 @@ describe('AppraisalSettingsForm', () => {
 
   it('shows the refining fields, and says no ship is set', async () => {
     render(<AppraisalSettingsForm characterId={null} />);
-    expect(await screen.findByText('Facility yield')).toBeInTheDocument();
+    expect(await screen.findByText('Facility base yield')).toBeInTheDocument();
     expect(screen.getByText('Reprocessing tax')).toBeInTheDocument();
     expect(screen.getByText(/No ship set/)).toBeInTheDocument();
   });

@@ -37,11 +37,17 @@ export function salesTaxPct(accountingLevel: number): number {
   return SALES_TAX_BASE_PCT * (1 - ACCOUNTING_REDUCTION_PER_LEVEL * accountingLevel);
 }
 
-/** NPC-station broker fee rate, percent. Standings are unmodified -10..10. */
+/**
+ * NPC-station broker fee rate, percent. Standings are unmodified -10..10.
+ * `surchargePct` is a hub's own extra points (Exordium's market fees,
+ * `TradeHub.brokerSurchargePct`); it is added after the zero floor, because a
+ * surcharge is not something skills or standing can reduce.
+ */
 export function brokerFeePct(
   brokerRelationsLevel: number,
   factionStanding = 0,
-  corpStanding = 0
+  corpStanding = 0,
+  surchargePct = 0
 ): number {
   assertLevel('Broker Relations', brokerRelationsLevel);
   const pct =
@@ -49,7 +55,7 @@ export function brokerFeePct(
     BROKER_RELATIONS_PCT_PER_LEVEL * brokerRelationsLevel -
     FACTION_STANDING_PCT_PER_POINT * factionStanding -
     CORP_STANDING_PCT_PER_POINT * corpStanding;
-  return Math.max(0, pct);
+  return Math.max(0, pct) + surchargePct;
 }
 
 /** Sales tax in ISK on a filled order of `value` ISK. */
@@ -62,10 +68,12 @@ export function brokerFee(
   value: number,
   brokerRelationsLevel: number,
   factionStanding = 0,
-  corpStanding = 0
+  corpStanding = 0,
+  surchargePct = 0
 ): number {
   if (value <= 0) return 0;
-  const fee = (value * brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding)) / 100;
+  const fee =
+    (value * brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding, surchargePct)) / 100;
   return Math.max(MIN_BROKER_FEE_ISK, fee);
 }
 
@@ -89,9 +97,10 @@ export function relistBrokerFeePct(
   brokerRelationsLevel: number,
   advancedBrokerRelationsLevel: number,
   factionStanding = 0,
-  corpStanding = 0
+  corpStanding = 0,
+  surchargePct = 0
 ): number {
-  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding);
+  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding, surchargePct);
   const discountPct = relistDiscountPct(advancedBrokerRelationsLevel);
   return (brokerPct * (100 - discountPct)) / 100;
 }
@@ -110,16 +119,18 @@ export function relistFee(
   brokerRelationsLevel: number,
   advancedBrokerRelationsLevel: number,
   factionStanding = 0,
-  corpStanding = 0
+  corpStanding = 0,
+  surchargePct = 0
 ): number {
   if (quantity <= 0 || newPrice <= 0) return 0;
 
-  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding);
+  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding, surchargePct);
   const discountedPct = relistBrokerFeePct(
     brokerRelationsLevel,
     advancedBrokerRelationsLevel,
     factionStanding,
-    corpStanding
+    corpStanding,
+    surchargePct
   );
 
   const increaseIncrement = Math.max(0, newPrice - oldPrice) * quantity;
@@ -163,10 +174,11 @@ export function breakEvenPrice(
   accountingLevel: number,
   brokerRelationsLevel: number,
   factionStanding = 0,
-  corpStanding = 0
+  corpStanding = 0,
+  surchargePct = 0
 ): number | null {
   const taxPct = salesTaxPct(accountingLevel);
-  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding);
+  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding, surchargePct);
   return breakEvenPriceAtRate(totalCost, quantity, taxPct, brokerPct);
 }
 
@@ -184,14 +196,16 @@ export function relistBreakEvenPrice(
   brokerRelationsLevel: number,
   advancedBrokerRelationsLevel: number,
   factionStanding = 0,
-  corpStanding = 0
+  corpStanding = 0,
+  surchargePct = 0
 ): number | null {
   const taxPct = salesTaxPct(accountingLevel);
   const brokerPct = relistBrokerFeePct(
     brokerRelationsLevel,
     advancedBrokerRelationsLevel,
     factionStanding,
-    corpStanding
+    corpStanding,
+    surchargePct
   );
   return breakEvenPriceAtRate(totalCost, quantity, taxPct, brokerPct);
 }

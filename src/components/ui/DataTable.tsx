@@ -29,7 +29,7 @@ import {
 } from './dataTableWidths';
 import { useDataTableVirtualizer } from './useDataTableVirtualizer';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from './ContextMenu';
-import { ExportTableItems, TableExportProvider } from './TableExport';
+import { ExportTableItems } from './TableExport';
 import { type TableExport } from './useTableExport';
 
 import { DataTableSortPicker } from './DataTableSortPicker';
@@ -561,21 +561,21 @@ export function DataTable<T>({
     />
   );
 
-  // Exportable: row menus grow the submenu through context; a table with no
-  // row menus gets a right-click menu of its own holding just the export
-  // formats (the trigger is `asChild`, so still no wrapper element).
-  const body = !tableExport ? (
-    table
-  ) : rowContextMenu ? (
-    <TableExportProvider tableExport={tableExport}>{table}</TableExportProvider>
-  ) : (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{table}</ContextMenuTrigger>
-      <ContextMenuContent>
-        <ExportTableItems tableExport={tableExport} />
-      </ContextMenuContent>
-    </ContextMenu>
-  );
+  // Exportable: a table with row menus exports from its title bar's actions
+  // menu (a row menu never carries export); one with no row menus gets a
+  // right-click menu of its own holding just the export formats (the trigger
+  // is `asChild`, so still no wrapper element).
+  const body =
+    !tableExport || rowContextMenu ? (
+      table
+    ) : (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{table}</ContextMenuTrigger>
+        <ContextMenuContent>
+          <ExportTableItems tableExport={tableExport} />
+        </ContextMenuContent>
+      </ContextMenu>
+    );
 
   // No wrapper element either way, so `className` and every caller's layout
   // (a flex/grid parent sizing the table) see the same `<table>` child.

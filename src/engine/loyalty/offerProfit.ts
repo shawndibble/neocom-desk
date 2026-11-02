@@ -108,7 +108,13 @@ export function loyaltyOfferProfit(input: LoyaltyOfferProfitInput): LoyaltyOffer
     revenue === null
       ? null
       : liquidationBasis === 'order'
-        ? brokerFee(revenue, brokerRelations, standing?.factionStanding, standing?.corpStanding)
+        ? brokerFee(
+            revenue,
+            brokerRelations,
+            standing?.factionStanding,
+            standing?.corpStanding,
+            standing?.brokerSurchargePct
+          )
         : 0;
   const netRevenue =
     revenue === null || tax === null || broker === null ? null : revenue - tax - broker;

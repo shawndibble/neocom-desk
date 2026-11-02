@@ -42,7 +42,8 @@ export function RealizedProfitBreakdown({
   const brokerPct = brokerFeePct(
     brokerRelationsLevel,
     standing?.factionStanding,
-    standing?.corpStanding
+    standing?.corpStanding,
+    standing?.brokerSurchargePct
   );
 
   return (

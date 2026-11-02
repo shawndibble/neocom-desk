@@ -82,14 +82,37 @@ export function esiCorporationCeoLookup(fetchImpl: typeof fetch = fetch): Corpor
 /** The public lookup of which corporation a Character is in: no token, no scope. */
 export type CorporationLookup = (characterId: number) => Promise<number>;
 
+/**
+ * Asks the bulk affiliation endpoint, not `GET /characters/{id}/`: ESI caches that page for a
+ * day, so a Character who just moved corporation still reads as the old one there, which
+ * refused a CEO's freshly made corporation as "another corporation". Affiliation is the same
+ * source the app's own pickers read.
+ */
 export function esiCorporationLookup(fetchImpl: typeof fetch = fetch): CorporationLookup {
   return async (characterId) => {
-    const character = await getJson(`${ESI_BASE}/characters/${characterId}/`, null, fetchImpl);
-    const corporationId = (character as { corporation_id?: unknown } | null)?.corporation_id;
-    if (typeof corporationId !== 'number') {
+    const res = await fetchImpl(`${ESI_BASE}/characters/affiliation/`, {
+      method: 'POST',
+      headers: { ...esiHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify([characterId]),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (res.status === 420 || res.status === 429) {
+      throw new HttpsError('resource-exhausted', 'ESI is rate limiting; try again shortly', {
+        reason: 'esi-backoff',
+      });
+    }
+    if (!res.ok)
+      throw new HttpsError('unavailable', `ESI answered ${res.status}`, { reason: 'esi-error' });
+    const body = (await res.json().catch(() => null)) as unknown;
+    const row = Array.isArray(body)
+      ? (body as { character_id?: unknown; corporation_id?: unknown }[]).find(
+          (r) => r?.character_id === characterId
+        )
+      : undefined;
+    if (typeof row?.corporation_id !== 'number') {
       throw new HttpsError('unavailable', 'ESI sent no corporation', { reason: 'esi-error' });
     }
-    return corporationId;
+    return row.corporation_id;
   };
 }
 

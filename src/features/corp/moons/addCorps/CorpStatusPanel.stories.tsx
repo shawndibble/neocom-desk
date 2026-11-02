@@ -26,5 +26,20 @@ type Story = StoryObj<typeof meta>;
 /** @summary All four kinds: sign-in, own book (words only), role, gone quiet. */
 export const Default: Story = {};
 
+/** @summary A connection that failed on the way through shows its reason, not "log in again". */
+export const Failed: Story = {
+  args: {
+    items: [
+      { corporationId: 22, name: 'Dunmoor Freight', state: 'failed', reason: 'unknown' },
+      {
+        corporationId: 23,
+        name: 'Wren Hollow Corp',
+        state: 'failed',
+        reason: 'ledger-unavailable',
+      },
+    ],
+  },
+};
+
 /** @summary Nothing needs the player: the panel is gone. */
 export const Empty: Story = { args: { items: [] } };

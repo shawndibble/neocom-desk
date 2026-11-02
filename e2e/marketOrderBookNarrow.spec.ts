@@ -402,8 +402,8 @@ test.describe('Market Browser — order book stacked cards', () => {
 });
 
 /**
- * The item panel header's icon cluster (Add to Quickbar, Add to Compare, price
- * alert, Info) at phone widths: every button visible, a 36px touch target
+ * The item panel header's icon cluster (Add to Quickbar, price alert, More
+ * actions ⋮) at phone widths: every button visible, a 36px touch target
  * (§6c touch tier), none overlapping another, and the page not scrolling
  * sideways.
  */
@@ -439,12 +439,7 @@ for (const width of [390, 360]) {
     await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritanium');
     await page.getByRole('button', { name: 'Tritanium', exact: true }).click();
 
-    const names = [
-      /^Add Tritanium to Quickbar$/,
-      /^Add Tritanium to Compare$/,
-      /^Set price alert for Tritanium$/,
-      /^Show info$/,
-    ];
+    const names = [/^Add to Quickbar$/, /^Set price alert$/, /^More actions$/];
     // The cluster must not squeeze the item name out of the header.
     await expect(page.getByRole('heading', { name: 'Tritanium' })).toBeVisible();
     const boxes = [];

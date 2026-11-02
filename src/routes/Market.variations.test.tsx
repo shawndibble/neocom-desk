@@ -176,7 +176,8 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     kestrelRow.focus();
     fireEvent.contextMenu(kestrelRow);
 
-    expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).toBeInTheDocument();
+    // Quickbar, price alert and stock target fold into one submenu.
+    expect(screen.getByRole('menuitem', { name: 'Track' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Compare Variations' })).toBeInTheDocument();
@@ -498,7 +499,8 @@ describe('Market Browser tree leaf (issue #6)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
 
-    await user.click(await screen.findByRole('button', { name: 'Show info' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Show info' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Rifter' });
     expect(await within(dialog).findByText('A rugged little frigate.')).toBeInTheDocument();
@@ -517,12 +519,12 @@ describe('Compare toggle in the item header', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
 
-    await user.click(await screen.findByRole('button', { name: 'Add Rifter to Compare' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Add to Compare' }));
     expect(useCompareSet.getState().items).toEqual([{ typeId: 587, itemName: 'Rifter' }]);
-    const remove = await screen.findByRole('button', { name: 'Remove Rifter from Compare' });
-    expect(remove).toHaveAttribute('aria-pressed', 'true');
 
-    await user.click(remove);
+    await user.click(await screen.findByRole('button', { name: 'More actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove from Compare' }));
     expect(useCompareSet.getState().items).toEqual([]);
   });
 });

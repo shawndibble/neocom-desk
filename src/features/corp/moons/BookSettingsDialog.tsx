@@ -27,7 +27,7 @@ import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import { Pill } from '@/components/ui/Pill';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { TRADE_HUBS } from '@/market/hubs';
+import { COMPARED_HUBS } from '@/market/hubs';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
 import { Label } from './BookDialogs';
@@ -541,7 +541,7 @@ export function BookSettingsDialog({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {TRADE_HUBS.map((h) => (
+                        {COMPARED_HUBS.map((h) => (
                           <SelectItem key={h.id} value={h.id}>
                             {h.systemName}
                           </SelectItem>

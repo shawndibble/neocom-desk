@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react';
 import { loadCharacterStandings } from '@/features/character/standings';
 import { resolveLocationStandings } from './locationStandings';
 import { ZERO_STANDINGS, type ResolvedStandings } from '@/engine/market/standings';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { useWarmLoad } from '@/lib/useWarmLoad';
 
@@ -25,12 +25,21 @@ export type TradeHubStandingsMap = ReadonlyMap<TradeHub['id'], ResolvedStandings
 
 const NO_STANDINGS: TradeHubStandingsMap = new Map();
 
+/** The standings at a hub's station, plus the hub's own broker surcharge so fee sites need no hub lookup. */
+async function resolveHubStandings(
+  hub: TradeHub,
+  entries: Parameters<typeof resolveLocationStandings>[1]
+): Promise<ResolvedStandings> {
+  const standing = await resolveLocationStandings(hub.stationId, entries);
+  return hub.brokerSurchargePct > 0
+    ? { ...standing, brokerSurchargePct: hub.brokerSurchargePct }
+    : standing;
+}
+
 async function loadTradeHubStandings(characterId: number): Promise<TradeHubStandingsMap> {
   const entries = await loadCharacterStandings(characterId);
   const resolved = await Promise.all(
-    TRADE_HUBS.map(
-      async (hub) => [hub.id, await resolveLocationStandings(hub.stationId, entries)] as const
-    )
+    TRADE_HUBS.map(async (hub) => [hub.id, await resolveHubStandings(hub, entries)] as const)
   );
   return new Map(resolved);
 }
@@ -67,9 +76,7 @@ export function useTradeHubStandingsByCharacter(
     void mapWithConcurrencyLimit(characterIds, ESI_FANOUT_CONCURRENCY, async (characterId) => {
       const entries = await loadCharacterStandings(characterId);
       const resolved = await Promise.all(
-        TRADE_HUBS.map(
-          async (hub) => [hub.id, await resolveLocationStandings(hub.stationId, entries)] as const
-        )
+        TRADE_HUBS.map(async (hub) => [hub.id, await resolveHubStandings(hub, entries)] as const)
       );
       byCharacter.set(characterId, new Map(resolved));
     }).then(() => {
@@ -84,10 +91,16 @@ export function useTradeHubStandingsByCharacter(
   return standingsByCharacter;
 }
 
+/** No standing at a hub, but still the hub's own surcharge: it is the market's, not the pilot's. */
+export function zeroStandingsAt(hubId: TradeHub['id']): ResolvedStandings {
+  const brokerSurchargePct = getTradeHub(hubId)?.brokerSurchargePct ?? 0;
+  return brokerSurchargePct > 0 ? { ...ZERO_STANDINGS, brokerSurchargePct } : ZERO_STANDINGS;
+}
+
 /** `standings.get(hubId)`, defaulting to zero for a hub not yet resolved. */
 export function tradeHubStanding(
   standings: TradeHubStandingsMap,
   hubId: TradeHub['id']
 ): ResolvedStandings {
-  return standings.get(hubId) ?? ZERO_STANDINGS;
+  return standings.get(hubId) ?? zeroStandingsAt(hubId);
 }

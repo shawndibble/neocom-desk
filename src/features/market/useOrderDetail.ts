@@ -14,7 +14,7 @@ import { useContext, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useJumpBasis } from '@/features/route/jumpBasis';
 import { useLazyRowCache } from '@/lib/useLazyRowCache';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
-import { TRADE_HUBS } from '@/market/hubs';
+import { COMPARED_HUBS } from '@/market/hubs';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { RegionCompetition, StructureCompetition } from './orderCompetition';
 import type { OpenOrderRow } from './openOrdersModel';
@@ -72,10 +72,10 @@ async function loadRefineQuote(
  */
 async function loadHubBids(loaders: OrderDetailLoaders, typeId: number): Promise<HubBids> {
   const prices = await loaders.stationBestPrices(
-    TRADE_HUBS.map((hub) => ({ stationId: hub.stationId, typeIds: [typeId] }))
+    COMPARED_HUBS.map((hub) => ({ stationId: hub.stationId, typeIds: [typeId] }))
   );
   const byHub: Record<string, number | null> = {};
-  for (const hub of TRADE_HUBS) {
+  for (const hub of COMPARED_HUBS) {
     byHub[hub.id] = prices.get(stationPriceKey(hub.stationId, typeId))?.buyMax ?? null;
   }
   return byHub;
@@ -302,7 +302,7 @@ export function useOpenOrderDetail(
   useEffect(() => {
     const mySystemId = orderSystemId(row, snapshot);
     if (mySystemId === undefined) return;
-    for (const hub of TRADE_HUBS) loadRoute(mySystemId, hub.systemId);
+    for (const hub of COMPARED_HUBS) loadRoute(mySystemId, hub.systemId);
   }, [row, snapshot, loadRoute]);
 
   /*

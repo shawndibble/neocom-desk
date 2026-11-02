@@ -1,5 +1,5 @@
 import { markBestHubs, type HubQuoteState } from '@/engine/market/compareHubs';
-import { TRADE_HUBS } from '@/market/hubs';
+import { COMPARED_HUBS } from '@/market/hubs';
 import type { CompareSetItem } from './compareSet';
 import type { HubId, UseCompareHubsResult } from './useCompareHubs';
 
@@ -11,7 +11,7 @@ export interface CompareHubRow extends CompareSetItem {
   bestBuyHub: HubId | null;
 }
 
-const HUB_ORDER = TRADE_HUBS.map((hub) => hub.id);
+const HUB_ORDER = COMPARED_HUBS.map((hub) => hub.id);
 
 /** One row per Compare Set item, each hub's best sell/buy and the row's best marks. */
 export function buildCompareHubRows(

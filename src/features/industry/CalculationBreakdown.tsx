@@ -101,7 +101,8 @@ export function CalculationBreakdown({
   const brokerPct = brokerFeePct(
     context.brokerRelationsLevel,
     context.standing?.factionStanding,
-    context.standing?.corpStanding
+    context.standing?.corpStanding,
+    context.standing?.brokerSurchargePct
   );
   const feePct = formatPercent(taxPct + brokerPct);
 

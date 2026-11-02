@@ -393,11 +393,13 @@ describe('countNpcStandingRows', () => {
 });
 
 describe('feeOwnerIds', () => {
-  it('holds the five hub owner corps and four distinct factions', () => {
+  it('holds the six hub owner corps and five distinct factions, Manifest’s AIR Laboratories included', () => {
     const ids = feeOwnerIds();
     expect(ids.has(1000035)).toBe(true);
     expect(ids.has(500002)).toBe(true);
-    expect(ids.size).toBe(9);
+    expect(ids.has(1000413)).toBe(true);
+    expect(ids.has(500028)).toBe(true);
+    expect(ids.size).toBe(11);
   });
 });
 

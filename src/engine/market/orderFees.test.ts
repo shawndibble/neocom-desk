@@ -16,6 +16,20 @@ describe('orderFees', () => {
     expect(finalPrice).toBeCloseTo(1_000 - fees, 9);
   });
 
+  it('adds a hub’s broker surcharge to a listed price but not to a buy order', () => {
+    const surcharged: OrderFeeContext = {
+      ...ctx,
+      standing: { ...ctx.standing, brokerSurchargePct: 5 },
+    };
+    const sell = orderFees({ price: 1_000, is_buy_order: false }, surcharged);
+    const plain = orderFees({ price: 1_000, is_buy_order: false }, ctx);
+    expect(sell.fees - plain.fees).toBeCloseTo(1_000 * pct(5), 9);
+    expect(orderFees({ price: 1_000, is_buy_order: true }, surcharged).fees).toBeCloseTo(
+      orderFees({ price: 1_000, is_buy_order: true }, ctx).fees,
+      9
+    );
+  });
+
   it('charges the broker fee and sales tax when you list at a sell order’s price', () => {
     const { fees, finalPrice } = orderFees({ price: 1_000, is_buy_order: false }, ctx);
     const expected = 1_000 * (pct(salesTaxPct(5)) + pct(brokerFeePct(4, 2, 1)));

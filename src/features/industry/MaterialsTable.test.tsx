@@ -1916,15 +1916,12 @@ describe('MaterialsTable item menu (issue #5381)', () => {
     return screen.findAllByRole('menuitem');
   }
 
-  it('lists Show info and View in Market ahead of the export items', async () => {
+  it('lists Show info and View in Market, and carries no export: that is the table menu’s', async () => {
     renderMenu();
     const labels = (await openRowMenu('Tritanium')).map((item) => item.textContent);
-    const showInfoAt = labels.indexOf('Show info');
-    const marketAt = labels.indexOf('View in Market');
-    const exportAt = labels.findIndex((label) => /export/i.test(label ?? ''));
-    expect(showInfoAt).toBeGreaterThanOrEqual(0);
-    expect(marketAt).toBeGreaterThanOrEqual(0);
-    expect(exportAt).toBeGreaterThan(Math.max(showInfoAt, marketAt));
+    expect(labels).toContain('Show info');
+    expect(labels).toContain('View in Market');
+    expect(labels.some((label) => /export/i.test(label ?? ''))).toBe(false);
   });
 
   it('opens Show info for the row’s material', async () => {

@@ -37,6 +37,11 @@ function CurrentLocation() {
   return <p data-testid="location">{`${location.pathname}${location.search}`}</p>;
 }
 
+/** The Track entries (Quickbar, price alert, stock target) fold into a submenu: open it. */
+async function openTrack() {
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Track' }));
+}
+
 function renderMenu(typeId: number, itemName: string) {
   return render(
     <MemoryRouter initialEntries={['/market']}>
@@ -114,6 +119,7 @@ describe('ItemContextMenu — Abyssal types', () => {
     );
 
     await screen.findByRole('menuitem', { name: 'Show info' });
+    await openTrack();
     for (const name of MARKET_ONLY)
       expect(await screen.findByRole('menuitem', { name })).toBeInTheDocument();
   });
@@ -220,6 +226,7 @@ describe('ItemContextMenu — price alert', () => {
   it('opens the alert dialog from the menu item', async () => {
     renderMenu(TRITANIUM, 'Tritanium');
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+    await openTrack();
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Set price alert' }));
     expect(await screen.findByRole('dialog', { name: 'Price alert: Tritanium' })).toBeTruthy();
   });
@@ -237,6 +244,7 @@ describe('ItemContextMenu — price alert availability', () => {
       </MemoryRouter>
     );
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+    await openTrack();
     const item = await screen.findByRole('menuitem', { name: 'Set price alert' });
     expect(item).toHaveAttribute('aria-disabled', 'true');
   });
@@ -257,6 +265,7 @@ describe('ItemContextMenu — price alert availability', () => {
       );
       fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
 
+      await openTrack();
       const menuItem = await screen.findByRole('menuitem', { name });
       fireEvent.touchStart(menuItem, {
         touches: [{ clientX: 0, clientY: 0 }],
@@ -281,6 +290,7 @@ describe('ItemContextMenu — price alert availability', () => {
       </MemoryRouter>
     );
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+    await openTrack();
     const item = await screen.findByRole('menuitem', { name: 'Add to Quickbar' });
     fireEvent.click(item);
     expect(actions.addToQuickbar).not.toHaveBeenCalled();
@@ -404,6 +414,7 @@ describe('ItemContextMenu — Item Actions', () => {
     const actions = fakeItemActions();
     renderWith(actions);
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Rifter' }));
+    await openTrack();
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Add to Quickbar' }));
     expect(actions.addToQuickbar).toHaveBeenCalledWith(RIFTER, 'Rifter');
 

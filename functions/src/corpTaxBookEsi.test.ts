@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { esiIdCategoryLookup, esiIdentityReader } from './corpTaxBookEsi.js';
+import { esiCorporationLookup, esiIdCategoryLookup, esiIdentityReader } from './corpTaxBookEsi.js';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
@@ -63,5 +63,49 @@ describe('esiIdCategoryLookup (#4621)', () => {
   it('ESI failing is an error, never a guess', async () => {
     const fetchMock = vi.fn(async () => json({}, 502));
     await expect(esiIdCategoryLookup(fetchMock as unknown as typeof fetch)(5)).rejects.toThrow();
+  });
+});
+
+describe('esiCorporationLookup', () => {
+  // GET /characters/{id}/ is cached by ESI for a day, so a Character that just moved corporation
+  // still reads as the old one there; the bulk affiliation lookup is fresh.
+  it('asks the affiliation endpoint, not the day-cached character page', async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return json([{ character_id: 7, corporation_id: 98000042 }]);
+    });
+    const corporationId = await esiCorporationLookup(fetchMock as unknown as typeof fetch)(7);
+    expect(corporationId).toBe(98000042);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toBe('https://esi.evetech.net/latest/characters/affiliation/');
+    expect(calls[0]!.init.method).toBe('POST');
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual([7]);
+    const headers = calls[0]!.init.headers as Record<string, string>;
+    expect(headers['X-Compatibility-Date']).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(headers['X-User-Agent']).toMatch(/Neocom Desk/);
+    expect(headers.Authorization).toBeUndefined();
+  });
+
+  it('an answer with no corporation for the Character is an error, never a guess', async () => {
+    const fetchMock = vi.fn(async () => json([]));
+    await expect(
+      esiCorporationLookup(fetchMock as unknown as typeof fetch)(7)
+    ).rejects.toMatchObject({
+      details: { reason: 'esi-error' },
+    });
+  });
+
+  it('maps ESI failures to callable errors', async () => {
+    const limited = vi.fn(async () => json({}, 429));
+    await expect(esiCorporationLookup(limited as unknown as typeof fetch)(7)).rejects.toMatchObject(
+      {
+        details: { reason: 'esi-backoff' },
+      }
+    );
+    const down = vi.fn(async () => json({}, 503));
+    await expect(esiCorporationLookup(down as unknown as typeof fetch)(7)).rejects.toMatchObject({
+      details: { reason: 'esi-error' },
+    });
   });
 });

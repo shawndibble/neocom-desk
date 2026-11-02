@@ -436,11 +436,10 @@ export interface DataTableProps<T> {
    */
   exportRef?: Ref<DataTableExportHandle<T>>;
   /**
-   * Makes the table exportable from its menus: every row menu
-   * (`rowContextMenu`, and its "More actions" button) gains an "Export
-   * table" submenu, and a table without row menus gets a table-wide
-   * right-click menu holding just the export formats. Exports the rows as sorted on
-   * screen. Usually spread from `useTableExport(...).tableProps` together
+   * Makes the table exportable: a table without row menus gets a table-wide
+   * right-click menu holding just the export formats (a row menu never
+   * carries export; the title bar's `TableActionsMenu` does). Exports the
+   * rows as sorted on screen. Usually spread from `useTableExport(...).tableProps` together
    * with `exportRef`, so the title bar's `TableActionsMenu` agrees.
    */
   exportable?: TableExportConfig<T>;

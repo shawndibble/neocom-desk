@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TRADE_HUBS } from '@/market/hubs';
+import { COMPARED_HUBS } from '@/market/hubs';
 import { compareHubsCsvColumns } from './compareHubsCsv';
 import type { CompareHubRow } from './compareHubsRows';
 import type { HubId } from './useCompareHubs';
@@ -7,7 +7,7 @@ import type { HubId } from './useCompareHubs';
 const t = (k: string, opts?: Record<string, unknown>) =>
   opts?.hub ? `${k}:${String(opts.hub)}` : k;
 
-const ids = TRADE_HUBS.map((hub) => hub.id);
+const ids = COMPARED_HUBS.map((hub) => hub.id);
 const quote = (sell: number | null, buy: number | null, loading = false) => ({
   sell,
   buy,
@@ -44,18 +44,18 @@ describe('compareHubsCsvColumns', () => {
   it('exports sell, buy, jumps and status per hub, then best hubs and your hub', () => {
     expect(columns).toHaveLength(1 + ids.length * 4 + 3);
     const values = valuesOf(row());
-    const jita = TRADE_HUBS[0].systemName;
+    const jita = COMPARED_HUBS[0].systemName;
     expect(values[`market.compare.hubSellColumn:${jita}`]).toBe(100);
     expect(values[`market.compare.hubJumpsColumn:${jita}`]).toBeNull();
-    expect(values[`market.compare.hubJumpsColumn:${TRADE_HUBS[1].systemName}`]).toBe(1);
+    expect(values[`market.compare.hubJumpsColumn:${COMPARED_HUBS[1].systemName}`]).toBe(1);
     expect(values['market.compare.columnBestSellHub']).toBe(jita);
     expect(values['market.compare.columnYourHub']).toBe(
-      TRADE_HUBS.find((hub) => hub.id === 'amarr')!.systemName
+      COMPARED_HUBS.find((hub) => hub.id === 'amarr')!.systemName
     );
   });
 
   it('tells an unreachable hub from one with no sellers', () => {
-    const first = TRADE_HUBS[0];
+    const first = COMPARED_HUBS[0];
     const status = `market.compare.hubStatusColumn:${first.systemName}`;
     const unreachable = row({
       quotes: { ...row().quotes, [first.id]: quote(null, null) },

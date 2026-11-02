@@ -16,7 +16,7 @@ describe('ItemPriceAlertBell', () => {
         onPin={() => {}}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Set price alert for Tritanium' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set price alert' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
@@ -32,7 +32,7 @@ describe('ItemPriceAlertBell', () => {
         onPin={() => {}}
       />
     );
-    const button = screen.getByRole('button', { name: 'Set price alert for Tritanium' });
+    const button = screen.getByRole('button', { name: 'Set price alert' });
     expect(button).toHaveAttribute('aria-disabled', 'true');
 
     fireEvent.touchStart(button, {

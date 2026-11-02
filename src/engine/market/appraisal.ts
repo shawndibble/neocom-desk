@@ -216,7 +216,8 @@ export function sellBrokerFee(
     row.sellTotal,
     brokerRelationsLevel,
     standing.factionStanding,
-    standing.corpStanding
+    standing.corpStanding,
+    standing.brokerSurchargePct
   );
 }
 
@@ -503,7 +504,8 @@ export function appraisalNet(
         listValue,
         brokerRelationsLevel,
         standing.factionStanding,
-        standing.corpStanding
+        standing.corpStanding,
+        standing.brokerSurchargePct
       );
       listNet += listValue - salesTax(listValue, accountingLevel) - fee;
     }
@@ -516,7 +518,8 @@ export function appraisalNet(
     brokerFeePct: brokerFeePct(
       brokerRelationsLevel,
       standing.factionStanding,
-      standing.corpStanding
+      standing.corpStanding,
+      standing.brokerSurchargePct
     ),
   };
 }
@@ -547,7 +550,13 @@ export function compareMargin(
   }
   const spread = bestSell - bestBuy;
   const broker = (value: number) =>
-    brokerFee(value, brokerRelationsLevel, standing.factionStanding, standing.corpStanding);
+    brokerFee(
+      value,
+      brokerRelationsLevel,
+      standing.factionStanding,
+      standing.corpStanding,
+      standing.brokerSurchargePct
+    );
   return {
     spread,
     spreadPct: bestBuy > 0 ? (spread / bestBuy) * 100 : null,

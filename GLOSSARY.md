@@ -46,7 +46,7 @@ here — they go one per file in `docs/context/decisions/`.
   Distinct from **Compare**, which puts the items in the **Compare Set** side
   by side on their own prices: an Appraisal answers "what is this pile
   worth", Compare answers "which of these is cheaper". Its "Compare hubs"
-  section prices the same pile at all 5 Trade Hubs ("where is it worth the
+  section prices the same pile at the five empire Trade Hubs ("where is it worth the
   most") and is not the **Compare** drawer. Its optional "Split each" column
   is the **split**: the midpoint of a line's buy and sell price, also shown
   on a **Shared Appraisal**.
@@ -294,7 +294,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Compare**: A resizable bottom drawer over the **Compare Set**, not a tab —
   it opens beside the order book, since comparing happens _while_ browsing.
   Shows Prices, Trade hubs and Attributes views. Distinct from **Appraisal**'s **Compare
-  hubs**, which prices one pasted pile across the five trade hubs, and from
+  hubs**, which prices one pasted pile across the five empire trade hubs, and from
   **Fitting Compare**, which never touches the Compare Set.
 - **Compare Set**: The short-lived selection of items being priced against each
   other right now — usually variants of one thing. Distinct from the
@@ -616,8 +616,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Order Urgency**: How soon an open order needs the pilot, the Open Orders fix list's three buckets. **Needs you**: `belowFloor`, `undercutStation`, `outbid`, `expiringOrStale`. **Watch**: `undercutSystem`, `undercutRegion`, and an order nobody could check (`notChecked`). **Fine**: `healthy`. The page's segments are Needs you, Watch and All (Fine shows under All).
 - **Ore Form**: Whether mining ore, moon ore and ice are valued and named as their Compressed or Raw type. A synced setting, Compressed by default; a type with no Compressed counterpart is always Raw. Applies to Unassigned and Outstanding rows only; Paid rows keep the ISK they were paid at.
 - **Reprocessing Yield**: What one type breaks down into when refined, per portion size rather than per unit. Combined with the character's skills into an expected output: ore, ice and moon ore use Reprocessing, Reprocessing Efficiency and their own specialisation skill; scrap uses Scrapmetal Processing only. The facility's own rate is the pilot's **Refining Setup**; with none set it is the base 50% NPC station rate with no tax (shown as an assumption).
-- **Refining Setup**: The pilot's own account of the facility they refine at: a **Facility Yield** and a **Reprocessing Tax**, set once and read by every refining figure in the app. One setup, not one per station. Unset means an NPC station at 50% with no tax.
-- **Facility Yield**: A refining facility's own yield before the pilot's skills and implants (50% at an NPC station; a structure's depends on its type, rigs and security). Skills and implants then multiply it. Not the pilot's final yield.
+- **Refining Setup**: The pilot's own account of the facility they refine at: a **Facility Base Yield** and a **Reprocessing Tax**, set once and read by every refining figure in the app. One setup, not one per station. Unset means an NPC station at 50% with no tax.
+- **Facility Base Yield**: A refining facility's own yield before the pilot's skills and implants (50% at an NPC station; a structure's depends on its type, rigs and security), the "base yield" line in the EVE client's Reprocessing tooltip. Skills and implants then multiply it. Not the pilot's final yield: that is the **Reprocessing Yield**.
+- **Reprocessing Yield**: The share of each portion's materials that actually comes back: the Facility Base Yield times the pilot's skills and implants. The headline "yield" in the EVE client's Reprocessing window (69.7% where the base is 51%), and the efficiency other appraisal tools ask for. Typing it into the Refine breakdown works the Facility Base Yield out from it.
 - **Reprocessing Tax**: The fee a facility charges to refine, as a percentage of the refined output's value, paid in ISK. It never reduces the quantities that come out.
 - **Order Slots**: How many market orders a character may keep open at once: a base 5, plus 4 per level of Trade, 8 per Retail, 16 per Wholesale and 32 per Tycoon, so 305 with all four at V. Derived from trained skills, since ESI never reports the ceiling.
 - **Overdue**: A **Statement** that is still unpaid a set number of days after it was issued (14 by default; settable per book). No interest accrues, and reminders are sent by hand. A Miner's declaration that they paid another way pauses it for at most 14 days.
@@ -761,7 +762,7 @@ here — they go one per file in `docs/context/decisions/`.
   with one card per domain. Retired; the Overview is now an **Overview Layout**
   the pilot builds. Distinct from the **Corp Board** (`/corp`), which
   answers the same question for a corporation.
-- **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan.
+- **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan. Five empire hubs (Jita, Amarr, Dodixie, Rens, Hek) plus **Manifest**, Exordium's starter hub, which every-hub views leave out.
 - **Hauling Opportunities**: The Market page's Hauling tab: items worth buying at one **Trade Hub** to sell at another, scanned per market category, priced at an **Expected Sell Price** and sized to a **Trip Plan**. Not a price-gap list.
 - **Selling into buy orders**: (`instant` mode in code.) The **Hauling Opportunities** mode that sells the cargo instantly into the destination hub station's standing buy orders instead of listing it: priced at what those orders actually pay, after sales tax only, with no **Days to Sell** or demand.
 - **Expected Sell Price**: What a hauler should expect per unit at the destination hub if they list to sell: the lower of one tick under the cheapest listing and the volume-weighted median price the item sold at recently. Never above today's cheapest listing.

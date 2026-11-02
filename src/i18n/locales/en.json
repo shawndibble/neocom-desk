@@ -4244,7 +4244,7 @@
       "leftoverUnpriced": "No buy price for leftover {{minerals}}; counted as worth nothing.",
       "wholePortions": "Ore is bought in whole portions, so no part-portion remainder is left unrefined.",
       "pricingBasis": "Ore at {{hub}} order-book prices, walked for the quantity. Leftovers at the hub buy price.",
-      "yieldAssumption": "Refining at a {{rate}}% facility yield, plus your skills; the reprocessing tax is added to the ore cost.",
+      "yieldAssumption": "Refining at a {{rate}}% facility base yield, plus your skills; the reprocessing tax is added to the ore cost.",
       "cheapestFound": "Cheapest found, not proven optimal.",
       "lightestFound": "Lightest found, not proven optimal.",
       "copy": "Copy buy list",
@@ -6901,6 +6901,10 @@
     "rowHint_touch": "Tip: touch and hold any row to open its actions",
     "hintGotIt": "Got it",
     "moreActions": "More actions",
+    "menuGroup": {
+      "track": "Track",
+      "game": "In game"
+    },
     "tableExport": {
       "menuLabel": "{{name}} actions",
       "exportButtonLabel": "Export {{name}}",
@@ -8007,7 +8011,7 @@
         "priceBasisNowHint": "Today's live {{price}} price, not the price on {{date}}. Raw ore is priced as its compressed form.",
         "priceBasisNowRatedHint": "{{percent}}% of today's live {{price}} price, not the price on {{date}}. Raw ore is priced as its compressed form.",
         "priceBasisUnpublishedHint": "Until that day's closing price is published, it uses today's live price.",
-        "refineBasisHint": "Refining uses {{character}}'s Reprocessing and Reprocessing Efficiency skills at your {{rate}}% facility yield ({{efficiency}}% yield), less {{tax}}% reprocessing tax.",
+        "refineBasisHint": "Refining uses {{character}}'s Reprocessing and Reprocessing Efficiency skills at your {{rate}}% facility base yield ({{efficiency}}% yield), less {{tax}}% reprocessing tax.",
         "refineImplantHint": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
         "partialPricingHint": "Some types have no Jita price on this basis. Their value is left out of both totals rather than guessed."
       }
@@ -12858,8 +12862,8 @@
       "assumesBaseStandingsHint": "The broker fee above is calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
       "refineTotal": "Refine",
       "refineTotalHelp": "What refining the list with the active Character's own reprocessing skills would fetch, sold into buy orders at this hub, less the reprocessing tax. The facility yield and tax beside it are yours to set.",
-      "refineYield": "Facility yield",
-      "refineYieldHelp": "The facility's own yield before your skills and implants, which are applied on top. 50% at an NPC station. At a structure, hover an item in its Reprocessing window for the yield breakdown.",
+      "refineYield": "Facility base yield",
+      "refineYieldHelp": "The facility's own yield before your skills and implants, which are applied on top: the 'base yield' line in the EVE client's Reprocessing tooltip (50% at an NPC station). Not the 'yield' headline above it, which already has your skills in it.",
       "refineTax": "Reprocessing tax",
       "refineTaxHelp": "The facility's fee, taken from the refined value in ISK. An NPC station's depends on your standings; a structure's is set by its owner. Check the structure in the Structures browser.",
       "breakdown": {
@@ -12870,19 +12874,19 @@
         "atEfficiency": "@ {{efficiency}}",
         "openRow": "Refine breakdown for {{name}}",
         "skills": "Skills",
-        "skillsHelp": "Reprocessing, Reprocessing Efficiency and the ore's specialisation skill, with any refining implant, folded into one multiplier on the facility yield.",
-        "efficiency": "Total efficiency",
-        "efficiencyHelp": "Facility yield times skills: the share of each portion's materials that comes back. Compare it with the efficiency another tool asks for.",
-        "assumingNpc": "Assuming an NPC station's 50% yield. At a structure, enter its yield and everything below follows.",
-        "assumingNpcShared": "These numbers use an NPC station's 50% yield, which may not be where the sharer refines.",
+        "skillsHelp": "Reprocessing, Reprocessing Efficiency and the ore's specialisation skill, with any refining implant, folded into one multiplier on the facility base yield.",
+        "efficiency": "Reprocessing yield",
+        "efficiencyHelp": "Facility base yield times your skills: the share of each portion's materials that comes back. It is the yield the EVE client shows in its Reprocessing window, and the efficiency other tools ask for. Type it here and the facility base yield is worked out for you.",
+        "assumingNpc": "Assuming an NPC station's 50% base yield. At a structure, enter its base yield, or type the reprocessing yield your EVE client shows, and everything below follows.",
+        "assumingNpcShared": "These numbers use an NPC station's 50% base yield, which may not be where the sharer refines.",
         "sellAsIs": "Sell as is",
         "sellAsIsNote": "Into {{hub}} buy orders now, no refining",
         "refineThenSell": "Refine, then sell minerals",
         "aheadNote": "{{amount}} ({{percent}}%) more than selling as is",
         "behindNote": "{{amount}} ({{percent}}%) less than selling as is",
         "better": "Better",
-        "breakEvenWin": "Refining beats selling as is above {{breakEven}} total efficiency. You are at {{yours}}.",
-        "breakEvenLose": "Refining only beats selling as is above {{breakEven}} total efficiency. You are at {{yours}}, so sell it as is.",
+        "breakEvenWin": "Refining beats selling as is above {{breakEven}} reprocessing yield. You are at {{yours}}.",
+        "breakEvenLose": "Refining only beats selling as is above {{breakEven}} reprocessing yield. You are at {{yours}}, so sell it as is.",
         "neverWins": "Refining does not beat selling as is at any yield for this pile.",
         "topOfBook": "Both figures use the best buy price at the hub, so a very large pile will sell for less.",
         "mineralsTitle": "Minerals you get",
@@ -13010,7 +13014,7 @@
       "seriesAverage": "Average",
       "averageNoOrderData": "Average Price (no order data)",
       "regionAverageNoOrderData": "{{region}} average (no order data)",
-      "noOrderDataTip": "Buy and Sell lines are the best orders at the five Trade Hub stations (Jita 4-4, Amarr VIII, Dodixie IX-20, Rens VI-8, Hek VIII-12); other regions show EVE's daily traded average.",
+      "noOrderDataTip": "Buy and Sell lines are the best orders at the Trade Hub stations (Jita 4-4, Amarr VIII, Dodixie IX-20, Rens VI-8, Hek VIII-12, Manifest V); other regions show EVE's daily traded average.",
       "summaryBuyMedian": "Median buy",
       "summarySellMedian": "Median sell",
       "compareRegions": "Compare regions",
@@ -13083,14 +13087,13 @@
       "rowCount_one": "{{count}} row",
       "rowCount_other": "{{count}} rows",
       "noDifferences": "Every attribute is the same across the compared items.",
-      "addItem": "Add {{name}} to Compare",
-      "removeItem": "Remove {{name}} from Compare"
+      "removeFromCompare": "Remove from Compare"
     },
     "quickbar": {
       "title": "Quickbar",
       "empty": "No items yet — open an item's menu (⋮) and choose Add to Quickbar.",
       "viewInAppraisal": "View in Appraisal",
-      "removeItem": "Remove {{name}} from Quickbar",
+      "removeFromQuickbar": "Remove from Quickbar",
       "removeMenu": "Remove",
       "removed": "Quickbar item {{name}} removed.",
       "undo": "Undo",
@@ -13103,7 +13106,6 @@
         "cancelled": "Reordering cancelled. {{name}} stayed at its original position.",
         "instructions": "Press space to pick up an item. Use the up and down arrow keys to move it, space again to drop it, or escape to cancel."
       },
-      "addItem": "Add {{name}} to Quickbar",
       "vsPaid": {
         "label": "against what you paid for {{name}}",
         "tooltip_one": "vs paid: {{price}} now against {{paid}} paid for the {{units}} unit you still hold, before fees.",
@@ -13111,7 +13113,7 @@
       }
     },
     "priceAlert": {
-      "button": "Set price alert for {{name}}",
+      "button": "Set price alert",
       "priceLabel": "Target price (ISK)",
       "directionLabel": "Direction",
       "directionAbove": "At or above",
@@ -13293,7 +13295,7 @@
         "topBid": "Nobody bids higher where this order sits"
       },
       "offHub": "Off hub",
-      "offHubHelp": "This order is not at one of the five NPC trade hubs, so fewer buyers pass it.",
+      "offHubHelp": "This order is not at one of the NPC trade hubs, so fewer buyers pass it.",
       "legendColourRule": "Colour marks distance only — station, system, region. Everything else is grey. Every badge also carries its own words.",
       "group": {
         "belowFloor": "Priced below cost",
@@ -13389,7 +13391,7 @@
       "exitHaulUnavailable": "Could not read the trade hub prices. Reopen this order to try again.",
       "exitReprocessNotBuilt": "Reprocess and sell the minerals",
       "exitReprocess": "Reprocess and sell the materials, {{price}} a unit",
-      "exitReprocessAssumption": "Refined at a {{rate}}% facility yield with {{tax}}% reprocessing tax, valued against the buy orders here. Set both in Appraisal.",
+      "exitReprocessAssumption": "Refined at a {{rate}}% facility base yield with {{tax}}% reprocessing tax, valued against the buy orders here. Set both in Appraisal.",
       "exitReprocessImplant": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
       "exitReprocessAssumesNoImplants": "Calculated without {{character}}'s fitted implants, so a refining implant isn't counted. Grant Character details for an accurate estimate.",
       "exitReprocessPartial": "At least one material has no buy order here, so this total is a floor.",
@@ -14523,8 +14525,8 @@
     "bpcHideAuctionsHint": "Hides auction contracts when BPC Sourcing opens.",
     "bpcHideHint": "Hides PLEX contracts when BPC Sourcing opens. Toggle it in the filter bar per search.",
     "tradeHubHint": "Prices LP offers and item lookups; Hauling Opportunities starts here. Moon mining tax uses each payee’s own hub.",
-    "refiningYieldLabel": "Facility yield",
-    "refiningYieldHint": "Where you refine, before your skills and implants: 50% at an NPC station. At a structure, hover an item in its Reprocessing window for the yield breakdown.",
+    "refiningYieldLabel": "Facility base yield",
+    "refiningYieldHint": "Where you refine, before your skills and implants: 50% at an NPC station. At a structure, use the 'base yield' line in its Reprocessing window's tooltip, not the 'yield' headline, which already has your skills in it.",
     "refiningTaxLabel": "Reprocessing tax",
     "refiningTaxHint": "The facility's fee, taken from the refined value. An NPC station's depends on your standings; a structure's is set by its owner. Check the structure in the Structures browser.",
     "assumedMeLabel": "Assumed ME for blueprints you don’t own",
@@ -17533,7 +17535,8 @@
             "needs-sign-in": "Needs login",
             "needs-role": "Needs a role",
             "own-book": "Has its own book",
-            "gone-quiet": "Gone quiet"
+            "gone-quiet": "Gone quiet",
+            "failed": "Could not connect"
           }
         },
         "needs": {
@@ -17549,6 +17552,11 @@
           },
           "own-book": {
             "text": "Delete its book first, then connect it here."
+          },
+          "failed": {
+            "text": "Something went wrong while connecting this corp.",
+            "code": "Reason: {{reason}}",
+            "action": "Try again"
           },
           "gone-quiet": {
             "text": "EVE has not answered for this corp for a while. It may be closed.",

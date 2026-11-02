@@ -7,7 +7,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppraisalNetFees } from '@/engine/market/appraisal';
 import { SKILL_IDS } from '@/engine/industry/types';
-import { ZERO_STANDINGS } from '@/engine/market/standings';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import type { TradeHub } from '@/market/hubs';
 import { typeIdsInHaulingCategory } from './haulingCategories';
@@ -20,7 +19,7 @@ import {
 import type { HaulingEnd } from './haulingHubs';
 import { scanHaulingLane } from './haulingScanRun';
 import type { HaulingFeesAt } from './haulingView';
-import { tradeHubStanding, useTradeHubStandings } from './useTradeHubStandings';
+import { tradeHubStanding, useTradeHubStandings, zeroStandingsAt } from './useTradeHubStandings';
 
 export type HaulingScanState =
   | { status: 'loading'; progress: HaulingProgress | null }
@@ -128,7 +127,8 @@ export function useHaulingFees(characterId: number | null): HaulingFees {
         fees = {
           accountingLevel,
           brokerRelationsLevel,
-          standing: characterId === null ? ZERO_STANDINGS : tradeHubStanding(standings, hub.id),
+          standing:
+            characterId === null ? zeroStandingsAt(hub.id) : tradeHubStanding(standings, hub.id),
         };
         byHub.set(hub.id, fees);
       }

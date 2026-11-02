@@ -195,7 +195,7 @@ describe('MarketWideOpportunitiesPanel row context menu', () => {
     const row = screen.getByText('Widget Beta').closest('tr')!;
     expect(within(row).getByRole('button', { name: 'Plan' })).toBeInTheDocument();
     await user.click(within(row).getByRole('button', { name: /More actions for Widget Beta/ }));
-    expect(await screen.findByRole('menuitem', { name: /Quickbar/ })).toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: 'Track' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Show info/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Price history' })).toBeInTheDocument();
   });

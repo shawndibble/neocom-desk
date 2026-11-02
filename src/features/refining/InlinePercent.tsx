@@ -68,7 +68,12 @@ export function InlinePercent({
         onClick={(e) => e.stopPropagation()}
         onBlur={() => close(true, false)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') close(true, true);
+          if (e.key === 'Enter') {
+            // Focus moves to the value's button as the field closes; left alone, this same keystroke's
+            // default action would then press that button and open the field again.
+            e.preventDefault();
+            close(true, true);
+          }
           if (e.key === 'Escape') {
             e.stopPropagation();
             close(false, true);
