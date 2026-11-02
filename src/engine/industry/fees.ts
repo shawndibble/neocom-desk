@@ -42,7 +42,7 @@ export function salesTaxPct(accountingLevel: number): number {
 
 /**
  * NPC-station broker fee rate, percent. Standings are unmodified -10..10.
- * `surchargePct` is a hub's own extra points (Exordium's Safety Tax,
+ * `safetyTaxPct` is a hub's own extra points (Exordium's Safety Tax,
  * `TradeHub.safetyTaxPct`); it is added after the zero floor, because a
  * surcharge is not something skills or standing can reduce. It is a separate
  * line in game, so `brokerFee`'s 100 ISK minimum applies to the rest only.
@@ -51,7 +51,7 @@ export function brokerFeePct(
   brokerRelationsLevel: number,
   factionStanding = 0,
   corpStanding = 0,
-  surchargePct = 0
+  safetyTaxPct = 0
 ): number {
   assertLevel('Broker Relations', brokerRelationsLevel);
   const pct =
@@ -59,7 +59,7 @@ export function brokerFeePct(
     BROKER_RELATIONS_PCT_PER_LEVEL * brokerRelationsLevel -
     FACTION_STANDING_PCT_PER_POINT * factionStanding -
     CORP_STANDING_PCT_PER_POINT * corpStanding;
-  return Math.max(0, pct) + surchargePct;
+  return Math.max(0, pct) + safetyTaxPct;
 }
 
 /** Sales tax in ISK on a filled order of `value` ISK. */
@@ -73,12 +73,12 @@ export function brokerFee(
   brokerRelationsLevel: number,
   factionStanding = 0,
   corpStanding = 0,
-  surchargePct = 0
+  safetyTaxPct = 0
 ): number {
   if (value <= 0) return 0;
   const skillFee =
     (value * brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding)) / 100;
-  return Math.max(MIN_BROKER_FEE_ISK, skillFee) + (value * surchargePct) / 100;
+  return Math.max(MIN_BROKER_FEE_ISK, skillFee) + (value * safetyTaxPct) / 100;
 }
 
 /**
@@ -144,17 +144,17 @@ function breakEvenPriceAtRate(
   quantity: number,
   taxPct: number,
   brokerPct: number,
-  surchargePct = 0
+  safetyTaxPct = 0
 ): number | null {
   if (quantity <= 0) return null;
 
-  const revenueNoFloor = totalCost / (1 - (taxPct + brokerPct + surchargePct) / 100);
+  const revenueNoFloor = totalCost / (1 - (taxPct + brokerPct + safetyTaxPct) / 100);
   const impliedBrokerFee = (revenueNoFloor * brokerPct) / 100;
 
   const revenue =
     revenueNoFloor <= 0 || impliedBrokerFee >= MIN_BROKER_FEE_ISK
       ? revenueNoFloor
-      : (totalCost + MIN_BROKER_FEE_ISK) / (1 - (taxPct + surchargePct) / 100);
+      : (totalCost + MIN_BROKER_FEE_ISK) / (1 - (taxPct + safetyTaxPct) / 100);
 
   return revenue / quantity;
 }
@@ -174,11 +174,11 @@ export function breakEvenPrice(
   brokerRelationsLevel: number,
   factionStanding = 0,
   corpStanding = 0,
-  surchargePct = 0
+  safetyTaxPct = 0
 ): number | null {
   const taxPct = salesTaxPct(accountingLevel);
   const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding);
-  return breakEvenPriceAtRate(totalCost, quantity, taxPct, brokerPct, surchargePct);
+  return breakEvenPriceAtRate(totalCost, quantity, taxPct, brokerPct, safetyTaxPct);
 }
 
 /**

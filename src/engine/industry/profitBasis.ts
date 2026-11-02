@@ -26,7 +26,7 @@ export interface ProfitBasisInput {
   accountingLevel: number;
   brokerRelationsLevel: number;
   factionStanding?: number;
-  /** The market's extra broker-fee points (`TradeHub.safetyTaxPct`); none when absent. */
+  /** The market's Safety Tax, percent of an order's value (`TradeHub.safetyTaxPct`); none when absent. */
   safetyTaxPct?: number;
   corpStanding?: number;
 }

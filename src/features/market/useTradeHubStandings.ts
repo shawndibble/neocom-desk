@@ -25,7 +25,7 @@ export type TradeHubStandingsMap = ReadonlyMap<TradeHub['id'], ResolvedStandings
 
 const NO_STANDINGS: TradeHubStandingsMap = new Map();
 
-/** The standings at a hub's station, plus the hub's own broker surcharge so fee sites need no hub lookup. */
+/** The standings at a hub's station, plus the hub's own Safety Tax so fee sites need no hub lookup. */
 async function resolveHubStandings(
   hub: TradeHub,
   entries: Parameters<typeof resolveLocationStandings>[1]
@@ -89,7 +89,7 @@ export function useTradeHubStandingsByCharacter(
   return standingsByCharacter;
 }
 
-/** No standing at a hub, but still the hub's own surcharge: it is the market's, not the pilot's. */
+/** No standing at a hub, but still the hub's own Safety Tax: it is the market's, not the pilot's. */
 export function zeroStandingsAt(hubId: TradeHub['id']): ResolvedStandings {
   const safetyTaxPct = getTradeHub(hubId)?.safetyTaxPct ?? 0;
   return safetyTaxPct > 0 ? { ...ZERO_STANDINGS, safetyTaxPct } : ZERO_STANDINGS;

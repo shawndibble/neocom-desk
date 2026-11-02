@@ -27,7 +27,7 @@ export interface ResolvedStandings {
   /** Unmodified standing toward the station owner's corporation, -10..10. */
   corpStanding: number;
   /**
-   * The market's own extra broker-fee points (`TradeHub.safetyTaxPct`).
+   * The market's own Safety Tax, percent of a non-instant order's value (`TradeHub.safetyTaxPct`).
    * Carried here because every fee site already holds the standing resolved
    * for its hub; absent means none.
    */

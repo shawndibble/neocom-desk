@@ -89,7 +89,7 @@ describe('compared and daily-job hubs', () => {
     ]);
   });
 
-  it('charges Exordium a broker surcharge and no empire hub one', () => {
+  it('charges Exordium a Safety Tax and no empire hub one', () => {
     expect(getTradeHub('manifest')?.safetyTaxPct).toBeGreaterThan(0);
     expect(COMPARED_HUBS.every((hub) => hub.safetyTaxPct === 0)).toBe(true);
   });
