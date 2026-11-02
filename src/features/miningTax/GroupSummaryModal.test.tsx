@@ -94,6 +94,22 @@ describe('GroupSummaryModal payment', () => {
     expect(screen.getByText('Paid 200 ISK · 2026-09-10')).toBeInTheDocument();
   });
 
+  it('lists entries outside the group that its payment also settled, and opens one', async () => {
+    const onOpenCovered = vi.fn();
+    renderGroup({
+      members: [
+        member('2026-09-08', {
+          payment: { paymentId: 'p', paidOn: '2026-09-10', method: 'donation', amount: 200 },
+        }),
+        member('2026-09-09'),
+      ],
+      alsoCovers: [{ id: 'out', date: '2026-09-01', taxOwed: 750_000 }],
+      onOpenCovered,
+    });
+    await userEvent.click(screen.getByRole('button', { name: '2026-09-01 · 750,000 ISK' }));
+    expect(onOpenCovered).toHaveBeenCalledWith('out');
+  });
+
   it('links a transaction to the Wallet Journal, highlighting it', () => {
     renderGroup({
       linkedTransactions: [

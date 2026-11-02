@@ -141,6 +141,27 @@ export function linkedRefIds(assignments: readonly MiningTaxAssignmentRecord[]) 
   return { journal, contract };
 }
 
+/** Every Assignment each journal / contract id is linked to, oldest first — the wallet journal lists one link per entry a payment settled. */
+export function linkedAssignmentsByRef(assignments: readonly MiningTaxAssignmentRecord[]) {
+  const journal = new Map<number, MiningTaxAssignmentRecord[]>();
+  const contract = new Map<number, MiningTaxAssignmentRecord[]>();
+  const add = (map: typeof journal, refId: number, a: MiningTaxAssignmentRecord) => {
+    const list = map.get(refId);
+    if (list) list.push(a);
+    else map.set(refId, [a]);
+  };
+  for (const a of assignments) {
+    if (!a.payment) continue;
+    const normalized = normalizePaymentInfo(a.payment);
+    for (const link of normalized.journalLinks ?? []) add(journal, link.refId, a);
+    for (const link of normalized.contractLinks ?? []) add(contract, link.refId, a);
+  }
+  for (const map of [journal, contract]) {
+    for (const list of map.values()) list.sort((x, y) => x.date.localeCompare(y.date));
+  }
+  return { journal, contract };
+}
+
 /**
  * Payments not already accounted for. Namespaced by kind: a journal entry id
  * and a contract id are separate id spaces that regularly collide.
@@ -468,6 +489,27 @@ export function coPaidAssignments(
   return everyAssignment
     .filter((a) => a.id !== assignment.id && a.payment?.paymentId === paymentId)
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * The entries outside a joined group that its payment also settled: the
+ * co-paid siblings of every member, minus the members themselves.
+ */
+export function coPaidOutsideGroup(
+  members: readonly MiningTaxAssignmentRecord[],
+  everyAssignment: readonly MiningTaxAssignmentRecord[]
+): MiningTaxAssignmentRecord[] {
+  const inGroup = new Set(members.map((m) => m.id));
+  const seen = new Set<string>();
+  const out: MiningTaxAssignmentRecord[] = [];
+  for (const m of members) {
+    for (const a of coPaidAssignments(m, everyAssignment)) {
+      if (inGroup.has(a.id) || seen.has(a.id)) continue;
+      seen.add(a.id);
+      out.push(a);
+    }
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /**

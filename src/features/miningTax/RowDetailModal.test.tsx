@@ -220,6 +220,16 @@ describe('RowDetailModal payment', () => {
     expect(screen.getByText(/2026-09-02 · 1,234,567 ISK/)).toBeInTheDocument();
   });
 
+  it('opens a listed sibling entry when clicked', async () => {
+    const onOpenCovered = vi.fn();
+    renderPaid({
+      alsoCovers: [{ id: 'x', date: '2026-09-02', taxOwed: 1_234_567 }],
+      onOpenCovered,
+    });
+    await userEvent.click(screen.getByRole('button', { name: /2026-09-02/ }));
+    expect(onOpenCovered).toHaveBeenCalledWith('x');
+  });
+
   it('calls onUnlinkTransaction with the clicked transaction', async () => {
     const onUnlink = vi.fn();
     const transaction = {

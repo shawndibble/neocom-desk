@@ -8,8 +8,8 @@ import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
-import { miningTaxPaymentHref } from '@/features/miningTax/paymentDeepLink';
-import { linkedRefIds } from '@/features/miningTax/paymentLinks';
+import { miningTaxEntryHref } from '@/features/miningTax/paymentDeepLink';
+import { linkedAssignmentsByRef } from '@/features/miningTax/paymentLinks';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import { classifyJournal, journalCoverage, type JournalLine } from '@/engine/journalNetting';
 import {
@@ -17,6 +17,7 @@ import {
   loadWalletScopedCharacterIds,
   type AllJournalsSnapshot,
 } from '@/features/character/walletJournalAll';
+import type { MiningTaxEntryLink } from '@/features/character/JournalDescriptionCell';
 import { usePartyNames } from '@/features/character/usePartyNames';
 import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
 import {
@@ -143,27 +144,26 @@ export function useWalletJournalView({
     return (id: number) => names.get(id) ?? `#${id}`;
   }, [allCharacters]);
   // Journal lines a pilot linked to a Moon Mining Tax payment get a way back
-  // to the tax row they settled. Every character's Assignments, since the
+  // to each tax entry they settled. Every character's Assignments, since the
   // journal can show any of them.
   const taxLinks = useLiveQuery(
-    async () => linkedRefIds(await db.miningTaxAssignments.toArray()),
+    async () => linkedAssignmentsByRef(await db.miningTaxAssignments.toArray()),
     [],
     undefined
   );
-  const miningTaxHrefFor = useCallback(
-    (entry: WalletJournalEntry) => {
+  const miningTaxEntriesFor = useCallback(
+    (entry: WalletJournalEntry): MiningTaxEntryLink[] | undefined => {
       if (!taxLinks) return undefined;
-      if (taxLinks.journal.has(entry.id)) {
-        return miningTaxPaymentHref({ kind: 'journal', id: entry.id });
-      }
-      if (
-        entry.context_id_type === 'contract_id' &&
-        entry.context_id !== undefined &&
-        taxLinks.contract.has(entry.context_id)
-      ) {
-        return miningTaxPaymentHref({ kind: 'contract', id: entry.context_id });
-      }
-      return undefined;
+      const linked =
+        taxLinks.journal.get(entry.id) ??
+        (entry.context_id_type === 'contract_id' && entry.context_id !== undefined
+          ? taxLinks.contract.get(entry.context_id)
+          : undefined);
+      return linked?.map((a) => ({
+        href: miningTaxEntryHref(a.id),
+        date: a.date,
+        taxOwed: a.taxOwed,
+      }));
     },
     [taxLinks]
   );
@@ -177,7 +177,7 @@ export function useWalletJournalView({
       buildJournalColumns(
         personalLinkFor,
         personalNameFor,
-        miningTaxHrefFor,
+        miningTaxEntriesFor,
         showingBeyondActive ? characterNameFor : undefined,
         undefined,
         lossCharacterFor
@@ -187,7 +187,7 @@ export function useWalletJournalView({
       lossCharacterFor,
       personalLinkFor,
       personalNameFor,
-      miningTaxHrefFor,
+      miningTaxEntriesFor,
       showingBeyondActive,
       characterNameFor,
     ]

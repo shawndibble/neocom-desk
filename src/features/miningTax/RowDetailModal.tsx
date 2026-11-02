@@ -92,6 +92,8 @@ interface RowDetailModalProps {
   linkedTransactions?: readonly LinkedTransaction[];
   /** The other entries this entry's payment also settled. */
   alsoCovers?: readonly CoveredEntry[];
+  /** Opens one of the `alsoCovers` entries in place of this one. */
+  onOpenCovered?: (id: string) => void;
   /** Opens the manual "Link transaction" picker (issue #540 follow-up) — offered whenever there is a payment to link against, paid or not. */
   onLinkTransaction?: () => void;
   onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
@@ -160,6 +162,7 @@ export function RowDetailModal({
   onAddPayee,
   linkedTransactions,
   alsoCovers,
+  onOpenCovered,
   onLinkTransaction,
   onUnlinkTransaction,
   suggestion,
@@ -331,6 +334,7 @@ export function RowDetailModal({
             onUnlinkTransaction={onUnlinkTransaction}
             busy={busy}
             alsoCovers={alsoCovers}
+            onOpenCovered={onOpenCovered}
             paid={assignment?.payment}
           />
         )}

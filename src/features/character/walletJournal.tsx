@@ -12,7 +12,10 @@ import { iskToneClass } from '@/features/character/format';
 import { journalRefKey, type JournalLine, type JournalRow } from '@/engine/journalNetting';
 import { journalRefLabel } from '@/features/character/journalRefLabel';
 import { journalDescriptionText } from '@/features/character/dailyGoal';
-import { JournalDescriptionCell } from '@/features/character/JournalDescriptionCell';
+import {
+  JournalDescriptionCell,
+  type MiningTaxEntryLink,
+} from '@/features/character/JournalDescriptionCell';
 import {
   filterWalletJournal,
   journalRefTypes,
@@ -97,7 +100,7 @@ export function useJournalFilterResult(
 export function useJournalColumnsBuilder(): (
   linkFor: (entry: JournalLine) => WalletTransactionCommon | undefined,
   nameFor: (typeId: number) => string,
-  miningTaxHrefFor?: (entry: JournalLine) => string | undefined,
+  miningTaxEntriesFor?: (entry: JournalLine) => readonly MiningTaxEntryLink[] | undefined,
   /** Set in the multi-Character view: adds a Character column. */
   characterNameFor?: (characterId: number) => string,
   /** Set on the corp journal: adds a Player column, who did it. */
@@ -111,7 +114,7 @@ export function useJournalColumnsBuilder(): (
     (
       linkFor: (entry: JournalLine) => WalletTransactionCommon | undefined,
       nameFor: (typeId: number) => string,
-      miningTaxHrefFor?: (entry: JournalLine) => string | undefined,
+      miningTaxEntriesFor?: (entry: JournalLine) => readonly MiningTaxEntryLink[] | undefined,
       characterNameFor?: (characterId: number) => string,
       playerNameFor?: (entry: JournalRow) => string,
       lossCharacterFor?: (entry: JournalRow) => number | undefined
@@ -194,7 +197,7 @@ export function useJournalColumnsBuilder(): (
                   entry={entry}
                   transaction={transaction}
                   itemName={transaction ? nameFor(transaction.type_id) : ''}
-                  miningTaxHref={miningTaxHrefFor?.(entry)}
+                  miningTaxEntries={miningTaxEntriesFor?.(entry)}
                   lossCharacterId={lossCharacterFor?.(entry)}
                 />
                 {entry.internal && (

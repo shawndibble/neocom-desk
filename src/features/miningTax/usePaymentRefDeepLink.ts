@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { DisplayRow } from '@/features/miningTax/groupRows';
 import {
-  findRowForPaymentRef,
-  PAYMENT_REF_PARAM,
-  parsePaymentRefParam,
+  findRowForEntry,
+  PAYMENT_ENTRY_PARAM,
+  parseEntryParam,
 } from '@/features/miningTax/paymentDeepLink';
 
 /**
- * The wallet journal's "Mining tax" link (`paymentDeepLink.ts`): opens the
- * detail of the row that transaction paid. Latched on mount and spent at
+ * The wallet journal's "Mining tax" entry link (`paymentDeepLink.ts`): opens
+ * the detail of the entry a linked transaction paid. Latched on mount and spent at
  * once, like `useHighlightParam`, so a reload or a later refresh can't
  * reopen the modal after the pilot closed it. Searches every row, not the
  * filtered ones: a Character or Payee filter must not hide the target.
@@ -21,28 +21,26 @@ export function usePaymentRefDeepLink(
   openDetail: (row: DisplayRow) => void
 ) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [initialPaymentRef] = useState(() =>
-    parsePaymentRefParam(searchParams.get(PAYMENT_REF_PARAM))
-  );
-  const pendingPaymentRef = useRef(initialPaymentRef);
+  const [initialEntryId] = useState(() => parseEntryParam(searchParams.get(PAYMENT_ENTRY_PARAM)));
+  const pendingEntryId = useRef(initialEntryId);
   useEffect(() => {
-    if (initialPaymentRef === null) return;
+    if (initialEntryId === null) return;
     setSearchParams(
       (prev) => {
         const params = new URLSearchParams(prev);
-        params.delete(PAYMENT_REF_PARAM);
+        params.delete(PAYMENT_ENTRY_PARAM);
         return params;
       },
       { replace: true }
     );
-  }, [initialPaymentRef, setSearchParams]);
+  }, [initialEntryId, setSearchParams]);
   // An effect rather than a render-phase write: the target now lives in the
   // dialogs store, which a render must not notify.
   useEffect(() => {
-    if (pendingPaymentRef.current === null || !hasData) return;
-    const target = findRowForPaymentRef(allDisplayRows, pendingPaymentRef.current);
+    if (pendingEntryId.current === null || !hasData) return;
+    const target = findRowForEntry(allDisplayRows, pendingEntryId.current);
     if (target) openDetail(target);
     // A miss on cached data may be a snapshot older than the link; wait for the fresh read.
-    if (target || !loading) pendingPaymentRef.current = null;
+    if (target || !loading) pendingEntryId.current = null;
   }, [hasData, allDisplayRows, loading, openDetail]);
 }
