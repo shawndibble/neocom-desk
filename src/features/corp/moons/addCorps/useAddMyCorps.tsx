@@ -23,7 +23,7 @@ import type { OwnCorpGrantCallbackState, OwnCorpGrantOutcome } from '../../taxBo
 import { useBook } from '../useBook';
 import { useAddCorpsRun, useAddCorpsRunStore } from '../useAddCorpsRun';
 import { newCorps, useMoonsHiddenCorps, useMoonsHiddenCorpsStore } from '../moonsHiddenCorps';
-import { useOwnCeoCorps } from '../useOwnCeoCorps';
+import { useOwnCeoCorps, verifyOwnCeoCorp } from '../useOwnCeoCorps';
 import { connectedInRun, needsYou } from './addCorpsStatus';
 import { NewCorpBanner, ResumeNotice } from './AddCorpsNotices';
 import { ConfirmBatchDialog } from './ConfirmBatchDialog';
@@ -75,7 +75,7 @@ export interface AddMyCorps {
 
 export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
   const { characterId, corporationId, canEdit, reload, names } = useBook();
-  const own = useOwnCeoCorps(corporationId);
+  const own = useOwnCeoCorps(corporationId, canEdit);
   const hidden = useMoonsHiddenCorps();
   const { run, start, recordOutcome, stop, retry } = useAddCorpsRun();
   const location = useLocation();
@@ -222,8 +222,17 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
           showOutcome={showOutcome}
           onClose={() => setStage({ kind: 'closed' })}
           onStop={() => void stop().then(() => setStage({ kind: 'closed' }))}
-          onSignIn={() => {
+          onSignIn={async () => {
             const cur = current(run)!;
+            // Read live right before leaving for EVE: a corporation or CEO that changed since
+            // the list was built is recorded as not connected, with no login wasted on it.
+            const check = await verifyOwnCeoCorp(cur);
+            if (check === 'unreachable') throw new Error('Could not check the corporation');
+            if (check === 'stale') {
+              await recordOutcome({ kind: 'refused', reason: 'ceo-changed' });
+              setShowOutcome(true);
+              return;
+            }
             return beginOwnCorpGrantLogin({
               characterId: run.editorCharacterId,
               expectedCeoCharacterId: cur.ceoCharacterId,

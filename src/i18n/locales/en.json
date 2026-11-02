@@ -17569,6 +17569,7 @@
         },
         "failed": {
           "wrong-corp": "That Character is not in this corporation.",
+          "ceo-changed": "This corporation has a different CEO now, or that Character has left it. Nothing was connected. Open Add my other corps again to see who leads it now.",
           "not-yours": "You are not the CEO of this corporation.",
           "own-book-exists": "This corp runs its own tax book. Delete it first, then connect it here.",
           "already-feeder": "This corporation is already a moon owner of a book.",
