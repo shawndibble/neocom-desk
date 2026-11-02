@@ -59,4 +59,19 @@ describe('CorpStatusPanel', () => {
     expect(onRemove).toHaveBeenCalledWith(4);
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not remove this corp');
   });
+  it('shows a failed connection with its reason and Try again, not "log in again"', async () => {
+    const onSignInAgain = vi.fn();
+    render(
+      <CorpStatusPanel
+        items={[{ corporationId: 9, name: 'Dunmoor Freight', state: 'failed', reason: 'unknown' }]}
+        onSignInAgain={onSignInAgain}
+        onRemove={() => Promise.resolve(true)}
+      />
+    );
+    expect(screen.getByText('Could not connect')).toBeInTheDocument();
+    expect(screen.getByText(/Reason: unknown/)).toBeInTheDocument();
+    expect(screen.queryByText('Needs login')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /Dunmoor Freight/ }));
+    expect(onSignInAgain).toHaveBeenCalledWith(9);
+  });
 });

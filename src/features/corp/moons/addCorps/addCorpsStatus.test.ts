@@ -13,7 +13,10 @@ describe('stateOfOutcome', () => {
     expect(stateOfOutcome({ kind: 'refused', reason: 'not-an-accountant' })).toBe('needs-role');
     expect(stateOfOutcome({ kind: 'refused', reason: 'own-book-exists' })).toBe('own-book');
     expect(stateOfOutcome({ kind: 'refused', reason: 'already-feeder' })).toBe('connected');
-    expect(stateOfOutcome({ kind: 'refused', reason: 'ledger-unavailable' })).toBe('needs-sign-in');
+    expect(stateOfOutcome({ kind: 'refused', reason: 'ledger-unavailable' })).toBe('failed');
+    // A server that failed or does not know the action is not "log in again".
+    expect(stateOfOutcome({ kind: 'refused', reason: 'unknown' })).toBe('failed');
+    expect(stateOfOutcome({ kind: 'refused', reason: 'wrong-corp' })).toBe('needs-sign-in');
   });
 });
 
