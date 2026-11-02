@@ -455,7 +455,8 @@ export function linkedTransactionsFor(
 
 /**
  * The other entries settled by the same lump sum as `assignment`, oldest
- * first — what the payment card lists so a single entry's detail still shows
+ * first (the same `paymentId` rule as `assignmentsSharingPayment`, which only
+ * `ledgerActions` may import) — what the payment card lists so a single entry's detail still shows
  * what the total covers. Empty when it has no payment record or paid alone.
  */
 export function coPaidAssignments(

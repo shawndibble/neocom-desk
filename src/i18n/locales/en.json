@@ -8190,7 +8190,8 @@
       "unlinkNamed": "Unlink transaction #{{id}}",
       "notCached": "Transaction #{{id}} · no longer in the cached wallet journal",
       "paidLine": "Paid {{amount}} ISK · {{date}}",
-      "alsoCovers": "The same payment also settled:"
+      "alsoCovers": "The same payment also settled:",
+      "alsoCoversLine": "{{date}} · {{amount}} ISK"
     },
     "suggestedPayeeHint": "Last used in {{system}}.",
     "assignToAction": "Assign to {{payee}} · {{amount}} ISK",

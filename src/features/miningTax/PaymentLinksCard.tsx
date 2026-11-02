@@ -18,6 +18,13 @@ export interface LinkedTransaction {
   label: string | null;
 }
 
+/** Another entry the same payment settled, as the card lists it. */
+export interface CoveredEntry {
+  id: string;
+  date: string;
+  taxOwed: number;
+}
+
 interface PaymentLinksCardProps {
   /**
    * Every linked transaction, resolved for display. Absent (rather than an
@@ -34,7 +41,7 @@ interface PaymentLinksCardProps {
   /** A single Assignment's own amount/paidOn line — `RowDetailModal` passes one, `GroupSummaryModal` doesn't (no one payment record to summarize for the whole group). */
   summary?: ReactNode;
   /** Other entries the same payment settled — shown so one entry's detail still says what the total covers. */
-  alsoCovers?: readonly { id: string; date: string; taxOwed: number }[];
+  alsoCovers?: readonly CoveredEntry[];
   /** The recorded payment, read as one sentence: "Paid 4,309,281 ISK · 2026-10-04 · auto-linked". */
   paid?: { amount: number; paidOn: string };
 }
@@ -98,7 +105,10 @@ export function PaymentLinksCard({
           <ul className="tabular-nums">
             {alsoCovers.map((c) => (
               <li key={c.id}>
-                {c.date} · {formatIsk(c.taxOwed, 0)} ISK
+                {t('miningTax.payment.alsoCoversLine', {
+                  date: c.date,
+                  amount: formatIsk(c.taxOwed, 0),
+                })}
               </li>
             ))}
           </ul>

@@ -30,7 +30,7 @@ import { cx } from '@/lib/cx';
 import { AssignDialog } from './AssignDialog';
 import { PriceBreakdownCard } from './PriceBreakdownCard';
 import { usePriceBreakdown } from './usePriceBreakdown';
-import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
+import { PaymentLinksCard, type CoveredEntry, type LinkedTransaction } from './PaymentLinksCard';
 import { StatusPill } from './StatusPill';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
@@ -91,7 +91,7 @@ interface RowDetailModalProps {
    */
   linkedTransactions?: readonly LinkedTransaction[];
   /** The other entries this entry's payment also settled. */
-  alsoCovers?: readonly { id: string; date: string; taxOwed: number }[];
+  alsoCovers?: readonly CoveredEntry[];
   /** Opens the manual "Link transaction" picker (issue #540 follow-up) — offered whenever there is a payment to link against, paid or not. */
   onLinkTransaction?: () => void;
   onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
