@@ -144,6 +144,8 @@ function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: s
   const listId = `${useId()}-suggestions`;
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState<number | null>(null);
+  /** False once the list is dismissed (Escape, a pick, leaving the box); typing opens it again. */
+  const [listOpen, setListOpen] = useState(true);
   const [entries, setEntries] = useState<readonly ImplantEntry[]>([]);
   useEffect(() => {
     let live = true;
@@ -161,7 +163,7 @@ function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: s
     () => rankedSearch(entries, query, { primary: (entry) => entry.name, limit: SUGGESTION_LIMIT }),
     [entries, query]
   );
-  const open = matches.length > 0;
+  const open = listOpen && matches.length > 0;
 
   function choose(name: string) {
     onAdd(name);
@@ -174,14 +176,15 @@ function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: s
     if (COMBOBOX_NAV_KEYS.includes(event.key)) {
       event.preventDefault();
       setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, matches.length));
-    } else if (event.key === 'Enter' && highlight !== null) {
+    } else if (event.key === 'Enter') {
+      // The top match when none is highlighted, so a part-typed name needs no arrow key.
       event.preventDefault();
-      choose(matches[highlight]!.name);
+      choose(matches[highlight ?? 0]!.name);
     } else if (event.key === 'Escape') {
       // Closes the list, not the dialog.
       event.preventDefault();
       event.stopPropagation();
-      setQuery('');
+      setListOpen(false);
       setHighlight(null);
     }
   }
@@ -210,7 +213,10 @@ function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: s
           onChange={(e) => {
             setQuery(e.target.value);
             setHighlight(null);
+            setListOpen(true);
           }}
+          onFocus={() => setListOpen(true)}
+          onBlur={() => setListOpen(false)}
           onKeyDown={onKeyDown}
           placeholder={t('fittings.implants.addPlaceholder')}
           aria-label={t('fittings.implants.addLabel')}

@@ -92,6 +92,29 @@ describe('ImplantSetPicker — add box suggestions', () => {
     await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
     await waitFor(() => expect(onChange).toHaveBeenCalledWith({ implants: [13284], boosters: [] }));
   });
+
+  it('adds the top match on Enter, and Escape closes the list but keeps the text', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderInRouter(
+      <ImplantSetPicker
+        open
+        onClose={vi.fn()}
+        implantSet={{ implants: [], boosters: [] }}
+        onChange={onChange}
+      />
+    );
+    const box = await screen.findByRole('combobox');
+
+    await user.type(box, 'squire');
+    await screen.findAllByRole('option');
+    await user.keyboard('{Escape}');
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    expect(box).toHaveValue('squire');
+
+    await user.type(box, ' eg-602{Enter}');
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith({ implants: [13283], boosters: [] }));
+  });
 });
 
 describe('ImplantSetPicker — booster side effects', () => {
