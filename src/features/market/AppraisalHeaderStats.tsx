@@ -18,6 +18,7 @@ import { HintText } from '@/components/ui/HintText';
 import type { AppraisalNetTotals, AppraisalTotals } from '@/engine/market/appraisal';
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
+import { RefineChipValue } from './RefineChipValue';
 
 /** How long the "copied" bubble stays on the card. */
 const COPIED_FEEDBACK_MS = 2000;
@@ -29,6 +30,10 @@ interface AppraisalHeaderStatsProps {
   showRefine: boolean;
   showCheapest: boolean;
   implantBonusPct: number;
+  /** The total efficiency the Refine figure was worked out at ("68.3%"), shown beside it so the default is never silent. */
+  refineEfficiency?: string | null;
+  /** Opens the refine breakdown on the whole pile; absent, the chip has no control. */
+  onOpenRefine?: () => void;
   /**
    * The price source could not be reached: the price-derived groups show a
    * placeholder instead of 0 ISK totals. Volume and item count need no price.
@@ -116,6 +121,8 @@ export function AppraisalHeaderStats({
   showRefine,
   showCheapest,
   implantBonusPct,
+  refineEfficiency = null,
+  onOpenRefine,
   pricesUnavailable = false,
 }: AppraisalHeaderStatsProps) {
   const { t } = useTranslation();
@@ -127,7 +134,13 @@ export function AppraisalHeaderStats({
       {!pricesUnavailable && showRefine && (
         <StatChip
           label={t('market.appraisal.refineTotal')}
-          value={<IskAmount value={totals.refine} decimals={0} />}
+          value={
+            <RefineChipValue
+              amount={<IskAmount value={totals.refine} decimals={0} />}
+              efficiency={refineEfficiency}
+              onOpen={onOpenRefine}
+            />
+          }
           tooltip={
             implantBonusPct > 0
               ? `${t('market.appraisal.refineTotalHelp')} ${t('market.appraisal.refineImplantHint', { pct: implantBonusPct })}`

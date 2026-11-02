@@ -60,6 +60,7 @@ export function NodeContainerRow({
   label,
   gameName,
   characterBadge,
+  stationId,
   selectMode,
   selectedIds,
   onToggleSelection,
@@ -71,6 +72,8 @@ export function NodeContainerRow({
   /** The player's in-game name for this ship or container. */
   gameName?: string;
   characterBadge: string | null;
+  /** The station it sits in, for its menu's Set waypoint; null when unknown. */
+  stationId: number | null;
 }) {
   return (
     <ContainerRow
@@ -80,6 +83,7 @@ export function NodeContainerRow({
       itemCount={node.itemCount}
       estimatedValue={node.estimatedValue}
       characterBadge={characterBadge}
+      stationId={stationId}
       named={node.kind !== 'bay'}
       selectMode={selectMode}
       selectionState={selectionStateForIds(collectItemIds(node), selectedIds)}
@@ -186,6 +190,7 @@ export function BrowseRowView(props: BrowseRowViewProps) {
       <LocationRow
         href={assetHref(station.locationId, [], props.query)}
         label={props.stationLabelFor(station)}
+        locationId={station.locationId}
         nickname={props.placeNicknames[station.locationId]}
         security={orphan ? undefined : props.securityForStation(station.locationId)}
         jumpsAway={orphan ? undefined : props.jumpsAwayFor(station.locationId)}
@@ -356,6 +361,7 @@ function NodeRowView({
         label={label}
         gameName={gameName}
         characterBadge={badge}
+        stationId={pathStationId}
         selectMode={selectMode}
         selectedIds={selectedIds}
         onToggleSelection={onToggleSelection}

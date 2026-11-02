@@ -36,6 +36,7 @@ interface FittingModuleDialogProps {
   explainModule: ComponentProps<typeof FittingAffectedByPanel>['explain'];
   typeName: (typeId: number) => string;
   characterId: ComponentProps<typeof FittingMutationPanel>['characterId'];
+  variants: ComponentProps<typeof FittingMutationPanel>['variants'];
 }
 
 /** A fitted module's dialog: its row, then Variations, Mutation and Affected-by folds. */
@@ -90,6 +91,7 @@ export function FittingModuleDialog(props: FittingModuleDialogProps) {
                   catalogue={catalogue}
                   edit={edit}
                   characterId={props.characterId}
+                  variants={props.variants}
                 />
               </div>
             </Disclosure>

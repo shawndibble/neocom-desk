@@ -31,6 +31,7 @@ vi.mock('@/features/industry/blueprintNames', () => ({
   loadBlueprintNames: () => Promise.resolve(new Set(['rifter blueprint', 'merlin blueprint'])),
 }));
 vi.mock('@/app/useGrantedScopes', () => ({
+  useCharacterLacksEndpoints: () => false,
   useGrantedScopes: () => undefined,
   useLockedRoutes: () => new Set<string>(),
 }));
@@ -41,6 +42,8 @@ vi.mock('@/features/corp/useCorpAccess', () => ({
 vi.mock('@/sde/loadMarketSde', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/sde/loadMarketSde')>()),
   loadLpCorporations: () => Promise.resolve([]),
+  loadSolarSystems: () => Promise.resolve([]),
+  loadNpcStations: () => Promise.resolve([]),
 }));
 vi.mock('@/sde/loadSde', () => ({ loadShipTree: () => new Promise(() => {}) }));
 vi.mock('@/app/loginFlow', () => ({ beginAddCharacterLogin: vi.fn() }));

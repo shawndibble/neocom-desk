@@ -10,6 +10,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip } from '@/components/ui';
 import { shownLastKill, type KillSpace } from '@/engine/pilotList/killActivity';
+import type { ThreatRead } from '@/engine/pilotList/threatContext';
 import {
   ACTIVE_MIN_KILLS,
   DANGEROUS_MIN_DANGER_RATIO,
@@ -55,11 +56,14 @@ export function PilotThreatBand({
   verdict,
   gangRatio,
   nowMs,
+  context,
 }: {
   verdict: ThreatVerdict;
   /** zKillboard's all-time gang ratio, 0-100; null when unknown. */
   gangRatio: number | null;
   nowMs: number;
+  /** Where you are and who is in Local, when they moved the level: said in plain words. */
+  context?: { read: ThreatRead; hereSpace: KillSpace | null; orgMatesHere: number | null };
 }) {
   const { t } = useTranslation();
   const tone = THREAT_LEVEL_TONE[verdict.level];
@@ -82,6 +86,26 @@ export function PilotThreatBand({
     sentence = t('travel.pilot.threat.summary', { count: verdict.recentKills, days, age });
   }
   const space = (kind: KillSpace) => t(`common.spaceOption.${kind}`);
+  // Why the level moved, in plain words, with what it would read without that.
+  const contextLines =
+    context === undefined
+      ? []
+      : context.read.reasons.map((reason) =>
+          reason === 'elsewhere'
+            ? t('travel.pilot.threat.context.elsewhere', {
+                space: context.hereSpace === null ? '' : space(context.hereSpace).toLowerCase(),
+              })
+            : reason === 'gangAlone'
+              ? t('travel.pilot.threat.context.gangAlone')
+              : t('travel.pilot.threat.context.gangHere', { count: context.orgMatesHere ?? 0 })
+        );
+  if (context !== undefined && contextLines.length > 0) {
+    contextLines.push(
+      t('travel.pilot.threat.context.base', {
+        level: t(`travel.pilot.threat.levelFull.${context.read.base}`),
+      })
+    );
+  }
   const chips: { key: string; text: string }[] = [];
   if (verdict.mainSpace !== null) {
     chips.push({
@@ -124,7 +148,7 @@ export function PilotThreatBand({
       >
         <span className={eyebrowClassName}>{t('travel.pilot.threat.label')}</span>
         <span className={cx('text-lg font-bold tracking-wider uppercase', THREAT_TEXT_CLASS[tone])}>
-          {t(`travel.pilot.threat.level.${verdict.level}`)}
+          {t(`travel.pilot.threat.levelFull.${verdict.level}`)}
         </span>
       </div>
       <div className="min-w-0 space-y-1.5 px-4 py-3">
@@ -141,6 +165,9 @@ export function PilotThreatBand({
             })}
           />
         </p>
+        {contextLines.length > 0 && (
+          <p className="text-xs text-text-dim">{contextLines.join(' ')}</p>
+        )}
         {chips.length > 0 && (
           <ul className="flex flex-wrap gap-1.5">
             {chips.map((chip) => (

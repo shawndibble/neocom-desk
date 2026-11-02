@@ -37,6 +37,8 @@ import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { resolveLocationStandings } from './locationStandings';
 import type { CharacterSkills } from './openOrdersModel';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { orderSlotBreakdown, type OrderSlotBreakdown } from '@/engine/market/orderSlots';
 
 export interface OpenOrdersPageSnapshot {
   openOrders: OpenOrdersSnapshot;
@@ -65,6 +67,12 @@ export interface OpenOrdersPageSnapshot {
    */
   problemSamples: Map<number, readonly OrderProblemSample[]>;
   skillsByCharacter: Map<number, CharacterSkills>;
+  /**
+   * Where each Character's open-order ceiling comes from (issue #5745). A Character is
+   * absent, or null, when /skills never landed: an untrained Character still has slots,
+   * so "no ceiling known" must not read as 5.
+   */
+  orderSlotsByCharacter?: Map<number, OrderSlotBreakdown | null>;
   /** Each order's own standing toward its station's NPC owner (issue #1238). Keyed orderId — see `openOrdersModel.ts`'s `standingsByOrder`. */
   standingsByOrder: Map<number, ResolvedStandings>;
   now: number;
@@ -164,13 +172,15 @@ export async function loadOpenOrdersSnapshot(
   const problemSamples = await problemSamplesPromise;
 
   const skillsByCharacter = new Map<number, CharacterSkills>();
+  const orderSlotsByCharacter = new Map<number, OrderSlotBreakdown | null>();
   const standingsByCharacter = new Map<
     number,
     Awaited<ReturnType<typeof loadCharacterStandings>>
   >();
   await mapWithConcurrencyLimit(openOrders.entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
-    const [modifiers, standings] = await Promise.all([
+    const [modifiers, corrected, standings] = await Promise.all([
       loadCharacterModifiers(entry.characterId, now),
+      loadCorrectedSkills(entry.characterId, now, { skipQueueWithoutScope: true }),
       loadCharacterStandings(entry.characterId),
     ]);
     skillsByCharacter.set(entry.characterId, {
@@ -179,6 +189,10 @@ export async function loadOpenOrdersSnapshot(
       advancedBrokerRelationsLevel: modifiers.skills[SKILL_IDS.advancedBrokerRelations] ?? 0,
       modifiers,
     });
+    orderSlotsByCharacter.set(
+      entry.characterId,
+      corrected.skillsResult ? orderSlotBreakdown(corrected.trained) : null
+    );
     standingsByCharacter.set(entry.characterId, standings);
   });
 
@@ -211,6 +225,7 @@ export async function loadOpenOrdersSnapshot(
     walletBasisGaps,
     problemSamples,
     skillsByCharacter,
+    orderSlotsByCharacter,
     standingsByOrder,
     now,
   };

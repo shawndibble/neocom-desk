@@ -23,6 +23,11 @@ import {
   type FeederGrantOutcome,
 } from '@/features/corp/taxBook/feederGrant';
 import {
+  completeOwnCorpGrant,
+  type OwnCorpGrantCallbackState,
+  type OwnCorpGrantOutcome,
+} from '@/features/corp/taxBook/ownCorpGrant';
+import {
   completeCorpSyncGrant,
   type CorpSyncCallbackState,
   type CorpSyncGrantOutcome,
@@ -148,6 +153,25 @@ export function Callback() {
       }
       void completeFeederGrant({ code, state })
         .catch((): FeederGrantOutcome => ({ status: 'failed' }))
+        .then(land);
+      return;
+    }
+
+    // Connecting one of the player's own CEO corporations: the same kind of round trip.
+    if (alertsIntent?.kind === 'ownCorpGrant') {
+      const corporationId = alertsIntent.feederCorporationId;
+      const land = (ownCorpGrant: OwnCorpGrantOutcome) => {
+        navigate(takeLoginReturnTo() ?? '/corp/moons', {
+          replace: true,
+          state: { ownCorpGrant } satisfies OwnCorpGrantCallbackState,
+        });
+      };
+      if (ssoError || !code || !state) {
+        land({ status: 'cancelled', corporationId });
+        return;
+      }
+      void completeOwnCorpGrant({ code, state })
+        .catch((): OwnCorpGrantOutcome => ({ status: 'refused', corporationId, reason: 'unknown' }))
         .then(land);
       return;
     }

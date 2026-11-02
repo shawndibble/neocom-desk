@@ -33,12 +33,13 @@ function messageOf(err: unknown): string | null {
 
 export async function setWaypointsInGame(
   characterId: number,
-  waypoints: readonly number[]
+  waypoints: readonly number[],
+  { clearOthers = true }: { clearOthers?: boolean } = {}
 ): Promise<SetWaypointsResult> {
   for (const [index, destinationId] of waypoints.entries()) {
     try {
       await postAutopilotWaypoint(characterId, destinationId, {
-        clearOtherWaypoints: index === 0,
+        clearOtherWaypoints: clearOthers && index === 0,
       });
     } catch (err) {
       if (isOfflineFailure(err)) {

@@ -426,10 +426,26 @@ describe('computeAppraisalRefine', () => {
       materialPrices: { 34: 5 },
     });
     // 10 batches x floor(415 x 10 x 0.5) Tritanium x 5 ISK
-    expect(refine).toEqual({
+    expect(refine).toMatchObject({
       valueAtFullPrice: Math.floor(415 * 10 * BASE_STATION_REPROCESSING_RATE) * 5,
       pricedAll: true,
       unitsLeftOver: 0,
+    });
+  });
+
+  it('keeps the recipe, yield and prices the figure was worked out from', () => {
+    const refine = computeAppraisalRefine({
+      quantity: 1000,
+      reprocessing: veldspar,
+      modifiers: NO_CHARACTER_MODIFIERS,
+      materialPrices: { 34: 5 },
+      refining: { stationRate: 0.6, taxRate: 0 },
+    });
+    expect(refine?.detail).toEqual({
+      portionSize: 100,
+      materials: veldspar.materials,
+      efficiency: 0.6,
+      materialPrices: { 34: 5 },
     });
   });
 
@@ -452,7 +468,7 @@ describe('computeAppraisalRefine', () => {
       modifiers: NO_CHARACTER_MODIFIERS,
       materialPrices: { 34: 5 },
     });
-    expect(refine).toEqual({ valueAtFullPrice: 0, pricedAll: true, unitsLeftOver: 50 });
+    expect(refine).toMatchObject({ valueAtFullPrice: 0, pricedAll: true, unitsLeftOver: 50 });
   });
 
   it('flags an unpriced output material rather than pricing it as free', () => {
@@ -462,7 +478,7 @@ describe('computeAppraisalRefine', () => {
       modifiers: NO_CHARACTER_MODIFIERS,
       materialPrices: {},
     });
-    expect(refine).toEqual({ valueAtFullPrice: 0, pricedAll: false, unitsLeftOver: 0 });
+    expect(refine).toMatchObject({ valueAtFullPrice: 0, pricedAll: false, unitsLeftOver: 0 });
   });
 });
 

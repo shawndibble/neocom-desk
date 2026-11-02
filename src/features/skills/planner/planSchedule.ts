@@ -8,7 +8,7 @@
  * is pure; `loadPlanScheduleInputs` is the fetch side for callers with no
  * hook to lean on.
  */
-import { db, type SkillPlanRecord } from '@/db';
+import { db, type CharacterAcceleratorRecord, type SkillPlanRecord } from '@/db';
 import {
   computeSkillPlanSchedule,
   type SkillPlanSchedule,
@@ -31,8 +31,11 @@ import {
   parseCloneStates,
 } from '@/features/skills/cloneState';
 import { normalizeMarkerAttributes } from './markers';
+import { pinnedInProgressEntry } from './queueRows';
 import { normalizeWhatIfSelection, whatIfImplants } from './whatIfImplants';
-import { resolvePlanBoosters, toBoosters } from './planBooster';
+import { isAcceleratorLive } from '@/engine/accelerator';
+import { acceleratorId } from '@/features/accelerator/characterAccelerators';
+import { composePlanBoosters, toBoosters } from './planBooster';
 
 /** What the scheduler costs against when ESI's attribute sheet cannot be read or explained. */
 export const DEFAULT_ATTRIBUTES: Attributes = {
@@ -60,6 +63,8 @@ export interface PlanScheduleInputs {
   attributeBaseline: AttributeBaseline | null;
   implants: Implants;
   cloneState: CloneState;
+  /** The Character's typed-in accelerator, shared by every plan (`features/accelerator`). */
+  accelerator?: CharacterAcceleratorRecord | null;
 }
 
 /** The plan's schedule, started when the live queue's lead ends (`nowMs` if there is none). */
@@ -73,11 +78,12 @@ export function schedulePlan(
     inputs.attributeBaseline?.kind === 'accelerated'
       ? inputs.attributeBaseline.acceleratorBonus
       : null;
+  const running = isAcceleratorLive(inputs.accelerator, nowMs) ? inputs.accelerator : null;
   const boosters = toBoosters(
-    resolvePlanBoosters(plan.boosters, plan.booster, detectedAccelerator)
+    composePlanBoosters(plan.boosters, plan.booster, running, detectedAccelerator)
   );
   const queue = projectQueueEnd(inputs.trained, inputs.queueEntries, nowMs, plan.entries);
-  return computeSkillPlanSchedule({
+  const schedule = computeSkillPlanSchedule({
     entries: plan.entries,
     skills: inputs.catalog.engineSkills,
     trainedSkills: queue.trained,
@@ -93,6 +99,24 @@ export function schedulePlan(
     cloneState: inputs.cloneState,
     startDate: new Date(queue.startMs),
   });
+  // The level training right now, when the plan also lists it, is the plan's
+  // own time: the queue pins it as lead (so the steps start after it), but a
+  // plan copied from the queue must still total what the game shows. The
+  // finish date already includes the lead; only the total needs it.
+  const pinned = pinnedInProgressEntry(plan.entries, queue, nowMs);
+  if (!pinned) return schedule;
+  // The marker result's totals share the total's basis, so a "saved" figure
+  // (total minus the remap total) is not inflated by the lead.
+  const { markersResult } = schedule;
+  return {
+    ...schedule,
+    totalSeconds: schedule.totalSeconds + pinned.seconds,
+    markersResult: markersResult && {
+      ...markersResult,
+      totalSeconds: markersResult.totalSeconds + pinned.seconds,
+      currentSeconds: markersResult.currentSeconds + pinned.seconds,
+    },
+  };
 }
 
 /**
@@ -114,12 +138,13 @@ export async function loadPlanScheduleInputs(
   characterId: number,
   nowMs: number
 ): Promise<PlanScheduleInputs> {
-  const [catalog, corrected, attrs, implants, cloneRecord] = await Promise.all([
+  const [catalog, corrected, attrs, implants, cloneRecord, accelerator] = await Promise.all([
     loadSkillCatalog(),
     loadCorrectedSkills(characterId, nowMs),
     loadCharacterAttributes(characterId),
     loadImplantBonuses(characterId),
     db.settings.get(SYNCED_CLONE_STATES_KEY),
+    db.characterAccelerators.get(acceleratorId(characterId)),
   ]);
   const attributeBaseline = attrs?.data ? toAttributeBaseline(attrs.data, implants) : null;
   return {
@@ -130,5 +155,6 @@ export async function loadPlanScheduleInputs(
     attributeBaseline,
     implants,
     cloneState: cloneStateFor(parseCloneStates(cloneRecord?.value), characterId),
+    accelerator: accelerator ?? null,
   };
 }

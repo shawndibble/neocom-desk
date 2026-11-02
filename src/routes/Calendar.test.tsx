@@ -454,6 +454,7 @@ describe('Calendar', () => {
       value: [
         'calendarEvent',
         'skillTraining',
+        'accelerator',
         'industryJob',
         'planetExtraction',
         'mercenaryDen',

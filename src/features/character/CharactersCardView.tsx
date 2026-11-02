@@ -3,7 +3,6 @@ import type { CharacterRecord } from '@/db';
 import { CharacterCard } from '@/features/character/CharacterCard';
 import type { AchievementLookup } from '@/features/character/useCharacterAchievements';
 import { GroupSectionHeader } from '@/features/character/GroupSectionHeader';
-import type { AttentionEntry } from '@/features/character/rosterAttention';
 import type { RosterCore } from '@/features/character/rosterView';
 import { isCharacterStarred, partitionStarredFirst } from '@/features/character/starredCharacters';
 import {
@@ -23,12 +22,10 @@ export function CharactersCardView({
   ungroupedIds,
   charactersById,
   rosterCore,
-  attentionById,
   alertCounts,
   groupIdByCharacterId,
   starred,
   activeCharacterId,
-  now,
   sortKey,
   sortDirection,
   sortStatsById,
@@ -47,12 +44,10 @@ export function CharactersCardView({
   ungroupedIds: readonly number[];
   charactersById: ReadonlyMap<number, CharacterRecord>;
   rosterCore: ReadonlyMap<number, RosterCore>;
-  attentionById: ReadonlyMap<number, AttentionEntry>;
   alertCounts: ReadonlyMap<number, number>;
   groupIdByCharacterId: ReadonlyMap<number, string>;
   starred: readonly number[];
   activeCharacterId: number | null;
-  now: number;
   sortKey: CharacterSortKey;
   sortDirection: SortDirection;
   sortStatsById: ReadonlyMap<number, CharacterSortStats>;
@@ -103,8 +98,6 @@ export function CharactersCardView({
               starred={isCharacterStarred(starred, characterId)}
               isActive={activeCharacterId === characterId}
               alertCount={alertCounts.get(characterId) ?? 0}
-              attention={attentionById.get(characterId)}
-              now={now}
               onSelect={onSelect}
               onToggleStar={onToggleStar}
               onMoveToGroup={onMoveToGroup}

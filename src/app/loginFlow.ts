@@ -3,6 +3,7 @@ import {
   startAlertsLogin,
   startCorpSyncLogin,
   startFeederGrantLogin,
+  startOwnCorpGrantLogin,
   startLogin,
   scopesForRetry,
   takeRetryBudget,
@@ -152,6 +153,18 @@ export async function beginFeederGrantLogin(
 ): Promise<void> {
   rememberThisPage();
   assignLocation(await startFeederGrantLogin(characterId, inviteCode, requestedRatePct));
+}
+
+/**
+ * Connect one of the player's own CEO corporations as a moon owner: a separate
+ * SSO round trip signed in as that corporation's CEO, returning to the page it
+ * was pressed on.
+ */
+export async function beginOwnCorpGrantLogin(
+  intent: Parameters<typeof startOwnCorpGrantLogin>[0]
+): Promise<void> {
+  rememberThisPage();
+  assignLocation(await startOwnCorpGrantLogin(intent));
 }
 
 /**

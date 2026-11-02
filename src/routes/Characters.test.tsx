@@ -229,63 +229,10 @@ describe('Characters', () => {
     expect(within(pilotTwoCard).queryByText('Alerts')).not.toBeInTheDocument();
   });
 
-  it('shows a warning-tone "PI Stopped" chip for a Character whose colony has expired, none for a healthy card (#1793)', async () => {
-    await withMockedRoster(
-      [pilotRosterEntry(91, 'Pilot One'), pilotRosterEntry(92, 'Pilot Two')],
-      [
-        pilotAttentionEntry(91, { piAttention: 'idle', piSoonestExpiryMs: Date.now() - 3_600_000 }),
-        pilotAttentionEntry(92),
-      ],
-      async () => {
-        renderCharacters();
-        await screen.findByText('Pilot One');
-
-        const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
-        const pilotTwoCard = screen.getByText('Pilot Two').closest('li') as HTMLElement;
-        await within(pilotOneCard).findByText('Stopped');
-        expect(within(pilotOneCard).getByText('PI')).toBeInTheDocument();
-        expect(within(pilotTwoCard).queryByText('PI')).not.toBeInTheDocument();
-      }
-    );
-  });
-
-  it('shows both an Alerts chip and a PI chip on the same card when both apply (#1793)', async () => {
-    await db.notificationFeed.put({
-      id: 'feed-both',
-      characterId: 91,
-      eventId: 'newMail',
-      title: 'New mail',
-      body: 'body',
-      firedAt: Date.now(),
-    });
+  it('never puts a PI chip on a card, whatever the colony state (card PI chip removed)', async () => {
     await withMockedRoster(
       [pilotRosterEntry(91, 'Pilot One')],
       [pilotAttentionEntry(91, { piAttention: 'idle', piSoonestExpiryMs: Date.now() - 3_600_000 })],
-      async () => {
-        renderCharacters();
-        await screen.findByText('Pilot One');
-
-        const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
-        await within(pilotOneCard).findByText('Stopped');
-        expect(within(pilotOneCard).getByText('Alerts')).toBeInTheDocument();
-        expect(within(pilotOneCard).getByText('1')).toBeInTheDocument();
-        expect(within(pilotOneCard).getByText('PI')).toBeInTheDocument();
-      }
-    );
-  });
-
-  it('never shows a PI chip for a "decayed" colony, even once a stale cached expiry has passed (#1793)', async () => {
-    // `decayed` still carries a real `piSoonestExpiryMs` (a program that
-    // hasn't stopped, just fallen past its efficient window) — must stay
-    // table-only even once the clock has passed that expiry.
-    await withMockedRoster(
-      [pilotRosterEntry(91, 'Pilot One')],
-      [
-        pilotAttentionEntry(91, {
-          piAttention: 'decayed',
-          piSoonestExpiryMs: Date.now() - 3_600_000,
-        }),
-      ],
       async () => {
         renderCharacters();
         const pilotOneCard = (await screen.findByText('Pilot One')).closest('li') as HTMLElement;
@@ -333,7 +280,7 @@ describe('Characters', () => {
 
     const pilotTwoCard = screen.getByText('Pilot Two').closest('li') as HTMLElement;
     const spChip = within(pilotTwoCard).getByText('SP').parentElement as HTMLElement;
-    const walletChip = within(pilotTwoCard).getByText('Wallet').parentElement as HTMLElement;
+    const walletChip = within(pilotTwoCard).getByText('ISK').parentElement as HTMLElement;
     expect(spChip).toHaveTextContent('—');
     expect(walletChip).toHaveTextContent('—');
     // No fetchedAt at all for either field on Pilot Two — no badge, full stop.
@@ -458,12 +405,13 @@ describe('Characters', () => {
     expect(screen.queryByRole('link', { name: 'Test Alliance' })).not.toBeInTheDocument();
   });
 
-  it('selecting a character persists it as active and navigates to /overview', async () => {
+  it('selecting a character persists it as active and stays on Characters', async () => {
     const user = userEvent.setup();
     renderCharacters();
     await user.click(await screen.findByRole('button', { name: 'Select Pilot One' }));
 
-    expect(await screen.findByText('overview page')).toBeInTheDocument();
+    await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(91));
+    expect(screen.queryByText('overview page')).not.toBeInTheDocument();
     expect(useActiveCharacter.getState().activeCharacterId).toBe(91);
     expect((await db.settings.get(ACTIVE_CHARACTER_KEY))?.value).toBe(91);
   });
@@ -477,8 +425,8 @@ describe('Characters', () => {
     await user.keyboard('{Escape}');
 
     await user.click(await screen.findByText('Test Corp'));
-    expect(await screen.findByText('overview page')).toBeInTheDocument();
-    expect(useActiveCharacter.getState().activeCharacterId).toBe(91);
+    await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(91));
+    expect(screen.queryByText('overview page')).not.toBeInTheDocument();
   });
 
   it('selecting a character returns to the page the switch started from (#1764)', async () => {
@@ -507,12 +455,13 @@ describe('Characters', () => {
     expect(locationSearch()).toBe('?q=hi');
   });
 
-  it('falls back to /overview when the origin is /characters itself (#1764)', async () => {
+  it('stays on Characters when the origin is /characters itself (#1764)', async () => {
     const user = userEvent.setup();
     renderCharacters({ pathname: '/characters', state: { from: '/characters' } });
     await user.click(await screen.findByRole('button', { name: 'Select Pilot One' }));
 
-    expect(await screen.findByText('overview page')).toBeInTheDocument();
+    await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(91));
+    expect(screen.queryByText('overview page')).not.toBeInTheDocument();
   });
 
   it('shows a visible "Add" label on the Add button from sm up, hidden below sm (#1784)', async () => {
@@ -1196,14 +1145,14 @@ describe('Characters table view', () => {
     expect(await screen.findByRole('button', { name: 'Columns' })).toBeInTheDocument();
   });
 
-  it('clicking a table row selects that character and navigates to /overview, same as a card', async () => {
+  it('clicking a table row selects that character and stays on Characters, same as a card', async () => {
     const user = userEvent.setup();
     renderCharacters();
     await user.click(await screen.findByRole('button', { name: 'Table' }));
     await user.click(await screen.findByText('Pilot One'));
 
-    expect(await screen.findByText('overview page')).toBeInTheDocument();
-    expect(useActiveCharacter.getState().activeCharacterId).toBe(91);
+    await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(91));
+    expect(screen.queryByText('overview page')).not.toBeInTheDocument();
   });
 
   it('the Columns picker adds and removes columns from the table, and persists the choice device-locally', async () => {
@@ -1211,13 +1160,13 @@ describe('Characters table view', () => {
     renderCharacters();
     await user.click(await screen.findByRole('button', { name: 'Table' }));
 
-    // Wallet isn't one of the default-visible columns.
+    // Net worth isn't one of the default-visible columns (ISK is).
     expect(
-      within(screen.getByRole('table')).queryByRole('columnheader', { name: /wallet/i })
+      within(screen.getByRole('table')).queryByRole('columnheader', { name: /net worth/i })
     ).not.toBeInTheDocument();
 
     await user.click(await screen.findByRole('button', { name: 'Columns' }));
-    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Wallet' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Net worth' }));
     // The menu stays open on purpose (multi-select — see the component's own
     // comment), and Radix marks the rest of the page aria-hidden while it's
     // open, which hides the table from every role query below. Close it
@@ -1225,19 +1174,19 @@ describe('Characters table view', () => {
     await user.keyboard('{Escape}');
 
     expect(
-      within(screen.getByRole('table')).getByRole('columnheader', { name: /wallet/i })
+      within(screen.getByRole('table')).getByRole('columnheader', { name: /net worth/i })
     ).toBeInTheDocument();
     await waitForSettingsValue(
       'charactersVisibleColumns',
-      (value) => Array.isArray(value) && value.includes('wallet')
+      (value) => Array.isArray(value) && value.includes('netWorth')
     );
 
     // Toggling it back off removes the column again.
     await user.click(await screen.findByRole('button', { name: 'Columns' }));
-    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Wallet' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Net worth' }));
     await user.keyboard('{Escape}');
     expect(
-      within(screen.getByRole('table')).queryByRole('columnheader', { name: /wallet/i })
+      within(screen.getByRole('table')).queryByRole('columnheader', { name: /net worth/i })
     ).not.toBeInTheDocument();
   });
 
@@ -1261,6 +1210,7 @@ describe('Characters table view', () => {
 
     for (const label of [
       'Alerts',
+      'ISK',
       'Last synced',
       'PI',
       'Mfg',

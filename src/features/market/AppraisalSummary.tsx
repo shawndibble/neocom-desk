@@ -34,6 +34,9 @@ interface AppraisalSummaryProps {
   onHubChange: (id: TradeHub['id']) => void;
   /** Progress of the other hubs' live books, shown over the cards while they load. */
   compareLive: AppraisalController['compareLive'];
+  /** The Refine figure's total efficiency, and the control that opens its breakdown. */
+  refineEfficiency?: string | null;
+  onOpenRefine?: () => void;
 }
 
 export function AppraisalSummary({
@@ -52,6 +55,8 @@ export function AppraisalSummary({
   hubId,
   onHubChange,
   compareLive,
+  refineEfficiency,
+  onOpenRefine,
 }: AppraisalSummaryProps) {
   const { t } = useTranslation();
   const totals = result.appraisal.totals;
@@ -70,6 +75,8 @@ export function AppraisalSummary({
           showRefine={showRefine}
           showCheapest={hasLpOption}
           implantBonusPct={implantBonusPct}
+          refineEfficiency={refineEfficiency}
+          onOpenRefine={onOpenRefine}
           pricesUnavailable={result.pricesUnreachable}
         />
         {loading && <Spinner label={t('common.loading')} size="sm" />}

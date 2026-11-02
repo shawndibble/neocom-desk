@@ -24,6 +24,7 @@ import type { Table } from 'dexie';
 import type {
   BuildPlanRecord,
   db,
+  CharacterAcceleratorRecord,
   FittingRecord,
   MiningTaxAssignmentRecord,
   NetWorthSnapshotRecord,
@@ -47,6 +48,7 @@ import type {
   RemotePayeeDoc,
   RemotePlanDoc,
   RemotePlanetRichnessDoc,
+  RemoteCharacterAcceleratorDoc,
   RemoteNetWorthSnapshotDoc,
   RemoteProductionLossDoc,
   RemoteProductionOrderWatchDoc,
@@ -73,6 +75,7 @@ export type SyncedFaqItemId =
   | 'miningTax'
   | 'fittings'
   | 'netWorthSnapshots'
+  | 'characterAccelerators'
   | 'notificationFeed'
   | 'settings';
 
@@ -93,6 +96,7 @@ export type SyncedCollectionName =
   | 'productionOrderWatches'
   | 'productionLosses'
   | 'netWorthSnapshots'
+  | 'characterAccelerators'
   | 'payees'
   | 'fittings'
   | 'miningTaxAssignments'
@@ -764,6 +768,35 @@ const NET_WORTH_SNAPSHOTS = defineEditableCollection<
   }),
 });
 
+/** One Character's running cerebral accelerator: bonus and expiry, one document per Character. */
+export const CHARACTER_ACCELERATORS = defineEditableCollection<
+  CharacterAcceleratorRecord,
+  RemoteCharacterAcceleratorDoc
+>({
+  kind: 'editable',
+  remoteName: 'characterAccelerators',
+  table: 'characterAccelerators',
+  tombstoneSegment: 'characterAcceleratorTombstones',
+  onRemoval: 'delete',
+  faqItem: 'characterAccelerators',
+  toRemoteDoc: (r, ownerHash) => ({
+    id: r.id,
+    characterId: r.characterId,
+    bonus: r.bonus,
+    expiresAt: r.expiresAt,
+    updatedAt: r.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    bonus: r.bonus,
+    expiresAt: r.expiresAt,
+    updatedAt: r.updatedAt,
+  }),
+});
+
 /**
  * Every editable collection, **in sync order**: syncCharacter walks this list
  * one collection at a time and a throw stops the pass, so the order is
@@ -780,6 +813,7 @@ export const EDITABLE_COLLECTIONS: readonly EditableCollection[] = [
   PRODUCTION_ORDER_WATCHES,
   PRODUCTION_LOSSES,
   NET_WORTH_SNAPSHOTS,
+  CHARACTER_ACCELERATORS,
   PAYEES,
   FITTINGS,
   MINING_TAX_ASSIGNMENTS,

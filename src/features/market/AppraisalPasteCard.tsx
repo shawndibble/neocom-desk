@@ -19,6 +19,7 @@ import {
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { GrantNote } from '@/app/GrantNote';
 import { formatAge } from '@/lib/age';
+import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { countPasteLines, pasteBoxRows } from '@/engine/market/appraisalPaste';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { ASSETS_ENDPOINTS, OWNED_EVERYWHERE, type AppraisalOwnedPref } from './appraisalOwnedPref';
@@ -74,53 +75,49 @@ export function AppraisalPasteCard({
 }: AppraisalPasteCardProps) {
   const { t } = useTranslation();
   const { text, setText, loading } = controller;
+  const isDesktop = useMediaQuery(MD_UP_QUERY);
+  // One picker, rendered in the header below `md` and above the textarea from `md` up:
+  // beside the title it squeezed "Paste" to "PA…" in the narrow desktop paste column (#5761).
+  const recentPicker =
+    recent.length > 0 ? (
+      <Select
+        value=""
+        onValueChange={(value) => {
+          if (value === CLEAR_RECENT) void setRecent([]);
+          else appraiseFromForm(() => controller.appraiseText(recent[Number(value)]?.text ?? ''));
+        }}
+      >
+        <SelectTrigger
+          size="sm"
+          aria-label={t('market.appraisal.recentPlaceholder')}
+          className="w-32 max-w-full min-w-0"
+        >
+          <SelectValue placeholder={t('market.appraisal.recentPlaceholder')} />
+        </SelectTrigger>
+        <SelectContent>
+          {recent.map((entry, index) => {
+            const { names, more } = recentLabel(entry.text);
+            return (
+              <SelectItem key={entry.text} value={String(index)}>
+                {t(more > 0 ? 'market.appraisal.recentLabelMore' : 'market.appraisal.recentLabel', {
+                  names: names.join(', '),
+                  count: more,
+                  age: formatAge(openedAt - entry.savedAt, t),
+                })}
+              </SelectItem>
+            );
+          })}
+          <SelectSeparator />
+          <SelectItem value={CLEAR_RECENT} className="text-text-dim">
+            {t('market.appraisal.clearRecent')}
+          </SelectItem>
+        </SelectContent>
+      </Select>
+    ) : null;
   return (
     <Panel
       title={t('market.appraisal.pasteTitle')}
-      actions={
-        recent.length > 0 ? (
-          <Select
-            value=""
-            onValueChange={(value) => {
-              if (value === CLEAR_RECENT) void setRecent([]);
-              else
-                appraiseFromForm(() => controller.appraiseText(recent[Number(value)]?.text ?? ''));
-            }}
-          >
-            <SelectTrigger
-              size="sm"
-              id="market-appraisal-recent"
-              aria-label={t('market.appraisal.recentPlaceholder')}
-              className="w-32 max-w-full min-w-0"
-            >
-              <SelectValue placeholder={t('market.appraisal.recentPlaceholder')} />
-            </SelectTrigger>
-            <SelectContent>
-              {recent.map((entry, index) => {
-                const { names, more } = recentLabel(entry.text);
-                return (
-                  <SelectItem key={entry.text} value={String(index)}>
-                    {t(
-                      more > 0
-                        ? 'market.appraisal.recentLabelMore'
-                        : 'market.appraisal.recentLabel',
-                      {
-                        names: names.join(', '),
-                        count: more,
-                        age: formatAge(openedAt - entry.savedAt, t),
-                      }
-                    )}
-                  </SelectItem>
-                );
-              })}
-              <SelectSeparator />
-              <SelectItem value={CLEAR_RECENT} className="text-text-dim">
-                {t('market.appraisal.clearRecent')}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        ) : undefined
-      }
+      actions={isDesktop ? undefined : (recentPicker ?? undefined)}
       meta={
         controller.canAppraise ? (
           <StatChip
@@ -136,6 +133,7 @@ export function AppraisalPasteCard({
       }
     >
       <div className="flex flex-col gap-2">
+        {isDesktop && recentPicker}
         <label className="block text-xs text-text-dim" htmlFor="market-appraisal-text">
           {t('market.appraisal.pasteLabel')}
         </label>

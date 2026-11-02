@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -13,15 +13,30 @@ import {
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { splitEach, type AppraisalRow } from '@/engine/market/appraisal';
+import {
+  buildAppraisal,
+  refineBeatsSellAsIs,
+  splitEach,
+  type AppraisalItem,
+  type AppraisalRow,
+} from '@/engine/market/appraisal';
+import { refineEfficiencyRange } from '@/engine/market/refineBreakdown';
 import { ShareShell, type OpenInApp } from '@/features/share/ShareShell';
 import { formatIskAuto } from '@/lib/isk';
 import { appraisalCsvColumns } from './appraisalCsv';
 import type { AppraisalShareView } from './appraisalShareData';
 import { formatVolume } from './format';
 import { FullIskTotal } from './FullIskTotal';
+import { RefineBreakdownModal } from './RefineBreakdownModal';
+import { RefineChipValue } from './RefineChipValue';
+import { comparisonCell } from './appraisalCells';
+import { RefineFigureButton } from './RefineFigureButton';
+import { efficiencyText } from './refineFormat';
+import { useMyRefine } from './useMyRefine';
+import { useRefineMineralNames } from './useRefineMineralNames';
 
 const NO_ROWS: readonly AppraisalRow[] = [];
+const NO_ITEMS: readonly AppraisalItem[] = [];
 
 /**
  * A per-unit price, exact — same split as `AppraisalPanel`, so a share link
@@ -61,7 +76,33 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const isPhone = useIsPhone();
-  const shareRows = state.status === 'ready' ? state.view.appraisal.rows : NO_ROWS;
+  const view = state.status === 'ready' ? state.view : null;
+  // The refine breakdown: null closed, `typeId: null` the whole pile, else one item's.
+  const [refineModal, setRefineModal] = useState<{ typeId: number | null } | null>(null);
+  const [source, setSource] = useState<'shared' | 'mine'>('shared');
+  const [askedForMine, setAskedForMine] = useState(false);
+  const mine = useMyRefine(view, askedForMine || refineModal !== null);
+  const usingMine = source === 'mine' && mine.status === 'ready';
+  // The sharer's figures, or the visitor's own at the same prices: the table, chip and breakdown all follow.
+  const appraisal = useMemo(() => {
+    if (view === null) return null;
+    return usingMine ? buildAppraisal(mine.items, view.pricePercent) : view.appraisal;
+  }, [view, usingMine, mine]);
+  const setup = usingMine
+    ? { yieldRate: mine.setup.stationRate, taxRate: mine.setup.taxRate }
+    : (view?.refining ?? null);
+  const hasRefine =
+    setup !== null && (appraisal?.rows.some((row) => row.refineTotal !== undefined) ?? false);
+  const refineRange = hasRefine && appraisal ? refineEfficiencyRange(appraisal.items) : null;
+  const refineEfficiency = refineRange ? efficiencyText(refineRange.min, refineRange.max) : null;
+  const shareRows = appraisal ? appraisal.rows : NO_ROWS;
+  // A link made before the names had loaded carries empty ones; read them here rather than show "#id".
+  const loadedNames = useRefineMineralNames(appraisal?.items ?? NO_ITEMS);
+  const mineralNames = useMemo(() => {
+    const names = new Map(loadedNames);
+    for (const [typeId, name] of view?.mineralNames ?? []) if (name !== '') names.set(typeId, name);
+    return names;
+  }, [loadedNames, view]);
   const csvColumns = useMemo(() => appraisalCsvColumns(t), [t]);
   const tableExport = useTableExport({
     surface: 'appraisal-shared',
@@ -134,6 +175,29 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
       render: (row) => totalCell(row.sellTotal),
       sortValue: (row) => row.sellTotal ?? undefined,
     },
+    ...(hasRefine
+      ? [
+          {
+            id: 'refineTotal',
+            header: t('market.appraisal.columnRefineTotal'),
+            align: 'right' as const,
+            className: 'whitespace-nowrap tabular-nums',
+            render: (row: AppraisalRow) =>
+              row.refineTotal === undefined
+                ? '—'
+                : comparisonCell(
+                    <RefineFigureButton
+                      name={row.name}
+                      onOpen={() => setRefineModal({ typeId: row.typeId })}
+                    >
+                      {totalCell(row.refineTotal)}
+                    </RefineFigureButton>,
+                    refineBeatsSellAsIs(row)
+                  ),
+            sortValue: (row: AppraisalRow) => row.refineTotal ?? undefined,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -163,13 +227,25 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
                 label={t('market.appraisal.buyTotal')}
                 value={totalFigure(state.view.appraisal.totals.buy)}
               />
+              {hasRefine && appraisal && (
+                <StatChip
+                  label={t('market.appraisal.refineTotal')}
+                  value={
+                    <RefineChipValue
+                      amount={<IskAmount value={appraisal.totals.refine} decimals={0} />}
+                      efficiency={refineEfficiency}
+                      onOpen={() => setRefineModal({ typeId: null })}
+                    />
+                  }
+                />
+              )}
             </StatChips>
             {shareRows.length > 0 && (
               <TableActionsMenu name={t('appraisalShare.title')} tableExport={tableExport} />
             )}
           </div>
 
-          {state.view.appraisal.rows.length === 0 ? (
+          {shareRows.length === 0 ? (
             <EmptyState
               title={t('market.appraisal.noMatchesTitle')}
               hint={t('market.appraisal.noMatchesHint')}
@@ -180,7 +256,7 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
               <DataTable
                 {...tableExport.tableProps}
                 columns={columns}
-                rows={state.view.appraisal.rows}
+                rows={shareRows}
                 rowKey={(row) => row.typeId}
                 label={t('appraisalShare.title')}
                 // Six numeric columns hang off the item name: a table read across
@@ -201,6 +277,34 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
               value={formatTimestamp(new Date(expiresAt), timeZone)}
             />
           </StatChips>
+          {refineModal !== null && view !== null && appraisal !== null && setup !== null && (
+            <RefineBreakdownModal
+              open
+              onClose={() => setRefineModal(null)}
+              appraisal={appraisal}
+              pricePercent={view.pricePercent}
+              hubName={view.hub.systemName}
+              setup={setup}
+              mineralNames={mineralNames}
+              initialTypeId={refineModal.typeId}
+              shared={{
+                generatedAt: view.generatedAt,
+                source: usingMine ? 'mine' : 'shared',
+                unavailable:
+                  mine.status === 'ready'
+                    ? null
+                    : mine.status === 'signedOut'
+                      ? 'signedOut'
+                      : mine.status === 'failed'
+                        ? 'failed'
+                        : 'loading',
+                onToggleSource: () => {
+                  setAskedForMine(true);
+                  setSource(usingMine ? 'shared' : 'mine');
+                },
+              }}
+            />
+          )}
         </>
       )}
     </ShareShell>

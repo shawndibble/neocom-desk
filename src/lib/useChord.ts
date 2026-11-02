@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { isApplePlatform, isModChord } from './shortcuts';
+import { isAltChord, isApplePlatform, isModChord } from './shortcuts';
 
 /**
  * Runs `onChord` for Ctrl+`key` (Cmd on Apple), from anywhere on the page,
@@ -30,4 +30,28 @@ export function useChord(
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [key, shift, enabled]);
+}
+
+/**
+ * Runs `onChord` for Alt+`code` (Option on Apple), e.g. `'KeyJ'`, from anywhere
+ * on the page, text fields included. Swallows the key's own answer (Option+J's
+ * `∆`) only while `enabled`, so a disabled chord leaves typing alone. Left alone
+ * while a modal is open, so its own fields still type.
+ */
+export function useAltChord(code: string, onChord: () => void, enabled = true): void {
+  const latest = useRef(onChord);
+  useEffect(() => {
+    latest.current = onChord;
+  });
+  useEffect(() => {
+    if (!enabled) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (!isAltChord(event, code) || event.repeat) return;
+      if (document.querySelector('dialog[open]')) return;
+      event.preventDefault();
+      latest.current();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [code, enabled]);
 }

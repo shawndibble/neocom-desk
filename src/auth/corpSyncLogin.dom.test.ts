@@ -5,12 +5,14 @@ import {
   completeAlertsLogin,
   completeCorpSyncLogin,
   completeFeederGrantLogin,
+  completeOwnCorpGrantLogin,
   completeLogin,
   loginIntentFor,
   scopesForRetry,
   startAlertsLogin,
   startCorpSyncLogin,
   startFeederGrantLogin,
+  startOwnCorpGrantLogin,
   startLogin,
   LoginError,
 } from './session';
@@ -147,5 +149,45 @@ describe('moon owner grant round trip', () => {
     });
     expect(result.requestedRatePct).toBeUndefined();
     expect(await db.tokens.count()).toBe(0);
+  });
+});
+
+describe('own corporation grant round trip', () => {
+  const intent = {
+    characterId: 111,
+    expectedCeoCharacterId: 222,
+    collectorCorporationId: 98000001,
+    feederCorporationId: 98000002,
+    coverageFrom: '2026-10-25',
+  };
+
+  it('asks for the observer ledger scope alone and carries the whole intent', async () => {
+    const url = await startOwnCorpGrantLogin(intent, cfg);
+    expect(new URL(url).searchParams.get('scope')).toBe(FEEDER_SYNC_SCOPES.join(' '));
+    expect(loginIntentFor(stateOf(url))).toEqual({ kind: 'ownCorpGrant', ...intent });
+    expect(scopesForRetry()).toBeUndefined();
+  });
+
+  it('hands back who signed in and stores nothing', async () => {
+    const state = stateOf(await startOwnCorpGrantLogin(intent, cfg));
+    returnedCharacterId = 333;
+    const result = await completeOwnCorpGrantLogin({ code: 'c', state }, cfg);
+    expect(result).toMatchObject({
+      expectedCharacterId: 111,
+      expectedCeoCharacterId: 222,
+      characterId: 333,
+      name: 'Pilot 333',
+      feederCorporationId: 98000002,
+      coverageFrom: '2026-10-25',
+    });
+    expect(await db.tokens.count()).toBe(0);
+    expect(await db.characters.count()).toBe(0);
+  });
+
+  it('is not interchangeable with a moon owner invite round trip', async () => {
+    const feeder = stateOf(await startFeederGrantLogin(111, 'code', undefined, cfg));
+    await expect(
+      completeOwnCorpGrantLogin({ code: 'c', state: feeder }, cfg)
+    ).rejects.toBeInstanceOf(LoginError);
   });
 });

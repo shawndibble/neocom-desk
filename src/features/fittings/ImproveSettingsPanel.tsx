@@ -188,6 +188,13 @@ export function ImproveSettingsPanel({
                   />
                   {t('fittings.improve.includeOfficer')}
                 </label>
+                <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
+                  <Checkbox
+                    checked={settings.allowMutated}
+                    onChange={(event) => settings.onAllowMutatedChange(event.target.checked)}
+                  />
+                  {t('fittings.improve.allowMutated')}
+                </label>
               </div>
             </Collapse>
           </div>

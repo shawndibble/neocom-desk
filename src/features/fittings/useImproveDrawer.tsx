@@ -153,6 +153,7 @@ export function useImproveDrawer({
   // Not remembered: a Defense Choice, and the Officer tick, are about this fit.
   const [defense, setDefense] = useState<DefenseChoice>('keep');
   const [includeOfficer, setIncludeOfficer] = useState(false);
+  const [allowMutated, setAllowMutated] = useState(false);
   // What the ticked and hovered rows would change, for the stats column; never part of the Fitting or its history.
   const [preview, setPreview] = useState<FittingStatsDelta | null>(null);
   const [previewIsk, setPreviewIsk] = useState<number | null>(null);
@@ -220,6 +221,7 @@ export function useImproveDrawer({
       defense,
       includeRigs,
       includeOfficer,
+      allowMutated,
       oreFamily,
       hold,
     },
@@ -376,6 +378,8 @@ export function useImproveDrawer({
         onIncludeRigsChange: (next) => void setIncludeRigs(next),
         includeOfficer,
         onIncludeOfficerChange: setIncludeOfficer,
+        allowMutated,
+        onAllowMutatedChange: setAllowMutated,
         oreFamily,
         onOreFamilyChange: (next) => void setOreFamily(next),
         hold,

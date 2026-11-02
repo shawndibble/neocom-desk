@@ -150,7 +150,7 @@ function NoColonies({ planHref }: { planHref: string }) {
   const blurbs = [
     { icon: <Icon.Recent />, key: 'restart', help: 'piColonies.help.extractors' },
     { icon: <Icon.Container />, key: 'storage', help: 'piColonies.help.launchpad' },
-    { icon: <Icon.Industry />, key: 'health', help: 'piPlan.explainer.commandCenterBody' },
+    { icon: <Icon.PiCommandCenter />, key: 'health', help: 'piPlan.explainer.commandCenterBody' },
   ] as const;
   return (
     <Panel

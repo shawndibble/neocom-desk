@@ -1,5 +1,5 @@
 /**
- * The character's Coming Up board: ten heterogeneous clocks in, one ordered
+ * The character's Coming Up board: eleven heterogeneous clocks in, one ordered
  * list out.
  *
  * The corp side of this exists already (`engine/corp/board.ts`) and answers the
@@ -42,6 +42,7 @@
 export const CHARACTER_BOARD_ITEM_KINDS = [
   'calendarEvent',
   'skillTraining',
+  'accelerator',
   'industryJob',
   'planetExtraction',
   'mercenaryDen',
@@ -130,12 +131,15 @@ export interface CharacterBoardSources {
   orderExpiries?: readonly BoardClockSource[];
   /** Projected Skill Plan steps — a forecast, not an ESI clock. */
   skillPlan?: readonly BoardClockSource[];
+  /** The pilot's typed-in cerebral accelerator running out — their own answer, not an ESI clock. */
+  accelerator?: readonly BoardClockSource[];
 }
 
 /** Which `CharacterBoardSources` field carries each kind — the one place the two names meet. */
 const SOURCE_KEY = {
   calendarEvent: 'calendarEvents',
   skillTraining: 'skillTraining',
+  accelerator: 'accelerator',
   industryJob: 'industryJobs',
   planetExtraction: 'planetExtractions',
   mercenaryDen: 'mercenaryDens',

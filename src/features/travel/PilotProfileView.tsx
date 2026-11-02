@@ -27,7 +27,10 @@ import { useNow } from '@/lib/useNow';
 import { characterZkillUrl, fetchPilotStats, type PilotStatsResult } from '@/lib/zkillboard';
 import { PilotKillActivityView, PilotStandingLine } from './PilotKillActivity';
 import { PilotShips } from './PilotShips';
+import { threatInContext } from '@/engine/pilotList/threatContext';
 import { PilotThreatBand } from './PilotThreatBand';
+import { useHereSpace } from './useHereSpace';
+import { useLocalThreatContext } from './localThreatContext';
 import { usePilotKillHistory } from './usePilotKillHistory';
 import { usePilotLossTimes } from './usePilotLossTimes';
 import { killerRatio } from './zkillFigures';
@@ -57,6 +60,9 @@ export function PilotProfileView(props: PilotProfileViewProps) {
   const [attempt, setAttempt] = useState(0);
   const { history, retry: retryHistory } = usePilotKillHistory(characterId);
   const now = useNow();
+  // Where you are, and who of theirs is in the Local list this was opened from (none otherwise).
+  const hereSpace = useHereSpace().space;
+  const orgMatesHere = useLocalThreatContext((state) => state.matesById.get(characterId) ?? null);
   const pilotStats = stats?.kind === 'stats' ? stats.stats : null;
   // zKillboard could not be read: an empty kill list beside that is unknown, never "no kills".
   const zkillDown = stats?.kind === 'failed';
@@ -86,8 +92,24 @@ export function PilotProfileView(props: PilotProfileViewProps) {
     });
     const waitingForRatios = stats === null && needsDangerRatio(history.kills, now);
     const waitingForLosses = needsLosses && losses.kind === 'loading';
-    return { verdict, pending: waitingForRatios || waitingForLosses };
-  }, [history, pilotStats, stats, losses, needsLosses, lossesUnreadable, killsUnknown, now]);
+    const read = threatInContext(verdict.level, history.kills, now, { hereSpace, orgMatesHere });
+    return {
+      verdict: { ...verdict, level: read.level },
+      read,
+      pending: waitingForRatios || waitingForLosses,
+    };
+  }, [
+    history,
+    pilotStats,
+    stats,
+    losses,
+    needsLosses,
+    lossesUnreadable,
+    killsUnknown,
+    now,
+    hereSpace,
+    orgMatesHere,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +134,7 @@ export function PilotProfileView(props: PilotProfileViewProps) {
           verdict={threat.verdict}
           gangRatio={pilotStats?.gangRatio ?? null}
           nowMs={now}
+          context={{ read: threat.read, hereSpace, orgMatesHere }}
         />
       )}
       {killsUnknown && (

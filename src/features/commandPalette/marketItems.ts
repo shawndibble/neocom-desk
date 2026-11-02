@@ -131,7 +131,7 @@ export interface ShownMarketItem {
 
 export interface MarketItemsProviderOptions {
   readonly catalogue: MarketItemCatalogue;
-  /** Opens the item's Item Detail over the current page. */
+  /** Opens the item in the Market Browser. */
   readonly onSelect: (item: ShownMarketItem) => void;
 }
 

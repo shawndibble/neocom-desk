@@ -26,6 +26,8 @@ const settings = (patch: Partial<ImproveSettings> = {}): ImproveSettings => ({
   onIncludeRigsChange: vi.fn(),
   includeOfficer: false,
   onIncludeOfficerChange: vi.fn(),
+  allowMutated: false,
+  onAllowMutatedChange: vi.fn(),
   oreFamily: 'Simple Asteroid',
   onOreFamilyChange: vi.fn(),
   hold: 'cargo',
@@ -75,6 +77,7 @@ const searchOf = (s: ImproveState): ImproveSearch => ({
   restart: vi.fn(),
   recalc: null,
   completion: null,
+  mutatedKept: { kept: 0, unflyable: 0 },
 });
 
 const renderPanel = (s: ImproveState, onApply = vi.fn(), config = settings()) =>

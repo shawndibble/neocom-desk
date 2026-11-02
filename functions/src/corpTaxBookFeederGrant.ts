@@ -74,7 +74,7 @@ export interface FeederGrantDeps extends CorpSyncDeps {
 
 const PURPOSE = 'corpSyncGrant' as const;
 
-const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
+export const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
   db: deps.db,
   now: deps.now,
   verifyToken: deps.verify,
@@ -315,7 +315,9 @@ async function undoReconnect(
 export async function saveFeederGrant(
   deps: FeederGrantDeps,
   caller: Caller,
-  input: SaveFeederGrantInput
+  input: SaveFeederGrantInput,
+  /** The add-my-corp path names the corporation the alt must be in: `wrong-corp` otherwise. */
+  options: { expectedFeederCorp?: number } = {}
 ): Promise<SaveFeederGrantResult> {
   const callerId = signedInCharacter(caller);
   // The alt need not be on the caller's account, so the token's Character is not
@@ -354,6 +356,9 @@ export async function saveFeederGrant(
     }
     const readsStructures = feederGrantReadsStructures(claims.scopes);
     const feederCorp = await deps.lookupCorporation(claims.characterId);
+    if (options.expectedFeederCorp !== undefined && feederCorp !== options.expectedFeederCorp) {
+      fail('failed-precondition', 'That Character is in another corporation', 'wrong-corp');
+    }
 
     accepted =
       input.code === RECONNECT_CODE
@@ -614,7 +619,11 @@ export async function authorizeFeederCaller(
 
 // --- Leave -----------------------------------------------------------------
 
-const LEAVABLE: readonly FeederRecord['status'][] = ['active', 'pending-removal', 'disconnected'];
+export const LEAVABLE: readonly FeederRecord['status'][] = [
+  'active',
+  'pending-removal',
+  'disconnected',
+];
 
 export async function leaveFeeder(
   deps: CorpSyncDeps,

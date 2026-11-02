@@ -329,6 +329,51 @@ describe('OpenOrdersPanel', () => {
     expect(screen.getByRole('button', { name: 'All (3)' })).toBeInTheDocument();
   });
 
+  it("shows the viewed Character's used / max order slots, uncoloured below the cap", async () => {
+    mockedSkills.mockResolvedValue({
+      ...skillsFixture([[3443, 0]]),
+      skillsResult: {} as CorrectedSkills['skillsResult'],
+    });
+    mockedLoadAll.mockResolvedValue(
+      snapshot([entry([BELOW_FLOOR_ORDER, EXPIRING_ORDER, NO_COST_BASIS_ORDER])])
+    );
+
+    renderPanel();
+
+    const figure = await screen.findByText('Order slots 3 / 5');
+    expect(figure).not.toHaveClass('text-danger');
+  });
+
+  it('turns the slot figure red when the book is full', async () => {
+    mockedSkills.mockResolvedValue({
+      ...skillsFixture([]),
+      skillsResult: {} as CorrectedSkills['skillsResult'],
+    });
+    const orders = [1, 2, 3, 4, 5].map((id) =>
+      order({
+        order_id: 900 + id,
+        type_id: 34,
+        price: 5,
+        region_id: REGION,
+        location_id: STATION_A,
+      })
+    );
+    mockedLoadAll.mockResolvedValue(snapshot([entry(orders)]));
+
+    renderPanel();
+
+    expect(await screen.findByText('Order slots 5 / 5')).toHaveClass('text-danger');
+  });
+
+  it('hides the slot figure and says why when skills are unavailable', async () => {
+    mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
+
+    renderPanel();
+
+    expect(await screen.findByText(/Order slots are hidden/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Order slots \d+ \/ \d+$/)).not.toBeInTheDocument();
+  });
+
   it('shows Watch and All one segment away, and remembers the pick in the URL', async () => {
     const user = userEvent.setup();
     mockedStationPrices.mockResolvedValue(new Map());

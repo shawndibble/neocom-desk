@@ -9,6 +9,12 @@ alphabetical position lands mid-file, so two agents adding terms at once do not
 collide the way appending to the end always did. Scope decisions do not belong
 here — they go one per file in `docs/context/decisions/`.
 
+- **Accelerator**: A Character's running cerebral accelerator as the pilot told us
+  about it: a bonus to all five attributes and the instant it runs out, saved
+  once per Character and shared by every **Skill Plan** and the Characters
+  table's Accelerator column. Typed-in wins while it has not run out; after
+  that it is deleted and a **Detected Accelerator** (a guess, no expiry) applies
+  again. It is the first **Booster** of the plans costed for that Character.
 - **Abyssal type**: The item type a **Mutaplasmid** makes — "Heavy Abyssal
   Energy Neutralizer", "Light Mutated Drone". One abyssal type is made from
   many base modules, so the type alone never says which base an item came
@@ -123,7 +129,9 @@ here — they go one per file in `docs/context/decisions/`.
   the boot screen on a cold start or browser reload, never mid-session: no
   route-change reload, and no "update ready" indicator.
 - **Booster**: Cerebral accelerator; user adds it manually, entering the time
-  left as EVE's tooltip shows it, for training-time math. A Skill Plan holds
+  left as EVE's tooltip shows it, for training-time math. The one running now
+  is the Character's **Accelerator**, shared across plans; a plan holds only the
+  Boosters it queues behind it. A Skill Plan holds
   an ordered list of Boosters run one after another, since EVE has a single
   booster slot; a queued one starts when the one before it expires.
 - **BPC**: An owned Blueprint Copy — an ESI blueprint instance with a finite
@@ -542,7 +550,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Way to fly**: One way a **Leg** can be flown, listed beside its rows: gates only, via Thera / Turnur, via Ansiblex, the planner's pick when it differs, and a **Pinned way**. Each states its facts side by side, never ranked.
 - **Pinned way**: The **Way to fly** a pilot chose for one **Leg** with "Use for this leg", kept in the link. A pin that cannot be flown is reported on the leg, and the planner's pick flies it.
 - **Pilot Lookup**: Travel's view of one pilot found by name: public ESI identity, zKillboard's all-time figures, and their newest kills and losses. Carries a **Threat** badge, otherwise only numbers; no pilot is called hostile or safe. Also groups a pasted or typed **Local list** by what each pilot means to you, or by alliance and corporation ("Group by", remembered per device).
-- **Threat**: A pilot's colour-coded verdict badge (**Dangerous**, **Active**, **Low threat**, **Inactive**), read from their kills in the last 90 days and zKillboard's all-time ratios. Kills decide the level; a recent loss only keeps a pilot with no recent kill from reading Inactive. Says how threatening a pilot looks, never that one is safe: there is no green level.
+- **Threat**: A pilot's colour-coded verdict badge (**Dangerous**, **Active**, **Low**, **Quiet**; shown as one short word, read in full as Low threat and "No recent kills"), read from their kills in the last 90 days and zKillboard's all-time ratios. Kills decide the level; a recent loss only keeps a pilot with no recent kill from reading Quiet. Says how threatening a pilot looks, never that one is safe: there is no green level. Read against where you are and who is in Local, it can move one level (a small arrow says so): lower for a pilot who has never killed in the kind of space you are in, or who kills in groups and has none of their own here; higher for a group killer with several of their own here.
 - **Avoided Systems**: The solar systems a pilot keeps off their routes, entered by hand because ESI cannot read the game client's own autopilot avoidance list. Part of **Travel Settings**; not a **Route Preference**.
 - **Route Preference**: Which trip a distance describes: the game's Prefer shorter, Prefer safer or Prefer less secure, one vocabulary app-wide. The pilot's default lives in **Travel Settings**; a page with its own picker opens on it and overrides it for that view only.
 - **Travel Settings**: The in-game autopilot's route options, for planning: the default **Route Preference**, the security penalty, and what to avoid (the **Avoided Systems**, EDENCOM and Triglavian minor-victory systems, and systems over a pod-kill count in ESI's last-hour report).
@@ -796,3 +804,6 @@ here — they go one per file in `docs/context/decisions/`.
   its one feed, e.g. the Wallet on Balance or on Flow.
 - **Widget State**: Which of five things a **Widget** is showing: loading,
   needs permission, failed, empty or ok.
+- **Yours**: The pill on a **Feeder** whose corporation is one of the viewer's own, joined through "Add my other
+  corps" (the CEO is a Character on the viewer's account) rather than an invite. It owes no owner rate and takes no
+  payouts: the row is always settled otherwise.

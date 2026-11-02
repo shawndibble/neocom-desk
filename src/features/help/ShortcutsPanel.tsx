@@ -8,6 +8,7 @@ import {
   SHORTCUTS,
   commandPaletteDisplayKey,
   isApplePlatform,
+  altChordDisplayKey,
   modChordDisplayKey,
   pasteDisplayKey,
 } from '@/lib/shortcuts';
@@ -115,6 +116,9 @@ export function ShortcutsPanel() {
           </Row>
           <Row label={t('shortcuts.cycleModuleState')}>
             <kbd className={KBD}>S</kbd>
+          </Row>
+          <Row label={t('shortcuts.openInJanice')}>
+            <kbd className={KBD}>{altChordDisplayKey(apple, 'J')}</kbd>
           </Row>
           <Row label={t('shortcuts.submitPaste')}>
             <kbd className={KBD}>{modChordDisplayKey(apple, 'Enter')}</kbd>

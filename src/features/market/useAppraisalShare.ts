@@ -5,8 +5,12 @@ import {
 } from '@/engine/market/appraisalSnapshot';
 import { createShareLink, existingShareLink } from '@/features/share/shareStore';
 import { writeToClipboard } from '@/lib/clipboard';
+import type { AppraisalItem } from '@/engine/market/appraisal';
 import type { TradeHub } from '@/market/hubs';
 import type { AppraisalController } from './useAppraisal';
+import { useRefineMineralNames } from './useRefineMineralNames';
+
+const NO_ITEMS: readonly AppraisalItem[] = [];
 
 /**
  * The Share button's progress. `manual` is a link that was stored but could
@@ -33,6 +37,8 @@ export function useAppraisalShare({
   characterId: number | null;
 }) {
   const [share, setShare] = useState<ShareState>({ status: 'idle' });
+  // Read ahead of the press, so the handler stays inside the click.
+  const mineralNames = useRefineMineralNames(result?.appraisal.items ?? NO_ITEMS);
   // A link belongs to the result it was made from; a new appraisal drops it.
   const [shareResult, setShareResult] = useState(result);
   if (result !== shareResult) {
@@ -52,6 +58,12 @@ export function useAppraisalShare({
       pricePercent,
       generatedAt: Math.floor(Date.now() / 1000),
       items: result.appraisal.items,
+      refining: result.refining && {
+        yieldRate: result.refining.stationRate,
+        taxRate: result.refining.taxRate,
+      },
+      // The minerals' names travel with the link so a signed-out visitor can read the breakdown.
+      mineralNames,
     });
     if (!snapshot.ok) return; // pre-checked by the disabled state below
     const reuseKey = appraisalSnapshotReuseKey(snapshot.value);

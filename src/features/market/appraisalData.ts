@@ -67,7 +67,7 @@ import { loadMarketTypesById } from '@/sde/marketTypesById';
 import { loadMutaplasmids, loadReprocessing, loadTypes } from '@/sde/loadSde';
 import { splitAbyssalUnmatched } from '@/engine/market/abyssalValuation';
 import type { ReprocessingType } from '@/sde/types';
-import type { RefiningSetup } from '@/engine/industry/refiningSetup';
+import { DEFAULT_REFINING_SETUP, type RefiningSetup } from '@/engine/industry/refiningSetup';
 
 export interface AppraisalOutcome {
   appraisal: Appraisal;
@@ -87,6 +87,13 @@ export interface AppraisalOutcome {
    * implants without saying so over a scrap-only paste (issue #1588).
    */
   refinesOreOrIce: boolean;
+  /**
+   * The Refining Setup the refine figures were worked out at: the pilot's own,
+   * or the NPC-station default when none was given. Undefined where no refine
+   * was computed (no active Character), so a caller can tell "the default"
+   * from "nothing refined".
+   */
+  refining?: RefiningSetup;
   /** The active Character's own skill level, or null with no active Character. Feeds `appraisalNet`. */
   accountingLevel: number | null;
   /** Same as `accountingLevel`, for Broker Relations. */
@@ -281,6 +288,7 @@ export async function appraisePaste(
     abyssal,
     implantBonusPct: implantApplied ? (modifiers?.refiningImplantPct ?? 0) : 0,
     refinesOreOrIce,
+    ...(modifiers ? { refining: refining ?? DEFAULT_REFINING_SETUP } : {}),
     accountingLevel: modifiers ? (modifiers.skills[SKILL_IDS.accounting] ?? 0) : null,
     brokerRelationsLevel: modifiers ? (modifiers.skills[SKILL_IDS.brokerRelations] ?? 0) : null,
     pricesUnreachable,

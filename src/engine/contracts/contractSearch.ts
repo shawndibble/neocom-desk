@@ -93,6 +93,24 @@ export function isUnpricedOffer(
 }
 
 /**
+ * What one unit of a single-type contract costs: the asking price the Price
+ * column shows, divided by the stack's quantity. `undefined` when it cannot be
+ * known — a bundle (or a row whose `lineCount` was never stamped) has a price
+ * that covers several items and is never apportioned to one (decision
+ * 20260915-093419), an unpriced offer has no price, and a zero quantity has
+ * nothing to divide by. Built on `offerAskingPrice`/`isUnpricedOffer` so the
+ * two columns can never disagree.
+ */
+export function offerUnitPrice(
+  row: PublicContractOfferRow,
+  plexPrice: number | null
+): number | undefined {
+  if (row.lineCount !== 1 || row.quantity <= 0) return undefined;
+  if (isUnpricedOffer(row, plexPrice)) return undefined;
+  return offerAskingPrice(row, plexPrice) / row.quantity;
+}
+
+/**
  * What a `maxPrice` ceiling judges a row on — deliberately not
  * `offerAskingPrice`, which answers a different question. This one asks
  * "could this row exceed my ceiling": an auction's starting bid says nothing

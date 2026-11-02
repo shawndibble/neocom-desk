@@ -1,16 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
-import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import * as Icon from './icons';
 import { panelDomId, tabDomId, useTabPanelProps } from './tabPanel';
-import {
-  pageScrollDelta,
-  revealInScroller,
-  scrollEdges,
-  wheelScrollDelta,
-  type ScrollEdges,
-} from './tabScroll';
+import { revealInScroller, scrollEdges, wheelScrollDelta } from './tabScroll';
+import { useScrollEdges } from './useScrollEdges';
 import {
   tabItemActiveClassName,
   tabItemClassName,
@@ -113,30 +107,7 @@ export function Tabs({
   // anything until Enter/Space says so.
   const [manualFocusId, setManualFocusId] = useState(value);
   const focusedId = activation === 'manual' ? manualFocusId : value;
-  const reducedMotion = usePrefersReducedMotion();
-  const [edges, setEdges] = useState<ScrollEdges>({ before: false, after: false });
-
-  // Chevrons and wheel travel both need to know which ends still have tabs
-  // beyond them. Recomputed on scroll and on any resize of the frame or the
-  // bar (a tab added, a count badge growing, a window resize), so it needs no
-  // dependency on `tabs`, which callers often pass as a fresh array.
-  useEffect(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-    const update = () => {
-      const next = scrollEdges(scroller);
-      setEdges((prev) => (prev.before === next.before && prev.after === next.after ? prev : next));
-    };
-    update();
-    scroller.addEventListener('scroll', update, { passive: true });
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
-    observer?.observe(scroller);
-    if (listRef.current) observer?.observe(listRef.current);
-    return () => {
-      scroller.removeEventListener('scroll', update);
-      observer?.disconnect();
-    };
-  }, []);
+  const { edges, pageScroll } = useScrollEdges(scrollerRef, listRef);
 
   // Native listener, not `onWheel`: React registers wheel passively, and
   // taking the event over means calling `preventDefault`.
@@ -152,15 +123,6 @@ export function Tabs({
     scroller.addEventListener('wheel', onWheel, { passive: false });
     return () => scroller.removeEventListener('wheel', onWheel);
   }, []);
-
-  function pageScroll(direction: 'before' | 'after') {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-    scroller.scrollBy({
-      left: pageScrollDelta(direction, scroller.clientWidth),
-      behavior: reducedMotion ? 'auto' : 'smooth',
-    });
-  }
 
   /**
    * Keeps the selected (or, in manual mode, focused) tab on screen when it
@@ -211,7 +173,11 @@ export function Tabs({
             onClick={() => pageScroll(side)}
             className={cx(tabChevronClassName, side === 'before' ? 'left-0.5' : 'right-0.5')}
           >
-            {side === 'before' ? <Icon.Back size={14} /> : <Icon.Descend size={14} />}
+            {side === 'before' ? (
+              <Icon.Back className="size-3.5" />
+            ) : (
+              <Icon.Descend className="size-3.5" />
+            )}
           </button>
         ) : null
       )}

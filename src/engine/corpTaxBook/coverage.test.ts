@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clampCoverageFrom,
   closePeriod,
   filterCovered,
   isDayCovered,
@@ -133,5 +134,28 @@ describe('splitByCoverage (moon owner rows, #4618)', () => {
     const out = splitByCoverage([...own, stranger], BOOK, feeders);
     expect(out.covered).toEqual([...own, stranger]);
     expect(out.outsideCoverage).toEqual([]);
+  });
+});
+
+describe('clampCoverageFrom', () => {
+  const TODAY = '2026-10-20';
+
+  it('defaults to today and keeps a requested day in range', () => {
+    expect(clampCoverageFrom([], undefined, TODAY)).toBe('2026-10-20');
+    expect(clampCoverageFrom([], '2026-10-05', TODAY)).toBe('2026-10-05');
+  });
+
+  it('never starts after today or more than 30 days back', () => {
+    expect(clampCoverageFrom([], '2026-10-25', TODAY)).toBe('2026-10-20');
+    expect(clampCoverageFrom([], '2026-09-20', TODAY)).toBe('2026-09-20');
+    expect(clampCoverageFrom([], '2026-09-19', TODAY)).toBe('2026-09-20');
+  });
+
+  it('starts a rejoin the day after the last period ended, so reopenPeriod never throws', () => {
+    const periods = [{ from: '2026-10-01', to: '2026-10-10' }];
+    const from = clampCoverageFrom(periods, '2026-10-05', TODAY);
+    expect(from).toBe('2026-10-11');
+    expect(() => reopenPeriod(periods, from)).not.toThrow();
+    expect(clampCoverageFrom(periods, '2026-10-15', TODAY)).toBe('2026-10-15');
   });
 });

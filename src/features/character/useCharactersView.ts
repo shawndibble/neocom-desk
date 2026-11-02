@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { CharacterRecord } from '@/db';
+import type { CharacterAcceleratorRecord, CharacterRecord } from '@/db';
 import type { AttentionEntry } from '@/features/character/rosterAttention';
 import type { RosterCore } from '@/features/character/rosterView';
 import {
@@ -28,6 +28,7 @@ import {
 } from '@/lib/urlState';
 import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 import type { WhereaboutsLookup } from '@/features/character/useCharacterWhereabouts';
+import type { LatestNetWorth } from '@/engine/netWorth/latest';
 import type { CharacterRow } from '@/features/character/charactersTableColumns';
 
 export const SORT_KEYS: readonly CharacterSortKey[] = [
@@ -110,6 +111,12 @@ interface CharactersViewInput {
   visibleColumns: readonly CharacterColumnId[];
   spExtractionEnabled: boolean;
   whereabouts: WhereaboutsLookup;
+  /** Newest Net Worth Snapshot per Character; none for one never snapshotted. */
+  netWorthById: ReadonlyMap<number, LatestNetWorth>;
+  /** Each Character's typed-in accelerator. */
+  acceleratorById: ReadonlyMap<number, CharacterAcceleratorRecord>;
+  /** The accelerator bonus each Character's cached attribute sheet implies. */
+  detectedAcceleratorById: ReadonlyMap<number, number | null>;
 }
 
 /**
@@ -133,6 +140,9 @@ export function useCharactersView(input: CharactersViewInput) {
     visibleColumns,
     spExtractionEnabled,
     whereabouts,
+    netWorthById,
+    acceleratorById,
+    detectedAcceleratorById,
   } = input;
   const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
   const { q: search, sort: sortKey, dir: sortDirection } = filterParams;
@@ -269,6 +279,9 @@ export function useCharactersView(input: CharactersViewInput) {
         whereabouts: whereabouts.of(character.characterId),
         locationGranted: whereabouts.hasLocationGrant(character.characterId),
         shipGranted: whereabouts.hasShipGrant(character.characterId),
+        netWorth: netWorthById.get(character.characterId),
+        acceleratorRecord: acceleratorById.get(character.characterId),
+        detectedAccelerator: detectedAcceleratorById.get(character.characterId) ?? null,
       };
     });
   const allIds = (characters ?? []).map((character) => character.characterId);

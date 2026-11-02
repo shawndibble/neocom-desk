@@ -16,6 +16,7 @@ export function InlinePercent({
   min,
   max,
   onCommit,
+  className,
 }: {
   /** The value shown at rest, as a fraction. */
   fraction: number;
@@ -25,6 +26,8 @@ export function InlinePercent({
   min: number;
   max: number;
   onCommit: (fraction: number) => void;
+  /** Extra classes for the value's button at rest (the field in edit mode is unaffected). */
+  className?: string;
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<string | null>(null);
@@ -76,6 +79,7 @@ export function InlinePercent({
   }
   return (
     <EditableValue
+      className={className}
       label={t('refining.editValue', { name })}
       focusOnMount={refocus}
       onFocused={() => setRefocus(false)}

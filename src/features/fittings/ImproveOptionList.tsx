@@ -179,12 +179,22 @@ function ImproveOptionRow({
             <span className="font-medium">{labels.swapLabel(option)}</span>
             {leadContext.goal !== 'cheaper' && !option.candidate.fixesUnflyable && (
               <span className="text-success shrink-0 text-xs font-medium">
-                {t('fittings.improve.gain', { percent: m3sFormat(option.score * 100) })}
+                {t(
+                  leadContext.goal === 'overall'
+                    ? 'fittings.improve.gainOverall'
+                    : 'fittings.improve.gain',
+                  {
+                    percent: m3sFormat(option.score * 100),
+                  }
+                )}
               </span>
             )}
           </span>
           {option.candidate.fixesUnflyable && (
             <span className="text-warning block text-xs">{t('fittings.improve.unflyable')}</span>
+          )}
+          {option.candidate.losesRoll && (
+            <span className="text-warning block text-xs">{t('fittings.improve.rollLost')}</span>
           )}
           {option.candidate.fixesUnflyable && option.candidate.pairedWith && (
             <span className="block text-xs">

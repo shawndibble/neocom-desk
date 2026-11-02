@@ -179,6 +179,25 @@ describe('FilterBar', () => {
     expect(screen.queryByText('From')).not.toBeInTheDocument();
   });
 
+  it('captions a field inline when it asks to', async () => {
+    const user = userEvent.setup();
+    render(
+      <FilterBar
+        value={0}
+        onChange={() => {}}
+        search={<SearchInput aria-label="Search" value="" onChange={() => {}} />}
+      >
+        {() => (
+          <FilterField captionInline label="From">
+            <TextInput aria-label="From" value="" onChange={() => {}} />
+          </FilterField>
+        )}
+      </FilterBar>
+    );
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    expect(screen.getByText('From')).toBeInTheDocument();
+  });
+
   it('captions each field in the sheet', async () => {
     useNarrowViewport();
     const user = userEvent.setup();

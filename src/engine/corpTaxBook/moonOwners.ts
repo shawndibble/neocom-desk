@@ -32,6 +32,8 @@ export interface MoonOwnerFeeder {
   corporationId: number;
   status: 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
   mode: FeederMode;
+  /** The CEO's own corporation, joined without an invite: always settled otherwise. */
+  sameOwner?: boolean;
   note?: string;
   joinedAt: number;
   leftAt?: number;
@@ -126,6 +128,8 @@ export interface MoonOwnerRow {
   lastReadWellAt?: string;
   staleSince?: number;
   mode: FeederMode;
+  /** One of the viewer's own corporations: no owner rate, no payouts. */
+  sameOwner?: boolean;
 }
 
 /** Whether a row is on the pay list: whole ISK owed, on a normal (not settled otherwise) moon owner. */
@@ -248,7 +252,7 @@ function workFromSummary(
   entries: () => readonly ObservedMiningEntry[]
 ): MoonOwnerRow {
   const today = input.now.slice(0, 10);
-  const settledNow = isSettledOn(deriveModeChanges(f), today);
+  const settledNow = f.sameOwner === true || isSettledOn(deriveModeChanges(f), today);
   const rate = effectiveOwnerRate(deriveOwnerRateHistory(f), today);
   const display: BalanceDisplay = { kind: s.balanceKind, isk: s.balanceIsk };
   const froms = f.coveragePeriods.map((p) => p.from).sort();
@@ -282,6 +286,7 @@ function workFromSummary(
     ...(f.lastReadWellAt !== undefined ? { lastReadWellAt: f.lastReadWellAt } : {}),
     ...(f.staleSince !== undefined ? { staleSince: f.staleSince } : {}),
     mode: settledNow ? 'settled-otherwise' : 'normal',
+    ...(f.sameOwner ? { sameOwner: true } : {}),
   };
 }
 
@@ -335,7 +340,7 @@ function work(
       ),
     }
   );
-  const settledNow = isSettledOn(modeChanges, today);
+  const settledNow = f.sameOwner === true || isSettledOn(modeChanges, today);
   const rate = effectiveOwnerRate(history, today);
   const { display } = feederBalance(accrued, f.payouts, settledNow);
   const mined = coveredValues.reduce((sum, v) => sum + v, 0);
@@ -367,6 +372,7 @@ function work(
       ...(f.lastReadWellAt !== undefined ? { lastReadWellAt: f.lastReadWellAt } : {}),
       ...(f.staleSince !== undefined ? { staleSince: f.staleSince } : {}),
       mode: settledNow ? 'settled-otherwise' : 'normal',
+      ...(f.sameOwner ? { sameOwner: true } : {}),
     },
   };
 }

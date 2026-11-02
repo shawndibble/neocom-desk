@@ -4,7 +4,17 @@
  * #2322, Contacts #2323) is a new provider, never a change to the palette.
  */
 
+import type { ReactNode } from 'react';
 import type { CharacterScopeReadoutProps } from '@/features/character/CharacterScopeReadout';
+
+/** What a result's second action reports back; the palette stays open and shows it. */
+export type PaletteAltOutcome = { tone: 'status' | 'alert'; text: ReactNode } | null;
+
+/** A result's second action: Shift+Enter, or the small button on the highlighted row. */
+export interface PaletteAltAction {
+  readonly label: string;
+  run(): PaletteAltOutcome | PromiseLike<PaletteAltOutcome>;
+}
 
 export interface PaletteResult {
   /** Unique within its provider; the palette tracks the highlight by it. */
@@ -16,6 +26,8 @@ export interface PaletteResult {
   /** Marked, never disabled: `run` still goes there so `ScopeGate` can explain. */
   readonly locked?: boolean;
   run(): void;
+  /** Shift+Enter (and a button on touch) runs this instead of `run`, keeping the palette open. */
+  readonly altAction?: PaletteAltAction;
 }
 
 export interface PaletteProvider {

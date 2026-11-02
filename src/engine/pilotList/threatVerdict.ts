@@ -55,7 +55,7 @@ export interface ThreatVerdict {
   ratiosKnown: boolean;
 }
 
-function recentKillsOf(kills: readonly KillRecord[], nowMs: number): KillRecord[] {
+export function recentKillsOf(kills: readonly KillRecord[], nowMs: number): KillRecord[] {
   const since = nowMs - THREAT_WINDOW_DAYS * DAY_MS;
   return kills.filter((kill) => kill.timeMs >= since);
 }

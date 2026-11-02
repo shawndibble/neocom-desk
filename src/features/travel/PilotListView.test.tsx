@@ -5,6 +5,7 @@ import '@/i18n';
 import { db } from '@/db';
 import type { KillSpace } from '@/engine/pilotList/killActivity';
 import { summarizeKills } from '@/engine/pilotList/killActivity';
+import { useLocalThreatContext } from './localThreatContext';
 import type { PilotListRow } from './pilotListData';
 
 const mocks = vi.hoisted(() => ({
@@ -119,13 +120,14 @@ describe('PilotListView (Local list)', () => {
     renderList();
     await screen.findByRole('table', { name: 'Killed in highsec, last 30 days' });
     const badgeOf = (name: string) =>
-      screen.getByText(name).closest('td')?.querySelector('span.inline-flex')?.textContent;
-    expect(badgeOf('Nullbear')).toContain('Low threat');
-    expect(badgeOf('Sleeper')).toContain('Inactive');
+      screen.getByText(name).closest('td')?.querySelector('span.inline-flex span[aria-hidden]')
+        ?.textContent;
+    expect(badgeOf('Nullbear')).toBe('Low');
+    expect(badgeOf('Sleeper')).toBe('Quiet');
     expect(badgeOf('Offline') ?? null).toBeNull();
   });
 
-  it('washes a Dangerous row red and fills its badge, and leaves an Inactive one plain', async () => {
+  it('washes a Dangerous row red and fills its badge, and leaves a Quiet one plain', async () => {
     const killedLately = Array.from({ length: 10 }, (_, i) => kill((i + 1) * HOUR, 'highsec'));
     const rows = [
       row('Reaper', {
@@ -161,7 +163,103 @@ describe('PilotListView (Local list)', () => {
     expect(inCard.getAllByText('2').length).toBeGreaterThan(0);
     expect(inCard.getByText('Kills, 30 days')).toBeTruthy();
     expect(inCard.getByText('Highsec')).toBeTruthy();
-    expect(inCard.getByText('Low threat')).toBeTruthy();
+    expect(inCard.getByText('Low')).toBeTruthy();
+  });
+
+  describe('read against where you are and who is in Local', () => {
+    const roamer = () =>
+      row('Roamer', {
+        kills: ready(
+          ...Array.from({ length: 6 }, (_, i) => kill((i + 1) * DAY, 'nullsec')).map((k) => ({
+            ...k,
+            attackerCount: 1,
+          }))
+        ),
+      });
+    const show = (rows: PilotListRow[]) =>
+      mocks.loadPilotList.mockImplementation(
+        (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
+          onRows(rows);
+          return Promise.resolve();
+        }
+      );
+    const badge = (name: string) =>
+      screen.getAllByText(name)[0].closest('td')?.querySelector('span.inline-flex') as HTMLElement;
+
+    it('reads a nullsec-only killer one level lower while you are in highsec, with an arrow', async () => {
+      show([roamer()]);
+      render(
+        <MemoryRouter>
+          <PilotListView paste={{ kind: 'local', names: ['Roamer'], overflow: 0 }} />
+        </MemoryRouter>
+      );
+      await screen.findByRole('table');
+      expect(within(badge('Roamer')).getByText('Low')).toBeTruthy();
+      expect(within(badge('Roamer')).getByText(/one level lower/)).toBeTruthy();
+    });
+
+    it("publishes who of each pilot's organization is in Local, for a profile opened from the list", async () => {
+      show([
+        row('Roamer', { ...roamer(), corporationId: 5, allianceId: 9 }),
+        row('Wingman', { corporationId: 6, allianceId: 9, kills: ready() }),
+      ]);
+      render(
+        <MemoryRouter>
+          <PilotListView paste={{ kind: 'local', names: ['Roamer', 'Wingman'], overflow: 0 }} />
+        </MemoryRouter>
+      );
+      await screen.findAllByRole('table');
+      expect(useLocalThreatContext.getState().matesById.get('Roamer'.length)).toBe(1);
+    });
+
+    it('leaves them at Active when you are in nullsec, where they kill', async () => {
+      mocks.here.space = 'nullsec';
+      show([roamer()]);
+      render(
+        <MemoryRouter>
+          <PilotListView paste={{ kind: 'local', names: ['Roamer'], overflow: 0 }} />
+        </MemoryRouter>
+      );
+      await screen.findByRole('table');
+      expect(within(badge('Roamer')).getByText('Active')).toBeTruthy();
+      expect(within(badge('Roamer')).queryByText(/one level/)).toBeNull();
+    });
+  });
+
+  describe('a kill history read in an earlier paste (issue #5812)', () => {
+    const staleRows = () =>
+      ROWS.map((r) =>
+        r.name === 'Nullbear' && r.kills.kind === 'ready'
+          ? { ...r, kills: { ...r.kills, staleSinceMs: Date.now() - 5.5 * HOUR } }
+          : r
+      );
+    const showStale = () =>
+      mocks.loadPilotList.mockImplementation(
+        (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
+          onRows(staleRows());
+          return Promise.resolve();
+        }
+      );
+
+    it('says how old it is on that row alone, in the last column', async () => {
+      showStale();
+      renderList();
+      const table = await screen.findByRole('table', { name: 'Killed in highsec, last 30 days' });
+      const headers = within(table).getAllByRole('columnheader');
+      expect(headers[headers.length - 1].textContent).toContain('Kills read');
+      const nullbear = screen.getAllByText('Nullbear')[0].closest('tr') as HTMLElement;
+      expect(within(nullbear).getByText('5h ago')).toBeTruthy();
+      expect(screen.getAllByText('5h ago')).toHaveLength(1);
+    });
+
+    it('says it on the phone card beside the other tags', async () => {
+      mocks.phone = true;
+      showStale();
+      renderList();
+      const card = (await screen.findAllByText('Nullbear'))[0].closest('li') as HTMLElement;
+      expect(within(card).getByText('Kills read')).toBeTruthy();
+      expect(within(card).getByText('5h ago')).toBeTruthy();
+    });
   });
 
   it('groups pilots by what they mean to you, in a fixed order', async () => {
@@ -200,9 +298,9 @@ describe('PilotListView (Local list)', () => {
     for (const table of tables) {
       // Fixed layout, so the pinned widths hold whatever the group's content.
       expect(table.className).toContain('table-fixed');
-      // Pilot and Flew on stay flexible; Standing, Highsec, Lowsec, Nullsec are pinned.
+      // Pilot and Flew on stay flexible; Standing, Highsec, Lowsec, Nullsec and Kills read are pinned.
       expect(widthsOf(table)).toEqual(widthsOf(tables[0]));
-      expect(widthsOf(table).filter((w) => w !== null)).toHaveLength(4);
+      expect(widthsOf(table).filter((w) => w !== null)).toHaveLength(5);
     }
   });
 
@@ -403,7 +501,16 @@ describe('PilotListView (Group by Organization, issue #5668)', () => {
     // Stands in for a name past the 40-name zKillboard cap.
     row('Imre', { corporationId: 701, corporationName: 'Ember', kills: { kind: 'notLookedUp' } }),
     row('Varek', { corporationId: 801, corporationName: 'Quiet Orbit', kills: ready() }),
-    row('Corpmate', { corporationId: 901, ownOrganization: 'corporation' }),
+    row('Corpmate', {
+      corporationId: 901,
+      corporationName: 'Home Corp',
+      ownOrganization: 'corporation',
+    }),
+    row('Corpmate Two', {
+      corporationId: 901,
+      corporationName: 'Home Corp',
+      ownOrganization: 'corporation',
+    }),
   ];
 
   beforeEach(async () => {
@@ -457,6 +564,16 @@ describe('PilotListView (Group by Organization, issue #5668)', () => {
     expect(within(alone).getByText('Varek')).toBeInTheDocument();
     // Friendly stays last and folded, as in the Kills view.
     expect(screen.queryByText('Corpmate')).toBeNull();
+  });
+
+  it('groups the Friendly section by organization too, once it is opened', async () => {
+    await db.settings.put({ key: LOCAL_GROUP_MODE_KEY, value: 'organization' });
+    renderOrgList();
+    await screen.findByRole('link', { name: 'Black Lotus' });
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }));
+    const heading = screen.getByRole('link', { name: 'Home Corp' }).closest('h3');
+    expect(heading?.textContent).toContain('2 pilots');
+    expect(screen.getByRole('table', { name: /Friendly · Home Corp/ })).toBeInTheDocument();
   });
 
   it("shows a corporation's contact on that corporation, never on its alliance's heading", async () => {

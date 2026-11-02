@@ -135,6 +135,14 @@ const CATALOG = [
     scope: requiredScope('getCharacterPlanets'),
   },
   {
+    // Local data, no ESI: the pilot's typed-in cerebral accelerator
+    // (`characterAccelerators`), so no scope gates it, as for
+    // `priceAlertTriggered`.
+    id: 'acceleratorExpiring',
+    labelKey: 'settings.notifications.event.acceleratorExpiring',
+    defaultChannels: 'both',
+  },
+  {
     // Per Character: ESI has no corporation den route (issue #4782). The den
     // scope sits in the opt-in `mercenaryDens` Permission.
     id: 'mercenaryDenReinforced',

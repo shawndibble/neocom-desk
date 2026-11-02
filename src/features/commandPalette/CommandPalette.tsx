@@ -1,4 +1,5 @@
 import { formatCount } from '@/lib/formatCount';
+import { marketItemUrl } from '@/engine/market/urlState';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   useEffect,
@@ -48,19 +49,31 @@ import {
   type PaletteAsset,
 } from './assetsProvider';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
-import {
-  createMarketItemsProvider,
-  marketItemCatalogue,
-  type ShownMarketItem,
-} from './marketItems';
-import { loadLpCorporations } from '@/sde/loadMarketSde';
+import { createMarketItemsProvider, marketItemCatalogue } from './marketItems';
+import { loadLpCorporations, loadSolarSystems } from '@/sde/loadMarketSde';
 import { loadShipTree } from '@/sde/loadSde';
 import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
 import { createShipsProvider } from './shipsProvider';
+import { createPlacesProvider } from './placesProvider';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
+import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
+import { useOnline } from '@/stores/network';
+import { setWaypointsInGame } from '@/features/travel/sendWaypoints';
+import {
+  WAYPOINT_ENDPOINTS,
+  WAYPOINT_GROUPS,
+  waypointOutcome,
+} from '@/features/travel/waypointOutcome';
+import { routeToHref } from '@/features/route/routeSafetyLink';
+import { searchKnownPlaces } from '@/features/places/placeSearch';
+import { resolvePlace } from '@/features/places';
+import { usePlaceNicknames } from '@/features/assets/placeNicknames';
+import { fixed1 } from '@/lib/fixedFormat';
 import { readCachedLoyaltyBalances } from '@/features/character/loyalty';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
 import { createLpStoresProvider, NO_BALANCES } from './lpStoresProvider';
-import { GROUP_LIMIT, type PaletteProvider, type PaletteResult } from './types';
+import { type PaletteAltOutcome, type PaletteProvider, type PaletteResult } from './types';
+import { groupCountLabel, rankGroups, visibleRowCounts } from './rowBudget';
 import { usePaletteSearch } from './usePaletteSearch';
 
 const NO_CONTACTS: readonly PaletteContact[] = [];
@@ -71,7 +84,7 @@ function signedStanding(standing: number): string {
 }
 
 /** The live reads behind the shipped groups, turned into providers. */
-function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
+function useShippedProviders(): {
   providers: PaletteProvider[];
   destinations: NavDestination[];
 } {
@@ -140,6 +153,54 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
     [navigate, shipWindowOpen]
   );
 
+  const online = useOnline();
+  const lacksWaypointScope = useCharacterLacksEndpoints(activeCharacterId, WAYPOINT_ENDPOINTS);
+  const setWaypoint = useMemo(
+    () =>
+      async (locationId: number, placeName: string): Promise<PaletteAltOutcome> => {
+        if (activeCharacterId === null)
+          return { tone: 'alert', text: t('travel.waypoints.needCharacter') };
+        if (lacksWaypointScope)
+          return { tone: 'alert', text: <GrantMissingLink groups={WAYPOINT_GROUPS} /> };
+        if (!online) return { tone: 'alert', text: t('common.needsConnection') };
+        return waypointOutcome(
+          await setWaypointsInGame(activeCharacterId, [locationId]),
+          placeName,
+          t
+        );
+      },
+    [activeCharacterId, lacksWaypointScope, online, t]
+  );
+  const places = useMemo(
+    () =>
+      createPlacesProvider({
+        loadSystems: loadSolarSystems,
+        searchPlaces: (query, limit) => searchKnownPlaces(activeCharacterId, query, limit),
+        nicknames: () => usePlaceNicknames.getState().value,
+        resolvePlace: async (locationId) => {
+          const place = await resolvePlace(
+            { locationId, characterId: activeCharacterId },
+            undefined,
+            { settle: true }
+          );
+          return place.name !== null && place.systemId !== null
+            ? { name: place.name, systemId: place.systemId }
+            : null;
+        },
+        openRoute: (systemId, stationId) =>
+          void navigate(routeToHref(systemId, null, null, stationId)),
+        setWaypoint,
+        waypointLabel: t('commandPalette.setWaypoint'),
+        describeSystem: (system) =>
+          t('commandPalette.systemSublabel', { security: fixed1(system.security) }),
+        describeStation: ({ name, systemName }, nickname) =>
+          [nickname === undefined ? null : name, systemName]
+            .filter((part): part is string => part !== null)
+            .join(' · '),
+      }),
+    [activeCharacterId, navigate, setWaypoint, t]
+  );
+
   const providers = useMemo(
     () => [
       createPagesProvider({ destinations, navigate: (path) => void navigate(path) }),
@@ -185,13 +246,19 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
         quantityHint: (quantity) =>
           t('commandPalette.assetQuantity', { quantity: formatCount(quantity) }),
       }),
+      places,
       lpStores,
       ships,
-      createMarketItemsProvider({ catalogue: marketItemCatalogue, onSelect: onShowItem }),
+      createMarketItemsProvider({
+        catalogue: marketItemCatalogue,
+        // The Market Browser, carrying the hub or region it is already on.
+        onSelect: ({ typeId }) => void navigate(marketItemUrl(typeId, location.search)),
+      }),
     ],
     [
       destinations,
       navigate,
+      location.search,
       t,
       characters,
       activeCharacterId,
@@ -199,9 +266,9 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
       contacts,
       assets,
       assetsScope,
+      places,
       lpStores,
       ships,
-      onShowItem,
     ]
   );
   return { providers, destinations };
@@ -209,8 +276,6 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
 
 interface CommandPaletteProps {
   onClose: () => void;
-  /** A Market Items pick: Item Detail over the current page, owned by the host so it outlives the palette. */
-  onShowItem: (item: ShownMarketItem) => void;
 }
 
 /**
@@ -228,12 +293,12 @@ interface CommandPaletteProps {
  * Rendered only while open (`CommandPaletteHost`), so each opening starts
  * with an empty query and the first result highlighted.
  */
-export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
+export function CommandPalette({ onClose }: CommandPaletteProps) {
   const { t } = useTranslation();
   const baseId = useId();
   const listboxId = `${baseId}-listbox`;
   const inputRef = useRef<HTMLInputElement>(null);
-  const { providers, destinations } = useShippedProviders(onShowItem);
+  const { providers, destinations } = useShippedProviders();
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
   // Only the latest paste may navigate, whichever classifies first.
@@ -243,19 +308,41 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
   const isDesktop = useMediaQuery(MD_UP_QUERY);
   const recent = useRecentNav((state) => state.value);
   const [query, setQuery] = useState('');
-  const groups = usePaletteSearch(providers, query);
+  const found = usePaletteSearch(providers, query);
+  const groups = useMemo(() => rankGroups(found, query), [found, query]);
+  // Sections the pilot has arrowed into show every row; the rest show a few.
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
 
   // Keyed by group and result id, not position, so an async group landing
   // above the highlight does not move it onto a different row.
-  const options = groups.flatMap((group) =>
-    group.results.map((result) => ({ key: `${group.provider.id}:${result.id}`, result }))
+  const allOptions = groups.flatMap((group) =>
+    group.results.map((result, row) => ({
+      groupId: group.provider.id,
+      row,
+      key: `${group.provider.id}:${result.id}`,
+      result,
+    }))
   );
-  const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
+  // The highlighted row's section stays open, so a section landing late cannot
+  // collapse the row the pilot is on.
+  const highlightedGroupId = allOptions.find((option) => option.key === highlightedKey)?.groupId;
+  const rowCounts = visibleRowCounts(
+    groups,
+    highlightedGroupId === undefined ? expanded : new Set(expanded).add(highlightedGroupId)
+  );
+  // What is on screen. Hidden rows take no index: arrowing onto one expands its section first.
+  const options = allOptions.filter((option) => option.row < (rowCounts.get(option.groupId) ?? 0));
+  const [altOutcome, setAltOutcome] = useState<PaletteAltOutcome>(null);
+  /** A second Shift+Enter while one is sending must not send twice. */
+  const altInFlight = useRef(false);
   // A new query starts back at the top: Enter then takes the best match.
   const [prevQuery, setPrevQuery] = useState(query);
   if (prevQuery !== query) {
     setPrevQuery(query);
     setHighlightedKey(null);
+    setExpanded(new Set());
+    setAltOutcome(null);
   }
   const foundIndex = options.findIndex((option) => option.key === highlightedKey);
   const highlightedIndex = foundIndex >= 0 ? foundIndex : options.length > 0 ? 0 : null;
@@ -288,6 +375,22 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
     if (activeDescendant === undefined) return;
     document.getElementById(activeDescendant)?.scrollIntoView?.({ block: 'nearest' });
   }, [activeDescendant]);
+
+  /** Shift+Enter or the row's button: the second action, palette kept open to show its outcome. */
+  function activateAlt(result: PaletteResult) {
+    const action = result.altAction;
+    if (!action) return;
+    if (altInFlight.current) return;
+    altInFlight.current = true;
+    setAltOutcome(null);
+    void Promise.resolve(action.run())
+      .then(setAltOutcome, () =>
+        setAltOutcome({ tone: 'alert', text: t('travel.waypoints.unknownError') })
+      )
+      .finally(() => {
+        altInFlight.current = false;
+      });
+  }
 
   function activate(result: PaletteResult) {
     // Closed first: the dialog's teardown hands focus back to where it came
@@ -322,7 +425,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
       case 'ArrowUp':
       case 'Home':
       case 'End': {
-        if (options.length === 0) return;
+        if (allOptions.length === 0) return;
         event.preventDefault();
         // Options are not focusable, so Tab would only leave the input and
         // strand Enter: it steps the highlight like the arrows instead.
@@ -332,13 +435,30 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
               ? 'ArrowUp'
               : 'ArrowDown'
             : (event.key as ComboboxNavKey);
-        const next = moveHighlight(key, highlightedIndex, options.length);
-        setHighlightedKey(next === null ? null : options[next].key);
+        // Steps over every row, hidden ones too: landing on one opens its section.
+        const current =
+          highlightedIndex === null
+            ? null
+            : allOptions.findIndex((option) => option.key === options[highlightedIndex].key);
+        const next = moveHighlight(key, current, allOptions.length);
+        if (next === null) {
+          setHighlightedKey(null);
+          break;
+        }
+        const target = allOptions[next];
+        setHighlightedKey(target.key);
+        if (!expanded.has(target.groupId)) {
+          setExpanded((previous) => new Set(previous).add(target.groupId));
+        }
         break;
       }
       case 'Enter':
         if (highlightedIndex === null) return;
         event.preventDefault();
+        if (event.shiftKey && options[highlightedIndex].result.altAction) {
+          activateAlt(options[highlightedIndex].result);
+          break;
+        }
         activate(options[highlightedIndex].result);
         break;
       case 'Escape':
@@ -361,14 +481,10 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
       : [];
   // The error row is not an option, so the live count alone would hide it.
   const failedGroups = groups.filter((group) => group.status === 'error');
-  const groupCapped = groups.some(
-    (group) => group.status !== 'error' && group.results.length >= GROUP_LIMIT
-  );
-  // The capped note and group error rows are `aria-hidden` (a listbox child
-  // that is not an option); the status region carries them instead.
+  // Group error rows are `aria-hidden` (a listbox child that is not an
+  // option); the status region carries them instead.
   const statusParts = [
-    t('commandPalette.resultsCount', { count: options.length }),
-    groupCapped && t('commandPalette.groupCapped', { count: GROUP_LIMIT }),
+    t('commandPalette.resultsCount', { count: allOptions.length }),
     ...new Set(
       failedGroups.map((group) => t(group.provider.errorKey ?? 'commandPalette.groupError'))
     ),
@@ -402,19 +518,27 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
             id={listboxId}
             role="listbox"
             aria-label={t('commandPalette.resultsLabel')}
-            className="flex flex-col gap-2"
+            // The input stays put above; only the results scroll.
+            className="flex max-h-[min(30rem,calc(70vh-9rem))] scroll-py-2 flex-col gap-2 overflow-y-auto overscroll-contain"
           >
             {groups.map((group) => {
               const headingId = `${baseId}-group-${group.provider.id}`;
               return (
                 <div key={group.provider.id} role="group" aria-labelledby={headingId}>
                   <div
-                    id={headingId}
                     role="presentation"
                     className={cx(eyebrowClassName, 'flex items-center gap-2 px-2 pb-1')}
                   >
-                    {t(group.provider.labelKey)}
-                    {group.provider.scope && <CharacterScopeReadout {...group.provider.scope} />}
+                    {/* The group's name is the label alone: the count is heard in the status region. */}
+                    <span id={headingId} className="flex items-center gap-2">
+                      {t(group.provider.labelKey)}
+                      {group.provider.scope && <CharacterScopeReadout {...group.provider.scope} />}
+                    </span>
+                    {group.status === 'ready' && group.results.length > 0 && (
+                      <span aria-hidden="true" className="ml-auto tabular-nums">
+                        {groupCountLabel(group.results.length)}
+                      </span>
+                    )}
                   </div>
                   {group.status === 'error' ? (
                     <div aria-hidden="true" className="px-2 py-1.5 text-sm text-danger">
@@ -430,53 +554,72 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                     </div>
                   ) : (
                     <>
-                      {group.results.map((result) => {
-                        const index = optionIndex++;
-                        const highlighted = index === highlightedIndex;
-                        return (
-                          <div
-                            key={result.id}
-                            id={optionDomId(index)}
-                            role="option"
-                            aria-selected={highlighted}
-                            // Keeps focus in the input, as every combobox here does.
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => activate(result)}
-                            className={cx(
-                              'flex min-h-9 cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-sm',
-                              highlighted
-                                ? `bg-panel-2 text-text ${activeOptionClassName}`
-                                : 'text-text-dim hover:bg-panel-2'
-                            )}
-                          >
-                            <span className="flex min-w-0 flex-1 flex-col">
-                              <span className="truncate">{result.label}</span>
-                              {result.sublabel && (
-                                <span className="truncate text-xs text-text-dim">
-                                  {result.sublabel}
+                      {group.results
+                        .slice(0, rowCounts.get(group.provider.id) ?? 0)
+                        .map((result) => {
+                          const index = optionIndex++;
+                          const highlighted = index === highlightedIndex;
+                          return (
+                            <div
+                              key={result.id}
+                              id={optionDomId(index)}
+                              role="option"
+                              aria-selected={highlighted}
+                              aria-keyshortcuts={result.altAction ? 'Shift+Enter' : undefined}
+                              // Keeps focus in the input, as every combobox here does.
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => activate(result)}
+                              className={cx(
+                                'flex min-h-9 cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-sm',
+                                highlighted
+                                  ? `bg-panel-2 text-text ${activeOptionClassName}`
+                                  : 'text-text-dim hover:bg-panel-2'
+                              )}
+                            >
+                              <span className="flex min-w-0 flex-1 flex-col">
+                                <span className="truncate">{result.label}</span>
+                                {result.sublabel && (
+                                  <span className="truncate text-xs text-text-dim">
+                                    {result.sublabel}
+                                  </span>
+                                )}
+                              </span>
+                              {highlighted && result.altAction && (
+                                <button
+                                  type="button"
+                                  tabIndex={-1}
+                                  onMouseDown={(event) => event.preventDefault()}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    activateAlt(result);
+                                  }}
+                                  className={cx(
+                                    'min-h-9 shrink-0 rounded-xs border border-line px-2 text-xs text-text',
+                                    interactiveClassName,
+                                    focusRingClassName
+                                  )}
+                                >
+                                  {result.altAction.label}
+                                  <kbd className="ml-1.5 hidden text-text-dim md:inline">⇧↵</kbd>
+                                </button>
+                              )}
+                              {result.hint && (
+                                <span className="shrink-0 text-xs text-text-dim">
+                                  {result.hint}
                                 </span>
                               )}
-                            </span>
-                            {result.hint && (
-                              <span className="shrink-0 text-xs text-text-dim">{result.hint}</span>
-                            )}
-                            {result.locked && (
-                              <>
-                                <span
-                                  aria-hidden="true"
-                                  className="size-1.5 shrink-0 rounded-full bg-warning"
-                                />
-                                <span className="sr-only">{`, ${t('reauth.navLocked')}`}</span>
-                              </>
-                            )}
-                          </div>
-                        );
-                      })}
-                      {query.trim() !== '' && group.results.length >= GROUP_LIMIT && (
-                        <div aria-hidden="true" className="px-2 py-1 text-xs text-text-dim">
-                          {t('commandPalette.groupCapped', { count: GROUP_LIMIT })}
-                        </div>
-                      )}
+                              {result.locked && (
+                                <>
+                                  <span
+                                    aria-hidden="true"
+                                    className="size-1.5 shrink-0 rounded-full bg-warning"
+                                  />
+                                  <span className="sr-only">{`, ${t('reauth.navLocked')}`}</span>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
                     </>
                   )}
                 </div>
@@ -512,6 +655,17 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
               </Link>
             ))}
           </section>
+        )}
+        {altOutcome && (
+          <p
+            role={altOutcome.tone === 'alert' ? 'alert' : 'status'}
+            className={cx(
+              'px-2 text-sm',
+              altOutcome.tone === 'alert' ? 'text-danger' : 'text-text-dim'
+            )}
+          >
+            {altOutcome.text}
+          </p>
         )}
         <span role="status" aria-live="polite" className="sr-only">
           {statusText}

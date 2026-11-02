@@ -1,5 +1,5 @@
 /**
- * Kind to tokens: fill and text tone, for the ten clocks the Calendar merges.
+ * Kind to tokens: fill and text tone, for the eleven clocks the Calendar merges.
  *
  * The sibling of `severityTone.ts`, and deliberately its opposite. That one
  * colours a **magnitude** — how close a deadline is, on an ordered ladder.
@@ -30,6 +30,7 @@ import { isProjectedKind, type CharacterBoardItemKind } from '@/engine/character
 export const KIND_FILL: Record<CharacterBoardItemKind, string> = {
   calendarEvent: 'bg-kind-calendar-event',
   skillTraining: 'bg-kind-skill-training',
+  accelerator: 'bg-kind-accelerator',
   industryJob: 'bg-kind-industry-job',
   planetExtraction: 'bg-kind-planet-extraction',
   mercenaryDen: 'bg-kind-mercenary-den',
@@ -44,6 +45,7 @@ export const KIND_FILL: Record<CharacterBoardItemKind, string> = {
 export const KIND_TEXT: Record<CharacterBoardItemKind, string> = {
   calendarEvent: 'text-kind-calendar-event',
   skillTraining: 'text-kind-skill-training',
+  accelerator: 'text-kind-accelerator',
   industryJob: 'text-kind-industry-job',
   planetExtraction: 'text-kind-planet-extraction',
   mercenaryDen: 'text-kind-mercenary-den',

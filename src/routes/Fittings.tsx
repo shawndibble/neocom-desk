@@ -638,6 +638,7 @@ function FittingsPage() {
               explainModule={workspace.explainModule}
               typeName={typeName}
               characterId={activeCharacterId}
+              variants={workspace.variants}
             />
             {isPhone && (
               <FittingRackSheet

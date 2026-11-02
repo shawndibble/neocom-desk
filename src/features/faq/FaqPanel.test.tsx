@@ -58,6 +58,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.industryAssumedTe': /assumed ME\/TE/,
   'sync.industryBuildGroups': /build groups/i,
   'sync.piExpiringSoonHours': /expiring-soon window/i,
+  'sync.moonsHiddenCorps': /corporations you hid/i,
   'sync.corpDarkAfterDays': /dark threshold/i,
   'sync.defaultCharacterFilter': /default characters shown/i,
   'sync.spExtractionMonitoringEnabled': /SP Extraction monitoring/i,
@@ -143,6 +144,7 @@ describe('FaqPanel — What We Store', () => {
       'miningTax',
       'fittings',
       'netWorthSnapshots',
+      'characterAccelerators',
       'notificationFeed',
       'settings',
     ]);

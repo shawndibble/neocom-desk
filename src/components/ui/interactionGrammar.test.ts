@@ -167,6 +167,8 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       'src/features/assets/MyShipsView.tsx',
       // Admin's Member rows: Make admin… and Remove, reachable nowhere else.
       'src/features/communities/CommunityMemberList.tsx',
+      // Contract item lines: View in Market, Add to Compare, Copy name, Build Plan; the row holds only the name link.
+      'src/features/contracts/PublicContractDetailModal.tsx',
       'src/features/fittings/AddCargoTab.tsx',
       'src/features/fittings/AddChargesTab.tsx',
       'src/features/fittings/FittingAddPanel.tsx',

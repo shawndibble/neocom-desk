@@ -1,7 +1,13 @@
 {
   "app": {
     "name": "Neocom Desk",
-    "tagline": "Skill plans, build margins, market orders, colonies and mining tax — every character you fly, all in one place."
+    "tagline": "Skill plans, build margins, market orders, colonies and mining tax — every character you fly, all in one place.",
+    "shortcuts": {
+      "route": "Route planner",
+      "pilot": "Pilot lookup",
+      "alerts": "Alerts",
+      "orders": "Open orders"
+    }
   },
   "boot": {
     "stalledHint": "Still loading. Another copy of the app may be holding your local data open.",
@@ -852,25 +858,37 @@
       "security": "Activate in",
       "securityOption": "{{value}} security",
       "securityBelow": "Low or null security",
-      "hull": {
-        "cruiser": "Cruiser: flies alone.",
-        "destroyer": "Destroyer: up to 2 ships. Only a fleet can activate it, even flying alone; the activating ship carries both filaments.",
-        "frigate": "Frigate: up to 3 ships. Only a fleet can activate it, even flying alone; the activating ship carries all three filaments.",
-        "unconfirmed": "No source names this hull type; check in game.",
-        "tech3Cruiser": "Tech 3 cruisers can't enter Abyssal Deadspace.",
-        "tooLarge": "Too big: only cruisers and smaller can enter.",
-        "unlisted": "No Abyssal rule known for this hull; check in game."
+      "verdict": {
+        "clear": "Clear to run",
+        "hull": {
+          "cruiser": "Cruiser, solo",
+          "destroyer": "Destroyer, up to 2 ships",
+          "frigate": "Frigate, up to 3 ships",
+          "unconfirmed": "No source names this hull type; check in game.",
+          "tech3Cruiser": "Tech 3 cruisers can't enter Abyssal Deadspace.",
+          "tooLarge": "Too big: only cruisers and smaller can enter.",
+          "unlisted": "No Abyssal rule known for this hull; check in game."
+        },
+        "activation": {
+          "clear": "no suspect flag",
+          "suspect": "T{{tier}} here flags you suspect: anyone can shoot you without CONCORD response.",
+          "blocked": "T{{tier}} can't be activated here; only T0 works in 1.0 and 0.9.",
+          "unpoliced": "No suspect flag here, but no CONCORD either: anyone can attack you at the trace."
+        }
       },
-      "activation": {
-        "clear": "T{{tier}} activates here with no suspect flag.",
-        "suspect": "T{{tier}} here flags you suspect: anyone can shoot you without CONCORD response.",
-        "blocked": "T{{tier}} can't be activated here; only T0 works in 1.0 and 0.9.",
-        "unpoliced": "No suspect flag here, but no CONCORD either: anyone can attack you at the trace."
+      "fleetNote": {
+        "destroyer": "Only a fleet can activate it, even flying alone; the activating ship carries both filaments.",
+        "frigate": "Only a fleet can activate it, even flying alone; the activating ship carries all three filaments."
       },
+      "info": "About Abyssal runs",
       "timer": "{{minutes}} minutes per run across {{pockets}} pockets (about {{perPocket}} each). Staying past it destroys ship and pod.",
-      "buy_one": "Buy {{count}} filament:",
-      "buy_other": "Buy {{count}} filaments:",
-      "pickWeather": "Pick an Abyssal weather above to see what it does to this fit and which filament to buy.",
+      "buy": "Buy:",
+      "buyCount": "x {{count}}",
+      "buyCountMore": "x {{count}} more",
+      "buyIsk": "{{isk}} ISK at {{hub}}",
+      "buyIskShort": "{{isk}} ISK at {{hub}} ({{inCargo}} in cargo)",
+      "buyCovered": "covered by cargo",
+      "pickWeather": "Pick a weather to see what it does to this fit and which filament to buy.",
       "working": "Working out this fit in the weather…",
       "failed": "Couldn't work out this fit in the weather.",
       "deltaHeading": "This fit in {{weather}}, against normal space",
@@ -1433,6 +1451,11 @@
       "swap_other": "{{count}}× {{from}} → {{to}}",
       "givesUp": "Gives up:",
       "unflyable": "You can't fly the current module yet; this one you can.",
+      "rollLost": "The roll on your mutated module is lost.",
+      "mutatedKept_one": "{{count}} mutated module kept",
+      "mutatedKept_other": "{{count}} mutated modules kept",
+      "mutatedUnflyable_one": "You can't fly it yet, so it is not replaced.",
+      "mutatedUnflyable_other": "You can't fly {{count}} of them yet, so they are not replaced.",
       "flyableWith": "Also swaps {{swaps}} to keep the fit within CPU, powergrid and calibration.",
       "flyableWithCapacitor": "Also swaps {{swaps}} to keep the capacitor stable.",
       "flyableImplants": "Or fly {{fix}} with implants instead:",
@@ -1450,6 +1473,7 @@
       "flyableNoCover": "Needs {{short}}, and no module or rig swap frees it.",
       "noPrice": "No price",
       "gain": "+{{percent}}%",
+      "gainOverall": "+{{percent}}% overall",
       "moreOptions_one": "{{count}} more option",
       "moreOptions_other": "{{count}} more options",
       "bestFound": "Now → best found",
@@ -1588,6 +1612,7 @@
         "rigFullPrice": "(full price: the old rigs are destroyed)"
       },
       "includeOfficer": "Officer and Deadspace modules",
+      "allowMutated": "Swap mutated modules (their rolls are lost)",
       "fill_one": "Add {{to}}",
       "fill_other": "Add {{count}}× {{to}}",
       "pair": "{{add}}, paid for by {{downgrade}}",
@@ -2492,6 +2517,12 @@
       "fromAssetsNeedsPermission": "Loading rolls from your assets needs the Assets Permission.",
       "ownedItem": "{{base}} · {{mutaplasmid}}",
       "ownedQuality": "avg {{pct}}%",
+      "sortLabel": "Order my modules by",
+      "sortEffect": "Effect on fit",
+      "sortQuality": "Roll quality",
+      "rankedCap": "Showing the best {{shown}} of {{count}} by roll quality; the rest aren't compared.",
+      "notRanked": "Not compared",
+      "estimatePrice": "Estimate price",
       "badge": {
         "rollsUnknown": "Rolls unknown",
         "baseUnknown": "Base unknown",
@@ -2661,6 +2692,14 @@
       "noMatches": "No certificates match these filters.",
       "loadFailed": "Couldn’t load the certificates."
     }
+  },
+  "accelerator": {
+    "entryMode": "How to enter when it ends",
+    "clear": "Clear",
+    "autoDetectHint": "Cleared or run out, it goes back to being guessed from the attribute sheet.",
+    "modeRemaining": "Time remaining",
+    "modeExpires": "Expires at",
+    "expiresAt": "Ends at"
   },
   "plans": {
     "closest": {
@@ -3174,6 +3213,35 @@
     "sortedAsc": "{{column}}, sorted ascending",
     "sortedDesc": "{{column}}, sorted descending",
     "blueprintOwned": "Owned",
+    "planFilters": {
+      "title": "Filter plans",
+      "ownership": "Blueprint",
+      "ownerships": {
+        "any": "Any",
+        "owned": "I own it (BPO or BPC)",
+        "bpo": "I own the BPO",
+        "bpc": "I own a BPC",
+        "none": "I don't own it"
+      },
+      "verdict": "Verdict",
+      "verdicts": {
+        "build": "Build",
+        "buy": "Buy",
+        "unknown": "Can't price",
+        "fixLocation": "Fix location"
+      },
+      "activity": "Activity",
+      "activities": { "any": "Any", "manufacturing": "Manufacturing", "reaction": "Reactions" },
+      "group": "Group",
+      "groupAny": "Any",
+      "groupNone": "Ungrouped",
+      "profit": "Profit",
+      "profitableOnly": "Profitable only",
+      "count": "{{shown}} of {{total}} plans",
+      "noMatchTitle": "No plans match these filters",
+      "noMatchHint": "Loosen a filter to see the rest.",
+      "clear": "Clear filters"
+    },
     "verdictColumn": "Verdict",
     "runsColumn": "Runs",
     "verdictTagBuild": "Build",
@@ -4717,13 +4785,20 @@
     "sortKeys": {
       "name": "Name",
       "skillPoints": "Skill points",
-      "wallet": "Wallet",
+      "wallet": "ISK",
       "group": "Group",
       "alerts": "Alerts"
     },
     "activeLabel": "Active",
     "spLabel": "SP",
-    "walletLabel": "Wallet",
+    "walletLabel": "ISK",
+    "acceleratorManual": "+{{bonus}} · {{left}}",
+    "acceleratorDetected": "+{{bonus}}",
+    "acceleratorNone": "No",
+    "acceleratorEnds": "Ends {{at}}",
+    "acceleratorDetectedHint": "Guessed from this Character's attribute sheet; EVE doesn't say when it ends. Use the pencil to enter that.",
+    "acceleratorEdit": "Edit accelerator for {{name}}",
+    "netWorthTooltip": "Snapshot of {{day}}: ISK {{isk}} · assets {{assets}} · buy orders {{escrow}} · sell orders {{sellOrders}} · contracts {{contracts}}",
     "queueState": "Queue",
     "queueStates": {
       "training": "Training",
@@ -4780,7 +4855,9 @@
       "ship": "Ship",
       "group": "Group",
       "spTotal": "SP",
-      "wallet": "Wallet",
+      "wallet": "ISK",
+      "netWorth": "Net worth",
+      "accelerator": "Accelerator",
       "lastSynced": "Last synced",
       "training": "Training",
       "pi": "PI",
@@ -8382,6 +8459,7 @@
     "csvLocationId": "Location ID",
     "placeNickname": {
       "rename": "Rename {{place}}",
+      "menuRename": "Rename",
       "tooltip": "Give this place a nickname",
       "field": "Place nickname",
       "hint": "Only you see this, and only on the Assets page. Leave it empty to show the real name."
@@ -8426,7 +8504,9 @@
       "unpinned": "Pin to top",
       "character": "Pinned for this character",
       "account": "Pinned for all characters",
-      "ariaLabel": "Pin toggle for {{station}}: {{state}}"
+      "pinCharacter": "Pin for this character",
+      "pinAccount": "Pin for all characters",
+      "unpin": "Unpin"
     },
     "jumpsAway": {
       "value_one": "{{count}} jump",
@@ -8822,9 +8902,6 @@
     "rsvpOffline": "You're offline — your response wasn't saved. Reconnect and try again.",
     "yourResponse": "Your response",
     "export": "Export",
-    "contextMenu": {
-      "copyEventId": "Copy event ID"
-    },
     "important": "High",
     "overdue": "Overdue",
     "started": "Started",
@@ -8833,6 +8910,7 @@
     "nextFortnight": "Next fortnight",
     "projected": "Projected",
     "projectedKind": "{{kind}} (projected)",
+    "acceleratorSubject": "Cerebral accelerator +{{bonus}}",
     "skillPlan": {
       "title": "Skill plan to project",
       "none": "No Skill Plans for this character",
@@ -8843,6 +8921,7 @@
     "kind": {
       "calendarEvent": "Calendar events",
       "skillTraining": "Skill queue",
+      "accelerator": "Accelerator expires",
       "industryJob": "Industry jobs",
       "planetExtraction": "Planets",
       "mercenaryDen": "Mercenary dens",
@@ -9152,6 +9231,8 @@
     "picksNoteLabel": "About these picks",
     "chainTip": "Click for the planets, haul and assumptions.",
     "chainTip_touch": "Tap for the planets, haul and assumptions.",
+    "scrollBefore": "Scroll the map left",
+    "scrollAfter": "Scroll the map right",
     "boardLabel": "Planet map: planet types, then raw, processed, refined, specialized and advanced products",
     "planetsTitle": "Planets",
     "planetsSub": "Tick yours",
@@ -11976,6 +12057,11 @@
         "title": "Skill queue ending soon",
         "body": "{{character}}'s skill queue will run dry in under {{hours}} hours."
       },
+      "acceleratorExpiring": {
+        "title": "Accelerator running out soon",
+        "body_one": "{{character}}'s cerebral accelerator should run out in about {{count}} hour.",
+        "body_other": "{{character}}'s cerebral accelerator should run out in about {{count}} hours."
+      },
       "incursionNearby": {
         "title_one": "Incursion {{count}} jump away",
         "title_other": "Incursion {{count}} jumps away",
@@ -12776,6 +12862,68 @@
       "refineYieldHelp": "The facility's own yield before your skills and implants, which are applied on top. 50% at an NPC station. At a structure, hover an item in its Reprocessing window for the yield breakdown.",
       "refineTax": "Reprocessing tax",
       "refineTaxHelp": "The facility's fee, taken from the refined value in ISK. An NPC station's depends on your standings; a structure's is set by its owner. Check the structure in the Structures browser.",
+      "breakdown": {
+        "titleAll_one": "Refine breakdown, {{count}} item",
+        "titleAll_other": "Refine breakdown, {{count}} items",
+        "titleItem": "Refine breakdown, {{name}}",
+        "open": "Show how the Refine figure is worked out",
+        "atEfficiency": "@ {{efficiency}}",
+        "openRow": "Refine breakdown for {{name}}",
+        "skills": "Skills",
+        "skillsHelp": "Reprocessing, Reprocessing Efficiency and the ore's specialisation skill, with any refining implant, folded into one multiplier on the facility yield.",
+        "efficiency": "Total efficiency",
+        "efficiencyHelp": "Facility yield times skills: the share of each portion's materials that comes back. Compare it with the efficiency another tool asks for.",
+        "assumingNpc": "Assuming an NPC station's 50% yield. At a structure, enter its yield and everything below follows.",
+        "assumingNpcShared": "These numbers use an NPC station's 50% yield, which may not be where the sharer refines.",
+        "sellAsIs": "Sell as is",
+        "sellAsIsNote": "Into {{hub}} buy orders now, no refining",
+        "refineThenSell": "Refine, then sell minerals",
+        "aheadNote": "{{amount}} ({{percent}}%) more than selling as is",
+        "behindNote": "{{amount}} ({{percent}}%) less than selling as is",
+        "better": "Better",
+        "breakEvenWin": "Refining beats selling as is above {{breakEven}} total efficiency. You are at {{yours}}.",
+        "breakEvenLose": "Refining only beats selling as is above {{breakEven}} total efficiency. You are at {{yours}}, so sell it as is.",
+        "neverWins": "Refining does not beat selling as is at any yield for this pile.",
+        "topOfBook": "Both figures use the best buy price at the hub, so a very large pile will sell for less.",
+        "mineralsTitle": "Minerals you get",
+        "mineralsTitleItem": "What this item refines into",
+        "columnMineral": "Mineral",
+        "columnQuantity": "Quantity",
+        "columnPrice": "Buy price",
+        "columnValue": "Value at {{percent}}%",
+        "subtotal": "Minerals",
+        "taxLine": "Reprocessing tax ({{percent}}%)",
+        "leftoverLine_one": "{{count}} leftover unit, too few for a portion, sold as is",
+        "leftoverLine_other": "{{count}} leftover units, too few for a portion, sold as is",
+        "total": "Refine total",
+        "refineFigure": "Refined minerals, less tax",
+        "totalWithLeftover": "Total with leftover",
+        "unbuyable_one": "{{count}} item has no buy orders here, so selling it as is counts for 0.",
+        "unbuyable_other": "{{count}} items have no buy orders here, so selling them as is counts for 0.",
+        "nothingToCompare": "Nothing here buys this as is, so there is no break-even to compare against.",
+        "unpriced": "A mineral has no buy order here, so this total is a floor.",
+        "perItemTitle": "By item",
+        "columnAsIs": "Sell as is",
+        "columnRefined": "Refined, with leftover",
+        "columnBetter": "Better",
+        "betterRefine": "Refine",
+        "betterSell": "Sell as is",
+        "mathTitle": "The math",
+        "mathBatches": "{{quantity}} units ÷ {{portion}} per portion = {{batches}} portions, {{left}} left over",
+        "mathMineral": "{{name}}: {{perPortion}} × {{batches}} × {{efficiency}} = {{exact}}, {{floored}} after rounding down",
+        "allItems": "All items",
+        "skipped_one": "{{count}} item has nothing to refine and is left out.",
+        "skipped_other": "{{count}} items have nothing to refine and are left out.",
+        "nothing": "Nothing in this list refines into anything.",
+        "sharedTitle": "Shared with you",
+        "sharedHint": "The sharer's yield, tax and skills, priced {{time}}.",
+        "sharedUsingMine": "Using your numbers",
+        "sharedUsingMineHint": "Your Refining Setup and skills, at the shared prices.",
+        "useMine": "Use my numbers",
+        "backToShared": "Back to shared numbers",
+        "useMineSignedOut": "Log in with a Character to use your own skills and Refining Setup.",
+        "useMineFailed": "Your skills could not be read just now. Try again in a moment."
+      },
       "refineImplantHint": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
       "refineAssumesNoImplantsHint": "Refine value is calculated without this character's fitted implants, so a refining implant isn't counted. Grant Character details for an accurate estimate.",
       "buyWalkHint": "Avg {{avg}} ISK a unit. The top bid, {{topBid}} ISK, takes {{takes}} of {{units}}; the rest sells into lower buy orders that reach this hub.",
@@ -13065,6 +13213,20 @@
       "errorHint": "Try again, or reload the page."
     },
     "orders": {
+      "slots": {
+        "label": "Order slots",
+        "value": "{{label}} {{used}} / {{max}}",
+        "tooltip": "Open orders against the most you can keep open: {{detail}}.",
+        "base": "{{count}} base",
+        "skill": "{{name}} {{level}} adds {{count}}",
+        "skillName": {
+          "3443": "Trade",
+          "3444": "Retail",
+          "16596": "Wholesale",
+          "18580": "Tycoon"
+        },
+        "unavailable": "Order slots are hidden: this Character's skills have not loaded, or the skills scope is not granted."
+      },
       "corp": {
         "issuedBy": "Issued by",
         "reauthTitle": "Corp orders need a new grant",
@@ -13855,6 +14017,7 @@
           "miningTax": "Moon Mining payees and assignments.",
           "fittings": "Fittings saved to My Fittings: name and share code.",
           "netWorthSnapshots": "Your daily net worth history: wallet, asset value, PLEX and order escrow per day, as plain numbers.",
+          "characterAccelerators": "Which cerebral accelerator you told us is running on each Character: its bonus and when it ends.",
           "miningTaxNote": "Includes the ore and ISK snapshot, because that snapshot is the invoice.",
           "notificationFeed": "Alerts you've already seen.",
           "notificationFeedNote": "Kept 30 days, so your other devices catch up.",
@@ -13866,7 +14029,7 @@
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, item contract flag multiple, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, SP Extraction monitoring and its threshold, and which characters you marked as SP Farm. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
-            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, how the Assign form edits ore values, and the moon surveys you connected to a payee with Assign Taxes. Assets: the refining rate you type for your own structure, and its reprocessing tax, and the nicknames you gave your stations and structures (shown on the Assets page only). Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
+            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, how the Assign form edits ore values, and the moon surveys you connected to a payee with Assign Taxes. Assets: the refining rate you type for your own structure, and its reprocessing tax, and the nicknames you gave your stations and structures (shown on the Assets page only). Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates, and the corporations you hid from Add my other corps.",
             "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your Corp Board layout, the stock targets you set on corporation assets, hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs. The notes you wrote on solar systems (up to 500 characters each, so don't put anything private in them)."
           }
@@ -14104,6 +14267,7 @@
         "skillLevelComplete": "Skill level complete",
         "characterNotTraining": "Character not training",
         "skillQueueEnding": "Skill queue ending",
+        "acceleratorExpiring": "Accelerator expiring",
         "spExtractionReady": "SP extraction ready",
         "industryJobComplete": "Industry job complete",
         "cloneJumpReady": "Clone jump ready",
@@ -14178,6 +14342,9 @@
       "skillQueueEndingLeadTimeLabel": "Warn this far before the skill queue runs dry:",
       "skillQueueEndingLeadTimeOption_one": "{{count}} hour",
       "skillQueueEndingLeadTimeOption_other": "{{count}} hours",
+      "acceleratorExpiringLeadTimeLabel": "Warn this far before an accelerator runs out:",
+      "acceleratorExpiringLeadTimeOption_one": "{{count}} hour",
+      "acceleratorExpiringLeadTimeOption_other": "{{count}} hours",
       "shipLostMinimumIskLabel": "Minimum loss value (ISK):",
       "shipLostMinimumIskHint": "Leave at 0 to hear about every loss. Shorthand works: 500m, 1.5b (b billion, m million, t thousand). Read from zKillboard while the app is open.",
       "incursionNearbyJumpsLabel": "Alert when an Incursion is within:",
@@ -14422,6 +14589,8 @@
     }
   },
   "commandPalette": {
+    "setWaypoint": "Set waypoint",
+    "systemSublabel": "System · {{security}}",
     "emptyTitle": "Search a page, item, asset, pilot or command",
     "emptyHint": "Or paste a fit, item list, Local list or D-Scan",
     "title": "Command palette",
@@ -14430,7 +14599,6 @@
     "resultsLabel": "Results",
     "noResults": "Nothing matches.",
     "loadingGroup": "Searching…",
-    "groupCapped": "Top {{count}} shown. Keep typing to narrow.",
     "groupError": "Couldn't load these results.",
     "itemSearchNeedsDownload": "Item search needs a one-time download — connect once.",
     "resultsCount_one": "{{count}} result",
@@ -14448,6 +14616,7 @@
       "contacts": "Contacts",
       "lpStores": "LP Stores",
       "ships": "Ships",
+      "places": "Places",
       "marketItems": "Market items"
     },
     "commands": {
@@ -14478,6 +14647,7 @@
     "saveFitting": "Save the fitting (Fittings)",
     "saveFittingAsNew": "Save the fitting as a new copy (Fittings)",
     "cycleModuleState": "Step a focused Ring module through its states (Fittings)",
+    "openInJanice": "Open the appraisal in Janice (Appraisal page)",
     "submitPaste": "Submit a pasted list or fit (any paste box)",
     "pasteTitle": "Paste anywhere",
     "pasteHint": "Outside a text field, a pasted fit, blueprint list, skill plan, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Pasting several lines into Go to does the same. Back returns you where you were.",
@@ -15045,6 +15215,7 @@
     "itemColumn": "Item",
     "qtyColumn": "Qty",
     "priceColumn": "Price",
+    "iskPerUnitColumn": "ISK/unit",
     "flag": {
       "overpricedLabel": "Priced far above market",
       "overpricedHint": "Asks {{times}} times the {{hub}} sell price.",
@@ -15103,6 +15274,7 @@
     "mobile": {
       "qtyAffix": "Qty ",
       "jumpsAffix": "Jumps ",
+      "perUnitAffix": "/unit",
       "expiresAffix": "Exp ",
       "offerCount_one": "{{count}} offer",
       "offerCount_other": "{{count}} offers"
@@ -15430,12 +15602,29 @@
         "level": {
           "dangerous": "Dangerous",
           "active": "Active",
-          "low": "Low threat",
-          "inactive": "Inactive"
+          "low": "Low",
+          "inactive": "Quiet"
         },
-        "help": "Read from their kills in the last {{days}} days and zKillboard's all-time ratios. Dangerous: {{dangerousKills}} or more recent kills and either a danger ratio of {{dangerRatio}} or more, or {{killerRatio}}% or more of their kills and losses being kills. Active: {{activeKills}} or more recent kills. Low threat: fewer, or no kills but a ship lost in that time. Inactive: neither. Low threat never means safe.",
+        "levelFull": {
+          "dangerous": "Dangerous",
+          "active": "Active",
+          "low": "Low threat",
+          "inactive": "No recent kills"
+        },
+        "help": "Read from their kills in the last {{days}} days and zKillboard's all-time ratios. Dangerous: {{dangerousKills}} or more recent kills and either a danger ratio of {{dangerRatio}} or more, or {{killerRatio}}% or more of their kills and losses being kills. Active: {{activeKills}} or more recent kills. Low: fewer, or no kills but a ship lost in that time. Quiet: neither. Low never means safe.",
         "inactive": "No kills in the last {{days}} days.",
         "inactiveLast": "No kills in the last {{days}} days. Last kill {{age}}.",
+        "adjusted": {
+          "down": "Read one level lower for where you are or who is in Local.",
+          "up": "Read one level higher for who is in Local."
+        },
+        "context": {
+          "base": "Without that it reads {{level}}.",
+          "elsewhere": "None of their recent kills were in {{space}}, where you are.",
+          "gangAlone": "They mostly kill in groups and none of their corporation or alliance is in Local.",
+          "gangHere_one": "They mostly kill in groups and {{count}} other of their corporation or alliance is in Local.",
+          "gangHere_other": "They mostly kill in groups and {{count}} others of their corporation or alliance are in Local."
+        },
         "lossesOnly_one": "No kills in the last {{days}} days. {{count}} loss in that time, the latest {{age}}.",
         "lossesOnly_other": "No kills in the last {{days}} days. {{count}} losses in that time, the latest {{age}}.",
         "summary_one": "{{count}} kill in the last {{days}} days. Last kill {{age}}.",
@@ -15476,6 +15665,9 @@
         "pilot": "Pilot",
         "standing": "Your standing",
         "flew": "Flew on kills",
+        "asOf": "Kills read",
+        "staleKills": "Kills read",
+        "staleNote": "From your last paste of this pilot; being read again now.",
         "killsLabel": "Kills, 30 days",
         "mainSpace": "Mostly {{space}}",
         "progress": "Loading zKillboard, {{done}} of {{total}}",
@@ -15483,7 +15675,8 @@
         "newSinceLastPaste_one": "{{count}} new since last paste",
         "newSinceLastPaste_other": "{{count}} new since last paste",
         "stateLoading": "Loading…",
-        "stateUnreachable": "zKillboard couldn't be reached",
+        "unreachableSummary_one": "zKillboard couldn't be reached for {{count}} pilot, so their kill counts are blank.",
+        "unreachableSummary_other": "zKillboard couldn't be reached for {{count}} pilots, so their kill counts are blank.",
         "noContact": "No contact",
         "groupCount_one": "{{count}} pilot",
         "groupCount_other": "{{count}} pilots",
@@ -16212,6 +16405,9 @@
     "waypoints": {
       "action": "Set waypoints in game",
       "menuItem": "Set waypoint in game",
+      "addMenuItem": "Add waypoint in game",
+      "addMenuSending": "Adding waypoint…",
+      "nextStopAdded": "{{placeName}} added to your route",
       "viewRoute": "View route",
       "viewRouteTo": "View route to {{placeName}}",
       "viewRouteResolving": "Finding route…",
@@ -17259,6 +17455,125 @@
         "confirm": "Turn the book on",
         "startHint": "EVE time (UTC). Mining before this day is kept as history and owes nothing. Once Statements cover days, the start can't move over them."
       },
+      "addCorps": {
+        "open": "Add my other corps",
+        "openShort": "Add corps",
+        "resume": "Continue ({{done}} of {{total}})",
+        "resumeHint": "You were connecting your corps. {{done}} of {{total}} are done.",
+        "bannerTitle": "New corp found: {{name}}.",
+        "bannerHint": "{{ceo}} is its CEO. If it owns moons, connect it so they show up in this book.",
+        "connectIt": "Connect it",
+        "notNow": "Not now",
+        "dontAsk": "Don't ask again",
+        "pick": {
+          "title": "Add my other corps",
+          "intro": "These are corps where one of your characters is CEO. Tick the ones that own moons. We can't see moons from here, the login on the next step confirms it.",
+          "tickAll": "Tick all",
+          "clear": "Clear",
+          "connect": "Connect {{name}}",
+          "dontAskNamed": "Don't ask again about {{name}}",
+          "ceo": "CEO: {{name}}",
+          "hiddenButton": "Hidden corps ({{count}})",
+          "continue_one": "Continue with {{count}} corp",
+          "continue_other": "Continue with {{count}} corps",
+          "loading": "Looking for your corps",
+          "empty": "None of your characters is CEO of another corp.",
+          "error": "Could not load your corps. Try again in a moment."
+        },
+        "hidden": {
+          "title": "Hidden corps",
+          "intro": "You chose not to be asked about these. Add one back and it appears in the list again.",
+          "add": "Add",
+          "addNamed": "Add {{name}} back",
+          "done": "Done"
+        },
+        "confirm": {
+          "title_one": "Connect {{count}} corp",
+          "title_other": "Connect {{count}} corps",
+          "seesTitle": "What this book will see",
+          "sees1": "Each corp's mining ledger: who mined what, and where.",
+          "sees2": "The names of its refineries.",
+          "notTitle": "What it will not see",
+          "not1": "Wallets, mail or notifications.",
+          "not2": "Anything you can't see in this book already.",
+          "yours": "Because you own these corps, they are marked <pill>Yours</pill>: no owner rate and no payouts between them. You can stop any corp later from its row.",
+          "how": "How far back should we count mining?",
+          "back": {
+            "label": "How far back",
+            "today": "From today",
+            "7": "The last 7 days",
+            "14": "The last 14 days",
+            "30": "The last 30 days"
+          },
+          "backHint": "Applies to all {{count}} corps. EVE only keeps about 30 days of mining, so anything older can't be recovered; you would have to record it yourself. Mining already taxed by a previous owner would be counted again if you go back.",
+          "batch": "Corps in this batch ({{count}})",
+          "back_button": "Back",
+          "go_one": "Connect {{count}} corp",
+          "go_other": "Connect {{count}} corps"
+        },
+        "signIn": {
+          "title": "Logging in: corp {{n}} of {{total}}",
+          "progress": "Corps done",
+          "choose": "Choose this character on EVE's login page",
+          "ceoOf": "CEO of {{name}}",
+          "hint": "Logged in to EVE as someone else? Pick {{ceo}} from the account list, or use \"Log in with a different character\". EVE brings you back here and this window opens on the next corp. You can close the tab between corps; your place is kept.",
+          "footnote": "If a login fails it is skipped and listed under Needs you, so you never have to start over.",
+          "connected": "Connected {{name}}. Next up is {{next}}.",
+          "connectedLast": "Connected {{name}}.",
+          "wrong": "You logged in as {{signedInAs}}. {{corp}} needs {{ceo}}. Nothing was connected; try again with the character below.",
+          "notConnected": "{{name}} was not connected. {{reason}} It is listed under Needs you.",
+          "cancelled": "The EVE login did not finish.",
+          "stop": "Stop here",
+          "action": "Log in as {{ceo}} with EVE",
+          "failed": "Could not open EVE's login. Try again.",
+          "now": "Now",
+          "state": {
+            "ready": "Ready",
+            "connected": "Connected",
+            "needs-sign-in": "Needs login",
+            "needs-role": "Needs a role",
+            "own-book": "Has its own book",
+            "gone-quiet": "Gone quiet"
+          }
+        },
+        "needs": {
+          "title": "Needs you ({{count}})",
+          "meta": "{{connected}} of {{total}} connected",
+          "needs-sign-in": {
+            "text": "The EVE login did not finish.",
+            "action": "Log in again"
+          },
+          "needs-role": {
+            "text": "EVE refused the mining ledger for this character. It needs the CEO, Director or Accountant role.",
+            "action": "Log in again"
+          },
+          "own-book": {
+            "text": "Delete its book first, then connect it here."
+          },
+          "gone-quiet": {
+            "text": "EVE has not answered for this corp for a while. It may be closed.",
+            "keeps": "Removing keeps its past mining and billing records.",
+            "action": "Remove"
+          },
+          "removeNamed": "Remove {{name}}",
+          "signInNamed": "Log in again for {{name}}",
+          "removeFailed": "Could not remove this corp. Try again."
+        },
+        "failed": {
+          "wrong-corp": "That Character is not in this corporation.",
+          "not-yours": "You are not the CEO of this corporation.",
+          "own-book-exists": "This corp runs its own tax book. Delete it first, then connect it here.",
+          "already-feeder": "This corporation is already a moon owner of a book.",
+          "is-a-feeder": "This corporation is a moon owner of another book.",
+          "not-an-accountant": "EVE refused the mining ledger for this character. It needs the CEO, Director or Accountant role.",
+          "ledger-unavailable": "Could not read the mining ledger just now. Try again in a few minutes.",
+          "collector-gone": "This book is no longer running.",
+          "invite-invalid": "This connection could not be set up. Try again.",
+          "invite-revoked": "This connection could not be set up. Try again.",
+          "invite-used": "This connection could not be set up. Try again.",
+          "unknown": "Could not connect this corporation. Try again later."
+        }
+      },
       "setup": {
         "back": "Back",
         "paste": "Paste an invite link or code",
@@ -17741,6 +18056,9 @@
         "failed": "That did not go through. Try again."
       },
       "moonOwners": {
+        "yours": "Yours",
+        "yoursNote": "no owner rate · no payouts",
+        "settled": "Settled",
         "label": "Moon owners",
         "invite": "Invite a moon owner",
         "cols": {
@@ -18363,6 +18681,7 @@
       "missingGrantMark": "Red slashed broadcast icon: this row needs a grant the Character lacks",
       "channelOff": "Greyed checkbox that keeps its tick: its channel is off",
       "figureHistory": "Small dim glyph after a figure: click or tap for its history in a popover",
+      "figureBreakdown": "Dashed underline on a figure: click or tap opens how it is worked out",
       "infoTooltip": "? circle: explains a term (InfoTooltip)",
       "chartPoint": "Highlighted column or dot on a chart: hover or tap reads that point (ChartHover)",
       "addPreview": "Readout under the Add panel list: hover or keyboard-focus a module row to see what adding it changes (never on touch)",
@@ -18379,6 +18698,7 @@
       "groupBySegments": "SegmentedControl after a dim \"Group by\" label, on a list's top line: regroups the same rows, remembered on this device",
       "dimmedZeroChip": "Count chip dimmed but live: no matches under the current filters",
       "rowMenu": "⋮: a row's menu of two or more real actions",
+      "altAction": "A small button, with ⇧↵ on desktop, on the highlighted result",
       "menuOpensDialog": "Menu item that opens a dialog: focus comes back to the menu button",
       "tabCount": "Round count badge after a tab label: how many things the tab holds",
       "selectedRow": "Accent 2px left border: selected row",
@@ -18399,6 +18719,7 @@
       "textAction": "Actions only. Navigation is a link or a row.",
       "iskAmount": "Hover, focus or tap reveals the exact figure.",
       "rowMenu": "Only where the row has two or more actions nothing else reaches. Right-click and touch-and-hold open the same menu.",
+      "altAction": "The Command Palette's second action (Places: Set waypoint). Enter does the row's main thing; this does the other and keeps the palette open to show the outcome. The button is the touch path.",
       "menuOpensDialog": "The dialog opens after the menu closes (useOpenAfterMenu). Open it with the keyboard and press Escape.",
       "tabCount": "Part of the tab's name (Members 12). Never a control, a status or a waiting count.",
       "selectedRow": "Click a row. Selected never looks like hover.",
@@ -18414,6 +18735,8 @@
       "fieldCaret": "The box is a control (§6); the caret says it opens a list."
     },
     "samples": {
+      "altActionRow": "Jita IV - Moon 4",
+      "altActionButton": "Set waypoint",
       "tabsLabel": "Community",
       "tabContent": "Blueprints",
       "tabMembers": "Members",
@@ -18430,6 +18753,7 @@
       "hintText": "Truncated name",
       "hintContent": "The full name, in a tooltip.",
       "figureHistory": "4.4%",
+      "figureBreakdown": "1.6M",
       "communityMark": "Shared in a Community",
       "channelOffLabel": "Device",
       "communityMarkContent": "Shared by Bob in Pals. Last updated 1 Oct 2026.",

@@ -10,10 +10,53 @@ import { HintText } from '@/components/ui/HintText';
 import { beginGrant } from '@/app/grantAction';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import type { EsiEndpointId } from '@/esi/registry';
+import { InfoTooltip } from '@/components/ui';
+import { STAT_CHIP_TONE_TEXT_CLASS } from '@/components/ui/statChipTone';
+import { orderSlotTone, type OrderSlotBreakdown } from '@/engine/market/orderSlots';
 import { WorkThroughSummaryTail } from './WorkThroughControls';
 
 /** As `AssumesBaseStandingsNote`'s. */
 const STANDINGS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterStandings'];
+
+/** The viewed Character's open orders against their ceiling; `breakdown` null when skills are missing. */
+export interface OrderSlotsFigure {
+  used: number;
+  breakdown: OrderSlotBreakdown | null;
+}
+
+function OrderSlotsMeter({ used, breakdown }: OrderSlotsFigure) {
+  const { t } = useTranslation();
+  if (!breakdown) return null;
+  const { total, base, skills } = breakdown;
+  // The breakdown is a list, so it sits in the tooltip text as one sentence (touch opens it on tap)
+  // and the used / max figure itself is always visible.
+  const detail = [
+    t('market.orders.slots.base', { count: base }),
+    ...skills
+      .filter((s) => s.level > 0)
+      .map((s) =>
+        t('market.orders.slots.skill', {
+          name: t(`market.orders.slots.skillName.${s.typeID}`),
+          level: s.level,
+          count: s.slots,
+        })
+      ),
+  ].join(', ');
+  const tone = orderSlotTone(used, total);
+  const label = t('market.orders.slots.label');
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={tone === 'default' ? '' : `font-medium ${STAT_CHIP_TONE_TEXT_CLASS[tone]}`}>
+        {t('market.orders.slots.value', { label, used, max: total })}
+      </span>
+      <InfoTooltip
+        label={t('common.aboutLabel', { label })}
+        content={t('market.orders.slots.tooltip', { detail })}
+        glyph="info"
+      />
+    </span>
+  );
+}
 
 /** "5 orders need you", then "600.8M ISK tied up in them · 3 to watch · 9 fine" and the work-through. */
 export function FixListSummary({
@@ -21,11 +64,13 @@ export function FixListSummary({
   actIskTiedUp,
   watchCount,
   fineCount,
+  orderSlots,
 }: {
   actCount: number;
   actIskTiedUp: number;
   watchCount: number;
   fineCount: number;
+  orderSlots?: OrderSlotsFigure;
 }) {
   const { t } = useTranslation();
   const parts: ReactNode[] = [
@@ -41,6 +86,7 @@ export function FixListSummary({
       />
     );
   }
+  if (orderSlots?.breakdown) parts.push(<OrderSlotsMeter key="slots" {...orderSlots} />);
   return (
     <div>
       <h2 className="text-xl font-semibold text-text">
@@ -57,6 +103,9 @@ export function FixListSummary({
         </span>
         <WorkThroughSummaryTail />
       </p>
+      {orderSlots && !orderSlots.breakdown && (
+        <p className="mt-0.5 text-xs text-text-dim">{t('market.orders.slots.unavailable')}</p>
+      )}
     </div>
   );
 }

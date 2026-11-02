@@ -27,6 +27,7 @@ import {
   type AppraisalColumnId,
 } from './appraisalColumns';
 import { comparisonCell, eachCell, leftoverTipsRefine, totalCell } from './appraisalCells';
+import { RefineFigureButton } from './RefineFigureButton';
 import { appraisalCsvColumns } from './appraisalCsv';
 import { appraisalIskPerM3Column, appraisalVolumeColumn } from './appraisalVolume';
 import { formatVolume } from './format';
@@ -52,11 +53,14 @@ export function useAppraisalColumns({
   controller,
   owned,
   standing,
+  onOpenRefine,
 }: {
   controller: AppraisalController;
   owned: ReadonlyMap<number, number> | null;
   /** The active Character's standing toward this hub's NPC station owner, for the broker fee. */
   standing: ResolvedStandings;
+  /** Opens the refine breakdown on one item; absent, the Refine figure is plain text. */
+  onOpenRefine?: (typeId: number) => void;
 }) {
   const { t } = useTranslation();
   const { text, result } = controller;
@@ -284,7 +288,13 @@ export function useAppraisalColumns({
         row.refineTotal === undefined
           ? '—'
           : comparisonCell(
-              totalCell(row.refineTotal),
+              onOpenRefine ? (
+                <RefineFigureButton name={row.name} onOpen={() => onOpenRefine(row.typeId)}>
+                  {totalCell(row.refineTotal)}
+                </RefineFigureButton>
+              ) : (
+                totalCell(row.refineTotal)
+              ),
               refineBeatsSellAsIs(row),
               row.refinePricedAll === false && (
                 <HintText

@@ -1159,7 +1159,7 @@ function PhoneChipButton({ items }: { items: QueueItem[] }) {
             aria-hidden="true"
             className="absolute -right-1.5 -bottom-1.5 inline-flex h-5 min-w-5 items-center justify-center gap-0.5 rounded-full border border-warning bg-bg px-1 text-[0.625rem] font-semibold text-warning tabular-nums"
           >
-            <Icon.Warn size={10} aria-hidden="true" />
+            <Icon.Warn className="size-3" aria-hidden="true" />
             {c.failed}
           </span>
         )}

@@ -17,7 +17,6 @@ import { CLOSEST_AUTO_LOAD_MAX, WhoIsClosest } from '../WhoIsClosest';
 import { ActionsToolSection } from './ActionsToolSection';
 import { AssumptionControls } from './AssumptionControls';
 import { AttributesToolSection } from './AttributesToolSection';
-import type { PlanEditorProps } from './types';
 import type { usePlanAssumptions } from './usePlanAssumptions';
 import type { usePlanOptimize } from './usePlanOptimize';
 import type { PlanScheduleResult } from './usePlanSchedule';
@@ -47,7 +46,6 @@ export function usePlanTools({
   toolActions,
   markersVerdict,
   onAddFitGoal,
-  onUpdate,
 }: {
   characterId: number;
   plan: SkillPlanRecord;
@@ -68,7 +66,6 @@ export function usePlanTools({
   toolActions: ReturnType<typeof usePlanToolActions>;
   markersVerdict: OptimizeVerdict | null;
   onAddFitGoal: () => void;
-  onUpdate: PlanEditorProps['onUpdate'];
 }) {
   const { t } = useTranslation();
   const roster = useCharacters();
@@ -181,7 +178,6 @@ export function usePlanTools({
                 assumptions={assumptions}
                 alphaCappedCount={alphaCappedSteps.size}
                 implants={implants}
-                onUpdate={onUpdate}
               />
             ),
           },

@@ -23,6 +23,8 @@ import {
   type BookCall,
 } from './corpTaxBook.js';
 import {
+  clampCoverageFrom,
+  deriveModeChanges,
   reopenPeriod,
   type CoveragePeriod,
   type FeederModeChange,
@@ -75,6 +77,11 @@ export interface FeederRecord {
   /** The id (hash) of the removal mail's link; the link's code is only ever in the mail. */
   removalLinkId?: string;
   mode: 'normal' | 'settled-otherwise';
+  /**
+   * The CEO's own corporation, joined without an invite link ("Add my other corps"): settled
+   * otherwise from its first day, no owner rate, no payouts. Absent on every other record.
+   */
+  sameOwner?: boolean;
   /** What the moon owner has been paid: payouts not marked "not a payout" (#5242). Absent until a payout write totals it. */
   payoutTotals?: { count: number; amount: number };
   note?: string;
@@ -147,6 +154,12 @@ export interface FeederInviteDoc {
   createdBy: number;
   createdAt: number;
   offeredOwnerRatePct?: number;
+  /** First covered day (UTC, `YYYY-MM-DD`) the join asks for; the accept clamps it. Absent: today. */
+  coverageFrom?: string;
+  /** The joined corporation is the same owner's: it joins settled otherwise. */
+  sameOwner?: boolean;
+  /** Minted by the add-my-corp call and never shown: exempt from the open-invite cap. */
+  selfInvite?: boolean;
   revokedAt?: number;
   acceptedBy?: number;
   acceptedAt?: number;
@@ -158,7 +171,7 @@ export const MAX_OPEN_FEEDER_INVITES = 20;
 
 export const hashInviteCode = (code: string) => createHash('sha256').update(code).digest('hex');
 
-const inviteRef = (db: BookDeps['db'], id: string) =>
+export const inviteRef = (db: BookDeps['db'], id: string) =>
   db.collection(FEEDER_INVITES_COLLECTION).doc(id);
 
 // --- Input -----------------------------------------------------------------
@@ -204,7 +217,7 @@ export function parseAcceptFeederInviteInput(data: unknown): AcceptFeederInviteI
 
 // --- Create and revoke -----------------------------------------------------
 
-async function requireActiveBook(deps: BookDeps, corporationId: number): Promise<void> {
+export async function requireActiveBook(deps: BookDeps, corporationId: number): Promise<void> {
   const book = await bookRef(deps.db, corporationId).get();
   if (!book.exists || book.get('active') !== true) {
     fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
@@ -227,7 +240,9 @@ export async function createFeederInvite(
         .collection(FEEDER_INVITES_COLLECTION)
         .where('collectorCorporationId', '==', input.corporationId)
     );
-    const openCount = open.docs.filter((d) => !d.get('revokedAt') && !d.get('acceptedAt')).length;
+    const openCount = open.docs.filter(
+      (d) => !d.get('revokedAt') && !d.get('acceptedAt') && !d.get('selfInvite')
+    ).length;
     if (openCount >= MAX_OPEN_FEEDER_INVITES) {
       fail('resource-exhausted', 'Too many open invite links', 'too-many-invites');
     }
@@ -465,6 +480,14 @@ export async function acceptInviteCore(
     if (pointer && !takenBack)
       fail('failed-precondition', 'This corporation already feeds a book', 'already-feeder');
 
+    // The first covered day: the invite's ask within 30 days back, never before the book began
+    // and (on a rejoin) never inside an earlier period.
+    const startDate: unknown = collectorBook.get('startDate');
+    let from = clampCoverageFrom(held?.coveragePeriods ?? [], invite.coverageFrom, today);
+    if (typeof startDate === 'string' && startDate > from && startDate <= today) from = startDate;
+    const sameOwner = invite.sameOwner === true;
+    const settled: FeederModeChange = { from, mode: 'settled-otherwise' };
+
     let rejoined = false;
     let priorRecord: FeederRecord | undefined;
     if (!held) {
@@ -473,10 +496,15 @@ export async function acceptInviteCore(
         status: 'active',
         invitedBy: invite.createdBy,
         joinedAt: now,
-        mode: 'normal',
-        coveragePeriods: [{ from: today }],
+        mode: sameOwner ? 'settled-otherwise' : 'normal',
+        coveragePeriods: [{ from }],
+        ...(sameOwner ? { sameOwner: true, modeChanges: [settled] } : {}),
       };
-      tx.create(recordRef, { ...created, ...offeredRate(created, invite, now), ...extra });
+      tx.create(recordRef, {
+        ...created,
+        ...(sameOwner ? {} : offeredRate(created, invite, now)),
+        ...extra,
+      });
     } else {
       // The pointer is gone only once the record has left or been removed, or kept while disconnected.
       if (held.status !== 'left' && held.status !== 'removed' && !takenBack) {
@@ -491,8 +519,15 @@ export async function acceptInviteCore(
         status: 'active',
         invitedBy: invite.createdBy,
         joinedAt: now,
-        ...offeredRate(held, invite, now),
-        coveragePeriods: reopenPeriod(held.coveragePeriods, today),
+        ...(sameOwner ? {} : offeredRate(held, invite, now)),
+        coveragePeriods: reopenPeriod(held.coveragePeriods, from),
+        ...(sameOwner
+          ? {
+              sameOwner: true,
+              mode: 'settled-otherwise' as const,
+              modeChanges: [...deriveModeChanges(held), settled],
+            }
+          : {}),
         ...extra,
       };
       tx.set(recordRef, reopened);
@@ -510,7 +545,11 @@ export async function acceptInviteCore(
       collector,
       { characterId, name: claims.name },
       rejoined ? 'feederRejoined' : 'feederJoined',
-      { feederCorporationId: feederCorp, inviteId }
+      {
+        feederCorporationId: feederCorp,
+        inviteId,
+        ...(sameOwner || held?.sameOwner ? { sameOwner: true } : {}),
+      }
     );
     return {
       collectorCorporationId: collector,

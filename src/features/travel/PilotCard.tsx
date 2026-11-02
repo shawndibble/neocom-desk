@@ -8,6 +8,7 @@
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
+import { DataAgeBadge } from '@/components/ui';
 import type { KillSpace, KillSummary } from '@/engine/pilotList/killActivity';
 import type { ThreatLevel } from '@/engine/pilotList/threatVerdict';
 import { CharacterLink } from '@/features/entities';
@@ -39,12 +40,15 @@ function mainSpaceOf(bySpace: KillSummary['bySpace']): KillSpace | null {
 export function PilotCard({
   row,
   threat,
+  adjusted = null,
   spaces,
   flew,
   isNew = false,
 }: {
   row: PilotListRow;
   threat: ThreatLevel | 'pending' | null;
+  /** The Threat was moved one level by where you are or who is in Local. */
+  adjusted?: 'down' | 'up' | null;
   spaces: readonly KillSpace[];
   /** Hull names already joined for display; null when there are none to show. */
   flew: string | null;
@@ -59,11 +63,10 @@ export function PilotCard({
   const status =
     row.kills.kind === 'loading'
       ? t('travel.pilot.list.stateLoading')
-      : row.kills.kind === 'unreachable'
-        ? t('travel.pilot.list.stateUnreachable')
-        : row.kills.kind === 'notLookedUp'
-          ? t('travel.pilot.list.stateNotLookedUp')
-          : null;
+      : row.kills.kind === 'notLookedUp'
+        ? t('travel.pilot.list.stateNotLookedUp')
+        : null;
+  const staleSinceMs = row.kills.kind === 'ready' ? row.kills.staleSinceMs : undefined;
   const own = row.ownOrganization;
   const mainSpace = ready === null ? null : mainSpaceOf(ready.bySpace);
 
@@ -115,9 +118,13 @@ export function PilotCard({
         </div>
       </div>
 
-      {(threat !== null || row.standing !== null || own !== null || status !== null) && (
+      {(threat !== null ||
+        row.standing !== null ||
+        own !== null ||
+        status !== null ||
+        staleSinceMs !== undefined) && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-text-dim">
-          {threat !== null && <ThreatBadge level={threat} solid />}
+          {threat !== null && <ThreatBadge level={threat} solid adjusted={adjusted} />}
           {mainSpace !== null && (
             <span
               className={cx(
@@ -125,7 +132,7 @@ export function PilotCard({
                 SPACE_TEXT[mainSpace]
               )}
             >
-              <Icon.Combat size={12} />
+              <Icon.Combat className="size-3" />
               {t('travel.pilot.list.mainSpace', {
                 space: t(`common.spaceOption.${mainSpace}`).toLowerCase(),
               })}
@@ -134,6 +141,16 @@ export function PilotCard({
           {own !== null && <span>{t(`travel.pilot.list.own.${own}`)}</span>}
           {row.standing !== null && <PilotStandingTag standing={row.standing} />}
           {status !== null && <span>{status}</span>}
+          {staleSinceMs !== undefined && (
+            <span className="inline-flex items-center gap-1.5">
+              {t('travel.pilot.list.staleKills')}
+              <DataAgeBadge
+                date={new Date(staleSinceMs)}
+                alwaysVisible
+                note={t('travel.pilot.list.staleNote')}
+              />
+            </span>
+          )}
         </div>
       )}
 

@@ -15,3 +15,4 @@ export * from './corp';
 export * from './kills';
 export * from './dens';
 export * from './skyhooks';
+export * from './accelerator';

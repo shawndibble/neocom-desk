@@ -306,6 +306,12 @@
 // deleted via deleteSyncedSetting: removing the last note writes {}. No
 // `legacyKey`: new. See features/travel/systemNotes.ts.
 //
+// sync.moonsHiddenCorps: which of the pilot's own CEO corporations they hid from
+// the Moons page's "Add my other corps" picker, and which the picker has already
+// shown them, as {hidden: number[], seen: number[]} (corporation ids). Account-wide.
+// Never deleted via deleteSyncedSetting: unhiding rewrites the arrays. No `legacyKey`:
+// new. See features/corp/moons/moonsHiddenCorps.ts.
+//
 // sync.surveyHistory: the Mining Survey short links the pilot created or opened
 // in the app, as {id, addedAt, name?} entries — the link ids and the pilot's
 // own name for each (capped at 40 characters, so 30 entries stay a few KB), so
@@ -376,6 +382,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpStockTargets',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
+  'sync.moonsHiddenCorps',
   'sync.placeNicknames',
   'sync.podKillThreshold',
   'sync.reprocessingTaxRate',

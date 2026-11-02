@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
+import { renderInRouter as render } from '@/test/render';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { BuildPlanRecord } from '@/db';
@@ -985,5 +986,58 @@ describe('BuildPlanList: "Fix location" figures (#3348)', () => {
     expect(order()).toEqual(['Astero', 'Merlin run']);
     await user.click(screen.getByRole('button', { name: 'Profit, sorted descending' }));
     expect(order()).toEqual(['Astero', 'Merlin run']);
+  });
+
+  it('filters to profitable plans and offers a way back from an empty result', async () => {
+    const user = userEvent.setup();
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        statsByPlanId={
+          new Map([
+            ['a', { profit: 500, verdict: 'build' as const, runs: 1 }],
+            ['b', { profit: -20, verdict: 'buy' as const, runs: 1 }],
+          ])
+        }
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /filter/i }));
+    await user.click(await screen.findByRole('button', { name: 'Profitable only' }));
+    expect(screen.getByText('Merlin run')).toBeInTheDocument();
+    expect(screen.queryByText('Astero')).not.toBeInTheDocument();
+    expect(screen.getByText('1 of 2 plans')).toBeInTheDocument();
+  });
+
+  it('says where a plan runs only when another plan shares its name', () => {
+    render(
+      <BuildPlanList
+        plans={[
+          plan({ id: 'x', name: 'Merlin', buildSystemName: 'Jita' }),
+          plan({ id: 'y', name: 'merlin ', buildSystemName: 'Amarr' }),
+          plan({ id: 'z', name: 'Astero', buildSystemName: 'Efa' }),
+        ]}
+        catalog={CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+      />
+    );
+    expect(screen.getByText('Jita')).toBeInTheDocument();
+    expect(screen.getByText('Amarr')).toBeInTheDocument();
+    expect(screen.queryByText('Efa')).not.toBeInTheDocument();
   });
 });

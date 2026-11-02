@@ -36,8 +36,12 @@ import { useShallow } from 'zustand/react/shallow';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
-import { useNow } from '@/lib/useNow';
 import { useRosterData } from '@/features/character/useRosterData';
+import { useLatestNetWorth } from '@/features/character/useLatestNetWorth';
+import {
+  useCharacterAccelerators,
+  useDetectedAccelerators,
+} from '@/features/accelerator/useAccelerators';
 import {
   RemoveCharacterDialog,
   type RemoveTarget,
@@ -81,6 +85,8 @@ import { useCharacterWhereabouts } from '@/features/character/useCharacterWherea
 import { useCharacterAchievements } from '@/features/character/useCharacterAchievements';
 import { returnPathAfterSwitch } from '@/features/character/characterSwitchReturn';
 
+const NO_CHARACTER_IDS: readonly number[] = [];
+
 const DENSITY_LABEL_KEYS = {
   0.875: 'characters.densityCompact',
   1: 'characters.densityCozy',
@@ -107,7 +113,6 @@ export function Characters() {
   );
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const now = useNow();
 
   const groupsValue = useOverviewGroups((state) => state.value);
   const groupsHydrated = useHydratedStore(useOverviewGroups);
@@ -180,6 +185,15 @@ export function Characters() {
     useMemo(() => (characters ?? []).map((character) => character.characterId), [characters])
   );
 
+  const netWorthById = useLatestNetWorth();
+  const acceleratorById = useCharacterAccelerators();
+  // Detection reads each Character's cached attribute sheet, so only pay for it while the column shows.
+  const detectedAcceleratorById = useDetectedAccelerators(
+    visibleColumns.includes('accelerator')
+      ? (characters ?? []).map((character) => character.characterId)
+      : NO_CHARACTER_IDS
+  );
+
   const {
     search,
     sortKey,
@@ -212,6 +226,9 @@ export function Characters() {
     visibleColumns,
     spExtractionEnabled,
     whereabouts,
+    netWorthById,
+    acceleratorById,
+    detectedAcceleratorById,
   });
 
   // One batched read for the roster (public records): the cards' line, the table's column and
@@ -256,8 +273,10 @@ export function Characters() {
     await setActiveCharacter(characterId);
     // Return to wherever the switch started (the rail portrait, the tab bar,
     // or the More sheet's portrait+name row) — see `returnPathAfterSwitch`.
+    // Picking on Characters itself (no origin) stays put.
     const from = (location.state as { from?: string } | null)?.from;
-    navigate(returnPathAfterSwitch(from));
+    const returnTo = returnPathAfterSwitch(from);
+    if (returnTo !== null) navigate(returnTo);
   }
 
   function handleToggleColumn(id: CharacterColumnId) {
@@ -552,12 +571,10 @@ export function Characters() {
               ungroupedIds={ungroupedIds}
               charactersById={charactersById}
               rosterCore={rosterCore}
-              attentionById={attentionById}
               alertCounts={alertCounts}
               groupIdByCharacterId={groupIdByCharacterId}
               starred={starred}
               activeCharacterId={activeCharacterId}
-              now={now}
               sortKey={sortKey}
               sortDirection={sortDirection}
               sortStatsById={sortStatsById}

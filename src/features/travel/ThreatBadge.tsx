@@ -24,11 +24,14 @@ export function ThreatBadge({
   level,
   className,
   solid = false,
+  adjusted = null,
 }: {
   level: ThreatLevel | 'pending';
   className?: string;
   /** Fills a Dangerous badge solid, for a list row where it has to read at a glance. */
   solid?: boolean;
+  /** The level was moved one step by where you are or who is in Local: a small arrow says so. */
+  adjusted?: 'down' | 'up' | null;
 }) {
   const { t } = useTranslation();
   const LevelIcon = LEVEL_ICON[level];
@@ -42,10 +45,30 @@ export function ThreatBadge({
       )}
     >
       <LevelIcon size={12} aria-hidden />
-      <span className="sr-only">{t('travel.pilot.threat.label')}: </span>
-      {level === 'pending'
-        ? t('travel.pilot.threat.pending')
-        : t(`travel.pilot.threat.level.${level}`)}
+      {level === 'pending' ? (
+        <>
+          <span className="sr-only">{t('travel.pilot.threat.label')}: </span>
+          {t('travel.pilot.threat.pending')}
+        </>
+      ) : (
+        <>
+          {/* One short word on screen; the full wording for a screen reader. */}
+          <span className="sr-only">
+            {t('travel.pilot.threat.label')}: {t(`travel.pilot.threat.levelFull.${level}`)}
+          </span>
+          <span aria-hidden>{t(`travel.pilot.threat.level.${level}`)}</span>
+        </>
+      )}
+      {adjusted !== null && (
+        <>
+          {adjusted === 'down' ? (
+            <Icon.LevelLower className="size-3" aria-hidden />
+          ) : (
+            <Icon.LevelHigher className="size-3" aria-hidden />
+          )}
+          <span className="sr-only">{t(`travel.pilot.threat.adjusted.${adjusted}`)}</span>
+        </>
+      )}
     </span>
   );
 }

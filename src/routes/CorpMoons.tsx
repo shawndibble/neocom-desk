@@ -20,7 +20,9 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   DataAgeBadge,
+  DropdownMenuItem,
   EmptyState,
+  HeaderMoreMenu,
   IconButton,
   LoadFailedState,
   PageHeader,
@@ -35,6 +37,7 @@ import * as Icon from '@/components/ui/icons';
 import { tabBarTabs, tabPath } from '@/lib/pageTabs';
 import { cx } from '@/lib/cx';
 import { usePageTab } from '@/lib/usePageTab';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { bookPartsFor } from '@/features/corp/taxBook/bookParts';
@@ -60,6 +63,7 @@ import { StatementPeriodDetail } from '@/features/corp/moons/StatementPeriodDeta
 import { StatementsTab } from '@/features/corp/moons/StatementsTab';
 import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
+import { useAddMyCorps } from '@/features/corp/moons/addCorps/useAddMyCorps';
 import { useMoonOwners, useShowExtractions } from '@/features/corp/moons/useMoonOwners';
 import { setMoonsTabsHidden } from '@/features/corp/moons/moonsTabsHidden';
 
@@ -84,7 +88,9 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { view, canEdit, characterId, corporationId, names } = useBook();
   const showExtractions = useShowExtractions();
   // With no moon owners the empty state carries the invite button itself.
-  const hasMoonOwners = useMoonOwners().rows.length > 0;
+  const { rows: moonOwnerRows } = useMoonOwners();
+  const hasMoonOwners = moonOwnerRows.length > 0;
+  const addCorps = useAddMyCorps(moonOwnerRows);
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
   // Back from EVE's page after the Automatic sync opt-in: show the settings it was pressed in.
@@ -96,6 +102,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const [saved, setSaved] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const isPhone = useIsPhone();
   const detail = moonsDetail(pathname);
   // A corporation with no refineries of its own has nothing for Extractions to show.
   if (!showExtractions && (tab === 'extractions' || detail?.kind === 'extraction'))
@@ -121,16 +128,27 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
               ) : undefined
             }
             actions={
-              <span className="flex items-center gap-1">
-                {tab === 'moon-owners' && canEdit && hasMoonOwners && (
+              <span className="flex flex-wrap items-center justify-end gap-1">
+                {!isPhone && tab === 'moon-owners' && canEdit && hasMoonOwners && (
                   <Button variant="ghost" onClick={() => setInviteOpen(true)}>
                     {t('corpTaxBook.moons.moonOwners.invite')}
                   </Button>
                 )}
-                <Button variant="ghost" onClick={() => setActivityOpen(true)}>
-                  <Icon.Recent size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                  {t('corpTaxBook.moons.activity.button')}
-                </Button>
+                {tab === 'moon-owners' && addCorps.showButton && (
+                  <Button variant="primary" onClick={addCorps.open}>
+                    {t(
+                      isPhone
+                        ? 'corpTaxBook.moons.addCorps.openShort'
+                        : 'corpTaxBook.moons.addCorps.open'
+                    )}
+                  </Button>
+                )}
+                {!isPhone && (
+                  <Button variant="ghost" onClick={() => setActivityOpen(true)}>
+                    <Icon.Recent size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                    {t('corpTaxBook.moons.activity.button')}
+                  </Button>
+                )}
                 {sync.ledger.state === 'ready' && (
                   <IconButton
                     icon={sync.run.phase === 'syncing' ? <Spinner /> : <Icon.Refresh />}
@@ -144,6 +162,18 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
                   label={t('corpTaxBook.moons.settings.open')}
                   onClick={() => setSettingsOpen(true)}
                 />
+                {isPhone && (
+                  <HeaderMoreMenu>
+                    {tab === 'moon-owners' && canEdit && hasMoonOwners && (
+                      <DropdownMenuItem onSelect={() => setInviteOpen(true)}>
+                        {t('corpTaxBook.moons.moonOwners.invite')}
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onSelect={() => setActivityOpen(true)}>
+                      {t('corpTaxBook.moons.activity.button')}
+                    </DropdownMenuItem>
+                  </HeaderMoreMenu>
+                )}
               </span>
             }
           />
@@ -165,7 +195,13 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             {tab === 'extractions' && <ExtractionsTab />}
             {tab === 'miners' && <MinersTab />}
             {tab === 'statements' && <StatementsTab />}
-            {tab === 'moon-owners' && <MoonOwnersTab onInvite={() => setInviteOpen(true)} />}
+            {tab === 'moon-owners' && (
+              <div className="space-y-4">
+                {addCorps.notices}
+                {addCorps.needsYou}
+                <MoonOwnersTab onInvite={() => setInviteOpen(true)} />
+              </div>
+            )}
           </TabPanel>
         </>
       )}
@@ -193,6 +229,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           onClose={() => setInviteOpen(false)}
         />
       )}
+      {addCorps.dialogs}
       {activityOpen && <ActivityPanel open onClose={() => setActivityOpen(false)} />}
     </div>
   );

@@ -109,7 +109,18 @@ interface PendingLogin {
 export type LoginIntent =
   | { kind: 'alerts'; characterId: number }
   | { kind: 'corpSync'; characterId: number; corporationId: number }
-  | { kind: 'feederGrant'; characterId: number; inviteCode: string; requestedRatePct?: number };
+  | { kind: 'feederGrant'; characterId: number; inviteCode: string; requestedRatePct?: number }
+  | {
+      kind: 'ownCorpGrant';
+      /** The book editor signed in on this device, who holds the grant. */
+      characterId: number;
+      /** The CEO the player must sign in as on EVE's login screen. */
+      expectedCeoCharacterId: number;
+      collectorCorporationId: number;
+      feederCorporationId: number;
+      /** UTC day (YYYY-MM-DD) the moon owner's ledger counts from. */
+      coverageFrom?: string;
+    };
 
 /**
  * Which way a login failed. The callback route recovers from these rather
@@ -205,6 +216,18 @@ export function startFeederGrantLogin(
     inviteCode,
     ...(requestedRatePct === undefined ? {} : { requestedRatePct }),
   });
+}
+
+/**
+ * Connect one of the player's own CEO corporations as a moon owner of a book:
+ * the observer ledger scope alone, signed in on EVE's login screen as that
+ * corporation's CEO. Leaves `INTENT_KEY` alone, like the other grants.
+ */
+export function startOwnCorpGrantLogin(
+  intent: Omit<Extract<LoginIntent, { kind: 'ownCorpGrant' }>, 'kind'>,
+  config?: SsoConfig
+): Promise<string> {
+  return beginLogin([...FEEDER_SYNC_SCOPES], config, { kind: 'ownCorpGrant', ...intent });
 }
 
 async function beginLogin(
@@ -524,7 +547,24 @@ function readPendingLogin(key: string, allowExpired = false): PendingLogin | und
                   : {}),
               } satisfies LoginIntent,
             }
-          : {}),
+          : intent?.kind === 'ownCorpGrant' &&
+              typeof intent.characterId === 'number' &&
+              typeof intent.expectedCeoCharacterId === 'number' &&
+              typeof intent.collectorCorporationId === 'number' &&
+              typeof intent.feederCorporationId === 'number'
+            ? {
+                intent: {
+                  kind: 'ownCorpGrant',
+                  characterId: intent.characterId,
+                  expectedCeoCharacterId: intent.expectedCeoCharacterId,
+                  collectorCorporationId: intent.collectorCorporationId,
+                  feederCorporationId: intent.feederCorporationId,
+                  ...(typeof intent.coverageFrom === 'string'
+                    ? { coverageFrom: intent.coverageFrom }
+                    : {}),
+                } satisfies LoginIntent,
+              }
+            : {}),
   };
 }
 
@@ -731,6 +771,31 @@ export async function completeFeederGrantLogin(
   const { intent, ...result } = await completeIntentLogin(params, 'feederGrant', config);
   const { inviteCode, requestedRatePct } = intent as Extract<LoginIntent, { kind: 'feederGrant' }>;
   return { ...result, inviteCode, ...(requestedRatePct === undefined ? {} : { requestedRatePct }) };
+}
+
+/** What an own-corporation grant round trip came back with. Nothing here has been stored. */
+export interface OwnCorpGrantLoginResult extends AlertsLoginResult {
+  expectedCeoCharacterId: number;
+  collectorCorporationId: number;
+  feederCorporationId: number;
+  coverageFrom?: string;
+}
+
+/** Handle the callback of an own-corporation grant round trip: like `completeFeederGrantLogin`, storing nothing. */
+export async function completeOwnCorpGrantLogin(
+  params: { code: string; state: string },
+  config?: SsoConfig
+): Promise<OwnCorpGrantLoginResult> {
+  const { intent, ...result } = await completeIntentLogin(params, 'ownCorpGrant', config);
+  const { expectedCeoCharacterId, collectorCorporationId, feederCorporationId, coverageFrom } =
+    intent as Extract<LoginIntent, { kind: 'ownCorpGrant' }>;
+  return {
+    ...result,
+    expectedCeoCharacterId,
+    collectorCorporationId,
+    feederCorporationId,
+    ...(coverageFrom === undefined ? {} : { coverageFrom }),
+  };
 }
 
 async function completeIntentLogin(

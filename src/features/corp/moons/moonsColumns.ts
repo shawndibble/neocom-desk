@@ -40,6 +40,12 @@ export type MinersColumnId = (typeof MINERS_COLUMN_IDS)[number];
 /** Starts unticked on a phone: the compact default `credit` had as `phoneHidden`. */
 export const MINERS_PHONE_OFF: readonly MinersColumnId[] = ['credit'];
 
+/** Starts unticked in a table pane between the narrow-table and card widths: only the columns that fit. */
+export const MINERS_NARROW_OFF: readonly MinersColumnId[] = ['standing', 'credit'];
+
+/** Below this pane width (rem) the Miners table shows as cards; the five core columns fit above it. */
+export const MINERS_CARDS_BELOW_REM = 40;
+
 export const useVisibleMinersColumns = createColumnVisibilitySetting({
   key: 'corpMoonsMinersVisibleColumns',
   ids: MINERS_COLUMN_IDS,

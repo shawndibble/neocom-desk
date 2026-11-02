@@ -19,6 +19,13 @@ interface FilterFieldProps {
    * `IconButton`, which a full-width stretch would leave as a wide short box.
    */
   stretch?: boolean;
+  /**
+   * Draw the caption above the control inline as well, for a row of several
+   * fields that read as a form (Build Plans' filters) rather than a few
+   * self-describing selects. Give every control in that row a caption, or the
+   * uncaptioned ones sit a caption's height out of line with the rest.
+   */
+  captionInline?: boolean;
   className?: string;
 }
 
@@ -32,11 +39,24 @@ interface FilterFieldProps {
  *
  * @summary One labelled control inside a `FilterBar`; the caption shows in the phone sheet only.
  */
-export function FilterField({ label, children, stretch = true, className = '' }: FilterFieldProps) {
+export function FilterField({
+  label,
+  children,
+  stretch = true,
+  captionInline = false,
+  className = '',
+}: FilterFieldProps) {
   const surface = useFilterSurface();
   // Inline there is no caption box, but a caller's class (a responsive
   // `sm:hidden`, say) still has to land: `contents` keeps the children in
   // the row's own flex flow while giving the class an element to sit on.
+  if (surface === 'inline' && captionInline)
+    return (
+      <div className={cx('flex flex-col items-start gap-1', className)}>
+        <span className={eyebrowClassName}>{label}</span>
+        {children}
+      </div>
+    );
   if (surface === 'inline')
     return className ? (
       <div className={cx('contents', className)}>{children}</div>
@@ -61,6 +81,13 @@ export function FilterField({ label, children, stretch = true, className = '' }:
     </div>
   );
 }
+
+type RowAlign = 'center' | 'end' | 'start';
+const ROW_ALIGN_CLASS: Record<RowAlign, string> = {
+  center: 'items-center',
+  end: 'items-end',
+  start: 'items-start',
+};
 
 interface FilterBarProps<T> {
   /** @summary The committed filter state. On desktop edits land here at once. */
@@ -111,9 +138,11 @@ interface FilterBarProps<T> {
    * from labelled fields (a caption above each control, Hauling's From/To/
    * Category) is taller than those buttons, so `end` lines every control's
    * own bottom edge up instead of centering the icons against the taller
-   * block's full height.
+   * block's full height. `start` pins the controls to the top for a `search`
+   * that grows downward (a picker listing results under its input), so the
+   * funnel stays beside the input instead of drifting to the middle.
    */
-  rowAlign?: 'center' | 'end';
+  rowAlign?: RowAlign;
   /**
    * Size of the funnel trigger's `IconButton`. Defaults to `IconButton`'s
    * own default (`md`) so existing callers are unchanged; pass `sm` to match
@@ -311,7 +340,7 @@ function CollapsibleFilterRow({
   trailing?: ReactNode;
   children: ReactNode;
   className?: string;
-  rowAlign?: 'center' | 'end';
+  rowAlign?: RowAlign;
   triggerSize?: ComponentProps<typeof IconButton>['size'];
 }) {
   const { t } = useTranslation();
@@ -319,9 +348,7 @@ function CollapsibleFilterRow({
   const groupId = useId();
   return (
     <div className={cx('flex flex-col gap-2', className)}>
-      <div
-        className={cx('flex flex-wrap gap-2', rowAlign === 'end' ? 'items-end' : 'items-center')}
-      >
+      <div className={cx('flex flex-wrap gap-2', ROW_ALIGN_CLASS[rowAlign])}>
         {search}
         {/* Before the trigger, so Tab runs straight from the funnel into the
             group it just revealed. */}
@@ -372,18 +399,12 @@ function FilterPopover({
   trailing?: ReactNode;
   children: ReactNode;
   className?: string;
-  rowAlign?: 'center' | 'end';
+  rowAlign?: RowAlign;
   triggerSize?: ComponentProps<typeof IconButton>['size'];
 }) {
   const { t } = useTranslation();
   return (
-    <div
-      className={cx(
-        'flex flex-wrap gap-2',
-        rowAlign === 'end' ? 'items-end' : 'items-center',
-        className
-      )}
-    >
+    <div className={cx('flex flex-wrap gap-2', ROW_ALIGN_CLASS[rowAlign], className)}>
       {search}
       {actions}
       <Popover>
@@ -446,13 +467,7 @@ function FilterSheet<T>({
 
   return (
     <>
-      <div
-        className={cx(
-          'flex flex-wrap gap-2',
-          rowAlign === 'end' ? 'items-end' : 'items-center',
-          className
-        )}
-      >
+      <div className={cx('flex flex-wrap gap-2', ROW_ALIGN_CLASS[rowAlign], className)}>
         {search}
         {actions}
         <FilterTrigger

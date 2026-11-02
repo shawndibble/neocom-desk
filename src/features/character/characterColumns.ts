@@ -20,8 +20,10 @@ export const CHARACTER_COLUMN_IDS = [
   'group',
   'spTotal',
   'wallet',
+  'netWorth',
   'lastSynced',
   'training',
+  'accelerator',
   'openJobsManufacturing',
   'openJobsScience',
   'openJobsReaction',
@@ -41,6 +43,7 @@ export type CharacterColumnId = (typeof CHARACTER_COLUMN_IDS)[number];
 export const DEFAULT_VISIBLE_CHARACTER_COLUMNS: readonly CharacterColumnId[] = [
   'name',
   'group',
+  'wallet',
   'training',
   'openJobsManufacturing',
   'openJobsScience',

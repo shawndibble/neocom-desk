@@ -3,6 +3,8 @@ import {
   SHORTCUTS,
   commandPaletteDisplayKey,
   isCommandPaletteShortcut,
+  isAltChord,
+  altChordDisplayKey,
   isModChord,
   modChordDisplayKey,
   type ChordEvent,
@@ -148,5 +150,30 @@ describe('SHORTCUTS', () => {
     const navigate = vi.fn();
     shortcut?.run?.(navigate);
     expect(navigate).toHaveBeenCalledWith(path);
+  });
+});
+
+describe('isAltChord / altChordDisplayKey', () => {
+  const press = (init: Partial<KeyboardEvent>) => ({
+    code: 'KeyJ',
+    altKey: true,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    ...init,
+  });
+
+  it('matches Alt plus the physical key only', () => {
+    expect(isAltChord(press({}), 'KeyJ')).toBe(true);
+    expect(isAltChord(press({ code: 'KeyK' }), 'KeyJ')).toBe(false);
+    expect(isAltChord(press({ altKey: false }), 'KeyJ')).toBe(false);
+    expect(isAltChord(press({ shiftKey: true }), 'KeyJ')).toBe(false);
+    expect(isAltChord(press({ ctrlKey: true }), 'KeyJ')).toBe(false);
+    expect(isAltChord(press({ metaKey: true }), 'KeyJ')).toBe(false);
+  });
+
+  it('labels the chord per platform', () => {
+    expect(altChordDisplayKey(false, 'J')).toBe('Alt J');
+    expect(altChordDisplayKey(true, 'J')).toBe('⌥J');
   });
 });

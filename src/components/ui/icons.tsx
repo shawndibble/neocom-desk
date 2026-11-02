@@ -84,9 +84,9 @@ import { FileText } from '@phosphor-icons/react/dist/csr/FileText';
 import { Flag } from '@phosphor-icons/react/dist/csr/Flag';
 import { Note } from '@phosphor-icons/react/dist/csr/Note';
 import { Flask } from '@phosphor-icons/react/dist/csr/Flask';
+import { Lightning } from '@phosphor-icons/react/dist/csr/Lightning';
 import { FolderSimple } from '@phosphor-icons/react/dist/csr/FolderSimple';
 import { Funnel } from '@phosphor-icons/react/dist/csr/Funnel';
-import { Gauge } from '@phosphor-icons/react/dist/csr/Gauge';
 import { Gear } from '@phosphor-icons/react/dist/csr/Gear';
 import { GearSix } from '@phosphor-icons/react/dist/csr/GearSix';
 import { GraduationCap } from '@phosphor-icons/react/dist/csr/GraduationCap';
@@ -196,6 +196,9 @@ export const Sort = withWeight(CaretUpDown);
 export const Ascending = withWeight(ArrowUp);
 /** Descending: a sorted-descending column, or "move this row down". */
 export const Descending = withWeight(ArrowDown);
+/** LevelLower / LevelHigher: a Threat badge read one level lower or higher for where you are and who is in Local. */
+export const LevelLower = withWeight(ArrowDown);
+export const LevelHigher = withWeight(ArrowUp);
 /** Re-fetch from ESI. */
 export const Refresh = withWeight(ArrowClockwise);
 /** Sync status: everything is saved to the cloud. One shape per state, so the sync dot never relies on colour alone. */
@@ -335,6 +338,8 @@ export const Build = withWeight(Hammer);
 export const Buy = withWeight(ShoppingCart);
 /** A build plan material this character is better off reacting than buying (issue #460) — its own glyph, not the manufacturing hammer or the planetary globe. */
 export const Reaction = withWeight(Flask);
+/** A running cerebral accelerator: the Calendar's "Accelerator expires" clock. */
+export const Accelerator = withWeight(Lightning);
 /** Promote a derived prereq row into a real Skill Plan entry (GLOSSARY.md "Prereq Promotion"). */
 export const AddToPlan = withWeight(Plus);
 /** Append a new row to an editable list, e.g. another Booster (#1407). */
@@ -380,8 +385,6 @@ export const Location = withWeight(MapPin);
 export const Wallet = withWeight(WalletGlyph);
 /** Colonies and extraction timers. */
 export const Planetary = withWeight(Planet);
-/** An extractor program's live telemetry — the one PI card with real-time data. */
-export const Extraction = withWeight(Gauge);
 /** Planetary Industry buildings, for the explainer and the in-game checklist. */
 export const PiExtractor = withWeight(ArrowLineDown);
 export const PiFactory = withWeight(Factory);

@@ -44,42 +44,27 @@ function lateCatalogue() {
   return { load, resolve: (catalogue: MarketTypeEntry[]) => resolve(catalogue) };
 }
 
-// The real modal reads ESI; this stand-in is a real `Modal`, so focus
-// hand-back is the real thing.
-vi.mock('@/features/market/ItemDetailModal', async () => {
-  const { Modal } = await import('@/components/ui');
-  return {
-    ItemDetailModal: ({
-      typeId,
-      itemName,
-      onClose,
-      showOpenInMarket,
-    }: {
-      typeId: number;
-      itemName: string;
-      onClose: () => void;
-      showOpenInMarket?: boolean;
-    }) => (
-      <Modal open onClose={onClose} title={itemName}>
-        <p>{`Item Detail ${typeId}${showOpenInMarket ? ' with market link' : ''}`}</p>
-      </Modal>
-    ),
-  };
-});
-
 // One Set, as the real hook memoises it: a fresh one per render would be a
 // fresh search per render, and a failing async group would never settle.
 const LOCKED = new Set(['/assets']);
 vi.mock('@/app/useGrantedScopes', () => ({
   useGrantedScopes: () => undefined,
   useLockedRoutes: () => LOCKED,
+  useCharacterLacksEndpoints: () => false,
 }));
 vi.mock('@/features/corp/useCorpNavVisible', () => ({ useCorpNavVisible: () => false }));
 vi.mock('@/features/corp/useCorpAccess', () => ({
   useCorpAccess: () => ({ state: 'none', capabilities: NO_CORP_CAPABILITIES }),
 }));
 const loadLpCorporations = vi.hoisted(() => vi.fn());
-vi.mock('@/sde/loadMarketSde', () => ({ loadLpCorporations }));
+const loadSolarSystems = vi.hoisted(() => vi.fn());
+const setWaypointsInGame = vi.hoisted(() => vi.fn());
+vi.mock('@/features/travel/sendWaypoints', () => ({ setWaypointsInGame }));
+vi.mock('@/sde/loadMarketSde', () => ({
+  loadLpCorporations,
+  loadSolarSystems,
+  loadNpcStations: () => Promise.resolve([]),
+}));
 const loadShipTree = vi.hoisted(() => vi.fn());
 vi.mock('@/sde/loadSde', () => ({ loadShipTree }));
 const beginAddCharacterLogin = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
@@ -118,6 +103,10 @@ beforeEach(async () => {
   await useActiveCharacter.getState().setActiveCharacter(1);
   await db.esiCache.clear();
   loadShipTree.mockResolvedValue(SHIP_TREE);
+  loadSolarSystems.mockResolvedValue([
+    { id: 30000142, name: 'Jita', security: 0.9, regionId: 10000002 },
+  ]);
+  setWaypointsInGame.mockResolvedValue({ ok: true, set: 1 });
   loadLpCorporations.mockResolvedValue([
     { id: 1000130, name: 'Sisters of EVE' },
     { id: 1000125, name: 'CONCORD' },
@@ -258,6 +247,29 @@ describe('CommandPalette', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('/industry/opportunities');
   });
 
+  it('finds a solar system: Enter opens its route, Shift+Enter sets the waypoint and stays open', async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(await screen.findByRole('combobox'), 'jita');
+
+    const places = await screen.findByRole('group', { name: 'Places' });
+    expect(within(places).getByRole('option', { name: /Jita/ })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+
+    await user.keyboard('{Shift>}{Enter}{/Shift}');
+    expect(setWaypointsInGame).toHaveBeenCalledWith(1, [30000142]);
+    expect(await screen.findByText('Destination set to Jita')).toBeInTheDocument();
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+
+    await user.keyboard('{Enter}');
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent('/travel/route');
+    expect(screen.getByTestId('search')).toHaveTextContent('stops=30000142');
+  });
+
   it('replaces its history entry when a result navigates, so Back returns to the page under it', async () => {
     window.history.replaceState(null, '', '/overview');
     const user = userEvent.setup();
@@ -293,8 +305,14 @@ describe('CommandPalette', () => {
     const names = groups.map((id) => document.getElementById(id!)!.textContent);
     expect(names).toEqual(['Pages', 'Commands']);
 
-    const pageOptions = within(screen.getByRole('group', { name: 'Pages' })).getAllByRole('option');
-    for (let i = 0; i < pageOptions.length; i++) await user.keyboard('{ArrowDown}');
+    const pagesGroup = () => within(screen.getByRole('group', { name: 'Pages' }));
+    // Two sections match, so Pages starts at three rows; arrowing past them opens the rest.
+    expect(pagesGroup().getAllByRole('option')).toHaveLength(3);
+    for (let i = 0; i < 3; i++) await user.keyboard('{ArrowDown}');
+    const pageOptions = pagesGroup().getAllByRole('option');
+    expect(pageOptions.length).toBeGreaterThan(3);
+    expect(pageOptions[3]).toHaveAttribute('aria-selected', 'true');
+    for (let i = 3; i < pageOptions.length; i++) await user.keyboard('{ArrowDown}');
     const command = within(screen.getByRole('group', { name: 'Commands' })).getAllByRole(
       'option'
     )[0];
@@ -405,35 +423,42 @@ describe('CommandPalette', () => {
     ).toBeInTheDocument();
   });
 
-  it('hides the capped note from the listbox and announces it in the status region', async () => {
+  it('shows a count in each section header and no footer note, and announces results', async () => {
     const user = userEvent.setup();
     renderShell();
     await user.keyboard('{Control>}k{/Control}');
-    await user.type(await screen.findByRole('combobox'), 'a');
+    await user.type(await screen.findByRole('combobox'), 'settings');
 
-    const note = await screen.findByText(/keep typing to narrow/i, { selector: 'div' });
-    expect(note).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.getByText(/results?\. Top \d+ shown/i)).toHaveAttribute('aria-live', 'polite');
+    expect(screen.queryByText(/keep typing to narrow/i)).not.toBeInTheDocument();
+    const heading = document.getElementById(
+      screen.getByRole('group', { name: 'Pages' }).getAttribute('aria-labelledby')!
+    )!;
+    expect(heading.parentElement).toHaveTextContent(/^Pages\d+\+?$/);
+    expect(screen.getByRole('status')).toHaveTextContent(/\d+ results?/);
   });
 
-  it('opens Item Detail over the current page and hands focus back on close', async () => {
+  it('keeps the search field outside the scrolling results', async () => {
     const user = userEvent.setup();
     renderShell();
-    const pageSearch = screen.getByRole('textbox', { name: 'Page search' });
-    await user.click(pageSearch);
+    await user.keyboard('{Control>}k{/Control}');
+    const input = await screen.findByRole('combobox');
+    await user.type(input, 'settings');
+    const list = screen.getByRole('listbox');
+    expect(list).toHaveClass('overflow-y-auto');
+    expect(list).not.toContainElement(input);
+  });
+
+  it('opens the Market Browser on a picked item', async () => {
+    const user = userEvent.setup();
+    renderShell();
     await user.keyboard('{Control>}k{/Control}');
     await user.type(await screen.findByRole('combobox'), 'rifter');
     const items = await screen.findByRole('group', { name: 'Market items' });
     await user.click(within(items).getByRole('option', { name: 'Rifter' }));
 
-    const detail = await screen.findByRole('dialog', { name: 'Rifter' });
-    expect(within(detail).getByText('Item Detail 587 with market link')).toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.getByTestId('where')).toHaveTextContent('/overview');
-
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog', { name: 'Rifter' })).not.toBeInTheDocument();
-    expect(pageSearch).toHaveFocus();
+    expect(screen.getByTestId('where')).toHaveTextContent('/market/browser');
+    expect(screen.getByTestId('search')).toHaveTextContent('type=587');
   });
 
   it('runs the Add character command through the login flow', async () => {

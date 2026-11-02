@@ -37,7 +37,11 @@ export function useViewRoute(
       .catch(() => null)
       .then((systemId) => {
         if (systemId === null) setFailed(true);
-        else navigate(routeToHref(systemId, null, preference));
+        else
+          // A place that isn't itself a system is the route's end, so the page docks there.
+          navigate(
+            routeToHref(systemId, null, preference, locationId === systemId ? null : locationId)
+          );
       })
       .finally(() => {
         inFlight.current = false;

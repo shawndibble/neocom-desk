@@ -16,9 +16,10 @@ import { fixed1 } from '@/lib/fixedFormat';
 import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { type ReactElement, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { RENAME_PLACE_STATE } from './renamePlaceState';
 import { NicknamedName } from '@/features/assets/PlaceName';
-import { IconButton, IskAmount, RowMoreActions, Tooltip } from '@/components/ui';
+import { IskAmount, RowActionsMenu, RowMoreActions, Tooltip } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -28,6 +29,8 @@ import { ItemInfoLink } from '@/features/entities';
 import { formatUnitVolume } from '@/lib/volume';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { formatBadge } from './assetBrowserFormat';
+import { PlaceRowMenuItems } from './PlaceRowMenuItems';
+import { placeMenuActions } from './placeRowMenu';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { PinState } from '@/features/assets/stationPins';
 import type { SelectionState } from '@/features/assets/assetSelection';
@@ -104,7 +107,7 @@ export function JumpsAwayText({
     // Plain Tooltip, not HintText: this sits inside a row link, where a focusable,
     // tap-to-toggle trigger would fight the navigation.
     <Tooltip content={t(`assets.jumpsAway.unknownReason.${result.reason}`)}>
-      <span className="relative z-10 tabular-nums">
+      <span className="pointer-events-auto relative z-10 tabular-nums">
         <span aria-hidden="true">{t('assets.jumpsAway.unknown')}</span>
         <span className="sr-only">{t(`assets.jumpsAway.unknownReason.${result.reason}`)}</span>
       </span>
@@ -172,6 +175,8 @@ interface LocationRowProps {
   label: string;
   /** The pilot's Place Nickname (personal Assets only): shown first, the real label dim beneath. */
   nickname?: string;
+  /** The station or structure id: what Set waypoint and the jump count's route go to. */
+  locationId: number;
   security: number | null | undefined;
   jumpsAway: JumpsAwayResult | undefined;
   itemCount: number;
@@ -197,6 +202,7 @@ export function LocationRow({
   href,
   label,
   nickname,
+  locationId,
   security,
   jumpsAway,
   itemCount,
@@ -210,26 +216,32 @@ export function LocationRow({
   onToggleSelection,
   t,
 }: LocationRowProps) {
-  const pinLabel = t('assets.pin.ariaLabel', {
-    station: label,
-    state: t(`assets.pin.${pinState}`),
+  const actions = placeMenuActions({
+    kind: 'station',
+    pinnable: showPin,
+    renamable: showPin,
+    resolved: !unresolvedParent,
   });
-  return (
-    <div className="flex items-center gap-2 border-b border-line pr-2 pl-3 hover:bg-panel-2">
+  const navigate = useNavigate();
+  const pinned = pinState !== 'unpinned';
+  const row = (
+    <div className="relative flex items-center gap-2 border-b border-line pr-2 pl-3 hover:bg-panel-2">
       {selectMode && (
-        <SelectionCheckbox
-          state={selectionState}
-          onToggle={onToggleSelection}
-          label={t('assets.select.stationAriaLabel', { station: label })}
-        />
+        <span className="relative z-10 flex">
+          <SelectionCheckbox
+            state={selectionState}
+            onToggle={onToggleSelection}
+            label={t('assets.select.stationAriaLabel', { station: label })}
+          />
+        </span>
       )}
+      {/* The whole row is the link into it: a stretched, empty link behind the content, so the jump count can be a link of its own rather than nested in this one. */}
       <Link
         to={href}
-        className={cx(
-          'group flex min-h-16 min-w-0 flex-1 items-center gap-2.5 py-2',
-          focusRingInsetClassName
-        )}
-      >
+        aria-label={label}
+        className={cx('absolute inset-0', focusRingInsetClassName)}
+      />
+      <div className="pointer-events-none flex min-h-16 min-w-0 flex-1 items-center gap-2.5 py-2">
         <span className="flex w-7 shrink-0 justify-end">
           {unresolvedParent ? (
             <Icon.Container size={Icon.ICON_SIZE.md} className="text-text-faint" />
@@ -248,7 +260,12 @@ export function LocationRow({
             {unresolvedParent ? (
               <span className="text-warning">{t('assets.unresolved.rowHint')}</span>
             ) : (
-              <JumpsAwayText result={jumpsAway} t={t} />
+              <JumpsAwayText
+                result={jumpsAway}
+                t={t}
+                locationId={locationId}
+                linkClassName="pointer-events-auto relative z-10 -my-1.5 py-1.5"
+              />
             )}
             <span aria-hidden="true">·</span>
             <span className="tabular-nums">{t('assets.itemCount', { count: itemCount })}</span>
@@ -258,25 +275,39 @@ export function LocationRow({
             </span>
           </span>
         </span>
+        {pinned && !unresolvedParent && showPin && (
+          <span className="shrink-0 text-accent">
+            <Icon.Pin size={Icon.ICON_SIZE.sm} weight="fill" />
+            <span className="sr-only">{t(`assets.pin.${pinState}`)}</span>
+          </span>
+        )}
         <Icon.Descend size={Icon.ICON_SIZE.md} className={rowCaretClassName} />
-      </Link>
-      {!unresolvedParent && showPin && (
-        <IconButton
-          icon={
-            <Icon.Pin
-              size={Icon.ICON_SIZE.md}
-              weight={pinState === 'unpinned' ? 'light' : 'fill'}
-            />
-          }
-          label={pinLabel}
-          pressed={pinState !== 'unpinned'}
-          onClick={onTogglePin}
-          variant="plain"
-          size="sm"
-          className={pinState === 'unpinned' ? '' : 'text-accent'}
-        />
+      </div>
+      {actions.length >= 2 && (
+        <span className="relative z-10 flex">
+          <RowMoreActions />
+        </span>
       )}
     </div>
+  );
+  if (actions.length < 2) return row;
+  return (
+    <RowActionsMenu
+      name={label}
+      items={
+        <PlaceRowMenuItems
+          actions={actions}
+          placeId={locationId}
+          placeName={label}
+          pinState={pinState}
+          onTogglePin={onTogglePin}
+          onRename={() => void navigate(href, { state: RENAME_PLACE_STATE })}
+          t={t}
+        />
+      }
+    >
+      {row}
+    </RowActionsMenu>
   );
 }
 
@@ -290,6 +321,8 @@ interface ContainerRowProps {
   itemCount: number;
   estimatedValue: number;
   characterBadge: string | null;
+  /** The station the container sits in: its menu sets a waypoint there. Null when unknown. */
+  stationId: number | null;
   /** A bay (Cargo Hold/Drone Bay/Fitting) has no asset of its own — plain text, not a heading, same as a station's `h2`/an item's plain name. A ship or container names a real, ownable entity and gets an `h3`, same distinction the tree view made. */
   named: boolean;
   selectMode: boolean;
@@ -306,13 +339,20 @@ export function ContainerRow({
   itemCount,
   estimatedValue,
   characterBadge,
+  stationId,
   named,
   selectMode,
   selectionState,
   onToggleSelection,
   t,
 }: ContainerRowProps) {
-  return (
+  const actions = placeMenuActions({
+    kind: 'container',
+    pinnable: false,
+    resolved: stationId !== null,
+  });
+  const name = gameName ?? label;
+  const row = (
     <div className="flex items-center gap-2 border-b border-line pl-3 hover:bg-panel-2">
       {selectMode && (
         <SelectionCheckbox
@@ -347,7 +387,21 @@ export function ContainerRow({
         </span>
         <Icon.Descend size={Icon.ICON_SIZE.sm} className={rowCaretClassName} />
       </Link>
+      {actions.length >= 2 && (
+        <span className="flex pr-2">
+          <RowMoreActions />
+        </span>
+      )}
     </div>
+  );
+  if (actions.length < 2) return row;
+  return (
+    <RowActionsMenu
+      name={name}
+      items={<PlaceRowMenuItems actions={actions} placeId={stationId} placeName={name} t={t} />}
+    >
+      {row}
+    </RowActionsMenu>
   );
 }
 

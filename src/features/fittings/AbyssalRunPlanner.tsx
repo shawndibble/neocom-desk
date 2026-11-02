@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
+import {
+  InfoTooltip,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui';
 import { ItemInfoLink } from '@/features/entities';
 import {
   ABYSSAL_POCKETS,
@@ -8,6 +15,7 @@ import {
   ABYSSAL_SECURITY_BANDS,
   ABYSSAL_TIERS,
   abyssalActivation,
+  abyssalFilamentCost,
   abyssalFilamentTypeId,
   abyssalHullRule,
   abyssalTierLevels,
@@ -23,8 +31,14 @@ import {
   type AbyssalWeather,
 } from '@/engine/fittings/abyssalWeather';
 import { diffFittingStats, type StatChange } from '@/engine/fittings/variationDelta';
-import type { FittingStats } from '@/engine/fittings/types';
+import type { FittingCargoItem, FittingStats } from '@/engine/fittings/types';
+import { useMarketHub } from '@/features/market/hub';
+import { getTradeHub } from '@/market/hubs';
+import { getHubPrices } from '@/market/prices';
+import { useHydratedStore } from '@/lib/useHydratedStore';
+import { formatIsk } from '@/lib/isk';
 import { abyssalWeatherLabel, useAbyssalWeather, useWeatherName } from './abyssalWeatherSelection';
+import { abyssalVerdict } from './abyssalVerdict';
 import { AbyssalWeatherPicker } from './AbyssalWeatherPicker';
 import { useAbyssalRunPlan } from './abyssalRunPlan';
 import { changeLabel } from './fittingVariationsCsv';
@@ -79,6 +93,34 @@ function useRunDelta(
     : null;
 }
 
+/**
+ * The hub's sell price for one filament type, via the same `getHubPrices` path
+ * the Variations Jita price uses, at the Settings hub. Null while loading, on
+ * a failed read, or when the hub quotes none; a stale answer for another
+ * filament or hub is never shown.
+ */
+function useFilamentPrice(typeId: number | null, hubId: string): number | null {
+  const [result, setResult] = useState<{ key: string; price: number | null } | null>(null);
+  const key = `${hubId}:${typeId}`;
+  useEffect(() => {
+    const hub = getTradeHub(hubId);
+    if (typeId === null || !hub) return;
+    let cancelled = false;
+    void getHubPrices(hub, [typeId]).then(
+      (prices) => {
+        if (!cancelled) setResult({ key, price: prices.get(typeId)?.sellMin ?? null });
+      },
+      () => {
+        if (!cancelled) setResult({ key, price: null });
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [typeId, hubId, key]);
+  return result?.key === key ? result.price : null;
+}
+
 /** What the stats column's Abyssal row says closed: the session weather's name, else normal space. */
 export function AbyssalWeatherMeta() {
   const { t } = useTranslation();
@@ -95,14 +137,19 @@ export function AbyssalWeatherMeta() {
 export function AbyssalRunPlanner({
   hullGroupId,
   compare,
+  cargo,
   typeName,
 }: {
   /** The open fit's hull's inventory group; undefined while the catalogue loads hides the hull rule. */
   hullGroupId: number | undefined;
   compare: WeatherCompare | null;
+  /** The open fit's own cargo: matching filaments in it reduce the cost line. Never the pilot's assets. */
+  cargo: readonly FittingCargoItem[];
   typeName: (typeId: number) => string;
 }) {
   const { t } = useTranslation();
+  const hubId = useMarketHub((state) => state.value);
+  const hubHydrated = useHydratedStore(useMarketHub);
   const { tier, security, setTier, setSecurity } = useAbyssalRunPlan();
   const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
   const setWeather = useAbyssalWeather((state) => state.setWeather);
@@ -112,11 +159,57 @@ export function AbyssalRunPlanner({
   const hull = abyssalHullRule(hullGroupId);
   const activation = abyssalActivation(tier, security);
   const filamentId = weather ? abyssalFilamentTypeId(tier, weather.kind) : null;
+  const hubPrice = useFilamentPrice(
+    filamentId !== null && hull.eligible && hubHydrated ? filamentId : null,
+    hubId
+  );
+  const cost =
+    filamentId !== null && hull.eligible
+      ? abyssalFilamentCost(hull.ships, filamentId, hubPrice, cargo)
+      : null;
+  const hubName = getTradeHub(hubId)?.systemName ?? hubId;
 
+  const reference = (
+    <InfoTooltip
+      label={t('fittings.abyssalRun.info')}
+      glyph="info"
+      content={
+        <span className="block space-y-1">
+          {weather && abyssalTierLevels(tier).includes(weather.level) && (
+            <span className="block">{strengthRange(t, tier, weather)}</span>
+          )}
+          <span className="block">
+            {t('fittings.abyssalRun.timer', {
+              minutes: ABYSSAL_RUN_MINUTES,
+              pockets: ABYSSAL_POCKETS,
+              perPocket: fixed1(ABYSSAL_RUN_MINUTES / ABYSSAL_POCKETS),
+            })}
+          </span>
+          <span className="block">{t('fittings.abyssalRun.source')}</span>
+        </span>
+      }
+    />
+  );
+  const picker = (
+    <StatFields>
+      <AbyssalWeatherPicker field info={reference} />
+    </StatFields>
+  );
+  if (weather === undefined)
+    return (
+      <div className="space-y-2">
+        {picker}
+        <StatNote>{t('fittings.abyssalRun.pickWeather')}</StatNote>
+      </div>
+    );
+
+  const verdict = abyssalVerdict(hull, activation, hullGroupId !== undefined);
+  const verdictText = (key: string) => t(`fittings.abyssalRun.verdict.${key}`, { tier });
   return (
     <div className="space-y-2">
+      {picker}
+      <RunDeltaNote weather={weather} delta={delta} typeName={typeName} />
       <StatFields>
-        <AbyssalWeatherPicker field />
         <StatField label={t('fittings.abyssalRun.tier')}>
           <Select
             value={String(tier)}
@@ -125,7 +218,7 @@ export function AbyssalRunPlanner({
               const nextLevels = abyssalTierLevels(next);
               setTier(next);
               // Off-tier strength: new tier's harsher one, kind kept.
-              if (weather && !nextLevels.includes(weather.level))
+              if (!nextLevels.includes(weather.level))
                 setWeather(abyssalWeatherOf(weather.kind, nextLevels[1]).typeId);
             }}
           >
@@ -174,62 +267,81 @@ export function AbyssalRunPlanner({
       </StatFields>
 
       <ul className="space-y-1 text-xs">
-        {weather && <StrengthNote tier={tier} weather={weather} />}
-        {hullGroupId !== undefined && (
-          <li className={hull.eligible ? 'text-text' : 'text-warning'}>
-            {t(`fittings.abyssalRun.hull.${hull.eligible ? hull.shipClass : hull.reason}`)}
-            {hull.eligible && !hull.confirmed && (
-              <span className="text-warning"> {t('fittings.abyssalRun.hull.unconfirmed')}</span>
-            )}
+        <StrengthOffNote tier={tier} weather={weather} />
+        <li>
+          {verdict.clear && <span>{verdictText('clear')} · </span>}
+          {verdict.facts.map((key, index) => (
+            <span key={key}>
+              {index > 0 && ' · '}
+              {verdictText(key)}
+            </span>
+          ))}
+        </li>
+        {verdict.problems.map((key) => (
+          <li key={key} className="text-warning">
+            {verdictText(key)}
           </li>
-        )}
-        <li className={activation === 'clear' ? 'text-text' : 'text-warning'}>
-          {t(`fittings.abyssalRun.activation.${activation}`, { tier })}
-        </li>
-        <li className="text-text-dim">
-          {t('fittings.abyssalRun.timer', {
-            minutes: ABYSSAL_RUN_MINUTES,
-            pockets: ABYSSAL_POCKETS,
-            perPocket: fixed1(ABYSSAL_RUN_MINUTES / ABYSSAL_POCKETS),
-          })}
-        </li>
+        ))}
         {filamentId !== null && hull.eligible && (
-          <li>
-            {t('fittings.abyssalRun.buy', { count: hull.ships })}{' '}
-            <ItemInfoLink typeId={filamentId}>{typeName(filamentId)}</ItemInfoLink>
+          <li className="tabular-nums">
+            {t('fittings.abyssalRun.buy')}{' '}
+            <ItemInfoLink typeId={filamentId}>{typeName(filamentId)}</ItemInfoLink>{' '}
+            {buyDetail(t, cost, hull.ships, hubName)}
           </li>
         )}
       </ul>
-
-      {weather === undefined ? (
-        <StatNote>{t('fittings.abyssalRun.pickWeather')}</StatNote>
-      ) : (
-        <RunDeltaNote weather={weather} delta={delta} typeName={typeName} />
+      {hull.eligible && hull.shipClass !== 'cruiser' && (
+        <StatNote>{t(`fittings.abyssalRun.fleetNote.${hull.shipClass}`)}</StatNote>
       )}
-      <StatNote>{t('fittings.abyssalRun.source')}</StatNote>
     </div>
   );
+}
+
+type Translate = ReturnType<typeof useTranslation>['t'];
+
+/** "x 3 · 3,000,000 ISK at Jita": the count, then the price when the hub quotes one. */
+function buyDetail(
+  t: Translate,
+  cost: ReturnType<typeof abyssalFilamentCost> | null,
+  ships: number,
+  hub: string
+): string {
+  if (cost === null) return t('fittings.abyssalRun.buyCount', { count: ships });
+  if (cost.kind === 'covered')
+    return `${t('fittings.abyssalRun.buyCount', { count: ships })} · ${t('fittings.abyssalRun.buyCovered')}`;
+  const isk = formatIsk(cost.total);
+  return cost.inCargo > 0
+    ? `${t('fittings.abyssalRun.buyCountMore', { count: cost.count })} · ${t('fittings.abyssalRun.buyIskShort', { isk, hub, inCargo: cost.inCargo })}`
+    : `${t('fittings.abyssalRun.buyCount', { count: cost.count })} · ${t('fittings.abyssalRun.buyIsk', { isk, hub })}`;
+}
+
+function tierRange(tier: AbyssalTier, weather: AbyssalWeather) {
+  const levels = abyssalTierLevels(tier);
+  return {
+    tier,
+    low: abyssalWeatherOf(weather.kind, levels[0]).penaltyPercent,
+    high: abyssalWeatherOf(weather.kind, levels[1]).penaltyPercent,
+  };
+}
+
+function strengthRange(t: Translate, tier: AbyssalTier, weather: AbyssalWeather): string {
+  return t('fittings.abyssalRun.strengthNote', tierRange(tier, weather));
 }
 
 /**
  * A filament fixes tier and kind; the site rolls the strength. An off-tier pick
  * keeps its filament and names the tiers that roll it; the stats stay at the pick.
+ * An in-tier pick says nothing here: the range is in the section's info tooltip.
  */
-function StrengthNote({ tier, weather }: { tier: AbyssalTier; weather: AbyssalWeather }) {
+function StrengthOffNote({ tier, weather }: { tier: AbyssalTier; weather: AbyssalWeather }) {
   const { t } = useTranslation();
   const levels = abyssalTierLevels(tier);
-  const range = {
-    tier,
-    low: abyssalWeatherOf(weather.kind, levels[0]).penaltyPercent,
-    high: abyssalWeatherOf(weather.kind, levels[1]).penaltyPercent,
-  };
-  if (levels.includes(weather.level))
-    return <li className="text-text-dim">{t('fittings.abyssalRun.strengthNote', range)}</li>;
+  if (levels.includes(weather.level)) return null;
   const rolling = abyssalTiersRolling(weather.level);
   return (
     <li className="text-warning">
       {t('fittings.abyssalRun.strengthOff', {
-        ...range,
+        ...tierRange(tier, weather),
         picked: weather.penaltyPercent,
         from: rolling[0],
         to: rolling[rolling.length - 1],

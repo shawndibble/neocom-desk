@@ -478,10 +478,12 @@ describe('jumps-away distance (issue #87)', () => {
   it('shows 0 jumps for a pinned location in the character’s own system', async () => {
     const user = userEvent.setup({ delay: null });
     render(<App />);
-    const pinButton = await screen.findByRole('button', {
-      name: new RegExp(`Pin toggle for ${escapeRegExp(JITA)}`),
-    });
-    await user.click(pinButton);
+    await user.click(
+      await screen.findByRole('button', {
+        name: new RegExp(`More actions for ${escapeRegExp(JITA)}`),
+      })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: /pin for this character/i }));
 
     expect(await screen.findByText('0 jumps')).toBeInTheDocument();
   });

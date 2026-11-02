@@ -6,17 +6,17 @@ Code: `src/features/commandPalette/` (`CommandPaletteHost.tsx`, `CommandPalette.
 
 ## Summary
 
-| Feature                   | What                                                                                 | Where                                                               |
-| ------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| Open: chord               | Ctrl+K (Windows/Linux) / Cmd+K (Apple), also from inside text fields; again to close | `CommandPaletteHost.tsx`, `shortcuts.ts` `isCommandPaletteShortcut` |
-| Open: desktop button      | "Go to..." button top of the rail, shows the chord                                   | `RailNav.tsx:47`                                                    |
-| Open: phone               | Search field at top of the More sheet (closes sheet first)                           | `MobileMoreSheet.tsx:106,153`                                       |
-| Groups (fixed order)      | Pages, Commands, Characters, Assets, Market items, LP Stores, Contacts               | `CommandPalette.tsx` `useShippedProviders`                          |
-| Keyboard                  | ArrowUp/Down, Home, End, Enter, Escape; focus stays in input                         | `CommandPalette.tsx` `handleKeyDown`                                |
-| Pointer                   | Click a row to activate; mouse-down does not steal focus                             | same                                                                |
-| Locked pages              | Marked with amber dot + sr-only text, still navigate                                 | `result.locked`                                                     |
-| Loading / error per group | "Searching..." row; "Couldn't load these results" in that group only                 | `usePaletteSearch.ts`                                               |
-| Result count (a11y)       | polite live region                                                                   | `CommandPalette.tsx`                                                |
+| Feature                   | What                                                                                  | Where                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Open: chord               | Ctrl+K (Windows/Linux) / Cmd+K (Apple), also from inside text fields; again to close  | `CommandPaletteHost.tsx`, `shortcuts.ts` `isCommandPaletteShortcut` |
+| Open: desktop button      | "Go to..." button top of the rail, shows the chord                                    | `RailNav.tsx:47`                                                    |
+| Open: phone               | Search field at top of the More sheet (closes sheet first)                            | `MobileMoreSheet.tsx:106,153`                                       |
+| Groups (fixed order)      | Pages, Commands, Characters, Assets, Places, LP Stores, Contacts, Ships, Market items | `CommandPalette.tsx` `useShippedProviders`                          |
+| Keyboard                  | ArrowUp/Down, Home, End, Enter, Escape; focus stays in input                          | `CommandPalette.tsx` `handleKeyDown`                                |
+| Pointer                   | Click a row to activate; mouse-down does not steal focus                              | same                                                                |
+| Locked pages              | Marked with amber dot + sr-only text, still navigate                                  | `result.locked`                                                     |
+| Loading / error per group | "Searching..." row; "Couldn't load these results" in that group only                  | `usePaletteSearch.ts`                                               |
+| Result count (a11y)       | polite live region                                                                    | `CommandPalette.tsx`                                                |
 
 ## Purpose and user goal
 
@@ -50,21 +50,22 @@ Code: `src/features/commandPalette/` (`CommandPaletteHost.tsx`, `CommandPalette.
 ## Search model
 
 - `usePaletteSearch(providers, query)`: trims the query, sorts providers by `order`, skips those whose `minQueryLength` exceeds the trimmed length, asks each provider during render (memoised on providers + query). Sync answer renders immediately; Promise answer shows that group as `loading` until it settles; rejection shows an error row in that group only; stale answers for an old query are dropped and their `AbortSignal` aborted. Empty groups are hidden. No debounce (all providers are in-memory).
+- **Places** (#5742, `placesProvider.ts`): solar systems (SDE), NPC stations, structures Dexie already knows (`searchKnownPlaces`) and Place Nicknames; local reads only. Enter opens Route Safety there (`routeToHref`); a result's `altAction` (Shift+Enter, or the small button on the highlighted row for touch) sets the in-game waypoint and keeps the palette open to show the outcome. No jumps-away sublabel: it would need the Character's location per keystroke.
 - Highlight is one index across groups, tracked by `groupId:resultId`, so an async group landing above does not move it; new query resets to the top, so Enter takes the best match. Home/End/arrows wrap via `moveHighlight`.
 - Ranking (`rankedSearch.ts`): case-insensitive; exact name > prefix > substring > secondary-field-only match; alphabetical within rank; empty query returns nothing. Per group cap `GROUP_LIMIT = 6` rows.
 - ARIA: hand-built combobox (input `role=combobox`, `aria-activedescendant`), one `role=group` per provider labelled by heading, results `role=option`. "Nothing matches." when query non-empty and no group has rows.
 
 ## Groups
 
-| Order | Group        | Min chars | Matches                                                                 | On select                                                | Source                                                              |
-| ----- | ------------ | --------- | ----------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------- |
-| 0     | Pages        | 0         | label (primary), breadcrumb and translated keywords (secondary)         | `navigate(path)`                                         | `listNavDestinations`                                               |
-| 1     | Commands     | 1         | label                                                                   | run command                                              | `PALETTE_COMMANDS`                                                  |
-| 2     | Characters   | 1         | Character name; "Active" hint on the current one                        | `setActiveCharacter(id)`                                 | Dexie `characters` live query                                       |
-| 3     | Assets       | 2         | item name; sublabel "Char xN" per holder, hint total "xN"               | navigate `/assets?q=<name>[&chars=all]`                  | cached assets of all Characters whose token has the assets scope    |
-| 4     | Market items | 3         | name: exact, prefix, substring (own scan, alphabetical per rank)        | Item Detail modal over current page (`showOpenInMarket`) | SDE market catalogue (~19.5k types, lazy ~1.5 MB, outside precache) |
-| 5     | LP Stores    | 2         | NPC corp name; hint "N LP" for corps the active Character holds LP with | navigate `/market/lp-store/<corpId>`                     | SDE `loadLpCorporations` + cached loyalty balances                  |
-| 6     | Contacts     | 1         | contact name; sublabel type + "+standing Character" per holder          | open Public Info modal                                   | cached contacts across Characters whose token has contacts scope    |
+| Order | Group        | Min chars | Matches                                                                 | On select                                                             | Source                                                              |
+| ----- | ------------ | --------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 0     | Pages        | 0         | label (primary), breadcrumb and translated keywords (secondary)         | `navigate(path)`                                                      | `listNavDestinations`                                               |
+| 1     | Commands     | 1         | label                                                                   | run command                                                           | `PALETTE_COMMANDS`                                                  |
+| 2     | Characters   | 1         | Character name; "Active" hint on the current one                        | `setActiveCharacter(id)`                                              | Dexie `characters` live query                                       |
+| 3     | Assets       | 2         | item name; sublabel "Char xN" per holder, hint total "xN"               | navigate `/assets?q=<name>[&chars=all]`                               | cached assets of all Characters whose token has the assets scope    |
+| 4     | Market items | 3         | name: exact, prefix, substring (own scan, alphabetical per rank)        | navigate `/market/browser?type=<id>` (keeps the browser's hub/region) | SDE market catalogue (~19.5k types, lazy ~1.5 MB, outside precache) |
+| 5     | LP Stores    | 2         | NPC corp name; hint "N LP" for corps the active Character holds LP with | navigate `/market/lp-store/<corpId>`                                  | SDE `loadLpCorporations` + cached loyalty balances                  |
+| 6     | Contacts     | 1         | contact name; sublabel type + "+standing Character" per holder          | open Public Info modal                                                | cached contacts across Characters whose token has contacts scope    |
 
 - Pages: empty query lists pages only (kind `page`), uncapped, as a quick navigator; with a query, tabs and sub-views are included, capped to 6 (`providers.ts:34-53`). Corp pages are listed only while the Corp entry is visible (hidden, never locked); other scope-gated pages are marked locked, never hidden. Contacts lists Standings but not its character-filter views (`controlTabs`: no `/contacts/across` entry).
 - Commands (`PALETTE_COMMANDS`, `providers.ts:70-95`): Open settings (`/settings`), Keyboard shortcuts (`/help/shortcuts`), Add character (`beginAddCharacterLogin()`), Open notification feed (`/alerts`).
@@ -79,7 +80,7 @@ Nothing persisted: query and highlight are component state; no recents, no histo
 
 ## Test-covered behaviours (`CommandPalette.test.tsx`, `providers.test.ts`, `usePaletteSearch.test.tsx`, provider tests)
 
-Ctrl+K from a text field (:120), no stacking over dialogs (:137), empty query lists pages (:152), "opp" finds Industry > Opportunities (:161), history replace on navigate (:177), fixed group order and cross-group arrows (:199), locked page marked but navigable (:223), Character switch (:233), catalogue load on open (:243), catalogue failure scoped to its group (:268), Item Detail focus return (:290), Add character (:310), contacts never fetch and need scope (:350, :365), LP store open and balance hint (:381, :393), LP list loading does not block typing (:412).
+Ctrl+K from a text field (:120), no stacking over dialogs (:137), empty query lists pages (:152), "opp" finds Industry > Opportunities (:161), history replace on navigate (:177), fixed group order and cross-group arrows (:199), locked page marked but navigable (:223), Character switch (:233), catalogue load on open (:243), catalogue failure scoped to its group (:268), Market items pick opens the Market Browser, Add character (:310), contacts never fetch and need scope (:350, :365), LP store open and balance hint (:381, :393), LP list loading does not block typing (:412).
 
 ## Interview Q&A
 

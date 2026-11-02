@@ -24,7 +24,7 @@ import { isk, shortDate } from './moonsFormat';
 import { Crumb } from './moonsParts';
 import { RefineryLabels, type RefineryLabelEdit } from './RefineryLabels';
 import { RemovalStrip } from './RemovalStrip';
-import { MoonOwnerStatusPill } from './MoonOwnersTable';
+import { MoonOwnerStatusPill } from './MoonOwnerStatusPill';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.page.${key}`;
 
@@ -405,6 +405,7 @@ export function MoonOwnerPage({
             rowKey={minedKey}
             defaultSort={{ columnId: 'value', direction: 'desc' }}
             mobileSort
+            stackColumns={2}
           />
         )}
       </Panel>

@@ -40,6 +40,11 @@ export const STATIC_RETENTION_MS = 30 * DAY_MS;
 export const AVOID_ROUTE_RETENTION_MS = 2 * DAY_MS;
 /** Market rows, stale after 5-15 minutes: a week is still generous. */
 export const MARKET_RETENTION_MS = 7 * DAY_MS;
+/**
+ * A pilot's stored Local-list kill history: shown from disk for a day, so a
+ * week keeps the pilots who turn up again and drops the ones who do not.
+ */
+export const PILOT_KILLS_RETENTION_MS = 7 * DAY_MS;
 /** A stored share's 7-day life, plus a day. */
 export const SHARE_COPY_RETENTION_MS = 8 * DAY_MS;
 /** A run at most this often. */
@@ -140,6 +145,9 @@ export const PRUNE_RULES: readonly PruneRule[] = [
   // A Share Link copy kept under the sentinel Character (`shareStore.ts`): its
   // share lives 7 days, so a day past that it can no longer be served.
   { pattern: /^share:/, maxAgeMs: SHARE_COPY_RETENTION_MS },
+  { pattern: /^pilot-kills:\d+$/, maxAgeMs: PILOT_KILLS_RETENTION_MS },
+  // Pasted name -> character id (reused for a day); a name has no digits-only form.
+  { pattern: /^pilot-id:.+$/, maxAgeMs: STATIC_RETENTION_MS },
   { pattern: /^marketPrice:/, maxAgeMs: MARKET_RETENTION_MS },
   { pattern: /^market-history:\d+:\d+$/, maxAgeMs: MARKET_RETENTION_MS },
   { pattern: /^structure-market:\d+$/, maxAgeMs: MARKET_RETENTION_MS },

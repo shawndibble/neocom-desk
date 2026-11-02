@@ -10,6 +10,7 @@ import type { CharacterBoardItemKind } from '@/engine/character/board';
 export const KIND_LABEL: Record<CharacterBoardItemKind, string> = {
   calendarEvent: 'calendar.kind.calendarEvent',
   skillTraining: 'calendar.kind.skillTraining',
+  accelerator: 'calendar.kind.accelerator',
   industryJob: 'calendar.kind.industryJob',
   planetExtraction: 'calendar.kind.planetExtraction',
   mercenaryDen: 'calendar.kind.mercenaryDen',

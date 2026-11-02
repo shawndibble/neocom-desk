@@ -1,3 +1,4 @@
+import { shiftUtcDate } from '@/engine/localDay';
 import { shiftDate } from '../miningTax/yieldRange';
 
 /** A feeder's coverage: UTC days, both ends inclusive; no `to` means still open. */
@@ -32,6 +33,31 @@ export function reopenPeriod(periods: readonly CoveragePeriod[], day: string): C
     if (day <= p.to) throw new Error('a new coverage period cannot overlap an earlier one');
   }
   return [...periods, { from: day }];
+}
+
+/** How far back a moon owner may start its coverage: EVE keeps about 30 days of ledger. */
+export const MAX_COVERAGE_BACKDATE_DAYS = 30;
+
+/**
+ * The first covered day for a join or rejoin: the requested day (default today), never after
+ * today or more than 30 days back, and for a rejoin never before the day after the last closed
+ * period, so `reopenPeriod` cannot throw. Mirrored in `functions/`.
+ */
+export function clampCoverageFrom(
+  periods: readonly CoveragePeriod[],
+  requested: string | undefined,
+  today: string
+): string {
+  const earliest = shiftUtcDate(today, -MAX_COVERAGE_BACKDATE_DAYS);
+  let day = requested ?? today;
+  if (day > today) day = today;
+  if (day < earliest) day = earliest;
+  for (const p of periods) {
+    if (p.to === undefined) continue;
+    const next = shiftUtcDate(p.to, 1);
+    if (day < next) day = next;
+  }
+  return day;
 }
 
 /** Rows outside coverage owe nothing. */

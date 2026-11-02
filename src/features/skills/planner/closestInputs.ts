@@ -10,7 +10,9 @@ import {
   cloneStateFor,
   parseCloneStates,
 } from '@/features/skills/cloneState';
-import { resolvePlanBoosters, toBoosters } from './planBooster';
+import { isAcceleratorLive } from '@/engine/accelerator';
+import { acceleratorId } from '@/features/accelerator/characterAccelerators';
+import { composePlanBoosters, toBoosters } from './planBooster';
 
 /**
  * One Character's timing inputs for "Who's closest", read from ESI's cache
@@ -23,11 +25,12 @@ export async function loadClosestInputs(
   nowMs: number
 ): Promise<CharacterTimingInput> {
   try {
-    const [corrected, attrs, implantIds, cloneRecord] = await Promise.all([
+    const [corrected, attrs, implantIds, cloneRecord, typed] = await Promise.all([
       loadCorrectedSkills(characterId, nowMs),
       loadCharacterAttributes(characterId),
       loadCharacterImplants(characterId),
       db.settings.get(SYNCED_CLONE_STATES_KEY),
+      db.characterAccelerators.get(acceleratorId(characterId)),
     ]);
     if (corrected.skillsResult === null) {
       return {
@@ -47,7 +50,14 @@ export async function loadClosestInputs(
       trained: corrected.trained,
       attributes,
       implants,
-      boosters: toBoosters(resolvePlanBoosters(undefined, undefined, accelerator)),
+      boosters: toBoosters(
+        composePlanBoosters(
+          undefined,
+          undefined,
+          isAcceleratorLive(typed, nowMs) ? typed : null,
+          accelerator
+        )
+      ),
       cloneState: cloneStateFor(parseCloneStates(cloneRecord?.value), characterId),
     };
   } catch {

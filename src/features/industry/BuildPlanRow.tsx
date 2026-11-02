@@ -78,6 +78,8 @@ type PlanRowProps = {
   /** Set on a row sitting under its group's header, to step it in from the ungrouped ones. */
   indented?: boolean;
   stats: PlanIndexStats | undefined;
+  /** Where the job runs, shown under the name only when another plan shares that name. */
+  locationHint?: string;
   onSelect: (id: string) => void;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
@@ -99,6 +101,7 @@ export const PlanRow = memo(function PlanRow({
   dropKind,
   indented = false,
   stats,
+  locationHint,
 }: PlanRowProps) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
@@ -237,7 +240,7 @@ export const PlanRow = memo(function PlanRow({
             // Name click opens the plan, double-click renames; the rest (move to
             // group, rename, duplicate, delete) is the trailing ⋮, also the row's
             // right-click menu.
-            <span className="flex min-w-0 flex-1">
+            <span className="flex min-w-0 flex-1 flex-col">
               <button
                 type="button"
                 onClick={(event) => {
@@ -248,6 +251,9 @@ export const PlanRow = memo(function PlanRow({
               >
                 {plan.name}
               </button>
+              {locationHint && (
+                <span className="truncate text-[0.6875rem] text-text-dim">{locationHint}</span>
+              )}
             </span>
           )}
           {/* Kept, not withheld, while the verdict is "Fix location": the figures

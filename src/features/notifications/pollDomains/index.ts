@@ -54,6 +54,7 @@ import { skyhookNearbyDomain } from './skyhooksNearby';
 import { communitiesDomain } from './communities';
 import { killsDomain } from './kills';
 import { mercenaryDensDomain } from './mercenaryDens';
+import { acceleratorDomain } from './accelerator';
 
 export type { AnyNotificationFire } from '../eventEntries';
 export type { PollDomain } from './defineDomain';
@@ -89,6 +90,7 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   communitiesDomain,
   killsDomain,
   mercenaryDensDomain,
+  acceleratorDomain,
 ];
 
 const DOMAIN_BY_EVENT: ReadonlyMap<NotificationEventId, PollDomain> = new Map(

@@ -16,4 +16,5 @@ export const KIND_ENDPOINTS: Record<CharacterBoardItemKind, readonly EsiEndpoint
   contractExpiry: ['getCharacterContracts'],
   orderExpiry: ['getCharacterOrders'],
   skillPlan: [],
+  accelerator: [],
 };

@@ -144,8 +144,8 @@ for (const width of [1024, 1100, 1280, 1440]) {
   });
 }
 
-for (const width of [390, 1024, 1280]) {
-  test(`recent-list select sits in the paste card header at ${width}px`, async ({ page }) => {
+for (const width of [390, 1024, 1280, 1440]) {
+  test(`recent-list select keeps the paste card title whole at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });
     await signInAndGoto(page);
     await mockHubPrices(page);
@@ -160,28 +160,33 @@ for (const width of [390, 1024, 1280]) {
     if (width < 1024) await page.getByRole('button', { name: /Edit list/ }).click();
     const select = page.getByRole('combobox', { name: 'Load a recent list' });
     await expect(select).toBeVisible();
+    // The title never truncates, wherever the select sits (#5761).
+    const title = page.getByRole('heading', { name: 'Paste', exact: true });
+    await expect(title).toHaveText('Paste');
+    const clipped = await title.evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(clipped, 'the card title is clipped').toBeLessThanOrEqual(0);
     const g = await select.evaluate((el) => {
-      const header = el.closest('header')!;
-      const title = header.querySelector('h2')!.getBoundingClientRect();
+      const header = el.closest('section')!.querySelector('header')!;
       const h = header.getBoundingClientRect();
       const s = el.getBoundingClientRect();
-      const card = header.parentElement!.getBoundingClientRect();
+      const text = document.getElementById('market-appraisal-text')!.getBoundingClientRect();
       return {
-        title: title.toJSON(),
         header: h.toJSON(),
         select: s.toJSON(),
-        card: card.toJSON(),
+        text: text.toJSON(),
+        inHeader: header.contains(el),
         headerOverflow: header.scrollWidth - header.clientWidth,
       };
     });
-    expect(g.select.left, 'select is to the right of the title').toBeGreaterThanOrEqual(
-      g.title.right - 1
-    );
-    // Same row: vertical centres within the header's height, no wrap.
-    expect(g.select.top).toBeGreaterThanOrEqual(g.header.top - 1);
-    expect(g.select.bottom).toBeLessThanOrEqual(g.header.bottom + 1);
-    expect(g.select.right).toBeLessThanOrEqual(g.card.right + 1);
-    expect(g.select.width).toBeLessThan(g.card.width * 0.6);
+    if (width < 768) {
+      // Phone lane: unchanged, the select stays in the header row.
+      expect(g.inHeader).toBe(true);
+      expect(g.select.bottom).toBeLessThanOrEqual(g.header.bottom + 1);
+    } else {
+      // md and up: the select sits in the body, above the textarea.
+      expect(g.inHeader).toBe(false);
+      expect(g.select.bottom).toBeLessThanOrEqual(g.text.top);
+    }
     expect(g.headerOverflow).toBeLessThanOrEqual(1);
     await expectNoPageOverflow(page);
     await page.screenshot({
