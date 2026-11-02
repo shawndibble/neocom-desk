@@ -89,4 +89,12 @@ describe('InlinePercent', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: /Edit Facility yield/ }), { key: '5' });
     expect(screen.getByRole('textbox')).toHaveValue('5');
   });
+
+  it('swallows the Enter that saves, so it cannot press the value button focus moves to', () => {
+    setup();
+    const field = openField();
+    fireEvent.change(field, { target: { value: '54' } });
+    // fireEvent returns false when the event was default-prevented.
+    expect(fireEvent.keyDown(field, { key: 'Enter' })).toBe(false);
+  });
 });

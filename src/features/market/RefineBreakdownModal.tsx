@@ -11,6 +11,7 @@
  * All the figures come from `buildRefineBreakdown`; this only lays them out.
  */
 import { useState, type ReactNode } from 'react';
+import { facilityBaseYieldFor } from '@/engine/industry/refiningSetup';
 import { InlinePercent } from '@/features/refining/InlinePercent';
 import { useTranslation } from 'react-i18next';
 import {
@@ -182,6 +183,15 @@ export function RefineBreakdownModal({
     },
   ];
 
+  // One skills multiplier across the items lets a typed reprocessing yield be divided back down to the
+  // facility's base yield; with several (ores trained to different levels) there is no single answer.
+  const skillsMultiplier =
+    breakdown.efficiencyMin !== null &&
+    breakdown.efficiencyMax !== null &&
+    setup.yieldRate > 0 &&
+    Math.abs(breakdown.efficiencyMax - breakdown.efficiencyMin) < 1e-9
+      ? breakdown.efficiencyMin / setup.yieldRate
+      : null;
   const usingMine = shared?.source === 'mine';
   const assumingDefault = setup.yieldRate === 0.5;
 
@@ -274,7 +284,20 @@ export function RefineBreakdownModal({
             tooltip={t('market.appraisal.breakdown.efficiencyHelp')}
             accent
           >
-            {efficiencyText(breakdown.efficiencyMin, breakdown.efficiencyMax)}
+            {editSetup && skillsMultiplier !== null ? (
+              <InlinePercent
+                fraction={breakdown.efficiencyMin ?? 0}
+                name={t('market.appraisal.breakdown.efficiency')}
+                min={1}
+                max={Math.floor(skillsMultiplier * 100)}
+                onCommit={(total) => {
+                  const base = facilityBaseYieldFor(total, skillsMultiplier);
+                  if (base !== null) editSetup.onYield(base);
+                }}
+              />
+            ) : (
+              efficiencyText(breakdown.efficiencyMin, breakdown.efficiencyMax)
+            )}
           </SetupBox>
         </div>
         {assumingDefault && (
