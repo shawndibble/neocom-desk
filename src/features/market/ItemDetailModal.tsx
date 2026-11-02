@@ -45,7 +45,6 @@ import {
   PopoverContent,
   PopoverTrigger,
   RowActionsContext,
-  RowMenuExtrasContext,
   RowMoreActions,
   Spinner,
   TabPanel,
@@ -577,13 +576,10 @@ function ItemDetailMoreActions({
       </MenuItem>
     </>
   );
-  // Null extras: a host table's "Export table" submenu would otherwise reach this ⋮ through the portal.
   return (
-    <RowMenuExtrasContext.Provider value={null}>
-      <RowActionsContext.Provider value={{ name: itemName, items }}>
-        <RowMoreActions />
-      </RowActionsContext.Provider>
-    </RowMenuExtrasContext.Provider>
+    <RowActionsContext.Provider value={{ name: itemName, items }}>
+      <RowMoreActions />
+    </RowActionsContext.Provider>
   );
 }
 

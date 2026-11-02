@@ -11,6 +11,7 @@ import {
   EmptyState,
   FilterBar,
   IconButton,
+  MenuGroup,
   MenuItem,
   LiveStatus,
   SearchInput,
@@ -557,13 +558,17 @@ export function OpenOrdersPanel({
         extraItems={
           <>
             {newPrice !== null && (
-              <MenuItem onSelect={() => void writeToClipboard(priceClipboardText(newPrice))}>
-                {t('market.orders.copyNewPrice')}
-              </MenuItem>
+              <MenuGroup id="copy">
+                <MenuItem onSelect={() => void writeToClipboard(priceClipboardText(newPrice))}>
+                  {t('market.orders.copyNewPrice')}
+                </MenuItem>
+              </MenuGroup>
             )}
             {/* Only where the station is named: an unnamed structure has nothing to show. */}
             {row.stationName !== null && (
-              <SetWaypointMenuItem locationId={row.locationId} placeName={row.stationName} />
+              <MenuGroup id="game">
+                <SetWaypointMenuItem locationId={row.locationId} placeName={row.stationName} />
+              </MenuGroup>
             )}
           </>
         }

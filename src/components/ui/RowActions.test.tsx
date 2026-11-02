@@ -5,6 +5,7 @@ import '@/i18n';
 import { claimSessionHint, hintSeenCount, resetSessionHints, useHintCounts } from '@/lib/hintFlags';
 import { stubViewport } from '@/test/viewport';
 import {
+  MenuGroup,
   MenuItem,
   MenuSeparator,
   MenuSub,
@@ -418,5 +419,87 @@ describe('row menu hints', () => {
     expect(claimSessionHint('goTo')).toBe(true);
     render(plainRow);
     expect(screen.queryByText(/to open its actions/)).not.toBeInTheDocument();
+  });
+});
+
+describe('MenuGroup', () => {
+  function open(items: React.ReactNode) {
+    render(
+      <RowActionsMenu name="Tritanium" items={items}>
+        <div>
+          Tritanium
+          <RowMoreActions />
+        </div>
+      </RowActionsMenu>
+    );
+    fireEvent.contextMenu(screen.getByText('Tritanium'));
+  }
+
+  it('sorts groups into the fixed order, whatever order they are written or merged in', async () => {
+    open(
+      <>
+        <MenuGroup id="copy">
+          <MenuItem>Copy name</MenuItem>
+        </MenuGroup>
+        <MenuGroup id="primary">
+          <MenuItem>Show info</MenuItem>
+        </MenuGroup>
+        <MenuGroup id="copy">
+          <MenuItem>Copy new price</MenuItem>
+        </MenuGroup>
+      </>
+    );
+    const names = (await screen.findAllByRole('menuitem')).map((item) => item.textContent);
+    expect(names).toEqual(['Show info', 'Copy name', 'Copy new price']);
+    expect(screen.getAllByRole('group')).toHaveLength(2);
+  });
+
+  it('folds a track group of three or more into a submenu, and keeps a smaller one flat', async () => {
+    const user = userEvent.setup();
+    open(
+      <>
+        <MenuGroup id="primary">
+          <MenuItem>Show info</MenuItem>
+        </MenuGroup>
+        <MenuGroup id="track">
+          <MenuItem>Add to Quickbar</MenuItem>
+          <MenuItem>Set price alert</MenuItem>
+          <MenuItem>Set stock target</MenuItem>
+        </MenuGroup>
+        <MenuGroup id="game">
+          <MenuItem>Open in EVE</MenuItem>
+          <MenuItem>Set waypoint in game</MenuItem>
+        </MenuGroup>
+      </>
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Open in EVE' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Set price alert' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Track' }));
+    expect(await screen.findByRole('menuitem', { name: 'Set price alert' })).toBeInTheDocument();
+  });
+
+  it('puts an item outside any group last, and leaves a menu with no groups as written', async () => {
+    open(
+      <>
+        <MenuItem>Remove from list</MenuItem>
+        <MenuGroup id="primary">
+          <MenuItem>Show info</MenuItem>
+        </MenuGroup>
+      </>
+    );
+    const names = (await screen.findAllByRole('menuitem')).map((item) => item.textContent);
+    expect(names).toEqual(['Show info', 'Remove from list']);
+  });
+
+  it('renders ungrouped items untouched, with no group wrapper', async () => {
+    open(
+      <>
+        <MenuItem>Show info</MenuItem>
+        <MenuSeparator />
+        <MenuItem>Copy name</MenuItem>
+      </>
+    );
+    await screen.findByRole('menuitem', { name: 'Show info' });
+    expect(screen.queryByRole('group')).not.toBeInTheDocument();
   });
 });

@@ -174,7 +174,8 @@ describe('VariationsTable', () => {
       row.focus();
       fireEvent.contextMenu(row);
 
-      expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).toBeInTheDocument();
+      // Quickbar, price alert and stock target fold into one submenu.
+      expect(screen.getByRole('menuitem', { name: 'Track' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Compare Variations' })).toBeInTheDocument();
@@ -199,7 +200,8 @@ describe('VariationsTable', () => {
       const row = screen.getByText('Rifter').closest('tr');
       if (!row) throw new Error('expected a Rifter row');
       fireEvent.contextMenu(row);
-      await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+      await user.click(screen.getByRole('menuitem', { name: 'Track' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Add to Quickbar' }));
       expect(actions.addToQuickbar).toHaveBeenCalledWith(587, 'Rifter');
     });
 

@@ -71,7 +71,6 @@ import * as Icon from './icons';
 import {
   MenuKindContext,
   RowActionsContext,
-  RowMenuExtrasContext,
   RowOpenHrefContext,
   type RowActions,
 } from './rowActionsContext';
@@ -192,6 +191,96 @@ export function MenuRadioItem(props: ComponentProps<typeof ContextMenuRadioItem>
 }
 
 /**
+ * The ordered vocabulary a menu's items are grouped by (DESIGN.md §6c "Menu
+ * length"). A menu groups its items with `MenuGroup`; the arranger below sorts
+ * the groups into this order, puts a hairline between non-empty ones, and
+ * folds the `fold` groups into a submenu, so no call site places a divider or
+ * decides what folds. `other` is where an item outside any group lands.
+ */
+const MENU_GROUP_ORDER = ['primary', 'track', 'copy', 'game', 'other'] as const;
+export type MenuGroupId = (typeof MENU_GROUP_ORDER)[number];
+
+/** Groups that fold into a submenu (value: its i18n label key) once they hold `MENU_FOLD_MIN` items. */
+const FOLDED_GROUPS: Partial<Record<MenuGroupId, string>> = {
+  track: 'common.menuGroup.track',
+  game: 'common.menuGroup.game',
+};
+
+/** A submenu of fewer items than this costs a click and hides too little: the group stays flat. */
+const MENU_FOLD_MIN = 3;
+
+/**
+ * Marks `children` as one of a menu's groups. Groups with the same `id`, from
+ * any number of `MenuGroup`s (a page's `extraItems` joining the shared menu's),
+ * merge into one. Only a top-level child of the `items` counts, and a folded
+ * group's items are counted as written: give it real items, not wrappers that
+ * may render nothing.
+ */
+export function MenuGroup({ children }: { id: MenuGroupId; children?: ReactNode }): ReactNode {
+  return children;
+}
+
+function flattenMenuNodes(node: ReactNode): ReactNode[] {
+  return Children.toArray(node).flatMap((child) =>
+    isValidElement<{ children?: ReactNode }>(child) && child.type === Fragment
+      ? flattenMenuNodes(child.props.children)
+      : [child]
+  );
+}
+
+/**
+ * Hairline between non-empty sibling groups, as CSS: a group whose items all
+ * render nothing (an Abyssal item's market actions) is `:empty`, and neither
+ * shows nor leaves a stray rule behind.
+ */
+const GROUP_CLASS =
+  'empty:hidden [&:not(:empty)~&:not(:empty)]:mt-1 [&:not(:empty)~&:not(:empty)]:border-t [&:not(:empty)~&:not(:empty)]:border-line [&:not(:empty)~&:not(:empty)]:pt-1';
+
+/**
+ * Lays out a menu's items: groups in `MENU_GROUP_ORDER`, hairlines between
+ * them, and the folded groups as submenus. Items with no `MenuGroup` anywhere
+ * render as written (a menu not yet migrated keeps its own separators).
+ * Kind-agnostic: render it inside whichever menu's content.
+ */
+export function ArrangedMenuItems({ items }: { items: ReactNode }) {
+  const { t } = useTranslation();
+  const nodes = flattenMenuNodes(items);
+  const isGroup = (
+    node: ReactNode
+  ): node is ReactElement<{ id: MenuGroupId; children?: ReactNode }> =>
+    isValidElement(node) && node.type === MenuGroup;
+  if (!nodes.some(isGroup)) return <>{items}</>;
+  const buckets = new Map<MenuGroupId, ReactNode[]>();
+  const add = (id: MenuGroupId, content: ReactNode[]) =>
+    buckets.set(id, [...(buckets.get(id) ?? []), ...content]);
+  for (const node of nodes) {
+    if (isGroup(node)) add(node.props.id, flattenMenuNodes(node.props.children));
+    else add('other', [node]);
+  }
+  return (
+    <>
+      {MENU_GROUP_ORDER.map((id) => {
+        const content = buckets.get(id);
+        if (!content?.length) return null;
+        const foldKey = FOLDED_GROUPS[id];
+        return (
+          <div key={id} role="group" className={GROUP_CLASS}>
+            {foldKey !== undefined && content.length >= MENU_FOLD_MIN ? (
+              <MenuSub>
+                <MenuSubTrigger>{t(foldKey)}</MenuSubTrigger>
+                <MenuSubContent>{content}</MenuSubContent>
+              </MenuSub>
+            ) : (
+              content
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/**
  * How many real actions `items` holds, or `undefined` when it can't tell (a
  * wrapper component may render any number). Separators and empties count 0; a
  * `MenuSub` counts as 2 (a submenu is a menu's worth of actions, so it never
@@ -204,7 +293,7 @@ function countMenuItems(node: ReactNode): number | undefined {
     if (child.type === MenuSeparator || child.type === MenuLabel) continue;
     if (child.type === MenuItem || child.type === DisabledMenuItem) count += 1;
     else if (child.type === MenuSub) count += 2;
-    else if (child.type === Fragment || child.type === MenuRadioGroup) {
+    else if (child.type === Fragment || child.type === MenuRadioGroup || child.type === MenuGroup) {
       const inner = countMenuItems(child.props.children);
       if (inner === undefined) return undefined;
       count += inner;
@@ -288,10 +377,6 @@ export function RowActionsMenu({
       {children}
     </ContextMenuTrigger>
   );
-  // Anything the surrounding table adds (DataTable's "Export table").
-  // `RowMoreActions` appends the same itself, so the context value stays
-  // the row's own items and a hand-rolled wrapper gets the extras too.
-  const extras = useContext(RowMenuExtrasContext);
   const rowHref = useContext(RowOpenHrefContext);
   const href = openHref ?? rowHref;
   useEffect(() => warnRestraint(name, items), [name, items]);
@@ -310,8 +395,7 @@ export function RowActionsMenu({
           )}
           <ContextMenuContent onCloseAutoFocus={onCloseAutoFocus}>
             {href && <OpenInNewTabMenuItem href={href} />}
-            {items}
-            {extras}
+            <ArrangedMenuItems items={items} />
           </ContextMenuContent>
         </ContextMenu>
       </TooltipHoldContext.Provider>
@@ -376,7 +460,6 @@ export function RowMoreActions({
 }) {
   const { t } = useTranslation();
   const actions = useContext(RowActionsContext);
-  const extras = useContext(RowMenuExtrasContext);
   const [tip, setTip] = useState(false);
   const [hintShown, dismissHint] = useRowMoreHint(actions !== null);
   const context = useTouchContext();
@@ -437,8 +520,7 @@ export function RowMoreActions({
       >
         <MenuKindContext.Provider value="dropdown">
           {actions.openHref && <OpenInNewTabMenuItem href={actions.openHref} />}
-          {actions.items}
-          {extras}
+          <ArrangedMenuItems items={actions.items} />
           {tip && (
             <p className="mt-1 border-t border-line px-2 pt-1.5 pb-1 text-xs text-text-dim">
               {t('common.rowMenuTip', { context })}

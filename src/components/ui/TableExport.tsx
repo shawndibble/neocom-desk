@@ -3,9 +3,9 @@
  * Where export is a menu's only job — the title bar's `TableActionsMenu`
  * with no other table actions, a table's own right-click menu — the three
  * formats are the menu, behind a download button. Where it shares the menu
- * with other actions (a row's right-click menu and "More actions" dropdown,
- * a `TableActionsMenu` given `children`) they sit in an "Export table ▸"
- * submenu.
+ * with other actions (a `TableActionsMenu` given `children`) they sit in an
+ * "Export table ▸" submenu. A row's menu never carries export: it is a table
+ * action, so it lives in the table's own actions menu, not on every row.
  *
  * Wiring a DataTable:
  *
@@ -13,9 +13,9 @@
  *   <Panel actions={<TableActionsMenu name={title} tableExport={tableExport} />}>
  *     <DataTable {...tableExport.tableProps} rows={rows} … />
  *
- * `tableProps` hands DataTable the config (so its row menus — or, with none,
- * a table-wide right-click menu — grow the submenu) and a ref back to its
- * sorted rows, so every entry point exports exactly what is on screen.
+ * `tableProps` hands DataTable the config (so a table with no row menus gets
+ * a table-wide right-click menu of the formats) and a ref back to its sorted
+ * rows, so every entry point exports exactly what is on screen.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,8 +26,8 @@ import { LiveStatus } from './LiveStatus';
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger } from './RowActions';
-import { MenuKindContext, RowMenuExtrasContext } from './rowActionsContext';
-import { TableExportContext, useTableExportContext, type TableExport } from './useTableExport';
+import { MenuKindContext } from './rowActionsContext';
+import type { TableExport } from './useTableExport';
 
 async function run<T>(tableExport: TableExport<T>, format: ExportFormat): Promise<number> {
   const rows = tableExport.getRows();
@@ -89,45 +89,6 @@ export function ExportTableSub<T>(props: ExportItemsProps<T>) {
     </MenuSub>
   );
 }
-
-/**
- * What `DataTable`'s `exportable` does for its rows, for a table that isn't a
- * DataTable (a virtualized list, a raw `<table>`): every `RowActionsMenu`
- * under it gains the "Export table" submenu.
- */
-export function TableExportProvider<T>({
-  tableExport,
-  children,
-}: {
-  tableExport: TableExport<T>;
-  children: ReactNode;
-}) {
-  return (
-    <TableExportContext.Provider value={tableExport}>
-      <RowMenuExtrasContext.Provider value={ROW_EXPORT_ITEMS}>
-        {children}
-      </RowMenuExtrasContext.Provider>
-    </TableExportContext.Provider>
-  );
-}
-
-/** Appends the submenu (after a separator) to a row menu inside an exportable table. */
-export function RowExportItems() {
-  const tableExport = useTableExportContext();
-  if (!tableExport) return null;
-  return (
-    <>
-      <MenuSeparator />
-      <ExportTableSub tableExport={tableExport} />
-    </>
-  );
-}
-
-/**
- * One element for every provider: a fresh one per render would change the
- * context value and re-render every row menu in a long (virtualized) list.
- */
-const ROW_EXPORT_ITEMS = <RowExportItems />;
 
 /**
  * The table block's own menu, for its title bar. With no `children` it is an

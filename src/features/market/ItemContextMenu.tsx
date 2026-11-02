@@ -11,6 +11,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import {
   DisabledMenuItem,
+  MenuGroup,
   MenuItem,
   RowActionsContext,
   RowActionsMenu,
@@ -229,74 +230,91 @@ function useItemMenuItems(
   if (props.holdingsOnly) {
     return (
       <>
-        <ShowInfoMenuItem typeId={typeId} itemName={itemName} itemId={itemId} />
-        <ViewInMarketMenuItem typeId={typeId} />
-        {!props.hideStockTarget && (
-          <MenuItem onSelect={onStockTargetRequest}>{t('stockTargets.dialog.menuItem')}</MenuItem>
-        )}
+        <MenuGroup id="primary">
+          <ShowInfoMenuItem typeId={typeId} itemName={itemName} itemId={itemId} />
+          <ViewInMarketMenuItem typeId={typeId} />
+          {!props.hideStockTarget && (
+            <MenuItem onSelect={onStockTargetRequest}>{t('stockTargets.dialog.menuItem')}</MenuItem>
+          )}
+        </MenuGroup>
         {extraItems}
       </>
     );
   }
 
+  // Groups, not a flat list (DESIGN.md §6c "Menu length"): `MenuGroup` sorts,
+  // divides and folds them. Each Abyssal-only entry carries its own
+  // `MarketOnly`, so a group's item count is what it renders.
   return (
     <>
-      <MarketOnly typeId={typeId}>
-        {canAddToQuickbar ? (
-          <MenuItem onSelect={() => addToQuickbar(typeId, itemName)}>
-            {t('market.contextMenu.addToQuickbar')}
+      <MenuGroup id="primary">
+        <ShowInfoMenuItem typeId={typeId} itemName={itemName} itemId={itemId} />
+        <ViewInMarketMenuItem typeId={typeId} />
+        {!props.hideCompare && (
+          <MenuItem onSelect={() => addToCompare({ typeId, itemName })}>
+            {t('market.contextMenu.addToCompare')}
           </MenuItem>
-        ) : (
-          <DisabledMenuItem reason={t('market.contextMenu.quickbarNoCharacter')}>
-            {t('market.contextMenu.addToQuickbar')}
-          </DisabledMenuItem>
         )}
-        <PriceAlertMenuItem
-          typeId={typeId}
-          available={canAddToQuickbar}
-          onSelect={onAlertRequest}
-        />
-      </MarketOnly>
-      {!props.hideStockTarget && (
-        <MenuItem onSelect={onStockTargetRequest}>{t('stockTargets.dialog.menuItem')}</MenuItem>
-      )}
-      <ShowInfoMenuItem typeId={typeId} itemName={itemName} itemId={itemId} />
-      <OpenInEveItemMenuItems typeId={typeId} />
-      {!props.hideCompare && (
-        <MenuItem onSelect={() => addToCompare({ typeId, itemName })}>
-          {t('market.contextMenu.addToCompare')}
+        {onCompareVariations && (
+          <MenuItem onSelect={onCompareVariations}>
+            {t('market.contextMenu.compareVariations')}
+          </MenuItem>
+        )}
+        {!props.hideBuildPlan && (
+          <MenuItem
+            disabled={!blueprintTypeID}
+            onSelect={() => {
+              if (blueprintTypeID)
+                navigate(`${industryTabHref('plans')}?product=${planProductTypeID ?? typeId}`);
+            }}
+          >
+            {buildPlanLabel}
+          </MenuItem>
+        )}
+        {onViewInIndustryAsMaterial && (
+          <MenuItem onSelect={onViewInIndustryAsMaterial}>
+            {t('market.contextMenu.viewInIndustryAsMaterial')}
+          </MenuItem>
+        )}
+        {piPlannable && (
+          <MenuItem
+            onSelect={() => navigate(piPlanHref(typeId, location.pathname, location.search))}
+          >
+            {t('market.contextMenu.piPlan')}
+          </MenuItem>
+        )}
+      </MenuGroup>
+      <MenuGroup id="track">
+        <MarketOnly typeId={typeId}>
+          {canAddToQuickbar ? (
+            <MenuItem onSelect={() => addToQuickbar(typeId, itemName)}>
+              {t('market.contextMenu.addToQuickbar')}
+            </MenuItem>
+          ) : (
+            <DisabledMenuItem reason={t('market.contextMenu.quickbarNoCharacter')}>
+              {t('market.contextMenu.addToQuickbar')}
+            </DisabledMenuItem>
+          )}
+        </MarketOnly>
+        <MarketOnly typeId={typeId}>
+          <PriceAlertMenuItem
+            typeId={typeId}
+            available={canAddToQuickbar}
+            onSelect={onAlertRequest}
+          />
+        </MarketOnly>
+        {!props.hideStockTarget && (
+          <MenuItem onSelect={onStockTargetRequest}>{t('stockTargets.dialog.menuItem')}</MenuItem>
+        )}
+      </MenuGroup>
+      <MenuGroup id="copy">
+        <MenuItem onSelect={() => void writeToClipboard(itemName)}>
+          {t('market.contextMenu.copyName')}
         </MenuItem>
-      )}
-      {onCompareVariations && (
-        <MenuItem onSelect={onCompareVariations}>
-          {t('market.contextMenu.compareVariations')}
-        </MenuItem>
-      )}
-      <ViewInMarketMenuItem typeId={typeId} />
-      <MenuItem onSelect={() => void writeToClipboard(itemName)}>
-        {t('market.contextMenu.copyName')}
-      </MenuItem>
-      {!props.hideBuildPlan && (
-        <MenuItem
-          disabled={!blueprintTypeID}
-          onSelect={() => {
-            if (blueprintTypeID)
-              navigate(`${industryTabHref('plans')}?product=${planProductTypeID ?? typeId}`);
-          }}
-        >
-          {buildPlanLabel}
-        </MenuItem>
-      )}
-      {onViewInIndustryAsMaterial && (
-        <MenuItem onSelect={onViewInIndustryAsMaterial}>
-          {t('market.contextMenu.viewInIndustryAsMaterial')}
-        </MenuItem>
-      )}
-      {piPlannable && (
-        <MenuItem onSelect={() => navigate(piPlanHref(typeId, location.pathname, location.search))}>
-          {t('market.contextMenu.piPlan')}
-        </MenuItem>
-      )}
+      </MenuGroup>
+      <MenuGroup id="game">
+        <OpenInEveItemMenuItems typeId={typeId} />
+      </MenuGroup>
       {extraItems}
     </>
   );
