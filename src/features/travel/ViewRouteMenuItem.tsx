@@ -1,5 +1,6 @@
 /**
- * "View route" for a row menu beside `SetWaypointMenuItem`: opens Route Safety
+ * "View route" for a row menu: bundled after `SetWaypointMenuItem` by default, or
+ * placed by a grouped menu beside View in Market (`withViewRoute={false}`). Opens Route Safety
  * with this place as the destination and the Character's current system as
  * the start. Stays open while it resolves the place's system and reads the
  * reason inline if it can't, as the waypoint item does.
