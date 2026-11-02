@@ -170,6 +170,31 @@ export function refiningEfficiency(
 }
 
 /**
+ * The skills multiplier on a facility's base yield for a pilot, with no
+ * particular ore in mind: Reprocessing and Reprocessing Efficiency, the
+ * average of the ore specialisation skills they have trained, and any
+ * refining implant. This is what a yield typed in Settings is divided by to
+ * give the facility's base yield; with ores on screen the Refine breakdown
+ * divides by that ore's own multiplier instead, which is exact. Skills at 0
+ * are left out of the average, so a pilot with one ore line untrained is not
+ * pulled down by it.
+ */
+export function referenceSkillsMultiplier(
+  modifiers: CharacterModifiers,
+  specialisationSkillIds: readonly number[]
+): number {
+  const { skills } = modifiers;
+  const trained = specialisationSkillIds.map((id) => skills[id] ?? 0).filter((level) => level > 0);
+  const average = trained.length === 0 ? 0 : trained.reduce((a, b) => a + b, 0) / trained.length;
+  return (
+    (1 + 0.03 * (skills[SKILL_IDS.reprocessing] ?? 0)) *
+    (1 + 0.02 * (skills[SKILL_IDS.reprocessingEfficiency] ?? 0)) *
+    (1 + 0.02 * average) *
+    (1 + modifiers.refiningImplantPct / 100)
+  );
+}
+
+/**
  * General ore/ice skills plus implant, no specialisation — the one number a
  * mixed-type summary can honestly state (issue #1058).
  */
