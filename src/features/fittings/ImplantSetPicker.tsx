@@ -15,7 +15,17 @@
  * changes nothing. "Use my clone" drops the set again.
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -34,11 +44,15 @@ import * as Icon from '@/components/ui/icons';
 import { ItemInfoLink } from '@/features/entities';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cloneSeedSet, type ImplantBasis } from '@/engine/fittings/implantBasis';
-import { placeInSet } from '@/engine/fittings/implantFinder';
+import { placeInSet, type ImplantEntry } from '@/engine/fittings/implantFinder';
+import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
+import { cx } from '@/lib/cx';
+import { rankedSearch } from '@/lib/rankedSearch';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
+import { loadImplantMarketEntries } from './implantSlotLookup';
 import { loadImplantCatalog } from './useImplantFinder';
 import { guarded } from '@/app/routeChunks';
 
@@ -116,12 +130,64 @@ function SideEffectSwitches({
   );
 }
 
-/** One box for both lists: the item itself decides where it goes. */
+/** Suggestions shown under the box while typing. */
+const SUGGESTION_LIMIT = 8;
+
+/**
+ * One box for both lists: the item itself decides where it goes. Typing lists
+ * the matching implants and boosters (a combobox, arrow keys and Enter or a
+ * click to pick); picking one adds it at once, and typing a full name and
+ * pressing Add still works.
+ */
 function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: string | null }) {
   const { t } = useTranslation();
+  const listId = `${useId()}-suggestions`;
   const [query, setQuery] = useState('');
+  const [highlight, setHighlight] = useState<number | null>(null);
+  const [entries, setEntries] = useState<readonly ImplantEntry[]>([]);
+  useEffect(() => {
+    let live = true;
+    void loadImplantMarketEntries().then(
+      (loaded) => {
+        if (live) setEntries([...loaded.implants, ...loaded.boosters]);
+      },
+      () => undefined // no suggestions; a typed full name still adds
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+  const matches = useMemo(
+    () => rankedSearch(entries, query, { primary: (entry) => entry.name, limit: SUGGESTION_LIMIT }),
+    [entries, query]
+  );
+  const open = matches.length > 0;
+
+  function choose(name: string) {
+    onAdd(name);
+    setQuery('');
+    setHighlight(null);
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (!open) return;
+    if (COMBOBOX_NAV_KEYS.includes(event.key)) {
+      event.preventDefault();
+      setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, matches.length));
+    } else if (event.key === 'Enter' && highlight !== null) {
+      event.preventDefault();
+      choose(matches[highlight]!.name);
+    } else if (event.key === 'Escape') {
+      // Closes the list, not the dialog.
+      event.preventDefault();
+      event.stopPropagation();
+      setQuery('');
+      setHighlight(null);
+    }
+  }
+
   return (
-    <div className="space-y-1">
+    <div className="relative space-y-1">
       <form
         className="flex items-center gap-2"
         onSubmit={(e) => {
@@ -129,11 +195,23 @@ function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: s
           if (query.trim() === '') return;
           onAdd(query.trim());
           setQuery('');
+          setHighlight(null);
         }}
       >
         <SearchInput
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={highlight === null ? undefined : `${listId}-${highlight}`}
+          autoComplete="off"
+          spellCheck={false}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setHighlight(null);
+          }}
+          onKeyDown={onKeyDown}
           placeholder={t('fittings.implants.addPlaceholder')}
           aria-label={t('fittings.implants.addLabel')}
         />
@@ -142,6 +220,34 @@ function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: s
         </Button>
       </form>
       {error && <p className="text-xs text-danger">{error}</p>}
+      <ul
+        id={listId}
+        role="listbox"
+        aria-label={t('fittings.implants.addLabel')}
+        hidden={!open}
+        className="absolute z-20 w-full overflow-hidden rounded-xs border border-line-bright bg-panel shadow-lg"
+      >
+        {matches.map((entry, index) => (
+          <li
+            key={entry.typeId}
+            id={`${listId}-${index}`}
+            role="option"
+            aria-selected={index === highlight}
+            className={cx(
+              tappableRowClassName,
+              'flex cursor-pointer items-center gap-2 border-l-2 px-3 text-sm',
+              index === highlight
+                ? 'border-accent bg-panel-2 font-semibold'
+                : 'border-transparent hover:bg-panel-2'
+            )}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => choose(entry.name)}
+          >
+            <TypeIcon typeId={entry.typeId} size={32} width={20} height={20} />
+            <span className="truncate">{entry.name}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
