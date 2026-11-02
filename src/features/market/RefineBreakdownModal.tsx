@@ -242,44 +242,6 @@ export function RefineBreakdownModal({
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <SetupBox
-            label={t('market.appraisal.refineYield')}
-            tooltip={t('market.appraisal.refineYieldHelp')}
-          >
-            {editSetup ? (
-              <InlinePercent
-                fraction={setup.yieldRate}
-                name={t('market.appraisal.refineYield')}
-                min={1}
-                max={100}
-                onCommit={editSetup.onYield}
-              />
-            ) : (
-              pct(setup.yieldRate)
-            )}
-          </SetupBox>
-          <SetupBox
-            label={t('market.appraisal.refineTax')}
-            tooltip={t('market.appraisal.refineTaxHelp')}
-          >
-            {editSetup ? (
-              <InlinePercent
-                fraction={setup.taxRate}
-                name={t('market.appraisal.refineTax')}
-                min={0}
-                max={100}
-                onCommit={editSetup.onTax}
-              />
-            ) : (
-              pct(setup.taxRate)
-            )}
-          </SetupBox>
-          <SetupBox
-            label={t('market.appraisal.breakdown.skills')}
-            tooltip={t('market.appraisal.breakdown.skillsHelp')}
-          >
-            {skillsText(breakdown.efficiencyMin, breakdown.efficiencyMax, setup.yieldRate)}
-          </SetupBox>
-          <SetupBox
             label={t('market.appraisal.breakdown.efficiency')}
             tooltip={t('market.appraisal.breakdown.efficiencyHelp')}
             accent
@@ -297,6 +259,44 @@ export function RefineBreakdownModal({
               />
             ) : (
               efficiencyText(breakdown.efficiencyMin, breakdown.efficiencyMax)
+            )}
+          </SetupBox>
+          <SetupBox
+            label={t('market.appraisal.refineYield')}
+            tooltip={t('market.appraisal.refineYieldHelp')}
+          >
+            {editSetup ? (
+              <InlinePercent
+                fraction={setup.yieldRate}
+                name={t('market.appraisal.refineYield')}
+                min={1}
+                max={100}
+                onCommit={editSetup.onYield}
+              />
+            ) : (
+              pct(setup.yieldRate)
+            )}
+          </SetupBox>
+          <SetupBox
+            label={t('market.appraisal.breakdown.skills')}
+            tooltip={t('market.appraisal.breakdown.skillsHelp')}
+          >
+            {skillsText(breakdown.efficiencyMin, breakdown.efficiencyMax, setup.yieldRate)}
+          </SetupBox>
+          <SetupBox
+            label={t('market.appraisal.refineTax')}
+            tooltip={t('market.appraisal.refineTaxHelp')}
+          >
+            {editSetup ? (
+              <InlinePercent
+                fraction={setup.taxRate}
+                name={t('market.appraisal.refineTax')}
+                min={0}
+                max={100}
+                onCommit={editSetup.onTax}
+              />
+            ) : (
+              pct(setup.taxRate)
             )}
           </SetupBox>
         </div>
