@@ -61,17 +61,8 @@ export function usePlanSchedule({
       markers: plan.markers,
       markerAttributes: plan.markerAttributes,
       whatIfImplants: plan.whatIfImplants,
-      booster: plan.booster,
-      boosters: plan.boosters,
     }),
-    [
-      plan.entries,
-      plan.markers,
-      plan.markerAttributes,
-      plan.whatIfImplants,
-      plan.booster,
-      plan.boosters,
-    ]
+    [plan.entries, plan.markers, plan.markerAttributes, plan.whatIfImplants]
   );
   const scheduleInputs = useMemo<PlanScheduleInputs>(
     () => ({

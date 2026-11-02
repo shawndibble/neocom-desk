@@ -12,7 +12,7 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { WhatIfImplantPreset } from '@/db';
 import { ATTRIBUTE_NAMES } from '@/engine/optimizer';
 import type { Implants } from '@/engine/types';
-import { BoosterList } from '../BoosterList';
+import { AcceleratorSection } from '../AcceleratorSection';
 import { MarketGroupLink } from '../MarketGroupLink';
 import { ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID } from '../plannerMarketGroups';
 import { attributeShort } from '../remapInstruction';
@@ -26,7 +26,7 @@ import {
 } from '../whatIfImplants';
 import type { usePlanAssumptions } from './usePlanAssumptions';
 
-/** The Assumptions section's controls: Alpha Clone, What-If Implants (preset or per-slot) and Boosters. */
+/** The Assumptions section's controls: Alpha Clone, What-If Implants (preset or per-slot) and the Accelerator. */
 export function AssumptionControls({
   assumptions,
   alphaCappedCount,
@@ -46,8 +46,8 @@ export function AssumptionControls({
     jumpClones,
     matchedCloneId,
     effectiveImplants,
-    planBoosters,
-    setPlanBoosters,
+    characterId,
+    runningAccelerator,
     detectedAccelerator,
   } = assumptions;
   return (
@@ -166,10 +166,10 @@ export function AssumptionControls({
         </p>
       )}
 
-      <BoosterList
-        boosters={planBoosters}
-        detectedAccelerator={detectedAccelerator}
-        onChange={setPlanBoosters}
+      <AcceleratorSection
+        characterId={characterId}
+        running={runningAccelerator}
+        detectedBonus={detectedAccelerator}
       />
     </div>
   );

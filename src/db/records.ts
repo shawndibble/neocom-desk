@@ -86,14 +86,10 @@ export type WhatIfImplantSelection =
   | { readonly kind: 'custom'; readonly bonuses: Implants };
 
 /**
- * A Skill Plan's Booster (GLOSSARY.md): one cerebral accelerator the plan is
- * costed under, one of a `boosters` list run one after another (EVE has a
- * single booster slot, so two can never be live at once). `startsAt` and
- * `expiresAt` are **instants** (epoch ms), not the `datetime-local` strings
- * the inputs edit — the plan syncs across devices, and a bare wall-clock
- * string would mean a different moment in each timezone. `startsAt: null`
- * means "already running"; `expiresAt: null` means no expiry has been
- * entered yet, in which case this row applies nothing however `enabled` reads.
+ * LEGACY: a Skill Plan's Booster, written by builds before the Accelerator
+ * became one-per-Character (GLOSSARY.md **Accelerator**). Kept on the plan, and
+ * synced, so dev and prod can share the Firebase project; nothing reads it for
+ * costing any more. `startsAt` and `expiresAt` are instants (epoch ms).
  */
 export interface PlanBooster {
   enabled: boolean;
@@ -140,24 +136,9 @@ export interface SkillPlanRecord {
    * Dexie schema version bump is needed.
    */
   whatIfImplants?: WhatIfImplantSelection;
-  /**
-   * Legacy single Booster the plan is costed under. Superseded by `boosters`
-   * (#1407) but still written — as the list's first entry — for one release,
-   * so a device on an older build reading this plan next still sees an
-   * answer instead of losing it on its own next write. Optional, and its
-   * absence carries meaning beyond "off": a plan that has never had one
-   * configured is the only one the editor may prefill from a detected
-   * in-game accelerator.
-   */
+  /** LEGACY, no longer read: see `PlanBooster`. Older builds wrote the first accelerator here. */
   booster?: PlanBooster;
-  /**
-   * Ordered list of Boosters the plan is costed under, one after another —
-   * EVE has a single booster slot, so at most one is ever live. Optional and
-   * additive like `booster` was: absent means the plan has never answered
-   * (see `booster`'s own doc for what that unlocks). `[]` is itself an
-   * answer — "no accelerators" — and is written and read distinctly from
-   * "never configured".
-   */
+  /** LEGACY, no longer read: see `PlanBooster`. Older builds wrote the plan's accelerator list here. */
   boosters?: PlanBooster[];
   /**
    * Named goals pinned to a plan entry's skill level ("Fly Loki") — GLOSSARY.md

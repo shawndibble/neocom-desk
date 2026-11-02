@@ -12,7 +12,7 @@ import {
 } from '@/features/skills/cloneState';
 import { isAcceleratorLive } from '@/engine/accelerator';
 import { acceleratorId } from '@/features/accelerator/characterAccelerators';
-import { composePlanBoosters, toBoosters } from './planBooster';
+import { acceleratorBoosters } from './planBooster';
 
 /**
  * One Character's timing inputs for "Who's closest", read from ESI's cache
@@ -44,20 +44,12 @@ export async function loadClosestInputs(
     const baseline = toAttributeBaseline(attrs.data, implants);
     const attributes = baseline && baselineAttributes(baseline);
     if (!attributes) return { kind: 'unavailable', reason: 'attributes-unavailable' };
-    const accelerator = baseline.kind === 'accelerated' ? baseline.acceleratorBonus : null;
     return {
       kind: 'ready',
       trained: corrected.trained,
       attributes,
       implants,
-      boosters: toBoosters(
-        composePlanBoosters(
-          undefined,
-          undefined,
-          isAcceleratorLive(typed, nowMs) ? typed : null,
-          accelerator
-        )
-      ),
+      boosters: acceleratorBoosters(isAcceleratorLive(typed, nowMs) ? typed : null),
       cloneState: cloneStateFor(parseCloneStates(cloneRecord?.value), characterId),
     };
   } catch {

@@ -1,12 +1,11 @@
 /**
  * The editable fields of one cerebral accelerator (GLOSSARY.md **Accelerator**):
  * its bonus and when it runs out, entered as time left (EVE's own tooltip) or as
- * the date and time it ends. Shared by the Skill Plan's Booster rows and the
+ * the date and time it ends. Shared by the Skill Plan's Accelerator section and the
  * Characters table's popover, so the two can never drift apart.
  *
  * Stateless about where the value lives: the caller owns it and `onExpiresChange`
- * reports whether the edit applied (a plan row rejects one that would overlap
- * its neighbour). The expiry is always an instant; the two modes only differ in
+ * reports whether the edit applied. The expiry is always an instant; the two modes only differ in
  * how it is typed.
  *
  * Duration boxes follow the blur-commit rule: a set that adds up to something
@@ -30,7 +29,6 @@ import { inputValueToInstant, instantToInputValue } from '@/lib/zonedInput';
 import {
   BOOSTER_QUICK_PICKS,
   MAX_BOOSTER_BONUS,
-  boosterDurationBase,
   boosterExpiryFromNow,
   clampBoosterBonus,
   joinBoosterDuration,
@@ -44,7 +42,6 @@ type EntryMode = 'remaining' | 'expires';
 
 function useDurationFields(
   expiresAt: number | null,
-  startsAt: number | null,
   onCommit: (expiresAt: number | null) => boolean
 ) {
   // `syncedTo` is the committed expiry the draft was typed against: a draft
@@ -56,7 +53,7 @@ function useDurationFields(
   if (draft !== null && draft.syncedTo === expiresAt) {
     text = draft.text;
   } else if (expiresAt !== null) {
-    const d = splitBoosterDuration(expiresAt, startsAt, now);
+    const d = splitBoosterDuration(expiresAt, now);
     text = { days: String(d.days), hours: String(d.hours), minutes: String(d.minutes) };
   }
 
@@ -72,7 +69,7 @@ function useDurationFields(
       setDraft({ syncedTo: expiresAt, text: next });
       return;
     }
-    const nextExpiry = boosterDurationBase(startsAt, Date.now()) + duration;
+    const nextExpiry = Date.now() + duration;
     setDraft({ syncedTo: onCommit(nextExpiry) ? nextExpiry : expiresAt, text: next });
   };
 
@@ -91,8 +88,8 @@ function useDurationFields(
 export interface AcceleratorFieldsProps {
   bonus: number;
   expiresAt: number | null;
-  /** When the accelerator before it ends, for a queued Booster; null runs from now. */
-  startsAt: number | null;
+  /** The bonus is known (detected from the attribute sheet): shown, not editable. */
+  bonusLocked?: boolean;
   onBonusChange: (bonus: number) => void;
   /** Returns whether the new expiry applied. */
   onExpiresChange: (expiresAt: number | null) => boolean;
@@ -103,7 +100,7 @@ export interface AcceleratorFieldsProps {
 export function AcceleratorFields({
   bonus,
   expiresAt,
-  startsAt,
+  bonusLocked = false,
   onBonusChange,
   onExpiresChange,
   invalidProps,
@@ -112,22 +109,26 @@ export function AcceleratorFields({
   const timeZone = useTimeZone();
   const modeId = useId();
   const [mode, setMode] = useState<EntryMode>('remaining');
-  const expiresIn = useDurationFields(expiresAt, startsAt, onExpiresChange);
+  const expiresIn = useDurationFields(expiresAt, onExpiresChange);
 
   return (
     <div className="space-y-2">
       <label className="flex items-center justify-between gap-2">
         {t('plans.boosterBonus')}
-        <TextInput
-          size="md"
-          type="number"
-          min={1}
-          max={MAX_BOOSTER_BONUS}
-          value={bonus}
-          onChange={(e) => onBonusChange(clampBoosterBonus(Number(e.target.value)))}
-          {...invalidProps}
-          className="field-no-spinner w-16 text-center"
-        />
+        {bonusLocked ? (
+          <span className="font-semibold">+{bonus}</span>
+        ) : (
+          <TextInput
+            size="md"
+            type="number"
+            min={1}
+            max={MAX_BOOSTER_BONUS}
+            value={bonus}
+            onChange={(e) => onBonusChange(clampBoosterBonus(Number(e.target.value)))}
+            {...invalidProps}
+            className="field-no-spinner w-16 text-center"
+          />
+        )}
       </label>
       <SegmentedControl<EntryMode>
         label={t('accelerator.entryMode')}
@@ -184,7 +185,7 @@ export function AcceleratorFields({
           <button
             key={hours}
             type="button"
-            onClick={() => onExpiresChange(boosterExpiryFromNow(hours, startsAt, Date.now()))}
+            onClick={() => onExpiresChange(boosterExpiryFromNow(hours, Date.now()))}
             className={cx(
               tappableRowClassName,
               'rounded-xs border px-1.5 text-[0.6875rem]',
