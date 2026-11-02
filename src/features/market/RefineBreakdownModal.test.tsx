@@ -75,7 +75,7 @@ afterEach(cleanup);
 describe('RefineBreakdownModal', () => {
   it('compares refining with selling as is on every price basis, with the selected one marked', () => {
     open();
-    const table = screen.getByRole('table', { name: 'Refine or sell as is, on each price basis' });
+    const table = screen.getByRole('table', { name: 'Refine or sell as is' });
     for (const name of ['Buy orders', 'Split', 'Sell orders']) {
       expect(within(table).getByText(name)).toBeInTheDocument();
     }
@@ -87,7 +87,7 @@ describe('RefineBreakdownModal', () => {
     );
   });
 
-  it('says once what to do on the selected basis, and what the others say where they differ', () => {
+  it('says once what to do on the selected basis, without naming the other bases', () => {
     // The ore sells for 5,000: listing it as is beats refining on the sell side, though refining wins on buy.
     const lopsided = buildAppraisal(
       [ore(1, 'Zeolites', 1000, 0.9, { sell: 5000 }), ore(2, 'Coesite', 500, 0.9, { sell: 5000 })],
@@ -96,7 +96,7 @@ describe('RefineBreakdownModal', () => {
     open({ appraisal: lopsided });
     const action = screen.getByText('Suggested action:').parentElement as HTMLElement;
     expect(within(action).getByText('Refine')).toBeInTheDocument();
-    expect(within(action).getByText(/sell as is on split and sell orders/)).toBeInTheDocument();
+    expect(within(action).queryByText(/sell as is on/)).not.toBeInTheDocument();
   });
 
   it('adds no note when every basis agrees', () => {

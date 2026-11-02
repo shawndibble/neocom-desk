@@ -136,6 +136,7 @@ export function DataTable<T>({
   fullWidthRow,
   virtualize = false,
   hugColumns = false,
+  stickyHeader: stickyHeaderWanted = true,
   exportRef,
   exportable,
 }: DataTableProps<T>) {
@@ -171,7 +172,10 @@ export function DataTable<T>({
   const dense = responsive === 'stack' && stackLayout === 'dense';
   // A table that stays a table on a phone keeps its header in view; a
   // stacked one has no header row (each card labels its own cells).
-  const stickyHeader = useStickyTableHeader(tableRef, responsive === 'table' && isPhone);
+  const stickyHeader = useStickyTableHeader(
+    tableRef,
+    stickyHeaderWanted && responsive === 'table' && isPhone
+  );
 
   const headerPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-2';
   const cellPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-1.5';
