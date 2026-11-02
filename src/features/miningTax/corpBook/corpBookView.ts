@@ -19,7 +19,7 @@ import {
 import type { MadePayment } from '../paymentLinks';
 import type { MoonMiningTaxRow } from '../snapshot';
 import type { ClaimablePayment, LoadedCorpBook } from './corpBookStore';
-import { corpPayee, personalEntriesOf } from './corpRows';
+import { corpPayee, isCorpEntityPayee, personalEntriesOf } from './corpRows';
 
 export interface CorpBookViewBook {
   loaded: LoadedCorpBook;
@@ -92,7 +92,7 @@ export function buildCorpBookView(
       hubId: book.hubId,
       oreForm: book.oreForm,
       ownPayeeIds: input.payees
-        .filter((p) => p.entityKind === 'corporation' && p.entityId === book.corporationId)
+        .filter((p) => isCorpEntityPayee(p, book.corporationId))
         .map((p) => p.id),
       pricesOn: (date) => ({
         prices: new Map(pricesAtHubOnDate(dated, book.hubId, date)),

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { MiningTaxAssignmentRecord } from '@/db';
+import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { BookRowView, PersonalOverlay } from '@/engine/corpTaxBook/personal';
 import { flatten } from '../groupRows';
 import type { MoonMiningTaxRow } from '../snapshot';
 import {
   buildDisplayRows,
   corpPayee,
+  corpPayeeAliases,
   corpPayeeId,
   corporationOfPayee,
   isBookRow,
@@ -168,6 +169,38 @@ describe('buildDisplayRows', () => {
     expect(row.assignment?.label).toBe('Ikao - Moon Drill');
     const [unnamed] = buildDisplayRows([], overlay({ rows: [view()] }), nameOf);
     expect(unnamed.assignment?.label).toBeUndefined();
+  });
+});
+
+describe('corpPayeeAliases', () => {
+  const stored = (id: string, over: Partial<PayeeRecord> = {}): PayeeRecord => ({
+    id,
+    characterId: ME,
+    name: 'Brass Meridian Logistics',
+    defaultTaxPct: 10,
+    updatedAt: 1,
+    ...over,
+  });
+  const virtual = corpPayee(98000001, ME, 'Brass Meridian Logistics', 15, 'jita');
+
+  it('points the book Payee at the stored Payee verified as the same corporation', () => {
+    const aliases = corpPayeeAliases(
+      [stored('mine', { entityId: 98000001, entityKind: 'corporation' })],
+      [virtual]
+    );
+    expect(aliases).toEqual(new Map([[virtual.id, 'mine']]));
+  });
+
+  it('leaves it alone for a same-named label, a character or another corporation', () => {
+    const aliases = corpPayeeAliases(
+      [
+        stored('label'),
+        stored('char', { entityId: 98000001, entityKind: 'character' }),
+        stored('other', { entityId: 98000002, entityKind: 'corporation' }),
+      ],
+      [virtual]
+    );
+    expect(aliases.size).toBe(0);
   });
 });
 
