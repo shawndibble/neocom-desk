@@ -34,7 +34,8 @@ export async function findOwnCeoCorps(
   const byId = new Map(characters.map((c) => [c.characterId, c.name]));
   const found = await Promise.all(
     [...corpIds].map(async (corporationId): Promise<AddCorpsCandidate | null> => {
-      const info = await loadCorporationLive(corporationId);
+      // One corporation ESI cannot answer for is left out, not a reason to blank the list.
+      const info = await loadCorporationLive(corporationId).catch(() => null);
       if (!info || !byId.has(info.ceo_id)) return null;
       // The CEO must be in the corporation by the same fresh read, or the pairing is stale.
       if (corpOf.get(info.ceo_id) !== corporationId) return null;
@@ -55,9 +56,12 @@ export async function findOwnCeoCorps(
  * Whether `candidate` still holds: its CEO Character is in the corporation and the
  * corporation still names that Character CEO. Read live just before a login is sent to
  * EVE, so a corporation that changed since the list was built is never signed in for.
- * False when ESI cannot answer.
+ * `unreachable` when ESI cannot answer (not a verdict on the pairing). "Live" is ESI's own
+ * cache window, a few minutes to an hour, not real time.
  */
-export async function verifyOwnCeoCorp(candidate: AddCorpsCandidate): Promise<boolean> {
+export type PairingCheck = 'ok' | 'stale' | 'unreachable';
+
+export async function verifyOwnCeoCorp(candidate: AddCorpsCandidate): Promise<PairingCheck> {
   try {
     const [rows, info] = await Promise.all([
       postCharactersAffiliation([candidate.ceoCharacterId]),
@@ -66,9 +70,13 @@ export async function verifyOwnCeoCorp(candidate: AddCorpsCandidate): Promise<bo
     const corporationId = rows.find(
       (r) => r.character_id === candidate.ceoCharacterId
     )?.corporation_id;
-    return corporationId === candidate.corporationId && info?.ceo_id === candidate.ceoCharacterId;
-  } catch {
-    return false;
+    return corporationId === candidate.corporationId && info?.ceo_id === candidate.ceoCharacterId
+      ? 'ok'
+      : 'stale';
+  } catch (e) {
+    // ESI could not answer: not the same as a pairing that changed, so never recorded as one.
+    reportFailure('esi', e);
+    return 'unreachable';
   }
 }
 
@@ -78,7 +86,7 @@ export interface OwnCeoCorps {
   error: boolean;
 }
 
-export function useOwnCeoCorps(excludeCorporationId?: number): OwnCeoCorps {
+export function useOwnCeoCorps(excludeCorporationId?: number, enabled = true): OwnCeoCorps {
   const characters = useCharacters();
   const lookup = useMemo(
     () =>
@@ -96,7 +104,7 @@ export function useOwnCeoCorps(excludeCorporationId?: number): OwnCeoCorps {
   }>();
 
   useEffect(() => {
-    if (characters.length === 0) return;
+    if (!enabled || characters.length === 0) return;
     let cancelled = false;
     findOwnCeoCorps(characters, excludeCorporationId)
       .then((corps) => !cancelled && setDone({ lookup, corps, error: false }))
@@ -109,9 +117,9 @@ export function useOwnCeoCorps(excludeCorporationId?: number): OwnCeoCorps {
     };
     // `lookup` stands for `characters`: a live query hands a new array on every write.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lookup]);
+  }, [lookup, enabled]);
 
-  if (characters.length === 0) return { corps: [], loading: false, error: false };
+  if (!enabled || characters.length === 0) return { corps: [], loading: false, error: false };
   if (done?.lookup !== lookup) return { corps: done?.corps ?? [], loading: true, error: false };
   return { corps: done.corps, loading: false, error: done.error };
 }

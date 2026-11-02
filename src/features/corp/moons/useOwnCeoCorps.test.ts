@@ -47,6 +47,13 @@ describe('findOwnCeoCorps', () => {
     expect(found.map((c) => c.corporationId)).toEqual([100]);
   });
 
+  it('keeps the others when one corporation cannot be read', async () => {
+    const { getCorporationPublicInfo } = await import('@/esi/endpoints');
+    vi.mocked(getCorporationPublicInfo).mockRejectedValueOnce(new Error('503'));
+    const found = await findOwnCeoCorps(ME, undefined);
+    expect(found).toHaveLength(1);
+  });
+
   it('leaves the book corporation out', async () => {
     const found = await findOwnCeoCorps(ME, 100);
     expect(found.map((c) => c.corporationId)).toEqual([200]);
@@ -62,19 +69,20 @@ describe('verifyOwnCeoCorp', () => {
   };
 
   it('is true while the CEO is still in the corporation', async () => {
-    expect(await verifyOwnCeoCorp(candidate)).toBe(true);
+    expect(await verifyOwnCeoCorp(candidate)).toBe('ok');
   });
 
   it('is false once the CEO has moved or the corporation has a new CEO', async () => {
     affiliations.rows[0] = { character_id: 1, corporation_id: 555 };
-    expect(await verifyOwnCeoCorp(candidate)).toBe(false);
+    expect(await verifyOwnCeoCorp(candidate)).toBe('stale');
     affiliations.rows[0] = { character_id: 1, corporation_id: 100 };
     corps.byId.set(100, { name: 'Ironvale Reach', ceo_id: 77 });
-    expect(await verifyOwnCeoCorp(candidate)).toBe(false);
+    expect(await verifyOwnCeoCorp(candidate)).toBe('stale');
   });
 
-  it('is false when ESI cannot be asked, never a guess', async () => {
-    affiliations.rows = [];
-    expect(await verifyOwnCeoCorp(candidate)).toBe(false);
+  it('says unreachable, not stale, when ESI cannot be asked', async () => {
+    const { postCharactersAffiliation } = await import('@/esi/endpoints');
+    vi.mocked(postCharactersAffiliation).mockRejectedValueOnce(new Error('offline'));
+    expect(await verifyOwnCeoCorp(candidate)).toBe('unreachable');
   });
 });

@@ -75,7 +75,7 @@ export interface AddMyCorps {
 
 export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
   const { characterId, corporationId, canEdit, reload, names } = useBook();
-  const own = useOwnCeoCorps(corporationId);
+  const own = useOwnCeoCorps(corporationId, canEdit);
   const hidden = useMoonsHiddenCorps();
   const { run, start, recordOutcome, stop, retry } = useAddCorpsRun();
   const location = useLocation();
@@ -226,8 +226,11 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
             const cur = current(run)!;
             // Read live right before leaving for EVE: a corporation or CEO that changed since
             // the list was built is recorded as not connected, with no login wasted on it.
-            if (!(await verifyOwnCeoCorp(cur))) {
-              await recordOutcome({ kind: 'refused', reason: 'wrong-corp' });
+            const check = await verifyOwnCeoCorp(cur);
+            if (check === 'unreachable') throw new Error('Could not check the corporation');
+            if (check === 'stale') {
+              await recordOutcome({ kind: 'refused', reason: 'ceo-changed' });
+              setShowOutcome(true);
               return;
             }
             return beginOwnCorpGrantLogin({
