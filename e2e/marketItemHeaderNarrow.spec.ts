@@ -45,7 +45,7 @@ test('long item name keeps header actions inside the panel at 390px', async ({ p
 
   const heading = page.getByRole('heading', { level: 2, name: LONG_NAME });
   const panel = page.locator('section').filter({ has: heading });
-  const info = panel.getByRole('button', { name: 'Show info' });
+  const info = panel.getByRole('button', { name: 'More actions' });
   const bell = panel.locator('header').getByRole('button').nth(1);
   const back = panel.locator('header').getByRole('button').first();
 

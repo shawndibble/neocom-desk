@@ -40,11 +40,11 @@ describe('Quickbar unavailable with no active character (issue #7)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
 
-    expect(await screen.findByRole('button', { name: 'Add Rifter to Quickbar' })).toHaveAttribute(
+    expect(await screen.findByRole('button', { name: 'Add to Quickbar' })).toHaveAttribute(
       'aria-disabled',
       'true'
     );
-    const bell = await screen.findByRole('button', { name: 'Set price alert for Rifter' });
+    const bell = await screen.findByRole('button', { name: 'Set price alert' });
     // `aria-disabled`, not the native attribute: a natively disabled button
     // takes no tap, which would leave the reason unreachable on touch (#2162).
     expect(bell).toHaveAttribute('aria-disabled', 'true');
@@ -95,7 +95,7 @@ describe('Quickbar (issue #7)', () => {
     const quickbar = await screen.findByTestId('quickbar');
     await waitFor(() => expect(within(quickbar).getAllByText('Rifter')).toHaveLength(1));
 
-    await user.click(await screen.findByRole('button', { name: 'Set price alert for Rifter' }));
+    await user.click(await screen.findByRole('button', { name: 'Set price alert' }));
     await user.click(await screen.findByRole('button', { name: 'Save' }));
     await waitFor(() => expect(within(quickbar).getAllByText('Rifter')).toHaveLength(1));
   });
@@ -106,11 +106,11 @@ describe('Quickbar (issue #7)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
 
-    await user.click(await screen.findByRole('button', { name: 'Add Rifter to Quickbar' }));
+    await user.click(await screen.findByRole('button', { name: 'Add to Quickbar' }));
     const quickbar = await screen.findByTestId('quickbar');
     expect(await within(quickbar).findByText('Rifter')).toBeInTheDocument();
 
-    const toggle = await screen.findAllByRole('button', { name: 'Remove Rifter from Quickbar' });
+    const toggle = await screen.findAllByRole('button', { name: 'Remove from Quickbar' });
     const header = toggle.find((b) => b.getAttribute('aria-pressed') === 'true')!;
     await user.click(header);
     expect(await screen.findByText(/No items yet/)).toBeInTheDocument();

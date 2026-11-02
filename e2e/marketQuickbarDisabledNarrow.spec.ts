@@ -64,7 +64,7 @@ test.describe('Quickbar actions with no active character', () => {
     await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritanium');
     await page.getByRole('button', { name: 'Tritanium', exact: true }).click();
 
-    const bell = page.getByRole('button', { name: 'Set price alert for Tritanium' });
+    const bell = page.getByRole('button', { name: 'Set price alert' });
     await expect(bell).toHaveAttribute('aria-disabled', 'true');
     await expect(page.getByRole('tooltip')).toHaveCount(0);
 

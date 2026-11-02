@@ -113,7 +113,7 @@ for (const size of [{ width: 1024, height: 768 }, DESKTOP, { width: 1440, height
     );
     await searchTritanium(page);
     await page.getByRole('button', { name: 'Tritanium', exact: true }).click();
-    await page.getByRole('button', { name: 'Add Tritanium to Quickbar' }).click();
+    await page.getByRole('button', { name: 'Add to Quickbar' }).click();
     await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritaniu');
 
     const quickbar = page.getByTestId('quickbar');
