@@ -209,12 +209,12 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 46. **A proxy is not a measurement**; name the property, then test it (#1085).
 47. **A rate divided by a guessed duration is a typed-in estimate**; show
     per-day totals (`20261006-085420`).
-48. **A fee ESI reports is fixed at install time**; recomputing it today with
-    today's adjusted prices and cost index gives a gap that is drift, so an
-    "implied facility tax" from a plan-vs-reported job fee is noise (killed).
-49. **The public contract snapshot drops asked-for lines** (only PLEX survives
+48. **The public contract snapshot drops asked-for lines** (only PLEX survives
     as `requestedPlex`); value-vs-asking ranking ranks item-swap bait first
     until #3986's `requestsItems` flag lands.
+49. **A fee ESI reports is fixed at install time**; recomputing it today with
+    today's adjusted prices and cost index gives a gap that is drift, so an
+    "implied facility tax" from a plan-vs-reported job fee is noise (killed).
 
 ## Filed candidates
 
