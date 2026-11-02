@@ -29,12 +29,19 @@ import { bountyKillsOf } from './bountyKills';
 import { dailyGoalMessageIdOf, dailyGoalName } from './dailyGoal';
 import { transactionTotal } from './walletTransactionsCsv';
 
+/** One Moon Mining Tax entry a linked payment settled, as the journal lists it. */
+export interface MiningTaxEntryLink {
+  href: string;
+  date: string;
+  taxOwed: number;
+}
+
 interface JournalDescriptionCellProps {
   entry: WalletJournalEntry;
   transaction: WalletTransactionCommon | undefined;
   itemName: string;
-  /** Where the Moon Mining Tax row this line paid is, when a pilot linked it there. Built by the route, so this feature never imports `miningTax`. */
-  miningTaxHref?: string;
+  /** The Moon Mining Tax entries this line paid, when a pilot linked it there: one link each. Built by the route, so this feature never imports `miningTax`. */
+  miningTaxEntries?: readonly MiningTaxEntryLink[];
   /** The Character whose losses an insurance payout line can be matched against; absent where the line can't be (the corp journal). Opens the loss in a modal. */
   lossCharacterId?: number;
 }
@@ -43,7 +50,7 @@ export function JournalDescriptionCell({
   entry,
   transaction,
   itemName,
-  miningTaxHref,
+  miningTaxEntries,
   lossCharacterId,
 }: JournalDescriptionCellProps) {
   const { t } = useTranslation();
@@ -64,11 +71,18 @@ export function JournalDescriptionCell({
       </HintText>
     );
   }
-  if (!transaction && !entry.reason && contractId === undefined && !miningTaxHref && !canViewLoss) {
+  if (
+    !transaction &&
+    !entry.reason &&
+    contractId === undefined &&
+    !miningTaxEntries?.length &&
+    !canViewLoss
+  ) {
     return <>{entry.description}</>;
   }
-  // The memo ("Moon tax 10-05 Ainsan") is the link when there is one; a line with no memo gets a labelled link instead.
-  const reasonIsTaxLink = Boolean(miningTaxHref && entry.reason && !kills);
+  // One entry and a memo ("Moon tax 10-05 Ainsan"): the memo is the link. Otherwise each entry gets its own labelled link.
+  const soleTaxEntry = miningTaxEntries?.length === 1 ? miningTaxEntries[0] : undefined;
+  const reasonIsTaxLink = Boolean(soleTaxEntry && entry.reason && !kills);
   const fill = transaction
     ? t(transaction.is_buy ? 'wallet.journalItemBought' : 'wallet.journalItemSold', {
         quantity: formatCount(transaction.quantity),
@@ -83,9 +97,9 @@ export function JournalDescriptionCell({
         <BountyFactionSummary kills={kills} />
       ) : (
         entry.reason &&
-        (reasonIsTaxLink && miningTaxHref ? (
+        (reasonIsTaxLink && soleTaxEntry ? (
           <Link
-            to={miningTaxHref}
+            to={soleTaxEntry.href}
             className={`${inlineLinkClassName} w-fit`}
             aria-label={t('wallet.journalMiningTaxReasonLink', { reason: entry.reason })}
           >
@@ -103,11 +117,15 @@ export function JournalDescriptionCell({
           {t('wallet.journalContractLink')}
         </Link>
       )}
-      {miningTaxHref && !reasonIsTaxLink && (
-        <Link to={miningTaxHref} className={inlineLinkClassName}>
-          {t('wallet.journalMiningTaxLink')}
-        </Link>
-      )}
+      {!reasonIsTaxLink &&
+        miningTaxEntries?.map((taxEntry) => (
+          <Link key={taxEntry.href} to={taxEntry.href} className={`${inlineLinkClassName} w-fit`}>
+            {t('wallet.journalMiningTaxEntryLink', {
+              date: taxEntry.date,
+              amount: formatIsk(taxEntry.taxOwed, 0),
+            })}
+          </Link>
+        ))}
       {canViewLoss && (
         <Button
           size="sm"

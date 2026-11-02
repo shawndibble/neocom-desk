@@ -28,6 +28,8 @@ function entry(overrides: Partial<WalletJournalEntry> = {}): WalletJournalEntry 
   };
 }
 
+const ONE_ENTRY = { href: '/mining/tax?tax.entry=a1', date: '2026-09-04', taxOwed: 1_200_000 };
+
 describe('JournalDescriptionCell', () => {
   it('renders only the description when there is nothing extra to show', () => {
     const { container } = render(
@@ -165,14 +167,39 @@ describe('JournalDescriptionCell', () => {
           entry={entry({ ref_type: 'player_donation', description: 'Donation' })}
           transaction={undefined}
           itemName=""
-          miningTaxHref="/mining/tax?tax.payment=journal%3A1"
+          miningTaxEntries={[ONE_ENTRY]}
         />
       </MemoryRouter>
     );
     expect(screen.getByRole('link', { name: /mining tax/i })).toHaveAttribute(
       'href',
-      '/mining/tax?tax.payment=journal%3A1'
+      '/mining/tax?tax.entry=a1'
     );
+  });
+
+  it('lists one link per tax entry a payment settled, each on its own line', () => {
+    render(
+      <MemoryRouter>
+        <JournalDescriptionCell
+          entry={entry({ ref_type: 'player_donation', reason: 'Moon tax' })}
+          transaction={undefined}
+          itemName=""
+          miningTaxEntries={[
+            ONE_ENTRY,
+            { href: '/mining/tax?tax.entry=a2', date: '2026-09-05', taxOwed: 800_000 },
+            { href: '/mining/tax?tax.entry=a3', date: '2026-09-06', taxOwed: 500_000 },
+          ]}
+        />
+      </MemoryRouter>
+    );
+    const links = screen.getAllByRole('link');
+    expect(links.map((l) => l.getAttribute('href'))).toEqual([
+      '/mining/tax?tax.entry=a1',
+      '/mining/tax?tax.entry=a2',
+      '/mining/tax?tax.entry=a3',
+    ]);
+    expect(links[0]).toHaveTextContent('Mining tax 2026-09-04 · 1,200,000 ISK');
+    expect(screen.getByText('Moon tax').closest('a')).toBeNull();
   });
 
   it('makes the memo line the link when a linked line has one', () => {
@@ -182,14 +209,14 @@ describe('JournalDescriptionCell', () => {
           entry={entry({ ref_type: 'player_donation', reason: 'Moon tax 10-05 Ainsan' })}
           transaction={undefined}
           itemName=""
-          miningTaxHref="/mining/tax?tax.payment=journal%3A1"
+          miningTaxEntries={[ONE_ENTRY]}
         />
       </MemoryRouter>
     );
     expect(screen.getAllByRole('link')).toHaveLength(1);
     expect(screen.getByRole('link', { name: /Moon tax 10-05 Ainsan/ })).toHaveAttribute(
       'href',
-      '/mining/tax?tax.payment=journal%3A1'
+      '/mining/tax?tax.entry=a1'
     );
   });
 

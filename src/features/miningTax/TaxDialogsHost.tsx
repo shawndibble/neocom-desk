@@ -15,6 +15,7 @@ import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
 import type { useCorpStateHint } from '@/features/miningTax/corpBook/useCorpStateText';
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
 import { allMembers, type DisplayRow, type GroupMember } from '@/features/miningTax/groupRows';
+import { findRowForEntry } from '@/features/miningTax/paymentDeepLink';
 import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
 import {
   acceptNewTotal,
@@ -36,6 +37,7 @@ import type { LinkedTransaction } from '@/features/miningTax/PaymentLinksCard';
 import {
   assignmentsForLinkTarget,
   coPaidAssignments,
+  coPaidOutsideGroup,
   linkedTransactionsFor,
   unlinkedPayments,
   type MadePayment,
@@ -375,6 +377,23 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     [detailTarget, everyAssignment]
   );
 
+  const groupAlsoCovers = useMemo(
+    () =>
+      detailTarget?.groupMembers
+        ? coPaidOutsideGroup(
+            allMembers(detailTarget).map((m) => m.assignment),
+            everyAssignment
+          )
+        : [],
+    [detailTarget, everyAssignment]
+  );
+
+  // A listed sibling opens in place of the entry showing: the row holding it, found in every row, not the filtered ones.
+  function openCoveredEntry(id: string) {
+    const target = findRowForEntry(allDisplayRows, id);
+    if (target) actions.openDetail(target);
+  }
+
   const groupLinkedTransactions: LinkedTransaction[] | undefined = useMemo(() => {
     if (!detailTarget?.groupMembers) return undefined;
     return linkedTransactionsFor(
@@ -621,6 +640,8 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
           onUnassignAll={() => unassignGroup(detailTarget)}
           onLinkWalletPayment={() => linkWalletFor(detailTarget)}
           linkedTransactions={groupLinkedTransactions}
+          alsoCovers={groupAlsoCovers}
+          onOpenCovered={openCoveredEntry}
           onLinkTransaction={
             allMembers(detailTarget).every((m) => m.assignment.status === 'paid')
               ? () => actions.openLinkTransaction(detailTarget)
@@ -759,6 +780,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             }
             linkedTransactions={detailLinkedTransactions}
             alsoCovers={detailAlsoCovers}
+            onOpenCovered={openCoveredEntry}
             onLinkTransaction={
               detailTarget.status === 'paid'
                 ? () => actions.openLinkTransaction(detailTarget)

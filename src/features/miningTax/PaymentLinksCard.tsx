@@ -42,6 +42,8 @@ interface PaymentLinksCardProps {
   summary?: ReactNode;
   /** Other entries the same payment settled — shown so one entry's detail still says what the total covers. */
   alsoCovers?: readonly CoveredEntry[];
+  /** Opens one of the listed entries; without it they are plain text. */
+  onOpenCovered?: (id: string) => void;
   /** The recorded payment, read as one sentence: "Paid 4,309,281 ISK · 2026-10-04 · auto-linked". */
   paid?: { amount: number; paidOn: string };
 }
@@ -67,6 +69,7 @@ export function PaymentLinksCard({
   busy,
   summary,
   alsoCovers,
+  onOpenCovered,
   paid,
 }: PaymentLinksCardProps) {
   const { t } = useTranslation();
@@ -103,14 +106,23 @@ export function PaymentLinksCard({
         <div className="text-xs text-text-dim">
           <p>{t('miningTax.payment.alsoCovers')}</p>
           <ul className="tabular-nums">
-            {alsoCovers.map((c) => (
-              <li key={c.id}>
-                {t('miningTax.payment.alsoCoversLine', {
-                  date: c.date,
-                  amount: formatIsk(c.taxOwed, 0),
-                })}
-              </li>
-            ))}
+            {alsoCovers.map((c) => {
+              const line = t('miningTax.payment.alsoCoversLine', {
+                date: c.date,
+                amount: formatIsk(c.taxOwed, 0),
+              });
+              return (
+                <li key={c.id}>
+                  {onOpenCovered ? (
+                    <Button size="sm" onClick={() => onOpenCovered(c.id)} disabled={busy}>
+                      {line}
+                    </Button>
+                  ) : (
+                    line
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
