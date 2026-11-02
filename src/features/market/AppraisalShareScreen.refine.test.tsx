@@ -75,7 +75,8 @@ describe('a Shared Appraisal with refine figures', () => {
   it("shows the sharer's Refine total with the efficiency it was worked out at", () => {
     renderShared();
     expect(screen.getByText('buy @ 90%')).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /Refine/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Refine total/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Refine \+ ore/ })).toBeInTheDocument();
   });
 
   it('opens the breakdown on the sharer numbers, and a visitor with no Character is told to log in', async () => {

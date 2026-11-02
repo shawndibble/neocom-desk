@@ -15,6 +15,7 @@ export const APPRAISAL_COLUMN_IDS = [
   'buyTotal',
   'sellTotal',
   'refineTotal',
+  'refineWithLeftover',
   'lpTotal',
   'volume',
   'iskPerM3',

@@ -183,7 +183,7 @@ export interface AppraisalRow {
   sellEach: number | null;
   buyTotal: number | null;
   sellTotal: number | null;
-  /** The minerals' net value at the price percent, on the buy side, leaving the leftover units out. The figure shown is `refineTotalFor`. Undefined when this type carries no reprocessing data at all. */
+  /** The minerals' net value at the price percent, on the buy side, leaving the leftover units out. The figure the page shows is `refineMineralsFor`; the verdict compares `refineWithLeftoverFor`. Undefined when this type carries no reprocessing data at all. */
   refineTotal?: number;
   refinePricedAll?: boolean;
   refineUnitsLeftOver?: number;
@@ -316,7 +316,7 @@ function scale(price: number | null, percent: number): number | null {
 /**
  * Does refining this row beat selling it as is?
  *
- * Both sides are on one Price Basis (`refineTotalFor` and `asIsTotalFor`) and
+ * Both sides are on one Price Basis (`refineWithLeftoverFor` and `asIsTotalFor`) and
  * already scaled by the appraisal's Price Percent. The refine side is what the
  * player actually ends up holding: the whole batches refined, **plus** the
  * units that could not fill a batch, which are still there to sell as is.
@@ -334,7 +334,7 @@ function scale(price: number | null, percent: number): number | null {
  * the leftover unpriced rather than silently free.
  */
 export function refineBeatsSellAsIs(row: AppraisalRow, basis: RefineBasis = 'buy'): boolean {
-  const refine = refineTotalFor(row, basis);
+  const refine = refineWithLeftoverFor(row, basis);
   const asIs = asIsTotalFor(row, basis);
   if (refine === undefined || asIs === null || asIsEachFor(row, basis) === null) return false;
   return refine > asIs;
@@ -355,19 +355,21 @@ export function refineMineralsFor(row: AppraisalRow, basis: RefineBasis): number
 }
 
 /**
- * A row's refine figure on a price basis, the one the Appraisal shows: the
- * minerals (`refineMineralsFor`) **plus** the units too few to fill a portion,
- * which stay yours and sell as is at that basis's unit price. Undefined where
- * the row has no minerals figure on the basis. A leftover with no as-is price
- * counts for nothing rather than for a guess.
+ * What refining a row leaves you holding on a price basis: the minerals
+ * (`refineMineralsFor`) **plus** the units too few to fill a portion, which
+ * stay yours and sell as is at that basis's unit price. This is the figure
+ * the refine-versus-sell verdict compares, and the breakdown's "Refined +
+ * leftover ore"; the Appraisal page itself shows the minerals alone. Undefined
+ * where the row has no minerals figure on the basis. A leftover with no as-is
+ * price counts for nothing rather than for a guess.
  */
-export function refineTotalFor(row: AppraisalRow, basis: RefineBasis): number | undefined {
+export function refineWithLeftoverFor(row: AppraisalRow, basis: RefineBasis): number | undefined {
   const minerals = refineMineralsFor(row, basis);
   if (minerals === undefined) return undefined;
   return minerals + (row.refineUnitsLeftOver ?? 0) * (asIsEachFor(row, basis) ?? 0);
 }
 
-/** `refineTotalFor`'s pricing flag: false where a mineral had no price on that basis, so the figure is a floor. */
+/** `refineWithLeftoverFor`'s pricing flag: false where a mineral had no price on that basis, so the figure is a floor. */
 export function refinePricedAllFor(row: AppraisalRow, basis: RefineBasis): boolean | undefined {
   if (basis === 'buy') return row.refinePricedAll;
   if (basis === 'sell') return row.refineSellPricedAll;
@@ -386,9 +388,9 @@ export function asIsEachFor(row: AppraisalRow, basis: RefineBasis): number | nul
   return priceOnBasis(basis, row.buyEach, row.sellEach);
 }
 
-/** The pile's refine total on a basis (minerals plus leftover, `refineTotalFor`), over the rows that have one. */
-export function refineTotalOfRows(rows: readonly AppraisalRow[], basis: RefineBasis): number {
-  return rows.reduce((sum, row) => sum + (refineTotalFor(row, basis) ?? 0), 0);
+/** The pile's refine figure on a basis, the one the Refine chip shows: the minerals alone (`refineMineralsFor`), over the rows that have one. */
+export function refineMineralsOfRows(rows: readonly AppraisalRow[], basis: RefineBasis): number {
+  return rows.reduce((sum, row) => sum + (refineMineralsFor(row, basis) ?? 0), 0);
 }
 
 /**
@@ -396,7 +398,7 @@ export function refineTotalOfRows(rows: readonly AppraisalRow[], basis: RefineBa
  * as-is total on that basis is the one to mark.
  */
 export function sellAsIsBeatsRefine(row: AppraisalRow, basis: RefineBasis): boolean {
-  return refineTotalFor(row, basis) !== undefined && !refineBeatsSellAsIs(row, basis);
+  return refineWithLeftoverFor(row, basis) !== undefined && !refineBeatsSellAsIs(row, basis);
 }
 
 /**

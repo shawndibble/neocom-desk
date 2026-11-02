@@ -15,7 +15,7 @@ import {
   lpBeatsMarket,
   refineBeatsSellAsIs,
   refineMineralsFor,
-  refineTotalFor,
+  refineWithLeftoverFor,
   type AppraisalItem,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
@@ -894,9 +894,9 @@ describe('refine on each price basis', () => {
     const row = rows[0];
     // The figure shown is the minerals plus the 50 leftover units at the basis's as-is unit price.
     expect(refineMineralsFor(row, 'buy')).toBe(row.refineTotal);
-    expect(refineTotalFor(row, 'buy')).toBeCloseTo(9_000 + 50 * 10, 6);
-    expect(refineTotalFor(row, 'sell')).toBeCloseTo(14_400 + 50 * 14, 6);
-    expect(refineTotalFor(row, 'split')).toBeCloseTo((9_000 + 14_400) / 2 + 50 * 12, 6);
+    expect(refineWithLeftoverFor(row, 'buy')).toBeCloseTo(9_000 + 50 * 10, 6);
+    expect(refineWithLeftoverFor(row, 'sell')).toBeCloseTo(14_400 + 50 * 14, 6);
+    expect(refineWithLeftoverFor(row, 'split')).toBeCloseTo((9_000 + 14_400) / 2 + 50 * 12, 6);
     expect(asIsTotalFor(row, 'buy')).toBe(10_500);
     expect(asIsTotalFor(row, 'sell')).toBe(14_700);
     expect(asIsTotalFor(row, 'split')).toBe(12_600);
@@ -934,10 +934,10 @@ describe('split refine figure', () => {
     });
     const priced = buildAppraisal([item({ 34: 8 })], 100).rows[0];
     // (10,000 + 16,000) / 2 of minerals, plus 50 leftover units at the split unit price of 12.
-    expect(refineTotalFor(priced, 'split')).toBeCloseTo(13_000 + 50 * 12, 6);
+    expect(refineWithLeftoverFor(priced, 'split')).toBeCloseTo(13_000 + 50 * 12, 6);
     const oneSided = buildAppraisal([item({})], 100).rows[0];
-    expect(refineTotalFor(oneSided, 'split')).toBeUndefined();
+    expect(refineWithLeftoverFor(oneSided, 'split')).toBeUndefined();
     // The minerals 10,000 plus the 50 leftover units at 10 each.
-    expect(refineTotalFor(oneSided, 'buy')).toBeCloseTo(10_500, 6);
+    expect(refineWithLeftoverFor(oneSided, 'buy')).toBeCloseTo(10_500, 6);
   });
 });

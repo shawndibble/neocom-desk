@@ -172,8 +172,15 @@ export function RefineBreakdownModal({
       render: (row) => (row.breakdown === null ? '—' : formatIsk(row.breakdown.asIs, 0)),
     },
     {
-      id: 'refined',
+      id: 'minerals',
       header: t('market.appraisal.breakdown.columnRefined'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (row) => (row.breakdown === null ? '—' : formatIsk(row.breakdown.net, 0)),
+    },
+    {
+      id: 'refined',
+      header: t('market.appraisal.breakdown.columnRefinedWithLeftover'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
       render: (row) => (row.breakdown === null ? '—' : formatIsk(row.breakdown.total, 0)),
@@ -350,8 +357,17 @@ export function RefineBreakdownModal({
       render: (line) => formatIsk(line.asIs, 0),
     },
     {
-      id: 'refined',
+      id: 'minerals',
       header: t('market.appraisal.breakdown.columnRefinedOn', {
+        basis: basisInline(activeBasis),
+      }),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (line) => formatIsk(line.refined, 0),
+    },
+    {
+      id: 'refined',
+      header: t('market.appraisal.breakdown.columnRefinedWithLeftoverOn', {
         basis: basisInline(activeBasis),
       }),
       align: 'right',
@@ -613,14 +629,12 @@ export function RefineBreakdownModal({
                 rows={mineralRows}
                 rowKey={(row) => row.key}
                 rowClassName={(row) =>
-                  // A heavier rule over the Minerals row says the lines above it add up to it.
+                  // A heavier rule over the bold Minerals row says the lines above it add up to it.
                   row.kind === 'subtotal'
-                    ? 'border-t-2 border-line-bright font-medium'
-                    : row.kind === 'total'
-                      ? 'font-semibold'
-                      : row.kind === 'leftover' || row.kind === 'tax'
-                        ? 'text-text-dim'
-                        : undefined
+                    ? 'border-t-2 border-line-bright font-semibold'
+                    : row.kind === 'leftover' || row.kind === 'tax'
+                      ? 'text-text-dim'
+                      : undefined
                 }
                 label={t('market.appraisal.breakdown.mineralsTitle')}
                 responsive="table"

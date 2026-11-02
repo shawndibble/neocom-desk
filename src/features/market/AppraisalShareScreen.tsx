@@ -16,8 +16,9 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import {
   buildAppraisal,
   refineBeatsSellAsIs,
-  refineTotalFor,
-  refineTotalOfRows,
+  refineMineralsFor,
+  refineMineralsOfRows,
+  refineWithLeftoverFor,
   splitEach,
   type AppraisalItem,
   type AppraisalRow,
@@ -106,7 +107,7 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
   const hasRefine =
     basisReady &&
     setup !== null &&
-    (appraisal?.rows.some((row) => refineTotalFor(row, refineBasis) !== undefined) ?? false);
+    (appraisal?.rows.some((row) => refineMineralsFor(row, refineBasis) !== undefined) ?? false);
   const refineRange = hasRefine && appraisal ? refineEfficiencyRange(appraisal.items) : null;
   const refineEfficiency = refineRange ? efficiencyText(refineRange.min, refineRange.max) : null;
   const shareRows = appraisal ? appraisal.rows : NO_ROWS;
@@ -197,18 +198,32 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
             align: 'right' as const,
             className: 'whitespace-nowrap tabular-nums',
             render: (row: AppraisalRow) =>
-              refineTotalFor(row, refineBasis) === undefined
+              refineMineralsFor(row, refineBasis) === undefined
                 ? '—'
                 : comparisonCell(
                     <RefineFigureButton
                       name={row.name}
                       onOpen={() => setRefineModal({ typeId: row.typeId })}
                     >
-                      {totalCell(refineTotalFor(row, refineBasis) ?? null)}
+                      {totalCell(refineMineralsFor(row, refineBasis) ?? null)}
                     </RefineFigureButton>,
                     refineBeatsSellAsIs(row, refineBasis)
                   ),
-            sortValue: (row: AppraisalRow) => refineTotalFor(row, refineBasis),
+            sortValue: (row: AppraisalRow) => refineMineralsFor(row, refineBasis),
+          },
+          {
+            id: 'refineWithLeftover',
+            header: t('market.appraisal.columnRefineWithLeftover'),
+            align: 'right' as const,
+            className: 'whitespace-nowrap tabular-nums',
+            render: (row: AppraisalRow) =>
+              refineWithLeftoverFor(row, refineBasis) === undefined
+                ? '—'
+                : comparisonCell(
+                    totalCell(refineWithLeftoverFor(row, refineBasis) ?? null),
+                    refineBeatsSellAsIs(row, refineBasis)
+                  ),
+            sortValue: (row: AppraisalRow) => refineWithLeftoverFor(row, refineBasis),
           },
         ]
       : []),
@@ -248,7 +263,7 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
                     <RefineChipValue
                       amount={
                         <IskAmount
-                          value={refineTotalOfRows(appraisal.rows, refineBasis)}
+                          value={refineMineralsOfRows(appraisal.rows, refineBasis)}
                           decimals={0}
                         />
                       }
