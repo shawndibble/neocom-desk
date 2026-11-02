@@ -212,11 +212,22 @@ const MENU_FOLD_MIN = 3;
 /**
  * Marks `children` as one of a menu's groups. Groups with the same `id`, from
  * any number of `MenuGroup`s (a page's `extraItems` joining the shared menu's),
- * merge into one. Only a top-level child of the `items` counts, and a folded
- * group's items are counted as written: give it real items, not wrappers that
- * may render nothing.
+ * merge into one. Only a top-level child of the `items` counts. A folded
+ * group folds on its `size`, which defaults to its element count: pass `size`
+ * where a child renders more or fewer items than one.
  */
-export function MenuGroup({ children }: { id: MenuGroupId; children?: ReactNode }): ReactNode {
+export function MenuGroup({
+  children,
+}: {
+  id: MenuGroupId;
+  children?: ReactNode;
+  /**
+   * How many items `children` render, when that is not the number of
+   * elements (a wrapper that renders two items, or none for an Abyssal
+   * type). Decides folding; summed across same-`id` groups.
+   */
+  size?: number;
+}): ReactNode {
   return children;
 }
 
@@ -247,25 +258,32 @@ export function ArrangedMenuItems({ items }: { items: ReactNode }) {
   const nodes = flattenMenuNodes(items);
   const isGroup = (
     node: ReactNode
-  ): node is ReactElement<{ id: MenuGroupId; children?: ReactNode }> =>
+  ): node is ReactElement<{ id: MenuGroupId; children?: ReactNode; size?: number }> =>
     isValidElement(node) && node.type === MenuGroup;
   if (!nodes.some(isGroup)) return <>{items}</>;
-  const buckets = new Map<MenuGroupId, ReactNode[]>();
-  const add = (id: MenuGroupId, content: ReactNode[]) =>
-    buckets.set(id, [...(buckets.get(id) ?? []), ...content]);
+  const buckets = new Map<MenuGroupId, { content: ReactNode[]; size: number }>();
+  const add = (id: MenuGroupId, content: ReactNode[], size = content.length) => {
+    const bucket = buckets.get(id) ?? { content: [], size: 0 };
+    buckets.set(id, { content: [...bucket.content, ...content], size: bucket.size + size });
+  };
   for (const node of nodes) {
-    if (isGroup(node)) add(node.props.id, flattenMenuNodes(node.props.children));
-    else add('other', [node]);
+    if (isGroup(node)) {
+      add(node.props.id, flattenMenuNodes(node.props.children), node.props.size);
+    } else if (!(isValidElement(node) && node.type === MenuSeparator)) {
+      // A hand-placed separator is dropped: the groups own the hairlines.
+      add('other', [node]);
+    }
   }
   return (
     <>
       {MENU_GROUP_ORDER.map((id) => {
-        const content = buckets.get(id);
-        if (!content?.length) return null;
+        const bucket = buckets.get(id);
+        if (!bucket?.content.length) return null;
+        const { content, size } = bucket;
         const foldKey = FOLDED_GROUPS[id];
         return (
           <div key={id} role="group" className={GROUP_CLASS}>
-            {foldKey !== undefined && content.length >= MENU_FOLD_MIN ? (
+            {foldKey !== undefined && size >= MENU_FOLD_MIN ? (
               <MenuSub>
                 <MenuSubTrigger>{t(foldKey)}</MenuSubTrigger>
                 <MenuSubContent>{content}</MenuSubContent>

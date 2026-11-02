@@ -566,7 +566,7 @@ export function OpenOrdersPanel({
             )}
             {/* Only where the station is named: an unnamed structure has nothing to show. */}
             {row.stationName !== null && (
-              <MenuGroup id="game">
+              <MenuGroup id="game" size={2}>
                 <SetWaypointMenuItem locationId={row.locationId} placeName={row.stationName} />
               </MenuGroup>
             )}

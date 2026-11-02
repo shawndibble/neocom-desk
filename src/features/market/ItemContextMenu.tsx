@@ -26,6 +26,7 @@ import { useItemActions } from './itemActions';
 import { StockTargetDialog } from '@/features/stockTargets/StockTargetDialog';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { MarketOnly } from '@/features/abyssal/MarketOnly';
+import { loadedMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { ViewInMarketMenuItem } from './ViewInMarketMenuItem';
 // Re-exported: menus built on this module's entries import it from here.
 export { ViewInMarketMenuItem };
@@ -243,8 +244,10 @@ function useItemMenuItems(
   }
 
   // Groups, not a flat list (DESIGN.md §6c "Menu length"): `MenuGroup` sorts,
-  // divides and folds them. Each Abyssal-only entry carries its own
-  // `MarketOnly`, so a group's item count is what it renders.
+  // divides and folds them, on the `size` each declares. An Abyssal type has
+  // no market entries (`MarketOnly`); the lookup is read only if already
+  // loaded, so a row never pulls it in, and until then the guess is "market".
+  const marketItems = loadedMutaplasmidLookup()?.isAbyssalType(typeId) ? 0 : 1;
   return (
     <>
       <MenuGroup id="primary">
@@ -284,7 +287,7 @@ function useItemMenuItems(
           </MenuItem>
         )}
       </MenuGroup>
-      <MenuGroup id="track">
+      <MenuGroup id="track" size={2 * marketItems + (props.hideStockTarget ? 0 : 1)}>
         <MarketOnly typeId={typeId}>
           {canAddToQuickbar ? (
             <MenuItem onSelect={() => addToQuickbar(typeId, itemName)}>
@@ -312,7 +315,7 @@ function useItemMenuItems(
           {t('market.contextMenu.copyName')}
         </MenuItem>
       </MenuGroup>
-      <MenuGroup id="game">
+      <MenuGroup id="game" size={marketItems}>
         <OpenInEveItemMenuItems typeId={typeId} />
       </MenuGroup>
       {extraItems}

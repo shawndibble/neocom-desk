@@ -478,6 +478,50 @@ describe('MenuGroup', () => {
     expect(await screen.findByRole('menuitem', { name: 'Set price alert' })).toBeInTheDocument();
   });
 
+  it('folds on a declared size, summed across merged groups, not on the element count', async () => {
+    open(
+      <>
+        <MenuGroup id="game" size={1}>
+          <MenuItem>Open in EVE</MenuItem>
+        </MenuGroup>
+        {/* One wrapper element that renders two items. */}
+        <MenuGroup id="game" size={2}>
+          <>
+            <MenuItem>Set waypoint in game</MenuItem>
+            <MenuItem>View route</MenuItem>
+          </>
+        </MenuGroup>
+      </>
+    );
+    expect(await screen.findByRole('menuitem', { name: 'In game' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'View route' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a group flat when its declared size is under three, whatever it holds', async () => {
+    open(
+      <MenuGroup id="track" size={1}>
+        <MenuItem>Set stock target</MenuItem>
+        <MenuItem>Add to Quickbar</MenuItem>
+        <MenuItem>Set price alert</MenuItem>
+      </MenuGroup>
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Set stock target' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Track' })).not.toBeInTheDocument();
+  });
+
+  it('drops a hand-placed separator among grouped items: the groups own the hairlines', async () => {
+    open(
+      <>
+        <MenuSeparator />
+        <MenuGroup id="primary">
+          <MenuItem>Show info</MenuItem>
+        </MenuGroup>
+      </>
+    );
+    await screen.findByRole('menuitem', { name: 'Show info' });
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+  });
+
   it('puts an item outside any group last, and leaves a menu with no groups as written', async () => {
     open(
       <>
