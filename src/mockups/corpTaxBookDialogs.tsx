@@ -28,7 +28,7 @@ import {
 } from './corpTaxBookFixtures';
 import { isk } from './corpTaxBookFormat';
 
-function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
+export function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
   return (
     <label className="block space-y-1">
       <span className="text-xs text-text-dim">{text}</span>
@@ -37,7 +37,7 @@ function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
   );
 }
 
-function Footer({ cancel = 'Cancel', confirm }: { cancel?: string; confirm: ReactNode }) {
+export function Footer({ cancel = 'Cancel', confirm }: { cancel?: string; confirm: ReactNode }) {
   return (
     <div className="flex justify-end gap-2">
       <Button variant="ghost">{cancel}</Button>
@@ -46,11 +46,11 @@ function Footer({ cancel = 'Cancel', confirm }: { cancel?: string; confirm: Reac
   );
 }
 
-const LOGGED =
+export const LOGGED =
   'Logged as Kestrel Vane, now, with your reason. Your role is checked again when you confirm.';
 
 /** A before → after line, so the officer sees what the action does to the balance. */
-function Effect({ children }: { children: ReactNode }) {
+export function Effect({ children }: { children: ReactNode }) {
   return (
     <p className="rounded-xs border border-line bg-panel-2 p-2 text-xs tabular-nums">{children}</p>
   );
