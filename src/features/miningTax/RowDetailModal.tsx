@@ -90,6 +90,8 @@ interface RowDetailModalProps {
    * when there is no payment to show, so the section renders nothing.
    */
   linkedTransactions?: readonly LinkedTransaction[];
+  /** The other entries this entry's payment also settled. */
+  alsoCovers?: readonly { id: string; date: string; taxOwed: number }[];
   /** Opens the manual "Link transaction" picker (issue #540 follow-up) — offered whenever there is a payment to link against, paid or not. */
   onLinkTransaction?: () => void;
   onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
@@ -157,6 +159,7 @@ export function RowDetailModal({
   onSplit,
   onAddPayee,
   linkedTransactions,
+  alsoCovers,
   onLinkTransaction,
   onUnlinkTransaction,
   suggestion,
@@ -327,6 +330,7 @@ export function RowDetailModal({
             onLinkTransaction={onLinkTransaction}
             onUnlinkTransaction={onUnlinkTransaction}
             busy={busy}
+            alsoCovers={alsoCovers}
             paid={assignment?.payment}
           />
         )}

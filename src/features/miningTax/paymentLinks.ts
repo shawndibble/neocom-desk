@@ -454,6 +454,22 @@ export function linkedTransactionsFor(
 }
 
 /**
+ * The other entries settled by the same lump sum as `assignment`, oldest
+ * first — what the payment card lists so a single entry's detail still shows
+ * what the total covers. Empty when it has no payment record or paid alone.
+ */
+export function coPaidAssignments(
+  assignment: MiningTaxAssignmentRecord,
+  everyAssignment: readonly MiningTaxAssignmentRecord[]
+): MiningTaxAssignmentRecord[] {
+  const paymentId = assignment.payment?.paymentId;
+  if (paymentId === undefined) return [];
+  return everyAssignment
+    .filter((a) => a.id !== assignment.id && a.payment?.paymentId === paymentId)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
  * Every Assignment a "Link transaction" action on `dr` should apply to:
  * every member of a joined group at once (issue #540 follow-up — a joined
  * group is billed as one obligation, so a linked transaction covers all of
