@@ -6,7 +6,7 @@ import '@/i18n';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { ZERO_STANDINGS } from '@/engine/market/standings';
 import { configureClipboard } from '@/lib/clipboard';
-import { TRADE_HUBS } from '@/market/hubs';
+import { COMPARED_HUBS, TRADE_HUBS } from '@/market/hubs';
 import { db } from '@/db';
 import { stubNoViewportMatch, stubViewport } from '@/test/viewport';
 import { seedGrant } from '@/test/seed';
@@ -463,7 +463,7 @@ describe('AppraisalPanel', () => {
   // `e2e/marketAppraisalNarrow.spec.ts`; this only guards the opt-in from
   // being dropped, the same pairing `PriceHistoryChart.test.tsx` asserts.
   describe('Compare hubs', () => {
-    const COMPARE_ROWS: HubComparisonRow[] = TRADE_HUBS.map((hub, index) => ({
+    const COMPARE_ROWS: HubComparisonRow[] = COMPARED_HUBS.map((hub, index) => ({
       hub,
       buy: index === 0 ? null : 1_000 * (index + 1),
       sell: 2_000 * (index + 1),
@@ -498,8 +498,8 @@ describe('AppraisalPanel', () => {
       expect(screen.queryByRole('list', { name: 'Compare hubs' })).not.toBeInTheDocument();
 
       const list = await compareCards();
-      expect(within(list).getAllByRole('listitem')).toHaveLength(TRADE_HUBS.length);
-      for (const hub of TRADE_HUBS) {
+      expect(within(list).getAllByRole('listitem')).toHaveLength(COMPARED_HUBS.length);
+      for (const hub of COMPARED_HUBS) {
         // Both sides are labelled on every card, so the buy/sell figures can
         // never be told apart by position alone.
         const card = hubCard(list, hub.systemName);
@@ -1759,7 +1759,7 @@ describe('AppraisalPanel: unreachable price source (offline)', () => {
   });
 
   it('marks an unreachable hub card in Compare hubs', async () => {
-    const rows: HubComparisonRow[] = TRADE_HUBS.map((hub) => ({
+    const rows: HubComparisonRow[] = COMPARED_HUBS.map((hub) => ({
       hub,
       buy: null,
       sell: null,
@@ -1771,7 +1771,7 @@ describe('AppraisalPanel: unreachable price source (offline)', () => {
     });
     const list = await screen.findByRole('list', { name: 'Compare hubs' });
     expect(within(list).getAllByText('Prices unavailable right now')).toHaveLength(
-      TRADE_HUBS.length
+      COMPARED_HUBS.length
     );
   });
 });

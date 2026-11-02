@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { buildAppraisal, type AppraisalItem } from '@/engine/market/appraisal';
-import { DEFAULT_TRADE_HUB, TRADE_HUBS } from '@/market/hubs';
+import { COMPARED_HUBS, DEFAULT_TRADE_HUB, TRADE_HUBS } from '@/market/hubs';
 import type { AppraisalOutcome, HubComparisonRow } from './appraisalData';
 import { useAppraisalLive } from './useAppraisalLive';
 import type { LiveBook, LiveBookRequest } from './liveBooks';
@@ -133,7 +133,7 @@ describe('useAppraisalLive', () => {
 
   it('fetches the other four hubs only once Compare Hubs is open', async () => {
     loadLiveBooks.mockResolvedValue(undefined);
-    const baseCompare: HubComparisonRow[] = TRADE_HUBS.map((h) => ({
+    const baseCompare: HubComparisonRow[] = COMPARED_HUBS.map((h) => ({
       hub: h,
       buy: 1,
       sell: 2,
@@ -155,7 +155,7 @@ describe('useAppraisalLive', () => {
   });
   it('tells a superseded run to stop, and refetches after Compare closes and reopens', async () => {
     loadLiveBooks.mockImplementation(() => new Promise<void>(() => {}));
-    const baseCompare: HubComparisonRow[] = TRADE_HUBS.map((h) => ({
+    const baseCompare: HubComparisonRow[] = COMPARED_HUBS.map((h) => ({
       hub: h,
       buy: 1,
       sell: 2,
