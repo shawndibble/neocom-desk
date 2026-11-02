@@ -118,7 +118,8 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
           revenue,
           skills[SKILL_IDS.brokerRelations] ?? 0,
           standing?.factionStanding,
-          standing?.corpStanding
+          standing?.corpStanding,
+          standing?.brokerSurchargePct
         );
   const netRevenue =
     revenue === null || tax === null || broker === null ? null : revenue - tax - broker;
@@ -147,7 +148,8 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     skills[SKILL_IDS.accounting] ?? 0,
     skills[SKILL_IDS.brokerRelations] ?? 0,
     standing?.factionStanding,
-    standing?.corpStanding
+    standing?.corpStanding,
+    standing?.brokerSurchargePct
   );
 
   return {

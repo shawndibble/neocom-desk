@@ -26,6 +26,8 @@ export interface ProfitBasisInput {
   accountingLevel: number;
   brokerRelationsLevel: number;
   factionStanding?: number;
+  /** The market's extra broker-fee points (`TradeHub.brokerSurchargePct`); none when absent. */
+  brokerSurchargePct?: number;
   corpStanding?: number;
 }
 
@@ -62,7 +64,8 @@ export function profitOnBasis(basis: ProfitBasis, input: ProfitBasisInput): Prof
       input.accountingLevel,
       input.brokerRelationsLevel,
       input.factionStanding,
-      input.corpStanding
+      input.corpStanding,
+      input.brokerSurchargePct
     );
   }
 

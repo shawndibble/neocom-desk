@@ -48,6 +48,43 @@ describe('brokerFeePct', () => {
   });
 });
 
+describe('brokerFeePct and brokerFee with a hub surcharge', () => {
+  it('adds the surcharge points on top of the skill and standing rate', () => {
+    expect(brokerFeePct(5, 0, 0, 5)).toBeCloseTo(brokerFeePct(5, 0, 0) + 5, 10);
+  });
+
+  it('adds it after the zero floor, so heavy skill and standing cuts never reduce it', () => {
+    // Standings far past the real -10..10 range push the base rate below zero.
+    expect(brokerFeePct(5, 100, 100, 5)).toBe(5);
+  });
+
+  it('charges the surcharge in ISK on an order', () => {
+    expect(brokerFee(1_000_000, 5, 0, 0, 5)).toBeCloseTo(
+      (1_000_000 * (brokerFeePct(5, 0, 0) + 5)) / 100,
+      6
+    );
+  });
+
+  it('defaults to no surcharge', () => {
+    expect(brokerFeePct(3)).toBe(brokerFeePct(3, 0, 0, 0));
+  });
+});
+
+describe('break-even and relist with a hub surcharge', () => {
+  it('needs a higher break-even price when the hub adds broker points', () => {
+    const plain = breakEvenPrice(1_000_000, 10, 5, 5)!;
+    const surcharged = breakEvenPrice(1_000_000, 10, 5, 5, 0, 0, 5)!;
+    expect(surcharged).toBeGreaterThan(plain);
+  });
+
+  it('puts the surcharge through the Relist Discount like the rest of the broker rate', () => {
+    const plain = relistBrokerFeePct(5, 5, 0, 0);
+    const surcharged = relistBrokerFeePct(5, 5, 0, 0, 5);
+    const discount = relistDiscountPct(5);
+    expect(surcharged - plain).toBeCloseTo((5 * (100 - discount)) / 100, 10);
+  });
+});
+
 describe('salesTax', () => {
   it('is order value times the tax rate', () => {
     expect(salesTax(1_000_000, 5)).toBeCloseTo(33_750, 6);

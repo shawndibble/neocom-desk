@@ -5,24 +5,27 @@
  * Jita, so the two never coincide. A Jita pilot sees the lane the tab always
  * opened on. The URL still wins (ADR 0015).
  */
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { COMPARED_HUBS, DAILY_JOB_HUBS, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 
 export function haulingHubDefaults(hubId: TradeHub['id']): {
   from: TradeHub['id'];
   to: TradeHub['id'];
 } {
-  return { from: hubId, to: hubId === 'jita' ? 'amarr' : 'jita' };
+  // A hub the daily hauling books do not cover has no lane to open on: start
+  // from Jita rather than on an empty scan.
+  const from = DAILY_JOB_HUBS.some((hub) => hub.id === hubId) ? hubId : 'jita';
+  return { from, to: from === 'jita' ? 'amarr' : 'jita' };
 }
 
 /**
  * One end of the lane may be _Any hub_: the scan then picks, per item, the
- * best of the five Trade Hubs for that end. Never both ends (v1: 20 lanes
+ * best of the five empire Trade Hubs for that end. Never both ends (v1: 20 lanes
  * would blow the request budget).
  */
 export const ANY_HUB = 'any';
 export type HaulingHubChoice = TradeHub['id'] | typeof ANY_HUB;
 export const HAULING_HUB_CHOICES: readonly HaulingHubChoice[] = [
-  ...TRADE_HUBS.map((h) => h.id),
+  ...DAILY_JOB_HUBS.map((h) => h.id),
   ANY_HUB,
 ];
 
@@ -35,7 +38,7 @@ export interface HaulingLane {
 export type HaulingEnd = TradeHub | typeof ANY_HUB;
 
 export function haulingEnd(id: HaulingHubChoice): HaulingEnd {
-  return id === ANY_HUB ? ANY_HUB : (TRADE_HUBS.find((h) => h.id === id) ?? TRADE_HUBS[0]!);
+  return id === ANY_HUB ? ANY_HUB : (DAILY_JOB_HUBS.find((h) => h.id === id) ?? TRADE_HUBS[0]!);
 }
 
 export function haulingEndId(end: HaulingEnd): HaulingHubChoice {
@@ -71,7 +74,7 @@ export interface HubLane {
  */
 export function expandHaulingLane(from: HaulingHubChoice, to: HaulingHubChoice): HubLane[] {
   const ends = (choice: HaulingHubChoice) =>
-    choice === ANY_HUB ? TRADE_HUBS : TRADE_HUBS.filter((h) => h.id === choice);
+    choice === ANY_HUB ? COMPARED_HUBS : DAILY_JOB_HUBS.filter((h) => h.id === choice);
   if (from === ANY_HUB && to === ANY_HUB) return [];
   return ends(from).flatMap((f) =>
     ends(to)

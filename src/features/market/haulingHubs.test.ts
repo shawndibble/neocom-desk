@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { expandHaulingLane, haulingHubDefaults, pickHaulingHub } from './haulingHubs';
 
 describe('haulingHubDefaults', () => {
+  it('opens on Jita for a hub the daily hauling books do not cover yet', () => {
+    expect(haulingHubDefaults('manifest')).toEqual({ from: 'jita', to: 'amarr' });
+  });
+
   it('keeps the original Jita to Amarr lane for a Jita pilot', () => {
     expect(haulingHubDefaults('jita')).toEqual({ from: 'jita', to: 'amarr' });
   });

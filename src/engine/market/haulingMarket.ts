@@ -485,7 +485,13 @@ export function lotEconomics(input: {
   const tax = filled > 0 ? salesTax(revenue, accountingLevel) : 0;
   const broker =
     filled > 0 && !instant
-      ? brokerFee(revenue, brokerRelationsLevel, standing.factionStanding, standing.corpStanding)
+      ? brokerFee(
+          revenue,
+          brokerRelationsLevel,
+          standing.factionStanding,
+          standing.corpStanding,
+          standing.brokerSurchargePct
+        )
       : 0;
   const profit = revenue - tax - broker - cost;
   return {
@@ -498,7 +504,12 @@ export function lotEconomics(input: {
     salesTaxPct: salesTaxPct(accountingLevel),
     brokerFeePct: instant
       ? 0
-      : brokerFeePct(brokerRelationsLevel, standing.factionStanding, standing.corpStanding),
+      : brokerFeePct(
+          brokerRelationsLevel,
+          standing.factionStanding,
+          standing.corpStanding,
+          standing.brokerSurchargePct
+        ),
     profit,
     marginPct: cost > 0 ? (profit / cost) * 100 : 0,
   };

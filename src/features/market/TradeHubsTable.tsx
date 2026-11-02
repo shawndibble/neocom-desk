@@ -10,7 +10,7 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import { formatMarketIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { COMPARED_HUBS, type ComparedHub, type TradeHub } from '@/market/hubs';
 import { MarketItemLink } from './MarketItemLink';
 import { RemovableTypeIcon } from './RemovableTypeIcon';
 import type { CompareHubRow } from './compareHubsRows';
@@ -25,7 +25,7 @@ function BestTag({ children }: { children: string }) {
   );
 }
 
-function TradeHubCell({ row, hub }: { row: CompareHubRow; hub: TradeHub }) {
+function TradeHubCell({ row, hub }: { row: CompareHubRow; hub: ComparedHub }) {
   const { t } = useTranslation();
   const quote = row.quotes[hub.id];
   if (quote.loading) return <span className="text-text-dim">…</span>;
@@ -67,7 +67,7 @@ export interface TradeHubsTableProps {
   rows: CompareHubRow[];
   jumps: Readonly<Record<HubId, number | null>>;
   /** The pilot's saved Market hub, marked in its column header. */
-  ownHub: HubId;
+  ownHub: TradeHub['id'];
   tableExport: UseTableExport<CompareHubRow>;
   onRemove: (typeId: number) => void;
 }
@@ -99,7 +99,7 @@ export function TradeHubsTable({
           </span>
         ),
       },
-      ...TRADE_HUBS.map((hub): DataTableColumn<CompareHubRow> => {
+      ...COMPARED_HUBS.map((hub): DataTableColumn<CompareHubRow> => {
         const count = jumps[hub.id];
         const isOwn = hub.id === ownHub;
         const tooltip = [

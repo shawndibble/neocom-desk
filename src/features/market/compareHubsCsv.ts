@@ -1,5 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import { getTradeHub, TRADE_HUBS } from '@/market/hubs';
+import { COMPARED_HUBS, getTradeHub, type TradeHub } from '@/market/hubs';
 import type { CompareHubRow } from './compareHubsRows';
 import type { HubId } from './useCompareHubs';
 
@@ -11,14 +11,14 @@ export function compareHubsCsvColumns(
   t: CsvTranslate,
   context: {
     jumps: Readonly<Record<HubId, number | null>>;
-    ownHub: HubId;
+    ownHub: TradeHub['id'];
   }
 ): CsvColumn<CompareHubRow>[] {
-  const hubName = (id: HubId | null) =>
+  const hubName = (id: TradeHub['id'] | null) =>
     id === null ? null : (getTradeHub(id)?.systemName ?? null);
   return [
     { header: t('market.compare.columnItem'), value: (row) => row.itemName },
-    ...TRADE_HUBS.flatMap((hub): CsvColumn<CompareHubRow>[] => [
+    ...COMPARED_HUBS.flatMap((hub): CsvColumn<CompareHubRow>[] => [
       {
         header: t('market.compare.hubSellColumn', { hub: hub.systemName }),
         value: (row) => row.quotes[hub.id].sell,

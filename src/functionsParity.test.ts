@@ -9,7 +9,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { TRADE_HUBS } from '@/market/hubs';
+import { COMPARED_HUBS, DAILY_JOB_HUBS } from '@/market/hubs';
 import { isFiniteNumber, isPlainRecord, isRecord } from '@/engine/guards';
 import { COMPATIBILITY_DATE } from '@/esi/compatibilityDate';
 import { USER_AGENT } from '@/esi/userAgent';
@@ -131,15 +131,15 @@ describe('type guards', () => {
 });
 
 describe('trade hubs', () => {
-  it('SNAPSHOT_HUBS matches TRADE_HUBS ids, stations and regions, in order', () => {
+  it('SNAPSHOT_HUBS matches the daily-job hubs ids, stations and regions, in order', () => {
     expect(SNAPSHOT_HUBS.map((h) => ({ ...h }))).toEqual(
-      TRADE_HUBS.map((h) => ({ id: h.id, stationId: h.stationId, regionId: h.regionId }))
+      DAILY_JOB_HUBS.map((h) => ({ id: h.id, stationId: h.stationId, regionId: h.regionId }))
     );
   });
 
   it('MARKET_OPEN_PRICES_REGION_IDS is exactly the hub regions', () => {
     expect([...MARKET_OPEN_PRICES_REGION_IDS].sort()).toEqual(
-      TRADE_HUBS.map((h) => h.regionId).sort()
+      DAILY_JOB_HUBS.map((h) => h.regionId).sort()
     );
   });
 });
@@ -202,7 +202,7 @@ describe('contracts and Workbench fits', () => {
 describe('standing buyback Requests', () => {
   it('the callable names the same groups, hubs and rate bounds as the engine', () => {
     expect([...FUNCTIONS_GROUP_KEYS]).toEqual(BUYBACK_GROUP_KEYS);
-    expect([...BUYBACK_HUB_IDS]).toEqual(TRADE_HUBS.map((h) => h.id));
+    expect([...BUYBACK_HUB_IDS]).toEqual(COMPARED_HUBS.map((h) => h.id));
     expect([FUNCTIONS_MIN_RATE, FUNCTIONS_MAX_RATE]).toEqual([MIN_RATE, MAX_RATE]);
     expect([...FUNCTIONS_RATE_BASES]).toEqual([...RATE_BASES]);
     expect(FUNCTIONS_MAX_BUY_LINES).toBe(MAX_BUY_LINES);

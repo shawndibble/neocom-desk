@@ -160,7 +160,12 @@ export function profitableDepth(
   }
   const feeRate =
     (salesTaxPct(accountingLevel) +
-      brokerFeePct(brokerRelationsLevel, standing.factionStanding, standing.corpStanding)) /
+      brokerFeePct(
+        brokerRelationsLevel,
+        standing.factionStanding,
+        standing.corpStanding,
+        standing.brokerSurchargePct
+      )) /
     100;
   const breakEven = (candidate.expectedPrice * (1 - feeRate)) / (1 + minMarginPct / 100);
   return candidate.buyLadder.reduce((sum, l) => (l.price <= breakEven ? sum + l.units : sum), 0);
@@ -206,7 +211,12 @@ export function maxBuyPrice(
   }
   const feeRate =
     (salesTaxPct(accountingLevel) +
-      brokerFeePct(brokerRelationsLevel, standing.factionStanding, standing.corpStanding)) /
+      brokerFeePct(
+        brokerRelationsLevel,
+        standing.factionStanding,
+        standing.corpStanding,
+        standing.brokerSurchargePct
+      )) /
     100;
   const limit = (candidate.expectedPrice * (1 - feeRate)) / (1 + minMarginPct / 100);
   const cheapest = candidate.buyLadder[0]?.price;

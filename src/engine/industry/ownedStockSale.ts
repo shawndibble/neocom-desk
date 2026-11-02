@@ -173,7 +173,13 @@ export function ownedStockSale(
     // buy order does.
     const broker =
       basis === 'order'
-        ? brokerFee(gross, brokerRelations, standing?.factionStanding, standing?.corpStanding)
+        ? brokerFee(
+            gross,
+            brokerRelations,
+            standing?.factionStanding,
+            standing?.corpStanding,
+            standing?.brokerSurchargePct
+          )
         : 0;
     lines.push({
       typeID: material.typeID,

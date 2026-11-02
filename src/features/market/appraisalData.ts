@@ -59,7 +59,7 @@ import {
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisalLpAcquisition';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { COMPARED_HUBS, type TradeHub } from '@/market/hubs';
 import { getHubPricesWithStatus, invalidateHubPrices } from '@/market/prices';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import { knownPackagedVolumeOf } from '@/sde/marketTypes';
@@ -328,7 +328,7 @@ export async function compareHubs(
   const typeIds = matched.map((match) => match.typeId);
 
   return Promise.all(
-    TRADE_HUBS.map(async (hub) => {
+    COMPARED_HUBS.map(async (hub) => {
       if (force) invalidateHubPrices(hub.stationId, typeIds);
       const { prices, unreachable } = await getHubPricesWithStatus(hub, typeIds);
       const items: AppraisalItem[] = matched.map((match) => {

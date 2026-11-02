@@ -1,9 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub } from './hubs';
+import { COMPARED_HUBS, DAILY_JOB_HUBS, TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub } from './hubs';
 
 describe('TRADE_HUBS', () => {
-  it('lists exactly the five v1 trade hubs with verified station/system/region IDs', () => {
-    expect(TRADE_HUBS.map((hub) => hub.id)).toEqual(['jita', 'amarr', 'dodixie', 'rens', 'hek']);
+  it('lists the five empire trade hubs and Manifest with verified station/system/region IDs', () => {
+    expect(TRADE_HUBS.map((hub) => hub.id)).toEqual([
+      'jita',
+      'amarr',
+      'dodixie',
+      'rens',
+      'hek',
+      'manifest',
+    ]);
 
     expect(getTradeHub('jita')).toMatchObject({
       stationId: 60003760,
@@ -30,6 +37,13 @@ describe('TRADE_HUBS', () => {
       systemId: 30002053,
       regionId: 10000042,
     });
+    expect(getTradeHub('manifest')).toMatchObject({
+      stationId: 60015249,
+      systemId: 30100032,
+      regionId: 10001004,
+      systemName: 'Manifest',
+      name: 'Manifest V - AIR Laboratories Trade Center',
+    });
   });
 
   it('has no duplicate station, system, or region IDs', () => {
@@ -45,6 +59,7 @@ describe('TRADE_HUBS', () => {
       'Dodixie',
       'Rens',
       'Hek',
+      'Manifest',
     ]);
   });
 
@@ -55,5 +70,27 @@ describe('TRADE_HUBS', () => {
 
   it('getTradeHub returns undefined for an unknown id', () => {
     expect(getTradeHub('unknown' as never)).toBeUndefined();
+  });
+});
+
+describe('compared and daily-job hubs', () => {
+  it('keeps Manifest out of the every-hub views but lists it as a hub', () => {
+    expect(COMPARED_HUBS.map((hub) => hub.id)).toEqual(['jita', 'amarr', 'dodixie', 'rens', 'hek']);
+    expect(getTradeHub('manifest')?.compared).toBe(false);
+  });
+
+  it('keeps Manifest out of the daily backend jobs until they cover Exordium', () => {
+    expect(DAILY_JOB_HUBS.map((hub) => hub.id)).toEqual([
+      'jita',
+      'amarr',
+      'dodixie',
+      'rens',
+      'hek',
+    ]);
+  });
+
+  it('charges Exordium a broker surcharge and no empire hub one', () => {
+    expect(getTradeHub('manifest')?.brokerSurchargePct).toBeGreaterThan(0);
+    expect(COMPARED_HUBS.every((hub) => hub.brokerSurchargePct === 0)).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
 import { EsiError } from '@/esi/errors';
-import { TRADE_HUBS } from '@/market/hubs';
+import { COMPARED_HUBS, TRADE_HUBS } from '@/market/hubs';
 
 const getHubPrices = vi.fn();
 const loadPriceHistory = vi.fn();
@@ -644,7 +644,7 @@ describe('runHaulingScan, Any hub at one end', () => {
       types: typesFor(typeIds),
       mode: 'instant',
     });
-    expect(getHubPrices).toHaveBeenCalledTimes(TRADE_HUBS.length);
+    expect(getHubPrices).toHaveBeenCalledTimes(COMPARED_HUBS.length);
     expect(scan.rows).toHaveLength(MAX_BOOK_CANDIDATES);
     // Two books (origin and destination) per shortlisted item — no more.
     expect(getOrderBook).toHaveBeenCalledTimes(2 * MAX_BOOK_CANDIDATES);

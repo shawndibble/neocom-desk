@@ -3,7 +3,7 @@
  * fits across the page, so the comparison is a glance across the row rather
  * than a scan down a column.
  *
- * A card grid has no column to sort, so `TRADE_HUBS`' own fixed order (Jita,
+ * A card grid has no column to sort, so `COMPARED_HUBS`' own fixed order (Jita,
  * Amarr, Dodixie, Rens, Hek) is the order at every width: a hub is always in
  * the same place on the grid.
  *
