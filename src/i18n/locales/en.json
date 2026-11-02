@@ -2801,6 +2801,7 @@
     "attributesImpossible": "These attributes don't add up to a legal sheet, so estimates use a default spread.",
     "attributesCopyDiagnostics": "Copy diagnostics",
     "attributesDiagnosticsCopied": "Copied",
+    "attributesDiagnosticsCopyFailed": "Copy failed",
     "importExport": "Import / Export",
     "export": "Export",
     "addSkill": "Add skill",

@@ -1,14 +1,7 @@
 import { BASE_ATTRIBUTE_TOTAL, type AttributeBaseline } from '@/engine/attributeBaseline';
-import type { AttributeName, Implants } from '@/engine/types';
+import { ATTRIBUTE_NAMES as NAMES } from '@/engine/optimizer';
+import type { Implants } from '@/engine/types';
 import type { CharacterAttributes } from '@/esi/endpoints';
-
-const NAMES: readonly AttributeName[] = [
-  'intelligence',
-  'memory',
-  'perception',
-  'willpower',
-  'charisma',
-];
 
 export interface AttributeDiagnosticsInput {
   attributes: CharacterAttributes;
@@ -23,6 +16,8 @@ export interface AttributeDiagnosticsInput {
  * A plain-text account of why a sheet was read the way it was, for a pilot to
  * paste into a bug report: what ESI said, what was subtracted, and what is
  * left per attribute. Numbers only — no tokens, no character id or name.
+ * English labels on purpose: it is a bug-report payload read by a developer,
+ * not UI copy.
  */
 export function attributeDiagnostics(input: AttributeDiagnosticsInput): string {
   const { attributes, implants, baseline } = input;
@@ -35,20 +30,12 @@ export function attributeDiagnostics(input: AttributeDiagnosticsInput): string {
     `${label.padEnd(18)}${values.map((value) => String(value).padStart(4)).join('')}`;
   return [
     'Neocom Desk attribute diagnostics',
-    `Verdict: ${baseline.kind}${baseline.kind === 'accelerated' ? ` (+${baseline.acceleratorBonus})` : ''}`,
+    `Verdict: ${baseline.kind}`,
     `${''.padEnd(18)}${['INT', 'MEM', 'PER', 'WIL', 'CHA'].map((n) => n.padStart(4)).join('')}`,
     row('ESI reported', reported),
     row('Implants', worn),
     row('After implants', afterImplants),
     `After-implant total: ${total} (a legal base totals ${BASE_ATTRIBUTE_TOTAL}; excess ${excess}, ${excess / NAMES.length} per attribute)`,
-    ...(baseline.kind === 'accelerated'
-      ? [
-          row(
-            `Base (-${baseline.acceleratorBonus})`,
-            NAMES.map((name) => baseline.attributes[name])
-          ),
-        ]
-      : []),
     `Fetched: ${input.fetchedAt ? input.fetchedAt.toISOString() : 'unknown'}${input.fromCache ? ' (from cache)' : ''}`,
   ].join('\n');
 }

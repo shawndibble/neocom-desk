@@ -20,7 +20,7 @@ export function AttributesToolSection({
   attributeBaseline: AttributeBaseline | null;
 }) {
   const { t } = useTranslation();
-  const { copied, flash } = useCopyFeedback(2000);
+  const { copied, flash } = useCopyFeedback<'ok' | 'failed'>(2000);
   return (
     <div className="space-y-2 text-xs">
       {/* The clone's real sheet, never re-rendered through the what-if
@@ -54,7 +54,10 @@ export function AttributesToolSection({
                     fetchedAt: attributesResult.fetchedAt,
                     fromCache: attributesResult.fromCache,
                   })
-                ).then(() => flash())
+                ).then(
+                  () => flash('ok'),
+                  () => flash('failed')
+                )
               }
             >
               {copied

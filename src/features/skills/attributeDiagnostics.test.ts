@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { deriveAttributeBaseline } from '@/engine/attributeBaseline';
+import type { CharacterAttributes } from '@/esi/endpoints';
 import { attributeDiagnostics } from './attributeDiagnostics';
 
-const attributes = {
+const attributes: CharacterAttributes = {
   intelligence: 38,
   memory: 34,
   perception: 40,
   willpower: 36,
   charisma: 31,
-  charisma_modified_at: undefined,
-} as never;
+};
 
 describe('attributeDiagnostics', () => {
   it('shows each attribute after implants so the one that breaks the sheet is visible', () => {
