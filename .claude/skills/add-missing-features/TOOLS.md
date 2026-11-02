@@ -23,7 +23,7 @@ Adam4EVE, Ravworks/Slipway (Jobs view = Active Jobs), EVE Tycoon, Janice
 (#5006), jEveAssets, GESI, Dr.MoonGoo, EVE Horizon, EVE Forge,
 EVE-HUB, RIFT (desktop; wallet Insights, asset filters, What's new list v2.2–6.2 read in full; #5601, #5602, #5605), EVE Industry Scanner Tool (#5007), Blizbor's skill trio (#2390; no
 licence, data unusable), Quantum Anomaly (#1040), Uedama Scout (#1043), EQM
-(2.0 changelog + Local Scan/D-Scan docs read; #5668, #5669), EVE Retroindustry (v0.11.27–41 release notes read; #5797 rejected), Canopus (1.2 post: PI calculator, colony siting, My colonies, My trades = all covered).
+(2.0 changelog + Local Scan/D-Scan docs read, v1.0–1.0.7 industry/PI/PLEX/HyperNet notes re-read, post 51 is a UI-overhaul teaser; #5668, #5669), EVE Retroindustry (v0.11.27–41 release notes and the whole README/site inventory read; nothing newer than 0.11.41; #5797 rejected), Canopus (v1.0–1.2.1: PI calculator, LP store pricing, My trades, Doctrines multibuy, freelance board = all covered or killed), EVE Industry Scanner Tool (v0.7–1.1.6 read; #5853's sibling items all covered).
 
 **Examined, nothing left:** EVE Blue Desk, SolCore Dynamics, EvE Blueprint, EVE
 Courier, ISK.GG, EVE Miner Hub, EVE-Industry-Scanner,
@@ -34,7 +34,7 @@ EVE Data Site, PIM, EVE PI Manager, Web-based PI Tracker, JitaStocks, Indeve,
 EVE Fleet Mining & Ratting Tool, FW LP Store cart tool, EVE ONE, EVE Buddy,
 CLI Metenox Calculator, Eden Buyback, Lazy Blacksmith, EVE Orchestra,
 Alysii's PI Scheme, EVE Planetary Planner, Upwell Fuel Monitor, ETM v2,
-AllianceAuth Market Manager, EVE Tycoon MCP server, EVE Metro, EVE Omni,
+AllianceAuth Market Manager, EVE Tycoon MCP server, EVE Metro, EVE Omni (4.0.74–5.5.1 changelog re-read: wallet analysis, T2 planner, Upwell hold, gank systems, trade guards all built),
 Eve Deep Industry, SNOW//OPS, New Eden Command, eve-hub.ru,
 Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas, Gatewatch, EVE
 PvP Corp Activity Search, Forge Ledger, New Eden Trade, Keystar, AstraCore,
@@ -209,7 +209,10 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 46. **A proxy is not a measurement**; name the property, then test it (#1085).
 47. **A rate divided by a guessed duration is a typed-in estimate**; show
     per-day totals (`20261006-085420`).
-48. **The public contract snapshot drops asked-for lines** (only PLEX survives
+48. **A fee ESI reports is fixed at install time**; recomputing it today with
+    today's adjusted prices and cost index gives a gap that is drift, so an
+    "implied facility tax" from a plan-vs-reported job fee is noise (killed).
+49. **The public contract snapshot drops asked-for lines** (only PLEX survives
     as `requestedPlex`); value-vs-asking ranking ranks item-swap bait first
     until #3986's `requestsItems` flag lands.
 
@@ -261,6 +264,10 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 #722 unowned-blueprint coverage; #725 PI Production Run/Log (no PI cost basis);
 #822/#827/#925 Skill ROI panels; #858 Quickbar unrealized P&L vs typed cost. #5797 Quickbar sold/day (the Quickbar row is too narrow for another figure).
 
+- Omni/Scanner/Canopus/EQM/Retroindustry thread sweep: #5853 NARROW Open Orders
+  headline totals the gross ISK listed on sell orders and held in buy escrow
+  (filter-aware, no net-of-fees; the reviewer's KILL on the drafted net figure
+  stands).
 - **Abyssal:** #5800 SHIP Improve keeps fitted mutated modules (probe first;
   swap helper drops the roll). #5801 NARROW rank owned rolled modules by fit
   effect (no MutaMarket estimate in the ranking, top 8 cap). #5802 NARROW
@@ -405,6 +412,7 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   shipping/collateral (47); A4E crawls (1, 14). Lead, unverified: FW industry
   bonus (EVE Tycoon calculator field); check the current mechanic first.
 - **Retroindustry leftovers:** Transactions "N journal sales not listed yet" count (KILL: `DataAgeBadge` + wallet `lagNote` exist; transactions are page-capped, so old journal lines false-positive); ISK/7d column (units shipped as #5797); traded types missing from the SDE (SDE refresh cadence, names resolve via ESI); net worth sell/escrow/contracts/jobs layers (shipped, #5128); frozen saved-plan figures (Production Run is the snapshot); Map overlays (intel; cost indices covered). Canopus: Abyss planner, trial skill levels, kill radar, AI assistant = non-ISK or client-reading.
+- **Thread-sweep leftovers (Omni, Industry Scanner, Canopus, EQM, Retroindustry):** plan-vs-reported job fee / implied facility tax (49); Open Orders net-of-fees total (no fee engine under `src/engine/market`; 27, 30); Storyline/Cosmic production tab and gas site picker (niche reach, hand-kept mission data; unverified beyond that); Freelance Jobs board filters (ESI projects are corp-scoped, `getCorporationProjects`; the member's own projects are in Opportunities, #4786); "gain vs selling directly" for own reaction/gas material (`ownedStockSale`, `oreDecision`; gas sell-vs-react already weak); PI storage as owned stock (17); Industry Report/Inventory Report share links, ship analytics over time (1, 5, 7); PLEX FIFO ledger (10); HyperNet; wormhole mapper (weak J-space gap above); setup role picker (rail defaults are settled, `20261009-230259`). Already built, don't re-pitch: reactions apply no ME (`computeBuildPlan`), invention base ME2/TE4 (`INVENTED_BASE_ME`), an omitted history day is a zero (`averageDailyVolume`), infrastructure hold in hauling (`cargoHolds.ts`), max buy price / min margin (`haulingPlan`), J-space cost-index override (`costIndexOverride.ts`), Assets jumps away, net worth keeps stale characters out of the day's row (`20261008-081039`).
 - **Housekeeping only:** Mining Yield `specialisationLevel: 0`, dead i18n keys.
 - **RIFT ratting rollup** (kills by faction/system, ISK per kill): per-line `BountyFactionSummary`/`killsByFaction` exists; a bounty line's ISK is shared across NPC types, so per-class ISK is an estimate. RIFT daily-goals tab: ref-type breakdown + `dailyGoalMessageIdOf` cover it. "Open ship in Fittings" from Assets: shipped (`assetShipLocation.ts`).
 - **RIFT What's new leftovers:** freelance jobs (#4609), cost indices (`cheaperNearbySystems`), skyhooks, clones, LP totals = covered; PI time seek = kill-tests 3/17; intel, overlay, chat, combat/log alerts, settings copying, map markers = kill-test 2 (client-reading).
