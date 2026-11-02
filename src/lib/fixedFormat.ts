@@ -1,7 +1,8 @@
 /**
  * Fixed-decimal number formatters that follow the active decimal mark: the
  * on-screen replacement for `toFixed(n)`. Never grouped, like `toFixed`;
- * `signDisplay: 'negative'` keeps a rounded-to-zero value from reading `-0.0`.
+ * a value that rounds to zero loses its minus by hand so it never reads `-0.0`
+ * (assumes ASCII `-` and digits, true of the two locales in `numberLocale.ts`).
  */
 import { createNumberFormat } from './numberLocale';
 

@@ -469,6 +469,18 @@ async function bumpMarkerQuietly(
 }
 
 /**
+ * A pass queued for a Character that was removed (or never existed) on this
+ * device. Not a fault, so `reportFailure` ignores it by `name`; the sync status
+ * line still shows the message.
+ */
+class UnknownCharacterError extends Error {
+  override readonly name = 'UnknownCharacterError';
+  constructor(characterId: number) {
+    super(`Unknown character ${characterId}`);
+  }
+}
+
+/**
  * One pass for one Character over `requested`: every collection, or only the
  * named ones (syncScheduler.ts decides when narrowing is safe). Each listed
  * collection is still pulled before it is pushed — narrowing skips whole
@@ -482,18 +494,6 @@ async function bumpMarkerQuietly(
  * always push. A marker the rules refuse (not deployed yet) or that fails to
  * bump only costs the shortcut, never the sync.
  */
-/**
- * A pass queued for a Character that was removed (or never existed) on this
- * device. Not a fault, so `reportFailure` ignores it by `name`; the sync status
- * line still shows the message.
- */
-class UnknownCharacterError extends Error {
-  override readonly name = 'UnknownCharacterError';
-  constructor(characterId: number) {
-    super(`Unknown character ${characterId}`);
-  }
-}
-
 async function syncCharacter(
   characterId: number,
   requested: SyncScope,
