@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildAppraisal, type AppraisalItem } from '@/engine/market/appraisal';
+import { buildAppraisal, refineBeatsSellAsIs, type AppraisalItem } from '@/engine/market/appraisal';
 import {
   buildRefineBreakdown,
   buildRefineComparison,
+  lopsidedItems,
   refineEfficiencyRange,
 } from '@/engine/market/refineBreakdown';
 
@@ -290,5 +291,126 @@ describe('refine on each price basis', () => {
     expect(old.buy).not.toBeNull();
     expect(old.split).toBeNull();
     expect(old.sell).toBeNull();
+  });
+});
+
+describe('Janice parity', () => {
+  // The six ores of the Jita appraisal the breakdown was checked against, at 100%, with the buy and sell
+  // prices Janice quoted in the same minute and the 0.6831 reprocessing yield. Its Buy, Split and Sell
+  // totals, as is and refined with leftover, are the figures below to the cent.
+  const BIT = [
+    { typeId: 35, quantity: 6000 },
+    { typeId: 36, quantity: 400 },
+    { typeId: 16633, quantity: 65 },
+  ];
+  const BRIM = [
+    { typeId: 35, quantity: 6900 },
+    { typeId: 36, quantity: 460 },
+    { typeId: 16633, quantity: 75 },
+  ];
+  const COES = [
+    { typeId: 35, quantity: 4000 },
+    { typeId: 36, quantity: 800 },
+    { typeId: 16636, quantity: 130 },
+  ];
+  const ZEO = [
+    { typeId: 35, quantity: 16000 },
+    { typeId: 36, quantity: 800 },
+    { typeId: 16634, quantity: 130 },
+  ];
+  const buyPrices = { 35: 16.68, 36: 50.61, 16633: 380.8, 16636: 355.5, 16634: 180 };
+  const sellPrices = { 35: 17.05, 36: 52.34, 16633: 420, 16636: 413.1, 16634: 188.6 };
+  const item = (
+    typeId: number,
+    name: string,
+    quantity: number,
+    buy: number,
+    sell: number,
+    materials: { typeId: number; quantity: number }[]
+  ): AppraisalItem => ({
+    typeId,
+    name,
+    quantity,
+    buy,
+    sell,
+    refine: {
+      valueAtFullPrice: 0,
+      pricedAll: true,
+      unitsLeftOver: quantity % 100,
+      detail: {
+        portionSize: 100,
+        materials,
+        efficiency: 0.6831,
+        materialPrices: buyPrices,
+        materialSellPrices: sellPrices,
+      },
+    },
+  });
+  const items = [
+    item(62454, 'Compressed Bitumens', 186, 1279, 1280, BIT),
+    item(62455, 'Compressed Brimful Bitumens', 632, 1412, 1413, BRIM),
+    item(62459, 'Compressed Glistening Coesite', 1737, 1241, 1242, COES),
+    item(62467, 'Compressed Glistening Zeolites', 57_638, 2812, 2813, ZEO),
+    item(46287, 'Glistening Coesite', 164, 260.1, 5000, COES),
+    item(46281, 'Glistening Zeolites', 2471, 1110, 51_100, ZEO),
+  ];
+  const comparison = buildRefineComparison({
+    appraisal: buildAppraisal(items, 100),
+    pricePercent: 100,
+    taxRate: 0,
+  });
+
+  it('reproduces every mineral quantity', () => {
+    const quantity = (id: number) => comparison.buy.minerals.find((m) => m.typeId === id)?.quantity;
+    expect([35, 36, 16633, 16636, 16634].map(quantity)).toEqual([
+      6_639_319, 339_881, 351, 1_597, 53_281,
+    ]);
+  });
+
+  it('reproduces the as-is and refined totals on the buy, split and sell bases', () => {
+    const figures = (basis: 'buy' | 'split' | 'sell') => {
+      const breakdown = comparison[basis];
+      return [breakdown?.asIs ?? NaN, breakdown?.total ?? NaN];
+    };
+    const [buyAsIs, buyRefined] = figures('buy');
+    expect(buyAsIs).toBeCloseTo(168_149_417.4, 1);
+    expect(buyRefined).toBeCloseTo(138_640_600.03, 1);
+    const [splitAsIs, splitRefined] = figures('split');
+    expect(splitAsIs).toBeCloseTo(230_330_830.7, 1);
+    expect(splitRefined).toBeCloseTo(142_371_270.91, 1);
+    const [sellAsIs, sellRefined] = figures('sell');
+    expect(sellAsIs).toBeCloseTo(292_512_244, 1);
+    expect(sellRefined).toBeCloseTo(146_101_941.79, 1);
+  });
+
+  it('finds the 82.89% break-even on the buy side, and none up to 100% on the others', () => {
+    expect(comparison.buy.breakEvenEfficiency).toBeCloseTo(0.8289, 3);
+    expect(comparison.split?.breakEvenEfficiency ?? 0).toBeGreaterThan(1);
+    expect(comparison.sell?.breakEvenEfficiency ?? 0).toBeGreaterThan(1);
+  });
+
+  it('calls the two ores that sell for over 10 times their buy price lopsided', () => {
+    expect(lopsidedItems(items).map((i) => i.name)).toEqual([
+      'Glistening Coesite',
+      'Glistening Zeolites',
+    ]);
+    expect(lopsidedItems(items, 62467)).toEqual([]);
+  });
+});
+
+describe('a basis with no as-is price is no comparison, as in the table', () => {
+  it('is not a win on that basis, and the table agrees', () => {
+    const item: AppraisalItem = { ...ore({ quantity: 1000, efficiency: 0.9 }), sell: null };
+    const detail = item.refine?.detail;
+    if (!item.refine || !detail) throw new Error('fixture');
+    item.refine = {
+      ...item.refine,
+      detail: { ...detail, materialSellPrices: { [PYERITE]: 8, [MEXALLON]: 70 } },
+    };
+    const appraisal = buildAppraisal([item], 100);
+    const sell = buildRefineBreakdown({ appraisal, pricePercent: 100, taxRate: 0, basis: 'sell' });
+    expect(sell.items[0].wins).toBe(false);
+    expect(refineBeatsSellAsIs(appraisal.rows[0], 'sell')).toBe(false);
+    expect(sell.unbuyable).toBe(1);
   });
 });

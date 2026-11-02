@@ -1,6 +1,6 @@
 # Scope decisions — Refine is compared on the buy, split and sell price basis, and the pick is remembered
 
-_Recorded 2026-11-02._
+_Recorded 2026-11-01._
 
 - **The Refine breakdown compares refining with selling as is on all three Price Bases at once** (buy orders, split, sell orders) and says once, top right, what to do on the selected one ("Suggested action"), with a note only where the other bases disagree. There is no per-row Better column in that comparison: three identical verdicts say nothing. The per-item table keeps its own, because it varies by item.
 - **The selected basis is remembered on the device and drives the page's single refine figures.** Choosing a row in the breakdown sets it for every later appraisal: the Refine total column (priced on it, highlighted against the same basis's as-is total), the Refine chip (which says which basis), the "refine" copy list and the break-even. The table keeps one Refine total column rather than separate Buy and Sell columns; the breakdown is where the bases sit side by side. Default: buy orders.

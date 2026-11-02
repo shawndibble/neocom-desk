@@ -11,6 +11,7 @@ import {
   refineBeatsSellAsIs,
   refinePricedAllFor,
   refineTotalFor,
+  sellAsIsBeatsRefine,
   type RefineBasis,
   sellAfterFees,
   sellBrokerFee,
@@ -60,6 +61,7 @@ export function useAppraisalColumns({
   standing,
   onOpenRefine,
   refineBasis = 'buy',
+  refineReady = true,
 }: {
   controller: AppraisalController;
   owned: ReadonlyMap<number, number> | null;
@@ -69,6 +71,8 @@ export function useAppraisalColumns({
   onOpenRefine?: (typeId: number) => void;
   /** The side of the book the Refine total column is priced on (the remembered pick). */
   refineBasis?: RefineBasis;
+  /** False until the remembered basis has loaded, so the Refine figures do not show on buy first and then switch. */
+  refineReady?: boolean;
 }) {
   const { t } = useTranslation();
   const { text, result } = controller;
@@ -106,7 +110,8 @@ export function useAppraisalColumns({
       ...withOwned.filter((r) => r.need === 0),
     ];
   }, [rows, owned]);
-  const hasRefine = rows.some((row) => refineTotalFor(row, refineBasis) !== undefined);
+  const hasRefine =
+    refineReady && rows.some((row) => refineTotalFor(row, refineBasis) !== undefined);
   // Undefined per row when nothing the active Character holds LP with sells
   // this item — same "only earns its place once something has it" rule as
   // the refine column, and also why this never shows with no active
@@ -247,9 +252,7 @@ export function useAppraisalColumns({
       render: (row) =>
         comparisonCell(
           totalCell(row.buyTotal),
-          refineBasis === 'buy' &&
-            refineTotalFor(row, 'buy') !== undefined &&
-            !refineBeatsSellAsIs(row, 'buy'),
+          refineBasis === 'buy' && sellAsIsBeatsRefine(row, 'buy'),
           undefined,
           <>
             {row.buyWalk && (
@@ -286,9 +289,7 @@ export function useAppraisalColumns({
           {priceMark(row, 'sellTotal')}
           {comparisonCell(
             totalCell(row.sellTotal),
-            refineBasis === 'sell' &&
-              refineTotalFor(row, 'sell') !== undefined &&
-              !refineBeatsSellAsIs(row, 'sell')
+            refineBasis === 'sell' && sellAsIsBeatsRefine(row, 'sell')
           )}
         </>
       ),
@@ -327,7 +328,7 @@ export function useAppraisalColumns({
                 isk: formatIskAuto(
                   (row.refineUnitsLeftOver ?? 0) * (asIsEachFor(row, refineBasis) ?? 0)
                 ),
-                buyTotal: formatIskAuto(asIsTotalFor(row, refineBasis) ?? 0),
+                asIsTotal: formatIskAuto(asIsTotalFor(row, refineBasis) ?? 0),
               })}
               className="mr-1 text-warning"
             >

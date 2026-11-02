@@ -65,11 +65,9 @@ import { useRefineMineralNames } from './useRefineMineralNames';
 import { useAltChord } from '@/lib/useChord';
 import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 import { useRefineBasis } from './refineBasis';
-import { basisAvailable } from '@/engine/market/refineBreakdown';
-import type { RefineBasis } from '@/engine/market/appraisal';
 import { DEFAULT_REFINING_SETUP } from '@/engine/industry/refiningSetup';
-import { refineEfficiencyRange } from '@/engine/market/refineBreakdown';
-import type { AppraisalItem } from '@/engine/market/appraisal';
+import { basisAvailable, refineEfficiencyRange } from '@/engine/market/refineBreakdown';
+import type { AppraisalItem, RefineBasis } from '@/engine/market/appraisal';
 import type { AppraisalController } from './useAppraisal';
 
 interface AppraisalPanelProps {
@@ -159,7 +157,7 @@ export function AppraisalPanel({
   // never carried the sell side (a link from before it did) cannot be priced on it, so it reads as buy.
   const storedBasis = useRefineBasis((state) => state.value);
   const setStoredBasis = useRefineBasis((state) => state.setValue);
-  useHydratedStore(useRefineBasis);
+  const basisReady = useHydratedStore(useRefineBasis);
   const refineBasis: RefineBasis =
     result !== null && basisAvailable(result.appraisal, storedBasis) ? storedBasis : 'buy';
   const mineralNames = useRefineMineralNames(result?.appraisal.items ?? NO_ITEMS);
@@ -205,6 +203,7 @@ export function AppraisalPanel({
     standing,
     onOpenRefine: (typeId) => setRefineModal({ typeId }),
     refineBasis,
+    refineReady: basisReady,
   });
   const { share, handleShare, handleCopyShareUrl, shareItemCount } = useAppraisalShare({
     result,

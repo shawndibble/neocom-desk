@@ -7,7 +7,9 @@
  * The one resolved figure is each refinable item's `efficiency`: the sharer's
  * skills are not stored, so their outcome has to be, and the recipe and mineral
  * prices ride along so the refine figure is rebuilt by the same
- * `refineFromDetail` the live tab uses.
+ * `refineFromDetail` the live tab uses. The minerals' sell prices ride along too,
+ * as an optional extra (`sellPrice`): a link from before they did has none, and
+ * is priced on the buy side only.
  *
  * Pure: the Firestore read/write around it lives in `features/share`.
  */

@@ -914,3 +914,28 @@ describe('refine on each price basis', () => {
     expect(refineBeatsSellAsIs(row, 'sell')).toBe(false);
   });
 });
+
+describe('split refine figure', () => {
+  it('is not given where a mineral had no price on one side, rather than half of the other', () => {
+    const base = {
+      quantity: 1050,
+      reprocessing: { portionSize: 100, materials: [{ typeId: 34, quantity: 400 }] },
+      modifiers: NO_CHARACTER_MODIFIERS,
+      refining: { stationRate: 0.5, taxRate: 0 },
+      materialPrices: { 34: 5 },
+    };
+    const item = (materialSellPrices: Record<number, number>): AppraisalItem => ({
+      typeId: 1230,
+      name: 'Veldspar',
+      quantity: 1050,
+      buy: 10,
+      sell: 14,
+      refine: computeAppraisalRefine({ ...base, materialSellPrices }),
+    });
+    const priced = buildAppraisal([item({ 34: 8 })], 100).rows[0];
+    expect(refineTotalFor(priced, 'split')).toBeCloseTo((10_000 + 16_000) / 2, 6);
+    const oneSided = buildAppraisal([item({})], 100).rows[0];
+    expect(refineTotalFor(oneSided, 'split')).toBeUndefined();
+    expect(refineTotalFor(oneSided, 'buy')).toBeCloseTo(10_000, 6);
+  });
+});

@@ -27,16 +27,18 @@ import { cx } from '@/lib/cx';
 import { formatIsk, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import type { Appraisal, RefineBasis } from '@/engine/market/appraisal';
+import { REFINE_BASES, type Appraisal, type RefineBasis } from '@/engine/market/appraisal';
 import {
+  basisAvailable,
   buildRefineComparison,
+  lopsidedItems,
+  LOPSIDED_SELL_RATIO,
   type RefineBreakdown,
   type RefineItemLine,
   type RefineMineralLine,
 } from '@/engine/market/refineBreakdown';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { formatVolume } from './format';
-import { REFINE_BASES } from './refineBasis';
 import { efficiencyText, pct, skillsText } from './refineFormat';
 
 /** Whose numbers a Shared Appraisal's breakdown is showing, and what swapping needs. */
@@ -73,9 +75,6 @@ interface RefineBreakdownModalProps {
 /** The unrounded yield, so the line shows what "rounding down" rounds. */
 const oneDecimal = createNumberFormat({ minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
-/** An item whose sell price is this many times its buy price is lopsided: a thin book, not a market. */
-const LOPSIDED_SELL_RATIO = 10;
-
 interface BasisRow {
   key: RefineBasis;
   /** Null where the basis cannot be priced (the link never carried the sell side). */
@@ -106,8 +105,9 @@ export function RefineBreakdownModal({
   editSetup,
   shared,
 }: RefineBreakdownModalProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const timeZone = useTimeZone();
+  const listFormat = new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' });
   const [typeId, setTypeId] = useState<number | null>(initialTypeId);
 
   const input = { appraisal, pricePercent, taxRate: setup.taxRate };
@@ -118,11 +118,15 @@ export function RefineBreakdownModal({
   const single = typeId === null ? null : (scoped.buy.items[0] ?? null);
   const comparison = single === null ? all : scoped;
   // The sell side may be missing (a link from before it was carried): then only the buy basis can be shown.
-  const activeBasis: RefineBasis = comparison[basis] ? basis : 'buy';
+  // Judged over the whole pile, as the page does, so the modal's selected row and the page agree.
+  const activeBasis: RefineBasis = basisAvailable(appraisal, basis) ? basis : 'buy';
   const breakdown = comparison[activeBasis] ?? comparison.buy;
 
   const nameOf = (id: number): string => mineralNames.get(id) || `#${id}`;
   const basisName = (key: RefineBasis): string => t(`market.appraisal.breakdown.basis.${key}`);
+  /** The basis as it reads inside a sentence. */
+  const basisInline = (key: RefineBasis): string =>
+    t(`market.appraisal.breakdown.basisInline.${key}`);
 
   const title =
     single === null
@@ -196,7 +200,7 @@ export function RefineBreakdownModal({
   const elsewhere = REFINE_BASES.flatMap((key) => {
     const other = comparison[key];
     return key !== activeBasis && other !== null && other.refineWins !== breakdown.refineWins
-      ? [basisName(key).toLowerCase()]
+      ? [basisInline(key)]
       : [];
   });
   const action = t(
@@ -206,14 +210,7 @@ export function RefineBreakdownModal({
   );
 
   // An item selling for many times its buy price props up the Sell and Split rows.
-  const lopsided = appraisal.items.filter(
-    (item) =>
-      (typeId === null || item.typeId === typeId) &&
-      item.buy !== null &&
-      item.sell !== null &&
-      item.buy > 0 &&
-      item.sell > item.buy * LOPSIDED_SELL_RATIO
-  );
+  const lopsided = lopsidedItems(appraisal.items, typeId ?? undefined);
   const lopsidedNames = lopsided.map((item) => item.name).join(', ');
 
   const mineralRows: MineralRow[] = [
@@ -346,7 +343,7 @@ export function RefineBreakdownModal({
     {
       id: 'asIs',
       header: t('market.appraisal.breakdown.columnAsIsOn', {
-        basis: basisName(activeBasis).toLowerCase(),
+        basis: basisInline(activeBasis),
       }),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
@@ -355,7 +352,7 @@ export function RefineBreakdownModal({
     {
       id: 'refined',
       header: t('market.appraisal.breakdown.columnRefinedOn', {
-        basis: basisName(activeBasis).toLowerCase(),
+        basis: basisInline(activeBasis),
       }),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
@@ -537,7 +534,7 @@ export function RefineBreakdownModal({
                           breakdown.refineWins
                             ? 'market.appraisal.breakdown.elsewhereSell'
                             : 'market.appraisal.breakdown.elsewhereRefine',
-                          { bases: elsewhere.join(` ${t('market.appraisal.breakdown.and')} `) }
+                          { bases: listFormat.format(elsewhere) }
                         )}
                       </small>
                     )}
@@ -562,7 +559,10 @@ export function RefineBreakdownModal({
                     className="mt-px shrink-0"
                   />
                   <HintText content={lopsidedNames}>
-                    {t('market.appraisal.breakdown.lopsided', { count: lopsided.length })}
+                    {t('market.appraisal.breakdown.lopsided', {
+                      count: lopsided.length,
+                      ratio: LOPSIDED_SELL_RATIO,
+                    })}
                   </HintText>
                 </p>
               )}
@@ -575,7 +575,7 @@ export function RefineBreakdownModal({
                       breakdown.asIs <= 0
                         ? 'market.appraisal.breakdown.nothingToCompare'
                         : 'market.appraisal.breakdown.neverWins',
-                      { basis: basisName(activeBasis).toLowerCase(), yours }
+                      { basis: basisInline(activeBasis), yours }
                     )
                   : t(
                       breakdown.breakEvenEfficiency > 1
@@ -583,7 +583,7 @@ export function RefineBreakdownModal({
                         : 'market.appraisal.breakdown.breakEvenAt',
                       {
                         breakEven: pct(breakdown.breakEvenEfficiency),
-                        basis: basisName(activeBasis).toLowerCase(),
+                        basis: basisInline(activeBasis),
                         yours,
                       }
                     )}
@@ -605,7 +605,7 @@ export function RefineBreakdownModal({
                   single === null
                     ? 'market.appraisal.breakdown.mineralsTitleOn'
                     : 'market.appraisal.breakdown.mineralsTitleItemOn',
-                  { basis: basisName(activeBasis).toLowerCase() }
+                  { basis: basisInline(activeBasis) }
                 )}
               </h3>
               <DataTable
@@ -624,12 +624,15 @@ export function RefineBreakdownModal({
               />
               {!breakdown.pricedAll && (
                 <p className="text-[0.6875rem] text-warning">
-                  {t('market.appraisal.breakdown.unpriced')}
+                  {t('market.appraisal.breakdown.unpriced', { basis: basisInline(activeBasis) })}
                 </p>
               )}
               {breakdown.unbuyable > 0 && (
                 <p className="text-[0.6875rem] text-warning">
-                  {t('market.appraisal.breakdown.unbuyable', { count: breakdown.unbuyable })}
+                  {t('market.appraisal.breakdown.unbuyable', {
+                    count: breakdown.unbuyable,
+                    basis: basisInline(activeBasis),
+                  })}
                 </p>
               )}
             </section>
@@ -639,7 +642,7 @@ export function RefineBreakdownModal({
                 <section className="flex flex-col gap-2">
                   <h3 className={SECTION_HEADING}>
                     {t('market.appraisal.breakdown.perItemTitleOn', {
-                      basis: basisName(activeBasis).toLowerCase(),
+                      basis: basisInline(activeBasis),
                     })}
                   </h3>
                   <DataTable

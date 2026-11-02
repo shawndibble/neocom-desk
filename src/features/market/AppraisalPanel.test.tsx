@@ -711,7 +711,7 @@ describe('AppraisalPanel', () => {
       renderPanel({ controller: controller({ result: partial }) });
       const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
       await userEvent.hover(within(veldsparRow).getByText('*'));
-      expect(await screen.findByRole('tooltip')).toHaveTextContent(/no price at this hub/);
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/no price on this basis/);
     });
 
     it('hides the Refine total chip with the Refine column, and brings it back with it', async () => {

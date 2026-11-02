@@ -107,8 +107,29 @@ export interface AppraisalRefineDetail {
   materialSellPrices?: Readonly<Record<number, number>>;
 }
 
+/** Every price basis, in the order they are shown. The one list the type and the comparison are built from. */
+export const REFINE_BASES = ['buy', 'split', 'sell'] as const;
+
 /** Which side of the book a refine comparison prices on: the buy orders, the sell orders, or halfway. */
-export type RefineBasis = 'buy' | 'split' | 'sell';
+export type RefineBasis = (typeof REFINE_BASES)[number];
+
+/**
+ * A price on a basis from its two sides: the buy side, the sell side, or their
+ * midpoint, which needs both. Null where a side the basis needs has no price.
+ * The one place the three bases are told apart; every `…For` selector below,
+ * and the breakdown's mineral prices, go through it.
+ */
+export function priceOnBasis(
+  basis: RefineBasis,
+  buy: number | null | undefined,
+  sell: number | null | undefined
+): number | null {
+  const buySide = buy ?? null;
+  const sellSide = sell ?? null;
+  if (basis === 'buy') return buySide;
+  if (basis === 'sell') return sellSide;
+  return buySide === null || sellSide === null ? null : (buySide + sellSide) / 2;
+}
 
 /** One resolved, priced item to appraise. Prices are per unit, at 100%. */
 export interface AppraisalItem {
@@ -256,7 +277,7 @@ export interface AppraisalTotals {
   spread: number;
   /** Rows missing a price on at least one side, so the totals are a subset. */
   unpricedRows: number;
-  /** Summed over rows carrying reprocessing data, whatever their pricing. */
+  /** The buy side of the refine total (see `refineSell`): summed over rows carrying reprocessing data, whatever their pricing. */
   refine: number;
   /** `refine` on the sell side, over rows that have it. */
   refineSell: number;
@@ -327,13 +348,17 @@ export function refineBeatsSellAsIs(row: AppraisalRow, basis: RefineBasis = 'buy
   return refine + leftOverValue > asIs;
 }
 
-/** A row's refine figure on a price basis: undefined where it has none, or where the basis needs a side that was never read. */
+/**
+ * A row's refine figure on a price basis: undefined where it has none, or where
+ * the basis needs a side that was never read. A split is only given where both
+ * sides priced every mineral, so a mineral nobody trades on one side is never
+ * counted at half its other price.
+ */
 export function refineTotalFor(row: AppraisalRow, basis: RefineBasis): number | undefined {
-  if (basis === 'buy') return row.refineTotal;
-  if (basis === 'sell') return row.refineSellTotal;
-  return row.refineTotal === undefined || row.refineSellTotal === undefined
-    ? undefined
-    : (row.refineTotal + row.refineSellTotal) / 2;
+  if (basis === 'split' && (row.refinePricedAll === false || row.refineSellPricedAll === false)) {
+    return undefined;
+  }
+  return priceOnBasis(basis, row.refineTotal, row.refineSellTotal) ?? undefined;
 }
 
 /** `refineTotalFor`'s pricing flag: false where a mineral had no price on that basis, so the figure is a floor. */
@@ -347,18 +372,12 @@ export function refinePricedAllFor(row: AppraisalRow, basis: RefineBasis): boole
 
 /** What the whole pasted quantity fetches sold as is, on a basis; null where a side it needs has no price. */
 export function asIsTotalFor(row: AppraisalRow, basis: RefineBasis): number | null {
-  if (basis === 'buy') return row.buyTotal;
-  if (basis === 'sell') return row.sellTotal;
-  return row.buyTotal === null || row.sellTotal === null
-    ? null
-    : (row.buyTotal + row.sellTotal) / 2;
+  return priceOnBasis(basis, row.buyTotal, row.sellTotal);
 }
 
 /** One unit's as-is price on a basis, which also prices the leftover units; null where a side it needs has no price. */
 export function asIsEachFor(row: AppraisalRow, basis: RefineBasis): number | null {
-  if (basis === 'buy') return row.buyEach;
-  if (basis === 'sell') return row.sellEach;
-  return row.buyEach === null || row.sellEach === null ? null : (row.buyEach + row.sellEach) / 2;
+  return priceOnBasis(basis, row.buyEach, row.sellEach);
 }
 
 /** The pile's refine total on a basis, over the rows that have one. */
@@ -366,9 +385,15 @@ export function refineTotalsFor(
   totals: Pick<AppraisalTotals, 'refine' | 'refineSell'>,
   basis: RefineBasis
 ): number {
-  if (basis === 'buy') return totals.refine;
-  if (basis === 'sell') return totals.refineSell;
-  return (totals.refine + totals.refineSell) / 2;
+  return priceOnBasis(basis, totals.refine, totals.refineSell) ?? 0;
+}
+
+/**
+ * The row has a refine figure on this basis and selling it as is wins: the
+ * as-is total on that basis is the one to mark.
+ */
+export function sellAsIsBeatsRefine(row: AppraisalRow, basis: RefineBasis): boolean {
+  return refineTotalFor(row, basis) !== undefined && !refineBeatsSellAsIs(row, basis);
 }
 
 /**

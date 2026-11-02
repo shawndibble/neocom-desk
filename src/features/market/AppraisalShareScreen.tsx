@@ -100,10 +100,11 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
   // side was carried can only be priced on the buy orders.
   const storedBasis = useRefineBasis((state) => state.value);
   const setStoredBasis = useRefineBasis((state) => state.setValue);
-  useHydratedStore(useRefineBasis);
+  const basisReady = useHydratedStore(useRefineBasis);
   const refineBasis: RefineBasis =
     appraisal !== null && basisAvailable(appraisal, storedBasis) ? storedBasis : 'buy';
   const hasRefine =
+    basisReady &&
     setup !== null &&
     (appraisal?.rows.some((row) => refineTotalFor(row, refineBasis) !== undefined) ?? false);
   const refineRange = hasRefine && appraisal ? refineEfficiencyRange(appraisal.items) : null;

@@ -6,12 +6,10 @@
  * and the highlights, so every appraisal after it uses the same pick.
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
-import type { RefineBasis } from '@/engine/market/appraisal';
-
-export const REFINE_BASES: readonly RefineBasis[] = ['buy', 'split', 'sell'];
+import { REFINE_BASES, type RefineBasis } from '@/engine/market/appraisal';
 
 export const useRefineBasis = createLocalSetting<RefineBasis>({
   key: 'appraisalRefineBasis',
   defaultValue: 'buy',
-  parse: (raw) => (raw === 'buy' || raw === 'split' || raw === 'sell' ? raw : null),
+  parse: (raw) => REFINE_BASES.find((basis) => basis === raw) ?? null,
 });

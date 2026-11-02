@@ -2,7 +2,9 @@
  * The arithmetic behind an Appraisal's Refine figure, laid out so a pilot can
  * check it against another tool: which minerals the pile refines into, at what
  * price, less the facility's tax, plus the units too few to fill a portion,
- * against what the same pile fetches sold as is into the buy orders.
+ * against what the same pile fetches sold as is. Everything is priced on one
+ * Price Basis (the buy orders, the sell orders, or halfway between), and
+ * `buildRefineComparison` does all three at once.
  *
  * Pure. It re-derives nothing the Appraisal already decided: the recipe, the
  * yield applied and the prices read all arrive on each item's
@@ -10,15 +12,19 @@
  * snapshot go through this one function. An item with no `detail` has no
  * breakdown and is counted in `skipped`.
  *
- * The comparison is deliberately the table's: `refineBeatsSellAsIs` already
- * judges a row as refined value plus leftover units at the row's buy price
- * against its buy total, and this does the same over the whole pile.
+ * The comparison is deliberately the table's: `refineBeatsSellAsIs` judges a
+ * row as refined value plus leftover units, at the row's as-is unit price on
+ * the basis, against its as-is total on the basis (`asIsEachFor` /
+ * `asIsTotalFor`), and this does the same over the whole pile. A row with no
+ * as-is price on the basis is no comparison there: not a win.
  */
 import { reprocessingYield } from '@/engine/industry/reprocessing';
 import { netOfReprocessingTax } from '@/engine/industry/refiningSetup';
 import {
   asIsEachFor,
   asIsTotalFor,
+  priceOnBasis,
+  REFINE_BASES,
   type Appraisal,
   type AppraisalItem,
   type AppraisalRow,
@@ -115,11 +121,10 @@ function mineralPrice(
   typeId: number,
   basis: RefineBasis
 ): number | undefined {
-  const buy = detail.materialPrices[typeId];
-  const sell = detail.materialSellPrices?.[typeId];
-  if (basis === 'buy') return buy;
-  if (basis === 'sell') return sell;
-  return buy === undefined || sell === undefined ? undefined : (buy + sell) / 2;
+  return (
+    priceOnBasis(basis, detail.materialPrices[typeId], detail.materialSellPrices?.[typeId]) ??
+    undefined
+  );
 }
 
 function netMineralValue(
@@ -238,7 +243,11 @@ export function buildRefineBreakdown({
       refined,
       leftoverValue: itemLeftover,
       asIs: itemAsIs,
-      wins: refined + itemLeftover > itemAsIs,
+      // No as-is price on this basis is no comparison, as in the table: not a win.
+      wins:
+        asIsTotalFor(row, basis) !== null &&
+        asIsEachFor(row, basis) !== null &&
+        refined + itemLeftover > itemAsIs,
     });
   }
 
@@ -320,12 +329,10 @@ export function basisAvailable(
     .every((item) => !item.refine?.detail || item.refine.detail.materialSellPrices !== undefined);
 }
 
-export interface RefineComparison {
+/** The breakdown on every basis. The buy side is always there; the others need the sell side to have been read. */
+export type RefineComparison = Record<RefineBasis, RefineBreakdown | null> & {
   buy: RefineBreakdown;
-  /** Null where the sell prices were never read, which is also what split needs. */
-  split: RefineBreakdown | null;
-  sell: RefineBreakdown | null;
-}
+};
 
 /** The breakdown on every price basis at once, for the side-by-side comparison. */
 export function buildRefineComparison(
@@ -336,8 +343,29 @@ export function buildRefineComparison(
       ? buildRefineBreakdown({ ...input, basis })
       : null;
   return {
+    ...Object.fromEntries(REFINE_BASES.map((basis) => [basis, on(basis)])),
     buy: buildRefineBreakdown({ ...input, basis: 'buy' }),
-    split: on('split'),
-    sell: on('sell'),
-  };
+  } as RefineComparison;
+}
+
+/** An item whose sell price is this many times its buy price is lopsided: a thin book, not a market. */
+export const LOPSIDED_SELL_RATIO = 10;
+
+/**
+ * Items whose sell price dwarfs their buy price, which props up the Sell and
+ * Split bases (one uncompressed ore sat at 46x its compressed price). The
+ * figures stay as the market shows them; this is what lets a caller say so.
+ */
+export function lopsidedItems(
+  items: readonly Pick<AppraisalItem, 'typeId' | 'name' | 'buy' | 'sell'>[],
+  onlyTypeId?: number
+): { typeId: number; name: string }[] {
+  return items.filter(
+    (item) =>
+      (onlyTypeId === undefined || item.typeId === onlyTypeId) &&
+      item.buy !== null &&
+      item.sell !== null &&
+      item.buy > 0 &&
+      item.sell > item.buy * LOPSIDED_SELL_RATIO
+  );
 }
