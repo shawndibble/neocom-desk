@@ -65,6 +65,20 @@ describe('brokerFeePct and brokerFee with a hub surcharge', () => {
     );
   });
 
+  it('keeps the 100 ISK minimum on the skill fee only: a 230 ISK order at Manifest (measured)', () => {
+    // In game, untrained pilot: broker 100 (the minimum), safety tax 5% = 11.50.
+    expect(brokerFee(230, 0, 0, 0, 5)).toBeCloseTo(111.5, 10);
+  });
+
+  it('charges 3% broker plus 5% safety tax above the minimum: a 5,000 ISK order (measured)', () => {
+    expect(brokerFee(5000, 0, 0, 0, 5)).toBeCloseTo(150 + 250, 10);
+  });
+
+  it('breaks even above the minimum-fee floor when the safety tax is on a tiny order', () => {
+    // cost 230, 1 unit, untrained: revenue R satisfies R - 100 - 0.075R - 0.05R = 230.
+    expect(breakEvenPrice(230, 1, 0, 0, 0, 0, 5)).toBeCloseTo(330 / (1 - 0.125), 8);
+  });
+
   it('defaults to no surcharge', () => {
     expect(brokerFeePct(3)).toBe(brokerFeePct(3, 0, 0, 0));
   });
@@ -77,11 +91,9 @@ describe('break-even and relist with a hub surcharge', () => {
     expect(surcharged).toBeGreaterThan(plain);
   });
 
-  it('puts the surcharge through the Relist Discount like the rest of the broker rate', () => {
-    const plain = relistBrokerFeePct(5, 5, 0, 0);
-    const surcharged = relistBrokerFeePct(5, 5, 0, 0, 5);
-    const discount = relistDiscountPct(5);
-    expect(surcharged - plain).toBeCloseTo((5 * (100 - discount)) / 100, 10);
+  it('charges no safety tax on a relist: Manifest 100 -> 5,000 ISK, one unit (measured)', () => {
+    // 4,900 increase at 3% = 147, plus 5,000 at the 50%-discounted 1.5% = 75.
+    expect(relistFee(100, 5000, 1, 0, 0)).toBeCloseTo(222, 10);
   });
 });
 

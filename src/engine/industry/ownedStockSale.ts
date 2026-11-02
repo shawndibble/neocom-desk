@@ -178,7 +178,7 @@ export function ownedStockSale(
             brokerRelations,
             standing?.factionStanding,
             standing?.corpStanding,
-            standing?.brokerSurchargePct
+            standing?.safetyTaxPct
           )
         : 0;
     lines.push({

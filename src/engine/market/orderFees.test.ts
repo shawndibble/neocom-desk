@@ -16,15 +16,15 @@ describe('orderFees', () => {
     expect(finalPrice).toBeCloseTo(1_000 - fees, 9);
   });
 
-  it('adds a hub’s broker surcharge to a listed price but not to a buy order', () => {
-    const surcharged: OrderFeeContext = {
+  it('adds a hub’s Safety Tax to a listed price but not to a buy order', () => {
+    const withTax: OrderFeeContext = {
       ...ctx,
-      standing: { ...ctx.standing, brokerSurchargePct: 5 },
+      standing: { ...ctx.standing, safetyTaxPct: 5 },
     };
-    const sell = orderFees({ price: 1_000, is_buy_order: false }, surcharged);
+    const sell = orderFees({ price: 1_000, is_buy_order: false }, withTax);
     const plain = orderFees({ price: 1_000, is_buy_order: false }, ctx);
     expect(sell.fees - plain.fees).toBeCloseTo(1_000 * pct(5), 9);
-    expect(orderFees({ price: 1_000, is_buy_order: true }, surcharged).fees).toBeCloseTo(
+    expect(orderFees({ price: 1_000, is_buy_order: true }, withTax).fees).toBeCloseTo(
       orderFees({ price: 1_000, is_buy_order: true }, ctx).fees,
       9
     );

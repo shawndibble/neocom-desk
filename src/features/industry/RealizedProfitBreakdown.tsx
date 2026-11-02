@@ -43,7 +43,7 @@ export function RealizedProfitBreakdown({
     brokerRelationsLevel,
     standing?.factionStanding,
     standing?.corpStanding,
-    standing?.brokerSurchargePct
+    standing?.safetyTaxPct
   );
 
   return (

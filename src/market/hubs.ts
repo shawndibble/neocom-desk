@@ -57,14 +57,14 @@ export interface TradeHub {
    */
   compared: boolean;
   /**
-   * Extra broker-fee points a hub charges on top of the skill and standing
-   * rate. Exordium's market fees run higher than empire space; the 5 is the
-   * EVE University wiki's "additional 5% market fees on non-instant orders"
-   * (read 2026-11-01), which does not say whether it is broker fee, sales tax
-   * or both. Provisional until measured in game (tracked in the ticket linked
-   * from the Manifest scope decision).
+   * The Safety Tax a hub charges, percent of the order's value, on every
+   * non-instant order (buy and sell; instant trades pay none). Exordium's is
+   * 5, measured at Manifest V on 2026-11-02: a separate line from the broker
+   * fee (3.0% at Broker Relations 0, 100 ISK minimum) and the sales tax (7.5%
+   * at Accounting 0), neither of which Manifest changes. A 5,000 ISK order
+   * showed 150 broker + 250 safety tax; a 230 ISK order showed 100 + 11.50.
    */
-  brokerSurchargePct: number;
+  safetyTaxPct: number;
 }
 
 export const TRADE_HUBS: readonly TradeHub[] = [
@@ -82,7 +82,7 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     ownerFactionId: 500001, // Caldari State
     dailyJobs: true,
     compared: true,
-    brokerSurchargePct: 0,
+    safetyTaxPct: 0,
   },
   {
     id: 'amarr',
@@ -98,7 +98,7 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     ownerFactionId: 500003, // Amarr Empire
     dailyJobs: true,
     compared: true,
-    brokerSurchargePct: 0,
+    safetyTaxPct: 0,
   },
   {
     id: 'dodixie',
@@ -114,7 +114,7 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     ownerFactionId: 500004, // Gallente Federation
     dailyJobs: true,
     compared: true,
-    brokerSurchargePct: 0,
+    safetyTaxPct: 0,
   },
   {
     id: 'rens',
@@ -130,7 +130,7 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     ownerFactionId: 500002, // Minmatar Republic
     dailyJobs: true,
     compared: true,
-    brokerSurchargePct: 0,
+    safetyTaxPct: 0,
   },
   {
     id: 'hek',
@@ -146,7 +146,7 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     ownerFactionId: 500002, // Minmatar Republic
     dailyJobs: true,
     compared: true,
-    brokerSurchargePct: 0,
+    safetyTaxPct: 0,
   },
   {
     id: 'manifest',
@@ -162,7 +162,7 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     ownerFactionId: 500028, // AIR Laboratories (the SDE's faction for the corp)
     dailyJobs: false,
     compared: false,
-    brokerSurchargePct: 5,
+    safetyTaxPct: 5,
   },
 ] as const;
 
