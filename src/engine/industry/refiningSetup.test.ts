@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_REFINING_SETUP,
   netOfReprocessingTax,
+  facilityBaseYieldFor,
   reprocessingTaxOn,
   resolveRefiningSetup,
 } from './refiningSetup';
@@ -47,5 +48,25 @@ describe('netOfReprocessingTax', () => {
 
   it('is the value unchanged at no tax', () => {
     expect(netOfReprocessingTax(1_234, 0)).toBe(1_234);
+  });
+});
+
+describe('facilityBaseYieldFor', () => {
+  it("works the facility's base yield out of the total the EVE client shows", () => {
+    // The client: 51% base x 1.08 x 1.15 x 1.1 = 69.7%; typing 69.7% gets the 51% back.
+    const skills = 1.08 * 1.15 * 1.1;
+    expect(facilityBaseYieldFor(0.697, skills)).toBeCloseTo(0.51, 3);
+  });
+
+  it('rounds to four places so a typed total reads back as itself', () => {
+    const skills = 1.08 * 1.15 * 1.1;
+    const base = facilityBaseYieldFor(0.697, skills);
+    expect(base).toBe(0.5102);
+    expect((base ?? 0) * skills).toBeCloseTo(0.697, 3);
+  });
+
+  it('has no answer without a skills multiplier, rather than dividing by zero', () => {
+    expect(facilityBaseYieldFor(0.697, 0)).toBeNull();
+    expect(facilityBaseYieldFor(0.697, Number.NaN)).toBeNull();
   });
 });

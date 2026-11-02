@@ -111,7 +111,7 @@ describe('RefineBreakdownModal', () => {
       setup: { yieldRate: 0.5, taxRate: 0 },
       editSetup: { onYield: vi.fn(), onTax: vi.fn() },
     });
-    expect(screen.getByText(/Assuming an NPC station's 50% yield/)).toBeInTheDocument();
+    expect(screen.getByText(/Assuming an NPC station's 50% base yield/)).toBeInTheDocument();
   });
 
   it('names the NPC default on a shared link too, as the sharer numbers', () => {
@@ -124,7 +124,9 @@ describe('RefineBreakdownModal', () => {
         onToggleSource: vi.fn(),
       },
     });
-    expect(screen.getByText(/These numbers use an NPC station's 50% yield/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/These numbers use an NPC station's 50% base yield/)
+    ).toBeInTheDocument();
     expect(screen.getByText('Shared with you')).toBeInTheDocument();
   });
 
@@ -183,5 +185,45 @@ describe('RefineBreakdownModal, when the chosen item stops refining', () => {
     expect(screen.getByText('Total with leftover')).toBeInTheDocument();
     // With no tax, the minerals line already is the figure the table shows.
     expect(screen.queryByText('Refined minerals, less tax')).not.toBeInTheDocument();
+  });
+});
+
+describe('RefineBreakdownModal, typing the reprocessing yield', () => {
+  it('works the facility base yield out of the yield the EVE client shows', async () => {
+    const user = userEvent.setup();
+    const onYield = vi.fn();
+    open({ editSetup: { onYield, onTax: vi.fn() } });
+    // 0.9 efficiency over a 0.66 base yield is a x1.3636 skills multiplier.
+    await user.click(screen.getByRole('button', { name: /Edit Reprocessing yield/ }));
+    const field = screen.getByRole('textbox', { name: 'Reprocessing yield' });
+    await user.clear(field);
+    await user.type(field, '69.7{Enter}');
+    expect(onYield).toHaveBeenCalledOnce();
+    expect(onYield.mock.calls[0][0]).toBeCloseTo(0.697 / (0.9 / 0.66), 3);
+  });
+
+  it('leaves it as a readout when the ores carry different skills, with no single base to work out', () => {
+    open({
+      editSetup: { onYield: vi.fn(), onTax: vi.fn() },
+      appraisal: buildAppraisal([ore(1, 'Zeolites', 1000, 0.9), ore(2, 'Coesite', 500, 0.8)], 100),
+    });
+    expect(
+      screen.queryByRole('button', { name: /Edit Reprocessing yield/ })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('80% – 90%')).toBeInTheDocument();
+  });
+
+  it('is a readout on a shared link', () => {
+    open({
+      shared: {
+        generatedAt: 1_790_000_000,
+        source: 'shared',
+        unavailable: null,
+        onToggleSource: vi.fn(),
+      },
+    });
+    expect(
+      screen.queryByRole('button', { name: /Edit Reprocessing yield/ })
+    ).not.toBeInTheDocument();
   });
 });

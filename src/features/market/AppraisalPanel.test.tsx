@@ -714,7 +714,7 @@ describe('AppraisalPanel', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       expect(screen.getByText('Refine total')).toBeInTheDocument();
       // Yield and tax are edited in the page settings now, not beside the total.
-      expect(screen.queryByText('Facility yield')).not.toBeInTheDocument();
+      expect(screen.queryByText('Facility base yield')).not.toBeInTheDocument();
       expect(screen.queryByText('Reprocessing tax')).not.toBeInTheDocument();
 
       await userEvent.click(screen.getByRole('button', { name: 'Columns' }));

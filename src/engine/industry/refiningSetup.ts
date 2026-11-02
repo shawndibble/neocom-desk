@@ -36,6 +36,18 @@ export function resolveRefiningSetup(input: { yieldRate: number; taxRate: number
 }
 
 /**
+ * The facility's base yield behind a total yield: the figure the EVE client's
+ * Reprocessing window shows (`69.7%`), which already has the pilot's skills
+ * and implants in it, divided back down by `skillsMultiplier`. Rounded to four
+ * places, so a typed total reads back as itself. Null where there is no
+ * multiplier to divide by.
+ */
+export function facilityBaseYieldFor(totalYield: number, skillsMultiplier: number): number | null {
+  if (!(skillsMultiplier > 0) || !Number.isFinite(totalYield)) return null;
+  return Math.round((totalYield / skillsMultiplier) * 10_000) / 10_000;
+}
+
+/**
  * The fee on a pile of refined minerals, `quantities` by type id at `prices`.
  * A mineral with no price adds nothing: the fee is on what the facility could value.
  */
