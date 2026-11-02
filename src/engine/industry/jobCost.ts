@@ -4,6 +4,8 @@
  * EIV uses ME0 (unresearched) quantities x ESI adjusted prices x runs; ME does
  * not reduce the job fee. The structure job-cost bonus applies only to the
  * cost-index term. SCC surcharge fixed at 4%; NPC station tax fixed at 0.25%.
+ * A region's own tax (`regionalTax.ts`, Exordium's 5%) is one more percent of
+ * EIV, untouched by the structure bonus.
  * (Alpha clone tax ignored — app targets Omega.)
  */
 
@@ -33,7 +35,8 @@ export function jobFee(
   eiv: number,
   systemCostIndex: number,
   facility: FacilityPreset,
-  facilityTaxPct?: number
+  facilityTaxPct?: number,
+  regionalTaxPct = 0
 ): JobFeeBreakdown {
   if (eiv < 0) throw new RangeError(`eiv must be >= 0, got ${eiv}`);
   if (systemCostIndex < 0) {
@@ -43,11 +46,13 @@ export function jobFee(
   const grossCost = eiv * systemCostIndex * (1 - facility.jobCostBonusPct / 100);
   const sccSurcharge = (eiv * SCC_SURCHARGE_PCT) / 100;
   const facilityTax = (eiv * taxPct) / 100;
+  const regionalTax = (eiv * regionalTaxPct) / 100;
   return {
     eiv,
     grossCost,
     sccSurcharge,
     facilityTax,
-    total: grossCost + sccSurcharge + facilityTax,
+    regionalTax,
+    total: grossCost + sccSurcharge + facilityTax + regionalTax,
   };
 }

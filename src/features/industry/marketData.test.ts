@@ -9,12 +9,21 @@ import { clearMarketPriceCache } from '@/market/prices';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { loadMarketSnapshot, loadMarketSnapshots, clearCostIndexCache } from './marketData';
 
+const { systemRegions } = vi.hoisted(() => ({ systemRegions: new Map<number, number>() }));
+vi.mock('@/sde/solarSystems', () => ({
+  lookupSolarSystem: async (id: number) => {
+    const regionId = systemRegions.get(id);
+    return regionId === undefined ? undefined : { id, name: 'X', security: 0.9, regionId };
+  },
+}));
+
 const server = mswServer();
 
 beforeEach(() => server.use(...fallbackSourcesDown));
 afterEach(() => {
   clearMarketPriceCache();
   clearCostIndexCache();
+  systemRegions.clear();
 });
 
 function fuzzworkHandler() {
@@ -98,6 +107,25 @@ describe('loadMarketSnapshot', () => {
 
     expect(snapshot.hubPrices).toEqual({});
     expect(snapshot.hubPricesUnreachable).toBe(false);
+  });
+
+  it("carries the job system's region tax: Exordium 5, an empire region or an unknown region 0", async () => {
+    server.use(fuzzworkHandler(), adjustedPricesHandler(), costIndexHandler());
+
+    systemRegions.set(BUILD_SYSTEM_ID, 10001004);
+    expect(
+      (await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34], BUILD_SYSTEM_ID)).regionalTaxPct
+    ).toBe(5);
+
+    systemRegions.set(BUILD_SYSTEM_ID, 10000002);
+    expect(
+      (await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34], BUILD_SYSTEM_ID)).regionalTaxPct
+    ).toBe(0);
+
+    systemRegions.clear();
+    expect(
+      (await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34], BUILD_SYSTEM_ID)).regionalTaxPct
+    ).toBe(0);
   });
 
   it("reads the cost index of the build system when one is named, not the hub's", async () => {

@@ -449,6 +449,18 @@ describe('buildVsBuy', () => {
   });
 });
 
+describe('buildVsBuy — regional job tax (Exordium Industrial Tax)', () => {
+  it('adds 5% of EIV to the job fee and the total cost, and nothing without it', () => {
+    const plain = buildVsBuy(baseInputs);
+    const taxed = buildVsBuy({ ...baseInputs, regionalTaxPct: 5 });
+    const eiv = taxed.jobFee.eiv;
+    expect(taxed.jobFee.regionalTax).toBeCloseTo(eiv * 0.05, 6);
+    expect(taxed.jobFee.total - plain.jobFee.total).toBeCloseTo(eiv * 0.05, 6);
+    expect(taxed.totalCost - plain.totalCost).toBeCloseTo(eiv * 0.05, 6);
+    expect(plain.jobFee.regionalTax).toBe(0);
+  });
+});
+
 describe('buildVsBuy — Blueprint Acquisition for the top-level product (issue #838)', () => {
   it('does nothing when the caller does not opt in', () => {
     const r = buildVsBuy(baseInputs);

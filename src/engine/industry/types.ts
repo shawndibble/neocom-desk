@@ -502,6 +502,8 @@ export interface IndustryInputs {
   facilityTaxPct?: number;
   /** Manufacturing system cost index for the facility's system (ESI). */
   systemCostIndex: number;
+  /** The job's region's own tax, percent of EIV (`regionalTax.ts`); absent is none. */
+  regionalTaxPct?: number;
   adjustedPrices: AdjustedPrices;
   hubPrices: HubPrices;
   /**
@@ -583,6 +585,8 @@ export interface JobFeeBreakdown {
   grossCost: number;
   sccSurcharge: number;
   facilityTax: number;
+  /** A region's own tax on the job (Exordium's), in ISK; absent is none. */
+  regionalTax?: number;
   total: number;
 }
 

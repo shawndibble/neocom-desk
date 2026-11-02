@@ -281,6 +281,14 @@ export function ResultsSummary({
             tooltip={t('industry.sccSurchargeTooltip')}
             indented
           />
+          {(result.jobFee.regionalTax ?? 0) > 0 && (
+            <CostRow
+              label={t('industry.exordiumTax')}
+              value={formatIsk(result.jobFee.regionalTax ?? 0)}
+              tooltip={t('industry.exordiumTaxTooltip')}
+              indented
+            />
+          )}
           <CostRow
             label={t('industry.facilityTaxAmount')}
             value={formatIsk(result.jobFee.facilityTax)}

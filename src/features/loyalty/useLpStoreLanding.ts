@@ -338,6 +338,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
       ...revenuePricing(snapshot, priceBasis),
       adjustedPrices: snapshot.adjustedPrices,
       systemCostIndex: snapshot.systemCostIndex,
+      regionalTaxPct: snapshot.regionalTaxPct,
       skills,
       standing,
       materialSourcing: undefined,

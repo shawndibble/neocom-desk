@@ -89,3 +89,19 @@ describe('jobFee', () => {
     expect(() => jobFee(1, -0.05, FACILITY_PRESETS.npcStation)).toThrow(RangeError);
   });
 });
+
+describe('jobFee with a regional tax', () => {
+  it('adds the Exordium Industrial Tax as its own line: Manifest V job, EIV 386,830 (measured)', () => {
+    const fee = jobFee(386_830, 0.0234, FACILITY_PRESETS.npcStation, undefined, 5);
+    expect(fee.regionalTax).toBeCloseTo(19_341.5, 2);
+    expect(fee.total).toBeCloseTo(fee.grossCost + fee.sccSurcharge + fee.facilityTax + 19_341.5, 6);
+  });
+
+  it('is not reduced by a structure job-cost bonus, and is 0 by default', () => {
+    expect(jobFee(1_000_000, 0.03, FACILITY_PRESETS.raitaru, 0, 5).regionalTax).toBeCloseTo(
+      50_000,
+      6
+    );
+    expect(jobFee(1_000_000, 0.03, FACILITY_PRESETS.raitaru, 0).regionalTax).toBe(0);
+  });
+});
