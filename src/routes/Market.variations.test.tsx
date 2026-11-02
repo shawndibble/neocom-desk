@@ -498,7 +498,8 @@ describe('Market Browser tree leaf (issue #6)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
 
-    await user.click(await screen.findByRole('button', { name: 'Show info' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Show info' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Rifter' });
     expect(await within(dialog).findByText('A rugged little frigate.')).toBeInTheDocument();
@@ -517,12 +518,12 @@ describe('Compare toggle in the item header', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
 
-    await user.click(await screen.findByRole('button', { name: 'Add Rifter to Compare' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Add to Compare' }));
     expect(useCompareSet.getState().items).toEqual([{ typeId: 587, itemName: 'Rifter' }]);
-    const remove = await screen.findByRole('button', { name: 'Remove Rifter from Compare' });
-    expect(remove).toHaveAttribute('aria-pressed', 'true');
 
-    await user.click(remove);
+    await user.click(await screen.findByRole('button', { name: 'More actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove from Compare' }));
     expect(useCompareSet.getState().items).toEqual([]);
   });
 });

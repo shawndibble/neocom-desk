@@ -13083,14 +13083,13 @@
       "rowCount_one": "{{count}} row",
       "rowCount_other": "{{count}} rows",
       "noDifferences": "Every attribute is the same across the compared items.",
-      "addItem": "Add {{name}} to Compare",
-      "removeItem": "Remove {{name}} from Compare"
+      "removeFromCompare": "Remove from Compare"
     },
     "quickbar": {
       "title": "Quickbar",
       "empty": "No items yet — open an item's menu (⋮) and choose Add to Quickbar.",
       "viewInAppraisal": "View in Appraisal",
-      "removeItem": "Remove {{name}} from Quickbar",
+      "removeFromQuickbar": "Remove from Quickbar",
       "removeMenu": "Remove",
       "removed": "Quickbar item {{name}} removed.",
       "undo": "Undo",
@@ -13103,7 +13102,6 @@
         "cancelled": "Reordering cancelled. {{name}} stayed at its original position.",
         "instructions": "Press space to pick up an item. Use the up and down arrow keys to move it, space again to drop it, or escape to cancel."
       },
-      "addItem": "Add {{name}} to Quickbar",
       "vsPaid": {
         "label": "against what you paid for {{name}}",
         "tooltip_one": "vs paid: {{price}} now against {{paid}} paid for the {{units}} unit you still hold, before fees.",
@@ -13111,7 +13109,7 @@
       }
     },
     "priceAlert": {
-      "button": "Set price alert for {{name}}",
+      "button": "Set price alert",
       "priceLabel": "Target price (ISK)",
       "directionLabel": "Direction",
       "directionAbove": "At or above",

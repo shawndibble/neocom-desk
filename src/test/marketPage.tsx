@@ -274,7 +274,7 @@ export function finder(): HTMLElement {
 export async function pinRifterFromHeaderBell(user: ReturnType<typeof userEvent.setup>) {
   await user.type(await screen.findByRole('searchbox'), 'rift');
   await user.click(await screen.findByText('Rifter'));
-  await user.click(await screen.findByRole('button', { name: 'Set price alert for Rifter' }));
+  await user.click(await screen.findByRole('button', { name: 'Set price alert' }));
   await user.type(await screen.findByLabelText('Target price (ISK)'), '1000000');
   await user.click(screen.getByRole('button', { name: 'Save' }));
 }
