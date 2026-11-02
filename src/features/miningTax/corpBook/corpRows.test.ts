@@ -30,6 +30,20 @@ const mined = (date: string, over: Partial<MoonMiningTaxRow> = {}): MoonMiningTa
   ...over,
 });
 
+const assigned = (payeeId: string): MiningTaxAssignmentRecord => ({
+  id: payeeId,
+  characterId: ME,
+  date: '2026-10-17',
+  solarSystemId: 30003838,
+  payeeId,
+  oreLines: [{ typeId: ZEO, quantity: 1000 }],
+  taxPct: 10,
+  estimatedValue: 0,
+  taxOwed: 0,
+  status: 'outstanding',
+  updatedAt: 1,
+});
+
 const view = (over: Partial<BookRowView> = {}): BookRowView => ({
   id: '98000001:90000001:1000:2026-10-17',
   corporationId: 98000001,
@@ -54,6 +68,7 @@ const view = (over: Partial<BookRowView> = {}): BookRowView => ({
 const overlay = (over: Partial<PersonalOverlay> = {}): PersonalOverlay => ({
   rows: [],
   takenFromFree: new Map(),
+  absorbed: new Map(),
   labels: new Map(),
   books: [],
   ...over,
@@ -81,6 +96,25 @@ describe('buildDisplayRows', () => {
       nameOf
     );
     expect(wholly).toEqual([]);
+  });
+
+  it('hides the rows of a Payee that is the corporation, the book row stands in for them', () => {
+    const key = `${ME}:2026-10-17:30003838`;
+    const base = mined('2026-10-17');
+    const row = {
+      ...base,
+      unassignedOreLines: [],
+      assignments: [
+        { ...assigned('bmw'), id: 'a1' },
+        { ...assigned('ashfall'), id: 'a2' },
+      ],
+    };
+    const out = buildDisplayRows(
+      [row],
+      overlay({ absorbed: new Map([[key, new Set(['a1'])]]) }),
+      nameOf
+    );
+    expect(out.map((d) => d.assignment?.payeeId)).toEqual(['ashfall']);
   });
 
   it('labels the unassigned row Pending corp record or Unattributed', () => {
@@ -143,7 +177,7 @@ describe('corp Payee ids', () => {
     expect(corporationOfPayee(corpPayeeId(98000001))).toBe(98000001);
     expect(isCorpPayeeId('some-uuid')).toBe(false);
     expect(isCorpPayeeId(undefined)).toBe(false);
-    expect(corpPayee(98000001, ME, 'Brass (Corp Tax Book)', 15, 'jita')).toMatchObject({
+    expect(corpPayee(98000001, ME, 'Brass', 15, 'jita')).toMatchObject({
       id: corpPayeeId(98000001),
       entityId: 98000001,
       entityKind: 'corporation',
@@ -179,6 +213,7 @@ describe('personalEntriesOf', () => {
     expect(entry.freeOreLines).toEqual([{ typeId: ZEO, quantity: 400 }]);
     expect(entry.allocations).toEqual([
       {
+        id: 'a',
         payeeId: 'p1',
         taxPct: 10,
         oreLines: [{ typeId: ZEO, quantity: 600 }],

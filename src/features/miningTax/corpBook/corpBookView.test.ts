@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { PayeeRecord } from '@/db';
 import type { DatedUnitPrices } from '@/features/miningTax/pricing';
 import { buildCorpBookView } from './corpBookView';
 import type { LoadedCorpBook } from './corpBookStore';
@@ -65,13 +66,14 @@ const input = (over = {}) => ({
   loaded: [loaded()],
   pricesByCorp: new Map([[CORP, prices]]),
   corpNames: new Map([[CORP, 'Brass Meridian Logistics']]),
+  payees: [],
   made: [],
   characterNames: new Map([[ME, 'Kestrel Vane']]),
   now: '2026-10-18T14:00:00Z',
   ...over,
 });
 
-const payeeName = (corp: string) => `${corp} (Corp Tax Book)`;
+const payeeName = (corp: string) => `${corp}`;
 
 describe('buildCorpBookView', () => {
   it('is null until a book has its prices (the tab stays as it was)', () => {
@@ -86,10 +88,62 @@ describe('buildCorpBookView', () => {
     expect(view.overlay.rows[0].taxOwed).toBeCloseTo(1000 * 148 * 0.15, 4);
     expect(view.payees).toHaveLength(1);
     expect(view.payees[0]).toMatchObject({
-      name: 'Brass Meridian Logistics (Corp Tax Book)',
+      name: 'Brass Meridian Logistics',
       hubId: 'jita',
     });
     expect(view.books[0]).toMatchObject({ corpName: 'Brass Meridian Logistics', left: false });
+  });
+
+  it('connects a stored Payee verified as the corporation, and no other', () => {
+    const payee = (id: string, over: Partial<PayeeRecord>): PayeeRecord => ({
+      id,
+      characterId: ME,
+      name: 'Brass Meridian Logistics',
+      defaultTaxPct: 10,
+      updatedAt: 1,
+      ...over,
+    });
+    const cases = [
+      payee('verified', { entityId: CORP, entityKind: 'corporation' }),
+      // Same name, no verified id: a label, not the corporation.
+      payee('label', {}),
+      payee('character', { entityId: CORP, entityKind: 'character' }),
+      payee('other', { entityId: CORP + 1, entityKind: 'corporation' }),
+    ];
+    const seen: string[][] = [];
+    // The overlay reads ownPayeeIds only through the allocation it absorbs, so assert via an allocation per Payee.
+    for (const c of cases) {
+      const row = input().rows[0];
+      const view = buildCorpBookView(
+        input({
+          payees: [c],
+          rows: [
+            {
+              ...row,
+              unassignedOreLines: [],
+              assignments: [
+                {
+                  id: 'a',
+                  characterId: ME,
+                  date: row.entry.date,
+                  solarSystemId: row.entry.solarSystemId,
+                  payeeId: c.id,
+                  oreLines: row.entry.oreLines,
+                  taxPct: 10,
+                  estimatedValue: 0,
+                  taxOwed: 0,
+                  status: 'outstanding',
+                  updatedAt: 1,
+                },
+              ],
+            },
+          ],
+        }),
+        payeeName
+      )!;
+      seen.push([...view.overlay.absorbed.values()].flatMap((s) => [...s]));
+    }
+    expect(seen).toEqual([['a'], [], [], []]);
   });
 
   it('marks a book none of the tracked Characters is in any more as left', () => {
