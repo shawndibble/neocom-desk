@@ -109,7 +109,7 @@ describe('loadMarketSnapshot', () => {
     expect(snapshot.hubPricesUnreachable).toBe(false);
   });
 
-  it("carries the job system's region tax: Exordium 5, an empire region 0, an unknown region none", async () => {
+  it("carries the job system's region tax: Exordium 5, an empire region or an unknown region 0", async () => {
     server.use(fuzzworkHandler(), adjustedPricesHandler(), costIndexHandler());
 
     systemRegions.set(BUILD_SYSTEM_ID, 10001004);
@@ -125,7 +125,7 @@ describe('loadMarketSnapshot', () => {
     systemRegions.clear();
     expect(
       (await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34], BUILD_SYSTEM_ID)).regionalTaxPct
-    ).toBeUndefined();
+    ).toBe(0);
   });
 
   it("reads the cost index of the build system when one is named, not the hub's", async () => {

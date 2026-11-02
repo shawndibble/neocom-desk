@@ -66,7 +66,7 @@ export interface MarketSnapshot {
   systemCostIndex: number | null;
   /** True only when ESI answered but has no index for the system — never for the offline null. */
   systemCostIndexMissing?: boolean;
-  /** The job system's region's own tax, percent of EIV (`regionalTax.ts`); 0 where none, absent when the region is unknown. */
+  /** The job system's region's own tax, percent of EIV (`regionalTax.ts`); 0 where none or when the region is unknown. */
   regionalTaxPct?: number;
   /**
    * Same system's copying/invention indices (issue #3990), for invented-copy
@@ -287,7 +287,7 @@ export function loadMarketSnapshots(
       adjustedPrices: adjusted,
       systemCostIndex,
       systemCostIndexMissing,
-      ...(regionId !== undefined ? { regionalTaxPct: regionalJobTaxPct(regionId) } : {}),
+      regionalTaxPct: regionalJobTaxPct(regionId),
       ...(copyingCostIndex !== undefined ? { copyingCostIndex, inventionCostIndex } : {}),
       hubPricesUnreachable: unreachable,
     };

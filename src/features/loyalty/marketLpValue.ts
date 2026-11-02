@@ -35,6 +35,7 @@ function valueOf(
     hubPrices: snapshot.hubPrices,
     adjustedPrices: snapshot.adjustedPrices,
     systemCostIndex: snapshot.systemCostIndex,
+    regionalTaxPct: snapshot.regionalTaxPct,
     skills: {},
     materialSourcing: undefined,
     liquidationBasis: 'order',
