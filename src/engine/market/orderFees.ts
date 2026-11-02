@@ -33,7 +33,7 @@ export function orderFees(
         brokerRelationsLevel,
         standing.factionStanding,
         standing.corpStanding,
-        standing.brokerSurchargePct
+        standing.safetyTaxPct
       );
   const fees = (order.price * (taxPct + brokerPct)) / 100;
   return { fees, finalPrice: order.price - fees };

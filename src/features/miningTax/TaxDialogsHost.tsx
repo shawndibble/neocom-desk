@@ -443,6 +443,13 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     void runAndClose(() => unsettle([assignment]), fromMenu ? dr : undefined);
   }
 
+  /** Undoes the member's own "paid" on Assignments a Corp Tax Book row stands in for. */
+  function unmarkCorpPayment(ids: readonly string[] | undefined) {
+    const marked = everyAssignment.filter((a) => ids?.includes(a.id));
+    if (marked.length === 0) return;
+    void runAndClose(() => unsettle(marked));
+  }
+
   function resolveEntry(dr: DisplayRow, fromMenu = false) {
     const assignment = dr.assignment;
     if (!assignment) return;
@@ -649,6 +656,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
           systemSecurity={systemSecurityOf(detailTarget)}
           typeNames={typeNames}
           onPay={() => actions.corpPayFromDetail(corpDetail.view.corporationId)}
+          onUnmarkPaid={() => unmarkCorpPayment(corpDetail.view.markedPaidIds)}
           notice={
             corpDetail.view.overlap && (
               <CorpOverlapNotice

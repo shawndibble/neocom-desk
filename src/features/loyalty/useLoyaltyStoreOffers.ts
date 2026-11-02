@@ -233,6 +233,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
       ...revenuePricing(snapshot, priceBasis),
       adjustedPrices: snapshot.adjustedPrices,
       systemCostIndex: snapshot.systemCostIndex,
+      regionalTaxPct: snapshot.regionalTaxPct,
       skills,
       standing,
       materialSourcing,

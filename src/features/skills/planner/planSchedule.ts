@@ -35,7 +35,7 @@ import { pinnedInProgressEntry } from './queueRows';
 import { normalizeWhatIfSelection, whatIfImplants } from './whatIfImplants';
 import { isAcceleratorLive } from '@/engine/accelerator';
 import { acceleratorId } from '@/features/accelerator/characterAccelerators';
-import { composePlanBoosters, toBoosters } from './planBooster';
+import { acceleratorBoosters } from './planBooster';
 
 /** What the scheduler costs against when ESI's attribute sheet cannot be read or explained. */
 export const DEFAULT_ATTRIBUTES: Attributes = {
@@ -49,7 +49,7 @@ export const DEFAULT_ATTRIBUTES: Attributes = {
 /** The persisted fields of a plan that change its schedule. */
 export type SchedulablePlan = Pick<
   SkillPlanRecord,
-  'entries' | 'markers' | 'markerAttributes' | 'whatIfImplants' | 'booster' | 'boosters'
+  'entries' | 'markers' | 'markerAttributes' | 'whatIfImplants'
 >;
 
 export interface PlanScheduleInputs {
@@ -74,14 +74,8 @@ export function schedulePlan(
   nowMs: number
 ): SkillPlanSchedule {
   const implants = whatIfImplants(normalizeWhatIfSelection(plan.whatIfImplants), inputs.implants);
-  const detectedAccelerator =
-    inputs.attributeBaseline?.kind === 'accelerated'
-      ? inputs.attributeBaseline.acceleratorBonus
-      : null;
   const running = isAcceleratorLive(inputs.accelerator, nowMs) ? inputs.accelerator : null;
-  const boosters = toBoosters(
-    composePlanBoosters(plan.boosters, plan.booster, running, detectedAccelerator)
-  );
+  const boosters = acceleratorBoosters(running);
   const queue = projectQueueEnd(inputs.trained, inputs.queueEntries, nowMs, plan.entries);
   const schedule = computeSkillPlanSchedule({
     entries: plan.entries,

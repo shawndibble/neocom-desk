@@ -64,6 +64,8 @@ export interface MakeOrBuyContext {
   security: SecurityBand;
   facilityTaxPct?: number;
   systemCostIndex: number;
+  /** The job's region's own tax, percent of EIV (`regionalTax.ts`); absent is none. */
+  regionalTaxPct?: number;
   adjustedPrices: AdjustedPrices;
   /**
    * What the recipe's inputs cost to buy — the plan's own material price
@@ -181,6 +183,7 @@ function jobUnitCost(
     security: ctx.security,
     facilityTaxPct: ctx.facilityTaxPct,
     systemCostIndex: ctx.systemCostIndex,
+    regionalTaxPct: ctx.regionalTaxPct,
     adjustedPrices: ctx.adjustedPrices,
     hubPrices: ctx.materialPrices,
     modifiers: ctx.modifiers,
@@ -233,6 +236,8 @@ function reactionUnitCost(
     security: location?.security ?? ctx.security,
     facilityTaxPct: location?.facilityTaxPct ?? ctx.facilityTaxPct,
     systemCostIndex: location?.systemCostIndex ?? ctx.systemCostIndex,
+    // Exordium's tax is measured on manufacturing jobs only; a reaction pays none here.
+    regionalTaxPct: undefined,
   });
 }
 

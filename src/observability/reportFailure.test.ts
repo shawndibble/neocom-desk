@@ -30,6 +30,24 @@ describe('reportFailure', () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 
+  it('skips a sync queued for a removed Character (NEOCOM-DESK-1V)', () => {
+    const removed = Object.assign(new Error('Unknown character 1'), {
+      name: 'UnknownCharacterError',
+    });
+    reportFailure('sync', removed);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it("skips WebKit's IndexedDB transaction kill, alone or in an aggregate (NEOCOM-DESK-1W)", () => {
+    const webkit = Object.assign(
+      new Error('Attempt to get a record from database without an in-progress transaction'),
+      { name: 'UnknownError' }
+    );
+    reportFailure('sync', webkit);
+    reportFailure('sync', new AggregateError([webkit, new DOMException('x', 'AbortError')], 'x'));
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
   it('captures an unexpected failure tagged with only its subsystem', () => {
     const err = new Error('boom');
     reportFailure('sync', err);

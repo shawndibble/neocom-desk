@@ -1187,21 +1187,18 @@ describe('PlanEditor Assumptions disclosure', () => {
 
   it('summarises what is set while closed', async () => {
     const user = userEvent.setup();
+    await seedAccelerator(12, Date.UTC(2099, 0, 1));
     renderEditor(vi.fn(), {
-      plan: {
-        ...PLAN,
-        whatIfImplants: { kind: 'preset', preset: '+5' },
-        boosters: [{ enabled: true, bonus: 12, startsAt: null, expiresAt: Date.UTC(2099, 0, 1) }],
-      },
+      plan: { ...PLAN, whatIfImplants: { kind: 'preset', preset: '+5' } },
     });
     await openTools(user);
 
-    expect(screen.getByRole('button', { name: /^assumptions/i })).toHaveTextContent(
-      '+5 implants · Booster'
+    expect(await screen.findByRole('button', { name: /^assumptions/i })).toHaveTextContent(
+      '+5 implants · Accelerator'
     );
   });
 
-  it('does not claim a Booster the scheduler is not applying', async () => {
+  it('does not claim an Accelerator the scheduler is not applying', async () => {
     const user = userEvent.setup();
     // A detected in-game accelerator prefills a row with no expiry, which is
     // costed as none; the closed row must not say otherwise.
@@ -1661,6 +1658,15 @@ describe('PlanEditor booster market link (issue #407)', () => {
  */
 const DAY = 24 * 60 * 60 * 1000;
 
+const seedAccelerator = (bonus: number, expiresAt: number) =>
+  db.characterAccelerators.put({
+    id: '1',
+    characterId: 1,
+    bonus,
+    expiresAt,
+    updatedAt: 1,
+  });
+
 describe('a cerebral accelerator detected in the ESI sheet', () => {
   const ACCELERATED = {
     kind: 'accelerated' as const,
@@ -1668,15 +1674,15 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     attributes: { intelligence: 17, memory: 26, perception: 22, willpower: 17, charisma: 17 },
   };
 
-  it('prefills the Booster control with the detected bonus and says where it came from', async () => {
+  it('shows the detected bonus as a fact and says where it came from', async () => {
     const user = userEvent.setup();
     renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.getByRole('button', { name: 'Remove accelerator 1' })).toBeInTheDocument();
-    expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('12');
-    expect(screen.getByText(/\+12 cerebral accelerator/i)).toBeInTheDocument();
+    expect(screen.getByText(/\+12 from the EVE API has been auto applied/i)).toBeInTheDocument();
+    expect(screen.getByText('+12')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Bonus')).toBeNull();
   });
 
   it('leaves the expiry blank and warns that nothing is applied until it is set', async () => {
@@ -1689,20 +1695,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     expect(screen.getByText(/costed as if you had none/i)).toBeInTheDocument();
   });
 
-  it('keeps the prefilled bonus editable, and does not stomp the edit back', async () => {
-    const user = userEvent.setup();
-    renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
-    await openTools(user);
-    await openAssumptions(user);
-
-    const bonus = screen.getByLabelText('Bonus');
-    await user.clear(bonus);
-    await user.type(bonus, '8');
-
-    expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('8');
-  });
-
-  it('prefills whatever tier was detected, not a fixed number', async () => {
+  it('shows whatever tier was detected, not a fixed number', async () => {
     const user = userEvent.setup();
     renderEditor(vi.fn(), {
       attributeBaseline: { ...ACCELERATED, acceleratorBonus: 4 },
@@ -1710,7 +1703,18 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('4');
+    expect(screen.getByText('+4')).toBeInTheDocument();
+  });
+
+  it('saves the detected bonus with the time the pilot sets', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
+    await openTools(user);
+    await openAssumptions(user);
+
+    await user.click(screen.getByRole('button', { name: '+12h' }));
+
+    await waitFor(async () => expect((await db.characterAccelerators.get('1'))?.bonus).toBe(12));
   });
 
   it('still applies the accelerator once an expiry is given', async () => {
@@ -1787,9 +1791,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     expect(screen.getByText('INT +5 · MEM +5 · PER +5 · WIL +5 · CHA +5')).toBeInTheDocument();
   });
 
-  it('saves the whole Booster answer the moment a row is added', async () => {
-    // No row exists until one is added — "Add accelerator" is the
-    // empty-state affordance.
+  it('opens an Accelerator editor from "Add accelerator" without touching the plan', async () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
     await openTools(user);
@@ -1797,11 +1799,9 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
 
-    // Not just an empty row: a stored Booster is what tells the editor the
-    // user has answered, so it has to carry the bonus the new row opens on.
-    expect(onUpdate).toHaveBeenCalledWith({
-      boosters: [{ enabled: true, bonus: 3, startsAt: null, expiresAt: null }],
-    });
+    expect(screen.getByLabelText('Days')).toBeInTheDocument();
+    // The accelerator belongs to the Character, never to the plan.
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 
   it('stores the time left as the instant that long from now, not as the typed text', async () => {
@@ -1823,137 +1823,80 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     });
   });
 
-  it('reopens on the Booster the plan was saved with', async () => {
+  it('reopens on the Accelerator the Character was saved with', async () => {
     const user = userEvent.setup();
-    renderEditor(vi.fn(), {
-      plan: {
-        ...PLAN,
-        booster: {
-          enabled: true,
-          bonus: 6,
-          startsAt: null,
-          expiresAt: Date.now() + 2 * DAY + 5 * 60 * 60 * 1000 + 30 * 60 * 1000,
-        },
-      },
-    });
+    await seedAccelerator(6, Date.now() + 2 * DAY + 5 * 60 * 60 * 1000 + 30 * 60 * 1000);
+    renderEditor();
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.getByRole('button', { name: 'Remove accelerator 1' })).toBeInTheDocument();
-    expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('6');
+    expect((await screen.findByLabelText<HTMLInputElement>('Bonus')).value).toBe('6');
     expect(screen.getByLabelText<HTMLInputElement>('Days').value).toBe('2');
     expect(screen.getByLabelText<HTMLInputElement>('Hours').value).toBe('5');
   });
 
   it('does not erase a saved expiry when a box is cleared to be retyped', async () => {
     // The data-loss path: emptying a box to retype it is not an answer.
-    // Writing null there would erase the stored expiry, re-cost the plan, and
-    // sync the erasure away.
     const user = userEvent.setup();
-    const { onUpdate } = renderEditor(vi.fn(), {
-      plan: {
-        ...PLAN,
-        booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: Date.now() + 5 * DAY },
-      },
-    });
+    await seedAccelerator(3, Date.now() + 5 * DAY);
+    renderEditor();
     await openTools(user);
     await openAssumptions(user);
 
-    const days = screen.getByLabelText<HTMLInputElement>('Days');
+    const days = await screen.findByLabelText<HTMLInputElement>('Days');
     await user.clear(days);
 
-    expect(onUpdate).not.toHaveBeenCalled();
     expect(days.value).toBe('');
+    expect(await db.characterAccelerators.get('1')).toBeDefined();
   });
 
-  it('commits an emptied expiry on blur — clearing it IS an answer', async () => {
+  it('forgets the accelerator when every time box is emptied and focus leaves', async () => {
     const user = userEvent.setup();
-    const { onUpdate } = renderEditor(vi.fn(), {
-      plan: {
-        ...PLAN,
-        booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: Date.now() + 5 * DAY },
-      },
-    });
+    await seedAccelerator(3, Date.now() + 5 * DAY);
+    renderEditor();
     await openTools(user);
     await openAssumptions(user);
 
-    await user.clear(screen.getByLabelText('Days'));
+    await user.clear(await screen.findByLabelText('Days'));
     await user.clear(screen.getByLabelText('Hours'));
     await user.clear(screen.getByLabelText('Minutes'));
     await user.tab();
 
-    expect(onUpdate).toHaveBeenCalledWith({
-      boosters: [{ enabled: true, bonus: 3, startsAt: null, expiresAt: null }],
-    });
+    await waitFor(async () => expect(await db.characterAccelerators.get('1')).toBeUndefined());
   });
 
   it('replaces a saved expiry in one write, never through an expiry of zero in between', async () => {
     const user = userEvent.setup();
-    renderEditor(vi.fn(), {
-      plan: {
-        ...PLAN,
-        booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: Date.now() + 5 * DAY },
-      },
-    });
+    await seedAccelerator(3, Date.now() + 5 * DAY);
+    renderEditor();
     await openTools(user);
     await openAssumptions(user);
 
-    const days = screen.getByLabelText<HTMLInputElement>('Days');
+    const days = await screen.findByLabelText<HTMLInputElement>('Days');
     await user.clear(days);
     await user.type(days, '4');
     await user.tab();
 
-    // One write, carrying the new instant. The emptied box on the way there
-    // must not land on the plan.
     await waitFor(async () => {
       const saved = await db.characterAccelerators.get('1');
       expect(saved?.expiresAt).toBeGreaterThan(Date.now() + 4 * DAY - 10_000);
       expect(saved?.expiresAt).toBeLessThan(Date.now() + 4 * DAY + 10_000);
     });
-    // No write ever carried an expiry of zero days on the way there.
     expect(await db.characterAccelerators.count()).toBe(1);
   });
 
-  it('clamps the bonus where it is written, not only where it is read', async () => {
+  it('clamps the bonus where it is written', async () => {
     const user = userEvent.setup();
-    const { onUpdate } = renderEditor(vi.fn(), {
-      plan: { ...PLAN, booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: null } },
-    });
+    await seedAccelerator(3, Date.now() + 5 * DAY);
+    renderEditor();
     await openTools(user);
     await openAssumptions(user);
 
-    const bonus = screen.getByLabelText('Bonus');
+    const bonus = await screen.findByLabelText('Bonus');
     await user.clear(bonus);
     await user.type(bonus, '45');
 
-    // Never a stored 45 the plan is not costed under.
-    expect(onUpdate).toHaveBeenLastCalledWith({
-      boosters: [{ enabled: true, bonus: 30, startsAt: null, expiresAt: null }],
-    });
-  });
-
-  it('does not re-prefill a detected accelerator over a saved "no booster" answer', async () => {
-    // Unticking the box is a legitimate answer — "that accelerator is gone" —
-    // and the prefill must not overrule it on the next visit.
-    const user = userEvent.setup();
-    renderEditor(vi.fn(), {
-      attributeBaseline: {
-        kind: 'accelerated',
-        acceleratorBonus: 12,
-        attributes: ATTRIBUTES,
-      },
-      plan: {
-        ...PLAN,
-        booster: { enabled: false, bonus: 12, startsAt: null, expiresAt: null },
-      },
-    });
-    await openTools(user);
-    await openAssumptions(user);
-
-    // The unticked legacy row reads as no row at all, and the detected
-    // accelerator still does not prefill over that answer.
-    expect(screen.queryByRole('button', { name: 'Remove accelerator 1' })).toBeNull();
-    expect(screen.queryByLabelText('Bonus')).toBeNull();
+    await waitFor(async () => expect((await db.characterAccelerators.get('1'))?.bonus).toBe(30));
   });
 });
 
@@ -1972,7 +1915,6 @@ describe('a character with no accelerator', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.queryByRole('button', { name: 'Remove accelerator 1' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
     expect(screen.queryByText(/cerebral accelerator/i)).toBeNull();
     expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
@@ -1997,7 +1939,6 @@ describe('an attribute sheet nothing explains', () => {
     expect(screen.getByRole('button', { name: 'Copy diagnostics' })).toBeInTheDocument();
     // No accelerator was recovered, so nothing is prefilled either — the
     // list stays empty, same as the no-accelerator case above.
-    expect(screen.queryByRole('button', { name: 'Remove accelerator 1' })).toBeNull();
   });
 });
 

@@ -39,6 +39,9 @@ export function isNetworkFailure(error: unknown): boolean {
     return true;
   // Any `AbortError`, not only a DOMException: Dexie's "Transaction aborted" is a DexieError.
   if (error instanceof Error && error.name === 'AbortError') return true;
+  // WebKit's wording when Safari kills an IndexedDB transaction under a reader.
+  if (error instanceof Error && /without an in-progress transaction/.test(error.message))
+    return true;
   const { code, status } = (error ?? {}) as { code?: unknown; status?: unknown };
   if (typeof code === 'string' && NETWORK_CODES.has(code.replace(/^[a-z]+\//, ''))) return true;
   // Firestore Lite's own wrap of a fetch that threw (no response at all): the
@@ -65,6 +68,11 @@ function isUnauthenticated(error: unknown): boolean {
 function isDeadGrant(error: unknown): boolean {
   const { name, code } = (error ?? {}) as { name?: unknown; code?: unknown };
   return name === 'AuthError' && code === 'invalid_grant';
+}
+
+/** A queued sync for a Character removed meanwhile: the player's own action. Matched by `name` like `isDeadGrant`. */
+function isRemovedCharacter(error: unknown): boolean {
+  return (error as { name?: unknown } | null)?.name === 'UnknownCharacterError';
 }
 
 /**
@@ -127,7 +135,7 @@ export function reportFailure(
   error: unknown,
   now: number = Date.now()
 ): void {
-  if (isNetworkFailure(error) || isDeadGrant(error)) return;
+  if (isNetworkFailure(error) || isDeadGrant(error) || isRemovedCharacter(error)) return;
   const message = error instanceof Error ? error.message : String(error);
   const key = `${subsystem}:${message}`;
   const last = lastReported.get(key);

@@ -14,7 +14,13 @@ export function moveSaving(
   toNpcStation: boolean
 ): number {
   if (toNpcStation) {
-    return current.total - jobFee(current.eiv, newIndex, FACILITY_PRESETS.npcStation).total;
+    // A nearby system is assumed to be in the same region, so it pays the same
+    // regional tax (`regionalTax.ts`) and the saving is the other terms only.
+    const regionalTaxPct = current.eiv > 0 ? ((current.regionalTax ?? 0) / current.eiv) * 100 : 0;
+    return (
+      current.total -
+      jobFee(current.eiv, newIndex, FACILITY_PRESETS.npcStation, undefined, regionalTaxPct).total
+    );
   }
   return current.grossCost * (1 - newIndex / currentIndex);
 }

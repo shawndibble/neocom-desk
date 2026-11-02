@@ -95,6 +95,8 @@ export interface LoyaltyOfferComputeInputs {
   hubPrices: HubPrices;
   adjustedPrices: AdjustedPrices | null;
   systemCostIndex: number | null;
+  /** The hub system's region tax, percent of EIV (`regionalTax.ts`); absent is none. */
+  regionalTaxPct?: number;
   skills: SkillLevels;
   /** Detected owned-stock coverage, applied only to offers named in `useOwnMaterialsFor`. */
   materialSourcing: MaterialSourcingMap | undefined;
@@ -236,6 +238,7 @@ function computeBlueprintRow(
     rigFit: ['none', 'none', 'none'],
     security: 'highsec',
     systemCostIndex: inputs.systemCostIndex ?? 0,
+    regionalTaxPct: inputs.regionalTaxPct,
     adjustedPrices: inputs.adjustedPrices ?? {},
     hubPrices: inputs.hubPrices,
     materialSourcing: useOwnMaterials ? inputs.materialSourcing : undefined,

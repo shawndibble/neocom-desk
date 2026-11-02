@@ -64,12 +64,19 @@ export function FixListSummary({
   actIskTiedUp,
   watchCount,
   fineCount,
+  matching,
   orderSlots,
 }: {
   actCount: number;
   actIskTiedUp: number;
   watchCount: number;
   fineCount: number;
+  /**
+   * What the funnel matched, passed only while a funnel filter narrows: the ISK across all of it, so
+   * a pilot who filtered to a station or a Character sees what that set is worth. The Needs you
+   * figure beside it is part of this one.
+   */
+  matching?: { count: number; iskTiedUp: number };
   orderSlots?: OrderSlotsFigure;
 }) {
   const { t } = useTranslation();
@@ -83,6 +90,16 @@ export function FixListSummary({
         key="isk"
         i18nKey="market.orders.fixList.tiedUp"
         components={{ isk: <IskAmount value={actIskTiedUp} /> }}
+      />
+    );
+  }
+  if (matching && matching.count > 0) {
+    parts.push(
+      <Trans
+        key="matching"
+        i18nKey="market.orders.fixList.acrossMatching"
+        count={matching.count}
+        components={{ isk: <IskAmount value={matching.iskTiedUp} /> }}
       />
     );
   }

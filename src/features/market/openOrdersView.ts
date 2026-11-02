@@ -16,6 +16,8 @@ export interface OpenOrdersFixList {
   fine: OpenOrderRow[];
   /** ISK tied up in the Needs you rows: the headline's quiet line. */
   actIskTiedUp: number;
+  /** ISK tied up in every matching row: what the funnel's match line reads out while it narrows. */
+  matchingIskTiedUp: number;
 }
 
 export function buildOpenOrdersView(
@@ -34,6 +36,7 @@ export function buildOpenOrdersView(
     watch,
     fine,
     actIskTiedUp: act.reduce((sum, row) => sum + row.iskTiedUp, 0),
+    matchingIskTiedUp: sorted.reduce((sum, row) => sum + row.iskTiedUp, 0),
   };
 }
 

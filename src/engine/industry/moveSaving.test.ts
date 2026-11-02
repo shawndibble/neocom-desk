@@ -20,3 +20,14 @@ describe('moveSaving', () => {
     expect(moveSaving(current, 0.05, 0.048, true)).toBeLessThan(0);
   });
 });
+
+describe('moveSaving inside a taxed region', () => {
+  it('does not count the regional tax as a saving when the move stays in the region', () => {
+    const current = jobFee(1_000_000, 0.05, FACILITY_PRESETS.npcStation, undefined, 5);
+    const plain = jobFee(1_000_000, 0.05, FACILITY_PRESETS.npcStation);
+    expect(moveSaving(current, 0.05, 0.03, true)).toBeCloseTo(
+      moveSaving(plain, 0.05, 0.03, true),
+      6
+    );
+  });
+});

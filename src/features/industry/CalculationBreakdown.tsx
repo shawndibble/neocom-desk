@@ -102,7 +102,7 @@ export function CalculationBreakdown({
     context.brokerRelationsLevel,
     context.standing?.factionStanding,
     context.standing?.corpStanding,
-    context.standing?.brokerSurchargePct
+    context.standing?.safetyTaxPct
   );
   const feePct = formatPercent(taxPct + brokerPct);
 
@@ -205,13 +205,19 @@ export function CalculationBreakdown({
             })}
           </p>
           <Formula>
-            {t('industry.breakdown.jobFeeFormula', {
-              eiv: formatIsk(result.jobFee.eiv),
-              costIndexFee: formatIsk(result.jobFee.grossCost),
-              scc: formatIsk(result.jobFee.sccSurcharge),
-              facilityTax: formatIsk(result.jobFee.facilityTax),
-              total: formatIsk(result.jobFee.total),
-            })}
+            {t(
+              (result.jobFee.regionalTax ?? 0) > 0
+                ? 'industry.breakdown.jobFeeFormulaExordium'
+                : 'industry.breakdown.jobFeeFormula',
+              {
+                eiv: formatIsk(result.jobFee.eiv),
+                costIndexFee: formatIsk(result.jobFee.grossCost),
+                scc: formatIsk(result.jobFee.sccSurcharge),
+                facilityTax: formatIsk(result.jobFee.facilityTax),
+                regional: formatIsk(result.jobFee.regionalTax ?? 0),
+                total: formatIsk(result.jobFee.total),
+              }
+            )}
           </Formula>
           <Formula>
             {t('industry.breakdown.totalCostFormula', {

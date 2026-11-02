@@ -113,7 +113,7 @@ export function loyaltyOfferProfit(input: LoyaltyOfferProfitInput): LoyaltyOffer
             brokerRelations,
             standing?.factionStanding,
             standing?.corpStanding,
-            standing?.brokerSurchargePct
+            standing?.safetyTaxPct
           )
         : 0;
   const netRevenue =

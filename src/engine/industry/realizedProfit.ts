@@ -63,7 +63,7 @@ export function realizedProfit(inputs: RealizedProfitInputs): RealizedProfitResu
     inputs.brokerRelationsLevel,
     inputs.standing?.factionStanding,
     inputs.standing?.corpStanding,
-    inputs.standing?.brokerSurchargePct
+    inputs.standing?.safetyTaxPct
   );
   const netRevenue = inputs.grossRevenue - salesTaxAmount - brokerFeeAmount;
   const insurance = inputs.insurancePayout ?? 0;

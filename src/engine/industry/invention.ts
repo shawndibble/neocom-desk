@@ -196,5 +196,6 @@ export function researchJobFee(
   facilityTaxPct?: number
 ): number {
   const eiv = estimatedItemValue(builtBy, 1, adjustedPrices);
+  // No regional tax: Exordium's is measured on manufacturing jobs only.
   return jobFee(eiv * RESEARCH_JOB_EIV_SHARE, systemCostIndex, facility, facilityTaxPct).total;
 }

@@ -322,7 +322,7 @@ function onPlanHeroBasis(
     brokerRelationsLevel: modifiers.skills[SKILL_IDS.brokerRelations] ?? 0,
     factionStanding: standing?.factionStanding,
     corpStanding: standing?.corpStanding,
-    brokerSurchargePct: standing?.brokerSurchargePct,
+    safetyTaxPct: standing?.safetyTaxPct,
   });
   return {
     result: {
@@ -396,6 +396,7 @@ export function computeOpportunityRow(
         security: basePlan.security,
         facilityTaxPct: basePlan.facilityTaxPct,
         systemCostIndex,
+        regionalTaxPct: snapshot.regionalTaxPct,
         adjustedPrices,
         materialPrices,
         modifiers,
@@ -408,6 +409,7 @@ export function computeOpportunityRow(
     plan,
     blueprint,
     systemCostIndex,
+    regionalTaxPct: snapshot.regionalTaxPct,
     adjustedPrices,
     hubPrices: snapshot.hubPrices,
     materialPrices,

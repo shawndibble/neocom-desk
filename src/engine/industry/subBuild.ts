@@ -61,6 +61,8 @@ export interface SubBuild {
 export interface SubBuildContext extends FacilityContext {
   facilityTaxPct?: number;
   systemCostIndex: number;
+  /** The job's region's own tax, percent of EIV (`regionalTax.ts`); absent is none. */
+  regionalTaxPct?: number;
   adjustedPrices: AdjustedPrices;
   /** See `IndustryInputs.modifiers`. */
   modifiers: CharacterModifiers;
@@ -103,7 +105,8 @@ export function planSubBuild(
         estimatedItemValue(blueprint, runs, ctx.adjustedPrices),
         ctx.systemCostIndex,
         ctx.facility,
-        ctx.facilityTaxPct
+        ctx.facilityTaxPct,
+        ctx.regionalTaxPct
       ),
     };
   } catch {

@@ -14,7 +14,8 @@ here — they go one per file in `docs/context/decisions/`.
   once per Character and shared by every **Skill Plan** and the Characters
   table's Accelerator column. Typed-in wins while it has not run out; after
   that it is deleted and a **Detected Accelerator** (a guess, no expiry) applies
-  again. It is the first **Booster** of the plans costed for that Character.
+  again. It is the one accelerator every plan costed for that Character uses; a
+  plan keeps none of its own. EVE has a single booster slot.
 - **Abyssal type**: The item type a **Mutaplasmid** makes — "Heavy Abyssal
   Energy Neutralizer", "Light Mutated Drone". One abyssal type is made from
   many base modules, so the type alone never says which base an item came
@@ -128,12 +129,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Boot Update**: A new app build (a waiting service worker) applied behind
   the boot screen on a cold start or browser reload, never mid-session: no
   route-change reload, and no "update ready" indicator.
-- **Booster**: Cerebral accelerator; user adds it manually, entering the time
-  left as EVE's tooltip shows it, for training-time math. The one running now
-  is the Character's **Accelerator**, shared across plans; a plan holds only the
-  Boosters it queues behind it. A Skill Plan holds
-  an ordered list of Boosters run one after another, since EVE has a single
-  booster slot; a queued one starts when the one before it expires.
+- **Booster**: Retired name for a cerebral accelerator in a Skill Plan; see **Accelerator**. (A
+  fitting's combat booster is a different thing.)
 - **BPC**: An owned Blueprint Copy — an ESI blueprint instance with a finite
   number of runs remaining. Distinct from a **BPO**, which never depletes.
   Circulates only via player contracts in EVE, never ordinary market
@@ -400,8 +397,8 @@ here — they go one per file in `docs/context/decisions/`.
   any more: corp data lives only on corp routes.
 - **Depth Price**: A Build Plan material's unit price when its need is large against what its **Trade Hub** lists (at least 1% of the units for sale): the average paid walking the hub station's sell orders, cheapest first, until the need is filled, instead of the lowest sell. Sell **Material Price Basis** only, on the plan and Build Group pages only; the product is never walked. A Build Group walks its members' summed need.
 - **Detected Accelerator** — a cerebral accelerator inferred from a base sheet
-  that is over budget, by the size of the excess. Prefilled into the Booster
-  control; not a separate mechanism.
+  that is over budget, by the size of the excess. Shown in the plan's Accelerator
+  section with its bonus fixed; the pilot sets only the time left.
 - **Day Ticker**: The **Calendar Map** on a phone — one horizontally scrolled
   row of day columns, each with its weekday, date, a count and a bar segmented
   by **Clock Kind**, in place of a grid that would take the width the **Coming
@@ -554,7 +551,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Avoided Systems**: The solar systems a pilot keeps off their routes, entered by hand because ESI cannot read the game client's own autopilot avoidance list. Part of **Travel Settings**; not a **Route Preference**.
 - **Route Preference**: Which trip a distance describes: the game's Prefer shorter, Prefer safer or Prefer less secure, one vocabulary app-wide. The pilot's default lives in **Travel Settings**; a page with its own picker opens on it and overrides it for that view only.
 - **Travel Settings**: The in-game autopilot's route options, for planning: the default **Route Preference**, the security penalty, and what to avoid (the **Avoided Systems**, EDENCOM and Triglavian minor-victory systems, and systems over a pod-kill count in ESI's last-hour report).
-- **Job Fee**: The ISK ESI charges to install a manufacturing job, separate from material cost. Sized from EIV, the system's **Cost Index**, a fixed SCC surcharge, and the facility's tax.
+- **Safety Tax**: Exordium's extra market charge, 5% of an order's value, paid when a non-instant buy or sell order is placed. Its own line beside the broker fee and sales tax; instant trades and relists pay none, and the broker fee's 100 ISK minimum does not absorb it (`TradeHub.safetyTaxPct`).
+- **Job Fee**: The ISK ESI charges to install a manufacturing job, separate from material cost. Sized from EIV, the system's **Cost Index**, a fixed SCC surcharge, the facility's tax, and, in Exordium, the region's own Exordium Industrial Tax (5% of EIV).
 - **Journal Party**: The other side of a wallet journal line: the player, corporation or NPC (CONCORD, Secure Commerce Commission) that paid or was paid, never the user's own Character. A transfer between the user's own Characters has none; it is netted away. Distinct from a corp journal's **player**, the member who made the line.
 - **Jump Basis**: The one set of rules every jump count in the app is worked out under: the Travel Settings plus Route Safety's saved Thera / Turnur hole and Ansiblex jump-bridge settings. It is how Assets, Market, BPC Sourcing, Contract Search and Courier agree with the route Route Safety draws.
 - **Jump Range**: The distance filter on Market Browser, Contract Search's Items and **BPC Sourcing**: Any, the **Current System** only, or within a set number of stargate jumps of it. Counted on the local stargate graph under the **Jump Basis**. A row the app cannot place (a player structure) drops out once a range is set.
@@ -729,7 +727,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Orders Lapsing**: One batched alert, with a count, when the Character's own open market orders come within their configured lead time of lapsing. A single alert per window, never one per order; corp orders are excluded. A **Scheduled Push** warning.
 - **Incursion Nearby**: Fires once when an Incursion's staging system comes within a Character's chosen number of jumps of their **Current System**, counted on Route Safety's jump basis. Edge-triggered per constellation; a changed Current System or jump count re-baselines silently.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
-- **Skill Plan schedule**: A **Skill Plan** costed in time: per-level steps with training seconds, plan total, projected finish, skill count, **Remap Marker** segments, **Booster**-boosted and Alpha-capped steps and effective **Priority (Skill Plan)**, computed in one pass from the plan, the Character's trained skills and attributes, **Clone State**, implants (or **What-If Implants**) and Booster. Every timing figure the plan editor shows reads from it, so none can disagree.
+- **Skill Plan schedule**: A **Skill Plan** costed in time: per-level steps with training seconds, plan total, projected finish, skill count, **Remap Marker** segments, **Accelerator**-boosted and Alpha-capped steps and effective **Priority (Skill Plan)**, computed in one pass from the plan, the Character's trained skills and attributes, **Clone State**, implants (or **What-If Implants**) and Accelerator. Every timing figure the plan editor shows reads from it, so none can disagree.
 - **Skill Queue Ending**: Fires once the in-game **Skill Queue**'s last queued item will finish within a Character's configured lead time, warning ahead of the queue running dry. Distinct from **Character Not Training**, which fires only after the queue has _already_ gone idle or stalled; a paused or empty queue is that event's state, never this one's.
 - **Size**: A **Widget**'s width on the Overview: S, M, L or Full, a share of
   one row. Not a height; its content sets that. Also sets how much a **View**

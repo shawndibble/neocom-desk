@@ -292,6 +292,13 @@ describe('overlayCorpBooks', () => {
       expect(out.absorbed.get(KEY)?.has('a-bmw')).toBe(true);
     });
 
+    it("records the member's own mark as how the day was settled, with the ids to unmark", () => {
+      const out = overlay([own({ status: 'paid' })], [book({ ownPayeeIds: ['bmw'] })]);
+      expect(out.rows[0]).toMatchObject({ settledBy: 'yourMark', markedPaidIds: ['a-bmw'] });
+      // Paid keeps what the day was billed at: only the owed amount is zero.
+      expect(out.rows[0].billed).toBeGreaterThan(0);
+    });
+
     it('owes only what a part payment did not cover', () => {
       const half = own({ status: 'paid' });
       half.allocations[0].oreLines = [{ typeId: ZEO, quantity: 20_000 }];
@@ -829,6 +836,15 @@ describe('overlayCorpBooks', () => {
       '2026-10-16': ['billed', 222_000],
       '2026-10-17': ['billed', 222_000],
     });
+  });
+
+  it('records a donation as how the day was settled', () => {
+    const out = overlay(
+      [entry()],
+      [book({ inFlight: [{ amount: 1_000_000, at: '2026-10-18T13:10:00Z' }] })]
+    );
+    expect(out.rows[0]).toMatchObject({ state: 'paid', settledBy: 'donation' });
+    expect(out.rows[0].markedPaidIds).toBeUndefined();
   });
 
   it('keeps a day Paid once the book credits the donation, before any Statement bills it', () => {
@@ -1405,6 +1421,65 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
     expect(row.state).toBe('paid');
     expect(row.taxOwed).toBe(0);
     expect(row.correction).toEqual({ before: 900_000, after: 400_000, reasons: ['Goodwill'] });
+  });
+
+  it('still carries the mark to unmark when a Statement settled the day first', () => {
+    const marked = entry({
+      freeOreLines: [],
+      allocations: [
+        {
+          id: 'a-bmw',
+          payeeId: 'bmw',
+          taxPct: 10,
+          oreLines: [{ typeId: ZEO, quantity: 41_200 }],
+          status: 'paid',
+        },
+      ],
+    });
+    const row = overlay(
+      [marked],
+      [
+        book({
+          ownPayeeIds: ['bmw'],
+          statements: [issued([mined])],
+          payments: [
+            {
+              id: 'p1',
+              minerId: MINER,
+              characterId: ME,
+              amount: 900_000,
+              at: '2026-10-21T00:00:00Z',
+              source: 'donation' as const,
+            },
+          ],
+        }),
+      ]
+    ).rows[0];
+    expect(row).toMatchObject({ state: 'paid', settledBy: 'statement' });
+    expect(row.markedPaidIds).toEqual(['a-bmw']);
+  });
+
+  it('records the settled Statement as how the day was settled, and keeps what it billed', () => {
+    const row = overlay(
+      [entry()],
+      [
+        book({
+          statements: [issued([mined])],
+          payments: [
+            {
+              id: 'p1',
+              minerId: MINER,
+              characterId: ME,
+              amount: 900_000,
+              at: '2026-10-21T00:00:00Z',
+              source: 'donation' as const,
+            },
+          ],
+        }),
+      ]
+    ).rows[0];
+    expect(row).toMatchObject({ state: 'paid', taxOwed: 0, settledBy: 'statement' });
+    expect(row.billed).toBe(900_000);
   });
 
   it("ignores another Miner's write-off (#4637)", () => {

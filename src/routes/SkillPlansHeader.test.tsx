@@ -281,7 +281,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     });
   });
 
-  it('shows the bonus/time-left inputs only once an accelerator row exists, and flags a past expiry as expired', async () => {
+  it('shows the bonus/time-left inputs only once an accelerator exists, and offers Add again once it has lapsed', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
@@ -295,18 +295,21 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     // `find`, not `get`: the Booster is saved on the plan now, so the row
     // travels through Dexie and back before the time-left field exists.
     await screen.findByLabelText('Days');
-    expect(screen.queryByText('Expired')).not.toBeInTheDocument();
 
-    // A past expiry can't be typed as time left, only reached by waiting or
-    // by a plan saved earlier — so reopen on one.
-    await db.skillPlans.update('plan-1', {
-      boosters: [{ enabled: true, bonus: 3, startsAt: null, expiresAt: Date.now() - 60_000 }],
+    // A lapsed accelerator is not running: reopening on one offers "Add" again.
+    await db.characterAccelerators.put({
+      id: String(CHAR_ID),
+      characterId: CHAR_ID,
+      bonus: 3,
+      expiresAt: Date.now() - 60_000,
+      updatedAt: 1,
     });
     first.unmount();
     render(<App />);
     await openPlanTools();
     await openAssumptions();
-    expect(await screen.findByText('Expired')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Days')).not.toBeInTheDocument();
   });
 
   it('an active (non-expired) booster reaches computeSchedule and changes training time', async () => {
@@ -328,7 +331,6 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
     await user.type(await screen.findByLabelText('Days'), '5');
-    expect(screen.queryByText('Expired')).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(durationHeader().textContent).not.toBe(durationBefore);
@@ -371,6 +373,6 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     expect(await screen.findByLabelText('Days')).toHaveValue('5');
     expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('+5');
-    expect(screen.getByRole('button', { name: 'Remove accelerator 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear' })).toBeEnabled();
   });
 });

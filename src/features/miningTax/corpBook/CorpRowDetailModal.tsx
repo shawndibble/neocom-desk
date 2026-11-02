@@ -10,6 +10,7 @@ import { formatIsk } from '@/lib/isk';
 import { useTicker } from '@/lib/ticker';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { OreIcon, OreLink } from '../OreIcon';
+import { bookRowTax } from './corpRows';
 import { typeLabel } from './typeLabel';
 import { hubForPayee } from '../pricing';
 import type { DisplayRow } from '../groupRows';
@@ -29,6 +30,8 @@ interface Props {
   systemName: string;
   systemSecurity: number | null | undefined;
   typeNames: ReadonlyMap<number, string>;
+  /** Unmarks the member's own payment this day stands on; absent when there is none. */
+  onUnmarkPaid?: () => void;
   /** Opens the corp pay dialog; absent when nothing is owed. */
   onPay?: () => void;
   /** The overlap notice for a day the miner's own list shares with the corporation's bill. */
@@ -52,6 +55,7 @@ export function CorpRowDetailModal({
   systemSecurity,
   typeNames,
   onPay,
+  onUnmarkPaid,
   notice,
 }: Props) {
   const { t } = useTranslation();
@@ -66,7 +70,7 @@ export function CorpRowDetailModal({
       ? 'miningTax.detail.breakdown.compressed'
       : 'miningTax.detail.breakdown.raw'
   );
-  const owed = view.taxOwed ?? 0;
+  const owed = bookRowTax(view);
   const owing = view.state === 'billed';
   const scope = t(`miningTax.corpBook.rateScope.${view.rateScope}`);
   const synced = book?.summary.lastSyncedAt;
@@ -177,7 +181,21 @@ export function CorpRowDetailModal({
           </div>
 
           <p className="rounded-xs border border-line p-2 text-xs text-text-dim">
-            {hint(corp)}{' '}
+            {t('miningTax.corpBook.detail.locked', { corp: corp.corpName })} {hint(corp)}{' '}
+            {view.state === 'paid' && view.settledBy === 'yourMark' && (
+              <>{t('miningTax.corpBook.detail.settled.yourMark', { amount: formatIsk(owed) })} </>
+            )}
+            {view.settledBy !== 'yourMark' &&
+              view.markedPaidIds &&
+              view.markedPaidIds.length > 0 && (
+                <>{t('miningTax.corpBook.detail.settled.alsoMarked')} </>
+              )}
+            {view.state === 'paid' && view.settledBy === 'donation' && (
+              <>{t('miningTax.corpBook.detail.settled.donation', { corp: corp.corpName })} </>
+            )}
+            {(view.state === 'dismissed' || view.state === 'waived') && view.billed > 0 && (
+              <>{t('miningTax.corpBook.detail.overridden', { billed: formatIsk(view.billed) })} </>
+            )}
             {/* A day paid before any Statement bills it (a donation sent ahead) has nothing pending to explain. */}
             {view.statementId
               ? (view.state === 'billed' || view.state === 'paid') &&
@@ -234,6 +252,9 @@ export function CorpRowDetailModal({
           )}
 
           <div className="flex flex-wrap gap-2 pt-1">
+            {onUnmarkPaid && view.markedPaidIds && view.markedPaidIds.length > 0 && (
+              <Button onClick={onUnmarkPaid}>{t('miningTax.unmarkPaidAction')}</Button>
+            )}
             {owing && owed > 0 && onPay && (
               <Button variant="primary" onClick={onPay}>
                 {t('miningTax.settleUpAction')}
