@@ -2960,6 +2960,8 @@
     "importQueueAppend": "Append",
     "importQueueReplace": "Replace plan",
     "importQueueReplaced": "Plan replaced with skill queue",
+    "importAppendToPlan": "Append to plan",
+    "importTextReplaced": "Plan replaced with the imported skills",
     "importQueueUndo": "Undo",
     "removeTrained": "Remove trained skills",
     "trainedRemoved_one": "Removed {{count}} trained skill",

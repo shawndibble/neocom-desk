@@ -368,7 +368,12 @@ export function PlanEditor({
         />
       )}
 
-      <PlanImportDialogs imports={imports} nameFor={nameFor} trainedSkills={trainedSkills} />
+      <PlanImportDialogs
+        imports={imports}
+        nameFor={nameFor}
+        trainedSkills={trainedSkills}
+        planEntryCount={plan.entries.length}
+      />
 
       <PlanOptimizeModals
         optimize={optimize}
