@@ -46,12 +46,18 @@ export function resolvePayeeFilter(
  * an unassigned or dismissed row has no Payee to match, so it drops out as
  * soon as a specific Payee is selected.
  */
-export function filterRowsByPayee(rows: DisplayRow[], resolved: PayeeFilter): DisplayRow[] {
+export function filterRowsByPayee(
+  rows: DisplayRow[],
+  resolved: PayeeFilter,
+  /** Payee ids merged into another entry of the filter (a book's Payee into the corporation's own). */
+  aliases: ReadonlyMap<string, string> = new Map()
+): DisplayRow[] {
   if (resolved === 'all') return rows;
   if (resolved === 'none') return [];
-  return rows.filter(
-    (dr) => dr.assignment?.payeeId !== undefined && resolved.has(dr.assignment.payeeId)
-  );
+  return rows.filter((dr) => {
+    const id = dr.assignment?.payeeId;
+    return id !== undefined && resolved.has(aliases.get(id) ?? id);
+  });
 }
 
 /**

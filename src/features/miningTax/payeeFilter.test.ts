@@ -46,6 +46,15 @@ describe('filterRowsByPayee', () => {
   it('drops rows with no Payee once a specific one is selected', () => {
     expect(filterRowsByPayee(rows, new Set(['a']))).toEqual([rows[0]]);
   });
+  it('reads a row of an aliased Payee as the Payee it is merged into', () => {
+    const aliased = [rowFor('stored'), rowFor('corp-book:1'), rowFor('b')];
+    const aliases = new Map([['corp-book:1', 'stored']]);
+    expect(filterRowsByPayee(aliased, new Set(['stored']), aliases)).toEqual([
+      aliased[0],
+      aliased[1],
+    ]);
+    expect(filterRowsByPayee(aliased, new Set(['b']), aliases)).toEqual([aliased[2]]);
+  });
 });
 
 describe('togglePayeeFilter', () => {
