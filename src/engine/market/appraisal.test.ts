@@ -14,6 +14,7 @@ import {
   computeAppraisalRefine,
   lpBeatsMarket,
   refineBeatsSellAsIs,
+  refineMineralsFor,
   refineTotalFor,
   type AppraisalItem,
   type AppraisalRow,
@@ -891,12 +892,11 @@ describe('refine on each price basis', () => {
   it('picks the refine figure, the as-is total and the verdict by basis', () => {
     const { rows } = buildAppraisal([item()], 100);
     const row = rows[0];
-    expect(refineTotalFor(row, 'buy')).toBe(row.refineTotal);
-    expect(refineTotalFor(row, 'sell')).toBe(row.refineSellTotal);
-    expect(refineTotalFor(row, 'split')).toBeCloseTo(
-      ((row.refineTotal ?? 0) + (row.refineSellTotal ?? 0)) / 2,
-      6
-    );
+    // The figure shown is the minerals plus the 50 leftover units at the basis's as-is unit price.
+    expect(refineMineralsFor(row, 'buy')).toBe(row.refineTotal);
+    expect(refineTotalFor(row, 'buy')).toBeCloseTo(9_000 + 50 * 10, 6);
+    expect(refineTotalFor(row, 'sell')).toBeCloseTo(14_400 + 50 * 14, 6);
+    expect(refineTotalFor(row, 'split')).toBeCloseTo((9_000 + 14_400) / 2 + 50 * 12, 6);
     expect(asIsTotalFor(row, 'buy')).toBe(10_500);
     expect(asIsTotalFor(row, 'sell')).toBe(14_700);
     expect(asIsTotalFor(row, 'split')).toBe(12_600);
@@ -933,9 +933,11 @@ describe('split refine figure', () => {
       refine: computeAppraisalRefine({ ...base, materialSellPrices }),
     });
     const priced = buildAppraisal([item({ 34: 8 })], 100).rows[0];
-    expect(refineTotalFor(priced, 'split')).toBeCloseTo((10_000 + 16_000) / 2, 6);
+    // (10,000 + 16,000) / 2 of minerals, plus 50 leftover units at the split unit price of 12.
+    expect(refineTotalFor(priced, 'split')).toBeCloseTo(13_000 + 50 * 12, 6);
     const oneSided = buildAppraisal([item({})], 100).rows[0];
     expect(refineTotalFor(oneSided, 'split')).toBeUndefined();
-    expect(refineTotalFor(oneSided, 'buy')).toBeCloseTo(10_000, 6);
+    // The minerals 10,000 plus the 50 leftover units at 10 each.
+    expect(refineTotalFor(oneSided, 'buy')).toBeCloseTo(10_500, 6);
   });
 });

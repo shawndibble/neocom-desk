@@ -613,11 +613,14 @@ export function RefineBreakdownModal({
                 rows={mineralRows}
                 rowKey={(row) => row.key}
                 rowClassName={(row) =>
-                  row.kind === 'total'
-                    ? 'font-semibold'
-                    : row.kind === 'leftover' || row.kind === 'tax'
-                      ? 'text-text-dim'
-                      : undefined
+                  // A heavier rule over the Minerals row says the lines above it add up to it.
+                  row.kind === 'subtotal'
+                    ? 'border-t-2 border-line-bright font-medium'
+                    : row.kind === 'total'
+                      ? 'font-semibold'
+                      : row.kind === 'leftover' || row.kind === 'tax'
+                        ? 'text-text-dim'
+                        : undefined
                 }
                 label={t('market.appraisal.breakdown.mineralsTitle')}
                 responsive="table"

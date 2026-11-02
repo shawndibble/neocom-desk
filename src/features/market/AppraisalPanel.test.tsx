@@ -785,7 +785,7 @@ describe('AppraisalPanel', () => {
       const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
       // The figure is a button inside the highlighted span (it opens the breakdown).
       const refineCell = within(oreRow)
-        .getByText('15,436,890 ISK', { selector: '.sr-only' })
+        .getByText('17,020,890 ISK', { selector: '.sr-only' })
         .closest('button')?.parentElement;
       const buyCell = within(oreRow).getByText('15,984,000 ISK', { selector: '.sr-only' })
         .parentElement?.parentElement;
@@ -793,7 +793,7 @@ describe('AppraisalPanel', () => {
       expect(buyCell?.className).not.toContain('text-isk-pos');
     });
 
-    it('explains the leftover that tips refine over the buy total', async () => {
+    it('shows the minerals plus the leftover units as the Refine total, the number the breakdown shows', () => {
       const partBatch = refineOutcome();
       partBatch.appraisal.rows[0] = {
         ...partBatch.appraisal.rows[0],
@@ -806,21 +806,10 @@ describe('AppraisalPanel', () => {
       };
       renderPanel({ controller: controller({ result: partBatch }) });
       const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
-      await userEvent.hover(within(oreRow).getByText('!'));
-      expect(await screen.findByRole('tooltip')).toHaveTextContent(/99 units are too few/);
-    });
-
-    it('shows no leftover mark when refine wins without the leftover', () => {
-      const clean = refineOutcome();
-      clean.appraisal.rows[0] = {
-        ...clean.appraisal.rows[0],
-        name: 'Mercoxit III-Grade',
-        buyTotal: 1_000,
-        refineTotal: 2_000,
-        refineUnitsLeftOver: 5,
-      };
-      renderPanel({ controller: controller({ result: clean }) });
-      const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
+      // 15,436,890 of minerals + 99 leftover units at 16,000 each.
+      expect(
+        within(oreRow).getByText('17,020,890 ISK', { selector: '.sr-only' })
+      ).toBeInTheDocument();
       expect(within(oreRow).queryByText('!')).not.toBeInTheDocument();
     });
 
