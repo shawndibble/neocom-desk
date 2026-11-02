@@ -52,6 +52,14 @@ export function corpPayeeAliases(
   return aliases;
 }
 
+/**
+ * What the day is worth in tax, as every other row on the page reads it: the bill for a Paid day
+ * (after any correction), what is still owed while Billed, and 0 only where the corporation
+ * dismissed or waived it. The engine zeroes `taxOwed` once paid, so Paid reads the bill instead.
+ */
+export const bookRowTax = (view: BookRowView): number =>
+  view.state === 'paid' ? (view.correction?.after ?? view.billed) : (view.taxOwed ?? 0);
+
 /** The row is one the book decided (not a personal row relabelled). */
 export const isBookRow = (dr: DisplayRow): boolean => dr.corp?.kind === 'row';
 
@@ -103,7 +111,7 @@ function syntheticRow(view: BookRowView, characterName: string, corpName: string
     oreLines: view.oreLines,
     taxPct: view.taxPct,
     estimatedValue: view.estimatedValue,
-    taxOwed: view.taxOwed ?? 0,
+    taxOwed: bookRowTax(view),
     status: STATUS_OF_STATE[view.state],
     // The refinery, read beside the corporation in the Payee column (spec #4504).
     ...(view.refineryLabel ? { label: view.refineryLabel } : {}),
