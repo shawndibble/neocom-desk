@@ -1,5 +1,5 @@
 /**
- * Settings › Market: the inline percent values (Facility base yield, Reprocessing
+ * Settings › Market: the inline percent values (Reprocessing yield, Reprocessing
  * tax) put their text on the control column's edge, the same x as the hint
  * beneath them (issue #5788). The hover box hangs into the gutter instead.
  */
@@ -16,7 +16,8 @@ for (const size of SIZES) {
     await page.setViewportSize(size);
     await signInAndGoto(page, './settings/market');
 
-    for (const name of ['Facility base yield', 'Reprocessing tax']) {
+    // The seeded Character has skills, so the form asks for the reprocessing yield, not the base.
+    for (const name of ['Reprocessing yield', 'Reprocessing tax']) {
       const button = page.getByRole('button', { name: new RegExp(`Edit ${name}`) });
       await expect(button).toBeVisible();
       const textX = await button.evaluate((el) => {
