@@ -97,3 +97,22 @@ describe('useAltChord', () => {
     expect(event.defaultPrevented).toBe(false);
   });
 });
+
+describe('useAltChord over a modal', () => {
+  it('leaves the key alone while a dialog is open', () => {
+    const onChord = vi.fn();
+    function Probe() {
+      useAltChord('KeyJ', onChord);
+      return null;
+    }
+    render(<Probe />);
+    const dialog = document.createElement('dialog');
+    dialog.setAttribute('open', '');
+    document.body.append(dialog);
+    const event = new KeyboardEvent('keydown', { code: 'KeyJ', altKey: true, cancelable: true });
+    document.dispatchEvent(event);
+    dialog.remove();
+    expect(onChord).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+});

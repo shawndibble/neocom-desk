@@ -28,7 +28,7 @@ interface AppraisalResultActionsProps {
   >;
   share: Pick<Share, 'share' | 'handleShare' | 'shareItemCount'>;
   copy: Pick<CopyLists, 'copied' | 'pending' | 'copyLists' | 'handleCopy'>;
-  janice: Pick<Janice, 'janice' | 'handleOpenInJanice'> & { canOpen: boolean };
+  janice: Pick<Janice, 'handleOpenInJanice'> & { canOpen: boolean };
   characterId: number | null;
   rowCount: number;
 }
@@ -40,7 +40,7 @@ export function AppraisalResultActions({
   columns: { availableColumns, visibleColumns, optionalColumnsById, toggleColumn, tableExport },
   share: { share, handleShare, shareItemCount },
   copy: { copied, pending, copyLists, handleCopy },
-  janice: { janice, handleOpenInJanice, canOpen },
+  janice: { handleOpenInJanice, canOpen },
   characterId,
   rowCount,
 }: AppraisalResultActionsProps) {
@@ -121,10 +121,7 @@ export function AppraisalResultActions({
             )}
           </MenuItem>
         ))}
-        <MenuItem
-          disabled={!canOpen || janice.status === 'fetching'}
-          onSelect={() => void handleOpenInJanice()}
-        >
+        <MenuItem disabled={!canOpen} onSelect={() => void handleOpenInJanice()}>
           {t('market.appraisal.openInJanice')}
           <ExternalMark />
           <span className="ml-auto pl-4 text-text-dim">

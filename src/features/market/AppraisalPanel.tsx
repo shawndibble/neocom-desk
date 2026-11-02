@@ -62,12 +62,12 @@ import { useAppraisalShare } from './useAppraisalShare';
 import { RefineBreakdownModal } from './RefineBreakdownModal';
 import { efficiencyText } from './refineFormat';
 import { useRefineMineralNames } from './useRefineMineralNames';
+import { useAltChord } from '@/lib/useChord';
 import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 import { DEFAULT_REFINING_SETUP } from '@/engine/industry/refiningSetup';
 import { refineEfficiencyRange } from '@/engine/market/refineBreakdown';
 import type { AppraisalItem } from '@/engine/market/appraisal';
 import type { AppraisalController } from './useAppraisal';
-import { useAltChord } from '@/lib/useChord';
 
 interface AppraisalPanelProps {
   controller: AppraisalController;
@@ -211,11 +211,8 @@ export function AppraisalPanel({
     hub,
     pricePercent,
   });
-  useAltChord(
-    'KeyJ',
-    () => void handleOpenInJanice(),
-    text.trim() !== '' && janice.status !== 'fetching'
-  );
+  const canOpenInJanice = text.trim() !== '' && janice.status !== 'fetching';
+  useAltChord('KeyJ', () => void handleOpenInJanice(), canOpenInJanice);
 
   /*
    * The percent field is a string while it is being typed. Committing on every
@@ -422,7 +419,7 @@ export function AppraisalPanel({
                   }}
                   share={{ share, handleShare, shareItemCount }}
                   copy={{ copied, pending, copyLists, handleCopy }}
-                  janice={{ janice, handleOpenInJanice, canOpen: text.trim() !== '' }}
+                  janice={{ handleOpenInJanice, canOpen: canOpenInJanice }}
                   characterId={characterId}
                   rowCount={rows.length}
                 />
