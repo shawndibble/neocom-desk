@@ -128,19 +128,6 @@ export function normalizePaymentInfo(payment: MiningTaxPaymentInfo): MiningTaxPa
   };
 }
 
-/** The journal and contract ids some Assignment already records a payment against. */
-export function linkedRefIds(assignments: readonly MiningTaxAssignmentRecord[]) {
-  const journal = new Set<number>();
-  const contract = new Set<number>();
-  for (const a of assignments) {
-    if (!a.payment) continue;
-    const normalized = normalizePaymentInfo(a.payment);
-    for (const link of normalized.journalLinks ?? []) journal.add(link.refId);
-    for (const link of normalized.contractLinks ?? []) contract.add(link.refId);
-  }
-  return { journal, contract };
-}
-
 /** Every Assignment each journal / contract id is linked to, oldest first — the wallet journal lists one link per entry a payment settled. */
 export function linkedAssignmentsByRef(assignments: readonly MiningTaxAssignmentRecord[]) {
   const journal = new Map<number, MiningTaxAssignmentRecord[]>();
@@ -160,6 +147,12 @@ export function linkedAssignmentsByRef(assignments: readonly MiningTaxAssignment
     for (const list of map.values()) list.sort((x, y) => x.date.localeCompare(y.date));
   }
   return { journal, contract };
+}
+
+/** The journal and contract ids some Assignment already records a payment against. */
+export function linkedRefIds(assignments: readonly MiningTaxAssignmentRecord[]) {
+  const { journal, contract } = linkedAssignmentsByRef(assignments);
+  return { journal: new Set(journal.keys()), contract: new Set(contract.keys()) };
 }
 
 /**

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import type { DisplayRow } from './groupRows';
-import { findRowForEntry, miningTaxEntryHref, parseEntryParam } from './paymentDeepLink';
+import { findRowForEntry, miningTaxEntryHref } from './paymentDeepLink';
 import type { MoonMiningTaxRow } from './snapshot';
 
 function assignment(overrides: Partial<MiningTaxAssignmentRecord> = {}): MiningTaxAssignmentRecord {
@@ -29,15 +29,9 @@ function displayRow(a: MiningTaxAssignmentRecord, groupMembers?: DisplayRow['gro
   return { key: a.id, row, assignment: a, status: 'paid', groupMembers } as DisplayRow;
 }
 
-describe('miningTaxEntryHref / parseEntryParam', () => {
-  it('round-trips an assignment id', () => {
+describe('miningTaxEntryHref', () => {
+  it('names the assignment in the scoped tax param', () => {
     expect(miningTaxEntryHref('abc-1')).toBe('/mining/tax?tax.entry=abc-1');
-    expect(parseEntryParam('abc-1')).toBe('abc-1');
-  });
-
-  it('rejects an empty value', () => {
-    expect(parseEntryParam(null)).toBeNull();
-    expect(parseEntryParam('')).toBeNull();
   });
 });
 

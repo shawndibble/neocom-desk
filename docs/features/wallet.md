@@ -68,7 +68,7 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 | Loyalty points / EverMarks         | `features/character/loyalty.ts`                                   | `getCharacterLoyaltyPoints`                                                                      | `esi-characters.read_loyalty.v1`      |
 | Corp names for LP rows             | `features/character/names` `resolveNames`                         | `postUniverseNames`                                                                              | public                                |
 | Item names on journal lines        | `features/character/typeNames.ts`                                 | local SDE `types.json`, then `postUniverseNames`/`getUniverseType`                               | public                                |
-| Mining tax links                   | Dexie `miningTaxAssignments` (`linkedRefIds`)                     | local                                                                                            | none                                  |
+| Mining tax links                   | Dexie `miningTaxAssignments` (`linkedAssignmentsByRef`)           | local                                                                                            | none                                  |
 | LP-store corp list                 | `loadLpCorporations` (`@/sde/loadMarketSde`)                      | local SDE                                                                                        | none                                  |
 
 - Cache keys: `wallet:balance`, `wallet:journal`, `wallet:transactions`, `loyalty` (`wallet.ts:24-28`, `loyalty.ts`).

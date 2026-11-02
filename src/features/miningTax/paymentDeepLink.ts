@@ -14,10 +14,6 @@ export function miningTaxEntryHref(assignmentId: string): string {
   return `/mining/tax?${params.toString()}`;
 }
 
-export function parseEntryParam(raw: string | null): string | null {
-  return raw ? raw : null;
-}
-
 /** The row holding this Assignment: its own row, or the joined row it was combined into. */
 export function findRowForEntry(
   rows: readonly DisplayRow[],

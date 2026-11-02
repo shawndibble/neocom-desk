@@ -1,11 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { DisplayRow } from '@/features/miningTax/groupRows';
-import {
-  findRowForEntry,
-  PAYMENT_ENTRY_PARAM,
-  parseEntryParam,
-} from '@/features/miningTax/paymentDeepLink';
+import { findRowForEntry, PAYMENT_ENTRY_PARAM } from '@/features/miningTax/paymentDeepLink';
 
 /**
  * The wallet journal's "Mining tax" entry link (`paymentDeepLink.ts`): opens
@@ -14,14 +10,14 @@ import {
  * reopen the modal after the pilot closed it. Searches every row, not the
  * filtered ones: a Character or Payee filter must not hide the target.
  */
-export function usePaymentRefDeepLink(
+export function useEntryDeepLink(
   hasData: boolean,
   allDisplayRows: readonly DisplayRow[],
   loading: boolean,
   openDetail: (row: DisplayRow) => void
 ) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [initialEntryId] = useState(() => parseEntryParam(searchParams.get(PAYMENT_ENTRY_PARAM)));
+  const [initialEntryId] = useState(() => searchParams.get(PAYMENT_ENTRY_PARAM) || null);
   const pendingEntryId = useRef(initialEntryId);
   useEffect(() => {
     if (initialEntryId === null) return;

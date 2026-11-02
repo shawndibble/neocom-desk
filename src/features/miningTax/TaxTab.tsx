@@ -36,7 +36,7 @@ import { TaxHistoryLedger, TaxOpenLedger } from './TaxLedgerTables';
 import { TaxPageDialogs } from './TaxPageDialogs';
 import { TaxSelectionBar } from './TaxSelectionBar';
 import { usePayeeFilter } from './usePayeeFilter';
-import { usePaymentRefDeepLink } from './usePaymentRefDeepLink';
+import { useEntryDeepLink } from './useEntryDeepLink';
 import { useTaxAttentionItems } from './useTaxAttentionItems';
 import { useTaxBalances } from './useTaxBalances';
 import { useTaxCorpBooks } from './useTaxCorpBooks';
@@ -133,7 +133,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   );
   // Read by the Assign dialog when it opens, long after this has hydrated.
   useHydratedStore(useSurveyPayeeId);
-  usePaymentRefDeepLink(Boolean(data), allDisplayRows, loading, actions.openDetail);
+  useEntryDeepLink(Boolean(data), allDisplayRows, loading, actions.openDetail);
 
   const { allPayees, payeeById, ledgerPayees, filterPayees, payeeAliases } = useTaxPayees(
     data,

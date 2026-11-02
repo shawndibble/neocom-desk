@@ -114,14 +114,9 @@ export function PaymentLinksCard({
               return (
                 <li key={c.id}>
                   {onOpenCovered ? (
-                    <button
-                      type="button"
-                      className={inlineLinkClassName}
-                      onClick={() => onOpenCovered(c.id)}
-                      disabled={busy}
-                    >
+                    <Button size="sm" onClick={() => onOpenCovered(c.id)} disabled={busy}>
                       {line}
-                    </button>
+                    </Button>
                   ) : (
                     line
                   )}
