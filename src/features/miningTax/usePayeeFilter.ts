@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import type { PayeeRecord } from '@/db';
 import {
+  canonicalizePayeeFilter,
+  canonicalPayeeId,
   isSolePayeeFilter,
   resolvePayeeFilter,
   togglePayeeFilter,
@@ -15,14 +17,15 @@ export function usePayeeFilter(
   /** Payee ids the filter lists under another Payee (see `corpPayeeAliases`). */
   aliases: ReadonlyMap<string, string>
 ) {
-  const canon = (payeeId: string) => aliases.get(payeeId) ?? payeeId;
+  const canon = (payeeId: string) => canonicalPayeeId(aliases, payeeId);
   const resolvedPayeeFilter = useMemo(
     () =>
       resolvePayeeFilter(
-        payeeFilter,
+        // A link written before a Payee was merged names its old id.
+        canonicalizePayeeFilter(payeeFilter, aliases),
         filterPayees.map((p) => p.id)
       ),
-    [payeeFilter, filterPayees]
+    [payeeFilter, filterPayees, aliases]
   );
 
   function togglePayee(payeeId: string) {

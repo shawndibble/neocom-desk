@@ -41,6 +41,19 @@ export function resolvePayeeFilter(
   return kept.size === 0 || kept.size === known.size ? 'all' : kept;
 }
 
+/** The filter entry a Payee id is listed under: itself, unless it is merged into another. */
+export const canonicalPayeeId = (aliases: ReadonlyMap<string, string>, payeeId: string): string =>
+  aliases.get(payeeId) ?? payeeId;
+
+/** `payeeFilter` with every merged Payee id moved onto the entry the filter lists it under. */
+export function canonicalizePayeeFilter(
+  payeeFilter: PayeeFilter,
+  aliases: ReadonlyMap<string, string>
+): PayeeFilter {
+  if (payeeFilter === 'all' || payeeFilter === 'none') return payeeFilter;
+  return new Set([...payeeFilter].map((id) => canonicalPayeeId(aliases, id)));
+}
+
 /**
  * Filtering "by Payee" only makes sense for rows that already have one —
  * an unassigned or dismissed row has no Payee to match, so it drops out as
@@ -56,7 +69,7 @@ export function filterRowsByPayee(
   if (resolved === 'none') return [];
   return rows.filter((dr) => {
     const id = dr.assignment?.payeeId;
-    return id !== undefined && resolved.has(aliases.get(id) ?? id);
+    return id !== undefined && resolved.has(canonicalPayeeId(aliases, id));
   });
 }
 

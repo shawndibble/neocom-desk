@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DisplayRow } from '@/features/miningTax/groupRows';
 import {
+  canonicalizePayeeFilter,
   filterRowsByPayee,
   isSolePayeeFilter,
   payeeFilterParam,
@@ -54,6 +55,20 @@ describe('filterRowsByPayee', () => {
       aliased[1],
     ]);
     expect(filterRowsByPayee(aliased, new Set(['b']), aliases)).toEqual([aliased[2]]);
+  });
+});
+
+describe('canonicalizePayeeFilter', () => {
+  const aliases = new Map([['corp-book:1', 'stored']]);
+  it('moves a merged Payee id onto the entry it is listed under, so an old link keeps its pick', () => {
+    expect(canonicalizePayeeFilter(new Set(['corp-book:1', 'b']), aliases)).toEqual(
+      new Set(['stored', 'b'])
+    );
+    expect(canonicalizePayeeFilter(new Set(['corp-book:1']), aliases)).toEqual(new Set(['stored']));
+  });
+  it('leaves all and none alone', () => {
+    expect(canonicalizePayeeFilter('all', aliases)).toBe('all');
+    expect(canonicalizePayeeFilter('none', aliases)).toBe('none');
   });
 });
 

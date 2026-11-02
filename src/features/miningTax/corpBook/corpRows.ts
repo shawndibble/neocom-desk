@@ -39,12 +39,12 @@ export const isCorpEntityPayee = (payee: PayeeRecord, corporationId: number): bo
  * filter lists the corporation once and a pick covers both sets of rows.
  */
 export function corpPayeeAliases(
-  stored: readonly PayeeRecord[],
-  virtual: readonly PayeeRecord[]
+  storedPayees: readonly PayeeRecord[],
+  bookPayees: readonly PayeeRecord[]
 ): Map<string, string> {
   const aliases = new Map<string, string>();
-  for (const book of virtual) {
-    const mine = stored.find(
+  for (const book of bookPayees) {
+    const mine = storedPayees.find(
       (p) => book.entityId !== undefined && isCorpEntityPayee(p, book.entityId)
     );
     if (mine) aliases.set(book.id, mine.id);
