@@ -1,8 +1,9 @@
 /**
  * Fixtures for the Moon mining at scale mockup. One heavy Miner (Varro Kestane,
- * two characters) mining nearly every day since 1 Aug 2026 across 20 corp
- * moons and 60 pops, built from a seeded generator so every figure on every
- * screen is a sum of the same lines (no hand-typed totals to drift apart).
+ * two characters) mining on 68 of 79 days since 1 Aug 2026 across 20 corp
+ * moons and 57 pops, built from a seeded generator so the Miner and Miner x pop
+ * figures are sums of the same lines. The Pop page's other Miners and the
+ * Miners list are synthesized or asserted (see UNLISTED).
  *
  * Today is 18 Oct 2026 14:00 EVE; every day through 17 Oct is Billable. The
  * Aug Statement went out 1 Sep, the Sep Statement 1 Oct (due 15 Oct).
@@ -144,11 +145,13 @@ MOON_NAMES.forEach((m, moonIndex) => {
 });
 
 /** One-off exceptions the CEO made: a hauling op dismissed, one pop at a lower rate. */
-const dismissedPop = POPS.find(
+export const dismissedPop = POPS.find(
   (p) => p.moon === 'Kamela II - Moon 2' && monthOf(p.fracture) === 'Sep'
 );
 if (dismissedPop) dismissedPop.dismissed = true;
-const rateCutPop = POPS.find((p) => p.moon === 'Efa VII - Moon 1' && monthOf(p.fracture) === 'Oct');
+export const rateCutPop = POPS.find(
+  (p) => p.moon === 'Efa VII - Moon 1' && monthOf(p.fracture) === 'Oct'
+);
 if (rateCutPop) rateCutPop.rate = 5;
 
 const CHARACTERS = ['Varro Kestane', 'Lysa Kestane'];
@@ -192,6 +195,8 @@ export interface Payment {
   covers: string;
   partial: boolean;
   popIds: number[];
+  /** ISK of this payment applied to each pop it reached. */
+  applied: Record<number, number>;
 }
 
 const popTotals = new Map<
@@ -217,7 +222,7 @@ const sepBilled = billedPopsOldestFirst.filter((p) => monthOf(p.fracture) === 'S
 const aug40 = round4(AUG_BILLED * 0.4);
 
 /** Payments land on whole pops, except the last, which is part paid. */
-const PAYMENT_PLAN: Omit<Payment, 'covers' | 'partial' | 'popIds'>[] = [
+const PAYMENT_PLAN: Omit<Payment, 'covers' | 'partial' | 'popIds' | 'applied'>[] = [
   { id: 1, date: '2 Sep', from: 'Lysa Kestane', amount: aug40, statement: 'Aug Statement' },
   {
     id: 2,
@@ -247,6 +252,7 @@ const PAYMENT_PLAN: Omit<Payment, 'covers' | 'partial' | 'popIds'>[] = [
 export const PAYMENTS: Payment[] = PAYMENT_PLAN.map((plan) => {
   let left = plan.amount;
   const reached: number[] = [];
+  const applied: Record<number, number> = {};
   let partial = false;
   for (const pop of billedPopsOldestFirst) {
     const t = popTotals.get(pop.id)!;
@@ -255,6 +261,7 @@ export const PAYMENTS: Payment[] = PAYMENT_PLAN.map((plan) => {
     if (left <= 0) break;
     const take = Math.min(room, left);
     t.paid += take;
+    applied[pop.id] = take;
     left -= take;
     reached.push(pop.id);
     if (take < room) partial = true;
@@ -265,6 +272,7 @@ export const PAYMENTS: Payment[] = PAYMENT_PLAN.map((plan) => {
     ...plan,
     partial,
     popIds: reached,
+    applied,
     covers: `${reached.length} pops, ${dateOf(first.fracture)} to ${dateOf(last.fracture)}${partial ? ', last one part' : ''}`,
   };
 });
@@ -465,6 +473,8 @@ export interface ListMiner {
   overdueDays: number | null;
   nextStatement: number;
   lastPaid: string;
+  /** Last reminder mailed; Never when none was sent. */
+  lastReminder: string;
   pops: number;
 }
 
@@ -497,6 +507,7 @@ export const LIST_MINERS: ListMiner[] = NAMES.map((main, i) => {
       overdueDays: 3,
       nextStatement: VARRO_TOTALS.nextStatement,
       lastPaid: '16 Oct',
+      lastReminder: 'Never',
       pops: VARRO_TOTALS.pops,
     };
   }
@@ -510,20 +521,35 @@ export const LIST_MINERS: ListMiner[] = NAMES.map((main, i) => {
     standing: i % 5 === 0 ? ('Guest' as const) : ('Member' as const),
     corp: i % 5 === 0 ? 'Ashfall Prospecting' : 'Brass Meridian Logistics',
     owed,
-    overdueDays: owed > 0 && i % 2 === 0 ? 3 + ((i * 5) % 40) : null,
+    // Overdue counts from the oldest unpaid Statement: Sep (due 15 Oct) is 3 days, Aug (due 15 Sep) is 33.
+    overdueDays: owed > 0 && i % 2 === 0 ? (i % 4 === 0 ? 33 : 3) : null,
     nextStatement,
-    lastPaid: owed === 0 ? `${2 + i} Oct` : i % 3 === 0 ? '2 Sep' : `${1 + i} Oct`,
+    lastPaid:
+      owed === 0
+        ? `${2 + ((i * 3) % 15)} Oct`
+        : i % 3 === 0
+          ? '2 Sep'
+          : `${1 + ((i * 2) % 15)} Oct`,
+    lastReminder: owed > 0 && i % 4 === 0 ? '15 Oct' : 'Never',
     pops: big ? 20 + i : 3 + i,
   };
 }).sort((a, b) => b.owed - a.owed);
 
+/**
+ * The list shows 13 of 61 Miners. The other 48 are asserted, not generated, so
+ * the chips and Select all on the Miners page are the only figures in this
+ * mockup that are not a sum of the visible lines.
+ */
+const UNLISTED = { count: 48, willBill: 20, below: 14, owed: 214_300_000, next: 380_100_000 };
+
 export const LIST_TOTALS = {
-  miners: 61,
+  miners: LIST_MINERS.length + UNLISTED.count,
   shown: LIST_MINERS.length,
-  willBill: LIST_MINERS.filter((m) => m.nextStatement >= MIN_STATEMENT).length + 20,
+  willBill: LIST_MINERS.filter((m) => m.nextStatement >= MIN_STATEMENT).length + UNLISTED.willBill,
   below:
-    LIST_MINERS.filter((m) => m.nextStatement > 0 && m.nextStatement < MIN_STATEMENT).length + 14,
+    LIST_MINERS.filter((m) => m.nextStatement > 0 && m.nextStatement < MIN_STATEMENT).length +
+    UNLISTED.below,
   overdue: LIST_MINERS.filter((m) => m.overdueDays !== null).length,
-  owed: sum2(LIST_MINERS, (m) => m.owed) + 214_300_000,
-  next: sum2(LIST_MINERS, (m) => m.nextStatement) + 380_100_000,
+  owed: sum2(LIST_MINERS, (m) => m.owed) + UNLISTED.owed,
+  next: sum2(LIST_MINERS, (m) => m.nextStatement) + UNLISTED.next,
 };

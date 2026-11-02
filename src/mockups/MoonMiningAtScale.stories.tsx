@@ -33,6 +33,8 @@ import {
   LIST_MINERS,
   LIST_TOTALS,
   MEMBER_RATE,
+  dismissedPop,
+  rateCutPop,
   MIN_STATEMENT,
   MONTH_STATEMENT,
   MOON_POPS,
@@ -50,7 +52,7 @@ import {
 
 /**
  * Moon mining at scale: the officer's pages for a corp whose heaviest miner
- * mined twice a day for 79 days across 20 moons and 60 pops. Built for two
+ * mined on 68 of 79 days across 20 moons and 57 pops. Built for two
  * reviews, a CEO's day-to-day jobs and a UI/UX pass.
  *
  * One idea carries the whole thing: **the pop is the unit.** Every figure
@@ -384,8 +386,8 @@ function MinerAtScale({
           }}
         />
         <Footing>
-          Tax {isk(t.tax)} = paid {isk(t.paid)} + owed {isk(t.owed)} + not billed yet{' '}
-          {isk(t.nextStatement + t.notBillable)}
+          Tax {isk(t.tax)} = paid {isk(t.paid)} + owed {isk(t.owed)} + next Statement{' '}
+          {isk(t.nextStatement)} + today’s mining {isk(t.notBillable)}
         </Footing>
       </Panel>
       <Panel
@@ -408,20 +410,20 @@ function MinerAtScale({
           {
             when: '16 Oct',
             who: 'Book',
-            what: 'credited Lysa Kestane’s 34,002,960 donation to the Sep Statement',
+            what: `credited Lysa Kestane’s ${isk(PAYMENTS[3].amount)} donation to the Sep Statement`,
             why: 'Automatic',
           },
           {
             when: '12 Oct',
             who: 'Kestrel Vane',
-            what: 'dismissed Kamela II - Moon 2, 20 Sep pop',
+            what: `dismissed ${dismissedPop!.moon}, ${dateOf(dismissedPop!.fracture)} pop`,
             why: 'Corp capital build haul',
             reverse: true,
           },
           {
             when: '6 Oct',
             who: 'Kestrel Vane',
-            what: 'set Efa VII - Moon 1, 4 Oct pop to 5%',
+            what: `set ${rateCutPop!.moon}, ${dateOf(rateCutPop!.fracture)} pop to 5%`,
             why: 'Alliance mining op',
             reverse: true,
           },
@@ -528,7 +530,32 @@ function MinerPop({ dialog }: { dialog?: 'adjust' }) {
           <DataTable
             label="Payments toward this pop"
             density="compact"
-            columns={paymentColumns}
+            columns={[
+              { id: 'date', header: 'When', render: (r: Payment) => r.date },
+              { id: 'from', header: 'From', primary: true, render: (r: Payment) => r.from },
+              {
+                id: 'applied',
+                header: 'Applied here',
+                align: 'right',
+                className: num,
+                cardCorner: true,
+                render: (r: Payment) => (
+                  <span className="text-isk-pos">+{isk(r.applied[row.pop.id])}</span>
+                ),
+              },
+              {
+                id: 'of',
+                header: 'Payment',
+                align: 'right',
+                className: num,
+                phoneHidden: true,
+                render: (r: Payment) => (
+                  <span className="text-text-dim">
+                    {isk(r.amount)} · {r.statement}
+                  </span>
+                ),
+              },
+            ]}
             rows={paidBy}
             rowKey={(p) => p.id}
           />
@@ -696,9 +723,14 @@ function PopPage({ dialog, scheduled }: { dialog?: MoonDialog; scheduled?: boole
           </span>
         }
         actions={
-          <Button size="sm" variant="ghost">
-            Adjust this pop…
-          </Button>
+          <span className="flex items-center gap-1">
+            <Button size="sm" variant="ghost">
+              Adjust this pop…
+            </Button>
+            <Button size="sm" variant="ghost">
+              Dismiss tax…
+            </Button>
+          </span>
         }
         padded={false}
       >
@@ -1110,7 +1142,7 @@ const listColumns: DataTableColumn<ListMiner>[] = [
     id: 'reminder',
     header: 'Last reminder',
     phoneHidden: true,
-    render: (m) => (m.owed ? (m.overdueDays ? `${10 + (m.main.length % 6)} Oct` : 'Never') : '—'),
+    render: (m) => (m.owed ? m.lastReminder : '—'),
   },
   caretColumn<ListMiner>(),
 ];

@@ -2,11 +2,13 @@
 
 Source: `src/mockups/MoonMiningAtScale.stories.tsx` (data in `moonScaleFixtures.ts`). Story ids are `mockups-moon-mining-at-scale--<step>`. Sample data; the ticket text wins over the picture.
 
-One officer's view of a corp whose heaviest miner (Varro Kestane, two characters) mined twice a day for 79 days across 20 moons and 57 pops. Today is 18 Oct 2026 14:00 EVE; the Aug Statement went out 1 Sep, the Sep Statement 1 Oct (due 15 Oct). Every figure is a sum of the same generated lines, so the Miner, Miner × pop and Pop pages agree. The separate Corp Tax Book mockup's Statements page uses its own sample data, so its totals do not tie to these pages (a build must read both from one read model).
+One officer's view of a corp whose heaviest miner (Varro Kestane, two characters) mined on 68 of 79 days, with both characters, across 20 moons and 57 pops (215 lines). Today is 18 Oct 2026 14:00 EVE; the Aug Statement went out 1 Sep, the Sep Statement 1 Oct (due 15 Oct). The Miner and Miner × pop pages are sums of the same generated lines, and the Pop page's focus pop ties to them. The Pop page's other Miners and other pops, and the Miners list (13 of 61 shown), are synthesized or asserted totals. The separate Corp Tax Book mockup's Statements page uses its own sample data, so its totals do not tie to these pages (a build must read both from one read model).
 
 **The pop is the unit.** Each page names the next one as a link instead of repeating it: Miners → Miner → Miner × pop, and Pop → Miner. No new components: Panel, DataTable (month `groupBy`), StatChips, FilterChip, Modal.
 
-Reviewed by a CEO persona, a UI/UX reviewer and a junior accountant (findings folded in below). Open items for the build tickets: ageing buckets, a payment reference and unapplied-balance line, a Statement number linked from payments, and one read model so Statements and Miners totals tie.
+Reviewed by a CEO persona, a UI/UX reviewer and a junior accountant (findings folded in below). "Credit held" in the adjust and dismiss dialogs is a proposal (an overpayment becomes credit on the next Statement); it is not decided. Open items for the build tickets: add "Pop" to the glossary or say Extraction (the glossary has no Pop), ageing buckets, a payment reference and unapplied-balance line, a Statement number linked from payments, and one read model so Statements and Miners totals tie.
+
+Phone shots not named `-phone` are the same story rendered at 390: `npm run ui:shot -- mockups-moon-mining-at-scale--<id> --widths 390`.
 
 | Step | 1440 | 390 |
 |---|---|---|
