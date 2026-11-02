@@ -221,8 +221,9 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 `SHIP` is the hostile review's verdict, not the ticket's fate (#858 carried
 `SHIP` and was closed). Check `gh api repos/shawndibble/neocom-desk/issues/<n>`.
 
-- #5866 NARROW: drag-to-resize columns on windowed tables (ECT; widths per table,
-  keyboard + double-click reset).
+- #5866 NARROW, closed not planned: drag-to-resize columns on windowed tables (ECT).
+  Owner held it until a player asks; no demand in the repo, picker + sort + author
+  widths cover most of it. Don't re-pitch without a player request.
 - Small/UI re-sweep of RIFT, jEveAssets, EVE Farm, Omnitool, MoMa, EveLens,
   Adam4EVE, Janice, EVE Tycoon (ready-for-agent, owner-reviewed): #5652 in-game
   asset names; #5653 Dump/Appraisal walk reachable buy orders (range,
