@@ -67,7 +67,8 @@ describe('item context menu (issue #83)', () => {
     item.focus();
     fireEvent.contextMenu(item);
 
-    expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).toBeInTheDocument();
+    // Quickbar, price alert and stock target fold into the Track submenu.
+    expect(screen.getByRole('menuitem', { name: 'Track' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
@@ -87,7 +88,8 @@ describe('item context menu (issue #83)', () => {
     item.focus();
     fireEvent.contextMenu(item);
 
-    await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Track' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Add to Quickbar' }));
 
     await waitFor(async () => {
       const record = await db.quickbars.get(String(CHAR_ID));

@@ -230,6 +230,8 @@ describe('HaulingItemDetail — listing', () => {
     await user.click(screen.getByRole('button', { name: 'More actions for Damage Control II' }));
     // Opening the ⋮ loads the blueprint catalog, so Build Plan can show.
     expect(actions.requestBlueprints).toHaveBeenCalled();
+    // Quickbar, price alert and stock target fold into the Track submenu.
+    await user.click(await screen.findByRole('menuitem', { name: 'Track' }));
     for (const name of [
       'Add to Quickbar',
       'Set price alert',
