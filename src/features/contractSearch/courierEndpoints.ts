@@ -12,7 +12,9 @@
  * files, indexed once per session, so this whole pass costs no requests at
  * all.
  *
- * The price is that a player structure stays unnamed, unplaced and unbanded.
+ * The price is that a player structure stays unnamed, unplaced and unbanded —
+ * unless this device already knows its name (`nameFromCache`), or the modal
+ * resolves it on demand for the one haul being read.
  * `CourierEndpoint` says so with `null` rather than guessing, and the table
  * shows the raw id — the honest answer, and one that still lets the route
  * search match the *other* end. A pickup keeps its region regardless: the row
@@ -23,6 +25,7 @@ import { classifySpace } from '@/engine/space';
 import { lookupNpcStation } from '@/sde/npcStations';
 import { lookupSolarSystem } from '@/sde/solarSystems';
 import { loadJumpGraph } from '@/sde/jumpGraph';
+import { readCachedStructureNames } from '@/features/character/structures';
 import type { JumpGraph } from '@/engine/route/jumpRoute';
 import type { CourierEndpoint, PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 
@@ -124,5 +127,25 @@ export async function loadCourierEndpoints(
       endpoints.set(id, await resolveOne(id, graph, regionByLocation.get(id) ?? null));
     })
   );
+  await nameFromCache(endpoints);
   return endpoints;
+}
+
+/**
+ * A player structure some character on this device has already named keeps
+ * that name: read from the device's own structure cache, no request. Anything
+ * the cache does not hold stays `null`, and the detail modal resolves it on
+ * demand — one lookup for the haul someone opened, never a fan-out across the
+ * board (see the module note on the error budget).
+ */
+async function nameFromCache(endpoints: Map<number, CourierEndpoint>): Promise<void> {
+  const unnamed = [...endpoints.values()].filter(
+    (endpoint) => endpoint.resolution === 'structure' && endpoint.name === null
+  );
+  if (unnamed.length === 0) return;
+  const names = await readCachedStructureNames(unnamed.map((endpoint) => endpoint.locationId));
+  for (const endpoint of unnamed) {
+    const name = names.get(endpoint.locationId);
+    if (name !== undefined) endpoints.set(endpoint.locationId, { ...endpoint, name });
+  }
 }
