@@ -382,7 +382,7 @@ describe('CourierResults route cell', () => {
 });
 
 describe('CourierResults ISK/jump cell', () => {
-  it('names an over-rate haul in text on the desktop table too, not only by border colour', async () => {
+  it('shows the going-rate multiple alone for an over-rate haul, with no separate "Over rate" label', async () => {
     knownJumps();
     renderLanes();
 
@@ -391,9 +391,10 @@ describe('CourierResults ISK/jump cell', () => {
       if (!row) throw new Error('expected the bait row');
       return row as HTMLElement;
     });
-    expect(within(baitRow).getByText('Over rate')).toBeInTheDocument();
+    expect(within(baitRow).getByText(/x going rate$/)).toBeInTheDocument();
+    expect(within(baitRow).queryByText('Over rate')).not.toBeInTheDocument();
 
-    // An ordinary haul on the same lane carries the multiple with no marker.
+    // An ordinary haul on the same lane carries the multiple too.
     const ordinaryRow = document.querySelector('tr[data-row-key="100"]') as HTMLElement;
     expect(within(ordinaryRow).queryByText('Over rate')).not.toBeInTheDocument();
   });
