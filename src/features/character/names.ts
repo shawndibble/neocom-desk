@@ -11,7 +11,8 @@
  * History — part of the wait those pages showed a spinner for.
  */
 import { postUniverseNames, type UniverseName } from '@/esi/endpoints';
-import { EsiError } from '@/esi/client';
+import { EsiError } from '@/esi/errors';
+import { chunk } from '@/lib/chunk';
 import {
   GLOBAL_CACHE_CHARACTER_ID,
   STALE_AFTER,
@@ -134,33 +135,49 @@ async function fetchNames(ids: readonly number[]): Promise<Map<number, string>> 
 }
 
 /**
- * Ids ESI has refused as invalid this session (a deleted or never-valid id),
- * so a page that re-asks for them does not re-spend the error budget finding
- * the same bad id again.
+ * Ids ESI has refused as invalid, with when, so a page that re-asks for one does
+ * not re-spend the error budget finding the same bad id again. Lapses after
+ * `REFUSED_TTL_MS`: an id ESI has not indexed yet (a new character) becomes
+ * valid later.
  */
-const refusedIds = new Set<number>();
+const REFUSED_TTL_MS = 15 * 60_000;
+const refusedIds = new Map<number, number>();
+
+function isRefused(id: number): boolean {
+  const at = refusedIds.get(id);
+  if (at === undefined) return false;
+  if (Date.now() - at < REFUSED_TTL_MS) return true;
+  refusedIds.delete(id);
+  return false;
+}
+
+/** For tests: forget every refused id. */
+export function clearRefusedNameIds(): void {
+  refusedIds.clear();
+}
+
+/**
+ * Most 404s one lookup may spend finding bad ids. Each is charged to ESI's
+ * shared error budget (100 a minute), so a batch full of bad ids stops
+ * splitting and leaves the rest unresolved, as before bisecting existed.
+ */
+const MAX_BISECT_404S = 20;
 
 async function fetchEntries(ids: readonly number[]): Promise<Map<number, UniverseName>> {
   const resolved = new Map<number, UniverseName>();
-  const askable = ids.filter((id) => !refusedIds.has(id));
+  const askable = ids.filter((id) => !isRefused(id));
+  const allowance = { left: MAX_BISECT_404S };
   // One POST per batch, each guarded, so a failed batch keeps the others' names.
-  for (let i = 0; i < askable.length; i += NAMES_BATCH) {
-    await fetchBatch(askable.slice(i, i + NAMES_BATCH), resolved);
+  for (const batch of chunk(askable, NAMES_BATCH)) {
+    await fetchBatch(batch, resolved, allowance);
   }
   return resolved;
 }
 
-/**
- * ESI answers 404 to the *whole* POST when any one id in it is invalid, so a
- * single bad id used to blank every name beside it (a corp page mixing pilots,
- * corporations and systems showed `#id` for the lot). A 404 on a batch is split
- * in halves and each half asked again, down to the one id that is refused.
- * Any other failure (offline, 5xx) keeps the old behaviour: the batch is
- * skipped and whatever the caller read from cache stands.
- */
 async function fetchBatch(
   batch: readonly number[],
-  resolved: Map<number, UniverseName>
+  resolved: Map<number, UniverseName>,
+  allowance: { left: number }
 ): Promise<void> {
   if (batch.length === 0) return;
   try {
@@ -177,12 +194,14 @@ async function fetchBatch(
     );
   } catch (error) {
     if (!(error instanceof EsiError) || error.status !== 404) return;
+    allowance.left -= 1;
     if (batch.length === 1) {
-      refusedIds.add(batch[0]);
+      refusedIds.set(batch[0], Date.now());
       return;
     }
+    if (allowance.left <= 0) return;
     const middle = Math.ceil(batch.length / 2);
-    await fetchBatch(batch.slice(0, middle), resolved);
-    await fetchBatch(batch.slice(middle), resolved);
+    await fetchBatch(batch.slice(0, middle), resolved, allowance);
+    await fetchBatch(batch.slice(middle), resolved, allowance);
   }
 }
