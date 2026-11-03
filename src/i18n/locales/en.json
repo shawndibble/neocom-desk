@@ -3900,7 +3900,7 @@
       "depthTitle": "Order book depth",
       "depthIntro_one": "{{materials}} needs at least 1% of the units listed for sale in {{hub}}, so its price walks {{hub}}'s sell orders, cheapest first, until the plan's need is filled. The rest use the buy-now price.",
       "depthIntro_other": "{{materials}} each need at least 1% of the units listed for sale in {{hub}}, so their price walks {{hub}}'s sell orders, cheapest first, until the plan's need is filled. The rest use the buy-now price.",
-      "depthProduct": "The {{product}}'s own sale price is still the lowest sell order price.",
+      "depthProduct": "The {{product}}'s own sale price is still the lowest sell order.",
       "depthRow": "{{material}}: {{need}} needed · {{avg}} avg",
       "depthLevel": "{{price}} ISK × {{units}}",
       "depthLevelPartial": "{{price}} ISK × {{units}} (of {{listed}} listed)",
@@ -7238,7 +7238,7 @@
       "fittingLabel": "Fitting",
       "fittingPlaceholder": "Pick a fitting",
       "noFittings": "No saved or in-game fittings for this character yet.",
-      "fittingHint": "The target is the fitting's sell price at {{hub}}, and it follows the market."
+      "fittingHint": "The target is the fitting's buy-now price at {{hub}}, and it follows the market."
     },
     "journalBreakdownTitle": "Where the ISK went",
     "journalFlowHeading": "Daily flow",
@@ -12613,7 +12613,7 @@
         "addedFromColumn": "Added from category",
         "onTripColumn": "On trip",
         "buyOrder": "Sell now",
-        "buyOrderTip": "What the destination hub's buy orders pay per unit for the suggested load, on average. You sell instantly: nothing is listed, so there is no broker fee. Only buy orders at the hub station count.",
+        "buyOrderTip": "Sell now price: what the destination hub's buy orders pay per unit for the suggested load, on average. You sell instantly: nothing is listed, so there is no broker fee. Only buy orders at the hub station count.",
         "marginInstantTip": "Profit as a percentage of what the load costs, after the sales tax on the sale. Nothing is listed, so there is no broker fee. Select a row for the full working.",
         "iskPerM3": "ISK/m³",
         "iskPerM3Tip": "Profit per unit divided by its hauled volume: what each cubic metre of hold earns carrying this item.",

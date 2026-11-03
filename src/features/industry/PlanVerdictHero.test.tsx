@@ -277,7 +277,7 @@ describe('PlanVerdictHero: calculation breakdown', () => {
     expect(within(dialog).getByText('Order book depth')).toBeTruthy();
     expect(within(dialog).getByText(/Tritanium needs at least 1% .* Jita/)).toBeTruthy();
     expect(
-      within(dialog).getByText(/Rifter's own sale price is still the lowest sell order price/)
+      within(dialog).getByText(/Rifter's own sale price is still the lowest sell order/)
     ).toBeTruthy();
     expect(within(dialog).getByText('Tritanium: 300 needed · 4.50 avg')).toBeTruthy();
     expect(within(dialog).getByText('4.00 ISK × 150')).toBeTruthy();
