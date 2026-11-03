@@ -56,12 +56,12 @@ export const One: Story = { args: { selected: new Set(['cruiser']) } };
 /** @summary Several ticked: the summary is a count. */
 export const Count: Story = { args: { selected: new Set(['frigate', 'cruiser']) } };
 
-/** @summary Nothing ticked: the summary reads "None". */
 /** @summary A narrowed filter: `active` draws the accent border (§6c). */
 export const Active: Story = {
   args: { selected: new Set(['cruiser']), active: true },
 };
 
+/** @summary Nothing ticked: the summary reads "None". */
 export const None: Story = { args: { selected: new Set() } };
 
 /** @summary Open menu: checked items carry a check, options can carry a dim description. */
@@ -73,3 +73,21 @@ export const Open: Story = {
 
 /** @summary `size="md"`: the 36px height of a `SearchInput` beside it, for a filter row built at the default size. */
 export const Medium: Story = { args: { size: 'md' } };
+
+/** @summary `noneLabel`: for a filter where nothing ticked means no narrowing, the empty summary reads "Any". */
+export const NoneLabel: Story = { args: { selected: new Set(), noneLabel: 'Any' } };
+
+/** @summary A `disabled` option is greyed and unclickable, and keeps its tick when it was already on. */
+export const DisabledOption: Story = {
+  args: {
+    selected: new Set(['frigate']),
+    options: [
+      { value: 'frigate', label: 'Frigates', disabled: true },
+      { value: 'cruiser', label: 'Cruisers', description: 'Tech 1 and Tech 2', disabled: true },
+      { value: 'battleship', label: 'Battleships' },
+    ],
+  },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole('button'));
+  },
+};

@@ -215,6 +215,8 @@ export function LpLandingFilterBar({
           <FilterField captionInline label={t('loyaltyStore.landing.showOnlyLabel')}>
             <CheckboxSelect<ShowOnlyKey>
               label={t('loyaltyStore.landing.showOnlyLabel')}
+              size="md"
+              active={SHOW_ONLY_KEYS.some((key) => draft[key])}
               noneLabel={t('loyaltyStore.landing.showOnlyAny')}
               options={[
                 {
