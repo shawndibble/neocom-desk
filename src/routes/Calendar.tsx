@@ -18,7 +18,7 @@ import { loadCalendarBoard } from '@/features/character/calendarBoardData';
 import { EventDetailModal } from '@/features/character/EventDetailModal';
 import { skyhookRaidDetail } from '@/features/character/skyhookRaidDetail';
 import { RowDetailModal } from '@/features/overview/widgets/RowDetailModal';
-import { CalendarMap, CalendarPastHint } from '@/features/character/CalendarMap';
+import { CalendarMap } from '@/features/character/CalendarMap';
 import { CalendarDayTicker } from '@/features/character/CalendarDayTicker';
 import { ComingUpRail } from '@/features/character/ComingUpRail';
 import { CalendarReauthNotice } from '@/features/character/CalendarReauthNotice';
@@ -448,8 +448,6 @@ export function Calendar() {
                   selectedDayMs={selectedDayMs}
                   onSelectDay={setSelectedDayMs}
                 />
-                {/* The same caption the wide grid carries — the rule it teaches is not a desktop rule. */}
-                <CalendarPastHint className="mt-2" />
               </Panel>
             ) : (
               <Panel

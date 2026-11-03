@@ -48,18 +48,6 @@ export interface CalendarMapProps {
   onSelectDay: (dayStartMs: number | null) => void;
 }
 
-/**
- * Why the hatched cells are hatched.
- *
- * Exported because the phone shows a Day Ticker rather than this grid and owes
- * the reader the same sentence — two copies of the wording is one copy too
- * many for a caption whose whole job is to be exact.
- */
-export function CalendarPastHint({ className = '' }: { className?: string }) {
-  const { t } = useTranslation();
-  return <p className={cx('text-xs text-text-dim', className)}>{t('calendar.map.pastHint')}</p>;
-}
-
 export function CalendarMap({
   days,
   loads,
@@ -165,7 +153,6 @@ export function CalendarMap({
           );
         })}
       </div>
-      <CalendarPastHint className="px-3 py-2" />
     </>
   );
 }
