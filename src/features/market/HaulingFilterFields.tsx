@@ -103,7 +103,7 @@ export function IskCapField({
     } else if (held !== 'none') commit(held.amount);
   }
   return (
-    <FilterField label={label}>
+    <FilterField captionInline label={label}>
       <IskInput
         size="sm"
         aria-label={label}

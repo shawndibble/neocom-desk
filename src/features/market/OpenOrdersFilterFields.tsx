@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   FilterChip,
+  FilterField,
   MultiSelect,
   Select,
   SelectContent,
@@ -110,60 +111,64 @@ export function OpenOrdersFilterFields({
           })
         }
       />
-      <Select
-        value={draft.expiringWithinDays === null ? 'any' : String(draft.expiringWithinDays)}
-        onValueChange={(value) =>
-          setDraft({
-            ...draft,
-            expiringWithinDays: value === 'any' ? null : Number(value),
-          })
-        }
-      >
-        <SelectTrigger
-          size="sm"
-          aria-label={t('market.orders.filter.expiringWithin')}
-          active={draft.expiringWithinDays !== null}
-          className="w-36"
+      <FilterField captionInline label={t('market.orders.filter.expiringWithin')}>
+        <Select
+          value={draft.expiringWithinDays === null ? 'any' : String(draft.expiringWithinDays)}
+          onValueChange={(value) =>
+            setDraft({
+              ...draft,
+              expiringWithinDays: value === 'any' ? null : Number(value),
+            })
+          }
         >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">{t('market.orders.filter.anyExpiry')}</SelectItem>
-          {EXPIRING_WITHIN_DAY_OPTIONS.map((days) => (
-            <SelectItem key={days} value={String(days)}>
-              {t('market.orders.filter.expiringWithinOption', { count: days })}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select
-        value={draft.minIskTiedUp === null ? 'any' : String(draft.minIskTiedUp)}
-        onValueChange={(value) =>
-          setDraft({
-            ...draft,
-            minIskTiedUp: value === 'any' ? null : Number(value),
-          })
-        }
-      >
-        <SelectTrigger
-          size="sm"
-          aria-label={t('market.orders.filter.minIskTiedUp')}
-          active={draft.minIskTiedUp !== null}
-          className="w-36"
+          <SelectTrigger
+            size="sm"
+            aria-label={t('market.orders.filter.expiringWithin')}
+            active={draft.expiringWithinDays !== null}
+            className="w-36"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">{t('market.orders.filter.anyExpiry')}</SelectItem>
+            {EXPIRING_WITHIN_DAY_OPTIONS.map((days) => (
+              <SelectItem key={days} value={String(days)}>
+                {t('market.orders.filter.expiringWithinOption', { count: days })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FilterField>
+      <FilterField captionInline label={t('market.orders.filter.minIskTiedUp')}>
+        <Select
+          value={draft.minIskTiedUp === null ? 'any' : String(draft.minIskTiedUp)}
+          onValueChange={(value) =>
+            setDraft({
+              ...draft,
+              minIskTiedUp: value === 'any' ? null : Number(value),
+            })
+          }
         >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">{t('market.orders.filter.anySize')}</SelectItem>
-          {MIN_ISK_TIED_UP_OPTIONS.map((amount) => (
-            <SelectItem key={amount} value={String(amount)}>
-              {t('market.orders.filter.minIskTiedUpOption', {
-                amount: formatIskCompact(amount),
-              })}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          <SelectTrigger
+            size="sm"
+            aria-label={t('market.orders.filter.minIskTiedUp')}
+            active={draft.minIskTiedUp !== null}
+            className="w-36"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">{t('market.orders.filter.anySize')}</SelectItem>
+            {MIN_ISK_TIED_UP_OPTIONS.map((amount) => (
+              <SelectItem key={amount} value={String(amount)}>
+                {t('market.orders.filter.minIskTiedUpOption', {
+                  amount: formatIskCompact(amount),
+                })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FilterField>
       {showLocationFilter && (
         <MultiSelect
           label={t('market.orders.filter.location')}
