@@ -390,6 +390,16 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: { fields: [THRESHOLD_FIELDS.skillQueueEndingLeadHours], hintKey: null },
     rowHintKey: null,
   }),
+  // Over the same skill-queue read as the three above. A slowdown that already happened, so it
+  // is only ever seen while the app is open: nothing to project for a Scheduled Push.
+  omegaLapsed: defineEvent({
+    source: SNAPSHOT_SOURCES.skillQueue,
+    diff: SKILL_QUEUE_NOTIFICATION_DIFFS.omegaLapsed,
+    copy: skillQueueCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
   // Opt-in behind sync.spExtractionMonitoringEnabled, with its threshold a
   // single account-wide setting (`Settings.tsx`), not a per-Character field.
   spExtractionReady: defineEvent({

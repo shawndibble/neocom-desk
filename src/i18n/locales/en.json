@@ -12107,6 +12107,10 @@
         "body_one": "{{character}}'s cerebral accelerator should run out in about {{count}} hour.",
         "body_other": "{{character}}'s cerebral accelerator should run out in about {{count}} hours."
       },
+      "omegaLapsed": {
+        "title": "Training slowed to half speed",
+        "body": "{{character}}'s skill training just halved in speed, which looks like Omega ending. If so, set the Clone State to Alpha in Skill Plans so your plans match."
+      },
       "acceleratorEnded": {
         "expired": {
           "title": "Accelerator ran out",
@@ -14358,6 +14362,7 @@
         "skillQueueEnding": "Skill queue ending",
         "acceleratorExpiring": "Accelerator expiring",
         "acceleratorEnded": "Accelerator ended",
+        "omegaLapsed": "Omega may have ended",
         "spExtractionReady": "SP extraction ready",
         "industryJobComplete": "Industry job complete",
         "cloneJumpReady": "Clone jump ready",

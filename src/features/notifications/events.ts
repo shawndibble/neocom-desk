@@ -95,6 +95,14 @@ const CATALOG = [
     scope: requiredScope('getCharacterSkillQueue'),
   },
   {
+    // Inferred from the skill queue's own re-projected finish date (no ESI field says Omega or
+    // Alpha), so it needs the queue read and is only seen while the app is open.
+    id: 'omegaLapsed',
+    labelKey: 'settings.notifications.event.omegaLapsed',
+    defaultChannels: 'both',
+    scope: requiredScope('getCharacterSkillQueue'),
+  },
+  {
     // Opt-in behind sync.spExtractionMonitoringEnabled — the scope below
     // just gates whether the event can fire at all once a pilot turns
     // monitoring on; `pollDomains/`'s spExtractionDomain checks the

@@ -46,7 +46,7 @@ export interface SkillQueueSnapshot {
 }
 
 export type SkillQueueNotificationEventId =
-  'skillLevelComplete' | 'characterNotTraining' | 'skillQueueEnding';
+  'skillLevelComplete' | 'characterNotTraining' | 'skillQueueEnding' | 'omegaLapsed';
 
 export interface NotificationFire {
   eventId: SkillQueueNotificationEventId;
@@ -334,6 +334,66 @@ export function diffCloneJumpReady(
   return fires;
 }
 
+/**
+ * Alpha trains at half the Omega rate (`ALPHA_RATE_FACTOR`, `engine/skills/sp.ts`), and ESI
+ * re-projects the active skill's finish date when the rate changes, so an Omega clone lapsing
+ * to Alpha shows up as the same active entry finishing about twice as far away.
+ *
+ * `omegaLapsed` reads exactly that: between two polls, the same skill and level (same queue
+ * position) is still the active entry and its remaining time at least doubled. Two guards keep
+ * other slowdowns from reading as Alpha. The previous poll must be recent against the time left
+ * (`remaining >= 4 * gap`), because the slowdown lands somewhere inside the gap and the longer
+ * ago it did the more the ratio is inflated: a change of `d` before this poll gives a ratio of
+ * `2 + d/remaining` for a halving, at most 2.25 here. And the threshold sits just under 2, above
+ * the 1.95 ceiling of the strongest other cause (an accelerator or implants coming off a weak
+ * attribute set, about 1.7x, plus the same inflation). An accelerator lapsing in the same gap as
+ * Omega only pushes the ratio higher, so both are seen.
+ *
+ * Fires nothing without a baseline, for a paused or edited entry, or on a speed-up.
+ */
+export const OMEGA_LAPSED_RATIO = 1.97;
+const OMEGA_LAPSED_GAP_FACTOR = 4;
+
+function activeEntry(
+  snapshot: SkillQueueSnapshot
+): (SkillQueueEntrySnapshot & { finishMs: number }) | undefined {
+  return orderedByQueuePosition(snapshot.entries).find(
+    (entry): entry is SkillQueueEntrySnapshot & { finishMs: number } =>
+      isActive(entry, snapshot.nowMs)
+  );
+}
+
+export function diffOmegaLapsed(
+  characterId: number,
+  prev: SkillQueueSnapshot | undefined,
+  next: SkillQueueSnapshot
+): NotificationFire[] {
+  if (!prev) return [];
+  const gap = next.nowMs - prev.nowMs;
+  const before = activeEntry(prev);
+  const after = activeEntry(next);
+  if (gap <= 0 || !before || !after) return [];
+  if (
+    before.skillId !== after.skillId ||
+    before.finishedLevel !== after.finishedLevel ||
+    before.queuePosition !== after.queuePosition
+  ) {
+    return [];
+  }
+  const expectedRemaining = before.finishMs - next.nowMs;
+  if (expectedRemaining < OMEGA_LAPSED_GAP_FACTOR * gap) return [];
+  if ((after.finishMs - next.nowMs) / expectedRemaining < OMEGA_LAPSED_RATIO) return [];
+  return [
+    {
+      eventId: 'omegaLapsed',
+      characterId,
+      skillId: after.skillId,
+      level: after.finishedLevel,
+      finishMs: after.finishMs,
+    },
+  ];
+}
+
 export const SKILL_QUEUE_NOTIFICATION_DIFFS: Record<
   SkillQueueNotificationEventId,
   (
@@ -345,4 +405,5 @@ export const SKILL_QUEUE_NOTIFICATION_DIFFS: Record<
   skillLevelComplete: diffSkillLevelComplete,
   characterNotTraining: diffCharacterNotTraining,
   skillQueueEnding: diffSkillQueueEnding,
+  omegaLapsed: diffOmegaLapsed,
 };

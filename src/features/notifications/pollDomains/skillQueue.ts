@@ -7,8 +7,8 @@ import type {
   SkillQueueEntrySnapshot,
   SkillQueueSnapshot,
 } from '@/engine/notificationDiffs';
-import type { SkillNames } from '../domainCopy';
-import { NOTIFICATION_EVENT_ENTRIES, SNAPSHOT_SOURCES } from '../eventEntries';
+import { skillQueueCopy, type SkillNames } from '../domainCopy';
+import { SNAPSHOT_SOURCES } from '../eventEntries';
 import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 import { HOUR_MS, currentThresholds, resolveProjectionNames, universeTypeName } from './shared';
@@ -86,8 +86,7 @@ export const skillQueueDomain = defineDomain<
       characterName,
       entries,
       skillNames,
-      (fire, character, names) =>
-        NOTIFICATION_EVENT_ENTRIES[fire.eventId].projection.push(fire, character, names),
+      skillQueueCopy.push,
       nowMs
     );
   },

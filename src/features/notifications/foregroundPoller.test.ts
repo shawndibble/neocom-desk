@@ -390,6 +390,7 @@ describe('runForegroundPoll', () => {
         skillLevelComplete: false,
         characterNotTraining: false,
         skillQueueEnding: false,
+        omegaLapsed: false,
       }),
       loadSkillQueue,
     });
@@ -2192,6 +2193,7 @@ describe('runForegroundPoll per-event channel columns', () => {
         skillLevelComplete: { browser: false, feed: false },
         characterNotTraining: { browser: false, feed: false },
         skillQueueEnding: { browser: false, feed: false },
+        omegaLapsed: { browser: false, feed: false },
       }),
     });
     await runForegroundPoll(deps);
@@ -2206,6 +2208,7 @@ describe('runForegroundPoll per-event channel columns', () => {
         skillLevelComplete: false,
         characterNotTraining: false,
         skillQueueEnding: false,
+        omegaLapsed: false,
       }),
     });
     await runForegroundPoll(deps);
