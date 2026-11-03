@@ -4,14 +4,15 @@
  */
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
-  Button,
   FilterBar,
   countActive,
   FilterChip,
   FilterField,
   IskInput,
   RegionSelect,
+  type RegionSelectShortcut,
   Select,
   SelectContent,
   SelectItem,
@@ -37,11 +38,13 @@ function RegionFilterField({
   value,
   options,
   onChange,
+  shortcut,
 }: {
   label: string;
   value: number | null;
   options: RegionOption[];
   onChange: (regionId: number | null) => void;
+  shortcut?: RegionSelectShortcut;
 }) {
   const { t } = useTranslation();
   return (
@@ -55,6 +58,7 @@ function RegionFilterField({
         noResultsLabel={t('common.noRegionMatches')}
         aria-label={label}
         className="w-44"
+        shortcut={shortcut}
       />
     </FilterField>
   );
@@ -67,6 +71,8 @@ function RegionFilterField({
  * Region, not station or system, and the label says so. ESI answers this
  * question with a solar system; the filter beside it is region-scoped, so
  * naming anything finer would claim a precision the control does not have.
+ *
+ * The shortcut is a pinned row inside the From region picker, not a control of its own.
  *
  * The answer is *not* held here. `FilterBar` unmounts its controls whenever
  * the funnel closes or the sheet is dismissed, so state kept in this component
@@ -82,22 +88,20 @@ function RegionFilterField({
  * character whose grant predates `esi-location.read_location.v1` should find a
  * convenience missing, never a re-auth banner.
  */
-function MyRegionButton({
+function myRegionShortcut({
+  t,
   state,
   pending,
   options,
   onResolve,
-  onPick,
 }: {
+  t: TFunction;
   state: MyRegion;
   pending: boolean;
   options: RegionOption[];
   /** Asks the board to resolve the location, and answers with what it found. */
   onResolve: () => Promise<MyRegion>;
-  onPick: (regionId: number) => void;
-}) {
-  const { t } = useTranslation();
-
+}): RegionSelectShortcut {
   const offered = (regionId: number) => options.some((option) => option.id === regionId);
   const eligible = state.kind === 'region' && offered(state.regionId);
   // Disabled while in flight as much as for the answer: on a phone a double
@@ -105,44 +109,25 @@ function MyRegionButton({
   const disabled =
     pending || state.kind === 'unavailable' || (state.kind === 'region' && !eligible);
 
-  const message =
+  const note =
     state.kind === 'unavailable'
       ? t('contractSearch.fromMyRegionUnavailable')
       : state.kind === 'region' && !eligible
         ? t('contractSearch.noHaulsFromMyRegion')
         : null;
 
-  async function handleClick() {
-    // Already known and offered — the only way this click is reachable with an
-    // answer in hand, since every other answer disables the button.
-    if (state.kind === 'region') {
-      onPick(state.regionId);
-      return;
-    }
-    const resolved = await onResolve();
-    if (resolved.kind === 'region' && offered(resolved.regionId)) onPick(resolved.regionId);
-  }
-
-  // A plain group rather than a `FilterField`: the button's own text is its
-  // caption, and `FilterField` would stack an identical one above it in the
-  // sheet. Same shape as the space chips below.
-  return (
-    <div className="flex flex-col items-start gap-1">
-      <Button size="sm" disabled={disabled} onClick={() => void handleClick()}>
-        {t('contractSearch.fromMyRegion')}
-      </Button>
-      {/*
-        The reason, announced and not only drawn: the button goes unfocusable
-        in the same commit that renders this, so a screen reader following the
-        control would otherwise be told nothing at all about why it died.
-      */}
-      {message && (
-        <span role="status" className="text-xs text-text-dim">
-          {message}
-        </span>
-      )}
-    </div>
-  );
+  return {
+    label: t('contractSearch.fromMyRegion'),
+    disabled,
+    note,
+    onSelect: async () => {
+      // Already known and offered — the only way this is reachable with an
+      // answer in hand, since every other answer disables the row.
+      if (state.kind === 'region') return state.regionId;
+      const resolved = await onResolve();
+      return resolved.kind === 'region' && offered(resolved.regionId) ? resolved.regionId : null;
+    },
+  };
 }
 
 /** An ISK bound — reward floor, collateral ceiling — through the shared `IskInput`. */
@@ -302,13 +287,13 @@ export function CourierFilterBar({
             value={draft.originRegionId}
             options={originRegions}
             onChange={(originRegionId) => setDraft({ ...draft, originRegionId })}
-          />
-          <MyRegionButton
-            state={myRegion}
-            pending={myRegionPending}
-            onResolve={onResolveMyRegion}
-            options={originRegions}
-            onPick={(originRegionId) => setDraft({ ...draft, originRegionId })}
+            shortcut={myRegionShortcut({
+              t,
+              state: myRegion,
+              pending: myRegionPending,
+              options: originRegions,
+              onResolve: onResolveMyRegion,
+            })}
           />
           <RegionFilterField
             label={t('contractSearch.destinationRegionLabel')}
@@ -341,6 +326,7 @@ export function CourierFilterBar({
                 {spaceKinds.map((kind) => (
                   <FilterChip
                     key={kind}
+                    size="md"
                     label={t(`common.spaceOption.${kind}`)}
                     selected={draft.destinationSpace.includes(kind)}
                     onToggle={() =>
@@ -410,6 +396,7 @@ export function CourierFilterBar({
             </Select>
           </FilterField>
           <FilterChip
+            size="md"
             label={t('contractSearch.hideUncompletableLabel')}
             tooltip={t('contractSearch.hideUncompletableTooltip')}
             selected={draft.hideUncompletable}

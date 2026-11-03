@@ -84,6 +84,14 @@ function renderBoard(characterId = CHARACTER_ID, initialEntries: string[] = ['/'
 
 const myRegionButton = () => screen.getByRole('button', { name: 'From my region' });
 
+/** The shortcut is a row inside the From region picker: open the picker first if it is closed. */
+async function pressMyRegion(user: ReturnType<typeof userEvent.setup>) {
+  if (!screen.queryByRole('button', { name: 'From my region' })) {
+    await user.click(screen.getByRole('combobox', { name: 'From region' }));
+  }
+  await user.click(myRegionButton());
+}
+
 beforeEach(() => {
   loadCharacterRegionId.mockReset();
   vi.mocked(localJumpCountsForRoutes).mockResolvedValue({ kind: 'unknown' });
@@ -140,6 +148,7 @@ describe('CourierResults "From my region" shortcut', () => {
     renderBoard();
 
     await openFilters(user);
+    await user.click(screen.getByRole('combobox', { name: 'From region' }));
 
     expect(myRegionButton()).toBeInTheDocument();
     expect(loadCharacterRegionId).not.toHaveBeenCalled();
@@ -158,12 +167,14 @@ describe('CourierResults "From my region" shortcut', () => {
     renderBoard();
     await openFilters(user);
 
-    await user.click(myRegionButton());
+    await pressMyRegion(user);
     await waitFor(() => expect(myRegionButton()).toBeDisabled());
     await user.click(myRegionButton());
     release(THE_FORGE);
 
-    await waitFor(() => expect(myRegionButton()).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'From region' })).toHaveTextContent('The Forge')
+    );
     expect(loadCharacterRegionId).toHaveBeenCalledTimes(1);
   });
 
@@ -173,7 +184,7 @@ describe('CourierResults "From my region" shortcut', () => {
     renderBoard();
     await openFilters(user);
 
-    await user.click(screen.getByRole('button', { name: 'From my region' }));
+    await pressMyRegion(user);
 
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'From region' })).toHaveTextContent('The Forge')
@@ -187,7 +198,7 @@ describe('CourierResults "From my region" shortcut', () => {
     renderBoard();
     await openFilters(user);
 
-    await user.click(screen.getByRole('button', { name: 'From my region' }));
+    await pressMyRegion(user);
 
     await waitFor(() =>
       expect(screen.getByText('No hauls start in your region')).toBeInTheDocument()
@@ -204,7 +215,7 @@ describe('CourierResults "From my region" shortcut', () => {
     renderBoard();
     await openFilters(user);
 
-    await user.click(screen.getByRole('button', { name: 'From my region' }));
+    await pressMyRegion(user);
 
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'From my region' })).toBeDisabled()
@@ -222,12 +233,12 @@ describe('CourierResults "From my region" shortcut', () => {
     const user = userEvent.setup();
     renderBoard();
     await openFilters(user);
-    await user.click(myRegionButton());
+    await pressMyRegion(user);
     await waitFor(() => expect(loadCharacterRegionId).toHaveBeenCalledTimes(1));
 
     await openFilters(user); // collapse
     await openFilters(user); // reopen
-    await user.click(myRegionButton());
+    await pressMyRegion(user);
 
     expect(loadCharacterRegionId).toHaveBeenCalledTimes(1);
   });
@@ -237,7 +248,7 @@ describe('CourierResults "From my region" shortcut', () => {
     const user = userEvent.setup();
     const { rerender } = renderBoard();
     await openFilters(user);
-    await user.click(myRegionButton());
+    await pressMyRegion(user);
     await waitFor(() => expect(myRegionButton()).toBeDisabled());
 
     loadCharacterRegionId.mockResolvedValue(THE_FORGE);
@@ -249,7 +260,7 @@ describe('CourierResults "From my region" shortcut', () => {
 
     // The previous character's "no hauls start there" must not survive them.
     await waitFor(() => expect(myRegionButton()).toBeEnabled());
-    await user.click(myRegionButton());
+    await pressMyRegion(user);
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'From region' })).toHaveTextContent('The Forge')
     );
@@ -264,7 +275,7 @@ describe('CourierResults "From my region" shortcut', () => {
       renderBoard();
       await openFilters(user);
 
-      await user.click(myRegionButton());
+      await pressMyRegion(user);
       await waitFor(() => expect(loadCharacterRegionId).toHaveBeenCalledTimes(1));
       await user.keyboard('{Escape}');
 

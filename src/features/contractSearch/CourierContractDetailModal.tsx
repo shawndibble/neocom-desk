@@ -526,8 +526,7 @@ export function CourierContractDetailModal({
             </li>
             {floor !== null && (
               <li>
-                {t('contractSearch.communityFloorValue', { reward: formatIskAuto(floor) })}
-                {' · '}
+                {t('contractSearch.communityFloorValue', { reward: formatIskAuto(floor) })}{' '}
                 {belowFloor
                   ? t('contractSearch.communityFloorShare', {
                       reward: formatIskAuto(row.reward),
