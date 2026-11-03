@@ -194,8 +194,8 @@ export function loadMailBody(
 /**
  * After a header load that reached ESI: fetches and caches the bodies of the
  * newest mail (unread first) that are not cached yet, so the reader shows
- * them offline. A delivered body does not change, so a cached one is never
- * fetched again. Bounds, gate and failure memory: `detailPrefetch.ts`.
+ * them offline. A delivered body does not change, so a cached one is not
+ * fetched again until the daily prune drops it after 7 days. Bounds, gate and failure memory: `detailPrefetch.ts`.
  */
 export function prefetchMailBodies(
   characterId: number,

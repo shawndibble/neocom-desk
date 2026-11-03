@@ -27,6 +27,7 @@
  * refreshed between the scan and the delete survives. The DBCore middleware
  * mirrors every delete onto meta.
  */
+import { captureException } from '@sentry/react';
 import { db, type EsiCacheMetaRecord } from '@/db';
 import { DAY_MS } from '@/lib/age';
 
@@ -38,6 +39,15 @@ export const STATIC_RETENTION_MS = 30 * DAY_MS;
  * already on a device still age out: two days, not thirty.
  */
 export const AVOID_ROUTE_RETENTION_MS = 2 * DAY_MS;
+/**
+ * A downloaded mail body. Bodies never change, so this is only how long an
+ * opened or prefetched mail stays readable offline; past it the body is
+ * fetched again when the mail is opened. Applies even to a mail still in the
+ * cached header list (the rule has no `referencedBy`).
+ */
+export const MAIL_BODY_RETENTION_MS = 7 * DAY_MS;
+/** An unsent mail draft nobody has touched in this long is dropped. */
+export const MAIL_DRAFT_RETENTION_MS = 30 * DAY_MS;
 /** Market rows, stale after 5-15 minutes: a week is still generous. */
 export const MARKET_RETENTION_MS = 7 * DAY_MS;
 /**
@@ -124,11 +134,9 @@ export const PRUNE_RULES: readonly PruneRule[] = [
     maxAgeMs: AVOID_ROUTE_RETENTION_MS,
   },
   { pattern: /^route:\d+:\d+:[a-z-]+(?::p\d+)?$/, maxAgeMs: STATIC_RETENTION_MS },
-  {
-    pattern: /^mail:(\d+)$/,
-    maxAgeMs: STATIC_RETENTION_MS,
-    referencedBy: [{ listKey: 'mail:headers', idField: 'mail_id' }],
-  },
+  // No `referencedBy`: mail content is the most private thing cached here, so a
+  // body ages out on its own clock even while its header is still listed.
+  { pattern: /^mail:(\d+)$/, maxAgeMs: MAIL_BODY_RETENTION_MS },
   {
     pattern: /^calendar:(\d+)$/,
     maxAgeMs: STATIC_RETENTION_MS,
@@ -314,6 +322,11 @@ function deleteChunk(chunk: readonly Candidate[], now: number): Promise<number> 
   });
 }
 
+/** Deletes mail drafts not edited for `MAIL_DRAFT_RETENTION_MS`. Returns how many went. */
+export function pruneStaleMailDrafts(now: number): Promise<number> {
+  return db.mailDrafts.filter((draft) => now - draft.updatedAt > MAIL_DRAFT_RETENTION_MS).delete();
+}
+
 /** One prune pass. Returns how many rows it deleted. */
 export async function pruneEsiCache(options: PruneOptions): Promise<number> {
   const { now, firstRunAt, chunkSize = 200, scanPageSize = 500 } = options;
@@ -368,6 +381,12 @@ export async function runDailyEsiCachePrune(): Promise<number | null> {
   const now = Date.now();
   const claim = await claimRun(now);
   if (claim === null) return null;
+  // Same daily cadence. A failure is reported, and must not skip the cache prune
+  // below; the next daily run tries the drafts again.
+  await pruneStaleMailDrafts(now).catch((error: unknown) => {
+    captureException(error);
+    return 0;
+  });
   return pruneEsiCache({
     now,
     firstRunAt: claim.firstRunAt,

@@ -14167,8 +14167,12 @@
           "alertsKept": "the newest 300.",
           "esi": "Your characters' EVE data (assets, wallet, skills, mail lists):",
           "esiKept": "replaced on each refresh.",
-          "lookups": "Names, items and stations looked up, and mail bodies no longer in your mail list:",
+          "lookups": "Names, items and stations looked up:",
           "lookupsKept": "30 days after they were last fetched.",
+          "mailBodies": "Mail text kept for reading offline (fetched ahead only for the character you're playing):",
+          "mailBodiesKept": "7 days after it was last fetched.",
+          "mailDrafts": "Unsent mail drafts:",
+          "mailDraftsKept": "30 days after you last edited them.",
           "market": "Market prices and history:",
           "marketKept": "7 days after they were last fetched."
         },

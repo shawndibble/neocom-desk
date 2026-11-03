@@ -306,10 +306,12 @@ export function prefetchTasksFor(
 }
 
 /**
- * Mail bodies and calendar details for every *other* Character that holds the
- * scope. Mail aggregates all Characters, but the task table above warms only
- * the active one, and the poll domains cover the rest only with notifications
- * on. Sequential and bounded like the active Character's (the limits are
+ * Calendar details for every *other* Character that holds the scope. The task
+ * table above warms only the active one, and the poll domains cover the rest
+ * only with notifications on. Mail bodies are deliberately not warmed here: an
+ * alt's mail is fetched when it is opened (decision
+ * `20261102-231716-mail-storage-active-character-body-prefetch-7-day`).
+ * Sequential and bounded like the active Character's (the limits are
  * `features/character/detailPrefetch.ts`'s), in the background lane; each list
  * load is a cache hit inside its freshness window, which prefetches nothing.
  * Never rejects.
@@ -319,7 +321,7 @@ export async function prefetchRosterDetails(
   signal: PrefetchSignal = { cancelled: false }
 ): Promise<void> {
   try {
-    // Header lists for other Characters are only worth loading for the sake of the prefetch.
+    // Calendar lists for other Characters are only worth loading for the sake of the prefetch.
     if (!detailPrefetchAllowed()) return;
     const tokens = await db.tokens.toArray();
     for (const token of tokens) {
@@ -328,13 +330,6 @@ export async function prefetchRosterDetails(
       const held = new Set(token.scopes);
       const characterId = token.characterId;
       try {
-        if (grantCovers(held, ['getCharacterMailHeaders', 'getCharacterMail'])) {
-          const result = await inBackgroundLane(() => loadMailHeaders(characterId));
-          if (!result.needsReauth && result.cached !== null && !result.cached.fromCache) {
-            await prefetchMailBodies(characterId, result.cached.data);
-          }
-        }
-        if (signal.cancelled) return;
         if (grantCovers(held, ['getCharacterCalendar', 'getCharacterCalendarEvent'])) {
           const result = await inBackgroundLane(() => loadCalendarEvents(characterId));
           if (!result.needsReauth && result.cached !== null && !result.cached.fromCache) {

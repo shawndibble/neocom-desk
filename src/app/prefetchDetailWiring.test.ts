@@ -100,27 +100,29 @@ describe('prefetchRosterDetails', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('prefetches for every other Character that holds the scope, and no one else', async () => {
+  it('prefetches calendar details for every other Character that holds the scope, and never mail', async () => {
     await prefetchRosterDetails(1);
 
-    expect(mocks.prefetchMailBodies.mock.calls.map((call) => call[0])).toEqual([2, 3]);
+    // Mail bodies are the active Character's alone (decision 20261102): an alt's mail
+    // is read from ESI when it is opened.
+    expect(mocks.prefetchMailBodies).not.toHaveBeenCalled();
+    expect(mocks.loadMailHeaders).not.toHaveBeenCalled();
     expect(mocks.prefetchCalendarEventDetails.mock.calls.map((call) => call[0])).toEqual([2]);
-    expect(mocks.loadMailHeaders.mock.calls.map((call) => call[0])).toEqual([2, 3]);
   });
 
   it('does nothing on a metered connection', async () => {
     vi.stubGlobal('navigator', { onLine: true, connection: { saveData: true } });
     await prefetchRosterDetails(1);
-    expect(mocks.loadMailHeaders).not.toHaveBeenCalled();
+    expect(mocks.loadCalendarEvents).not.toHaveBeenCalled();
   });
 
   it('stops when the run is cancelled, and a failing Character does not stop the rest', async () => {
-    mocks.loadMailHeaders.mockRejectedValueOnce(new Error('boom'));
+    mocks.loadCalendarEvents.mockRejectedValueOnce(new Error('boom'));
     await prefetchRosterDetails(1);
-    expect(mocks.prefetchMailBodies.mock.calls.map((call) => call[0])).toEqual([3]);
+    expect(mocks.loadCalendarEvents).toHaveBeenCalledTimes(1);
 
-    mocks.prefetchMailBodies.mockClear();
+    mocks.loadCalendarEvents.mockClear();
     await prefetchRosterDetails(1, { cancelled: true });
-    expect(mocks.prefetchMailBodies).not.toHaveBeenCalled();
+    expect(mocks.loadCalendarEvents).not.toHaveBeenCalled();
   });
 });

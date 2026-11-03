@@ -8,8 +8,11 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
+import en from '@/i18n/locales/en.json';
 import {
   AVOID_ROUTE_RETENTION_MS,
+  MAIL_BODY_RETENTION_MS,
+  MAIL_DRAFT_RETENTION_MS,
   MARKET_RETENTION_MS,
   PILOT_KILLS_RETENTION_MS,
   PRUNE_FIRST_RUN_KEY,
@@ -20,6 +23,7 @@ import {
   STATIC_RETENTION_MS,
   pruneEsiCache,
   pruneRuleFor,
+  pruneStaleMailDrafts,
   runDailyEsiCachePrune,
 } from './cachePrune';
 import { GLOBAL_CACHE_CHARACTER_ID } from './cache';
@@ -112,12 +116,19 @@ describe('pruneRuleFor', () => {
     expect(pruneRuleFor(key)?.maxAgeMs).toBe(AVOID_ROUTE_RETENTION_MS);
   });
 
-  it.each(['mail:12345', 'calendar:777', 'contract-items:200000001'])(
+  it.each(['calendar:777', 'contract-items:200000001'])(
     '%s is pruned only once its list no longer references it',
     (key) => {
       expect(pruneRuleFor(key)?.referencedBy).toBeDefined();
     }
   );
+
+  it('a mail body ages out after 7 days whether or not its mail is still listed', () => {
+    const rule = pruneRuleFor('mail:12345');
+    expect(rule?.maxAgeMs).toBe(MAIL_BODY_RETENTION_MS);
+    expect(MAIL_BODY_RETENTION_MS).toBe(7 * DAY);
+    expect(rule?.referencedBy).toBeUndefined();
+  });
 
   it.each([
     // Single-row-per-character keys: the user's main data, never age-pruned.
@@ -260,24 +271,14 @@ describe('pruneEsiCache', () => {
   describe('referenced rows', () => {
     const old = NOW - STATIC_RETENTION_MS - 1;
 
-    it('keeps an old mail body whose mail is still in the cached header list', async () => {
-      await seed(CHAR, 'mail:headers', NOW, [{ mail_id: 1 }]);
-      await seed(CHAR, 'mail:1', old);
-      await seed(CHAR, 'mail:2', old);
-
-      await pruneEsiCache({ now: NOW });
-
-      expect(await keys()).toEqual([`${CHAR}|mail:1`, `${CHAR}|mail:headers`]);
-    });
-
     it('checks references per character', async () => {
-      await seed(CHAR, 'mail:headers', NOW, [{ mail_id: 1 }]);
-      await seed(CHAR + 1, 'mail:headers', NOW, []);
-      await seed(CHAR + 1, 'mail:1', old);
+      await seed(CHAR, 'calendar', NOW, [{ event_id: 1 }]);
+      await seed(CHAR + 1, 'calendar', NOW, []);
+      await seed(CHAR + 1, 'calendar:1', old);
 
       await pruneEsiCache({ now: NOW });
 
-      expect(await db.esiCache.get([CHAR + 1, 'mail:1'])).toBeUndefined();
+      expect(await db.esiCache.get([CHAR + 1, 'calendar:1'])).toBeUndefined();
     });
 
     it('keeps an event detail listed in either calendar row', async () => {
@@ -357,6 +358,24 @@ describe('runDailyEsiCachePrune', () => {
     vi.spyOn(Date, 'now').mockReturnValue(NOW);
   });
 
+  it('also drops a mail draft untouched for 30 days', async () => {
+    await db.mailDrafts.clear();
+    await db.mailDrafts.put({
+      id: `${CHAR}:new`,
+      characterId: CHAR,
+      mailId: 0,
+      kind: 'new',
+      recipients: [],
+      subject: '',
+      body: '',
+      updatedAt: NOW - MAIL_DRAFT_RETENTION_MS - 1,
+    });
+
+    await runDailyEsiCachePrune();
+
+    expect(await db.mailDrafts.count()).toBe(0);
+  });
+
   it('prunes, stamps the run, and records the first run once', async () => {
     await seed(G, 'name:1', NOW - STATIC_RETENTION_MS - 1);
 
@@ -414,5 +433,50 @@ describe('runDailyEsiCachePrune', () => {
     await seedWithoutMeta(G, 'name:1', 0);
 
     expect(await runDailyEsiCachePrune()).toBe(1);
+  });
+});
+
+describe('mail bodies and drafts', () => {
+  it('prunes a mail body past 7 days even while its mail is still in the header list, and keeps a fresh one', async () => {
+    await seed(CHAR, 'mail:headers', NOW, [{ mail_id: 1 }, { mail_id: 2 }]);
+    await seed(CHAR, 'mail:1', NOW - MAIL_BODY_RETENTION_MS - 1);
+    await seed(CHAR, 'mail:2', NOW - MAIL_BODY_RETENTION_MS + DAY);
+
+    await pruneEsiCache({ now: NOW });
+
+    expect(await db.esiCache.get([CHAR, 'mail:1'])).toBeUndefined();
+    expect(await db.esiCache.get([CHAR, 'mail:2'])).toBeDefined();
+    expect(await db.esiCache.get([CHAR, 'mail:headers'])).toBeDefined();
+  });
+
+  it('deletes a draft untouched for 30 days and keeps a newer one', async () => {
+    const draft = (id: string, updatedAt: number) => ({
+      id,
+      characterId: CHAR,
+      mailId: 0,
+      kind: 'new' as const,
+      recipients: [],
+      subject: '',
+      body: '',
+      updatedAt,
+    });
+    await db.mailDrafts.clear();
+    await db.mailDrafts.bulkPut([
+      draft('stale', NOW - MAIL_DRAFT_RETENTION_MS - 1),
+      draft('fresh', NOW - MAIL_DRAFT_RETENTION_MS + DAY),
+    ]);
+
+    expect(await pruneStaleMailDrafts(NOW)).toBe(1);
+
+    expect((await db.mailDrafts.toArray()).map((d) => d.id)).toEqual(['fresh']);
+  });
+});
+
+describe('the retention copy in What we store', () => {
+  const device = en.settings.faq.retention.device;
+  it('states the mail body and draft windows the prune enforces', () => {
+    expect(device.mailBodiesKept).toContain(`${MAIL_BODY_RETENTION_MS / DAY} days`);
+    expect(device.mailDraftsKept).toContain(`${MAIL_DRAFT_RETENTION_MS / DAY} days`);
+    expect(device.lookupsKept).toContain(`${STATIC_RETENTION_MS / DAY} days`);
   });
 });
