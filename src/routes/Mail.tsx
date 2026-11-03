@@ -54,7 +54,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useCalendarWeekStart } from '@/features/character/calendarWeekStart';
 import { useNow } from '@/lib/useNow';
-import { sumUnreadByTab, MAIL_FOLDERS, type MailTab } from '@/engine/mail/mail';
+import { applyUnreadDelta, sumUnreadByTab, MAIL_FOLDERS, type MailTab } from '@/engine/mail/mail';
 import type { MailHeader } from '@/esi/endpoints';
 
 const SEARCH_PARAM = textParam();
@@ -180,7 +180,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
     return at && (oldest === null || at < oldest) ? at : oldest;
   }, null);
   const needsReauth = data?.needsReauth ?? false;
-  const unreadByTab = useMemo(() => sumUnreadByTab(owners.map((o) => o.labels)), [owners]);
+  const labelUnreadByTab = useMemo(() => sumUnreadByTab(owners.map((o) => o.labels)), [owners]);
   const mailingListNames = useMemo(() => {
     const map = new Map<number, string>();
     for (const list of data?.mailingLists ?? NO_MAILING_LISTS)
@@ -188,7 +188,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
     return map;
   }, [data]);
 
-  const { rows, cappedRows, headersTruncated, rowSections, listState } = useMailRows({
+  const { rows, cappedRows, headersTruncated, rowSections, listState, unreadDelta } = useMailRows({
     owners,
     ownerById,
     loadedHeaders,
@@ -204,9 +204,14 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
     weekStart,
   });
 
+  const unreadByTab = useMemo(
+    () => applyUnreadDelta(labelUnreadByTab, unreadDelta),
+    [labelUnreadByTab, unreadDelta]
+  );
   const organize = useMailOrganize({
     owners,
-    rows,
+    // Only what the list shows: a mail a later filter hides is never acted on unseen.
+    rows: cappedRows,
     readState,
     selectedKey,
     onDeletedSelected: () => selectMail(null),
@@ -344,11 +349,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
               </Button>
             )}
             {organize.anyOrganizable && rows.length > 0 && !newMailOpen && (
-              <Button
-                size="md"
-                aria-pressed={organize.selecting}
-                onClick={() => organize.setSelecting(!organize.selecting)}
-              >
+              <Button size="md" onClick={() => organize.setSelecting(!organize.selecting)}>
                 {organize.selecting ? t('mail.doneSelecting') : t('mail.select')}
               </Button>
             )}
@@ -604,6 +605,8 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
         body={t('mail.deleteBody', { count: organize.deleteTargets?.length ?? 1 })}
         actionLabel={t('mail.deleteAction', { count: organize.deleteTargets?.length ?? 1 })}
         cancelLabel={t('common.cancel')}
+        // A deleted row's menu is gone with it: focus goes to the search box instead of the page top.
+        returnFocusFallback={() => searchInputRef.current}
         failedLabel={t('mail.deleteFailed')}
         onConfirm={organize.confirmDelete}
         onClose={organize.cancelDelete}

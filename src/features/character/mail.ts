@@ -236,9 +236,6 @@ export function prefetchMailBodies(
  * inside the 10-minute cache window.
  */
 export async function markMailReadOnEsi(characterId: number, mailId: number): Promise<void> {
-  // Opening a mail is not a request to write, and `organize_mail` is off by
-  // default (Write to EVE): without the scope skip quietly, rather than fail
-  // and raise the grant notice on every open. The Mail view offers the grant.
   await setMailReadOnEsi(characterId, mailId, true);
 }
 
@@ -247,14 +244,18 @@ export type MailWriteResult = 'done' | 'skipped' | 'failed';
 
 /**
  * Sets one mail's read flag on ESI (so the game client shows it too), then
- * patches the cached header the same way as `markMailReadOnEsi`. Nothing else
- * is stored: ESI stays the source of truth.
+ * patches the cached header the same way as `markMailReadOnEsi`, and the
+ * cached label counts so a reload agrees. Nothing else is stored: ESI stays
+ * the source of truth.
  */
 export async function setMailReadOnEsi(
   characterId: number,
   mailId: number,
   read: boolean
 ): Promise<MailWriteResult> {
+  // Opening a mail is not a request to write, and `organize_mail` is off by
+  // default (Write to EVE): without the scope skip quietly, rather than fail
+  // and raise the grant notice on every open. The Mail view offers the grant.
   if (!(await grantHoldsEndpointScope(characterId, 'putCharacterMail'))) return 'skipped';
   try {
     await putCharacterMail(characterId, mailId, { read });
@@ -262,9 +263,18 @@ export async function setMailReadOnEsi(
     await reportWriteAuthFailure(characterId, err, 'putCharacterMail');
     return 'failed';
   }
-  await patchCachedHeaders(characterId, (headers) =>
-    headers.map((header) => (header.mail_id === mailId ? { ...header, is_read: read } : header))
-  );
+  // ESI has answered: the write is done even if tidying the local copy fails.
+  try {
+    const before = await patchCachedHeaders(characterId, mailId, (header) => ({
+      ...header,
+      is_read: read,
+    }));
+    if (before !== undefined && Boolean(before.is_read) !== read) {
+      await patchCachedUnreadCounts(characterId, before, read ? -1 : 1);
+    }
+  } catch {
+    // Deliberately not rethrown: see above.
+  }
   return 'done';
 }
 
@@ -284,24 +294,83 @@ export async function deleteMailOnEsi(
     await reportWriteAuthFailure(characterId, err, 'deleteCharacterMail');
     return 'failed';
   }
-  await patchCachedHeaders(characterId, (headers) =>
-    headers.filter((header) => header.mail_id !== mailId)
-  );
-  await db.esiCache.delete([characterId, KEYS.body(mailId)]);
-  await clearDraft(characterId, mailId);
+  // ESI has answered 204: the mail is gone in EVE, so it is deleted even if
+  // dropping the local copies fails (a stale cached row ages out on the daily prune).
+  try {
+    const before = await patchCachedHeaders(characterId, mailId, null);
+    if (before !== undefined && before.is_read === false) {
+      await patchCachedUnreadCounts(characterId, before, -1);
+    }
+    await db.esiCache.delete([characterId, KEYS.body(mailId)]);
+    await clearDraft(characterId, mailId);
+  } catch {
+    // Deliberately not rethrown: see above.
+  }
   return 'done';
 }
 
-/** Rewrites the cached header list in place, keeping its own age: the list was not re-read from ESI, and restamping it would show a days-old list as just fetched. */
-async function patchCachedHeaders(
-  characterId: number,
-  patch: (headers: MailHeader[]) => MailHeader[]
-): Promise<void> {
-  const row = (await readCachedEntries<MailHeader[]>(characterId, [KEYS.headers])).get(
-    KEYS.headers
+/** One cache patch at a time per Character: a bulk action writes three mails at once, and two read-patch-writes interleaved would drop each other's change. */
+const cachePatchQueue = new Map<number, Promise<unknown>>();
+
+function serializePerCharacter<T>(characterId: number, run: () => Promise<T>): Promise<T> {
+  const next = (cachePatchQueue.get(characterId) ?? Promise.resolve()).then(run, run);
+  cachePatchQueue.set(
+    characterId,
+    next.catch(() => undefined)
   );
-  if (!row) return;
-  await writeCached(characterId, KEYS.headers, patch(row.value), row.fetchedAt);
+  return next;
+}
+
+/**
+ * Rewrites one mail in the cached header list (`null` removes it), keeping the
+ * list's own age: it was not re-read from ESI, and restamping it would show a
+ * days-old list as just fetched. Resolves to the mail as it was, or undefined
+ * when the list or the mail is not cached.
+ */
+function patchCachedHeaders(
+  characterId: number,
+  mailId: number,
+  patch: ((header: MailHeader) => MailHeader) | null
+): Promise<MailHeader | undefined> {
+  return serializePerCharacter(characterId, async () => {
+    const row = (await readCachedEntries<MailHeader[]>(characterId, [KEYS.headers])).get(
+      KEYS.headers
+    );
+    const before = row?.value.find((header) => header.mail_id === mailId);
+    if (!row || before === undefined) return undefined;
+    const next =
+      patch === null
+        ? row.value.filter((header) => header.mail_id !== mailId)
+        : row.value.map((header) => (header.mail_id === mailId ? patch(header) : header));
+    await writeCached(characterId, KEYS.headers, next, row.fetchedAt);
+    return before;
+  });
+}
+
+/** Moves the cached label unread counts (each label the mail carries, and the total) by `change`, floored at zero, so the folder chips agree after a reload. */
+function patchCachedUnreadCounts(
+  characterId: number,
+  header: MailHeader,
+  change: 1 | -1
+): Promise<void> {
+  return serializePerCharacter(characterId, async () => {
+    const row = (await readCachedEntries<MailLabels>(characterId, [KEYS.labels])).get(KEYS.labels);
+    if (!row) return;
+    const carried = new Set(header.labels ?? []);
+    const bump = (n: number | undefined) => Math.max(0, (n ?? 0) + change);
+    await writeCached(
+      characterId,
+      KEYS.labels,
+      {
+        ...row.value,
+        labels: row.value.labels?.map((label) =>
+          carried.has(label.label_id) ? { ...label, unread_count: bump(label.unread_count) } : label
+        ),
+        total_unread_count: bump(row.value.total_unread_count),
+      },
+      row.fetchedAt
+    );
+  });
 }
 
 /**

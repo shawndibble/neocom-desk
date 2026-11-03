@@ -125,6 +125,8 @@ describe('Mail organize', () => {
     await user.click(screen.getByRole('button', { name: 'Mark read' }));
     await waitFor(() => expect(puts).toEqual([{ id: '1', body: { read: true } }]));
 
+    // The bar is disabled while the writes finish.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete…' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Delete…' }));
     expect(await screen.findByText('Delete 2 mails?')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Delete 2 mails' }));
@@ -176,5 +178,106 @@ describe('Mail organize', () => {
     // The System Labels (Corp, Inbox) show as the folder, never as a tag; id 99 has no name.
     expect(within(fleet).queryAllByText('Corp').length).toBeLessThanOrEqual(1);
     expect(within(market).queryByText('99')).not.toBeInTheDocument();
+  });
+
+  it('moves the folder chip counts at once, not only on the next load', async () => {
+    trackWrites();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    expect(await screen.findByRole('button', { name: /Corp.*2 unread/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Fleet up!' }));
+    await user.click(screen.getByRole('button', { name: 'Mark read' }));
+
+    expect(await screen.findByRole('button', { name: /Corp.*1 unread/ })).toBeInTheDocument();
+  });
+
+  it('writes read again when a mail marked unread this session is opened', async () => {
+    const { puts } = trackWrites();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Market report');
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Market report' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Mark as unread' }));
+    const row = screen.getByText('Market report').closest('li') as HTMLElement;
+    await waitFor(() => expect(within(row).getByText('Unread')).toBeInTheDocument());
+    // Nothing flips it back by itself.
+    expect(puts).toHaveLength(1);
+
+    await user.click(screen.getByText('Market report'));
+    await waitFor(() =>
+      expect(puts).toEqual([
+        { id: '2', body: { read: false } },
+        { id: '2', body: { read: true } },
+      ])
+    );
+  });
+
+  it('acts only on ticked mail the list still shows', async () => {
+    const { deletes } = trackWrites();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Market report');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Fleet up!' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Market report' }));
+    await user.type(screen.getByLabelText('Search subject or sender'), 'market');
+    await waitFor(() => expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument());
+
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete mail' }));
+    await waitFor(() => expect(deletes).toEqual(['2']));
+  });
+
+  it('on a partly failed bulk delete, removes what went and keeps the rest to retry', async () => {
+    server.use(
+      http.delete(`${MAIL}/1/`, () => new HttpResponse(null, { status: 500 })),
+      http.delete(`${MAIL}/2/`, () => new HttpResponse(null, { status: 204 }))
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Market report');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Fleet up!' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Market report' }));
+    await user.click(screen.getByRole('button', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete 2 mails' }));
+
+    expect(await screen.findByText(/Couldn't delete/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Market report')).not.toBeInTheDocument());
+    expect(screen.getByText('Fleet up!')).toBeInTheDocument();
+    expect(screen.getByText('Delete this mail?')).toBeInTheDocument();
+  });
+
+  it('offers Mark as unread from the reader menu and shows the labels there too', async () => {
+    const { puts } = trackWrites();
+    server.use(
+      http.get(`${MAIL}`, () =>
+        HttpResponse.json([{ ...headers[0], labels: [3, 32] }, headers[1]])
+      ),
+      http.get(`${MAIL}/labels`, () =>
+        HttpResponse.json({
+          ...mailLabels,
+          labels: [...mailLabels.labels, { label_id: 32, name: 'Haulers', unread_count: 0 }],
+        })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByText('Fleet up!'));
+    // Opening marks it read; its label shows on the row and in the reader.
+    await waitFor(() => expect(puts).toEqual([{ id: '1', body: { read: true } }]));
+    await waitFor(() => expect(screen.getAllByText('Haulers').length).toBe(2));
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Mark as unread' }));
+
+    await waitFor(() => expect(puts[1]).toEqual({ id: '1', body: { read: false } }));
   });
 });

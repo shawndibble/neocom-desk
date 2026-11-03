@@ -7,6 +7,7 @@ import {
   mailSearchMatches,
   mergeOwnedMail,
   resolveMailTab,
+  unreadDeltaByTab,
   type MailTab,
 } from '@/engine/mail/mail';
 import { isMailRead, type MailRow } from '@/features/character/mailDisplay';
@@ -47,7 +48,7 @@ export function useMailRows({
   timeZone,
   weekStart,
 }: MailRowsInput) {
-  const rows = useMemo<MailRow[]>(
+  const allRows = useMemo<MailRow[]>(
     () =>
       mergeOwnedMail(
         owners.map((o) => ({
@@ -55,24 +56,32 @@ export function useMailRows({
           characterName: o.name,
           headers: loadedHeaders?.get(o.characterId) ?? o.headersResult?.data ?? [],
         }))
-      )
-        .map(({ ownerId, ownerName, header }) => {
-          const owner = ownerById.get(ownerId);
-          return {
-            key: mailKey(ownerId, header.mail_id),
-            ownerId,
-            ownerName,
-            header,
-            tab: resolveMailTab(header.labels, owner?.labelTabById ?? new Map()),
-            labelNames: customLabelNames(
-              header.labels,
-              owner?.labels ?? [],
-              owner?.labelTabById ?? new Map()
-            ),
-          };
-        })
-        .filter((row) => !deletedKeys.has(row.key)),
-    [owners, ownerById, loadedHeaders, deletedKeys]
+      ).map(({ ownerId, ownerName, header }) => {
+        const owner = ownerById.get(ownerId);
+        return {
+          key: mailKey(ownerId, header.mail_id),
+          ownerId,
+          ownerName,
+          header,
+          tab: resolveMailTab(header.labels, owner?.labelTabById ?? new Map()),
+          labelNames: customLabelNames(
+            header.labels,
+            owner?.labels ?? [],
+            owner?.labelTabById ?? new Map()
+          ),
+        };
+      }),
+    [owners, ownerById, loadedHeaders]
+  );
+  const rows = useMemo(
+    () => allRows.filter((row) => !deletedKeys.has(row.key)),
+    [allRows, deletedKeys]
+  );
+  // The folder chips' unread counts are ESI's label counts, read before this session's
+  // changes: this is how far this session has moved them.
+  const unreadDelta = useMemo(
+    () => unreadDeltaByTab(allRows, locallyReadKeys, locallyUnreadKeys, deletedKeys),
+    [allRows, locallyReadKeys, locallyUnreadKeys, deletedKeys]
   );
 
   // Folder, then search, then Hide read, kept per stage for `listState` below.
@@ -123,5 +132,5 @@ export function useMailRows({
     return 'all-read-hidden';
   })();
 
-  return { rows, cappedRows, headersTruncated, rowSections, listState } as const;
+  return { rows, cappedRows, headersTruncated, rowSections, listState, unreadDelta } as const;
 }

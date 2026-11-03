@@ -3,6 +3,8 @@ import {
   buildLabelTabMap,
   buildReplyAllRecipients,
   customLabelNames,
+  unreadDeltaByTab,
+  applyUnreadDelta,
   capHeadersForDisplay,
   mailKey,
   mergeOwnedMail,
@@ -461,5 +463,46 @@ describe('customLabelNames', () => {
 
   it('is empty for a mail with no labels', () => {
     expect(customLabelNames(undefined, labels, tabById)).toEqual([]);
+  });
+});
+
+describe('unreadDeltaByTab', () => {
+  const row = (key: string, tab: 'inbox' | 'corp', is_read: boolean) => ({
+    key,
+    tab,
+    header: { mail_id: Number(key), is_read },
+  });
+  const none = new Set<string>();
+
+  it('is empty when nothing changed this session', () => {
+    expect(unreadDeltaByTab([row('1', 'inbox', false)], none, none, none).size).toBe(0);
+  });
+
+  it('counts a mail marked read, marked unread and deleted-while-unread against its own tab', () => {
+    const rows = [
+      row('1', 'inbox', false), // marked read: -1 inbox
+      row('2', 'corp', true), // marked unread: +1 corp
+      row('3', 'inbox', false), // deleted while unread: -1 inbox
+      row('4', 'corp', true), // deleted while read: no change
+    ];
+    const delta = unreadDeltaByTab(rows, new Set(['1']), new Set(['2']), new Set(['3', '4']));
+    expect(delta.get('inbox')).toBe(-2);
+    expect(delta.get('corp')).toBe(1);
+  });
+
+  it('applies a delta to the label counts and never goes below zero', () => {
+    const base = new Map([
+      ['inbox', 1],
+      ['corp', 2],
+    ] as const);
+    const out = applyUnreadDelta(
+      base,
+      new Map([
+        ['inbox', -3],
+        ['corp', 1],
+      ] as const)
+    );
+    expect(out.get('inbox')).toBe(0);
+    expect(out.get('corp')).toBe(3);
   });
 });

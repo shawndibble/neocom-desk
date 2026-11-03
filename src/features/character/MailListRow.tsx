@@ -92,7 +92,7 @@ export function MailListRow({
           {/* Unread marker, in a fixed-width gutter so read and unread rows
           keep one left edge — the empty gutter is itself the "read" signal. */}
           <span aria-hidden="true" className="mt-1.5 flex w-1.5 shrink-0 justify-center">
-            {!isRead && <span className="size-1.5 rounded-full bg-accent" />}
+            {!isRead && !ticking && <span className="size-1.5 rounded-full bg-accent" />}
           </span>
 
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">

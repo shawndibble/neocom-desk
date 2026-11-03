@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { grantHoldsEndpointScope } from '@/esi/grantScope';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -84,9 +84,15 @@ export function useMailOrganize({
     const ids = ownerIdsKey === '' ? [] : ownerIdsKey.split(',').map(Number);
     void Promise.all(
       ids.map(async (id) => ((await grantHoldsEndpointScope(id, 'putCharacterMail')) ? id : null))
-    ).then((held) => {
-      if (!cancelled) setHolding(new Set(held.filter((id): id is number => id !== null)));
-    });
+    )
+      .then((held) => {
+        if (!cancelled) setHolding(new Set(held.filter((id): id is number => id !== null)));
+      })
+      // Fail closed: if the grant cannot be read, the write controls stay hidden
+      // rather than offering an action that cannot run.
+      .catch(() => {
+        if (!cancelled) setHolding(new Set());
+      });
     return () => {
       cancelled = true;
     };
@@ -97,6 +103,8 @@ export function useMailOrganize({
   const [selecting, setSelectingState] = useState(false);
   const [checkedKeys, setCheckedKeys] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  // A ref beside the state: a second action started mid-flight reads it at once, not on the next render.
+  const busyRef = useRef(false);
   const setSelecting = useCallback((on: boolean) => {
     setSelectingState(on);
     setCheckedKeys(new Set());
@@ -116,19 +124,28 @@ export function useMailOrganize({
         (row) =>
           holding.has(row.ownerId) && isMailRead(row, locallyReadKeys, locallyUnreadKeys) !== read
       );
-      if (todo.length === 0) return;
+      if (todo.length === 0 || busyRef.current) return;
+      busyRef.current = true;
       setBusy(true);
       let failed = 0;
       let done = 0;
-      await mapWithConcurrencyLimit(todo, ORGANIZE_CONCURRENCY, async (row) => {
-        const result = await setMailReadOnEsi(row.ownerId, row.header.mail_id, read);
-        if (result === 'done') {
-          done += 1;
-          if (read) markLocalRead(row.key);
-          else markLocalUnread(row.key);
-        } else if (result === 'failed') failed += 1;
-      });
-      setBusy(false);
+      try {
+        await mapWithConcurrencyLimit(todo, ORGANIZE_CONCURRENCY, async (row) => {
+          try {
+            const result = await setMailReadOnEsi(row.ownerId, row.header.mail_id, read);
+            if (result === 'done') {
+              done += 1;
+              if (read) markLocalRead(row.key);
+              else markLocalUnread(row.key);
+            } else if (result === 'failed') failed += 1;
+          } catch {
+            failed += 1;
+          }
+        });
+      } finally {
+        busyRef.current = false;
+        setBusy(false);
+      }
       if (failed > 0) notify(t('mail.organizeFailed', { count: failed }));
       else if (done > 0) notify(t(read ? 'mail.markedRead' : 'mail.markedUnread', { count: done }));
     },
@@ -150,7 +167,12 @@ export function useMailOrganize({
     const targets = deleteTargets ?? [];
     const failedRows: MailRow[] = [];
     await mapWithConcurrencyLimit(targets, ORGANIZE_CONCURRENCY, async (row) => {
-      const result = await deleteMailOnEsi(row.ownerId, row.header.mail_id);
+      let result: Awaited<ReturnType<typeof deleteMailOnEsi>>;
+      try {
+        result = await deleteMailOnEsi(row.ownerId, row.header.mail_id);
+      } catch {
+        result = 'failed';
+      }
       if (result === 'done') {
         markLocalDeleted(row.key);
         if (row.key === selectedKey) onDeletedSelected(row.key);
@@ -158,6 +180,9 @@ export function useMailOrganize({
       } else failedRows.push(row);
     });
     if (failedRows.length > 0) {
+      // Say what did go, before the confirm stays open on what did not.
+      const gone = targets.length - failedRows.length;
+      if (gone > 0) notify(t('mail.deleted', { count: gone }));
       setDeleteTargets(failedRows);
       throw new Error('mail delete failed');
     }

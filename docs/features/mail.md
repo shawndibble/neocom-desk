@@ -191,7 +191,7 @@ Registry: `src/esi/registry.ts:249-281`. Mail is not synced to Firestore.
 - Custom labels show as read-only tags but cannot be filtered or assigned (ESI replaces the whole label array on a write, so a stale set could clobber labels changed in game; chips were removed by decision `20260905-140358`). A mail with only a custom label still files under Inbox.
 - No label assignment, no mailing-list view; `getCharacterMailingLists` is used only to name recipients.
 - Search matches subject and sender name only; not body, not recipients (Sent folder rows are searched by sender = yourself).
-- Unread count per chip is ESI's count for all mail, not for the loaded/filtered window; "Hide read" uses per-header flags.
+- Unread count per chip is ESI's count for all mail (moved at once by this session's mark read/unread/delete), not for the loaded/filtered window; "Hide read" uses per-header flags.
 - Reader renders a safe subset of EVE markup; no images. Constellation and faction show-info links stay inert text.
 - Folder chips on phone are hidden while a mail is open, so folder cannot be changed without Back.
 - `loadMoreMailHeaders` swallows non-auth errors silently (list stays, button stays).
