@@ -277,6 +277,8 @@ export const RETENTION_GROUPS: readonly RetentionGroup[] = [
       'alerts',
       'esi',
       'lookups',
+      'mailBodies',
+      'mailDrafts',
       'market',
     ].map((id) => ({
       id,

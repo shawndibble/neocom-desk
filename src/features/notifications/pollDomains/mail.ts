@@ -1,4 +1,5 @@
 import { loadMailHeaders, prefetchMailBodies } from '@/features/character/mail';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { MailHeader } from '@/esi/endpoints';
 import type {
   MailHeaderSnapshot,
@@ -37,7 +38,14 @@ export const mailDomain = defineDomain<MailHeader, MailSnapshot, MailNotificatio
     if (result.needsReauth || result.cached === null) return null;
     // Only after a read that reached ESI (a cache hit or an offline fallback
     // proves nothing landed); see `detailPrefetch.ts` for the triggers.
-    if (!result.cached.fromCache) void prefetchMailBodies(characterId, result.cached.data);
+    // Bodies are the active Character's alone (decision 20261102): an alt's
+    // headers still feed its alerts, but its mail is fetched when opened.
+    if (
+      !result.cached.fromCache &&
+      useActiveCharacter.getState().activeCharacterId === characterId
+    ) {
+      void prefetchMailBodies(characterId, result.cached.data);
+    }
     return result.cached.data;
   },
   toSnapshot: (headers, nowMs) => ({ entries: headers.map(toMailHeaderSnapshot), nowMs }),

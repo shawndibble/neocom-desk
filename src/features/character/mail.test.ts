@@ -11,6 +11,8 @@ import {
   loadMailLabels,
   loadMoreMailHeaders,
   markMailReadOnEsi,
+  setMailReadOnEsi,
+  deleteMailOnEsi,
   prefetchMailBodies,
   sendMail,
 } from './mail';
@@ -552,5 +554,185 @@ describe('sendMail', () => {
     await expect(sendMail(CHAR_ID, RECIPIENTS, 'RE: Hi', 'On my way')).rejects.toThrow();
 
     expect((await db.esiCache.get([CHAR_ID, 'mail:headers']))?.value).toEqual([{ mail_id: 1 }]);
+  });
+});
+
+describe('setMailReadOnEsi and deleteMailOnEsi', () => {
+  const headers = [
+    { mail_id: 7, subject: 'A', is_read: true, labels: [1] },
+    { mail_id: 8, subject: 'B', is_read: false, labels: [1] },
+  ];
+  async function holdScope(held: boolean) {
+    await db.tokens.clear();
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 600_000,
+      scopes: [held ? 'esi-mail.organize_mail.v1' : 'esi-mail.read_mail.v1'],
+    });
+  }
+  async function cacheHeaders() {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'mail:headers',
+      value: headers,
+      fetchedAt: 1_000,
+    } as never);
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'mail:7',
+      value: { body: 'x' },
+      fetchedAt: 1_000,
+    } as never);
+  }
+
+  it('marks a mail unread: PUTs {read:false}, patches the cached header, keeps its age', async () => {
+    await holdScope(true);
+    await cacheHeaders();
+    let body: unknown;
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, async ({ request }) => {
+        body = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+
+    await expect(setMailReadOnEsi(CHAR_ID, 7, false)).resolves.toBe('done');
+
+    expect(body).toEqual({ read: false });
+    const row = await db.esiCache.get([CHAR_ID, 'mail:headers']);
+    expect((row?.value as typeof headers)[0].is_read).toBe(false);
+    expect(row?.fetchedAt).toBe(1_000);
+  });
+
+  it('skips without the Mail organize Permission: no request', async () => {
+    await holdScope(false);
+    const requested = vi.fn();
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, () => {
+        requested();
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    await expect(setMailReadOnEsi(CHAR_ID, 7, false)).resolves.toBe('skipped');
+    expect(requested).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed write and leaves the cache alone', async () => {
+    await holdScope(true);
+    await cacheHeaders();
+    server.use(
+      http.put(
+        `${ESI_BASE_URL}/characters/${CHAR_ID}/mail/8/`,
+        () => new HttpResponse(null, { status: 500 })
+      )
+    );
+    await expect(setMailReadOnEsi(CHAR_ID, 8, true)).resolves.toBe('failed');
+    const row = await db.esiCache.get([CHAR_ID, 'mail:headers']);
+    expect((row?.value as typeof headers)[1].is_read).toBe(false);
+  });
+
+  it('deletes on ESI, then drops the cached header, body and any draft', async () => {
+    await holdScope(true);
+    await cacheHeaders();
+    await db.mailDrafts.put({
+      id: `${CHAR_ID}:7`,
+      characterId: CHAR_ID,
+      mailId: 7,
+      kind: 'reply',
+      recipients: [],
+      subject: '',
+      body: 'draft',
+      updatedAt: 1,
+    } as never);
+    let deleted = false;
+    server.use(
+      http.delete(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, () => {
+        deleted = true;
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+
+    await expect(deleteMailOnEsi(CHAR_ID, 7)).resolves.toBe('done');
+
+    expect(deleted).toBe(true);
+    const row = await db.esiCache.get([CHAR_ID, 'mail:headers']);
+    expect((row?.value as typeof headers).map((h) => h.mail_id)).toEqual([8]);
+    expect(row?.fetchedAt).toBe(1_000);
+    expect(await db.esiCache.get([CHAR_ID, 'mail:7'])).toBeUndefined();
+    expect(await db.mailDrafts.get(`${CHAR_ID}:7`)).toBeUndefined();
+  });
+
+  it('keeps everything when the delete fails or the Permission is missing', async () => {
+    await holdScope(true);
+    await cacheHeaders();
+    server.use(
+      http.delete(
+        `${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`,
+        () => new HttpResponse(null, { status: 500 })
+      )
+    );
+    await expect(deleteMailOnEsi(CHAR_ID, 7)).resolves.toBe('failed');
+    expect(await db.esiCache.get([CHAR_ID, 'mail:7'])).toBeDefined();
+
+    await holdScope(false);
+    await expect(deleteMailOnEsi(CHAR_ID, 7)).resolves.toBe('skipped');
+  });
+
+  it('moves the cached label unread counts with the mail, so a reload agrees', async () => {
+    await holdScope(true);
+    await cacheHeaders();
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'mail:labels',
+      value: { labels: [{ label_id: 1, name: 'Inbox', unread_count: 2 }], total_unread_count: 2 },
+      fetchedAt: 1_000,
+    } as never);
+    server.use(
+      http.put(
+        `${ESI_BASE_URL}/characters/${CHAR_ID}/mail/:id/`,
+        () => new HttpResponse(null, { status: 204 })
+      ),
+      http.delete(
+        `${ESI_BASE_URL}/characters/${CHAR_ID}/mail/:id/`,
+        () => new HttpResponse(null, { status: 204 })
+      )
+    );
+    const counts = async () => {
+      const row = await db.esiCache.get([CHAR_ID, 'mail:labels']);
+      const value = row?.value as {
+        labels: { unread_count: number }[];
+        total_unread_count: number;
+      };
+      return [value.labels[0].unread_count, value.total_unread_count];
+    };
+
+    await setMailReadOnEsi(CHAR_ID, 8, true); // unread -> read
+    expect(await counts()).toEqual([1, 1]);
+    await setMailReadOnEsi(CHAR_ID, 8, true); // already read: no change
+    expect(await counts()).toEqual([1, 1]);
+    await setMailReadOnEsi(CHAR_ID, 7, false); // read -> unread
+    expect(await counts()).toEqual([2, 2]);
+    await deleteMailOnEsi(CHAR_ID, 7); // deleting an unread mail
+    expect(await counts()).toEqual([1, 1]);
+    await deleteMailOnEsi(CHAR_ID, 8); // deleting a read mail: no change
+    expect(await counts()).toEqual([1, 1]);
+  });
+
+  it('keeps every patch when several writes finish together', async () => {
+    await holdScope(true);
+    await cacheHeaders();
+    server.use(
+      http.put(
+        `${ESI_BASE_URL}/characters/${CHAR_ID}/mail/:id/`,
+        () => new HttpResponse(null, { status: 204 })
+      )
+    );
+
+    await Promise.all([setMailReadOnEsi(CHAR_ID, 7, false), setMailReadOnEsi(CHAR_ID, 8, true)]);
+
+    const row = await db.esiCache.get([CHAR_ID, 'mail:headers']);
+    expect((row?.value as typeof headers).map((h) => h.is_read)).toEqual([false, true]);
   });
 });

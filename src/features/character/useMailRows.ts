@@ -2,13 +2,15 @@ import { useMemo } from 'react';
 import { groupMailByAge } from '@/engine/mail/mailAge';
 import {
   capHeadersForDisplay,
+  customLabelNames,
   mailKey,
   mailSearchMatches,
   mergeOwnedMail,
   resolveMailTab,
+  unreadDeltaByTab,
   type MailTab,
 } from '@/engine/mail/mail';
-import type { MailRow } from '@/features/character/mailDisplay';
+import { isMailRead, type MailRow } from '@/features/character/mailDisplay';
 import type { OwnerSnapshot } from '@/features/character/mailSnapshot';
 import type { WeekStart } from '@/lib/calendarGrid';
 import type { MailHeader } from '@/esi/endpoints';
@@ -22,6 +24,9 @@ interface MailRowsInput {
   debouncedSearch: string;
   hideRead: boolean;
   locallyReadKeys: ReadonlySet<string>;
+  locallyUnreadKeys: ReadonlySet<string>;
+  /** Mail deleted this session: gone from the list at once, before any reload. */
+  deletedKeys: ReadonlySet<string>;
   now: number;
   timeZone: 'UTC' | undefined;
   weekStart: WeekStart;
@@ -37,11 +42,13 @@ export function useMailRows({
   debouncedSearch,
   hideRead,
   locallyReadKeys,
+  locallyUnreadKeys,
+  deletedKeys,
   now,
   timeZone,
   weekStart,
 }: MailRowsInput) {
-  const rows = useMemo<MailRow[]>(
+  const allRows = useMemo<MailRow[]>(
     () =>
       mergeOwnedMail(
         owners.map((o) => ({
@@ -49,14 +56,32 @@ export function useMailRows({
           characterName: o.name,
           headers: loadedHeaders?.get(o.characterId) ?? o.headersResult?.data ?? [],
         }))
-      ).map(({ ownerId, ownerName, header }) => ({
-        key: mailKey(ownerId, header.mail_id),
-        ownerId,
-        ownerName,
-        header,
-        tab: resolveMailTab(header.labels, ownerById.get(ownerId)?.labelTabById ?? new Map()),
-      })),
+      ).map(({ ownerId, ownerName, header }) => {
+        const owner = ownerById.get(ownerId);
+        return {
+          key: mailKey(ownerId, header.mail_id),
+          ownerId,
+          ownerName,
+          header,
+          tab: resolveMailTab(header.labels, owner?.labelTabById ?? new Map()),
+          labelNames: customLabelNames(
+            header.labels,
+            owner?.labels ?? [],
+            owner?.labelTabById ?? new Map()
+          ),
+        };
+      }),
     [owners, ownerById, loadedHeaders]
+  );
+  const rows = useMemo(
+    () => allRows.filter((row) => !deletedKeys.has(row.key)),
+    [allRows, deletedKeys]
+  );
+  // The folder chips' unread counts are ESI's label counts, read before this session's
+  // changes: this is how far this session has moved them.
+  const unreadDelta = useMemo(
+    () => unreadDeltaByTab(allRows, locallyReadKeys, locallyUnreadKeys, deletedKeys),
+    [allRows, locallyReadKeys, locallyUnreadKeys, deletedKeys]
   );
 
   // Folder, then search, then Hide read, kept per stage for `listState` below.
@@ -75,9 +100,9 @@ export function useMailRows({
   const visibleRows = useMemo(
     () =>
       hideRead
-        ? searchRows.filter((row) => !(row.header.is_read || locallyReadKeys.has(row.key)))
+        ? searchRows.filter((row) => !isMailRead(row, locallyReadKeys, locallyUnreadKeys))
         : searchRows,
-    [searchRows, hideRead, locallyReadKeys]
+    [searchRows, hideRead, locallyReadKeys, locallyUnreadKeys]
   );
 
   // Rendered-list cap (issue #416): applied after every filter, so it caps
@@ -107,5 +132,5 @@ export function useMailRows({
     return 'all-read-hidden';
   })();
 
-  return { rows, cappedRows, headersTruncated, rowSections, listState } as const;
+  return { rows, cappedRows, headersTruncated, rowSections, listState, unreadDelta } as const;
 }

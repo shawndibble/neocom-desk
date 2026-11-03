@@ -443,7 +443,6 @@ export const eveTime: Builder = (_feeds, { t, now }) => ({
   }),
   number: {
     value: eveClock(now),
-    unit: t('overview.widgets.eveTime.unit'),
     secondary: { text: utcDay(now) },
     tone: 'clear',
   },

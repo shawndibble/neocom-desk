@@ -43,6 +43,26 @@ export function buildLabelTabMap(labels: readonly SystemLabel[]): ReadonlyMap<nu
   return map;
 }
 
+/**
+ * The names of a mail's Custom Labels, in the mail's own label order. A System
+ * Label (it has a tab) is never a tag, and a label id with no name (a label
+ * deleted in game) or no match shows nothing, never a raw id.
+ */
+export function customLabelNames(
+  labelIds: readonly number[] | undefined,
+  labels: readonly SystemLabel[],
+  labelTabById: ReadonlyMap<number, MailTab>
+): string[] {
+  const nameById = new Map(labels.map((l) => [l.label_id, l.name?.trim()]));
+  const names: string[] = [];
+  for (const id of labelIds ?? []) {
+    if (labelTabById.has(id)) continue;
+    const name = nameById.get(id);
+    if (name) names.push(name);
+  }
+  return names;
+}
+
 /** One canonical tab for a header's `labels` ids; no recognized System Label (or none at all) folds into Inbox. */
 export function resolveMailTab(
   labelIds: readonly number[] | undefined,
@@ -303,6 +323,48 @@ export function sumUnreadByTab(
     }
   }
   return sums;
+}
+
+interface DeltaRow {
+  key: string;
+  tab: MailTab;
+  header: { is_read?: boolean };
+}
+
+/**
+ * How many unread mails each folder gained or lost this session, from what the
+ * pilot marked read, marked unread or deleted since the label counts were
+ * read. Attributed to the mail's own folder (the one label that decides its
+ * tab), so a mail carrying several labels is approximate, never double counted.
+ */
+export function unreadDeltaByTab(
+  rows: readonly DeltaRow[],
+  locallyReadKeys: ReadonlySet<string>,
+  locallyUnreadKeys: ReadonlySet<string>,
+  deletedKeys: ReadonlySet<string>
+): ReadonlyMap<MailTab, number> {
+  const delta = new Map<MailTab, number>();
+  for (const row of rows) {
+    const wasUnread = !row.header.is_read;
+    const isUnread = deletedKeys.has(row.key)
+      ? false
+      : locallyUnreadKeys.has(row.key)
+        ? true
+        : !(row.header.is_read || locallyReadKeys.has(row.key));
+    if (wasUnread !== isUnread) delta.set(row.tab, (delta.get(row.tab) ?? 0) + (isUnread ? 1 : -1));
+  }
+  return delta;
+}
+
+/** Label unread counts moved by a session delta, floored at zero. */
+export function applyUnreadDelta(
+  counts: ReadonlyMap<MailTab, number>,
+  delta: ReadonlyMap<MailTab, number>
+): ReadonlyMap<MailTab, number> {
+  if (delta.size === 0) return counts;
+  const out = new Map(counts);
+  for (const [tab, change] of delta) out.set(tab, Math.max(0, (out.get(tab) ?? 0) + change));
+  return out;
 }
 
 /**

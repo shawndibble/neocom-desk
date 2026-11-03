@@ -13,7 +13,16 @@ export interface PwaShortcut {
   icons: { src: string; sizes: string; type: string }[];
 }
 
-const ICON = { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' };
+/**
+ * One 192px PNG per shortcut, `public/icons/shortcut-<name>.png`: the page's
+ * nav glyph (`navIcons.ts`) in the accent colour on the app's dark background.
+ * Launchers need a raster image, so the nav's SVG components can't be used.
+ */
+const icon = (name: string) => ({
+  src: `icons/shortcut-${name}.png`,
+  sizes: '192x192',
+  type: 'image/png',
+});
 
 /**
  * Android shows at most four; order is the long-press menu order. The four are
@@ -22,11 +31,16 @@ const ICON = { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' };
  * from mobile usage). `/alerts` redirects to Overview with the bell panel open.
  */
 export function buildPwaShortcuts(strings: PwaShortcutStrings): PwaShortcut[] {
-  const entries: [string, string][] = [
-    [strings.alerts, '/alerts'],
-    [strings.mail, '/mail'],
-    [strings.wallet, '/wallet/balance'],
-    [strings.orders, '/market/orders'],
+  const entries: [string, string, string][] = [
+    [strings.alerts, '/alerts', 'alerts'],
+    [strings.mail, '/mail', 'mail'],
+    [strings.wallet, '/wallet/balance', 'wallet'],
+    [strings.orders, '/market/orders', 'orders'],
   ];
-  return entries.map(([name, url]) => ({ name, short_name: name, url, icons: [ICON] }));
+  return entries.map(([name, url, glyph]) => ({
+    name,
+    short_name: name,
+    url,
+    icons: [icon(glyph)],
+  }));
 }
