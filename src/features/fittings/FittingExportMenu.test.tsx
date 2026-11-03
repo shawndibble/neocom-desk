@@ -185,8 +185,8 @@ describe('FittingExportMenu', () => {
     setup();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Export' }));
-    expect(await screen.findByText('Jita sell: 2,000 ISK')).toBeInTheDocument();
-    expect(screen.queryByText(/Jita buy/)).toBeNull();
+    expect(await screen.findByText('Buy now at Jita: 2,000 ISK')).toBeInTheDocument();
+    expect(screen.queryByText(/sell now/i)).toBeNull();
     await user.click(screen.getByRole('menuitem', { name: 'Appraise in Market' }));
     const at = await screen.findByTestId('at');
     expect(at).toHaveTextContent('/market/appraisal');

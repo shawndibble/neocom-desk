@@ -56,7 +56,7 @@ test('/market/hauling: the open filter row shares one height', async ({ page }) 
   expect(Math.abs(field!.y - sells!.y)).toBeLessThanOrEqual(1);
 });
 
-// Category and Sell by give way before the route row wraps the funnel.
+// Category and Sell give way before the route row wraps the funnel.
 for (const width of [960, 1024]) {
   test(`/market/hauling @${width}: the filter funnel stays on the route row`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });

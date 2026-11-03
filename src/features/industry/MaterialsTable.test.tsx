@@ -1392,7 +1392,7 @@ describe('MaterialsTable build-here control', () => {
       ),
       ownedSellNet: 925,
     });
-    expect(screen.getByText('sells for 925 after fees')).toBeInTheDocument();
+    expect(screen.getByText('resale 925 after fees')).toBeInTheDocument();
   });
 
   it('shows what a fully owned row would sell for in its Total cell', () => {
@@ -1403,7 +1403,7 @@ describe('MaterialsTable build-here control', () => {
       sellValueFor: (typeID) => (typeID === 34 ? 925 : undefined),
     });
     fireEvent.click(screen.getByRole('button', { name: /^Already have/ }));
-    expect(screen.getByText('sells for 925')).toBeInTheDocument();
+    expect(screen.getByText('resale 925')).toBeInTheDocument();
   });
 
   it('turns Build instead green, with what it saves, only when building is cheaper', () => {

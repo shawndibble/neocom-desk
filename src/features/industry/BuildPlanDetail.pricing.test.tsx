@@ -69,13 +69,13 @@ describe('BuildPlanDetail material price basis', () => {
     await openSetup(user);
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(basisSelect()).toHaveTextContent('Sell orders');
+    expect(basisSelect()).toHaveTextContent('Buy now');
 
     await user.click(basisSelect());
     const options = await screen.findAllByRole('option');
     expect(options.map((o) => o.textContent?.replace(/^\W+/, ''))).toEqual([
-      'Sell orders',
-      'Buy orders',
+      'Buy now',
+      'Buy order',
     ]);
   });
 
@@ -88,7 +88,7 @@ describe('BuildPlanDetail material price basis', () => {
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     await user.click(basisSelect());
-    await user.click(await screen.findByRole('option', { name: /Buy orders/ }));
+    await user.click(await screen.findByRole('option', { name: /Buy order/ }));
 
     expect(onUpdate).toHaveBeenCalledWith({ materialPriceBasis: 'buy' });
   });
@@ -104,7 +104,7 @@ describe('BuildPlanDetail material price basis', () => {
     const fetchesBefore = loadMarketSnapshot.mock.calls.length;
 
     await user.click(basisSelect());
-    await user.click(await screen.findByRole('option', { name: /Buy orders/ }));
+    await user.click(await screen.findByRole('option', { name: /Buy order/ }));
 
     await waitFor(() => expect(tritaniumPrice().value).toBe('4'));
     // One snapshot, both sides: switching basis must never spend a request.
@@ -119,7 +119,7 @@ describe('BuildPlanDetail material price basis', () => {
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(tritaniumPrice().value).toBe('4');
-    expect(basisSelect()).toHaveTextContent('Buy orders');
+    expect(basisSelect()).toHaveTextContent('Buy order');
   });
 });
 

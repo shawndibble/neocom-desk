@@ -364,7 +364,7 @@ describe('computeLoyaltyOfferRows', () => {
     // 1 run of the fixture's blueprint needs 1,000,000 Tritanium, not 3,000,000.
     expect(row.build!.materials[0].baseQuantity).toBe(1_000_000);
   });
-  it('charges the broker fee only on the "Sell (list order)" basis, sales tax on both', () => {
+  it('charges the broker fee only on the "Sell order" basis, sales tax on both', () => {
     const base = {
       offers: [probes],
       catalog: makeCatalog(),

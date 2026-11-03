@@ -181,9 +181,9 @@ describe('SkillDetailModal', () => {
 
     const dialog = await screen.findByRole('dialog');
     await within(dialog).findByText('Frigate');
-    const hubRow = (await within(dialog).findByText('Sell at Jita')).parentElement!;
+    const hubRow = (await within(dialog).findByText('Buy now at Jita')).parentElement!;
     expect(await within(hubRow).findByText('1.5M')).toBeInTheDocument();
-    const regionRow = within(dialog).getByText('Lowest sell in The Forge').parentElement!;
+    const regionRow = within(dialog).getByText('Buy now in The Forge').parentElement!;
     expect(within(regionRow).getByText('1.2M')).toBeInTheDocument();
     expect(orderBookMock.getOrderBook).toHaveBeenCalledWith(10000002, 2);
   });
@@ -195,9 +195,9 @@ describe('SkillDetailModal', () => {
     act(() => useSkillDetailModalStore.getState().open(2));
 
     const dialog = await screen.findByRole('dialog');
-    const hubRow = (await within(dialog).findByText('Sell at Jita')).parentElement!;
+    const hubRow = (await within(dialog).findByText('Buy now at Jita')).parentElement!;
     expect(await within(hubRow).findByText('No sell orders')).toBeInTheDocument();
-    const regionRow = within(dialog).getByText('Lowest sell in The Forge').parentElement!;
+    const regionRow = within(dialog).getByText('Buy now in The Forge').parentElement!;
     expect(within(regionRow).getByText('2M')).toBeInTheDocument();
   });
 

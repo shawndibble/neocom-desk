@@ -159,7 +159,7 @@ describe('ResultsSummary: the ledger', () => {
   it("says where the product is priced, and the whole plan's time when it differs", () => {
     renderSummary({ planSeconds: 7200 });
     expect(screen.getByText('Rifter priced at').nextElementSibling).toHaveTextContent(
-      'Jita lowest sell'
+      'Jita sell order'
     );
     expect(screen.getByText('Whole plan, on free slots').nextElementSibling).toHaveTextContent(
       '2h'
@@ -293,7 +293,7 @@ describe('ResultsSummary: unpriced-product Market link (#409)', () => {
       result: { ...RESULT, buyCost: null, unpriceable: true, unpricedMaterials: [] },
       productTypeID: 587,
     });
-    const link = screen.getByRole('link', { name: /Rifter has no hub sell price/ });
+    const link = screen.getByRole('link', { name: /Rifter has no hub buy-now price/ });
     expect(link).toHaveAttribute('href', expect.stringContaining('/market/browser'));
     await userEvent.click(link);
     expect(screen.getByText('Market Browser')).toBeInTheDocument();
@@ -305,9 +305,9 @@ describe('ResultsSummary: unpriced-product Market link (#409)', () => {
       productTypeID: null,
     });
     expect(
-      screen.queryByRole('link', { name: /Rifter has no hub sell price/ })
+      screen.queryByRole('link', { name: /Rifter has no hub buy-now price/ })
     ).not.toBeInTheDocument();
-    expect(screen.getByText(/Rifter has no hub sell price/)).toBeInTheDocument();
+    expect(screen.getByText(/Rifter has no hub buy-now price/)).toBeInTheDocument();
   });
 });
 
