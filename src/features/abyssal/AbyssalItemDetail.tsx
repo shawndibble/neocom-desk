@@ -211,6 +211,33 @@ function AttributeCell({
   );
 }
 
+/**
+ * The base value, an arrow, the rolled value: green when the roll improved the
+ * stat, red when it made it worse. The words ride along for screen readers,
+ * so colour is never the only signal.
+ */
+function BeforeAfter({ row, unit }: { row: RolledAttributeRow; unit: string | null }) {
+  const { t } = useTranslation();
+  const change = Math.sign(row.rolled - row.base);
+  const better = change === 0 ? null : change > 0 === row.range.highIsGood;
+  return (
+    <span className="inline-flex items-baseline gap-1">
+      <span className="text-text-dim">{formatAttributeValue(row.base, unit)}</span>
+      <span aria-hidden="true" className="text-text-dim">
+        →
+      </span>
+      <span className={better === null ? undefined : better ? 'text-success' : 'text-danger'}>
+        {formatAttributeValue(row.rolled, unit)}
+      </span>
+      {better !== null && (
+        <span className="sr-only">
+          {better ? t('market.itemDetail.abyssal.better') : t('market.itemDetail.abyssal.worse')}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function RangeText({ range, unit }: { range: DisplayRange | null; unit: string | null }) {
   const { t } = useTranslation();
   if (!range) {
@@ -411,18 +438,18 @@ function OwnedRollsSection({
   const unitOf = (row: RolledAttributeRow) => dictionary[row.attributeId]?.unit ?? null;
 
   const columns: DataTableColumn<RolledAttributeRow>[] = [
-    ...attributeAndBaseColumns<RolledAttributeRow>(
+    attributeAndBaseColumns<RolledAttributeRow>(
       t,
       dictionary,
       lookup,
       (row) => row.range.highIsGood
-    ),
+    )[0]!,
     {
-      id: 'rolled',
-      header: t('market.itemDetail.abyssal.rolledColumn'),
+      id: 'change',
+      header: t('market.itemDetail.abyssal.changeColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => formatAttributeValue(row.rolled, unitOf(row)),
+      render: (row) => <BeforeAfter row={row} unit={unitOf(row)} />,
     },
     {
       id: 'range',

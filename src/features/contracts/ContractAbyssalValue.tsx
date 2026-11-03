@@ -8,17 +8,35 @@
  * side the reader is on.
  */
 import { useTranslation } from 'react-i18next';
+import { InfoTooltip } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { MUTAMARKET_SITE_URL } from '@/market/mutamarket';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { AbyssalContractValue } from './abyssalValueMath';
 
-export function ContractAbyssalValue({ value }: { value: AbyssalContractValue }) {
+export function ContractAbyssalValue({
+  value,
+  abyssalOnly,
+  onToggleAbyssalOnly,
+}: {
+  value: AbyssalContractValue;
+  /** With `onToggleAbyssalOnly`: whether the contents list is narrowed to abyssal modules. */
+  abyssalOnly?: boolean;
+  onToggleAbyssalOnly?: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <div className="border-y border-line py-1.5">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-text-dim">{t('contracts.detailAbyssalValue')}</span>
+        <span className="flex items-center gap-1.5 text-text-dim">
+          {t('contracts.detailAbyssalValue')}
+          <InfoTooltip
+            glyph="info"
+            label={t('contracts.detailAbyssalInfoLabel')}
+            content={t('contracts.detailAbyssalInfo')}
+          />
+        </span>
         {value.priced > 0 ? (
           <span className="tabular-nums font-semibold">
             {formatIskAuto(value.estimated, CONTRACT_ISK_CENTS_BELOW)}
@@ -38,6 +56,18 @@ export function ContractAbyssalValue({ value }: { value: AbyssalContractValue })
         {value.unpriced > 0 && t('contracts.detailAbyssalWhy')}{' '}
         <ExternalLink href={MUTAMARKET_SITE_URL}>{t('market.mutamarket.priceFrom')}</ExternalLink>
       </p>
+      {onToggleAbyssalOnly && (
+        <div className="mt-1 flex justify-end">
+          <button
+            type="button"
+            aria-pressed={abyssalOnly === true}
+            onClick={onToggleAbyssalOnly}
+            className={`${inlineLinkClassName} inline-flex min-h-9 items-center md:min-h-0`}
+          >
+            {abyssalOnly ? t('contracts.detailShowAllItems') : t('contracts.detailShowAbyssalOnly')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -177,6 +177,9 @@ export function PublicContractDetailModal({
   const [location, setLocation] = useState<string | null | undefined>(undefined);
   const [items, setItems] = useState<ItemsState | null | undefined>(undefined);
   const [abyssalValue, setAbyssalValue] = useState<AbyssalContractValue | undefined>(undefined);
+  // Session-only view filter: not remembered or synced, and back to the full list for the next contract.
+  const [abyssalOnlyFor, setAbyssalOnlyFor] = useState<number | null>(null);
+  const abyssalOnly = abyssalOnlyFor === contractId;
 
   useEffect(() => {
     let cancelled = false;
@@ -225,6 +228,10 @@ export function PublicContractDetailModal({
   );
   const included = lines.filter((line) => line.isIncluded);
   const requested = lines.filter((line) => !line.isIncluded);
+  // What the list shows; the price check above keeps reading the full lines.
+  const shownLines = abyssalOnly ? lines.filter((l) => isAbyssalType?.(l.typeId)) : lines;
+  const shownIncluded = shownLines.filter((line) => line.isIncluded);
+  const shownRequested = shownLines.filter((line) => !line.isIncluded);
 
   // Which line(s) the shopper asked for. With no match nothing is tagged, so a
   // search that is not about this contract's contents never greys it out.
@@ -401,14 +408,14 @@ export function PublicContractDetailModal({
               // Keyed on contractId so each group's expanded state resets when another contract opens.
               key={`${contractId}-hand`}
               heading={t('contractDetail.youHandOverHeading')}
-              lines={requested}
+              lines={shownRequested}
               typeNames={items.typeNames}
               searched={searchedMark}
             />
             <ItemGroup
               key={`${contractId}-receive`}
               heading={t('contractDetail.youReceiveHeading')}
-              lines={included}
+              lines={shownIncluded}
               typeNames={items.typeNames}
               searched={searchedMark}
             />
@@ -417,7 +424,7 @@ export function PublicContractDetailModal({
           <ItemGroup
             key={`${contractId}-all`}
             heading={oneSidedHeading}
-            lines={lines}
+            lines={shownLines}
             typeNames={items.typeNames}
             searched={searchedMark}
           />
@@ -441,7 +448,11 @@ export function PublicContractDetailModal({
           </p>
         )}
         {abyssalValue && checkLines.abyssal.length > 0 && (
-          <ContractAbyssalValue value={abyssalValue} />
+          <ContractAbyssalValue
+            value={abyssalValue}
+            abyssalOnly={abyssalOnly}
+            onToggleAbyssalOnly={() => setAbyssalOnlyFor(abyssalOnly ? null : contractId)}
+          />
         )}
 
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
@@ -558,6 +569,7 @@ function ItemGroup({
   const shown =
     capped && !expanded ? ordered.slice(0, Math.max(ITEM_CAP, matches.length)) : ordered;
   const hidden = ordered.length - shown.length;
+  if (lines.length === 0) return null;
   return (
     <div>
       <h3 className={cx(eyebrowClassName, 'flex items-center gap-1.5 pb-1.5')}>{heading}</h3>
@@ -633,7 +645,9 @@ function ContractItemRow({
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-1.5">
               <span className="min-w-0 truncate">
-                <ItemInfoLink typeId={line.typeId}>{name}</ItemInfoLink>
+                <ItemInfoLink typeId={line.typeId} itemId={line.itemId}>
+                  {name}
+                </ItemInfoLink>
               </span>
               {searched === true && (
                 <Pill tone="success">{t('contractDetail.priceCheckYourSearch')}</Pill>
