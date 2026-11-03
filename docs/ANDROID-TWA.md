@@ -10,9 +10,9 @@ web manifest.
 Bubblewrap writes into `twa/` (the keystore, the generated Gradle project,
 build output) is gitignored and must never be committed.
 
-> `twa-manifest.json` holds the next build for Play (version code 4: the
-> shortcuts follow mobile usage, `docs/context/decisions/`; version code 3
-> was the first with the notification settings activity). Keystore alias is `android`. Keep
+> `twa-manifest.json` holds the next build for Play (version code 5: per-page
+> shortcut icons; version 4 changed the shortcuts, see the pwa-shortcuts decision in
+> `docs/context/decisions/`; version 3 was the first with the notification settings activity). Keystore alias is `android`. Keep
 > `signingKey.path` as `./android.keystore` here; a local build may point it
 > at wherever the keystore actually lives. Play rejects an upload whose
 > `appVersionCode` isn't above the one Play Console shows.
@@ -98,7 +98,15 @@ as Chrome:
   (`src/app/pwaShortcuts.ts`) is the source; `twa-manifest.json` mirrors it with
   absolute `https://neocomdesk.com/...` urls, and `bubblewrap merge` re-reads
   the web manifest. Change both together. Bump `appVersionCode` only in the
-  change that prepares a release.
+  change that prepares a release. Bubblewrap downloads each `chosenIconUrl` from
+  the live site when it generates the project, so new icons must be deployed
+  before `bubblewrap update`.
+  Each icon, `public/icons/shortcut-<name>.png`, is the page's nav glyph
+  (`src/app/navIcons.ts`: Bell, EnvelopeSimple, Wallet, ChartLineUp) at the
+  `fill` weight, 192×192, in `#57c7f4` on `#0d1117`, glyph at 58% of the canvas
+  (the launcher's mask can clip the edge). Render the glyph's SVG
+  (`renderToStaticMarkup` of the `Nav*` component) and screenshot it on that
+  background with Playwright; redo all four if a glyph in `navIcons.ts` changes.
 
 After shipping a build that turns delegation on, a user who already allowed
 notifications while Chrome owned them must toggle notifications off and on in

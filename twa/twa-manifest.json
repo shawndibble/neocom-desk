@@ -22,33 +22,33 @@
     "path": "./android.keystore",
     "alias": "android"
   },
-  "appVersionName": "4",
-  "appVersion": "4",
-  "appVersionCode": 4,
+  "appVersionName": "5",
+  "appVersion": "5",
+  "appVersionCode": 5,
   "shortcuts": [
     {
       "name": "Alerts",
       "shortName": "Alerts",
       "url": "https://neocomdesk.com/alerts",
-      "chosenIconUrl": "https://neocomdesk.com/icons/icon-192.png"
+      "chosenIconUrl": "https://neocomdesk.com/icons/shortcut-alerts.png"
     },
     {
       "name": "Mail",
       "shortName": "Mail",
       "url": "https://neocomdesk.com/mail",
-      "chosenIconUrl": "https://neocomdesk.com/icons/icon-192.png"
+      "chosenIconUrl": "https://neocomdesk.com/icons/shortcut-mail.png"
     },
     {
       "name": "Wallet",
       "shortName": "Wallet",
       "url": "https://neocomdesk.com/wallet/balance",
-      "chosenIconUrl": "https://neocomdesk.com/icons/icon-192.png"
+      "chosenIconUrl": "https://neocomdesk.com/icons/shortcut-wallet.png"
     },
     {
       "name": "Open orders",
       "shortName": "Open orders",
       "url": "https://neocomdesk.com/market/orders",
-      "chosenIconUrl": "https://neocomdesk.com/icons/icon-192.png"
+      "chosenIconUrl": "https://neocomdesk.com/icons/shortcut-orders.png"
     }
   ],
   "generatorApp": "bubblewrap-cli",
