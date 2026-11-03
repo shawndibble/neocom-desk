@@ -13,7 +13,7 @@ import type {
   PersonalEntry,
   PersonalOverlay,
 } from '@/engine/corpTaxBook/personal';
-import { isDefaultAssigned } from '@/engine/miningTax/defaultSystems';
+import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
 import { entryKey, type OreLine } from '@/engine/miningTax/types';
 import { flatten, type DisplayRow } from '../groupRows';
 import type { MoonMiningTaxRow } from '../snapshot';
@@ -205,7 +205,7 @@ export function personalEntriesOf(rows: readonly MoonMiningTaxRow[]): PersonalEn
         oreLines: a.oreLines,
         status: a.status,
         // A Default System's unpaid Assignment is ore given to no Payee as far as the book goes.
-        ...(isDefaultAssigned(a) && a.status === 'outstanding' ? { releasable: true } : {}),
+        ...(isUnpaidDefault(a) ? { releasable: true } : {}),
       })),
   }));
 }

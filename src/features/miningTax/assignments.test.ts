@@ -1789,13 +1789,31 @@ describe('override (a Default System made it, and nobody has changed it)', () =>
     expect('override' in joined).toBe(false);
   });
 
-  it('survives a takeover releasing some of its ore: the rest is still the default’s', async () => {
+  const priced = { prices: new Map([[TYPE_B, 4]]), compressed: true };
+
+  it('survives a Survey takeover releasing some of its ore: the rest is still the default’s', async () => {
     const row = made();
     await db.miningTaxAssignments.put(row);
-    const next = await releaseOreFromAssignment(row, [{ typeId: TYPE_B, quantity: 50 }], {
-      prices: new Map([[TYPE_B, 4]]),
-      compressed: true,
-    });
+    const next = await releaseOreFromAssignment(
+      row,
+      [{ typeId: TYPE_B, quantity: 50 }],
+      priced,
+      true
+    );
     expect(next?.override).toBe(false);
+  });
+
+  it('is cleared when the pilot lets the corporation bill some of the ore', async () => {
+    const row = made();
+    await db.miningTaxAssignments.put(row);
+    const next = await releaseOreFromAssignment(row, [{ typeId: TYPE_B, quantity: 50 }], priced);
+    expect(next && 'override' in next).toBe(false);
+  });
+
+  it('is cleared when the pilot marks it paid', async () => {
+    const row = made();
+    await db.miningTaxAssignments.put(row);
+    await markAssignmentsPaid([row]);
+    expect('override' in (await db.miningTaxAssignments.get('dm'))!).toBe(false);
   });
 });

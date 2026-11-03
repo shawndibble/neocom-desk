@@ -15,7 +15,7 @@
  * looking at.
  */
 import { db, type MiningTaxAssignmentRecord, type MiningTaxOreLine } from '@/db';
-import { isDefaultAssigned } from '@/engine/miningTax/defaultSystems';
+import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
 import {
   isConnectionLive,
   parseSurveyConnections,
@@ -192,7 +192,7 @@ async function takeOverFromDefaults(takeovers: readonly Takeover[]): Promise<boo
   const releases: { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[] = [];
   for (const takeover of takeovers) {
     const assignment = await db.miningTaxAssignments.get(takeover.assignmentId);
-    if (!assignment || !isDefaultAssigned(assignment) || assignment.status !== 'outstanding') {
+    if (!assignment || !isUnpaidDefault(assignment)) {
       continue;
     }
     releases.push({
@@ -201,7 +201,7 @@ async function takeOverFromDefaults(takeovers: readonly Takeover[]): Promise<boo
     });
   }
   if (releases.length === 0) return true;
-  return (await releaseOre(releases)).ok;
+  return (await releaseOre(releases, true)).ok;
 }
 
 /**

@@ -26,6 +26,8 @@ _Recorded 2026-11-03._
   backward-compatible (absent on stored rows means set), because dev and prod
   share one Firestore. Nothing in the UI shows it: a default's Assignment looks
   and works like any other (no badge).
+  Marking it paid and "Let the corporation bill it" count as pilot acts too; a
+  Survey taking some of its ore does not.
 - **An Assignment without `override` behaves as unassigned to the Survey.** The
   Survey takes only its own ore types (splitting the Assignment if it holds
   more), on every day of its window, exactly as for unassigned ore. Paid or

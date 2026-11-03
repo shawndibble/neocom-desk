@@ -55,9 +55,19 @@ export function isDefaultAssigned(assignment: { override?: boolean }): boolean {
   return assignment.override === false;
 }
 
+/** A default's Assignment still unpaid: the only kind a Survey connection or a Corp Tax Book may take over. */
+export function isUnpaidDefault(assignment: { override?: boolean; status?: string }): boolean {
+  return isDefaultAssigned(assignment) && assignment.status === 'outstanding';
+}
+
 /** The key a pilot's unassign is remembered under, so the default does not assign the entry again. */
 export function defaultOptOutKey(characterId: number, date: string, solarSystemId: number): string {
   return `${characterId}|${date}|${solarSystemId}`;
+}
+
+/** The mined date inside a `defaultOptOutKey`. */
+export function defaultOptOutDate(key: string): string {
+  return key.split('|')[1] ?? '';
 }
 
 /** The Character's Payee that defaults `systemId`; the lowest id if (stale data) two do. */

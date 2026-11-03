@@ -279,7 +279,9 @@ export function unsettle(
 
 /** Takes ore off the miner's own Assignments because the corporation bills it (#4517). */
 export async function releaseOre(
-  releases: readonly { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[]
+  releases: readonly { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[],
+  /** True when a Survey connection takes ore off a Default System's Assignment (`surveyConnections.ts`): the rest stays the default's. */
+  takeoverFromDefault = false
 ): Promise<LedgerActionResult> {
   // Priced before the write: pricing reads market data outside the ledger's transaction.
   let priced: ReleasePrices[];
@@ -290,7 +292,7 @@ export async function releaseOre(
   }
   return commit(charactersOf(releases.map((r) => r.assignment)), async () => {
     for (const [i, r] of releases.entries())
-      await releaseOreFromAssignment(r.assignment, r.after, priced[i]!);
+      await releaseOreFromAssignment(r.assignment, r.after, priced[i]!, takeoverFromDefault);
   });
 }
 

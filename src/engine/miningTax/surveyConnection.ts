@@ -15,7 +15,7 @@
  *
  * Pure: the caller loads entries and Assignments and writes what this plans.
  */
-import { isDefaultAssigned } from './defaultSystems';
+import { isDefaultAssigned, isUnpaidDefault } from './defaultSystems';
 import { growthCollector, type CoveringAssignment } from './ownership';
 import type { MiningLedgerEntry, OreLine } from './types';
 import { utcDay } from '@/engine/localDay';
@@ -223,7 +223,7 @@ export function planSurveyAutoAssign(
     // Ore a Default System assigned and no one has changed counts as unassigned to a
     // connection claiming its type (the default is the last resort); a paid one is the pilot's.
     const claimed = new Set(live.flatMap((c) => c.typeIds));
-    const takeable = (a: PlannedCovering) => isDefaultAssigned(a) && a.status === 'outstanding';
+    const takeable = isUnpaidDefault;
     const held = new Map<number, number>();
     for (const a of covering) {
       for (const line of a.oreLines) {

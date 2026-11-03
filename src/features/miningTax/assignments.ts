@@ -430,13 +430,15 @@ export async function markAssignmentsPaid(
     paymentId: crypto.randomUUID(),
     ...payment,
   };
-  const updated = assignments.map((a): MiningTaxAssignmentRecord => ({
-    ...a,
-    status: 'paid',
-    paidAt: now,
-    ...(paymentInfo ? { payment: paymentInfo } : {}),
-    updatedAt: now,
-  }));
+  const updated = assignments.map((a): MiningTaxAssignmentRecord =>
+    asPilotAct({
+      ...a,
+      status: 'paid',
+      paidAt: now,
+      ...(paymentInfo ? { payment: paymentInfo } : {}),
+      updatedAt: now,
+    })
+  );
   await db.miningTaxAssignments.bulkPut(updated);
 }
 
@@ -759,7 +761,9 @@ export async function loadReleasePrices(
 export async function releaseOreFromAssignment(
   assignment: MiningTaxAssignmentRecord,
   remaining: readonly MiningTaxOreLine[],
-  priced: ReleasePrices
+  priced: ReleasePrices,
+  /** A Survey connection taking its ore off a default's Assignment: what is left is still the default's. A pilot's release is a pilot act. */
+  keepOverride = false
 ): Promise<MiningTaxAssignmentRecord | undefined> {
   const kept = remaining.filter((l) => l.quantity > 0);
   if (kept.length === 0) {
@@ -776,6 +780,7 @@ export async function releaseOreFromAssignment(
     priced.compressed
   );
   delete next.oreLineValues;
+  if (!keepOverride) asPilotAct(next);
   await db.miningTaxAssignments.put(next);
   return next;
 }

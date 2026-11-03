@@ -5,9 +5,10 @@
  * (a second device would otherwise assign it again). Pruned on every write to the days the
  * ledger itself still keeps, so it stays a short list.
  */
-import { defaultOptOutKey } from '@/engine/miningTax/defaultSystems';
+import { defaultOptOutDate, defaultOptOutKey } from '@/engine/miningTax/defaultSystems';
 import { utcDay } from '@/engine/localDay';
 import { db } from '@/db';
+import { DAY_MS } from '@/lib/age';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 
 export const SYNCED_DEFAULT_OPT_OUTS_KEY = 'sync.miningTaxDefaultOptOuts';
@@ -42,10 +43,10 @@ export async function recordDefaultOptOuts(
 ): Promise<void> {
   if (entries.length === 0) return;
   const { value, setValue } = await current();
-  const oldest = utcDay(nowMs - KEEP_DAYS * 24 * 60 * 60 * 1000);
+  const oldest = utcDay(nowMs - KEEP_DAYS * DAY_MS);
   const keys = new Set([
     ...value,
     ...entries.map((e) => defaultOptOutKey(e.characterId, e.date, e.solarSystemId)),
   ]);
-  await setValue([...keys].filter((key) => (key.split('|')[1] ?? '') >= oldest));
+  await setValue([...keys].filter((key) => defaultOptOutDate(key) >= oldest));
 }
