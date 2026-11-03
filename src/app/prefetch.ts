@@ -309,7 +309,9 @@ export function prefetchTasksFor(
  * Calendar details for every *other* Character that holds the scope. The task
  * table above warms only the active one, and the poll domains cover the rest
  * only with notifications on. Mail bodies are deliberately not warmed here: an
- * alt's mail is fetched when it is opened (decision 20261102). Sequential and bounded like the active Character's (the limits are
+ * alt's mail is fetched when it is opened (decision
+ * `20261102-231716-mail-storage-active-character-body-prefetch-7-day`).
+ * Sequential and bounded like the active Character's (the limits are
  * `features/character/detailPrefetch.ts`'s), in the background lane; each list
  * load is a cache hit inside its freshness window, which prefetches nothing.
  * Never rejects.

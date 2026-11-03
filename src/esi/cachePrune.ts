@@ -27,6 +27,7 @@
  * refreshed between the scan and the delete survives. The DBCore middleware
  * mirrors every delete onto meta.
  */
+import { captureException } from '@sentry/react';
 import { db, type EsiCacheMetaRecord } from '@/db';
 import { DAY_MS } from '@/lib/age';
 
@@ -380,8 +381,12 @@ export async function runDailyEsiCachePrune(): Promise<number | null> {
   const now = Date.now();
   const claim = await claimRun(now);
   if (claim === null) return null;
-  // Same daily cadence; a failure here must not skip the cache prune below.
-  await pruneStaleMailDrafts(now).catch(() => 0);
+  // Same daily cadence. A failure is reported, and must not skip the cache prune
+  // below; the next daily run tries the drafts again.
+  await pruneStaleMailDrafts(now).catch((error: unknown) => {
+    captureException(error);
+    return 0;
+  });
   return pruneEsiCache({
     now,
     firstRunAt: claim.firstRunAt,

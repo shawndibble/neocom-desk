@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
+import en from '@/i18n/locales/en.json';
 import {
   AVOID_ROUTE_RETENTION_MS,
   MAIL_BODY_RETENTION_MS,
@@ -357,6 +358,24 @@ describe('runDailyEsiCachePrune', () => {
     vi.spyOn(Date, 'now').mockReturnValue(NOW);
   });
 
+  it('also drops a mail draft untouched for 30 days', async () => {
+    await db.mailDrafts.clear();
+    await db.mailDrafts.put({
+      id: `${CHAR}:new`,
+      characterId: CHAR,
+      mailId: 0,
+      kind: 'new',
+      recipients: [],
+      subject: '',
+      body: '',
+      updatedAt: NOW - MAIL_DRAFT_RETENTION_MS - 1,
+    });
+
+    await runDailyEsiCachePrune();
+
+    expect(await db.mailDrafts.count()).toBe(0);
+  });
+
   it('prunes, stamps the run, and records the first run once', async () => {
     await seed(G, 'name:1', NOW - STATIC_RETENTION_MS - 1);
 
@@ -450,5 +469,14 @@ describe('mail bodies and drafts', () => {
     expect(await pruneStaleMailDrafts(NOW)).toBe(1);
 
     expect((await db.mailDrafts.toArray()).map((d) => d.id)).toEqual(['fresh']);
+  });
+});
+
+describe('the retention copy in What we store', () => {
+  const device = en.settings.faq.retention.device;
+  it('states the mail body and draft windows the prune enforces', () => {
+    expect(device.mailBodiesKept).toContain(`${MAIL_BODY_RETENTION_MS / DAY} days`);
+    expect(device.mailDraftsKept).toContain(`${MAIL_DRAFT_RETENTION_MS / DAY} days`);
+    expect(device.lookupsKept).toContain(`${STATIC_RETENTION_MS / DAY} days`);
   });
 });
