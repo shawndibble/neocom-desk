@@ -57,6 +57,20 @@ the `.aab` to Play Console. Commit the bumped `twa-manifest.json`. Don't edit
 `twa-manifest.json` between the patch and the build: `build` sees the changed
 checksum, offers to regenerate, and regenerating drops the patch.
 
+**Linux/WSL setup notes (Bubblewrap 1.27):**
+
+- If Bubblewrap's own JDK/SDK download stalls, download Temurin JDK 17 and Google's
+  `commandlinetools-linux` yourself, unpack them under `~/.bubblewrap/`, and point
+  `~/.bubblewrap/config.json` (`jdkPath`, `androidSdkPath`) at them.
+- Bubblewrap only accepts an SDK with `bin/` or `tools/` at its root, but Google's
+  current download puts `sdkmanager` in `cmdline-tools/latest/bin`: add the link
+  `ln -s cmdline-tools/latest/bin ~/.bubblewrap/android_sdk/bin`.
+- `sdkmanager` needs `JAVA_HOME` (the JDK above) and `--sdk_root`; accept the
+  licences with `--licenses`, then install `build-tools;36.1.0` and `platform-tools`.
+- `twa-manifest.json` needs `minSdkVersion` 24 (androidbrowserhelper 2.7.x), and each
+  shortcut an absolute `chosenIconUrl`, not an `icons` array
+  (`src/app/pwaShortcuts.test.ts` guards both).
+
 Automation notes: `bubblewrap build` is interactive only for the keystore
 password — supply it via `BUBBLEWRAP_KEYSTORE_PASSWORD` and
 `BUBBLEWRAP_KEY_PASSWORD`. Keep the keystore in a secret store, not the repo.

@@ -40,4 +40,26 @@ describe('buildPwaShortcuts', () => {
       shortcuts.map((s) => [s.name, `https://neocomdesk.com${s.url}`])
     );
   });
+
+  it('gives each twa shortcut the icon field Bubblewrap reads', () => {
+    // Bubblewrap's ShortcutInfo throws "must have either chosenIconUrl or
+    // chosenMonochromeIconUrl" on a web-manifest-style `icons` array, so
+    // `bubblewrap update` fails before it builds anything.
+    const twa = JSON.parse(readFileSync('twa/twa-manifest.json', 'utf-8')) as {
+      shortcuts: Record<string, unknown>[];
+    };
+    for (const s of twa.shortcuts) {
+      expect(s).not.toHaveProperty('icons');
+      expect(s.chosenIconUrl).toMatch(/^https:\/\/neocomdesk\.com\/icons\/.+\.png$/);
+    }
+  });
+
+  it('keeps the twa minSdkVersion at what androidbrowserhelper needs', () => {
+    // androidbrowserhelper 2.7.x (bundled by Bubblewrap 1.27) declares minSdk 24;
+    // a lower value fails the Gradle manifest merge.
+    const twa = JSON.parse(readFileSync('twa/twa-manifest.json', 'utf-8')) as {
+      minSdkVersion: number;
+    };
+    expect(twa.minSdkVersion).toBeGreaterThanOrEqual(24);
+  });
 });
