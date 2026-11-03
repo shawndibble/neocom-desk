@@ -5,6 +5,7 @@
  * `/markets/{region_id}/history`.
  */
 
+import { DAY_MS } from '@/lib/age';
 import { median } from '../math';
 import { utcDay } from '../localDay';
 
@@ -87,7 +88,7 @@ export function orderCountWindowDays(
 ): number {
   const first = Date.parse(`${firstDate}T00:00:00Z`);
   const today = Date.parse(`${utcDay(now.getTime())}T00:00:00Z`);
-  const sinceFirst = Number.isFinite(first) ? Math.round((today - first) / 86_400_000) : Infinity;
+  const sinceFirst = Number.isFinite(first) ? Math.round((today - first) / DAY_MS) : Infinity;
   return Math.max(1, Math.min(RANGE_DAYS[range], sinceFirst));
 }
 
