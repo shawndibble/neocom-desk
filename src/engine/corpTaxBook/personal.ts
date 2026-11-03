@@ -64,6 +64,12 @@ export interface PersonalAllocation {
   taxPct: number;
   oreLines: OreLine[];
   status: string;
+  /**
+   * A Default System made this and the member has not touched it: it is ore given to no Payee as far
+   * as the book is concerned, so an unpaid one is the book's to bill like a corporation's own
+   * Payee's, never a conflict.
+   */
+  releasable?: boolean;
 }
 
 export interface PersonalEntry {
@@ -489,7 +495,8 @@ function takeOverlap(pool: OverlapPool, observed: readonly OreLine[]): BookOverl
 }
 
 /**
- * The allocations to the corporation's own Payees that the book's share covers whole. They leave
+ * The allocations to the corporation's own Payees, and the unpaid ones a Default System made, that
+ * the book's share covers whole. They leave
  * `pool`, so they overlap nothing and conflict with nothing; their ore joins the free ore the
  * share resolves from. `paidLines` is the part the member already paid: their side is done, and the
  * corporation confirms it against its wallet. One that lists more than the corporation observed stays another Payee's.
@@ -506,7 +513,9 @@ function takeOwnAllocations(
   let room = sumLines(share);
   for (let i = 0; i < pool.length; i++) {
     const { allocation } = pool[i];
-    if (!ownPayeeIds?.includes(allocation.payeeId) || allocation.id === undefined) continue;
+    const own = ownPayeeIds?.includes(allocation.payeeId) === true;
+    const unclaimed = allocation.releasable === true && allocation.status === 'outstanding';
+    if (!(own || unclaimed) || allocation.id === undefined) continue;
     // A row needing review is the member's to sort out, not the book's to take.
     if (allocation.status !== 'paid' && allocation.status !== 'outstanding') continue;
     const listed = sumLines(allocation.oreLines);

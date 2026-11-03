@@ -54,6 +54,7 @@ import {
   type SplitPrices,
   type UpdateCombinedInput,
 } from './assignments';
+import { recordDefaultOptOuts } from './defaultOptOuts';
 import type { GroupMember } from './groupRows';
 import { removePayeeRecord } from './payees';
 import type { SessionContinuation } from './sessionContinuation';
@@ -231,10 +232,15 @@ export function uncombine(
 }
 
 /** Unassigns one Assignment (or undoes a dismissal), or every day of a Combined Entry together. */
-export function unassign(
+export async function unassign(
   assignments: readonly MiningTaxAssignmentRecord[]
 ): Promise<LedgerActionResult> {
-  return commit(charactersOf(assignments), () => deleteAssignments(assignments));
+  const result = await commit(charactersOf(assignments), () => deleteAssignments(assignments));
+  // Unassign sticks: a Payee's Default Systems must not assign the entry again. Written after
+  // the commit (the synced setting is not Dexie-only); a failure here only means the default may
+  // try once more, so it never undoes the unassign.
+  if (result.ok) await recordDefaultOptOuts(assignments).catch(() => undefined);
+  return result;
 }
 
 /**

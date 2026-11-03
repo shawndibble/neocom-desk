@@ -145,6 +145,18 @@ export interface AssignInput {
    * now being mined rather than growing into an earlier moon's Assignment.
    */
   takesGrowth?: boolean;
+  /**
+   * A Payee's Default Systems made this, not the pilot: the row is written with `override: false`
+   * (`MiningTaxAssignmentRecord.override`), so a Survey connection or the Corp Tax Book can still
+   * claim the ore. Every other writer leaves it out, which is what "a pilot acted" means.
+   */
+  byDefault?: boolean;
+}
+
+/** A pilot act on an Assignment a Default System made: from now on it is an ordinary Assignment. */
+function asPilotAct(record: MiningTaxAssignmentRecord): MiningTaxAssignmentRecord {
+  delete record.override;
+  return record;
 }
 
 /** The `rawOrePriced` marker for a value snapshotted under the Ore Form setting as it stands now. */
@@ -168,6 +180,7 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
     status: input.markPaid ? 'paid' : 'outstanding',
     ...(input.markPaid ? { paidAt: now } : {}),
     ...(normalizeLabel(input.label) ? { label: normalizeLabel(input.label) } : {}),
+    ...(input.byDefault ? { override: false } : {}),
     ...oreFormMarker(),
     updatedAt: now,
   };
@@ -276,7 +289,7 @@ export async function updateCombinedAssignments(
       if (values.oreLineValues !== undefined) next.oreLineValues = values.oreLineValues;
       else delete next.oreLineValues;
     }
-    return next;
+    return asPilotAct(next);
   });
   await db.miningTaxAssignments.bulkPut(updated);
   return updated;
@@ -315,7 +328,7 @@ export async function moveAssignmentsToPayee(
 ): Promise<void> {
   if (assignments.length === 0) return;
   const now = Date.now();
-  const updated = assignments.map((a) => ({ ...a, payeeId, updatedAt: now }));
+  const updated = assignments.map((a) => asPilotAct({ ...a, payeeId, updatedAt: now }));
   await db.miningTaxAssignments.bulkPut(updated);
 }
 
@@ -361,7 +374,7 @@ export async function joinAssignments(
   const now = Date.now();
   const marker = oreFormMarker();
   const records: MiningTaxAssignmentRecord[] = members.map((m) => {
-    if (m.assignment) return { ...m.assignment, groupId, updatedAt: now };
+    if (m.assignment) return asPilotAct({ ...m.assignment, groupId, updatedAt: now });
     const oreLines = m.oreLines ?? [];
     const { estimatedValue, taxOwed } = computeAssignmentValue(oreLines, pricesOn(m.date), taxPct);
     return {
@@ -653,6 +666,7 @@ export async function splitAssignment(
   delete kept.oreLineValues;
   delete kept.collectsGrowth;
   delete kept.rawOrePriced;
+  delete kept.override;
   Object.assign(kept, marker);
   if (input.collector === 'original') kept.collectsGrowth = true;
   if (original.status === 'needs-review') {

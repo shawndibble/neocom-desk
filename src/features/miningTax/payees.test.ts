@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { PAYEES } from '@/sync/syncedCollections';
+import { utcDay } from '@/engine/localDay';
 import {
+  DefaultSystemTakenError,
   createPayee,
   loadPayees,
   rememberPayeeEntity,
@@ -32,9 +34,53 @@ describe('createPayee', () => {
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A, { collections: ['payees'] });
   });
 
-  it('omits systemId entirely when not given, rather than writing it as undefined', async () => {
+  it('omits defaultSystems entirely when none are given, rather than writing undefined', async () => {
     const payee = await createPayee(CHAR_A, { name: 'Some Corp', defaultTaxPct: 10 });
+    expect('defaultSystems' in payee).toBe(false);
     expect('systemId' in payee).toBe(false);
+  });
+
+  it('stamps each Default System with the day it was added', async () => {
+    const payee = await createPayee(CHAR_A, {
+      name: 'Landlord',
+      defaultTaxPct: 10,
+      defaultSystemIds: [30000142, 30002187],
+    });
+    const today = utcDay(Date.now());
+    expect(payee.defaultSystems).toEqual([
+      { systemId: 30000142, from: today },
+      { systemId: 30002187, from: today },
+    ]);
+  });
+
+  it('refuses a system another of the Character’s Payees already defaults, naming that Payee', async () => {
+    await createPayee(CHAR_A, {
+      name: 'Landlord',
+      defaultTaxPct: 10,
+      defaultSystemIds: [30000142],
+    });
+    const attempt = createPayee(CHAR_A, {
+      name: 'Other',
+      defaultTaxPct: 10,
+      defaultSystemIds: [30000142],
+    });
+    await expect(attempt).rejects.toBeInstanceOf(DefaultSystemTakenError);
+    await expect(attempt).rejects.toMatchObject({ systemId: 30000142, holderName: 'Landlord' });
+    expect(await loadPayees(CHAR_A)).toHaveLength(1);
+  });
+
+  it('lets another Character default the same system', async () => {
+    await createPayee(CHAR_A, {
+      name: 'Landlord',
+      defaultTaxPct: 10,
+      defaultSystemIds: [30000142],
+    });
+    const other = await createPayee(CHAR_B, {
+      name: 'Landlord',
+      defaultTaxPct: 10,
+      defaultSystemIds: [30000142],
+    });
+    expect(other.defaultSystems).toHaveLength(1);
   });
 
   it('keeps two characters’ Payees independent', async () => {
@@ -95,12 +141,84 @@ describe('updatePayee', () => {
     expect(await db.payees.get(payee.id)).toMatchObject({ name: 'New Name', defaultTaxPct: 15 });
   });
 
-  it('removes systemId when the input no longer carries one', async () => {
-    const payee = await createPayee(CHAR_A, { name: 'A', defaultTaxPct: 10, systemId: 30000142 });
-    const updated = await updatePayee(payee, { name: 'A', defaultTaxPct: 10 });
+  it('keeps the Default Systems, and the day each was added, when the input carries none', async () => {
+    const payee = await createPayee(CHAR_A, {
+      name: 'A',
+      defaultTaxPct: 10,
+      defaultSystemIds: [1],
+    });
+    const updated = await updatePayee(payee, { name: 'Renamed', defaultTaxPct: 12 });
+    expect(updated.defaultSystems).toEqual(payee.defaultSystems);
+  });
 
-    expect('systemId' in updated).toBe(false);
-    expect('systemId' in (await db.payees.get(payee.id))!).toBe(false);
+  it('adds and removes Default Systems, keeping the start day of one that stays', async () => {
+    const payee = await createPayee(CHAR_A, {
+      name: 'A',
+      defaultTaxPct: 10,
+      defaultSystemIds: [1],
+    });
+    const old = { ...payee, defaultSystems: [{ systemId: 1, from: '2026-01-01' }] };
+    await db.payees.put(old);
+    const updated = await updatePayee(old, {
+      name: 'A',
+      defaultTaxPct: 10,
+      defaultSystemIds: [1, 2],
+    });
+    expect(updated.defaultSystems).toEqual([
+      { systemId: 1, from: '2026-01-01' },
+      { systemId: 2, from: utcDay(Date.now()) },
+    ]);
+    const emptied = await updatePayee(updated, {
+      name: 'A',
+      defaultTaxPct: 10,
+      defaultSystemIds: [],
+    });
+    expect('defaultSystems' in emptied).toBe(false);
+    expect('defaultSystems' in (await db.payees.get(payee.id))!).toBe(false);
+  });
+
+  it('refuses to take a system from another Payee, and a Payee may keep its own', async () => {
+    const a = await createPayee(CHAR_A, { name: 'A', defaultTaxPct: 10, defaultSystemIds: [1] });
+    const b = await createPayee(CHAR_A, { name: 'B', defaultTaxPct: 10 });
+    await expect(
+      updatePayee(b, { name: 'B', defaultTaxPct: 10, defaultSystemIds: [1] })
+    ).rejects.toMatchObject({ holderName: 'A' });
+    await expect(
+      updatePayee(a, { name: 'A', defaultTaxPct: 10, defaultSystemIds: [1] })
+    ).resolves.toBeTruthy();
+  });
+});
+
+describe('loadPayees', () => {
+  it('folds a legacy remembered system into Default Systems once, from today', async () => {
+    await db.payees.put({
+      id: 'old',
+      characterId: CHAR_A,
+      name: 'Old',
+      defaultTaxPct: 10,
+      systemId: 30000142,
+      updatedAt: 1,
+    });
+    const [payee] = await loadPayees(CHAR_A);
+    expect(payee.defaultSystems).toEqual([{ systemId: 30000142, from: utcDay(Date.now()) }]);
+    expect('systemId' in payee).toBe(false);
+    expect('systemId' in (await db.payees.get('old'))!).toBe(false);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A, { collections: ['payees'] });
+  });
+
+  it('gives a system two legacy Payees shared to just one of them', async () => {
+    for (const id of ['b', 'a']) {
+      await db.payees.put({
+        id,
+        characterId: CHAR_A,
+        name: id,
+        defaultTaxPct: 10,
+        systemId: 30000142,
+        updatedAt: 1,
+      });
+    }
+    const held = (await loadPayees(CHAR_A)).filter((p) => p.defaultSystems?.length);
+    expect(held.map((p) => p.id)).toEqual(['a']);
   });
 });
 

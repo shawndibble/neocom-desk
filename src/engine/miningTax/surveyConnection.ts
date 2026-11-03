@@ -15,6 +15,7 @@
  *
  * Pure: the caller loads entries and Assignments and writes what this plans.
  */
+import { isDefaultAssigned } from './defaultSystems';
 import { growthCollector, type CoveringAssignment } from './ownership';
 import type { MiningLedgerEntry, OreLine } from './types';
 import { utcDay } from '@/engine/localDay';
@@ -144,6 +145,14 @@ export interface PlannedCovering extends CoveringAssignment {
   solarSystemId: number;
   payeeId?: string;
   taxPct: number;
+  /** `false` on an Assignment a Default System made and no one has changed (`defaultSystems.ts`). */
+  override?: boolean;
+}
+
+/** Ore types a Default Systems Assignment gives up to a connection, so the caller can release them before assigning. */
+export interface Takeover {
+  assignmentId: string;
+  typeIds: number[];
 }
 
 export interface AutoAssignSlice {
@@ -156,6 +165,8 @@ export interface AutoAssignSlice {
   label?: string;
   /** The entry's whole ore, for the double-assignment guard. */
   entryOreLines: readonly OreLine[];
+  /** Unpaid Default Systems Assignments holding some of this slice's ore: release those types first. */
+  takeovers: Takeover[];
 }
 
 function covers(c: SurveyConnection, e: MiningLedgerEntry, nowMs: number): boolean {
@@ -209,9 +220,14 @@ export function planSurveyAutoAssign(
     const collector = growthCollector(covering);
     if (collector?.status === 'dismissed') continue;
 
+    // Ore a Default System assigned and no one has changed counts as unassigned to a
+    // connection claiming its type (the default is the last resort); a paid one is the pilot's.
+    const claimed = new Set(live.flatMap((c) => c.typeIds));
+    const takeable = (a: PlannedCovering) => isDefaultAssigned(a) && a.status === 'outstanding';
     const held = new Map<number, number>();
     for (const a of covering) {
       for (const line of a.oreLines) {
+        if (takeable(a) && claimed.has(line.typeId)) continue;
         held.set(line.typeId, (held.get(line.typeId) ?? 0) + line.quantity);
       }
     }
@@ -238,10 +254,18 @@ export function planSurveyAutoAssign(
     for (const [c, oreLines] of owned) {
       const alreadyBilling =
         collector !== undefined &&
+        !isDefaultAssigned(collector) &&
         collector.status !== 'paid' &&
         collector.payeeId === c.payeeId &&
         collector.taxPct === c.taxPct;
       if (alreadyBilling) continue;
+      const typeIds = new Set(oreLines.map((l) => l.typeId));
+      const takeovers = covering.filter(takeable).flatMap((a) => {
+        const taken = a.oreLines.map((l) => l.typeId).filter((t) => typeIds.has(t));
+        return taken.length > 0
+          ? [{ assignmentId: a.id, typeIds: taken.sort((x, y) => x - y) }]
+          : [];
+      });
       slices.push({
         connection: c,
         characterId: e.characterId,
@@ -250,6 +274,7 @@ export function planSurveyAutoAssign(
         oreLines: [...oreLines].sort((a, b) => a.typeId - b.typeId),
         ...(c.structureLabel ? { label: c.structureLabel } : {}),
         entryOreLines: e.oreLines,
+        takeovers,
       });
     }
   }

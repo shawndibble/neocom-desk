@@ -47,7 +47,8 @@ describe('suggestPayeeForSystem', () => {
         assigned('st', '2026-09-10'),
       ],
       payees,
-      AINSAN
+      AINSAN,
+      1
     );
     expect(result.suggested?.id).toBe('ion');
     expect(result.fromHistory).toBe(true);
@@ -63,7 +64,8 @@ describe('suggestPayeeForSystem', () => {
         assigned('gu', '2026-09-08', TALIDAL),
       ],
       payees,
-      AINSAN
+      AINSAN,
+      1
     );
     expect(result.ranked.map((p) => p.id)).toEqual(['ion', 'st', 'bu', 'gu']);
   });
@@ -76,7 +78,8 @@ describe('suggestPayeeForSystem', () => {
         assigned('st', '2026-09-01'),
       ],
       payees,
-      AINSAN
+      AINSAN,
+      1
     );
     expect(result.suggested?.id).toBe('st');
   });
@@ -85,21 +88,43 @@ describe('suggestPayeeForSystem', () => {
     const result = suggestPayeeForSystem(
       [assigned('gone', '2026-10-02'), assigned('bu', '2026-09-01')],
       payees,
-      AINSAN
+      AINSAN,
+      1
     );
     expect(result.suggested?.id).toBe('bu');
   });
 
-  it('falls back to a Payee remembered for the system when nothing was assigned there yet', () => {
-    const remembered = payee('pl', 'Plenitude Highsec Police', { systemId: TALIDAL });
-    const result = suggestPayeeForSystem([], [...payees, remembered], TALIDAL);
+  const defaultFor = (systemId: number, characterId = 1) =>
+    payee('pl', 'Plenitude Highsec Police', {
+      characterId,
+      defaultSystems: [{ systemId, from: '2026-09-01' }],
+    });
+
+  it('falls back to the system’s Default Payee when nothing was assigned there yet', () => {
+    const result = suggestPayeeForSystem([], [...payees, defaultFor(TALIDAL)], TALIDAL, 1);
     expect(result.suggested?.id).toBe('pl');
     expect(result.fromHistory).toBe(false);
     expect(result.ranked[0].id).toBe('pl');
   });
 
-  it('suggests nothing for a system with no history and no remembered Payee', () => {
-    const result = suggestPayeeForSystem([assigned('st', '2026-09-01')], payees, TALIDAL);
+  it('puts the Default Payee last: history in the system comes first', () => {
+    const result = suggestPayeeForSystem(
+      [assigned('st', '2026-09-01', TALIDAL)],
+      [...payees, defaultFor(TALIDAL)],
+      TALIDAL,
+      1
+    );
+    expect(result.suggested?.id).toBe('st');
+    expect(result.fromHistory).toBe(true);
+  });
+
+  it('ignores another Character’s Default Payee', () => {
+    const result = suggestPayeeForSystem([], [...payees, defaultFor(TALIDAL, 2)], TALIDAL, 1);
+    expect(result.suggested).toBeUndefined();
+  });
+
+  it('suggests nothing for a system with no history and no Default Payee', () => {
+    const result = suggestPayeeForSystem([assigned('st', '2026-09-01')], payees, TALIDAL, 1);
     expect(result.suggested).toBeUndefined();
     expect(result.ranked.map((p) => p.name)).toEqual([
       'Bureau of Unified Harvesting',

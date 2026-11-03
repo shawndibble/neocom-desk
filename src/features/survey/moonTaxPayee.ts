@@ -50,7 +50,6 @@ export async function ensurePayee(
   return updatePayee(existing, {
     name: existing.name,
     defaultTaxPct: taxPct,
-    systemId: existing.systemId,
     hubId: existing.hubId,
   });
 }
