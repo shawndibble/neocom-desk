@@ -77,6 +77,7 @@ export function MailListPane({
   return (
     <Panel
       padded={false}
+      fill
       className={
         visible ? 'lg:sticky lg:top-4 lg:flex lg:max-h-[calc(100dvh-2rem)] lg:flex-col' : 'hidden'
       }
