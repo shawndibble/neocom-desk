@@ -5,6 +5,7 @@
  * `/markets/{region_id}/history`.
  */
 
+import { DAY_MS } from '@/lib/age';
 import { median } from '../math';
 import { utcDay } from '../localDay';
 
@@ -63,7 +64,10 @@ export interface PriceHistorySummary {
   /** Units traded across the whole range. */
   totalVolume: number;
   /**
-   * Mean daily order count, left unrounded — the caller formats it. Rounding
+   * Mean daily order count over the whole window, left unrounded. ESI omits a
+   * day nothing traded, so that day counts as zero orders: ten orders on 3 of
+   * 90 days is 0.11 a day, not the 3.3 that averaging over traded days gives.
+   * Unrounded — the caller formats it. Rounding
    * here turned a real but thin market ("10 orders across 90 days") into a
    * flat `0`, which is the fabricated figure the null return above exists to
    * avoid.
@@ -71,9 +75,31 @@ export interface PriceHistorySummary {
   meanOrderCount: number;
 }
 
-/** Range hi/lo, median day, total volume and mean daily order count. Null for an empty range — never a fabricated 0. */
+/**
+ * Calendar days the "orders per day" mean divides by: the range's days, or the
+ * days since the series' first trade where the market is newer than the range
+ * (so a new market is not diluted by days before it existed). `firstDate` is
+ * the first point of the full, unfiltered series. At least 1.
+ */
+export function orderCountWindowDays(
+  range: PriceHistoryRange,
+  firstDate: string,
+  now: Date
+): number {
+  const first = Date.parse(`${firstDate}T00:00:00Z`);
+  const today = Date.parse(`${utcDay(now.getTime())}T00:00:00Z`);
+  const sinceFirst = Number.isFinite(first) ? Math.round((today - first) / DAY_MS) : Infinity;
+  return Math.max(1, Math.min(RANGE_DAYS[range], sinceFirst));
+}
+
+/**
+ * Range hi/lo, median day, total volume and mean daily order count over
+ * `windowDays` calendar days (see `orderCountWindowDays`). Null for an empty
+ * range — never a fabricated 0.
+ */
 export function summarizePriceHistory(
-  points: readonly MarketHistoryPoint[]
+  points: readonly MarketHistoryPoint[],
+  windowDays: number
 ): PriceHistorySummary | null {
   if (points.length === 0) return null;
   const medianDay = median(points.map((p) => p.average));
@@ -97,7 +123,7 @@ export function summarizePriceHistory(
     lo,
     median: medianDay,
     totalVolume,
-    meanOrderCount: totalOrderCount / points.length,
+    meanOrderCount: totalOrderCount / Math.max(1, windowDays),
   };
 }
 

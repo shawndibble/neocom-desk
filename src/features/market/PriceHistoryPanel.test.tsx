@@ -191,11 +191,11 @@ describe('PriceHistoryPanel', () => {
     ).toHaveTextContent('Low');
   });
 
-  it('sums traded volume and averages the daily order count across the range', async () => {
+  it('sums traded volume and averages the daily order count over the range\u2019s calendar days', async () => {
     mockedLoad.mockResolvedValue({
       points: [
-        historyPoint({ date: '2026-08-01', average: 10, volume: 1_200, orderCount: 40 }),
-        historyPoint({ date: '2026-08-02', average: 10, volume: 800, orderCount: 41 }),
+        historyPoint({ date: '2026-08-02', average: 10, volume: 1_200, orderCount: 40 }),
+        historyPoint({ date: '2026-08-03', average: 10, volume: 800, orderCount: 41 }),
       ],
       fetchedAt: 1_000_000,
     });
@@ -204,23 +204,18 @@ describe('PriceHistoryPanel', () => {
     );
     await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
     // Matched from the figure outward, like the ISK stats above, so each
-    // number is pinned to the label it actually sits beside. The mean keeps
-    // its decimal rather than rounding — 40.5 orders a day is the fact.
+    // number is pinned to the label it actually sits beside. The market's
+    // first trade is 3 days before `now`, so 81 orders is 27 a day.
     expect(screen.getByText('2,000').parentElement).toHaveTextContent('Volume');
-    expect(screen.getByText('40.5').parentElement).toHaveTextContent('Orders / day');
+    expect(screen.getByText('27').parentElement).toHaveTextContent('Orders / day');
   });
 
   it('keeps a thin market off a flat zero in the orders-per-day stat', async () => {
     mockedLoad.mockResolvedValue({
       points: [
-        historyPoint({ date: '2026-08-01', average: 10, orderCount: 1 }),
-        ...Array.from({ length: 9 }, (_, i) =>
-          historyPoint({
-            date: `2026-08-${String(i + 2).padStart(2, '0')}`,
-            average: 10,
-            orderCount: 0,
-          })
-        ),
+        // One order on the first of ten days since the market began: 0.1 a day.
+        // ESI omits the nine quiet days, so they must count as zero.
+        historyPoint({ date: '2026-07-26', average: 10, orderCount: 1 }),
       ],
       fetchedAt: 1_000_000,
     });
