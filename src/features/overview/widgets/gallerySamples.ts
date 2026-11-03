@@ -894,7 +894,6 @@ function buildSamples(t: TFunction): Record<string, Sample> {
     },
     eveTime: {
       value: 'Fri 14:32',
-      unit: t('overview.widgets.eveTime.unit'),
       note: '2026-10-23',
       rows: [],
     },
