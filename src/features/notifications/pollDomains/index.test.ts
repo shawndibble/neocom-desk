@@ -211,6 +211,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       skyhooksNearby: ['skyhookRaidableNearby'],
       kills: ['shipLost'],
       accelerator: ['acceleratorExpiring'],
+      acceleratorPresence: ['acceleratorEnded'],
       mercenaryDens: ['mercenaryDenReinforced', 'mercenaryDenAnarchy'],
       skyhooks: ['skyhookRaidable'],
       communities: ['communityJoinRequest', 'communityMemberJoined', 'communityRequestPledged'],
