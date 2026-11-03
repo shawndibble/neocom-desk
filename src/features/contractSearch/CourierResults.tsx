@@ -10,6 +10,7 @@
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { HintText } from '@/components/ui/HintText';
+import * as Icon from '@/components/ui/icons';
 import { CourierFilterBar } from '@/features/contractSearch/CourierFilterBar';
 import {
   UNASKED,
@@ -804,10 +805,20 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
                 <span
                   className={
                     paysFarAboveGoingRate(multiple)
-                      ? 'text-[0.6875rem] font-normal text-warning'
+                      ? 'flex items-center gap-1 text-[0.6875rem] font-normal text-warning'
                       : 'text-[0.6875rem] font-normal text-text-dim'
                   }
                 >
+                  {/* The multiple alone names the rate; a flagged one also
+                      wears the warning glyph so colour is never the only cue
+                      (DESIGN.md §7). The word "Over rate" stays for screen
+                      readers, and the modal and the filter spell it out. */}
+                  {paysFarAboveGoingRate(multiple) && (
+                    <>
+                      <Icon.Warn className="size-3" aria-hidden="true" />
+                      <span className="sr-only">{t('contractSearch.risk.overRateShort')}</span>
+                    </>
+                  )}
                   {t('contractSearch.goingRateMultiple', {
                     multiple: formatMagnitude(multiple),
                   })}
