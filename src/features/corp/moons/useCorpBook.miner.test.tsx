@@ -23,6 +23,7 @@ vi.mock('@/features/character/names', () => ({
 }));
 vi.mock('@/features/character/structures', () => ({
   loadStructureName: vi.fn().mockResolvedValue(null),
+  loadStructureAccess: vi.fn().mockResolvedValue('unknown'),
 }));
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: vi.fn().mockResolvedValue(new Map()),
