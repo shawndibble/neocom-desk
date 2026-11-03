@@ -196,7 +196,8 @@ describe('LoyaltyStoreLanding', () => {
     renderLanding();
     expect(screen.queryByText('Your LP', { selector: 'dt, span' })).toBeNull();
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
-    expect(screen.getByRole('button', { name: /Stores I hold LP with/ })).toHaveAttribute(
+    await user.click(screen.getByRole('button', { name: /^Show only/ }));
+    expect(screen.getByRole('menuitemcheckbox', { name: /Stores I hold LP with/ })).toHaveAttribute(
       'aria-disabled',
       'true'
     );

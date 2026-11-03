@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import {
   CheckboxSelect,
   FilterBar,
-  FilterChip,
   FilterField,
   SearchInput,
   SegmentedControl,
@@ -40,6 +39,9 @@ function toggleCategory(
   );
   return next === 'all' ? [] : [...next];
 }
+
+const SHOW_ONLY_KEYS = ['mineOnly', 'affordableOnly', 'noTurnIns', 'hideFactionWarfare'] as const;
+type ShowOnlyKey = (typeof SHOW_ONLY_KEYS)[number];
 
 export type LpLandingView = 'stores' | 'offers';
 
@@ -81,7 +83,6 @@ export function LpLandingFilterBar({
 }) {
   const { t } = useTranslation();
   const noLp = heldStores === 0;
-  const heldCount = heldStores ?? undefined;
   return (
     <FilterBar
       value={value}
@@ -211,52 +212,41 @@ export function LpLandingFilterBar({
               />
             </FilterField>
           )}
-          {/* `md:contents`: inline the chips join the row; in the sheet they wrap under one caption. */}
-          <FilterField
-            captionInline
-            label={t('loyaltyStore.landing.showOnlyLabel')}
-            stretch={false}
-          >
-            <div className="flex flex-wrap gap-2 md:contents">
-              <FilterChip
-                label={t('loyaltyStore.landing.mineOnly')}
-                selected={draft.mineOnly}
-                onToggle={() => setDraft({ ...draft, mineOnly: !draft.mineOnly })}
-                count={noLp ? undefined : heldCount}
-                countLabel={t('loyaltyStore.landing.mineOnlyCount')}
-                disabled={noLp && !draft.mineOnly}
-                tooltip={noLp ? t('loyaltyStore.landing.noLpHeld') : undefined}
-                size="md"
-              />
-              <FilterChip
-                label={t('loyaltyStore.landing.affordable')}
-                selected={draft.affordableOnly}
-                onToggle={() => setDraft({ ...draft, affordableOnly: !draft.affordableOnly })}
-                disabled={noLp && !draft.affordableOnly}
-                tooltip={
-                  noLp
+          <FilterField captionInline label={t('loyaltyStore.landing.showOnlyLabel')}>
+            <CheckboxSelect<ShowOnlyKey>
+              label={t('loyaltyStore.landing.showOnlyLabel')}
+              size="md"
+              active={SHOW_ONLY_KEYS.some((key) => draft[key])}
+              noneLabel={t('loyaltyStore.landing.showOnlyAny')}
+              options={[
+                {
+                  value: 'mineOnly',
+                  label: t('loyaltyStore.landing.mineOnly'),
+                  description: noLp ? t('loyaltyStore.landing.noLpHeld') : undefined,
+                  disabled: noLp && !draft.mineOnly,
+                },
+                {
+                  value: 'affordableOnly',
+                  label: t('loyaltyStore.landing.affordable'),
+                  description: noLp
                     ? t('loyaltyStore.landing.noLpHeld')
-                    : t('loyaltyStore.landing.affordableHelp')
-                }
-                size="md"
-              />
-              <FilterChip
-                label={t('loyaltyStore.landing.noTurnIns')}
-                selected={draft.noTurnIns}
-                onToggle={() => setDraft({ ...draft, noTurnIns: !draft.noTurnIns })}
-                tooltip={t('loyaltyStore.landing.noTurnInsHelp')}
-                size="md"
-              />
-              <FilterChip
-                label={t('loyaltyStore.landing.hideFactionWarfare')}
-                selected={draft.hideFactionWarfare}
-                onToggle={() =>
-                  setDraft({ ...draft, hideFactionWarfare: !draft.hideFactionWarfare })
-                }
-                tooltip={t('loyaltyStore.landing.hideFactionWarfareHelp')}
-                size="md"
-              />
-            </div>
+                    : t('loyaltyStore.landing.affordableHelp'),
+                  disabled: noLp && !draft.affordableOnly,
+                },
+                {
+                  value: 'noTurnIns',
+                  label: t('loyaltyStore.landing.noTurnIns'),
+                  description: t('loyaltyStore.landing.noTurnInsHelp'),
+                },
+                {
+                  value: 'hideFactionWarfare',
+                  label: t('loyaltyStore.landing.hideFactionWarfare'),
+                  description: t('loyaltyStore.landing.hideFactionWarfareHelp'),
+                },
+              ]}
+              selected={new Set(SHOW_ONLY_KEYS.filter((key) => draft[key]))}
+              onToggle={(key) => setDraft({ ...draft, [key]: !draft[key] })}
+            />
           </FilterField>
         </>
       )}
