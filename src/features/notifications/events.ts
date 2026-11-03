@@ -143,6 +143,12 @@ const CATALOG = [
     defaultChannels: 'both',
   },
   {
+    // Local data, no ESI, like the one above; only seen while the app is open.
+    id: 'acceleratorEnded',
+    labelKey: 'settings.notifications.event.acceleratorEnded',
+    defaultChannels: 'both',
+  },
+  {
     // Per Character: ESI has no corporation den route (issue #4782). The den
     // scope sits in the opt-in `mercenaryDens` Permission.
     id: 'mercenaryDenReinforced',

@@ -57,3 +57,71 @@ export function diffAcceleratorExpiring(
   }
   return fires;
 }
+
+/**
+ * `acceleratorEnded`: a Character's cerebral accelerator stopped, by either
+ * evidence the app has of one. Either the typed-in accelerator ran out
+ * (`expired`), or the one detected from the attribute sheet (GLOSSARY.md
+ * **Detected Accelerator**, no expiry ever typed) is no longer there (`lost`).
+ *
+ * One event for both, and one occurrence per Character per UTC day (see
+ * `occurrenceKey`): the sheet usually refreshes a poll or two after the typed
+ * expiry, and that second sighting is the same accelerator ending, not news.
+ * Window-crossing like the diff above; fires nothing without a baseline.
+ */
+export interface AcceleratorPresenceEntry {
+  kind: 'typed' | 'detected';
+  bonus: number;
+  /** Epoch ms a typed accelerator runs out; 0 for a detected one, which has none. */
+  expiresAtMs: number;
+}
+
+export interface AcceleratorPresenceSnapshot {
+  entries: readonly AcceleratorPresenceEntry[];
+  nowMs: number;
+}
+
+export interface AcceleratorEndedFire {
+  eventId: 'acceleratorEnded';
+  characterId: number;
+  kind: 'expired' | 'lost';
+  bonus: number;
+  /** When it ended: the typed expiry for `expired`, the poll that missed it for `lost`. */
+  atMs: number;
+}
+
+export function diffAcceleratorEnded(
+  characterId: number,
+  prev: AcceleratorPresenceSnapshot | undefined,
+  next: AcceleratorPresenceSnapshot
+): AcceleratorEndedFire[] {
+  if (!prev) return [];
+  const pick = (snapshot: AcceleratorPresenceSnapshot, kind: AcceleratorPresenceEntry['kind']) =>
+    snapshot.entries.find((entry) => entry.kind === kind);
+  const typedBefore = pick(prev, 'typed');
+  // Gone only by running out: the pilot deleting a still-running one is not it.
+  if (typedBefore && !pick(next, 'typed') && typedBefore.expiresAtMs <= next.nowMs) {
+    return [
+      {
+        eventId: 'acceleratorEnded',
+        characterId,
+        kind: 'expired',
+        bonus: typedBefore.bonus,
+        atMs: typedBefore.expiresAtMs,
+      },
+    ];
+  }
+  const detectedBefore = pick(prev, 'detected');
+  if (detectedBefore && !pick(next, 'detected') && !pick(next, 'typed')) {
+    return [
+      {
+        eventId: 'acceleratorEnded',
+        characterId,
+        kind: 'lost',
+        bonus: detectedBefore.bonus,
+        atMs: next.nowMs,
+      },
+    ];
+  }
+  return [];
+}

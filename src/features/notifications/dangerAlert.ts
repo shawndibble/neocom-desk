@@ -92,6 +92,7 @@ const EVENT_CHIP: Readonly<Record<string, TopicChip>> = {
   characterNotTraining: 'skills',
   skillQueueEnding: 'skills',
   acceleratorExpiring: 'skills',
+  acceleratorEnded: 'skills',
   spExtractionReady: 'skills',
   cloneJumpReady: 'skills',
 };
