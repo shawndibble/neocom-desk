@@ -82,6 +82,7 @@ export function ExtractionsTab() {
       render: (row) => (
         <PlaceCell
           refinery={names.refinery(row.structureId)}
+          undockable={names.undockable?.(row.structureId)}
           moon={names.moon(row.moonId)}
           accent
         />

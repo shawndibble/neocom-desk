@@ -14,6 +14,7 @@ import {
   type DataTableColumn,
   type DataTableSort,
 } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { splitPlace } from '@/engine/corpTaxBook/bookSections';
@@ -30,6 +31,7 @@ export function PlaceCell({
   moon,
   to,
   accent = false,
+  undockable = false,
 }: {
   refinery: string;
   moon: string | undefined;
@@ -37,12 +39,23 @@ export function PlaceCell({
   to?: string;
   /** Moon in the accent colour without a link: the row it sits in is the link. */
   accent?: boolean;
+  /** The station has a name (read by someone who can dock) but the viewer cannot dock there. */
+  undockable?: boolean;
 }) {
+  const { t } = useTranslation();
   const place = splitPlace(refinery, moon);
+  const chip = undockable ? (
+    <Pill tone="warning" className="ml-1.5 align-middle">
+      {t('corpTaxBook.moons.undockable')}
+    </Pill>
+  ) : null;
   return (
     <span className="block min-w-0">
       {place.moon === undefined ? (
-        place.station
+        <>
+          {place.station}
+          {chip}
+        </>
       ) : (
         <>
           {to ? (
@@ -55,7 +68,10 @@ export function PlaceCell({
           ) : (
             <span className={cx('whitespace-nowrap', accent && 'text-accent')}>{place.moon}</span>
           )}
-          <span className="block text-xs text-text-dim">{place.station}</span>
+          <span className="block text-xs text-text-dim">
+            {place.station}
+            {chip}
+          </span>
         </>
       )}
     </span>

@@ -261,11 +261,11 @@ describe('CourierContractDetailModal player structure names', () => {
     expect(loadStructureName).toHaveBeenCalledWith(9001, STRUCTURE_ID);
   });
 
-  it('says "Unreadable station" when ESI refuses', async () => {
+  it('says "Unknown/Undockable" when ESI refuses', async () => {
     loadStructureName.mockResolvedValue(null);
     renderModal({ kind: 'known', count: 2 }, {}, structureRow);
 
-    expect(await screen.findByText('Unreadable station')).toBeInTheDocument();
+    expect(await screen.findByText('Unknown/Undockable')).toBeInTheDocument();
   });
 
   it('keeps the bare id, and asks nothing, with no active character', () => {

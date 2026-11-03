@@ -153,7 +153,7 @@ function useRouteExposure(
 /**
  * A player structure's name, asked for once when its haul is opened. ESI names
  * a structure only to a character on its access list, so a refusal is a normal
- * answer: it reads "Unreadable station", not an error. With no active
+ * answer: it reads "Unknown/Undockable", not an error. With no active
  * character nothing was asked, so the id stays — that is not a refusal.
  */
 type StructureLookup = 'pending' | 'unreadable' | { name: string };

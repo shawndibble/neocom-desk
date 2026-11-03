@@ -13,7 +13,7 @@ import { useEntityName } from '@/features/character/useEntityName';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { reminderAllowed } from '@/engine/corpTaxBook/mailQueue';
 import type { StatementToMail } from '@/features/corpTaxBook/mailQueue';
-import { addDays, periodLabel, refineryPlaceholder } from './moonsFormat';
+import { addDays, isRefineryPlaceholder, periodLabel } from './moonsFormat';
 import type { BookContextValue } from './bookContextValue';
 import { useBook } from './useBook';
 
@@ -29,7 +29,7 @@ export function statementRefineryNames(
   for (const { structureId } of statement.lines) {
     if (!structureId) continue;
     const name = names.refinery(structureId);
-    if (name.trim() !== '' && name !== refineryPlaceholder(structureId))
+    if (name.trim() !== '' && !isRefineryPlaceholder(name, structureId))
       out[String(structureId)] = name;
   }
   return out;

@@ -34,7 +34,7 @@ import { loadMoonNames } from '@/features/character/moonNames';
 import { loadSurvey } from '@/features/survey/surveyStore';
 import { loadMoonOreTypeIds, loadTypes } from '@/sde/loadSde';
 import { resolveNames } from '@/features/character/names';
-import { loadStructureName } from '@/features/character/structures';
+import { loadStructureName, loadVisibleStructure } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
 import {
   hubForPayee,
@@ -67,7 +67,7 @@ import {
 import { moonOwnersNeedRows, ownRefineriesFromStored } from '@/engine/corpTaxBook/moonOwners';
 import { forgetObservedCopy } from '../taxBook/observedStore';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
-import { refineryPlaceholder } from './moonsFormat';
+import { isRefineryPlaceholder, refineryPlaceholder, refineryUnreadable } from './moonsFormat';
 import { MINUTE_MS } from '@/lib/age';
 
 export interface BookNames {
@@ -79,6 +79,8 @@ export interface BookNames {
    * "Refinery <id>". Never the moon owner's name, so it is safe on a miner's line or mail.
    */
   refinery: (id: number) => string;
+  /** A refinery shown by a name the viewer's character cannot dock at to read for itself (the server read it). */
+  undockable?: (id: number) => boolean;
   /** The same chain, falling back to the moon owner's name plus the id: officer screens about a moon owner only. */
   ownerRefinery: (id: number) => string;
   moon: (id: number) => string;
@@ -90,6 +92,9 @@ const EMPTY_NAMES = {
   refineries: new Map<number, string>(),
   ores: new Map<number, string>(),
   moons: new Map<number, string>(),
+  /** False until the name lookups have answered: a refinery is not "undockable" while still being asked about. */
+  resolved: false,
+  undockable: new Set<number>(),
 };
 
 type Fetched =
@@ -452,13 +457,26 @@ export function useCorpBook(
         loadMoonNames(moonIds).catch(() => new Map<number, string>()),
       ]);
       const refineries = new Map<number, string>();
+      // A name the server read with the moon owner's own grant is used as it is,
+      // so ESI is not asked for it again (and no other character is swept on a
+      // refusal). This character's own access is still checked, from its own
+      // cached lookup, because a refinery you cannot dock at is worth saying so.
+      const serverNamed =
+        fetched.status === 'loaded'
+          ? structureNamesOf(fetched.data.feeders ?? [])
+          : new Map<number, string>();
+      const undockable = new Set<number>();
       await Promise.all(
         [...refineryIds].map(async (id) => {
+          const visible = await loadVisibleStructure(characterId, id).catch(() => undefined);
+          // `undefined`: the question went unanswered (offline), which is not a refusal.
+          if (visible === null) undockable.add(id);
+          if (serverNamed.has(id)) return;
           const name = await loadStructureName(characterId, id).catch(() => null);
           if (name) refineries.set(id, name);
         })
       );
-      if (!cancelled) setNames({ characters, refineries, ores, moons });
+      if (!cancelled) setNames({ characters, refineries, ores, moons, resolved: true, undockable });
     })();
     return () => {
       cancelled = true;
@@ -486,12 +504,15 @@ export function useCorpBook(
         const system = refineries?.systemOf.get(id);
         return system === undefined ? undefined : names.characters.get(system);
       },
-      fallback: refineryPlaceholder,
+      fallback: names.resolved ? refineryUnreadable : refineryPlaceholder,
     };
+    const refinery = refineryLabeler(sources);
     return {
       character: (id) => names.characters.get(id) ?? `#${id}`,
       corporation: (id) => names.characters.get(id) ?? `#${id}`,
-      refinery: refineryLabeler(sources),
+      refinery,
+      // Only worth a chip when a real name is showing: the stand-in already says it.
+      undockable: (id) => names.undockable.has(id) && !isRefineryPlaceholder(refinery(id), id),
       ownerRefinery: refineryLabeler({
         ...sources,
         ownerName: (id) => {

@@ -106,6 +106,7 @@ export function OverviewTab({ showMoons }: { showMoons: boolean }) {
                         <span className="min-w-0 flex-1">
                           <PlaceCell
                             refinery={names.refinery(r.structureId)}
+                            undockable={names.undockable?.(r.structureId)}
                             moon={names.moon(r.moonId)}
                             to={extractionPath(r.id)}
                           />

@@ -34,7 +34,7 @@ import { callRouted } from '@/sync/routedCallable';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { getDocUnlessKnownMissing, NOT_FOUND_TTL_MS } from '@/sync/notFoundCache';
 import { underFirebaseSession } from '@/features/communities/pledgeWrites';
-import { refineryPlaceholder } from '@/features/corp/moons/moonsFormat';
+import { isRefineryPlaceholder } from '@/features/corp/moons/moonsFormat';
 import { bookVersionsOf, cachedPart } from '@/features/corp/taxBook/bookCache';
 import { forgetMemberParts, memberPartStore } from './memberPartStore';
 import { readMemberObserved } from './memberObservedRead';
@@ -301,7 +301,7 @@ export function refineryNamesOf(
     for (const [id, name] of Object.entries(s.refineryNames ?? {})) {
       const structureId = Number(id);
       if (!Number.isSafeInteger(structureId) || typeof name !== 'string') continue;
-      if (name.trim() === '' || name === refineryPlaceholder(id)) continue;
+      if (name.trim() === '' || isRefineryPlaceholder(name, id)) continue;
       out[structureId] = name;
     }
   }
