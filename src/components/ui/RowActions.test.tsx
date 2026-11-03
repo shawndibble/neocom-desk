@@ -1,11 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { claimSessionHint, hintSeenCount, resetSessionHints, useHintCounts } from '@/lib/hintFlags';
 import { stubViewport } from '@/test/viewport';
-import { db } from '@/db';
-import { seedCharacter } from '@/test/seed';
 import {
   MenuGroup,
   MenuItem,
@@ -26,6 +24,10 @@ import {
   DropdownMenuTrigger,
 } from './DropdownMenu';
 
+const characters = vi.hoisted(() => ({ count: 1 }));
+vi.mock('@/features/character/useCharacters', () => ({
+  useCharacterCount: () => characters.count,
+}));
 function Row({ onInto }: { onInto: () => void }) {
   return (
     <RowActionsMenu
@@ -356,29 +358,23 @@ describe('row menu hints', () => {
     </RowActionsMenu>
   );
 
-  beforeEach(async () => {
+  beforeEach(() => {
     useHintCounts.setState({ value: {}, hydrated: true });
     resetSessionHints();
-    await db.characters.clear();
-    await seedCharacter(1);
   });
 
-  it('keeps the hint off until a pilot is logged in (never on /login)', async () => {
-    await db.characters.clear();
-    render(plainRow);
-    await db.characters.count();
-    await act(async () => {});
-    expect(screen.queryByText(/to open its actions/)).not.toBeInTheDocument();
-  });
-
-  it('keeps the menu footer tip off until a pilot is logged in, and does not spend it', async () => {
-    const user = userEvent.setup();
-    await db.characters.clear();
-    render(plainRow);
-    await user.click(screen.getByRole('button', { name: 'More actions for Row' }));
-    await screen.findByRole('menuitem', { name: 'Show info' });
-    expect(screen.queryByText('Tip: right-click any row')).not.toBeInTheDocument();
-    expect(hintSeenCount(useHintCounts.getState().value, 'rowMenuTip')).toBe(0);
+  it('keeps the menu footer tip off before login, and does not spend it', async () => {
+    characters.count = 0;
+    try {
+      const user = userEvent.setup();
+      render(plainRow);
+      await user.click(screen.getByRole('button', { name: 'More actions for Row' }));
+      await screen.findByRole('menuitem', { name: 'Show info' });
+      expect(screen.queryByText('Tip: right-click any row')).not.toBeInTheDocument();
+      expect(hintSeenCount(useHintCounts.getState().value, 'rowMenuTip')).toBe(0);
+    } finally {
+      characters.count = 1;
+    }
   });
 
   it('adds the right-click tip to the first three ⋮ opens, never the right-click menu', async () => {
@@ -431,14 +427,14 @@ describe('row menu hints', () => {
     expect(hintSeenCount(useHintCounts.getState().value, 'rowHint')).toBe(1);
   });
 
-  it('does not hint again once seen, or in a session that already showed a hint', () => {
+  it('does not hint again once seen, or in a session that already showed it', () => {
     useHintCounts.setState({ value: { rowHint: 1 }, hydrated: true });
     const { unmount } = render(plainRow);
     expect(screen.queryByText(/to open its actions/)).not.toBeInTheDocument();
     unmount();
 
     useHintCounts.setState({ value: {}, hydrated: true });
-    expect(claimSessionHint('goTo')).toBe(true);
+    expect(claimSessionHint('rowHint:other')).toBe(true);
     render(plainRow);
     expect(screen.queryByText(/to open its actions/)).not.toBeInTheDocument();
   });

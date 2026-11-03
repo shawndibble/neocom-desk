@@ -116,7 +116,7 @@ export async function signInAndGoto(
       // Nothing hidden, so specs find every page.
       { key: 'sync.navHidden', value: [] },
       // One-time hints already seen, so none opens over what a spec clicks.
-      { key: 'hintCounts', value: { rowHint: 1, goTo: 1 } },
+      { key: 'hintCounts', value: { rowHint: 1, goTo: 1, columnPickerHint: 1 } },
       ...extraSettings,
     ],
   };

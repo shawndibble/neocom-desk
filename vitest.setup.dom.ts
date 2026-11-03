@@ -22,12 +22,14 @@ import { fakeMediaQueryList } from '@/test/viewport';
 
 /**
  * A one-time hint is a Popover with `role="dialog"`; opened over a test that
- * asserts on a bare dialog it breaks it. Each test starts with the session's
- * one hint already taken. A test of a hint calls `resetSessionHints()` itself.
+ * asserts on a bare dialog it breaks it. Each test starts with every hint
+ * type's session slot already taken. A test of a hint calls
+ * `resetSessionHints()` itself. A new hint type goes in this list.
  */
 beforeEach(() => {
   resetSessionHints();
-  claimSessionHint('test-setup');
+  for (const hint of ['rowHint', 'columnPickerHint', 'goTo'])
+    claimSessionHint(`${hint}:test-setup`);
 });
 
 /**

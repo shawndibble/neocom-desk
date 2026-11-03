@@ -234,7 +234,7 @@ Dense cards and mobile sort on both search tabs; filters in a funnel sheet; pane
 - No corporation contracts view: no `getCorporationContracts` in `esi/registry.ts`; Corp section is Members/Wallet/Assets only.
 - Item search and Courier need no sync backend (R2 only since #4270); R2 unreachable with nothing cached shows the unreachable state.
 - Public snapshot is ≤ 30 min old and can list a contract already gone; only discovered on modal open (404 → "no longer listed").
-- Courier player structures are named only from the device's structure cache on the board (no requests); the detail modal resolves the opened haul's structure once and shows "Unreadable station" when ESI refuses. Uncached ones stay an id on the board and in the modal title; local snapshots hold NPC stations only; wormhole hauls always unplaced.
+- Courier player structures are named only from the device's structure cache on the board (no requests); the detail modal resolves the opened haul's structure once and shows "Unknown/Undockable" when ESI refuses. Uncached ones stay an id on the board and in the modal title; local snapshots hold NPC stations only; wormhole hauls always unplaced.
 - Courier region filter cannot match unplaced ends; Space chip row hides bands with no data (Wormhole never offered).
 - History rows are not clickable as a whole; only the Type button opens detail (and in dense Search cards the whole row does).
 - History modal item lists exist only for item_exchange/auction; courier/loan show no contents.

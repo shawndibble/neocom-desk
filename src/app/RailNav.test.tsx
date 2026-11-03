@@ -271,14 +271,14 @@ describe('the rail', () => {
     );
   });
 
-  it('leaves the New tag off a phone and off a session that showed another hint', () => {
+  it('leaves the New tag off a phone and off a session that already showed it', () => {
     setPhone(true);
     const { unmount } = renderAt('/overview');
     expect(useHintCounts.getState().value).toEqual({});
     unmount();
 
     setPhone(false);
-    expect(claimSessionHint('rowHint:x')).toBe(true);
+    expect(claimSessionHint('goTo:x')).toBe(true);
     renderAt('/overview');
     expect(screen.getByRole('button', { name: /go to/i })).not.toHaveTextContent('New');
   });

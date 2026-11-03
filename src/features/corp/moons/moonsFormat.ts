@@ -13,6 +13,17 @@ export const iskOrDash = (value: number) => (Math.abs(value) < 1 ? '—' : isk(v
 /** A refinery shown before (or without) its name: a placeholder, never written as one. */
 export const refineryPlaceholder = (id: number | string) => `Refinery ${id}`;
 
+/**
+ * A refinery whose name lookups have finished and found nothing: ESI names a
+ * structure only to a character with docking access. The id stays so two such
+ * refineries never read alike.
+ */
+export const refineryUnreadable = (id: number | string) => `Unknown/Undockable (${id})`;
+
+/** Either stand-in, so neither is ever saved or mailed as if it were the structure's real name. */
+export const isRefineryPlaceholder = (name: string, id: number | string) =>
+  name === refineryPlaceholder(id) || name === refineryUnreadable(id);
+
 /** "18 Oct" from a UTC date or instant. */
 export function shortDate(value: string): string {
   const [, m, d] = value.slice(0, 10).split('-').map(Number);
