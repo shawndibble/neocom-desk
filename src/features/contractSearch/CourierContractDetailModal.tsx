@@ -59,6 +59,7 @@ import { useJumpBasis } from '@/features/route/jumpBasis';
 import { formatMagnitude } from '@/lib/magnitude';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { courierPlanRouteHref } from '@/features/contractSearch/courierPlanRoute';
+import { HintText } from '@/components/ui/HintText';
 import { loadStructureName } from '@/features/character/structures';
 import { endpointName, endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { useCourierCollateralRatio } from '@/features/contractSearch/collateralThreshold';
@@ -194,7 +195,11 @@ function EndpointPlaceName({
   const name = endpoint.name ?? (typeof lookup === 'object' && lookup ? lookup.name : null);
   if (name !== null) return <PlaceLink id={endpoint.locationId}>{name}</PlaceLink>;
   if (lookup === 'unreadable') {
-    return <span title={`#${endpoint.locationId}`}>{t('contractSearch.unreadableStation')}</span>;
+    return (
+      <HintText content={`#${endpoint.locationId}`}>
+        {t('contractSearch.unreadableStation')}
+      </HintText>
+    );
   }
   return <>{endpointName(endpoint)}</>;
 }
