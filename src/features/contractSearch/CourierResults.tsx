@@ -10,6 +10,7 @@
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { HintText } from '@/components/ui/HintText';
+import * as Icon from '@/components/ui/icons';
 import { CourierFilterBar } from '@/features/contractSearch/CourierFilterBar';
 import {
   UNASKED,
@@ -801,28 +802,26 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
                 should be.
               */}
               {multiple !== null && (
-                <span className="flex items-center gap-1">
-                  <span
-                    className={
-                      paysFarAboveGoingRate(multiple)
-                        ? 'text-[0.6875rem] font-normal text-warning'
-                        : 'text-[0.6875rem] font-normal text-text-dim'
-                    }
-                  >
-                    {t('contractSearch.goingRateMultiple', {
-                      multiple: formatMagnitude(multiple),
-                    })}
-                  </span>
-                  {/* Colour alone used to be the only tell that this multiple
-                      is flagged (DESIGN.md §7) — the mobile lane header
-                      already names it via `RiskMarker`; this repeats that
-                      same word here. */}
+                <span
+                  className={
+                    paysFarAboveGoingRate(multiple)
+                      ? 'flex items-center gap-1 text-[0.6875rem] font-normal text-warning'
+                      : 'text-[0.6875rem] font-normal text-text-dim'
+                  }
+                >
+                  {/* The multiple alone names the rate; a flagged one also
+                      wears the warning glyph so colour is never the only cue
+                      (DESIGN.md §7). The word "Over rate" stays for screen
+                      readers, and the modal and the filter spell it out. */}
                   {paysFarAboveGoingRate(multiple) && (
-                    <RiskMarker
-                      kind="over-rate"
-                      detailOptions={{ multiple: formatMagnitude(multiple) }}
-                    />
+                    <>
+                      <Icon.Warn className="size-3" aria-hidden="true" />
+                      <span className="sr-only">{t('contractSearch.risk.overRateShort')}</span>
+                    </>
                   )}
+                  {t('contractSearch.goingRateMultiple', {
+                    multiple: formatMagnitude(multiple),
+                  })}
                 </span>
               )}
             </div>
@@ -886,8 +885,8 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         sortValue: (row) =>
           `${endpointSystemName(row.origin)} ${endpointSystemName(row.destination)}`,
         render: (row) => (
-          <div className="flex flex-col gap-0.5">
-            <span className="truncate">
+          <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+            <span className="max-w-full truncate">
               <EndpointSystem endpoint={row.origin} />
               <EndpointSecurity security={row.origin.security} />
               {originRegion(row) && (
@@ -895,7 +894,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
               )}
               <EndpointRiskMarkers endpoint={row.origin} end="origin" />
             </span>
-            <span className="truncate text-text-dim">
+            <span className="max-w-full truncate text-text-dim">
               {'→ '}
               <EndpointSystem endpoint={row.destination} />
               <EndpointSecurity security={row.destination.security} />

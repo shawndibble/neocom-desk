@@ -382,7 +382,7 @@ describe('CourierResults route cell', () => {
 });
 
 describe('CourierResults ISK/jump cell', () => {
-  it('names an over-rate haul in text on the desktop table too, not only by border colour', async () => {
+  it('shows the going-rate multiple for an over-rate haul with a warning glyph, not a separate label', async () => {
     knownJumps();
     renderLanes();
 
@@ -391,10 +391,15 @@ describe('CourierResults ISK/jump cell', () => {
       if (!row) throw new Error('expected the bait row');
       return row as HTMLElement;
     });
-    expect(within(baitRow).getByText('Over rate')).toBeInTheDocument();
+    const multiple = within(baitRow).getByText(/x going rate$/);
+    // Not colour alone: the flagged multiple carries a glyph and a screen-reader label.
+    expect(multiple.querySelector('svg')).not.toBeNull();
+    expect(within(multiple).getByText('Over rate')).toHaveClass('sr-only');
 
-    // An ordinary haul on the same lane carries the multiple with no marker.
+    // An ordinary haul on the same lane carries the multiple with neither.
     const ordinaryRow = document.querySelector('tr[data-row-key="100"]') as HTMLElement;
+    const ordinary = within(ordinaryRow).getByText(/x going rate$/);
+    expect(ordinary.querySelector('svg')).toBeNull();
     expect(within(ordinaryRow).queryByText('Over rate')).not.toBeInTheDocument();
   });
 
