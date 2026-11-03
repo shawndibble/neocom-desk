@@ -433,6 +433,7 @@ const ROW_MENU_TIP_OPENS = 3;
  */
 function useRowMoreHint(menuPresent: boolean): [shown: boolean, dismiss: () => void] {
   // Only once a pilot is logged in: never on /login, where no Character exists yet.
+  // 0 while Dexie loads, which only delays the hint.
   const hasCharacter = useCharacterCount() > 0;
   const active = menuPresent && hasCharacter;
   const owner = `${ROW_HINT}:${useId()}`;
@@ -485,13 +486,15 @@ export function RowMoreActions({
   const [tip, setTip] = useState(false);
   const [hintShown, dismissHint] = useRowMoreHint(actions !== null);
   const context = useTouchContext();
+  const loggedIn = useCharacterCount() > 0;
   if (!actions) return null;
   const onOpenChange = (open: boolean) => {
     if (open) {
       if (hintShown) dismissHint();
       // Counted per open, but the footer stays for the open that earned it.
       const { value, hydrated } = useHintCounts.getState();
-      const earned = hydrated && hintSeenCount(value, ROW_MENU_TIP) < ROW_MENU_TIP_OPENS;
+      const earned =
+        loggedIn && hydrated && hintSeenCount(value, ROW_MENU_TIP) < ROW_MENU_TIP_OPENS;
       setTip(earned);
       if (earned) recordHintSeen(ROW_MENU_TIP);
     }

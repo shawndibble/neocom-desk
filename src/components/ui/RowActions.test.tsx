@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { claimSessionHint, hintSeenCount, resetSessionHints, useHintCounts } from '@/lib/hintFlags';
@@ -366,8 +366,19 @@ describe('row menu hints', () => {
   it('keeps the hint off until a pilot is logged in (never on /login)', async () => {
     await db.characters.clear();
     render(plainRow);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await db.characters.count();
+    await act(async () => {});
     expect(screen.queryByText(/to open its actions/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the menu footer tip off until a pilot is logged in, and does not spend it', async () => {
+    const user = userEvent.setup();
+    await db.characters.clear();
+    render(plainRow);
+    await user.click(screen.getByRole('button', { name: 'More actions for Row' }));
+    await screen.findByRole('menuitem', { name: 'Show info' });
+    expect(screen.queryByText('Tip: right-click any row')).not.toBeInTheDocument();
+    expect(hintSeenCount(useHintCounts.getState().value, 'rowMenuTip')).toBe(0);
   });
 
   it('adds the right-click tip to the first three ⋮ opens, never the right-click menu', async () => {
