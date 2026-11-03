@@ -115,6 +115,8 @@ as Chrome:
   viewBox to it, and screenshot with Playwright (`omitBackground` for the plain
   icon, the dark background for the maskable one). Redo all eight if a glyph in
   `navIcons.ts` changes.
+  Exception: Open orders' ChartLineUp is the `bold` weight. The nav draws it as light
+  line art (no box), and `fill` adds a solid square behind the chart.
 
 After shipping a build that turns delegation on, a user who already allowed
 notifications while Chrome owned them must toggle notifications off and on in
