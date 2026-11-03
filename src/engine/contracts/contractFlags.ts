@@ -28,6 +28,11 @@ export interface ContractFlagContext {
   threshold: number;
 }
 
+/** An auction's `price` is a starting bid, so without a buyout it states no ask. */
+function isAuctionWithoutBuyout(row: PublicContractOfferRow): boolean {
+  return row.isAuction && buyoutOf(row) === null;
+}
+
 /**
  * A blueprint copy is held against the original's hub price,
  * anything else against the hub sell of every unit the contract carries.
@@ -39,7 +44,7 @@ export function contractFlagFor(
   if (row.lineCount !== 1 || hubSell === null || hubSell <= 0) return null;
   if (row.requestsItems || isUnpricedOffer(row)) return null;
   // An auction's `price` is a starting bid, so only a buyout is an ask.
-  if (row.isAuction && buyoutOf(row) === null) return null;
+  if (isAuctionWithoutBuyout(row)) return null;
   const asking = buyoutOf(row) ?? row.price;
   if (row.isBlueprintCopy) {
     return asking > hubSell
@@ -55,6 +60,28 @@ export function contractFlagFor(
   return multiple >= threshold
     ? { kind: 'overpriced', multiple, hubSell, quantity: row.quantity }
     : null;
+}
+
+/**
+ * The Saving the contract detail modal shows for a row, as a percent: what the
+ * contract's units come to at the hub sell, less the ask, over that value.
+ * Negative when the ask is above the hub. Silent (`null`) wherever the row
+ * alone cannot say what the modal would: no hub price, a bundle or unknown
+ * line count (one price pays for every line, and the board holds only the
+ * searched ones), a blueprint copy (never valued from the original's book), a
+ * contract that asks for items or PLEX, a barter, or an auction with no buyout.
+ */
+export function contractSavingFor(
+  row: PublicContractOfferRow,
+  hubSell: number | null
+): number | null {
+  if (row.lineCount !== 1 || hubSell === null || !(hubSell > 0)) return null;
+  if (row.isBlueprintCopy || row.requestsItems || row.requestedPlex) return null;
+  if (isUnpricedOffer(row)) return null;
+  if (isAuctionWithoutBuyout(row)) return null;
+  const asking = buyoutOf(row) ?? row.price;
+  const value = hubSell * row.quantity;
+  return ((value - asking) / value) * 100;
 }
 
 /**

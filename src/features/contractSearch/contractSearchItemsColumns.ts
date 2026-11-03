@@ -10,6 +10,7 @@ export const CONTRACT_SEARCH_ITEMS_COLUMN_IDS = [
   'qty',
   'iskPerUnit',
   'price',
+  'saving',
   'system',
   'jumps',
   'region',

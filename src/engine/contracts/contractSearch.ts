@@ -14,9 +14,6 @@
 import { median } from '../math';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 
-/** How the seller priced it: a fixed ask, or bids-with-optional-buyout. */
-export type ContractSaleKind = 'exchange' | 'auction';
-
 export interface ContractOfferFilter {
   /**
    * `null`/`undefined` means "no type search active" (every row passes). An
@@ -29,7 +26,8 @@ export interface ContractOfferFilter {
   maxPrice?: number | null;
   /** Lets a buyer skip the single-unit listings when they want a stack. */
   minQuantity?: number | null;
-  saleKind?: ContractSaleKind | null;
+  /** Drops an item-exchange row (an auction stays): the Exclude menu's "Item Exchange". */
+  hideExchanges?: boolean | null;
   /** Drops an auction row — the same exclusion BPC Sourcing's `hideAuctions` makes. */
   hideAuctions?: boolean | null;
   /** Drops a row whose contract asks for PLEX in return (`requestedPlex`). */
@@ -132,9 +130,7 @@ export function offerPassesFilter(
   if (filter.typeIds && !filter.typeIds.has(row.typeId)) return false;
   if (filter.regionId != null && row.regionId !== filter.regionId) return false;
   if (filter.minQuantity != null && row.quantity < filter.minQuantity) return false;
-  if (filter.saleKind != null && (row.isAuction ? 'auction' : 'exchange') !== filter.saleKind) {
-    return false;
-  }
+  if (filter.hideExchanges && !row.isAuction) return false;
   if (filter.hideAuctions && row.isAuction) return false;
   if (filter.hidePlexRequests && row.requestedPlex) return false;
   if (filter.maxPrice != null) {

@@ -57,7 +57,7 @@ User goal by tab:
 - Route `UNGATED` (`routeScopes.ts:230`): History needs a scope but Search does not, and Search is the landing tab, so a page gate would put a re-login wall in front of it. Decision `20260912-200442-contracts-is-ungated-its-scope-is-gated-per`.
 - No active Character → `/characters` (`Contracts.tsx:550`). Search tabs still require an active Character (they need a session and a location ACL identity).
 - URL state (ADR `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`):
-  - Items: `items.q`, `items.type`, `items.region`, `items.maxPrice`, `items.minQty`, `items.kind` (exchange|auction), `items.hideAuctions`, `items.hidePlex`, `items.jumps`, `items.sort` (default price asc).
+  - Items: `items.q`, `items.type`, `items.region`, `items.maxPrice`, `items.minQty`, `items.hideExchanges`, `items.hideAuctions`, `items.hidePlex`, `items.jumps`, `items.sort` (default price asc).
   - Courier: `courier.q`, `.origin`, `.dest`, `.space` (set), `.hideRisky`, `.overRate` (all|only|hide), `.minReward`, `.maxCollateral`, `.maxVolume`, `.minDays`, `.pref`, `.sort` (default iskPerJump desc).
   - History: `history.q`, `history.status`, `history.type`, `history.sort` (default issued desc).
   - `highlight=<contractId>` pulses a History row (target of `contractAccepted` alerts and of the wallet journal "Contract" link).
@@ -113,8 +113,7 @@ States (in order, `ContractSearchPanel.tsx:964-1031`):
 - Search box "Search item name…": ranked search (`rankedSearch`) over only item types currently listed (`listedContractTypeOptions`), limit 50 types for free text; `deferredTypeQuery` so a keystroke does not stall on ~370k rows (#2024).
 - Region (`RegionSelect`, searchable; only regions present in rows) → `items.region`.
 - Max price (`IskInput`, shorthand ok). Min quantity (number).
-- Sale kind chips Exchange / Auction (toggle; `items.kind`).
-- Exclude (`CheckboxSelect`): Hide auctions; Hide PLEX requests (tooltip "Hide contracts asking for PLEX in return, rather than ISK").
+- Exclude (`CheckboxSelect`): Item Exchange (`items.hideExchanges`), Auctions (`items.hideAuctions`), PLEX contracts (`items.hidePlex`, tooltip "Hide contracts asking for PLEX in return, rather than ISK"). Nothing is excluded by default. There is no separate type chip.
 - Hide overpriced chip (`items.hideOverpriced`, in the funnel like Market Browser's Hide bait sells): drops the rows the price flag marks and prints a dim "N overpriced contracts hidden" under the filter bar. Judged after the engine's filter, since it needs hub prices.
 - Jump range (`JumpRangeSelect`): Any, current system only, 3/5/10/15/20 jumps under the Jump Basis. `CurrentSystemPicker`: game location by default or a hand-picked system, stored device-local per Character (`currentSystemPicks`), writes immediately (not part of the draft). `JumpRangeNote` explains missing origin.
 - Column picker (button "Columns") + export menu in the bar's actions.
@@ -127,7 +126,7 @@ States (in order, `ContractSearchPanel.tsx:964-1031`):
 
 ### Table
 
-- Columns: Item (always; plain accent text since the row opens the modal), then optional Qty, Price, System (+ security), Jumps, Region, Expires. All default visible, device-local `contractSearchItemsVisibleColumns` (non-empty list required).
+- Columns: Item (always; plain accent text since the row opens the modal), then optional Qty, ISK/unit, Price, Saving, System (+ security), Jumps, Region, Expires. All default visible, device-local `contractSearchItemsVisibleColumns` (non-empty list required).
 - Default order cheapest first. Unpriced rows (barter, 0 ISK, or PLEX ask with no PLEX price) sort last in the default view and under the Price column sort in either direction (sortValue `undefined`), issue #1080.
 - Price cell: `IskAmount` (compact, long-press exact); auctions get a suffix "Buyout" or "Starting bid"; PLEX asks show "includes N PLEX"; barter shows "unpriced" marker.
 - System cell: "…" while resolving, "—" if unplaced (player structure), else name + `SecurityStatus`.
@@ -241,6 +240,7 @@ Dense cards and mobile sort on both search tabs; filters in a funnel sheet; pane
 - Jump counts on Courier use local graph under Travel rules, not live ESI; "—" for unplaced ends or unreachable.
 - No saved searches or price alerts on contract searches; no notifications for new matching offers.
 - Items tab's ISK/unit column (beside Qty, on by default for users who have not customised their columns) shows the asking price per unit only for single-type contracts (`lineCount` of 1); it is "–" for bundles, rows not yet stamped with a line count and unpriced offers, and sorts those last. It uses the Price column's own asking price (buyout else starting bid, PLEX at market), and is in the CSV export.
+- Items tab's Saving column is the detail modal's Saving for the row: the units at the hub's best sell, less the ask, as a signed percent of that value (green unless it prints as a loss; sorts biggest first). `contractSavingFor` (engine `contractFlags.ts`) states it only where the row alone can, like the price flag: one line, not a blueprint copy, no item or PLEX ask, not a barter, an auction only with a buyout, and a hub price known (so "–" on a wide browse past 100 types). Not in the CSV.
 - Help/FAQ do not describe Contracts at all (only the stored-data list).
 - BPC Sourcing (Industry tab) reads the same snapshot with BPC-only filters, and `/bpc-contracts` appears in ARCHITECTURE as a route; documented in Industry, not here.
 

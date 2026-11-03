@@ -3,6 +3,7 @@ import type { PublicContractOfferRow } from './contractOffers';
 import {
   bundleShareOfValue,
   contractFlagFor,
+  contractSavingFor,
   splitFlagged,
   type ContractFlagContext,
 } from './contractFlags';
@@ -143,5 +144,36 @@ describe('bundleShareOfValue', () => {
 
   it('stays silent when nothing is priced', () => {
     expect(bundleShareOfValue({ mine: 0, rest: 0, unpricedLines: 0 })).toBeNull();
+  });
+});
+
+describe('contractSavingFor', () => {
+  it('is what the hub sell of every unit would cost, less the ask, as a percent of it', () => {
+    // 3 units at 1,000 = 3,000 at the hub; asking 2,400 saves 20%.
+    expect(contractSavingFor(row({ price: 2_400, quantity: 3 }), 1_000)).toBeCloseTo(20);
+  });
+
+  it('is negative when the ask is above the hub', () => {
+    expect(contractSavingFor(row({ price: 1_500 }), 1_000)).toBeCloseTo(-50);
+  });
+
+  it('uses an auction buyout as the ask, and is silent without one', () => {
+    expect(contractSavingFor(row({ isAuction: true, price: 1, buyout: 800 }), 1_000)).toBeCloseTo(
+      20
+    );
+    expect(contractSavingFor(row({ isAuction: true, price: 1 }), 1_000)).toBeNull();
+  });
+
+  it.each([
+    ['no hub price yet', row(), null],
+    ['a zero hub price', row(), 0],
+    ['a bundle', row({ lineCount: 3 }), 1_000],
+    ['an unknown line count', row({ lineCount: undefined }), 1_000],
+    ['a blueprint copy, which never trades', row({ isBlueprintCopy: true }), 1_000],
+    ['a contract that also asks for items', row({ requestsItems: true }), 1_000],
+    ['a PLEX ask', row({ requestedPlex: 100 }), 1_000],
+    ['a barter', row({ price: 0 }), 1_000],
+  ])('is silent for %s', (_name, offer, hubSell) => {
+    expect(contractSavingFor(offer, hubSell)).toBeNull();
   });
 });
