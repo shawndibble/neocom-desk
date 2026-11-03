@@ -6904,6 +6904,7 @@
     "rowMenuTip_touch": "Tip: touch and hold any row",
     "rowHint": "Tip: right-click any row to open its actions",
     "rowHint_touch": "Tip: touch and hold any row to open its actions",
+    "columnPickerHint": "Toggle columns here. Some are hidden by default.",
     "hintGotIt": "Got it",
     "moreActions": "More actions",
     "menuGroup": {

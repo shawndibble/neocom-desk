@@ -11,7 +11,7 @@ import {
 beforeEach(() => resetSessionHints());
 
 describe('useSessionHintShown', () => {
-  it('shows for the holder until the session hint is dismissed, which spends it for everyone', () => {
+  it('shows for the holder until the session hint is dismissed, which spends it for its type', () => {
     const { result } = renderHook(() => useSessionHintShown('goTo'));
     expect(result.current).toBe(false);
 
@@ -22,7 +22,8 @@ describe('useSessionHintShown', () => {
     expect(result.current).toBe(true);
     act(() => dismissSessionHint('goTo'));
     expect(result.current).toBe(false);
-    expect(claimSessionHint('rowHint')).toBe(false);
+    expect(claimSessionHint('goTo:other')).toBe(false);
+    expect(claimSessionHint('rowHint')).toBe(true);
   });
 });
 
@@ -34,6 +35,6 @@ describe('releaseSessionHint', () => {
 
     dismissSessionHint('rowHint:b');
     releaseSessionHint('rowHint:b');
-    expect(claimSessionHint('goTo')).toBe(false);
+    expect(claimSessionHint('rowHint:c')).toBe(false);
   });
 });

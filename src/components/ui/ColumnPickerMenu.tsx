@@ -1,6 +1,11 @@
 import { eyebrowClassName } from './eyebrowClassName';
 import { cx } from '@/lib/cx';
 import type { ComponentProps } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useCharacterCount } from '@/features/character/useCharacters';
+import { useOneTimeHint } from '@/lib/hintFlags';
+import { Button } from './Button';
+import { Popover, PopoverAnchor, PopoverContent } from './Popover';
 import * as Icon from './icons';
 import { IconButton } from './IconButton';
 import {
@@ -34,6 +39,8 @@ interface ColumnPickerMenuProps<Id extends string, Row> {
   extraItems?: readonly { id: string; label: string; checked: boolean; onToggle: () => void }[];
 }
 
+const COLUMN_PICKER_HINT = 'columnPickerHint';
+
 /**
  * Which columns show in a table view — a menu, not a form: every toggle is
  * already reversible in one tap. Labels come straight from `columnsById`'s
@@ -56,13 +63,39 @@ export function ColumnPickerMenu<Id extends string, Row>({
   size,
   extraItems,
 }: ColumnPickerMenuProps<Id, Row>) {
+  const { t } = useTranslation();
   const visibleSet = new Set(visible);
+  // Only once a pilot is logged in: never on /login, where no Character exists yet.
+  const loggedIn = useCharacterCount() > 0;
+  const [hintShown, dismissHint] = useOneTimeHint(COLUMN_PICKER_HINT, loggedIn);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <IconButton icon={<Icon.ColumnsPicker />} label={buttonLabel} size={size} />
-      </DropdownMenuTrigger>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open && hintShown) dismissHint();
+      }}
+    >
+      <Popover open={hintShown} onOpenChange={(open) => !open && dismissHint()}>
+        <PopoverAnchor asChild>
+          <DropdownMenuTrigger asChild>
+            <IconButton icon={<Icon.ColumnsPicker />} label={buttonLabel} size={size} />
+          </DropdownMenuTrigger>
+        </PopoverAnchor>
+        <PopoverContent
+          align="end"
+          className="flex max-w-60 flex-col items-start gap-2 p-2 text-xs"
+          // A hint never takes focus from where the pilot is working.
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onCloseAutoFocus={(event) => event.preventDefault()}
+          // Focus moving elsewhere is not an answer; a press outside or Escape is.
+          onFocusOutside={(event) => event.preventDefault()}
+        >
+          <p>{t('common.columnPickerHint')}</p>
+          <Button size="sm" onClick={dismissHint}>
+            {t('common.hintGotIt')}
+          </Button>
+        </PopoverContent>
+      </Popover>
       <DropdownMenuContent align="end" className="min-w-48">
         <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{menuTitle}</p>
         {available.map((id) => (

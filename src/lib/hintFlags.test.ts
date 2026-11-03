@@ -37,9 +37,11 @@ describe('recordHintSeen', () => {
 });
 
 describe('claimSessionHint', () => {
-  it('gives the session to one hint only', () => {
+  it('gives each hint type its own slot, one instance at a time', () => {
+    expect(claimSessionHint('rowHint:a')).toBe(true);
+    expect(claimSessionHint('rowHint:b')).toBe(false);
     expect(claimSessionHint('goTo')).toBe(true);
-    expect(claimSessionHint('rowHint')).toBe(false);
+    expect(claimSessionHint('columnPickerHint:a')).toBe(true);
   });
 
   it('lets the owner ask again, so a re-render keeps its hint', () => {
