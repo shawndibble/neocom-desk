@@ -11,6 +11,7 @@ import {
 } from '@/components/ui';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { AssetCategoryPicker, BlueprintKindSelect } from './AssetCategoryPicker';
+import { pickIsAll } from './assetCategoryFilter';
 import type { AssetSortField } from './assetSortPreference';
 import type { AssetsData } from './useAssetsData';
 import type { AssetsRows } from './useAssetsRows';
@@ -49,12 +50,17 @@ export function AssetsFilterRow({
       index={categoryIndex}
       visibleIndex={pickerIndex}
       pick={categoryPick}
+      active={!pickIsAll(categoryPick)}
       onChange={(cat) => setView({ cat })}
     />
   );
 
   const blueprints = showBlueprintSelect && (
-    <BlueprintKindSelect value={blueprintKind} onChange={(bp) => setView({ bp })} />
+    <BlueprintKindSelect
+      value={blueprintKind}
+      active={blueprintKind !== 'any'}
+      onChange={(bp) => setView({ bp })}
+    />
   );
 
   const minValue = (

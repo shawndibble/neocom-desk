@@ -320,6 +320,7 @@ function ContractSearchFilterBar({
               label={t('contractSearch.excludeLabel')}
               size="md"
               className="w-44"
+              active={draft.hideAuctions || draft.hidePlex}
               options={[
                 { value: 'auctions' as const, label: t('contractSearch.hideAuctions') },
                 {
@@ -356,6 +357,7 @@ function ContractSearchFilterBar({
           <FilterField label={t('jumpRange.label')}>
             <JumpRangeSelect
               value={draft.jumps}
+              active={draft.jumps !== DEFAULT_JUMP_RANGE}
               onChange={(jumps) => setDraft({ ...draft, jumps })}
             />
           </FilterField>

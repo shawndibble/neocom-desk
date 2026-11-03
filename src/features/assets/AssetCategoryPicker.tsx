@@ -33,6 +33,7 @@ export function AssetCategoryPicker({
   visibleIndex = index,
   pick,
   onChange,
+  active,
 }: {
   /** The full index: toggles run against it so an `'all'` pick stays "everything". */
   index: AssetCategoryIndex;
@@ -40,6 +41,8 @@ export function AssetCategoryPicker({
   visibleIndex?: AssetCategoryIndex;
   pick: CategoryPick;
   onChange: (pick: CategoryPick) => void;
+  /** Draws the accent border while the pick narrows the list. */
+  active?: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -75,6 +78,7 @@ export function AssetCategoryPicker({
 
   return (
     <MultiSelect<number>
+      active={active}
       className="w-full md:w-52"
       label={t('assets.category.label')}
       triggerLabel={t('assets.category.label')}
@@ -111,14 +115,20 @@ export function AssetCategoryPicker({
 export function BlueprintKindSelect({
   value,
   onChange,
+  active,
 }: {
   value: BlueprintKind;
   onChange: (kind: BlueprintKind) => void;
+  active?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <Select value={value} onValueChange={(kind) => onChange(kind as BlueprintKind)}>
-      <SelectTrigger aria-label={t('assets.blueprints.label')} className="w-full md:w-40">
+      <SelectTrigger
+        aria-label={t('assets.blueprints.label')}
+        active={active}
+        className="w-full md:w-40"
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

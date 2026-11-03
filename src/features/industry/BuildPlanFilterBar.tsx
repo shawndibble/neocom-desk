@@ -63,6 +63,7 @@ export function BuildPlanFilterBar({
               >
                 <SelectTrigger
                   size="sm"
+                  active={draft.ownership !== 'any'}
                   aria-label={t('industry.planFilters.ownership')}
                   className="w-44"
                 >
@@ -82,6 +83,7 @@ export function BuildPlanFilterBar({
             <CheckboxSelect
               label={t('industry.planFilters.verdict')}
               className="w-44"
+              active={draft.verdicts.size !== PLAN_VERDICTS.length}
               options={PLAN_VERDICTS.map((value) => ({
                 value,
                 label: t(`industry.planFilters.verdicts.${value}`),
@@ -101,6 +103,7 @@ export function BuildPlanFilterBar({
             >
               <SelectTrigger
                 size="sm"
+                active={draft.activity !== 'any'}
                 aria-label={t('industry.planFilters.activity')}
                 className="w-44"
               >
@@ -123,6 +126,7 @@ export function BuildPlanFilterBar({
               >
                 <SelectTrigger
                   size="sm"
+                  active={draft.group !== GROUP_ANY}
                   aria-label={t('industry.planFilters.group')}
                   className="w-44"
                 >

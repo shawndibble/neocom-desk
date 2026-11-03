@@ -1033,6 +1033,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                         size="sm"
                         aria-label={t('market.hauling.filters.sellsWithin')}
                         className="w-28"
+                        active={draft.days !== DEFAULT_HAULING_FILTER.days}
                       >
                         <SelectValue />
                       </SelectTrigger>
@@ -1057,6 +1058,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                       size="sm"
                       aria-label={t('market.hauling.filters.marginOver')}
                       className="w-24"
+                      active={draft.margin !== DEFAULT_HAULING_FILTER.margin}
                     >
                       <SelectValue />
                     </SelectTrigger>
@@ -1081,6 +1083,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                         size="sm"
                         aria-label={t('market.hauling.filters.demand')}
                         className="w-40"
+                        active={draft.demand !== DEFAULT_HAULING_FILTER.demand}
                       >
                         <SelectValue />
                       </SelectTrigger>

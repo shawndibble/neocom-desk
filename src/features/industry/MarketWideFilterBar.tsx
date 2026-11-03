@@ -20,7 +20,7 @@ import {
   type BuildCostCap,
   type MarketWideFilterState,
 } from './marketWideFilter';
-import { SALES_SHARE_OPTIONS } from './salesSharePref';
+import { DEFAULT_SALES_SHARE, SALES_SHARE_OPTIONS } from './salesSharePref';
 
 interface MarketWideFilterBarProps {
   filter: MarketWideFilterState;
@@ -55,6 +55,7 @@ export function MarketWideFilterBar({ filter, onChange, gatedCount }: MarketWide
             >
               <SelectTrigger
                 size="sm"
+                active={draft.maxBuildCost !== 'any'}
                 aria-label={t('industry.marketOpportunitiesFilters.maxBuildCost')}
                 className="w-52"
               >
@@ -73,6 +74,7 @@ export function MarketWideFilterBar({ filter, onChange, gatedCount }: MarketWide
             label={t('industry.marketOpportunitiesFilters.tier')}
             members={PRODUCT_TIERS}
             selected={draft.tiers}
+            active={draft.tiers.size !== PRODUCT_TIERS.length}
             labelFor={(tier) => t(`industry.marketOpportunitiesFilters.tiers.${tier}`)}
             onToggle={(tier) => setDraft({ ...draft, tiers: toggleInSet(draft.tiers, tier) })}
           />
@@ -80,6 +82,7 @@ export function MarketWideFilterBar({ filter, onChange, gatedCount }: MarketWide
             label={t('industry.marketOpportunitiesFilters.category')}
             members={PRODUCT_CATEGORIES}
             selected={draft.categories}
+            active={draft.categories.size !== PRODUCT_CATEGORIES.length}
             labelFor={(category) => t(`industry.marketOpportunitiesFilters.categories.${category}`)}
             onToggle={(category) =>
               setDraft({ ...draft, categories: toggleInSet(draft.categories, category) })
@@ -89,6 +92,7 @@ export function MarketWideFilterBar({ filter, onChange, gatedCount }: MarketWide
             label={t('industry.marketOpportunitiesBlueprintSource')}
             members={BLUEPRINT_SOURCES}
             selected={draft.sources}
+            active={draft.sources.size !== BLUEPRINT_SOURCES.length}
             labelFor={(source) => t(`industry.marketOpportunitiesBlueprintSources.${source}`)}
             onToggle={(source) =>
               setDraft({ ...draft, sources: toggleInSet(draft.sources, source) })
@@ -117,6 +121,7 @@ export function MarketWideFilterBar({ filter, onChange, gatedCount }: MarketWide
             >
               <SelectTrigger
                 size="sm"
+                active={draft.salesShare !== DEFAULT_SALES_SHARE}
                 aria-label={t('industry.marketOpportunitiesFilters.salesShare')}
                 className="w-52"
               >
@@ -158,18 +163,21 @@ function FilterMultiSelect<V extends string>({
   selected,
   labelFor,
   onToggle,
+  active,
 }: {
   label: string;
   members: readonly V[];
   selected: ReadonlySet<V>;
   labelFor: (member: V) => string;
   onToggle: (member: V) => void;
+  active?: boolean;
 }) {
   return (
     <FilterField label={label}>
       <CheckboxSelect
         label={label}
         className="w-44"
+        active={active}
         options={members.map((member) => ({ value: member, label: labelFor(member) }))}
         selected={selected}
         onToggle={onToggle}

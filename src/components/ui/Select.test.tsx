@@ -106,3 +106,30 @@ describe('Select', () => {
     expect(screen.getByRole('combobox', { name: 'Region' })).toHaveTextContent('Domain');
   });
 });
+
+describe('SelectTrigger active', () => {
+  it('marks the trigger only when the filter is set away from its default', () => {
+    const { rerender } = render(
+      <Select value="a">
+        <SelectTrigger aria-label="Region">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="a">A</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+    expect(screen.getByRole('combobox', { name: 'Region' })).not.toHaveAttribute('data-active');
+    rerender(
+      <Select value="a">
+        <SelectTrigger aria-label="Region" active>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="a">A</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+    expect(screen.getByRole('combobox', { name: 'Region' })).toHaveAttribute('data-active', 'true');
+  });
+});

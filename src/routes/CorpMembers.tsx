@@ -396,6 +396,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                     >
                       <SelectTrigger
                         aria-label={t('corp.members.shipFilterLabel')}
+                        active={draft.ship !== null}
                         className="w-44"
                       >
                         <SelectValue />
@@ -419,6 +420,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                     >
                       <SelectTrigger
                         aria-label={t('corp.members.locationFilterLabel')}
+                        active={draft.loc !== null}
                         className="w-56"
                       >
                         <SelectValue />

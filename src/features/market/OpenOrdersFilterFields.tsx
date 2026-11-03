@@ -122,6 +122,7 @@ export function OpenOrdersFilterFields({
         <SelectTrigger
           size="sm"
           aria-label={t('market.orders.filter.expiringWithin')}
+          active={draft.expiringWithinDays !== null}
           className="w-36"
         >
           <SelectValue />
@@ -147,6 +148,7 @@ export function OpenOrdersFilterFields({
         <SelectTrigger
           size="sm"
           aria-label={t('market.orders.filter.minIskTiedUp')}
+          active={draft.minIskTiedUp !== null}
           className="w-36"
         >
           <SelectValue />
@@ -166,6 +168,7 @@ export function OpenOrdersFilterFields({
         <MultiSelect
           label={t('market.orders.filter.location')}
           size="sm"
+          active={draft.locationIds.length > 0}
           triggerLabel={locationSummary}
           options={locationOptions.map((option) => ({
             id: option.locationId,

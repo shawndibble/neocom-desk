@@ -386,7 +386,11 @@ export function CourierFilterBar({
               value={draft.overRate}
               onValueChange={(value) => setDraft({ ...draft, overRate: value as OverRateFilter })}
             >
-              <SelectTrigger className="w-44" aria-label={t('contractSearch.overRateLabel')}>
+              <SelectTrigger
+                className="w-44"
+                aria-label={t('contractSearch.overRateLabel')}
+                active={draft.overRate !== 'all'}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

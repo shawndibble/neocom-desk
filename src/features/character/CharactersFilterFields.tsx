@@ -63,7 +63,12 @@ export function CharactersFilterFields({
               setDraft({ ...draft, corp: value === ALL_CORPS_VALUE ? null : value })
             }
           >
-            <SelectTrigger size="sm" aria-label={t('characters.filterCorpLabel')} className="w-48">
+            <SelectTrigger
+              size="sm"
+              aria-label={t('characters.filterCorpLabel')}
+              active={draft.corp !== null}
+              className="w-48"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -86,7 +91,12 @@ export function CharactersFilterFields({
               setDraft({ ...draft, group: value === ALL_GROUPS_VALUE ? null : value })
             }
           >
-            <SelectTrigger size="sm" aria-label={t('characters.filterGroupLabel')} className="w-48">
+            <SelectTrigger
+              size="sm"
+              aria-label={t('characters.filterGroupLabel')}
+              active={draft.group !== null}
+              className="w-48"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
