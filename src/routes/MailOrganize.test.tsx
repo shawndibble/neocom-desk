@@ -283,5 +283,7 @@ describe('Mail organize', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Mark as unread' }));
 
     await waitFor(() => expect(puts[1]).toEqual({ id: '1', body: { read: false } }));
+    // Same as the chip-count test: the toast is posted after `busy` clears.
+    expect((await screen.findAllByText('Marked 1 mail unread')).length).toBeGreaterThan(0);
   });
 });
