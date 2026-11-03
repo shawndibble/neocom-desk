@@ -75,7 +75,13 @@ export function MailListPane({
 }: MailListPaneProps) {
   const { t } = useTranslation();
   return (
-    <Panel padded={false} className={visible ? '' : 'hidden'}>
+    <Panel
+      padded={false}
+      fill
+      className={
+        visible ? 'lg:sticky lg:top-4 lg:flex lg:max-h-[calc(100dvh-2rem)] lg:flex-col' : 'hidden'
+      }
+    >
       {organize.selecting && selectionBar}
       {listState !== 'rows' ? (
         <MailListEmpty
@@ -88,14 +94,14 @@ export function MailListPane({
           onShowRead={onShowRead}
         />
       ) : (
-        // Flat cap, not viewport-relative: the "load more" button
-        // renders below this list in the same column, so sizing the
-        // list to all remaining viewport height would push it off-screen.
-        // Raised from 32rem alongside the taller two-line row, so about
-        // as many mails stay on screen as before.
+        // Below `lg` a flat cap, since the page scrolls and the "load more"
+        // button sits under the list. From `lg` the pane is sticky and capped
+        // to the viewport, and the list takes the height left after the
+        // search/selection bar and the load-more footer, so it fills the
+        // screen instead of stopping at a fixed height.
         // Sticky date <h3>s, as in the Coming up rail; `scroll-pt-8`
         // keeps a focused row out from under one (WCAG 2.4.11).
-        <div className="max-h-[36rem] scroll-pt-8 overflow-y-auto lg:max-h-[44rem]">
+        <div className="max-h-[36rem] scroll-pt-8 overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
           {rowSections.map((section) => (
             <div key={section.key}>
               <h3

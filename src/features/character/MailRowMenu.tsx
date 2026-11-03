@@ -26,7 +26,13 @@ export function MailRowMenu({ label, isRead, onSetRead, onDelete }: MailRowMenuP
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton size="row" icon={<Icon.More />} label={label} className="mr-1 shrink-0" />
+        <IconButton
+          variant="plain"
+          size="row"
+          icon={<Icon.More />}
+          label={label}
+          className="mr-1 shrink-0"
+        />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onCloseAutoFocus={onCloseAutoFocus}>
         <DropdownMenuItem onSelect={() => onSetRead(!isRead)}>
