@@ -111,8 +111,10 @@ as Chrome:
   in the web manifest): `#57c7f4` glyph fitted so its bounding-box diagonal is 76% of the canvas, inside the mask's 80% safe circle,
   on `#0d1117` full-bleed. Bubblewrap builds an Android adaptive icon from it, which
   fills the launcher's circle with no white ring. Render the glyph's SVG
-  (`renderToStaticMarkup` of the `Nav*` component) and screenshot it on that
-  background with Playwright; redo all four if a glyph in `navIcons.ts` changes.
+  (`renderToStaticMarkup` of the Phosphor glyph), measure its `getBBox()`, set the
+  viewBox to it, and screenshot with Playwright (`omitBackground` for the plain
+  icon, the dark background for the maskable one). Redo all eight if a glyph in
+  `navIcons.ts` changes.
 
 After shipping a build that turns delegation on, a user who already allowed
 notifications while Chrome owned them must toggle notifications off and on in

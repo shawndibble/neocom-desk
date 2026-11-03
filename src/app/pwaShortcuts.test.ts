@@ -65,6 +65,7 @@ describe('buildPwaShortcuts', () => {
     const twa = readTwa<{ shortcuts: { chosenMaskableIconUrl: string }[] }>();
     const maskable = shortcuts.map((s) => s.icons.find((i) => i.purpose === 'maskable'));
     for (const icon of maskable) {
+      expect(icon).toBeDefined();
       expect(existsSync(`public/${icon?.src}`)).toBe(true);
     }
     expect(twa.shortcuts.map((s) => s.chosenMaskableIconUrl)).toEqual(
