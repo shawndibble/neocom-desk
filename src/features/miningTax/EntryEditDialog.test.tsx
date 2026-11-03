@@ -106,7 +106,7 @@ describe('EntryEditDialog', () => {
 
     // One box per ore line per day, each starting at its share of the billed value.
     const zeolitesOct4 = screen.getByRole('textbox', { name: 'Zeolites value on 2026-10-04' });
-    expect(zeolitesOct4).toHaveValue('1000');
+    expect(zeolitesOct4).toHaveValue('1,000');
     fireEvent.change(zeolitesOct4, { target: { value: '3000' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save all 2 days' }));
 
@@ -175,7 +175,7 @@ describe('EntryEditDialog', () => {
     const { onSaved } = renderDialog([member('d3', '2026-10-03', { groupId: undefined })]);
     expect(screen.getAllByText('Estimated value')).toHaveLength(1);
     const box = screen.getByRole('textbox', { name: 'Estimated value on 2026-10-03' });
-    expect(box).toHaveValue('2000');
+    expect(box).toHaveValue('2,000');
     fireEvent.change(box, { target: { value: '4000' } });
     expect(screen.getByRole('textbox', { name: 'Tax owed on 2026-10-03' })).toHaveValue('200');
     fireEvent.change(box, { target: { value: '' } });
@@ -183,7 +183,7 @@ describe('EntryEditDialog', () => {
     expect(box).toHaveValue('');
     fireEvent.blur(box);
     expect(screen.getByRole('textbox', { name: 'Estimated value on 2026-10-03' })).toHaveValue(
-      '2000'
+      '2,000'
     );
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -213,7 +213,7 @@ describe('EntryEditDialog', () => {
     it('a typed tax sets the value it implies and saves that tax exactly', async () => {
       const { onSaved, value, tax } = setup({ taxPct: 7, taxOwed: 140 });
       fireEvent.change(tax(), { target: { value: '100' } });
-      expect(value()).toHaveValue('1429');
+      expect(value()).toHaveValue('1,429');
       expect(tax()).toHaveValue('100');
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
       await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
@@ -226,7 +226,7 @@ describe('EntryEditDialog', () => {
     it('editing the value afterwards drops the typed tax', async () => {
       const { onSaved, value, tax } = setup();
       fireEvent.change(tax(), { target: { value: '150' } });
-      expect(value()).toHaveValue('3000');
+      expect(value()).toHaveValue('3,000');
       fireEvent.change(value(), { target: { value: '4000' } });
       expect(tax()).toHaveValue('200');
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -243,7 +243,7 @@ describe('EntryEditDialog', () => {
       fireEvent.change(screen.getByRole('spinbutton', { name: 'Tax %' }), {
         target: { value: '10' },
       });
-      expect(value()).toHaveValue('3000');
+      expect(value()).toHaveValue('3,000');
       expect(tax()).toHaveValue('300');
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
       await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());

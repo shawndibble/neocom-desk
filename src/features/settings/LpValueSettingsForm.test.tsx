@@ -23,7 +23,7 @@ describe('LpValueSettingsForm', () => {
     const user = userEvent.setup();
     useLpValue.setState({ value: 2000, hydrated: true });
     render(<LpValueSettingsForm />);
-    expect(await screen.findByRole('textbox', { name: /Your LP value/ })).toHaveValue('2000');
+    expect(await screen.findByRole('textbox', { name: /Your LP value/ })).toHaveValue('2,000');
     await user.click(screen.getByRole('button', { name: 'Use market rates' }));
     expect(useLpValue.getState().value).toBe(0);
     expect(screen.queryByRole('button', { name: 'Use market rates' })).not.toBeInTheDocument();
