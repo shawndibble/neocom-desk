@@ -16,10 +16,14 @@ vi.mock('@/features/character/calendar', () => ({
   prefetchCalendarEventDetails: mocks.prefetchCalendarEventDetails,
 }));
 
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { calendarDomain } from './calendar';
 import { mailDomain } from './mail';
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  useActiveCharacter.setState({ activeCharacterId: 7 });
+});
 
 describe('poll domains and the detail prefetch', () => {
   it('mail: prefetches bodies after a header read that reached ESI', async () => {
@@ -30,6 +34,15 @@ describe('poll domains and the detail prefetch', () => {
     });
     expect(await mailDomain.load(7)).toBe(headers);
     expect(mocks.prefetchMailBodies).toHaveBeenCalledWith(7, headers);
+  });
+
+  it("mail: not for a Character that is not the active one (an alt's bodies are fetched when opened)", async () => {
+    mocks.loadMailHeaders.mockResolvedValue({
+      cached: { data: [{ mail_id: 1 }], fromCache: false },
+      needsReauth: false,
+    });
+    expect(await mailDomain.load(8)).toEqual([{ mail_id: 1 }]);
+    expect(mocks.prefetchMailBodies).not.toHaveBeenCalled();
   });
 
   it('mail: not after a cached read, a re-login, or nothing', async () => {

@@ -201,15 +201,15 @@ Registry: `src/esi/registry.ts:249-281`. Mail is not synced to Firestore.
 
 ## Persistence and sync
 
-| State                                                            | Storage                                                                                                  | Synced? |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------- |
-| `search`, `hideRead`                                             | URL query (ADR 0015 `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`), omitted when default | no      |
-| Selected folders                                                 | Dexie `settings` key `mailFolders`, device-wide                                                          | no      |
-| Scope (This / All characters)                                    | Dexie `settings` key `mailScope`, device-wide; URL `scope` overrides per view                            | no      |
-| Selected mail, open compose, locally-read set                    | React state only                                                                                         | no      |
-| Headers/labels/lists/bodies                                      | Dexie `esiCache` per Character (`mail:headers`, `mail:labels`, `mail:lists`, `mail:<id>`)                | no      |
-| Drafts (Reply/Forward per mail, New Mail one slot per Character) | Dexie `mailDrafts`                                                                                       | no      |
-| Read flag                                                        | ESI (source of truth) + patched cache                                                                    | via ESI |
+| State                                                            | Storage                                                                                                                                                                                                                                                                 | Synced? |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `search`, `hideRead`                                             | URL query (ADR 0015 `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`), omitted when default                                                                                                                                                                | no      |
+| Selected folders                                                 | Dexie `settings` key `mailFolders`, device-wide                                                                                                                                                                                                                         | no      |
+| Scope (This / All characters)                                    | Dexie `settings` key `mailScope`, device-wide; URL `scope` overrides per view                                                                                                                                                                                           | no      |
+| Selected mail, open compose, locally-read set                    | React state only                                                                                                                                                                                                                                                        | no      |
+| Headers/labels/lists/bodies                                      | Dexie `esiCache` per Character (`mail:headers`, `mail:labels`, `mail:lists`, `mail:<id>`). Bodies: the active Character's 20 newest are prefetched, any other is fetched when opened; a body is pruned after 7 days even while its header is listed (`20261102-231716`) | no      |
+| Drafts (Reply/Forward per mail, New Mail one slot per Character) | Dexie `mailDrafts`; deleted after 30 days untouched                                                                                                                                                                                                                     | no      |
+| Read flag                                                        | ESI (source of truth) + patched cache                                                                                                                                                                                                                                   | via ESI |
 
 ## Test-covered behaviours (`src/routes/Mail.test.tsx`)
 
