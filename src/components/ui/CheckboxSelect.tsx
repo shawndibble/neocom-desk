@@ -15,6 +15,8 @@ export interface CheckboxSelectOption<V> {
   label: string;
   /** A dim second line under the label, for an option whose name needs explaining. */
   description?: string;
+  /** Greyed and unclickable; a checked disabled option still shows its tick. */
+  disabled?: boolean;
 }
 
 export interface CheckboxSelectProps<V> {
@@ -25,6 +27,8 @@ export interface CheckboxSelectProps<V> {
   onToggle: (value: V) => void;
   /** `sm` (default) matches the filter rows; `md` lines up with a `SearchInput` beside it. */
   size?: ControlSize;
+  /** The summary when nothing is ticked, for a filter where that means "no narrowing" (default "None"). */
+  noneLabel?: string;
   className?: string;
   /** This filter is set away from its default: draws the accent border (DESIGN.md §6c). */
   active?: boolean;
@@ -48,6 +52,7 @@ export function CheckboxSelect<V extends string | number>({
   selected,
   onToggle,
   size = 'sm',
+  noneLabel,
   className,
   active,
 }: CheckboxSelectProps<V>) {
@@ -60,7 +65,7 @@ export function CheckboxSelect<V extends string | number>({
     chosen.length === options.length
       ? t('common.checkboxSelect.all')
       : chosen.length === 0
-        ? t('common.checkboxSelect.none')
+        ? (noneLabel ?? t('common.checkboxSelect.none'))
         : chosen.length === 1
           ? chosen[0].label
           : t('common.checkboxSelect.count', { count: chosen.length });
@@ -82,6 +87,7 @@ export function CheckboxSelect<V extends string | number>({
           <DropdownMenuCheckboxItem
             key={option.value}
             checked={selected.has(option.value)}
+            disabled={option.disabled}
             // Keep the menu open across toggles (`CalendarKindFilterMenu`'s precedent).
             onSelect={(event) => event.preventDefault()}
             onCheckedChange={() => onToggle(option.value)}
