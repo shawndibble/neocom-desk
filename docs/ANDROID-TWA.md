@@ -103,7 +103,7 @@ as Chrome:
   before `bubblewrap update`.
   Each icon, `public/icons/shortcut-<name>.png`, is the page's nav glyph
   (`src/app/navIcons.ts`: Bell, EnvelopeSimple, Wallet, ChartLineUp) at the
-  `fill` weight (Open orders' ChartLineUp is the `bold` weight instead: the nav draws it as bare line art, and `fill` adds a solid square behind the chart), 192×192, **transparent background**, glyph in `#0b78ad`, cropped to its ink bounds and
+  `fill` weight, 192×192, **transparent background**, glyph in `#0b78ad`, cropped to its ink bounds and
   fitted so its longest side is 96% of the canvas (Phosphor's own viewBox padding
   would leave ~72%). This is the fallback "any" icon, which the launcher insets on a white
   disc, so it must read on white (the app's `#57c7f4` accent is too faint there). Each also
@@ -115,6 +115,8 @@ as Chrome:
   viewBox to it, and screenshot with Playwright (`omitBackground` for the plain
   icon, the dark background for the maskable one). Redo all eight if a glyph in
   `navIcons.ts` changes.
+  Exception: Open orders' ChartLineUp is the `bold` weight. The nav draws it as light
+  line art (no box), and `fill` adds a solid square behind the chart.
 
 After shipping a build that turns delegation on, a user who already allowed
 notifications while Chrome owned them must toggle notifications off and on in
