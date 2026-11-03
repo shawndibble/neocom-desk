@@ -22,53 +22,33 @@
     "path": "./android.keystore",
     "alias": "android"
   },
-  "appVersionName": "3",
-  "appVersion": "3",
-  "appVersionCode": 3,
+  "appVersionName": "4",
+  "appVersion": "4",
+  "appVersionCode": 4,
   "shortcuts": [
-    {
-      "name": "Route planner",
-      "shortName": "Route planner",
-      "url": "https://neocomdesk.com/travel",
-      "icons": [
-        {
-          "src": "https://neocomdesk.com/icons/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "Pilot lookup",
-      "shortName": "Pilot lookup",
-      "url": "https://neocomdesk.com/travel/pilot",
-      "icons": [
-        {
-          "src": "https://neocomdesk.com/icons/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
     {
       "name": "Alerts",
       "shortName": "Alerts",
       "url": "https://neocomdesk.com/alerts",
-      "icons": [
-        {
-          "src": "https://neocomdesk.com/icons/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
+      "chosenIconUrl": "https://neocomdesk.com/icons/icon-192.png"
+    },
+    {
+      "name": "Mail",
+      "shortName": "Mail",
+      "url": "https://neocomdesk.com/mail",
+      "chosenIconUrl": "https://neocomdesk.com/icons/icon-192.png"
+    },
+    {
+      "name": "Wallet",
+      "shortName": "Wallet",
+      "url": "https://neocomdesk.com/wallet/balance",
+      "chosenIconUrl": "https://neocomdesk.com/icons/icon-192.png"
     },
     {
       "name": "Open orders",
       "shortName": "Open orders",
       "url": "https://neocomdesk.com/market/orders",
-      "icons": [
-        {
-          "src": "https://neocomdesk.com/icons/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
+      "chosenIconUrl": "https://neocomdesk.com/icons/icon-192.png"
     }
   ],
   "generatorApp": "bubblewrap-cli",
@@ -82,5 +62,5 @@
   "isChromeOSOnly": false,
   "isMetaQuest": false,
   "fullScopeUrl": "https://neocomdesk.com/",
-  "minSdkVersion": 21
+  "minSdkVersion": 24
 }
