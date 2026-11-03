@@ -111,7 +111,7 @@ function cellTone(cell: TableCell): CellTone | undefined {
 
 const cellPad = 'pl-3 last:pr-3';
 /** The header's share of the first column's icon slot (`size-4` plus `gap-1.5`) past `cellPad`, so a label sits over its rows' text. */
-const ICON_SLOT_INDENT = 'pl-[2.125rem]';
+const ICON_SLOT_INDENT = 'pl-[2.125rem] last:pr-3';
 
 /** A row whose tone draws a severity icon: only what needs a decision, a "watch" row just tints its figure. */
 function isFlagged(row: Pick<TableRowModel, 'tone'>): boolean {
@@ -464,11 +464,11 @@ export function TableBody({
                         : undefined
                     }
                     className={cx(
-                      cellPad,
+                      // Replaces `cellPad`, never adds to it: two `pl-*` classes would race on stylesheet order.
+                      i === 0 && iconSlot ? ICON_SLOT_INDENT : cellPad,
                       column.hideNarrow && HIDE_NARROW,
                       'py-1 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-text-dim uppercase',
-                      i === 0 ? 'text-left' : column.align === 'end' ? 'text-right' : 'text-left',
-                      i === 0 && iconSlot && ICON_SLOT_INDENT
+                      i === 0 ? 'text-left' : column.align === 'end' ? 'text-right' : 'text-left'
                     )}
                   >
                     {column.sortable ? (

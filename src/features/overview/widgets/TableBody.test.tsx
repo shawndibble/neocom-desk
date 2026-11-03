@@ -275,5 +275,6 @@ describe('TableBody icon column', () => {
     });
     expect(container.querySelectorAll('tbody td .size-4')).toHaveLength(2);
     expect(screen.getByRole('columnheader', { name: 'Name' })).toHaveClass('pl-[2.125rem]');
+    expect(screen.getByRole('columnheader', { name: 'Name' })).not.toHaveClass('pl-3');
   });
 });

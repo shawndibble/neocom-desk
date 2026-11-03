@@ -41,11 +41,6 @@ function instant(date: string | undefined): number | null {
 
 // --- Training ------------------------------------------------------------------------
 
-/**
- * The unfinished queue: skill, when it ends, how long it trains in all, the
- * level it reaches and SP per hour. SP per hour needs the entry's declared
- * start and SP figures, so a skill queued behind another shows no rate.
- */
 /** The accelerator line a Training table leads with: what it is, when it runs out, how loud. */
 export interface TrainingAcceleratorRow {
   label: string;
@@ -53,6 +48,11 @@ export interface TrainingAcceleratorRow {
   severity: DeadlineSeverity;
 }
 
+/**
+ * The unfinished queue: skill, when it ends, how long it trains in all, the
+ * level it reaches and SP per hour. SP per hour needs the entry's declared
+ * start and SP figures, so a skill queued behind another shows no rate.
+ */
 export function trainingTable(
   t: Translate,
   entries: readonly SkillQueueEntry[],
