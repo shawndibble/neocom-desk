@@ -381,7 +381,12 @@ export function SettleUpDialog({
     >
       <div className="space-y-3 text-sm">
         <OreArrivalNotice
-          entries={included.map((r) => r.assignment)}
+          entries={included.map((r) => ({
+            characterId: r.assignment.characterId,
+            date: r.assignment.date,
+            solarSystemId: r.assignment.solarSystemId,
+            typeIds: r.assignment.oreLines.map((line) => line.typeId),
+          }))}
           checking={arrivalCheck?.checking ?? false}
           pullStartedAt={arrivalCheck?.pullStartedAt ?? null}
         />

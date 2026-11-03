@@ -15,7 +15,7 @@ const CHAR = 91;
 const SYSTEM = 30000142;
 
 function fetchOf(quantity: number, date = '2026-10-04') {
-  return [{ date, solarSystemId: SYSTEM, quantity }];
+  return [{ date, solarSystemId: SYSTEM, oreLines: [{ typeId: 1, quantity }] }];
 }
 const settled = (date = '2026-10-04') => [{ characterId: CHAR, date, solarSystemId: SYSTEM }];
 
@@ -170,13 +170,19 @@ describe('arrivalNotice', () => {
     let log = recordLedgerFetch(
       EMPTY_ORE_ARRIVAL_LOG,
       CHAR,
-      [...fetchOf(100), { date: '2026-10-04', solarSystemId: 1, quantity: 10 }],
+      [
+        ...fetchOf(100),
+        { date: '2026-10-04', solarSystemId: 1, oreLines: [{ typeId: 1, quantity: 10 }] },
+      ],
       at('2026-10-04T12:00:00Z')
     );
     log = recordLedgerFetch(
       log,
       CHAR,
-      [...fetchOf(150), { date: '2026-10-04', solarSystemId: 1, quantity: 10 }],
+      [
+        ...fetchOf(150),
+        { date: '2026-10-04', solarSystemId: 1, oreLines: [{ typeId: 1, quantity: 10 }] },
+      ],
       at('2026-10-04T12:10:00Z')
     );
     expect(
@@ -186,6 +192,40 @@ describe('arrivalNotice', () => {
         at('2026-10-04T12:20:00Z')
       )
     ).toEqual({ kind: 'arriving', arriving: 1, of: 2, waitMs: GROWTH_WAIT_MS - 10 * MIN });
+  });
+});
+
+describe('arrivalNotice per ore type', () => {
+  const twoOres = (a: number, b: number) => [
+    {
+      date: '2026-10-04',
+      solarSystemId: SYSTEM,
+      oreLines: [
+        { typeId: 1, quantity: a },
+        { typeId: 2, quantity: b },
+      ],
+    },
+  ];
+  const log = () => {
+    const first = recordLedgerFetch(
+      EMPTY_ORE_ARRIVAL_LOG,
+      CHAR,
+      twoOres(100, 50),
+      at('2026-10-04T12:00:00Z')
+    );
+    return recordLedgerFetch(first, CHAR, twoOres(100, 80), at('2026-10-04T12:10:00Z'));
+  };
+
+  it("ignores growth in another payee's ore type within the same entry", () => {
+    const payeeA = [{ ...settled()[0], typeIds: [1] }];
+    expect(arrivalNotice(payeeA, log(), at('2026-10-04T12:20:00Z'))).toEqual({ kind: 'quiet' });
+  });
+
+  it('warns for the payee whose ore type is still growing', () => {
+    const payeeB = [{ ...settled()[0], typeIds: [2] }];
+    expect(arrivalNotice(payeeB, log(), at('2026-10-04T12:20:00Z'))).toMatchObject({
+      kind: 'arriving',
+    });
   });
 });
 
