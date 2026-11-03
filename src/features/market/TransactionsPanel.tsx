@@ -694,6 +694,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
           <>
             {!allScope && transactionsResult?.fromCache && (
               <CachedNotice
+                withBadge
                 className="px-3 pt-2"
                 fetchedAt={transactionsResult.fetchedAt}
                 refreshFailed={refreshCount > 0}

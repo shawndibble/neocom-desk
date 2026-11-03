@@ -238,6 +238,7 @@ function CorpDivisionsPanel({
   const foldable = isPhone && !loading && !!walletsResult && divisions.length > 1;
   const offlineNote = walletsResult?.fromCache ? (
     <CachedNotice
+      withBadge
       className="mt-3"
       fetchedAt={walletsResult.fetchedAt}
       refreshFailed={refreshFailed}
@@ -416,6 +417,7 @@ function CorpJournalPanel({
         <>
           {journalResult.fromCache && (
             <CachedNotice
+              withBadge
               className="px-3 pt-2"
               fetchedAt={journalResult.fetchedAt}
               refreshFailed={refreshFailed}

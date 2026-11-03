@@ -878,7 +878,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       ) : (
         <div className="space-y-2">
           {fromCacheAny && (
-            <CachedNotice fetchedAt={dataAgeDate} refreshFailed={listRefreshCount > 0} />
+            <CachedNotice withBadge fetchedAt={dataAgeDate} refreshFailed={listRefreshCount > 0} />
           )}
           <div className="flex flex-wrap items-center gap-1.5">
             {(showActivityFilter || showStatusFilter) && (

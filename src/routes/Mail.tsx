@@ -408,7 +408,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
               endpoints={['getCharacterMailHeaders']}
             />
           )}
-          {offline && <CachedNotice fetchedAt={fetchedAt} />}
+          {offline && <CachedNotice withBadge fetchedAt={fetchedAt} />}
           {/* Opening a mail marks it read in EVE only with this Permission (Write to EVE, off by default). */}
           <GrantNote
             compact

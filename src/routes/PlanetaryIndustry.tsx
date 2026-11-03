@@ -211,6 +211,7 @@ export function PlanetaryIndustry() {
 
               {planetsResult?.fromCache && (
                 <CachedNotice
+                  withBadge
                   fetchedAt={planetsResult.fetchedAt}
                   refreshFailed={refreshCount > 0}
                 />

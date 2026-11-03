@@ -423,7 +423,7 @@ export function Calendar() {
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : (
         <>
-          {data?.fromCache && <CachedNotice fetchedAt={data.oldestFetchedAt} />}
+          {data?.fromCache && <CachedNotice withBadge fetchedAt={data.oldestFetchedAt} />}
           {/*
             The page no longer gates on one scope, so a refused source has to
             announce itself somewhere the pilot will actually look. Naming the

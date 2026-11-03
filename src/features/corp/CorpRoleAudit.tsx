@@ -312,7 +312,11 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
         >
           <div className="space-y-4">
             {audit?.fromCache && (
-              <CachedNotice fetchedAt={audit.fetchedAt} refreshFailed={snapshot.refreshCount > 0} />
+              <CachedNotice
+                withBadge
+                fetchedAt={audit.fetchedAt}
+                refreshFailed={snapshot.refreshCount > 0}
+              />
             )}
             <Panel padded={false}>
               <h2 className="px-3 pt-3 text-sm font-medium text-text">

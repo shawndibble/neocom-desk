@@ -599,7 +599,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
         ) : (
           <>
-            {data && data.fromCache && <CachedNotice fetchedAt={data.fetchedAt} />}
+            {data && data.fromCache && <CachedNotice withBadge fetchedAt={data.fetchedAt} />}
 
             {refiningUnavailable && (
               <p className="text-xs text-warning">{t('miningTax.overview.refiningUnavailable')}</p>

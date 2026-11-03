@@ -125,6 +125,7 @@ export function WalletJournalPanel({
         <>
           {!showingBeyondActive && journalResult?.fromCache && (
             <CachedNotice
+              withBadge
               className="px-3 pt-2"
               fetchedAt={journalResult.fetchedAt}
               refreshFailed={refreshCount > 0}

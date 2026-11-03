@@ -147,7 +147,7 @@ export function EmploymentHistory() {
         ) : (
           <>
             {historyResult.fromCache && (
-              <CachedNotice className="px-3 pt-2" fetchedAt={historyResult.fetchedAt} />
+              <CachedNotice withBadge className="px-3 pt-2" fetchedAt={historyResult.fetchedAt} />
             )}
             <div className="space-y-4 p-3">
               <EmploymentSummaryChips summary={summary} names={corpNames} />

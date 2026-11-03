@@ -16,6 +16,13 @@ interface CachedNoticeProps {
    * Refresh button was pressed), not because the app is offline. Says so.
    */
   refreshFailed?: boolean;
+  /**
+   * The page header also shows a `DataAgeBadge` (md and up), which already says
+   * the data is cached and how old it is, so this line is only the phone
+   * fallback: hidden from `md`. A failed refresh still shows, the badge can't
+   * say that.
+   */
+  withBadge?: boolean;
   className?: string;
 }
 
@@ -35,6 +42,7 @@ interface CachedNoticeProps {
 export function CachedNotice({
   fetchedAt = null,
   refreshFailed = false,
+  withBadge = false,
   className,
 }: CachedNoticeProps) {
   const { t } = useTranslation();
@@ -42,8 +50,11 @@ export function CachedNotice({
   const title = refreshFailed ? t('common.refreshFailedTitle') : t('common.offlineTitle');
   const at = fetchedAt === null ? null : new Date(fetchedAt);
   const valid = at !== null && !Number.isNaN(at.getTime());
+  const hideOnDesktop = withBadge && !refreshFailed ? 'md:hidden ' : '';
   return (
-    <p className={`text-[0.6875rem] text-warning uppercase ${className ?? ''}`.trimEnd()}>
+    <p
+      className={`${hideOnDesktop}text-[0.6875rem] text-warning uppercase ${className ?? ''}`.trimEnd()}
+    >
       <span>{title}</span>
       {valid && (
         <>

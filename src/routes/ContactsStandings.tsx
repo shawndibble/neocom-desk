@@ -216,7 +216,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
   } else if (state.rows.length === 0) {
     content = (
       <div className="space-y-3">
-        {state.fromCache && <CachedNotice fetchedAt={state.fetchedAt} />}
+        {state.fromCache && <CachedNotice withBadge fetchedAt={state.fetchedAt} />}
         <EmptyState
           title={t('contacts.standingsEmptyTitle')}
           hint={t('contacts.standingsEmptyHint')}
@@ -226,7 +226,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
   } else {
     content = (
       <div className="space-y-3">
-        {state.fromCache && <CachedNotice fetchedAt={state.fetchedAt} />}
+        {state.fromCache && <CachedNotice withBadge fetchedAt={state.fetchedAt} />}
         <NpcStandingsFilterBar
           filter={filter}
           onChange={(next) => setFilterParams(paramsPatchFromFilter(next, FILTER_URL.fieldToParam))}
