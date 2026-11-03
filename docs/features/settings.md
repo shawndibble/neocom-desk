@@ -78,7 +78,7 @@ Three tiers, all in Dexie `db.settings` (key/value) unless noted:
 
 Sync: Firestore, per-Character uid, `src/sync/planSync.ts`; background sweep every >= 5 min active Character / 20 min others, on tick + `visibilitychange` (`src/app/backgroundSync.ts:36-45`). Sync state is a dot in the app shell (`SyncStatusDot.tsx`: idle/syncing/error/offline) — there is no sync UI inside Settings. Setup: `docs/SYNC-SETUP.md`. FAQ "What We Store": `src/features/faq/whatWeStore.ts`.
 
-Settings forms show `DefaultsSyncHint` ("Kept across your devices") on every synced section (`settingsFields.tsx`).
+Synced sections carry no scope line; what syncs is answered in Help & FAQ. Device-only sections and fields say "Stays on this device" (`SettingsScopeHint`, `settingsFields.tsx`).
 
 ## Settings catalog
 

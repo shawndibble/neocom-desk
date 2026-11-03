@@ -14,11 +14,7 @@ import {
 } from '@/features/character/characterFilterValue';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import {
-  CheckboxField,
-  DefaultsSyncHint,
-  SettingsPanelLoading,
-} from '@/features/settings/settingsFields';
+import { CheckboxField, SettingsPanelLoading } from '@/features/settings/settingsFields';
 
 export function CharacterDefaultsPanel() {
   const { t } = useTranslation();
@@ -51,7 +47,6 @@ export function CharacterDefaultsPanel() {
   return (
     <Panel>
       <div className="space-y-4">
-        <DefaultsSyncHint />
         <Fields variant="form">
           <Field
             label={t('settings.defaultCharacterFilterLabel')}

@@ -16,11 +16,7 @@ import {
 import { RefiningSetupFields } from '@/features/refining/RefiningSetupFields';
 import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 import { LpValueField } from '@/features/settings/LpValueSettingsForm';
-import {
-  ChipRow,
-  DefaultsSyncHint,
-  SettingsPanelLoading,
-} from '@/features/settings/settingsFields';
+import { ChipRow, SettingsPanelLoading } from '@/features/settings/settingsFields';
 
 export function MarketDefaultsPanel() {
   const { t } = useTranslation();
@@ -39,7 +35,6 @@ export function MarketDefaultsPanel() {
   return (
     <Panel>
       <div className="space-y-4">
-        <DefaultsSyncHint />
         <Fields variant="form">
           <TradeHubField />
 

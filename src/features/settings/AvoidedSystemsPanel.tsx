@@ -3,7 +3,7 @@ import { CollapsiblePanel } from '@/components/ui';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useAvoidedSystemsEnabled } from '@/features/route/routeRules';
 import { AvoidedSystemsEditor } from '@/features/route/TravelRuleFields';
-import { SettingsHint, SettingsScopeHint } from '@/features/settings/settingsFields';
+import { SettingsHint } from '@/features/settings/settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { usePhoneFold } from './usePhoneFold';
 
@@ -37,7 +37,6 @@ export function AvoidedSystemsPanel() {
       labels={{ show: t('settings.avoidedSystems.show'), hide: t('settings.avoidedSystems.hide') }}
     >
       <div className="space-y-4">
-        <SettingsScopeHint scope="synced" />
         <SettingsHint>{t('settings.avoidedSystems.hint')}</SettingsHint>
         <AvoidedSystemsEditor />
       </div>

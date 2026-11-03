@@ -1223,10 +1223,10 @@ the one thing to avoid. Beside a row's checkboxes, a phone prints the word
 
 ### Settings scope line
 
-Every Settings panel says once where its settings live: `SettingsScopeHint` ("Kept
-across your devices" or "Stays on this device"; `DefaultsSyncHint` is the synced
-form). A field that differs from its panel carries `CheckboxField`'s `scope` note
-instead of prose in its hint. Wording lives in `settings.scope.*`.
+What syncs is answered once, in Help & FAQ, not repeated on every panel. A panel or
+field that stays on this device says so: `SettingsScopeHint` ("Stays on this
+device"), or `CheckboxField`'s `scope` note for one field that differs from its
+panel. Wording lives in `settings.scope.*`.
 
 ### Origin crumb
 

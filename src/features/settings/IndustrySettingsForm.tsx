@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Field, Fields, TextInput } from '@/components/ui';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
 import { useAssumedTe, MIN_ASSUMED_TE, MAX_ASSUMED_TE } from '@/features/industry/assumedTe';
-import { DefaultsSyncHint, SettingsFormLoading } from './settingsFields';
+import { SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
@@ -36,7 +36,6 @@ export function IndustrySettingsForm({
 
   return (
     <div className="space-y-4">
-      <DefaultsSyncHint />
       <Fields variant="form">
         <Field
           label={t('settings.assumedMeLabel')}
