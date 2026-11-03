@@ -81,6 +81,7 @@ export function BuildPlanFilterBar({
           )}
           <FilterField captionInline label={t('industry.planFilters.verdict')}>
             <CheckboxSelect
+              size="sm"
               label={t('industry.planFilters.verdict')}
               className="w-44"
               active={draft.verdicts.size !== PLAN_VERDICTS.length}

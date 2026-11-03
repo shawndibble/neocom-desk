@@ -110,6 +110,7 @@ function BrowserFilterFields({
             <FilterChip
               key={kind}
               label={t(`common.spaceOption.${kind}`)}
+              size="md"
               selected={draft.sec.has(kind)}
               onToggle={() => {
                 const next = new Set(draft.sec);
@@ -124,6 +125,7 @@ function BrowserFilterFields({
       {spansStations && (
         <FilterChip
           label={t('market.filterNpcOnly')}
+          size="md"
           selected={draft.npcOnly}
           onToggle={() => setDraft({ ...draft, npcOnly: !draft.npcOnly })}
         />
@@ -132,6 +134,7 @@ function BrowserFilterFields({
       <FilterChip
         label={t('market.filterHideBait')}
         tooltip={t('market.filterHideBaitHint', { times: SELL_OUTLIER_FACTOR })}
+        size="md"
         selected={draft.hideBait}
         onToggle={() => setDraft({ ...draft, hideBait: !draft.hideBait })}
       />

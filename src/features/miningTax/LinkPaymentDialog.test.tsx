@@ -69,7 +69,6 @@ describe('LinkPaymentDialog — value handed over', () => {
     renderDialog();
 
     await user.type(screen.getByRole('textbox', { name: 'Value handed over' }), '1b');
-    expect(screen.getByText('= 1,000,000,000 ISK')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Mark 1 paid' }));
 
     await waitFor(() => expect(settle).toHaveBeenCalled());

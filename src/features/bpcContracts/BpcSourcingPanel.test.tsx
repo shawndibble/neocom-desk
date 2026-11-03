@@ -469,13 +469,47 @@ describe('BpcSourcingPanel', () => {
     await openFilters(user);
     await user.type(screen.getByRole('textbox', { name: 'Max price' }), '1b');
 
-    expect(screen.getByText('= 1,000,000,000 ISK')).toBeInTheDocument();
     // Filtering re-renders the table, so look it up afresh.
     await waitFor(() => {
       const filtered = screen.getByRole('table', { name: 'BPC Sourcing' });
       expect(within(filtered).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
       expect(within(filtered).getByText('Rifter Blueprint')).toBeInTheDocument();
     });
+  });
+
+  it('groups the typed max price as it is typed, with no echo line', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    const user = userEvent.setup({ delay: null });
+    render(<App />);
+    await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+    await openFilters(user);
+    const price = screen.getByRole('textbox', { name: 'Max price' });
+    await user.type(price, '1234567');
+
+    expect(price).toHaveValue('1,234,567');
+    expect(screen.queryByText(/^= .* ISK$/)).not.toBeInTheDocument();
+  });
+
+  it('draws every filter field at one height, selects and inputs alike', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    const user = userEvent.setup({ delay: null });
+    render(<App />);
+    await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+    await openFilters(user);
+    const fields = [
+      screen.getByRole('textbox', { name: 'Max price' }),
+      screen.getByRole('spinbutton', { name: 'Min runs' }),
+      screen.getByRole('button', { name: /^Source/ }),
+      screen.getByRole('button', { name: /^Exclude/ }),
+      screen.getByRole('button', { name: /^Space/ }),
+    ];
+    // The 36px `md` tier: a stray `sm` field would carry `md:h-7`.
+    for (const field of fields) {
+      expect(field.className).toContain('h-9');
+      expect(field.className).not.toContain('md:h-7');
+    }
   });
 
   it('narrows the table to a typed item-name search', async () => {

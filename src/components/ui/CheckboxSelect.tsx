@@ -25,7 +25,7 @@ export interface CheckboxSelectProps<V> {
   options: readonly CheckboxSelectOption<V>[];
   selected: ReadonlySet<V>;
   onToggle: (value: V) => void;
-  /** `sm` (default) matches the filter rows; `md` lines up with a `SearchInput` beside it. */
+  /** `md` (default) like every other field; pass `sm` only in a row whose other controls are `sm`. */
   size?: ControlSize;
   /** The summary when nothing is ticked, for a filter where that means "no narrowing" (default "None"). */
   noneLabel?: string;
@@ -51,7 +51,7 @@ export function CheckboxSelect<V extends string | number>({
   options,
   selected,
   onToggle,
-  size = 'sm',
+  size = 'md',
   noneLabel,
   className,
   active,

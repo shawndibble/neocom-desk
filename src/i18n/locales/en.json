@@ -6883,7 +6883,6 @@
     "opensInNewTab": "(opens in a new tab)",
     "pricesUnavailableOffline": "Prices unavailable offline",
     "pricesUnavailable": "Prices unavailable right now",
-    "iskAmountHint": "= {{amount}} ISK",
     "iskInvalid": "Not an ISK amount. Try 1.5b, 500m or 1,000,000.",
     "columnsButton": "Columns",
     "columnsMenuTitle": "Columns",

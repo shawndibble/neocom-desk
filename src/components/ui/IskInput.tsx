@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getDecimalMark } from '@/lib/numberLocale';
-import { formatIsk, maskIsk, maskIskTyping, parseIskAmount } from '@/lib/isk';
+import { maskIsk, maskIskTyping, parseIskAmount } from '@/lib/isk';
 import { FieldError } from './FieldError';
 import { FieldNoteContext, mergeDescribedBy } from './fieldNote';
 import { TextInput } from './TextInput';
@@ -28,16 +28,6 @@ interface IskInputProps extends Omit<
   value: string;
   /** Receives each newly parsed amount as a plain digit string, or `''` when cleared. */
   onChange: (value: string) => void;
-  /**
-   * Echo the parsed exact figure ("= 1,000,000,000 ISK") under the field.
-   * Off only where the layout has no room for a second line.
-   */
-  echo?: boolean;
-  /**
-   * Group the digits with the display format's separator as they are typed, so
-   * the field itself shows the figure and needs no echo under it.
-   */
-  mask?: boolean;
   /** What a blank field stands for; shown grouped as the placeholder. */
   defaultAmount?: number;
   /**
@@ -62,8 +52,6 @@ interface IskInputProps extends Omit<
 export function IskInput({
   value,
   onChange,
-  echo = true,
-  mask = false,
   defaultAmount,
   onParseableChange,
   onBlur,
@@ -73,12 +61,11 @@ export function IskInput({
   ...rest
 }: IskInputProps) {
   const { t } = useTranslation();
-  const echoId = useId();
   const errorId = useId();
   const noteId = useContext(FieldNoteContext);
   // A committed value is a plain `1500000.5`, whatever the display mark: it is formatted, not re-read as typed text.
   const toDisplay = (amount: string) =>
-    mask && amount !== '' && Number.isFinite(Number(amount)) ? maskIsk(Number(amount)) : amount;
+    amount !== '' && Number.isFinite(Number(amount)) ? maskIsk(Number(amount)) : amount;
   const [text, setText] = useState(toDisplay(value));
   // The last value this field itself committed: a `value` that differs came
   // from outside (Clear, a URL change) and replaces what was typed.
@@ -88,7 +75,6 @@ export function IskInput({
       committed.current = value;
       setText(toDisplay(value));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
   // Typing re-groups the text, which moves the caret: it is put back after the same count of digits.
   const field = useRef<HTMLInputElement | null>(null);
@@ -112,7 +98,6 @@ export function IskInput({
   const parsed = text.trim() === '' ? null : parseIskAmount(text);
   const parseable = text.trim() === '' || parsed !== null;
   const showError = !parseable && errorFor === text;
-  const showEcho = echo && !mask && parsed !== null;
   useEffect(() => {
     // A trailing "." is incomplete until blur.
     if (parseable || text.trim().endsWith('.')) return;
@@ -131,26 +116,21 @@ export function IskInput({
         }
         className="w-full tabular-nums aria-[invalid=true]:border-danger"
         aria-invalid={parseable ? undefined : true}
-        aria-describedby={mergeDescribedBy(
-          describedBy,
-          noteId,
-          showEcho ? echoId : undefined,
-          showError ? errorId : undefined
-        )}
+        aria-describedby={mergeDescribedBy(describedBy, noteId, showError ? errorId : undefined)}
         value={text}
         onBlur={(event) => {
           if (!parseable) setErrorFor(text);
+          // Shorthand settles to the full grouped figure on the way out, so the zeros can be checked.
+          else if (parsed !== null) setText(maskIsk(parsed));
           onBlur?.(event);
         }}
         onChange={(event) => {
           let next = event.target.value;
-          if (mask) {
-            const masked = maskIskTyping(next);
-            if (masked !== next) {
-              const caret = event.target.selectionStart ?? next.length;
-              caretDigits.current = [...next.slice(0, caret)].filter(isAmountChar).length;
-              next = masked;
-            }
+          const masked = maskIskTyping(next);
+          if (masked !== next) {
+            const caret = event.target.selectionStart ?? next.length;
+            caretDigits.current = [...next.slice(0, caret)].filter(isAmountChar).length;
+            next = masked;
           }
           setText(next);
           const amount = next.trim() === '' ? '' : parseIskAmount(next);
@@ -165,11 +145,6 @@ export function IskInput({
         <FieldError id={errorId} className="text-[0.6875rem]">
           {t('common.iskInvalid')}
         </FieldError>
-      )}
-      {showEcho && (
-        <span id={echoId} className="text-[0.6875rem] text-text-dim">
-          {t('common.iskAmountHint', { amount: formatIsk(parsed) })}
-        </span>
       )}
     </div>
   );
