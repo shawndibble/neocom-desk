@@ -89,8 +89,7 @@ Contract Bot (dead; prior art for #1091) are the only examples.
 - **Services category (id 61) is swept and spent**: buyback, freight and
   wormhole real estate are cross-player commerce (kill-test 1). Do **not**
   build a directory of third-party rate cards; they go stale and the app lies.
-- **A title is a weak classifier.** Unexamined, not cleared: EveWebMail,
-  Wayfinder, Atlas, MISMAPS, WHMapper, Socketkill, PEARL, Eve PvP Radar, EVE
+- **A title is a weak classifier.** Unexamined, not cleared: Wayfinder, Atlas, MISMAPS, WHMapper, Socketkill, PEARL, Eve PvP Radar, EVE
   Fit Assistant, EVE Link, EveHunter, Eveswitcher, Insurgency Tools, Project
   Eden, Eve Ship Stats. Cleared as non-ISK before #2328 (re-check route
   safety, Thera or pilot lookup): Rangefinder, Nexum, Helm, EVE411, W-Space
@@ -351,6 +350,10 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   format sale post (Appraisal Copy sell list covers it); "Need Hauling / Need
   BP" status; wallet top/flop and weekday heatmap; hauling top-routes list;
   quiet hours/digest (#2871); "still not fixed" reminders.
+- **EveWebMail (mail + push PWA, swept):** unified inbox (#2867), quiet
+  hours (#2871) and digest (#5747) all shipped. Dropped: mail delete (2026-09-10
+  decision keeps it out of scope; not ISK) and a Discord webhook channel (CCP has
+  no webhooks, needs a stored secret; notifications.md Q1).
 - **Assets/Appraisal leftovers:** CSV Value/Location columns (ESI average price
   only, `20260929-085650`); bay in search trails (label fix); "which of ALL my
   ships can pass" (#2906 shipped one); Market-Wide reliability popover (#3071);
