@@ -120,22 +120,6 @@ export function putCharacterMail(
   });
 }
 
-// --- DELETE /characters/{character_id}/mail/{mail_id}/ (esi-mail.organize_mail.v1) ---
-
-/** Deletes a mail from the character's mailbox, in game too. Irreversible; answers 204 No Content. */
-export function deleteCharacterMail(
-  characterId: number,
-  mailId: number,
-  options: { signal?: AbortSignal } = {}
-): Promise<EsiResult<void>> {
-  return esiFetch<void>(`/characters/${characterId}/mail/${mailId}/`, {
-    ...options,
-    characterId,
-    method: 'DELETE',
-    endpointId: 'deleteCharacterMail',
-  });
-}
-
 // --- POST /characters/{character_id}/mail/ (esi-mail.send_mail.v1) ---
 
 /** What a Reply/Forward send actually posts. */

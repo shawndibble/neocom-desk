@@ -69,7 +69,7 @@ describe('Mail organize', () => {
     await screen.findByText('Market report');
 
     await user.click(screen.getByRole('button', { name: 'More actions for Market report' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     expect(await screen.findByText('Delete this mail?')).toBeInTheDocument();
     expect(deletes).toEqual([]);
 
@@ -87,7 +87,7 @@ describe('Mail organize', () => {
     await screen.findByText('Market report');
 
     await user.click(screen.getByRole('button', { name: 'More actions for Market report' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     await user.click(await screen.findByRole('button', { name: 'Cancel' }));
 
     expect(deletes).toEqual([]);
@@ -101,7 +101,7 @@ describe('Mail organize', () => {
     await screen.findByText('Market report');
 
     await user.click(screen.getByRole('button', { name: 'More actions for Market report' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     await user.click(await screen.findByRole('button', { name: 'Delete mail' }));
 
     expect(await screen.findByText(/Couldn't delete/)).toBeInTheDocument();
@@ -126,8 +126,8 @@ describe('Mail organize', () => {
     await waitFor(() => expect(puts).toEqual([{ id: '1', body: { read: true } }]));
 
     // The bar is disabled while the writes finish.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete…' })).toBeEnabled());
-    await user.click(screen.getByRole('button', { name: 'Delete…' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
     expect(await screen.findByText('Delete 2 mails?')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Delete 2 mails' }));
 
@@ -229,7 +229,7 @@ describe('Mail organize', () => {
     await waitFor(() => expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument());
 
     expect(screen.getByText('1 selected')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Delete…' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
     await user.click(await screen.findByRole('button', { name: 'Delete mail' }));
     await waitFor(() => expect(deletes).toEqual(['2']));
   });
@@ -246,7 +246,7 @@ describe('Mail organize', () => {
     await user.click(screen.getByRole('button', { name: 'Select' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select Fleet up!' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select Market report' }));
-    await user.click(screen.getByRole('button', { name: 'Delete…' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
     await user.click(await screen.findByRole('button', { name: 'Delete 2 mails' }));
 
     expect(await screen.findByText(/Couldn't delete/)).toBeInTheDocument();

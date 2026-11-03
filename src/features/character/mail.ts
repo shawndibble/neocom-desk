@@ -6,7 +6,6 @@ import {
   getCharacterMailLabels,
   getCharacterMailingLists,
   putCharacterMail,
-  deleteCharacterMail,
   postCharacterMail,
   type MailHeader,
   type MailBody,
@@ -25,7 +24,7 @@ import {
   type CachedResult,
   type StatusResult,
 } from '@/esi/cache';
-import { isAuthFailure, isOfflineFailure } from '@/esi/client';
+import { esiFetch, isAuthFailure, isOfflineFailure } from '@/esi/client';
 import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
 import { grantHoldsEndpointScope } from '@/esi/grantScope';
 import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
@@ -287,11 +286,16 @@ export async function deleteMailOnEsi(
   characterId: number,
   mailId: number
 ): Promise<MailWriteResult> {
-  if (!(await grantHoldsEndpointScope(characterId, 'deleteCharacterMail'))) return 'skipped';
+  if (!(await grantHoldsEndpointScope(characterId, 'putCharacterMail'))) return 'skipped';
   try {
-    await deleteCharacterMail(characterId, mailId);
+    // The same route as the read-flag PUT, so one registry entry and one Permission cover both.
+    await esiFetch<void>(`/characters/${characterId}/mail/${mailId}/`, {
+      characterId,
+      method: 'DELETE',
+      endpointId: 'putCharacterMail',
+    });
   } catch (err) {
-    await reportWriteAuthFailure(characterId, err, 'deleteCharacterMail');
+    await reportWriteAuthFailure(characterId, err, 'putCharacterMail');
     return 'failed';
   }
   // ESI has answered 204: the mail is gone in EVE, so it is deleted even if

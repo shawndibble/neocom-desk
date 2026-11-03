@@ -347,12 +347,9 @@ export const ESI_REGISTRY = {
     scope: 'esi-mail.read_mail.v1',
     group: 'mail',
   },
+  // Also the entry for `DELETE` of the same route (sent by `deleteMailOnEsi`):
+  // one route template, one scope, one Permission, and route templates are unique here.
   putCharacterMail: {
-    route: '/characters/{character_id}/mail/{mail_id}/',
-    scope: 'esi-mail.organize_mail.v1',
-    group: 'mailOrganize',
-  },
-  deleteCharacterMail: {
     route: '/characters/{character_id}/mail/{mail_id}/',
     scope: 'esi-mail.organize_mail.v1',
     group: 'mailOrganize',
