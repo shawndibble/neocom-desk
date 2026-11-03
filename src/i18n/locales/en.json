@@ -15452,7 +15452,7 @@
       "only": "Only far above",
       "hide": "Hide far above"
     },
-    "unreadableStation": "Unreadable station",
+    "unreadableStation": "Unknown/Undockable",
     "goingRateBenchmarkLabel": "Going rate",
     "goingRateAgainstCorpus": "Pays {{multiple}}x the median reward per m³ per jump across every outstanding public courier contract.",
     "goingRateUnavailable": "No rate comparison: this haul has no measurable distance, states no cargo volume, or the corpus is too small for a median.",
@@ -17035,6 +17035,7 @@
       "panelTitle": "Statement mail queue"
     },
     "moons": {
+      "undockable": "Undockable",
       "title": "Moons",
       "payeeNotice": {
         "title": "Who gets paid changed",

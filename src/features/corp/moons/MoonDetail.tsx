@@ -30,7 +30,7 @@ import { caretColumn } from './caretColumn';
 import { Crumb, OreLine, StateWord } from './moonsParts';
 import { tapTargetClassName } from './sectionHelpers';
 import { OreLinesTable } from './OreLinesTable';
-import { BookSection, EntityHeader } from './sectionParts';
+import { BookSection, EntityHeader, UndockableChip } from './sectionParts';
 
 /**
  * A moon's page: this extraction's header, then one scroll of
@@ -172,6 +172,7 @@ export function MoonDetail({ id }: { id: string }) {
           <span className="flex items-center gap-2 text-xs text-text-dim">
             <StateWord state={row.state} />
             {place.moon !== undefined && place.station}
+            {names.undockable?.(row.structureId) && <UndockableChip />}
           </span>
         }
         actions={
