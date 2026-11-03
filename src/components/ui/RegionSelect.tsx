@@ -17,6 +17,20 @@ export interface RegionSelectOption {
   readonly name: string;
 }
 
+/**
+ * A pinned row above the list for a shortcut to one region the caller has to
+ * work out first (the character's own region). Not an option: it stands for
+ * whichever region `onSelect` answers with.
+ */
+export interface RegionSelectShortcut {
+  label: string;
+  disabled?: boolean;
+  /** Why the shortcut is disabled, announced and drawn under the row. */
+  note?: string | null;
+  /** Resolves to the region to pick, or `null`/`undefined` to leave the picker open. */
+  onSelect: () => Promise<number | null | undefined> | number | null | undefined;
+}
+
 export interface RegionSelectProps {
   /** Any order — the control sorts by name itself. */
   options: readonly RegionSelectOption[];
@@ -33,6 +47,7 @@ export interface RegionSelectProps {
   size?: ControlSize;
   /** This filter is set away from its default: draws the accent border (DESIGN.md §6c). */
   active?: boolean;
+  shortcut?: RegionSelectShortcut;
 }
 
 interface Row {
@@ -63,6 +78,7 @@ export function RegionSelect({
   className,
   size = 'md',
   active,
+  shortcut,
 }: RegionSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -109,6 +125,15 @@ export function RegionSelect({
   function choose(row: Row) {
     onChange(row.id);
     setOpen(false);
+  }
+
+  async function runShortcut() {
+    if (!shortcut) return;
+    const regionId = await shortcut.onSelect();
+    if (regionId !== null && regionId !== undefined) {
+      onChange(regionId);
+      setOpen(false);
+    }
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -173,6 +198,23 @@ export function RegionSelect({
             }
           />
         </div>
+        {shortcut && (
+          <div className="px-1 pb-1">
+            <button
+              type="button"
+              disabled={shortcut.disabled}
+              onClick={() => void runShortcut()}
+              className="w-full rounded-xs px-2 py-1.5 text-left text-sm text-accent hover:bg-panel-2 disabled:cursor-not-allowed disabled:text-text-dim disabled:hover:bg-transparent"
+            >
+              {shortcut.label}
+            </button>
+            {shortcut.note && (
+              <span role="status" className="block px-2 text-xs text-text-dim">
+                {shortcut.note}
+              </span>
+            )}
+          </div>
+        )}
         <div
           id={listId}
           role="listbox"

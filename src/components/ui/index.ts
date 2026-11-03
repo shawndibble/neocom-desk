@@ -128,7 +128,7 @@ export type { CheckboxSelectOption, CheckboxSelectProps } from './CheckboxSelect
 export { MultiSelect } from './MultiSelect';
 export type { MultiSelectGroup, MultiSelectOption, MultiSelectProps } from './MultiSelect';
 export { RegionSelect } from './RegionSelect';
-export type { RegionSelectOption, RegionSelectProps } from './RegionSelect';
+export type { RegionSelectOption, RegionSelectProps, RegionSelectShortcut } from './RegionSelect';
 export {
   Select,
   SelectValue,

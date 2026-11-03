@@ -138,3 +138,76 @@ describe('RegionSelect', () => {
     );
   });
 });
+
+describe('RegionSelect shortcut', () => {
+  function WithShortcut({
+    shortcut,
+    onChange = () => {},
+  }: {
+    shortcut: NonNullable<Parameters<typeof RegionSelect>[0]['shortcut']>;
+    onChange?: (id: number | null) => void;
+  }) {
+    return (
+      <RegionSelect
+        options={REGIONS}
+        value={null}
+        onChange={onChange}
+        allLabel="All regions"
+        searchPlaceholder="Search regions…"
+        noResultsLabel="No matching regions"
+        aria-label="Region"
+        shortcut={shortcut}
+      />
+    );
+  }
+
+  it('picks the region the shortcut answers with, and closes', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <WithShortcut
+        onChange={onChange}
+        shortcut={{ label: 'From my region', onSelect: () => 10000002 }}
+      />
+    );
+
+    await user.click(trigger());
+    await user.click(screen.getByRole('button', { name: 'From my region' }));
+
+    expect(onChange).toHaveBeenCalledWith(10000002);
+    expect(screen.queryByRole('button', { name: 'From my region' })).not.toBeInTheDocument();
+  });
+
+  it('stays open and picks nothing when the shortcut answers null', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <WithShortcut
+        onChange={onChange}
+        shortcut={{ label: 'From my region', onSelect: async () => null }}
+      />
+    );
+
+    await user.click(trigger());
+    await user.click(screen.getByRole('button', { name: 'From my region' }));
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'From my region' })).toBeInTheDocument();
+  });
+
+  it('shows the note and blocks the click when disabled', async () => {
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <WithShortcut
+        shortcut={{ label: 'From my region', disabled: true, note: 'Unavailable', onSelect }}
+      />
+    );
+
+    await user.click(trigger());
+    await user.click(screen.getByRole('button', { name: 'From my region' }));
+
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+});

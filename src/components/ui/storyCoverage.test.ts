@@ -23,14 +23,13 @@ const UNSTORIED = [
   'IskAmount',
   'IskFigureGroup',
   'LogoMark',
-  'RegionSelect',
   'RowCaret',
   'StandingIcon',
   'TypeIcon',
 ];
 
 /** Pinned size. Removing a name means lowering this; adding a name fails. */
-const PINNED_COUNT = 14;
+const PINNED_COUNT = 13;
 
 /** Component name -> source module, from the value (non-type) re-exports in index.ts. */
 function exportedComponents(): Map<string, string> {
