@@ -338,7 +338,7 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
   );
 }
 
-/** The pace tooltip's content for one interval: ores ranked by share, idle ones left out. */
+/** The pace tooltip's content for one interval: most valuable ore first (the chart's top slice), idle ones left out. */
 export function PaceTipBody({
   interval,
   activeOres,
@@ -349,9 +349,7 @@ export function PaceTipBody({
   toneIndex: Record<string, number>;
 }) {
   const { t } = useTranslation();
-  const ranked = activeOres
-    .filter((ore) => interval.shares[ore] !== undefined)
-    .sort((a, b) => interval.shares[b] - interval.shares[a]);
+  const ranked = activeOres.filter((ore) => interval.shares[ore] !== undefined);
   return (
     <ChartTooltipShell>
       <div className="min-w-48 space-y-1 text-xs">
@@ -417,7 +415,7 @@ function SliceShape({ x, y, width, height, fill }: SliceShapeProps) {
 /**
  * The Depletion view's pace chart: one 100% bar per scan interval, from scan to scan on the shared
  * time axis, split into each mined ore's share of that interval's progress. Slices keep the
- * legend's order and colours with the first (most valuable) ore at the bottom; each is inset
+ * legend's order and colours with the first (most valuable) ore at the top, like the ore-left stack; each is inset
  * 1px top and bottom (see SliceShape), leaving a 2px gap. The caller wraps it in its figure and table; only the plot is here.
  */
 export function PaceByOreChart({
@@ -432,11 +430,12 @@ export function PaceByOreChart({
   const { xAxis } = timeAxis(summary);
 
   // The bars themselves: each ore's slice runs from the shares of the ores below it to its own top.
+  // activeOres is most valuable first, so stack from the cheapest up to leave the priciest on top.
   const slices = useMemo(
     () =>
       intervals.flatMap((i) => {
         let floor = 0;
-        return activeOres.flatMap((ore) => {
+        return [...activeOres].reverse().flatMap((ore) => {
           const share = i.shares[ore];
           if (share === undefined) return [];
           const slice = {

@@ -24,7 +24,7 @@ describe('PaceTipBody', () => {
     ]),
   ])!;
 
-  it('ranks mined ores by share, largest first, and leaves idle ores out', () => {
+  it('lists mined ores most valuable first, not by share, and leaves idle ores out', () => {
     const pace = paceShareSeries(summary);
     render(
       <PaceTipBody
@@ -36,7 +36,7 @@ describe('PaceTipBody', () => {
     expect(screen.getByText(/5 min|between scans/i)).toBeInTheDocument();
     expect(screen.getByText(/of the field mined this scan/i)).toBeInTheDocument();
     const rows = screen.getAllByText(/^[0-9.<]+% of [A-Z]/).map((n) => n.textContent);
-    expect(rows).toEqual(['40% of Scordite', '10% of Veldspar']);
+    expect(rows).toEqual(['10% of Veldspar', '40% of Scordite']);
     expect(screen.getByText('80%')).toBeInTheDocument();
     expect(screen.getByText('20%')).toBeInTheDocument();
     expect(screen.queryByText(/Omber/)).toBeNull();
