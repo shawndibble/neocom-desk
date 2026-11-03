@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   FilterChip,
+  FilterField,
   MultiSelect,
   Select,
   SelectContent,
@@ -110,95 +111,104 @@ export function OpenOrdersFilterFields({
           })
         }
       />
-      <Select
-        value={draft.expiringWithinDays === null ? 'any' : String(draft.expiringWithinDays)}
-        onValueChange={(value) =>
-          setDraft({
-            ...draft,
-            expiringWithinDays: value === 'any' ? null : Number(value),
-          })
-        }
-      >
-        <SelectTrigger
-          size="sm"
-          aria-label={t('market.orders.filter.expiringWithin')}
-          className="w-36"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">{t('market.orders.filter.anyExpiry')}</SelectItem>
-          {EXPIRING_WITHIN_DAY_OPTIONS.map((days) => (
-            <SelectItem key={days} value={String(days)}>
-              {t('market.orders.filter.expiringWithinOption', { count: days })}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select
-        value={draft.minIskTiedUp === null ? 'any' : String(draft.minIskTiedUp)}
-        onValueChange={(value) =>
-          setDraft({
-            ...draft,
-            minIskTiedUp: value === 'any' ? null : Number(value),
-          })
-        }
-      >
-        <SelectTrigger
-          size="sm"
-          aria-label={t('market.orders.filter.minIskTiedUp')}
-          className="w-36"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">{t('market.orders.filter.anySize')}</SelectItem>
-          {MIN_ISK_TIED_UP_OPTIONS.map((amount) => (
-            <SelectItem key={amount} value={String(amount)}>
-              {t('market.orders.filter.minIskTiedUpOption', {
-                amount: formatIskCompact(amount),
-              })}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {showLocationFilter && (
-        <MultiSelect
-          label={t('market.orders.filter.location')}
-          size="sm"
-          triggerLabel={locationSummary}
-          options={locationOptions.map((option) => ({
-            id: option.locationId,
-            label: option.label,
-          }))}
-          selected={new Set(draft.locationIds)}
-          onToggle={(locationId) =>
+      <FilterField captionInline label={t('market.orders.filter.expiringWithin')}>
+        <Select
+          value={draft.expiringWithinDays === null ? 'any' : String(draft.expiringWithinDays)}
+          onValueChange={(value) =>
             setDraft({
               ...draft,
-              locationIds: draft.locationIds.includes(locationId)
-                ? draft.locationIds.filter((id) => id !== locationId)
-                : [...draft.locationIds, locationId],
+              expiringWithinDays: value === 'any' ? null : Number(value),
             })
           }
-          searchPlaceholder={t('market.orders.filter.locationSearchPlaceholder')}
-          noResultsLabel={t('market.orders.filter.locationNoResults')}
-          extraContent={(close) => (
-            <div className="border-b border-line p-1">
-              <Button
-                variant="ghost"
-                align="start"
-                size="sm"
-                className="w-full"
-                onClick={() => {
-                  setDraft({ ...draft, locationIds: [] });
-                  close();
-                }}
-              >
-                {t('market.orders.filter.allLocations')}
-              </Button>
-            </div>
-          )}
-        />
+        >
+          <SelectTrigger
+            size="sm"
+            aria-label={t('market.orders.filter.expiringWithin')}
+            active={draft.expiringWithinDays !== null}
+            className="w-36"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">{t('market.orders.filter.anyExpiry')}</SelectItem>
+            {EXPIRING_WITHIN_DAY_OPTIONS.map((days) => (
+              <SelectItem key={days} value={String(days)}>
+                {t('market.orders.filter.expiringWithinOption', { count: days })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FilterField>
+      <FilterField captionInline label={t('market.orders.filter.minIskTiedUp')}>
+        <Select
+          value={draft.minIskTiedUp === null ? 'any' : String(draft.minIskTiedUp)}
+          onValueChange={(value) =>
+            setDraft({
+              ...draft,
+              minIskTiedUp: value === 'any' ? null : Number(value),
+            })
+          }
+        >
+          <SelectTrigger
+            size="sm"
+            aria-label={t('market.orders.filter.minIskTiedUp')}
+            active={draft.minIskTiedUp !== null}
+            className="w-36"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">{t('market.orders.filter.anySize')}</SelectItem>
+            {MIN_ISK_TIED_UP_OPTIONS.map((amount) => (
+              <SelectItem key={amount} value={String(amount)}>
+                {t('market.orders.filter.minIskTiedUpOption', {
+                  amount: formatIskCompact(amount),
+                })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FilterField>
+      {showLocationFilter && (
+        <FilterField captionInline label={t('market.orders.filter.location')}>
+          <MultiSelect
+            label={t('market.orders.filter.location')}
+            size="sm"
+            active={draft.locationIds.length > 0}
+            triggerLabel={locationSummary}
+            options={locationOptions.map((option) => ({
+              id: option.locationId,
+              label: option.label,
+            }))}
+            selected={new Set(draft.locationIds)}
+            onToggle={(locationId) =>
+              setDraft({
+                ...draft,
+                locationIds: draft.locationIds.includes(locationId)
+                  ? draft.locationIds.filter((id) => id !== locationId)
+                  : [...draft.locationIds, locationId],
+              })
+            }
+            searchPlaceholder={t('market.orders.filter.locationSearchPlaceholder')}
+            noResultsLabel={t('market.orders.filter.locationNoResults')}
+            extraContent={(close) => (
+              <div className="border-b border-line p-1">
+                <Button
+                  variant="ghost"
+                  align="start"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    setDraft({ ...draft, locationIds: [] });
+                    close();
+                  }}
+                >
+                  {t('market.orders.filter.allLocations')}
+                </Button>
+              </div>
+            )}
+          />
+        </FilterField>
       )}
       <Select
         value={draft.sort}

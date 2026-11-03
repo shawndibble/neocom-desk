@@ -45,7 +45,7 @@ function RegionFilterField({
 }) {
   const { t } = useTranslation();
   return (
-    <FilterField label={label}>
+    <FilterField captionInline label={label}>
       <RegionSelect
         options={options}
         value={value}
@@ -158,8 +158,9 @@ function IskFilterField({
   onChange: (value: string) => void;
 }) {
   return (
-    <FilterField label={label}>
+    <FilterField captionInline label={label}>
       <IskInput
+        mask
         aria-label={label}
         placeholder={label}
         className={width}
@@ -184,7 +185,7 @@ function NumericFilterField({
   onChange: (value: string) => void;
 }) {
   return (
-    <FilterField label={label}>
+    <FilterField captionInline label={label}>
       <TextInput
         type="number"
         inputMode="numeric"
@@ -215,7 +216,7 @@ function RoutePreferenceField({
   const { t } = useTranslation();
   const label = t('contractSearch.routePreferenceLabel');
   return (
-    <FilterField label={label}>
+    <FilterField captionInline label={label}>
       <Select value={value} onValueChange={(next) => onChange(next as RoutePreferenceKind)}>
         <SelectTrigger aria-label={label} className="w-44">
           <SelectValue />
@@ -282,6 +283,7 @@ export function CourierFilterBar({
       value={filter}
       onChange={onChange}
       activeCount={activeCount}
+      rowAlign="end"
       actions={actions}
       className="border-b border-line px-3 py-2"
       search={
@@ -326,28 +328,33 @@ export function CourierFilterBar({
             snapshot cannot be read at all.
           */}
           {spaceKinds.length > 0 && (
-            <div
-              role="group"
-              aria-label={t('contractSearch.destinationSpaceLabel')}
-              className="flex flex-wrap items-center gap-2"
+            <FilterField
+              captionInline
+              label={t('contractSearch.destinationSpaceLabel')}
+              stretch={false}
             >
-              <span className="text-text-dim">{t('contractSearch.destinationSpaceLabel')}</span>
-              {spaceKinds.map((kind) => (
-                <FilterChip
-                  key={kind}
-                  label={t(`common.spaceOption.${kind}`)}
-                  selected={draft.destinationSpace.includes(kind)}
-                  onToggle={() =>
-                    setDraft({
-                      ...draft,
-                      destinationSpace: draft.destinationSpace.includes(kind)
-                        ? draft.destinationSpace.filter((existing) => existing !== kind)
-                        : [...draft.destinationSpace, kind],
-                    })
-                  }
-                />
-              ))}
-            </div>
+              <div
+                role="group"
+                aria-label={t('contractSearch.destinationSpaceLabel')}
+                className="flex flex-wrap items-center gap-2"
+              >
+                {spaceKinds.map((kind) => (
+                  <FilterChip
+                    key={kind}
+                    label={t(`common.spaceOption.${kind}`)}
+                    selected={draft.destinationSpace.includes(kind)}
+                    onToggle={() =>
+                      setDraft({
+                        ...draft,
+                        destinationSpace: draft.destinationSpace.includes(kind)
+                          ? draft.destinationSpace.filter((existing) => existing !== kind)
+                          : [...draft.destinationSpace, kind],
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            </FilterField>
           )}
           <IskFilterField
             label={t('contractSearch.minRewardLabel')}
@@ -381,12 +388,16 @@ export function CourierFilterBar({
             to decide, which is more than the label has room to say: hence the
             tooltip, which states both halves and the nullsec exclusion.
           */}
-          <FilterField label={t('contractSearch.overRateLabel')}>
+          <FilterField captionInline label={t('contractSearch.overRateLabel')}>
             <Select
               value={draft.overRate}
               onValueChange={(value) => setDraft({ ...draft, overRate: value as OverRateFilter })}
             >
-              <SelectTrigger className="w-44" aria-label={t('contractSearch.overRateLabel')}>
+              <SelectTrigger
+                className="w-44"
+                aria-label={t('contractSearch.overRateLabel')}
+                active={draft.overRate !== 'all'}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

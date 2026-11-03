@@ -943,6 +943,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           activeCount={activeFilterCount}
           title={t('market.hauling.filters.title')}
           className="px-3 py-2.5"
+          rowAlign="end"
           triggerSize="sm"
           search={
             <>
@@ -1008,14 +1009,14 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
               <>
                 {isNarrow && (
                   <>
-                    <FilterField label={t('market.hauling.category')}>
+                    <FilterField captionInline label={t('market.hauling.category')}>
                       <CategorySelect
                         value={draft.cat}
                         onChange={(cat) => setDraft({ ...draft, cat })}
                         nameOf={categoryName}
                       />
                     </FilterField>
-                    <FilterField label={t('market.hauling.mode')}>
+                    <FilterField captionInline label={t('market.hauling.mode')}>
                       <ModeSelect
                         value={draft.mode}
                         onChange={(next) => setDraft({ ...draft, mode: next })}
@@ -1024,7 +1025,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   </>
                 )}
                 {!draftInstant && (
-                  <FilterField label={t('market.hauling.filters.sellsWithin')}>
+                  <FilterField captionInline label={t('market.hauling.filters.sellsWithin')}>
                     <Select
                       value={String(draft.days)}
                       onValueChange={(v) => setDraft({ ...draft, days: Number(v) })}
@@ -1033,6 +1034,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                         size="sm"
                         aria-label={t('market.hauling.filters.sellsWithin')}
                         className="w-28"
+                        active={draft.days !== DEFAULT_HAULING_FILTER.days}
                       >
                         <SelectValue />
                       </SelectTrigger>
@@ -1048,7 +1050,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                     </Select>
                   </FilterField>
                 )}
-                <FilterField label={t('market.hauling.filters.marginOver')}>
+                <FilterField captionInline label={t('market.hauling.filters.marginOver')}>
                   <Select
                     value={String(draft.margin)}
                     onValueChange={(v) => setDraft({ ...draft, margin: Number(v) })}
@@ -1057,6 +1059,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                       size="sm"
                       aria-label={t('market.hauling.filters.marginOver')}
                       className="w-24"
+                      active={draft.margin !== DEFAULT_HAULING_FILTER.margin}
                     >
                       <SelectValue />
                     </SelectTrigger>
@@ -1070,7 +1073,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   </Select>
                 </FilterField>
                 {!draftInstant && (
-                  <FilterField label={t('market.hauling.filters.demand')}>
+                  <FilterField captionInline label={t('market.hauling.filters.demand')}>
                     <Select
                       value={draft.demand}
                       onValueChange={(v) =>
@@ -1081,6 +1084,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                         size="sm"
                         aria-label={t('market.hauling.filters.demand')}
                         className="w-40"
+                        active={draft.demand !== DEFAULT_HAULING_FILTER.demand}
                       >
                         <SelectValue />
                       </SelectTrigger>

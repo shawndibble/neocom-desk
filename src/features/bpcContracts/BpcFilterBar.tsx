@@ -10,10 +10,10 @@ import {
   TextInput,
 } from '@/components/ui';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
-import type { JumpRange } from '@/engine/route/jumpRange';
+import { DEFAULT_JUMP_RANGE, type JumpRange } from '@/engine/route/jumpRange';
 import { type CurrentSystemState } from '@/features/route/currentSystem';
 import { CurrentSystemPicker, JumpRangeSelect } from '@/features/route/JumpRangeControls';
-import { SOURCE_TOGGLES, type SourceToggle } from './bpcSourcingUrl';
+import { DEFAULT_SOURCE_TOGGLES, SOURCE_TOGGLES, type SourceToggle } from './bpcSourcingUrl';
 import { SOURCE_LABEL_KEYS, SOURCE_TOOLTIP_KEYS } from './bpcSourcingHelpers';
 import {
   bpcActiveFilterCount,
@@ -99,6 +99,7 @@ export function BpcFilterBar({
             <RegionSelect
               options={regionOptions}
               value={draft.regionId}
+              active={draft.regionId !== null}
               onChange={(regionId) => setDraft({ ...draft, regionId })}
               allLabel={t('bpcContracts.allRegions')}
               searchPlaceholder={t('common.searchRegions')}
@@ -111,6 +112,7 @@ export function BpcFilterBar({
             <div className="flex flex-wrap items-center gap-2">
               <JumpRangeSelect
                 value={draft.jumps}
+                active={draft.jumps !== DEFAULT_JUMP_RANGE}
                 onChange={(next) => setDraft({ ...draft, jumps: next })}
               />
               <CurrentSystemPicker current={currentSystem} />
@@ -167,6 +169,10 @@ export function BpcFilterBar({
             <CheckboxSelect
               label={t('bpcContracts.excludeLabel')}
               className="w-44"
+              active={
+                (draft.hideAuctions && !hideDefaults.hideAuctions) ||
+                (draft.hidePlex && !hideDefaults.hidePlex)
+              }
               options={[
                 { value: 'auctions' as const, label: t('bpcContracts.hideAuctions') },
                 {
@@ -194,6 +200,10 @@ export function BpcFilterBar({
             <CheckboxSelect
               label={t('bpcContracts.sourceLabel')}
               className="w-44"
+              active={
+                draft.sources.size !== DEFAULT_SOURCE_TOGGLES.length ||
+                !DEFAULT_SOURCE_TOGGLES.every((source) => draft.sources.has(source))
+              }
               options={SOURCE_TOGGLES.map((source) => ({
                 value: source,
                 label: t(SOURCE_LABEL_KEYS[source]),
@@ -212,6 +222,7 @@ export function BpcFilterBar({
             <CheckboxSelect
               label={t('bpcContracts.spaceLabel')}
               className="w-44"
+              active={draft.spaceKinds.length !== SPACE_KINDS.length}
               options={SPACE_KINDS.map((kind) => ({
                 value: kind,
                 label: t(`common.spaceOption.${kind}`),

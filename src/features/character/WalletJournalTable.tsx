@@ -139,7 +139,11 @@ function JournalFilterBar({
                 setDraft({ ...draft, refType: value === ALL_OPTION ? null : value })
               }
             >
-              <SelectTrigger aria-label={t('wallet.refTypeFilterLabel')} className="w-44">
+              <SelectTrigger
+                aria-label={t('wallet.refTypeFilterLabel')}
+                className="w-44"
+                active={draft.refType !== null}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -160,7 +164,11 @@ function JournalFilterBar({
                   setDraft({ ...draft, player: value === ALL_OPTION ? null : value })
                 }
               >
-                <SelectTrigger aria-label={t('wallet.playerFilterLabel')} className="w-44">
+                <SelectTrigger
+                  aria-label={t('wallet.playerFilterLabel')}
+                  className="w-44"
+                  active={draft.player !== null}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -191,6 +199,7 @@ function JournalFilterBar({
                 }
                 triggerAriaLabel={t('wallet.partyFilterLabel')}
                 className="w-44"
+                active={draft.party !== null}
                 options={partyOptions.map((p) => ({ id: p.id, label: p.name }))}
                 selected={new Set(draft.party === null ? [] : [draft.party])}
                 onToggle={(id) => setDraft({ ...draft, party: draft.party === id ? null : id })}

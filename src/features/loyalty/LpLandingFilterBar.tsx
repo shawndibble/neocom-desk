@@ -117,19 +117,19 @@ export function LpLandingFilterBar({
     >
       {(draft, setDraft) => (
         <>
-          <FilterField label={t('loyaltyStore.hubLabel')}>
+          <FilterField captionInline label={t('loyaltyStore.hubLabel')}>
             <TradeHubSelect
               value={draft.hubId}
               onValueChange={(hubId) => setDraft({ ...draft, hubId })}
             />
           </FilterField>
-          <FilterField label={t('loyaltyStore.priceBasisLabel')}>
+          <FilterField captionInline label={t('loyaltyStore.priceBasisLabel')}>
             <PriceBasisSelect
               value={draft.priceBasis}
               onValueChange={(priceBasis) => setDraft({ ...draft, priceBasis })}
             />
           </FilterField>
-          <FilterField label={t('loyaltyStore.landing.factionLabel')}>
+          <FilterField captionInline label={t('loyaltyStore.landing.factionLabel')}>
             <Select
               value={String(draft.faction)}
               onValueChange={(next) =>
@@ -139,7 +139,10 @@ export function LpLandingFilterBar({
                 })
               }
             >
-              <SelectTrigger aria-label={t('loyaltyStore.landing.factionLabel')}>
+              <SelectTrigger
+                aria-label={t('loyaltyStore.landing.factionLabel')}
+                active={draft.faction !== 'all'}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -153,20 +156,24 @@ export function LpLandingFilterBar({
               </SelectContent>
             </Select>
           </FilterField>
-          <FilterField label={t('jumpRange.label')}>
+          <FilterField captionInline label={t('jumpRange.label')}>
             <JumpRangeSelect
               value={draft.range}
+              active={draft.range !== 'any'}
               onChange={(range) => setDraft({ ...draft, range })}
             />
           </FilterField>
-          <FilterField label={t('loyaltyStore.landing.minSellsLabel')}>
+          <FilterField captionInline label={t('loyaltyStore.landing.minSellsLabel')}>
             <Select
               value={String(draft.minSellsPerDay)}
               onValueChange={(next) =>
                 setDraft({ ...draft, minSellsPerDay: Number(next) as MinSellsPerDay })
               }
             >
-              <SelectTrigger aria-label={t('loyaltyStore.landing.minSellsLabel')}>
+              <SelectTrigger
+                aria-label={t('loyaltyStore.landing.minSellsLabel')}
+                active={draft.minSellsPerDay !== 0}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -181,9 +188,11 @@ export function LpLandingFilterBar({
             </Select>
           </FilterField>
           {categories.length > 0 && (
-            <FilterField label={t('loyaltyStore.landing.categoryLabel')}>
+            <FilterField captionInline label={t('loyaltyStore.landing.categoryLabel')}>
               <CheckboxSelect
                 label={t('loyaltyStore.landing.categoryLabel')}
+                size="md"
+                active={draft.categories.length > 0}
                 options={categories.map((category) => ({
                   value: category.id,
                   label: category.name,
@@ -203,7 +212,11 @@ export function LpLandingFilterBar({
             </FilterField>
           )}
           {/* `md:contents`: inline the chips join the row; in the sheet they wrap under one caption. */}
-          <FilterField label={t('loyaltyStore.landing.showOnlyLabel')} stretch={false}>
+          <FilterField
+            captionInline
+            label={t('loyaltyStore.landing.showOnlyLabel')}
+            stretch={false}
+          >
             <div className="flex flex-wrap gap-2 md:contents">
               <FilterChip
                 label={t('loyaltyStore.landing.mineOnly')}

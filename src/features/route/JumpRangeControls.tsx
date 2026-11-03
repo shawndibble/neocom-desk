@@ -30,6 +30,8 @@ interface JumpRangeSelectProps {
    * back to (the header's hub or region); elsewhere it is "Any distance".
    */
   anyLabel?: string;
+  /** Draw the accent border: the range is set away from its default. */
+  active?: boolean;
 }
 
 export function JumpRangeSelect({
@@ -37,11 +39,12 @@ export function JumpRangeSelect({
   onChange,
   className = 'w-40',
   anyLabel,
+  active,
 }: JumpRangeSelectProps) {
   const { t } = useTranslation();
   return (
     <Select value={value} onValueChange={(next) => onChange(next as JumpRange)}>
-      <SelectTrigger aria-label={t('jumpRange.label')} className={className}>
+      <SelectTrigger aria-label={t('jumpRange.label')} className={className} active={active}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

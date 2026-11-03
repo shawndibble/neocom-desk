@@ -506,7 +506,7 @@ describe('CourierResults remembered filter (issue #1719)', () => {
     renderBoard(CHARACTER_ID, ['/']);
 
     await openFilters(user);
-    expect(screen.getByLabelText('Max collateral')).toHaveValue('50000000');
+    expect(screen.getByLabelText('Max collateral')).toHaveValue('50,000,000');
   });
 
   it("lets a shared link's URL param win over a remembered filter value", async () => {
@@ -518,7 +518,7 @@ describe('CourierResults remembered filter (issue #1719)', () => {
     renderBoard(CHARACTER_ID, ['/?courier.maxCollateral=1000']);
 
     await openFilters(user);
-    expect(screen.getByLabelText('Max collateral')).toHaveValue('1000');
+    expect(screen.getByLabelText('Max collateral')).toHaveValue('1,000');
   });
 
   it('remembers a filter change for the next visit', async () => {
@@ -552,14 +552,13 @@ describe('CourierResults remembered filter (issue #1719)', () => {
 });
 
 describe('CourierResults ISK filters', () => {
-  it('accepts shorthand in Min reward and echoes the parsed figure', async () => {
+  it('accepts shorthand in Min reward', async () => {
     const user = userEvent.setup();
     renderBoard();
     await openFilters(user);
     const field = screen.getByRole('textbox', { name: 'Min reward' });
     await user.type(field, '1b');
     expect(field).toHaveValue('1b');
-    expect(screen.getByText('= 1,000,000,000 ISK')).toBeInTheDocument();
   });
 
   it('filters on the shorthand value, and plain digits still work', async () => {
@@ -572,7 +571,7 @@ describe('CourierResults ISK filters', () => {
     expect(screen.queryAllByText(/Jita/)).toHaveLength(0);
     await user.clear(field);
     await user.type(field, '5000000');
-    expect(screen.getByText('= 5,000,000 ISK')).toBeInTheDocument();
+    expect(field).toHaveValue('5,000,000');
     expect(screen.getAllByText(/Jita/).length).toBeGreaterThan(0);
   });
 

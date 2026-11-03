@@ -47,6 +47,7 @@ function FilterControls({
         <CheckboxSelect<NpcStandingKind>
           label={t('contacts.standings.typeFilter')}
           size="md"
+          active={filter.kinds.size !== NPC_STANDING_KINDS.length}
           className="w-44"
           options={NPC_STANDING_KINDS.map((kind) => ({
             value: kind,
@@ -72,6 +73,7 @@ function FilterControls({
         >
           <SelectTrigger
             size="md"
+            active={filter.minAccess !== null}
             aria-label={t('contacts.standings.accessFilter')}
             className="w-52"
           >

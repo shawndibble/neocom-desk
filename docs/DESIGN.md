@@ -1201,6 +1201,15 @@ Retired meanings, each with its replacement:
 | A gear that navigates                                 | The gear opens _this page's_ settings modal; link to Settings with labelled text                                                                        |
 | `textActionClassName` that navigates or opens a modal | A `Button`; a secondary action beside an existing primary `Button` may be a text action, and so may a budget's "Fix" link under its over-budget readout |
 
+### Filter set away from its default
+
+A select-shaped filter (`SelectTrigger`, `CheckboxSelect`, `MultiSelect`,
+`RegionSelect`, `JumpRangeSelect`) whose value differs from its default takes `active`, which
+draws the accent border, so "which filter is on?" is answered by looking at the
+row. The border never carries it alone: the trigger's text still names the value
+and the funnel's badge still counts it. Persisted settings that sit in a filter
+row (trade hub, price basis) are not filters and are never marked.
+
 ### Scope readout
 
 A surface that reads more than the active Character says so on screen, in one

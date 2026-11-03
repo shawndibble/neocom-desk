@@ -478,6 +478,7 @@ export function RequestsTab({
                 <div className="flex flex-wrap items-center gap-2">
                   <JumpRangeSelect
                     value={draft.jumps}
+                    active={draft.jumps !== 'any'}
                     onChange={(next) => setDraft({ ...draft, jumps: next })}
                   />
                   <CurrentSystemPicker current={currentSystem} />

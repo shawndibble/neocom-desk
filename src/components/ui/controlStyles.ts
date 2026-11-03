@@ -129,7 +129,9 @@ export function selectTriggerClassName(size: ControlSize): string {
   return cx(
     fieldBaseClassName,
     fieldSizeClassName[size],
-    'flex items-center justify-between gap-2 overflow-hidden whitespace-nowrap [&>span]:min-w-0 [&>span]:truncate'
+    'flex items-center justify-between gap-2 overflow-hidden whitespace-nowrap [&>span]:min-w-0 [&>span]:truncate',
+    // A filter set away from its default: `active` on the trigger sets `data-active`.
+    'data-[active]:border-accent'
   );
 }
 

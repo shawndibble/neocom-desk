@@ -722,7 +722,11 @@ function CorpAssetsView({
                 value={draft.loc === null ? ALL : String(draft.loc)}
                 onValueChange={(v) => setDraft({ ...draft, loc: v === ALL ? null : Number(v) })}
               >
-                <SelectTrigger aria-label={t('corp.assets.filter.location')} className="w-56">
+                <SelectTrigger
+                  aria-label={t('corp.assets.filter.location')}
+                  active={draft.loc !== null}
+                  className="w-56"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -740,7 +744,11 @@ function CorpAssetsView({
                 value={draft.div === null ? ALL : String(draft.div)}
                 onValueChange={(v) => setDraft({ ...draft, div: v === ALL ? null : Number(v) })}
               >
-                <SelectTrigger aria-label={t('corp.assets.filter.division')} className="w-44">
+                <SelectTrigger
+                  aria-label={t('corp.assets.filter.division')}
+                  active={draft.div !== null}
+                  className="w-44"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -758,6 +766,7 @@ function CorpAssetsView({
                 <AssetCategoryPicker
                   index={categoryIndex}
                   pick={draft.cat}
+                  active={!pickIsAll(draft.cat)}
                   onChange={(cat) => setDraft({ ...draft, cat })}
                 />
               </FilterField>
@@ -766,6 +775,7 @@ function CorpAssetsView({
               <FilterField label={t('assets.blueprints.label')}>
                 <BlueprintKindSelect
                   value={draft.bp}
+                  active={draft.bp !== 'any'}
                   onChange={(bp) => setDraft({ ...draft, bp })}
                 />
               </FilterField>

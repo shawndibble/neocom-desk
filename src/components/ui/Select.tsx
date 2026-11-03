@@ -34,12 +34,15 @@ export const SelectValue = SelectPrimitive.Value;
 interface SelectTriggerProps extends ComponentProps<typeof SelectPrimitive.Trigger> {
   /** `md` (default) is the page/form size; `sm` matches `Button size="sm"` inside a dense row. */
   size?: ControlSize;
+  /** This filter is set away from its default: draws the accent border (DESIGN.md §6c). */
+  active?: boolean;
 }
 
 export function SelectTrigger({
   className,
   children,
   size = 'md',
+  active,
   'aria-describedby': describedBy,
   ...props
 }: SelectTriggerProps) {
@@ -52,6 +55,7 @@ export function SelectTrigger({
         className
       )}
       {...props}
+      data-active={active || undefined}
       aria-describedby={described}
     >
       {children}

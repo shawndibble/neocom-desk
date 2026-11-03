@@ -26,6 +26,8 @@ export interface CheckboxSelectProps<V> {
   /** `sm` (default) matches the filter rows; `md` lines up with a `SearchInput` beside it. */
   size?: ControlSize;
   className?: string;
+  /** This filter is set away from its default: draws the accent border (DESIGN.md §6c). */
+  active?: boolean;
 }
 
 /**
@@ -47,6 +49,7 @@ export function CheckboxSelect<V extends string | number>({
   onToggle,
   size = 'sm',
   className,
+  active,
 }: CheckboxSelectProps<V>) {
   const { t } = useTranslation();
   const inline = useFilterSurface() === 'inline';
@@ -67,6 +70,7 @@ export function CheckboxSelect<V extends string | number>({
       <DropdownMenuTrigger
         aria-label={t('common.checkboxSelect.labelled', { label, value: summary })}
         className={cx(selectTriggerClassName(size), className)}
+        data-active={active || undefined}
       >
         <span>
           {inline ? t('common.checkboxSelect.labelled', { label, value: summary }) : summary}

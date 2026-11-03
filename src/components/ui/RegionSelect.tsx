@@ -31,6 +31,8 @@ export interface RegionSelectProps {
   'aria-label': string;
   className?: string;
   size?: ControlSize;
+  /** This filter is set away from its default: draws the accent border (DESIGN.md §6c). */
+  active?: boolean;
 }
 
 interface Row {
@@ -60,6 +62,7 @@ export function RegionSelect({
   'aria-label': ariaLabel,
   className,
   size = 'md',
+  active,
 }: RegionSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -125,10 +128,11 @@ export function RegionSelect({
           type="button"
           role="combobox"
           aria-label={ariaLabel}
+          data-active={active || undefined}
           className={cx(
             fieldBaseClassName,
             fieldSizeClassName[size],
-            'flex items-center justify-between gap-2 overflow-hidden whitespace-nowrap',
+            'flex items-center justify-between gap-2 overflow-hidden whitespace-nowrap data-[active]:border-accent',
             className
           )}
         >

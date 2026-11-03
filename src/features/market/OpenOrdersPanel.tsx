@@ -706,6 +706,7 @@ export function OpenOrdersPanel({
                 />
                 <FilterBar
                   className="min-w-0 flex-1"
+                  rowAlign="end"
                   value={filter}
                   onChange={setFilter}
                   activeCount={activeCount}

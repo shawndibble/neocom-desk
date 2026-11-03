@@ -151,7 +151,11 @@ export function TransactionsFilterBar({
               value={draft.side}
               onValueChange={(value) => setDraft({ ...draft, side: value as TransactionSide })}
             >
-              <SelectTrigger aria-label={t('wallet.sideFilterLabel')} className="w-32">
+              <SelectTrigger
+                active={draft.side !== 'all'}
+                aria-label={t('wallet.sideFilterLabel')}
+                className="w-32"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -197,6 +201,7 @@ export function TransactionsFilterBar({
                       : [...draft.stations, id].sort((a, b) => a - b),
                   })
                 }
+                active={draft.stations.length > 0}
                 className="w-44"
               />
             </FilterField>

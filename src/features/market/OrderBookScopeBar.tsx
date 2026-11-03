@@ -81,6 +81,7 @@ function BrowserFilterFields({
             value={draft.jumps}
             onChange={(jumps) => setDraft({ ...draft, jumps })}
             anyLabel={scopeLabel}
+            active={draft.jumps !== DEFAULT_JUMP_RANGE}
             className="w-40 max-md:w-full"
           />
           {draft.jumps !== DEFAULT_JUMP_RANGE && <CurrentSystemPicker current={currentSystem} />}
@@ -327,6 +328,7 @@ export function OrderBookScopeBar({
             value={filterValue.jumps}
             onChange={(jumps) => onFilterChange({ ...filterValue, jumps })}
             anyLabel={scopeLabel}
+            active={filterValue.jumps !== DEFAULT_JUMP_RANGE}
             className="w-44"
           />
           {filterValue.jumps !== DEFAULT_JUMP_RANGE && (
