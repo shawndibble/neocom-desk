@@ -460,7 +460,8 @@ export function RowMoreActions({
       if (hintShown) dismissHint();
       // Counted per open, but the footer stays for the open that earned it.
       const { value, hydrated } = useHintCounts.getState();
-      const earned = hydrated && hintSeenCount(value, ROW_MENU_TIP) < ROW_MENU_TIP_OPENS;
+      const earned =
+        loggedIn && hydrated && hintSeenCount(value, ROW_MENU_TIP) < ROW_MENU_TIP_OPENS;
       setTip(earned);
       if (earned) recordHintSeen(ROW_MENU_TIP);
     }

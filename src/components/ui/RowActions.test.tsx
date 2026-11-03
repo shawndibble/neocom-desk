@@ -24,7 +24,10 @@ import {
   DropdownMenuTrigger,
 } from './DropdownMenu';
 
-vi.mock('@/features/character/useCharacters', () => ({ useCharacterCount: () => 1 }));
+const characters = vi.hoisted(() => ({ count: 1 }));
+vi.mock('@/features/character/useCharacters', () => ({
+  useCharacterCount: () => characters.count,
+}));
 function Row({ onInto }: { onInto: () => void }) {
   return (
     <RowActionsMenu
@@ -358,6 +361,20 @@ describe('row menu hints', () => {
   beforeEach(() => {
     useHintCounts.setState({ value: {}, hydrated: true });
     resetSessionHints();
+  });
+
+  it('keeps the menu footer tip off before login, and does not spend it', async () => {
+    characters.count = 0;
+    try {
+      const user = userEvent.setup();
+      render(plainRow);
+      await user.click(screen.getByRole('button', { name: 'More actions for Row' }));
+      await screen.findByRole('menuitem', { name: 'Show info' });
+      expect(screen.queryByText('Tip: right-click any row')).not.toBeInTheDocument();
+      expect(hintSeenCount(useHintCounts.getState().value, 'rowMenuTip')).toBe(0);
+    } finally {
+      characters.count = 1;
+    }
   });
 
   it('adds the right-click tip to the first three ⋮ opens, never the right-click menu', async () => {
