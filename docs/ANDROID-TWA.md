@@ -103,7 +103,7 @@ as Chrome:
   before `bubblewrap update`.
   Each icon, `public/icons/shortcut-<name>.png`, is the page's nav glyph
   (`src/app/navIcons.ts`: Bell, EnvelopeSimple, Wallet, ChartLineUp) at the
-  `fill` weight, 192×192, **transparent background**, glyph in `#0b78ad`, cropped to its ink bounds and
+  `fill` weight (Open orders' ChartLineUp is the `bold` weight instead: the nav draws it as bare line art, and `fill` adds a solid square behind the chart), 192×192, **transparent background**, glyph in `#0b78ad`, cropped to its ink bounds and
   fitted so its longest side is 96% of the canvas (Phosphor's own viewBox padding
   would leave ~72%). This is the fallback "any" icon, which the launcher insets on a white
   disc, so it must read on white (the app's `#57c7f4` accent is too faint there). Each also
