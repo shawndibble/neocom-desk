@@ -454,6 +454,7 @@ export function StockMarketPage({
             <SelectTrigger
               size="sm"
               aria-label={t('stockTargets.groupFilterLabel')}
+              active={activeGroup !== null}
               className="ml-auto max-w-[50%] min-w-0 sm:max-w-64"
             >
               <SelectValue />

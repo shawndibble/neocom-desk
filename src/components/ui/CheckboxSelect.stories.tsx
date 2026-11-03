@@ -57,6 +57,11 @@ export const One: Story = { args: { selected: new Set(['cruiser']) } };
 export const Count: Story = { args: { selected: new Set(['frigate', 'cruiser']) } };
 
 /** @summary Nothing ticked: the summary reads "None". */
+/** @summary A narrowed filter: `active` draws the accent border (§6c). */
+export const Active: Story = {
+  args: { selected: new Set(['cruiser']), active: true },
+};
+
 export const None: Story = { args: { selected: new Set() } };
 
 /** @summary Open menu: checked items carry a check, options can carry a dim description. */

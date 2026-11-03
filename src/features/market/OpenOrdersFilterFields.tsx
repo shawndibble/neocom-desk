@@ -170,43 +170,45 @@ export function OpenOrdersFilterFields({
         </Select>
       </FilterField>
       {showLocationFilter && (
-        <MultiSelect
-          label={t('market.orders.filter.location')}
-          size="sm"
-          active={draft.locationIds.length > 0}
-          triggerLabel={locationSummary}
-          options={locationOptions.map((option) => ({
-            id: option.locationId,
-            label: option.label,
-          }))}
-          selected={new Set(draft.locationIds)}
-          onToggle={(locationId) =>
-            setDraft({
-              ...draft,
-              locationIds: draft.locationIds.includes(locationId)
-                ? draft.locationIds.filter((id) => id !== locationId)
-                : [...draft.locationIds, locationId],
-            })
-          }
-          searchPlaceholder={t('market.orders.filter.locationSearchPlaceholder')}
-          noResultsLabel={t('market.orders.filter.locationNoResults')}
-          extraContent={(close) => (
-            <div className="border-b border-line p-1">
-              <Button
-                variant="ghost"
-                align="start"
-                size="sm"
-                className="w-full"
-                onClick={() => {
-                  setDraft({ ...draft, locationIds: [] });
-                  close();
-                }}
-              >
-                {t('market.orders.filter.allLocations')}
-              </Button>
-            </div>
-          )}
-        />
+        <FilterField captionInline label={t('market.orders.filter.location')}>
+          <MultiSelect
+            label={t('market.orders.filter.location')}
+            size="sm"
+            active={draft.locationIds.length > 0}
+            triggerLabel={locationSummary}
+            options={locationOptions.map((option) => ({
+              id: option.locationId,
+              label: option.label,
+            }))}
+            selected={new Set(draft.locationIds)}
+            onToggle={(locationId) =>
+              setDraft({
+                ...draft,
+                locationIds: draft.locationIds.includes(locationId)
+                  ? draft.locationIds.filter((id) => id !== locationId)
+                  : [...draft.locationIds, locationId],
+              })
+            }
+            searchPlaceholder={t('market.orders.filter.locationSearchPlaceholder')}
+            noResultsLabel={t('market.orders.filter.locationNoResults')}
+            extraContent={(close) => (
+              <div className="border-b border-line p-1">
+                <Button
+                  variant="ghost"
+                  align="start"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    setDraft({ ...draft, locationIds: [] });
+                    close();
+                  }}
+                >
+                  {t('market.orders.filter.allLocations')}
+                </Button>
+              </div>
+            )}
+          />
+        </FilterField>
       )}
       <Select
         value={draft.sort}

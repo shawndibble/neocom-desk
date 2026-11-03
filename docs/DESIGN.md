@@ -1204,7 +1204,7 @@ Retired meanings, each with its replacement:
 ### Filter set away from its default
 
 A select-shaped filter (`SelectTrigger`, `CheckboxSelect`, `MultiSelect`,
-`JumpRangeSelect`) whose value differs from its default takes `active`, which
+`RegionSelect`, `JumpRangeSelect`) whose value differs from its default takes `active`, which
 draws the accent border, so "which filter is on?" is answered by looking at the
 row. The border never carries it alone: the trigger's text still names the value
 and the funnel's badge still counts it. Persisted settings that sit in a filter
