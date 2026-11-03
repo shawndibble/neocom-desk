@@ -41,11 +41,19 @@ function instant(date: string | undefined): number | null {
 
 // --- Training ------------------------------------------------------------------------
 
-/** The accelerator line a Training table leads with: what it is, when it runs out, how loud. */
+/** The accelerator line a Training table carries, in time-left order: what it is, when it runs out, how loud. */
 export interface TrainingAcceleratorRow {
   label: string;
   expiresAt: number;
   severity: DeadlineSeverity;
+}
+
+/**
+ * Where the accelerator sits among the queue's rows: after every skill that ends before it runs
+ * out, so the list reads by time left. A skill with no end (a paused queue) sorts after it.
+ */
+export function acceleratorSlot(finishes: readonly (number | null)[], expiresAt: number): number {
+  return finishes.filter((finish) => finish !== null && finish <= expiresAt).length;
 }
 
 /**
@@ -61,22 +69,9 @@ export function trainingTable(
   accelerator?: TrainingAcceleratorRow | null
 ): TableModel {
   let previousFinish: number | null = null;
-  // First, so "+N more" never hides an accelerator about to run out.
-  const rows: TableRowModel[] = accelerator
-    ? [
-        {
-          key: 'accelerator',
-          cells: [
-            accelerator.label,
-            formatCountdown(Math.max(0, accelerator.expiresAt - now) / 1000),
-            '',
-            '',
-            '',
-          ],
-          tone: accelerator.severity,
-        },
-      ]
-    : [];
+  const rows: TableRowModel[] = [];
+  // Each row's end, so the accelerator can take its place among them by time left.
+  const finishes: (number | null)[] = [];
   for (const entry of entries) {
     const finish = instant(entry.finish_date);
     if (finish !== null && finish <= now) continue;
@@ -101,7 +96,21 @@ export function trainingTable(
       tone: 'clear',
       info: { typeId: entry.skill_id },
     });
+    finishes.push(finish);
     if (finish !== null) previousFinish = finish;
+  }
+  if (accelerator) {
+    rows.splice(acceleratorSlot(finishes, accelerator.expiresAt), 0, {
+      key: 'accelerator',
+      cells: [
+        accelerator.label,
+        formatCountdown(Math.max(0, accelerator.expiresAt - now) / 1000),
+        '',
+        '',
+        '',
+      ],
+      tone: accelerator.severity,
+    });
   }
   return {
     columns: [

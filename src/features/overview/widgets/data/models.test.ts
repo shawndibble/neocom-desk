@@ -335,15 +335,16 @@ describe('training', () => {
     });
     const expiresAt = NOW + 20 * HOUR;
 
-    it('leads the table and the list with the accelerator and offers its expiry as a deadline by default', () => {
+    it('places the accelerator among the skills by time left and offers its expiry as a deadline by default', () => {
       const view = buildView(
         'training',
         { skills: skills(queue) as never, ...accelerators(expiresAt) },
         ctx()
       );
-      expect(view.table?.rows[0]?.key).toBe('accelerator');
-      expect(view.table?.rows[0]?.cells[1]).toBe('20h 0m');
-      expect(view.rows[0]?.key).toBe('accelerator');
+      // The skill ends in 4h, the accelerator in 20h: skill first.
+      expect(view.table?.rows.map((row) => row.key)).toEqual(['3300:0', 'accelerator']);
+      expect(view.table?.rows[1]?.cells[1]).toBe('20h 0m');
+      expect(view.rows.map((row) => row.key)).toEqual(['3300:0', 'accelerator']);
       expect(view.deadlines).toContainEqual({
         at: expiresAt,
         note: 'overview.board.acceleratorEnds',
@@ -351,6 +352,16 @@ describe('training', () => {
         to: '/skills/plans',
       });
       expect(view.deadlines).toHaveLength(2);
+    });
+
+    it('leads with an accelerator that runs out before the skill finishes', () => {
+      const view = buildView(
+        'training',
+        { skills: skills(queue) as never, ...accelerators(NOW + HOUR) },
+        ctx()
+      );
+      expect(view.table?.rows[0]?.key).toBe('accelerator');
+      expect(view.rows[0]?.key).toBe('accelerator');
     });
 
     it('draws the skills alone when the widget is set to skills only', () => {

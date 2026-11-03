@@ -22,7 +22,7 @@ import {
 import { comingUpSummary, spExtractionSummary } from '../../data/boardSummary';
 import { blank, count, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { queueSegments, queueStack } from './chartBuilders';
-import { comingUpTable, spTable, trainingTable } from './characterTables';
+import { acceleratorSlot, comingUpTable, spTable, trainingTable } from './characterTables';
 import type { BoardDeadline } from '../nextDeadline';
 import type { ListRow } from './types';
 import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
@@ -90,28 +90,37 @@ export const training: Builder = (feeds, { t, now, notTrainingAlert, activeChara
 
   const finishOf = (entry: { finish_date?: string }) =>
     entry.finish_date ? Date.parse(entry.finish_date) : null;
-  const skillRows: ListRow[] = sorted
-    .filter((entry) => {
-      const finish = finishOf(entry);
-      return finish === null || finish > now;
-    })
-    .map((entry) => {
-      const finish = finishOf(entry);
-      return {
-        key: `${entry.skill_id}:${entry.queue_position}`,
-        title: t('overview.widgets.training.skillLevel', {
-          name: nameOf(entry.skill_id),
-          level: entry.finished_level,
-        }),
-        detail: t(
-          entry === active ? 'overview.widgets.training.now' : 'overview.widgets.training.next'
-        ),
-        value: finish === null ? UNKNOWN : formatCountdown(Math.max(0, finish - now) / 1000),
-        tone: 'clear' as DeadlineSeverity,
-      };
-    });
+  const liveEntries = sorted.filter((entry) => {
+    const finish = finishOf(entry);
+    return finish === null || finish > now;
+  });
+  const skillRows: ListRow[] = liveEntries.map((entry) => {
+    const finish = finishOf(entry);
+    return {
+      key: `${entry.skill_id}:${entry.queue_position}`,
+      title: t('overview.widgets.training.skillLevel', {
+        name: nameOf(entry.skill_id),
+        level: entry.finished_level,
+      }),
+      detail: t(
+        entry === active ? 'overview.widgets.training.now' : 'overview.widgets.training.next'
+      ),
+      value: finish === null ? UNKNOWN : formatCountdown(Math.max(0, finish - now) / 1000),
+      tone: 'clear' as DeadlineSeverity,
+    };
+  });
 
-  const rows = [...acceleratorRows, ...skillRows];
+  const rows = [...skillRows];
+  if (accelerator) {
+    rows.splice(
+      acceleratorSlot(
+        liveEntries.map((entry) => finishOf(entry)),
+        accelerator.expiresAt
+      ),
+      0,
+      ...acceleratorRows
+    );
+  }
 
   if (!active) {
     return {
