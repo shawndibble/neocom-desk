@@ -26,7 +26,7 @@ function both() {
 describe('PiSettingsForm', () => {
   it('shows the sell market, buy tiers and cadence, with buying off by default', async () => {
     render(<PiSettingsForm />);
-    const tiers = await screen.findByRole('group', { name: 'Buy at the hub when short' });
+    const tiers = await screen.findByRole('group', { name: 'Buy now at the hub when short' });
     for (const tier of ['P1', 'P2', 'P3']) {
       expect(within(tiers).getByRole('button', { name: tier })).toHaveAttribute(
         'aria-pressed',
@@ -41,7 +41,7 @@ describe('PiSettingsForm', () => {
   it('toggles tiers from the keyboard and stores them, in tier order', async () => {
     const user = userEvent.setup();
     render(<PiSettingsForm />);
-    const tiers = await screen.findByRole('group', { name: 'Buy at the hub when short' });
+    const tiers = await screen.findByRole('group', { name: 'Buy now at the hub when short' });
     const p3 = within(tiers).getByRole('button', { name: 'P3' });
     p3.focus();
     await user.keyboard('{Enter}');
@@ -63,7 +63,7 @@ describe('PiSettingsForm', () => {
 
   it('leaves one sell control with the strip and the form side by side', async () => {
     both();
-    await screen.findByRole('group', { name: 'Buy at the hub when short' });
+    await screen.findByRole('group', { name: 'Buy now at the hub when short' });
     expect(screen.getAllByRole('combobox', { name: 'Where do you sell?' })).toHaveLength(1);
   });
 

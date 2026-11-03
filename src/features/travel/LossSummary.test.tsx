@@ -26,12 +26,12 @@ describe('LossSummary', () => {
   it('prices at Jita whatever the Settings hub is, and does not refetch when it changes', async () => {
     useMarketHub.setState({ value: 'amarr' });
     render(<LossSummary detail={detail} zkbValue={null} />);
-    expect(await screen.findByText('What it cost, Jita sell')).toBeTruthy();
+    expect(await screen.findByText('What it cost, at Jita buy-now prices')).toBeTruthy();
     expect(prices).toHaveBeenCalledTimes(1);
     expect(prices.mock.calls[0][0].id).toBe('jita');
 
     useMarketHub.setState({ value: 'hek' });
-    await screen.findByText('What it cost, Jita sell');
+    await screen.findByText('What it cost, at Jita buy-now prices');
     expect(prices).toHaveBeenCalledTimes(1);
   });
 });

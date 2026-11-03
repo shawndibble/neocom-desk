@@ -123,8 +123,8 @@ export interface LoyaltyOfferComputeInputs {
   revenueHubPrices?: HubPrices;
   /**
    * Which side of the order book `revenueHubPrices` was priced on, as the
-   * loyalty engine's market fees need it: `order` (the "Sell (list order)"
-   * basis) pays sales tax plus a broker fee, `instant` (the "Buy (instant)"
+   * loyalty engine's market fees need it: `order` (the "Sell order"
+   * basis) pays sales tax plus a broker fee, `instant` (the "Sell now"
    * basis) pays sales tax only. The price map alone can't say which — the
    * caller (`priceBasis.ts`) owns that choice, so it states it here rather
    * than having this module infer it.
