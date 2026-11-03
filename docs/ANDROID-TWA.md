@@ -10,8 +10,8 @@ web manifest.
 Bubblewrap writes into `twa/` (the keystore, the generated Gradle project,
 build output) is gitignored and must never be committed.
 
-> `twa-manifest.json` holds the next build for Play (version code 4: the
-> shortcuts follow mobile usage, `docs/context/decisions/`; version code 3
+> `twa-manifest.json` holds the next build for Play (version code 5: per-page
+> shortcut icons; version 4 changed the shortcuts, `docs/context/decisions/`; version 3
 > was the first with the notification settings activity). Keystore alias is `android`. Keep
 > `signingKey.path` as `./android.keystore` here; a local build may point it
 > at wherever the keystore actually lives. Play rejects an upload whose

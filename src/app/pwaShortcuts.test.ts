@@ -52,6 +52,15 @@ describe('buildPwaShortcuts', () => {
     }
   });
 
+  it('gives each shortcut its own icon, the same file in the web and twa manifests', () => {
+    const twa = readTwa<{ shortcuts: { chosenIconUrl: string }[] }>();
+    const web = shortcuts.map((s) => s.icons[0].src);
+    expect(new Set(web).size).toBe(shortcuts.length);
+    expect(twa.shortcuts.map((s) => s.chosenIconUrl)).toEqual(
+      web.map((src) => `https://neocomdesk.com/${src}`)
+    );
+  });
+
   it('keeps the twa minSdkVersion at what androidbrowserhelper needs', () => {
     // androidbrowserhelper 2.7.x (bundled by Bubblewrap 1.27) declares minSdk 24;
     // a lower value fails the Gradle manifest merge.
