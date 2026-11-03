@@ -18,6 +18,7 @@ import { formatMeanCount, formatVolume } from './format';
 import { loadPriceHistory } from './priceHistory';
 import {
   filterPriceHistoryRange,
+  orderCountWindowDays,
   summarizePriceHistory,
   movingAverage,
   PRICE_HISTORY_RANGES,
@@ -406,7 +407,15 @@ function RangedHistory({
     [compareIds, comparedHistories, regions, range, now]
   );
   const filtered = useMemo(() => filterPriceHistoryRange(points, range, now), [points, range, now]);
-  const summary = useMemo(() => summarizePriceHistory(filtered), [filtered]);
+  const summary = useMemo(
+    () =>
+      summarizePriceHistory(
+        filtered,
+        // `points` is the full series: its first day says how long the market has traded.
+        points.length > 0 ? orderCountWindowDays(range, points[0].date, now) : 1
+      ),
+    [filtered, points, range, now]
+  );
   // Computed over the full unfiltered `points`, then sliced to `range` —
   // computing it over `filtered` instead would understate the window for
   // the first days of any range that don't have `windowDays` prior days

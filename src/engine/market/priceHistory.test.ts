@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   sortPriceHistory,
   filterPriceHistoryRange,
+  orderCountWindowDays,
   summarizePriceHistory,
   movingAverage,
 } from './priceHistory';
@@ -72,7 +73,7 @@ describe('summarizePriceHistory', () => {
       point({ date: '2026-01-02', average: 30, lowest: 25, highest: 44 }),
       point({ date: '2026-01-03', average: 20, lowest: 18, highest: 23 }),
     ];
-    const summary = summarizePriceHistory(points);
+    const summary = summarizePriceHistory(points, 30);
     expect(summary?.hi).toBe(44);
     expect(summary?.lo).toBe(4);
   });
@@ -83,7 +84,7 @@ describe('summarizePriceHistory', () => {
       point({ date: '2026-01-02', average: 30 }),
       point({ date: '2026-01-03', average: 20 }),
     ];
-    expect(summarizePriceHistory(points)?.median).toBe(20);
+    expect(summarizePriceHistory(points, 30)?.median).toBe(20);
   });
 
   it('averages the two middle values for an even count', () => {
@@ -93,7 +94,7 @@ describe('summarizePriceHistory', () => {
       point({ date: '2026-01-03', average: 30 }),
       point({ date: '2026-01-04', average: 40 }),
     ];
-    expect(summarizePriceHistory(points)?.median).toBe(25);
+    expect(summarizePriceHistory(points, 30)?.median).toBe(25);
   });
 
   it('sums traded volume across the range', () => {
@@ -102,24 +103,32 @@ describe('summarizePriceHistory', () => {
       point({ date: '2026-01-02', volume: 30 }),
       point({ date: '2026-01-03', volume: 7 }),
     ];
-    expect(summarizePriceHistory(points)?.totalVolume).toBe(157);
+    expect(summarizePriceHistory(points, 30)?.totalVolume).toBe(157);
   });
 
-  it('reports the mean daily order count', () => {
+  it('reports the mean daily order count over a fully traded window', () => {
     const points = [
       point({ date: '2026-01-01', orderCount: 10 }),
       point({ date: '2026-01-02', orderCount: 11 }),
       point({ date: '2026-01-03', orderCount: 12 }),
       point({ date: '2026-01-04', orderCount: 12 }),
     ];
-    expect(summarizePriceHistory(points)?.meanOrderCount).toBe(11.25);
+    expect(summarizePriceHistory(points, 4)?.meanOrderCount).toBe(11.25);
+  });
+
+  it('counts a day nothing traded as zero orders (ESI omits it)', () => {
+    // 10 orders on 3 of 90 days: 0.11 a day, not the 3.3 that dividing by traded days gives.
+    const points = [
+      point({ date: '2026-01-01', orderCount: 5 }),
+      point({ date: '2026-02-01', orderCount: 3 }),
+      point({ date: '2026-03-01', orderCount: 2 }),
+    ];
+    expect(summarizePriceHistory(points, 90)?.meanOrderCount).toBeCloseTo(10 / 90, 10);
   });
 
   it('keeps a thin market\u2019s order count off zero rather than rounding it away', () => {
-    const points = Array.from({ length: 90 }, (_, i) =>
-      point({ date: `2026-01-${String(i + 1).padStart(3, '0')}`, orderCount: i < 10 ? 1 : 0 })
-    );
-    expect(summarizePriceHistory(points)?.meanOrderCount).toBeGreaterThan(0);
+    const points = [point({ date: '2026-01-01', orderCount: 1 })];
+    expect(summarizePriceHistory(points, 365)?.meanOrderCount).toBeGreaterThan(0);
   });
 
   it('finds the range high and low wherever in the series they sit', () => {
@@ -131,12 +140,12 @@ describe('summarizePriceHistory', () => {
       point({ date: '2026-01-01', lowest: 40, highest: 50 }),
       point({ date: '2026-01-02', lowest: 2, highest: 99 }),
     ];
-    expect(summarizePriceHistory(atStart)).toMatchObject({ hi: 99, lo: 2 });
-    expect(summarizePriceHistory(atEnd)).toMatchObject({ hi: 99, lo: 2 });
+    expect(summarizePriceHistory(atStart, 30)).toMatchObject({ hi: 99, lo: 2 });
+    expect(summarizePriceHistory(atEnd, 30)).toMatchObject({ hi: 99, lo: 2 });
   });
 
   it('returns null for an empty range rather than a fabricated zero', () => {
-    expect(summarizePriceHistory([])).toBeNull();
+    expect(summarizePriceHistory([], 30)).toBeNull();
   });
 });
 
@@ -199,5 +208,22 @@ describe('filterPriceHistoryRange with a moving-average series', () => {
     expect(filterPriceHistoryRange(maPoints, '7d', now)).toEqual([
       { date: '2026-02-28', average: 25 },
     ]);
+  });
+});
+
+describe('orderCountWindowDays', () => {
+  const now = new Date('2026-03-31T12:00:00Z');
+
+  it('is the range\u2019s calendar days when the series reaches back that far', () => {
+    expect(orderCountWindowDays('30d', '2025-01-01', now)).toBe(30);
+    expect(orderCountWindowDays('1y', '2025-01-01', now)).toBe(365);
+  });
+
+  it('shrinks to the days since the first trade for a market newer than the range', () => {
+    expect(orderCountWindowDays('90d', '2026-03-21', now)).toBe(10);
+  });
+
+  it('is at least one day', () => {
+    expect(orderCountWindowDays('7d', '2026-03-31', now)).toBe(1);
   });
 });
