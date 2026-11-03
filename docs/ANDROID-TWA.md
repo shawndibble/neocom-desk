@@ -103,11 +103,12 @@ as Chrome:
   before `bubblewrap update`.
   Each icon, `public/icons/shortcut-<name>.png`, is the page's nav glyph
   (`src/app/navIcons.ts`: Bell, EnvelopeSimple, Wallet, ChartLineUp) at the
-  `fill` weight, 192×192, **transparent background**, glyph in `#0b78ad` at 88% of
-  the canvas. This is the fallback "any" icon, which the launcher insets on a white
+  `fill` weight, 192×192, **transparent background**, glyph in `#0b78ad`, cropped to its ink bounds and
+  fitted so its longest side is 96% of the canvas (Phosphor's own viewBox padding
+  would leave ~72%). This is the fallback "any" icon, which the launcher insets on a white
   disc, so it must read on white (the app's `#57c7f4` accent is too faint there). Each also
   has `shortcut-<name>-maskable.png` (`chosenMaskableIconUrl`, `purpose: maskable`
-  in the web manifest): `#57c7f4` glyph at 60% so it stays inside the mask's safe circle,
+  in the web manifest): `#57c7f4` glyph fitted so its bounding-box diagonal is 76% of the canvas, inside the mask's 80% safe circle,
   on `#0d1117` full-bleed. Bubblewrap builds an Android adaptive icon from it, which
   fills the launcher's circle with no white ring. Render the glyph's SVG
   (`renderToStaticMarkup` of the `Nav*` component) and screenshot it on that
