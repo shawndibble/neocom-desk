@@ -722,7 +722,7 @@ describe('ContractSearchPanel', () => {
     expect(screen.getByRole('textbox', { name: 'Max price' })).toHaveValue('');
   });
 
-  it('takes ISK shorthand in max price and echoes the exact figure (issue #2227)', async () => {
+  it('takes ISK shorthand in max price (issue #2227)', async () => {
     const user = userEvent.setup();
     renderWithRouter();
     expect(await bodyRows()).toHaveLength(3);
@@ -731,7 +731,6 @@ describe('ContractSearchPanel', () => {
     await user.type(screen.getByRole('textbox', { name: 'Max price' }), '1.5m');
 
     // The auction is judged on its 2M buyout, so only the two Tritanium asks remain.
-    expect(screen.getByText('= 1,500,000 ISK')).toBeInTheDocument();
     await waitFor(async () => expect(await bodyRows()).toHaveLength(2));
   });
 

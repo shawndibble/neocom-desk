@@ -292,7 +292,6 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
     await waitFor(() => expect(window.location.search).toContain('min=10000'));
-    expect(screen.queryByText(/= 10,000 ISK/)).not.toBeInTheDocument();
   });
 
   it('sorts the flat list by value, highest first', async () => {

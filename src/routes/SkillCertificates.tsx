@@ -202,6 +202,7 @@ export function SkillCertificates() {
             </Select>
             {/* Each grade carries its count, so the filter doubles as the summary. */}
             <CheckboxSelect
+              size="sm"
               label={t('skills.certificates.gradeFilter')}
               className="min-w-0 flex-1 sm:w-44 sm:flex-none"
               options={GRADES.map((grade) => ({

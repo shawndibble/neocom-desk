@@ -322,7 +322,6 @@ export function EntryEditDialog({
                       </span>
                       {perOre && (
                         <DefaultedIskInput
-                          echo={false}
                           aria-label={t('miningTax.entryEdit.oreValueLabel', {
                             name,
                             date: assignment.date,
@@ -350,7 +349,6 @@ export function EntryEditDialog({
                       {t('miningTax.estimatedValueLabel')}
                     </span>
                     <DefaultedIskInput
-                      echo={false}
                       aria-label={t('miningTax.entryEdit.dayValueLabel', {
                         date: assignment.date,
                       })}
@@ -377,7 +375,6 @@ export function EntryEditDialog({
               // their per-line boxes, so there the tile is a read-only total.
               <div className="relative">
                 <DefaultedIskInput
-                  echo={false}
                   aria-label={t('miningTax.entryEdit.dayValueLabel', {
                     date: singleDayValue.date,
                   })}
@@ -409,7 +406,6 @@ export function EntryEditDialog({
               // the value it implies. Needs a rate above 0% to imply one.
               <div className="relative">
                 <DefaultedIskInput
-                  echo={false}
                   disabled={!pctValid || pct <= 0}
                   aria-label={t('miningTax.entryEdit.dayTaxLabel', { date: singleDayValue.date })}
                   className="[&_input]:pr-7 [&_input]:font-semibold"

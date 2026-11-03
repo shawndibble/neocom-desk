@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { Field } from './Fields';
 import { IskInput } from './IskInput';
@@ -46,8 +45,7 @@ describe('Field note', () => {
     expect(screen.getByLabelText('B')).not.toHaveAttribute('aria-describedby');
   });
 
-  it('lists the note before the ISK echo', async () => {
-    const user = userEvent.setup();
+  it('describes an ISK field by its note', () => {
     render(
       <Field label="Price" htmlFor="p" note="Per unit">
         <IskInput id="p" value="" onChange={() => {}} />
@@ -55,7 +53,5 @@ describe('Field note', () => {
     );
     const input = screen.getByLabelText('Price');
     expect(input).toHaveAccessibleDescription('Per unit');
-    await user.type(input, '1b');
-    expect(input).toHaveAccessibleDescription('Per unit = 1,000,000,000 ISK');
   });
 });

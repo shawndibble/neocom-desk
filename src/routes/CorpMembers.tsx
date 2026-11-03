@@ -386,6 +386,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                     selected={draft.dark}
                     onToggle={() => setDraft({ ...draft, dark: !draft.dark })}
                     tooltip={t('corp.members.darkHint', { days: darkAfterDays })}
+                    size="md"
                   />
                   <FilterField label={t('corp.members.shipFilterLabel')}>
                     <Select

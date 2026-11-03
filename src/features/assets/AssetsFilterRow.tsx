@@ -65,7 +65,6 @@ export function AssetsFilterRow({
 
   const minValue = (
     <IskInput
-      echo={false}
       value={minValueInput}
       onChange={(min) => setView({ min })}
       placeholder={t('assets.minValue.placeholder')}

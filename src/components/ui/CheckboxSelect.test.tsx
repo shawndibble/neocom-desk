@@ -49,21 +49,21 @@ describe('CheckboxSelect', () => {
     expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 
-  it('takes the md height when asked, the sm height by default', () => {
+  it('takes the md height by default, the sm height when asked', () => {
     const { rerender } = render(
       <CheckboxSelect label="Letters" options={OPTIONS} selected={new Set()} onToggle={vi.fn()} />
     );
     const trigger = () => screen.getByRole('button', { name: /Letters/ });
-    expect(trigger().className).toContain('md:h-7');
+    expect(trigger().className).not.toContain('md:h-7');
     rerender(
       <CheckboxSelect
         label="Letters"
         options={OPTIONS}
         selected={new Set()}
         onToggle={vi.fn()}
-        size="md"
+        size="sm"
       />
     );
-    expect(trigger().className).not.toContain('md:h-7');
+    expect(trigger().className).toContain('md:h-7');
   });
 });

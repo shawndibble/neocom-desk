@@ -391,7 +391,7 @@ describe('view state in the URL (issue #1306)', () => {
       'aria-checked',
       'true'
     );
-    expect(screen.getByLabelText('Minimum value')).toHaveValue('10000');
+    expect(screen.getByLabelText('Minimum value')).toHaveValue('10,000');
   });
 
   it('reads the search text from the URL', async () => {

@@ -145,7 +145,6 @@ function IskFilterField({
   return (
     <FilterField captionInline label={label}>
       <IskInput
-        mask
         aria-label={label}
         placeholder={label}
         className={width}

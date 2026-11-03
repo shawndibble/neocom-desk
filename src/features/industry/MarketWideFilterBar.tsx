@@ -175,6 +175,7 @@ function FilterMultiSelect<V extends string>({
   return (
     <FilterField label={label}>
       <CheckboxSelect
+        size="sm"
         label={label}
         className="w-44"
         active={active}

@@ -137,7 +137,7 @@ Toggle (`?all=1`). Same flat list as search with every item across every locatio
 
 ## Min value and sorts (flat views)
 
-- **Minimum value** `IskInput` (accepts shorthand like `10m`; echo hidden), `?min=`. Held off (0) while prices still load (`pricesReady`), so rows are not hidden by a zero price. Never remembered (decision in `assetSortPreference.ts` comment: a filter that hides assets must not persist).
+- **Minimum value** `IskInput` (masked as typed; accepts shorthand like `10m`), `?min=`. Held off (0) while prices still load (`pricesReady`), so rows are not hidden by a zero price. Never remembered (decision in `assetSortPreference.ts` comment: a filter that hides assets must not persist).
 - **Sort** select: Name (asc), Value (high first), Quantity (high first). Remembered per device (`assetsItemSort`).
 
 ## Value model (`engine/assetTree.ts`)

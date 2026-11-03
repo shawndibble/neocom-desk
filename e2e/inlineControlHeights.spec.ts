@@ -38,7 +38,27 @@ for (const url of [...new Set([...ROUTES, ...TABS])]) {
   });
 }
 
-// The filter row opens behind its funnel, so the sweep above never sees it.
+// The filter row opens behind its funnel, so the sweep above never sees it:
+// open every page's funnel (desktop only; below `md` it is a sheet of stacked
+// fields, not a row) and measure what is inside.
+for (const url of [...new Set([...ROUTES, ...TABS])]) {
+  test(`${url}: the open filters share one height`, async ({ page }) => {
+    await page.setViewportSize({ width: CONTROL_ROW_WIDTHS[0], height: 900 });
+    await signInAndGoto(page, url);
+    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main .animate-spin')).toHaveCount(0, { timeout: 8000 });
+    const funnels = page.getByRole('button', { name: /^Filters/ });
+    const count = await funnels.count();
+    for (let i = 0; i < count; i += 1) {
+      const funnel = funnels.nth(i);
+      if (!(await funnel.isVisible())) continue;
+      await funnel.click();
+      await expectInlineControlsAligned(page, `${url} filters open (${i})`);
+      await page.keyboard.press('Escape');
+    }
+  });
+}
+
 // Hauling's mixes selects with the two ISK fields (Max price per item, Max
 // spend): one size across the lot. Desktop only — below `md` it is a sheet
 // of stacked fields, not a row.
@@ -47,9 +67,9 @@ test('/market/hauling: the open filter row shares one height', async ({ page }) 
   await signInAndGoto(page, '/market/hauling');
   await page.getByRole('button', { name: /^Filters/ }).click();
   await expect(page.getByRole('textbox', { name: 'Max spend' })).toBeVisible();
-  // A typed figure shows its full-ISK echo: it must not lift its box out of the row.
-  await page.getByRole('textbox', { name: 'Max price per item' }).fill('1000');
-  await expect(page.getByText('= 1,000 ISK')).toBeVisible();
+  // A typed figure groups in the field itself: it must not lift its box out of the row.
+  await page.getByRole('textbox', { name: 'Max price per item' }).fill('1000000');
+  await expect(page.getByRole('textbox', { name: 'Max price per item' })).toHaveValue('1,000,000');
   await expectInlineControlsAligned(page, '/market/hauling filters open');
   const field = await page.getByRole('textbox', { name: 'Max price per item' }).boundingBox();
   const sells = await page.getByRole('combobox', { name: 'Sells within' }).boundingBox();
