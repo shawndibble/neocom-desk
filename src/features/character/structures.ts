@@ -257,6 +257,21 @@ export async function loadVisibleStructure(
     : null;
 }
 
+/**
+ * Whether this Character alone can see a structure: `visible`, `refused` (ESI
+ * said 403, now or on the one-day memo), or `unknown` — offline, a timeout, a
+ * 5xx or a spent budget gate, none of which says anything about the ACL. A
+ * caller that labels a structure "undockable" must act on `refused` only.
+ */
+export async function loadStructureAccess(
+  characterId: number,
+  structureId: number
+): Promise<'visible' | 'refused' | 'unknown'> {
+  const { structure, forbidden } = await loadOwnStructure(characterId, structureId);
+  if (forbidden) return 'refused';
+  return structure ? 'visible' : 'unknown';
+}
+
 async function loadStructure(
   characterId: number,
   structureId: number

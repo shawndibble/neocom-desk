@@ -34,7 +34,7 @@ import { loadMoonNames } from '@/features/character/moonNames';
 import { loadSurvey } from '@/features/survey/surveyStore';
 import { loadMoonOreTypeIds, loadTypes } from '@/sde/loadSde';
 import { resolveNames } from '@/features/character/names';
-import { loadStructureName, loadVisibleStructure } from '@/features/character/structures';
+import { loadStructureAccess, loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
 import {
   hubForPayee,
@@ -458,9 +458,11 @@ export function useCorpBook(
       ]);
       const refineries = new Map<number, string>();
       // A name the server read with the moon owner's own grant is used as it is,
-      // so ESI is not asked for it again (and no other character is swept on a
-      // refusal). This character's own access is still checked, from its own
-      // cached lookup, because a refinery you cannot dock at is worth saying so.
+      // so no roster sweep is made for it. This character's own access is still
+      // checked (one lookup per refinery, then cached, and a refusal is
+      // remembered for a day), because a refinery you cannot dock at is worth
+      // saying so. Only a confirmed refusal counts: offline or a failed request
+      // says nothing about docking rights.
       const serverNamed =
         fetched.status === 'loaded'
           ? structureNamesOf(fetched.data.feeders ?? [])
@@ -468,9 +470,8 @@ export function useCorpBook(
       const undockable = new Set<number>();
       await Promise.all(
         [...refineryIds].map(async (id) => {
-          const visible = await loadVisibleStructure(characterId, id).catch(() => undefined);
-          // `undefined`: the question went unanswered (offline), which is not a refusal.
-          if (visible === null) undockable.add(id);
+          const access = await loadStructureAccess(characterId, id).catch(() => 'unknown');
+          if (access === 'refused') undockable.add(id);
           if (serverNamed.has(id)) return;
           const name = await loadStructureName(characterId, id).catch(() => null);
           if (name) refineries.set(id, name);

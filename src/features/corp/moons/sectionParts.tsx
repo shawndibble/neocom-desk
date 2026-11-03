@@ -22,6 +22,16 @@ import { cx } from '@/lib/cx';
 import { tapTargetClassName, useCards } from './sectionHelpers';
 import { usePaged } from './usePaged';
 
+/** Yellow badge after a station name the viewer's character cannot dock at to read for itself. */
+export function UndockableChip() {
+  const { t } = useTranslation();
+  return (
+    <Pill tone="warning" className="ml-1.5 align-middle">
+      {t('corpTaxBook.moons.undockable')}
+    </Pill>
+  );
+}
+
 /**
  * Where a day or a moon happened: the moon once (a link when it has a page), then only the
  * station under it, so the system name is never said twice.
@@ -42,13 +52,8 @@ export function PlaceCell({
   /** The station has a name (read by someone who can dock) but the viewer cannot dock there. */
   undockable?: boolean;
 }) {
-  const { t } = useTranslation();
   const place = splitPlace(refinery, moon);
-  const chip = undockable ? (
-    <Pill tone="warning" className="ml-1.5 align-middle">
-      {t('corpTaxBook.moons.undockable')}
-    </Pill>
-  ) : null;
+  const chip = undockable ? <UndockableChip /> : null;
   return (
     <span className="block min-w-0">
       {place.moon === undefined ? (

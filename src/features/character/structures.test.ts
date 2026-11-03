@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { STALE_AFTER, resetRevalidationState } from '@/esi/cache';
 import {
   listCachedStructures,
+  loadStructureAccess,
   loadStructureName,
   loadStructureNameNoRoster,
   readCachedStructureNames,
@@ -346,5 +347,35 @@ describe('loadStructureNameNoRoster', () => {
     expect((await readCachedStructureNames([1000000000001])).get(1000000000001)).toBe(
       'Own Citadel'
     );
+  });
+});
+
+describe('loadStructureAccess', () => {
+  const ID = 1000000000777;
+
+  it('is `refused` only for a confirmed 403', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/${ID}`, () =>
+        HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
+      )
+    );
+
+    expect(await loadStructureAccess(CHARACTER_ID, ID)).toBe('refused');
+  });
+
+  it('is `unknown`, never `refused`, when the request just fails', async () => {
+    server.use(http.get(`${ESI_BASE_URL}/universe/structures/${ID}`, () => HttpResponse.error()));
+
+    expect(await loadStructureAccess(CHARACTER_ID, ID)).toBe('unknown');
+  });
+
+  it('is `visible` when ESI names the structure', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/${ID}`, () =>
+        HttpResponse.json({ name: 'Efa - Brass Anvil', owner_id: 1, solar_system_id: 30002187 })
+      )
+    );
+
+    expect(await loadStructureAccess(CHARACTER_ID, ID)).toBe('visible');
   });
 });
