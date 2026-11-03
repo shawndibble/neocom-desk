@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import en from '../i18n/locales/en.json';
 import { buildPwaShortcuts } from './pwaShortcuts';
 
+const readTwa = <T>(): T => JSON.parse(readFileSync('twa/twa-manifest.json', 'utf-8')) as T;
+
 describe('buildPwaShortcuts', () => {
   const shortcuts = buildPwaShortcuts(en.app.shortcuts);
 
@@ -33,9 +35,7 @@ describe('buildPwaShortcuts', () => {
   });
 
   it('is mirrored in twa/twa-manifest.json (docs/ANDROID-TWA.md)', () => {
-    const twa = JSON.parse(readFileSync('twa/twa-manifest.json', 'utf-8')) as {
-      shortcuts: { name: string; url: string }[];
-    };
+    const twa = readTwa<{ shortcuts: { name: string; url: string }[] }>();
     expect(twa.shortcuts.map((s) => [s.name, s.url])).toEqual(
       shortcuts.map((s) => [s.name, `https://neocomdesk.com${s.url}`])
     );
@@ -45,9 +45,7 @@ describe('buildPwaShortcuts', () => {
     // Bubblewrap's ShortcutInfo throws "must have either chosenIconUrl or
     // chosenMonochromeIconUrl" on a web-manifest-style `icons` array, so
     // `bubblewrap update` fails before it builds anything.
-    const twa = JSON.parse(readFileSync('twa/twa-manifest.json', 'utf-8')) as {
-      shortcuts: Record<string, unknown>[];
-    };
+    const twa = readTwa<{ shortcuts: Record<string, unknown>[] }>();
     for (const s of twa.shortcuts) {
       expect(s).not.toHaveProperty('icons');
       expect(s.chosenIconUrl).toMatch(/^https:\/\/neocomdesk\.com\/icons\/.+\.png$/);
@@ -57,9 +55,7 @@ describe('buildPwaShortcuts', () => {
   it('keeps the twa minSdkVersion at what androidbrowserhelper needs', () => {
     // androidbrowserhelper 2.7.x (bundled by Bubblewrap 1.27) declares minSdk 24;
     // a lower value fails the Gradle manifest merge.
-    const twa = JSON.parse(readFileSync('twa/twa-manifest.json', 'utf-8')) as {
-      minSdkVersion: number;
-    };
+    const twa = readTwa<{ minSdkVersion: number }>();
     expect(twa.minSdkVersion).toBeGreaterThanOrEqual(24);
   });
 });
