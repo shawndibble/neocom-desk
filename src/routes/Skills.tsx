@@ -372,7 +372,7 @@ export function Skills() {
           {skillsNeedsReauth && (
             <ReauthCachedNote characterId={activeCharacterId} endpoints={['getCharacterSkills']} />
           )}
-          {skillsResult.fromCache && <CachedNotice fetchedAt={fetchedAt} />}
+          {skillsResult.fromCache && <CachedNotice withBadge fetchedAt={fetchedAt} />}
 
           <Panel title={t('skills.attributes')}>
             <AttributeChips

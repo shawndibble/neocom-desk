@@ -399,6 +399,7 @@ export function CorpTransactionsPanel({
         <>
           {transactionsResult.fromCache && (
             <CachedNotice
+              withBadge
               className="px-3 pt-2"
               fetchedAt={transactionsResult.fetchedAt}
               refreshFailed={refreshFailed}
