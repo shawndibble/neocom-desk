@@ -10,8 +10,9 @@ web manifest.
 Bubblewrap writes into `twa/` (the keystore, the generated Gradle project,
 build output) is gitignored and must never be committed.
 
-> `twa-manifest.json` matches the last build sent to Play (version code 3,
-> the first with the notification settings activity). Keystore alias is `android`. Keep
+> `twa-manifest.json` holds the next build for Play (version code 4: the
+> shortcuts follow mobile usage, `docs/context/decisions/`; version code 3
+> was the first with the notification settings activity). Keystore alias is `android`. Keep
 > `signingKey.path` as `./android.keystore` here; a local build may point it
 > at wherever the keystore actually lives. Play rejects an upload whose
 > `appVersionCode` isn't above the one Play Console shows.
@@ -78,12 +79,12 @@ as Chrome:
   silhouette the web notifications use, also listed in the web manifest as a
   `monochrome` icon so `bubblewrap merge` (which re-reads the web manifest)
   keeps it.
-- **`shortcuts`** — the long-press app shortcuts (Route planner, Pilot lookup,
-  Alerts, Open orders). The web manifest's `shortcuts`
+- **`shortcuts`** — the long-press app shortcuts (Alerts, Mail, Wallet,
+  Open orders). The web manifest's `shortcuts`
   (`src/app/pwaShortcuts.ts`) is the source; `twa-manifest.json` mirrors it with
   absolute `https://neocomdesk.com/...` urls, and `bubblewrap merge` re-reads
-  the web manifest. Change both together. Do not bump `appVersionCode` until
-  release time.
+  the web manifest. Change both together. Bump `appVersionCode` only in the
+  change that prepares a release.
 
 After shipping a build that turns delegation on, a user who already allowed
 notifications while Chrome owned them must toggle notifications off and on in

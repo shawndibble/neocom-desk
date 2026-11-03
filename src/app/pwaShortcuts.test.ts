@@ -9,9 +9,9 @@ describe('buildPwaShortcuts', () => {
   it('lists at most four shortcuts with in-scope absolute-path urls', () => {
     expect(shortcuts.length).toBeLessThanOrEqual(4);
     expect(shortcuts.map((s) => s.url)).toEqual([
-      '/travel',
-      '/travel/pilot',
       '/alerts',
+      '/mail',
+      '/wallet/balance',
       '/market/orders',
     ]);
   });

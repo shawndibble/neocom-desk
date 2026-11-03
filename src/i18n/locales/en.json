@@ -3,9 +3,9 @@
     "name": "Neocom Desk",
     "tagline": "Skill plans, build margins, market orders, colonies and mining tax — every character you fly, all in one place.",
     "shortcuts": {
-      "route": "Route planner",
-      "pilot": "Pilot lookup",
       "alerts": "Alerts",
+      "mail": "Mail",
+      "wallet": "Wallet",
       "orders": "Open orders"
     }
   },
