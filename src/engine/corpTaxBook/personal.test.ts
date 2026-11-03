@@ -257,6 +257,45 @@ describe('overlayCorpBooks', () => {
     expect(out.rows[0].resolvesAt).toBe('2026-11-01T00:30:00.000Z');
   });
 
+  describe('an Assignment a Default System made', () => {
+    const made = (over: Partial<PersonalEntry['allocations'][number]> = {}) =>
+      entry({
+        freeOreLines: [],
+        oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+        allocations: [
+          {
+            id: 'a-default',
+            payeeId: 'landlord',
+            taxPct: 10,
+            oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+            status: 'outstanding',
+            releasable: true,
+            ...over,
+          },
+        ],
+      });
+    const KEY = `${ME}:2026-10-17:${SYSTEM}`;
+
+    it('is given to no Payee: the book bills the day, with no conflict', () => {
+      const out = overlay([made()], [book()]);
+      expect(out.rows).toHaveLength(1);
+      expect(out.rows[0]).toMatchObject({ state: 'billed' });
+      expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-default']);
+      expect(out.takenFromFree.size).toBe(0);
+    });
+
+    it('is a conflict once the pilot has made it theirs (not releasable)', () => {
+      const out = overlay([made({ releasable: undefined })], [book()]);
+      expect(out.absorbed.size).toBe(0);
+      expect(out.rows[0].state).toBe('conflict');
+    });
+
+    it('is left alone once it is paid', () => {
+      const out = overlay([made({ status: 'paid' })], [book()]);
+      expect(out.absorbed.size).toBe(0);
+    });
+  });
+
   describe('a Payee that is the corporation', () => {
     const own = (over: Partial<PersonalEntry['allocations'][number]> = {}) =>
       entry({

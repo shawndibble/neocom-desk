@@ -4,6 +4,7 @@ import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS, PAYEES } from '@/sync/syncedCollections';
 import { coalesceAssignments } from './coalesce';
+import { loadDefaultOptOuts, useDefaultOptOuts } from './defaultOptOuts';
 import type { GroupMember, DisplayRow } from './groupRows';
 import type { SessionContinuation } from './sessionContinuation';
 import type { MoonMiningTaxRow } from './snapshot';
@@ -107,6 +108,7 @@ beforeEach(async () => {
   await db.miningTaxAssignments.clear();
   await db.payees.clear();
   await db.settings.clear();
+  useDefaultOptOuts.setState({ value: [], hydrated: false });
   pricingMock.loadUnitPricesOnDate.mockResolvedValue({
     prices: PRICES,
     unpriced: new Set<number>(),
@@ -226,6 +228,15 @@ describe('unassign', () => {
     expect(await stored()).toEqual([]);
     expect((await tombstonedIds()).sort()).toEqual(['a1', 'a2']);
     expect(syncMock.scheduleSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('remembers the entry so a Default System does not assign it again', async () => {
+    const row = assignment({ id: 'a1', override: false });
+    await db.miningTaxAssignments.put(row);
+
+    await unassign([row]);
+
+    expect(await loadDefaultOptOuts()).toEqual(new Set([`${CHAR}|2026-09-04|${SYSTEM}`]));
   });
 
   it('leaves the whole Combined Entry in place when the write fails partway', async () => {

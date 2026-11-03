@@ -14,18 +14,20 @@
  * is open (`useSurveyConnection`), so ore is assigned whichever the pilot is
  * looking at.
  */
-import { db, type MiningTaxAssignmentRecord } from '@/db';
+import { db, type MiningTaxAssignmentRecord, type MiningTaxOreLine } from '@/db';
+import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
 import {
   isConnectionLive,
   parseSurveyConnections,
   planSurveyAutoAssign,
   updateSurveyConnection,
   type SurveyConnection,
+  type Takeover,
 } from '@/engine/miningTax/surveyConnection';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
-import { assign } from './ledgerActions';
+import { assign, releaseOre } from './ledgerActions';
 import { loadAllCharacterLedgers } from './ledger';
 import { readCompressedOre } from './oreForm';
 import { loadPayees } from './payees';
@@ -156,6 +158,9 @@ export async function applySurveyConnections(
           compressed
         );
         const value = computeAssignmentValue(slice.oreLines, prices, slice.connection.taxPct);
+        // Ore a Default System had assigned is the Survey's now: take those types off it first.
+        // A failure here (or in the assign below) leaves the entry for the next load to redo.
+        if (!(await takeOverFromDefaults(slice.takeovers))) continue;
         const result = await assign({
           characterId: slice.characterId,
           date: slice.date,
@@ -177,6 +182,26 @@ export async function applySurveyConnections(
     }
   }
   return created;
+}
+
+/**
+ * Takes the Survey's ore types off the Assignments a Default System made (an Assignment is read
+ * again first: an earlier slice may have changed it). Resolves false if any release failed.
+ */
+async function takeOverFromDefaults(takeovers: readonly Takeover[]): Promise<boolean> {
+  const releases: { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[] = [];
+  for (const takeover of takeovers) {
+    const assignment = await db.miningTaxAssignments.get(takeover.assignmentId);
+    if (!assignment || !isUnpaidDefault(assignment)) {
+      continue;
+    }
+    releases.push({
+      assignment,
+      after: assignment.oreLines.filter((l) => !takeover.typeIds.includes(l.typeId)),
+    });
+  }
+  if (releases.length === 0) return true;
+  return (await releaseOre(releases, true)).ok;
 }
 
 /**

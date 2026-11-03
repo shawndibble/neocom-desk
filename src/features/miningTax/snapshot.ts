@@ -9,6 +9,7 @@ import { recordLedgerArrivals } from './oreArrivalLog';
 import { loadPayees } from './payees';
 import { loadAssignments } from './assignments';
 import { reconcileAssignments } from './reconcile';
+import { applyDefaultSystems } from './defaultAssignments';
 import { applySurveyConnections } from './surveyConnections';
 import { readCompressedOre } from './oreForm';
 import { repriceForOreForm } from './oreFormReprice';
@@ -86,6 +87,9 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
   // Assignment (the entry's growth collector) before reconcile folds it into
   // an earlier moon's Assignment on the same day and system.
   await applySurveyConnections(ledgers).catch(() => []);
+  // Last resort, after the Survey has had first claim: a Payee's Default Systems assign what
+  // nothing else has touched.
+  await applyDefaultSystems(ledgers).catch(() => []);
 
   await Promise.all(
     ledgers

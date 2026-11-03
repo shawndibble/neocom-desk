@@ -6,18 +6,87 @@
  * entries in the same transaction.
  */
 import { db, type PayeeRecord } from '@/db';
+import { utcDay } from '@/engine/localDay';
 import { scheduleSync } from '@/sync';
 import { appendTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { PAYEES } from '@/sync/syncedCollections';
 
-export function loadPayees(characterId: number): Promise<PayeeRecord[]> {
-  return db.payees.where('characterId').equals(characterId).toArray();
+/**
+ * The Character's Payees. A Payee that still carries the old single remembered `systemId` has it
+ * folded into its Default Systems first (`migrateLegacyPayeeSystems`).
+ */
+export async function loadPayees(characterId: number): Promise<PayeeRecord[]> {
+  const payees = await db.payees.where('characterId').equals(characterId).toArray();
+  if (!payees.some((p) => p.systemId !== undefined)) return payees;
+  return migrateLegacyPayeeSystems(characterId, payees);
+}
+
+/**
+ * The old "remember this system" tag becomes a Default System, effective today: forward-only, so
+ * ore mined before the migration is never billed unasked. A system two Payees both remembered
+ * goes to the lowest id, the way the plan picks (`defaultPayeeForSystem`); the other loses it.
+ */
+async function migrateLegacyPayeeSystems(
+  characterId: number,
+  payees: PayeeRecord[]
+): Promise<PayeeRecord[]> {
+  const today = utcDay(Date.now());
+  const held = new Set(payees.flatMap((p) => p.defaultSystems?.map((s) => s.systemId) ?? []));
+  const migrated = new Map<string, PayeeRecord>();
+  for (const payee of [...payees].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (payee.systemId === undefined) continue;
+    const { systemId, ...rest } = payee;
+    const next: PayeeRecord = { ...rest, updatedAt: Date.now() };
+    if (!held.has(systemId)) {
+      held.add(systemId);
+      next.defaultSystems = [...(payee.defaultSystems ?? []), { systemId, from: today }];
+    }
+    migrated.set(payee.id, next);
+  }
+  await db.payees.bulkPut([...migrated.values()]);
+  scheduleSync(characterId, { collections: ['payees'] });
+  return payees.map((p) => migrated.get(p.id) ?? p);
+}
+
+/** A Default System can belong to one of a Character's Payees only; this names the one that has it. */
+export class DefaultSystemTakenError extends Error {
+  constructor(
+    readonly systemId: number,
+    readonly holderName: string
+  ) {
+    super(`System ${systemId} is already the default of ${holderName}`);
+    this.name = 'DefaultSystemTakenError';
+  }
+}
+
+/**
+ * The Default Systems a save leaves a Payee with: each requested system keeps the day it was
+ * added if the Payee already had it, and is stamped today otherwise. Throws if another of the
+ * Character's Payees already holds one.
+ */
+async function resolveDefaultSystems(
+  characterId: number,
+  payeeId: string | undefined,
+  existing: PayeeRecord['defaultSystems'],
+  systemIds: readonly number[]
+): Promise<NonNullable<PayeeRecord['defaultSystems']>> {
+  const others = (await loadPayees(characterId)).filter((p) => p.id !== payeeId);
+  const today = utcDay(Date.now());
+  return [...new Set(systemIds)].map((systemId) => {
+    const holder = others.find((p) => p.defaultSystems?.some((s) => s.systemId === systemId));
+    if (holder) throw new DefaultSystemTakenError(systemId, holder.name);
+    return { systemId, from: existing?.find((s) => s.systemId === systemId)?.from ?? today };
+  });
 }
 
 export interface PayeeInput {
   name: string;
   defaultTaxPct: number;
-  systemId?: number;
+  /**
+   * The systems this Payee is the default for. On `updatePayee` absent keeps what the record has
+   * (an ordinary rename or rate change must not forget them); an empty list clears them.
+   */
+  defaultSystemIds?: readonly number[];
   /** Absent means Jita — the basis every Payee was priced at before this was settable. */
   hubId?: string;
   /**
@@ -32,12 +101,15 @@ export interface PayeeInput {
 export type PayeeEntityKind = NonNullable<PayeeRecord['entityKind']>;
 
 export async function createPayee(characterId: number, input: PayeeInput): Promise<PayeeRecord> {
+  const defaultSystems = input.defaultSystemIds?.length
+    ? await resolveDefaultSystems(characterId, undefined, undefined, input.defaultSystemIds)
+    : [];
   const record: PayeeRecord = {
     id: crypto.randomUUID(),
     characterId,
     name: input.name,
     defaultTaxPct: input.defaultTaxPct,
-    ...(input.systemId !== undefined ? { systemId: input.systemId } : {}),
+    ...(defaultSystems.length > 0 ? { defaultSystems } : {}),
     ...(input.hubId !== undefined ? { hubId: input.hubId } : {}),
     ...(input.entityId != null ? { entityId: input.entityId } : {}),
     ...(input.entityId != null && input.entityKind != null ? { entityKind: input.entityKind } : {}),
@@ -53,18 +125,22 @@ export async function updatePayee(payee: PayeeRecord, input: PayeeInput): Promis
     ...payee,
     name: input.name,
     defaultTaxPct: input.defaultTaxPct,
-    ...(input.systemId !== undefined ? { systemId: input.systemId } : { systemId: undefined }),
     ...(input.hubId !== undefined ? { hubId: input.hubId } : { hubId: undefined }),
     updatedAt: Date.now(),
   };
-  // Firestore rejects `undefined` fields; an explicit removal must drop the
-  // key entirely rather than write `systemId: undefined` to Dexie, which
-  // `toRemoteDoc`'s `!== undefined` check would then happily (and wrongly)
-  // treat as "no change to push".
-  if (input.systemId === undefined) delete updated.systemId;
-  // Same reason as `systemId` above: Firestore rejects an `undefined` field,
-  // and `toRemoteDoc`'s `!== undefined` check would read a written `undefined`
-  // as "no change to push", so clearing the hub has to drop the key entirely.
+  if (input.defaultSystemIds !== undefined) {
+    const defaultSystems = await resolveDefaultSystems(
+      payee.characterId,
+      payee.id,
+      payee.defaultSystems,
+      input.defaultSystemIds
+    );
+    // Firestore rejects `undefined` fields, and `toRemoteDoc`'s `!== undefined` check would read
+    // a written `undefined` as "no change to push", so an empty list drops the key entirely.
+    if (defaultSystems.length > 0) updated.defaultSystems = defaultSystems;
+    else delete updated.defaultSystems;
+  }
+  // Same reason as the Default Systems above: clearing the hub has to drop the key entirely.
   if (input.hubId === undefined) delete updated.hubId;
   // Absent keeps the stored entity; `null` clears it. A kind without an id is
   // meaningless, so clearing the id drops the kind too.

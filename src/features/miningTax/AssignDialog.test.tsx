@@ -7,6 +7,7 @@ import type { PayeeRecord } from '@/db';
 import { AssignDialog } from './AssignDialog';
 import { assign } from './ledgerActions';
 import type { MoonMiningTaxRow } from './snapshot';
+import { useSurveyPayeeId } from './surveyPayeePref';
 
 vi.mock('./ledgerActions', () => ({
   assign: vi.fn(async () => ({ ok: true, value: {} })),
@@ -57,9 +58,9 @@ function payee(overrides: Partial<PayeeRecord> = {}): PayeeRecord {
     characterId: CHAR,
     name: 'Hek landlord',
     defaultTaxPct: 10,
-    // Auto-matched by `AssignDialog` on open, so the money path is exercised
-    // without driving the Radix Select.
-    systemId: SYSTEM,
+    // Auto-matched by `AssignDialog` on open (its Default Payee for the entry's system), so the
+    // money path is exercised without driving the Radix Select.
+    defaultSystems: [{ systemId: SYSTEM, from: '2026-01-01' }],
     hubId: 'hek',
     updatedAt: 1,
     ...overrides,
@@ -180,16 +181,35 @@ describe('AssignDialog — the money path', () => {
     expect(screen.getByText(HEK_HINT)).toBeInTheDocument();
   });
 
+  it('puts the Survey hand-off Payee ahead of the system’s Default Payee', () => {
+    useSurveyPayeeId.setState({ value: 'p-jita' });
+    const jitaPayee = payee({
+      id: 'p-jita',
+      name: 'Jita landlord',
+      hubId: undefined,
+      defaultSystems: undefined,
+    });
+    renderDialog([payee(), jitaPayee]);
+    expect(screen.queryByText(HEK_HINT)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Estimated value')).toHaveValue('100,000');
+    useSurveyPayeeId.setState({ value: null });
+  });
+
   it('says nothing about the hub for a Payee priced at the default', () => {
     renderDialog([payee({ hubId: undefined })]);
     expect(screen.queryByText(/priced at .* buy orders./)).not.toBeInTheDocument();
   });
 
   it('re-prices when the pilot changes the Payee selection', async () => {
-    const jitaPayee = payee({ id: 'p-jita', name: 'Jita landlord', hubId: undefined, systemId: 1 });
+    const jitaPayee = payee({
+      id: 'p-jita',
+      name: 'Jita landlord',
+      hubId: undefined,
+      defaultSystems: [{ systemId: 1, from: '2026-01-01' }],
+    });
     renderDialog([payee(), jitaPayee]);
 
-    // Opens auto-matched on the Hek Payee (its systemId matches the entry).
+    // Opens auto-matched on the Hek Payee (the Default Payee of the entry's system).
     expect(screen.getByText(HEK_HINT)).toBeInTheDocument();
     const estimated = screen.getByLabelText('Estimated value');
     expect(estimated).toHaveValue('40,000');

@@ -248,7 +248,8 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     return suggestPayeeForSystem(
       everyAssignment.filter((a) => a.characterId === row.characterId),
       allPayees,
-      row.entry.solarSystemId
+      row.entry.solarSystemId,
+      row.characterId
     );
   }
 

@@ -16,6 +16,7 @@ import {
   Checkbox,
 } from '@/components/ui';
 import type { PayeeRecord } from '@/db';
+import { defaultPayeeForSystem } from '@/engine/miningTax/defaultSystems';
 import type { OreLine } from '@/engine/miningTax/types';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { maskIsk } from '@/lib/isk';
@@ -158,15 +159,15 @@ export function AssignDialog({
   const { t } = useTranslation();
   const oreLines = row.unassignedOreLines;
 
-  // The Payee the pilot last used in this system (scope decision 20261004),
-  // falling back to one remembered for it. Still never `payees[0]`: with no
-  // history here at all, pre-selecting an arbitrary Payee would let a pilot
-  // in a hurry create a real Assignment against one they never chose.
+  // The Payee the pilot last used in this system (scope decision 20261004), then the one a
+  // Survey just handed this tab, then the system's Default Payee as the last resort. Still never
+  // `payees[0]`: with none of those, pre-selecting an arbitrary Payee would let a pilot in a
+  // hurry create a real Assignment against one they never chose.
   const surveyPayeeId = useSurveyPayeeId((state) => state.value);
   const autoMatch =
-    suggestion?.suggested ??
-    payees.find((p) => p.systemId === row.entry.solarSystemId) ??
-    payees.find((p) => p.id === surveyPayeeId);
+    (suggestion?.fromHistory ? suggestion.suggested : undefined) ??
+    payees.find((p) => p.id === surveyPayeeId) ??
+    defaultPayeeForSystem(payees, row.characterId, row.entry.solarSystemId);
   const orderedPayees = suggestion ? suggestion.ranked : payees;
   const [payeeId, setPayeeId] = useState<string | null>(autoMatch?.id ?? null);
   const [taxPct, setTaxPct] = useState(String(autoMatch?.defaultTaxPct ?? ''));
