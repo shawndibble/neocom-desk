@@ -67,7 +67,10 @@ export function ColumnPickerMenu<Id extends string, Row>({
   const visibleSet = new Set(visible);
   // Only once a pilot is logged in: never on /login, where no Character exists yet.
   const loggedIn = useCharacterCount() > 0;
-  const [hintShown, dismissHint] = useOneTimeHint(COLUMN_PICKER_HINT, loggedIn);
+  // The hint says some columns are off by default — pointless (and it would
+  // burn the one-time slot) on a table already showing every column.
+  const hasHiddenColumns = available.some((id) => !visibleSet.has(id));
+  const [hintShown, dismissHint] = useOneTimeHint(COLUMN_PICKER_HINT, loggedIn && hasHiddenColumns);
 
   return (
     <DropdownMenu

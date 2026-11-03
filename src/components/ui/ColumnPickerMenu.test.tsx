@@ -55,6 +55,23 @@ describe('column picker hint', () => {
     expect(hintSeenCount(useHintCounts.getState().value, 'columnPickerHint')).toBe(1);
   });
 
+  it('stays off, and keeps its slot, when every column is already showing', () => {
+    const { unmount } = render(
+      <ColumnPickerMenu
+        available={['a', 'b']}
+        visible={['a', 'b']}
+        columnsById={columnsById}
+        onToggle={() => {}}
+        buttonLabel="Columns"
+        menuTitle="Columns"
+      />
+    );
+    expect(screen.queryByText(HINT)).not.toBeInTheDocument();
+    unmount();
+    render(picker);
+    expect(screen.getByText(HINT)).toBeInTheDocument();
+  });
+
   it('stays off before counts load, and in a session that already showed it', () => {
     useHintCounts.setState({ value: {}, hydrated: false });
     const { unmount } = render(picker);
