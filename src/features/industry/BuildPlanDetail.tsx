@@ -4,7 +4,6 @@ import { EmptyState, Panel, Toast } from '@/components/ui';
 import { FACILITY_PRESETS, industryActivityOf } from '@/engine/industry/types';
 import type { GroupClaimMember } from '@/engine/industry/groupStockClaims';
 import type { LiquidationBasis } from '@/engine/industry/ownedStockSale';
-import type { ProfitBasis } from '@/engine/industry/profitBasis';
 import { moveSaving } from '@/engine/industry/moveSaving';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -41,6 +40,7 @@ import { usePlanMaterialsExport } from './usePlanMaterialsExport';
 import { usePlanOwnedStock } from './usePlanOwnedStock';
 import { usePlanPricing } from './usePlanPricing';
 import { useReactionLocationBlock } from './useReactionLocationBlock';
+import { useProfitBasis } from './profitBasisSetting';
 import { usePlanResolution } from './usePlanResolution';
 import { useShoppingListCopy } from './useShoppingListCopy';
 
@@ -110,8 +110,9 @@ export function BuildPlanDetail({
   const [setupOpen, setSetupOpen] = useState(false);
   const setupFormId = useId();
   // How the hero counts owned materials, and how they would be sold. Page
-  // state, not plan state: a way of reading the plan, like a sort.
-  const [profitBasis, setProfitBasis] = useState<ProfitBasis>('sellValue');
+  // setting, not plan state (`profitBasisSetting.ts`): the list reads it too.
+  const profitBasis = useProfitBasis((state) => state.value);
+  const setProfitBasis = useProfitBasis((state) => state.setValue);
   const [saleBasis, setSaleBasis] = useState<LiquidationBasis>('instant');
   const isDesktop = useIsDesktop();
   const [costsOpen, setCostsOpen] = useState<boolean | null>(null);

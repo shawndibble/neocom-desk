@@ -201,12 +201,10 @@ describe('PlanVerdictHero: how owned materials are counted', () => {
     expect(screen.queryByRole('button', { name: 'resale value' })).not.toBeInTheDocument();
   });
 
-  it('names the comparison and flips the basis in place', async () => {
+  it('labels the basis and flips the basis in place', async () => {
     const onBasisChange = vi.fn();
     renderHero({ basis: 'sellValue', onBasisChange });
-    expect(
-      screen.getByText(/compared with selling your materials, counted at/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Owned materials =/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'resale value' }));
     expect(onBasisChange).toHaveBeenCalledWith('free');
   });
