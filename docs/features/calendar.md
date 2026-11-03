@@ -174,7 +174,6 @@ ESI drops an event the moment it starts. `loadCalendarEvents` keeps previously s
 8. **What is "Projected"?** Un-queued steps of the chosen Skill Plan scheduled from `startDate + cumulativeSeconds`, excluding steps already in the queue (`calendarBoardSources.ts` `toSkillPlanSources`); tagged `Projected` via `isProjectedKind`; plan error surfaces in the menu, not as a page error.
 9. **How are contract deadlines computed?** Active contracts only; courier uses `courierDeliveryDeadlineMs` (accepted + days to complete) else `date_expired`; untitled couriers named "start -> end" via location lookups (`calendarBoardSources.ts`, `calendarBoardData.ts:loadCourierRouteNames`).
 10. **When does a moon chunk show?** Only when `resolveCorpReadAccess` says `canReadMoonExtractions`; before arrival the deadline is chunk arrival with detail "arrives", after it natural decay with "decays if not fractured" (`calendarMoonChunks.ts`, `toMoonChunkSources`).
-11. **Why are grid days hatched?** Day before today with no load: no new calendar event can land there, though overdue items still show (`pastHint`, `CalendarMap.tsx`).
 
 ## Improvement ideas
 
