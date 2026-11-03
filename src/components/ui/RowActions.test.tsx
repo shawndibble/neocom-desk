@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { claimSessionHint, hintSeenCount, resetSessionHints, useHintCounts } from '@/lib/hintFlags';
 import { stubViewport } from '@/test/viewport';
+import { db } from '@/db';
+import { seedCharacter } from '@/test/seed';
 import {
   MenuGroup,
   MenuItem,
@@ -354,9 +356,18 @@ describe('row menu hints', () => {
     </RowActionsMenu>
   );
 
-  beforeEach(() => {
+  beforeEach(async () => {
     useHintCounts.setState({ value: {}, hydrated: true });
     resetSessionHints();
+    await db.characters.clear();
+    await seedCharacter(1);
+  });
+
+  it('keeps the hint off until a pilot is logged in (never on /login)', async () => {
+    await db.characters.clear();
+    render(plainRow);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByText(/to open its actions/)).not.toBeInTheDocument();
   });
 
   it('adds the right-click tip to the first three ⋮ opens, never the right-click menu', async () => {

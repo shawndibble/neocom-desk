@@ -27,6 +27,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTouchContext } from '@/lib/useMediaQuery';
+import { useCharacterCount } from '@/features/character/useCharacters';
 import {
   claimSessionHint,
   dismissSessionHint,
@@ -430,7 +431,10 @@ const ROW_MENU_TIP_OPENS = 3;
  * The one-time hint on the first ⋮ a pilot sees (§6c "Hints"): shows once ever,
  * on one ⋮ only, and never in a session that already showed another hint.
  */
-function useRowMoreHint(active: boolean): [shown: boolean, dismiss: () => void] {
+function useRowMoreHint(menuPresent: boolean): [shown: boolean, dismiss: () => void] {
+  // Only once a pilot is logged in: never on /login, where no Character exists yet.
+  const hasCharacter = useCharacterCount() > 0;
+  const active = menuPresent && hasCharacter;
   const owner = `${ROW_HINT}:${useId()}`;
   const hydrated = useHintCounts((state) => state.hydrated);
   const shown = useSessionHintShown(owner);
