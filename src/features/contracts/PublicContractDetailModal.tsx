@@ -229,7 +229,7 @@ export function PublicContractDetailModal({
   const included = lines.filter((line) => line.isIncluded);
   const requested = lines.filter((line) => !line.isIncluded);
   // What the list shows; the price check above keeps reading the full lines.
-  const shownLines = abyssalOnly ? lines.filter((l) => isAbyssalType?.(l.typeId)) : lines;
+  const shownLines = abyssalOnly ? lines.filter((line) => isAbyssalType?.(line.typeId)) : lines;
   const shownIncluded = shownLines.filter((line) => line.isIncluded);
   const shownRequested = shownLines.filter((line) => !line.isIncluded);
 

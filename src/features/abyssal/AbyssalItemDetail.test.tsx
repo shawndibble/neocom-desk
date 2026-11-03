@@ -145,6 +145,9 @@ describe('AbyssalItemDetail', () => {
     expect(within(cap).getByText('200')).toBeInTheDocument();
     expect(within(cap).getByText('170')).toBeInTheDocument();
     expect(within(cap).getByText('100%')).toBeInTheDocument();
+    // Activation cost fell and lower is better: green, and said in words.
+    expect(within(cap).getByText('170')).toHaveClass('text-success');
+    expect(within(cap).getByText('(better than base)')).toBeInTheDocument();
   });
 
   it('still picks a base and shows the ranges when type names fail to load', async () => {

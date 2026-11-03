@@ -60,7 +60,6 @@ export function ContractAbyssalValue({
         <div className="mt-1 flex justify-end">
           <button
             type="button"
-            aria-pressed={abyssalOnly === true}
             onClick={onToggleAbyssalOnly}
             className={`${inlineLinkClassName} inline-flex min-h-9 items-center md:min-h-0`}
           >

@@ -13254,7 +13254,6 @@
         "noRolls": "No rolls to show for this module.",
         "attributeColumn": "Attribute",
         "baseColumn": "Base",
-        "rolledColumn": "Rolled",
         "changeColumn": "Base → rolled",
         "better": "(better than base)",
         "worse": "(worse than base)",

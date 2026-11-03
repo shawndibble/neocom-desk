@@ -258,7 +258,27 @@ function RangeText({ range, unit }: { range: DisplayRange | null; unit: string |
   );
 }
 
-/** Both roll tables' leading columns: the attribute (sticky) and the base module's value. */
+/** Both roll tables' leading column: the attribute, sticky. */
+function attributeColumn<R extends { attributeId: number }>(
+  t: TFunction,
+  dictionary: AttributeDictionary,
+  lookup: MutaplasmidLookup,
+  highIsGood: (row: R) => boolean
+): DataTableColumn<R> {
+  return {
+    id: 'attribute',
+    header: t('market.itemDetail.abyssal.attributeColumn'),
+    stickyStart: true,
+    stickyStartOnPanel: true,
+    className: 'min-w-36',
+    render: (row) => {
+      const { name, unit } = attributeLabel(row.attributeId, dictionary, lookup);
+      return <AttributeCell name={name} unit={unit} highIsGood={highIsGood(row)} />;
+    },
+  };
+}
+
+/** The range table's leading columns: the attribute and the base module's value. */
 function attributeAndBaseColumns<R extends { attributeId: number; base: number }>(
   t: TFunction,
   dictionary: AttributeDictionary,
@@ -266,17 +286,7 @@ function attributeAndBaseColumns<R extends { attributeId: number; base: number }
   highIsGood: (row: R) => boolean
 ): DataTableColumn<R>[] {
   return [
-    {
-      id: 'attribute',
-      header: t('market.itemDetail.abyssal.attributeColumn'),
-      stickyStart: true,
-      stickyStartOnPanel: true,
-      className: 'min-w-36',
-      render: (row) => {
-        const { name, unit } = attributeLabel(row.attributeId, dictionary, lookup);
-        return <AttributeCell name={name} unit={unit} highIsGood={highIsGood(row)} />;
-      },
-    },
+    attributeColumn(t, dictionary, lookup, highIsGood),
     {
       id: 'base',
       header: t('market.itemDetail.abyssal.baseColumn'),
@@ -438,12 +448,7 @@ function OwnedRollsSection({
   const unitOf = (row: RolledAttributeRow) => dictionary[row.attributeId]?.unit ?? null;
 
   const columns: DataTableColumn<RolledAttributeRow>[] = [
-    attributeAndBaseColumns<RolledAttributeRow>(
-      t,
-      dictionary,
-      lookup,
-      (row) => row.range.highIsGood
-    )[0]!,
+    attributeColumn<RolledAttributeRow>(t, dictionary, lookup, (row) => row.range.highIsGood),
     {
       id: 'change',
       header: t('market.itemDetail.abyssal.changeColumn'),
