@@ -531,6 +531,18 @@ describe('diffOmegaLapsed', () => {
     ).toEqual([]);
   });
 
+  it('still fires when the skill moved from queue position 1 to 0 after the one ahead finished', () => {
+    const prev = snapshot([training(NOW + 8 * HOUR, { queuePosition: 1 })], NOW);
+    const next = snapshot([training(NOW + POLL + 16 * HOUR, { queuePosition: 0 })], NOW + POLL);
+    expect(diffOmegaLapsed(1, prev, next)).toHaveLength(1);
+  });
+
+  it('allows for a cached read: a slowdown 15 minutes old on a short remainder is not trusted', () => {
+    const prev = snapshot([training(NOW + HOUR)], NOW);
+    const next = snapshot([training(NOW + POLL + 2 * HOUR)], NOW + POLL);
+    expect(diffOmegaLapsed(1, prev, next)).toEqual([]);
+  });
+
   it('ignores a long gap, where the slowdown could have landed any time and inflates the ratio', () => {
     const prev = snapshot([training(NOW + 8 * HOUR)], NOW);
     const next = snapshot([training(NOW + 3 * HOUR + 14 * HOUR)], NOW + 3 * HOUR);
