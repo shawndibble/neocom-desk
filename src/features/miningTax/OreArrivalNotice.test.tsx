@@ -17,13 +17,19 @@ function seedLog(grows: boolean) {
   let log = recordLedgerFetch(
     EMPTY_ORE_ARRIVAL_LOG,
     CHAR,
-    [{ date: '2026-10-04', solarSystemId: SYSTEM, quantity: 100 }],
+    [{ date: '2026-10-04', solarSystemId: SYSTEM, oreLines: [{ typeId: 1, quantity: 100 }] }],
     Date.parse('2026-10-04T12:00:00Z')
   );
   log = recordLedgerFetch(
     log,
     CHAR,
-    [{ date: '2026-10-04', solarSystemId: SYSTEM, quantity: grows ? 150 : 100 }],
+    [
+      {
+        date: '2026-10-04',
+        solarSystemId: SYSTEM,
+        oreLines: [{ typeId: 1, quantity: grows ? 150 : 100 }],
+      },
+    ],
     Date.parse('2026-10-04T12:10:00Z')
   );
   useOreArrivalLog.setState({ value: log, hydrated: true });

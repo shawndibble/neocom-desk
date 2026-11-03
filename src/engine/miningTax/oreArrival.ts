@@ -27,14 +27,23 @@ const MIN_LEDGER_LAG_MS = 10 * MINUTE_MS;
  */
 export const GROWTH_WAIT_MS = ARRIVAL_WINDOW_MS - MIN_LEDGER_LAG_MS;
 
-/** One ledger entry's last known moon-ore total, and when the app first saw it grow. */
+/** One ore type's last known total within a ledger entry, and when the app last saw it grow. */
+export interface OreArrival {
+  quantity: number;
+  /** Epoch ms of the fetch that last saw this total grow; `null` when no growth has been seen. */
+  grewAt: number | null;
+}
+
+/**
+ * One ledger entry's moon-ore totals per ore type (keyed by type id). Growth is
+ * tracked per ore type so ore mined for one Payee doesn't hold up another
+ * Payee's settlement once that one's ore has stopped coming in.
+ */
 export interface EntryArrival {
   characterId: number;
   /** EVE/UTC date, e.g. "2026-10-04". */
   date: string;
-  quantity: number;
-  /** Epoch ms of the fetch that last saw this total grow; `null` when no growth has been seen. */
-  grewAt: number | null;
+  ores: Readonly<Record<string, OreArrival>>;
 }
 
 export interface OreArrivalLog {
@@ -46,11 +55,11 @@ export interface OreArrivalLog {
 
 export const EMPTY_ORE_ARRIVAL_LOG: OreArrivalLog = { entries: {}, checkedAt: {} };
 
-/** One entry from a fetch: its total across ore types. */
+/** One entry from a fetch: its total per ore type. */
 export interface FetchedEntryTotal {
   date: string;
   solarSystemId: number;
-  quantity: number;
+  oreLines: readonly { typeId: number; quantity: number }[];
 }
 
 /** An entry being settled, identified the way a Mining Ledger Entry is. */
@@ -58,6 +67,11 @@ export interface SettledEntryRef {
   characterId: number;
   date: string;
   solarSystemId: number;
+  /**
+   * The ore types this settlement covers. Only growth in these counts; absent
+   * means every ore type in the entry.
+   */
+  typeIds?: readonly number[];
 }
 
 function eveDayStartMs(date: string): number {
@@ -90,16 +104,22 @@ export function recordLedgerFetch(
     if (isInArrivalWindow(entry.date, fetchedAtMs)) entries[key] = entry;
   }
 
-  for (const { date, solarSystemId, quantity } of fetched) {
+  for (const { date, solarSystemId, oreLines } of fetched) {
     if (!isInArrivalWindow(date, fetchedAtMs)) continue;
     const key = entryKey(characterId, date, solarSystemId);
     const previous = log.entries[key];
-    let grewAt: number | null;
-    if (previous) grewAt = quantity > previous.quantity ? fetchedAtMs : previous.grewAt;
-    else
-      grewAt =
-        previousCheck !== undefined && previousCheck >= eveDayStartMs(date) ? fetchedAtMs : null;
-    entries[key] = { characterId, date, quantity, grewAt };
+    const seenDuringDay = previousCheck !== undefined && previousCheck >= eveDayStartMs(date);
+    const ores: Record<string, OreArrival> = {};
+    for (const { typeId, quantity } of oreLines) {
+      const before = previous?.ores[String(typeId)];
+      let grewAt: number | null;
+      if (before) grewAt = quantity > before.quantity ? fetchedAtMs : before.grewAt;
+      // A new ore type in an entry already seen is new ore; in an entry never
+      // seen it follows the entry's own rule.
+      else grewAt = previous || seenDuringDay ? fetchedAtMs : null;
+      ores[String(typeId)] = { quantity, grewAt };
+    }
+    entries[key] = { characterId, date, ores };
   }
 
   return {
@@ -125,20 +145,29 @@ export function arrivalNotice(
   log: OreArrivalLog,
   nowMs: number
 ): ArrivalNotice {
-  const inWindow = new Set(
-    settled
-      .filter((ref) => isInArrivalWindow(ref.date, nowMs))
-      .map((ref) => entryKey(ref.characterId, ref.date, ref.solarSystemId))
-  );
+  // Per entry, the ore types settled (`null`: all of them).
+  const inWindow = new Map<string, Set<number> | null>();
+  for (const ref of settled) {
+    if (!isInArrivalWindow(ref.date, nowMs)) continue;
+    const key = entryKey(ref.characterId, ref.date, ref.solarSystemId);
+    const known = inWindow.get(key);
+    if (known === null || !ref.typeIds) inWindow.set(key, null);
+    else inWindow.set(key, new Set([...(known ?? []), ...ref.typeIds]));
+  }
   if (inWindow.size === 0) return { kind: 'none' };
 
   let arriving = 0;
   let waitMs = 0;
-  for (const key of inWindow) {
-    const grewAt = log.entries[key]?.grewAt;
-    if (grewAt == null || nowMs - grewAt >= GROWTH_WAIT_MS) continue;
+  for (const [key, typeIds] of inWindow) {
+    const ores = log.entries[key]?.ores ?? {};
+    let latest: number | null = null;
+    for (const [typeId, ore] of Object.entries(ores)) {
+      if (typeIds && !typeIds.has(Number(typeId))) continue;
+      if (ore.grewAt != null && (latest === null || ore.grewAt > latest)) latest = ore.grewAt;
+    }
+    if (latest === null || nowMs - latest >= GROWTH_WAIT_MS) continue;
     arriving += 1;
-    waitMs = Math.max(waitMs, grewAt + GROWTH_WAIT_MS - nowMs);
+    waitMs = Math.max(waitMs, latest + GROWTH_WAIT_MS - nowMs);
   }
   if (arriving === 0) return { kind: 'quiet' };
   return { kind: 'arriving', arriving, of: inWindow.size, waitMs };
