@@ -42,17 +42,14 @@ describe('IndustrySettingsForm', () => {
   it('picks how owned materials are counted, defaulting to opportunity cost, and keeps the choice', async () => {
     render(<IndustrySettingsForm />);
 
-    expect(await screen.findByRole('button', { name: 'Opportunity cost' })).toHaveAttribute(
+    expect(await screen.findByRole('button', { name: 'Resale value' })).toHaveAttribute(
       'aria-pressed',
       'true'
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Actual cost' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Free' }));
 
-    expect(screen.getByRole('button', { name: 'Actual cost' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
+    expect(screen.getByRole('button', { name: 'Free' })).toHaveAttribute('aria-pressed', 'true');
     await waitFor(async () =>
       expect((await db.settings.get('industryProfitBasis'))?.value).toBe('free')
     );
@@ -62,6 +59,6 @@ describe('IndustrySettingsForm', () => {
     render(<IndustrySettingsForm onlyAssumedMe />);
 
     await screen.findByRole('spinbutton', { name: /Assumed ME/ });
-    expect(screen.queryByRole('button', { name: 'Actual cost' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Free' })).not.toBeInTheDocument();
   });
 });

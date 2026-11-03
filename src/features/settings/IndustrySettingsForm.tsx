@@ -95,8 +95,8 @@ export function IndustrySettingsForm({
               <SegmentedControl
                 label={t('settings.profitBasisLabel')}
                 options={[
-                  { value: 'sellValue', label: t('settings.profitBasisOpportunity') },
-                  { value: 'free', label: t('settings.profitBasisActual') },
+                  { value: 'sellValue', label: t('settings.profitBasisSellPrice') },
+                  { value: 'free', label: t('settings.profitBasisFree') },
                 ]}
                 value={profitBasis}
                 onChange={(value) => void setProfitBasis(value)}
