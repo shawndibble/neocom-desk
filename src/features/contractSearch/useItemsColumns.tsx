@@ -13,7 +13,6 @@ import { SecurityStatus } from '@/components/SecurityStatus';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import type { ContractFlag } from '@/engine/contracts/contractFlags';
 import { formatSignedPercent, savingTone } from '@/lib/formatSignedPercent';
-import { cx } from '@/lib/cx';
 import {
   isUnpricedOffer,
   offerAskingPrice,
@@ -206,7 +205,7 @@ export function useItemsColumns({
           const saving = savingFor?.(row) ?? null;
           if (saving === null) return <span className="text-text-dim">–</span>;
           return (
-            <span className={cx(savingTone(saving) === 'good' ? 'text-isk-pos' : 'text-isk-neg')}>
+            <span className={savingTone(saving) === 'good' ? 'text-isk-pos' : 'text-isk-neg'}>
               {formatSignedPercent(saving)}
             </span>
           );

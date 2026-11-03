@@ -14,8 +14,6 @@
 import { median } from '../math';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 
-/** How the seller priced it: a fixed ask, or bids-with-optional-buyout. */
-
 export interface ContractOfferFilter {
   /**
    * `null`/`undefined` means "no type search active" (every row passes). An

@@ -28,6 +28,11 @@ export interface ContractFlagContext {
   threshold: number;
 }
 
+/** An auction's `price` is a starting bid, so without a buyout it states no ask. */
+function isAuctionWithoutBuyout(row: PublicContractOfferRow): boolean {
+  return row.isAuction && buyoutOf(row) === null;
+}
+
 /**
  * A blueprint copy is held against the original's hub price,
  * anything else against the hub sell of every unit the contract carries.
@@ -39,7 +44,7 @@ export function contractFlagFor(
   if (row.lineCount !== 1 || hubSell === null || hubSell <= 0) return null;
   if (row.requestsItems || isUnpricedOffer(row)) return null;
   // An auction's `price` is a starting bid, so only a buyout is an ask.
-  if (row.isAuction && buyoutOf(row) === null) return null;
+  if (isAuctionWithoutBuyout(row)) return null;
   const asking = buyoutOf(row) ?? row.price;
   if (row.isBlueprintCopy) {
     return asking > hubSell
@@ -73,14 +78,10 @@ export function contractSavingFor(
   if (row.lineCount !== 1 || hubSell === null || !(hubSell > 0)) return null;
   if (row.isBlueprintCopy || row.requestsItems || row.requestedPlex) return null;
   if (isUnpricedOffer(row)) return null;
-  const asking = isAuctionWithoutBuyout(row) ? null : (buyoutOf(row) ?? row.price);
-  if (asking === null) return null;
+  if (isAuctionWithoutBuyout(row)) return null;
+  const asking = buyoutOf(row) ?? row.price;
   const value = hubSell * row.quantity;
   return ((value - asking) / value) * 100;
-}
-
-function isAuctionWithoutBuyout(row: PublicContractOfferRow): boolean {
-  return row.isAuction && buyoutOf(row) === null;
 }
 
 /**

@@ -126,7 +126,7 @@ States (in order, `ContractSearchPanel.tsx:964-1031`):
 
 ### Table
 
-- Columns: Item (always; plain accent text since the row opens the modal), then optional Qty, Price, System (+ security), Jumps, Region, Expires. All default visible, device-local `contractSearchItemsVisibleColumns` (non-empty list required).
+- Columns: Item (always; plain accent text since the row opens the modal), then optional Qty, ISK/unit, Price, Saving, System (+ security), Jumps, Region, Expires. All default visible, device-local `contractSearchItemsVisibleColumns` (non-empty list required).
 - Default order cheapest first. Unpriced rows (barter, 0 ISK, or PLEX ask with no PLEX price) sort last in the default view and under the Price column sort in either direction (sortValue `undefined`), issue #1080.
 - Price cell: `IskAmount` (compact, long-press exact); auctions get a suffix "Buyout" or "Starting bid"; PLEX asks show "includes N PLEX"; barter shows "unpriced" marker.
 - System cell: "…" while resolving, "—" if unplaced (player structure), else name + `SecurityStatus`.
@@ -240,6 +240,7 @@ Dense cards and mobile sort on both search tabs; filters in a funnel sheet; pane
 - Jump counts on Courier use local graph under Travel rules, not live ESI; "—" for unplaced ends or unreachable.
 - No saved searches or price alerts on contract searches; no notifications for new matching offers.
 - Items tab's ISK/unit column (beside Qty, on by default for users who have not customised their columns) shows the asking price per unit only for single-type contracts (`lineCount` of 1); it is "–" for bundles, rows not yet stamped with a line count and unpriced offers, and sorts those last. It uses the Price column's own asking price (buyout else starting bid, PLEX at market), and is in the CSV export.
+- Items tab's Saving column is the detail modal's Saving for the row: the units at the hub's best sell, less the ask, as a signed percent of that value (green unless it prints as a loss; sorts biggest first). `contractSavingFor` (engine `contractFlags.ts`) states it only where the row alone can, like the price flag: one line, not a blueprint copy, no item or PLEX ask, not a barter, an auction only with a buyout, and a hub price known (so "–" on a wide browse past 100 types). Not in the CSV.
 - Help/FAQ do not describe Contracts at all (only the stored-data list).
 - BPC Sourcing (Industry tab) reads the same snapshot with BPC-only filters, and `/bpc-contracts` appears in ARCHITECTURE as a route; documented in Industry, not here.
 
