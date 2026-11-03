@@ -53,7 +53,7 @@ describe('Mail organize', () => {
     render(<App />);
     await screen.findByText('Market report');
 
-    await user.click(screen.getByRole('button', { name: 'More actions for Market report' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Market report' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Mark as unread' }));
 
     await waitFor(() => expect(puts).toEqual([{ id: '2', body: { read: false } }]));
@@ -68,7 +68,7 @@ describe('Mail organize', () => {
     render(<App />);
     await screen.findByText('Market report');
 
-    await user.click(screen.getByRole('button', { name: 'More actions for Market report' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Market report' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     expect(await screen.findByText('Delete this mail?')).toBeInTheDocument();
     expect(deletes).toEqual([]);
@@ -86,7 +86,7 @@ describe('Mail organize', () => {
     render(<App />);
     await screen.findByText('Market report');
 
-    await user.click(screen.getByRole('button', { name: 'More actions for Market report' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Market report' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     await user.click(await screen.findByRole('button', { name: 'Cancel' }));
 
@@ -100,7 +100,7 @@ describe('Mail organize', () => {
     render(<App />);
     await screen.findByText('Market report');
 
-    await user.click(screen.getByRole('button', { name: 'More actions for Market report' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Market report' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     await user.click(await screen.findByRole('button', { name: 'Delete mail' }));
 
@@ -114,7 +114,7 @@ describe('Mail organize', () => {
     render(<App />);
     await screen.findByText('Market report');
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(await screen.findByRole('button', { name: 'Select' }));
     expect(screen.getByRole('toolbar', { name: 'Selected mail' })).toBeInTheDocument();
     expect(screen.getByText('0 selected')).toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: 'Select Fleet up!' }));
@@ -187,7 +187,7 @@ describe('Mail organize', () => {
     await screen.findByText('Fleet up!');
     expect(await screen.findByRole('button', { name: /Corp.*2 unread/ })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(await screen.findByRole('button', { name: 'Select' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select Fleet up!' }));
     await user.click(screen.getByRole('button', { name: 'Mark read' }));
 
@@ -204,7 +204,7 @@ describe('Mail organize', () => {
     render(<App />);
     await screen.findByText('Market report');
 
-    await user.click(screen.getByRole('button', { name: 'More actions for Market report' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Market report' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Mark as unread' }));
     const row = screen.getByText('Market report').closest('li') as HTMLElement;
     await waitFor(() => expect(within(row).getByText('Unread')).toBeInTheDocument());
@@ -226,7 +226,7 @@ describe('Mail organize', () => {
     render(<App />);
     await screen.findByText('Market report');
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(await screen.findByRole('button', { name: 'Select' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select Fleet up!' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select Market report' }));
     await user.type(screen.getByLabelText('Search subject or sender'), 'market');
@@ -247,7 +247,7 @@ describe('Mail organize', () => {
     render(<App />);
     await screen.findByText('Market report');
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(await screen.findByRole('button', { name: 'Select' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select Fleet up!' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select Market report' }));
     await user.click(screen.getByRole('button', { name: 'Delete' }));
