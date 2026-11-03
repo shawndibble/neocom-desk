@@ -110,6 +110,13 @@ function cellTone(cell: TableCell): CellTone | undefined {
 }
 
 const cellPad = 'pl-3 last:pr-3';
+/** The header's share of the first column's icon slot (`size-4` plus `gap-1.5`) past `cellPad`, so a label sits over its rows' text. */
+const ICON_SLOT_INDENT = 'pl-[2.125rem]';
+
+/** A row whose tone draws a severity icon: only what needs a decision, a "watch" row just tints its figure. */
+function isFlagged(row: Pick<TableRowModel, 'tone'>): boolean {
+  return row.tone === 'warning' || row.tone === 'critical';
+}
 
 /** Px of the `w-5` caret column a linked row adds. */
 const CARET_WIDTH = 20;
@@ -125,6 +132,7 @@ function Row({
   compact,
   rowHeader,
   growKey,
+  iconSlot,
   onOpen,
 }: {
   row: TableRowModel;
@@ -137,13 +145,14 @@ function Row({
   rowHeader: boolean;
   /** The visible column that truncates in the first one's place, when a table has one. */
   growKey: string | undefined;
+  /** Whether the first cell keeps a leading icon column (some row of the table draws an icon). */
+  iconSlot: boolean;
   /** Opens the row's detail modal or Show info; set only for a row with a `detail` or `info`. */
   onOpen?: () => void;
 }) {
   const { t } = useTranslation();
   const toned = row.tone !== undefined && row.tone !== 'clear';
-  // The icon (colour plus shape) marks only what needs a decision; a "watch" row just tints its figure.
-  const flagged = row.tone === 'warning' || row.tone === 'critical';
+  const flagged = isFlagged(row);
   const linked = row.to !== undefined;
   const opens = onOpen !== undefined;
   return (
@@ -194,9 +203,11 @@ function Row({
           >
             {first ? (
               <span className="flex min-w-0 items-center gap-1.5">
-                <span className="flex size-4 shrink-0 items-center">
-                  {flagged && row.tone && <SeverityIcon severity={row.tone} size="0.875rem" />}
-                </span>
+                {iconSlot && (
+                  <span className="flex size-4 shrink-0 items-center">
+                    {flagged && row.tone && <SeverityIcon severity={row.tone} size="0.875rem" />}
+                  </span>
+                )}
                 {linked && row.to !== undefined ? (
                   <RowTappableContext.Provider value>
                     <Link
@@ -429,6 +440,8 @@ export function TableBody({
   const hasHeader = columns.some((column) => column.label !== '');
   const growKey = columns.find((column, i) => i > 0 && column.grow)?.key;
   const caret = shown.some((row) => row.to !== undefined);
+  // The icon column exists only while a row of the table draws an icon (all rows, so "+N more" and paging never shift it), so a table without one starts its text flush with its header.
+  const iconSlot = table.rows.some(isFlagged);
   return (
     <div ref={setBox} className={cx('@container', className)}>
       <table aria-label={ariaLabel} className="w-full border-collapse">
@@ -454,7 +467,8 @@ export function TableBody({
                       cellPad,
                       column.hideNarrow && HIDE_NARROW,
                       'py-1 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-text-dim uppercase',
-                      i === 0 ? 'text-left' : column.align === 'end' ? 'text-right' : 'text-left'
+                      i === 0 ? 'text-left' : column.align === 'end' ? 'text-right' : 'text-left',
+                      i === 0 && iconSlot && ICON_SLOT_INDENT
                     )}
                   >
                     {column.sortable ? (
@@ -496,6 +510,7 @@ export function TableBody({
               compact={columnsFor === 'S'}
               rowHeader={!hasHeader}
               growKey={growKey}
+              iconSlot={iconSlot}
               onOpen={
                 row.detail !== undefined
                   ? () => setOpened(row)

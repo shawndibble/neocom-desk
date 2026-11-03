@@ -22,7 +22,15 @@ export type WidgetKindId = string;
  * corp wallet's divisions, its flow or its income sources, all structures or only the problems.
  * Each kind lists the ones it offers.
  */
-export type WidgetShow = 'balance' | 'flow' | 'divisions' | 'sources' | 'all' | 'problems';
+export type WidgetShow =
+  | 'balance'
+  | 'flow'
+  | 'divisions'
+  | 'sources'
+  | 'all'
+  | 'problems'
+  | 'withAccelerator'
+  | 'skillsOnly';
 
 export const KIND_CATEGORIES = [
   'character',
@@ -142,6 +150,8 @@ const SPECS = {
     view: 'number',
     size: 'S',
     endpoints: ['getCharacterSkillQueue', 'getCharacterSkills'],
+    // Skills and the typed-in accelerator's expiry, or the skills alone; the accelerator is a local read, so no endpoint.
+    shows: ['withAccelerator', 'skillsOnly'],
   },
   sp: {
     category: 'character',

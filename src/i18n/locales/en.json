@@ -4992,6 +4992,7 @@
       "notTraining": "Nothing in training",
       "nextJob": "Next industry job finishes",
       "nextSkill": "Next skill finishes",
+      "acceleratorEnds": "Cerebral accelerator runs out",
       "queued_one": "{{count}} skill queued",
       "queued_other": "{{count}} skills queued",
       "priceAlertTargetLabel": {
@@ -5362,6 +5363,8 @@
         "skillLevel": "{{name}} {{level}}",
         "now": "Training now",
         "next": "Next",
+        "accelerator": "Accelerator +{{bonus}}",
+        "acceleratorEnds": "Runs out",
         "idle": "Idle",
         "col": {
           "skill": "Skill",
@@ -6734,7 +6737,9 @@
         "divisions": "Divisions",
         "sources": "Sources",
         "all": "All structures",
-        "problems": "Problems only"
+        "problems": "Problems only",
+        "withAccelerator": "Skills and accelerator",
+        "skillsOnly": "Skills only"
       },
       "where": "Where",
       "whereChoice": {

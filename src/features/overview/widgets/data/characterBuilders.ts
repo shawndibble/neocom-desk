@@ -2,6 +2,7 @@
  * The Training, SP and Coming up builders: the Character-clock kinds, split
  * out of `models.ts`.
  */
+import { isAcceleratorLive } from '@/engine/accelerator';
 import { severityForRemaining, type DeadlineSeverity } from '@/engine/character/severity';
 import {
   soonestCalendarDeadline,
@@ -22,13 +23,14 @@ import { comingUpSummary, spExtractionSummary } from '../../data/boardSummary';
 import { blank, count, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { queueSegments, queueStack } from './chartBuilders';
 import { comingUpTable, spTable, trainingTable } from './characterTables';
+import type { BoardDeadline } from '../nextDeadline';
 import type { ListRow } from './types';
 import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
 
 // Part-trained levels bank fractional SP; the old default printed up to 3 decimals.
 const formatSp = createNumberFormat({ maximumFractionDigits: 3 });
 
-export const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
+export const training: Builder = (feeds, { t, now, notTrainingAlert, activeCharacterId, show }) => {
   const feed = feeds.skills;
   const data = feed?.data ?? null;
   const to = '/skills/plans';
@@ -51,9 +53,44 @@ export const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
     fromCache: data.queueResult?.fromCache ?? false,
   };
 
+  // The typed-in accelerator, unless the widget is set to skills only; an expired one counts as gone.
+  const record =
+    show === 'skillsOnly' || activeCharacterId === null
+      ? undefined
+      : feeds.accelerator?.data?.get(activeCharacterId);
+  const accelerator =
+    record && isAcceleratorLive(record, now)
+      ? {
+          label: t('overview.widgets.training.accelerator', { bonus: record.bonus }),
+          expiresAt: record.expiresAt,
+          severity: severityForRemaining(record.expiresAt - now),
+        }
+      : null;
+  const acceleratorRows: ListRow[] = accelerator
+    ? [
+        {
+          key: 'accelerator',
+          title: accelerator.label,
+          detail: t('overview.widgets.training.acceleratorEnds'),
+          value: formatCountdown(Math.max(0, accelerator.expiresAt - now) / 1000),
+          tone: accelerator.severity,
+        },
+      ]
+    : [];
+  const acceleratorDeadlines: BoardDeadline[] = accelerator
+    ? [
+        {
+          at: accelerator.expiresAt,
+          note: t('overview.board.acceleratorEnds'),
+          severity: accelerator.severity,
+          to,
+        },
+      ]
+    : [];
+
   const finishOf = (entry: { finish_date?: string }) =>
     entry.finish_date ? Date.parse(entry.finish_date) : null;
-  const rows: ListRow[] = sorted
+  const skillRows: ListRow[] = sorted
     .filter((entry) => {
       const finish = finishOf(entry);
       return finish === null || finish > now;
@@ -74,6 +111,8 @@ export const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
       };
     });
 
+  const rows = [...acceleratorRows, ...skillRows];
+
   if (!active) {
     return {
       ...base,
@@ -82,6 +121,7 @@ export const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
         tone: notTrainingAlert ? 'warning' : 'clear',
       },
       rows,
+      deadlines: acceleratorDeadlines,
       summary: t('overview.board.notTraining'),
     };
   }
@@ -102,7 +142,7 @@ export const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
         })),
         (seconds) => formatCountdown(seconds)
       ) ?? undefined,
-    table: trainingTable(t, sorted, now, nameOf),
+    table: trainingTable(t, sorted, now, nameOf, accelerator),
     number: {
       value: finish === null ? UNKNOWN : formatCountdown(Math.max(0, finish - now) / 1000),
       secondary: {
@@ -114,10 +154,12 @@ export const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
       tone: 'clear',
     },
     rows,
-    deadlines:
-      finish !== null && finish > now
-        ? [{ at: finish, note: t('overview.board.nextSkill'), severity: 'clear', to }]
-        : [],
+    deadlines: [
+      ...(finish !== null && finish > now
+        ? [{ at: finish, note: t('overview.board.nextSkill'), severity: 'clear' as const, to }]
+        : []),
+      ...acceleratorDeadlines,
+    ],
     summary: nameOf(active.skill_id),
   };
 };

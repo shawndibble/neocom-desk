@@ -246,3 +246,34 @@ describe('TableBody fitWidth', () => {
     expect(screen.queryByText('40%')).not.toBeInTheDocument();
   });
 });
+
+describe('TableBody icon column', () => {
+  const columns: TableModel['columns'] = [
+    { key: 'name', label: 'Name', priority: 0 },
+    { key: 'when', label: 'When', align: 'end', priority: 1 },
+  ];
+
+  it('keeps no empty icon column when no row draws an icon, so the text starts under its header', () => {
+    const { container } = renderTable({
+      columns,
+      rows: [
+        { key: 'a', cells: ['Alpha', '1h'] },
+        { key: 'b', cells: ['Beta', '2h'], tone: 'watch' },
+      ],
+    });
+    expect(container.querySelector('tbody td .size-4')).toBeNull();
+    expect(screen.getByRole('columnheader', { name: 'Name' })).not.toHaveClass('pl-[2.125rem]');
+  });
+
+  it('keeps the icon column on every row, and indents the header over it, once a row is flagged', () => {
+    const { container } = renderTable({
+      columns,
+      rows: [
+        { key: 'a', cells: ['Alpha', '1h'] },
+        { key: 'b', cells: ['Beta', '2h'], tone: 'critical' },
+      ],
+    });
+    expect(container.querySelectorAll('tbody td .size-4')).toHaveLength(2);
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toHaveClass('pl-[2.125rem]');
+  });
+});

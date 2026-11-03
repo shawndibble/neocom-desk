@@ -46,14 +46,37 @@ function instant(date: string | undefined): number | null {
  * level it reaches and SP per hour. SP per hour needs the entry's declared
  * start and SP figures, so a skill queued behind another shows no rate.
  */
+/** The accelerator line a Training table leads with: what it is, when it runs out, how loud. */
+export interface TrainingAcceleratorRow {
+  label: string;
+  expiresAt: number;
+  severity: DeadlineSeverity;
+}
+
 export function trainingTable(
   t: Translate,
   entries: readonly SkillQueueEntry[],
   now: number,
-  nameOf: (skillId: number) => string
+  nameOf: (skillId: number) => string,
+  accelerator?: TrainingAcceleratorRow | null
 ): TableModel {
   let previousFinish: number | null = null;
-  const rows: TableRowModel[] = [];
+  // First, so "+N more" never hides an accelerator about to run out.
+  const rows: TableRowModel[] = accelerator
+    ? [
+        {
+          key: 'accelerator',
+          cells: [
+            accelerator.label,
+            formatCountdown(Math.max(0, accelerator.expiresAt - now) / 1000),
+            '',
+            '',
+            '',
+          ],
+          tone: accelerator.severity,
+        },
+      ]
+    : [];
   for (const entry of entries) {
     const finish = instant(entry.finish_date);
     if (finish !== null && finish <= now) continue;
