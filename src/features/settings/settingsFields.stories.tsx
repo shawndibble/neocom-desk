@@ -26,13 +26,10 @@ export const Hint: Story = {
   render: () => <SettingsHint>Systems you keep off your routes.</SettingsHint>,
 };
 
-/** @summary Scope readout (§6c): synced panel line. */
-export const ScopeSynced: Story = { render: () => <SettingsScopeHint scope="synced" /> };
-
 /** @summary Scope readout (§6c): device-only panel line. */
 export const ScopeDevice: Story = { render: () => <SettingsScopeHint scope="device" /> };
 
-function CheckboxDemo({ scope }: { scope?: 'synced' | 'device' }) {
+function CheckboxDemo({ scope }: { scope?: 'device' }) {
   const [on, setOn] = useState(true);
   return (
     <CheckboxField

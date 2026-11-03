@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Field, Fields, IskInput } from '@/components/ui';
 import { DEFAULT_LP_VALUE, useLpValue } from '@/features/loyalty/lpValue';
-import { DefaultsSyncHint, SettingsFormLoading } from './settingsFields';
+import { SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
@@ -88,7 +88,6 @@ export function LpValueSettingsForm() {
   if (!hydrated) return <SettingsFormLoading />;
   return (
     <div className="space-y-4">
-      <DefaultsSyncHint />
       <Fields variant="form">
         <LpValueField id="settings-lp-value" />
       </Fields>
