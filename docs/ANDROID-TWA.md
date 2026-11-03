@@ -103,10 +103,18 @@ as Chrome:
   before `bubblewrap update`.
   Each icon, `public/icons/shortcut-<name>.png`, is the page's nav glyph
   (`src/app/navIcons.ts`: Bell, EnvelopeSimple, Wallet, ChartLineUp) at the
-  `fill` weight, 192×192, in `#57c7f4` on `#0d1117`, glyph at 58% of the canvas
-  (the launcher's mask can clip the edge). Render the glyph's SVG
-  (`renderToStaticMarkup` of the `Nav*` component) and screenshot it on that
-  background with Playwright; redo all four if a glyph in `navIcons.ts` changes.
+  `fill` weight, 192×192, **transparent background**, glyph in `#0b78ad`, cropped to its ink bounds and
+  fitted so its longest side is 96% of the canvas (Phosphor's own viewBox padding
+  would leave ~72%). This is the fallback "any" icon, which the launcher insets on a white
+  disc, so it must read on white (the app's `#57c7f4` accent is too faint there). Each also
+  has `shortcut-<name>-maskable.png` (`chosenMaskableIconUrl`, `purpose: maskable`
+  in the web manifest): `#57c7f4` glyph fitted so its bounding-box diagonal is 76% of the canvas, inside the mask's 80% safe circle,
+  on `#0d1117` full-bleed. Bubblewrap builds an Android adaptive icon from it, which
+  fills the launcher's circle with no white ring. Render the glyph's SVG
+  (`renderToStaticMarkup` of the Phosphor glyph), measure its `getBBox()`, set the
+  viewBox to it, and screenshot with Playwright (`omitBackground` for the plain
+  icon, the dark background for the maskable one). Redo all eight if a glyph in
+  `navIcons.ts` changes.
 
 After shipping a build that turns delegation on, a user who already allowed
 notifications while Chrome owned them must toggle notifications off and on in

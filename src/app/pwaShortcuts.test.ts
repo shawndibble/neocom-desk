@@ -61,6 +61,18 @@ describe('buildPwaShortcuts', () => {
     );
   });
 
+  it('gives each shortcut a maskable icon so the launcher fills its circle, mirrored in the twa manifest', () => {
+    const twa = readTwa<{ shortcuts: { chosenMaskableIconUrl: string }[] }>();
+    const maskable = shortcuts.map((s) => s.icons.find((i) => i.purpose === 'maskable'));
+    for (const icon of maskable) {
+      expect(icon).toBeDefined();
+      expect(existsSync(`public/${icon?.src}`)).toBe(true);
+    }
+    expect(twa.shortcuts.map((s) => s.chosenMaskableIconUrl)).toEqual(
+      maskable.map((i) => `https://neocomdesk.com/${i?.src}`)
+    );
+  });
+
   it('keeps the twa minSdkVersion at what androidbrowserhelper needs', () => {
     // androidbrowserhelper 2.7.x (bundled by Bubblewrap 1.27) declares minSdk 24;
     // a lower value fails the Gradle manifest merge.
