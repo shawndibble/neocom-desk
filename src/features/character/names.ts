@@ -179,7 +179,7 @@ async function fetchBatch(
   resolved: Map<number, UniverseName>,
   allowance: { left: number }
 ): Promise<void> {
-  if (batch.length === 0) return;
+  if (batch.length === 0 || allowance.left <= 0) return;
   try {
     const entries = await postUniverseNames([...batch]);
     const fetchedAt = Date.now();
@@ -199,7 +199,6 @@ async function fetchBatch(
       refusedIds.set(batch[0], Date.now());
       return;
     }
-    if (allowance.left <= 0) return;
     const middle = Math.ceil(batch.length / 2);
     await fetchBatch(batch.slice(0, middle), resolved, allowance);
     await fetchBatch(batch.slice(middle), resolved, allowance);
