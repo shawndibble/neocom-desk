@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
+import { useFitToViewport } from '@/lib/useFitToViewport';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { MailListRow } from '@/features/character/MailListRow';
 import { MailListEmpty, type MailListState } from '@/features/character/MailListEmpty';
 import { isMailRead, mailAgeLabel, type MailRow } from '@/features/character/mailDisplay';
@@ -74,8 +76,14 @@ export function MailListPane({
   onLoadMore,
 }: MailListPaneProps) {
   const { t } = useTranslation();
+  // Sticky and a viewport tall, but at scroll 0 it starts below the header and
+  // filters: this keeps its bottom edge on the screen's. The `lg:max-h` class
+  // is the first-paint fallback.
+  const isDesktop = useIsDesktop();
+  const paneRef = useFitToViewport<HTMLElement>(visible && isDesktop, 'maxHeight');
   return (
     <Panel
+      ref={paneRef}
       padded={false}
       fill
       className={
