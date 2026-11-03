@@ -1092,6 +1092,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           onSearchReverseLane={() => searchReverseLane(selectedRow)}
           onClose={() => setSelectedRow(null)}
           returnFocusFallback={() => resultsRef.current}
+          characterId={characterId}
         />
       )}
     </>

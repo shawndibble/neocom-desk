@@ -15,6 +15,11 @@ vi.mock('@/features/route/routeExposure', () => ({
   routeExposure: () => routeExposure(),
 }));
 
+const loadStructureName = vi.hoisted(() =>
+  vi.fn<(c: number, id: number) => Promise<string | null>>()
+);
+vi.mock('@/features/character/structures', () => ({ loadStructureName }));
+
 const openInEve = vi.hoisted(() => ({ unavailable: false }));
 vi.mock('@/features/openInEve/useOpenInEve', () => ({
   useOpenInEve: () => ({
@@ -77,12 +82,15 @@ const KNOWN: RouteExposure = {
 
 function renderModal(
   jumps: CourierJumps = { kind: 'known', count: 2 },
-  extra: { returnFocusFallback?: () => HTMLElement | null } = {}
+  extra: { returnFocusFallback?: () => HTMLElement | null } = {},
+  row: CourierRouteRow = ROW,
+  characterId: number | null = 9001
 ) {
   return render(
     <MemoryRouter>
       <CourierContractDetailModal
-        row={ROW}
+        row={row}
+        characterId={characterId}
         regionNames={new Map()}
         jumps={jumps}
         goingRateMultiple={null}
@@ -97,6 +105,7 @@ function renderModal(
 }
 
 beforeEach(() => {
+  loadStructureName.mockReset();
   routeExposure.mockReset();
   lawlessSystems = new Set();
   openInEve.unavailable = false;
@@ -225,5 +234,45 @@ describe('CourierContractDetailModal plan route', () => {
       'href',
       '/travel/route?pref=prefer-highsec&stops=30000142%3A60003760%2C30002187%3A60003760'
     );
+  });
+});
+
+describe('CourierContractDetailModal player structure names', () => {
+  const STRUCTURE_ID = 1049588174021;
+  const unnamed: CourierEndpoint = {
+    locationId: STRUCTURE_ID,
+    name: null,
+    systemName: null,
+    systemId: null,
+    regionId: 10000002,
+    security: null,
+    space: null,
+    resolution: 'structure',
+    hasStargates: null,
+  };
+  const structureRow: CourierRouteRow = { ...ROW, destination: unnamed };
+  beforeEach(() => routeExposure.mockResolvedValue(KNOWN));
+
+  it('names a structure the character can read', async () => {
+    loadStructureName.mockResolvedValue('Perimeter - Keepstar');
+    renderModal({ kind: 'known', count: 2 }, {}, structureRow);
+
+    expect(await screen.findByText('Perimeter - Keepstar')).toBeInTheDocument();
+    expect(loadStructureName).toHaveBeenCalledWith(9001, STRUCTURE_ID);
+  });
+
+  it('says "Unreadable station" when ESI refuses, keeping the id on hover', async () => {
+    loadStructureName.mockResolvedValue(null);
+    renderModal({ kind: 'known', count: 2 }, {}, structureRow);
+
+    const label = await screen.findByText('Unreadable station');
+    expect(label).toHaveAttribute('title', `#${STRUCTURE_ID}`);
+  });
+
+  it('keeps the bare id, and asks nothing, with no active character', () => {
+    renderModal({ kind: 'known', count: 2 }, {}, structureRow, null);
+
+    expect(screen.getByText(`#${STRUCTURE_ID}`)).toBeInTheDocument();
+    expect(loadStructureName).not.toHaveBeenCalled();
   });
 });

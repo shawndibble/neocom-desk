@@ -6,6 +6,11 @@ import type { NpcStationEntry, SolarSystemEntry } from '@/sde/marketTypes';
 import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 import { loadCourierEndpoints } from './courierEndpoints';
 
+const cachedStructureNames = vi.hoisted(() => new Map<number, string>());
+vi.mock('@/features/character/structures', () => ({
+  readCachedStructureNames: async () => cachedStructureNames,
+}));
+
 const JITA_STATION = 60003760;
 const JITA_SYSTEM = 30000142;
 const STRUCTURE = 1035466617946;
@@ -60,5 +65,25 @@ describe('loadCourierEndpoints — security', () => {
     // STRUCTURE is not in STATIONS, so it resolves as a player structure —
     // no system, so no security status either.
     expect(endpoints.get(STRUCTURE)?.security).toBeNull();
+  });
+});
+
+describe('loadCourierEndpoints — cached structure names', () => {
+  beforeEach(() => cachedStructureNames.clear());
+
+  it('names a player structure this device already knows, and still marks it a structure', async () => {
+    cachedStructureNames.set(STRUCTURE, 'Perimeter - Keepstar');
+    const endpoints = await loadCourierEndpoints([row()]);
+
+    expect(endpoints.get(STRUCTURE)).toMatchObject({
+      name: 'Perimeter - Keepstar',
+      resolution: 'structure',
+    });
+  });
+
+  it('leaves it nameless when the cache has nothing', async () => {
+    const endpoints = await loadCourierEndpoints([row()]);
+
+    expect(endpoints.get(STRUCTURE)?.name).toBeNull();
   });
 });

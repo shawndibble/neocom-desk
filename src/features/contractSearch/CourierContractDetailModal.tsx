@@ -59,6 +59,7 @@ import { useJumpBasis } from '@/features/route/jumpBasis';
 import { formatMagnitude } from '@/lib/magnitude';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { courierPlanRouteHref } from '@/features/contractSearch/courierPlanRoute';
+import { loadStructureName } from '@/features/character/structures';
 import { endpointName, endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { useCourierCollateralRatio } from '@/features/contractSearch/collateralThreshold';
 import { RISK_COPY, WARNING_RISKS } from '@/features/contractSearch/courierRiskLabels';
@@ -104,6 +105,8 @@ export interface CourierContractDetailModalProps {
   reverseLane: ReverseLane;
   /** Where focus lands on close when the row that opened this is gone (the reverse-lane search filters it out). */
   returnFocusFallback?: () => HTMLElement | null;
+  /** The active character, whose access list decides whether a player structure's name is readable. */
+  characterId: number | null;
   /** Swap the two region filters and go look, closing this. */
   onSearchReverseLane: () => void;
   onClose: () => void;
@@ -146,13 +149,54 @@ function useRouteExposure(
   return measured?.key === routeKey ? measured.exposure : null;
 }
 
+/**
+ * A player structure's name, asked for once when its haul is opened. ESI names
+ * a structure only to a character on its access list, so a refusal is a normal
+ * answer: it reads "Unreadable station", not an error. With no active
+ * character nothing was asked, so the id stays — that is not a refusal.
+ */
+type StructureLookup = 'pending' | 'unreadable' | { name: string };
+
+function useStructureLookup(
+  endpoint: CourierEndpoint,
+  characterId: number | null
+): StructureLookup | null {
+  const wanted =
+    endpoint.resolution === 'structure' && endpoint.name === null && characterId !== null;
+  const [answer, setAnswer] = useState<{ id: number; result: string | null } | null>(null);
+  useEffect(() => {
+    if (!wanted || characterId === null) return;
+    let cancelled = false;
+    void loadStructureName(characterId, endpoint.locationId)
+      .catch(() => null)
+      .then((result) => {
+        if (!cancelled) setAnswer({ id: endpoint.locationId, result });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wanted, characterId, endpoint.locationId]);
+  if (!wanted) return null;
+  if (answer?.id !== endpoint.locationId) return 'pending';
+  return answer.result === null ? 'unreadable' : { name: answer.result };
+}
+
 /** The station name, linked to its Place Info once it resolved; the `#id` fallback stays plain. */
-function endpointPlace(endpoint: CourierEndpoint): ReactNode {
-  return endpoint.name === null ? (
-    endpointName(endpoint)
-  ) : (
-    <PlaceLink id={endpoint.locationId}>{endpoint.name}</PlaceLink>
-  );
+function EndpointPlaceName({
+  endpoint,
+  characterId,
+}: {
+  endpoint: CourierEndpoint;
+  characterId: number | null;
+}) {
+  const { t } = useTranslation();
+  const lookup = useStructureLookup(endpoint, characterId);
+  const name = endpoint.name ?? (typeof lookup === 'object' && lookup ? lookup.name : null);
+  if (name !== null) return <PlaceLink id={endpoint.locationId}>{name}</PlaceLink>;
+  if (lookup === 'unreadable') {
+    return <span title={`#${endpoint.locationId}`}>{t('contractSearch.unreadableStation')}</span>;
+  }
+  return <>{endpointName(endpoint)}</>;
 }
 
 /**
@@ -228,6 +272,7 @@ export function CourierContractDetailModal({
   onSearchReverseLane,
   onClose,
   returnFocusFallback,
+  characterId,
 }: CourierContractDetailModalProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -356,7 +401,9 @@ export function CourierContractDetailModal({
             {/* Wraps rather than truncates: the station name and its region
                 are the whole reason this row exists, and the old `truncate`
                 clipped the region off both ends. */}
-            <span className="text-sm">{endpointPlace(row.origin)}</span>
+            <span className="text-sm">
+              <EndpointPlaceName endpoint={row.origin} characterId={characterId} />
+            </span>
             {place(row.origin)}
           </div>
 
@@ -417,7 +464,9 @@ export function CourierContractDetailModal({
 
           <div className="flex flex-col gap-0.5">
             <span className={eyebrowClassName}>{t('contractSearch.dropOffLabel')}</span>
-            <span className="text-sm">{endpointPlace(row.destination)}</span>
+            <span className="text-sm">
+              <EndpointPlaceName endpoint={row.destination} characterId={characterId} />
+            </span>
             {place(row.destination)}
             {planRouteHref !== null && (
               <Link
