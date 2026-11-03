@@ -121,7 +121,9 @@ export function IskInput({
         onBlur={(event) => {
           if (!parseable) setErrorFor(text);
           // Shorthand settles to the full grouped figure on the way out, so the zeros can be checked.
-          else if (parsed !== null) setText(maskIsk(parsed));
+          // Only when the grouped figure says exactly what was committed: maskIsk keeps two decimals.
+          else if (parsed !== null && parseIskAmount(maskIsk(parsed)) === parsed)
+            setText(maskIsk(parsed));
           onBlur?.(event);
         }}
         onChange={(event) => {
