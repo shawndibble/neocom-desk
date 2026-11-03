@@ -43,4 +43,19 @@ export interface MailRow {
   ownerName: string;
   header: MailHeader;
   tab: MailTab;
+  /** The mail's Custom Label names (never a System Label), for the tags under its row. */
+  labelNames: readonly string[];
+}
+
+/**
+ * Whether a mail reads as read: ESI's flag, moved by what the pilot did in
+ * this session before the next load. The two sets never overlap.
+ */
+export function isMailRead(
+  row: Pick<MailRow, 'key' | 'header'>,
+  locallyReadKeys: ReadonlySet<string>,
+  locallyUnreadKeys: ReadonlySet<string>
+): boolean {
+  if (locallyUnreadKeys.has(row.key)) return false;
+  return Boolean(row.header.is_read) || locallyReadKeys.has(row.key);
 }

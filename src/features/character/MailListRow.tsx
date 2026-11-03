@@ -1,12 +1,15 @@
 import { useTranslation } from 'react-i18next';
-import { Tooltip } from '@/components/ui';
+import { Checkbox, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import {
   focusRingInsetClassName,
   interactiveClassName,
   selectedRowClassName,
+  touchCheckboxLabelClassName,
 } from '@/components/ui/controlStyles';
+import { MailLabelTags } from '@/features/character/MailLabelTags';
+import { MailRowMenu } from '@/features/character/MailRowMenu';
 import { cx } from '@/lib/cx';
 import { formatDateOnly } from '@/lib/timestamp';
 import { FOLDER_ICON, TAB_LABEL_KEY, type MailRow } from '@/features/character/mailDisplay';
@@ -20,6 +23,13 @@ interface MailListRowProps {
   party: string;
   timeZone?: string;
   onOpen: (row: MailRow, button: HTMLButtonElement) => void;
+  /** This mailbox holds the Mail organize Permission: the ⋮ menu and Select mode apply. */
+  canOrganize?: boolean;
+  selecting?: boolean;
+  checked?: boolean;
+  onToggleCheck?: (row: MailRow) => void;
+  onSetRead?: (row: MailRow, read: boolean) => void;
+  onDelete?: (row: MailRow) => void;
 }
 
 /** One two-line mail row in the list: unread gutter, subject, then folder · party · date. */
@@ -31,10 +41,18 @@ export function MailListRow({
   party,
   timeZone,
   onOpen,
+  canOrganize = false,
+  selecting = false,
+  checked = false,
+  onToggleCheck,
+  onSetRead,
+  onDelete,
 }: MailListRowProps) {
   const { t } = useTranslation();
   const { header, tab } = row;
   const FolderIcon = FOLDER_ICON[tab];
+  // In Select mode a click ticks the row (when its mailbox can organize) instead of opening it.
+  const ticking = selecting && canOrganize;
   return (
     <li>
       {/* Selection used to be `bg-panel-2` alone, the same fill hover already
@@ -49,9 +67,18 @@ export function MailListRow({
           isSelected ? selectedRowClassName : 'border-l-2 border-l-transparent hover:bg-panel-2'
         )}
       >
+        {ticking && (
+          <label className={cx(touchCheckboxLabelClassName, 'pl-2.5')}>
+            <Checkbox
+              checked={checked}
+              onChange={() => onToggleCheck?.(row)}
+              aria-label={t('mail.selectRow', { subject: header.subject || t('mail.noSubject') })}
+            />
+          </label>
+        )}
         <button
           type="button"
-          onClick={(e) => onOpen(row, e.currentTarget)}
+          onClick={(e) => (ticking ? onToggleCheck?.(row) : onOpen(row, e.currentTarget))}
           // `aria-current={false}` renders the string "false", which is a
           // valid token meaning "not current" — so this is tidiness, not a bug
           // fix: it drops an attribute from every unselected row rather than
@@ -65,7 +92,7 @@ export function MailListRow({
           {/* Unread marker, in a fixed-width gutter so read and unread rows
           keep one left edge — the empty gutter is itself the "read" signal. */}
           <span aria-hidden="true" className="mt-1.5 flex w-1.5 shrink-0 justify-center">
-            {!isRead && <span className="size-1.5 rounded-full bg-accent" />}
+            {!isRead && !ticking && <span className="size-1.5 rounded-full bg-accent" />}
           </span>
 
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -117,6 +144,7 @@ export function MailListRow({
                 </span>
               )}
             </span>
+            <MailLabelTags names={row.labelNames} />
           </span>
 
           {/* The dot and the bold weight say "unread" in colour and typography
@@ -124,6 +152,14 @@ export function MailListRow({
           words too. The folder needs no such gloss: its name is rendered above. */}
           {!isRead && <span className="sr-only">{t('mail.unread')}</span>}
         </button>
+        {canOrganize && !selecting && (
+          <MailRowMenu
+            label={t('mail.rowMoreActions', { subject: header.subject || t('mail.noSubject') })}
+            isRead={isRead}
+            onSetRead={(read) => onSetRead?.(row, read)}
+            onDelete={() => onDelete?.(row)}
+          />
+        )}
       </div>
     </li>
   );

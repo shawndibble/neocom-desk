@@ -933,6 +933,20 @@ describe('mail', () => {
     expect(capturedBody).toEqual({ read: true });
     expect(result.data).toBeNull();
   });
+
+  it('putCharacterMail PUTs {read:false} to mark a mail unread', async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/mail/1/`, async ({ request }) => {
+        capturedBody = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+
+    await putCharacterMail(CHARACTER_ID, 1, { read: false });
+
+    expect(capturedBody).toEqual({ read: false });
+  });
 });
 
 describe('postUniverseNames', () => {

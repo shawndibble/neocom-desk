@@ -98,7 +98,7 @@ describe('Mail', () => {
     expect(capturedBody).toEqual({ read: true });
   });
 
-  it('offers the mark-as-read Permission and makes no write without organize_mail', async () => {
+  it('offers the Mail organize Permission and makes no write without organize_mail', async () => {
     await db.tokens.update(CHAR_ID, { scopes: ['esi-mail.read_mail.v1'] });
     let requestCount = 0;
     server.use(
@@ -112,7 +112,7 @@ describe('Mail', () => {
 
     await user.click(await screen.findByText('Fleet up!'));
 
-    expect(await screen.findByText('Mail you open stays unread in EVE')).toBeInTheDocument();
+    expect(await screen.findByText('Organize your mail from here')).toBeInTheDocument();
     expect(requestCount).toBe(0);
   });
 
