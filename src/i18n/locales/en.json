@@ -5764,7 +5764,6 @@
       "eveTime": {
         "title": "EVE time",
         "description": "The game clock, UTC, with today's date",
-        "unit": "EVE time",
         "summary": "EVE time {{time}}"
       },
       "incursions": {
