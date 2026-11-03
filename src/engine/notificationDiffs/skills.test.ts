@@ -5,6 +5,7 @@ import {
   diffSkillQueueEnding,
   diffSpExtractionReady,
   SKILL_QUEUE_NOTIFICATION_DIFFS,
+  diffOmegaLapsed,
   type SpExtractionSnapshot,
   type SkillQueueEntrySnapshot,
   type SkillQueueSnapshot,
@@ -445,9 +446,10 @@ describe('diffSpExtractionReady', () => {
 });
 
 describe('SKILL_QUEUE_NOTIFICATION_DIFFS', () => {
-  it('registers all three events by id', () => {
+  it('registers all four events by id', () => {
     expect(Object.keys(SKILL_QUEUE_NOTIFICATION_DIFFS).sort()).toEqual([
       'characterNotTraining',
+      'omegaLapsed',
       'skillLevelComplete',
       'skillQueueEnding',
     ]);
@@ -475,5 +477,83 @@ describe('SKILL_QUEUE_NOTIFICATION_DIFFS', () => {
     ]).toEqual([
       { eventId: 'skillLevelComplete', characterId: 7, skillId: 1, level: 3, finishMs: T0 + 1000 },
     ]);
+  });
+});
+
+describe('diffOmegaLapsed', () => {
+  const POLL = 5 * 60 * 1000;
+  const NOW = 10 * HOUR;
+  const training = (finishMs: number, overrides: Partial<SkillQueueEntrySnapshot> = {}) =>
+    entry({ skillId: 3300, queuePosition: 0, finishedLevel: 5, finishMs, ...overrides });
+
+  it('fires nothing without a baseline', () => {
+    expect(diffOmegaLapsed(1, undefined, snapshot([training(NOW + 8 * HOUR)], NOW))).toEqual([]);
+  });
+
+  it('fires when the active skill suddenly finishes about twice as far away', () => {
+    const prev = snapshot([training(NOW + 8 * HOUR)], NOW);
+    // Halved speed at the poll: the 8h left becomes 16h.
+    const next = snapshot([training(NOW + POLL + 16 * HOUR)], NOW + POLL);
+    expect(diffOmegaLapsed(1, prev, next)).toEqual([
+      {
+        eventId: 'omegaLapsed',
+        characterId: 1,
+        skillId: 3300,
+        level: 5,
+        finishMs: NOW + POLL + 16 * HOUR,
+      },
+    ]);
+  });
+
+  it('fires when an accelerator lapses in the same gap (an even bigger slowdown)', () => {
+    const prev = snapshot([training(NOW + 8 * HOUR)], NOW);
+    const next = snapshot([training(NOW + POLL + 28 * HOUR)], NOW + POLL);
+    expect(diffOmegaLapsed(1, prev, next)).toHaveLength(1);
+  });
+
+  it('does not fire for the strongest other slowdown, an accelerator or implants coming off', () => {
+    const prev = snapshot([training(NOW + 8 * HOUR)], NOW);
+    // 1.7x on a weak attribute set, plus most of the gap's inflation.
+    const next = snapshot([training(NOW + POLL + 13.6 * HOUR)], NOW + POLL);
+    expect(diffOmegaLapsed(1, prev, next)).toEqual([]);
+  });
+
+  it('does not fire on a speed-up, an unchanged finish, or a different active skill', () => {
+    const prev = snapshot([training(NOW + 8 * HOUR)], NOW);
+    expect(diffOmegaLapsed(1, prev, snapshot([training(NOW + 4 * HOUR)], NOW + POLL))).toEqual([]);
+    expect(diffOmegaLapsed(1, prev, snapshot([training(NOW + 8 * HOUR)], NOW + POLL))).toEqual([]);
+    expect(
+      diffOmegaLapsed(
+        1,
+        prev,
+        snapshot([training(NOW + POLL + 16 * HOUR, { skillId: 3301 })], NOW + POLL)
+      )
+    ).toEqual([]);
+  });
+
+  it('still fires when the skill moved from queue position 1 to 0 after the one ahead finished', () => {
+    const prev = snapshot([training(NOW + 8 * HOUR, { queuePosition: 1 })], NOW);
+    const next = snapshot([training(NOW + POLL + 16 * HOUR, { queuePosition: 0 })], NOW + POLL);
+    expect(diffOmegaLapsed(1, prev, next)).toHaveLength(1);
+  });
+
+  it('allows for a cached read: a slowdown 15 minutes old on a short remainder is not trusted', () => {
+    const prev = snapshot([training(NOW + HOUR)], NOW);
+    const next = snapshot([training(NOW + POLL + 2 * HOUR)], NOW + POLL);
+    expect(diffOmegaLapsed(1, prev, next)).toEqual([]);
+  });
+
+  it('ignores a long gap, where the slowdown could have landed any time and inflates the ratio', () => {
+    const prev = snapshot([training(NOW + 8 * HOUR)], NOW);
+    const next = snapshot([training(NOW + 3 * HOUR + 14 * HOUR)], NOW + 3 * HOUR);
+    expect(diffOmegaLapsed(1, prev, next)).toEqual([]);
+  });
+
+  it('ignores a paused or finished queue', () => {
+    const prev = snapshot([training(NOW + 8 * HOUR)], NOW);
+    expect(
+      diffOmegaLapsed(1, prev, snapshot([entry({ skillId: 3300, queuePosition: 0 })], NOW + POLL))
+    ).toEqual([]);
+    expect(diffOmegaLapsed(1, prev, snapshot([], NOW + POLL))).toEqual([]);
   });
 });

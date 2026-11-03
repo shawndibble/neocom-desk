@@ -14,6 +14,9 @@ export const skillQueueCopy: DomainCopy<NotificationFire, SkillNames> & {
     if (fire.eventId === 'characterNotTraining') {
       return simple('characterNotTraining', { character });
     }
+    if (fire.eventId === 'omegaLapsed') {
+      return simple('omegaLapsed', { character });
+    }
     if (fire.eventId === 'skillQueueEnding') {
       return simple('skillQueueEnding', {
         character,
@@ -38,6 +41,8 @@ export const skillQueueCopy: DomainCopy<NotificationFire, SkillNames> & {
    * (`engine/projection.ts`'s `projectionWording`).
    */
   push: (fire, character, names) => {
+    // Inferred from a slowdown that already happened: nothing to predict for a Scheduled Push.
+    if (fire.eventId === 'omegaLapsed') throw new Error('omegaLapsed is never projected');
     if (fire.eventId === 'characterNotTraining') {
       assertProjectionWording('characterNotTraining', 'assert');
       return renderSharedWording('characterNotTraining', { character });

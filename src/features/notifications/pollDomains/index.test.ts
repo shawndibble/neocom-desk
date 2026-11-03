@@ -166,6 +166,7 @@ describe('POLL_DOMAINS', () => {
   it('drives the skill queue off the engine diff registry, not a hand-written list', () => {
     expect([...skillQueueDomain.eventIds].sort()).toEqual([
       'characterNotTraining',
+      'omegaLapsed',
       'skillLevelComplete',
       'skillQueueEnding',
     ]);
@@ -182,7 +183,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
 
   it("lists each domain's events in catalog order, from the entries naming its source", () => {
     expect(Object.fromEntries(POLL_DOMAINS.map((domain) => [domain.id, domain.eventIds]))).toEqual({
-      skillQueue: ['skillLevelComplete', 'characterNotTraining', 'skillQueueEnding'],
+      skillQueue: ['skillLevelComplete', 'characterNotTraining', 'skillQueueEnding', 'omegaLapsed'],
       spExtraction: ['spExtractionReady'],
       industryJobs: ['industryJobComplete'],
       cloneJump: ['cloneJumpReady'],

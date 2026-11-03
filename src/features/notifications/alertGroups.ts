@@ -108,6 +108,8 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   mercenaryDenAnarchy: 'warning',
   // A lead-time warning, same shape as the extractor one above.
   skillQueueEnding: 'warning',
+  // Training is already at half speed: act (renew Omega), but nothing is lost.
+  omegaLapsed: 'warning',
   // A lead-time warning too: a typed-in accelerator ending.
   acceleratorExpiring: 'warning',
   // Already over: the boost is gone, but nothing is lost with it.

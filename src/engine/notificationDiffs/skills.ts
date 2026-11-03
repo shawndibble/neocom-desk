@@ -46,7 +46,7 @@ export interface SkillQueueSnapshot {
 }
 
 export type SkillQueueNotificationEventId =
-  'skillLevelComplete' | 'characterNotTraining' | 'skillQueueEnding';
+  'skillLevelComplete' | 'characterNotTraining' | 'skillQueueEnding' | 'omegaLapsed';
 
 export interface NotificationFire {
   eventId: SkillQueueNotificationEventId;
@@ -334,6 +334,70 @@ export function diffCloneJumpReady(
   return fires;
 }
 
+/**
+ * Alpha trains at half the Omega rate (`ALPHA_RATE_FACTOR`, `engine/skills/sp.ts`), and ESI
+ * re-projects the active skill's finish date when the rate changes, so an Omega clone lapsing
+ * to Alpha shows up as the same active entry finishing about twice as far away.
+ *
+ * `omegaLapsed` reads exactly that: between two polls, the same skill and level is still the
+ * active entry and its remaining time at least doubled. (The queue position is not compared:
+ * the entry behind a just-finished one drops from 1 to 0.) Two guards keep other slowdowns from
+ * reading as Alpha.
+ *
+ * The slowdown lands somewhere inside the window the data covers, `c` before this poll, and the
+ * longer ago it did the more the ratio is inflated: for a rate change of `k` it is
+ * `k + (k-1) * c / remaining`. So the previous poll must be recent against the time left
+ * (`remaining >= 4 * window`), which holds `c / remaining` to 1/4 and a halving to 2.0 to 2.25.
+ * The window is the poll gap plus `OMEGA_LAPSED_DATA_AGE_MS`, because a snapshot's `nowMs` is the
+ * poll time while its rows can be served from a cache that old.
+ *
+ * And the threshold sits just under 2, above what an accelerator or implants coming off a weak
+ * attribute set usually give (about 1.7x, at most 1.875 with that inflation). That is a margin,
+ * not a proof: losing implants and an accelerator together on a weak set can reach 2.0, so the
+ * alert says "looks like" and leaves the Clone State to the pilot. An accelerator lapsing in the
+ * same window as Omega only pushes the ratio higher, so both are seen.
+ *
+ * Fires nothing without a baseline, for a paused or edited entry, or on a speed-up.
+ */
+export const OMEGA_LAPSED_RATIO = 1.97;
+const OMEGA_LAPSED_GAP_FACTOR = 4;
+/** How stale a cached skill-queue read can be when a poll stamps it (`STALE_AFTER.default`). */
+const OMEGA_LAPSED_DATA_AGE_MS = 10 * 60 * 1000;
+
+function activeEntry(
+  snapshot: SkillQueueSnapshot
+): (SkillQueueEntrySnapshot & { finishMs: number }) | undefined {
+  return orderedByQueuePosition(snapshot.entries).find(
+    (entry): entry is SkillQueueEntrySnapshot & { finishMs: number } =>
+      isActive(entry, snapshot.nowMs)
+  );
+}
+
+export function diffOmegaLapsed(
+  characterId: number,
+  prev: SkillQueueSnapshot | undefined,
+  next: SkillQueueSnapshot
+): NotificationFire[] {
+  if (!prev) return [];
+  const gap = next.nowMs - prev.nowMs;
+  const before = activeEntry(prev);
+  const after = activeEntry(next);
+  if (gap <= 0 || !before || !after) return [];
+  if (before.skillId !== after.skillId || before.finishedLevel !== after.finishedLevel) return [];
+  const expectedRemaining = before.finishMs - next.nowMs;
+  if (expectedRemaining < OMEGA_LAPSED_GAP_FACTOR * (gap + OMEGA_LAPSED_DATA_AGE_MS)) return [];
+  if ((after.finishMs - next.nowMs) / expectedRemaining < OMEGA_LAPSED_RATIO) return [];
+  return [
+    {
+      eventId: 'omegaLapsed',
+      characterId,
+      skillId: after.skillId,
+      level: after.finishedLevel,
+      finishMs: after.finishMs,
+    },
+  ];
+}
+
 export const SKILL_QUEUE_NOTIFICATION_DIFFS: Record<
   SkillQueueNotificationEventId,
   (
@@ -345,4 +409,5 @@ export const SKILL_QUEUE_NOTIFICATION_DIFFS: Record<
   skillLevelComplete: diffSkillLevelComplete,
   characterNotTraining: diffCharacterNotTraining,
   skillQueueEnding: diffSkillQueueEnding,
+  omegaLapsed: diffOmegaLapsed,
 };

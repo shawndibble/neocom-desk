@@ -140,6 +140,9 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // already-delivered.
     case 'skillQueueEnding':
       return [characterId, fire.eventId, fire.finishMs, fire.thresholdMs].join(':');
+    // One lapse is seen on one active skill level: a later lapse lands on a different one.
+    case 'omegaLapsed':
+      return [characterId, fire.eventId, fire.skillId, fire.level].join(':');
     // spExtractionReady shares characterNotTraining's reasoning: "ready" is a
     // threshold crossing with no entity id of its own, so two devices agree
     // only by bucketing the day they each independently observed it.
@@ -343,6 +346,9 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     case 'newMail':
       return pastOrNow(fire.sentMs);
     case 'characterNotTraining':
+    // The poll that saw the slowdown; ESI gives no time for it.
+    // falls through
+    case 'omegaLapsed':
     // falls through: skillQueueEnding's tail finish is a future deadline too, not the moment the queue actually runs dry (same reasoning as planetaryExtractorExpiring).
     case 'skillQueueEnding':
     case 'spExtractionReady':

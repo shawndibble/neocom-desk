@@ -91,6 +91,7 @@ const EVENT_CHIP: Readonly<Record<string, TopicChip>> = {
   skillLevelComplete: 'skills',
   characterNotTraining: 'skills',
   skillQueueEnding: 'skills',
+  omegaLapsed: 'skills',
   acceleratorExpiring: 'skills',
   acceleratorEnded: 'skills',
   spExtractionReady: 'skills',
