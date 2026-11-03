@@ -33,11 +33,11 @@
  * resolves at lowest sells first, each hub's need is summed across members,
  * the books are walked once per material, and the members resolve again at
  * those prices. Rows are held until that second pass, so a rollup never
- * shows lowest-sell totals and then jumps. The plan list and Compare keep
- * lowest sells.
+ * shows lowest-sell totals and then jumps. The plan list and Compare
+ * walk only the depth their own plan needs, as the plan page does.
  */
 import { useEffect, useRef, useState } from 'react';
-import { depthCandidates, depthPriceMap, summedDepthNeeds } from '@/engine/industry/depthPrice';
+import { depthPriceMap, summedDepthNeeds } from '@/engine/industry/depthPrice';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
@@ -46,11 +46,11 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
-import { loadDepthPrices, type DepthPrices } from './depthPriceLoader';
+import { loadDepthPrices, planDepthNeeds, type DepthPrices } from './depthPriceLoader';
 import { loadPlanSnapshots, type PlanSnapshots } from './planSnapshots';
 import { createYielder } from './yieldToMain';
 import { shoppingListMaterials } from './subBuildPlan';
-import { onPlanHeroBasis } from './opportunities';
+import { onPlanHeroBasis } from './planOwnedBasis';
 import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
 import {
   isPricingReady,
@@ -150,16 +150,11 @@ async function computeRow(
     const blueprintPurchaseOffersFor = await priced.blueprintOffers;
     const inventionMarket = await priced.inventionMarket;
     const hub: TradeHub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
+    const hubSources = pricingSourcesForHub(pricing, hub);
     const resolveAt = (prices: HubPrices | undefined) =>
       resolveBuildPlan(
         plan,
-        {
-          ...sources,
-          ...pricingSourcesForHub(pricing, hub),
-          blueprintPurchaseOffersFor,
-          inventionMarket,
-          catalog,
-        },
+        { ...sources, ...hubSources, blueprintPurchaseOffersFor, inventionMarket, catalog },
         {
           snapshot,
           reactionSystemCostIndex: reactionSnapshot?.systemCostIndex,
@@ -173,12 +168,7 @@ async function computeRow(
     // the page's (one re-resolve, read off the lowest-sell pass, as there).
     // A group walk (`depthPrices` given) already did this for the whole group.
     if (!depthPrices && resolved.result) {
-      const needs = depthCandidates(
-        shoppingListMaterials(resolved.result.materials),
-        snapshot.hubSellVolumes,
-        plan.materialSourcing,
-        plan.materialPriceBasis
-      );
+      const needs = planDepthNeeds(plan, resolved.result, snapshot.hubSellVolumes);
       if (needs.size > 0) {
         const depth = await loadDepthPrices(hub, needs).catch(() => null);
         if (depth && depth.size > 0) resolved = resolveAt(depthPriceMap(depth));
@@ -198,7 +188,7 @@ async function computeRow(
         ? onPlanHeroBasis(result, {
             snapshot,
             modifiers: sources.modifiers,
-            standing: pricingSourcesForHub(pricing, hub).standing,
+            standing: hubSources.standing,
             productQuantity: (entry.blueprint.products[0]?.quantity ?? 0) * plan.runs,
             productUnitPrice:
               entry.productTypeID !== null

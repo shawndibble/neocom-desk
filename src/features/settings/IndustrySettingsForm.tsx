@@ -91,11 +91,7 @@ export function IndustrySettingsForm({
             </Field>
 
             {/* The list and the plan page both read this, so a plan's profit agrees on both. */}
-            <Field
-              label={t('settings.profitBasisLabel')}
-              htmlFor="settings-profit-basis"
-              note={t('settings.profitBasisHint')}
-            >
+            <Field label={t('settings.profitBasisLabel')} note={t('settings.profitBasisHint')}>
               <SegmentedControl
                 label={t('settings.profitBasisLabel')}
                 options={[
