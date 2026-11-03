@@ -498,7 +498,11 @@ export function Contracts() {
               notices={
                 <>
                   {contractsResult.fromCache && (
-                    <CachedNotice className="px-3 pt-2" fetchedAt={contractsResult.fetchedAt} />
+                    <CachedNotice
+                      withBadge
+                      className="px-3 pt-2"
+                      fetchedAt={contractsResult.fetchedAt}
+                    />
                   )}
                   {contractsTruncated && (
                     <p className="flex flex-wrap items-center gap-2 px-3 pt-2 text-[0.6875rem] text-warning uppercase">

@@ -4992,6 +4992,7 @@
       "notTraining": "Nothing in training",
       "nextJob": "Next industry job finishes",
       "nextSkill": "Next skill finishes",
+      "acceleratorEnds": "Cerebral accelerator runs out",
       "queued_one": "{{count}} skill queued",
       "queued_other": "{{count}} skills queued",
       "priceAlertTargetLabel": {
@@ -5362,6 +5363,8 @@
         "skillLevel": "{{name}} {{level}}",
         "now": "Training now",
         "next": "Next",
+        "accelerator": "Accelerator +{{bonus}}",
+        "acceleratorEnds": "Runs out",
         "idle": "Idle",
         "col": {
           "skill": "Skill",
@@ -6734,7 +6737,9 @@
         "divisions": "Divisions",
         "sources": "Sources",
         "all": "All structures",
-        "problems": "Problems only"
+        "problems": "Problems only",
+        "withAccelerator": "Skills and accelerator",
+        "skillsOnly": "Skills only"
       },
       "where": "Where",
       "whereChoice": {
@@ -9029,7 +9034,6 @@
       "label": "Calendar map",
       "today": "Today",
       "clearDay": "Show all days",
-      "pastHint": "Hatched days are behind you: no new calendar event can land there, though anything overdue still shows.",
       "dayWithLoad": "{{date}} — {{count}} due: {{kinds}}",
       "dayEmpty": "{{date}} — nothing due",
       "todayPrefix": "Today, {{label}}"
@@ -12103,6 +12107,16 @@
         "body_one": "{{character}}'s cerebral accelerator should run out in about {{count}} hour.",
         "body_other": "{{character}}'s cerebral accelerator should run out in about {{count}} hours."
       },
+      "acceleratorEnded": {
+        "expired": {
+          "title": "Accelerator ran out",
+          "body": "{{character}}'s +{{bonus}} cerebral accelerator has run out."
+        },
+        "lost": {
+          "title": "Accelerator no longer detected",
+          "body": "{{character}}'s attributes no longer show a +{{bonus}} cerebral accelerator."
+        }
+      },
       "incursionNearby": {
         "title_one": "Incursion {{count}} jump away",
         "title_other": "Incursion {{count}} jumps away",
@@ -14343,6 +14357,7 @@
         "characterNotTraining": "Character not training",
         "skillQueueEnding": "Skill queue ending",
         "acceleratorExpiring": "Accelerator expiring",
+        "acceleratorEnded": "Accelerator ended",
         "spExtractionReady": "SP extraction ready",
         "industryJobComplete": "Industry job complete",
         "cloneJumpReady": "Clone jump ready",

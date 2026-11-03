@@ -22,6 +22,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'planetaryExtractionDone',
       'planetaryExtractorExpiring',
       'acceleratorExpiring',
+      'acceleratorEnded',
       'mercenaryDenReinforced',
       'mercenaryDenAnarchy',
       'marketOrderFilled',

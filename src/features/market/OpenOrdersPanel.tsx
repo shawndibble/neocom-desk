@@ -647,7 +647,7 @@ export function OpenOrdersPanel({
             />
           )}
 
-          {fromCacheAny && <CachedNotice fetchedAt={oldestFetchedAt} />}
+          {fromCacheAny && <CachedNotice withBadge fetchedAt={oldestFetchedAt} />}
 
           {corpGrantOnly ? null : noOrders ? (
             // Every Character skipped: the "hasn't shared" note below already says why.

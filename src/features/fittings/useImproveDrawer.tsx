@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Close } from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useFitToViewport } from '@/lib/useFitToViewport';
 import { useTranslation } from 'react-i18next';
 import { IconButton, Modal, Panel, Toast } from '@/components/ui';
 import {
@@ -179,7 +180,7 @@ export function useImproveDrawer({
   // closing gives focus back to what held it (the ⋮ menu's button, which the menu
   // has refocused by then: `useOpenAfterMenu`), as the slide-out used to.
   const columnHeading = useRef<HTMLHeadingElement | null>(null);
-  const columnRef = useFitToViewport(isOpen && asColumn);
+  const columnRef = useFitToViewport<HTMLDivElement>(isOpen && asColumn);
   const opener = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!isOpen || !asColumn) return;
@@ -472,41 +473,4 @@ export function useImproveDrawer({
     preview: isOpen ? preview : null,
     previewIsk: isOpen ? previewIsk : null,
   };
-}
-
-/**
- * The column is sticky a viewport tall, but at the top of the page it starts below
- * the editor's header, so a fixed `100vh` height would push its selection bar off
- * the bottom of the screen until the page scrolled. This keeps it ending at the
- * viewport's bottom (0.75rem clear) wherever its top is.
- */
-function useFitToViewport(active: boolean) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  // Before paint, so the first frame already ends at the viewport's bottom.
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!active || !el) return;
-    let frame = 0;
-    const fit = () => {
-      frame = 0;
-      const top = Math.max(el.getBoundingClientRect().top, 12);
-      el.style.height = `${window.innerHeight - top - 12}px`;
-    };
-    const schedule = () => {
-      if (frame === 0) frame = requestAnimationFrame(fit);
-    };
-    fit();
-    window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule);
-    // Content above it changing height (a charge note, load warnings) moves its top too.
-    const resized = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
-    resized?.observe(document.body);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', schedule);
-      window.removeEventListener('resize', schedule);
-      resized?.disconnect();
-    };
-  }, [active]);
-  return ref;
 }

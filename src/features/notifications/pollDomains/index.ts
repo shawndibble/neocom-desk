@@ -55,6 +55,7 @@ import { communitiesDomain } from './communities';
 import { killsDomain } from './kills';
 import { mercenaryDensDomain } from './mercenaryDens';
 import { acceleratorDomain } from './accelerator';
+import { acceleratorEndedDomain } from './acceleratorEnded';
 
 export type { AnyNotificationFire } from '../eventEntries';
 export type { PollDomain } from './defineDomain';
@@ -91,6 +92,7 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   killsDomain,
   mercenaryDensDomain,
   acceleratorDomain,
+  acceleratorEndedDomain,
 ];
 
 const DOMAIN_BY_EVENT: ReadonlyMap<NotificationEventId, PollDomain> = new Map(

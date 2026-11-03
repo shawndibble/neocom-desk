@@ -220,7 +220,7 @@ export function SkillPlans() {
       />
       <SkillsSubNav />
 
-      {cachedAt !== null && <CachedNotice fetchedAt={cachedAt} />}
+      {cachedAt !== null && <CachedNotice withBadge fetchedAt={cachedAt} />}
 
       <QueueStrip view={queueView} nowMs={nowMs} />
 

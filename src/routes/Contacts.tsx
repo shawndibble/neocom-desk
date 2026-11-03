@@ -390,7 +390,11 @@ export function Contacts() {
                   />
                 )}
                 {contactsResult.fromCache && (
-                  <CachedNotice className="px-3 pt-2" fetchedAt={contactsResult.fetchedAt} />
+                  <CachedNotice
+                    withBadge
+                    className="px-3 pt-2"
+                    fetchedAt={contactsResult.fetchedAt}
+                  />
                 )}
                 {contactsTruncated && (
                   <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">

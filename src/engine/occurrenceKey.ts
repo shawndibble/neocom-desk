@@ -49,6 +49,7 @@ import type {
   StructureFuelLowFire,
   MercenaryDenReinforcedFire,
   AcceleratorExpiringFire,
+  AcceleratorEndedFire,
   SkyhookRaidableFire,
   MercenaryDenAnarchyFire,
   CorpIndustryJobNotificationFire,
@@ -68,6 +69,7 @@ import type { StockBelowTargetFire } from './stockTargets/stockAlert';
 import type { IncursionNearbyFire } from './incursions/incursionAlert';
 import type { SkyhookRaidableNearbyFire } from './skyhooks/skyhookAlert';
 import { parseInstant } from './esiInstant';
+import { utcDay } from './localDay';
 import { DAY_MS } from '@/lib/age';
 
 /**
@@ -96,6 +98,7 @@ export type OccurrenceFire =
   | StructureFuelLowFire
   | MercenaryDenReinforcedFire
   | AcceleratorExpiringFire
+  | AcceleratorEndedFire
   | SkyhookRaidableFire
   | MercenaryDenAnarchyFire
   | CorpIndustryJobNotificationFire
@@ -196,6 +199,10 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // One expiry, one lead time: a swapped-in accelerator is a new countdown.
     case 'acceleratorExpiring':
       return [characterId, fire.eventId, fire.expiresAtMs, fire.thresholdMs].join(':');
+    // One per Character per UTC day, whichever evidence saw it end: the attribute sheet usually
+    // refreshes a poll after the typed expiry, and that is the same accelerator, not a second one.
+    case 'acceleratorEnded':
+      return [characterId, fire.eventId, utcDay(fire.atMs)].join(':');
     // A reinforcement is identified by its exit instant, so a fresh one is a new countdown; the
     // lead warning and the "out now" fire of one exit are different occurrences.
     case 'mercenaryDenReinforced':
@@ -329,6 +336,9 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     case 'contractAccepted':
     case 'contractCompleted':
       return pastOrNow(fire.occurredMs);
+    // A typed expiry already past, or the poll that saw the detected one gone.
+    case 'acceleratorEnded':
+      return pastOrNow(fire.atMs);
     // The mail header's own `timestamp`.
     case 'newMail':
       return pastOrNow(fire.sentMs);

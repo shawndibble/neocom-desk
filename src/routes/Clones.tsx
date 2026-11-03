@@ -298,7 +298,7 @@ export function Clones() {
               </div>
             )}
             {clonesResult.fromCache && (
-              <CachedNotice className="px-3 pt-2" fetchedAt={clonesResult.fetchedAt} />
+              <CachedNotice withBadge className="px-3 pt-2" fetchedAt={clonesResult.fetchedAt} />
             )}
             {clones.length > 1 && (
               <div className="overflow-x-auto border-b border-line px-3 py-2">

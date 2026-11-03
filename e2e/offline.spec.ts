@@ -63,12 +63,13 @@ test('shows cached character and skills after external hosts go unreachable', as
   // The reload resets React state, so groups are collapsed again.
   await page.getByRole('button', { name: 'Expand all' }).click();
 
-  // Skills data served from esiCache: cached rows + the "stale" notice, dated.
-  await expect(page.getByText('Showing cached data')).toBeVisible();
+  // Skills data served from esiCache: cached rows, dated by the header badge.
+  // At this desktop width the amber "Showing cached data" line is hidden (the
+  // badge already says it); a phone shows the line instead.
+  await expect(page.getByText('Showing cached data')).toBeHidden();
   await expect(page.getByText('Caldari Frigate', { exact: true })).toBeVisible();
   await expect(page.getByText('Small Hybrid Turret', { exact: true })).toBeVisible();
-  // The notice's own age: the header's DataAgeBadge is a second `<time>` (hidden below md).
-  await expect(page.getByText('Showing cached data').locator('..').locator('time')).toBeVisible();
+  await expect(page.getByRole('main').locator('time').first()).toBeVisible();
 });
 
 /**

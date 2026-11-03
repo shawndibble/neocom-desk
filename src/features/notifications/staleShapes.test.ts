@@ -39,6 +39,7 @@ import { communitiesDomain } from './pollDomains/communities';
 import { killsDomain } from './pollDomains/kills';
 import { mercenaryDensDomain } from './pollDomains/mercenaryDens';
 import { acceleratorDomain } from './pollDomains/accelerator';
+import { acceleratorEndedDomain } from './pollDomains/acceleratorEnded';
 import { skyhookDomain } from './pollDomains/corp';
 
 type Entry = Record<string, unknown>;
@@ -231,6 +232,11 @@ const CASES: Case[] = [
     name: 'accelerator',
     domain: acceleratorDomain,
     base: { expiresAtMs: 100, bonus: 10, leadMs: 5 },
+  },
+  {
+    name: 'acceleratorPresence',
+    domain: acceleratorEndedDomain,
+    base: { kind: 'typed', bonus: 10, expiresAtMs: 100 },
   },
   {
     name: 'mercenary dens',

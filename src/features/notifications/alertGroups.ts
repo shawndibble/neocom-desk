@@ -110,6 +110,8 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   skillQueueEnding: 'warning',
   // A lead-time warning too: a typed-in accelerator ending.
   acceleratorExpiring: 'warning',
+  // Already over: the boost is gone, but nothing is lost with it.
+  acceleratorEnded: 'watch',
   // A lead-time warning too (issue #1713) — the collateral is still recoverable.
   courierDeliveryDue: 'warning',
   // A loss already happened — the same "standing fault" reasoning as the

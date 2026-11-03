@@ -25,7 +25,7 @@ const stateOf = (view: ReturnType<typeof buildView>) => resolveWidget(view.statu
 describe('feedsFor', () => {
   it('lists each feed once, for only the kinds given', () => {
     expect(feedsFor(['training', 'sp', 'wallet']).sort()).toEqual(
-      ['journal', 'skills', 'spExtras', 'wallet'].sort()
+      ['accelerator', 'journal', 'skills', 'spExtras', 'wallet'].sort()
     );
   });
 
@@ -317,6 +317,86 @@ describe('training', () => {
     ]);
     expect(view.rows[0].title).toContain('Gunnery');
     expect(view.table?.rows[0]?.info).toEqual({ typeId: 3300 });
+  });
+
+  describe('accelerator', () => {
+    const finish = NOW + 4 * HOUR;
+    const queue = [
+      {
+        skill_id: 3300,
+        queue_position: 0,
+        finished_level: 5,
+        start_date: new Date(NOW - HOUR).toISOString(),
+        finish_date: new Date(finish).toISOString(),
+      },
+    ];
+    const accelerators = (expiresAt: number) => ({
+      accelerator: ok(new Map([[91, { bonus: 12, expiresAt }]])),
+    });
+    const expiresAt = NOW + 20 * HOUR;
+
+    it('places the accelerator among the skills by time left and offers its expiry as a deadline by default', () => {
+      const view = buildView(
+        'training',
+        { skills: skills(queue) as never, ...accelerators(expiresAt) },
+        ctx()
+      );
+      // The skill ends in 4h, the accelerator in 20h: skill first.
+      expect(view.table?.rows.map((row) => row.key)).toEqual(['3300:0', 'accelerator']);
+      expect(view.table?.rows[1]?.cells[1]).toBe('20h 0m');
+      expect(view.rows.map((row) => row.key)).toEqual(['3300:0', 'accelerator']);
+      expect(view.deadlines).toContainEqual({
+        at: expiresAt,
+        note: 'overview.board.acceleratorEnds',
+        severity: 'critical',
+        to: '/skills/plans',
+      });
+      expect(view.deadlines).toHaveLength(2);
+    });
+
+    it('leads with an accelerator that runs out before the skill finishes', () => {
+      const view = buildView(
+        'training',
+        { skills: skills(queue) as never, ...accelerators(NOW + HOUR) },
+        ctx()
+      );
+      expect(view.table?.rows[0]?.key).toBe('accelerator');
+      expect(view.rows[0]?.key).toBe('accelerator');
+    });
+
+    it('draws the skills alone when the widget is set to skills only', () => {
+      const view = buildView(
+        'training',
+        { skills: skills(queue) as never, ...accelerators(expiresAt) },
+        ctx({ show: 'skillsOnly' })
+      );
+      expect(view.table?.rows.some((row) => row.key === 'accelerator')).toBe(false);
+      expect(view.deadlines).toHaveLength(1);
+    });
+
+    it("ignores an accelerator that has run out, and another Character's", () => {
+      const feeds = { skills: skills(queue) as never };
+      expect(
+        buildView('training', { ...feeds, ...accelerators(NOW - HOUR) }, ctx()).deadlines
+      ).toHaveLength(1);
+      expect(
+        buildView(
+          'training',
+          { ...feeds, ...accelerators(expiresAt) },
+          ctx({ activeCharacterId: 92 })
+        ).deadlines
+      ).toHaveLength(1);
+    });
+
+    it('still warns about the accelerator while nothing is training', () => {
+      const view = buildView(
+        'training',
+        { skills: skills([]) as never, ...accelerators(expiresAt) },
+        ctx()
+      );
+      expect(view.deadlines).toHaveLength(1);
+      expect(view.deadlines[0]?.at).toBe(expiresAt);
+    });
   });
 
   it('warns about an idle queue only where the not-training alert is on', () => {

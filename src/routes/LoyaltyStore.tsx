@@ -480,7 +480,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             columnsById={optionalOfferColumns}
           />
 
-          {offersFromCache && <CachedNotice fetchedAt={offersFetchedAt} />}
+          {offersFromCache && <CachedNotice withBadge fetchedAt={offersFetchedAt} />}
 
           {isDesktop ? (
             <div className="flex items-start gap-3">

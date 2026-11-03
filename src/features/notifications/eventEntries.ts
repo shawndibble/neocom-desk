@@ -103,6 +103,9 @@ import {
   type AcceleratorExpiringFire,
   type AcceleratorSnapshot,
   diffAcceleratorExpiring,
+  type AcceleratorEndedFire,
+  type AcceleratorPresenceSnapshot,
+  diffAcceleratorEnded,
   type SkyhookRaidableFire,
   type SkyhookSnapshot,
   diffSkyhookRaidable,
@@ -153,6 +156,7 @@ import {
   structureFuelCopy,
   mercenaryDenReinforcedCopy,
   acceleratorExpiringCopy,
+  acceleratorEndedCopy,
   skyhookRaidableCopy,
   mercenaryDenAnarchyCopy,
   corpIndustryJobCopy,
@@ -201,6 +205,7 @@ export type AnyNotificationFire =
   | StructureFuelLowFire
   | MercenaryDenReinforcedFire
   | AcceleratorExpiringFire
+  | AcceleratorEndedFire
   | SkyhookRaidableFire
   | MercenaryDenAnarchyFire
   | CorpIndustryJobNotificationFire
@@ -253,6 +258,7 @@ export const SNAPSHOT_SOURCES = {
   structureFuel: source<StructureFuelSnapshot>('structureFuel'),
   mercenaryDens: source<DenSnapshot, PlanetNames>('mercenaryDens'),
   accelerator: source<AcceleratorSnapshot>('accelerator'),
+  acceleratorPresence: source<AcceleratorPresenceSnapshot>('acceleratorPresence'),
   skyhooks: source<SkyhookSnapshot, PlanetNames>('skyhooks'),
   corpIndustryJobs: source<CorpIndustryJobSnapshot, ItemNames>('corpIndustryJobs'),
   corpRoster: source<CorpRosterSnapshot, MemberNames>('corpRoster'),
@@ -449,6 +455,16 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     copy: acceleratorExpiringCopy,
     projection: { push: acceleratorExpiringCopy.push, everyOccurrence: true },
     thresholds: { fields: [THRESHOLD_FIELDS.acceleratorExpiringLeadHours], hintKey: null },
+    rowHintKey: null,
+  }),
+  // Local data again, and a fact that already happened, so there is nothing to project for a
+  // Scheduled Push: it can only be seen while the app is open to read the accelerator.
+  acceleratorEnded: defineEvent({
+    source: SNAPSHOT_SOURCES.acceleratorPresence,
+    diff: diffAcceleratorEnded,
+    copy: acceleratorEndedCopy,
+    projection: null,
+    thresholds: null,
     rowHintKey: null,
   }),
   // Per Character (issue #4782): ESI has no corporation den route.

@@ -320,7 +320,7 @@ export function SkillCertificates() {
         }
       />
       <SkillsSubNav />
-      {data.fromCache && <CachedNotice fetchedAt={data.fetchedAt} />}
+      {data.fromCache && <CachedNotice withBadge fetchedAt={data.fetchedAt} />}
       {body}
       {added && (
         <Toast

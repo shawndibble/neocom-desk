@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useCorpStockTargetsStore } from '@/features/corp/stockTargets';
+import { useCharacterAccelerators } from '@/features/accelerator/useAccelerators';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import {
   useSpExtractionMonitoringEnabled,
@@ -187,6 +188,13 @@ function SpExtrasSource() {
   return null;
 }
 
+/** Every Character's typed-in accelerator (local Dexie, synced), a live query not a load. */
+function AcceleratorSource() {
+  const accelerators = useCharacterAccelerators();
+  useReportFeed('accelerator', accelerators, false, false);
+  return null;
+}
+
 /** The synced corp stock targets, a hook not a load; hydrated before it answers. */
 function CorpStockTargetsSource() {
   const value = useCorpStockTargetsStore((state) => state.value);
@@ -214,6 +222,7 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   incursions: { type: 'hook', Component: IncursionsSource },
   sovRaids: snapshot(loadSovRaidsWidget, 'overview:sov-raids'),
   spExtras: { type: 'hook', Component: SpExtrasSource },
+  accelerator: { type: 'hook', Component: AcceleratorSource },
   journal: snapshot(loadJournalPanel, 'overview:journal'),
   netWorth: snapshot(loadNetWorthWidget, 'overview:net-worth'),
   profit: snapshot(loadProfitWidget, 'overview:profit'),

@@ -800,7 +800,8 @@ here — they go one per file in `docs/context/decisions/`.
   are prefixed `corp`; Structures and Moon extractions are on both boards. A
   kind not built yet is "coming soon": listed in the **Gallery**, not addable.
 - **Widget Show**: A per-**Widget** setting that picks what a kind draws from
-  its one feed, e.g. the Wallet on Balance or on Flow.
+  its one feed, e.g. the Wallet on Balance or on Flow, or Training on Skills and
+  accelerator or Skills only.
 - **Widget State**: Which of five things a **Widget** is showing: loading,
   needs permission, failed, empty or ok.
 - **Yours**: The pill on a **Feeder** whose corporation is one of the viewer's own, joined through "Add my other

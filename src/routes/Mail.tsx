@@ -408,7 +408,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
               endpoints={['getCharacterMailHeaders']}
             />
           )}
-          {offline && <CachedNotice fetchedAt={fetchedAt} />}
+          {offline && <CachedNotice withBadge fetchedAt={fetchedAt} />}
           {/* Opening a mail marks it read in EVE only with this Permission (Write to EVE, off by default). */}
           <GrantNote
             compact
@@ -431,7 +431,11 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
             />
           )}
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start xl:grid-cols-[24rem_minmax(0,1fr)]">
+          {/* `mb-0`: the dialog and toast after this block render nothing in
+          flow, but they still make the grid a non-last child, so the page's
+          `space-y-4` adds a bottom margin that pushes the page past the
+          viewport the sticky list pane is sized to. */}
+          <div className="mb-0 grid grid-cols-1 gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start xl:grid-cols-[24rem_minmax(0,1fr)]">
             <MailListPane
               visible={isDesktop || selectedKey === null}
               listState={listState}

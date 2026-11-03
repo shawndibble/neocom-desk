@@ -852,7 +852,11 @@ function CorpAssetsView({
         ) : (
           <div className="space-y-2">
             {data.fromCache && (
-              <CachedNotice fetchedAt={data.fetchedAt} refreshFailed={snapshot.refreshCount > 0} />
+              <CachedNotice
+                withBadge
+                fetchedAt={data.fetchedAt}
+                refreshFailed={snapshot.refreshCount > 0}
+              />
             )}
             {data.truncated && (
               <p className="text-[0.6875rem] text-warning uppercase">
