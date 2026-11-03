@@ -12,6 +12,8 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import type { ContractFlag } from '@/engine/contracts/contractFlags';
+import { formatSignedPercent, savingTone } from '@/lib/formatSignedPercent';
+import { cx } from '@/lib/cx';
 import {
   isUnpricedOffer,
   offerAskingPrice,
@@ -54,6 +56,8 @@ interface ItemsColumnsInput {
   /** The marker before a row's price, or nothing: the flag judgement lives with the caller. */
   priceFlag?: (row: PublicContractOfferRow) => ReactNode;
   flagFor?: (row: PublicContractOfferRow) => ContractFlag | null;
+  /** The detail modal's Saving for the row, in percent, or `null` where the row cannot state it. */
+  savingFor?: (row: PublicContractOfferRow) => number | null;
 }
 
 export function useItemsColumns({
@@ -65,6 +69,7 @@ export function useItemsColumns({
   visibleItemsColumns,
   priceFlag,
   flagFor,
+  savingFor,
 }: ItemsColumnsInput) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -187,6 +192,26 @@ export function useItemsColumns({
           </>
         ),
       },
+      saving: {
+        id: 'saving',
+        header: t('contractSearch.savingColumn'),
+        width: COL_SMALL_NUMBER,
+        align: 'right',
+        className: 'tabular-nums whitespace-nowrap',
+        // Biggest saving first; a row with no figure sinks either way.
+        sortFirst: 'desc',
+        sortValue: (row) => savingFor?.(row) ?? undefined,
+        stackAffix: { after: t('contractSearch.mobile.savingAffix') },
+        render: (row) => {
+          const saving = savingFor?.(row) ?? null;
+          if (saving === null) return <span className="text-text-dim">–</span>;
+          return (
+            <span className={cx(savingTone(saving) === 'good' ? 'text-isk-pos' : 'text-isk-neg')}>
+              {formatSignedPercent(saving)}
+            </span>
+          );
+        },
+      },
       system: {
         // The system, with its security, is what a buyer actually weighs —
         // whether the pickup is a hop from home or a trip into lowsec — and a
@@ -258,7 +283,17 @@ export function useItemsColumns({
         stackAffix: { before: t('contractSearch.mobile.expiresAffix') },
       },
     }),
-    [t, regionNames, offerLocations, timeZone, offerJumps, plexPrice, plexAskLabel, priceFlag]
+    [
+      t,
+      regionNames,
+      offerLocations,
+      timeZone,
+      offerJumps,
+      plexPrice,
+      plexAskLabel,
+      priceFlag,
+      savingFor,
+    ]
   );
 
   const columns = useMemo<DataTableColumn<PublicContractOfferRow>[]>(() => {

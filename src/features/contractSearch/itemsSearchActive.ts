@@ -14,7 +14,7 @@ export interface ItemsSearchControls {
   regionId: number | null;
   maxPrice: string;
   minQuantity: string;
-  saleKind: string | null;
+  hideExchanges: boolean;
   hideAuctions: boolean;
   hidePlex: boolean;
   jumps: JumpRange;
@@ -30,7 +30,7 @@ export function isItemsSearchActive(
     filter.regionId !== null ||
     filter.maxPrice.trim() !== '' ||
     filter.minQuantity.trim() !== '' ||
-    filter.saleKind !== null ||
+    filter.hideExchanges ||
     filter.hideAuctions ||
     filter.hidePlex ||
     filter.jumps !== DEFAULT_JUMP_RANGE

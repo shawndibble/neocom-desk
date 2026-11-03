@@ -15312,15 +15312,12 @@
     "allRegions": "All regions",
     "maxPriceLabel": "Max price",
     "minQuantityLabel": "Min qty",
-    "saleKindLabel": "Contract type",
-    "saleKind": {
-      "exchange": "Item Exchange",
-      "auction": "Auction"
-    },
     "itemColumn": "Item",
     "qtyColumn": "Qty",
     "priceColumn": "Price",
     "iskPerUnitColumn": "ISK/unit",
+    "savingColumn": "Saving",
+    "priceFlagsLabel": "Price flags",
     "flag": {
       "overpricedLabel": "Priced far above market",
       "overpricedHint": "Asks {{times}} times the {{hub}} buy-now price.",
@@ -15357,6 +15354,7 @@
     "priceInclPlex": "{{price}} (incl. {{plex}} PLEX)",
     "plexColumn": "PLEX asked",
     "excludeLabel": "Exclude",
+    "hideExchanges": "Item Exchange",
     "hideAuctions": "Auctions",
     "hidePlex": "PLEX contracts",
     "hidePlexTooltip": "Hide contracts asking for PLEX in return, rather than ISK.",
@@ -15380,6 +15378,7 @@
       "qtyAffix": "Qty ",
       "jumpsAffix": "Jumps ",
       "perUnitAffix": "/unit",
+      "savingAffix": "saved",
       "expiresAffix": "Exp ",
       "offerCount_one": "{{count}} offer",
       "offerCount_other": "{{count}} offers"
@@ -15524,6 +15523,7 @@
       "sideLabel": "Value at",
       "sideSell": "Sell orders",
       "sideBuy": "Buy orders",
+      "includeOtherLabel": "Other lines",
       "includeOther": "Include Other",
       "includeOtherTooltip": "Also list contracts that are only profitable through Other, and add it to Profit.",
       "profitIncludesOther": "Includes Other",
@@ -15553,6 +15553,7 @@
   "jumpRange": {
     "systemsFailed": "System list couldn't load",
     "label": "Distance",
+    "currentSystemLabel": "Current system",
     "option": {
       "3": "Within 3 jumps",
       "5": "Within 5 jumps",

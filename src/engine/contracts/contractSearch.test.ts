@@ -47,8 +47,8 @@ describe('filterContractOffers', () => {
 
   it('narrows by sale kind', () => {
     const rows = [offer({ isAuction: false }), offer({ isAuction: true })];
-    expect(filterContractOffers(rows, { saleKind: 'auction' })).toEqual([rows[1]]);
-    expect(filterContractOffers(rows, { saleKind: 'exchange' })).toEqual([rows[0]]);
+    expect(filterContractOffers(rows, { hideExchanges: true })).toEqual([rows[1]]);
+    expect(filterContractOffers(rows, { hideAuctions: true })).toEqual([rows[0]]);
   });
 
   it('judges maxPrice on an auction buyout, never its starting bid', () => {

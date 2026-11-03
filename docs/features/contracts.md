@@ -57,7 +57,7 @@ User goal by tab:
 - Route `UNGATED` (`routeScopes.ts:230`): History needs a scope but Search does not, and Search is the landing tab, so a page gate would put a re-login wall in front of it. Decision `20260912-200442-contracts-is-ungated-its-scope-is-gated-per`.
 - No active Character → `/characters` (`Contracts.tsx:550`). Search tabs still require an active Character (they need a session and a location ACL identity).
 - URL state (ADR `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`):
-  - Items: `items.q`, `items.type`, `items.region`, `items.maxPrice`, `items.minQty`, `items.kind` (exchange|auction), `items.hideAuctions`, `items.hidePlex`, `items.jumps`, `items.sort` (default price asc).
+  - Items: `items.q`, `items.type`, `items.region`, `items.maxPrice`, `items.minQty`, `items.hideExchanges`, `items.hideAuctions`, `items.hidePlex`, `items.jumps`, `items.sort` (default price asc).
   - Courier: `courier.q`, `.origin`, `.dest`, `.space` (set), `.hideRisky`, `.overRate` (all|only|hide), `.minReward`, `.maxCollateral`, `.maxVolume`, `.minDays`, `.pref`, `.sort` (default iskPerJump desc).
   - History: `history.q`, `history.status`, `history.type`, `history.sort` (default issued desc).
   - `highlight=<contractId>` pulses a History row (target of `contractAccepted` alerts and of the wallet journal "Contract" link).
@@ -113,8 +113,7 @@ States (in order, `ContractSearchPanel.tsx:964-1031`):
 - Search box "Search item name…": ranked search (`rankedSearch`) over only item types currently listed (`listedContractTypeOptions`), limit 50 types for free text; `deferredTypeQuery` so a keystroke does not stall on ~370k rows (#2024).
 - Region (`RegionSelect`, searchable; only regions present in rows) → `items.region`.
 - Max price (`IskInput`, shorthand ok). Min quantity (number).
-- Sale kind chips Exchange / Auction (toggle; `items.kind`).
-- Exclude (`CheckboxSelect`): Hide auctions; Hide PLEX requests (tooltip "Hide contracts asking for PLEX in return, rather than ISK").
+- Exclude (`CheckboxSelect`): Item Exchange (`items.hideExchanges`), Auctions (`items.hideAuctions`), PLEX contracts (`items.hidePlex`, tooltip "Hide contracts asking for PLEX in return, rather than ISK"). Nothing is excluded by default. There is no separate type chip.
 - Hide overpriced chip (`items.hideOverpriced`, in the funnel like Market Browser's Hide bait sells): drops the rows the price flag marks and prints a dim "N overpriced contracts hidden" under the filter bar. Judged after the engine's filter, since it needs hub prices.
 - Jump range (`JumpRangeSelect`): Any, current system only, 3/5/10/15/20 jumps under the Jump Basis. `CurrentSystemPicker`: game location by default or a hand-picked system, stored device-local per Character (`currentSystemPicks`), writes immediately (not part of the draft). `JumpRangeNote` explains missing origin.
 - Column picker (button "Columns") + export menu in the bar's actions.
