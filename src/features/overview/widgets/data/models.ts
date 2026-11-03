@@ -36,7 +36,7 @@ import { getKind } from '../kinds';
  */
 const KINDS: Record<string, KindDef> = {
   ...ACCOUNT_DEFS,
-  training: { feeds: ['skills'], scope: 'character', build: training },
+  training: { feeds: ['skills', 'accelerator'], scope: 'character', build: training },
   sp: { feeds: ['skills', 'spExtras'], scope: 'character', build: sp },
   comingUp: { feeds: ['calendar'], scope: 'character', build: comingUp },
   ...WORLD_DEFS,

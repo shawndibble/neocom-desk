@@ -41,6 +41,21 @@ function instant(date: string | undefined): number | null {
 
 // --- Training ------------------------------------------------------------------------
 
+/** The accelerator line a Training table carries, in time-left order: what it is, when it runs out, how loud. */
+export interface TrainingAcceleratorRow {
+  label: string;
+  expiresAt: number;
+  severity: DeadlineSeverity;
+}
+
+/**
+ * Where the accelerator sits among the queue's rows: after every skill that ends before it runs
+ * out, so the list reads by time left. A skill with no end (a paused queue) sorts after it.
+ */
+export function acceleratorSlot(finishes: readonly (number | null)[], expiresAt: number): number {
+  return finishes.filter((finish) => finish !== null && finish <= expiresAt).length;
+}
+
 /**
  * The unfinished queue: skill, when it ends, how long it trains in all, the
  * level it reaches and SP per hour. SP per hour needs the entry's declared
@@ -50,10 +65,13 @@ export function trainingTable(
   t: Translate,
   entries: readonly SkillQueueEntry[],
   now: number,
-  nameOf: (skillId: number) => string
+  nameOf: (skillId: number) => string,
+  accelerator?: TrainingAcceleratorRow | null
 ): TableModel {
   let previousFinish: number | null = null;
   const rows: TableRowModel[] = [];
+  // Each row's end, so the accelerator can take its place among them by time left.
+  const finishes: (number | null)[] = [];
   for (const entry of entries) {
     const finish = instant(entry.finish_date);
     if (finish !== null && finish <= now) continue;
@@ -78,7 +96,21 @@ export function trainingTable(
       tone: 'clear',
       info: { typeId: entry.skill_id },
     });
+    finishes.push(finish);
     if (finish !== null) previousFinish = finish;
+  }
+  if (accelerator) {
+    rows.splice(acceleratorSlot(finishes, accelerator.expiresAt), 0, {
+      key: 'accelerator',
+      cells: [
+        accelerator.label,
+        formatCountdown(Math.max(0, accelerator.expiresAt - now) / 1000),
+        '',
+        '',
+        '',
+      ],
+      tone: accelerator.severity,
+    });
   }
   return {
     columns: [

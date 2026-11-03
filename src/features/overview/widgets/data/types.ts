@@ -7,6 +7,7 @@
  * plain fixtures.
  */
 import type { DeadlineSeverity } from '@/engine/character/severity';
+import type { TypedAccelerator } from '@/engine/accelerator';
 import type { DayZone } from '@/engine/localDay';
 import type { EsiEndpointId } from '@/esi/registry';
 import type { StockBoardData } from '@/features/stockTargets/stockBoard';
@@ -317,6 +318,8 @@ export interface FeedMap {
   incursions: IncursionsBoardData;
   sovRaids: SovRaidsWidgetData;
   spExtras: SpExtras;
+  /** Every Character's typed-in accelerator, a hook not a load (Training's expiry). */
+  accelerator: ReadonlyMap<number, TypedAccelerator>;
   journal: JournalData;
   netWorth: NetWorthWidgetData;
   profit: ProfitWidgetData;
