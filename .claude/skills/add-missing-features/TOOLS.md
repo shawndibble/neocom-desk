@@ -280,6 +280,12 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 Other open: #642, #718, #819, #821, #824, #880, #926, #1015, #1017, #1018,
 #1026, #1040, #1043, #1061, #1062, #1065, #1074, #1076, #1080, #1085.
 
+- **#5879** mail mark unread + Select mode (NARROW). **#5880** mail delete (hostile
+  KILL, owner overruled; confirm + existing Mail organize Permission).
+  **#5881** custom label tags, read-only (NARROW; no "Label as": ESI replaces the
+  whole label array). **#5882** mail storage trim: draft expiry firm, body
+  prefetch/retention cuts as human decisions. Mockup: `mail-organize`.
+
 ## Killed / dropped candidates (never filed)
 
 The reason is what stops a re-pitch. Numbers are kill-tests.
