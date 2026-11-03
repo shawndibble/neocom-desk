@@ -103,8 +103,13 @@ as Chrome:
   before `bubblewrap update`.
   Each icon, `public/icons/shortcut-<name>.png`, is the page's nav glyph
   (`src/app/navIcons.ts`: Bell, EnvelopeSimple, Wallet, ChartLineUp) at the
-  `fill` weight, 192×192, in `#57c7f4` on `#0d1117`, glyph at 80% of the canvas
-  (the launcher insets it in a circle, so a smaller glyph reads tiny). Render the glyph's SVG
+  `fill` weight, 192×192, **transparent background**, glyph in `#0b78ad` at 88% of
+  the canvas. This is the fallback "any" icon, which the launcher insets on a white
+  disc, so it must read on white (the app's `#57c7f4` accent is too faint there). Each also
+  has `shortcut-<name>-maskable.png` (`chosenMaskableIconUrl`, `purpose: maskable`
+  in the web manifest): `#57c7f4` glyph at 60% so it stays inside the mask's safe circle,
+  on `#0d1117` full-bleed. Bubblewrap builds an Android adaptive icon from it, which
+  fills the launcher's circle with no white ring. Render the glyph's SVG
   (`renderToStaticMarkup` of the `Nav*` component) and screenshot it on that
   background with Playwright; redo all four if a glyph in `navIcons.ts` changes.
 

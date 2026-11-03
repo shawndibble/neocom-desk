@@ -30,25 +30,29 @@
       "name": "Alerts",
       "shortName": "Alerts",
       "url": "https://neocomdesk.com/alerts",
-      "chosenIconUrl": "https://neocomdesk.com/icons/shortcut-alerts.png"
+      "chosenIconUrl": "https://neocomdesk.com/icons/shortcut-alerts.png",
+      "chosenMaskableIconUrl": "https://neocomdesk.com/icons/shortcut-alerts-maskable.png"
     },
     {
       "name": "Mail",
       "shortName": "Mail",
       "url": "https://neocomdesk.com/mail",
-      "chosenIconUrl": "https://neocomdesk.com/icons/shortcut-mail.png"
+      "chosenIconUrl": "https://neocomdesk.com/icons/shortcut-mail.png",
+      "chosenMaskableIconUrl": "https://neocomdesk.com/icons/shortcut-mail-maskable.png"
     },
     {
       "name": "Wallet",
       "shortName": "Wallet",
       "url": "https://neocomdesk.com/wallet/balance",
-      "chosenIconUrl": "https://neocomdesk.com/icons/shortcut-wallet.png"
+      "chosenIconUrl": "https://neocomdesk.com/icons/shortcut-wallet.png",
+      "chosenMaskableIconUrl": "https://neocomdesk.com/icons/shortcut-wallet-maskable.png"
     },
     {
       "name": "Open orders",
       "shortName": "Open orders",
       "url": "https://neocomdesk.com/market/orders",
-      "chosenIconUrl": "https://neocomdesk.com/icons/shortcut-orders.png"
+      "chosenIconUrl": "https://neocomdesk.com/icons/shortcut-orders.png",
+      "chosenMaskableIconUrl": "https://neocomdesk.com/icons/shortcut-orders-maskable.png"
     }
   ],
   "generatorApp": "bubblewrap-cli",

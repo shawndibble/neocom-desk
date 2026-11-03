@@ -10,7 +10,7 @@ export interface PwaShortcut {
   name: string;
   short_name: string;
   url: string;
-  icons: { src: string; sizes: string; type: string }[];
+  icons: { src: string; sizes: string; type: string; purpose?: string }[];
 }
 
 /**
@@ -22,6 +22,19 @@ const icon = (name: string) => ({
   src: `icons/shortcut-${name}.png`,
   sizes: '192x192',
   type: 'image/png',
+});
+
+/**
+ * The same glyph, full-bleed on the background with the glyph inside the
+ * mask's safe circle. Bubblewrap turns it into an Android adaptive icon, which
+ * the launcher fills its circle with; the plain icon above is the fallback and
+ * the launcher insets it on a white disc.
+ */
+const maskableIcon = (name: string) => ({
+  src: `icons/shortcut-${name}-maskable.png`,
+  sizes: '192x192',
+  type: 'image/png',
+  purpose: 'maskable',
 });
 
 /**
@@ -41,6 +54,6 @@ export function buildPwaShortcuts(strings: PwaShortcutStrings): PwaShortcut[] {
     name,
     short_name: name,
     url,
-    icons: [icon(glyph)],
+    icons: [icon(glyph), maskableIcon(glyph)],
   }));
 }
