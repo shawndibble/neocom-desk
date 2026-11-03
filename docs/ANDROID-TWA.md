@@ -103,8 +103,8 @@ as Chrome:
   before `bubblewrap update`.
   Each icon, `public/icons/shortcut-<name>.png`, is the page's nav glyph
   (`src/app/navIcons.ts`: Bell, EnvelopeSimple, Wallet, ChartLineUp) at the
-  `fill` weight, 192×192, in `#57c7f4` on `#0d1117`, glyph at 58% of the canvas
-  (the launcher's mask can clip the edge). Render the glyph's SVG
+  `fill` weight, 192×192, in `#57c7f4` on `#0d1117`, glyph at 80% of the canvas
+  (the launcher insets it in a circle, so a smaller glyph reads tiny). Render the glyph's SVG
   (`renderToStaticMarkup` of the `Nav*` component) and screenshot it on that
   background with Playwright; redo all four if a glyph in `navIcons.ts` changes.
 
