@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { claimSessionHint, hintSeenCount, resetSessionHints, useHintCounts } from '@/lib/hintFlags';
 import { ColumnPickerMenu } from './ColumnPickerMenu';
 
+vi.mock('@/features/character/useCharacters', () => ({ useCharacterCount: () => 1 }));
 const HINT = 'Toggle columns here. Some are hidden by default.';
 const columnsById = { a: { header: 'Alpha' }, b: { header: 'Beta' } } as never;
 
@@ -54,14 +55,14 @@ describe('column picker hint', () => {
     expect(hintSeenCount(useHintCounts.getState().value, 'columnPickerHint')).toBe(1);
   });
 
-  it('stays off before counts load, and in a session that already showed a hint', () => {
+  it('stays off before counts load, and in a session that already showed it', () => {
     useHintCounts.setState({ value: {}, hydrated: false });
     const { unmount } = render(picker);
     expect(screen.queryByText(HINT)).not.toBeInTheDocument();
     unmount();
 
     useHintCounts.setState({ value: {}, hydrated: true });
-    expect(claimSessionHint('goTo')).toBe(true);
+    expect(claimSessionHint('columnPickerHint:other')).toBe(true);
     render(picker);
     expect(screen.queryByText(HINT)).not.toBeInTheDocument();
   });

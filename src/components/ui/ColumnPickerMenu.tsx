@@ -1,17 +1,9 @@
 import { eyebrowClassName } from './eyebrowClassName';
 import { cx } from '@/lib/cx';
-import { useEffect, useId } from 'react';
 import type { ComponentProps } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  claimSessionHint,
-  dismissSessionHint,
-  hintSeenCount,
-  recordHintSeen,
-  releaseSessionHint,
-  useHintCounts,
-  useSessionHintShown,
-} from '@/lib/hintFlags';
+import { useCharacterCount } from '@/features/character/useCharacters';
+import { useOneTimeHint } from '@/lib/hintFlags';
 import { Button } from './Button';
 import { Popover, PopoverAnchor, PopoverContent } from './Popover';
 import * as Icon from './icons';
@@ -50,28 +42,6 @@ interface ColumnPickerMenuProps<Id extends string, Row> {
 const COLUMN_PICKER_HINT = 'columnPickerHint';
 
 /**
- * The one-time hint on the first column picker a pilot sees (§6c "Hints"):
- * shows once ever, on one picker only, and never in a session that already
- * showed another hint.
- */
-function useColumnPickerHint(): [shown: boolean, dismiss: () => void] {
-  const owner = `${COLUMN_PICKER_HINT}:${useId()}`;
-  const hydrated = useHintCounts((state) => state.hydrated);
-  const shown = useSessionHintShown(owner);
-  useEffect(() => {
-    if (!hydrated) return;
-    if (hintSeenCount(useHintCounts.getState().value, COLUMN_PICKER_HINT) > 0) return;
-    if (claimSessionHint(owner)) return () => releaseSessionHint(owner);
-  }, [hydrated, owner]);
-  // Counted when answered, not when claimed: a hint that never reached the screen is not spent.
-  const dismiss = () => {
-    recordHintSeen(COLUMN_PICKER_HINT);
-    dismissSessionHint(owner);
-  };
-  return [shown, dismiss];
-}
-
-/**
  * Which columns show in a table view — a menu, not a form: every toggle is
  * already reversible in one tap. Labels come straight from `columnsById`'s
  * own already-translated `header`, not a second id->i18n-key table that could
@@ -95,10 +65,16 @@ export function ColumnPickerMenu<Id extends string, Row>({
 }: ColumnPickerMenuProps<Id, Row>) {
   const { t } = useTranslation();
   const visibleSet = new Set(visible);
-  const [hintShown, dismissHint] = useColumnPickerHint();
+  // Only once a pilot is logged in: never on /login, where no Character exists yet.
+  const loggedIn = useCharacterCount() > 0;
+  const [hintShown, dismissHint] = useOneTimeHint(COLUMN_PICKER_HINT, loggedIn);
 
   return (
-    <DropdownMenu onOpenChange={(open) => open && hintShown && dismissHint()}>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open && hintShown) dismissHint();
+      }}
+    >
       <Popover open={hintShown} onOpenChange={(open) => !open && dismissHint()}>
         <PopoverAnchor asChild>
           <DropdownMenuTrigger asChild>

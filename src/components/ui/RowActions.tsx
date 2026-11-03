@@ -16,7 +16,6 @@ import {
   isValidElement,
   useContext,
   useEffect,
-  useId,
   useState,
   type ComponentProps,
   type MouseEvent,
@@ -27,15 +26,8 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTouchContext } from '@/lib/useMediaQuery';
-import {
-  claimSessionHint,
-  dismissSessionHint,
-  hintSeenCount,
-  recordHintSeen,
-  releaseSessionHint,
-  useHintCounts,
-  useSessionHintShown,
-} from '@/lib/hintFlags';
+import { useCharacterCount } from '@/features/character/useCharacters';
+import { hintSeenCount, recordHintSeen, useHintCounts, useOneTimeHint } from '@/lib/hintFlags';
 import {
   ContextMenu,
   ContextMenuCheckboxItem,
@@ -427,27 +419,6 @@ const ROW_HINT = 'rowHint';
 const ROW_MENU_TIP_OPENS = 3;
 
 /**
- * The one-time hint on the first ⋮ a pilot sees (§6c "Hints"): shows once ever,
- * on one ⋮ only, and never in a session that already showed another hint.
- */
-function useRowMoreHint(active: boolean): [shown: boolean, dismiss: () => void] {
-  const owner = `${ROW_HINT}:${useId()}`;
-  const hydrated = useHintCounts((state) => state.hydrated);
-  const shown = useSessionHintShown(owner);
-  useEffect(() => {
-    if (!active || !hydrated) return;
-    if (hintSeenCount(useHintCounts.getState().value, ROW_HINT) > 0) return;
-    if (claimSessionHint(owner)) return () => releaseSessionHint(owner);
-  }, [active, hydrated, owner]);
-  // Counted when answered, not when claimed: a hint that never reached the screen is not spent.
-  const dismiss = () => {
-    recordHintSeen(ROW_HINT);
-    dismissSessionHint(owner);
-  };
-  return [shown, dismiss];
-}
-
-/**
  * The visible trigger for the enclosing row's actions. A real dropdown rather
  * than a synthetic right-click, so it announces `aria-haspopup`/`expanded`,
  * lands focus on the first item when opened from the keyboard, and hands
@@ -479,7 +450,9 @@ export function RowMoreActions({
   const { t } = useTranslation();
   const actions = useContext(RowActionsContext);
   const [tip, setTip] = useState(false);
-  const [hintShown, dismissHint] = useRowMoreHint(actions !== null);
+  // Only once a pilot is logged in: never on /login, where no Character exists yet.
+  const loggedIn = useCharacterCount() > 0;
+  const [hintShown, dismissHint] = useOneTimeHint(ROW_HINT, actions !== null && loggedIn);
   const context = useTouchContext();
   if (!actions) return null;
   const onOpenChange = (open: boolean) => {

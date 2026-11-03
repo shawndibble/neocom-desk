@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from './DropdownMenu';
 
+vi.mock('@/features/character/useCharacters', () => ({ useCharacterCount: () => 1 }));
 function Row({ onInto }: { onInto: () => void }) {
   return (
     <RowActionsMenu
@@ -409,14 +410,14 @@ describe('row menu hints', () => {
     expect(hintSeenCount(useHintCounts.getState().value, 'rowHint')).toBe(1);
   });
 
-  it('does not hint again once seen, or in a session that already showed a hint', () => {
+  it('does not hint again once seen, or in a session that already showed it', () => {
     useHintCounts.setState({ value: { rowHint: 1 }, hydrated: true });
     const { unmount } = render(plainRow);
     expect(screen.queryByText(/to open its actions/)).not.toBeInTheDocument();
     unmount();
 
     useHintCounts.setState({ value: {}, hydrated: true });
-    expect(claimSessionHint('goTo')).toBe(true);
+    expect(claimSessionHint('rowHint:other')).toBe(true);
     render(plainRow);
     expect(screen.queryByText(/to open its actions/)).not.toBeInTheDocument();
   });
