@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -38,11 +38,18 @@ function renderSection() {
 
 describe('PilotKillActivity', () => {
   beforeEach(() => {
+    // Mid-month, so "2 and 3 days ago" are always in this month's bar; on the 1st to 3rd
+    // of a month the real clock puts them in last month's and the label assertion fails.
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-06-15T12:00:00Z') });
     vi.resetAllMocks();
     mocks.fetchPilotKillHistory.mockResolvedValue({
       ok: true,
       kills: [kill(2 * DAY, 'nullsec'), kill(3 * DAY, 'nullsec'), kill(40 * DAY, 'wormhole')],
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('draws the six-month chart open, with the 30-day counts under it in the same card', async () => {
