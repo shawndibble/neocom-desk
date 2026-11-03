@@ -1210,6 +1210,16 @@ row. The border never carries it alone: the trigger's text still names the value
 and the funnel's badge still counts it. Persisted settings that sit in a filter
 row (trade hub, price basis) are not filters and are never marked.
 
+### Shortcut inside a picker
+
+A shortcut that fills a select-shaped filter (Courier's "From my region") is a
+pinned row inside that picker's popover, never a separate button beside it: the
+control it fills already owns the space, and a second control next to it reads as
+a second filter. `RegionSelect`'s `shortcut` prop draws it as a full-width text
+row under the search box, accent text, with the reason drawn beneath when it is
+disabled. It resolves to one value and closes the picker; an answer of `null`
+keeps the picker open.
+
 ### Scope readout
 
 A surface that reads more than the active Character says so on screen, in one
