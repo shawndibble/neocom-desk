@@ -192,6 +192,10 @@ describe('Mail organize', () => {
     await user.click(screen.getByRole('button', { name: 'Mark read' }));
 
     expect(await screen.findByRole('button', { name: /Corp.*1 unread/ })).toBeInTheDocument();
+    // The count moves on the local mark, before the action's `finally` clears
+    // `busy`. Ending here let that state update land after teardown
+    // ("window is not defined"); the toast is posted after it.
+    expect((await screen.findAllByText('Marked 1 mail read')).length).toBeGreaterThan(0);
   });
 
   it('writes read again when a mail marked unread this session is opened', async () => {
@@ -279,5 +283,7 @@ describe('Mail organize', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Mark as unread' }));
 
     await waitFor(() => expect(puts[1]).toEqual({ id: '1', body: { read: false } }));
+    // Same as the chip-count test: the toast is posted after `busy` clears.
+    expect((await screen.findAllByText('Marked 1 mail unread')).length).toBeGreaterThan(0);
   });
 });
