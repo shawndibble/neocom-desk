@@ -38,6 +38,8 @@ export interface MultiSelectProps<Id> {
   size?: ControlSize;
   /** The trigger's classes — its width in a toolbar row. */
   className?: string;
+  /** This filter is set away from its default: draws the accent border (DESIGN.md §6c). */
+  active?: boolean;
   /** Flat, ungrouped options. Ignored if `groups` is given. */
   options?: readonly MultiSelectOption<Id>[];
   /** Grouped options, each under its own heading. Takes precedence over `options`. */
@@ -84,6 +86,7 @@ export function MultiSelect<Id>({
   triggerAriaLabel,
   size = 'md',
   className,
+  active,
   options,
   groups,
   selected,
@@ -168,6 +171,7 @@ export function MultiSelect<Id>({
             : undefined)
         }
         className={cx(selectTriggerClassName(size), className)}
+        data-active={active || undefined}
       >
         <span>
           {triggerLabel ?? label}
