@@ -3,7 +3,7 @@ import { db } from '@/db';
 import { HOUR_MS } from '@/lib/age';
 
 const detect = vi.hoisted(() => vi.fn());
-vi.mock('@/features/accelerator/useAccelerators', () => ({ detectAcceleratorBonus: detect }));
+vi.mock('@/features/accelerator/useAccelerators', () => ({ readDetectedAccelerator: detect }));
 
 import { acceleratorEndedDomain } from './acceleratorEnded';
 
@@ -11,7 +11,7 @@ const CHARACTER = 11;
 
 beforeEach(async () => {
   await db.characterAccelerators.clear();
-  detect.mockReset().mockResolvedValue(null);
+  detect.mockReset().mockResolvedValue({ bonus: null });
 });
 
 describe('acceleratorEndedDomain.load', () => {
@@ -36,9 +36,14 @@ describe('acceleratorEndedDomain.load', () => {
   });
 
   it('adds the accelerator the cached attribute sheet implies, with no expiry', async () => {
-    detect.mockResolvedValue(8);
+    detect.mockResolvedValue({ bonus: 8 });
     expect(await acceleratorEndedDomain.load(CHARACTER)).toEqual([
       { kind: 'detected', bonus: 8, expiresAtMs: 0 },
     ]);
+  });
+
+  it('skips the tick when the sheet cannot be read, so the baseline is kept', async () => {
+    detect.mockResolvedValue(null);
+    expect(await acceleratorEndedDomain.load(CHARACTER)).toBeNull();
   });
 });

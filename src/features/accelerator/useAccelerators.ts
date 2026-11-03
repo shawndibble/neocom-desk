@@ -33,6 +33,17 @@ export function useCharacterAccelerators(): ReadonlyMap<number, CharacterAcceler
  * uses (`deriveAttributeBaseline`).
  */
 export async function detectAcceleratorBonus(characterId: number): Promise<number | null> {
+  return (await readDetectedAccelerator(characterId))?.bonus ?? null;
+}
+
+/**
+ * `detectAcceleratorBonus` that tells "no accelerator" (`{ bonus: null }`) from "cannot tell"
+ * (`null`: the sheet or implants are not cached, or the read failed). The Accelerator ended
+ * alert needs the difference, or an emptied cache would read as a removed accelerator.
+ */
+export async function readDetectedAccelerator(
+  characterId: number
+): Promise<{ bonus: number | null } | null> {
   try {
     const [attributes, implants] = await Promise.all([
       readCachedRows<CharacterAttributes>([characterId], KEYS.attributes),
@@ -44,7 +55,7 @@ export async function detectAcceleratorBonus(characterId: number): Promise<numbe
     const bonus = acceleratorBonusOf(
       toAttributeBaseline(sheet, await loadImplantTypeBonuses(worn))
     );
-    return bonus > 0 ? bonus : null;
+    return { bonus: bonus > 0 ? bonus : null };
   } catch {
     return null;
   }

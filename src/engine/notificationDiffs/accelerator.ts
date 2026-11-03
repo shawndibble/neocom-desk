@@ -99,8 +99,13 @@ export function diffAcceleratorEnded(
   const pick = (snapshot: AcceleratorPresenceSnapshot, kind: AcceleratorPresenceEntry['kind']) =>
     snapshot.entries.find((entry) => entry.kind === kind);
   const typedBefore = pick(prev, 'typed');
-  // Gone only by running out: the pilot deleting a still-running one is not it.
-  if (typedBefore && !pick(next, 'typed') && typedBefore.expiresAtMs <= next.nowMs) {
+  // Over only by running out: the pilot deleting or replacing a still-running one is not it, but
+  // a replacement typed in after the old one ran out (a different expiry) still ended it.
+  if (
+    typedBefore &&
+    typedBefore.expiresAtMs <= next.nowMs &&
+    pick(next, 'typed')?.expiresAtMs !== typedBefore.expiresAtMs
+  ) {
     return [
       {
         eventId: 'acceleratorEnded',

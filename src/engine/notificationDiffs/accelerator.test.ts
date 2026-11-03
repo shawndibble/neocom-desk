@@ -109,6 +109,15 @@ describe('diffAcceleratorEnded', () => {
     );
   });
 
+  it('still fires expired when a replacement is typed in after the old one ran out', () => {
+    const before = presence(NOW, typed(NOW + HOUR));
+    const after = presence(NOW + 2 * HOUR, typed(NOW + 9 * HOUR));
+    expect(diffAcceleratorEnded(7, before, after)).toHaveLength(1);
+    expect(diffAcceleratorEnded(7, after, presence(NOW + 3 * HOUR, typed(NOW + 9 * HOUR)))).toEqual(
+      []
+    );
+  });
+
   it('fires lost when a detected accelerator goes away with no typed one', () => {
     expect(diffAcceleratorEnded(7, presence(NOW, detected(8)), presence(NOW + HOUR))).toEqual([
       { eventId: 'acceleratorEnded', characterId: 7, kind: 'lost', bonus: 8, atMs: NOW + HOUR },

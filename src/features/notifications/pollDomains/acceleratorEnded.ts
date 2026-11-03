@@ -6,7 +6,7 @@ import type {
   AcceleratorPresenceSnapshot,
 } from '@/engine/notificationDiffs';
 import { acceleratorId } from '@/features/accelerator/characterAccelerators';
-import { detectAcceleratorBonus } from '@/features/accelerator/useAccelerators';
+import { readDetectedAccelerator } from '@/features/accelerator/useAccelerators';
 import { SNAPSHOT_SOURCES } from '../eventEntries';
 import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
@@ -41,8 +41,13 @@ export const acceleratorEndedDomain = defineDomain<
     if (record && isAcceleratorLive(record, Date.now())) {
       entries.push({ kind: 'typed', bonus: record.bonus, expiresAtMs: record.expiresAt });
     }
-    const detected = await detectAcceleratorBonus(characterId);
-    if (detected !== null) entries.push({ kind: 'detected', bonus: detected, expiresAtMs: 0 });
+    const detected = await readDetectedAccelerator(characterId);
+    // Cannot tell (nothing cached yet, or the read failed): skip the tick and keep the baseline,
+    // so an emptied cache never reads as a removed accelerator.
+    if (detected === null) return null;
+    if (detected.bonus !== null) {
+      entries.push({ kind: 'detected', bonus: detected.bonus, expiresAtMs: 0 });
+    }
     return entries;
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
