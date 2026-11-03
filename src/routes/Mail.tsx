@@ -14,6 +14,7 @@ import {
   Toast,
   CachedNotice,
 } from '@/components/ui';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner, GrantNote } from '@/app/GrantNote';
 import { ReauthCachedNote } from '@/app/ReauthCachedNote';
@@ -39,7 +40,10 @@ import { useMailPaging } from '@/features/character/useMailPaging';
 import { useMailSelection } from '@/features/character/useMailSelection';
 import { useMailBody } from '@/features/character/useMailBody';
 import { useMailRows } from '@/features/character/useMailRows';
-import { TAB_LABEL_KEY, type MailRow } from '@/features/character/mailDisplay';
+import { isMailRead, TAB_LABEL_KEY, type MailRow } from '@/features/character/mailDisplay';
+import { MailRowMenu } from '@/features/character/MailRowMenu';
+import { MailSelectionBar } from '@/features/character/MailSelectionBar';
+import { useMailOrganize, useMailReadState } from '@/features/character/useMailOrganize';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useMailFolders } from '@/features/character/mailFolderPref';
@@ -128,13 +132,11 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
     replyButtonRef,
     forwardButtonRef,
   } = useMailSelection(isDesktop);
-  // Local "mark read" state, applied instantly on selection so the dim never
-  // waits on the network — independent of `markMailReadOnEsi`'s own write
-  // below. Set on selection, not toggled — no manual mark-unread control.
-  const [locallyReadKeys, setLocallyReadKeys] = useState<ReadonlySet<string>>(new Set());
-  function markLocalRead(key: string) {
-    setLocallyReadKeys((previous) => (previous.has(key) ? previous : new Set(previous).add(key)));
-  }
+  // Read, unread and deleted mail this session, applied instantly on selection
+  // or action so the list never waits on the network. In memory only: the
+  // cached headers are patched by `mail.ts`, so a reload agrees.
+  const readState = useMailReadState();
+  const { locallyReadKeys, locallyUnreadKeys, deletedKeys, markLocalRead } = readState;
 
   // Short-lived view state (ADR 0015): survives a reload, absent when default.
   const [filters, setFilters] = useUrlParams(MAIL_FILTER_PARAMS);
@@ -195,11 +197,21 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
     debouncedSearch,
     hideRead,
     locallyReadKeys,
+    locallyUnreadKeys,
+    deletedKeys,
     now,
     timeZone,
     weekStart,
   });
 
+  const organize = useMailOrganize({
+    owners,
+    rows,
+    readState,
+    selectedKey,
+    onDeletedSelected: () => selectMail(null),
+    notify: setNotice,
+  });
   const selectedRow = rows.find((row) => row.key === selectedKey) ?? null;
   const selectedHeader = selectedRow?.header ?? null;
   const selectedOwner = selectedRow ? ownerById.get(selectedRow.ownerId) : undefined;
@@ -280,8 +292,9 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
     markLocalRead(row.key);
     // Gated on ESI's flag, not the row's `isRead` (which also covers local
     // state) — a failed write must get another chance on every reopen, not
-    // just the next reload.
-    if (!row.header.is_read) {
+    // just the next reload. A mail the pilot marked unread this session counts
+    // as unread here, though the loaded header still says read.
+    if (!row.header.is_read || locallyUnreadKeys.has(row.key)) {
       void markMailReadOnEsi(row.ownerId, row.header.mail_id);
     }
   }
@@ -328,6 +341,15 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
             {isDesktop && !newMailOpen && (
               <Button ref={composeButtonRef} size="md" onClick={openNewMail}>
                 <Icon.MailCompose size={Icon.ICON_SIZE.sm} /> {t('mail.compose')}
+              </Button>
+            )}
+            {organize.anyOrganizable && rows.length > 0 && !newMailOpen && (
+              <Button
+                size="md"
+                aria-pressed={organize.selecting}
+                onClick={() => organize.setSelecting(!organize.selecting)}
+              >
+                {organize.selecting ? t('mail.doneSelecting') : t('mail.select')}
               </Button>
             )}
             <IconButton
@@ -422,6 +444,24 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
               isAll={isAll}
               names={names}
               locallyReadKeys={locallyReadKeys}
+              locallyUnreadKeys={locallyUnreadKeys}
+              organize={{
+                canOrganize: organize.canOrganize,
+                selecting: organize.selecting,
+                checkedKeys: organize.checkedKeys,
+                onToggleCheck: organize.toggleCheck,
+                onSetRead: (row, read) => void organize.setRead([row], read),
+                onDelete: (row) => organize.requestDelete([row]),
+              }}
+              selectionBar={
+                <MailSelectionBar
+                  count={organize.checkedRows.length}
+                  busy={organize.busy}
+                  onMarkRead={() => void organize.setRead(organize.checkedRows, true)}
+                  onMarkUnread={() => void organize.setRead(organize.checkedRows, false)}
+                  onDelete={() => organize.requestDelete(organize.checkedRows)}
+                />
+              }
               selectedKey={selectedKey}
               timeZone={timeZone}
               recipientSummary={recipientSummary}
@@ -492,6 +532,14 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
                           size="row"
                           onClick={() => openCompose('forward', selectedRow.key)}
                         />
+                        {organize.canOrganize(selectedRow) && (
+                          <MailRowMenu
+                            label={t('common.moreActions')}
+                            isRead={isMailRead(selectedRow, locallyReadKeys, locallyUnreadKeys)}
+                            onSetRead={(read) => void organize.setRead([selectedRow], read)}
+                            onDelete={() => organize.requestDelete([selectedRow])}
+                          />
+                        )}
                       </>
                     )}
                     {showBackControl && (
@@ -550,6 +598,16 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
           </Button>
         </div>
       )}
+      <ConfirmDialog
+        open={organize.deleteTargets !== null}
+        title={t('mail.deleteTitle', { count: organize.deleteTargets?.length ?? 1 })}
+        body={t('mail.deleteBody', { count: organize.deleteTargets?.length ?? 1 })}
+        actionLabel={t('mail.deleteAction', { count: organize.deleteTargets?.length ?? 1 })}
+        cancelLabel={t('common.cancel')}
+        failedLabel={t('mail.deleteFailed')}
+        onConfirm={organize.confirmDelete}
+        onClose={organize.cancelDelete}
+      />
       {notice !== null && <Toast message={notice} onClose={() => setNotice(null)} />}
     </div>
   );

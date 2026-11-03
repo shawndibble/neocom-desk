@@ -43,6 +43,26 @@ export function buildLabelTabMap(labels: readonly SystemLabel[]): ReadonlyMap<nu
   return map;
 }
 
+/**
+ * The names of a mail's Custom Labels, in the mail's own label order. A System
+ * Label (it has a tab) is never a tag, and a label id with no name (a label
+ * deleted in game) or no match shows nothing, never a raw id.
+ */
+export function customLabelNames(
+  labelIds: readonly number[] | undefined,
+  labels: readonly { label_id: number; name?: string }[],
+  labelTabById: ReadonlyMap<number, MailTab>
+): string[] {
+  const nameById = new Map(labels.map((l) => [l.label_id, l.name?.trim()]));
+  const names: string[] = [];
+  for (const id of labelIds ?? []) {
+    if (labelTabById.has(id)) continue;
+    const name = nameById.get(id);
+    if (name) names.push(name);
+  }
+  return names;
+}
+
 /** One canonical tab for a header's `labels` ids; no recognized System Label (or none at all) folds into Inbox. */
 export function resolveMailTab(
   labelIds: readonly number[] | undefined,

@@ -6,6 +6,7 @@ import {
   getCharacterMailLabels,
   getCharacterMailingLists,
   putCharacterMail,
+  deleteCharacterMail,
   postCharacterMail,
   type MailHeader,
   type MailBody,
@@ -34,6 +35,7 @@ import {
   MAIL_HEADERS_PAGE_SIZE,
 } from '@/engine/mail/mail';
 import { MAIL_BODY_PREFETCH_LIMIT, prefetchMissing } from './detailPrefetch';
+import { clearDraft } from './mailDrafts';
 
 export const KEYS = {
   headers: 'mail:headers',
@@ -237,25 +239,69 @@ export async function markMailReadOnEsi(characterId: number, mailId: number): Pr
   // Opening a mail is not a request to write, and `organize_mail` is off by
   // default (Write to EVE): without the scope skip quietly, rather than fail
   // and raise the grant notice on every open. The Mail view offers the grant.
-  if (!(await grantHoldsEndpointScope(characterId, 'putCharacterMail'))) return;
+  await setMailReadOnEsi(characterId, mailId, true);
+}
+
+/** How a Mail organize write ended: `skipped` is "the Permission is not held" (nothing was requested). */
+export type MailWriteResult = 'done' | 'skipped' | 'failed';
+
+/**
+ * Sets one mail's read flag on ESI (so the game client shows it too), then
+ * patches the cached header the same way as `markMailReadOnEsi`. Nothing else
+ * is stored: ESI stays the source of truth.
+ */
+export async function setMailReadOnEsi(
+  characterId: number,
+  mailId: number,
+  read: boolean
+): Promise<MailWriteResult> {
+  if (!(await grantHoldsEndpointScope(characterId, 'putCharacterMail'))) return 'skipped';
   try {
-    await putCharacterMail(characterId, mailId, { read: true });
+    await putCharacterMail(characterId, mailId, { read });
   } catch (err) {
     await reportWriteAuthFailure(characterId, err, 'putCharacterMail');
-    return;
+    return 'failed';
   }
+  await patchCachedHeaders(characterId, (headers) =>
+    headers.map((header) => (header.mail_id === mailId ? { ...header, is_read: read } : header))
+  );
+  return 'done';
+}
+
+/**
+ * Deletes one mail on ESI (in game too; irreversible), then drops the local
+ * copies: the cached header, the cached body and any Reply/Forward draft for
+ * it. A mail that fails to delete is left exactly as it was.
+ */
+export async function deleteMailOnEsi(
+  characterId: number,
+  mailId: number
+): Promise<MailWriteResult> {
+  if (!(await grantHoldsEndpointScope(characterId, 'deleteCharacterMail'))) return 'skipped';
+  try {
+    await deleteCharacterMail(characterId, mailId);
+  } catch (err) {
+    await reportWriteAuthFailure(characterId, err, 'deleteCharacterMail');
+    return 'failed';
+  }
+  await patchCachedHeaders(characterId, (headers) =>
+    headers.filter((header) => header.mail_id !== mailId)
+  );
+  await db.esiCache.delete([characterId, KEYS.body(mailId)]);
+  await clearDraft(characterId, mailId);
+  return 'done';
+}
+
+/** Rewrites the cached header list in place, keeping its own age: the list was not re-read from ESI, and restamping it would show a days-old list as just fetched. */
+async function patchCachedHeaders(
+  characterId: number,
+  patch: (headers: MailHeader[]) => MailHeader[]
+): Promise<void> {
   const row = (await readCachedEntries<MailHeader[]>(characterId, [KEYS.headers])).get(
     KEYS.headers
   );
   if (!row) return;
-  await writeCached(
-    characterId,
-    KEYS.headers,
-    row.value.map((header) => (header.mail_id === mailId ? { ...header, is_read: true } : header)),
-    // The row's own age, not now: the read flag is patched in, but the list was not re-read
-    // from ESI, and restamping it would show a days-old list as just fetched.
-    row.fetchedAt
-  );
+  await writeCached(characterId, KEYS.headers, patch(row.value), row.fetchedAt);
 }
 
 /**

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildLabelTabMap,
   buildReplyAllRecipients,
+  customLabelNames,
   capHeadersForDisplay,
   mailKey,
   mergeOwnedMail,
@@ -434,5 +435,31 @@ describe('forwardMailBody', () => {
     expect(forwardMailBody('A & B', 'Sep 21, 2026 03:14', 'Re: <fleet>', '<b>original</b>')).toBe(
       '\n\n---------- Forwarded message ----------\nFrom: A &amp; B\nDate: Sep 21, 2026 03:14\nSubject: Re: &lt;fleet&gt;\n\n<b>original</b>'
     );
+  });
+});
+
+describe('customLabelNames', () => {
+  const labels = [
+    { label_id: 1, name: 'Inbox' },
+    { label_id: 32, name: 'Industry' },
+    { label_id: 64, name: 'Haulers' },
+    { label_id: 128 },
+  ];
+  const tabById = buildLabelTabMap(labels);
+
+  it("names the custom labels on a mail, in the mail's own label order", () => {
+    expect(customLabelNames([64, 1, 32], labels, tabById)).toEqual(['Haulers', 'Industry']);
+  });
+
+  it('never names a System Label', () => {
+    expect(customLabelNames([1], labels, tabById)).toEqual([]);
+  });
+
+  it('skips an id with no name (a deleted label) and an unknown id', () => {
+    expect(customLabelNames([128, 999, 32], labels, tabById)).toEqual(['Industry']);
+  });
+
+  it('is empty for a mail with no labels', () => {
+    expect(customLabelNames(undefined, labels, tabById)).toEqual([]);
   });
 });

@@ -352,6 +352,11 @@ export const ESI_REGISTRY = {
     scope: 'esi-mail.organize_mail.v1',
     group: 'mailOrganize',
   },
+  deleteCharacterMail: {
+    route: '/characters/{character_id}/mail/{mail_id}/',
+    scope: 'esi-mail.organize_mail.v1',
+    group: 'mailOrganize',
+  },
 
   // Write to EVE, off by default: a Permission of its own (`mailSend`), asked
   // for the first time a Character tries to send.

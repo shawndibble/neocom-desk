@@ -6,6 +6,7 @@ import { CharacterLink } from '@/features/entities';
 import { StandingTag } from '@/features/character/StandingTag';
 import { MailComposeBox } from '@/features/character/MailComposeBox';
 import { MailBodyView } from '@/features/character/MailBodyView';
+import { MailLabelTags } from '@/features/character/MailLabelTags';
 import type { MailRow } from '@/features/character/mailDisplay';
 import { characterStanding } from '@/features/character/entityStanding';
 import { NO_STANDING_INDEX, type Snapshot } from '@/features/character/mailSnapshot';
@@ -153,6 +154,7 @@ export function MailReaderBody({
                 ))}
               </p>
             )}
+            <MailLabelTags names={selectedRow?.labelNames ?? []} />
           </div>
           {/* The body renders from the raw markup (`MailBodyView` parses
             it to a safe tree: bold, colour, links, tables) on the

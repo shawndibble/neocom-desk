@@ -33,6 +33,7 @@ import {
   getCharacterMailHeaders,
   getCharacterMail,
   putCharacterMail,
+  deleteCharacterMail,
   postUniverseNames,
   postCharactersAffiliation,
   getCharacterCalendar,
@@ -931,6 +932,37 @@ describe('mail', () => {
     const result = await putCharacterMail(CHARACTER_ID, 1, { read: true });
 
     expect(capturedBody).toEqual({ read: true });
+    expect(result.data).toBeNull();
+  });
+
+  it('putCharacterMail PUTs {read:false} to mark a mail unread', async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/mail/1/`, async ({ request }) => {
+        capturedBody = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+
+    await putCharacterMail(CHARACTER_ID, 1, { read: false });
+
+    expect(capturedBody).toEqual({ read: false });
+  });
+
+  it('deleteCharacterMail DELETEs the trailing-slash route and resolves on 204', async () => {
+    let method: string | undefined;
+    server.use(
+      http.delete(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/mail/5/`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        method = request.method;
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+
+    const result = await deleteCharacterMail(CHARACTER_ID, 5);
+
+    expect(method).toBe('DELETE');
     expect(result.data).toBeNull();
   });
 });

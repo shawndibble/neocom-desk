@@ -1,11 +1,11 @@
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { MailListRow } from '@/features/character/MailListRow';
 import { MailListEmpty, type MailListState } from '@/features/character/MailListEmpty';
-import { mailAgeLabel, type MailRow } from '@/features/character/mailDisplay';
+import { isMailRead, mailAgeLabel, type MailRow } from '@/features/character/mailDisplay';
 import type { MailAgeSection } from '@/engine/mail/mailAge';
 import type { MailHeader } from '@/esi/endpoints';
 
@@ -23,6 +23,18 @@ interface MailListPaneProps {
   isAll: boolean;
   names: ReadonlyMap<number, string>;
   locallyReadKeys: ReadonlySet<string>;
+  locallyUnreadKeys: ReadonlySet<string>;
+  /** Mark read/unread, delete and Select mode (see `useMailOrganize`). */
+  organize: {
+    canOrganize: (row: MailRow) => boolean;
+    selecting: boolean;
+    checkedKeys: ReadonlySet<string>;
+    onToggleCheck: (row: MailRow) => void;
+    onSetRead: (row: MailRow, read: boolean) => void;
+    onDelete: (row: MailRow) => void;
+  };
+  /** Select mode's bar, above the list. */
+  selectionBar?: ReactNode;
   selectedKey: string | null;
   timeZone: ComponentProps<typeof MailListRow>['timeZone'];
   recipientSummary: (header: MailHeader) => string;
@@ -48,6 +60,9 @@ export function MailListPane({
   isAll,
   names,
   locallyReadKeys,
+  locallyUnreadKeys,
+  organize,
+  selectionBar,
   selectedKey,
   timeZone,
   recipientSummary,
@@ -61,6 +76,7 @@ export function MailListPane({
   const { t } = useTranslation();
   return (
     <Panel padded={false} className={visible ? '' : 'hidden'}>
+      {organize.selecting && selectionBar}
       {listState !== 'rows' ? (
         <MailListEmpty
           state={listState}
@@ -104,7 +120,7 @@ export function MailListPane({
                       key={row.key}
                       row={row}
                       isAll={isAll}
-                      isRead={header.is_read || locallyReadKeys.has(row.key)}
+                      isRead={isMailRead(row, locallyReadKeys, locallyUnreadKeys)}
                       isSelected={selectedKey === row.key}
                       // A Sent mail's sender is you, so the whole Sent folder read
                       // as a column of your own name. Its recipients are already
@@ -114,6 +130,12 @@ export function MailListPane({
                       party={tab === 'sent' ? recipientSummary(header) : sender}
                       timeZone={timeZone}
                       onOpen={onOpenRow}
+                      canOrganize={organize.canOrganize(row)}
+                      selecting={organize.selecting}
+                      checked={organize.checkedKeys.has(row.key)}
+                      onToggleCheck={organize.onToggleCheck}
+                      onSetRead={organize.onSetRead}
+                      onDelete={organize.onDelete}
                     />
                   );
                 })}
