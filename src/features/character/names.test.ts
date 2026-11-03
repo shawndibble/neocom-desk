@@ -3,12 +3,13 @@ import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { resolveCategories, resolveNames } from './names';
+import { clearRefusedNameIds, resolveCategories, resolveNames } from './names';
 import { deferred } from '@/test/deferred';
 
 const server = mswServer();
 
 beforeEach(async () => {
+  clearRefusedNameIds();
   await db.esiCache.clear();
 });
 
@@ -181,5 +182,69 @@ describe('resolveCategories', () => {
     server.use(http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.error()));
 
     expect((await resolveCategories([7])).has(7)).toBe(false);
+  });
+});
+
+describe('resolveNames with an invalid id in the batch', () => {
+  it('still names the valid ids when ESI 404s the whole POST for one bad id', async () => {
+    const BAD = 777;
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
+        const ids = (await request.json()) as number[];
+        if (ids.includes(BAD)) {
+          return HttpResponse.json({ error: 'Ensure all IDs are valid' }, { status: 404 });
+        }
+        return HttpResponse.json(
+          ids.map((id) => ({ id, name: `Name ${id}`, category: 'character' }))
+        );
+      })
+    );
+
+    const names = await resolveNames([1, 2, BAD, 3, 4]);
+
+    expect([...names.keys()].sort()).toEqual([1, 2, 3, 4]);
+    expect(names.get(3)).toBe('Name 3');
+    expect(names.has(BAD)).toBe(false);
+  });
+
+  it('does not ask ESI about a refused id again in the same session', async () => {
+    const BAD = 778;
+    let badAsks = 0;
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
+        const ids = (await request.json()) as number[];
+        if (ids.includes(BAD)) {
+          badAsks += 1;
+          return HttpResponse.json({ error: 'Ensure all IDs are valid' }, { status: 404 });
+        }
+        return HttpResponse.json(ids.map((id) => ({ id, name: `N${id}`, category: 'character' })));
+      })
+    );
+
+    await resolveNames([BAD, 11]);
+    const asksAfterFirst = badAsks;
+    await db.esiCache.clear();
+    await resolveNames([BAD, 12]);
+
+    expect(badAsks).toBe(asksAfterFirst);
+  });
+
+  it('stops splitting once a lookup has spent its 404 allowance', async () => {
+    let posts = 0;
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
+        posts += 1;
+        const ids = (await request.json()) as number[];
+        // Every other id is invalid: the worst case for bisecting.
+        if (ids.some((id) => id % 2 === 0)) {
+          return HttpResponse.json({ error: 'Ensure all IDs are valid' }, { status: 404 });
+        }
+        return HttpResponse.json(ids.map((id) => ({ id, name: `N${id}`, category: 'character' })));
+      })
+    );
+
+    await resolveNames(Array.from({ length: 200 }, (_, i) => 5000 + i));
+
+    expect(posts).toBeLessThanOrEqual(25);
   });
 });
