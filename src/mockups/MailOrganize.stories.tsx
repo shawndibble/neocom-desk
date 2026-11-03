@@ -5,6 +5,7 @@ import {
   Checkbox,
   FilterChip,
   HeaderMoreMenu,
+  IconButton,
   SearchInput,
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +16,7 @@ import {
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Pill } from '@/components/ui/Pill';
 import * as Icon from '@/components/ui/icons';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { NewComponent } from './NewComponent';
 
@@ -102,13 +104,10 @@ function RowActions({ row, open }: { row: Row; open: boolean }) {
   return (
     <DropdownMenu open={open} modal={false}>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={`More actions for ${row.subject}`}
-          className="shrink-0 rounded-xs p-1 text-text-dim hover:bg-panel-2"
-        >
-          <Icon.More aria-hidden="true" size={Icon.ICON_SIZE.md} />
-        </button>
+        <IconButton
+          label={`More actions for ${row.subject}`}
+          icon={<Icon.More aria-hidden="true" size={Icon.ICON_SIZE.md} />}
+        />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem>Reply</DropdownMenuItem>
@@ -142,12 +141,9 @@ function MailRow({
       )}
     >
       {selecting ? (
-        <Checkbox
-          aria-label={`Select ${row.subject}`}
-          checked={checked}
-          readOnly
-          className="mt-1"
-        />
+        <label className={touchCheckboxLabelClassName}>
+          <Checkbox aria-label={`Select ${row.subject}`} checked={checked} readOnly />
+        </label>
       ) : (
         <span aria-hidden="true" className="mt-1.5 flex w-1.5 shrink-0 justify-center">
           {row.unread && <span className="size-1.5 rounded-full bg-accent" />}
@@ -210,13 +206,10 @@ function Reader({ menuOpen }: { menuOpen: boolean }) {
         {menuOpen ? (
           <DropdownMenu open modal={false}>
             <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label="More actions"
-                className="rounded-xs p-1 text-text-dim"
-              >
-                <Icon.More aria-hidden="true" size={Icon.ICON_SIZE.md} />
-              </button>
+              <IconButton
+                label="More actions"
+                icon={<Icon.More aria-hidden="true" size={Icon.ICON_SIZE.md} />}
+              />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem>Mark as unread</DropdownMenuItem>
