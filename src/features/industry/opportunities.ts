@@ -294,7 +294,7 @@ export interface OpportunityAutoBuildOptions {
  * plan's own figure stands, as it does there. Only the headline figures move:
  * cost columns keep the plan's own `totalCost`.
  */
-function onPlanHeroBasis(
+export function onPlanHeroBasis(
   result: BuildResult,
   input: {
     snapshot: MarketSnapshot;

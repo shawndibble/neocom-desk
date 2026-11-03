@@ -11,6 +11,7 @@ import {
 } from '@/features/market/useTradeHubStandings';
 import type { CachedResult } from '@/esi/cache';
 import { useAssumedMe } from './assumedMe';
+import { useProfitBasis } from './profitBasisSetting';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import {
   communityOffersForRows,
@@ -76,6 +77,7 @@ function inputs(overrides: Partial<BuildPlanPricingInputs> = {}): BuildPlanPrici
   return {
     hydrated: true,
     assumedMe: 0,
+    profitBasis: 'sellValue',
     corpBlueprints: CORP,
     standings: new Map(),
     bpcRows: [],
@@ -107,8 +109,12 @@ describe('useBuildPlanPricingInputs', () => {
     expect(isPricingReady(result.current)).toBe(false);
 
     act(() => mockedAssumedMe.setState({ value: 4, hydrated: true }));
+    // Every setting gates it: the profit basis is part of what a row prices.
+    expect(isPricingReady(result.current)).toBe(false);
+
+    act(() => useProfitBasis.setState({ value: 'free', hydrated: true }));
     expect(isPricingReady(result.current)).toBe(true);
-    expect(result.current).toMatchObject({ assumedMe: 4 });
+    expect(result.current).toMatchObject({ assumedMe: 4, profitBasis: 'free' });
   });
 
   it('still reports the current (default) values before hydration, for readers that do not wait', () => {

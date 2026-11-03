@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { Field, Fields, TextInput } from '@/components/ui';
+import { Field, Fields, SegmentedControl, TextInput } from '@/components/ui';
+import { useProfitBasis } from '@/features/industry/profitBasisSetting';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
 import { useAssumedTe, MIN_ASSUMED_TE, MAX_ASSUMED_TE } from '@/features/industry/assumedTe';
 import { SettingsFormLoading } from './settingsFields';
@@ -25,12 +26,15 @@ export function IndustrySettingsForm({
   const setAssumedMe = useAssumedMe((state) => state.setValue);
   const assumedTe = useAssumedTe((state) => state.value);
   const setAssumedTe = useAssumedTe((state) => state.setValue);
+  const profitBasis = useProfitBasis((state) => state.value);
+  const setProfitBasis = useProfitBasis((state) => state.setValue);
 
   // Each on its own line, never `a() && b()`: `&&` short-circuits, which would
   // make every hook after the first false one a conditional call.
   const assumedMeHydrated = useHydratedStore(useAssumedMe);
   const assumedTeHydrated = useHydratedStore(useAssumedTe);
-  const ready = assumedMeHydrated && assumedTeHydrated;
+  const profitBasisHydrated = useHydratedStore(useProfitBasis);
+  const ready = assumedMeHydrated && assumedTeHydrated && profitBasisHydrated;
 
   if (!ready) return <SettingsFormLoading />;
 
@@ -83,6 +87,23 @@ export function IndustrySettingsForm({
                   void setAssumedTe(Math.min(MAX_ASSUMED_TE, Math.max(MIN_ASSUMED_TE, parsed)));
                 }}
                 className="w-24"
+              />
+            </Field>
+
+            {/* The list and the plan page both read this, so a plan's profit agrees on both. */}
+            <Field
+              label={t('settings.profitBasisLabel')}
+              htmlFor="settings-profit-basis"
+              note={t('settings.profitBasisHint')}
+            >
+              <SegmentedControl
+                label={t('settings.profitBasisLabel')}
+                options={[
+                  { value: 'sellValue', label: t('settings.profitBasisOpportunity') },
+                  { value: 'free', label: t('settings.profitBasisActual') },
+                ]}
+                value={profitBasis}
+                onChange={(value) => void setProfitBasis(value)}
               />
             </Field>
           </>

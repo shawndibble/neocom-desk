@@ -443,6 +443,81 @@ describe('useComparedBuildResults', () => {
     expect(mockedCompute.mock.calls.some(([args]) => args.ignoreOwnedStock === true)).toBe(true);
   });
 
+  it("reads a plan with owned materials on the plan page's sell-value basis, so the list and the page agree", async () => {
+    // 100 owned Tritanium sell into a 10 ISK buy order: ~1,000 ISK forgone.
+    const owned: BuildResult = {
+      ...RESULT,
+      profit: 435,
+      materials: [
+        {
+          typeID: 34,
+          baseQuantity: 100,
+          quantity: 100,
+          ownedQuantity: 100,
+          remainingQuantity: 0,
+          unitPrice: 4,
+          lineCost: 0,
+          unpriced: false,
+        },
+      ],
+    };
+    mockedCompute.mockReturnValue({ result: owned, error: null });
+    mockedSnapshots.mockImplementation((requests) =>
+      requests.map(() =>
+        Promise.resolve({ ...SNAPSHOT, hubPrices: { 34: 4 }, hubBuyPrices: { 34: 10 } })
+      )
+    );
+    const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+
+    const { result } = renderHook(() =>
+      useComparedBuildResults({ plans: [plan({ id: 'a' })], catalog, ...baseArgs })
+    );
+    await waitFor(() => expect(result.current[0]?.loading).toBe(false));
+
+    // Building is worth less than just selling what you hold: a loss, as on the page.
+    expect(result.current[0]?.result?.profit).toBeLessThan(0);
+    expect(result.current[0]?.result?.profit).toBeLessThan(owned.profit ?? 0);
+    // Cost columns keep the plan's own total.
+    expect(result.current[0]?.result?.totalCost).toBe(owned.totalCost);
+  });
+
+  it('leaves owned materials free in the row when the pilot counts actual cost', async () => {
+    const owned: BuildResult = {
+      ...RESULT,
+      materials: [
+        {
+          typeID: 34,
+          baseQuantity: 100,
+          quantity: 100,
+          ownedQuantity: 100,
+          remainingQuantity: 0,
+          unitPrice: 4,
+          lineCost: 0,
+          unpriced: false,
+        },
+      ],
+    };
+    mockedCompute.mockReturnValue({ result: owned, error: null });
+    mockedSnapshots.mockImplementation((requests) =>
+      requests.map(() =>
+        Promise.resolve({ ...SNAPSHOT, hubPrices: { 34: 4 }, hubBuyPrices: { 34: 10 } })
+      )
+    );
+    const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+
+    const { result } = renderHook(() =>
+      useComparedBuildResults({
+        plans: [plan({ id: 'a' })],
+        catalog,
+        ...baseArgs,
+        pricingInputs: { ...PRICING_INPUTS, profitBasis: 'free' },
+      })
+    );
+    await waitFor(() => expect(result.current[0]?.loading).toBe(false));
+
+    expect(result.current[0]?.result?.profit).toBe(owned.profit);
+  });
+
   describe('group Depth Prices (issue #3993)', () => {
     const JITA_STATION = 60003760;
     // Each member buys 6 Tritanium; 1,000 are listed, so neither reaches 1%
