@@ -145,20 +145,24 @@ describe('the sharded layout', () => {
   });
 
   it('reads a shard once for every type it holds, at once or later', async () => {
+    const later = 34 + 2 * OPEN_PRICES_SHARD_COUNT;
     serveFiles({
-      [openPricesShardUrl(34)]: { types: { 34: DOC, [SIBLING]: { ...DOC, typeId: SIBLING } } },
+      [openPricesShardUrl(34)]: {
+        types: { 34: DOC, [SIBLING]: { ...DOC, typeId: SIBLING }, [later]: DOC },
+      },
     });
     const [a, b] = await Promise.all([loadStoredOpenPrices(34), loadStoredOpenPrices(SIBLING)]);
     expect(a?.stations.size).toBe(2);
     expect(b?.stations.size).toBe(2);
-    await loadStoredOpenPrices(34 + 2 * OPEN_PRICES_SHARD_COUNT);
+    expect((await loadStoredOpenPrices(later))?.stations.size).toBe(2);
     expect(urlsRead()).toEqual([openPricesShardUrl(34)]);
   });
 
-  it('is null for a type its shard does not hold, without reading the old object', async () => {
+  it("falls back to the type's own object when its shard does not hold it", async () => {
+    // A type with no hub price since the move: its history is only in the old object.
     serveFiles({ [openPricesShardUrl(34)]: { types: {} }, [openPricesUrl(34)]: DOC });
-    expect(await loadMarketOpenPrices(FORGE, 34)).toBeNull();
-    expect(urlsRead()).toEqual([openPricesShardUrl(34)]);
+    expect((await loadMarketOpenPrices(FORGE, 34))?.stationId).toBe(JITA);
+    expect(urlsRead()).toEqual([openPricesShardUrl(34), openPricesUrl(34)]);
   });
 
   it('is null for a shard not shaped like one, and tries again next time', async () => {

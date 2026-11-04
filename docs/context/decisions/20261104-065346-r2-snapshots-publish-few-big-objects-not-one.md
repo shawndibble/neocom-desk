@@ -26,8 +26,16 @@ _Recorded 2026-11-04._
   run from `develop` and write the one bucket production (`main`) also reads. A
   production client from before this change rejects an index naming shard
   objects (its name check) and would show contracts as unavailable, so the
-  writer change merges only after the reader change is promoted. Until then
-  the open-prices reader finds no shard (404) and reads the per-type object;
-  once a shard exists it is the only source for its types.
+  writer change merges only after the reader change is promoted. The moon
+  owner's view reads open prices in Cloud Functions, which are deployed by
+  hand, so Functions are deployed with the reader change before the writer
+  merges too.
+- **Open prices migrate per type, with no listing of the bucket.** When the
+  writer prices a type its shard does not hold yet, it seeds the entry from the
+  type's old `open-prices/<typeId>.json`, so the history carries over. Readers
+  (client and Functions alike) read the shard and fall back to the type's own
+  object when the shard does not hold it: before any shard exists, and for a
+  type with no hub price since the move. The old objects stay (no lifecycle
+  rule covers `open-prices/`) and stop changing.
 - **Cost indices stay per-system for now** (~5.5k writes a day, ~170k a
   cycle); shard them the same way if the total nears the free tier again.

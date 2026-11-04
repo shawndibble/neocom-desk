@@ -11,6 +11,8 @@
  * `immutable`, and an R2 lifecycle rule must not cover their prefixes.
  */
 import { gzipSync } from 'node:zlib';
+import { isRecord } from './guards.js';
+import { openPricesR2Key, openPricesShardR2Key } from './openPricesKeys.js';
 import type { R2Get, R2Put } from './r2Client.js';
 import type { LpStoreRow } from './lpOffersSnapshot.js';
 import type { StoredDemand } from './marketHistoryVolume.js';
@@ -21,8 +23,14 @@ import type {
   TypeOpenPrices,
 } from './marketOpenPrices.js';
 
+export {
+  OPEN_PRICES_R2_PREFIX,
+  OPEN_PRICES_SHARD_COUNT,
+  openPricesR2Key,
+  openPricesShardR2Key,
+} from './openPricesKeys.js';
+
 export const LP_STORE_OFFERS_R2_KEY = 'lp-store-offers/snapshot.json';
-export const OPEN_PRICES_R2_PREFIX = 'open-prices/';
 export const LP_STORE_VOLUME_R2_PREFIX = 'lp-store-volume/';
 export const HAULING_DEMAND_R2_PREFIX = 'hauling-demand/';
 
@@ -41,8 +49,15 @@ const OPEN_PRICES_HEADERS = {
 /** Small objects dominated by round-trip latency, as in `r2Publisher.ts`. */
 const OPEN_PRICES_CONCURRENCY = 32;
 
-export function openPricesR2Key(typeId: number): string {
-  return `${OPEN_PRICES_R2_PREFIX}${typeId}.json`;
+/**
+ * One type's open-prices object (unvalidated), or `null` when R2 has none: out
+ * of its shard, else the type's own object (before shards existed, or a type not
+ * priced since). The client reads the same way.
+ */
+export async function readOpenPricesFromR2(get: R2Get, typeId: number): Promise<unknown | null> {
+  const shard = await get(openPricesShardR2Key(typeId));
+  const entry = isRecord(shard) && isRecord(shard.types) ? shard.types[String(typeId)] : undefined;
+  return entry ?? get(openPricesR2Key(typeId));
 }
 
 /** The LP snapshot as one object: `{ lastSyncedAt, rows }`, the shape the client reads back. */

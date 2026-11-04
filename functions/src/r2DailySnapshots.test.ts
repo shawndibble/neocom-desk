@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { mergeDays } from './marketOpenPrices.js';
 import {
   LP_STORE_OFFERS_R2_KEY,
+  OPEN_PRICES_SHARD_COUNT,
   openPricesR2Key,
+  openPricesShardR2Key,
   publishLpStoreOffersToR2,
+  readOpenPricesFromR2,
   writeOpenPricesToR2,
 } from './r2DailySnapshots.js';
 
@@ -134,5 +137,39 @@ describe('writeOpenPricesToR2', () => {
     const result = await writeOpenPricesToR2(items(), mergeDays, { get, put }, (n) => seen.push(n));
     expect(result.written).toBe(70);
     expect(seen.at(-1)).toBe(70);
+  });
+});
+
+describe('readOpenPricesFromR2', () => {
+  const doc = { typeId: 34, dates: ['2026-10-16'], stations: { 1: { buy: [1], sell: [2] } } };
+
+  it('names a shard by the type id modulo the shard count, like the client', () => {
+    expect(openPricesShardR2Key(34)).toBe('open-prices/shards/34.json');
+    expect(openPricesShardR2Key(34 + OPEN_PRICES_SHARD_COUNT)).toBe('open-prices/shards/34.json');
+  });
+
+  it("reads the type out of its shard, not the type's own object", async () => {
+    const reads: string[] = [];
+    const { get } = fakeR2({ [openPricesShardR2Key(34)]: { types: { 34: doc } } });
+    const tracked = async (key: string) => (reads.push(key), get(key));
+    expect(await readOpenPricesFromR2(tracked, 34)).toEqual(doc);
+    expect(reads).toEqual([openPricesShardR2Key(34)]);
+  });
+
+  it("falls back to the type's own object when no shard holds it", async () => {
+    const { get } = fakeR2({
+      [openPricesShardR2Key(34)]: { types: {} },
+      [openPricesR2Key(34)]: doc,
+    });
+    expect(await readOpenPricesFromR2(get, 34)).toEqual(doc);
+  });
+
+  it("falls back to the type's own object before any shard exists", async () => {
+    const { get } = fakeR2({ [openPricesR2Key(34)]: doc });
+    expect(await readOpenPricesFromR2(get, 34)).toEqual(doc);
+  });
+
+  it('is null when neither has the type', async () => {
+    expect(await readOpenPricesFromR2(fakeR2().get, 34)).toBeNull();
   });
 });

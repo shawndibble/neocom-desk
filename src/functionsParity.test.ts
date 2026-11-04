@@ -29,10 +29,12 @@ import {
 import type { ProjectionRowInput } from '../functions/src/projectionRow';
 import { feedPurgeCutoff, isPurgeableFeedRow } from '../functions/src/purgeFeed';
 import { workbenchFitsR2Key } from '../functions/src/workbenchFits';
+import { openPricesR2Key, openPricesShardR2Key } from '../functions/src/openPricesKeys';
 import { FEED_SYNC_WINDOW_MS, rowsWithinSyncWindow } from '@/features/notifications/feed';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import type { ProjectionRow } from '@/engine/projection';
 import { workbenchFitsUrl } from '@/features/fittings/workbenchFits';
+import { openPricesShardUrl, openPricesUrl } from '@/features/market/marketOpenPrices';
 import {
   BUYBACK_GROUP_KEYS,
   MAX_BUY_LINES,
@@ -195,6 +197,18 @@ describe('contracts and Workbench fits', () => {
     'the client reads the object the writer publishes for hull %i',
     (id) => {
       expect(workbenchFitsUrl(id)).toMatch(new RegExp(`^https://[^/]+/${workbenchFitsR2Key(id)}$`));
+    }
+  );
+
+  it.each([34, 4130, 81_143])(
+    'the client reads the open-prices shard and object the writer publishes for type %i',
+    (typeId) => {
+      expect(openPricesShardUrl(typeId)).toMatch(
+        new RegExp(`^https://[^/]+/${openPricesShardR2Key(typeId)}$`)
+      );
+      expect(openPricesUrl(typeId)).toMatch(
+        new RegExp(`^https://[^/]+/${openPricesR2Key(typeId)}$`)
+      );
     }
   );
 });

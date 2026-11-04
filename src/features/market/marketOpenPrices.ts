@@ -141,15 +141,14 @@ function readShard(typeId: number, now: number): Promise<ShardTypes> {
 }
 
 /**
- * The type's stored object: out of its shard, or — only while R2 has no shard
- * for it, before the writer moved to shards — the type's own object.
+ * The type's stored object: out of its shard, else the type's own object. That
+ * fallback covers the time before the writer moved to shards, and a type with
+ * no hub price since (the writer only moves a type into its shard when it
+ * prices it, so its older history stays in the old object).
  */
 async function fetchStored(typeId: number, now: number): Promise<StoredOpenPrices | null> {
-  const types = await readShard(typeId, now);
-  if (types !== null) {
-    const entry = types[String(typeId)];
-    return entry === undefined ? null : parseOpenPricesByType(entry);
-  }
+  const entry = (await readShard(typeId, now))?.[String(typeId)];
+  if (entry !== undefined) return parseOpenPricesByType(entry);
   const body = await fetchObject(openPricesUrl(typeId));
   return body === null ? null : parseOpenPricesByType(body);
 }
