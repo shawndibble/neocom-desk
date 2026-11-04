@@ -2,6 +2,12 @@
  * "What skill affects this?" — each required skill, status + Add to Plan.
  * No Character: name + level only, not an always-"missing"/no-op Add.
  *
+ * The target-plan picker ("Adding to") shows only while a required skill is
+ * short of its level: it chooses where the rows' Add buttons write, so with
+ * every skill trained there is nothing for it to choose for. Checking the
+ * direct requirements covers their prerequisites too, since EVE won't train
+ * a skill whose prerequisites aren't trained.
+ *
  * Shared by `ItemDetailModal` (the item-level view) and `Market.tsx`'s order
  * row expand (the same section, so a pilot who never opens Show Info still
  * sees it from the order book directly).
@@ -50,12 +56,15 @@ export function RequiredSkillsSection({
   // "clicked Add to Skill Plan and nothing happened" — the skill was already
   // there from before).
   const planEntries = targetPlanEntries(target);
+  const anyUntrained = requiredSkills.some(
+    (req) => (trainedSkills.get(req.skillTypeID)?.level ?? 0) < req.level
+  );
 
   return (
     <div>
       <div className="flex items-center justify-between border-b border-line pb-1">
         <h3 className={eyebrowClassName}>{t('skills.requiredSkills.title')}</h3>
-        {hasCharacter && <TargetPlanPicker target={target} />}
+        {hasCharacter && anyUntrained && <TargetPlanPicker target={target} />}
       </div>
       <div className="mt-1 space-y-1">
         {requiredSkills.map((req) => {
