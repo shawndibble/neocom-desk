@@ -104,6 +104,11 @@ export function GoalResults({
       {list.map(({ family, grades }) => {
         const lowest = family.grades[0]!;
         const highest = family.grades[family.grades.length - 1]!;
+        // Every grade usually displaces the same item: say so once, not on each row.
+        const displaced = new Set(
+          grades.filter((row) => row.replaces !== null && !row.inSet).map((row) => row.replaces)
+        );
+        const sharedReplaces = displaced.size === 1 ? [...displaced][0]! : null;
         return (
           <li key={family.key} className="space-y-1 rounded-xs border border-line bg-panel-2 p-2.5">
             <div className="flex items-start gap-2">
@@ -125,6 +130,11 @@ export function GoalResults({
                         { slot: family.slot }
                       )}
                 </p>
+                {sharedReplaces !== null && (
+                  <p className="text-xs text-text-dim">
+                    {t('fittings.implantFinder.replaces', { name: nameOf(sharedReplaces) })}
+                  </p>
+                )}
               </div>
             </div>
             <ul>
@@ -137,7 +147,9 @@ export function GoalResults({
                     name={nameOf(row.grade.typeId)}
                     effect={rowEffect}
                     fixesIt={over > 0 && rowEffect.fits && !row.inSet}
-                    replacesName={row.replaces === null ? null : nameOf(row.replaces)}
+                    replacesName={
+                      row.replaces === null || sharedReplaces !== null ? null : nameOf(row.replaces)
+                    }
                     busy={busy}
                     onAdd={(id) => onAdd([id])}
                     onRemove={onRemove}
@@ -204,24 +216,41 @@ export function GoalResults({
       {firstFix && (
         <div className="space-y-1.5">
           <SectionHeading>{t('fittings.implantFinder.fixesHeading')}</SectionHeading>
-          <ul className="space-y-1.5">
+          <ul className="space-y-3">
             {fixes.map((fix, i) => (
               <li
                 key={fix.typeIds.join('+')}
                 className={cx(
-                  'flex flex-col gap-2 rounded-xs border p-2.5 sm:flex-row sm:items-center',
-                  i === 0 ? 'border-success/50 bg-success/5' : 'border-line bg-panel-2'
+                  'relative rounded-xs border bg-panel-2 p-2.5',
+                  i === 0 ? 'mt-3 border-success/60' : 'border-line'
                 )}
               >
-                <div className="min-w-0 flex-1 space-y-1">
-                  <p className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold">
-                      {fix.typeIds.map((id) => nameOf(id)).join(' + ')}
-                    </span>
-                    {i === 0 ? (
-                      <SuccessBadge>{t('fittings.implantFinder.cheapest')}</SuccessBadge>
-                    ) : (
-                      <span className="text-xs text-text-dim">
+                {i === 0 && (
+                  // Opaque under the badge, so the card's border does not show through it.
+                  <span className="absolute -top-2 left-2 rounded-xs bg-panel-2">
+                    <SuccessBadge>{t('fittings.implantFinder.cheapest')}</SuccessBadge>
+                  </span>
+                )}
+                <ul className="space-y-2">
+                  {fix.typeIds.map((id, k) => (
+                    <li key={id} className="flex items-start gap-2.5">
+                      <TypeIcon typeId={id} size={32} width={32} height={32} />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium">{nameOf(id)}</p>
+                        <p className="text-xs text-text-dim">
+                          <ImplantSourceLine source={fix.sources[k]!} />
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-line pt-2">
+                  <div className="min-w-0 space-y-0.5">
+                    <p className="text-sm font-medium text-success tabular-nums">
+                      {effect(fix.stats).text}
+                    </p>
+                    {i > 0 && (
+                      <p className="text-xs text-text-dim">
                         <Trans
                           i18nKey="fittings.implantFinder.moreHeadroom"
                           values={{ value: n(fix.headroom - firstFix.headroom), unit }}
@@ -229,30 +258,28 @@ export function GoalResults({
                             cost: <IskAmount value={fix.cost - firstFix.cost} />,
                           }}
                         />
-                      </span>
+                      </p>
                     )}
-                  </p>
-                  <ul className="space-y-0.5">
-                    {fix.sources.map((source, k) => (
-                      <li key={fix.typeIds[k]} className="text-xs text-text-dim">
-                        <span className="text-text">{nameOf(fix.typeIds[k]!)}:</span>{' '}
-                        <ImplantSourceLine source={source} />
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-xs text-success tabular-nums">{effect(fix.stats).text}</p>
+                  </div>
+                  <div className="ml-auto flex items-center gap-3">
+                    <span className="font-semibold whitespace-nowrap tabular-nums">
+                      <Trans
+                        i18nKey="fittings.implantFinder.isk"
+                        components={{ value: <IskAmount value={fix.cost} /> }}
+                      />
+                    </span>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => onAdd(fix.typeIds)}
+                    >
+                      {fix.typeIds.length > 1
+                        ? t('fittings.implantFinder.addAll')
+                        : t('fittings.implantFinder.add')}
+                    </Button>
+                  </div>
                 </div>
-                <span className="font-semibold whitespace-nowrap tabular-nums">
-                  <Trans
-                    i18nKey="fittings.implantFinder.isk"
-                    components={{ value: <IskAmount value={fix.cost} /> }}
-                  />
-                </span>
-                <Button variant="primary" disabled={busy} onClick={() => onAdd(fix.typeIds)}>
-                  {fix.typeIds.length > 1
-                    ? t('fittings.implantFinder.addAll')
-                    : t('fittings.implantFinder.add')}
-                </Button>
               </li>
             ))}
           </ul>
@@ -456,6 +483,7 @@ function GradeRow({
       </span>
       <Button
         variant={row.inSet ? 'ghost' : 'primary'}
+        size="sm"
         disabled={busy}
         aria-label={t('fittings.implantFinder.actionLabel', { action, name })}
         onClick={() => (row.inSet ? onRemove(row.grade.typeId) : onAdd(row.grade.typeId))}
