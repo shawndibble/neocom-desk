@@ -1,10 +1,11 @@
 /**
- * Pure pieces of the R2 offers writer (ADR 0019, issue #3745): group rows into
- * one content-addressed object per item type, split an oversized type by
- * region, and build the `index.json` that names the objects. Beside them, a few
- * bundle shards hold the same rows grouped as blueprint types and the rest, for
- * a reader that needs every type: thousands of small reads take minutes where a
- * handful of big ones take seconds.
+ * Pure pieces of the R2 offers writer (ADR 0019, issue #3745): group rows by
+ * item type, pack the types into content-addressed bundle shards (blueprint
+ * types apart from the rest), and build the `index.json` that names, per type,
+ * the shard holding it. A one-item read fetches one shard; a whole-snapshot
+ * read fetches them all. Shards rather than an object per type because R2
+ * bills every write, and ~30% of types change every half hour
+ * (docs/context/decisions/20261104-065346-r2-snapshots-publish-few-big-objects-not-one.md).
  */
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
@@ -20,8 +21,11 @@ const HASH_LENGTH = 16;
 /** Uncompressed bytes above which a type is split by region. */
 export const MAX_OBJECT_BYTES = 4_000_000;
 
-/** Uncompressed bytes per bundle shard (~1 MB gzipped): few reads, none huge. */
-export const MAX_BUNDLE_BYTES = 8_000_000;
+/**
+ * Uncompressed bytes per bundle shard (~80 KB gzipped): small enough for a
+ * one-item read, few enough (~75) that a publish writes ~75 objects.
+ */
+export const MAX_BUNDLE_BYTES = 1_000_000;
 
 export interface TypeObjectPart {
   /** Object key within the bucket. */
@@ -44,6 +48,8 @@ export type BundleGroup = 'blueprints' | 'others';
 export interface BundleObjectPart {
   name: string;
   body: string;
+  /** The types whose rows this shard holds, ascending; a type is in exactly one shard. */
+  typeIds: number[];
 }
 
 /** Every row, sharded: blueprint types (copies and originals) apart from the rest. */
@@ -53,8 +59,8 @@ export interface ContractOfferR2Index {
   lastSyncedAt: number;
   types: Record<string, { count: number; cheapest: number | null; objects: string[] }>;
   regionIds: number[];
-  /** Bundle shard names per group; absent when the bundles were not uploaded. */
-  bundles?: Record<BundleGroup, string[]>;
+  /** Bundle shard names per group. */
+  bundles: Record<BundleGroup, string[]>;
 }
 
 export function typeObjectName(typeId: number, hash: string, regionId?: number): string {
@@ -132,9 +138,9 @@ export function buildBundleObjects(
     if (row.isBlueprintCopy || row.me !== undefined) blueprintTypes.add(row.typeId);
   }
   const bundles: BundleObjects = { blueprints: [], others: [] };
-  const open: Record<BundleGroup, { items: string[]; bytes: number }> = {
-    blueprints: { items: [], bytes: 0 },
-    others: { items: [], bytes: 0 },
+  const open: Record<BundleGroup, { items: string[]; bytes: number; typeIds: number[] }> = {
+    blueprints: { items: [], bytes: 0, typeIds: [] },
+    others: { items: [], bytes: 0, typeIds: [] },
   };
   const close = (group: BundleGroup) => {
     const shard = open[group];
@@ -143,11 +149,13 @@ export function buildBundleObjects(
     bundles[group].push({
       name: bundleObjectName(group, bundles[group].length, contentHash(body)),
       body,
+      typeIds: shard.typeIds,
     });
-    open[group] = { items: [], bytes: 0 };
+    open[group] = { items: [], bytes: 0, typeIds: [] };
   };
   for (const object of [...objects].sort((a, b) => a.typeId - b.typeId)) {
     const group: BundleGroup = blueprintTypes.has(object.typeId) ? 'blueprints' : 'others';
+    open[group].typeIds.push(object.typeId);
     for (const part of object.parts) {
       // A part body is a JSON array; its inside joins the shard's array.
       const inner = part.body.slice(1, -1);
@@ -166,25 +174,27 @@ export function gzipObjectBody(body: string): Buffer {
   return gzipSync(body);
 }
 
-/** The per-type facts of `buildContractOfferIndex`, plus the object names. */
+/** The per-type facts of `buildContractOfferIndex`, plus the shard holding each type. */
 export function buildContractOfferR2Index(
   rows: readonly PublicContractOfferRow[],
-  objects: readonly TypeObject[],
-  lastSyncedAt: number,
-  bundles?: BundleObjects
+  bundles: BundleObjects,
+  lastSyncedAt: number
 ): ContractOfferR2Index {
   const base = buildContractOfferIndex(rows);
   const types: ContractOfferR2Index['types'] = {};
-  for (const object of objects) {
-    const [count, cheapest] = base.types[String(object.typeId)];
-    types[String(object.typeId)] = { count, cheapest, objects: object.parts.map((p) => p.name) };
+  for (const part of [...bundles.blueprints, ...bundles.others]) {
+    for (const typeId of part.typeIds) {
+      const [count, cheapest] = base.types[String(typeId)];
+      types[String(typeId)] = { count, cheapest, objects: [part.name] };
+    }
   }
-  const index: ContractOfferR2Index = { lastSyncedAt, types, regionIds: base.regionIds };
-  if (bundles) {
-    index.bundles = {
+  return {
+    lastSyncedAt,
+    types,
+    regionIds: base.regionIds,
+    bundles: {
       blueprints: bundles.blueprints.map((part) => part.name),
       others: bundles.others.map((part) => part.name),
-    };
-  }
-  return index;
+    },
+  };
 }

@@ -1,17 +1,17 @@
 /**
- * Publishes the offers snapshot to Cloudflare R2 (ADR 0019, issue #3745): one
- * gzip object per item type, named by content hash and uploaded only when its
- * hash changed, then the bundle shards (the same rows in a few big objects),
- * then `index.json` last. The upload itself is injected (`R2Put`)
- * so this stays testable; `createR2Put` is the SigV4 implementation.
+ * Publishes the offers snapshot to Cloudflare R2 (ADR 0019, issue #3745): the
+ * bundle shards (every row, a few dozen content-addressed gzip objects, each
+ * uploaded only when its content changed), then `index.json` last, naming per
+ * type the shard that holds it. The upload itself is injected (`R2Put`) so this
+ * stays testable; `createR2Put` is the SigV4 implementation.
  *
  * Config: `R2_ENDPOINT` (https://<account>.r2.cloudflarestorage.com) and
  * `R2_BUCKET` in functions/.env; the access key pair
  * comes from the `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` secrets (GitHub repository secrets for the runner jobs).
  *
  * An R2 lifecycle rule deletes objects after a few days, which would also
- * delete a long-unchanged type that `index.json` still names. So every
- * `REFRESH_AFTER_MS` the writer re-uploads every object; the rule's age must
+ * delete a long-unchanged shard that `index.json` still names. So every
+ * `REFRESH_AFTER_MS` the writer re-uploads every shard; the rule's age must
  * stay comfortably above that.
  */
 import type { R2Put } from './r2Client.js';
@@ -33,38 +33,27 @@ export { createR2Get, createR2Put } from './r2Client.js';
 export type { R2Config, R2Get, R2Put } from './r2Client.js';
 
 export const REFRESH_AFTER_MS = 2 * 24 * 60 * 60_000;
-/**
- * ~12k small PUTs, each dominated by round-trip latency rather than bandwidth,
- * so 8 in flight took minutes; 32 stays well inside R2's request limits and
- * Cloud Functions' socket and memory budget (bodies are ~450 bytes gzipped).
- */
-const UPLOAD_CONCURRENCY = 32;
-/** Well inside the 540 s function timeout, leaving room to persist state and write the index. */
-export const UPLOAD_BUDGET_MS = 360_000;
-/** Flush recorded hashes this often, so a killed run still leaves progress behind. */
-export const PROGRESS_FLUSH_EVERY = 1000;
+/** A few dozen ~80 KB shards; 8 in flight is plenty. */
+const UPLOAD_CONCURRENCY = 8;
 
-/** What the writer remembers between publishes (one Firestore doc). */
+/** What the writer remembers between publishes (one R2 state object). */
 export interface R2PublishState {
-  /** Hash of each type's objects that are in R2, by type id. */
-  hashes: Record<string, string>;
-  /** When every object was last uploaded in one successful pass; `null` until one completes. */
+  /** When every shard was last uploaded in one successful pass; `null` until one completes. */
   fullUploadAt: number | null;
-  /** Bundle shard names in R2 as of the last publish; absent before bundles existed. */
+  /** Shard names in R2 as of the last index written. */
   bundles?: string[];
 }
 
 export interface R2PublishResult {
+  /** Shards uploaded this publish. */
   uploaded: number;
+  /** Shards already in R2 (named by content, so unchanged). */
   skipped: number;
   failed: number;
-  /** Changed types not attempted because the time budget ran out; the next run resumes them. */
+  /** Always 0: a publish is a few dozen uploads, never cut by a time budget. */
   remaining: number;
   indexWritten: boolean;
-  /**
-   * The index names the bundle shards. False leaves readers on the per-type
-   * objects, which is slower but complete, so it never fails the run.
-   */
+  /** The index names the shards; the same as `indexWritten`, kept for the run log. */
   bundlesWritten: boolean;
   /** First upload error message, so an auth or network fault is diagnosable from the log. */
   firstError: string | null;
@@ -84,16 +73,13 @@ const INDEX_HEADERS = {
 async function runPool<T>(
   items: readonly T[],
   limit: number,
-  work: (item: T) => Promise<void>,
-  /** Checked before each item; once true no further items start. Returns how many were started. */
-  stop: () => boolean
-): Promise<number> {
+  work: (item: T) => Promise<void>
+): Promise<void> {
   let next = 0;
   const worker = async () => {
-    while (next < items.length && !stop()) await work(items[next++]);
+    while (next < items.length) await work(items[next++]);
   };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return next;
 }
 
 export async function publishContractOffersToR2(args: {
@@ -102,119 +88,66 @@ export async function publishContractOffersToR2(args: {
   previous: R2PublishState | null;
   now: number;
   put: R2Put;
-  /** Stop starting uploads after this long (default `UPLOAD_BUDGET_MS`). */
-  budgetMs?: number;
-  /** Monotonic clock in ms; injected for tests. */
-  clock?: () => number;
-  /** Called with the hashes recorded so far every `PROGRESS_FLUSH_EVERY` uploads. */
-  onProgress?: (state: R2PublishState) => Promise<void>;
 }): Promise<R2PublishResult> {
-  const { rows, lastSyncedAt, previous, now, put, onProgress } = args;
-  const clock = args.clock ?? Date.now;
-  const deadline = clock() + (args.budgetMs ?? UPLOAD_BUDGET_MS);
-  const objects = buildTypeObjects(rows);
-  // `fullUploadAt === null` means an earlier pass was partial: keep filling it
-  // in from the recorded hashes rather than starting over.
+  const { rows, lastSyncedAt, previous, now, put } = args;
+  // `fullUploadAt === null` means the last refresh pass did not finish: upload every shard again.
   const refresh =
     previous === null ||
-    (previous.fullUploadAt !== null && now - previous.fullUploadAt >= REFRESH_AFTER_MS);
-  const completesFullPass = refresh || previous.fullUploadAt === null;
-  const known = refresh ? {} : previous.hashes;
-
-  const hashes: Record<string, string> = {};
-  const changed = [];
-  let skipped = 0;
-  for (const object of objects) {
-    const key = String(object.typeId);
-    if (known[key] === object.hash) {
-      hashes[key] = object.hash;
-      skipped += 1;
-    } else {
-      changed.push(object);
-    }
-  }
+    previous.fullUploadAt === null ||
+    now - previous.fullUploadAt >= REFRESH_AFTER_MS;
+  const bundles = buildBundleObjects(buildTypeObjects(rows), rows);
+  const parts = [...bundles.blueprints, ...bundles.others];
+  const inR2 = new Set(refresh ? [] : (previous?.bundles ?? []));
+  const changed = parts.filter((part) => !inR2.has(part.name));
 
   let uploaded = 0;
   let failed = 0;
   let firstError: string | null = null;
-  const partialState = (): R2PublishState => ({
-    hashes: { ...hashes },
-    fullUploadAt: refresh ? null : (previous?.fullUploadAt ?? null),
-  });
-  const started = await runPool(
-    changed,
-    UPLOAD_CONCURRENCY,
-    async (object) => {
-      try {
-        for (const part of object.parts)
-          await put(part.name, gzipObjectBody(part.body), OBJECT_HEADERS);
-        hashes[String(object.typeId)] = object.hash;
-        uploaded += 1;
-        if (onProgress && uploaded % PROGRESS_FLUSH_EVERY === 0)
-          await onProgress(partialState()).catch(() => undefined);
-      } catch (error) {
-        failed += 1;
-        firstError ??= String(error);
-      }
-    },
-    () => clock() >= deadline
-  );
-  const remaining = changed.length - started;
-
-  // Names in the index must all exist, so a failed type holds the index back:
-  // readers keep the previous index and its (still present) objects.
-  let indexWritten = false;
-  let bundleNames: string[] = [];
-  let bundles: ReturnType<typeof buildBundleObjects> | undefined;
-  if (failed === 0 && remaining === 0) {
-    // Shards change with any row, so most publishes upload them all; one already
-    // in R2 is skipped unless the lifecycle refresh is due. A failed shard drops
-    // the bundles from this index only.
-    const built = buildBundleObjects(objects, rows);
-    const parts = [...built.blueprints, ...built.others];
-    const inR2 = new Set(refresh ? [] : (previous?.bundles ?? []));
+  await runPool(changed, UPLOAD_CONCURRENCY, async (part) => {
     try {
-      await runPool(
-        parts.filter((part) => !inR2.has(part.name)),
-        UPLOAD_CONCURRENCY,
-        (part) => put(part.name, gzipObjectBody(part.body), OBJECT_HEADERS),
-        () => false
-      );
-      bundles = built;
-      bundleNames = parts.map((part) => part.name);
+      await put(part.name, gzipObjectBody(part.body), OBJECT_HEADERS);
+      uploaded += 1;
     } catch (error) {
+      failed += 1;
       firstError ??= String(error);
     }
-    const index = buildContractOfferR2Index(rows, objects, lastSyncedAt, bundles);
+  });
+
+  // Every name in the index must exist, so a failed shard holds the index back:
+  // readers keep the previous index and its (still present) shards.
+  let indexWritten = false;
+  if (failed === 0) {
     try {
-      await put(R2_INDEX_KEY, JSON.stringify(index), INDEX_HEADERS);
+      await put(
+        R2_INDEX_KEY,
+        JSON.stringify(buildContractOfferR2Index(rows, bundles, lastSyncedAt)),
+        INDEX_HEADERS
+      );
       indexWritten = true;
     } catch (error) {
-      // Next publish retries; the objects are already uploaded and recorded.
+      // Next publish retries; the shards are already uploaded.
       firstError ??= String(error);
     }
   }
 
   return {
     uploaded,
-    skipped,
+    skipped: parts.length - changed.length,
     failed,
-    remaining,
+    remaining: 0,
     indexWritten,
-    bundlesWritten: indexWritten && bundles !== undefined,
+    bundlesWritten: indexWritten,
     firstError,
-    state: {
-      hashes,
-      bundles: indexWritten ? bundleNames : (previous?.bundles ?? []),
-      // A failed or budget-cut refresh pass drops to `null` so the next run resumes from the
-      // recorded hashes instead of re-uploading everything every hour.
-      fullUploadAt:
-        failed === 0 && remaining === 0 && completesFullPass
-          ? now
-          : refresh
-            ? null
-            : (previous?.fullUploadAt ?? null),
-    },
+    state: indexWritten
+      ? {
+          bundles: parts.map((part) => part.name),
+          fullUploadAt: refresh ? now : (previous?.fullUploadAt ?? now),
+        }
+      : {
+          bundles: previous?.bundles ?? [],
+          // A held-back refresh pass drops to `null`, so the next run uploads every shard again.
+          fullUploadAt: refresh ? null : (previous?.fullUploadAt ?? null),
+        },
   };
 }
 

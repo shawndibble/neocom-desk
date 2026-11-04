@@ -78,27 +78,6 @@ describe('gzipObjectBody', () => {
   });
 });
 
-describe('buildContractOfferR2Index', () => {
-  it('lists count, cheapest, object names and regions per type', () => {
-    const rows = [
-      row({ price: 300 }),
-      row({ contractId: 2, price: 200, regionId: 10000043 }),
-      row({ typeId: 35, price: 0 }),
-    ];
-    const objects = buildTypeObjects(rows);
-    const index = buildContractOfferR2Index(rows, objects, 12345);
-    expect(index.lastSyncedAt).toBe(12345);
-    expect(index.regionIds).toEqual([10000002, 10000043]);
-    const t34 = objects.find((o) => o.typeId === 34)!;
-    expect(index.types['34']).toEqual({
-      count: 2,
-      cheapest: 200,
-      objects: [t34.parts[0].name],
-    });
-    expect(index.types['35'].cheapest).toBeNull();
-  });
-});
-
 describe('bundleObjectName', () => {
   it('names the group, the shard and the content hash', () => {
     expect(bundleObjectName('blueprints', 0, 'abc123')).toBe(
@@ -163,6 +142,17 @@ describe('buildBundleObjects', () => {
     expect(c.others[0].name).not.toBe(a.others[0].name);
   });
 
+  it('lists the types each shard holds', () => {
+    const rows = [
+      row(),
+      row({ contractId: 2, typeId: 35 }),
+      row({ contractId: 3, typeId: 999, me: 1 }),
+    ];
+    const bundles = buildBundleObjects(buildTypeObjects(rows), rows);
+    expect(bundles.others.map((p) => p.typeIds)).toEqual([[34, 35]]);
+    expect(bundles.blueprints.map((p) => p.typeIds)).toEqual([[999]]);
+  });
+
   it('includes the rows of a type split by region', () => {
     const rows = [row({ regionId: 1 }), row({ contractId: 2, regionId: 2 })];
     const objects = buildTypeObjects(rows, { maxObjectBytes: 10 });
@@ -170,20 +160,33 @@ describe('buildBundleObjects', () => {
   });
 });
 
-describe('buildContractOfferR2Index bundles', () => {
-  it('names the bundle shards when given them', () => {
-    const rows = [row()];
-    const objects = buildTypeObjects(rows);
-    const bundles = buildBundleObjects(objects, rows);
-    const index = buildContractOfferR2Index(rows, objects, 1, bundles);
-    expect(index.bundles).toEqual({
-      blueprints: [],
-      others: bundles.others.map((p) => p.name),
+describe('buildContractOfferR2Index', () => {
+  it('lists count, cheapest, the shard holding each type, and regions', () => {
+    const rows = [
+      row({ price: 300 }),
+      row({ contractId: 2, price: 200, regionId: 10000043 }),
+      row({ typeId: 35, price: 0 }),
+    ];
+    const bundles = buildBundleObjects(buildTypeObjects(rows), rows);
+    const index = buildContractOfferR2Index(rows, bundles, 12345);
+    expect(index.lastSyncedAt).toBe(12345);
+    expect(index.regionIds).toEqual([10000002, 10000043]);
+    expect(index.types['34']).toEqual({
+      count: 2,
+      cheapest: 200,
+      objects: [bundles.others[0].name],
     });
+    expect(index.types['35'].cheapest).toBeNull();
+    expect(index.bundles).toEqual({ blueprints: [], others: bundles.others.map((p) => p.name) });
   });
 
-  it('leaves bundles out when not given them', () => {
-    const rows = [row()];
-    expect(buildContractOfferR2Index(rows, buildTypeObjects(rows), 1).bundles).toBeUndefined();
+  it('names the one shard each type landed in when there are several', () => {
+    const rows = Array.from({ length: 30 }, (_, i) => row({ contractId: i, typeId: 100 + i }));
+    const bundles = buildBundleObjects(buildTypeObjects(rows), rows, { maxBundleBytes: 500 });
+    const index = buildContractOfferR2Index(rows, bundles, 1);
+    for (const part of bundles.others) {
+      const held = JSON.parse(part.body).map((r: PublicContractOfferRow) => r.typeId);
+      for (const typeId of held) expect(index.types[String(typeId)].objects).toEqual([part.name]);
+    }
   });
 });

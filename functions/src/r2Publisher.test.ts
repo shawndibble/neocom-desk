@@ -3,7 +3,6 @@ import {
   publishContractOffersToR2,
   r2PublishOutcome,
   publicContractsRunVerdict,
-  PROGRESS_FLUSH_EVERY,
   REFRESH_AFTER_MS,
   type R2Put,
 } from './r2Publisher.js';
@@ -37,27 +36,46 @@ function recorder(failOn?: (key: string) => boolean): { puts: Put[]; put: R2Put 
   };
 }
 
-const rows = [row(), row({ typeId: 35 })];
+/** One plain type and one blueprint type, so the two groups get a shard each. */
+const rows = [row(), row({ contractId: 2, typeId: 999, isBlueprintCopy: true, me: 1, te: 2 })];
 const INDEX_KEY = 'contract-offers/index.json';
-const typePuts = (puts: Put[]) => puts.filter((p) => p.key.startsWith('contract-offers/types/'));
-const bundlePuts = (puts: Put[]) =>
-  puts.filter((p) => p.key.startsWith('contract-offers/bundles/'));
-const nonBundlePuts = (puts: Put[]) =>
-  puts.filter((p) => !p.key.startsWith('contract-offers/bundles/'));
+const shardPuts = (puts: Put[]) => puts.filter((p) => p.key.startsWith('contract-offers/bundles/'));
+
+interface WrittenIndex {
+  types: Record<string, { objects: string[] }>;
+  bundles: { blueprints: string[]; others: string[] };
+}
+
+/** A put that records keys and keeps the last index written. */
+function indexRecorder(failOn?: (key: string) => boolean) {
+  const puts: Put[] = [];
+  let index: WrittenIndex | null = null;
+  const put: R2Put = async (key, body, headers) => {
+    if (failOn?.(key)) throw new Error('boom');
+    puts.push({ key, headers });
+    if (key === INDEX_KEY) index = JSON.parse(String(body)) as WrittenIndex;
+  };
+  return { puts, put, index: () => index };
+}
+
+const publish = (over: Partial<Parameters<typeof publishContractOffersToR2>[0]> = {}) =>
+  publishContractOffersToR2({
+    rows,
+    lastSyncedAt: 1,
+    previous: null,
+    now: 1000,
+    put: recorder().put,
+    ...over,
+  });
 
 describe('publishContractOffersToR2', () => {
-  it('uploads every type then index.json last, with the right headers', async () => {
-    const { puts, put } = recorder();
-    const result = await publishContractOffersToR2({
-      rows,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put,
-    });
-    expect(typePuts(puts)).toHaveLength(2);
+  it('uploads the shards then index.json last, with the right headers, and no per-type objects', async () => {
+    const { puts, put, index } = indexRecorder();
+    const result = await publish({ put });
+    expect(shardPuts(puts)).toHaveLength(2);
+    expect(puts.some((p) => p.key.startsWith('contract-offers/types/'))).toBe(false);
     expect(puts.at(-1)!.key).toBe(INDEX_KEY);
-    expect(typePuts(puts)[0].headers).toMatchObject({
+    expect(shardPuts(puts)[0].headers).toMatchObject({
       'Content-Type': 'application/json',
       'Content-Encoding': 'gzip',
       'Cache-Control': 'public, max-age=31536000, immutable',
@@ -65,319 +83,87 @@ describe('publishContractOffersToR2', () => {
     expect(puts.at(-1)!.headers['Cache-Control']).toBe('public, max-age=60');
     expect(puts.at(-1)!.headers['Content-Encoding']).toBeUndefined();
     expect(result).toMatchObject({ uploaded: 2, skipped: 0, failed: 0, indexWritten: true });
-    expect(Object.keys(result.state.hashes).sort()).toEqual(['34', '35']);
+    expect(result.bundlesWritten).toBe(true);
     expect(result.state.fullUploadAt).toBe(1000);
+    expect(result.state.bundles).toEqual([
+      ...index()!.bundles.blueprints,
+      ...index()!.bundles.others,
+    ]);
+  });
+
+  it("names each type's own shard in the index", async () => {
+    const { put, index } = indexRecorder();
+    await publish({ put });
+    expect(index()!.types['34'].objects).toEqual(index()!.bundles.others);
+    expect(index()!.types['999'].objects).toEqual(index()!.bundles.blueprints);
   });
 
   it('uploads only index.json when nothing changed', async () => {
-    const first = await publishContractOffersToR2({
-      rows,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put: recorder().put,
-    });
+    const first = await publish();
     const { puts, put } = recorder();
-    const result = await publishContractOffersToR2({
-      rows,
+    const result = await publish({ lastSyncedAt: 2, previous: first.state, now: 2000, put });
+    expect(puts.map((p) => p.key)).toEqual([INDEX_KEY]);
+    expect(result).toMatchObject({ uploaded: 0, skipped: 2, indexWritten: true });
+  });
+
+  it('uploads just the shard whose rows changed', async () => {
+    const first = await publish();
+    const { puts, put } = recorder();
+    await publish({
+      rows: [row({ price: 101 }), rows[1]],
       lastSyncedAt: 2,
       previous: first.state,
       now: 2000,
       put,
     });
-    expect(typePuts(puts)).toHaveLength(0);
-    expect(nonBundlePuts(puts).map((p) => p.key)).toEqual([INDEX_KEY]);
-    expect(result).toMatchObject({ uploaded: 0, skipped: 2 });
+    expect(shardPuts(puts).map((p) => p.key.split('/').at(-1)!.split('.')[0])).toEqual(['others']);
   });
 
-  it('uploads just the changed type', async () => {
-    const first = await publishContractOffersToR2({
-      rows,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put: recorder().put,
-    });
+  it('re-uploads every shard once the refresh interval passes, so a lifecycle rule cannot expire live objects', async () => {
+    const first = await publish();
     const { puts, put } = recorder();
-    await publishContractOffersToR2({
-      rows: [row({ price: 101 }), row({ typeId: 35 })],
-      lastSyncedAt: 2,
-      previous: first.state,
-      now: 2000,
-      put,
-    });
-    expect(typePuts(puts)).toHaveLength(1);
-    expect(typePuts(puts)[0].key).toContain('/34.');
-  });
-
-  it('re-uploads everything once the refresh interval passes, so a lifecycle rule cannot expire live objects', async () => {
-    const first = await publishContractOffersToR2({
-      rows,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put: recorder().put,
-    });
-    const { puts, put } = recorder();
-    const result = await publishContractOffersToR2({
-      rows,
+    const result = await publish({
       lastSyncedAt: 2,
       previous: first.state,
       now: 1000 + REFRESH_AFTER_MS,
       put,
     });
-    expect(typePuts(puts)).toHaveLength(2);
+    expect(shardPuts(puts)).toHaveLength(2);
     expect(result.state.fullUploadAt).toBe(1000 + REFRESH_AFTER_MS);
   });
 
-  it('on a type failure skips index.json, keeps the successes, and retries the failure next time', async () => {
-    const failing = recorder((key) => key.includes('/35.'));
-    const result = await publishContractOffersToR2({
-      rows,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put: failing.put,
-    });
+  it('on a shard failure holds index.json back and uploads the missing shard next time', async () => {
+    const failing = recorder((key) => key.includes('/bundles/others.'));
+    const result = await publish({ put: failing.put });
     expect(result).toMatchObject({ uploaded: 1, failed: 1, indexWritten: false });
+    expect(result.bundlesWritten).toBe(false);
+    expect(result.firstError).toContain('boom');
     expect(failing.puts.map((p) => p.key)).not.toContain(INDEX_KEY);
-    expect(Object.keys(result.state.hashes)).toEqual(['34']);
     expect(result.state.fullUploadAt).toBeNull();
+    expect(r2PublishOutcome(result).kind).toBe('failed');
 
     const retry = recorder();
-    await publishContractOffersToR2({
-      rows,
-      lastSyncedAt: 1,
-      previous: result.state,
-      now: 2000,
-      put: retry.put,
-    });
-    expect(typePuts(retry.puts)).toHaveLength(1);
-    expect(typePuts(retry.puts)[0].key).toContain('/35.');
+    await publish({ previous: result.state, now: 2000, put: retry.put });
+    expect(shardPuts(retry.puts)).toHaveLength(2);
     expect(retry.puts.at(-1)!.key).toBe(INDEX_KEY);
+  });
+
+  it('keeps the shards of the last index it wrote when a later one is held back', async () => {
+    const first = await publish();
+    const result = await publish({
+      rows: [row({ price: 101 }), rows[1]],
+      previous: first.state,
+      now: 2000,
+      put: recorder((key) => key.includes('/bundles/')).put,
+    });
+    expect(result.indexWritten).toBe(false);
+    expect(result.state.bundles).toEqual(first.state.bundles);
+    expect(result.state.fullUploadAt).toBe(1000);
   });
 
   it('reports a failed index write without throwing', async () => {
-    const result = await publishContractOffersToR2({
-      rows,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put: recorder((key) => key === INDEX_KEY).put,
-    });
+    const result = await publish({ put: recorder((key) => key === INDEX_KEY).put });
     expect(result).toMatchObject({ uploaded: 2, failed: 0, indexWritten: false });
-  });
-
-  it('drops a vanished type from the saved hashes', async () => {
-    const first = await publishContractOffersToR2({
-      rows,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put: recorder().put,
-    });
-    const result = await publishContractOffersToR2({
-      rows: [row()],
-      lastSyncedAt: 2,
-      previous: first.state,
-      now: 2000,
-      put: recorder().put,
-    });
-    expect(Object.keys(result.state.hashes)).toEqual(['34']);
-  });
-});
-
-describe('publishContractOffersToR2 bundles', () => {
-  const bpRows = [row(), row({ contractId: 2, typeId: 999, isBlueprintCopy: true, me: 1, te: 2 })];
-
-  it('uploads the bundle shards after the types and names them in the index', async () => {
-    const puts: Put[] = [];
-    let index: { bundles?: { blueprints: string[]; others: string[] } } | null = null;
-    const result = await publishContractOffersToR2({
-      rows: bpRows,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put: async (key, body, headers) => {
-        puts.push({ key, headers });
-        if (key === INDEX_KEY) index = JSON.parse(String(body));
-      },
-    });
-    const bundles = bundlePuts(puts);
-    expect(bundles.map((p) => p.key.split('/').at(-1)!.split('.')[0]).sort()).toEqual([
-      'blueprints',
-      'others',
-    ]);
-    expect(bundles[0].headers['Cache-Control']).toBe('public, max-age=31536000, immutable');
-    const keys = puts.map((p) => p.key);
-    expect(Math.min(...bundles.map((p) => keys.indexOf(p.key)))).toBeGreaterThan(
-      Math.max(...typePuts(puts).map((p) => keys.indexOf(p.key)))
-    );
-    expect(keys.at(-1)).toBe(INDEX_KEY);
-    expect(index!.bundles!.blueprints).toHaveLength(1);
-    expect(index!.bundles!.others).toHaveLength(1);
-    expect(result.bundlesWritten).toBe(true);
-    expect(result.state.bundles).toEqual([
-      ...index!.bundles!.blueprints,
-      ...index!.bundles!.others,
-    ]);
-  });
-
-  it('skips unchanged shards on the next publish but still names them', async () => {
-    const first = await publishContractOffersToR2({
-      rows: bpRows,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put: recorder().put,
-    });
-    const { puts, put } = recorder();
-    const result = await publishContractOffersToR2({
-      rows: bpRows,
-      lastSyncedAt: 2,
-      previous: first.state,
-      now: 2000,
-      put,
-    });
-    expect(bundlePuts(puts)).toHaveLength(0);
-    expect(result.bundlesWritten).toBe(true);
-    expect(result.state.bundles).toEqual(first.state.bundles);
-  });
-
-  it('still writes the index, without bundles, when a shard upload fails', async () => {
-    let index: { bundles?: unknown } | null = null;
-    const result = await publishContractOffersToR2({
-      rows: bpRows,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put: async (key, body) => {
-        if (key.startsWith('contract-offers/bundles/')) throw new Error('boom');
-        if (key === INDEX_KEY) index = JSON.parse(String(body));
-      },
-    });
-    expect(result.indexWritten).toBe(true);
-    expect(result.bundlesWritten).toBe(false);
-    expect(index!.bundles).toBeUndefined();
-    expect(result.state.bundles).toEqual([]);
-    expect(result.firstError).toContain('boom');
-    expect(r2PublishOutcome(result).kind).toBe('complete');
-  });
-
-  it('uploads no shard while the types are incomplete', async () => {
-    const { puts, put } = recorder((key) => key.includes('/types/34.'));
-    const result = await publishContractOffersToR2({
-      rows: bpRows,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put,
-    });
-    expect(bundlePuts(puts)).toHaveLength(0);
-    expect(result.bundlesWritten).toBe(false);
-  });
-});
-
-describe('publishContractOffersToR2 failed refresh', () => {
-  it('resumes from recorded hashes instead of re-uploading everything', async () => {
-    const first = await publishContractOffersToR2({
-      rows,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put: recorder().put,
-    });
-    const due = 1000 + REFRESH_AFTER_MS;
-    const partial = await publishContractOffersToR2({
-      rows,
-      lastSyncedAt: 2,
-      previous: first.state,
-      now: due,
-      put: recorder((key) => key.includes('/35.')).put,
-    });
-    expect(partial.firstError).toContain('boom');
-    expect(partial.state.fullUploadAt).toBeNull();
-    const retry = recorder();
-    await publishContractOffersToR2({
-      rows,
-      lastSyncedAt: 2,
-      previous: partial.state,
-      now: due + 1800_000,
-      put: retry.put,
-    });
-    expect(typePuts(retry.puts)).toHaveLength(1);
-  });
-});
-
-describe('publishContractOffersToR2 time budget', () => {
-  const many = [34, 35, 36].map((typeId) => row({ typeId }));
-
-  /** A clock that advances 100 ms per reading, so a 150 ms budget admits a bounded number of starts. */
-  const ticking = () => {
-    let t = 0;
-    return () => (t += 100);
-  };
-
-  it('stops starting uploads once the budget is spent, keeps partial hashes, and holds the index', async () => {
-    const { puts, put } = recorder();
-    const result = await publishContractOffersToR2({
-      rows: many,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put,
-      budgetMs: 150,
-      clock: ticking(),
-    });
-    expect(result.remaining).toBeGreaterThan(0);
-    expect(result.uploaded + result.remaining).toBe(3);
-    expect(result.failed).toBe(0);
-    expect(result.indexWritten).toBe(false);
-    expect(puts.some((p) => p.key === INDEX_KEY)).toBe(false);
-    expect(Object.keys(result.state.hashes)).toHaveLength(result.uploaded);
-    expect(result.state.fullUploadAt).toBeNull();
-  });
-
-  it('resumes from the partial state and finishes with the index last', async () => {
-    const first = await publishContractOffersToR2({
-      rows: many,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put: recorder().put,
-      budgetMs: 150,
-      clock: ticking(),
-    });
-    const retry = recorder();
-    const second = await publishContractOffersToR2({
-      rows: many,
-      lastSyncedAt: 1,
-      previous: first.state,
-      now: 2000,
-      put: retry.put,
-    });
-    expect(typePuts(retry.puts)).toHaveLength(first.remaining);
-    expect(second).toMatchObject({ remaining: 0, failed: 0, indexWritten: true });
-    expect(retry.puts.at(-1)!.key).toBe(INDEX_KEY);
-    expect(second.state.fullUploadAt).toBe(2000);
-  });
-
-  it('flushes progress every PROGRESS_FLUSH_EVERY uploads', async () => {
-    const flushed: number[] = [];
-    const bulk = Array.from({ length: PROGRESS_FLUSH_EVERY + 5 }, (_, i) =>
-      row({ typeId: 1000 + i })
-    );
-    await publishContractOffersToR2({
-      rows: bulk,
-      lastSyncedAt: 1,
-      previous: null,
-      now: 1000,
-      put: recorder().put,
-      onProgress: async (state) => {
-        flushed.push(Object.keys(state.hashes).length);
-      },
-    });
-    expect(flushed).toEqual([PROGRESS_FLUSH_EVERY]);
   });
 });
 

@@ -89,7 +89,6 @@ async function publishOffers(
     previous,
     now: now(),
     put: deps.put,
-    onProgress: (state) => writeState(deps.put, OFFERS_STATE_R2_KEY, state),
   });
   await writeState(deps.put, OFFERS_STATE_R2_KEY, result.state);
   const { uploaded, skipped, failed, remaining, indexWritten, bundlesWritten, firstError } = result;
