@@ -100,12 +100,12 @@ test('boots, deep-links and serves a cached lazy SDE file with no network', asyn
 
   await context.setOffline(true);
 
-  // The precached shell: a reload of the landing page.
-  await page.reload();
-  await expect(page.locator('#root > *').first()).toBeVisible();
-
-  // A URL that is not in the precache: NavigationRoute -> /index.html.
-  await page.goto('/login');
+  // One offline navigation, to a URL that is not in the precache: NavigationRoute -> /index.html,
+  // which is also the precached shell. Two in a row (a reload, then this) flaked on CI: the
+  // second died with ERR_INTERNET_DISCONNECTED when it landed on the first's still-booting page
+  // or on the app's own `/` -> `/login` redirect. The query keeps it a different URL from both
+  // `/` and `/login`, whichever the page is on.
+  await page.goto('/login?offline=1');
   await expect(page.getByRole('button', { name: 'Log in with EVE Online' }).first()).toBeVisible();
 
   // The lazy file is served from the `sde-data` runtime cache.
