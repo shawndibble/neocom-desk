@@ -166,7 +166,7 @@ export function MailComposeBox({
           }))
         );
         setSubject(prefixSubject('reply', header.subject ?? ''));
-        // The quote is plain `> ` lines: formatting stripped, `< > &` escaped to stay literal.
+        // The quote sits under a dashed rule: formatting stripped, `< > &` escaped to stay literal.
         setQuoteFolded(true);
         setBody(quoteMarkup);
       } else {

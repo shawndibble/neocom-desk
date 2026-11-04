@@ -3,10 +3,19 @@ import { quoteMailBody } from './mail';
 import { trailingQuoteStart } from './quotedText';
 
 describe('trailingQuoteStart', () => {
-  it('finds where the attribution of a quote our Reply wrote begins', () => {
+  it('finds the dashed rule of a quote our Reply wrote', () => {
     const body = `Sounds good.${quoteMailBody('Mero', '10/25/2026, 6:36 PM', 'Thanks.\n\nSee you')}`;
     const lines = body.split('\n');
-    expect(lines[trailingQuoteStart(lines)!]).toBe('On 10/25/2026, 6:36 PM, Mero wrote:');
+    expect(lines[trailingQuoteStart(lines)!]).toBe('-'.repeat(32));
+  });
+
+  it('ignores a dashed rule with no From line under it', () => {
+    expect(trailingQuoteStart(['intro', '--------------------------------', 'text'])).toBeNull();
+  });
+
+  it('folds from the rule when an older quote still uses ">" below it', () => {
+    const lines = ['Hi', '', '-'.repeat(32), 'From: A', 'Sent: x', '', '> old'];
+    expect(trailingQuoteStart(lines)).toBe(2);
   });
 
   it('starts at the first > line when nothing introduces it', () => {

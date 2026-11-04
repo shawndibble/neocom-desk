@@ -245,7 +245,7 @@ function BodyBlocks({
   return (
     <div
       className={cx(
-        'min-w-0 space-y-2 overflow-x-auto text-sm break-words',
+        'min-w-0 space-y-2 overflow-x-auto text-xs break-words',
         !bare && (onSurface ? EVE_MAIL_SURFACE_CLASS : 'text-text')
       )}
     >
