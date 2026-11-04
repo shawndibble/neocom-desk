@@ -6,6 +6,7 @@
  * new writing is an inline reply, which stays open.
  */
 
+// Looser than QUOTE_SEPARATOR (mail.ts) on purpose: the EVE client's own rule is also accepted.
 const SEPARATOR = /^-{8,}\s*$/;
 const ATTRIBUTION = /^On .+ wrote:\s*$/;
 
