@@ -196,7 +196,7 @@ export function MailComposeBox({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run only on a genuinely new mail/kind, not on every resolver identity change.
   }, [characterId, header.mail_id, kind]);
 
-  // Debounced autosave (decision: Dexie, device-only, cleared on send).
+  // Debounced autosave (decision: Dexie, device-only, cleared on send or Cancel).
   // Gated on `ready` so the hydration above never overwrites a real draft
   // with the still-empty initial state on the first render.
   useEffect(() => {
