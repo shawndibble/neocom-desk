@@ -392,6 +392,52 @@ describe('CourierResults route cell', () => {
   });
 });
 
+describe('CourierResults open detail', () => {
+  it('follows its row when the structure it ends at is placed', async () => {
+    const user = userEvent.setup();
+    const structureEnd: CourierEndpoint = {
+      ...amarr(),
+      name: "Ainsan - Mav's Watering Hole",
+      systemName: null,
+      systemId: null,
+      security: null,
+      space: null,
+      resolution: 'structure',
+      hasStargates: null,
+      locationId: 1_039_000_000_001,
+    };
+    const unplaced: CourierRouteRow = {
+      ...laneRow(1, 5_000_000, 1_000),
+      destination: structureEnd,
+    };
+    const board = (rows: readonly CourierRouteRow[]) => (
+      <MemoryRouter>
+        <CourierResults rows={rows} regionNames={REGION_NAMES} characterId={CHARACTER_ID} />
+      </MemoryRouter>
+    );
+    const { rerender } = render(board([unplaced]));
+    await user.click(within(screen.getAllByRole('row')[1]).getAllByRole('cell')[0]);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('link', { name: 'Amarr' })).not.toBeInTheDocument();
+
+    rerender(
+      board([
+        {
+          ...unplaced,
+          destination: {
+            ...structureEnd,
+            systemName: 'Amarr',
+            systemId: AMARR_SYSTEM,
+            security: 1,
+          },
+        },
+      ])
+    );
+
+    expect(await within(dialog).findByRole('link', { name: 'Amarr' })).toBeInTheDocument();
+  });
+});
+
 describe('CourierResults ISK/jump cell', () => {
   it('shows the going-rate multiple for an over-rate haul with a warning glyph, not a separate label', async () => {
     knownJumps();

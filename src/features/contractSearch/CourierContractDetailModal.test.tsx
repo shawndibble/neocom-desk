@@ -15,10 +15,29 @@ vi.mock('@/features/route/routeExposure', () => ({
   routeExposure: () => routeExposure(),
 }));
 
-const loadStructureName = vi.hoisted(() =>
-  vi.fn<(c: number, id: number) => Promise<string | null>>()
+const loadStructureInfo = vi.hoisted(() =>
+  vi.fn<
+    (
+      c: number,
+      id: number
+    ) => Promise<{ name: string; owner_id: number; solar_system_id: number } | null>
+  >()
 );
-vi.mock('@/features/character/structures', () => ({ loadStructureName }));
+vi.mock('@/features/character/structures', () => ({ loadStructureInfo }));
+
+// The SDE read behind placement is `courierEndpoints.test.ts`'s; here it only
+// has to say the end was placed in the system the lookup returned.
+vi.mock('@/features/contractSearch/courierEndpoints', () => ({
+  placeStructureEndpoint: async (
+    endpoint: CourierEndpoint,
+    structure: { name: string; systemId: number }
+  ): Promise<CourierEndpoint> => ({
+    ...endpoint,
+    name: structure.name,
+    systemId: structure.systemId,
+    systemName: 'Ainsan',
+  }),
+}));
 
 const openInEve = vi.hoisted(() => ({ unavailable: false }));
 vi.mock('@/features/openInEve/useOpenInEve', () => ({
@@ -84,7 +103,8 @@ function renderModal(
   jumps: CourierJumps = { kind: 'known', count: 2 },
   extra: { returnFocusFallback?: () => HTMLElement | null } = {},
   row: CourierRouteRow = ROW,
-  characterId: number | null = 9001
+  characterId: number | null = 9001,
+  onStructurePlaced?: (endpoint: CourierEndpoint) => void
 ) {
   return render(
     <MemoryRouter>
@@ -98,6 +118,7 @@ function renderModal(
         reverseLane={{ kind: 'unresolved' }}
         onSearchReverseLane={() => {}}
         onClose={() => {}}
+        onStructurePlaced={onStructurePlaced}
         {...extra}
       />
     </MemoryRouter>
@@ -105,7 +126,7 @@ function renderModal(
 }
 
 beforeEach(() => {
-  loadStructureName.mockReset();
+  loadStructureInfo.mockReset();
   routeExposure.mockReset();
   lawlessSystems = new Set();
   openInEve.unavailable = false;
@@ -254,15 +275,38 @@ describe('CourierContractDetailModal player structure names', () => {
   beforeEach(() => routeExposure.mockResolvedValue(KNOWN));
 
   it('names a structure the character can read', async () => {
-    loadStructureName.mockResolvedValue('Perimeter - Keepstar');
+    loadStructureInfo.mockResolvedValue({
+      name: 'Perimeter - Keepstar',
+      owner_id: 1,
+      solar_system_id: 30000144,
+    });
     renderModal({ kind: 'known', count: 2 }, {}, structureRow);
 
     expect(await screen.findByText('Perimeter - Keepstar')).toBeInTheDocument();
-    expect(loadStructureName).toHaveBeenCalledWith(9001, STRUCTURE_ID);
+    expect(loadStructureInfo).toHaveBeenCalledWith(9001, STRUCTURE_ID);
+  });
+
+  it('hands the board the structure placed in its system, so the haul gets a jump count', async () => {
+    loadStructureInfo.mockResolvedValue({
+      name: "Ainsan - Mav's Watering Hole",
+      owner_id: 1,
+      solar_system_id: 30002162,
+    });
+    const onStructurePlaced = vi.fn();
+    renderModal({ kind: 'known', count: null }, {}, structureRow, 9001, onStructurePlaced);
+
+    await waitFor(() =>
+      expect(onStructurePlaced).toHaveBeenCalledWith({
+        ...unnamed,
+        name: "Ainsan - Mav's Watering Hole",
+        systemId: 30002162,
+        systemName: 'Ainsan',
+      })
+    );
   });
 
   it('says "Unknown/Undockable" when ESI refuses', async () => {
-    loadStructureName.mockResolvedValue(null);
+    loadStructureInfo.mockResolvedValue(null);
     renderModal({ kind: 'known', count: 2 }, {}, structureRow);
 
     expect(await screen.findByText('Unknown/Undockable')).toBeInTheDocument();
@@ -272,6 +316,6 @@ describe('CourierContractDetailModal player structure names', () => {
     renderModal({ kind: 'known', count: 2 }, {}, structureRow, null);
 
     expect(screen.getByText(`#${STRUCTURE_ID}`)).toBeInTheDocument();
-    expect(loadStructureName).not.toHaveBeenCalled();
+    expect(loadStructureInfo).not.toHaveBeenCalled();
   });
 });

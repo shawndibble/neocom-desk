@@ -84,6 +84,7 @@ import {
 } from '@/engine/contracts/contractFlags';
 import {
   resolveCourierRoutes,
+  type CourierEndpoint,
   type PublicCourierContractRow,
 } from '@/engine/contracts/courierSearch';
 import { loadPublicContractOffers } from '@/features/contractSearch/publicContractOffers';
@@ -610,7 +611,23 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     // Below market reads every type, so a query matching none still awaits rows.
     !(!belowMarket && typesKnown && typeIds !== null && typeIds.size === 0);
 
-  const { value: endpoints } = useCourierEndpoints(courierRows);
+  const { value: snapshotEndpoints } = useCourierEndpoints(courierRows);
+  // Player structures a haul's detail placed after asking ESI for them. Kept
+  // across corpus refreshes: a structure does not move, and the next load
+  // places it from the device cache anyway.
+  const [placedStructures, setPlacedStructures] = useState<ReadonlyMap<number, CourierEndpoint>>(
+    () => new Map()
+  );
+  const placeStructure = useCallback((endpoint: CourierEndpoint) => {
+    setPlacedStructures((placed) => new Map(placed).set(endpoint.locationId, endpoint));
+  }, []);
+  const endpoints = useMemo(
+    () =>
+      placedStructures.size === 0
+        ? snapshotEndpoints
+        : new Map([...snapshotEndpoints, ...placedStructures]),
+    [snapshotEndpoints, placedStructures]
+  );
   // Synchronous, so the haul list never empties while its ends are being
   // placed: an unresolved end shows its raw location id, exactly as a player
   // structure does once resolution has finished.
@@ -1025,6 +1042,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
               rows={courierRoutes}
               regionNames={regionNames}
               characterId={activeCharacterId}
+              onStructurePlaced={placeStructure}
             />
           ) : (
             <>
