@@ -6,14 +6,17 @@
  * entry (unpublished, or published but nameless) is skipped rather than
  * shown as a raw identifier — a curated allow-list was rejected for the same
  * reason: it would silently drop whatever mattered for an item class nobody
- * thought about.
+ * thought about. Each value is converted to what the game prints by its unit
+ * id (`fittings/attributeUnits`: ms as s, a resonance as its resistance).
  */
 import { romanLevel } from '../projection';
+import { displayAttributeValue } from '../fittings/attributeUnits';
 import {
   enumUnitLabel,
   idReferenceKind,
   isEnumUnit,
   looksLikeId,
+  unitRepeatsName,
   type IdReferenceKind,
 } from './attributeUnits';
 
@@ -26,6 +29,8 @@ export interface AttributeDictionaryEntry {
   name: string;
   unit: string | null;
   category: string;
+  /** The SDE unit id behind `unit`: how to read the raw value (`displayAttributeValue`). */
+  unitId?: number;
 }
 
 export type AttributeDictionary = Readonly<Record<number, AttributeDictionaryEntry>>;
@@ -40,7 +45,13 @@ export interface DisplayAttribute {
    * unresolved one keeps rendering as it does today.
    */
   unit: string | null;
+  /** As the game shows it: converted from the raw dogma value by `unitId`. */
   value: number;
+  /**
+   * The SDE unit id the value was converted by, so another raw value of this
+   * attribute (a skilled one) can be shown the same way.
+   */
+  unitId?: number;
   /**
    * Overrides value/unit in display: a required-skill row's
    * "<Skill name> <roman level>", an enum legend's member ("True", "Large"),
@@ -147,9 +158,36 @@ function idReferenceName(
 export interface GroupItemAttributesOptions {
   /** Skip the curated "<Skill name> <roman level>" rows — for a caller (Market's Required Skills section) rendering trained-status/Add-to-Plan rows of its own instead. */
   omitSkillRequirementRows?: boolean;
+  /** Attribute ids to leave out: ones another part of the view already shows (a Mutated module's rolls, the resist grid). */
+  omitAttributeIds?: ReadonlySet<number>;
 }
 
-/** Groups by category, sorted alphabetically; attributes within a group sorted by display name. */
+/** Damage types in the order the game and the fittings page read them. */
+const DAMAGE_TYPE_WORDS = ['EM', 'Thermal', 'Kinetic', 'Explosive'] as const;
+const DAMAGE_TYPE_WORD = /\b(EM|Thermal|Kinetic|Explosive)\b/;
+
+/**
+ * Row order inside a group: by name, except that rows differing only in their
+ * damage type sit together as EM, Thermal, Kinetic, Explosive — alphabetical
+ * would put Explosive second. The damage word sorts as "EM" would, so the
+ * four stay where the first of them falls among the other rows.
+ */
+export function compareAttributeNames(a: string, b: string): number {
+  const keyOf = (name: string) => {
+    const match = DAMAGE_TYPE_WORD.exec(name);
+    if (!match) return { stem: name, rank: -1 };
+    const word = match[1] as (typeof DAMAGE_TYPE_WORDS)[number];
+    return { stem: name.replace(DAMAGE_TYPE_WORD, 'EM'), rank: DAMAGE_TYPE_WORDS.indexOf(word) };
+  };
+  const ka = keyOf(a);
+  const kb = keyOf(b);
+  return ka.stem.localeCompare(kb.stem) || ka.rank - kb.rank || a.localeCompare(b);
+}
+
+/**
+ * Groups by category, sorted alphabetically (`itemAttributeSections` orders
+ * them for an item's kind); rows within a group by `compareAttributeNames`.
+ */
 export function groupItemAttributes(
   dogmaAttributes: readonly RawDogmaAttribute[] | undefined,
   dictionary: AttributeDictionary,
@@ -192,10 +230,12 @@ export function groupItemAttributes(
     );
   }
 
-  for (const { attribute_id, value } of dogmaAttributes) {
+  for (const { attribute_id, value: raw } of dogmaAttributes) {
     if (pairedAttributeIds.has(attribute_id)) continue;
+    if (options.omitAttributeIds?.has(attribute_id)) continue;
     const entry = dictionary[attribute_id];
     if (!entry) continue;
+    const value = displayAttributeValue(raw, entry.unitId, entry.unit).value;
     const kind = idReferenceKind(entry.unit);
     const resolved =
       kind === null
@@ -203,13 +243,18 @@ export function groupItemAttributes(
         : idReferenceName(kind, value, dictionary, names);
     // An enum legend is never a suffix worth keeping, resolved or not; an id
     // reference keeps its unit until something actually resolves it.
-    const dropUnit = kind === null ? isEnumUnit(entry.unit) : resolved !== null;
+    // So is a unit that only repeats the name ("Meta Level 5 Level").
+    const dropUnit =
+      kind === null
+        ? isEnumUnit(entry.unit) || unitRepeatsName(entry.name, entry.unit)
+        : resolved !== null;
     push(
       {
         attributeId: attribute_id,
         name: entry.name,
         unit: dropUnit ? null : entry.unit,
         value,
+        ...(entry.unitId === undefined ? {} : { unitId: entry.unitId }),
         ...(resolved === null ? {} : { displayValue: resolved }),
       },
       entry.category
@@ -218,7 +263,7 @@ export function groupItemAttributes(
 
   const groups = [...byCategory.entries()].map(([category, attributes]) => ({
     category,
-    attributes: attributes.sort((a, b) => a.name.localeCompare(b.name)),
+    attributes: attributes.sort((a, b) => compareAttributeNames(a.name, b.name)),
   }));
   groups.sort((a, b) => a.category.localeCompare(b.category));
   return groups;

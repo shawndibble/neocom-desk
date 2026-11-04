@@ -97,3 +97,18 @@ export function idReferenceKind(unit: string | null | undefined): IdReferenceKin
 export function looksLikeId(value: number): boolean {
   return Number.isInteger(value) && value > 0;
 }
+
+/**
+ * True when the unit is a word of the attribute's own name — "Meta Level"
+ * in "Level", "Turret Hardpoints" in "hardpoints" — so appending it reads
+ * "Meta Level 5 Level". Such a row shows the bare number. By shape, like the
+ * legends above, so a unit CCP adds later is caught without a list.
+ */
+export function unitRepeatsName(name: string, unit: string | null | undefined): boolean {
+  if (!unit) return false;
+  const word = unit.toLowerCase();
+  return name
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .includes(word);
+}

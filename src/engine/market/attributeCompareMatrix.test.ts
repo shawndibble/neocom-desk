@@ -136,6 +136,33 @@ describe('buildCompareMatrix', () => {
     expect(row.cells.get(2)).toEqual({ value: 99999, unit: 'groupID' });
   });
 
+  it('shows each cell as the game does, with damage types in EM, Thermal, Kinetic, Explosive order', () => {
+    const dictionary: AttributeDictionary = {
+      271: { name: 'Shield EM Damage Resistance', unit: '%', category: 'Shield', unitId: 108 },
+      272: {
+        name: 'Shield Explosive Damage Resistance',
+        unit: '%',
+        category: 'Shield',
+        unitId: 108,
+      },
+      273: { name: 'Shield Kinetic Damage Resistance', unit: '%', category: 'Shield', unitId: 108 },
+      274: { name: 'Shield Thermal Damage Resistance', unit: '%', category: 'Shield', unitId: 108 },
+    };
+    const items: CompareMatrixItem[] = [
+      {
+        typeId: 1,
+        dogmaAttributes: [271, 272, 273, 274].map((attribute_id) => ({
+          attribute_id,
+          value: 0.75,
+        })),
+        bestSell: null,
+      },
+    ];
+    const shield = buildCompareMatrix(items, dictionary, LABELS)[1];
+    expect(shield.rows.map((r) => r.key)).toEqual(['attr:271', 'attr:274', 'attr:273', 'attr:272']);
+    expect(shield.rows[0].cells.get(1)).toMatchObject({ value: 25, unit: '%' });
+  });
+
   it('marks non-price rows as kind "attribute"', () => {
     const items: CompareMatrixItem[] = [
       { typeId: 1, dogmaAttributes: [{ attribute_id: 9, value: 1200 }], bestSell: null },

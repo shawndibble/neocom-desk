@@ -12,6 +12,7 @@
  * relative best/worst coloring — deferred, see issue #146.
  */
 import {
+  compareAttributeNames,
   groupItemAttributes,
   type AttributeDictionary,
   type AttributeReferenceNames,
@@ -62,7 +63,7 @@ export interface CompareMatrixLabels {
   estimatedPrice: string;
 }
 
-/** Grouped by category (Worth always first), sorted alphabetically thereafter; rows within a group sorted by name. */
+/** Grouped by category (Worth always first), sorted alphabetically thereafter; rows within a group by `compareAttributeNames`. */
 export function buildCompareMatrix(
   items: readonly CompareMatrixItem[],
   dictionary: AttributeDictionary,
@@ -116,7 +117,7 @@ export function buildCompareMatrix(
           kind: 'attribute',
           cells: entry.cells,
         }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+        .sort((a, b) => compareAttributeNames(a.name, b.name)),
     }))
     .sort((a, b) => a.category.localeCompare(b.category));
 
