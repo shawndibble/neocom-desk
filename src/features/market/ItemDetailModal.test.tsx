@@ -45,6 +45,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => ({})),
   loadGroupCategories: vi.fn(async () => ({})),
+  loadFittingSlots: vi.fn(async () => ({})),
   loadShipTree: vi.fn(async () => ({ factions: [], groups: {}, ships: [] })),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadSkillAttributeModifiers: vi.fn(async () => ({})),
@@ -158,10 +159,10 @@ describe('ItemDetailModal', () => {
       )
     );
     mockedLoadDictionary.mockResolvedValue({});
-    vi.mocked(loadTypes).mockResolvedValueOnce({
+    vi.mocked(loadTypes).mockResolvedValue({
       [TYPE_ID]: { name: 'Rifter', groupID: 25, volume: 27289 },
     } as unknown as TypeMap);
-    vi.mocked(loadGroupCategories).mockResolvedValueOnce({ 25: 6 });
+    vi.mocked(loadGroupCategories).mockResolvedValue({ 25: 6 });
     vi.mocked(loadShipTree).mockResolvedValueOnce({
       factions: [{ id: 500002, name: 'Minmatar Republic', description: '' }],
       groups: {},

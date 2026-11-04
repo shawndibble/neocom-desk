@@ -53,6 +53,11 @@ export interface DisplayAttribute {
    */
   unitId?: number;
   /**
+   * The same attribute with the pilot's skills and implants, converted like
+   * `value`; set (`withSkilledValues`) only when it differs from `value`.
+   */
+  skilledValue?: number;
+  /**
    * Overrides value/unit in display: a required-skill row's
    * "<Skill name> <roman level>", an enum legend's member ("True", "Large"),
    * or the name an id reference points at — see `attributeUnits`.

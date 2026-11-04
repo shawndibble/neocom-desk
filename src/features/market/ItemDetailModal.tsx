@@ -55,6 +55,7 @@ import type { AttributeDictionary, AttributeReferenceNames } from '@/engine/mark
 import {
   itemAttributeSections,
   itemKindOf,
+  withSkilledValues,
   type AttributeSection,
   type ItemKind,
 } from '@/engine/market/itemAttributeSections';
@@ -80,6 +81,10 @@ import { loadRegionName } from '@/features/places/regions';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatVolume } from './format';
 import { ItemAttributeSections } from './ItemAttributeSections';
+import {
+  useSkilledAttributes,
+  type SkilledAttributesState,
+} from '@/features/fittings/useSkilledAttributes';
 import { loadTypeDetail, type TypeDetail } from '@/features/skills/typeDetail';
 import {
   loadOrderBookView,
@@ -220,6 +225,7 @@ export function ItemDetailModal({
   } | null>(null);
   // Its rolls show in "This module's rolls", so its groups leave them out.
   const mutation = useDynamicItemMutation(typeId, dynamic);
+  const skilled = useSkilledAttributes(typeId, mutation ?? undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -330,7 +336,7 @@ export function ItemDetailModal({
       cancelled = true;
     };
   }, [data, dynamicRecord]);
-  const attributeSections = useMemo(() => {
+  const baseSections = useMemo(() => {
     if (!data) return [];
     if (!dynamicRecord || dynamicNames?.record !== dynamicRecord) return data.sections;
     return itemAttributeSections(
@@ -346,6 +352,11 @@ export function ItemDetailModal({
       }
     );
   }, [data, dynamicRecord, dynamicNames, mutation]);
+  const attributeSections = useMemo(
+    () =>
+      skilled.status === 'ready' ? withSkilledValues(baseSections, skilled.values) : baseSections,
+    [baseSections, skilled]
+  );
 
   // Gates which attribute-modifier popovers can apply (empty while `data`
   // hasn't loaded yet).
@@ -521,6 +532,17 @@ export function ItemDetailModal({
               />
 
               <UsedInSection typeId={typeId} onNavigate={leave} />
+
+              {attributeSections.length > 0 && (
+                <SkilledValuesNote
+                  state={skilled}
+                  changed={attributeSections.some((section) =>
+                    section.kind === 'group'
+                      ? section.group.attributes.some((a) => a.skilledValue !== undefined)
+                      : section.layers.some((layer) => layer.skilled !== undefined)
+                  )}
+                />
+              )}
 
               {attributeSections.length === 0 ? (
                 // A Mutated module whose every attribute is a roll has them all above.
@@ -862,6 +884,50 @@ function PlanetaryProduction({ pi, typeId }: { pi: PiData | null; typeId: number
       ) : (
         <p className="mt-1 text-xs text-text-dim">{t('market.itemDetail.planetaryRaw')}</p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Above the attribute sections: what the arrows mean once the pilot's values
+ * are in, or the one-time engine download that brings them
+ * (`useSkilledAttributes`, which never starts it on its own).
+ */
+function SkilledValuesNote({
+  state,
+  changed,
+}: {
+  state: SkilledAttributesState;
+  /** Whether any row the note sits over reads "base → skilled". */
+  changed: boolean;
+}) {
+  const { t } = useTranslation();
+  const [asked, setAsked] = useState(false);
+  if (state.status === 'ready') {
+    if (!changed) return null;
+    return <p className="text-xs text-text-dim">{t('market.itemDetail.skilled.note')}</p>;
+  }
+  if (state.status === 'loading' && asked) {
+    return (
+      <p className="flex items-center gap-2 text-xs text-text-dim" role="status">
+        <Spinner size="sm" />
+        {t('market.itemDetail.skilled.loading')}
+      </p>
+    );
+  }
+  if (state.status !== 'needs-download') return null;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-dim">
+      <span>{t('market.itemDetail.skilled.offer')}</span>
+      <Button
+        size="sm"
+        onClick={() => {
+          setAsked(true);
+          state.load();
+        }}
+      >
+        {t('market.itemDetail.skilled.load')}
+      </Button>
     </div>
   );
 }

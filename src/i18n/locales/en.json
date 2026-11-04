@@ -13238,6 +13238,8 @@
         "attributeColumn": "Attribute",
         "baseColumn": "Base",
         "rolledColumn": "Rolled",
+        "skilledColumn": "With skills",
+        "skilledHint": "The rolled value with your skills and implants applied.",
         "possibleColumn": "Possible",
         "qualityColumn": "Roll quality",
         "qualityHint": "Where the roll sits in what the mutaplasmid could roll: 100% is the best roll, 0% the worst.",
@@ -13301,6 +13303,14 @@
       "noAttributes": "No fitting attributes for this item.",
       "resistsTitle": "Resistances",
       "layerHp": "{{value}} HP",
+      "layerHpSkilled": "{{base}} → {{value}} HP",
+      "skilled": {
+        "note": "Arrows show base → with your skills and implants.",
+        "loading": "Applying your skills…",
+        "offer": "Show these values with your skills and implants (a one-time download).",
+        "load": "Apply my skills",
+        "change": "{{base}}, {{value}} with your skills"
+      },
       "errorTitle": "Couldn't load item info",
       "errorHint": "Try again, or reload the page."
     },

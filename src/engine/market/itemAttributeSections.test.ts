@@ -3,6 +3,7 @@ import type { AttributeDictionary, RawDogmaAttribute } from './itemAttributes';
 import {
   itemAttributeSections,
   itemKindOf,
+  withSkilledValues,
   type AttributeSection,
   type ItemKind,
 } from './itemAttributeSections';
@@ -259,5 +260,53 @@ describe('itemAttributeSections', () => {
     expect(rowIds).not.toContain(267);
     // The rest of the armor layer falls back to rows.
     expect(rowIds).toEqual(expect.arrayContaining([265, 268, 269, 270]));
+  });
+});
+
+describe('withSkilledValues', () => {
+  const hull = (values: Record<number, number>): RawDogmaAttribute[] =>
+    Object.entries(values).map(([id, value]) => ({ attribute_id: Number(id), value }));
+  const sections = itemAttributeSections(
+    hull({ 265: 2250, 55: 285000, 37: 220, 9: 1000, 267: 0.5, 268: 0.2, 269: 0.375, 270: 0.65 }),
+    DICTIONARY,
+    {},
+    { kind: 'other' }
+  );
+  const skilled = new Map([
+    [265, 2812.5],
+    [55, 213750],
+    [37, 220],
+    [267, 0.5],
+    [268, 0.2],
+    [269, 0.375],
+    [270, 0.65],
+  ]);
+  const row = (all: AttributeSection[], id: number) =>
+    all
+      .flatMap((s) => (s.kind === 'group' ? s.group.attributes : []))
+      .find((a) => a.attributeId === id);
+
+  it('gives a row the skilled value in the unit it shows, converted like its base', () => {
+    const out = withSkilledValues(sections, skilled);
+    expect(row(out, 55)?.skilledValue).toBeCloseTo(213.75, 6);
+    expect(row(out, 55)?.value).toBeCloseTo(285, 6);
+  });
+
+  it('leaves a row the pilot does not change, or the engine did not report, without one', () => {
+    const out = withSkilledValues(sections, skilled);
+    expect(row(out, 37)?.skilledValue).toBeUndefined();
+    expect(row(out, 9)?.skilledValue).toBeUndefined();
+  });
+
+  it('gives a resist layer its skilled HP and resonances', () => {
+    const out = withSkilledValues(sections, skilled);
+    const grid = out.find((s) => s.kind === 'resists');
+    const armor = grid?.kind === 'resists' ? grid.layers.find((l) => l.layer === 'armor') : null;
+    expect(armor?.skilled?.hp).toBeCloseTo(2812.5, 6);
+    expect(armor?.skilled?.resonances.emResonance).toBeCloseTo(0.5, 6);
+  });
+
+  it('changes nothing without skilled values', () => {
+    expect(withSkilledValues(sections, new Map())).toEqual(sections);
   });
 });

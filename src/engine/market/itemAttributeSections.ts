@@ -10,6 +10,7 @@
  * else its largest groups first. Miscellaneous (a bag the SDE fills with
  * whatever has no better home) is always last.
  */
+import { displayAttributeValue } from '../fittings/attributeUnits';
 import { DOGMA_ATTRIBUTE, type Resonances } from '../fittings/types';
 import {
   groupItemAttributes,
@@ -62,6 +63,8 @@ export interface ResistLayer {
   hp: number | null;
   /** Raw resonances: 0.5 is a 50% resistance. */
   resonances: Resonances;
+  /** With the pilot's skills (`withSkilledValues`), when they change the layer at all. */
+  skilled?: { hp: number | null; resonances: Resonances };
 }
 
 const LAYER_ATTRIBUTES: ReadonlyArray<{
@@ -231,4 +234,47 @@ export function itemAttributeSections(
     if (group) sections.push({ kind: 'group', group });
   }
   return sections;
+}
+
+/** Two figures the same but for floating-point noise. */
+function same(a: number, b: number): boolean {
+  return Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+}
+
+/**
+ * `sections` with the pilot's values beside the base ones (Item Detail's
+ * "base → skilled"): `skilled` is the engine's raw value per attribute id
+ * (`skilledAttributes`). A row gets `skilledValue`, converted like its base,
+ * only when the pilot changes it; a resist layer gets `skilled` when its HP or
+ * any resonance changes. A row shown by name (`displayValue`) never changes.
+ */
+export function withSkilledValues(
+  sections: readonly AttributeSection[],
+  skilled: ReadonlyMap<number, number>
+): AttributeSection[] {
+  if (skilled.size === 0) return [...sections];
+  return sections.map((section) => {
+    if (section.kind === 'group') {
+      const attributes = section.group.attributes.map((attribute) => {
+        const raw = skilled.get(attribute.attributeId);
+        if (raw === undefined || attribute.displayValue !== undefined) return attribute;
+        const { value } = displayAttributeValue(raw, attribute.unitId, attribute.unit);
+        return same(value, attribute.value) ? attribute : { ...attribute, skilledValue: value };
+      });
+      return { kind: 'group', group: { ...section.group, attributes } };
+    }
+    const layers = section.layers.map((layer) => {
+      const ids = LAYER_ATTRIBUTES.find((entry) => entry.layer === layer.layer);
+      if (!ids) return layer;
+      const hp = layer.hp === null ? null : (skilled.get(ids.hp) ?? layer.hp);
+      const keys = Object.keys(ids.resonances) as (keyof Resonances)[];
+      const resonances = { ...layer.resonances };
+      for (const key of keys) resonances[key] = skilled.get(ids.resonances[key]) ?? resonances[key];
+      const changed =
+        (hp !== null && layer.hp !== null && !same(hp, layer.hp)) ||
+        keys.some((key) => !same(resonances[key], layer.resonances[key]));
+      return changed ? { ...layer, skilled: { hp, resonances } } : layer;
+    });
+    return { kind: 'resists', layers };
+  });
 }

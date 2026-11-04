@@ -43,6 +43,7 @@ import {
   type StrainRangeRow,
 } from '@/engine/fittings/mutaplasmidDisplay';
 import type { ItemMutation } from '@/engine/fittings/types';
+import { displayAttributeValue } from '@/engine/fittings/attributeUnits';
 import { shortCompareLabels } from '@/engine/market/compareLabels';
 import type { AttributeDictionary } from '@/sde/marketTypes';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -112,9 +113,11 @@ export interface AbyssalItemDetailProps {
   typeId: number;
   /** Set when opened on a Mutated module (`useDynamicItem`). */
   dynamic: DynamicItemState;
+  /** The pilot's raw values by attribute id (`useSkilledAttributes`), for the rolls' "With skills" column. */
+  skilled?: ReadonlyMap<number, number>;
 }
 
-export function AbyssalItemDetail({ typeId, dynamic }: AbyssalItemDetailProps) {
+export function AbyssalItemDetail({ typeId, dynamic, skilled }: AbyssalItemDetailProps) {
   const lookup = useMutaplasmidLookup();
   const dictionary = useAttributeDictionary();
   const mutation = useDynamicItemMutation(typeId, dynamic);
@@ -127,7 +130,14 @@ export function AbyssalItemDetail({ typeId, dynamic }: AbyssalItemDetailProps) {
   if (!lookup.isAbyssalType(typeId)) return null;
   if (dynamic.status === 'loading') return <SectionSpinner />;
   if (mutation) {
-    return <OwnedRollsSection mutation={mutation} lookup={lookup} dictionary={dictionary} />;
+    return (
+      <OwnedRollsSection
+        mutation={mutation}
+        lookup={lookup}
+        dictionary={dictionary}
+        skilled={skilled}
+      />
+    );
   }
   return (
     <AbyssalTypeSection
@@ -434,10 +444,12 @@ function OwnedRollsSection({
   mutation,
   lookup,
   dictionary,
+  skilled,
 }: {
   mutation: ItemMutation;
   lookup: MutaplasmidLookup;
   dictionary: AttributeDictionary;
+  skilled?: ReadonlyMap<number, number>;
 }) {
   const { t } = useTranslation();
   const names = useTypeNames(
@@ -451,6 +463,16 @@ function OwnedRollsSection({
     ? rolledAttributeRows(mutation, lookup, baseAttributes, (id) => dictionary[id]?.unitId)
     : null;
   const unitOf = (row: RolledAttributeRow) => dictionary[row.attributeId]?.unit ?? null;
+  /** The pilot's value of a roll, as shown, when it reads differently from the roll itself. */
+  const skilledText = (row: RolledAttributeRow): string | null => {
+    const raw = skilled?.get(row.attributeId);
+    if (raw === undefined) return null;
+    const unit = unitOf(row);
+    const { value } = displayAttributeValue(raw, dictionary[row.attributeId]?.unitId, unit);
+    const text = formatAttributeValue(value, unit);
+    return text === formatAttributeValue(row.rolled, unit) ? null : text;
+  };
+  const showSkilled = rows?.some((row) => skilledText(row) !== null) ?? false;
 
   // Base and rolled in columns of their own, not "base → rolled": that arrow
   // is the fit-change cue (§6c), whose colour means better or worse than before.
@@ -469,6 +491,18 @@ function OwnedRollsSection({
       cellClassName: (row) => ROLL_TONE[rollQualityTone(row.quality)].text,
       render: (row) => formatAttributeValue(row.rolled, unitOf(row)),
     },
+    ...(showSkilled
+      ? [
+          {
+            id: 'skilled',
+            header: t('market.itemDetail.abyssal.skilledColumn'),
+            headerTooltip: t('market.itemDetail.abyssal.skilledHint'),
+            align: 'right' as const,
+            className: 'whitespace-nowrap tabular-nums font-semibold',
+            render: (row: RolledAttributeRow) => skilledText(row) ?? '',
+          },
+        ]
+      : []),
     {
       id: 'range',
       header: t('market.itemDetail.abyssal.possibleColumn'),
