@@ -156,3 +156,59 @@ export const WithTrailing: Story = {
     ),
   },
 };
+
+/**
+ * @summary One key filter shown in the row on desktop (`inline`): no pill for it, and the box leaves it out. The phone sheet holds it with the rest.
+ */
+export const InlineKeyFilter: Story = {
+  args: { value: FILTERED },
+  render: function Render(args) {
+    const [value, setValue] = useState<Filters>(args.value);
+    const reward = (draft: Filters, setDraft: (next: Filters) => void) => (
+      <FilterField label="Min reward">
+        <TextInput
+          aria-label="Min reward"
+          size="sm"
+          className="w-28"
+          value={draft.minReward}
+          onChange={(event) => setDraft({ ...draft, minReward: event.target.value })}
+        />
+      </FilterField>
+    );
+    return (
+      <FilterBar<Filters>
+        {...args}
+        value={value}
+        onChange={setValue}
+        inline={reward}
+        active={activeFilters(value).map((filter) =>
+          filter.label === 'Min reward' ? { ...filter, inline: true } : filter
+        )}
+      >
+        {(draft, setDraft, surface) => (
+          <>
+            {surface === 'sheet' && reward(draft, setDraft)}
+            <FilterChip
+              label="Unread"
+              selected={draft.unreadOnly}
+              onToggle={() => setDraft({ ...draft, unreadOnly: !draft.unreadOnly })}
+            />
+          </>
+        )}
+      </FilterBar>
+    );
+  },
+};
+
+/** @summary `inlinePlacement="below"`: a narrow column's key filter on a line of its own under search and funnel. */
+export const InlineKeyFilterBelow: Story = {
+  ...InlineKeyFilter,
+  decorators: [
+    (Story) => (
+      <div style={{ width: 320 }}>
+        <Story />
+      </div>
+    ),
+  ],
+  args: { value: FILTERED, inlinePlacement: 'below' },
+};

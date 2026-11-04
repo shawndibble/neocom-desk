@@ -142,6 +142,9 @@ function focusField(container: HTMLElement | null, label: string | null): void {
   target?.focus();
 }
 
+/** Which surface `children` is rendering into: the pointer-width box or popover, or the phone sheet. */
+export type FilterControlsSurface = 'box' | 'sheet';
+
 interface FilterBarProps<T> {
   /** @summary The committed filter state. On desktop edits land here at once. */
   value: T;
@@ -179,7 +182,25 @@ interface FilterBarProps<T> {
    * The controls, written once. Called with `value` and `onChange` straight
    * through — every surface commits each edit as it is made.
    */
-  children: (value: T, onChange: (next: T) => void) => ReactNode;
+  children: (value: T, onChange: (next: T) => void, surface: FilterControlsSurface) => ReactNode;
+  /**
+   * @summary One or two key filters shown in the row itself on a pointer-width screen.
+   *
+   * For the filter a pilot changes on nearly every visit. Fixed per page, at
+   * most two, and always the same width whatever is picked, so the row stays
+   * one line (DESIGN.md §4b). Below `md` they are not in the row: the sheet
+   * holds them, so `children` renders them for `surface === 'sheet'` and
+   * leaves them out of the pointer-width box, where they would show twice.
+   * Mark their `active` entries `inline` so they get no pill and no funnel
+   * count on a pointer-width screen. Not supported with `pointerSurface="popover"`.
+   */
+  inline?: (value: T, onChange: (next: T) => void) => ReactNode;
+  /**
+   * Where `inline` sits: `row` (default) after the search box on its line, or
+   * `below` on a line of its own under the row — for a narrow column, where
+   * the search box and funnel already fill the line.
+   */
+  inlinePlacement?: 'row' | 'below';
   /**
    * View controls — a table's column picker, say — that sit between the search
    * box and the filter trigger, on the same line at every width. Not part of
@@ -337,16 +358,20 @@ function ClearAllButton<T>({
   value,
   onChange,
   active,
+  clearable = active,
 }: {
   value: T;
   onChange: (next: T) => void;
+  /** What shows the button: anything on that is not shown inline. */
   active: readonly ActiveFilter<T>[];
+  /** What it clears: everything on, inline filters included. */
+  clearable?: readonly ActiveFilter<T>[];
 }) {
   const { t } = useTranslation();
-  if (active.length === 0) return null;
+  if (clearable.length === 0) return null;
   return (
     <div className="flex basis-full justify-end">
-      <Button size="sm" variant="ghost" onClick={() => onChange(clearFilters(value, active))}>
+      <Button size="sm" variant="ghost" onClick={() => onChange(clearFilters(value, clearable))}>
         {t('filters.clearAll')}
       </Button>
     </div>
@@ -374,12 +399,17 @@ function CollapsibleFilterRow<T>({
   actions,
   trailing,
   children,
+  inline,
+  inlinePlacement = 'row',
   className = '',
   rowAlign = 'center',
   triggerSize,
 }: FilterBarProps<T>) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // An inline filter is already on the row: no pill, no funnel count.
+  const pills = active.filter((filter) => !filter.inline);
+  const inlineNode = inline?.(value, onChange);
   // The pill a click opened the box from, whose control takes focus once it mounts.
   const focusTarget = useRef<string | null>(null);
   const groupId = useId();
@@ -396,11 +426,12 @@ function CollapsibleFilterRow<T>({
     <div className={cx('flex flex-col', className)}>
       <div className={cx('flex flex-wrap gap-2', ROW_ALIGN_CLASS[rowAlign])}>
         <PrimarySearchContext.Provider value>{search}</PrimarySearchContext.Provider>
+        {inlinePlacement === 'row' && inlineNode}
         {/* Before the trigger, so Tab runs straight from the funnel into the
             group it just revealed. */}
         {actions}
         <FilterTrigger
-          activeCount={active.length}
+          activeCount={pills.length}
           expanded={open}
           controls={groupId}
           size={triggerSize}
@@ -409,9 +440,13 @@ function CollapsibleFilterRow<T>({
         />
         {trailing}
       </div>
-      <Collapse open={!open && active.length > 0} className="pt-2">
+      {inlinePlacement === 'below' && inlineNode && (
+        <div className="flex flex-wrap items-center gap-2 pt-2">{inlineNode}</div>
+      )}
+      <Collapse open={!open && pills.length > 0} className="pt-2">
         <ActiveFilterRow
-          active={active}
+          active={pills}
+          clearable={active}
           value={value}
           onChange={onChange}
           onOpen={(label) => {
@@ -428,8 +463,8 @@ function CollapsibleFilterRow<T>({
           aria-label={title ?? t('filters.title')}
           role="group"
         >
-          {children(value, onChange)}
-          <ClearAllButton value={value} onChange={onChange} active={active} />
+          {children(value, onChange, 'box')}
+          <ClearAllButton value={value} onChange={onChange} active={pills} clearable={active} />
         </div>
       </Collapse>
     </div>
@@ -466,7 +501,7 @@ function FilterPopover<T>({
           aria-label={title ?? t('filters.title')}
           className="flex w-max max-w-[min(44rem,calc(100vw-2rem))] flex-wrap items-center gap-2 p-2"
         >
-          {children(value, onChange)}
+          {children(value, onChange, 'box')}
           <ClearAllButton value={value} onChange={onChange} active={active} />
         </PopoverContent>
       </Popover>
@@ -597,7 +632,7 @@ function FilterSheet<T>({
             uppercase pill reads as a field it is not.
           */}
           <div ref={sheetBodyRef} className="flex flex-col items-start gap-3">
-            {children(value, commit)}
+            {children(value, commit, 'sheet')}
           </div>
         </FilterSurfaceContext.Provider>
       </Modal>

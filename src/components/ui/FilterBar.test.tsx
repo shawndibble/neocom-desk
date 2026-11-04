@@ -443,3 +443,98 @@ describe('FilterBar pill focus', () => {
     expect(screen.getByRole('button', { name: 'finished' })).toHaveFocus();
   });
 });
+
+describe('FilterBar inline key filter', () => {
+  interface Value {
+    space: string;
+    unread: boolean;
+  }
+  const away: Value = { space: 'Lowsec', unread: true };
+
+  function InlineHarness({ placement }: { placement?: 'row' | 'below' }) {
+    const [value, setValue] = useState<Value>(away);
+    const spaceField = (draft: Value, setDraft: (next: Value) => void) => (
+      <FilterField label="Space">
+        <TextInput
+          aria-label="Space"
+          value={draft.space}
+          onChange={(e) => setDraft({ ...draft, space: e.target.value })}
+        />
+      </FilterField>
+    );
+    return (
+      <>
+        <FilterBar
+          value={value}
+          onChange={setValue}
+          inline={spaceField}
+          inlinePlacement={placement}
+          active={[
+            {
+              label: 'Space',
+              value: value.space,
+              inline: true,
+              clear: (v: Value) => ({ ...v, space: '' }),
+            },
+            { label: 'Unread only', clear: (v: Value) => ({ ...v, unread: false }) },
+          ]}
+        >
+          {(draft, setDraft, surface) => (
+            <>
+              {surface === 'sheet' && spaceField(draft, setDraft)}
+              <FilterChip
+                label="Unread only"
+                selected={draft.unread}
+                onToggle={() => setDraft({ ...draft, unread: !draft.unread })}
+              />
+            </>
+          )}
+        </FilterBar>
+        <p>{`space:${value.space} unread:${String(value.unread)}`}</p>
+      </>
+    );
+  }
+
+  it('shows the key filter in the row, with no pill and no count for it', () => {
+    render(<InlineHarness />);
+    expect(screen.getByRole('textbox', { name: 'Space' })).toHaveValue('Lowsec');
+    expect(screen.queryByRole('button', { name: /Change filter: Space/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Change filter: Unread only' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
+  });
+
+  it('does not repeat the key filter inside the open box', async () => {
+    const user = userEvent.setup();
+    render(<InlineHarness />);
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    expect(screen.getAllByRole('textbox', { name: 'Space' })).toHaveLength(1);
+  });
+
+  it('clears the inline filter too with Clear all', async () => {
+    const user = userEvent.setup();
+    render(<InlineHarness />);
+    await user.click(screen.getByRole('button', { name: 'Clear all' }));
+    expect(screen.getByText('space: unread:false')).toBeInTheDocument();
+  });
+
+  it('puts it on a line under the row when asked', () => {
+    render(<InlineHarness placement="below" />);
+    const field = screen.getByRole('textbox', { name: 'Space' });
+    const funnel = screen.getByRole('button', { name: /^Filters/ });
+    expect(funnel.parentElement?.parentElement).not.toContainElement(field);
+  });
+
+  it('moves it into the sheet, with its pill and count, on a phone', async () => {
+    useNarrowViewport();
+    const user = userEvent.setup();
+    render(<InlineHarness />);
+    expect(screen.queryByRole('textbox', { name: 'Space' })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Change filter: Space: Lowsec' })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    expect(
+      within(screen.getByRole('dialog')).getByRole('textbox', { name: 'Space' })
+    ).toBeInTheDocument();
+  });
+});
