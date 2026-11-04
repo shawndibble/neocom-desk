@@ -15,22 +15,22 @@ vi.mock('@/engine/import/pasteDestination', async (importOriginal) => {
 
 // The market catalogue is fetched on first use and not precached: `available`
 // false is a fresh install with no connection.
-const market = vi.hoisted(() => ({ available: true, hang: false }));
+const market = vi.hoisted(() => ({ available: true, neverLoads: false }));
 
 vi.mock('@/features/market/appraisalData', () => ({
-  loadAppraisalCatalogue: () =>
-    market.hang
-      ? new Promise(() => {})
-      : !market.available
-        ? Promise.reject(new TypeError('Failed to fetch'))
-        : Promise.resolve(
-            new Map(
-              ['Rifter', 'Damage Control II', 'Tritanium'].map((name, index) => [
-                name.toLowerCase(),
-                { typeId: index + 1, name },
-              ])
-            )
-          ),
+  loadAppraisalCatalogue: () => {
+    // A load that never settles: a tab left idle with a stalled download.
+    if (market.neverLoads) return new Promise(() => {});
+    if (!market.available) return Promise.reject(new TypeError('Failed to fetch'));
+    return Promise.resolve(
+      new Map(
+        ['Rifter', 'Damage Control II', 'Tritanium'].map((name, index) => [
+          name.toLowerCase(),
+          { typeId: index + 1, name },
+        ])
+      )
+    );
+  },
 }));
 
 vi.mock('@/features/fittings/hullNames', () => ({
@@ -77,6 +77,10 @@ async function paste(target: Element, text: string) {
 }
 
 describe('GlobalPasteRouter', () => {
+  afterEach(() => {
+    market.neverLoads = false;
+  });
+
   it('opens a pasted fit in Fittings', async () => {
     renderRouter();
     await paste(document.body, FIT);
@@ -91,8 +95,8 @@ describe('GlobalPasteRouter', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('"appraiseText"');
   });
 
-  it('opens a survey scan without waiting on any lazy data', async () => {
-    market.hang = true;
+  it('opens a survey scan without waiting on the market catalogue', async () => {
+    market.neverLoads = true;
     renderRouter();
     await paste(
       document.body,
@@ -100,7 +104,6 @@ describe('GlobalPasteRouter', () => {
     );
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('survey'));
     expect(screen.getByTestId('where')).toHaveTextContent('"surveyScanText"');
-    market.hang = false;
   });
 
   it('opens a pasted skill plan in the Skills planner', async () => {
