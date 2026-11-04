@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import '@/i18n';
 import type { AttributeSection } from '@/engine/market/itemAttributeSections';
@@ -53,11 +54,48 @@ function sections(): AttributeSection[] {
 }
 
 describe('ItemAttributeSections', () => {
-  it('reads a row the pilot changes as base → skilled, with a spoken form', () => {
+  it('reads a row the pilot changes as base → skilled, the skilled figure a green opener', () => {
     render(<ItemAttributeSections sections={sections()} />);
     expect(screen.getByText('285 →')).toBeInTheDocument();
-    expect(screen.getByText('213.75 s', { selector: 'span.font-semibold' })).toBeInTheDocument();
-    expect(screen.getByText('285 s, 213.75 s with your skills')).toBeInTheDocument();
+    const figure = screen.getByRole('button', { name: '285 s, 213.75 s with your skills' });
+    expect(figure).toHaveClass('text-success', 'decoration-dashed');
+    expect(figure).toHaveTextContent('213.75 s');
+  });
+
+  it('opens what made a skilled figure: each skill at the pilot’s level, implants, the hull', async () => {
+    const user = userEvent.setup();
+    render(
+      <ItemAttributeSections
+        sections={sections()}
+        skilledSources={
+          new Map([
+            [
+              55,
+              [
+                { kind: 'skill', typeId: 3418, name: 'Capacitor Management', level: 4 },
+                {
+                  kind: 'implant',
+                  typeId: 3477,
+                  name: "Inherent Implants 'Squire' Capacitor Management EM-802",
+                },
+                { kind: 'hull', typeId: 12003, name: 'Zealot' },
+              ],
+            ],
+          ])
+        }
+        renderSkilledExtra={() => <p>Per-level effects</p>}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: '285 s, 213.75 s with your skills' }));
+    const popover = await screen.findByRole('dialog', {
+      name: 'What changes Capacitor Recharge time',
+    });
+    expect(popover).toHaveTextContent('Capacitor Management IV');
+    expect(popover).toHaveTextContent(
+      "Inherent Implants 'Squire' Capacitor Management EM-802 (implant)"
+    );
+    expect(popover).toHaveTextContent('Zealot hull bonus');
+    expect(popover).toHaveTextContent('Per-level effects');
   });
 
   it('shows a row the pilot does not change, or changes invisibly, as one value', () => {

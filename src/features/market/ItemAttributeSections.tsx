@@ -2,65 +2,75 @@
  * Item Detail's attribute sections (`itemAttributeSections`): each group a
  * heading over name/value rows, and the shield/armor/hull resistances as the
  * Fittings Defense table (`ResistTable`) with each layer's HP under its name.
- * A row or layer the pilot's skills change (`withSkilledValues`) reads
- * "base → skilled", the base dim and the pilot's value emphasised.
+ * A row, HP or resist the pilot's skills change (`withSkilledValues`) reads
+ * "base → skilled" (`SkilledValue`): the pilot's figure green, opening what
+ * made it.
  */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import type { DisplayAttribute } from '@/engine/market/itemAttributes';
-import type { AttributeSection, ResistLayer } from '@/engine/market/itemAttributeSections';
+import {
+  LAYER_ATTRIBUTES,
+  type AttributeSection,
+  type ResistLayer,
+} from '@/engine/market/itemAttributeSections';
 import { ResistTable, type ResistRow } from '@/features/fittings/stats/ResistTable';
+import { RESONANCE_KEY } from '@/features/fittings/stats/resistFormat';
+import type { NamedSkilledSource } from '@/features/fittings/useSkilledAttributes';
 import { formatAttributeValue } from './format';
-import { rowValueText, skilledChange, skilledHpChange, type SkilledChange } from './skilledFigures';
+import { SkilledValue } from './SkilledValue';
+import { rowValueText, skilledChange, skilledHpChange } from './skilledFigures';
 
 const SECTION_HEADING = cx(eyebrowClassName, 'border-b border-line pb-1');
 
-/** "base → skilled" (§6c): the base dim, the pilot's value emphasised, spoken as a sentence. */
-function SkilledFigure({ change }: { change: SkilledChange }) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <span aria-hidden className="tabular-nums">
-        <span className="text-text-dim">{change.base} → </span>
-        <span className="font-semibold">{change.skilled}</span>
-      </span>
-      <span className="sr-only">{t('market.itemDetail.skilled.change', change.spoken)}</span>
-    </>
-  );
-}
+/** What made each skilled value, by attribute id (`useSkilledAttributes`). */
+type SourcesById = ReadonlyMap<number, readonly NamedSkilledSource[]>;
 
-/** A row's value: "base → skilled" when the pilot changes it, else the one value. */
-function attributeValue(attribute: DisplayAttribute): ReactNode {
-  const change = skilledChange(attribute);
-  return change ? <SkilledFigure change={change} /> : rowValueText(attribute);
-}
-
-function ResistSection({ layers }: { layers: ResistLayer[] }) {
+function ResistSection({ layers, sources }: { layers: ResistLayer[]; sources?: SourcesById }) {
   const { t } = useTranslation();
   const rows: ResistRow[] = layers.map((layer) => {
+    const ids = LAYER_ATTRIBUTES.find((entry) => entry.layer === layer.layer);
+    const label = t(`fittings.stats.${layer.layer}`);
     const hpChange = skilledHpChange(layer);
     const sub =
       layer.hp === null ? undefined : hpChange ? (
-        <SkilledFigure change={hpChange} />
+        <SkilledValue
+          base={hpChange.base}
+          skilled={hpChange.skilled}
+          spoken={t('market.itemDetail.skilled.change', hpChange.spoken)}
+          label={t('market.itemDetail.layerHpLabel', { layer: label })}
+          sources={(ids && sources?.get(ids.hp)) ?? []}
+        />
       ) : (
         t('market.itemDetail.layerHp', { value: formatAttributeValue(layer.hp) })
       );
     return {
       key: layer.layer,
-      label: t(`fittings.stats.${layer.layer}`),
+      label,
       ...(sub === undefined ? {} : { sub }),
       // The pilot's resists, each cell reading "base → skilled" where they print differently.
       resonances: layer.skilled?.resonances ?? layer.resonances,
       ...(layer.skilled ? { baseResonances: layer.resonances } : {}),
+      renderSkilled: (type, base, value) => (
+        <SkilledValue
+          base={base}
+          skilled={`${value}%`}
+          spoken={t('fittings.stats.skilledResist', { base, value })}
+          label={t('market.itemDetail.resistLabel', {
+            layer: label,
+            type: t(`fittings.stats.damageTypeShort.${type}`),
+          })}
+          sources={(ids && sources?.get(ids.resonances[RESONANCE_KEY[type]])) ?? []}
+        />
+      ),
     };
   });
   return (
     <div>
       <h3 className={SECTION_HEADING}>{t('market.itemDetail.resistsTitle')}</h3>
-      {/* Four bars across the whole modal read as one long strip; this keeps each a bar. */}
-      <div className="mt-1 max-w-lg">
+      <div className="mt-1">
         <ResistTable rows={rows} />
       </div>
     </div>
@@ -69,27 +79,48 @@ function ResistSection({ layers }: { layers: ResistLayer[] }) {
 
 export function ItemAttributeSections({
   sections,
+  skilledSources,
   renderValue = (_, content) => content,
+  renderSkilledExtra,
 }: {
   sections: readonly AttributeSection[];
-  /** Wraps a row's value, e.g. in the "which skill changes this" popover. */
+  /** What made each skilled value; a changed figure opens these. */
+  skilledSources?: SourcesById;
+  /** Wraps a value the pilot doesn't change, e.g. in the "which skill changes this" popover. */
   renderValue?: (attribute: DisplayAttribute, content: ReactNode) => ReactNode;
+  /** More for a changed figure's popover (that row's per-skill lines), so one number is one trigger. */
+  renderSkilledExtra?: (attribute: DisplayAttribute) => ReactNode;
 }) {
+  const { t } = useTranslation();
   return sections.map((section) =>
     section.kind === 'resists' ? (
-      <ResistSection key="resists" layers={section.layers} />
+      <ResistSection key="resists" layers={section.layers} sources={skilledSources} />
     ) : (
       <div key={section.group.category}>
         <h3 className={SECTION_HEADING}>{section.group.category}</h3>
         <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs">
-          {section.group.attributes.map((attribute) => (
-            <div key={attribute.attributeId} className="contents">
-              <dt className="text-text-dim">{attribute.name}</dt>
-              <dd className="text-right text-text">
-                {renderValue(attribute, attributeValue(attribute))}
-              </dd>
-            </div>
-          ))}
+          {section.group.attributes.map((attribute) => {
+            const change = skilledChange(attribute);
+            return (
+              <div key={attribute.attributeId} className="contents">
+                <dt className="text-text-dim">{attribute.name}</dt>
+                <dd className="text-right text-text">
+                  {change ? (
+                    <SkilledValue
+                      base={change.base}
+                      skilled={change.skilled}
+                      spoken={t('market.itemDetail.skilled.change', change.spoken)}
+                      label={attribute.name}
+                      sources={skilledSources?.get(attribute.attributeId) ?? []}
+                      extra={renderSkilledExtra?.(attribute)}
+                    />
+                  ) : (
+                    renderValue(attribute, rowValueText(attribute))
+                  )}
+                </dd>
+              </div>
+            );
+          })}
         </dl>
       </div>
     )

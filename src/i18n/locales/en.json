@@ -2570,8 +2570,8 @@
       "added": "Added"
     },
     "attributeModifier": {
-      "perLevel": "{{skill}}: +{{perLevel}}% per level",
-      "current": "Trained to {{level}} — currently +{{total}}%",
+      "perLevel": "{{skill}}: {{perLevel}}% per level",
+      "current": "Trained to {{level}} — currently {{total}}%",
       "untrained": "Not trained"
     },
     "totalSp": "Total SP",
@@ -13240,6 +13240,7 @@
         "baseColumn": "Base",
         "rolledColumn": "Rolled",
         "skilledColumn": "With skills",
+        "skilledSpoken": "{{value}} with your skills",
         "skilledHint": "The rolled value with your skills and implants applied.",
         "possibleColumn": "Possible",
         "qualityColumn": "Roll quality",
@@ -13304,8 +13305,15 @@
       "noAttributes": "No fitting attributes for this item.",
       "resistsTitle": "Resistances",
       "layerHp": "{{value}} HP",
+      "layerHpLabel": "{{layer}} HP",
+      "resistLabel": "{{layer}} {{type}} resistance",
       "skilled": {
-        "note": "Arrows show base → with your skills and implants.",
+        "note": "Green figures include your skills and implants. Select one to see which.",
+        "sourcesTitle": "With your skills and implants",
+        "sourcesFor": "What changes {{attribute}}",
+        "skillLine": "{{name}} {{level}}",
+        "implantLine": "{{name}} (implant)",
+        "hullLine": "{{name}} hull bonus",
         "loading": "Applying your skills…",
         "offer": "Show these values with your skills and implants (a one-time download).",
         "load": "Apply my skills",

@@ -358,6 +358,11 @@ export function ItemDetailModal({
       skilled.status === 'ready' ? withSkilledValues(baseSections, skilled.values) : baseSections,
     [baseSections, skilled]
   );
+  /** The skills that change an attribute of this item ("which skill changes this"); none without a pilot. */
+  const modifiersOf = (attributeId: number) =>
+    activeCharacterId && data
+      ? findModifyingSkills(attributeId, requiredSkillTypeIds, data.skillAttributeModifiers)
+      : [];
 
   // Gates which attribute-modifier popovers can apply (empty while `data`
   // hasn't loaded yet).
@@ -371,10 +376,10 @@ export function ItemDetailModal({
       onClose={onClose}
       // The URL-backed host already owns the history entry (`?info`).
       closeOnBack={onLeave === undefined}
-      // One width for every tab and item kind (48rem), so switching tabs never
-      // jumps the box and text keeps a readable measure on a wide screen. An
-      // abyssal roll table wider than that scrolls sideways in its own box.
-      placement="medium"
+      // One width for every tab and item kind (40rem), so switching tabs never
+      // jumps the box and a name stays close to its value. An abyssal roll
+      // table wider than that scrolls sideways in its own box.
+      placement="detail"
       title={itemName}
       titleActions={
         // One header action, so a plain button at every width. The Market
@@ -397,7 +402,7 @@ export function ItemDetailModal({
           <AbyssalItemDetail
             typeId={typeId}
             dynamic={dynamic}
-            skilled={skilled.status === 'ready' ? skilled.values : undefined}
+            skilled={skilled.status === 'ready' ? skilled : undefined}
           />
           <PlanetaryProduction pi={pi} typeId={typeId} />
           <MadeFromSection typeId={typeId} />
@@ -513,7 +518,7 @@ export function ItemDetailModal({
               <AbyssalItemDetail
                 typeId={typeId}
                 dynamic={dynamic}
-                skilled={skilled.status === 'ready' ? skilled.values : undefined}
+                skilled={skilled.status === 'ready' ? skilled : undefined}
               />
 
               <RequiredSkillsSection
@@ -558,14 +563,9 @@ export function ItemDetailModal({
               ) : (
                 <ItemAttributeSections
                   sections={attributeSections}
+                  skilledSources={skilled.status === 'ready' ? skilled.sources : undefined}
                   renderValue={(attribute, valueText) => {
-                    const modifiers = activeCharacterId
-                      ? findModifyingSkills(
-                          attribute.attributeId,
-                          requiredSkillTypeIds,
-                          data.skillAttributeModifiers
-                        )
-                      : [];
+                    const modifiers = modifiersOf(attribute.attributeId);
                     return modifiers.length > 0 ? (
                       <AttributeModifierTrigger
                         modifiers={modifiers}
@@ -580,6 +580,18 @@ export function ItemDetailModal({
                     ) : (
                       valueText
                     );
+                  }}
+                  renderSkilledExtra={(attribute) => {
+                    const modifiers = modifiersOf(attribute.attributeId);
+                    return modifiers.length > 0 ? (
+                      <AttributeModifierList
+                        modifiers={modifiers}
+                        skillNames={data.allSkillNames}
+                        trainedSkills={trainedSkills}
+                        target={targetPlan}
+                        itemName={itemName}
+                      />
+                    ) : null;
                   }}
                 />
               )}
@@ -782,19 +794,47 @@ function AttributeModifierTrigger({
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 space-y-2" aria-label={modifiersLabel}>
-        {modifiers.map((modifier) => (
-          <AttributeModifierRow
-            key={modifier.ownerSkillTypeID}
-            modifier={modifier}
-            skillName={skillNameOrFallback(modifier.ownerSkillTypeID, skillNames)}
-            trainedLevel={trainedSkills.get(modifier.ownerSkillTypeID)?.level ?? 0}
-            target={target}
-            itemName={itemName}
-          />
-        ))}
+        <AttributeModifierList
+          modifiers={modifiers}
+          skillNames={skillNames}
+          trainedSkills={trainedSkills}
+          target={target}
+          itemName={itemName}
+        />
       </PopoverContent>
     </Popover>
   );
+}
+
+/** Each skill's per-level effect on one attribute, with its Add button: the "which skill changes this" lines. */
+function AttributeModifierList({
+  modifiers,
+  skillNames,
+  trainedSkills,
+  target,
+  itemName,
+}: {
+  modifiers: readonly ModifyingSkillEffect[];
+  skillNames: Readonly<Record<number, string>>;
+  trainedSkills: ReadonlyMap<number, TrainedSkill>;
+  target: TargetPlan;
+  itemName: string;
+}) {
+  return modifiers.map((modifier) => (
+    <AttributeModifierRow
+      key={modifier.ownerSkillTypeID}
+      modifier={modifier}
+      skillName={skillNameOrFallback(modifier.ownerSkillTypeID, skillNames)}
+      trainedLevel={trainedSkills.get(modifier.ownerSkillTypeID)?.level ?? 0}
+      target={target}
+      itemName={itemName}
+    />
+  ));
+}
+
+/** A per-level effect with its own sign: "+5", "-5" (the strings no longer hard-code "+"). */
+function signed(value: number): string {
+  return value > 0 ? `+${value}` : String(value);
 }
 
 /** One skill's effect inside `AttributeModifierTrigger`'s popover — `modifier.perLevelValue` is already static SDE data, no fetch needed. */
@@ -817,36 +857,34 @@ function AttributeModifierRow({
       <p className="text-text">
         {t('skills.attributeModifier.perLevel', {
           skill: skillName,
-          perLevel: modifier.perLevelValue,
+          perLevel: signed(modifier.perLevelValue),
         })}
       </p>
       <p className="text-text-dim">
         {trainedLevel > 0
           ? t('skills.attributeModifier.current', {
               level: trainedLevel,
-              total: postPercentMagnitude(modifier.perLevelValue, trainedLevel),
+              total: signed(postPercentMagnitude(modifier.perLevelValue, trainedLevel)),
             })
           : t('skills.attributeModifier.untrained')}
       </p>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={() =>
-          void target.addEntries(
-            [
-              {
-                skillTypeID: modifier.ownerSkillTypeID,
-                targetLevel: Math.min(trainedLevel + 1, 5),
-              },
-            ],
-            itemName
-          )
-        }
-      >
-        {target.plans?.length === 0
-          ? t('skills.fitCheck.createPlanAndAdd')
-          : t('skills.requiredSkills.addToPlan')}
-      </Button>
+      {/* Nothing left to train at V. */}
+      {trainedLevel < 5 && (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() =>
+            void target.addEntries(
+              [{ skillTypeID: modifier.ownerSkillTypeID, targetLevel: trainedLevel + 1 }],
+              itemName
+            )
+          }
+        >
+          {target.plans?.length === 0
+            ? t('skills.fitCheck.createPlanAndAdd')
+            : t('skills.requiredSkills.addToPlan')}
+        </Button>
+      )}
     </div>
   );
 }
