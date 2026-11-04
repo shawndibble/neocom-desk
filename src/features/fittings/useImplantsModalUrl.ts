@@ -1,6 +1,6 @@
 /**
- * The Implants & Boosters editor's open state, kept in the URL (`?implants=1`,
- * or the Improve panel's own `?improveImplants=1`). A link out of the editor —
+ * The Implants & Boosters editor's open state, kept in the URL (`?implants=1`;
+ * the Pilot panel that hosts its control opens itself for it). A link out of the editor —
  * the market, an LP Store — is a normal navigation, so Back lands on the same
  * Fitting with the editor open again instead of a page that forgot it. Opening
  * pushes one history entry; closing pops that entry (or just clears the param
@@ -19,7 +19,7 @@ interface ModalState {
   implantsPushed?: boolean;
 }
 
-export function useImplantsModalUrl(param: 'implants' | 'improveImplants') {
+export function useImplantsModalUrl(param: 'implants') {
   const schema = useMemo(
     () => ({
       [param]: boolParam(false),

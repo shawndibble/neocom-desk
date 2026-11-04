@@ -440,7 +440,10 @@ export function GoalResults({
 
 /** How a source line names a Trade Hub and a turn-in — resolved once for the whole window. */
 
-/** Where one item comes from, in a line: a hub's sell orders, or an LP Store offer and what it takes. */
+/**
+ * Where one item comes from, in a line: a hub's sell orders, or the terms of an LP Store offer.
+ * An offer's store, total and LP shortfall are the summary above its breakdown, so they aren't said twice.
+ */
 function ImplantSourceLine({ source }: { source: Source }) {
   const { t } = useTranslation();
   const { hubName, itemName } = useContext(SourceNames);
@@ -465,9 +468,6 @@ function ImplantSourceLine({ source }: { source: Source }) {
     )
     .join(', ');
   const status: string[] = [];
-  if (source.lpShort > 0) {
-    status.push(t('fittings.implantFinder.lpShort', { lp: fmt(source.lpShort, 0) }));
-  }
   for (const ti of source.unbuyable) {
     status.push(
       t('fittings.implantFinder.turnInUnbuyable', { count: ti.toBuy, name: itemName(ti.typeId) })
@@ -489,18 +489,11 @@ function ImplantSourceLine({ source }: { source: Source }) {
         i18nKey={
           tags ? 'fittings.implantFinder.sourceLpWithTags' : 'fittings.implantFinder.sourceLp'
         }
-        values={{ corp: source.corpName, lp: fmt(source.lpCost, 0), tags }}
+        values={{ lp: fmt(source.lpCost, 0), tags }}
         components={{ isk: <IskAmount value={source.iskCost} decimals={0} /> }}
-      />{' '}
-      {source.cost === null ? (
-        t('fittings.implantFinder.lpUnpriced')
-      ) : (
-        <Trans
-          i18nKey="fittings.implantFinder.lpTotal"
-          values={{ rate: fmt(source.lpRate ?? 0, 0) }}
-          components={{ total: <IskAmount value={source.cost} decimals={0} /> }}
-        />
-      )}
+      />
+      {source.cost !== null &&
+        ` · ${t('fittings.implantFinder.lpRate', { rate: fmt(source.lpRate ?? 0, 0) })}`}
       {status.length > 0 && (
         <span
           className={cx(

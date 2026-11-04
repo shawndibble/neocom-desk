@@ -5,7 +5,7 @@
  * Shown only when something helps; Best overall and Cheaper have no one stat
  * to chase, so no line.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { textActionClassName } from '@/components/ui';
 import type { ImproveGoal } from '@/engine/fittings/improve';
@@ -17,7 +17,6 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { fmt } from './implantFinderFormat';
 import type { MakeItFitImplantsInput } from './MakeItFitImplants';
 import { ImplantSetPicker } from './ImplantSetPicker';
-import { useImplantsModalUrl } from './useImplantsModalUrl';
 import { useTargetProfiles } from './targetProfiles';
 import { implantNames, useImplantFinder } from './useImplantFinder';
 
@@ -62,7 +61,8 @@ function Implants({ goalId, open, implants }: Omit<Props, 'goal'> & { goalId: Im
   const names = useMemo(() => implantNames(finder.catalog?.families ?? []), [finder.catalog]);
   const goalDef = goalById(goalId);
   const { baseline, context } = finder;
-  const { open: picking, openModal, closeModal } = useImplantsModalUrl('improveImplants');
+  // Local state, not the URL: this panel sits in the Improve drawer, which a URL can't reopen on its own.
+  const [picking, setPicking] = useState(false);
 
   const rows = useMemo(() => {
     if (!baseline || finder.updating || !finder.results) return [];
@@ -96,12 +96,12 @@ function Implants({ goalId, open, implants }: Omit<Props, 'goal'> & { goalId: Im
           {` (${topName} +${fmt(top.gain * 100, 1)}%)`}
         </span>
       </p>
-      <button type="button" className={textActionClassName()} onClick={openModal}>
+      <button type="button" className={textActionClassName()} onClick={() => setPicking(true)}>
         {t('fittings.improve.findImplants')}
       </button>
       <ImplantSetPicker
         open={picking}
-        onClose={closeModal}
+        onClose={() => setPicking(false)}
         implantSet={fitting.implantSet}
         onChange={(next) => next && onChange(next)}
         finder={{ fitting, profile, basis }}

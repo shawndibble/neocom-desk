@@ -106,14 +106,7 @@ export function FittingStatsColumn({
         yourCharacters={yourCharacters.length > 1 ? yourCharacters : undefined}
         implants={
           <>
-            <ImplantSetControl
-              basis={workspace.implantBasis}
-              canUseCloneBasis={workspace.canUseCloneBasis}
-              implantSet={fitting.implantSet}
-              onImplantSetChange={workspace.setImplantSet}
-              fitting={fitting}
-              profile={workspace.profile}
-            />
+            <ImplantSetControl basis={workspace.implantBasis} implantSet={fitting.implantSet} />
             {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
               // Across both columns of the stats column's controls grid.
               <div className="col-span-2">
