@@ -2396,7 +2396,7 @@
       "updating": "Updating for your change…",
       "budgetOver": "{{used}} / {{total}} {{unit}} · {{value}} {{unit}} over",
       "budgetSpare": "{{used}} / {{total}} {{unit}} · {{value}} {{unit}} spare",
-      "slotGrades": "Slot {{slot}} · each grade is its own item, from {{low}} (smallest bonus) to {{high}} (largest)",
+      "slotGrades": "Slot {{slot}} · {{low}} (smallest bonus) to {{high}} (largest)",
       "group": {
         "fitting": "Fitting",
         "weapons": "Weapons",
