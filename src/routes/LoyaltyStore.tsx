@@ -60,7 +60,7 @@ import { useConcordRate } from '@/features/loyalty/useConcordRate';
 import { useLoyaltyOfferColumns } from '@/features/loyalty/useLoyaltyOfferColumns';
 import { LoyaltyOfferFilterBar } from '@/features/loyalty/LoyaltyOfferFilterBar';
 import { OfferDetail } from '@/features/loyalty/OfferDetail';
-import { lpShortfall, resolveLoyaltyRowItem } from '@/features/loyalty/offerRowDisplay';
+import { resolveLoyaltyRowItem } from '@/features/loyalty/offerRowDisplay';
 import { LoyaltyStoreLanding } from '@/features/loyalty/LoyaltyStoreLanding';
 import { NearestStationLine } from '@/features/loyalty/NearestStationLine';
 import { LpStoreActions } from '@/features/loyalty/LpStoreChrome';
@@ -410,7 +410,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             mobileSort
             stackSummary={t('loyaltyStore.offerCount', { count: filteredRows.length })}
             onRowClick={selectRow}
-            rowClassName={(row) => (lpShortfall(row, playerLp) !== null ? 'opacity-60' : undefined)}
             rowContextMenu={rowContextMenu}
             rowMoreActions
             selectedRowKey={selectedOfferId}
