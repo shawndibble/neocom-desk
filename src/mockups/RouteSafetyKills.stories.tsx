@@ -70,6 +70,9 @@ const GATE_A: Kill[] = [
         finalBlow: true,
       },
       { name: 'Sil Dane', corp: 'Red Tide', ship: TORNADO, weapon: '800mm Repeating Cannon' },
+      { name: 'Vee Harlan', corp: 'Red Tide', ship: CATALYST, weapon: 'Light Neutron Blaster II' },
+      { name: 'Ora Minn', corp: 'Red Tide', ship: CATALYST, weapon: 'Light Neutron Blaster II' },
+      { name: 'Pax Dorel', corp: 'Red Tide', ship: CATALYST, weapon: 'Light Neutron Blaster II' },
     ],
   },
   {
@@ -167,41 +170,41 @@ function KillRow({ kill, open }: { kill: Kill; open?: boolean }) {
         type="button"
         aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-start gap-3 px-3 py-2 text-left hover:bg-panel-2"
+        className="flex w-full flex-wrap items-start gap-x-3 gap-y-1 px-3 py-2 text-left hover:bg-panel-2"
       >
         <TypeIcon typeId={kill.ship[0]} size={64} className="mt-0.5 size-9 shrink-0 rounded-xs" />
         <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-baseline gap-x-2">
-            <span className="font-semibold text-text">{kill.victim}</span>
-            <span className="text-text-dim">{kill.ship[1]}</span>
-            {kill.tags?.map((tag) => (
-              <Pill key={tag} tone="warning">
-                {tag}
-              </Pill>
-            ))}
-          </span>
-          <span className="block truncate text-xs text-text-dim">{kill.victimOrg}</span>
+          <span className="block font-semibold text-text">{kill.victim}</span>
+          <span className="block text-text-dim">{kill.ship[1]}</span>
         </span>
         <span className="shrink-0 text-right text-xs tabular-nums text-text-dim">
           <span className="block font-medium text-text">{kill.value} ISK</span>
           {kill.ago} · {kill.attackers} attackers
         </span>
         <Caret expanded={expanded} />
+        <span className="flex basis-full flex-wrap items-center gap-x-2 gap-y-1 pl-12">
+          <span className="text-xs text-text-dim">{kill.victimOrg}</span>
+          {kill.tags?.map((tag) => (
+            <Pill key={tag} tone="warning">
+              {tag}
+            </Pill>
+          ))}
+        </span>
       </button>
       {expanded && (
         <div className="bg-panel-2 px-3 pb-2 pt-1 pl-14 text-sm">
-          <ul className="space-y-1">
+          <ul className="space-y-2 sm:space-y-1">
             {kill.list.map((a) => (
               <li key={a.name + a.weapon} className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                 <span className="w-28 font-medium text-text">{a.name}</span>
                 <ShipLine ship={a.ship} className="w-32 text-text" />
-                <span className="text-text-dim">{a.weapon}</span>
+                <span className="basis-full text-text-dim sm:basis-auto">{a.weapon}</span>
                 {a.finalBlow && <Pill tone="accent">Final blow</Pill>}
               </li>
             ))}
           </ul>
           <p className="mt-1 text-xs text-text-dim">
-            Showing {kill.list.length} of {kill.attackers} attackers ·{' '}
+            {kill.list.length} of {kill.attackers} attackers ·{' '}
             <ExternalLink href="https://zkillboard.com/">Killmail on zKillboard</ExternalLink>
           </p>
         </div>
