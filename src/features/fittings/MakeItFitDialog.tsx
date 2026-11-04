@@ -12,11 +12,11 @@ import { useTranslation } from 'react-i18next';
 import { Button, Disclosure, Modal, Spinner, StatChange } from '@/components/ui';
 import type { FitOption } from '@/engine/fittings/makeItFit';
 import {
+  changeVerdict,
   diffFittingStats,
   type StatChange as StatChangeValue,
 } from '@/engine/fittings/variationDelta';
 import { changeLabel } from './fittingVariationsCsv';
-import { changeVerdict } from '@/engine/fittings/variationDelta';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import { catalogueTypeName } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';

@@ -19,7 +19,7 @@ export function MakeItFitProblem({ before }: { before: FittingStats }) {
             <p className="text-danger text-lg font-semibold tabular-nums">
               {t('fittings.makeItFit.problem', {
                 resource: t(`fittings.makeItFit.resourceName.${resource}`),
-                over: roundedAmount(over),
+                over: roundedAmount(Math.ceil(over)),
                 unit,
               })}
             </p>

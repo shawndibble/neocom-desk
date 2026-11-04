@@ -11,6 +11,8 @@ import { Pill } from '@/components/ui/Pill';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import type { Resource } from '@/engine/fittings/makeItFit';
 import { usedOf } from '@/engine/fittings/makeItFit';
+import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
+import { STAT_DETAIL } from './statKit';
 import type { FittingStats } from '@/engine/fittings/types';
 import { cx } from '@/lib/cx';
 import { roundedAmount, totalOf, unitOf } from './makeItFitFreed';
@@ -53,9 +55,8 @@ export function MakeItFitFixCard({
   onApply,
 }: Props) {
   const { t } = useTranslation();
-  const fits =
-    budget !== null &&
-    usedOf(budget.after, budget.resource) <= totalOf(budget.after, budget.resource);
+  // The engine offers only fixes that clear every budget, so this holds for all three; checked, not assumed.
+  const fits = budget !== null && fitsResourceBudget(budget.after);
   return (
     <li
       className={cx(
@@ -79,29 +80,31 @@ export function MakeItFitFixCard({
         )}
         onClick={onApply}
       >
-        <ul className="m-0 list-none space-y-2 p-0">
+        <span className="block space-y-2">
           {items.map((item) => (
-            <li key={item.key} className="flex items-center gap-2.5">
+            <span key={item.key} className="flex items-center gap-2.5">
               <TypeIcon typeId={item.typeId} size={32} width={32} height={32} />
               <span className="min-w-0">
                 <span className="block font-medium">{item.name}</span>
                 {item.detail && <span className="text-text-dim block text-xs">{item.detail}</span>}
               </span>
-            </li>
+            </span>
           ))}
-        </ul>
-        <div className="border-line mt-2.5 border-t pt-2">
-          <div className="flex items-baseline justify-between gap-3">
-            {freed && <p className="text-success text-base font-semibold tabular-nums">{freed}</p>}
+        </span>
+        <span className="border-line mt-2.5 block border-t pt-2">
+          <span className="flex items-baseline justify-between gap-3">
+            {freed && (
+              <span className="text-success text-base font-semibold tabular-nums">{freed}</span>
+            )}
             {cost !== null && (
-              <p className={cx('ml-auto text-sm font-semibold', cost < 0 && 'text-success')}>
-                <span className="text-text-dim mr-1.5 text-[0.6875rem] font-normal tracking-widest uppercase">
+              <span className={cx('ml-auto text-sm font-semibold', cost < 0 && 'text-success')}>
+                <span className={cx(STAT_DETAIL, 'mr-1.5 tracking-widest uppercase')}>
                   {t(cost < 0 ? 'fittings.makeItFit.saves' : 'fittings.makeItFit.costs')}
                 </span>
                 <IskAmount value={Math.abs(cost)} />
-              </p>
+              </span>
             )}
-          </div>
+          </span>
           {budget && (
             <ProgressBar
               label={t('fittings.makeItFit.landsAt')}
@@ -115,7 +118,7 @@ export function MakeItFitFixCard({
               className="mt-1.5"
             />
           )}
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             {budget && (
               <span className="text-text-dim tabular-nums">
                 {t('fittings.makeItFit.after', {
@@ -123,12 +126,18 @@ export function MakeItFitFixCard({
                   total: roundedAmount(totalOf(budget.after, budget.resource)),
                   unit: unitOf(budget.resource, t),
                 })}
-                {fits && <span className="text-success"> ✓</span>}
+                {fits && (
+                  <span className="text-success">
+                    {' '}
+                    <span aria-hidden="true">✓</span>
+                    <span className="sr-only">{t('fittings.makeItFit.landsFits')}</span>
+                  </span>
+                )}
               </span>
             )}
             {chips}
-          </div>
-        </div>
+          </span>
+        </span>
       </button>
       {footer}
     </li>

@@ -12,9 +12,13 @@ import { Spinner } from '@/components/ui';
 import { cloneSeedSet, type ImplantBasis } from '@/engine/fittings/implantBasis';
 import { placeAllInSet } from '@/engine/fittings/implantFinder';
 import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
-import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
+import type {
+  Fitting,
+  FittingImplantSet,
+  FittingStats,
+  PilotProfile,
+} from '@/engine/fittings/types';
 import { useMarketHub } from '@/features/market/hub';
-import type { FittingStats } from '@/engine/fittings/types';
 import { freedLabel } from './makeItFitFreed';
 import { MakeItFitFixCard } from './MakeItFitFixCard';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -88,7 +92,7 @@ function Implants({
   });
   const names = useMemo(() => implantNames(finder.catalog?.families ?? []), [finder.catalog]);
   const fixes = finder.fixes.filter((fix) => fitsResourceBudget(fix.stats)).slice(0, FIX_LIMIT);
-  const cheapest = Math.min(...fixes.map((fix) => fix.cost));
+  const cheapest = fixes.length > 0 ? Math.min(...fixes.map((fix) => fix.cost)) : null;
   const searching = finder.status === 'loading' || finder.updating;
 
   if (finder.status === 'error' || (!searching && fixes.length === 0)) return null;
