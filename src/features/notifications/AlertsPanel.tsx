@@ -433,7 +433,7 @@ function FireRow({
       data-fire-id={fire.id}
       className="flex items-start gap-x-2 border-b border-line py-1 last:border-b-0 min-h-9 md:min-h-0"
     >
-      {/* The × sits outside the wrapping text block so it stays top-right when the body wraps. */}
+      {/* The check sits outside the wrapping text block so it stays top-right when the body wraps. */}
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 self-center">
         <Link
           to={notificationUrlForSubject(
@@ -462,7 +462,7 @@ function FireRow({
         </time>
       </div>
       <IconButton
-        icon={<Icon.Close />}
+        icon={<Icon.Done />}
         label={t('alerts.panel.dismissFire', { body })}
         variant="plain"
         size="row"
