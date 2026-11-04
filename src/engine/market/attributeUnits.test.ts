@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { enumUnitLabel, idReferenceKind, isEnumUnit, looksLikeId } from './attributeUnits';
+import {
+  enumUnitLabel,
+  idReferenceKind,
+  isEnumUnit,
+  looksLikeId,
+  unitRepeatsName,
+} from './attributeUnits';
 
 describe('isEnumUnit', () => {
   it('recognises a legend regardless of how many members it lists', () => {
@@ -111,5 +117,22 @@ describe('looksLikeId', () => {
     expect(looksLikeId(-1)).toBe(false);
     expect(looksLikeId(1.5)).toBe(false);
     expect(looksLikeId(Number.NaN)).toBe(false);
+  });
+});
+
+describe('unitRepeatsName', () => {
+  it('is true when the unit is a word of the attribute name', () => {
+    expect(unitRepeatsName('Meta Level', 'Level')).toBe(true);
+    expect(unitRepeatsName('Tech Level', 'Level')).toBe(true);
+    expect(unitRepeatsName('Turret Hardpoints', 'hardpoints')).toBe(true);
+    expect(unitRepeatsName('Implant Slot', 'Slot')).toBe(true);
+  });
+
+  it('is false for a real unit, a partial word or no unit', () => {
+    expect(unitRepeatsName('Structure Hitpoints', 'HP')).toBe(false);
+    expect(unitRepeatsName('Calibration', 'points')).toBe(false);
+    expect(unitRepeatsName('Levelling', 'Level')).toBe(false);
+    expect(unitRepeatsName('Meta Level', null)).toBe(false);
+    expect(unitRepeatsName('Meta Level', '')).toBe(false);
   });
 });

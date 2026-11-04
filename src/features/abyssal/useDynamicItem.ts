@@ -2,9 +2,11 @@
  * A Mutated module's dynamic item (`dynamicItems.ts`): base, mutaplasmid and
  * full attribute set.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { DynamicItemRecord } from '@/db';
-import { getDynamicItem } from './dynamicItems';
+import type { ItemMutation } from '@/engine/fittings/types';
+import { getDynamicItem, mutationFromRecord } from './dynamicItems';
+import { useMutaplasmidLookup } from './mutaplasmidData';
 
 export type DynamicItemState =
   | { status: 'none' }
@@ -39,4 +41,24 @@ export function useDynamicItem(typeId: number, itemId: number | undefined): Dyna
   }, [typeId, itemId]);
   if (key === null) return { status: 'none' };
   return answer?.key === key ? answer.state : { status: 'loading' };
+}
+
+/**
+ * The Mutated module's mutation (base, mutaplasmid, its rolls) once the item
+ * has loaded and this build's mutaplasmid data agrees with it; null
+ * otherwise. What "This module's rolls" shows, so Item Detail can leave those
+ * attributes out of its groups.
+ */
+export function useDynamicItemMutation(
+  typeId: number,
+  dynamic: DynamicItemState
+): ItemMutation | null {
+  const lookup = useMutaplasmidLookup();
+  return useMemo(
+    () =>
+      lookup && dynamic.status === 'ready'
+        ? mutationFromRecord(typeId, dynamic.record, lookup)
+        : null,
+    [lookup, dynamic, typeId]
+  );
 }

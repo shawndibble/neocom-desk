@@ -1,4 +1,6 @@
+import { resistPct } from '@/engine/fittings/stats';
 import type { Resonances } from '@/engine/fittings/types';
+import { fmt0 } from './fixedFormat';
 
 export const DMG_FILL_CLASS = {
   em: 'bg-dmg-em',
@@ -31,4 +33,14 @@ const EHP_FORMAT = createNumberFormat({ maximumFractionDigits: 0 });
 /** Whole hit points, grouped: "64,745". */
 export function formatEhp(ehp: number): string {
   return EHP_FORMAT(ehp);
+}
+
+/** A resist as a cell prints it: whole percent. */
+export function resistText(resonance: number): string {
+  return fmt0(resistPct(resonance));
+}
+
+/** Whether two resonances print differently in a cell (Item Detail's base → skilled). */
+export function resistReadsDifferently(a: number, b: number): boolean {
+  return resistText(a) !== resistText(b);
 }
