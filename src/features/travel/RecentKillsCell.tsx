@@ -60,11 +60,7 @@ function LocationLine({
         });
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
-      <Button
-        size="sm"
-        aria-label={t('travel.kills.open', { location: location.name ?? systemName })}
-        onClick={() => setOpen(true)}
-      >
+      <Button size="sm" onClick={() => setOpen(true)}>
         <span className={location.onPath ? 'font-semibold text-text' : 'text-text-dim'}>
           {text}
         </span>
@@ -73,14 +69,17 @@ function LocationLine({
         <span className={`${BADGE} bg-panel-2 text-text`}>{t('travel.kills.onPath')}</span>
       )}
       <Tags tags={location} />
-      <KillLocationModal
-        open={open}
-        onClose={() => setOpen(false)}
-        systemId={systemId}
-        systemName={systemName}
-        locations={[location]}
-        scope="location"
-      />
+      {open && (
+        <KillLocationModal
+          open
+          onClose={() => setOpen(false)}
+          systemId={systemId}
+          systemName={systemName}
+          locations={[location]}
+          hulls={location.hulls}
+          scope="location"
+        />
+      )}
     </span>
   );
 }
@@ -118,11 +117,7 @@ export function RecentKillsCell({
       data-dense-omit={summary.count === 0 ? '' : undefined}
     >
       {summary.count > 0 ? (
-        <Button
-          size="sm"
-          aria-label={t('travel.kills.openSystem', { system: systemName })}
-          onClick={() => setSystemOpen(true)}
-        >
+        <Button size="sm" onClick={() => setSystemOpen(true)}>
           {t('travel.kills.count', { count: summary.count })}
         </Button>
       ) : (
@@ -138,13 +133,14 @@ export function RecentKillsCell({
             systemName={systemName}
           />
         ))}
-      {summary.count > 0 && (
+      {systemOpen && (
         <KillLocationModal
-          open={systemOpen}
+          open
           onClose={() => setSystemOpen(false)}
           systemId={systemId}
           systemName={systemName}
           locations={summary.locations}
+          hulls={summary.hulls}
           scope="system"
         />
       )}

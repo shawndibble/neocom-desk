@@ -180,7 +180,7 @@ export interface RecentKillsContext extends KillTagContext {
 
 const OTHER_KEY = 'other';
 
-function minutesBefore(now: number, time: number): number {
+export function minutesBefore(now: number, time: number): number {
   return Math.max(0, Math.floor((now - time) / MINUTE_MS));
 }
 

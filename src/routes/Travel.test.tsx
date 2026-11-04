@@ -205,7 +205,7 @@ describe('Travel › Route Safety', () => {
 
     const table = await screen.findByRole('table', { name: 'Systems on the route' });
     const body = (await within(table).findAllByRole('row')).slice(1);
-    await within(body[2]).findByRole('button', { name: 'Show the kills in Uedama' });
+    await within(body[2]).findByRole('button', { name: '2 player kills' });
     await user.click(within(body[2]).getByText('Uedama'));
     expect(await within(table).findByText('NPC kills in the last hour: 2')).toBeInTheDocument();
     expect(
@@ -246,9 +246,9 @@ describe('Travel › Route Safety', () => {
     const body = (await within(table).findAllByRole('row')).slice(1);
 
     const uedama = within(body[2]);
-    expect(
-      await uedama.findByRole('button', { name: 'Show the kills in Uedama' })
-    ).toHaveTextContent('2 player kills');
+    expect(await uedama.findByRole('button', { name: '2 player kills' })).toHaveTextContent(
+      '2 player kills'
+    );
     expect(
       await uedama.findByText('2 kills at Stargate (Perimeter), last one 12 min ago')
     ).toBeInTheDocument();

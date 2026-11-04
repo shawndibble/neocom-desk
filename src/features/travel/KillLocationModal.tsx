@@ -17,6 +17,8 @@ import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Pill } from '@/components/ui/Pill';
 import {
   capAttackers,
+  type HullKillCount,
+  minutesBefore,
   type RecentKillLocation,
   type RecentKillView,
 } from '@/engine/route/recentKills';
@@ -105,7 +107,14 @@ function AttackerList({
   typeLabel: (typeId: number) => string;
 }) {
   const { t } = useTranslation();
-  const { shown, more } = capAttackers(kill.attackers, ATTACKER_CAP);
+  const { shown: capped, more } = capAttackers(kill.attackers, ATTACKER_CAP);
+  // An attacker with nothing to show (no pilot name, ship or weapon) is left out, not drawn empty.
+  const shown = capped.filter(
+    (attacker) =>
+      attacker.shipTypeId !== undefined ||
+      attacker.weaponTypeId !== undefined ||
+      (attacker.characterId !== undefined && names.has(attacker.characterId))
+  );
   return (
     <div className="bg-panel-2 px-3 pb-2 pt-1 pl-14 text-sm">
       <ul className="space-y-2 sm:space-y-1">
@@ -180,15 +189,12 @@ function KillRow({
   );
   const shipTypeId = kill.victim?.shipTypeId ?? null;
   const pilot = kill.victim?.characterId == null ? undefined : names.get(kill.victim.characterId);
-  const minutes = Math.max(0, Math.floor((now - kill.time) / 60_000));
+  const minutes = minutesBefore(now, kill.time);
   return (
     <li className="border-b border-line last:border-b-0">
       <button
         type="button"
         aria-expanded={expanded}
-        aria-label={`${pilot ?? t('travel.kills.modal.victimUnknown')}: ${t(
-          expanded ? 'travel.kills.modal.collapse' : 'travel.kills.modal.expand'
-        )}`}
         onClick={() => setExpanded(!expanded)}
         className="flex w-full flex-wrap items-start gap-x-3 gap-y-1 px-3 py-2 text-left hover:bg-panel-2"
       >
@@ -198,11 +204,15 @@ function KillRow({
           <span className="size-9 shrink-0" aria-hidden />
         )}
         <span className="min-w-0 flex-1">
-          <span className="block font-semibold text-text">
-            {pilot ?? t('travel.kills.modal.victimUnknown')}
-          </span>
+          {pilot !== undefined && <span className="block font-semibold text-text">{pilot}</span>}
           {shipTypeId !== null && (
-            <span className="block text-text-dim">{typeLabel(shipTypeId)}</span>
+            <span
+              className={
+                pilot === undefined ? 'block font-semibold text-text' : 'block text-text-dim'
+              }
+            >
+              {typeLabel(shipTypeId)}
+            </span>
           )}
         </span>
         <span className="shrink-0 text-right text-xs tabular-nums text-text-dim">
@@ -236,6 +246,8 @@ export interface KillLocationModalProps {
   systemName: string;
   /** One location, or every location of the system (on-path gates first). */
   locations: readonly RecentKillLocation[];
+  /** Hull classes over the whole list, counted per kill. */
+  hulls: readonly HullKillCount[];
   /** `location` titles the modal with the place; `system` with the system. */
   scope: 'location' | 'system';
 }
@@ -245,31 +257,29 @@ export function KillLocationModal({
   onClose,
   systemId,
   systemName,
-  locations,
+  locations: openLocations,
+  hulls,
   scope,
 }: KillLocationModalProps) {
   const { t } = useTranslation();
   const phone = useIsPhone();
   const typeLabel = useTypeLabel();
+  // The modal mounts when it is opened, so both are a snapshot of that moment:
+  // a refresh of the route's kills does not shuffle rows under the reader.
   const [now] = useState(() => Date.now());
+  const [locations] = useState(openLocations);
   const ordered = useMemo(
     () => [...locations].sort((a, b) => Number(b.onPath) - Number(a.onPath)),
     [locations]
   );
   const allKills = useMemo(() => ordered.flatMap((location) => location.kills), [ordered]);
   const names = useNames(victimIds(allKills), open);
-  const hullGroups = useMemo(() => {
-    const counts = new Map<number, number>();
-    for (const location of ordered)
-      for (const hull of location.hulls)
-        counts.set(hull.groupId, Math.max(counts.get(hull.groupId) ?? 0, hull.kills));
-    return counts;
-  }, [ordered]);
+  const hullGroups = useMemo(() => hulls.map((hull) => hull.groupId), [hulls]);
   const [groupNames, setGroupNames] = useState<ReadonlyMap<number, string>>(new Map());
   useEffect(() => {
-    if (!open || hullGroups.size === 0) return;
+    if (!open || hullGroups.length === 0) return;
     let cancelled = false;
-    void loadGroupNames([...hullGroups.keys()])
+    void loadGroupNames(hullGroups)
       .then((resolved) => {
         if (!cancelled) setGroupNames(resolved);
       })
@@ -284,18 +294,19 @@ export function KillLocationModal({
     scope === 'location' && only
       ? `${only.name ?? t('travel.kills.modal.elsewhere')} · ${systemName}`
       : t('travel.kills.modal.system', { system: systemName });
-  const hulls = ordered.length === 1 && only ? only.hulls : null;
   const total = t('travel.kills.modal.summary', { count: allKills.length });
   const chips = [
     ordered.length > 1
       ? t('travel.kills.modal.summaryPlaces', { kills: total, places: ordered.length })
       : total,
-    allKills[0] !== undefined
+    allKills.length > 0
       ? t('travel.kills.modal.lastKill', {
-          minutes: Math.max(0, Math.floor((now - allKills[0].time) / 60_000)),
+          minutes: minutesBefore(now, Math.max(...allKills.map((kill) => kill.time))),
         })
       : null,
-    ...(hulls ?? []).slice(0, HULL_CHIPS).flatMap((hull) => {
+    allKills.some((kill) => kill.bubble) ? t('travel.kills.bubbles') : null,
+    allKills.some((kill) => kill.smartbomb) ? t('travel.kills.smartbombs') : null,
+    ...hulls.slice(0, HULL_CHIPS).flatMap((hull) => {
       const hullName = groupNames.get(hull.groupId);
       return hullName === undefined
         ? []

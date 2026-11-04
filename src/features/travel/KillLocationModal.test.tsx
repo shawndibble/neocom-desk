@@ -83,6 +83,7 @@ describe('KillLocationModal', () => {
         systemId={30002813}
         systemName="Tama"
         scope="location"
+        hulls={[{ groupId: 1201, kills: 3 }]}
         locations={[
           location('Stargate (Nourvukaiken)', [
             kill(1, 4, { bubble: true }),
@@ -95,8 +96,8 @@ describe('KillLocationModal', () => {
     expect(await screen.findByText('Name 101')).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: /Stargate \(Nourvukaiken\) · Tama/ })).toBeVisible();
     expect(await screen.findByText('Battlecruiser on 3 of 3 kills')).toBeInTheDocument();
-    expect(screen.getByText('Interdictor or HIC on the mail')).toBeInTheDocument();
-    expect(screen.getByText('Smartbombs involved')).toBeInTheDocument();
+    expect(screen.getAllByText('Interdictor or HIC on the mail')).toHaveLength(2);
+    expect(screen.getAllByText('Smartbombs involved')).toHaveLength(2);
     // One batched names read for every victim pilot and corporation.
     expect(resolveNames).toHaveBeenCalledTimes(1);
     const rows = screen.getAllByRole('button', { expanded: false });
@@ -111,6 +112,7 @@ describe('KillLocationModal', () => {
         systemId={30002813}
         systemName="Tama"
         scope="system"
+        hulls={[{ groupId: 1201, kills: 3 }]}
         locations={[
           location('Stargate (Sivala)', [kill(5, 11)]),
           location('Stargate (Nourvukaiken)', [kill(1, 4), kill(2, 19)], true),
@@ -134,6 +136,7 @@ describe('KillLocationModal', () => {
         systemId={1}
         systemName="Tama"
         scope="location"
+        hulls={[{ groupId: 1201, kills: 1 }]}
         locations={[location('Stargate (X)', [kill(1, 4, { attackers: crowd })])]}
       />
     );
@@ -154,11 +157,13 @@ describe('KillLocationModal', () => {
         systemId={1}
         systemName="Tama"
         scope="location"
+        hulls={[{ groupId: 1201, kills: 1 }]}
         locations={[location('Stargate (X)', [kill(1, 4)])]}
       />
     );
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('Unknown pilot')).toBeInTheDocument();
+    expect(within(dialog).getByText('Badger')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Unknown/)).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Battlecruiser/)).not.toBeInTheDocument();
     expect(within(dialog).getByText('1 kill')).toBeInTheDocument();
   });
