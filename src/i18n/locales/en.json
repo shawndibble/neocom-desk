@@ -8780,6 +8780,7 @@
     "noSubject": "(no subject)",
     "from": "From:",
     "to": "To:",
+    "date": "Date:",
     "recipientMore": "{{name}} +{{count}} more",
     "mailingList": "Mailing list",
     "unread": "Unread",

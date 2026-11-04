@@ -494,10 +494,27 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
               className={readerVisible ? 'min-w-0' : 'hidden'}
               // The folder the open mail sits in, not a repeat of the select
               // hint the empty body already renders — that string used to
-              // appear twice on the same panel at once.
-              title={selectedHeader === null ? undefined : t(TAB_LABEL_KEY[selectedTab])}
+              // appear twice on the same panel at once. A phone leaves it
+              // out: the pilot just came from that folder's list, and the
+              // header needs the room for Back and the actions.
+              title={
+                selectedHeader === null || !isDesktop ? undefined : t(TAB_LABEL_KEY[selectedTab])
+              }
+              leading={
+                showBackControl ? (
+                  <IconButton
+                    size="sm"
+                    icon={<Icon.Back />}
+                    label={t('mail.backToList')}
+                    onClick={handleBackToList}
+                  />
+                ) : undefined
+              }
+              // On a phone the date and the "for" owner move down into the
+              // From/To block (`MailReaderBody`): they describe the mail, and
+              // here they wrapped onto two lines.
               meta={
-                selectedHeader?.timestamp || (isAll && selectedRow) ? (
+                isDesktop && (selectedHeader?.timestamp || (isAll && selectedRow)) ? (
                   <span className="flex items-center gap-2 text-xs text-text-dim">
                     {isAll && selectedRow && (
                       <span className="inline-flex items-center gap-1">
@@ -519,7 +536,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
                 ) : undefined
               }
               actions={
-                (selectedRow !== null && composeKind === null) || showBackControl ? (
+                selectedRow !== null && composeKind === null ? (
                   <div className="flex items-center gap-2">
                     {selectedRow !== null && composeKind === null && (
                       <>
@@ -547,11 +564,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
                         )}
                       </>
                     )}
-                    {showBackControl && (
-                      <Button size="sm" onClick={handleBackToList}>
-                        {t('mail.backToList')}
-                      </Button>
-                    )}
                   </div>
                 ) : undefined
               }
@@ -573,6 +585,8 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
                 resolveRecipientName={resolveRecipientName}
                 composeKind={composeKind}
                 timeZone={timeZone}
+                isDesktop={isDesktop}
+                isAll={isAll}
                 onCloseCompose={() => setComposeKind(null)}
                 onSent={handleSent}
               />
