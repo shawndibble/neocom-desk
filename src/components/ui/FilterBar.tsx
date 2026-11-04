@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
+import { useIsBelowDesktop } from '@/lib/useIsBelowDesktop';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { ActiveFilterRow } from './ActiveFilterRow';
 import { clearFilters, type ActiveFilter } from './activeFilters';
@@ -142,7 +143,11 @@ function focusField(container: HTMLElement | null, label: string | null): void {
   target?.focus();
 }
 
-/** Which surface `children` is rendering into: the pointer-width box or popover, or the phone sheet. */
+/**
+ * What `children` is rendering for: `box` (the pointer-width box or popover,
+ * with `inline` filters on the row above it) or `sheet` (the phone sheet, or a
+ * box whose row has no room for `inline`): render the inline filters too.
+ */
 export type FilterControlsSurface = 'box' | 'sheet';
 
 interface FilterBarProps<T> {
@@ -188,9 +193,10 @@ interface FilterBarProps<T> {
    *
    * For the filter a pilot changes on nearly every visit. Fixed per page, at
    * most two, and always the same width whatever is picked, so the row stays
-   * one line (DESIGN.md §4b). Below `md` they are not in the row: the sheet
-   * holds them, so `children` renders them for `surface === 'sheet'` and
-   * leaves them out of the pointer-width box, where they would show twice.
+   * one line (DESIGN.md §4b). When they are not in the row — below `md`, and
+   * below `lg` for a `row` placement — `children` is told `surface ===
+   * 'sheet'` and renders them with the rest, and leaves them out otherwise,
+   * where they would show twice.
    * Mark their `active` entries `inline` so they get no pill and no funnel
    * count on a pointer-width screen. Not supported with `pointerSurface="popover"`.
    */
@@ -407,9 +413,14 @@ function CollapsibleFilterRow<T>({
 }: FilterBarProps<T>) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // A `row` filter needs `lg`: below it the content column (beside the nav
+  // rail) is too narrow for it, the search box and the buttons on one line, so
+  // it sits in the box with the rest. A `below` filter has a line to itself.
+  const belowDesktop = useIsBelowDesktop();
+  const inlineOn = inlinePlacement === 'below' || !belowDesktop;
   // An inline filter is already on the row: no pill, no funnel count.
-  const pills = active.filter((filter) => !filter.inline);
-  const inlineNode = inline?.(value, onChange);
+  const pills = inlineOn ? active.filter((filter) => !filter.inline) : active;
+  const inlineNode = inlineOn ? inline?.(value, onChange) : null;
   // The pill a click opened the box from, whose control takes focus once it mounts.
   const focusTarget = useRef<string | null>(null);
   const groupId = useId();
@@ -463,7 +474,7 @@ function CollapsibleFilterRow<T>({
           aria-label={title ?? t('filters.title')}
           role="group"
         >
-          {children(value, onChange, 'box')}
+          {children(value, onChange, inlineOn ? 'box' : 'sheet')}
           <ClearAllButton value={value} onChange={onChange} active={pills} clearable={active} />
         </div>
       </Collapse>
@@ -499,7 +510,9 @@ function FilterPopover<T>({
         <PopoverContent
           align="end"
           aria-label={title ?? t('filters.title')}
-          className="flex w-max max-w-[min(44rem,calc(100vw-2rem))] flex-wrap items-center gap-2 p-2"
+          // Narrower below `lg`, where the nav rail takes 13rem: a full-width popover
+          // anchored to a funnel near the right edge would cover it.
+          className="flex w-max max-w-[min(28rem,calc(100vw-2rem))] flex-wrap items-center gap-2 p-2 lg:max-w-[min(44rem,calc(100vw-2rem))]"
         >
           {children(value, onChange, 'box')}
           <ClearAllButton value={value} onChange={onChange} active={active} />

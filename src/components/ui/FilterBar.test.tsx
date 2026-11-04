@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { BELOW_DESKTOP_QUERY } from '@/lib/useIsBelowDesktop';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { stubViewport } from '@/test/viewport';
 import { FilterBar, FilterField, type ActiveFilter } from './FilterBar';
@@ -522,6 +523,24 @@ describe('FilterBar inline key filter', () => {
     const field = screen.getByRole('textbox', { name: 'Space' });
     const funnel = screen.getByRole('button', { name: /^Filters/ });
     expect(funnel.parentElement?.parentElement).not.toContainElement(field);
+  });
+
+  it('keeps a row-placed key filter in the box, with a pill and count, between md and lg', async () => {
+    stubViewport(BELOW_DESKTOP_QUERY);
+    const user = userEvent.setup();
+    render(<InlineHarness />);
+    expect(screen.queryByRole('textbox', { name: 'Space' })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Change filter: Space: Lowsec' })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    expect(screen.getByRole('textbox', { name: 'Space' })).toBeInTheDocument();
+  });
+
+  it('keeps a below-placed key filter on its line between md and lg', () => {
+    stubViewport(BELOW_DESKTOP_QUERY);
+    render(<InlineHarness placement="below" />);
+    expect(screen.getByRole('textbox', { name: 'Space' })).toBeInTheDocument();
   });
 
   it('moves it into the sheet, with its pill and count, on a phone', async () => {

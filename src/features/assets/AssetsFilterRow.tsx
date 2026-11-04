@@ -20,7 +20,8 @@ import type { AssetsRows } from './useAssetsRows';
 /**
  * The Items page's one filter row (issue #5601): search, Category, Blueprints
  * (only while something under Blueprints & Reactions is ticked), min value and,
- * in a flat list, sort. Inline from `md` up; behind the funnel's sheet on a phone.
+ * in a flat list, sort. Category and Blueprints sit in the row from `md` up
+ * (DESIGN.md §4b); on a phone every control is behind the funnel's sheet.
  */
 export function AssetsFilterRow({
   assetsData,
@@ -114,35 +115,34 @@ export function AssetsFilterRow({
     />
   );
 
-  if (isNarrow) {
-    return (
-      <FilterBar
-        value={filterValue}
-        onChange={(next) => setView({ cat: next.cat, bp: next.bp, min: next.min })}
-        search={searchBox}
-        active={activeFilters}
-        // Only a flat list's rows are results; browsing, they are a place's contents.
-        resultCount={flatModeActive ? rows.length : undefined}
-        title={t('assets.filters.title')}
-      >
-        {() => (
-          <div className="flex flex-col gap-2">
-            {category}
-            {blueprints}
-            {minValue}
-            {sort}
-          </div>
-        )}
-      </FilterBar>
-    );
-  }
+  // Category and Blueprints are the key filters: in the row on a pointer-width
+  // screen (no pill), in the sheet only on a phone. Sort orders the list, so on
+  // a pointer it is a view control beside the funnel, in the sheet on a phone.
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {searchBox}
-      {category}
-      {blueprints}
-      {minValue}
-      {sort}
-    </div>
+    <FilterBar
+      value={filterValue}
+      onChange={(next) => setView({ cat: next.cat, bp: next.bp, min: next.min })}
+      search={searchBox}
+      inline={() => (
+        <>
+          {category}
+          {blueprints}
+        </>
+      )}
+      actions={!isNarrow && sort}
+      active={activeFilters}
+      // Only a flat list's rows are results; browsing, they are a place's contents.
+      resultCount={flatModeActive ? rows.length : undefined}
+      title={t('assets.filters.title')}
+    >
+      {(_value, _onChange, surface) => (
+        <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+          {surface === 'sheet' && category}
+          {surface === 'sheet' && blueprints}
+          {minValue}
+          {isNarrow && sort}
+        </div>
+      )}
+    </FilterBar>
   );
 }

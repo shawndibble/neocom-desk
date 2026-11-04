@@ -67,6 +67,7 @@ export function activeBrowserFilters(
       label: t('jumpRange.label'),
       value: t(`jumpRange.option.${value.jumps}`),
       clear: (v) => ({ ...v, jumps: DEFAULT_JUMP_RANGE }),
+      inline: true,
     });
   if (spansStations && value.sec.size !== SPACE_KINDS.length) {
     const kinds = SPACE_KINDS.filter((kind) => value.sec.has(kind)).map((kind) =>

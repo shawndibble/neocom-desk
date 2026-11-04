@@ -141,6 +141,33 @@ describe('CourierResults column picker', () => {
   });
 });
 
+describe('CourierResults destination space key filter', () => {
+  it('sits in the row with no pill, and is not repeated in the open box', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await waitFor(() =>
+      expect(screen.getByRole('group', { name: 'Destination space' })).toBeInTheDocument()
+    );
+    expect(screen.queryByRole('button', { name: /Change filter: Destination space/ })).toBeNull();
+    await openFilters(user);
+    expect(screen.getAllByRole('group', { name: 'Destination space' })).toHaveLength(1);
+  });
+
+  it('moves into the sheet when narrow', async () => {
+    const restore = stubViewport(NARROW_QUERY);
+    try {
+      const user = userEvent.setup();
+      renderBoard();
+      await screen.findByRole('table', { name: 'Courier Contract Search' });
+      expect(screen.queryByRole('group', { name: 'Destination space' })).toBeNull();
+      await openFilters(user);
+      expect(await screen.findByRole('group', { name: 'Destination space' })).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+});
+
 describe('CourierResults "From my region" shortcut', () => {
   it('costs nothing until it is pressed', async () => {
     loadCharacterRegionId.mockResolvedValue(THE_FORGE);

@@ -87,7 +87,8 @@ test('keeps the filters behind the funnel, on the search row, on a pointer viewp
   const search = page.getByRole('searchbox', { name: 'Search description' });
   const trigger = page.getByRole('button', { name: /^Filters/ });
   await expect(trigger).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Ref type' })).toHaveCount(0);
+  // Ref type is the journal's one inline key filter: in the row, not behind the funnel.
+  await expect(page.getByRole('combobox', { name: 'Ref type' })).toBeVisible();
 
   // One line: the trigger's vertical centre sits within the search box.
   const searchBox = (await search.boundingBox())!;
@@ -98,6 +99,7 @@ test('keeps the filters behind the funnel, on the search row, on a pointer viewp
 
   // A box under the row, not a sheet: no dialog, controls commit directly.
   await trigger.click();
-  await expect(page.getByRole('combobox', { name: 'Ref type' })).toBeVisible();
+  // The box holds the rest; the inline select is not repeated in it.
+  await expect(page.getByRole('combobox', { name: 'Ref type' })).toHaveCount(1);
   await expect(page.getByRole('dialog', { name: 'Filters' })).toHaveCount(0);
 });
