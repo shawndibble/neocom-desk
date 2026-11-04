@@ -60,7 +60,7 @@ import { useConcordRate } from '@/features/loyalty/useConcordRate';
 import { useLoyaltyOfferColumns } from '@/features/loyalty/useLoyaltyOfferColumns';
 import { LoyaltyOfferFilterBar } from '@/features/loyalty/LoyaltyOfferFilterBar';
 import { OfferDetail } from '@/features/loyalty/OfferDetail';
-import { resolveLoyaltyRowItem } from '@/features/loyalty/offerRowDisplay';
+import { lpShortfall, resolveLoyaltyRowItem } from '@/features/loyalty/offerRowDisplay';
 import { LoyaltyStoreLanding } from '@/features/loyalty/LoyaltyStoreLanding';
 import { NearestStationLine } from '@/features/loyalty/NearestStationLine';
 import { LpStoreActions } from '@/features/loyalty/LpStoreChrome';
@@ -254,12 +254,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   // selected id rather than `selectedRow`, so a selected offer filtered out of
   // `filteredRows` simply has no row to mark.
 
-  const { columns, optionalColumns: optionalOfferColumns } = useLoyaltyOfferColumns({
-    lpBasis,
-    concord,
-    concordPending,
-    isColumnVisible: offersColumnVisibility.isVisible,
-  });
   // The full catalog, not just `columns`' currently-visible ids: a sort
   // picked while a column was shown should still resolve once the picker
   // hides it, ready to take effect again the moment it's shown back
@@ -268,6 +262,14 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     'item',
     ...LOYALTY_STORE_OFFERS_COLUMN_IDS,
   ]);
+  const { columns, optionalColumns: optionalOfferColumns } = useLoyaltyOfferColumns({
+    lpBasis,
+    concord,
+    concordPending,
+    isColumnVisible: offersColumnVisibility.isVisible,
+    playerLp,
+    sortColumnId: offersSortProps.sort?.columnId,
+  });
   // Every column, whatever the picker hides.
   const offersCsvColumns = useMemo(
     () => loyaltyOfferCsvColumns(t, { concordRate: concord?.rate ?? null }),
@@ -408,6 +410,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             mobileSort
             stackSummary={t('loyaltyStore.offerCount', { count: filteredRows.length })}
             onRowClick={selectRow}
+            rowClassName={(row) => (lpShortfall(row, playerLp) !== null ? 'opacity-60' : undefined)}
             rowContextMenu={rowContextMenu}
             rowMoreActions
             selectedRowKey={selectedOfferId}

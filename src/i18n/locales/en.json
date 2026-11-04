@@ -11823,6 +11823,8 @@
     "sellsNone": "None",
     "colProfit": "Profit",
     "colCost": "Cost",
+    "lowVolumeTag": "Low volume",
+    "needMoreLp": "need {{lp}} more LP",
     "perDayAffix": "/day",
     "profitAffix": " profit",
     "iskPerLpUnit": "ISK/LP",
