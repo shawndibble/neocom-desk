@@ -126,7 +126,7 @@ export interface WriteOpenPricesResult {
 async function readShardTypes(get: R2Get, key: string): Promise<Record<string, unknown>> {
   const shard = await get(key);
   if (shard === null) return {};
-  if (!isRecord(shard) || !isRecord(shard.types))
+  if (!isPlainRecord(shard) || !isPlainRecord(shard.types))
     throw new Error(`${key}: not an open-prices shard`);
   return shard.types;
 }
