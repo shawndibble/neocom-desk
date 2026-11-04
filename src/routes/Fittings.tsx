@@ -51,6 +51,7 @@ import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { FittingModuleDialog } from '@/features/fittings/FittingModuleDialog';
 import { FittingStatsColumn } from '@/features/fittings/FittingStatsColumn';
+import { ImplantsEditorHost } from '@/features/fittings/ImplantsEditorHost';
 import { RuleBreakFlags } from '@/features/fittings/ruleBreakFlags';
 import { useFittingRuleBreaks } from '@/features/fittings/useFittingRuleBreaks';
 import { THREE_COLUMN_QUERY, addModeFor, leftColumn } from '@/features/fittings/fittingLayout';
@@ -602,6 +603,14 @@ function FittingsPage() {
             />
             {makeItFit.dialog}
             {improve.drawer}
+            <ImplantsEditorHost
+              basis={workspace.implantBasis}
+              canUseCloneBasis={workspace.canUseCloneBasis}
+              implantSet={fitting.implantSet}
+              onImplantSetChange={workspace.setImplantSet}
+              fitting={fitting}
+              profile={workspace.profile}
+            />
             <FittingLibraryDialogs
               library={library}
               onClose={closeLibrary}

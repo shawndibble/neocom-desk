@@ -3,13 +3,14 @@
  * — "My clone", or the Fitting's own custom set — and opens the set's editor.
  * A Fitting that carries a set is stated on it (`defaultImplantBasis`, as
  * the workspace resolves `basis`); the editor's "Use my clone" drops the
- * set, which is the only way back.
+ * set, which is the only way back. The editor itself is `ImplantsEditorHost`,
+ * mounted by the page and opened by the URL, so it opens wherever this chip is
+ * (a closed panel, a phone's other tab) and Back from a link out of it returns.
  */
 import { useTranslation } from 'react-i18next';
 import { Expanded } from '@/components/ui/icons';
 import type { ImplantBasis } from '@/engine/fittings/implantBasis';
-import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
-import { ImplantSetPicker } from './ImplantSetPicker';
+import type { FittingImplantSet } from '@/engine/fittings/types';
 import { useImplantsModalUrl } from './useImplantsModalUrl';
 import { StatField } from './StatFacts';
 import { STAT_FIELD_WIDTH } from './statKit';
@@ -18,25 +19,12 @@ import { fieldBaseClassName, fieldSizeClassName } from '@/components/ui/controlS
 interface ImplantSetControlProps {
   /** What the stats are on, as the workspace resolved it. */
   basis: ImplantBasis;
-  /** A Character is active, so there is a clone to go back to. */
-  canUseCloneBasis: boolean;
   implantSet: FittingImplantSet | undefined;
-  onImplantSetChange: (implantSet: FittingImplantSet | undefined) => void;
-  /** The open Fitting and pilot, for the set editor's "Find by goal"; absent until the pilot loads. */
-  fitting?: Fitting;
-  profile?: PilotProfile | null;
 }
 
-export function ImplantSetControl({
-  basis,
-  canUseCloneBasis,
-  implantSet,
-  onImplantSetChange,
-  fitting,
-  profile,
-}: ImplantSetControlProps) {
+export function ImplantSetControl({ basis, implantSet }: ImplantSetControlProps) {
   const { t } = useTranslation();
-  const { open, openModal, closeModal } = useImplantsModalUrl('implants');
+  const { openModal } = useImplantsModalUrl('implants');
 
   const implants = implantSet?.implants.length ?? 0;
   const boosters = implantSet?.boosters.length ?? 0;
@@ -64,14 +52,6 @@ export function ImplantSetControl({
         <span className="truncate">{summary}</span>
         <Expanded aria-hidden className="shrink-0 text-text-dim" />
       </button>
-      <ImplantSetPicker
-        open={open}
-        onClose={closeModal}
-        implantSet={implantSet}
-        onChange={onImplantSetChange}
-        {...(canUseCloneBasis ? { onUseClone: () => onImplantSetChange(undefined) } : {})}
-        {...(fitting && profile ? { finder: { fitting, profile, basis } } : {})}
-      />
     </StatField>
   );
 }
