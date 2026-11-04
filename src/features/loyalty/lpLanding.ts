@@ -15,6 +15,8 @@ import { lpRate } from '@/engine/loyalty/marketLpValue';
 import { rankedSearch, type RankedSearchOptions } from '@/lib/rankedSearch';
 import type { NearestStation } from './lpStoreSnapshot';
 import type { LoyaltyOfferRow } from './offerRows';
+import type { Translate } from '@/lib/translate';
+import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
 
 export const MIN_SELLS_PER_DAY_OPTIONS = [0, 1, 5, 20] as const;
 export type MinSellsPerDay = (typeof MIN_SELLS_PER_DAY_OPTIONS)[number];
@@ -145,22 +147,78 @@ export function lpLandingStores(
   );
 }
 
+/** A faction or category the filters name by id, with the name the controls show. */
+interface LpLandingNamed {
+  id: number;
+  name: string;
+}
+
 /**
- * The funnel's badge: each filter that narrows the list, the default sales
+ * The funnel's pills: each filter that narrows the list, the default sales
  * floor included — like the store modal's "I can afford", it is on when the
- * page opens and the badge says so.
+ * page opens and the row says so, and its remove drops it to any volume. The
+ * hub and price basis are settings the numbers are priced at, not filters, so
+ * they never show. Each Show only pick is its own pill: they narrow
+ * independently. Generic so the bar's wider value (those settings) rides
+ * through each `clear`.
  */
-export function lpLandingActiveFilterCount(filters: LpLandingFilters): number {
-  return [
-    filters.faction !== 'all',
-    filters.range !== 'any',
-    filters.minSellsPerDay !== 0,
-    filters.mineOnly,
-    filters.hideFactionWarfare,
-    filters.noTurnIns,
-    filters.affordableOnly,
-    filters.categories.length > 0,
-  ].filter(Boolean).length;
+export function lpLandingActiveFilters<F extends LpLandingFilters>(
+  filters: F,
+  t: Translate,
+  {
+    factions,
+    categories,
+  }: { factions: readonly LpLandingNamed[]; categories: readonly LpLandingNamed[] }
+): ActiveFilter<F>[] {
+  const active: ActiveFilter<F>[] = [];
+  const { faction } = filters;
+  if (faction !== 'all')
+    active.push({
+      label: t('loyaltyStore.landing.factionLabel'),
+      value:
+        faction === 'none'
+          ? t('loyaltyStore.landing.noFaction')
+          : factions.find((option) => option.id === faction)?.name,
+      clear: (value) => ({ ...value, faction: 'all' }),
+    });
+  if (filters.range !== 'any')
+    active.push({
+      label: t('jumpRange.label'),
+      value: t(`jumpRange.option.${filters.range}`),
+      clear: (value) => ({ ...value, range: 'any' }),
+    });
+  if (filters.minSellsPerDay !== 0)
+    active.push({
+      label: t('loyaltyStore.landing.minSellsLabel'),
+      value: t('loyaltyStore.landing.minSellsPerDay', { count: filters.minSellsPerDay }),
+      clear: (value) => ({ ...value, minSellsPerDay: 0 }),
+    });
+  if (filters.categories.length > 0) {
+    const names = filters.categories.flatMap(
+      (id) => categories.find((option) => option.id === id)?.name ?? []
+    );
+    active.push({
+      label: t('loyaltyStore.landing.categoryLabel'),
+      // Unnamed until the categories load: the caption alone still says it is on.
+      value: names.length > 0 ? summarizeFilterValues(names, t) : undefined,
+      clear: (value) => ({ ...value, categories: [] }),
+    });
+  }
+  const showOnly = t('loyaltyStore.landing.showOnlyLabel');
+  const showOnlyPicks = [
+    ['mineOnly', 'loyaltyStore.landing.mineOnly'],
+    ['affordableOnly', 'loyaltyStore.landing.affordable'],
+    ['noTurnIns', 'loyaltyStore.landing.noTurnIns'],
+    ['hideFactionWarfare', 'loyaltyStore.landing.hideFactionWarfare'],
+  ] as const;
+  for (const [key, labelKey] of showOnlyPicks)
+    if (filters[key])
+      active.push({
+        label: showOnly,
+        value: t(labelKey),
+        clear: (value) => ({ ...value, [key]: false }),
+      });
+  return active;
 }
 
 export interface LpLandingHoldings {

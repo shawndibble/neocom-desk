@@ -1,4 +1,6 @@
 /** The Market-Wide Build Opportunities panel's filter: its shape, URL codec and pure predicates. */
+import type { TFunction } from 'i18next';
+import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
 import { BLUEPRINT_SOURCES, type BlueprintSource } from '@/engine/industry/blueprintObtainability';
 import {
   PRODUCT_CATEGORIES,
@@ -6,7 +8,8 @@ import {
   type ProductCategory,
   type ProductTier,
 } from '@/engine/industry/marketWideFilters';
-import { isRarelySold } from '@/engine/industry/marketWideSanity';
+import { RARELY_SOLD_PER_DAY, isRarelySold } from '@/engine/industry/marketWideSanity';
+import { formatIskCompact } from '@/lib/isk';
 import { boolParam, defineUrlFilter, enumParam, enumSetParam } from '@/lib/urlState';
 import { DEFAULT_SALES_SHARE, SALES_SHARE_OPTIONS } from './salesSharePref';
 
@@ -48,16 +51,85 @@ export const MARKET_WIDE_FILTER = defineUrlFilter<MarketWideFilterState>({
   },
 });
 
-export function activeFilterCount(filter: MarketWideFilterState): number {
-  return [
-    filter.tiers.size !== PRODUCT_TIERS.length,
-    filter.categories.size !== PRODUCT_CATEGORIES.length,
-    filter.sources.size !== BLUEPRINT_SOURCES.length,
-    filter.maxBuildCost !== 'any',
-    filter.hideSkillGated,
-    filter.hideRarelySold,
-    filter.salesShare !== DEFAULT_SALES_SHARE,
-  ].filter(Boolean).length;
+/** The picked members of a closed set, in the set's own order, as one short pill value. */
+function pickedSummary<V extends string>(
+  members: readonly V[],
+  picked: ReadonlySet<V>,
+  labelFor: (member: V) => string,
+  t: TFunction
+): string {
+  const names = members.filter((member) => picked.has(member)).map(labelFor);
+  return names.length === 0 ? t('filters.none') : summarizeFilterValues(names, t);
+}
+
+/**
+ * The filters set away from their default. The budget leads: it is the one a
+ * pilot sets to match their wallet, and it removes the most rows.
+ */
+export function activeMarketWideFilters(
+  filter: MarketWideFilterState,
+  t: TFunction
+): ActiveFilter<MarketWideFilterState>[] {
+  const active: ActiveFilter<MarketWideFilterState>[] = [];
+  const cap = BUILD_COST_CAP_ISK[filter.maxBuildCost];
+  if (cap !== null)
+    active.push({
+      label: t('industry.marketOpportunitiesFilters.maxBuildCost'),
+      value: `≤ ${formatIskCompact(cap)}`,
+      clear: (value) => ({ ...value, maxBuildCost: 'any' }),
+    });
+  if (filter.tiers.size !== PRODUCT_TIERS.length)
+    active.push({
+      label: t('industry.marketOpportunitiesFilters.tier'),
+      value: pickedSummary(
+        PRODUCT_TIERS,
+        filter.tiers,
+        (tier) => t(`industry.marketOpportunitiesFilters.tiers.${tier}`),
+        t
+      ),
+      clear: (value) => ({ ...value, tiers: new Set(PRODUCT_TIERS) }),
+    });
+  if (filter.categories.size !== PRODUCT_CATEGORIES.length)
+    active.push({
+      label: t('industry.marketOpportunitiesFilters.category'),
+      value: pickedSummary(
+        PRODUCT_CATEGORIES,
+        filter.categories,
+        (category) => t(`industry.marketOpportunitiesFilters.categories.${category}`),
+        t
+      ),
+      clear: (value) => ({ ...value, categories: new Set(PRODUCT_CATEGORIES) }),
+    });
+  if (filter.sources.size !== BLUEPRINT_SOURCES.length)
+    active.push({
+      label: t('industry.marketOpportunitiesBlueprintSource'),
+      value: pickedSummary(
+        BLUEPRINT_SOURCES,
+        filter.sources,
+        (source) => t(`industry.marketOpportunitiesBlueprintSources.${source}`),
+        t
+      ),
+      clear: (value) => ({ ...value, sources: new Set(BLUEPRINT_SOURCES) }),
+    });
+  if (filter.salesShare !== DEFAULT_SALES_SHARE)
+    active.push({
+      label: t('industry.marketOpportunitiesFilters.salesShare'),
+      value: `${filter.salesShare}%`,
+      clear: (value) => ({ ...value, salesShare: DEFAULT_SALES_SHARE }),
+    });
+  if (filter.hideSkillGated)
+    active.push({
+      label: t('industry.skillGateFilterChip'),
+      clear: (value) => ({ ...value, hideSkillGated: false }),
+    });
+  if (filter.hideRarelySold)
+    active.push({
+      label: t('industry.marketOpportunitiesFilters.hideRarelySold', {
+        limit: RARELY_SOLD_PER_DAY,
+      }),
+      clear: (value) => ({ ...value, hideRarelySold: false }),
+    });
+  return active;
 }
 
 /** Only a product whose sales were read and fall short is hidden; an unreadable one stays. */

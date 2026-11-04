@@ -22,7 +22,9 @@ import { formatCount } from '@/lib/formatCount';
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
+  type ActiveFilter,
   Button,
   Checkbox,
   ColumnPickerMenu,
@@ -45,6 +47,7 @@ import {
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useIsNarrow } from '@/lib/useIsNarrow';
+import { formatIskCompact } from '@/lib/isk';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { multibuyText } from '@/engine/market/haulingPlan';
@@ -172,6 +175,61 @@ type RememberedHaulingParams = StoredHaulingFilter & { spend: number | null };
 
 function pickRememberedParams(source: RememberedHaulingParams): RememberedHaulingParams {
   return { ...pickHaulingFilter(source), spend: source.spend };
+}
+
+/** What the filter bar edits: the remembered fields, with Category and mode for the narrow sheet. */
+type HaulingFilterValue = RememberedHaulingParams & { cat: number; mode: HaulMode };
+
+/**
+ * The filters set away from their default, for the bar's pills. Category and
+ * mode are the route's own choice, not a narrowing of it, so never pills;
+ * selling into buy orders reads neither days nor demand, so in instant mode
+ * those two are not on whatever the URL says.
+ */
+function activeHaulingFilters(
+  value: HaulingFilterValue,
+  t: TFunction
+): ActiveFilter<HaulingFilterValue>[] {
+  const listing = value.mode !== 'instant';
+  const active: ActiveFilter<HaulingFilterValue>[] = [];
+  if (value.margin !== DEFAULT_HAULING_FILTER.margin)
+    active.push({
+      label: t('market.hauling.filters.marginOver'),
+      value: `${value.margin}%`,
+      clear: (v) => ({ ...v, margin: DEFAULT_HAULING_FILTER.margin }),
+    });
+  if (value.maxprice !== null)
+    active.push({
+      label: t('market.hauling.filters.maxPrice'),
+      value: t('market.hauling.filters.iskCapValue', { amount: formatIskCompact(value.maxprice) }),
+      clear: (v) => ({ ...v, maxprice: null }),
+    });
+  if (value.spend !== null)
+    active.push({
+      label: t('market.hauling.filters.maxSpend'),
+      value: t('market.hauling.filters.iskCapValue', { amount: formatIskCompact(value.spend) }),
+      clear: (v) => ({ ...v, spend: null }),
+    });
+  if (listing && value.days !== DEFAULT_HAULING_FILTER.days)
+    active.push({
+      label: t('market.hauling.filters.sellsWithin'),
+      value:
+        value.days === 0
+          ? t('market.hauling.filters.anyTime')
+          : t('market.hauling.filters.days', { count: value.days }),
+      clear: (v) => ({ ...v, days: DEFAULT_HAULING_FILTER.days }),
+    });
+  if (listing && value.demand !== DEFAULT_HAULING_FILTER.demand)
+    active.push({
+      label: t('market.hauling.filters.demand'),
+      value: t(
+        value.demand === 'any'
+          ? 'market.hauling.filters.anyDemand'
+          : 'market.hauling.filters.steady'
+      ),
+      clear: (v) => ({ ...v, demand: DEFAULT_HAULING_FILTER.demand }),
+    });
+  return active;
 }
 
 /**
@@ -543,20 +601,17 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       limitTextOf,
     });
 
-  // Selling into buy orders reads neither days nor demand.
-  const activeFilterCount =
-    (!instant && params.days !== DEFAULT_HAULING_FILTER.days ? 1 : 0) +
-    (params.margin !== DEFAULT_HAULING_FILTER.margin ? 1 : 0) +
-    (!instant && params.demand !== DEFAULT_HAULING_FILTER.demand ? 1 : 0) +
-    (params.maxprice !== null ? 1 : 0) +
-    (params.spend !== null ? 1 : 0);
   // Max price hides at both ends: the scan's price pass drops most, the row filter what a lot pushes over it.
   const dear = hidden.tooDear + (state.status === 'ready' ? state.scan.overMaxPrice : 0);
   const hiddenCount = dear + (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
   // Only when Max price hid something does the hidden line name it.
   const hiddenKeySuffix = dear > 0 ? 'MaxPrice' : '';
   // Category and mode ride along so the narrow sheet can edit them in its draft; neither is remembered.
-  const filterValue = { ...pickRememberedParams(params), cat: categoryId, mode };
+  const filterValue: HaulingFilterValue = {
+    ...pickRememberedParams(params),
+    cat: categoryId,
+    mode,
+  };
 
   // With Any hub at an end each row has its own lane: no one label, no one jump count.
   const laneLabel =
@@ -940,7 +995,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         <FilterBar
           value={filterValue}
           onChange={(next) => setParams(next)}
-          activeCount={activeFilterCount}
+          active={activeHaulingFilters(filterValue, t)}
+          // Until the scan is in, there are no rows to count.
+          resultCount={state.status === 'ready' ? tableRows.length : undefined}
           title={t('market.hauling.filters.title')}
           className="px-3 py-2.5"
           rowAlign="end"

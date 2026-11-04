@@ -48,6 +48,8 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { shipsCsvColumns } from './shipsCsv';
 import type { JumpBasis } from '@/features/route/jumpBasis';
+import { textParam, type UrlSort } from '@/lib/urlState';
+import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 
 /** SDE category 6. */
 const SHIP_CATEGORY_ID = 6;
@@ -221,6 +223,21 @@ const ROW_GRID_SINGLE_CHARACTER =
   'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1.8fr)_2.5rem_10rem_2rem]';
 
 type SortColumn = 'ship' | 'character' | 'location' | 'security' | 'jumps';
+
+const SORT_COLUMNS: readonly SortColumn[] = ['ship', 'character', 'location', 'security', 'jumps'];
+
+/** Nearest first. Defaults stay out of the URL (ADR 0015). */
+const DEFAULT_SORT: UrlSort = { columnId: 'jumps', direction: 'asc' };
+
+const QUERY_PARAM = textParam();
+
+/**
+ * Search and sort live in the URL (ADR 0015), under `ships.*`: `usePageTab`
+ * carries the query string across a tab switch, and the Items tab's own `q`
+ * and sort would otherwise leak into this list and back.
+ */
+const QUERY_KEY = 'ships.q';
+const SORT_KEY = 'ships.sort';
 
 interface SortKeys {
   ship: string;
@@ -448,11 +465,12 @@ export function MyShipsView({
     [state, rows]
   );
   const shipClasses = useShipClasses(groupIds);
-  const [sort, setSort] = useState<{ column: SortColumn; direction: 'asc' | 'desc' }>({
-    column: 'jumps',
-    direction: 'asc',
-  });
-  const [query, setQuery] = useState('');
+  const { sort: urlSort, onSortChange } = useUrlSort(SORT_KEY, DEFAULT_SORT, SORT_COLUMNS);
+  const sort = useMemo(
+    () => ({ column: urlSort.columnId as SortColumn, direction: urlSort.direction }),
+    [urlSort.columnId, urlSort.direction]
+  );
+  const [query, setQuery] = useUrlParam(QUERY_KEY, QUERY_PARAM);
   // Keys that don't depend on the resolving places: built once per rows, not per places tick.
   const staticKeys = useMemo(() => {
     if (state.status !== 'ready') return [];
@@ -547,10 +565,10 @@ export function MyShipsView({
   ) as readonly SortColumn[];
   const rowGrid = `${ROW_GRID_BASE} ${showCharacter ? ROW_GRID_WITH_CHARACTER : ROW_GRID_SINGLE_CHARACTER}`;
   const toggleSort = (column: SortColumn) =>
-    setSort((prev) =>
-      prev.column === column
-        ? { column, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
-        : { column, direction: 'asc' }
+    onSortChange(
+      sort.column === column
+        ? { columnId: column, direction: sort.direction === 'asc' ? 'desc' : 'asc' }
+        : { columnId: column, direction: 'asc' }
     );
 
   return (
@@ -568,7 +586,11 @@ export function MyShipsView({
             className="w-full sm:ml-auto sm:w-64"
           />
           {state.status === 'ready' && sorted.length > 0 && (
-            <TableActionsMenu name={t('assets.myShips.title')} tableExport={shipsExport} />
+            <TableActionsMenu
+              name={t('assets.myShips.title')}
+              tableExport={shipsExport}
+              size="md"
+            />
           )}
         </div>
         <DataGate

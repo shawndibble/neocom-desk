@@ -4,6 +4,7 @@ import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { ShipTreeData, ShipTreeFaction, ShipTreeShip } from '@/sde/types';
 import {
+  activeShipTreeFilters,
   allSectionIds,
   DEFAULT_FACTION_ID,
   factionMatchCounts,
@@ -346,5 +347,37 @@ describe('ship tree filters', () => {
         { def: def(3), children: [] },
       ])
     ).toEqual([1, 2, 3]);
+  });
+});
+
+describe('activeShipTreeFilters', () => {
+  const t = (key: string, opts?: Record<string, unknown>) =>
+    opts ? `${key}${JSON.stringify(opts)}` : key;
+  const pills = (filter: ShipTreeFilter) =>
+    activeShipTreeFilters(filter, t).map(({ label, value }) => ({ label, value }));
+
+  it('lists nothing with no filter', () => {
+    expect(activeShipTreeFilters(NO_SHIP_TREE_FILTER, t)).toEqual([]);
+  });
+
+  it('lists the fly state and the Mastery tiers in effect', () => {
+    expect(pills({ fly: 'canFly', mastery: new Set([3, 0]) })).toEqual([
+      { label: 'ships.tree.fly.label', value: 'ships.tree.canFly' },
+      { label: 'ships.tree.mastery.label', value: 'ships.tree.mastery.none, III' },
+    ]);
+  });
+
+  it("leaves out a Mastery pick Can't fly holds off, and drops it with the fly state", () => {
+    const filter: ShipTreeFilter = { fly: 'cantFly', mastery: new Set([3]) };
+    const active = activeShipTreeFilters(filter, t);
+    expect(active.map(({ value }) => value)).toEqual(['ships.tree.cantFly']);
+    expect(active[0].clear(filter)).toEqual(NO_SHIP_TREE_FILTER);
+  });
+
+  it('clears the fly state alone while a Mastery pick is in effect', () => {
+    const filter: ShipTreeFilter = { fly: 'canFly', mastery: new Set([3]) };
+    const [fly, mastery] = activeShipTreeFilters(filter, t);
+    expect(fly.clear(filter)).toEqual({ fly: 'all', mastery: new Set([3]) });
+    expect(mastery.clear(filter)).toEqual({ fly: 'canFly', mastery: new Set() });
   });
 });

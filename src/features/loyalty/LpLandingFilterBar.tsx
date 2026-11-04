@@ -20,7 +20,7 @@ import { PriceBasisSelect } from './PriceBasisSelect';
 import { TradeHubSelect } from './TradeHubSelect';
 import {
   MIN_SELLS_PER_DAY_OPTIONS,
-  lpLandingActiveFilterCount,
+  lpLandingActiveFilters,
   type LpLandingFilters,
   type MinSellsPerDay,
 } from './lpLanding';
@@ -87,7 +87,7 @@ export function LpLandingFilterBar({
     <FilterBar
       value={value}
       onChange={onChange}
-      activeCount={lpLandingActiveFilterCount(value)}
+      active={lpLandingActiveFilters(value, t, { factions, categories })}
       rowAlign="end"
       search={
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">

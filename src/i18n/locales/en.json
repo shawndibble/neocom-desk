@@ -189,7 +189,8 @@
         "canFly": "can fly",
         "cantFly": "can't fly yet",
         "omega": "needs Omega"
-      }
+      },
+      "cantFly": "Can't fly"
     },
     "info": {
       "tabsLabel": "Ship info",
@@ -7280,14 +7281,9 @@
     "journalLeftOut_other": "{{count}} entries between your Characters left out",
     "journalEntryCount_one": "{{count}} entry",
     "journalEntryCount_other": "{{count}} entries",
-    "journalChipType": "Type: {{type}}",
-    "journalChipParty": "Party: {{party}}",
-    "journalChipDay": "Day: {{date}}",
-    "journalChipFrom": "From: {{date}}",
-    "journalChipTo": "To: {{date}}",
-    "journalChipRemove": "Clear this filter",
     "refTypePlexBought": "PLEX bought",
-    "refTypePlexSold": "PLEX sold"
+    "refTypePlexSold": "PLEX sold",
+    "dateDayLabel": "Day"
   },
   "survey": {
     "title": "Mining Survey",
@@ -8642,7 +8638,8 @@
     },
     "minValue": {
       "label": "Minimum value",
-      "placeholder": "Min value"
+      "placeholder": "Min value",
+      "atLeast": "≥ {{isk}} ISK"
     },
     "filters": {
       "title": "Filters"
@@ -10820,18 +10817,6 @@
     "regionOffers_other": "{{count}} offers",
     "offersOnContract_one": "{{count}} offer on contract",
     "offersOnContract_other": "{{count}} offers on contract",
-    "chips": {
-      "minMe": "ME ≥ {{value}}",
-      "minTe": "TE ≥ {{value}}",
-      "minRuns": "Runs ≥ {{value}}",
-      "maxPrice": "Max {{value}} ISK",
-      "hideAuctions": "No auctions",
-      "hidePlex": "No PLEX contracts",
-      "sources": "Source: {{list}}",
-      "sourcesCount": "Sources: {{count}} of {{total}}",
-      "space": "Space: {{list}}",
-      "clearAll": "Clear all"
-    },
     "mobile": {
       "jumpsAffix": "Jumps ",
       "meAffix": "ME ",
@@ -11712,7 +11697,8 @@
       "accessUpTo": "Agents up to level {{level}}",
       "accessOpen": "Open",
       "accessNeeds": "Needs {{standing}}",
-      "accessBlocked": "Blocked"
+      "accessBlocked": "Blocked",
+      "accessAtLeastShort": "Level {{level}}+"
     },
     "standingsUnavailableHint": "Your standings aren't saved on this device yet. They load once ESI answers.",
     "standingsEmptyTitle": "No standings yet",
@@ -12652,7 +12638,8 @@
         "maxPrice": "Max price per item",
         "maxSpend": "Max spend",
         "maxSpendHint": "For the whole trip",
-        "noLimit": "No limit"
+        "noLimit": "No limit",
+        "iskCapValue": "{{amount}} ISK"
       },
       "plan": {
         "holdNamed": "{{name}} {{used}} of {{total}} m³",
@@ -13520,7 +13507,10 @@
         "sortIskTiedUp": "Most ISK tied up",
         "sortItem": "Item name",
         "sortCharacter": "Character",
-        "matchCount": "{{count}} of {{total}} orders match"
+        "matchCount": "{{count}} of {{total}} orders match",
+        "problems": "Problems",
+        "costBasis": "Cost basis",
+        "characters": "Characters"
       },
       "checkDeeper": "Refresh system & region prices",
       "checkingDeeper": "Checking…",
@@ -14744,6 +14734,7 @@
     "goToMiningTax": "Go to Mining tax",
     "openSettings": "Open Settings",
     "showShortcuts": "Show this shortcut list",
+    "focusSearch": "Jump to the page's search box",
     "then": "then",
     "offNote": "Single-key shortcuts are off, so only Esc and the command palette key respond. Turn them on in Settings › Display.",
     "close": "Close the open dialog",
@@ -15302,7 +15293,20 @@
     "open": "Filters",
     "openWithCount": "Filters ({{count}} active)",
     "apply": "Apply",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "activeLabel": "Active filters",
+    "editOne": "Change filter: {{filter}}",
+    "removeOne": "Remove filter: {{filter}}",
+    "more": "+{{count}}",
+    "moreLabel_one": "{{count}} more filter",
+    "moreLabel_other": "{{count}} more filters",
+    "clearAll": "Clear all",
+    "done": "Done",
+    "showResults_one": "Show {{count}} result",
+    "showResults_other": "Show {{count}} results",
+    "valuesAndMore": "{{values}} +{{count}}",
+    "none": "None",
+    "atLeast": "≥ {{value}}"
   },
   "contractSearch": {
     "title": "Contract Search",
@@ -17265,7 +17269,9 @@
         "moreDays_other": "and {{count}} more days",
         "moreMoons_one": "and {{count}} more moon",
         "moreMoons_other": "and {{count}} more moons",
-        "openPage": "Open page"
+        "openPage": "Open page",
+        "empty": "No Miner owes tax, is owed credit or has days waiting.",
+        "emptyFiltered": "No Miner matches these filters."
       },
       "needs": {
         "title_one": "Needs you · {{count}}",

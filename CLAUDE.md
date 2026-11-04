@@ -71,8 +71,10 @@ dev`) — Shawn frequently has another agent working there at the same
   typechecks, but only once installed — run `npm run verify-hooks -- --fix`
   after any fresh clone or `npm ci` (`prepare` is skipped when
   `ignore-scripts` is set). Worktree setup does this for you.
-- **Run at most three agents at once**, each running only the test files it
-  touched. Run an e2e spec locally only when changing it, one file at a time.
+- **At most three agents at once may commit or run tests** (the pre-commit
+  hook typechecks, and tests flake under load); each runs only the test files
+  it touched. Agents that only read, research or edit files have no limit.
+  Run an e2e spec locally only when changing it, one file at a time.
 - **A flaky CI test never holds up your PR, and is never left unfixed.** If an
   unrelated test fails CI, confirm it's unrelated (`npx vitest run <path>`),
   rerun the failed job, merge your PR, then **immediately** fix the flake as its

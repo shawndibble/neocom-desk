@@ -21,15 +21,18 @@ import { useRememberedUrlParams, type RememberedDefaults } from '@/lib/useUrlSta
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { boolParam, textParam } from '@/lib/urlState';
 import {
+  assetKindActiveFilters,
   assetPassesKindFilter,
   blueprintKindParam,
   blueprintsTicked,
   categoryPickParam,
   pruneCategoryIndex,
   filterIsOpen,
-  pickIsAll,
   type AssetKindFilter,
+  type BlueprintKind,
+  type CategoryPick,
 } from '@/features/assets/assetCategoryFilter';
+import type { ActiveFilter } from '@/components/ui';
 import { useAssetCategoryIndex } from '@/features/assets/useAssetCategoryIndex';
 import { useAssetKindPreference } from '@/features/assets/assetKindPreference';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
@@ -41,7 +44,7 @@ import { usePlaceNicknameMap } from '@/features/assets/placeNicknames';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/assets/assetsCsv';
 import { withoutAbyssalTypePrices } from '@/engine/market/abyssalValuation';
 import { useAbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
-import { parseIskAmount } from '@/lib/isk';
+import { formatIskCompact, parseIskAmount } from '@/lib/isk';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { assetStackValue } from '@/engine/assetTree';
 import {
@@ -83,6 +86,13 @@ const EMPTY_CHARACTER_NAMES: ReadonlyMap<number, string> = new Map();
 export const LOCATION_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterLocation'];
 const NO_BUILD_PLANS: readonly BuildPlanRecord[] = [];
 const NO_PLACE_REFS: readonly PlaceRef[] = [];
+
+/** The Items page's funnel filters: Category, Blueprints and min value (search and sort sit outside). */
+export interface AssetsFilterValue {
+  cat: CategoryPick;
+  bp: BlueprintKind;
+  min: string;
+}
 
 export function useAssetsData() {
   const { t } = useTranslation();
@@ -357,10 +367,29 @@ export function useAssetsData() {
   }, [categoryIndex, mergedAssets, categoryPick]);
 
   const showBlueprintSelect = pickerIndex ? blueprintsTicked(pickerIndex, categoryPick) : false;
-  const activeFilterCount =
-    (pickIsAll(categoryPick) ? 0 : 1) +
-    (blueprintKind !== 'any' && showBlueprintSelect ? 1 : 0) +
-    (minValueThreshold > 0 ? 1 : 0);
+  // The filters the funnel holds, as one value, so each pill's `clear` stays pure.
+  const filterValue = useMemo<AssetsFilterValue>(
+    () => ({ cat: categoryPick, bp: blueprintKind, min: minValueInput }),
+    [categoryPick, blueprintKind, minValueInput]
+  );
+  const activeFilters = useMemo<ActiveFilter<AssetsFilterValue>[]>(() => {
+    const active = assetKindActiveFilters(
+      filterValue,
+      { index: pickerIndex, showBlueprintSelect, categoryLabel: t('assets.category.label') },
+      t
+    );
+    // The typed amount, not the threshold: while prices load the threshold is
+    // held at 0, but the box still holds the pilot's setting.
+    const min = parseIskAmount(filterValue.min) ?? 0;
+    if (min > 0)
+      active.push({
+        label: t('assets.minValue.label'),
+        value: t('assets.minValue.atLeast', { isk: formatIskCompact(min) }),
+        clear: (next) => ({ ...next, min: '' }),
+      });
+    return active;
+  }, [filterValue, pickerIndex, showBlueprintSelect, t]);
+  const activeFilterCount = activeFilters.length;
 
   const kindFilter = useMemo<AssetKindFilter | null>(() => {
     if (!categoryIndex) return null;
@@ -529,6 +558,8 @@ export function useAssetsData() {
     blueprintKind,
     kindFilter,
     showBlueprintSelect,
+    filterValue,
+    activeFilters,
     activeFilterCount,
     resetFilters,
     crossCharacterFilter,

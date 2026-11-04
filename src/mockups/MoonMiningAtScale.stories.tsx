@@ -9,6 +9,7 @@ import {
   Fields,
   FilterBar,
   FilterChip,
+  FilterField,
   IconButton,
   Modal,
   PageHeader,
@@ -394,10 +395,22 @@ function MinerAtScale({
         padded={false}
       >
         <div className="space-y-2 p-3">
-          <FilterBar
+          <FilterBar<PopFilter>
             value={filter}
             onChange={setFilter}
-            activeCount={(filter !== 'all' ? 1 : 0) + (payment ? 1 : 0)}
+            // The picked payment is not a pill: its own line under the row says it and clears it.
+            active={
+              filter === 'all'
+                ? []
+                : [
+                    {
+                      label: 'Status',
+                      value: FILTERS.find((f) => f.id === filter)?.label,
+                      clear: () => 'all',
+                    },
+                  ]
+            }
+            resultCount={rows.length}
             title="Filter pops"
             search={
               <SearchInput
@@ -409,17 +422,21 @@ function MinerAtScale({
               />
             }
           >
-            {(value, onChange) =>
-              FILTERS.map((f) => (
-                <FilterChip
-                  key={f.id}
-                  label={f.label}
-                  selected={value === f.id}
-                  count={count(f.id)}
-                  onToggle={() => onChange(f.id)}
-                />
-              ))
-            }
+            {(value, onChange) => (
+              <FilterField label="Status" stretch={false}>
+                <div role="group" aria-label="Status" className="flex flex-wrap gap-2">
+                  {FILTERS.map((f) => (
+                    <FilterChip
+                      key={f.id}
+                      label={f.label}
+                      selected={value === f.id}
+                      count={count(f.id)}
+                      onToggle={() => onChange(f.id)}
+                    />
+                  ))}
+                </div>
+              </FilterField>
+            )}
           </FilterBar>
           {payment && (
             <p className="text-xs text-text-dim">
@@ -1302,6 +1319,14 @@ function MoonRateDialog({
 
 type MinerFilter = 'bill' | 'overdue' | 'below' | 'all';
 
+/** One label per Miners view: its chip, and its pill while it is on. */
+const MINER_FILTER_LABEL: Record<MinerFilter, string> = {
+  bill: 'Gets a Statement',
+  overdue: 'Overdue',
+  below: 'Under the minimum',
+  all: 'Everyone',
+};
+
 const willBill = (m: ListMiner) => m.nextStatement >= MIN_STATEMENT;
 const below = (m: ListMiner) => m.nextStatement > 0 && m.nextStatement < MIN_STATEMENT;
 
@@ -1427,10 +1452,15 @@ function MinersList({ initial = 'bill', ticked = 0 }: { initial?: MinerFilter; t
       </StatChips>
       <Panel padded={false}>
         <div className="p-3">
-          <FilterBar
+          <FilterBar<MinerFilter>
             value={filter}
             onChange={setFilter}
-            activeCount={filter !== 'bill' ? 1 : 0}
+            active={
+              filter === 'bill'
+                ? []
+                : [{ label: 'Show', value: MINER_FILTER_LABEL[filter], clear: () => 'bill' }]
+            }
+            resultCount={rows.length}
             title="Filter Miners"
             actions={<TableActionsMenu name="Miners" size="md" tableExport={tableExport} />}
             search={
@@ -1444,32 +1474,34 @@ function MinersList({ initial = 'bill', ticked = 0 }: { initial?: MinerFilter; t
             }
           >
             {(value, onChange) => (
-              <>
-                <FilterChip
-                  label="Gets a Statement"
-                  selected={value === 'bill'}
-                  count={LIST_TOTALS.willBill}
-                  onToggle={() => onChange('bill')}
-                />
-                <FilterChip
-                  label="Overdue"
-                  selected={value === 'overdue'}
-                  count={overdueCount}
-                  onToggle={() => onChange('overdue')}
-                />
-                <FilterChip
-                  label="Under the minimum"
-                  selected={value === 'below'}
-                  count={LIST_TOTALS.below}
-                  onToggle={() => onChange('below')}
-                />
-                <FilterChip
-                  label="Everyone"
-                  selected={value === 'all'}
-                  count={LIST_TOTALS.miners}
-                  onToggle={() => onChange('all')}
-                />
-              </>
+              <FilterField label="Show" stretch={false}>
+                <div role="group" aria-label="Show" className="flex flex-wrap gap-2">
+                  <FilterChip
+                    label={MINER_FILTER_LABEL.bill}
+                    selected={value === 'bill'}
+                    count={LIST_TOTALS.willBill}
+                    onToggle={() => onChange('bill')}
+                  />
+                  <FilterChip
+                    label={MINER_FILTER_LABEL.overdue}
+                    selected={value === 'overdue'}
+                    count={overdueCount}
+                    onToggle={() => onChange('overdue')}
+                  />
+                  <FilterChip
+                    label={MINER_FILTER_LABEL.below}
+                    selected={value === 'below'}
+                    count={LIST_TOTALS.below}
+                    onToggle={() => onChange('below')}
+                  />
+                  <FilterChip
+                    label={MINER_FILTER_LABEL.all}
+                    selected={value === 'all'}
+                    count={LIST_TOTALS.miners}
+                    onToggle={() => onChange('all')}
+                  />
+                </div>
+              </FilterField>
             )}
           </FilterBar>
         </div>

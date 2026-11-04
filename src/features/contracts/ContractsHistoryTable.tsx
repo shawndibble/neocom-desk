@@ -70,6 +70,7 @@ export function ContractsHistoryTable({
         onChange={onFilterChange}
         statusOptions={statusOptions}
         typeOptions={typeOptions}
+        resultCount={rows.length}
         actions={
           <ColumnPickerMenu
             available={CONTRACTS_HISTORY_COLUMN_IDS}

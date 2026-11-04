@@ -314,7 +314,12 @@ export function MarketWideOpportunitiesPanel({
               resetLabel={t('common.resetColumns')}
             />
           )}
-          <MarketWideFilterBar filter={filter} onChange={applyFilter} gatedCount={gatedCount} />
+          <MarketWideFilterBar
+            filter={filter}
+            onChange={applyFilter}
+            gatedCount={gatedCount}
+            {...(hasRun && !loading && { resultCount: visibleRows.length })}
+          />
           {online ? (
             scanButton
           ) : (

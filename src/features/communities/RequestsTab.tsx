@@ -13,6 +13,7 @@ import {
   Panel,
   SearchInput,
   Spinner,
+  type ActiveFilter,
   type DataTableColumn,
   NeedsConnection,
   ToastStack,
@@ -22,6 +23,7 @@ import { db } from '@/db';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { uidForCharacter } from '@/sync/uid';
+import type { Translate } from '@/lib/translate';
 import {
   filterRequests,
   isOpenRequest,
@@ -75,6 +77,43 @@ const STATUS_ORDER: Record<RequestStatus, number> = {
   closed: 4,
   expired: 5,
 };
+
+/** The funnel's value: which Requests, and how far away. */
+interface RequestFilterValue {
+  filter: RequestFilter;
+  jumps: JumpRange;
+}
+
+const REQUEST_FILTER_KEY: Record<RequestFilter, string> = {
+  open: 'communities.board.filters.open',
+  mine: 'communities.board.filters.mine',
+  canFill: 'communities.board.filters.canFill',
+};
+
+/**
+ * Open is where the board starts, so it is no pill; Mine or I can fill is.
+ * `jumps` is the range the board is applying (`shownJumps`), so a limit it
+ * cannot measure never shows as one.
+ */
+function activeRequestFilters(
+  { filter, jumps }: RequestFilterValue,
+  t: Translate
+): ActiveFilter<RequestFilterValue>[] {
+  const active: ActiveFilter<RequestFilterValue>[] = [];
+  if (filter !== 'open')
+    active.push({
+      label: t('communities.board.filters.show'),
+      value: t(REQUEST_FILTER_KEY[filter]),
+      clear: (value) => ({ ...value, filter: 'open' }),
+    });
+  if (jumps !== 'any')
+    active.push({
+      label: t('communities.board.distance.label'),
+      value: t(`jumpRange.option.${jumps}`),
+      clear: (value) => ({ ...value, jumps: 'any' }),
+    });
+  return active;
+}
 
 /**
  * The Requests tab body (scope decision `20261014-221403-community-requests-...`,
@@ -173,6 +212,7 @@ export function RequestsTab({
   const limit = distance.status === 'unavailable' ? null : maxJumps;
   // What the funnel shows: a range that cannot be measured reads "Any distance", never a limit the list is not applying.
   const shownJumps: JumpRange = limit === null ? 'any' : jumps;
+  const filterValue: RequestFilterValue = { filter, jumps: shownJumps };
 
   const { rows, unmeasured } = useMemo(() => {
     const filtered = filterRequests(requests ?? [], { filter, query, myUid, now, sharedItems });
@@ -413,12 +453,13 @@ export function RequestsTab({
       <Panel>
         <FilterBar
           className="mb-3"
-          value={{ filter, jumps: shownJumps }}
+          value={filterValue}
           onChange={(next) => {
             setFilter(next.filter);
             setJumps(next.jumps);
           }}
-          activeCount={(filter !== 'open' ? 1 : 0) + (shownJumps !== 'any' ? 1 : 0)}
+          active={activeRequestFilters(filterValue, t)}
+          resultCount={rows.length}
           actions={
             <ColumnPickerMenu
               available={REQUEST_COLUMN_IDS}

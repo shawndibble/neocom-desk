@@ -12,6 +12,9 @@
  * `id` (`character:123`) for free. `clear` on a per-value chip removes only
  * that value from the array, never the whole constraint.
  */
+import type { TFunction } from 'i18next';
+import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
+import { formatIskCompact } from '@/lib/isk';
 import type { OpenOrderRow } from './openOrdersModel';
 import { compareOpenOrderRowsWorstFirst } from './openOrdersModel';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
@@ -217,9 +220,10 @@ export function sortOpenOrders(
 }
 
 /**
- * How many constraints the funnel holds, for `FilterBar`'s `activeCount`: one
- * per selected value of an array field, one per set scalar. `sort` and `view`
- * are not constraints (there is always exactly one of each); `filterOpenOrders`
+ * How many constraints narrow the rows, search and Character pick included:
+ * above zero, the page says how many orders of all of them match. One per
+ * selected value of an array field, one per set scalar. `sort` and `view` are
+ * not constraints (there is always exactly one of each); `filterOpenOrders`
  * never reads `view` either: the segment splits what the funnel matched.
  */
 export function activeFilterCount(filter: OpenOrdersFilter): number {
@@ -231,6 +235,83 @@ export function activeFilterCount(filter: OpenOrdersFilter): number {
     filter.minIskTiedUp !== null,
   ].filter(Boolean).length;
   return scalars + filter.characterIds.length + filter.locationIds.length + filter.problems.length;
+}
+
+export interface OpenOrdersFilterNames {
+  location: (locationId: number) => string;
+  /**
+   * Given only while the header's Character control cannot say the pick
+   * itself: a deep link naming one other alt reads "All characters" there
+   * (`characterFilterValue`), so the narrowing needs a pill of its own.
+   */
+  character?: (characterId: number) => string;
+}
+
+/**
+ * The funnel's filters set away from their default, for `FilterBar`'s pills:
+ * one per field, however many values it holds, so a three-problem pick is one
+ * pill to remove rather than three. The search text is not one (its box shows
+ * it), nor are `sort` and `view`.
+ */
+export function activeOpenOrdersFilters(
+  filter: OpenOrdersFilter,
+  t: TFunction,
+  names: OpenOrdersFilterNames
+): ActiveFilter<OpenOrdersFilter>[] {
+  const active: ActiveFilter<OpenOrdersFilter>[] = [];
+  const characterName = names.character;
+  if (characterName && filter.characterIds.length > 0)
+    active.push({
+      label: t('market.orders.filter.characters'),
+      value: summarizeFilterValues(filter.characterIds.map(characterName), t),
+      clear: (v) => ({ ...v, characterIds: [] }),
+    });
+  if (filter.problems.length > 0)
+    active.push({
+      label: t('market.orders.filter.problems'),
+      value: summarizeFilterValues(
+        filter.problems.map((problem) => t(`market.orders.group.${problem}`)),
+        t
+      ),
+      clear: (v) => ({ ...v, problems: [] }),
+    });
+  if (filter.side !== null)
+    active.push({
+      label: t('orders.side'),
+      value: t(filter.side === 'buy' ? 'orders.buy' : 'orders.sell'),
+      clear: (v) => ({ ...v, side: null }),
+    });
+  if (filter.locationIds.length > 0)
+    active.push({
+      label: t('market.orders.filter.location'),
+      value: summarizeFilterValues(filter.locationIds.map(names.location), t),
+      clear: (v) => ({ ...v, locationIds: [] }),
+    });
+  if (filter.costBasis !== null)
+    active.push({
+      label: t('market.orders.filter.costBasis'),
+      value: t(
+        filter.costBasis === 'linked'
+          ? 'market.orders.filter.costBasisLinked'
+          : 'market.orders.filter.costBasisMissing'
+      ),
+      clear: (v) => ({ ...v, costBasis: null }),
+    });
+  if (filter.expiringWithinDays !== null)
+    active.push({
+      label: t('market.orders.filter.expiringWithin'),
+      value: t('market.orders.filter.expiringWithinOption', { count: filter.expiringWithinDays }),
+      clear: (v) => ({ ...v, expiringWithinDays: null }),
+    });
+  if (filter.minIskTiedUp !== null)
+    active.push({
+      label: t('market.orders.filter.minIskTiedUp'),
+      value: t('market.orders.filter.minIskTiedUpOption', {
+        amount: formatIskCompact(filter.minIskTiedUp),
+      }),
+      clear: (v) => ({ ...v, minIskTiedUp: null }),
+    });
+  return active;
 }
 
 // --- URL state --------------------------------------------------------------

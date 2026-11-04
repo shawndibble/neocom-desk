@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LP_LANDING_FILTERS,
-  lpLandingActiveFilterCount,
+  lpLandingActiveFilters,
   lpLandingBestOffers,
   lpLandingHoldings,
   lpLandingOffers,
@@ -152,25 +152,62 @@ describe('lpLandingStores', () => {
   });
 });
 
-describe('lpLandingActiveFilterCount', () => {
-  it('counts the sales floor the landing opens with', () => {
-    expect(lpLandingActiveFilterCount(DEFAULT_LP_LANDING_FILTERS)).toBe(1);
-    expect(lpLandingActiveFilterCount(ANY)).toBe(0);
+describe('lpLandingActiveFilters', () => {
+  const t = (key: string, opts?: Record<string, unknown>) =>
+    opts ? `${key}${JSON.stringify(opts)}` : key;
+  const names = {
+    factions: [{ id: 500001, name: 'Caldari State' }],
+    categories: [
+      { id: 9, name: 'Ships' },
+      { id: 11, name: 'Ammunition' },
+    ],
+  };
+  const pills = (filters: LpLandingFilters) =>
+    lpLandingActiveFilters(filters, t, names).map(({ label, value }) => ({ label, value }));
+
+  it('shows the sales floor the landing opens with', () => {
+    expect(pills(DEFAULT_LP_LANDING_FILTERS)).toEqual([
+      {
+        label: 'loyaltyStore.landing.minSellsLabel',
+        value: 'loyaltyStore.landing.minSellsPerDay{"count":1}',
+      },
+    ]);
+    expect(pills(ANY)).toEqual([]);
   });
 
-  it('counts each filter set', () => {
-    expect(
-      lpLandingActiveFilterCount({
-        ...ANY,
-        faction: 'none',
-        range: '10',
-        mineOnly: true,
-        hideFactionWarfare: true,
-        noTurnIns: true,
-        affordableOnly: true,
-        categories: [9, 11],
-      })
-    ).toBe(7);
+  it('lists each filter set, each Show only pick on its own', () => {
+    const filters: LpLandingFilters = {
+      ...ANY,
+      faction: 500001,
+      range: '10',
+      mineOnly: true,
+      hideFactionWarfare: true,
+      noTurnIns: true,
+      affordableOnly: true,
+      categories: [9, 11],
+    };
+    expect(pills(filters)).toEqual([
+      { label: 'loyaltyStore.landing.factionLabel', value: 'Caldari State' },
+      { label: 'jumpRange.label', value: 'jumpRange.option.10' },
+      { label: 'loyaltyStore.landing.categoryLabel', value: 'Ships, Ammunition' },
+      { label: 'loyaltyStore.landing.showOnlyLabel', value: 'loyaltyStore.landing.mineOnly' },
+      { label: 'loyaltyStore.landing.showOnlyLabel', value: 'loyaltyStore.landing.affordable' },
+      { label: 'loyaltyStore.landing.showOnlyLabel', value: 'loyaltyStore.landing.noTurnIns' },
+      {
+        label: 'loyaltyStore.landing.showOnlyLabel',
+        value: 'loyaltyStore.landing.hideFactionWarfare',
+      },
+    ]);
+    expect(pills({ ...ANY, faction: 'none' })).toEqual([
+      { label: 'loyaltyStore.landing.factionLabel', value: 'loyaltyStore.landing.noFaction' },
+    ]);
+  });
+
+  it('clears one filter back to its default, keeping the settings beside them', () => {
+    const value = { ...DEFAULT_LP_LANDING_FILTERS, affordableOnly: true, hubId: 'jita' };
+    const [floor, affordable] = lpLandingActiveFilters(value, t, names);
+    expect(floor.clear(value)).toEqual({ ...value, minSellsPerDay: 0 });
+    expect(affordable.clear(value)).toEqual({ ...value, affordableOnly: false });
   });
 });
 

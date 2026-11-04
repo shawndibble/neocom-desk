@@ -709,6 +709,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
               filter={filter}
               onChange={setFilter}
               stationOptions={stationOptions}
+              resultCount={filteredTransactions.length}
               actions={
                 <>
                   {/* A view, not a filter: it changes the table's row grain (DESIGN.md §6c). */}

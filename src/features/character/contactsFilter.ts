@@ -10,6 +10,8 @@
 import type { CharacterContact } from '@/esi/endpoints';
 import { isNpcCharacterId, isNpcCorporationId } from '@/esi/entityIds';
 import type { PublicInfoKind } from '@/stores/publicInfoModal';
+import type { Translate } from '@/lib/translate';
+import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
 
 export type ContactType = CharacterContact['contact_type'];
 export type StandingCategory = 'good' | 'neutral' | 'bad';
@@ -137,6 +139,49 @@ export function activeContactsFilterCount(filter: ContactsFilter): number {
   if (filter.types.size !== ALL_CONTACT_KINDS.length) count += 1;
   if (filter.standings.size !== STANDING_CATEGORIES.length) count += 1;
   return count;
+}
+
+/** The standing chips' labels, best to worst. */
+export const STANDING_FILTER_KEY: Record<StandingCategory, string> = {
+  good: 'contacts.filterGood',
+  neutral: 'contacts.filterNeutral',
+  bad: 'contacts.filterBad',
+};
+
+/**
+ * The narrowed groups as `FilterBar` pills, Type then Standing. Unlike
+ * `activeContactsFilterCount` the search text is not one: the box shows it.
+ * Generic so the Across tab's bar value, which adds its own chip, keeps its
+ * extra field through each `clear`.
+ */
+export function activeContactsFilters<F extends ContactsFilter>(
+  filter: F,
+  t: Translate
+): ActiveFilter<F>[] {
+  const picked = (names: string[]) =>
+    names.length === 0 ? t('filters.none') : summarizeFilterValues(names, t);
+  const active: ActiveFilter<F>[] = [];
+  if (filter.types.size !== ALL_CONTACT_KINDS.length)
+    active.push({
+      label: t('contacts.typeFilterLabel'),
+      value: picked(
+        ALL_CONTACT_KINDS.filter((kind) => filter.types.has(kind)).map((kind) =>
+          t(CONTACT_KIND_KEY[kind])
+        )
+      ),
+      clear: (value) => ({ ...value, types: EMPTY_CONTACTS_FILTER.types }),
+    });
+  if (filter.standings.size !== STANDING_CATEGORIES.length)
+    active.push({
+      label: t('contacts.standingFilterLabel'),
+      value: picked(
+        STANDING_CATEGORIES.filter((category) => filter.standings.has(category)).map((category) =>
+          t(STANDING_FILTER_KEY[category])
+        )
+      ),
+      clear: (value) => ({ ...value, standings: EMPTY_CONTACTS_FILTER.standings }),
+    });
+  return active;
 }
 
 /** Every category, zeros included — a chip reading "Bad 0" is information. */

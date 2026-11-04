@@ -49,7 +49,8 @@ export function DateRangeFields({
   const fieldClassName = sheet ? 'w-full min-w-0' : 'w-36';
   return (
     <div className={sheet ? 'flex w-full items-center gap-2' : 'contents'}>
-      <label className={labelClassName}>
+      {/* Marked like a `FilterField`, so a "From" pill focuses this end. */}
+      <label data-filter-field={fromLabel} className={labelClassName}>
         {fromLabel}
         <TextInput
           type="date"
@@ -58,7 +59,8 @@ export function DateRangeFields({
           onChange={(event) => onFromChange(event.target.value === '' ? null : event.target.value)}
         />
       </label>
-      <label className={labelClassName}>
+      {/* Marked like a `FilterField`, so a "To" pill focuses this end. */}
+      <label data-filter-field={toLabel} className={labelClassName}>
         {toLabel}
         <TextInput
           type="date"

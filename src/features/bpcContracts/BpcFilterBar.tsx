@@ -1,4 +1,5 @@
 import { type InputHTMLAttributes, type ReactNode } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import {
   CheckboxSelect,
@@ -8,20 +9,88 @@ import {
   RegionSelect,
   SearchInput,
   TextInput,
+  summarizeFilterValues,
+  type ActiveFilter,
 } from '@/components/ui';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import { DEFAULT_JUMP_RANGE, type JumpRange } from '@/engine/route/jumpRange';
 import { type CurrentSystemState } from '@/features/route/currentSystem';
 import { CurrentSystemPicker, JumpRangeSelect } from '@/features/route/JumpRangeControls';
+import { formatIskCompact, parseIskAmount } from '@/lib/isk';
 import { DEFAULT_SOURCE_TOGGLES, SOURCE_TOGGLES, type SourceToggle } from './bpcSourcingUrl';
 import { SOURCE_LABEL_KEYS, SOURCE_TOOLTIP_KEYS } from './bpcSourcingHelpers';
 import {
-  bpcActiveFilterCount,
+  bpcActiveFilterChips,
+  type BpcFilterChip,
+  type BpcFilterState,
   type BpcHideDefaults,
   type BpcSourcingFilter,
 } from './bpcActiveFilters';
 
 export type UiFilter = BpcSourcingFilter;
+
+/** `FilterBar`'s value: the URL fields flattened beside Source, Space and Distance. */
+type CompositeFilter = UiFilter & Omit<BpcFilterState, 'filter'>;
+
+function toState({ sources, spaceKinds, jumps, ...filter }: CompositeFilter): BpcFilterState {
+  return { filter, sources, spaceKinds, jumps };
+}
+
+function fromState({ filter, sources, spaceKinds, jumps }: BpcFilterState): CompositeFilter {
+  return { ...filter, sources, spaceKinds, jumps };
+}
+
+/**
+ * A chip's pill: captioned as its control's `FilterField`, so a click on it
+ * focuses that control. Both Exclude picks share the Exclude caption.
+ */
+function chipPill(
+  chip: BpcFilterChip,
+  t: TFunction,
+  regionName: (id: number) => string
+): Omit<ActiveFilter<CompositeFilter>, 'clear'> {
+  const names = (list: string[]) =>
+    list.length === 0 ? t('filters.none') : summarizeFilterValues(list, t);
+  switch (chip.id) {
+    case 'region':
+      return { label: t('bpcContracts.regionLabel'), value: regionName(chip.value) };
+    case 'jumps':
+      return { label: t('jumpRange.label'), value: t(`jumpRange.option.${chip.value}`) };
+    case 'minMe':
+    case 'minTe':
+    case 'minRuns':
+      return { label: t(`bpcContracts.${chip.id}Label`), value: chip.value };
+    case 'maxPrice': {
+      // The field keeps what was typed ("50m", "50,000,000"); the pill says it one way.
+      const isk = parseIskAmount(chip.value);
+      return {
+        label: t('bpcContracts.maxPriceLabel'),
+        value: isk === null ? chip.value : `${formatIskCompact(isk)} ISK`,
+      };
+    }
+    case 'hideAuctions':
+    case 'hidePlex':
+      return { label: t('bpcContracts.excludeLabel'), value: t(`bpcContracts.${chip.id}`) };
+    case 'sources':
+      return {
+        label: t('bpcContracts.sourceLabel'),
+        value: names(
+          SOURCE_TOGGLES.filter((source) => chip.value.includes(source)).map((source) =>
+            t(SOURCE_LABEL_KEYS[source])
+          )
+        ),
+      };
+    case 'space':
+      return {
+        label: t('bpcContracts.spaceLabel'),
+        value: names(
+          SPACE_KINDS.filter((kind) => chip.value.includes(kind)).map((kind) =>
+            t(`common.spaceOption.${kind}`)
+          )
+        ),
+      };
+  }
+}
 
 interface BpcFilterBarProps {
   filter: UiFilter;
@@ -40,6 +109,8 @@ interface BpcFilterBarProps {
   searchComboboxProps: InputHTMLAttributes<HTMLInputElement>;
   /** The column picker, inline between the search box and the funnel. */
   actions?: ReactNode;
+  /** Rows the filters leave, for the phone sheet's done button. */
+  resultCount?: number;
 }
 
 export function BpcFilterBar({
@@ -56,14 +127,22 @@ export function BpcFilterBar({
   hideDefaults,
   searchComboboxProps,
   actions,
+  resultCount,
 }: BpcFilterBarProps) {
   const { t } = useTranslation();
-  const activeCount = bpcActiveFilterCount({ filter, sources, spaceKinds, jumps }, hideDefaults);
-
-  const compositeValue = { ...filter, sources, spaceKinds, jumps };
+  const compositeValue: CompositeFilter = { ...filter, sources, spaceKinds, jumps };
+  const regionNames = new Map(regionOptions.map((region) => [region.id, region.name]));
+  // Never the search text: the box above already shows it.
+  const active: ActiveFilter<CompositeFilter>[] = bpcActiveFilterChips(
+    toState(compositeValue),
+    hideDefaults
+  ).map((chip) => ({
+    ...chipPill(chip, t, (id) => regionNames.get(id) ?? `#${id}`),
+    clear: (value) => fromState(chip.clear(toState(value))),
+  }));
 
   /** Widened past `UiFilter` so Source/Space/Distance commit through the same `FilterBar` value as the other fields (matching Contracts.tsx and Market's FilterBar usage). Space is a Dexie-backed preference, written here and nowhere else. */
-  function handleCompositeChange(next: typeof compositeValue) {
+  function handleCompositeChange(next: CompositeFilter) {
     const {
       sources: nextSources,
       spaceKinds: nextSpaceKinds,
@@ -80,7 +159,8 @@ export function BpcFilterBar({
     <FilterBar
       value={compositeValue}
       onChange={handleCompositeChange}
-      activeCount={activeCount}
+      active={active}
+      resultCount={resultCount}
       className="border-b border-line px-3 py-2"
       actions={actions}
       search={

@@ -37,14 +37,14 @@ import * as Icon from '@/components/ui/icons';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import { journalRefKey, type JournalCoverage, type JournalRow } from '@/engine/journalNetting';
 import { CharacterRowMenu } from '@/features/corp/corpRowMenus';
-import { ActiveFilterRow } from '@/features/character/ActiveFilterRow';
+import { JournalSummaryRow } from '@/features/character/JournalSummaryRow';
 import { InsuranceLossHost } from '@/features/character/InsuranceLossHost';
 import { IskFlowChart } from '@/features/character/IskFlowChart';
 import { IskBreakdownPanel } from '@/features/character/IskBreakdownPanel';
 import { journalRefLabel } from '@/features/character/journalRefLabel';
 import {
   EMPTY_WALLET_JOURNAL_FILTER,
-  activeWalletJournalFilterCount,
+  activeWalletJournalFilters,
   journalNet,
   journalPartyBreakdown,
   journalRefTypeBreakdown,
@@ -95,6 +95,8 @@ interface JournalFilterBarProps {
   partyOptions?: readonly PlayerOption[];
   /** The column picker, inline between the search box and the funnel. */
   actions?: ReactNode;
+  /** Entries the filter leaves, for the phone sheet's done button. */
+  resultCount?: number;
 }
 
 /**
@@ -112,13 +114,18 @@ function JournalFilterBar({
   playerOptions,
   partyOptions,
   actions,
+  resultCount,
 }: JournalFilterBarProps) {
   const { t } = useTranslation();
   return (
     <FilterBar
       value={filter}
       onChange={onChange}
-      activeCount={activeWalletJournalFilterCount(filter)}
+      active={activeWalletJournalFilters(filter, t, {
+        players: playerOptions,
+        parties: partyOptions,
+      })}
+      resultCount={resultCount}
       className="border-b border-line px-3 py-2"
       search={
         <SearchInput
@@ -517,7 +524,8 @@ export function JournalTable({
   );
   // A filter with no criteria active still runs (it's the identity filter), so
   // "is a filter active" is asked separately here rather than read off the result.
-  const filterIsActive = activeWalletJournalFilterCount(filter) > 0 || filter.text.trim() !== '';
+  const filterIsActive =
+    activeWalletJournalFilters(filter, t).length > 0 || filter.text.trim() !== '';
   return (
     <>
       <JournalFilterBar
@@ -526,6 +534,7 @@ export function JournalTable({
         refTypeOptions={refTypeOptions}
         playerOptions={playerOptions}
         partyOptions={partyView?.options}
+        resultCount={filteredJournal.length}
         actions={
           <>
             <IconButton
@@ -549,13 +558,10 @@ export function JournalTable({
         }
       />
       <div className="border-b border-line px-3 py-2">
-        <ActiveFilterRow
-          filter={filter}
-          onChange={onFilterChange}
+        <JournalSummaryRow
           totals={totals}
           entryCount={filteredJournal.length}
           showInternal={panel.coverage !== undefined}
-          partyNameFor={partyView?.nameFor}
           // Phone: the sort is an icon at the row's end, so the table has no sort bar.
           sortControl={
             isPhone && filteredJournal.length > 0 ? (

@@ -61,6 +61,7 @@ import { buildOpenOrderRows, openOrderProblemCounts, type OpenOrderRow } from '.
 import {
   locationFilterOptions,
   activeFilterCount,
+  activeOpenOrdersFilters,
   type OpenOrdersFilter,
 } from './openOrdersFilter';
 import { buildOpenOrdersView, shownView } from './openOrdersView';
@@ -533,6 +534,20 @@ export function OpenOrdersPanel({
   }
 
   const activeCount = activeFilterCount(filter);
+  const locationNamesById = new Map(
+    locationOptions.map((option) => [option.locationId, option.label])
+  );
+  const activeFilters = activeOpenOrdersFilters(filter, t, {
+    location: (locationId) =>
+      locationNamesById.get(locationId) ??
+      t('market.orders.filter.unknownLocation', { id: locationId }),
+    // Only while the header's control reads "All characters" over a pick it
+    // cannot name; "This character" already says itself there.
+    character:
+      characterFilterValue === 'all'
+        ? (characterId) => characterNamesById.get(characterId) ?? String(characterId)
+        : undefined,
+  });
 
   const notShared = snapshot.openOrders.skipped;
   const pickerNamesMissing = showCharacterStrip && !corporation && characterFilterValue === 'all';
@@ -709,7 +724,8 @@ export function OpenOrdersPanel({
                   rowAlign="end"
                   value={filter}
                   onChange={setFilter}
-                  activeCount={activeCount}
+                  active={activeFilters}
+                  resultCount={viewRows.length}
                   actions={
                     // The phone cards ignore column choices, so the picker
                     // would have nothing to act on there.

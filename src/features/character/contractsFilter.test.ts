@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import type { TFunction } from 'i18next';
 import type { Contract } from '@/esi/endpoints';
+import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from './contractLabels';
 import {
   EMPTY_CONTRACTS_FILTER,
   filterContracts,
   contractStatusOptions,
   contractTypeOptions,
-  activeContractsFilterCount,
+  activeContractsFilters,
   isContractsFilterActive,
   type ContractsFilter,
 } from './contractsFilter';
@@ -130,15 +132,29 @@ describe('contractTypeOptions', () => {
   });
 });
 
-describe('activeContractsFilterCount', () => {
-  it('is zero for the identity filter', () => {
-    expect(activeContractsFilterCount(EMPTY_CONTRACTS_FILTER)).toBe(0);
+describe('activeContractsFilters', () => {
+  const t = ((key: string) => key) as unknown as TFunction;
+
+  it('is empty for the identity filter', () => {
+    expect(activeContractsFilters(EMPTY_CONTRACTS_FILTER, t)).toEqual([]);
   });
 
-  it('counts status and type, but not the search text', () => {
-    expect(
-      activeContractsFilterCount({ status: 'outstanding', type: 'courier', text: 'trader' })
-    ).toBe(2);
+  it('lists status then type, but not the search text', () => {
+    const active = activeContractsFilters(
+      { status: 'outstanding', type: 'courier', text: 'trader' },
+      t
+    );
+    expect(active.map(({ label, value }) => ({ label, value }))).toEqual([
+      { label: 'contracts.statusFilterLabel', value: CONTRACT_STATUS_KEY.outstanding },
+      { label: 'contracts.typeFilterLabel', value: CONTRACT_TYPE_KEY.courier },
+    ]);
+  });
+
+  it('clears just its own criterion', () => {
+    const filter: ContractsFilter = { status: 'outstanding', type: 'courier', text: 'trader' };
+    const [status, type] = activeContractsFilters(filter, t);
+    expect(status.clear(filter)).toEqual({ ...filter, status: null });
+    expect(type.clear(filter)).toEqual({ ...filter, type: null });
   });
 });
 

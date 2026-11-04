@@ -43,6 +43,7 @@ import {
   CachedNotice,
   Tabs,
   useTabsId,
+  type ActiveFilter,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
@@ -135,6 +136,42 @@ function rosterOptions(
   return [...byId]
     .map(([id, text]) => ({ id, label: text }))
     .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/**
+ * The funnel's filters that are on, as `FilterBar` pills. A ship or place
+ * reads as the select prints it; one no longer on the roster (a stale link)
+ * falls back to its id, as the table does.
+ */
+function activeRosterFilters(
+  filter: RosterFilter,
+  labels: {
+    darkLabel: string;
+    shipLabel: string;
+    locationLabel: string;
+    shipOptions: readonly RosterOption[];
+    locationOptions: readonly RosterOption[];
+  }
+): ActiveFilter<RosterFilter>[] {
+  const optionLabel = (options: readonly RosterOption[], id: number) =>
+    options.find((option) => option.id === id)?.label ?? label(null, id);
+  const active: ActiveFilter<RosterFilter>[] = [];
+  // The chip's own text ("Dark 30d+") says what it keeps, so it needs no value.
+  if (filter.dark)
+    active.push({ label: labels.darkLabel, clear: (next) => ({ ...next, dark: false }) });
+  if (filter.ship !== null)
+    active.push({
+      label: labels.shipLabel,
+      value: optionLabel(labels.shipOptions, filter.ship),
+      clear: (next) => ({ ...next, ship: null }),
+    });
+  if (filter.loc !== null)
+    active.push({
+      label: labels.locationLabel,
+      value: optionLabel(labels.locationOptions, filter.loc),
+      clear: (next) => ({ ...next, loc: null }),
+    });
+  return active;
 }
 
 interface MembersSnapshot {
@@ -284,7 +321,6 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
     () => ({ dark: darkOnly, ship, loc }),
     [darkOnly, ship, loc]
   );
-  const activeFilterCount = (darkOnly ? 1 : 0) + (ship !== null ? 1 : 0) + (loc !== null ? 1 : 0);
   const shipOptions = useMemo(
     () => rosterOptions(rows, (row) => ({ id: row.shipTypeId, name: row.shipName })),
     [rows]
@@ -292,6 +328,18 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const locationOptions = useMemo(
     () => rosterOptions(rows, (row) => ({ id: row.locationId, name: row.locationName })),
     [rows]
+  );
+  const darkLabel = t('corp.members.dark', { days: darkAfterDays });
+  const activeFilters = useMemo(
+    () =>
+      activeRosterFilters(rosterFilter, {
+        darkLabel,
+        shipLabel: t('corp.members.shipFilterLabel'),
+        locationLabel: t('corp.members.locationFilterLabel'),
+        shipOptions,
+        locationOptions,
+      }),
+    [rosterFilter, darkLabel, t, shipOptions, locationOptions]
   );
   const darkCount = rows.filter((row) => row.standing.isDark).length;
   const [debouncedSearch] = useDebouncedValue(search);
@@ -367,7 +415,8 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
             <FilterBar
               value={rosterFilter}
               onChange={(next) => setFilterParams(next)}
-              activeCount={activeFilterCount}
+              active={activeFilters}
+              resultCount={visibleRows.length}
               search={
                 <SearchInput
                   value={search}
@@ -380,14 +429,16 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
             >
               {(draft, setDraft) => (
                 <>
-                  <FilterChip
-                    label={t('corp.members.dark', { days: darkAfterDays })}
-                    count={darkCount}
-                    selected={draft.dark}
-                    onToggle={() => setDraft({ ...draft, dark: !draft.dark })}
-                    tooltip={t('corp.members.darkHint', { days: darkAfterDays })}
-                    size="md"
-                  />
+                  <FilterField label={darkLabel} stretch={false} hideCaption>
+                    <FilterChip
+                      label={darkLabel}
+                      count={darkCount}
+                      selected={draft.dark}
+                      onToggle={() => setDraft({ ...draft, dark: !draft.dark })}
+                      tooltip={t('corp.members.darkHint', { days: darkAfterDays })}
+                      size="md"
+                    />
+                  </FilterField>
                   <FilterField label={t('corp.members.shipFilterLabel')}>
                     <Select
                       value={draft.ship === null ? ANY : String(draft.ship)}

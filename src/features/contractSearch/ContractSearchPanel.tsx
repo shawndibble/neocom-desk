@@ -26,6 +26,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   Button,
   CheckboxSelect,
@@ -34,7 +35,6 @@ import {
   EmptyState,
   LoadFailedState,
   FilterBar,
-  countActive,
   FilterChip,
   FilterField,
   IskInput,
@@ -54,6 +54,8 @@ import {
   IskAmount,
   LiveStatus,
   CachedNotice,
+  summarizeFilterValues,
+  type ActiveFilter,
 } from '@/components/ui';
 import {
   CONTRACT_SEARCH_ITEMS_COLUMN_IDS,
@@ -122,7 +124,8 @@ import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
+import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto, formatIskCompact } from '@/lib/isk';
+import { boundText } from '@/features/contractSearch/boundText';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, enumParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { DEFAULT_JUMP_RANGE, JUMP_RANGES, type JumpRange } from '@/engine/route/jumpRange';
@@ -209,6 +212,8 @@ interface ContractSearchFilterBarProps {
   itemFlagMultiple: number;
   /** The table's column picker, drawn beside the filter trigger. */
   actions?: ReactNode;
+  /** Rows the filters leave, once there are rows to count: for the phone sheet's done button. */
+  resultCount?: number;
   /** Below market on: its two valuation controls join the filters. They write their own settings at once, not into the draft. */
   belowMarket?: {
     side: PriceSide;
@@ -218,6 +223,67 @@ interface ContractSearchFilterBarProps {
   };
 }
 
+/**
+ * The Item search filters set away from their default, as `FilterBar` pills.
+ *
+ * Read off the controls, not off the parsed engine filter: a half-typed "1e"
+ * parses to `null` there, and the pill should say the field has been touched
+ * rather than vanish mid-keystroke. The item query is left out — its box shows
+ * what it holds — and so are Current system and the Below market valuation
+ * controls, settings that write themselves rather than parts of this filter.
+ */
+function activeItemsFilters(
+  filter: UiFilter,
+  t: TFunction,
+  regionOptions: readonly RegionOption[]
+): ActiveFilter<UiFilter>[] {
+  const active: ActiveFilter<UiFilter>[] = [];
+  const { regionId } = filter;
+  if (regionId !== null)
+    active.push({
+      label: t('contractSearch.regionLabel'),
+      value: regionOptions.find((option) => option.id === regionId)?.name ?? `#${regionId}`,
+      clear: (value) => ({ ...value, regionId: null }),
+    });
+  if (filter.jumps !== DEFAULT_JUMP_RANGE)
+    active.push({
+      label: t('jumpRange.label'),
+      value: t(`jumpRange.option.${filter.jumps}`),
+      clear: (value) => ({ ...value, jumps: DEFAULT_JUMP_RANGE }),
+    });
+  if (filter.maxPrice.trim() !== '')
+    active.push({
+      label: t('contractSearch.maxPriceLabel'),
+      value: boundText(filter.maxPrice, formatIskCompact),
+      clear: (value) => ({ ...value, maxPrice: '' }),
+    });
+  if (filter.minQuantity.trim() !== '')
+    active.push({
+      label: t('contractSearch.minQuantityLabel'),
+      value: boundText(filter.minQuantity, formatCount),
+      clear: (value) => ({ ...value, minQuantity: '' }),
+    });
+  // The three hides share one Exclude control, so they are one pill too.
+  const excluded = [
+    filter.hideExchanges && t('contractSearch.hideExchanges'),
+    filter.hideAuctions && t('contractSearch.hideAuctions'),
+    filter.hidePlex && t('contractSearch.hidePlex'),
+  ].filter((name): name is string => typeof name === 'string');
+  if (excluded.length > 0)
+    active.push({
+      label: t('contractSearch.excludeLabel'),
+      value: summarizeFilterValues(excluded, t),
+      clear: (value) => ({ ...value, hideExchanges: false, hideAuctions: false, hidePlex: false }),
+    });
+  if (filter.hideOverpriced)
+    active.push({
+      label: t('contractSearch.priceFlagsLabel'),
+      value: t('contractSearch.filterHideOverpriced'),
+      clear: (value) => ({ ...value, hideOverpriced: false }),
+    });
+  return active;
+}
+
 function ContractSearchFilterBar({
   filter,
   onChange,
@@ -225,29 +291,16 @@ function ContractSearchFilterBar({
   currentSystem,
   itemFlagMultiple,
   actions,
+  resultCount,
   belowMarket,
 }: ContractSearchFilterBarProps) {
   const { t } = useTranslation();
-  // Counted off the controls, not off the parsed engine filter: a half-typed
-  // "1e" parses to `null` there, and the badge should say the field has been
-  // touched rather than silently drop back to zero mid-keystroke.
-  const activeCount = countActive([
-    filter.typeQuery,
-    filter.regionId !== null,
-    filter.maxPrice,
-    filter.minQuantity,
-    filter.hideExchanges,
-    filter.hideAuctions,
-    filter.hidePlex,
-    filter.hideOverpriced,
-    filter.jumps !== DEFAULT_JUMP_RANGE,
-  ]);
-
   return (
     <FilterBar
       value={filter}
       onChange={onChange}
-      activeCount={activeCount}
+      active={activeItemsFilters(filter, t, regionOptions)}
+      resultCount={resultCount}
       actions={actions}
       className="border-b border-line px-3 py-2"
       search={
@@ -976,6 +1029,17 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                 regionOptions={regionOptions}
                 currentSystem={currentSystem}
                 itemFlagMultiple={itemFlagMultiple}
+                // Only once the board has an answer: before a search, or mid-load,
+                // a count of zero would claim the filters emptied the list.
+                resultCount={
+                  !searchActive || awaitingRows || awaitingQuery
+                    ? undefined
+                    : belowMarket
+                      ? belowMarketState.status === 'ready'
+                        ? belowMarketRows.length
+                        : undefined
+                      : shownRows.length
+                }
                 belowMarket={
                   belowMarket
                     ? {

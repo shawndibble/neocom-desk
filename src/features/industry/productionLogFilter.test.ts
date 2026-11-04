@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import i18n from '@/i18n';
 import {
   EMPTY_PRODUCTION_LOG_FILTER,
-  activeProductionLogFilterCount,
+  activeProductionLogFilters,
   filterProductionRunsByDate,
 } from './productionLogFilter';
 import type { ProductionRunRecord } from '@/db';
@@ -74,15 +75,31 @@ describe('filterProductionRunsByDate', () => {
   });
 });
 
-describe('activeProductionLogFilterCount', () => {
-  it('counts zero for the empty filter', () => {
-    expect(activeProductionLogFilterCount(EMPTY_PRODUCTION_LOG_FILTER)).toBe(0);
+describe('activeProductionLogFilters', () => {
+  it('is empty for the empty filter', () => {
+    expect(activeProductionLogFilters(EMPTY_PRODUCTION_LOG_FILTER, i18n.t)).toEqual([]);
   });
 
-  it('counts each bound that is set', () => {
-    expect(activeProductionLogFilterCount({ startDate: '2026-08-01', endDate: null })).toBe(1);
-    expect(activeProductionLogFilterCount({ startDate: '2026-08-01', endDate: '2026-08-31' })).toBe(
-      2
-    );
+  it('lists each bound that is set, with the day it holds', () => {
+    expect(
+      activeProductionLogFilters({ startDate: '2026-08-01', endDate: null }, i18n.t).map(
+        ({ label, value }) => [label, value]
+      )
+    ).toEqual([['From', '2026-08-01']]);
+    expect(
+      activeProductionLogFilters({ startDate: '2026-08-01', endDate: '2026-08-31' }, i18n.t).map(
+        ({ label, value }) => [label, value]
+      )
+    ).toEqual([
+      ['From', '2026-08-01'],
+      ['To', '2026-08-31'],
+    ]);
+  });
+
+  it('clears one bound and leaves the other', () => {
+    const filter = { startDate: '2026-08-01', endDate: '2026-08-31' };
+    const [from, to] = activeProductionLogFilters(filter, i18n.t);
+    expect(from?.clear(filter)).toEqual({ startDate: null, endDate: '2026-08-31' });
+    expect(to?.clear(filter)).toEqual({ startDate: '2026-08-01', endDate: null });
   });
 });

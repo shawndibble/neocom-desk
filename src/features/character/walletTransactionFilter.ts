@@ -11,6 +11,8 @@
  * reason that one does: it is view state for one panel, not a rule about EVE.
  * It stays pure regardless, and its tests are the specification.
  */
+import type { TFunction } from 'i18next';
+import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
 import type { WalletTransactionCommon } from '@/esi/endpoints';
 import {
   defineUrlFilter,
@@ -19,6 +21,7 @@ import {
   nullableTextParam,
   textParam,
 } from '@/lib/urlState';
+import { activeDateRangeFilters } from './dateRangeActiveFilters';
 
 /** Buy, sell, or don't care. */
 export type TransactionSide = 'all' | 'buy' | 'sell';
@@ -104,17 +107,37 @@ export function filterWalletTransactions<T extends WalletTransactionCommon>(
 }
 
 /**
- * How many filters are set, for the mobile sheet's badge.
+ * The filters set away from their default, as `FilterBar` pills: side, the
+ * date ends, then the stations.
  *
  * Text is left out on purpose: its box stays on screen at every width, so it
- * is never one of the filters the badge is there to account for. Same rule as
- * `activeWalletJournalFilterCount`.
+ * already says what it holds. So are the view and station order, which arrange
+ * the rows rather than narrow them.
  */
-export function activeWalletTransactionFilterCount(filter: WalletTransactionFilter): number {
-  let count = 0;
-  if (filter.side !== 'all') count += 1;
-  if (filter.startDate !== null) count += 1;
-  if (filter.endDate !== null) count += 1;
-  if (filter.stations.length > 0) count += 1;
-  return count;
+export function activeWalletTransactionFilters(
+  filter: WalletTransactionFilter,
+  t: TFunction,
+  /** Names the picked stations; absent on the corp bar, which has no Stations field. */
+  stationOptions?: readonly { id: number; label: string }[]
+): ActiveFilter<WalletTransactionFilter>[] {
+  const active: ActiveFilter<WalletTransactionFilter>[] = [];
+  if (filter.side !== 'all')
+    active.push({
+      label: t('wallet.sideFilterLabel'),
+      value: t(filter.side === 'buy' ? 'wallet.buy' : 'wallet.sell'),
+      clear: (value) => ({ ...value, side: 'all' }),
+    });
+  active.push(...activeDateRangeFilters(filter, t));
+  if (filter.stations.length > 0)
+    active.push({
+      label: t('wallet.stationsFilterLabel'),
+      value: summarizeFilterValues(
+        filter.stations.map(
+          (id) => stationOptions?.find((option) => option.id === id)?.label ?? `#${id}`
+        ),
+        t
+      ),
+      clear: (value) => ({ ...value, stations: [] }),
+    });
+  return active;
 }

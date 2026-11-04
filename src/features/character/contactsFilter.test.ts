@@ -5,6 +5,7 @@ import {
   EMPTY_CONTACTS_FILTER,
   STANDING_CATEGORIES,
   activeContactsFilterCount,
+  activeContactsFilters,
   contactCountsByStanding,
   contactCountsByKind,
   contactKind,
@@ -124,6 +125,38 @@ describe('activeContactsFilterCount', () => {
         standings: new Set(['good' as const, 'bad' as const]),
       })
     ).toBe(3);
+  });
+});
+
+describe('activeContactsFilters', () => {
+  const t = (key: string) => key;
+
+  it('lists nothing for the empty filter, nor for search text alone', () => {
+    expect(activeContactsFilters(EMPTY_CONTACTS_FILTER, t)).toEqual([]);
+    expect(activeContactsFilters({ ...EMPTY_CONTACTS_FILTER, text: 'x' }, t)).toEqual([]);
+  });
+
+  it('lists each narrowed group once, naming what it still shows', () => {
+    const filter = {
+      text: 'x',
+      types: new Set(['character' as const]),
+      standings: new Set<never>(),
+    };
+    const active = activeContactsFilters(filter, t);
+    expect(active.map(({ label, value }) => ({ label, value }))).toEqual([
+      { label: 'contacts.typeFilterLabel', value: 'contacts.typeCharacter' },
+      { label: 'contacts.standingFilterLabel', value: 'filters.none' },
+    ]);
+    expect(active[0].clear(filter)).toEqual({ ...filter, types: EMPTY_CONTACTS_FILTER.types });
+    expect(active[1].clear(filter)).toEqual({
+      ...filter,
+      standings: EMPTY_CONTACTS_FILTER.standings,
+    });
+  });
+
+  it('keeps a wider value’s own fields through a clear', () => {
+    const filter = { ...EMPTY_CONTACTS_FILTER, types: new Set<never>(), extra: true };
+    expect(activeContactsFilters(filter, t)[0].clear(filter).extra).toBe(true);
   });
 });
 

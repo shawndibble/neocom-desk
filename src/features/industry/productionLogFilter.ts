@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+import type { ActiveFilter } from '@/components/ui';
 import type { ProductionRunRecord } from '@/db';
 import { formatLocalDate } from '@/lib/localDate';
 
@@ -43,6 +45,27 @@ export function filterProductionRunsByDate(
   });
 }
 
-export function activeProductionLogFilterCount(filter: ProductionLogFilter): number {
-  return [filter.startDate, filter.endDate].filter((v) => v !== null).length;
+/**
+ * Each bound that is set, as its own pill so either end can be dropped alone.
+ * The value is the `YYYY-MM-DD` the date field holds: a calendar day, so
+ * running it back through a `Date` to format it could land on the next one.
+ */
+export function activeProductionLogFilters(
+  filter: ProductionLogFilter,
+  t: TFunction
+): ActiveFilter<ProductionLogFilter>[] {
+  const active: ActiveFilter<ProductionLogFilter>[] = [];
+  if (filter.startDate !== null)
+    active.push({
+      label: t('industry.dateFromLabel'),
+      value: filter.startDate,
+      clear: (value) => ({ ...value, startDate: null }),
+    });
+  if (filter.endDate !== null)
+    active.push({
+      label: t('industry.dateToLabel'),
+      value: filter.endDate,
+      clear: (value) => ({ ...value, endDate: null }),
+    });
+  return active;
 }

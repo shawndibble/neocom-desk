@@ -1,8 +1,7 @@
 /**
- * BPC Sourcing's active filters as removable chips — what a phone shows under
- * the search box, where every filter otherwise hides behind the funnel's
- * sheet and only a count badge admits any is on. Ids, values and a `clear`
- * here; labels are the panel's, which owns translation and region names.
+ * BPC Sourcing's active filters — the pills `FilterBar` shows under the search
+ * box while its controls are closed. Ids, values and a `clear` here; labels
+ * are `BpcFilterBar`'s, which owns translation and region names.
  */
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import { DEFAULT_JUMP_RANGE, type JumpRange } from '@/engine/route/jumpRange';
@@ -107,12 +106,4 @@ export function bpcActiveFilterChips(
     });
   }
   return chips;
-}
-
-/** The funnel's badge: every chip, plus the search text, which narrows the table too. */
-export function bpcActiveFilterCount(state: BpcFilterState, hideDefaults: BpcHideDefaults): number {
-  return (
-    bpcActiveFilterChips(state, hideDefaults).length +
-    (state.filter.typeQuery.trim() === '' ? 0 : 1)
-  );
 }

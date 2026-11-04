@@ -61,7 +61,7 @@ export { FilterChip } from './FilterChip';
 export { EditableValue } from './EditableValue';
 export { SegmentedControl } from './SegmentedControl';
 export { FilterBar, FilterField } from './FilterBar';
-export { countActive } from './countActive';
+export { clearFilters, summarizeFilterValues, type ActiveFilter } from './activeFilters';
 export { DateRangeFields } from './DateRangeFields';
 export { useFilterSurface } from './filterSurface';
 export { Disclosure, Caret } from './Disclosure';

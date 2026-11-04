@@ -49,7 +49,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { ItemInfoLink } from '@/features/entities';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import {
-  activeWalletTransactionFilterCount,
+  activeWalletTransactionFilters,
   EMPTY_WALLET_TRANSACTION_FILTER,
   type StationOrder,
   type TransactionSide,
@@ -115,11 +115,14 @@ export function TransactionsFilterBar({
   onChange,
   actions,
   stationOptions,
+  resultCount,
 }: {
   filter: WalletTransactionFilter;
   onChange: (filter: WalletTransactionFilter) => void;
   /** The column picker, inline between the search box and the funnel. */
   actions?: ReactNode;
+  /** Transactions the filter leaves, for the phone sheet's done button. */
+  resultCount?: number;
   /**
    * The stations to pick from. Market History passes them (its Station filter
    * and, in the By station view, the "Stations by" picker); the corp wallet
@@ -132,7 +135,8 @@ export function TransactionsFilterBar({
     <FilterBar
       value={filter}
       onChange={onChange}
-      activeCount={activeWalletTransactionFilterCount(filter)}
+      active={activeWalletTransactionFilters(filter, t, stationOptions)}
+      resultCount={resultCount}
       className="border-b border-line px-3 py-2"
       search={
         <SearchInput
@@ -418,6 +422,7 @@ export function CorpTransactionsPanel({
           <TransactionsFilterBar
             filter={filter}
             onChange={onFilterChange}
+            resultCount={filteredTransactions.length}
             actions={
               <ColumnPickerMenu
                 available={CORP_TRANSACTIONS_COLUMN_IDS}
@@ -437,7 +442,8 @@ export function CorpTransactionsPanel({
               hint={t('wallet.transactionsNoFilterMatchesHint')}
               className="py-8"
               action={
-                activeWalletTransactionFilterCount(filter) > 0 || filter.text.trim() !== '' ? (
+                activeWalletTransactionFilters(filter, t).length > 0 ||
+                filter.text.trim() !== '' ? (
                   <Button size="sm" onClick={() => onFilterChange(EMPTY_WALLET_TRANSACTION_FILTER)}>
                     {t('common.resetFilters')}
                   </Button>

@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import type { TFunction } from 'i18next';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import {
   EMPTY_WALLET_JOURNAL_FILTER,
-  activeWalletJournalFilterCount,
+  activeWalletJournalFilters,
   filterWalletJournal,
   journalPartyBreakdown,
   toggleBreakdownParty,
@@ -144,28 +145,55 @@ describe('journalRefTypes', () => {
   });
 });
 
-describe('activeWalletJournalFilterCount', () => {
-  it('is zero for the identity filter', () => {
-    expect(activeWalletJournalFilterCount(EMPTY_WALLET_JOURNAL_FILTER)).toBe(0);
+/** Echoes the key, so a test reads which pills are on rather than their English. */
+const t = ((key: string) => key) as unknown as TFunction;
+
+describe('activeWalletJournalFilters', () => {
+  it('is empty for the identity filter', () => {
+    expect(activeWalletJournalFilters(EMPTY_WALLET_JOURNAL_FILTER, t)).toEqual([]);
   });
 
-  it('counts each active criterion', () => {
-    expect(
-      activeWalletJournalFilterCount({
+  it('lists each active criterion, in the bar order', () => {
+    const active = activeWalletJournalFilters(
+      {
         refType: 'bounty_prizes',
         startDate: '2026-01-01',
         endDate: null,
-        player: null,
+        player: '42',
         party: null,
         text: '',
-      })
-    ).toBe(2);
+      },
+      t,
+      { players: [{ id: '42', name: 'Some Pilot' }] }
+    );
+    expect(active.map((pill) => pill.label)).toEqual([
+      'wallet.refTypeFilterLabel',
+      'wallet.playerFilterLabel',
+      'wallet.dateFromLabel',
+    ]);
+    expect(active[1].value).toBe('Some Pilot');
+  });
+
+  it('names an id with no option by its number, as the dropdown does', () => {
+    const [player] = activeWalletJournalFilters({ ...EMPTY_WALLET_JOURNAL_FILTER, player: '7' }, t);
+    expect(player.value).toBe('#7');
   });
 
   it('ignores the search text, which stays in the row rather than the sheet', () => {
     expect(
-      activeWalletJournalFilterCount({ ...EMPTY_WALLET_JOURNAL_FILTER, text: 'concord' })
-    ).toBe(0);
+      activeWalletJournalFilters({ ...EMPTY_WALLET_JOURNAL_FILTER, text: 'concord' }, t)
+    ).toEqual([]);
+  });
+
+  it('clears just its own criterion', () => {
+    const filter: WalletJournalFilter = {
+      ...EMPTY_WALLET_JOURNAL_FILTER,
+      refType: 'bounty_prizes',
+      endDate: '2026-01-31',
+    };
+    const [refType, to] = activeWalletJournalFilters(filter, t);
+    expect(refType.clear(filter)).toEqual({ ...filter, refType: null });
+    expect(to.clear(filter)).toEqual({ ...filter, endDate: null });
   });
 });
 
@@ -286,7 +314,12 @@ describe('party filter and breakdown', () => {
   });
 
   it('counts the party as an active criterion', () => {
-    expect(activeWalletJournalFilterCount({ ...EMPTY_WALLET_JOURNAL_FILTER, party: '7' })).toBe(1);
+    const active = activeWalletJournalFilters({ ...EMPTY_WALLET_JOURNAL_FILTER, party: '7' }, t, {
+      parties: [{ id: '7', name: 'Some Corp' }],
+    });
+    expect(active.map(({ label, value }) => ({ label, value }))).toEqual([
+      { label: 'wallet.partyFilterLabel', value: 'Some Corp' },
+    ]);
   });
 
   it('rolls up In / Out / Net per party, groups market fills, skips internal and party-less lines', () => {

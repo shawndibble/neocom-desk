@@ -16,7 +16,7 @@ import { RARELY_SOLD_PER_DAY } from '@/engine/industry/marketWideSanity';
 import { toggleInSet } from '@/lib/sets';
 import {
   BUILD_COST_CAPS,
-  activeFilterCount,
+  activeMarketWideFilters,
   type BuildCostCap,
   type MarketWideFilterState,
 } from './marketWideFilter';
@@ -27,6 +27,8 @@ interface MarketWideFilterBarProps {
   onChange: (next: MarketWideFilterState) => void;
   /** Rows no Character on the account can build, shown as the skill chip's count. */
   gatedCount: number;
+  /** Rows the filters leave, for the phone sheet's done button; omitted before a scan. */
+  resultCount?: number;
 }
 
 /**
@@ -34,13 +36,19 @@ interface MarketWideFilterBarProps {
  * state: below `md` it opens `FilterBar`'s sheet, with a pointer a popover
  * off the funnel — a box unfolding beneath it would open inside the bar.
  */
-export function MarketWideFilterBar({ filter, onChange, gatedCount }: MarketWideFilterBarProps) {
+export function MarketWideFilterBar({
+  filter,
+  onChange,
+  gatedCount,
+  resultCount,
+}: MarketWideFilterBarProps) {
   const { t } = useTranslation();
   return (
     <FilterBar
       value={filter}
       onChange={onChange}
-      activeCount={activeFilterCount(filter)}
+      active={activeMarketWideFilters(filter, t)}
+      resultCount={resultCount}
       triggerSize="sm"
       pointerSurface="popover"
     >

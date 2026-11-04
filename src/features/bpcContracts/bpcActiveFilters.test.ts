@@ -4,7 +4,6 @@ import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
 import { DEFAULT_SOURCE_TOGGLES } from './bpcSourcingUrl';
 import {
   bpcActiveFilterChips,
-  bpcActiveFilterCount,
   type BpcFilterState,
   type BpcHideDefaults,
 } from './bpcActiveFilters';
@@ -100,7 +99,6 @@ describe('bpcActiveFilterChips with Exclude defaults', () => {
 
   it('gives no chip to hiding something the pilot hides by default', () => {
     expect(bpcActiveFilterChips(hidingPlex, HIDE_PLEX)).toEqual([]);
-    expect(bpcActiveFilterCount(hidingPlex, HIDE_PLEX)).toBe(0);
   });
 
   it('clears a chip back to the default, which Clear all then leaves alone', () => {
@@ -110,18 +108,5 @@ describe('bpcActiveFilterChips with Exclude defaults', () => {
     const cleared = auctions.clear(both);
     expect(cleared.filter.hideAuctions).toBe(false);
     expect(cleared.filter.hidePlex).toBe(true);
-  });
-});
-
-describe('bpcActiveFilterCount', () => {
-  it('is the chips plus the search text, so the funnel badge and the chips never disagree', () => {
-    expect(bpcActiveFilterCount(EMPTY, NO_HIDE)).toBe(0);
-    expect(bpcActiveFilterCount(EVERYTHING, NO_HIDE)).toBe(
-      bpcActiveFilterChips(EVERYTHING, NO_HIDE).length + 1
-    );
-    const noSearch = { ...EVERYTHING, filter: { ...EVERYTHING.filter, typeQuery: '' } };
-    expect(bpcActiveFilterCount(noSearch, NO_HIDE)).toBe(
-      bpcActiveFilterChips(noSearch, NO_HIDE).length
-    );
   });
 });

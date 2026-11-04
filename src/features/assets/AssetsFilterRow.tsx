@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   FilterBar,
+  FilterField,
   IskInput,
   SearchInput,
   Select,
@@ -41,49 +42,66 @@ export function AssetsFilterRow({
     categoryPick,
     blueprintKind,
     showBlueprintSelect,
-    activeFilterCount,
+    filterValue,
+    activeFilters,
   } = assetsData;
-  const { searchRef, sortField, setSortField } = assetsRows;
+  const { searchRef, sortField, setSortField, rows } = assetsRows;
 
+  // Each control sits in a `FilterField` whose label is its pill's, so a pill
+  // tapped on a phone opens the sheet on that control. Outside a `FilterBar`
+  // (the desktop row) a `FilterField` is `display: contents`, so the inline
+  // layout is untouched.
   const category = categoryIndex && pickerIndex && (
-    <AssetCategoryPicker
-      index={categoryIndex}
-      visibleIndex={pickerIndex}
-      pick={categoryPick}
-      active={!pickIsAll(categoryPick)}
-      onChange={(cat) => setView({ cat })}
-    />
+    <FilterField label={t('assets.category.label')}>
+      <AssetCategoryPicker
+        index={categoryIndex}
+        visibleIndex={pickerIndex}
+        pick={categoryPick}
+        active={!pickIsAll(categoryPick)}
+        onChange={(cat) => setView({ cat })}
+      />
+    </FilterField>
   );
 
   const blueprints = showBlueprintSelect && (
-    <BlueprintKindSelect
-      value={blueprintKind}
-      active={blueprintKind !== 'any'}
-      onChange={(bp) => setView({ bp })}
-    />
+    <FilterField label={t('assets.blueprints.label')}>
+      <BlueprintKindSelect
+        value={blueprintKind}
+        active={blueprintKind !== 'any'}
+        onChange={(bp) => setView({ bp })}
+      />
+    </FilterField>
   );
 
   const minValue = (
-    <IskInput
-      value={minValueInput}
-      onChange={(min) => setView({ min })}
-      placeholder={t('assets.minValue.placeholder')}
-      aria-label={t('assets.minValue.label')}
-      className="w-full md:w-28"
-    />
+    <FilterField label={t('assets.minValue.label')}>
+      <IskInput
+        value={minValueInput}
+        onChange={(min) => setView({ min })}
+        placeholder={t('assets.minValue.placeholder')}
+        aria-label={t('assets.minValue.label')}
+        className="w-full md:w-28"
+      />
+    </FilterField>
   );
 
+  // Sort orders the list rather than narrowing it, so it is never a pill.
   const sort = flatModeActive && (
-    <Select value={sortField} onValueChange={(value) => void setSortField(value as AssetSortField)}>
-      <SelectTrigger aria-label={t('assets.sort.label')} className="w-full md:w-32">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="name">{t('assets.sort.name')}</SelectItem>
-        <SelectItem value="value">{t('assets.sort.value')}</SelectItem>
-        <SelectItem value="quantity">{t('assets.sort.quantity')}</SelectItem>
-      </SelectContent>
-    </Select>
+    <FilterField label={t('assets.sort.label')}>
+      <Select
+        value={sortField}
+        onValueChange={(value) => void setSortField(value as AssetSortField)}
+      >
+        <SelectTrigger aria-label={t('assets.sort.label')} className="w-full md:w-32">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="name">{t('assets.sort.name')}</SelectItem>
+          <SelectItem value="value">{t('assets.sort.value')}</SelectItem>
+          <SelectItem value="quantity">{t('assets.sort.quantity')}</SelectItem>
+        </SelectContent>
+      </Select>
+    </FilterField>
   );
 
   const searchBox = (
@@ -99,10 +117,12 @@ export function AssetsFilterRow({
   if (isNarrow) {
     return (
       <FilterBar
-        value={null}
-        onChange={() => {}}
+        value={filterValue}
+        onChange={(next) => setView({ cat: next.cat, bp: next.bp, min: next.min })}
         search={searchBox}
-        activeCount={activeFilterCount}
+        active={activeFilters}
+        // Only a flat list's rows are results; browsing, they are a place's contents.
+        resultCount={flatModeActive ? rows.length : undefined}
         title={t('assets.filters.title')}
       >
         {() => (
