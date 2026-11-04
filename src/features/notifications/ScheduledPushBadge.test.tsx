@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import { db } from '@/db';
 import '@/i18n';
@@ -84,7 +84,8 @@ describe('EveNotificationBadge', () => {
       value: { 1: { status: 'active', enabledAt: 1 } },
     });
     const { container } = render(<EveNotificationBadge onlyWhenMissing />);
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(container).toBeEmptyDOMElement();
+    // The badge starts as "grant missing" and clears once the live query reads the grant, so wait
+    // for that instead of sleeping a fixed 20 ms, which lost the race on a loaded runner.
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 });
