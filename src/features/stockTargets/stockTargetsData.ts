@@ -5,10 +5,12 @@
  * Plan owned-stock detection uses, so opening the tab rarely costs an ESI call.
  */
 import { detectOwnedStock, type DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
+import { contractStockAtMarket, type ContractStockInput } from '@/engine/stockTargets/onContract';
 import { rankMarkets, type MarketSummary } from '@/engine/stockTargets/markets';
 import {
   countAtMarket,
   holdersAtMarket,
+  type HolderCount,
   listedAtMarket,
   sellersAtMarket,
 } from '@/engine/stockTargets/onHand';
@@ -22,6 +24,7 @@ import { readCachedRows } from '@/esi/cache';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { KEY as ASSETS_KEY, loadAllCharactersAssets } from '@/features/assets/assets';
 import { KEYS as ORDER_KEYS } from '@/features/character/orders';
+import { readCachedContractStock } from './cachedContractStock';
 import { loadStationSummary } from '@/features/character/stations';
 import { loadStructureSummary } from '@/features/character/structures';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
@@ -41,6 +44,8 @@ type SellOrder = MarketOrder & { characterId: number };
 interface Holdings {
   detected: DetectedOwnedStockMap;
   sellOrders: SellOrder[];
+  /** Own contracts and their cached items: stock on offer that has left the assets. */
+  contractStock: ContractStockInput[];
   /** Characters whose assets or orders could not all be read: every count is then a floor. */
   incompleteCharacters: string[];
   /** The oldest asset read behind the counts, or null when none was read. */
@@ -64,6 +69,9 @@ async function readHoldings(typeIds: readonly number[] | 'all'): Promise<Holding
     assets.entries.map((entry) => ({ characterId: entry.characterId, assets: entry.assets })),
     wanted
   );
+  const contractStock = await readCachedContractStock([
+    ...assets.entries.map((entry) => entry.characterId),
+  ]);
   const sellOrders = orders.entries.flatMap((entry) =>
     entry.orders
       .filter((order) => !order.is_buy_order)
@@ -87,6 +95,7 @@ async function readHoldings(typeIds: readonly number[] | 'all'): Promise<Holding
   return {
     detected,
     sellOrders,
+    contractStock,
     incompleteCharacters,
     oldestFetchedAt: fetchTimes.length > 0 ? new Date(Math.min(...fetchTimes)) : null,
     characterIds: assets.entries.map((entry) => entry.characterId),
@@ -138,6 +147,20 @@ function readersFor(locationId: number, holdings: Holdings): number[] {
   return [...new Set([...sellers, ...holdings.characterIds])];
 }
 
+/** Order-listed and on-contract holders as one Listed attribution: the same Character's shares add. */
+function mergeHolders(
+  orders: readonly HolderCount[],
+  contracts: readonly HolderCount[]
+): HolderCount[] {
+  const shares = new Map<number, number>();
+  for (const holder of [...orders, ...contracts]) {
+    shares.set(holder.characterId, (shares.get(holder.characterId) ?? 0) + holder.quantity);
+  }
+  return [...shares]
+    .map(([characterId, quantity]) => ({ characterId, quantity }))
+    .sort((a, b) => b.quantity - a.quantity || a.characterId - b.characterId);
+}
+
 function rowsFor(
   list: StockList,
   holdings: Holdings,
@@ -146,16 +169,27 @@ function rowsFor(
   const typeIds = list.items.map((item) => item.typeId);
   const counts = countAtMarket(holdings.detected, holdings.sellOrders, list.locationId, typeIds);
   const holders = holdersAtMarket(holdings.detected, holdings.sellOrders, list.locationId, typeIds);
+  const contracts = contractStockAtMarket(
+    holdings.contractStock,
+    list.locationId,
+    typeIds,
+    Date.now()
+  );
   return buildStockRows(
-    list.items.map((item) => ({
-      typeId: item.typeId,
-      target: item.target,
-      listed: counts.get(item.typeId)?.listed ?? 0,
-      inHangar: counts.get(item.typeId)?.inHangar ?? 0,
-      price: prices.get(item.typeId)?.sellMin ?? null,
-      listedBy: holders.get(item.typeId)?.listedBy,
-      inHangarBy: holders.get(item.typeId)?.inHangarBy,
-    }))
+    list.items.map((item) => {
+      const onContractBy = contracts.get(item.typeId) ?? [];
+      const onContract = onContractBy.reduce((sum, holder) => sum + holder.quantity, 0);
+      return {
+        typeId: item.typeId,
+        target: item.target,
+        listed: (counts.get(item.typeId)?.listed ?? 0) + onContract,
+        onContract,
+        inHangar: counts.get(item.typeId)?.inHangar ?? 0,
+        price: prices.get(item.typeId)?.sellMin ?? null,
+        listedBy: mergeHolders(holders.get(item.typeId)?.listedBy ?? [], onContractBy),
+        inHangarBy: holders.get(item.typeId)?.inHangarBy,
+      };
+    })
   );
 }
 
@@ -335,7 +369,16 @@ export async function loadStockAlertEntries(
     new Set(typeIds)
   );
   const sellOrders = [...orders.values()].flatMap((cached) => cached.data);
+  // Cache only, like the orders: a missing contract cache adds nothing and never makes `known` false.
+  const contractStock = await readCachedContractStock(characterIds);
+  const now = Date.now();
   return lists.flatMap((list) => {
+    const contracts = contractStockAtMarket(
+      contractStock,
+      list.locationId,
+      list.items.map((item) => item.typeId),
+      now
+    );
     const counts = countAtMarket(
       detected,
       sellOrders,
@@ -349,7 +392,10 @@ export async function loadStockAlertEntries(
       typeId: item.typeId,
       name: names.get(item.typeId) ?? `#${item.typeId}`,
       target: item.target,
-      listed: known ? (counts.get(item.typeId)?.listed ?? 0) : null,
+      listed: known
+        ? (counts.get(item.typeId)?.listed ?? 0) +
+          (contracts.get(item.typeId) ?? []).reduce((sum, holder) => sum + holder.quantity, 0)
+        : null,
       inHangar: counts.get(item.typeId)?.inHangar ?? 0,
     }));
   });

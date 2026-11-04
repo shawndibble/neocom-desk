@@ -48,7 +48,12 @@ function runningDeadline(contract: StockContract): number | null {
   return courierDeliveryDeadlineMs(withAcceptedCourierInProgress(contract));
 }
 
-function isOpenOwnContract(contract: StockContract, characterId: number, now: number): boolean {
+/** A contract the Character issued for themselves that is still live: not corporation-issued, not over, not expired. */
+export function isOpenOwnContract(
+  contract: StockContract,
+  characterId: number,
+  now: number
+): boolean {
   if (contract.issuer_id !== characterId || contract.for_corporation) return false;
   if (!isActiveContractStatus(contract.status)) return false;
   // An expired contract stays outstanding in ESI until its items are returned.

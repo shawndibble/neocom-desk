@@ -28,6 +28,7 @@ export function stockCsvColumns(
     { header: t('stockTargets.table.csvGroup'), value: (row) => groupOf(row.typeId) },
     { header: t('stockTargets.table.target'), value: (row) => row.target },
     { header: t('stockTargets.table.listed'), value: (row) => row.listed },
+    { header: t('stockTargets.table.csvOnContract'), value: (row) => row.onContract ?? 0 },
     { header: t('stockTargets.table.csvListedBy'), value: (row) => holders(row.listedBy) },
     { header: t('stockTargets.table.inHangar'), value: (row) => row.inHangar },
     { header: t('stockTargets.table.csvInHangarBy'), value: (row) => holders(row.inHangarBy) },

@@ -31,6 +31,8 @@ export interface StockRowInput {
   listedBy?: readonly HolderCount[];
   /** Whose hangars make up `inHangar`, biggest first. */
   inHangarBy?: readonly HolderCount[];
+  /** Units on own Item Exchange contracts at the market, already inside `listed`: shown apart, not added again. */
+  onContract?: number;
 }
 
 export interface StockRow extends StockRowInput {
