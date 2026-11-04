@@ -245,6 +245,23 @@ function sumLines(...lists: readonly (readonly OreLine[])[]): OreLine[] {
     .sort((a, b) => a.typeId - b.typeId);
 }
 
+/**
+ * One overlap for several books' lines on the same Mining Ledger Entry: every Payee involved,
+ * the ore they contest summed, paid only when every part is. What "let each corporation bill
+ * what it recorded" takes off the miner's entry in one go; undefined when no line has one.
+ */
+export function combineOverlaps(
+  overlaps: readonly (BookOverlap | undefined)[]
+): BookOverlap | undefined {
+  const present = overlaps.filter((o): o is BookOverlap => o !== undefined);
+  if (present.length === 0) return undefined;
+  return {
+    payeeIds: [...new Set(present.flatMap((o) => o.payeeIds))],
+    ore: sumLines(...present.map((o) => o.ore)),
+    paid: present.every((o) => o.paid),
+  };
+}
+
 function minusLines(from: readonly OreLine[], take: readonly OreLine[]): OreLine[] {
   const gone = new Map(take.map((l) => [l.typeId, l.quantity]));
   return from

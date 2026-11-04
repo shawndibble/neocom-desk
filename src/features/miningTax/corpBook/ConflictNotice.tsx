@@ -21,8 +21,8 @@ interface Props {
   entries: readonly ConflictEntry[];
   /** Where the book recorded the ore: the refinery, else the system. */
   recordedAt: string;
-  /** `YYYY-MM-DD` the conflict resolves to the corporation; empty when unknown. */
-  resolvesOn: string;
+  /** Other corporations whose books contest the same day, with what each would bill. */
+  others: readonly { corpName: string; billAmount: number }[];
   previews: readonly OverlapPreview[];
   typeNames: ReadonlyMap<number, string>;
   busy?: boolean;
@@ -35,16 +35,17 @@ interface Props {
 
 /**
  * A Conflict day's detail: what clashes (the entry, and why: another Payee holds the ore,
- * or the corporation's own Payee lists more than the book recorded), what happens if
- * nothing is done, and the two ways out — the book is right (take the ore off the entry),
- * or the entry is right (an officer corrects the book). Facts first, then the fix.
+ * or the corporation's own Payee lists more than the book recorded), any other book
+ * contesting the same day, and the two ways out — the book is right (take the ore off the entry),
+ * or the entry is right (an officer corrects the book). Facts first, then the fix. What it
+ * bills, and when, is the modal's header line.
  */
 export function ConflictNotice({
   corpName,
   cause,
   entries,
   recordedAt,
-  resolvesOn,
+  others,
   previews,
   typeNames,
   busy,
@@ -81,14 +82,34 @@ export function ConflictNotice({
         )}
         <li>{t(k('bookEntry'), { corp: corpName, place: recordedAt })}</li>
       </ul>
-      {resolvesOn && (
-        <p className="text-text-dim">{t(k('resolves'), { corp: corpName, date: resolvesOn })}</p>
+      {others.length > 0 && (
+        <p className="text-text-dim">
+          {t(k('alsoContested'), {
+            list: others
+              .map((o) =>
+                t(k('alsoContestedItem'), { corp: o.corpName, amount: formatIsk(o.billAmount) })
+              )
+              .join(', '),
+          })}
+        </p>
       )}
 
       <p className="font-semibold">{t(k('fixTitle'))}</p>
       <ul className="list-disc space-y-1.5 pl-4">
         <li className="space-y-1">
-          <p>{t(k(anyPaid ? 'bookRightPaid' : 'bookRight'))}</p>
+          <p>
+            {t(
+              k(
+                others.length > 0
+                  ? anyPaid
+                    ? 'booksRightPaid'
+                    : 'booksRight'
+                  : anyPaid
+                    ? 'bookRightPaid'
+                    : 'bookRight'
+              )
+            )}
+          </p>
           {entries.length > 0 &&
             (anyPaid ? (
               <div className="flex flex-wrap gap-2">
@@ -102,6 +123,7 @@ export function ConflictNotice({
                 typeNames={typeNames}
                 busy={busy}
                 onTakeOver={onTakeOver}
+                {...(others.length > 0 && { label: t(k('letEachBill')) })}
               />
             ))}
         </li>

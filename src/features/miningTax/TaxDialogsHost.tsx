@@ -692,6 +692,14 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 view={corpDetail.view}
                 corpName={corpDetail.corpName}
                 recordedAt={corpDetail.view.refineryLabel ?? systemName(detailTarget)}
+                siblings={corpView?.overlay.rows.filter(
+                  (r) =>
+                    r.state === 'conflict' &&
+                    r.corporationId !== corpDetail.view.corporationId &&
+                    r.characterId === corpDetail.view.characterId &&
+                    r.date === corpDetail.view.date &&
+                    r.solarSystemId === corpDetail.view.solarSystemId
+                )}
                 everyAssignment={everyAssignment}
                 payeeById={payeeById}
                 typeNames={typeNames}

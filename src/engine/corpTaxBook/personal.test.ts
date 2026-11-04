@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  combineOverlaps,
   coverInFlight,
   inFlightDonations,
   overlayCorpBooks,
@@ -314,6 +315,17 @@ describe('overlayCorpBooks', () => {
       );
       expect(out.rows.map((r) => r.state)).toEqual(['billed', 'billed']);
       expect(out.rows.every((r) => r.overlap === undefined)).toBe(true);
+    });
+
+    it("combines both books' overlaps into what one take-over removes from the entry", () => {
+      const out = overlay([day([given('x', 'ashfall', 30_000)], 30_000)], twoBooks());
+      const combined = combineOverlaps(out.rows.map((r) => r.overlap));
+      expect(combined).toEqual({
+        payeeIds: ['ashfall'],
+        ore: [{ typeId: ZEO, quantity: 30_000 }],
+        paid: false,
+      });
+      expect(combineOverlaps([undefined])).toBeUndefined();
     });
 
     it("names the Payee on each book's conflict, each capped at the ore it contests", () => {

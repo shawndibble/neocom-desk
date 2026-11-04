@@ -6,6 +6,7 @@ import { focusRingClassName, interactiveClassName } from '@/components/ui/contro
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import type { PayeeBalance, UnassignedSummary } from './balances';
+import type { ConflictSummary } from './corpBook/conflictSummary';
 import { DAY_MS } from '@/lib/age';
 
 /** Whole EVE days between the oldest owed entry and today (UTC) — how long this Payee has been waiting. */
@@ -35,6 +36,13 @@ interface OwedBalancesProps {
   hideLinkPayment?: (balance: PayeeBalance) => boolean;
   onAssignNext: () => void;
   onReviewPayments: () => void;
+  /**
+   * Corp Tax Book Conflicts still to fix. Not owed, so never in the total, but each turns into
+   * a bill on its day: shown at every width so the next Statement holds no surprise.
+   */
+  conflicts?: ConflictSummary | null;
+  /** Opens the first Conflict to resolve. */
+  onReviewConflicts?: () => void;
 }
 
 /**
@@ -57,6 +65,8 @@ export function OwedBalances({
   hideLinkPayment,
   onAssignNext,
   onReviewPayments,
+  conflicts,
+  onReviewConflicts,
 }: OwedBalancesProps) {
   const { t } = useTranslation();
   const owed = balances.filter((b) => b.owed > 0);
@@ -146,6 +156,27 @@ export function OwedBalances({
         </p>
       )}
 
+      {conflicts &&
+        promptRow(
+          'conflicts',
+          <span className="text-base font-semibold text-warning">
+            {t('miningTax.conflictsTitle')}
+          </span>,
+          <span className="text-sm font-semibold tabular-nums">
+            {formatIsk(conflicts.amount, 0)}
+            <span className="ml-1 text-xs font-normal text-text-dim">ISK</span>
+          </span>,
+          t('miningTax.conflictsHint', {
+            count: conflicts.count,
+            corp: conflicts.firstCorpName,
+            date: conflicts.firstDate,
+          }),
+          onReviewConflicts && (
+            <Button className="shrink-0" onClick={onReviewConflicts}>
+              {t('miningTax.conflictsReview')}
+            </Button>
+          )
+        )}
       {slimPrompts &&
         unassigned.entryCount > 0 &&
         promptRow(

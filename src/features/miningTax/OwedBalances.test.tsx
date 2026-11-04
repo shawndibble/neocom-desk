@@ -96,3 +96,42 @@ describe('OwedBalances prompts (#3120)', () => {
     expect(within(grid as HTMLElement).getByRole('button', { name: /Assign next/ })).toBeVisible();
   });
 });
+
+describe('OwedBalances Conflicts line', () => {
+  it('shows what Conflicts will bill and when, beside nothing outstanding, and opens the first', async () => {
+    const onReviewConflicts = vi.fn();
+    renderBalances([balance('a', 0)], {
+      conflicts: {
+        count: 1,
+        amount: 4_271_257,
+        first: {} as never,
+        firstDate: '2026-11-12',
+        firstCorpName: 'Bureau of Unified Harvesting',
+      },
+      onReviewConflicts,
+    });
+    expect(screen.getByText('No moon mining tax outstanding')).toBeInTheDocument();
+    expect(screen.getByText('Conflicts')).toBeInTheDocument();
+    expect(screen.getByText('4,271,257')).toBeInTheDocument();
+    expect(
+      screen.getByText('Bureau of Unified Harvesting bills this on 2026-11-12 unless you fix it.')
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Review' }));
+    expect(onReviewConflicts).toHaveBeenCalledOnce();
+  });
+
+  it('counts several Conflicts and names the first to bill', () => {
+    renderBalances([balance('a', 1_000_000)], {
+      conflicts: {
+        count: 3,
+        amount: 900_000,
+        first: {} as never,
+        firstDate: '2026-11-08',
+        firstCorpName: 'Brass',
+      },
+    });
+    expect(
+      screen.getByText('3 days. The first is billed on 2026-11-08 unless you fix it.')
+    ).toBeInTheDocument();
+  });
+});

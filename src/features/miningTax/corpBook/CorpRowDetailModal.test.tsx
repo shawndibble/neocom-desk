@@ -126,7 +126,7 @@ describe('CorpRowDetailModal', () => {
     expect(screen.queryByRole('button', { name: /settle up/i })).not.toBeInTheDocument();
   });
 
-  it('shows a conflict as not owed, with its notice ahead of the ore', () => {
+  it('shows a conflict as not owed yet, with what it bills and when, its notice ahead of the ore', () => {
     const conflict: BookRowView = {
       ...view,
       state: 'conflict',
@@ -135,7 +135,12 @@ describe('CorpRowDetailModal', () => {
       dispute: undefined,
     };
     renderModal({ corp: { ...corp, view: conflict }, notice: <p>Conflict notice</p> });
-    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByText('957,001 ISK')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Not owed yet · Brass Meridian Logistics bills it on 2026-11-01 unless you fix it'
+      )
+    ).toBeInTheDocument();
     const notice = screen.getByText('Conflict notice');
     const ore = screen.getByText('Ore');
     expect(notice.compareDocumentPosition(ore) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

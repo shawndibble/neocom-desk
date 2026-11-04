@@ -96,6 +96,7 @@ describe('CorpOverlapNotice on a Conflict day', () => {
     ...view,
     state: 'conflict',
     conflictCause: 'otherPayee',
+    billed: 319_000,
     resolvesAt: '2026-11-12T11:00:00.000Z',
   } as BookRowView;
   const renderConflict = (
@@ -115,13 +116,12 @@ describe('CorpOverlapNotice on a Conflict day', () => {
       />
     );
 
-  it('names the clashing entry, where the book recorded it, and when it resolves', () => {
+  it('names the clashing entry and where the book recorded it', () => {
     renderConflict();
     const region = screen.getByRole('region', { name: 'Conflict' });
     expect(region).toHaveTextContent('Your entry gives this ore to another Payee');
     expect(region).toHaveTextContent('Your entry: Ashfall · 500 ISK · owed');
     expect(region).toHaveTextContent("Brass Meridian's book: recorded it at Efa - Ore Works");
-    expect(region).toHaveTextContent('Left alone, it goes to Brass Meridian on 2026-11-12.');
     expect(region).toHaveTextContent(
       'If your entry is right: ask a Brass Meridian officer to correct the book.'
     );
@@ -172,6 +172,41 @@ describe('CorpOverlapNotice on a Conflict day', () => {
     expect(screen.getByRole('region', { name: 'Conflict' })).toHaveTextContent(
       'Your entry lists more ore than the book recorded'
     );
+  });
+
+  it('takes what each corporation recorded off the entry in one go when several books contest the day', async () => {
+    const second = {
+      ...conflict,
+      corporationId: 98000002,
+      corpName: 'Ashfall Prospecting',
+      billed: 120_000,
+      overlap: { payeeIds: ['p1'], ore: [{ typeId: ZEO, quantity: 5_000 }], paid: false },
+    } as BookRowView;
+    let changed = 0;
+    render(
+      <CorpOverlapNotice
+        view={conflict}
+        corpName="Brass Meridian"
+        recordedAt="Efa"
+        siblings={[second]}
+        everyAssignment={[assignment]}
+        payeeById={new Map([['p1', payee]])}
+        typeNames={new Map([[ZEO, 'Zeolites']])}
+        onChanged={() => changed++}
+      />
+    );
+    const region = screen.getByRole('region', { name: 'Conflict' });
+    expect(region).toHaveTextContent(
+      'Also in conflict on this day: Ashfall Prospecting (120,000 ISK).'
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Let each corp bill its share' }));
+    // 43,050 for this book and 5,000 for the other come off the 50,000 entry.
+    expect(screen.getByText(/Ashfall: 50,000 Zeolites → 1,950 Zeolites/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Take it off my list' }));
+    await waitFor(() => expect(changed).toBe(1));
+    expect((await db.miningTaxAssignments.get('a1'))?.oreLines).toEqual([
+      { typeId: ZEO, quantity: 1_950 },
+    ]);
   });
 
   it('says another Payee holds the ore when no entry of yours matches', () => {
