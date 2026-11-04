@@ -438,7 +438,7 @@ export function CourierResults({
   const preferenceOverride = params['courier.pref'];
   const routeQuery = useJumpBasis(preferenceOverride);
   const preference = routeQuery.rules.preference;
-  const [clickedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
+  const [clickedRow, setClickedRow] = useState<CourierRouteRow | null>(null);
   // The same contract out of the current rows, so an end the open detail
   // placed (or a refreshed corpus) reaches it; the clicked object only while
   // the rows no longer hold it.
@@ -692,7 +692,7 @@ export function CourierResults({
   const resultsRef = useRef<HTMLDivElement>(null);
 
   function searchReverseLane(row: CourierRouteRow) {
-    setSelectedRow(null);
+    setClickedRow(null);
     // The row that opened the detail is filtered out, so focus goes to the results.
     focusAfterCommit(resultsRef);
     changeFilter({
@@ -1078,7 +1078,7 @@ export function CourierResults({
               // a unique key.
               rowKey={(row) => String(row.contractId)}
               {...courierSortProps}
-              onRowClick={setSelectedRow}
+              onRowClick={setClickedRow}
               // Hundreds of hauls are scanned, not read: the dense two-line card
               // fits three times the labelled one on a phone.
               stackLayout="dense"
@@ -1109,7 +1109,7 @@ export function CourierResults({
           preference={preference}
           reverseLane={reverseLane}
           onSearchReverseLane={() => searchReverseLane(selectedRow)}
-          onClose={() => setSelectedRow(null)}
+          onClose={() => setClickedRow(null)}
           returnFocusFallback={() => resultsRef.current}
           characterId={characterId}
           onStructurePlaced={onStructurePlaced}

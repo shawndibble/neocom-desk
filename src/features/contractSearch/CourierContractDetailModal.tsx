@@ -190,12 +190,16 @@ function useStructureLookup(
       .then(async (structure) => {
         if (cancelled) return;
         setAnswer({ id: endpoint.locationId, result: structure?.name ?? null });
-        if (!structure) return;
+        // ESI's schema requires it, but a malformed cached row must not place
+        // an end in system `undefined`.
+        if (typeof structure?.solar_system_id !== 'number') return;
         const placed = await placeStructureEndpoint(latest.current.endpoint, {
           name: structure.name,
           systemId: structure.solar_system_id,
         }).catch(() => null);
-        if (!cancelled && placed) latest.current.onPlaced?.(placed);
+        // Not gated on `cancelled`: where a structure sits is true whether or
+        // not this detail is still open, and the board outlives it.
+        if (placed) latest.current.onPlaced?.(placed);
       });
     return () => {
       cancelled = true;

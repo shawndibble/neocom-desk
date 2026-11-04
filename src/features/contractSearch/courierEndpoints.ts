@@ -68,7 +68,7 @@ async function resolveOne(
     locationId,
     name: station.name,
     resolution: 'station',
-    ...(await inSystem(station.systemId, graph, null)),
+    ...(await systemPlacement(station.systemId, graph, null)),
   };
 }
 
@@ -78,7 +78,7 @@ type SystemPlacement = Pick<
   'systemName' | 'systemId' | 'regionId' | 'security' | 'space' | 'hasStargates'
 >;
 
-async function inSystem(
+async function systemPlacement(
   systemId: number,
   graph: JumpGraph | undefined,
   fallbackRegionId: number | null
@@ -122,7 +122,7 @@ export async function placeStructureEndpoint(
   return {
     ...endpoint,
     name: structure.name,
-    ...(await inSystem(structure.systemId, graph, endpoint.regionId)),
+    ...(await systemPlacement(structure.systemId, graph, endpoint.regionId)),
   };
 }
 
@@ -191,7 +191,7 @@ async function placeFromCache(
         name: structure.name,
         ...(structure.systemId === null
           ? {}
-          : await inSystem(structure.systemId, graph, endpoint.regionId)),
+          : await systemPlacement(structure.systemId, graph, endpoint.regionId)),
       });
     })
   );
