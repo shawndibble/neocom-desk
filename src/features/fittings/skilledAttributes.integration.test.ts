@@ -15,6 +15,7 @@ const MEDIUM_ARMOR_REPAIRER_II = 3530;
 const MECHANICS = 3392;
 const REPAIR_SYSTEMS = 3393;
 const HULL_UPGRADES = 3394;
+const NOBLE_HULL_UPGRADES_HG_1004 = 3481;
 
 const ARMOR_HP = DOGMA_ATTRIBUTE.armorHp;
 const STRUCTURE_HP = DOGMA_ATTRIBUTE.hullHp;
@@ -39,8 +40,23 @@ describe('skilledAttributes', () => {
     );
     const skilled = await skilledAttributes({ kind: 'ship', typeId: ZEALOT }, profile);
     // Zealot: 2,250 armor and 1,670 structure HP; each skill +5% a level.
-    expect(skilled.get(ARMOR_HP)).toBeCloseTo(2250 * 1.25, 3);
-    expect(skilled.get(STRUCTURE_HP)).toBeCloseTo(1670 * 1.25, 3);
+    expect(skilled.get(ARMOR_HP)?.value).toBeCloseTo(2250 * 1.25, 3);
+    expect(skilled.get(STRUCTURE_HP)?.value).toBeCloseTo(1670 * 1.25, 3);
+    // Each value says what made it.
+    expect(skilled.get(ARMOR_HP)?.sources).toEqual([{ kind: 'skill', typeId: HULL_UPGRADES }]);
+    expect(skilled.get(STRUCTURE_HP)?.sources).toEqual([{ kind: 'skill', typeId: MECHANICS }]);
+  });
+
+  it('names an implant that changes a value', async () => {
+    const skilled = await skilledAttributes(
+      { kind: 'ship', typeId: ZEALOT },
+      buildPilotProfile(new Map([[HULL_UPGRADES, 5]]), [NOBLE_HULL_UPGRADES_HG_1004])
+    );
+    expect(skilled.get(ARMOR_HP)?.value).toBeGreaterThan(2250 * 1.25);
+    expect(skilled.get(ARMOR_HP)?.sources).toEqual([
+      { kind: 'skill', typeId: HULL_UPGRADES },
+      { kind: 'implant', typeId: NOBLE_HULL_UPGRADES_HG_1004 },
+    ]);
   });
 
   it('applies the pilot’s skills to a module on its own, with no hull bonus', async () => {
@@ -49,7 +65,7 @@ describe('skilledAttributes', () => {
       buildPilotProfile(new Map([[REPAIR_SYSTEMS, 5]]), [])
     );
     // A 12 s cycle, 5% shorter per level of Repair Systems.
-    expect(skilled.get(DURATION)).toBeCloseTo(12000 * 0.75, 3);
+    expect(skilled.get(DURATION)?.value).toBeCloseTo(12000 * 0.75, 3);
   });
 
   it('starts a mutated module from its rolled values', async () => {
@@ -66,7 +82,7 @@ describe('skilledAttributes', () => {
       },
       buildPilotProfile(new Map([[REPAIR_SYSTEMS, 5]]), [])
     );
-    expect(skilled.get(DURATION)).toBeCloseTo(11400 * 0.75, 3);
+    expect(skilled.get(DURATION)?.value).toBeCloseTo(11400 * 0.75, 3);
   });
 
   it('reports only what something actually changed, never an engine default', async () => {

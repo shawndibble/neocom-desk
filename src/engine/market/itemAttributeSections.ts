@@ -67,7 +67,8 @@ export interface ResistLayer {
   skilled?: { hp: number | null; resonances: Resonances };
 }
 
-const LAYER_ATTRIBUTES: ReadonlyArray<{
+/** Each resist layer's HP and resonance attribute ids. */
+export const LAYER_ATTRIBUTES: ReadonlyArray<{
   layer: ResistLayerKind;
   hp: number;
   resonances: Readonly<Record<keyof Resonances, number>>;

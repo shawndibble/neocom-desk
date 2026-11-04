@@ -358,6 +358,11 @@ export function ItemDetailModal({
       skilled.status === 'ready' ? withSkilledValues(baseSections, skilled.values) : baseSections,
     [baseSections, skilled]
   );
+  /** The skills that change an attribute of this item ("which skill changes this"); none without a pilot. */
+  const modifiersOf = (attributeId: number) =>
+    activeCharacterId && data
+      ? findModifyingSkills(attributeId, requiredSkillTypeIds, data.skillAttributeModifiers)
+      : [];
 
   // Gates which attribute-modifier popovers can apply (empty while `data`
   // hasn't loaded yet).
@@ -371,9 +376,9 @@ export function ItemDetailModal({
       onClose={onClose}
       // The URL-backed host already owns the history entry (`?info`).
       closeOnBack={onLeave === undefined}
-      // One width for every tab and item kind (48rem), so switching tabs never
-      // jumps the box and text keeps a readable measure on a wide screen. An
-      // abyssal roll table wider than that scrolls sideways in its own box.
+      // One width for every tab and item kind (40rem), so switching tabs never
+      // jumps the box and a name stays close to its value. An abyssal roll
+      // table wider than that scrolls sideways in its own box.
       placement="medium"
       title={itemName}
       titleActions={
@@ -397,7 +402,7 @@ export function ItemDetailModal({
           <AbyssalItemDetail
             typeId={typeId}
             dynamic={dynamic}
-            skilled={skilled.status === 'ready' ? skilled.values : undefined}
+            skilled={skilled.status === 'ready' ? skilled : undefined}
           />
           <PlanetaryProduction pi={pi} typeId={typeId} />
           <MadeFromSection typeId={typeId} />
@@ -513,7 +518,7 @@ export function ItemDetailModal({
               <AbyssalItemDetail
                 typeId={typeId}
                 dynamic={dynamic}
-                skilled={skilled.status === 'ready' ? skilled.values : undefined}
+                skilled={skilled.status === 'ready' ? skilled : undefined}
               />
 
               <RequiredSkillsSection
@@ -558,14 +563,9 @@ export function ItemDetailModal({
               ) : (
                 <ItemAttributeSections
                   sections={attributeSections}
+                  skilledSources={skilled.status === 'ready' ? skilled.sources : undefined}
                   renderValue={(attribute, valueText) => {
-                    const modifiers = activeCharacterId
-                      ? findModifyingSkills(
-                          attribute.attributeId,
-                          requiredSkillTypeIds,
-                          data.skillAttributeModifiers
-                        )
-                      : [];
+                    const modifiers = modifiersOf(attribute.attributeId);
                     return modifiers.length > 0 ? (
                       <AttributeModifierTrigger
                         modifiers={modifiers}
@@ -581,6 +581,21 @@ export function ItemDetailModal({
                       valueText
                     );
                   }}
+                  renderSkilledExtra={(attribute) =>
+                    modifiersOf(attribute.attributeId).map((modifier) => (
+                      <AttributeModifierRow
+                        key={modifier.ownerSkillTypeID}
+                        modifier={modifier}
+                        skillName={skillNameOrFallback(
+                          modifier.ownerSkillTypeID,
+                          data.allSkillNames
+                        )}
+                        trainedLevel={trainedSkills.get(modifier.ownerSkillTypeID)?.level ?? 0}
+                        target={targetPlan}
+                        itemName={itemName}
+                      />
+                    ))
+                  }
                 />
               )}
             </>

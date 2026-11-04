@@ -44,6 +44,8 @@ import {
 } from '@/engine/fittings/mutaplasmidDisplay';
 import type { ItemMutation } from '@/engine/fittings/types';
 import { displayAttributeValue } from '@/engine/fittings/attributeUnits';
+import { SkilledValue } from '@/features/market/SkilledValue';
+import type { NamedSkilledSource } from '@/features/fittings/useSkilledAttributes';
 import { shortCompareLabels } from '@/engine/market/compareLabels';
 import type { AttributeDictionary } from '@/sde/marketTypes';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -109,12 +111,18 @@ function nameOf(names: Names | null, typeId: number): string {
   return names?.get(typeId) ?? `Type #${typeId}`;
 }
 
+/** The pilot's skilled values for this item (`useSkilledAttributes`' ready state). */
+interface SkilledValues {
+  values: ReadonlyMap<number, number>;
+  sources: ReadonlyMap<number, readonly NamedSkilledSource[]>;
+}
+
 export interface AbyssalItemDetailProps {
   typeId: number;
   /** Set when opened on a Mutated module (`useDynamicItem`). */
   dynamic: DynamicItemState;
-  /** The pilot's raw values by attribute id (`useSkilledAttributes`), for the rolls' "With skills" column. */
-  skilled?: ReadonlyMap<number, number>;
+  /** The pilot's raw values and what made them (`useSkilledAttributes`), for the rolls' "With skills" column. */
+  skilled?: SkilledValues;
 }
 
 export function AbyssalItemDetail({ typeId, dynamic, skilled }: AbyssalItemDetailProps) {
@@ -449,7 +457,7 @@ function OwnedRollsSection({
   mutation: ItemMutation;
   lookup: MutaplasmidLookup;
   dictionary: AttributeDictionary;
-  skilled?: ReadonlyMap<number, number>;
+  skilled?: SkilledValues;
 }) {
   const { t } = useTranslation();
   const names = useTypeNames(
@@ -465,7 +473,7 @@ function OwnedRollsSection({
   const unitOf = (row: RolledAttributeRow) => dictionary[row.attributeId]?.unit ?? null;
   /** The pilot's value of a roll, as shown, when it reads differently from the roll itself. */
   const skilledText = (row: RolledAttributeRow): string | null => {
-    const raw = skilled?.get(row.attributeId);
+    const raw = skilled?.values.get(row.attributeId);
     if (raw === undefined) return null;
     const unit = unitOf(row);
     const { value } = displayAttributeValue(raw, dictionary[row.attributeId]?.unitId, unit);
@@ -498,8 +506,22 @@ function OwnedRollsSection({
             header: t('market.itemDetail.abyssal.skilledColumn'),
             headerTooltip: t('market.itemDetail.abyssal.skilledHint'),
             align: 'right' as const,
-            className: 'whitespace-nowrap tabular-nums font-semibold',
-            render: (row: RolledAttributeRow) => skilledText(row) ?? '',
+            className: 'whitespace-nowrap tabular-nums',
+            render: (row: RolledAttributeRow) => {
+              const text = skilledText(row);
+              if (text === null) return '';
+              const unit = unitOf(row);
+              const label = attributeLabel(row.attributeId, dictionary, lookup).name;
+              const shown = unit ? `${text} ${unit}` : text;
+              return (
+                <SkilledValue
+                  skilled={text}
+                  spoken={t('market.itemDetail.abyssal.skilledSpoken', { value: shown })}
+                  label={label}
+                  sources={skilled?.sources.get(row.attributeId) ?? []}
+                />
+              );
+            },
           },
         ]
       : []),

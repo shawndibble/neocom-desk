@@ -50,6 +50,7 @@ import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
 import type { SkilledTarget } from '@/engine/fittings/skilledTarget';
+import { skilledSourcesOf, type SkilledSource } from '@/engine/fittings/skilledSources';
 import { COVERT_CLOAK_EFFECT, extractExplore } from '@/engine/fittings/explore';
 import { extractModuleFigures } from '@/engine/fittings/moduleFigures';
 import { extractCrystalFigures, extractMining, miningYield } from '@/engine/fittings/mining';
@@ -649,10 +650,16 @@ const CAPSULE_TYPE_ID = 670;
  * returned, and never the engine's own derived figures (ids ≤ 0), which Item
  * Detail has no row for.
  */
+/** One skilled value, and what made it (`skilledSourcesOf`). */
+export interface SkilledAttribute {
+  value: number;
+  sources: SkilledSource[];
+}
+
 export async function skilledAttributes(
   target: SkilledTarget,
   profile: PilotProfile
-): Promise<Map<number, number>> {
+): Promise<Map<number, SkilledAttribute>> {
   await loadDogmaEngine();
   const fitting: Fitting =
     target.kind === 'ship'
@@ -672,13 +679,25 @@ export async function skilledAttributes(
           drones: [],
           cargo: [],
         };
-  const calculation = calculate(toDogmaFit(fitting, profile));
+  const dogmaFit = toDogmaFit(fitting, profile);
+  const calculation = calculate(dogmaFit, { sources: true });
   const result = target.kind === 'ship' ? calculation.ship : calculation.items[0];
-  const skilled = new Map<number, number>();
+  if (!result) return new Map();
+  const sourcesById = new Map(
+    affectedAttributes(result.attributes, {
+      shipTypeId: dogmaFit.ship.type_id,
+      ...(dogmaFit.ship.mode === undefined ? {} : { modeTypeId: dogmaFit.ship.mode }),
+      itemTypeIds: dogmaFit.items.map((item) => item.type_id),
+      chargeTypeIds: dogmaFit.items.map((item) => item.charge?.type_id),
+      projectedTypeIds: [],
+    }).map((row) => [row.attributeId, row.sources])
+  );
+  const skilled = new Map<number, SkilledAttribute>();
   // Only what something changed: an attribute the engine left at its own base
   // can be a dogma default the item doesn't carry (a module's Mass of 1).
-  for (const [id, { base, value }] of result?.attributes ?? []) {
-    if (id > 0 && value !== base) skilled.set(id, value);
+  for (const [id, { base, value }] of result.attributes) {
+    if (id <= 0 || value === base) continue;
+    skilled.set(id, { value, sources: skilledSourcesOf(sourcesById.get(id) ?? [], profile) });
   }
   return skilled;
 }

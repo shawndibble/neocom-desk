@@ -23,8 +23,14 @@ vi.mock('./useDogmaEngineStatus', () => ({ useDogmaEngineStatus: () => 'idle' })
 vi.mock('./dogmaEngineAssets', () => ({ dogmaEngineAssetsCached: async () => engine.cached }));
 vi.mock('@/stores/network', () => ({ useOnline: () => engine.online }));
 const skilledAttributes = vi.hoisted(() =>
-  vi.fn(async () => new Map([[265, 2812.5]]) as Map<number, number>)
+  vi.fn(
+    async () =>
+      new Map([[265, { value: 2812.5, sources: [{ kind: 'skill' as const, typeId: 3394 }] }]])
+  )
 );
+vi.mock('@/features/character/typeNames', () => ({
+  loadTypeNames: async () => new Map([[3394, 'Hull Upgrades']]),
+}));
 vi.mock('./dogmaFittingEngine', () => ({ skilledAttributes }));
 
 beforeEach(() => {
@@ -41,6 +47,9 @@ describe('useSkilledAttributes', () => {
     const { result } = renderHook(() => useSkilledAttributes(ZEALOT));
     await waitFor(() => expect(result.current.status).toBe('ready'));
     expect(result.current.status === 'ready' && result.current.values.get(265)).toBe(2812.5);
+    expect(result.current.status === 'ready' && result.current.sources.get(265)).toEqual([
+      { kind: 'skill', typeId: 3394, name: 'Hull Upgrades', level: 5 },
+    ]);
     expect(skilledAttributes).toHaveBeenCalledWith({ kind: 'ship', typeId: ZEALOT }, PROFILE);
   });
 

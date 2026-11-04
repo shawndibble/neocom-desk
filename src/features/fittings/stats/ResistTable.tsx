@@ -25,6 +25,7 @@ function ResistCell({
   unheated,
   statKey,
   base,
+  renderSkilled,
 }: {
   /** The stat a previewed change to it shows in place of the percentage. */
   statKey?: StatChangeKey;
@@ -34,6 +35,8 @@ function ResistCell({
   unheated?: string;
   /** Item Detail: the resonance before the pilot's skills; the cell reads "base → skilled" when they print differently. */
   base?: number;
+  /** Draws the pilot's figure when it differs from `base` (Item Detail's opener); plain emphasis without it. */
+  renderSkilled?: (base: string, value: string) => ReactNode;
 }) {
   const { t } = useTranslation();
   const pct = resistPct(resonance);
@@ -47,13 +50,22 @@ function ResistCell({
         <PreviewedFigure keys={statKey && [statKey]}>
           {base !== undefined && resistReadsDifferently(base, resonance) ? (
             <span className="relative">
-              <span aria-hidden>
-                <span className="text-text-dim">{resistText(base)} → </span>
-                <span className="font-semibold">{fmt0(pct)}%</span>
-              </span>
-              <span className="sr-only">
-                {t('fittings.stats.skilledResist', { base: resistText(base), value: fmt0(pct) })}
-              </span>
+              {renderSkilled ? (
+                renderSkilled(resistText(base), fmt0(pct))
+              ) : (
+                <>
+                  <span aria-hidden>
+                    <span className="text-text-dim">{resistText(base)} → </span>
+                    <span className="font-semibold text-success">{fmt0(pct)}%</span>
+                  </span>
+                  <span className="sr-only">
+                    {t('fittings.stats.skilledResist', {
+                      base: resistText(base),
+                      value: fmt0(pct),
+                    })}
+                  </span>
+                </>
+              )}
             </span>
           ) : unheated === undefined ? (
             <span className="relative">{fmt0(pct)}%</span>
@@ -100,6 +112,8 @@ export interface ResistRow {
   resonances: Resonances;
   /** Item Detail: the resonances before the pilot's skills, when they change them. */
   baseResonances?: Resonances;
+  /** Item Detail: draws a changed resist's "base → skilled" (its sources' opener). */
+  renderSkilled?: (type: DamageType, base: string, value: string) => ReactNode;
   ehp?: number;
   /** Adapted rows read as a note on the row above. */
   tone?: 'note';
@@ -158,6 +172,11 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
                 resonance={row.resonances[RESONANCE_KEY[type]]}
                 unheated={row.unheated?.[type]}
                 base={row.baseResonances?.[RESONANCE_KEY[type]]}
+                renderSkilled={
+                  row.renderSkilled
+                    ? (base, value) => row.renderSkilled?.(type, base, value)
+                    : undefined
+                }
                 statKey={layerKey(row.key, RESONANCE_KEY[type])?.[0]}
               />
             ))}

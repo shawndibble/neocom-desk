@@ -89,7 +89,7 @@ const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightCla
     heightClass: 'h-dvh max-h-dvh',
   },
   medium: {
-    dialogClass: 'motion-dialog m-auto w-full max-w-3xl',
+    dialogClass: 'motion-dialog m-auto w-full max-w-[40rem]',
     heightClass: 'h-fit max-h-[85vh]',
   },
   wide: {
