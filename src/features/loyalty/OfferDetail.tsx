@@ -78,25 +78,44 @@ export function LoyaltyOfferCost({
   );
 }
 
-/** An offers table's item cell: the name, a BP marker for a blueprint, and its LP + ISK price. */
+/**
+ * An offers table's item cell: the name, a BP marker for a blueprint, and its LP + ISK price.
+ * `showCost` is false on a phone's dense card, which prints the price on its meta line instead;
+ * `lowVolumeTag` is false there too while the sells/day cell (amber) says it.
+ */
 export function LoyaltyOfferItemCell({
   row,
   showCost = true,
+  lowVolumeTag = true,
   playerLp = null,
 }: {
   row: LoyaltyOfferRow;
   playerLp?: number | null;
   /** False on a phone's dense card, where the cost has its own cell on the meta line. */
   showCost?: boolean;
+  /** False when the phone card's amber sells/day already carries the low-volume warning. */
+  lowVolumeTag?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <span className="flex flex-col">
-      <span className="inline-flex items-center gap-1.5">
+      {/* Plain inline text, not a flex row: a long name wraps and the tags follow its last word
+          instead of floating beside the wrapped block. The no-break space keeps a tag from
+          starting a line of its own. */}
+      <span>
         <LoyaltyItemName row={row} />
-        {row.isBlueprint && <span className={tagWordClassName}>BP</span>}
-        {isLowVolume(row) && (
-          <span className={tagWordClassName}>{t('loyaltyStore.lowVolumeTag')}</span>
+        {row.isBlueprint && (
+          <>
+            {'\u00a0'}
+            <span className={tagWordClassName}>BP</span>
+          </>
+        )}
+        {/* A phone says it on the meta line (amber sells/day), where the name needs the room. */}
+        {lowVolumeTag && isLowVolume(row) && (
+          <>
+            {' '}
+            <span className={tagWordClassName}>{t('loyaltyStore.lowVolumeTag')}</span>
+          </>
         )}
       </span>
       {showCost && (

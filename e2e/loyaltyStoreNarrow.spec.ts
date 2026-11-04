@@ -213,6 +213,17 @@ for (const width of [1024, 1280, 1440]) {
     const box = await list.boundingBox();
     if (width >= 1280) expect(box!.width).toBeGreaterThanOrEqual(26 * 16);
 
+    // Real figures are wider than the fixture's dashes: a seven-digit ISK/LP and a
+    // nine-figure profit must still sit inside the list's panel, not spill over its edge.
+    const spill = await list.evaluate((section) => {
+      for (const td of section.querySelectorAll('td')) {
+        if (td.textContent === '—') td.textContent = td.cellIndex === 2 ? '-648.2M' : '1,620,520';
+      }
+      const table = section.querySelector('table')!;
+      return table.getBoundingClientRect().right - section.getBoundingClientRect().right;
+    });
+    expect(spill).toBeLessThanOrEqual(1);
+
     // The detail panel is the list's right-hand sibling: no overlap, no clipping.
     const sibling = list.locator('xpath=following-sibling::*[contains(@class,"min-w-0")][1]');
     const d = await sibling.boundingBox();
