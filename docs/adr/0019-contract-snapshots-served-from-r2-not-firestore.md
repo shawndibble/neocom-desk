@@ -58,7 +58,8 @@ plus a small index, and have the client fetch only the types a search needs.
   `publicContractOfferIndex.ts` carries today) and one object per type,
   `contract-offers/types/<typeId>.<contentHash>.json`. A type that outgrows a
   sensible object size is split by region and listed as several objects in the
-  index.
+  index. _Since 2026-11-04 each type's entry names the bundle shard holding it
+  and no per-type objects are written (20261104-065346-r2-snapshots-publish-few-big-objects-not-one)._
 - **Content-addressed type objects.** The writer hashes each type's rows and
   uploads only the objects whose hash changed; the index names the current hash
   per type. Because a client reads the index first and then exactly the objects

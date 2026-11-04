@@ -38,8 +38,9 @@ no app server. Two kinds of data:
 
 - GitHub starts `schedule:` runs hours late, so the 15 min lawless job is also fired by a Cloudflare Cron Trigger Worker calling `workflow_dispatch` (`workers/public-data-dispatch`, README there; issues #5113, #5215). The workflow's own `schedule:` stays as the fallback.
 - A daily GitHub Actions job (`.github/workflows/public-data-market-open-prices.yml`, `functions/src/publicDataMarketOpenPrices.ts`) folds EVE Ref's last market-order
-  snapshot of the previous UTC day into the R2 object `open-prices/<typeId>.json`:
-  per type, every Trade Hub _station_'s highest buy and lowest sell for the day
+  snapshot of the previous UTC day into the R2 shards `open-prices/shards/<typeId % 4096>.json`
+  (`{ types: { <typeId>: … } }`, a few types each to keep R2 writes down; the old per-type
+  `open-prices/<typeId>.json` is the read fallback): per type, every Trade Hub _station_'s highest buy and lowest sell for the day
   (`{ typeId, dates, stations: { <stationId>: { buy, sell } } }`), up
   to 400 days, public static file with no Firebase involved (`functions/src/marketOpenPrices.ts` holds the logic,
   `marketOrdersArchive.ts` the streaming fetch). The mining pricing reads the

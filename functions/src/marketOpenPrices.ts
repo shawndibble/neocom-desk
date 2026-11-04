@@ -3,7 +3,8 @@
  * for each hub station and type, the highest buy order and the lowest sell
  * order placed at that station and standing at the end of a UTC day, read
  * from EVE Ref's twice-hourly market-order snapshots and stored one object
- * per type, holding every hub station, at `open-prices/<typeId>.json` in R2
+ * per type, holding every hub station, inside its shard `open-prices/shards/<typeId % 4096>.json` in R2
+ * (before 2026-11, at `open-prices/<typeId>.json`; decision 20261104-065346-r2-snapshots-publish-few-big-objects-not-one)
  * (layout: decision 20261018-164126-open-prices-one-document-per-type-every-hub;
  * storage moved from Firestore to R2 by 20261018-201511-moving-the-daily-snapshots-to-r2;
  * station rather than region-wide since 20261019-004148-open-prices-at-the-hub-station-not-region).
@@ -46,7 +47,7 @@ export interface OpenPriceSeries {
   sell: Array<number | null>;
 }
 
-/** One type's object, `open-prices/<typeId>.json` in R2. */
+/** One type's object: its entry in its R2 shard (formerly `open-prices/<typeId>.json`). */
 export interface TypeOpenPrices {
   typeId: number;
   /** Ascending, unique `YYYY-MM-DD`, shared by every series. */

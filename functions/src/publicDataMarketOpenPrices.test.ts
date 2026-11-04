@@ -47,12 +47,12 @@ function deps(over: Record<string, unknown> = {}, state: unknown = null) {
 }
 
 describe('publishMarketOpenPrices', () => {
-  it('writes the open-prices object and then the state', async () => {
+  it("writes the type's open-prices shard and then the state", async () => {
     const { d, put } = deps();
     expect(await publishMarketOpenPrices(d)).toBe(true);
     const [key, body] = put.mock.calls[0];
-    expect(key).toBe('open-prices/34.json');
-    expect(JSON.parse(gunzipSync(body as Buffer).toString())).toMatchObject({
+    expect(key).toBe('open-prices/shards/34.json');
+    expect(JSON.parse(gunzipSync(body as Buffer).toString()).types['34']).toMatchObject({
       typeId: 34,
       dates: [DATE],
     });
@@ -88,7 +88,7 @@ describe('publishMarketOpenPrices', () => {
     expect(put).not.toHaveBeenCalled();
   });
 
-  it('records no state when a type fails to write', async () => {
+  it('records no state when a shard fails to write', async () => {
     const put = vi.fn<Put>(async (key) => {
       if (key.startsWith('open-prices/')) throw new Error('boom');
     });

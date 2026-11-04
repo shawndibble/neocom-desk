@@ -46,7 +46,7 @@ const OPEN_PRICES_HEADERS = {
   'Content-Encoding': 'gzip',
   'Cache-Control': 'public, max-age=3600',
 };
-/** Small objects dominated by round-trip latency, as in `r2Publisher.ts`. */
+/** ~4,000 small shards, each a read and a write dominated by round-trip latency. */
 const OPEN_PRICES_CONCURRENCY = 32;
 
 /**
@@ -113,21 +113,31 @@ export interface MergeFn {
 }
 
 export interface WriteOpenPricesResult {
-  /** Objects actually put. */
+  /** Shards actually put. */
   written: number;
-  /** Objects left alone because the merge changed nothing (saves a Class A write). */
+  /** Shards left alone because the merge changed nothing (saves a Class A write). */
   skipped: number;
   failed: number;
   /** First failure's message, so an auth or network fault is diagnosable from the log. */
   firstError: string | null;
 }
 
+/** A shard's `types`, `{}` when R2 has no shard yet; throws on anything not shaped like a shard, so it is never overwritten. */
+async function readShardTypes(get: R2Get, key: string): Promise<Record<string, unknown>> {
+  const shard = await get(key);
+  if (shard === null) return {};
+  if (!isRecord(shard) || !isRecord(shard.types))
+    throw new Error(`${key}: not an open-prices shard`);
+  return shard.types;
+}
+
 /**
- * Merges `items` into each type's R2 object (read, `merge`, write). `items` is
- * consumed lazily so the backfill's ~20k documents are never materialised at
- * once. A type that fails is counted, not thrown: the merge is idempotent, so
- * the caller retries the whole run. `onProgress` gets the running total of
- * written objects.
+ * Merges `items` into their types' entries in the R2 shards (read the shard,
+ * `merge` each of its types, write the shard once). A type its shard does not
+ * hold yet is seeded from the type's own object, the layout before shards, so
+ * its history carries over; a type not priced today stays as it was. A shard
+ * that fails is counted, not thrown: the merge is idempotent, so the caller
+ * retries the whole run. `onProgress` gets the running total of written shards.
  */
 export async function writeOpenPricesToR2(
   items: Iterable<TypeDays>,
@@ -135,22 +145,36 @@ export async function writeOpenPricesToR2(
   io: { get: R2Get; put: R2Put },
   onProgress?: (written: number) => void
 ): Promise<WriteOpenPricesResult> {
-  const iterator = items[Symbol.iterator]();
+  // A day is ~20k small items; grouping them by shard holds them all at once, which is fine.
+  const byShard = new Map<string, TypeDays[]>();
+  for (const item of items) {
+    const key = openPricesShardR2Key(item.typeId);
+    const list = byShard.get(key);
+    if (list) list.push(item);
+    else byShard.set(key, [item]);
+  }
+  const shards = [...byShard];
+  let next = 0;
   let written = 0;
   let skipped = 0;
   let failed = 0;
   let firstError: string | null = null;
   const worker = async () => {
-    for (let step = iterator.next(); !step.done; step = iterator.next()) {
-      const item = step.value;
-      const key = openPricesR2Key(item.typeId);
+    while (next < shards.length) {
+      const [key, shardItems] = shards[next++];
       try {
-        const existing = (await io.get(key)) as StoredTypeOpenPrices | null;
-        const merged = merge(item, existing, item.days);
-        // Key order follows the stored order when nothing changed, so a plain stringify compare is safe;
-        // a reordered-but-equal object just costs one extra put.
-        const body = JSON.stringify(merged);
-        if (existing !== null && JSON.stringify(existing) === body) {
+        const types = await readShardTypes(io.get, key);
+        const merged: Record<string, unknown> = { ...types };
+        for (const item of shardItems) {
+          const id = String(item.typeId);
+          const existing = (types[id] ??
+            (await io.get(openPricesR2Key(item.typeId)))) as StoredTypeOpenPrices | null;
+          merged[id] = merge(item, existing, item.days);
+        }
+        // Merging keeps the stored key order when nothing changed, so a plain stringify compare is
+        // safe; a reordered-but-equal shard just costs one extra put.
+        const body = JSON.stringify({ types: merged });
+        if (JSON.stringify({ types }) === body) {
           skipped += 1;
         } else {
           await io.put(key, gzipSync(body), OPEN_PRICES_HEADERS);
