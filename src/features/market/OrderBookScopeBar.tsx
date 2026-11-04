@@ -16,20 +16,21 @@ import { JumpsLink } from '@/features/route/JumpsLink';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  CheckboxSelect,
   FilterBar,
   FilterChip,
   FilterField,
   InfoTooltip,
   TextInput,
   textActionClassName,
-  useFilterSurface,
   type ActiveFilter,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { HintText } from '@/components/ui/HintText';
 import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
-import { SPACE_KINDS } from '@/engine/space';
+import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
+import { toggleInSet } from '@/lib/sets';
 import { SELL_OUTLIER_FACTOR } from '@/engine/market/orderBookDepth';
 import { securityStatusColor } from '@/engine/securityStatus';
 import type { CurrentSystemState } from '@/features/route/currentSystem';
@@ -89,12 +90,11 @@ function BrowserFilterFields({
   showOrigin,
 }: BrowserFilterFieldsProps) {
   const { t } = useTranslation();
-  const inSheet = useFilterSurface() === 'sheet';
   const spansStations = regionMode || draft.jumps !== DEFAULT_JUMP_RANGE;
   return (
     <>
       {showRange && (
-        <FilterField label={t('jumpRange.label')}>
+        <FilterField captionInline label={t('jumpRange.label')}>
           <JumpRangeSelect
             {...rangeSelectProps(draft, setDraft, scopeLabel)}
             className="w-40 max-md:w-full"
@@ -119,29 +119,19 @@ function BrowserFilterFields({
         />
       </FilterField>
       {spansStations && (
-        <FilterField label={t('market.filterSecurity')} stretch={false}>
-          <div
-            role="group"
-            aria-label={t('market.filterSecurity')}
-            className="flex flex-wrap items-center gap-2"
-          >
-            {/* The sheet's field caption already says it there. */}
-            {!inSheet && <span className="text-text-dim">{t('market.filterSecurity')}</span>}
-            {SPACE_KINDS.map((kind) => (
-              <FilterChip
-                key={kind}
-                label={t(`common.spaceOption.${kind}`)}
-                size="md"
-                selected={draft.sec.has(kind)}
-                onToggle={() => {
-                  const next = new Set(draft.sec);
-                  if (next.has(kind)) next.delete(kind);
-                  else next.add(kind);
-                  setDraft({ ...draft, sec: next });
-                }}
-              />
-            ))}
-          </div>
+        <FilterField captionInline label={t('market.filterSecurity')}>
+          <CheckboxSelect<SpaceKind>
+            label={t('market.filterSecurity')}
+            size="md"
+            className="w-44"
+            active={draft.sec.size !== SPACE_KINDS.length}
+            options={SPACE_KINDS.map((kind) => ({
+              value: kind,
+              label: t(`common.spaceOption.${kind}`),
+            }))}
+            selected={draft.sec}
+            onToggle={(kind) => setDraft({ ...draft, sec: toggleInSet(draft.sec, kind) })}
+          />
         </FilterField>
       )}
       {spansStations && (
@@ -197,6 +187,7 @@ export function BrowserFilterBar({
   search,
   className,
 }: BrowserFilterBarProps) {
+  const { t } = useTranslation();
   return (
     <FilterBar
       value={value}
@@ -205,14 +196,29 @@ export function BrowserFilterBar({
       search={search}
       className={className}
       inline={(draft, setDraft) => (
-        <JumpRangeSelect {...rangeSelectProps(draft, setDraft, scopeLabel)} className="w-full" />
+        // One line under the search box: the range with a caption ("Jita"
+        // alone does not say it is a distance) and, once one is set, the
+        // Current System it is measured from. Two filters, the cap (§4b).
+        <div className="flex w-full items-end gap-2">
+          <FilterField captionInline label={t('jumpRange.label')}>
+            <JumpRangeSelect
+              {...rangeSelectProps(draft, setDraft, scopeLabel)}
+              className="w-40 shrink-0"
+            />
+          </FilterField>
+          {draft.jumps !== DEFAULT_JUMP_RANGE && (
+            <FilterField label={t('jumpRange.currentSystemLabel')} hideCaption>
+              <CurrentSystemPicker current={currentSystem} />
+            </FilterField>
+          )}
+        </div>
       )}
       inlinePlacement="below"
     >
       {(draft, setDraft, surface) => (
         <BrowserFilterFields
           showRange={surface === 'sheet'}
-          showOrigin
+          showOrigin={surface === 'sheet'}
           draft={draft}
           setDraft={setDraft}
           regionMode={regionMode}

@@ -46,14 +46,14 @@ test('boots, deep-links and serves a cached lazy SDE file with no network', asyn
 
   // The first load ran before the worker controlled the page, so the lazy chunks the landing
   // page needs (the Login demo board, the signed-in shell's preload group) never passed through the worker's cache. Only the boot
-  // graph is precached; the rest waits for the idle warm, which the offline reload below must
+  // graph is precached; the rest waits for the idle warm, which the offline navigation below must
   // not race. Do what the warm does for the chunks this page loaded: fetch them again under the
   // worker's control (its CacheFirst route stores them), then wait until they are in Cache Storage.
   await expect(page.getByRole('button', { name: 'Log in with EVE Online' }).first()).toBeVisible();
   // The demo board mounts on a `requestIdleCallback` (up to 3 s, `useBoardReady`) and its survey
   // chart imports its own chunks 1.2 s after that (`SURVEY_CHART_DELAY_MS`): both land after
   // `networkidle` can see them. Wait for each chunk, then for what they pull in, so the list below
-  // cannot miss them; uncached, the offline reload shows the error screen and aborts `goto`.
+  // cannot miss them; uncached, the offline navigation shows the error screen and aborts `goto`.
   const hasChunk = (name: string) =>
     page.evaluate(
       (pattern) =>
@@ -100,12 +100,13 @@ test('boots, deep-links and serves a cached lazy SDE file with no network', asyn
 
   await context.setOffline(true);
 
-  // The precached shell: a reload of the landing page.
-  await page.reload();
-  await expect(page.locator('#root > *').first()).toBeVisible();
-
-  // A URL that is not in the precache: NavigationRoute -> /index.html.
-  await page.goto('/login');
+  // Exactly one offline navigation, to a URL that is not in the precache: NavigationRoute ->
+  // /index.html, itself the precached shell. A second offline navigation right after another
+  // (even on a fresh page) intermittently fails with ERR_INTERNET_DISCONNECTED without the
+  // worker answering, so this step must not follow a reload or another goto. The query keeps
+  // it a different URL from `/` and `/login`, whichever the page is on after its redirect.
+  const response = await page.goto('/login?offline=1');
+  expect(response?.fromServiceWorker()).toBe(true);
   await expect(page.getByRole('button', { name: 'Log in with EVE Online' }).first()).toBeVisible();
 
   // The lazy file is served from the `sde-data` runtime cache.
