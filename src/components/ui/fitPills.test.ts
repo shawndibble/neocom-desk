@@ -20,10 +20,11 @@ describe('fitPills', () => {
     ).toBe(1);
   });
 
-  it('can show no pill at all, only "+N" and the trailing control', () => {
+  it('always keeps the first pill, which then shrinks to the room left', () => {
     expect(fitPills({ pills: [400, 400], more: 30, trailing: 60, available: 120, gap: GAP })).toBe(
-      0
+      1
     );
+    expect(fitPills({ pills: [400], more: 30, trailing: 60, available: 120, gap: GAP })).toBe(1);
   });
 
   it('shows everything when nothing has been laid out yet', () => {

@@ -55,8 +55,7 @@ describe('bpcActiveFilterChips', () => {
       'minTe',
       'minRuns',
       'maxPrice',
-      'hideAuctions',
-      'hidePlex',
+      'exclude',
       'sources',
       'space',
     ]);
@@ -68,6 +67,7 @@ describe('bpcActiveFilterChips', () => {
     expect(byId.get('jumps')?.value).toBe('10');
     expect(byId.get('minMe')?.value).toBe('8');
     expect(byId.get('maxPrice')?.value).toBe('50m');
+    expect(byId.get('exclude')?.value).toEqual(['hideAuctions', 'hidePlex']);
     expect(byId.get('sources')?.value).toEqual(['contract', 'market']);
     expect(byId.get('space')?.value).toEqual(['highsec']);
   });
@@ -103,10 +103,19 @@ describe('bpcActiveFilterChips with Exclude defaults', () => {
 
   it('clears a chip back to the default, which Clear all then leaves alone', () => {
     const both = { ...hidingPlex, filter: { ...hidingPlex.filter, hideAuctions: true } };
-    const [auctions] = bpcActiveFilterChips(both, HIDE_PLEX);
-    expect(auctions.id).toBe('hideAuctions');
-    const cleared = auctions.clear(both);
+    const [exclude] = bpcActiveFilterChips(both, HIDE_PLEX);
+    expect(exclude).toMatchObject({ id: 'exclude', value: ['hideAuctions'] });
+    const cleared = exclude.clear(both);
     expect(cleared.filter.hideAuctions).toBe(false);
     expect(cleared.filter.hidePlex).toBe(true);
+  });
+
+  it('gives both Exclude picks one chip that clears them both', () => {
+    const both = { ...EMPTY, filter: { ...EMPTY.filter, hideAuctions: true, hidePlex: true } };
+    const chips = bpcActiveFilterChips(both, NO_HIDE);
+    expect(chips).toHaveLength(1);
+    const cleared = chips[0].clear(both);
+    expect(cleared.filter.hideAuctions).toBe(false);
+    expect(cleared.filter.hidePlex).toBe(false);
   });
 });

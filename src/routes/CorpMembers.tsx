@@ -143,7 +143,7 @@ function rosterOptions(
  * reads as the select prints it; one no longer on the roster (a stale link)
  * falls back to its id, as the table does.
  */
-function activeRosterFilters(
+function activeMemberFilters(
   filter: RosterFilter,
   labels: {
     darkLabel: string;
@@ -332,7 +332,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const darkLabel = t('corp.members.dark', { days: darkAfterDays });
   const activeFilters = useMemo(
     () =>
-      activeRosterFilters(rosterFilter, {
+      activeMemberFilters(rosterFilter, {
         darkLabel,
         shipLabel: t('corp.members.shipFilterLabel'),
         locationLabel: t('corp.members.locationFilterLabel'),

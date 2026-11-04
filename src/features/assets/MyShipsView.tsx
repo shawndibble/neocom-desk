@@ -584,6 +584,7 @@ export function MyShipsView({
             placeholder={t('assets.myShips.searchPlaceholder')}
             aria-label={t('assets.myShips.searchLabel')}
             className="w-full sm:ml-auto sm:w-64"
+            pageSearch
           />
           {state.status === 'ready' && sorted.length > 0 && (
             <TableActionsMenu

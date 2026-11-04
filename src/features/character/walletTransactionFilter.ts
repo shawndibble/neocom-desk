@@ -12,7 +12,7 @@
  * It stays pure regardless, and its tests are the specification.
  */
 import type { TFunction } from 'i18next';
-import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
+import { activeDateRangeFilters, summarizeFilterValues, type ActiveFilter } from '@/components/ui';
 import type { WalletTransactionCommon } from '@/esi/endpoints';
 import {
   defineUrlFilter,
@@ -21,7 +21,6 @@ import {
   nullableTextParam,
   textParam,
 } from '@/lib/urlState';
-import { activeDateRangeFilters } from './dateRangeActiveFilters';
 
 /** Buy, sell, or don't care. */
 export type TransactionSide = 'all' | 'buy' | 'sell';
@@ -127,7 +126,12 @@ export function activeWalletTransactionFilters(
       value: t(filter.side === 'buy' ? 'wallet.buy' : 'wallet.sell'),
       clear: (value) => ({ ...value, side: 'all' }),
     });
-  active.push(...activeDateRangeFilters(filter, t));
+  active.push(
+    ...activeDateRangeFilters(filter, t, {
+      from: t('wallet.dateFromLabel'),
+      to: t('wallet.dateToLabel'),
+    })
+  );
   if (filter.stations.length > 0)
     active.push({
       label: t('wallet.stationsFilterLabel'),

@@ -7282,8 +7282,7 @@
     "journalEntryCount_one": "{{count}} entry",
     "journalEntryCount_other": "{{count}} entries",
     "refTypePlexBought": "PLEX bought",
-    "refTypePlexSold": "PLEX sold",
-    "dateDayLabel": "Day"
+    "refTypePlexSold": "PLEX sold"
   },
   "survey": {
     "title": "Mining Survey",
@@ -8638,8 +8637,7 @@
     },
     "minValue": {
       "label": "Minimum value",
-      "placeholder": "Min value",
-      "atLeast": "≥ {{isk}} ISK"
+      "placeholder": "Min value"
     },
     "filters": {
       "title": "Filters"
@@ -10585,7 +10583,6 @@
     "expiresAffix": "Expires ",
     "today": "Today",
     "yesterday": "Yesterday",
-    "statusAll": "All",
     "dayCount_one": "{{count}} contract",
     "dayCount_other": "{{count}} contracts",
     "fetchTruncatedRetry": "Try again",
@@ -12638,8 +12635,7 @@
         "maxPrice": "Max price per item",
         "maxSpend": "Max spend",
         "maxSpendHint": "For the whole trip",
-        "noLimit": "No limit",
-        "iskCapValue": "{{amount}} ISK"
+        "noLimit": "No limit"
       },
       "plan": {
         "holdNamed": "{{name}} {{used}} of {{total}} m³",
@@ -15306,7 +15302,11 @@
     "showResults_other": "Show {{count}} results",
     "valuesAndMore": "{{values}} +{{count}}",
     "none": "None",
-    "atLeast": "≥ {{value}}"
+    "atLeast": "≥ {{value}}",
+    "day": "Day",
+    "atMost": "≤ {{value}}",
+    "percent": "{{value}}%",
+    "isk": "{{amount}} ISK"
   },
   "contractSearch": {
     "title": "Contract Search",

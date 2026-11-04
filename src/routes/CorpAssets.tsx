@@ -95,7 +95,7 @@ import { NO_MOVE_PLAN } from '@/features/assets/movePlanUrl';
 import { loadTypeCategories, type AssetCategory } from '@/features/corp/assetCategories';
 import { AssetCategoryPicker, BlueprintKindSelect } from '@/features/assets/AssetCategoryPicker';
 import {
-  assetKindActiveFilters,
+  activeAssetKindFilters,
   assetPassesKindFilter,
   blueprintKindParam,
   blueprintsTicked,
@@ -346,7 +346,7 @@ function activePlaceFilters(
       clear: (next) => ({ ...next, div: null }),
     });
   active.push(
-    ...assetKindActiveFilters(
+    ...activeAssetKindFilters(
       filter,
       {
         index: categoryIndex,

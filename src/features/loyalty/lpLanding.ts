@@ -158,11 +158,11 @@ interface LpLandingNamed {
  * floor included — like the store modal's "I can afford", it is on when the
  * page opens and the row says so, and its remove drops it to any volume. The
  * hub and price basis are settings the numbers are priced at, not filters, so
- * they never show. Each Show only pick is its own pill: they narrow
- * independently. Generic so the bar's wider value (those settings) rides
+ * they never show. The Show only picks are one control, so they are one pill
+ * naming the ticked picks, and its remove unticks them all. Generic so the bar's wider value (those settings) rides
  * through each `clear`.
  */
-export function lpLandingActiveFilters<F extends LpLandingFilters>(
+export function activeLpLandingFilters<F extends LpLandingFilters>(
   filters: F,
   t: Translate,
   {
@@ -204,20 +204,28 @@ export function lpLandingActiveFilters<F extends LpLandingFilters>(
       clear: (value) => ({ ...value, categories: [] }),
     });
   }
-  const showOnly = t('loyaltyStore.landing.showOnlyLabel');
   const showOnlyPicks = [
     ['mineOnly', 'loyaltyStore.landing.mineOnly'],
     ['affordableOnly', 'loyaltyStore.landing.affordable'],
     ['noTurnIns', 'loyaltyStore.landing.noTurnIns'],
     ['hideFactionWarfare', 'loyaltyStore.landing.hideFactionWarfare'],
   ] as const;
-  for (const [key, labelKey] of showOnlyPicks)
-    if (filters[key])
-      active.push({
-        label: showOnly,
-        value: t(labelKey),
-        clear: (value) => ({ ...value, [key]: false }),
-      });
+  const picked = showOnlyPicks.filter(([key]) => filters[key]);
+  if (picked.length > 0)
+    active.push({
+      label: t('loyaltyStore.landing.showOnlyLabel'),
+      value: summarizeFilterValues(
+        picked.map(([, labelKey]) => t(labelKey)),
+        t
+      ),
+      clear: (value) => ({
+        ...value,
+        mineOnly: false,
+        affordableOnly: false,
+        noTurnIns: false,
+        hideFactionWarfare: false,
+      }),
+    });
   return active;
 }
 

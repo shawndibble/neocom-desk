@@ -74,7 +74,7 @@ export function activeBrowserFilters(
     );
     active.push({
       label: t('market.filterSecurity'),
-      value: kinds.length > 0 ? summarizeFilterValues(kinds, t) : t('filters.none'),
+      value: summarizeFilterValues(kinds, t),
       clear: (v) => ({ ...v, sec: new Set(SPACE_KINDS) }),
     });
   }

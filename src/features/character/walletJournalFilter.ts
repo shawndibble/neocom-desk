@@ -1,11 +1,10 @@
 import type { TFunction } from 'i18next';
-import type { ActiveFilter } from '@/components/ui';
+import { activeDateRangeFilters, type ActiveFilter } from '@/components/ui';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import { defineUrlFilter, nullableTextParam, textParam } from '@/lib/urlState';
 import { journalRefKey, type JournalRow } from '@/engine/journalNetting';
 import { bountyKillsOf } from './bountyKills';
 import { dailyGoalMessageIdOf } from './dailyGoal';
-import { activeDateRangeFilters } from './dateRangeActiveFilters';
 import { journalRefLabel } from './journalRefLabel';
 
 /**
@@ -265,6 +264,11 @@ export function activeWalletJournalFilters(
       value: nameOf(options.parties, filter.party),
       clear: (value) => ({ ...value, party: null }),
     });
-  active.push(...activeDateRangeFilters(filter, t));
+  active.push(
+    ...activeDateRangeFilters(filter, t, {
+      from: t('wallet.dateFromLabel'),
+      to: t('wallet.dateToLabel'),
+    })
+  );
   return active;
 }

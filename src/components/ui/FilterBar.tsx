@@ -122,8 +122,10 @@ const FOCUSABLE =
   'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * Focus the control a pill names inside `container`: the first focusable
- * thing in the `FilterField` captioned `label`, else the first in the box.
+ * Focus the control a pill names inside `container`: in the `FilterField`
+ * captioned `label`, the option that is on (a pressed chip, a checked box) —
+ * the one the pill is about — else its first control; with no such field,
+ * the first control in the box.
  */
 function focusField(container: HTMLElement | null, label: string | null): void {
   if (!container) return;
@@ -134,7 +136,9 @@ function focusField(container: HTMLElement | null, label: string | null): void {
           (element) => element.dataset.filterField === label
         );
   const target =
-    field?.querySelector<HTMLElement>(FOCUSABLE) ?? container.querySelector<HTMLElement>(FOCUSABLE);
+    field?.querySelector<HTMLElement>('[aria-pressed="true"], [aria-checked="true"]') ??
+    field?.querySelector<HTMLElement>(FOCUSABLE) ??
+    container.querySelector<HTMLElement>(FOCUSABLE);
   target?.focus();
 }
 

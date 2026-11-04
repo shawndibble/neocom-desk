@@ -14,6 +14,7 @@ import {
   StatChip,
   StatChips,
   sortRows,
+  summarizeFilterValues,
   useOpenAfterMenu,
   type ActiveFilter,
   type DataTableColumn,
@@ -245,13 +246,13 @@ export function MinersTab() {
       : [
           {
             label: standingLabel,
-            value:
+            value: summarizeFilterValues(
               [
-                filter.members && t('corpTaxBook.moons.miners.members'),
-                filter.guests && t('corpTaxBook.moons.miners.nonMembers'),
-              ]
-                .filter(Boolean)
-                .join(', ') || t('common.checkboxSelect.none'),
+                ...(filter.members ? [t('corpTaxBook.moons.miners.members')] : []),
+                ...(filter.guests ? [t('corpTaxBook.moons.miners.nonMembers')] : []),
+              ],
+              t
+            ),
             clear: (value) => ({ ...value, members: true, guests: true }),
           },
         ];

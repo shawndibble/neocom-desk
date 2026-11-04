@@ -41,9 +41,12 @@ export type BpcFilterChip =
   | { id: 'region'; value: number; clear: Clear }
   | { id: 'jumps'; value: JumpRange; clear: Clear }
   | { id: 'minMe' | 'minTe' | 'minRuns' | 'maxPrice'; value: string; clear: Clear }
-  | { id: 'hideAuctions' | 'hidePlex'; value?: undefined; clear: Clear }
+  | { id: 'exclude'; value: BpcExclude[]; clear: Clear }
   | { id: 'sources'; value: SourceToggle[]; clear: Clear }
   | { id: 'space'; value: SpaceKind[]; clear: Clear };
+
+/** An Exclude pick: the `BpcSourcingFilter` flag it sets. */
+export type BpcExclude = 'hideAuctions' | 'hidePlex';
 
 type Clear = (state: BpcFilterState) => BpcFilterState;
 
@@ -83,13 +86,18 @@ export function bpcActiveFilterChips(
     const value = filter[id].trim();
     if (value !== '') chips.push({ id, value, clear: (s) => withFilter(s, { [id]: '' }) });
   }
-  for (const id of ['hideAuctions', 'hidePlex'] as const) {
-    // Labelled by what it does now ("No auctions"), so a chip only ever
-    // says "hiding" — set against a default of hiding, showing is the
-    // default and gets none.
-    if (filter[id] && !hideDefaults[id]) {
-      chips.push({ id, clear: (s) => withFilter(s, { [id]: false }) });
-    }
+  // Exclude is one control, so one chip naming its picks. A chip only ever
+  // says "hiding": set against a default of hiding, showing is the default
+  // and gets none — and its clear leaves that default alone.
+  const excluded = (['hideAuctions', 'hidePlex'] as const).filter(
+    (id) => filter[id] && !hideDefaults[id]
+  );
+  if (excluded.length > 0) {
+    chips.push({
+      id: 'exclude',
+      value: excluded,
+      clear: (s) => excluded.reduce((next, id) => withFilter(next, { [id]: false }), s),
+    });
   }
   if (!isDefaultSources(sources)) {
     chips.push({

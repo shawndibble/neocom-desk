@@ -230,7 +230,7 @@ export interface ShortcutDef {
    * browser rather than swallowed (`/` on a page with no search box keeps
    * Firefox's quick find).
    */
-  readonly run?: (navigate: NavigateFunction) => unknown;
+  readonly run?: (navigate: NavigateFunction) => void | boolean | Promise<void>;
 }
 
 /**

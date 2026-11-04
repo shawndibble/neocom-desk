@@ -3,18 +3,37 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { useObservedMeasure } from '@/lib/useObservedMeasure';
 import { Button } from './Button';
-import { controlHeightClassName, focusRingClassName } from './controlStyles';
+import {
+  controlHeightClassName,
+  focusRingClassName,
+  toggleChipStateClassName,
+} from './controlStyles';
 import { fitPills } from './fitPills';
 import * as Icon from './icons';
-import { activeFilterText, type ActiveFilter } from './activeFilters';
+import { activeFilterText, clearFilters, type ActiveFilter } from './activeFilters';
 
 /** The row's gap, in px: `gap-2`. Read by `fitPills`. */
 const GAP_PX = 8;
 
-const pillClassName = cx(
-  'inline-flex shrink-0 items-stretch overflow-hidden rounded-xs border border-accent-dim bg-accent/15 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-accent uppercase',
+// A selected chip's look (an "on" filter), hovered part by part rather than whole.
+const pillFrameClassName = cx(
+  'inline-flex overflow-hidden rounded-xs border text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase',
+  toggleChipStateClassName(true, { hoverable: false }),
   controlHeightClassName.sm
 );
+/**
+ * A filter pill: its text part and its × stretch to the full height. It can
+ * shrink (the first pill, kept on a line too narrow for it, truncates).
+ */
+const pillClassName = cx(pillFrameClassName, 'min-w-0 shrink items-stretch');
+/** The "+N" pill: one centred part. */
+const morePillClassName = cx(pillFrameClassName, 'shrink-0 items-center');
+/**
+ * A pill's text, capped so one long filter ("Contract type: Item Exchange")
+ * still fits a phone's line with Clear all, rather than folding the whole
+ * line into "+N". The full text stays in the pill's accessible name.
+ */
+const pillTextClassName = 'block max-w-[10rem] min-w-0 truncate md:max-w-[18rem]';
 const pillPartClassName = cx(
   // `uppercase` again: Tailwind's preflight resets a button's text-transform,
   // and the measured copy (plain spans) must be the same width as the pill.
@@ -80,7 +99,7 @@ export function ActiveFilterRow<T>({
     onCleared();
   };
   const clearAll = () => {
-    onChange(active.reduce((next, filter) => filter.clear(next), value));
+    onChange(clearFilters(value, active));
     onCleared();
   };
   const visible = active.slice(0, Math.min(fit, active.length));
@@ -94,13 +113,15 @@ export function ActiveFilterRow<T>({
         <div ref={measureRef} className="flex w-max gap-2">
           {texts.map((text) => (
             <span key={text} className={pillClassName}>
-              <span className="px-2.5">{text}</span>
+              <span className="inline-flex items-center px-2.5">
+                <span className={pillTextClassName}>{text}</span>
+              </span>
               <span className="inline-flex items-center px-1.5">
                 <Icon.Close size={Icon.ICON_SIZE.sm} />
               </span>
             </span>
           ))}
-          <span className={cx(pillClassName, 'px-2.5')}>
+          <span className={cx(morePillClassName, 'px-2.5')}>
             {t('filters.more', { count: active.length })}
           </span>
           <Button size="sm" variant="ghost" tabIndex={-1}>
@@ -120,11 +141,11 @@ export function ActiveFilterRow<T>({
             <span key={text} className={pillClassName}>
               <button
                 type="button"
-                className={cx(pillPartClassName, 'px-2.5')}
+                className={cx(pillPartClassName, 'min-w-0 px-2.5')}
                 aria-label={t('filters.editOne', { filter: text })}
-                onClick={() => onOpen(filter.label)}
+                onClick={() => onOpen(filter.field ?? filter.label)}
               >
-                {text}
+                <span className={pillTextClassName}>{text}</span>
               </button>
               <button
                 type="button"
@@ -140,9 +161,9 @@ export function ActiveFilterRow<T>({
         {firstHidden && (
           <button
             type="button"
-            className={cx(pillClassName, pillPartClassName, 'px-2.5')}
+            className={cx(morePillClassName, pillPartClassName, 'px-2.5')}
             aria-label={t('filters.moreLabel', { count: hiddenCount })}
-            onClick={() => onOpen(firstHidden.label)}
+            onClick={() => onOpen(firstHidden.field ?? firstHidden.label)}
           >
             {t('filters.more', { count: hiddenCount })}
           </button>

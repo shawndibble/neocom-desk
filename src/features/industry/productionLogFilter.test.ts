@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import i18n from '@/i18n';
+import { formatIsoDay } from '@/lib/formatDateTick';
 import {
   EMPTY_PRODUCTION_LOG_FILTER,
   activeProductionLogFilters,
@@ -80,19 +81,19 @@ describe('activeProductionLogFilters', () => {
     expect(activeProductionLogFilters(EMPTY_PRODUCTION_LOG_FILTER, i18n.t)).toEqual([]);
   });
 
-  it('lists each bound that is set, with the day it holds', () => {
+  it('lists each bound that is set, with the day it holds as Wallet shows a day', () => {
     expect(
       activeProductionLogFilters({ startDate: '2026-08-01', endDate: null }, i18n.t).map(
         ({ label, value }) => [label, value]
       )
-    ).toEqual([['From', '2026-08-01']]);
+    ).toEqual([['From', formatIsoDay('2026-08-01')]]);
     expect(
       activeProductionLogFilters({ startDate: '2026-08-01', endDate: '2026-08-31' }, i18n.t).map(
         ({ label, value }) => [label, value]
       )
     ).toEqual([
-      ['From', '2026-08-01'],
-      ['To', '2026-08-31'],
+      ['From', formatIsoDay('2026-08-01')],
+      ['To', formatIsoDay('2026-08-31')],
     ]);
   });
 

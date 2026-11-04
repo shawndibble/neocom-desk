@@ -403,3 +403,43 @@ describe('FilterField hideCaption', () => {
     );
   });
 });
+
+describe('SearchInput pageSearch', () => {
+  it('marks a page search box outside a FilterBar for /', () => {
+    render(<SearchInput aria-label="Ships" pageSearch />);
+    expect(screen.getByRole('searchbox', { name: 'Ships' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      '/'
+    );
+  });
+});
+
+describe('FilterBar pill focus', () => {
+  it('focuses the option that is on in a chip group, not its first chip', async () => {
+    const user = userEvent.setup();
+    render(
+      <FilterBar
+        value="finished"
+        onChange={() => {}}
+        active={[{ label: 'Status', value: 'Finished', clear: () => '' }]}
+      >
+        {(draft) => (
+          <FilterField label="Status" stretch={false}>
+            <div role="group" aria-label="Status">
+              {['outstanding', 'finished'].map((status) => (
+                <FilterChip
+                  key={status}
+                  label={status}
+                  selected={draft === status}
+                  onToggle={() => {}}
+                />
+              ))}
+            </div>
+          </FilterField>
+        )}
+      </FilterBar>
+    );
+    await user.click(screen.getByRole('button', { name: 'Change filter: Status: Finished' }));
+    expect(screen.getByRole('button', { name: 'finished' })).toHaveFocus();
+  });
+});

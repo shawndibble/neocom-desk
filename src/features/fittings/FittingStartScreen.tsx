@@ -281,6 +281,8 @@ export function FittingStartScreen({
               placeholder={t('fittings.start.searchFittingsPlaceholder')}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              // The page's own box; a dialog's is a passing pick, not a `/` target.
+              pageSearch={page}
             />
           </div>
           {/* A dialog has no page header for the In-game refresh: it sits by the search. */}

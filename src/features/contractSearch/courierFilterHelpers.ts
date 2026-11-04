@@ -3,13 +3,12 @@
  * so that file exports only components.
  */
 import type { TFunction } from 'i18next';
-import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
+import { boundText, summarizeFilterValues, type ActiveFilter } from '@/components/ui';
 import type { CourierRouteRow } from '@/engine/contracts/courierSearch';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import type { OverRateFilter } from '@/features/contractSearch/overRateFilter';
 import { formatCount } from '@/lib/formatCount';
-import { formatIskCompact } from '@/lib/isk';
-import { boundText } from '@/features/contractSearch/boundText';
+import { formatIskCompact, parseIskAmount } from '@/lib/isk';
 
 /** The filter as the controls hold it: text fields stay strings until they are parsed into the engine's filter. */
 export interface CourierUiFilter {
@@ -152,26 +151,23 @@ export function activeCourierFilters(
     const selected = spaceKinds.filter((kind) => filter.destinationSpace.includes(kind));
     active.push({
       label: t('contractSearch.destinationSpaceLabel'),
-      value:
-        selected.length === 0
-          ? t('filters.none')
-          : summarizeFilterValues(
-              selected.map((kind) => t(`common.spaceOption.${kind}`)),
-              t
-            ),
+      value: summarizeFilterValues(
+        selected.map((kind) => t(`common.spaceOption.${kind}`)),
+        t
+      ),
       clear: (value) => ({ ...value, destinationSpace: SPACE_KINDS }),
     });
   }
   if (filter.minReward.trim() !== '')
     active.push({
       label: t('contractSearch.minRewardLabel'),
-      value: boundText(filter.minReward, formatIskCompact),
+      value: boundText(filter.minReward, formatIskCompact, parseIskAmount),
       clear: (value) => ({ ...value, minReward: '' }),
     });
   if (filter.maxCollateral.trim() !== '')
     active.push({
       label: t('contractSearch.maxCollateralLabel'),
-      value: boundText(filter.maxCollateral, formatIskCompact),
+      value: boundText(filter.maxCollateral, formatIskCompact, parseIskAmount),
       clear: (value) => ({ ...value, maxCollateral: '' }),
     });
   if (filter.maxVolume.trim() !== '')

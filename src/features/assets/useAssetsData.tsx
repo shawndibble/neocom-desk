@@ -21,7 +21,7 @@ import { useRememberedUrlParams, type RememberedDefaults } from '@/lib/useUrlSta
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { boolParam, textParam } from '@/lib/urlState';
 import {
-  assetKindActiveFilters,
+  activeAssetKindFilters,
   assetPassesKindFilter,
   blueprintKindParam,
   blueprintsTicked,
@@ -373,7 +373,7 @@ export function useAssetsData() {
     [categoryPick, blueprintKind, minValueInput]
   );
   const activeFilters = useMemo<ActiveFilter<AssetsFilterValue>[]>(() => {
-    const active = assetKindActiveFilters(
+    const active = activeAssetKindFilters(
       filterValue,
       { index: pickerIndex, showBlueprintSelect, categoryLabel: t('assets.category.label') },
       t
@@ -384,7 +384,7 @@ export function useAssetsData() {
     if (min > 0)
       active.push({
         label: t('assets.minValue.label'),
-        value: t('assets.minValue.atLeast', { isk: formatIskCompact(min) }),
+        value: t('filters.atLeast', { value: t('filters.isk', { amount: formatIskCompact(min) }) }),
         clear: (next) => ({ ...next, min: '' }),
       });
     return active;

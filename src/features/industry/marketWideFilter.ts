@@ -59,7 +59,7 @@ function pickedSummary<V extends string>(
   t: TFunction
 ): string {
   const names = members.filter((member) => picked.has(member)).map(labelFor);
-  return names.length === 0 ? t('filters.none') : summarizeFilterValues(names, t);
+  return summarizeFilterValues(names, t);
 }
 
 /**
@@ -75,7 +75,7 @@ export function activeMarketWideFilters(
   if (cap !== null)
     active.push({
       label: t('industry.marketOpportunitiesFilters.maxBuildCost'),
-      value: `≤ ${formatIskCompact(cap)}`,
+      value: t('filters.atMost', { value: formatIskCompact(cap) }),
       clear: (value) => ({ ...value, maxBuildCost: 'any' }),
     });
   if (filter.tiers.size !== PRODUCT_TIERS.length)
@@ -114,7 +114,7 @@ export function activeMarketWideFilters(
   if (filter.salesShare !== DEFAULT_SALES_SHARE)
     active.push({
       label: t('industry.marketOpportunitiesFilters.salesShare'),
-      value: `${filter.salesShare}%`,
+      value: t('filters.percent', { value: filter.salesShare }),
       clear: (value) => ({ ...value, salesShare: DEFAULT_SALES_SHARE }),
     });
   if (filter.hideSkillGated)

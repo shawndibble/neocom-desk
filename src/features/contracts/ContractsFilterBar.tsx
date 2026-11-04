@@ -4,7 +4,6 @@ import { FilterBar, FilterChip, FilterField, SearchInput } from '@/components/ui
 import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from '@/features/character/contractLabels';
 import { activeContractsFilters, type ContractsFilter } from '@/features/character/contractsFilter';
 import type { Contract } from '@/esi/endpoints';
-import { useIsPhone } from '@/lib/useIsPhone';
 
 interface ContractsFilterBarProps {
   filter: ContractsFilter;
@@ -27,16 +26,7 @@ export function ContractsFilterBar({
   resultCount,
 }: ContractsFilterBarProps) {
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
-  const statusLabel = t('contracts.statusFilterLabel');
-  // On a phone the status chips sit in their own row under the bar
-  // (`ContractsHistoryTable`), which already shows the pick and changes it in
-  // one tap; a status pill there would be the same setting twice. Left out
-  // of the badge and Clear all too, the way the order book's inline Jump
-  // Range is (`OrderBookScopeBar`).
-  const active = activeContractsFilters(filter, t).filter(
-    (entry) => !isPhone || entry.label !== statusLabel
-  );
+  const active = activeContractsFilters(filter, t);
   return (
     <FilterBar
       value={filter}

@@ -11,6 +11,12 @@ interface SearchInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, '
   className?: string;
   /** The `<input>` itself — for what only the focused element can carry (e.g. `scroll-mt-*`). */
   inputClassName?: string;
+  /**
+   * The page's own search box on a page with no `FilterBar` (My Ships, the
+   * Fittings start screen): `/` focuses it and it shows the `/` key cap. A
+   * `FilterBar`'s `search` slot says so already.
+   */
+  pageSearch?: boolean;
 }
 
 /**
@@ -31,10 +37,10 @@ interface SearchInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, '
  * @summary The one search box: a magnifier and a fixed `md` height; use it for every filter-as-you-type field.
  */
 export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(function SearchInput(
-  { className = '', inputClassName, ...rest },
+  { className = '', inputClassName, pageSearch = false, ...rest },
   ref
 ) {
-  const primary = useContext(PrimarySearchContext);
+  const primary = useContext(PrimarySearchContext) || pageSearch;
   const shortcutsOn = useSingleKeyShortcuts((s) => s.value);
   const hint = primary && shortcutsOn;
   return (

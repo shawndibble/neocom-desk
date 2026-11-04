@@ -158,26 +158,26 @@ export function activeContactsFilters<F extends ContactsFilter>(
   filter: F,
   t: Translate
 ): ActiveFilter<F>[] {
-  const picked = (names: string[]) =>
-    names.length === 0 ? t('filters.none') : summarizeFilterValues(names, t);
   const active: ActiveFilter<F>[] = [];
   if (filter.types.size !== ALL_CONTACT_KINDS.length)
     active.push({
       label: t('contacts.typeFilterLabel'),
-      value: picked(
+      value: summarizeFilterValues(
         ALL_CONTACT_KINDS.filter((kind) => filter.types.has(kind)).map((kind) =>
           t(CONTACT_KIND_KEY[kind])
-        )
+        ),
+        t
       ),
       clear: (value) => ({ ...value, types: EMPTY_CONTACTS_FILTER.types }),
     });
   if (filter.standings.size !== STANDING_CATEGORIES.length)
     active.push({
       label: t('contacts.standingFilterLabel'),
-      value: picked(
+      value: summarizeFilterValues(
         STANDING_CATEGORIES.filter((category) => filter.standings.has(category)).map((category) =>
           t(STANDING_FILTER_KEY[category])
-        )
+        ),
+        t
       ),
       clear: (value) => ({ ...value, standings: EMPTY_CONTACTS_FILTER.standings }),
     });

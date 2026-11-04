@@ -195,19 +195,19 @@ function activeHaulingFilters(
   if (value.margin !== DEFAULT_HAULING_FILTER.margin)
     active.push({
       label: t('market.hauling.filters.marginOver'),
-      value: `${value.margin}%`,
+      value: t('filters.percent', { value: value.margin }),
       clear: (v) => ({ ...v, margin: DEFAULT_HAULING_FILTER.margin }),
     });
   if (value.maxprice !== null)
     active.push({
       label: t('market.hauling.filters.maxPrice'),
-      value: t('market.hauling.filters.iskCapValue', { amount: formatIskCompact(value.maxprice) }),
+      value: t('filters.isk', { amount: formatIskCompact(value.maxprice) }),
       clear: (v) => ({ ...v, maxprice: null }),
     });
   if (value.spend !== null)
     active.push({
       label: t('market.hauling.filters.maxSpend'),
-      value: t('market.hauling.filters.iskCapValue', { amount: formatIskCompact(value.spend) }),
+      value: t('filters.isk', { amount: formatIskCompact(value.spend) }),
       clear: (v) => ({ ...v, spend: null }),
     });
   if (listing && value.days !== DEFAULT_HAULING_FILTER.days)

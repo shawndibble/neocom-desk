@@ -5,7 +5,6 @@ import {
   ColumnPickerMenu,
   DataTable,
   EmptyState,
-  FilterChip,
   RowActionsMenu,
   type DataTableColumn,
 } from '@/components/ui';
@@ -16,7 +15,6 @@ import { formatDateOnly } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { Contract } from '@/esi/endpoints';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
-import { CONTRACT_STATUS_KEY } from '@/features/character/contractLabels';
 import {
   EMPTY_CONTRACTS_FILTER,
   isContractsFilterActive,
@@ -84,28 +82,6 @@ export function ContractsHistoryTable({
           />
         }
       />
-      {/* Phone only: the filter sheet's status chips, one tap away. */}
-      <div
-        role="group"
-        aria-label={t('contracts.statusFilterLabel')}
-        className="flex gap-2 overflow-x-auto border-b border-line px-3 py-2 sm:hidden"
-      >
-        <FilterChip
-          label={t('contracts.statusAll')}
-          selected={filter.status === null}
-          onToggle={() => onFilterChange({ ...filter, status: null })}
-        />
-        {statusOptions.map((status) => (
-          <FilterChip
-            key={status}
-            label={t(CONTRACT_STATUS_KEY[status])}
-            selected={filter.status === status}
-            onToggle={() =>
-              onFilterChange({ ...filter, status: filter.status === status ? null : status })
-            }
-          />
-        ))}
-      </div>
       {rows.length === 0 ? (
         // Zero matches with no active filter can't happen today (an empty
         // list is caught above), but the reset only belongs where a filter is on.

@@ -2,6 +2,7 @@ import { type InputHTMLAttributes, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import {
+  boundText,
   CheckboxSelect,
   FilterBar,
   FilterField,
@@ -42,15 +43,13 @@ function fromState({ filter, sources, spaceKinds, jumps }: BpcFilterState): Comp
 
 /**
  * A chip's pill: captioned as its control's `FilterField`, so a click on it
- * focuses that control. Both Exclude picks share the Exclude caption.
+ * focuses that control.
  */
 function chipPill(
   chip: BpcFilterChip,
   t: TFunction,
   regionName: (id: number) => string
 ): Omit<ActiveFilter<CompositeFilter>, 'clear'> {
-  const names = (list: string[]) =>
-    list.length === 0 ? t('filters.none') : summarizeFilterValues(list, t);
   switch (chip.id) {
     case 'region':
       return { label: t('bpcContracts.regionLabel'), value: regionName(chip.value) };
@@ -60,33 +59,41 @@ function chipPill(
     case 'minTe':
     case 'minRuns':
       return { label: t(`bpcContracts.${chip.id}Label`), value: chip.value };
-    case 'maxPrice': {
-      // The field keeps what was typed ("50m", "50,000,000"); the pill says it one way.
-      const isk = parseIskAmount(chip.value);
+    case 'maxPrice':
       return {
         label: t('bpcContracts.maxPriceLabel'),
-        value: isk === null ? chip.value : `${formatIskCompact(isk)} ISK`,
+        value: boundText(
+          chip.value,
+          (isk) => t('filters.isk', { amount: formatIskCompact(isk) }),
+          parseIskAmount
+        ),
       };
-    }
-    case 'hideAuctions':
-    case 'hidePlex':
-      return { label: t('bpcContracts.excludeLabel'), value: t(`bpcContracts.${chip.id}`) };
+    case 'exclude':
+      return {
+        label: t('bpcContracts.excludeLabel'),
+        value: summarizeFilterValues(
+          chip.value.map((id) => t(`bpcContracts.${id}`)),
+          t
+        ),
+      };
     case 'sources':
       return {
         label: t('bpcContracts.sourceLabel'),
-        value: names(
+        value: summarizeFilterValues(
           SOURCE_TOGGLES.filter((source) => chip.value.includes(source)).map((source) =>
             t(SOURCE_LABEL_KEYS[source])
-          )
+          ),
+          t
         ),
       };
     case 'space':
       return {
         label: t('bpcContracts.spaceLabel'),
-        value: names(
+        value: summarizeFilterValues(
           SPACE_KINDS.filter((kind) => chip.value.includes(kind)).map((kind) =>
             t(`common.spaceOption.${kind}`)
-          )
+          ),
+          t
         ),
       };
   }

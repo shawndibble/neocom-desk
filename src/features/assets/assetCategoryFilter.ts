@@ -260,7 +260,7 @@ export function pickedCategoryNames(index: AssetCategoryIndex, pick: CategoryPic
  * and Corp Assets. Blueprints only counts while its select is shown: a hidden
  * select does not filter (`filterIsOpen`), so it is not a filter that is on.
  */
-export function assetKindActiveFilters<T extends { cat: CategoryPick; bp: BlueprintKind }>(
+export function activeAssetKindFilters<T extends { cat: CategoryPick; bp: BlueprintKind }>(
   value: T,
   {
     index,
@@ -280,7 +280,7 @@ export function assetKindActiveFilters<T extends { cat: CategoryPick; bp: Bluepr
     const names = pickedCategoryNames(index, value.cat);
     active.push({
       label: categoryLabel,
-      value: names.length === 0 ? t('assets.category.none') : summarizeFilterValues(names, t),
+      value: summarizeFilterValues(names, t),
       clear: (next) => ({ ...next, cat: 'all' }),
     });
   }

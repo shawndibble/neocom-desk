@@ -82,7 +82,7 @@ export function activePlanFilters(
     );
     active.push({
       label: t('industry.planFilters.verdict'),
-      value: names.length === 0 ? t('filters.none') : summarizeFilterValues(names, t),
+      value: summarizeFilterValues(names, t),
       clear: (value) => ({ ...value, verdicts: DEFAULT_BUILD_PLAN_FILTER.verdicts }),
     });
   }

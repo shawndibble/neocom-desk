@@ -54,6 +54,7 @@ import {
   IskAmount,
   LiveStatus,
   CachedNotice,
+  boundText,
   summarizeFilterValues,
   type ActiveFilter,
 } from '@/components/ui';
@@ -124,8 +125,12 @@ import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto, formatIskCompact } from '@/lib/isk';
-import { boundText } from '@/features/contractSearch/boundText';
+import {
+  CONTRACT_ISK_CENTS_BELOW,
+  formatIskAuto,
+  formatIskCompact,
+  parseIskAmount,
+} from '@/lib/isk';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, enumParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { DEFAULT_JUMP_RANGE, JUMP_RANGES, type JumpRange } from '@/engine/route/jumpRange';
@@ -254,7 +259,7 @@ function activeItemsFilters(
   if (filter.maxPrice.trim() !== '')
     active.push({
       label: t('contractSearch.maxPriceLabel'),
-      value: boundText(filter.maxPrice, formatIskCompact),
+      value: boundText(filter.maxPrice, formatIskCompact, parseIskAmount),
       clear: (value) => ({ ...value, maxPrice: '' }),
     });
   if (filter.minQuantity.trim() !== '')
