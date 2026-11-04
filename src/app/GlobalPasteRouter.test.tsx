@@ -15,20 +15,22 @@ vi.mock('@/engine/import/pasteDestination', async (importOriginal) => {
 
 // The market catalogue is fetched on first use and not precached: `available`
 // false is a fresh install with no connection.
-const market = vi.hoisted(() => ({ available: true }));
+const market = vi.hoisted(() => ({ available: true, neverLoads: false }));
 
 vi.mock('@/features/market/appraisalData', () => ({
-  loadAppraisalCatalogue: () =>
-    !market.available
-      ? Promise.reject(new TypeError('Failed to fetch'))
-      : Promise.resolve(
-          new Map(
-            ['Rifter', 'Damage Control II', 'Tritanium'].map((name, index) => [
-              name.toLowerCase(),
-              { typeId: index + 1, name },
-            ])
-          )
-        ),
+  loadAppraisalCatalogue: () => {
+    // A load that never settles: a tab left idle with a stalled download.
+    if (market.neverLoads) return new Promise(() => {});
+    if (!market.available) return Promise.reject(new TypeError('Failed to fetch'));
+    return Promise.resolve(
+      new Map(
+        ['Rifter', 'Damage Control II', 'Tritanium'].map((name, index) => [
+          name.toLowerCase(),
+          { typeId: index + 1, name },
+        ])
+      )
+    );
+  },
 }));
 
 vi.mock('@/features/fittings/hullNames', () => ({
@@ -75,6 +77,10 @@ async function paste(target: Element, text: string) {
 }
 
 describe('GlobalPasteRouter', () => {
+  afterEach(() => {
+    market.neverLoads = false;
+  });
+
   it('opens a pasted fit in Fittings', async () => {
     renderRouter();
     await paste(document.body, FIT);
@@ -87,6 +93,17 @@ describe('GlobalPasteRouter', () => {
     await paste(document.body, 'Tritanium\t1,000\nDamage Control II\t2');
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/market/appraisal'));
     expect(screen.getByTestId('where')).toHaveTextContent('"appraiseText"');
+  });
+
+  it('opens a survey scan without waiting on the market catalogue', async () => {
+    market.neverLoads = true;
+    renderRouter();
+    await paste(
+      document.body,
+      'Clear Icicle\t25\t25,000 m3\t5,120,000.00 ISK\t28 km\nClear Icicle\t55\t55,000 m3\t11,300,000.00 ISK\t10 km'
+    );
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('survey'));
+    expect(screen.getByTestId('where')).toHaveTextContent('"surveyScanText"');
   });
 
   it('opens a pasted skill plan in the Skills planner', async () => {
