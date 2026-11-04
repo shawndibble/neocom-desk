@@ -36,4 +36,11 @@ describe('ItemDescription', () => {
     expect(screen.getByText('Short.')).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
+
+  it('shows the whole text with no toggle when asked (an implant, whose bonuses are in it)', () => {
+    stubOverflow(120, 32);
+    render(<ItemDescription markup="+5% armor hitpoints." full />);
+    expect(screen.getByText('+5% armor hitpoints.')).not.toHaveClass('line-clamp-2');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
 });

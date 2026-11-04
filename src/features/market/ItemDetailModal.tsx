@@ -95,6 +95,8 @@ import {
 import { ItemMarketTab } from './ItemMarketTab';
 import { ItemDescription } from './ItemDescription';
 import { loadItemGroupLine } from './itemGroupLine';
+import { loadItemCategoryId } from './itemCategory';
+import { IMPLANT_CATEGORY_ID } from '@/sde/categories';
 import { priceMarketOf } from './priceMarket';
 import { RequiredSkillsSection } from './RequiredSkillsSection';
 import { skillNameOrFallback } from './skillNameOrFallback';
@@ -215,6 +217,8 @@ export function ItemDetailModal({
     : null;
   const loadGroupLine = useCallback(() => loadItemGroupLine(typeId), [typeId]);
   const { data: groupLine } = useKeyedLoad(String(typeId), loadGroupLine);
+  const loadCategory = useCallback(() => loadItemCategoryId(typeId), [typeId]);
+  const { data: categoryId } = useKeyedLoad(String(typeId), loadCategory);
 
   // Null until known, so the market line and link don't flash in on an Abyssal type.
   const abyssal = useIsAbyssalType(typeId);
@@ -513,7 +517,13 @@ export function ItemDetailModal({
                 </div>
               </div>
 
-              {data.type.description && <ItemDescription markup={data.type.description} />}
+              {data.type.description && (
+                <ItemDescription
+                  markup={data.type.description}
+                  // An implant's or booster's bonuses are written in its description.
+                  full={categoryId === IMPLANT_CATEGORY_ID}
+                />
+              )}
 
               <AbyssalItemDetail
                 typeId={typeId}
