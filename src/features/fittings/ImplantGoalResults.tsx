@@ -1,6 +1,8 @@
 import { useContext } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { Button, IconButton, IskAmount, Spinner, TypeIcon } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import {
@@ -13,6 +15,8 @@ import {
 } from '@/engine/fittings/implantFinder';
 import { alternativeSource, type Source } from '@/engine/fittings/implantSources';
 import type { FittingStats } from '@/engine/fittings/types';
+import { marketLinkParams } from '@/engine/market/urlState';
+import { lpStorePath } from '@/features/loyalty/lpStorePath';
 import { getTradeHub } from '@/market/hubs';
 import { type FamilyResult, type FixResult, type GradeResult } from './useImplantFinder';
 import { SourceNames } from './implantSourceNames';
@@ -109,33 +113,48 @@ export function GoalResults({
           grades.filter((row) => row.replaces !== null && !row.inSet).map((row) => row.replaces)
         );
         const sharedReplaces = displaced.size === 1 ? [...displaced][0]! : null;
+        // One grade: its action sits in the header, so the row below gets the whole width.
+        const single = grades.length === 1 ? grades[0]! : null;
         return (
           <li key={family.key} className="space-y-1 rounded-xs border border-line bg-panel-2 p-2.5">
             <div className="flex items-start gap-2">
               <TypeIcon typeId={highest.typeId} size={32} width={28} height={28} />
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">{family.name}</p>
-                <p className="text-xs text-text-dim">
-                  {family.grades.length > 1
-                    ? t(
-                        family.kind === 'booster'
-                          ? 'fittings.implantFinder.boosterSlotGrades'
-                          : 'fittings.implantFinder.slotGrades',
-                        { slot: family.slot, low: lowest.code, high: highest.code }
-                      )
-                    : t(
-                        family.kind === 'booster'
-                          ? 'fittings.implantFinder.boosterSlotLong'
-                          : 'fittings.implantFinder.slot',
-                        { slot: family.slot }
-                      )}
+                <p className="flex flex-wrap items-baseline gap-x-1.5 text-xs text-text-dim">
+                  <span>
+                    {family.grades.length > 1
+                      ? t(
+                          family.kind === 'booster'
+                            ? 'fittings.implantFinder.boosterSlotGrades'
+                            : 'fittings.implantFinder.slotGrades',
+                          { slot: family.slot, low: lowest.code, high: highest.code }
+                        )
+                      : t(
+                          family.kind === 'booster'
+                            ? 'fittings.implantFinder.boosterSlotLong'
+                            : 'fittings.implantFinder.slot',
+                          { slot: family.slot }
+                        )}
+                  </span>
+                  {sharedReplaces !== null && (
+                    <ReplacesLine
+                      typeId={sharedReplaces}
+                      name={nameOf(sharedReplaces)}
+                      onInfo={onInfo}
+                    />
+                  )}
                 </p>
-                {sharedReplaces !== null && (
-                  <p className="text-xs text-text-dim">
-                    {t('fittings.implantFinder.replaces', { name: nameOf(sharedReplaces) })}
-                  </p>
-                )}
               </div>
+              {single && (
+                <GradeAction
+                  row={single}
+                  name={nameOf(single.grade.typeId)}
+                  busy={busy}
+                  onAdd={(id) => onAdd([id])}
+                  onRemove={onRemove}
+                />
+              )}
             </div>
             <ul>
               {grades.map((row) => {
@@ -150,6 +169,7 @@ export function GoalResults({
                     replacesName={
                       row.replaces === null || sharedReplaces !== null ? null : nameOf(row.replaces)
                     }
+                    inHeader={single !== null}
                     busy={busy}
                     onAdd={(id) => onAdd([id])}
                     onRemove={onRemove}
@@ -402,12 +422,73 @@ function ImplantSourceLine({ source }: { source: Source }) {
   );
 }
 
+/** "Replaces <item>": the item's name opens its details, so the pilot can judge what they'd lose. */
+function ReplacesLine({
+  typeId,
+  name,
+  onInfo,
+}: {
+  typeId: number;
+  name: string;
+  onInfo: (typeId: number) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <span>
+      {t('fittings.implantFinder.replacesLabel')}{' '}
+      <button
+        type="button"
+        aria-label={t('fittings.implantFinder.info', { name })}
+        onClick={() => onInfo(typeId)}
+        className={inlineLinkClassName}
+      >
+        {name}
+      </button>
+    </span>
+  );
+}
+
+/** The one action a grade offers: Replace or Add (primary) or Remove (ghost). */
+function GradeAction({
+  row,
+  name,
+  busy,
+  onAdd,
+  onRemove,
+}: {
+  row: GradeResult;
+  name: string;
+  busy: boolean;
+  onAdd: (typeId: number) => void;
+  onRemove: (typeId: number) => void;
+}) {
+  const { t } = useTranslation();
+  const action = row.inSet
+    ? t('fittings.implantFinder.remove')
+    : row.replaces !== null
+      ? t('fittings.implantFinder.replace')
+      : t('fittings.implantFinder.add');
+  return (
+    <Button
+      variant={row.inSet ? 'ghost' : 'primary'}
+      size="sm"
+      disabled={busy}
+      aria-label={t('fittings.implantFinder.actionLabel', { action, name })}
+      onClick={() => (row.inSet ? onRemove(row.grade.typeId) : onAdd(row.grade.typeId))}
+      className="ml-auto min-w-20 shrink-0"
+    >
+      {action}
+    </Button>
+  );
+}
+
 function GradeRow({
   row,
   name,
   effect,
   fixesIt,
   replacesName,
+  inHeader,
   busy,
   onAdd,
   onRemove,
@@ -418,6 +499,8 @@ function GradeRow({
   effect: Effect;
   fixesIt: boolean;
   replacesName: string | null;
+  /** The card's header already carries this grade's action. */
+  inHeader: boolean;
   busy: boolean;
   onAdd: (typeId: number) => void;
   onRemove: (typeId: number) => void;
@@ -428,35 +511,35 @@ function GradeRow({
   // What the pilot can buy now; failing that, the best way there is, warnings and all.
   const shown = best ?? sources?.[0] ?? null;
   const alt = sources && shown ? alternativeSource(sources, shown) : null;
-  const action = row.inSet
-    ? t('fittings.implantFinder.remove')
-    : row.replaces !== null
-      ? t('fittings.implantFinder.replace')
-      : t('fittings.implantFinder.add');
+  const lpSources = [shown, alt?.source].filter(
+    (source): source is Extract<Source, { kind: 'lp' }> => source?.kind === 'lp'
+  );
+  // The market link opens on the hub the price shown is from.
+  const marketSource = [shown, alt?.source].find((source) => source?.kind === 'market');
+  const hasMarket = marketSource !== undefined;
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-1.5">
-      <span className="flex w-28 items-center gap-1">
-        <IconButton
-          variant="plain"
-          size="row"
-          icon={<Icon.Info />}
-          label={t('fittings.implantFinder.info', { name })}
-          onClick={() => onInfo(row.grade.typeId)}
-        />
-        <span className="font-semibold tabular-nums">{row.grade.code}</span>
+    <li className="flex flex-wrap items-start gap-x-4 gap-y-1 border-t border-line py-1.5">
+      <span className="flex min-w-44 items-start gap-1 md:w-52 md:shrink-0 md:flex-col md:gap-0.5">
+        <span className="flex items-center gap-1">
+          <IconButton
+            variant="plain"
+            size="row"
+            icon={<Icon.Info />}
+            label={t('fittings.implantFinder.info', { name })}
+            onClick={() => onInfo(row.grade.typeId)}
+          />
+          {!inHeader && <span className="font-semibold tabular-nums">{row.grade.code}</span>}
+          <span
+            className={cx('text-xs tabular-nums', effect.fits ? 'text-success' : 'text-warning')}
+          >
+            {effect.text}
+          </span>
+        </span>
+        {fixesIt && <SuccessBadge>{t('fittings.implantFinder.fixesIt')}</SuccessBadge>}
       </span>
-      {fixesIt && <SuccessBadge>{t('fittings.implantFinder.fixesIt')}</SuccessBadge>}
       <span
         className={cx(
-          'min-w-40 flex-1 text-xs tabular-nums',
-          effect.fits ? 'text-success' : 'text-warning'
-        )}
-      >
-        {effect.text}
-      </span>
-      <span
-        className={cx(
-          'basis-full text-xs tabular-nums sm:basis-72',
+          'min-w-0 flex-1 basis-full text-xs tabular-nums sm:basis-72',
           shown?.kind === 'market' && !shown.atSelectedHub ? 'text-warning' : 'text-text'
         )}
       >
@@ -475,22 +558,42 @@ function GradeRow({
             <ImplantSourceLine source={alt.source} />
           </span>
         )}
-        {replacesName && !row.inSet && (
-          <span className="block text-text-dim">
-            {t('fittings.implantFinder.replaces', { name: replacesName })}
+        {replacesName && !row.inSet && row.replaces !== null && (
+          <span className="mt-0.5 block text-text-dim">
+            <ReplacesLine typeId={row.replaces} name={replacesName} onInfo={onInfo} />
+          </span>
+        )}
+        {(hasMarket || lpSources.length > 0) && (
+          <span className="mt-1 flex flex-wrap gap-x-3 text-xs">
+            {hasMarket && (
+              <Link
+                to={`/market/browser?${new URLSearchParams(
+                  marketLinkParams(
+                    row.grade.typeId,
+                    '',
+                    marketSource?.kind === 'market' ? marketSource.hubId : undefined
+                  )
+                ).toString()}`}
+                className={inlineLinkClassName}
+              >
+                {t('fittings.implantFinder.openMarket')}
+              </Link>
+            )}
+            {lpSources.map((source) => (
+              <Link
+                key={`${source.corporationId}-${source.offerId ?? ''}`}
+                to={lpStorePath(source.corporationId, source.offerId)}
+                className={inlineLinkClassName}
+              >
+                {t('fittings.implantFinder.openLpStore', { corp: source.corpName })}
+              </Link>
+            ))}
           </span>
         )}
       </span>
-      <Button
-        variant={row.inSet ? 'ghost' : 'primary'}
-        size="sm"
-        disabled={busy}
-        aria-label={t('fittings.implantFinder.actionLabel', { action, name })}
-        onClick={() => (row.inSet ? onRemove(row.grade.typeId) : onAdd(row.grade.typeId))}
-        className="ml-auto min-w-20"
-      >
-        {action}
-      </Button>
+      {!inHeader && (
+        <GradeAction row={row} name={name} busy={busy} onAdd={onAdd} onRemove={onRemove} />
+      )}
     </li>
   );
 }
