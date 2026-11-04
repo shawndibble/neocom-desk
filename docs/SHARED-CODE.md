@@ -63,8 +63,9 @@ UI primitives are not listed: `npm run ui:catalog` (see `docs/DESIGN.md`).
 `firebase.json` deploys `functions/` alone, so a `../src` import cannot resolve
 at runtime — hence a mirrored copy, not an import. `src/functionsParity.test.ts`
 asserts the copies agree, so a change to one side that skips the other fails
-there. Mirrored so far: the guards below, and `esiClient.ts`'s compatibility
-date and User-Agent against `src/esi/`.
+there. Mirrored so far: the guards below, `esiClient.ts`'s compatibility
+date and User-Agent against `src/esi/`, and the open-prices R2 keys and shard
+count (`functions/src/openPricesKeys.ts` against `src/features/market/marketOpenPrices.ts`).
 
 | Need                                                                                      | Use                                                                                                                            | Not                                                                                              |
 | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |

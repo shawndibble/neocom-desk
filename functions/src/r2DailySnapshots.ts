@@ -11,7 +11,7 @@
  * `immutable`, and an R2 lifecycle rule must not cover their prefixes.
  */
 import { gzipSync } from 'node:zlib';
-import { isRecord } from './guards.js';
+import { isPlainRecord } from './guards.js';
 import { openPricesR2Key, openPricesShardR2Key } from './openPricesKeys.js';
 import type { R2Get, R2Put } from './r2Client.js';
 import type { LpStoreRow } from './lpOffersSnapshot.js';
@@ -56,7 +56,8 @@ const OPEN_PRICES_CONCURRENCY = 32;
  */
 export async function readOpenPricesFromR2(get: R2Get, typeId: number): Promise<unknown | null> {
   const shard = await get(openPricesShardR2Key(typeId));
-  const entry = isRecord(shard) && isRecord(shard.types) ? shard.types[String(typeId)] : undefined;
+  const entry =
+    isPlainRecord(shard) && isPlainRecord(shard.types) ? shard.types[String(typeId)] : undefined;
   return entry ?? get(openPricesR2Key(typeId));
 }
 

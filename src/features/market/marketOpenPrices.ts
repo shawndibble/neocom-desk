@@ -18,7 +18,7 @@
 import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
 import type { OpenPriceSeries } from '@/engine/market/priceHistoryOpen';
 import { TRADE_HUBS } from '@/market/hubs';
-import { isRecord } from '@/engine/guards';
+import { isPlainRecord, isRecord } from '@/engine/guards';
 import { HOUR_MS } from '@/lib/age';
 
 /** Mirrors `openPricesR2Key` on the Functions side (`functions/src/r2DailySnapshots.ts`). */
@@ -124,7 +124,7 @@ function readShard(typeId: number, now: number): Promise<ShardTypes> {
   if (!pending) {
     const read = fetchObject(openPricesShardUrl(typeId))
       .then((body) => {
-        if (body !== null && !(isRecord(body) && isRecord(body.types))) {
+        if (body !== null && !(isPlainRecord(body) && isPlainRecord(body.types))) {
           throw new Error(`open prices shard ${shard}: bad shape`);
         }
         const types = body === null ? null : (body.types as Record<string, unknown>);
