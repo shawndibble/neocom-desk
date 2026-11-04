@@ -307,22 +307,16 @@ describe('prefixSubject', () => {
 });
 
 describe('quoteMailBody', () => {
-  it('quotes every line of the body with "> ", headed by sender and timestamp', () => {
-    expect(quoteMailBody('Aura', 'Sep 21, 2026 03:14', 'line one\nline two')).toBe(
-      '\n\nOn Sep 21, 2026 03:14, Aura wrote:\n> line one\n> line two'
-    );
-  });
+  const RULE = '-'.repeat(32);
 
-  it('quotes a blank line as a bare ">", not "> " with a trailing space', () => {
+  it('puts the body verbatim under a dashed rule with From and Sent, no ">" markers', () => {
     expect(quoteMailBody('Aura', 'Sep 21, 2026 03:14', 'line one\n\nline two')).toBe(
-      '\n\nOn Sep 21, 2026 03:14, Aura wrote:\n> line one\n>\n> line two'
+      `\n\n${RULE}\nFrom: Aura\nSent: Sep 21, 2026 03:14\n\nline one\n\nline two`
     );
   });
 
-  it('quotes an empty body as just the attribution line', () => {
-    expect(quoteMailBody('Aura', 'Sep 21, 2026 03:14', '')).toBe(
-      '\n\nOn Sep 21, 2026 03:14, Aura wrote:\n>'
-    );
+  it('never prefixes a line with ">"', () => {
+    expect(quoteMailBody('Aura', 'Sep 21, 2026 03:14', 'a\nb')).not.toMatch(/^>/m);
   });
 });
 

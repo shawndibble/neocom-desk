@@ -240,6 +240,9 @@ export function buildReplyAllRecipients(
   return out;
 }
 
+/** The rule that opens a Reply's quoted history (the EVE client writes the same one). */
+export const QUOTE_SEPARATOR = '-'.repeat(32);
+
 export type ComposeKind = 'reply' | 'forward';
 
 const SUBJECT_PREFIX: Readonly<Record<ComposeKind, string>> = {
@@ -262,20 +265,19 @@ export function prefixSubject(kind: ComposeKind, subject: string): string {
 }
 
 /**
- * The original message, quoted line-by-line with `> ` (a blank line quotes as
- * a bare `>`, never `> ` with a trailing space nobody can see they typed
- * over), under a one-line attribution. `senderName` and `formattedTimestamp`
- * are supplied already-resolved: this stays a pure string join, with no name
- * lookup or timezone formatting of its own to keep in sync with the
- * reading pane's.
+ * The original message under a dashed separator and a From/Sent header, the
+ * way the EVE client's own reply does: the body is kept verbatim, with no `>`
+ * on any line, so a thread never turns into a wall of markers. `senderName`
+ * and `formattedTimestamp` are supplied already-resolved: this stays a pure
+ * string join, with no name lookup or timezone formatting of its own to keep
+ * in sync with the reading pane's.
  */
 export function quoteMailBody(
   senderName: string,
   formattedTimestamp: string,
   body: string
 ): string {
-  const quotedLines = body.split('\n').map((line) => (line === '' ? '>' : `> ${line}`));
-  return `\n\nOn ${formattedTimestamp}, ${senderName} wrote:\n${quotedLines.join('\n')}`;
+  return `\n\n${QUOTE_SEPARATOR}\nFrom: ${senderName}\nSent: ${formattedTimestamp}\n\n${body}`;
 }
 
 /** A header plus the Character whose mailbox it came from — `mail_id` is per-Character, so the pair is the identity. */
