@@ -7,6 +7,8 @@
  * ticked option ids.
  */
 import type { UrlParamCodec } from '@/lib/urlState';
+import type { Translate } from '@/lib/translate';
+import { summarizeFilterValues, type ActiveFilter } from '@/components/ui/activeFilters';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 import { marketGroupBranch } from '@/features/corp/assetCategories';
 
@@ -236,6 +238,59 @@ export function blueprintKindParam(): UrlParamCodec<BlueprintKind> {
       BLUEPRINT_KINDS.includes(raw as BlueprintKind) ? (raw as BlueprintKind) : 'any',
     serialize: (value) => (value === 'any' ? null : value),
   };
+}
+
+/**
+ * What a pick ticks, in picker order, for a one-line summary: a heading whose
+ * rows are all ticked as its own name ("Ships", not every ship class), else
+ * each ticked row. Read against the index the picker shows, so the summary
+ * names what the reader can see ticked there.
+ */
+export function pickedCategoryNames(index: AssetCategoryIndex, pick: CategoryPick): string[] {
+  if (pick === 'all') return [];
+  return index.headings.flatMap((heading) => {
+    const ticked = heading.options.filter((option) => pick.has(option.id));
+    if (ticked.length === heading.options.length && ticked.length > 0) return [heading.name];
+    return ticked.map((option) => option.name);
+  });
+}
+
+/**
+ * The Category and Blueprints filters as `FilterBar` pills, shared by Assets
+ * and Corp Assets. Blueprints only counts while its select is shown: a hidden
+ * select does not filter (`filterIsOpen`), so it is not a filter that is on.
+ */
+export function activeAssetKindFilters<T extends { cat: CategoryPick; bp: BlueprintKind }>(
+  value: T,
+  {
+    index,
+    showBlueprintSelect,
+    categoryLabel,
+  }: {
+    /** The index the picker shows; null while the market tree loads (no picker yet). */
+    index: AssetCategoryIndex | null;
+    showBlueprintSelect: boolean;
+    /** The Category `FilterField`'s label, which differs between the two pages. */
+    categoryLabel: string;
+  },
+  t: Translate
+): ActiveFilter<T>[] {
+  const active: ActiveFilter<T>[] = [];
+  if (index && !pickIsAll(value.cat)) {
+    const names = pickedCategoryNames(index, value.cat);
+    active.push({
+      label: categoryLabel,
+      value: summarizeFilterValues(names, t),
+      clear: (next) => ({ ...next, cat: 'all' }),
+    });
+  }
+  if (showBlueprintSelect && value.bp !== 'any')
+    active.push({
+      label: t('assets.blueprints.label'),
+      value: t(`assets.blueprints.${value.bp}`),
+      clear: (next) => ({ ...next, bp: 'any' }),
+    });
+  return active;
 }
 
 /**

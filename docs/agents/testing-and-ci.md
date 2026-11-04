@@ -45,7 +45,11 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
 - **Parallel agents stay light.** Every commit already runs a full
   `typecheck` through the pre-commit hook, so a dozen agents at once push the
   machine's load past 70 and make tests time out (they flake under load, they
-  don't fail for real). Run **at most three agents at once**. Each agent runs
+  don't fail for real). So **at most three agents at once may commit or run
+  tests, typecheck, lint or a build**. The limit is about that load, not about
+  agents as such: agents that only read, search, research or edit files run
+  in any number, and the session that owns them runs the checks once they
+  are done. Each agent that does run tests runs
   only the test files it touched (`npx vitest run <file>`), never a whole
   directory like `src/routes` or `src/features`. Run an e2e spec locally only
   when you are changing that spec or the geometry it asserts, one file at a

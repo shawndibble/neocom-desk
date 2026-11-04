@@ -15,6 +15,7 @@ import {
   DataTable,
   EmptyState,
   FilterBar,
+  FilterField,
   InfoTooltip,
   Panel,
   Spinner,
@@ -31,7 +32,7 @@ import { ItemInfoLink } from '@/features/entities';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import {
-  activeProductionLogFilterCount,
+  activeProductionLogFilters,
   filterProductionRunsByDate,
   type ProductionLogFilter,
 } from './productionLogFilter';
@@ -156,36 +157,49 @@ function ProductionLogDateRange({
 }) {
   const { t } = useTranslation();
   const sheet = useFilterSurface() === 'sheet';
-  const labelClassName = cx(
-    'flex items-center gap-1 text-xs text-text-dim',
-    sheet && 'min-w-0 flex-1'
-  );
-  const fieldClassName = sheet ? 'w-full min-w-0' : 'w-36';
   return (
-    <div className={sheet ? 'flex w-full items-center gap-2' : 'contents'}>
-      <label className={labelClassName}>
-        {t('industry.dateFromLabel')}
-        <TextInput
-          type="date"
-          className={fieldClassName}
-          value={draft.startDate ?? ''}
-          onChange={(event) =>
-            setDraft({ ...draft, startDate: event.target.value === '' ? null : event.target.value })
-          }
-        />
-      </label>
-      <label className={labelClassName}>
-        {t('industry.dateToLabel')}
-        <TextInput
-          type="date"
-          className={fieldClassName}
-          value={draft.endDate ?? ''}
-          onChange={(event) =>
-            setDraft({ ...draft, endDate: event.target.value === '' ? null : event.target.value })
-          }
-        />
-      </label>
+    <div className={sheet ? 'flex w-full items-start gap-2' : 'contents'}>
+      <DateBound
+        label={t('industry.dateFromLabel')}
+        value={draft.startDate}
+        onChange={(startDate) => setDraft({ ...draft, startDate })}
+      />
+      <DateBound
+        label={t('industry.dateToLabel')}
+        value={draft.endDate}
+        onChange={(endDate) => setDraft({ ...draft, endDate })}
+      />
     </div>
+  );
+}
+
+/**
+ * One end of the range, in a `FilterField` so its pill can focus it. In the
+ * sheet the field captions it above, so the inline caption beside the input
+ * is kept for screen readers only rather than shown twice.
+ */
+function DateBound({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string | null;
+  onChange: (next: string | null) => void;
+}) {
+  const sheet = useFilterSurface() === 'sheet';
+  return (
+    <FilterField label={label} className={sheet ? 'min-w-0 flex-1' : undefined}>
+      <label className="flex items-center gap-1 text-xs text-text-dim">
+        <span className={sheet ? 'sr-only' : undefined}>{label}</span>
+        <TextInput
+          type="date"
+          className={sheet ? 'w-full min-w-0' : 'w-36'}
+          value={value ?? ''}
+          onChange={(event) => onChange(event.target.value === '' ? null : event.target.value)}
+        />
+      </label>
+    </FilterField>
   );
 }
 
@@ -566,7 +580,8 @@ export function ProductionLogPanel({
         <FilterBar
           value={filter}
           onChange={setFilter}
-          activeCount={activeProductionLogFilterCount(filter)}
+          active={activeProductionLogFilters(filter, t)}
+          resultCount={filteredRunCount}
         >
           {(draft, setDraft) => <ProductionLogDateRange draft={draft} setDraft={setDraft} />}
         </FilterBar>

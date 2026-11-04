@@ -30,6 +30,8 @@ import { filterMyFittings, groupByHull } from '@/engine/fittings/myFittings';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
+import { textParam } from '@/lib/urlState';
+import { useUrlParam } from '@/lib/useUrlState';
 import { warmDogmaEngine } from './dogmaFittingEngine';
 import { FittingPreview } from './FittingPreview';
 import { ImportFittingCard, ImportFittingDialog, NewFromHullDialog } from './FittingStartDialogs';
@@ -79,6 +81,13 @@ interface FittingStartScreenProps {
   pageTabsPanel?: { tabsId: string; tabId: string };
 }
 
+/**
+ * The page's search, in the URL as `?q=` (ADR 0015), so Back from an opened
+ * Fitting returns to the list as it was searched.
+ */
+const QUERY_KEY = 'q';
+const QUERY_PARAM = textParam();
+
 /** The content under a page tab bar as its panel; without a bar it is just the content. */
 function MaybeTabPanel({
   panel,
@@ -122,7 +131,13 @@ export function FittingStartScreen({
   const page = variant === 'page';
   // A phone has no room for a preview beside the list: a tap opens instead.
   const previewing = page && !isPhone;
-  const [query, setQuery] = useState('');
+  // Only the page's search is URL state. A dialog's (the editor's Open, the
+  // Compare picker) is a passing pick over another page's URL: written there,
+  // it would outlive the dialog and come back the next time it opened.
+  const [urlQuery, setUrlQuery] = useUrlParam(QUERY_KEY, QUERY_PARAM);
+  const [dialogQuery, setDialogQuery] = useState('');
+  const query = page ? urlQuery : dialogQuery;
+  const setQuery = page ? setUrlQuery : setDialogQuery;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hullOpen, setHullOpen] = useState(false);
   // A Fitting Share Code that won't open lands on Import, where its message is.
@@ -266,6 +281,8 @@ export function FittingStartScreen({
               placeholder={t('fittings.start.searchFittingsPlaceholder')}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              // The page's own box; a dialog's is a passing pick, not a `/` target.
+              pageSearch={page}
             />
           </div>
           {/* A dialog has no page header for the In-game refresh: it sits by the search. */}

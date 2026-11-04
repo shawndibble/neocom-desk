@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CharacterStandingEntry } from '@/engine/market/standings';
 import {
   EVERY_NPC_STANDING,
-  activeNpcStandingsFilterCount,
+  activeNpcStandingsFilters,
   NO_NPC_STANDINGS_REFERENCE,
   buildNpcStandingRows,
   countNpcStandingRows,
@@ -371,18 +371,36 @@ describe('filterNpcStandingRows', () => {
   });
 });
 
-describe('activeNpcStandingsFilterCount', () => {
-  it('counts each filter set away from its default, not the search text', () => {
-    expect(activeNpcStandingsFilterCount(EVERY_NPC_STANDING)).toBe(0);
-    expect(activeNpcStandingsFilterCount({ ...EVERY_NPC_STANDING, text: 'navy' })).toBe(0);
+describe('activeNpcStandingsFilters', () => {
+  const t = (key: string, opts?: Record<string, unknown>) =>
+    opts ? `${key}${JSON.stringify(opts)}` : key;
+  const filtered: NpcStandingsFilter = {
+    text: '',
+    kinds: new Set(['agent']),
+    minAccess: 3,
+    feesOnly: true,
+  };
+
+  it('lists each filter set away from its default, not the search text', () => {
+    expect(activeNpcStandingsFilters(EVERY_NPC_STANDING, t)).toEqual([]);
+    expect(activeNpcStandingsFilters({ ...EVERY_NPC_STANDING, text: 'navy' }, t)).toEqual([]);
     expect(
-      activeNpcStandingsFilterCount({
-        text: '',
-        kinds: new Set(['agent']),
-        minAccess: 3,
-        feesOnly: true,
-      })
-    ).toBe(3);
+      activeNpcStandingsFilters(filtered, t).map(({ label, value }) => ({ label, value }))
+    ).toEqual([
+      { label: 'contacts.standings.typeFilter', value: 'contacts.standingsKind.agent' },
+      {
+        label: 'contacts.standings.accessFilter',
+        value: 'contacts.standings.accessAtLeastShort{"level":3}',
+      },
+      { label: 'contacts.standings.feesFilter', value: 'contacts.standings.usedForFees' },
+    ]);
+  });
+
+  it('clears each one back to its default alone', () => {
+    const [type, access, fees] = activeNpcStandingsFilters(filtered, t);
+    expect(type.clear(filtered).kinds).toEqual(EVERY_NPC_STANDING.kinds);
+    expect(access.clear(filtered)).toEqual({ ...filtered, minAccess: null });
+    expect(fees.clear(filtered)).toEqual({ ...filtered, feesOnly: false });
   });
 });
 

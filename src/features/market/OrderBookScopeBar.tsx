@@ -21,6 +21,8 @@ import {
   InfoTooltip,
   TextInput,
   textActionClassName,
+  useFilterSurface,
+  type ActiveFilter,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -70,6 +72,7 @@ function BrowserFilterFields({
   rangeFieldClassName,
 }: BrowserFilterFieldsProps) {
   const { t } = useTranslation();
+  const inSheet = useFilterSurface() === 'sheet';
   const spansStations = regionMode || draft.jumps !== DEFAULT_JUMP_RANGE;
   return (
     <>
@@ -100,44 +103,51 @@ function BrowserFilterFields({
         />
       </FilterField>
       {spansStations && (
-        <div
-          role="group"
-          aria-label={t('market.filterSecurity')}
-          className="flex flex-wrap items-center gap-2"
-        >
-          <span className="text-text-dim">{t('market.filterSecurity')}</span>
-          {SPACE_KINDS.map((kind) => (
-            <FilterChip
-              key={kind}
-              label={t(`common.spaceOption.${kind}`)}
-              size="md"
-              selected={draft.sec.has(kind)}
-              onToggle={() => {
-                const next = new Set(draft.sec);
-                if (next.has(kind)) next.delete(kind);
-                else next.add(kind);
-                setDraft({ ...draft, sec: next });
-              }}
-            />
-          ))}
-        </div>
+        <FilterField label={t('market.filterSecurity')} stretch={false}>
+          <div
+            role="group"
+            aria-label={t('market.filterSecurity')}
+            className="flex flex-wrap items-center gap-2"
+          >
+            {/* The sheet's field caption already says it there. */}
+            {!inSheet && <span className="text-text-dim">{t('market.filterSecurity')}</span>}
+            {SPACE_KINDS.map((kind) => (
+              <FilterChip
+                key={kind}
+                label={t(`common.spaceOption.${kind}`)}
+                size="md"
+                selected={draft.sec.has(kind)}
+                onToggle={() => {
+                  const next = new Set(draft.sec);
+                  if (next.has(kind)) next.delete(kind);
+                  else next.add(kind);
+                  setDraft({ ...draft, sec: next });
+                }}
+              />
+            ))}
+          </div>
+        </FilterField>
       )}
       {spansStations && (
-        <FilterChip
-          label={t('market.filterNpcOnly')}
-          size="md"
-          selected={draft.npcOnly}
-          onToggle={() => setDraft({ ...draft, npcOnly: !draft.npcOnly })}
-        />
+        <FilterField label={t('market.filterNpcOnly')} stretch={false} hideCaption>
+          <FilterChip
+            label={t('market.filterNpcOnly')}
+            size="md"
+            selected={draft.npcOnly}
+            onToggle={() => setDraft({ ...draft, npcOnly: !draft.npcOnly })}
+          />
+        </FilterField>
       )}
       {/* Any scope: a one-station Hub book can carry bait as well. */}
-      <FilterChip
-        label={t('market.filterHideBait')}
-        tooltip={t('market.filterHideBaitHint', { times: SELL_OUTLIER_FACTOR })}
-        size="md"
-        selected={draft.hideBait}
-        onToggle={() => setDraft({ ...draft, hideBait: !draft.hideBait })}
-      />
+      <FilterField label={t('market.filterHideBait')} stretch={false} hideCaption>
+        <FilterChip
+          label={t('market.filterHideBait')}
+          tooltip={t('market.filterHideBaitHint', { times: SELL_OUTLIER_FACTOR })}
+          size="md"
+          selected={draft.hideBait}
+          onToggle={() => setDraft({ ...draft, hideBait: !draft.hideBait })}
+        />
+      </FilterField>
     </>
   );
 }
@@ -145,7 +155,8 @@ function BrowserFilterFields({
 export interface BrowserFilterBarProps {
   value: BrowserFilterValue;
   onChange: (next: BrowserFilterValue) => void;
-  activeCount: number;
+  /** `activeBrowserFilters`: the pills under the search, and the funnel's badge. */
+  active: readonly ActiveFilter<BrowserFilterValue>[];
   regionMode: boolean;
   scopeLabel: string;
   currentSystem: CurrentSystemState;
@@ -163,7 +174,7 @@ export interface BrowserFilterBarProps {
 export function BrowserFilterBar({
   value,
   onChange,
-  activeCount,
+  active,
   regionMode,
   scopeLabel,
   currentSystem,
@@ -174,7 +185,7 @@ export function BrowserFilterBar({
     <FilterBar
       value={value}
       onChange={onChange}
-      activeCount={activeCount}
+      active={active}
       search={search}
       className={className}
     >
@@ -211,7 +222,8 @@ export interface OrderBookScopeBarProps {
   scope: OrderBookScope;
   filterValue: BrowserFilterValue;
   onFilterChange: (next: BrowserFilterValue) => void;
-  activeCount: number;
+  /** `activeBrowserFilters`, the same list the finder's bar shows. */
+  active: readonly ActiveFilter<BrowserFilterValue>[];
   regionMode: boolean;
   scopeLabel: string;
   currentSystem: CurrentSystemState;
@@ -223,7 +235,7 @@ export function OrderBookScopeBar({
   scope,
   filterValue,
   onFilterChange,
-  activeCount,
+  active,
   regionMode,
   scopeLabel,
   currentSystem,
@@ -233,10 +245,10 @@ export function OrderBookScopeBar({
   const originName = useSystemName(currentSystem.systemId);
   const ranged = scope.kind === 'range';
   // From `sm` up the range sits on the bar, not in the funnel, so the
-  // funnel's badge leaves it out; a phone's sheet still holds it.
+  // funnel's badge and Clear all leave it out; a phone's sheet still holds it.
   const isPhone = useIsPhone();
-  const funnelCount =
-    !isPhone && filterValue.jumps !== DEFAULT_JUMP_RANGE ? activeCount - 1 : activeCount;
+  const rangeLabel = t('jumpRange.label');
+  const funnelActive = isPhone ? active : active.filter((filter) => filter.label !== rangeLabel);
 
   const summary = (() => {
     switch (scope.kind) {
@@ -341,7 +353,7 @@ export function OrderBookScopeBar({
         <FilterBar
           value={filterValue}
           onChange={onFilterChange}
-          activeCount={funnelCount}
+          active={funnelActive}
           title={t('market.scope.sheetTitle')}
           pointerSurface="popover"
         >

@@ -19,7 +19,13 @@ function Harness() {
   const [filter, setFilter] = useState<Filter>({ unreadOnly: false });
   return (
     <>
-      <FilterBar value={filter} onChange={setFilter} activeCount={filter.unreadOnly ? 1 : 0}>
+      <FilterBar
+        value={filter}
+        onChange={setFilter}
+        active={
+          filter.unreadOnly ? [{ label: 'Unread only', clear: () => ({ unreadOnly: false }) }] : []
+        }
+      >
         {(draft, setDraft) => (
           <FilterChip
             label="Unread only"

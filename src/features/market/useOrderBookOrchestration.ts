@@ -18,6 +18,7 @@ import { useUrlParam } from '@/lib/useUrlState';
 import type { UrlParamCodec } from '@/lib/urlState';
 import { intersectSystemSets, systemsInSpace } from '@/engine/market/orderBookFilters';
 import type { CurrentSystemState, JumpRangeFilter } from '@/features/route/currentSystem';
+import type { ActiveFilter } from '@/components/ui';
 import { useBrowserFilters, type BrowserFilterValue } from '@/features/market/useBrowserFilters';
 import { useOrderBookFetch } from '@/features/market/useOrderBookFetch';
 import { useVariations } from '@/features/market/useVariations';
@@ -103,7 +104,7 @@ export interface OrderBookOrchestration {
 
   browserFilterValue: BrowserFilterValue;
   handleBrowserFiltersChange: (next: BrowserFilterValue) => void;
-  activeFilterCount: number;
+  activeFilters: ActiveFilter<BrowserFilterValue>[];
   filtersNarrowBook: boolean;
 
   orderBookFailed: boolean;
@@ -451,7 +452,7 @@ export function useOrderBookOrchestration({
       stationFilterLabel,
       browserFilterValue: filters.browserFilterValue,
       handleBrowserFiltersChange: filters.handleBrowserFiltersChange,
-      activeFilterCount: filters.activeFilterCount,
+      activeFilters: filters.activeFilters,
       filtersNarrowBook,
       orderBookFailed,
       regionsUnavailable,
@@ -489,7 +490,7 @@ export function useOrderBookOrchestration({
       stationFilterLabel,
       filters.browserFilterValue,
       filters.handleBrowserFiltersChange,
-      filters.activeFilterCount,
+      filters.activeFilters,
       filtersNarrowBook,
       orderBookFailed,
       regionsUnavailable,

@@ -1003,6 +1003,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         originRegions={originRegions}
         destinationRegions={destinationRegions}
         spaceKinds={spaceKinds}
+        resultCount={displayRows.length}
         preference={preference}
         onPreferenceChange={changePreference}
         actions={

@@ -4,7 +4,8 @@ import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 import type { CharacterRecord } from '@/db';
 import type { LatestNetWorth } from '@/engine/netWorth/latest';
-import { useCharactersView } from './useCharactersView';
+import { UNGROUPED_VALUE } from './rosterQueueChip';
+import { activeRosterFilters, useCharactersView, type RosterFilter } from './useCharactersView';
 
 const alice = { characterId: 1, name: 'Alice' } as CharacterRecord;
 const bob = { characterId: 2, name: 'Bob' } as CharacterRecord;
@@ -75,5 +76,59 @@ describe('useCharactersView', () => {
 
   it('filters to one group', () => {
     expect(view('/characters?group=g').tableRows.map((row) => row.character.name)).toEqual(['Bob']);
+  });
+});
+
+describe('activeRosterFilters', () => {
+  const t = (key: string) => key;
+  const none: RosterFilter = {
+    sortKey: 'name',
+    sortDirection: 'asc',
+    queue: null,
+    corp: null,
+    group: null,
+    starredOnly: false,
+    alertsOnly: false,
+  };
+  const groups = [{ id: 'g', name: 'Miners' }];
+
+  it('leaves sort out: it never hides anyone', () => {
+    const sorted: RosterFilter = { ...none, sortKey: 'wallet', sortDirection: 'desc' };
+    expect(activeRosterFilters(sorted, t, groups)).toEqual([]);
+  });
+
+  it('lists each filter set, naming the Group', () => {
+    const filter: RosterFilter = {
+      ...none,
+      queue: 'paused',
+      corp: 'Acme Corp',
+      group: 'g',
+      starredOnly: true,
+      alertsOnly: true,
+    };
+    expect(
+      activeRosterFilters(filter, t, groups).map(({ label, value }) => ({ label, value }))
+    ).toEqual([
+      { label: 'characters.filterQueueLabel', value: 'characters.queueStates.paused' },
+      { label: 'characters.filterCorpLabel', value: 'Acme Corp' },
+      { label: 'characters.filterGroupLabel', value: 'Miners' },
+      { label: 'characters.filterStarredOnly', value: undefined },
+      { label: 'characters.filterHasAlerts', value: undefined },
+    ]);
+    expect(activeRosterFilters({ ...none, group: UNGROUPED_VALUE }, t, groups)[0].value).toBe(
+      'characters.ungrouped'
+    );
+  });
+
+  it('clears one filter, keeping the sort', () => {
+    const filter: RosterFilter = {
+      ...none,
+      sortKey: 'wallet',
+      corp: 'Acme Corp',
+      starredOnly: true,
+    };
+    const [corp, starred] = activeRosterFilters(filter, t, groups);
+    expect(corp.clear(filter)).toEqual({ ...filter, corp: null });
+    expect(starred.clear(filter)).toEqual({ ...filter, starredOnly: false });
   });
 });

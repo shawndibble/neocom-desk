@@ -212,7 +212,7 @@ describe('JournalTable', () => {
     });
   });
 
-  it('shows the active ref type as a selected chip that a click clears', async () => {
+  it('shows the active ref type as a pill whose remove clears it', async () => {
     const onFilterChange = vi.fn();
     const user = userEvent.setup();
     render(
@@ -222,9 +222,7 @@ describe('JournalTable', () => {
         netted={false}
       />
     );
-    const chip = screen.getByRole('button', { name: 'Type: Bounty prize' });
-    expect(chip).toHaveAttribute('aria-pressed', 'true');
-    await user.click(chip);
+    await user.click(screen.getByRole('button', { name: 'Remove filter: Ref type: Bounty prize' }));
     expect(onFilterChange).toHaveBeenCalledWith(EMPTY_WALLET_JOURNAL_FILTER);
   });
 });

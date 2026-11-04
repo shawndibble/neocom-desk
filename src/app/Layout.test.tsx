@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { SearchInput } from '@/components/ui';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -93,6 +94,7 @@ function renderLayoutWithRoutes(initialEntry = '/overview') {
               <div>
                 <p>overview page</p>
                 <input aria-label="dummy input" />
+                <SearchInput aria-label="page search" />
               </div>
             }
           />
@@ -572,6 +574,17 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     // pass even with `allowsShift` deleted — testing nothing.
     await user.keyboard('{Shift>}?{/Shift}');
     expect(await screen.findByText('help page')).toBeInTheDocument();
+  });
+
+  it('"/" puts the cursor in the page search box without typing the slash', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    await user.keyboard('/');
+    const box = screen.getByRole('searchbox', { name: 'page search' });
+    expect(box).toHaveFocus();
+    expect(box).toHaveValue('');
   });
 
   it('does nothing for a lone letter, or a letter after a different first key', async () => {

@@ -51,6 +51,7 @@ import { classSkillTitle } from './classSkillTitle';
 import { flyLabel } from './flyLabel';
 import { classIconUrl, factionEmblemUrl } from './shipTreeAssets';
 import {
+  activeShipTreeFilters,
   allSectionIds,
   factionNameOf,
   flyableCount,
@@ -62,7 +63,6 @@ import {
   sectionPath,
   MASTERY_TIERS,
   masteryCounts,
-  masteryFilterActive,
   NO_SHIP_TREE_FILTER,
   type FlyState,
   type LadderSection,
@@ -203,7 +203,8 @@ export function ShipTreeLadder({
       <FilterBar<ShipTreeFilter>
         value={filter}
         onChange={onFilter}
-        activeCount={(filter.fly !== 'all' ? 1 : 0) + (masteryFilterActive(filter) ? 1 : 0)}
+        active={activeShipTreeFilters(filter, t)}
+        resultCount={factionMatches ? (factionMatches.get(tree.factionID) ?? 0) : flyCounts.all}
         title={t('ships.tree.filtersTitle')}
         search={
           narrow ? (

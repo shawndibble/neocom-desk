@@ -1,8 +1,7 @@
 /**
- * BPC Sourcing's active filters as removable chips — what a phone shows under
- * the search box, where every filter otherwise hides behind the funnel's
- * sheet and only a count badge admits any is on. Ids, values and a `clear`
- * here; labels are the panel's, which owns translation and region names.
+ * BPC Sourcing's active filters — the pills `FilterBar` shows under the search
+ * box while its controls are closed. Ids, values and a `clear` here; labels
+ * are `BpcFilterBar`'s, which owns translation and region names.
  */
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import { DEFAULT_JUMP_RANGE, type JumpRange } from '@/engine/route/jumpRange';
@@ -42,9 +41,12 @@ export type BpcFilterChip =
   | { id: 'region'; value: number; clear: Clear }
   | { id: 'jumps'; value: JumpRange; clear: Clear }
   | { id: 'minMe' | 'minTe' | 'minRuns' | 'maxPrice'; value: string; clear: Clear }
-  | { id: 'hideAuctions' | 'hidePlex'; value?: undefined; clear: Clear }
+  | { id: 'exclude'; value: BpcExclude[]; clear: Clear }
   | { id: 'sources'; value: SourceToggle[]; clear: Clear }
   | { id: 'space'; value: SpaceKind[]; clear: Clear };
+
+/** An Exclude pick: the `BpcSourcingFilter` flag it sets. */
+export type BpcExclude = 'hideAuctions' | 'hidePlex';
 
 type Clear = (state: BpcFilterState) => BpcFilterState;
 
@@ -84,13 +86,18 @@ export function bpcActiveFilterChips(
     const value = filter[id].trim();
     if (value !== '') chips.push({ id, value, clear: (s) => withFilter(s, { [id]: '' }) });
   }
-  for (const id of ['hideAuctions', 'hidePlex'] as const) {
-    // Labelled by what it does now ("No auctions"), so a chip only ever
-    // says "hiding" — set against a default of hiding, showing is the
-    // default and gets none.
-    if (filter[id] && !hideDefaults[id]) {
-      chips.push({ id, clear: (s) => withFilter(s, { [id]: false }) });
-    }
+  // Exclude is one control, so one chip naming its picks. A chip only ever
+  // says "hiding": set against a default of hiding, showing is the default
+  // and gets none — and its clear leaves that default alone.
+  const excluded = (['hideAuctions', 'hidePlex'] as const).filter(
+    (id) => filter[id] && !hideDefaults[id]
+  );
+  if (excluded.length > 0) {
+    chips.push({
+      id: 'exclude',
+      value: excluded,
+      clear: (s) => excluded.reduce((next, id) => withFilter(next, { [id]: false }), s),
+    });
   }
   if (!isDefaultSources(sources)) {
     chips.push({
@@ -107,12 +114,4 @@ export function bpcActiveFilterChips(
     });
   }
   return chips;
-}
-
-/** The funnel's badge: every chip, plus the search text, which narrows the table too. */
-export function bpcActiveFilterCount(state: BpcFilterState, hideDefaults: BpcHideDefaults): number {
-  return (
-    bpcActiveFilterChips(state, hideDefaults).length +
-    (state.filter.typeQuery.trim() === '' ? 0 : 1)
-  );
 }

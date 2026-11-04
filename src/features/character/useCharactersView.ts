@@ -30,6 +30,8 @@ import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 import type { WhereaboutsLookup } from '@/features/character/useCharacterWhereabouts';
 import type { LatestNetWorth } from '@/engine/netWorth/latest';
 import type { CharacterRow } from '@/features/character/charactersTableColumns';
+import type { ActiveFilter } from '@/components/ui';
+import type { Translate } from '@/lib/translate';
 
 export const SORT_KEYS: readonly CharacterSortKey[] = [
   'name',
@@ -88,6 +90,53 @@ export function activeRosterFilterCount(filter: RosterFilter): number {
     filter.starredOnly,
     filter.alertsOnly,
   ].filter(Boolean).length;
+}
+
+/**
+ * The funnel's pills, in the panel's order. Sort is left out for the same
+ * reason as in `activeRosterFilterCount`, and so is the search box, which
+ * shows its own text. `groups` names the Group filter: `groupFilterOptions`,
+ * so a deleted Group still has a name to clear.
+ */
+export function activeRosterFilters(
+  filter: RosterFilter,
+  t: Translate,
+  groups: readonly Pick<CharacterGroup, 'id' | 'name'>[]
+): ActiveFilter<RosterFilter>[] {
+  const active: ActiveFilter<RosterFilter>[] = [];
+  if (filter.queue !== null)
+    active.push({
+      label: t('characters.filterQueueLabel'),
+      value: t(`characters.queueStates.${filter.queue}`),
+      clear: (value) => ({ ...value, queue: null }),
+    });
+  if (filter.corp !== null)
+    active.push({
+      label: t('characters.filterCorpLabel'),
+      value: filter.corp,
+      clear: (value) => ({ ...value, corp: null }),
+    });
+  const { group } = filter;
+  if (group !== null)
+    active.push({
+      label: t('characters.filterGroupLabel'),
+      value:
+        group === UNGROUPED_VALUE
+          ? t('characters.ungrouped')
+          : (groups.find((option) => option.id === group)?.name ?? group),
+      clear: (value) => ({ ...value, group: null }),
+    });
+  if (filter.starredOnly)
+    active.push({
+      label: t('characters.filterStarredOnly'),
+      clear: (value) => ({ ...value, starredOnly: false }),
+    });
+  if (filter.alertsOnly)
+    active.push({
+      label: t('characters.filterHasAlerts'),
+      clear: (value) => ({ ...value, alertsOnly: false }),
+    });
+  return active;
 }
 
 /**

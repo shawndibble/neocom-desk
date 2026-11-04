@@ -2,9 +2,13 @@
  * The Courier filter's types and pure helpers, split from `CourierFilterBar`
  * so that file exports only components.
  */
+import type { TFunction } from 'i18next';
+import { boundText, summarizeFilterValues, type ActiveFilter } from '@/components/ui';
 import type { CourierRouteRow } from '@/engine/contracts/courierSearch';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import type { OverRateFilter } from '@/features/contractSearch/overRateFilter';
+import { formatCount } from '@/lib/formatCount';
+import { formatIskCompact, parseIskAmount } from '@/lib/isk';
 
 /** The filter as the controls hold it: text fields stay strings until they are parsed into the engine's filter. */
 export interface CourierUiFilter {
@@ -104,3 +108,90 @@ export type MyRegion =
  * object would re-render it continuously.
  */
 export const UNASKED: MyRegion = { kind: 'unknown' };
+
+/**
+ * The Courier filters set away from their default, as `FilterBar` pills, in
+ * the order a hauler reads a lane: where it runs, then what it pays and asks.
+ *
+ * Read off the controls, not the parsed engine filter: a half-typed "1e"
+ * parses to `null` there, and the pill should still say the field holds
+ * something. The route search is left out — its box shows what it holds —
+ * and so is the route preference, a remembered setting rather than a filter.
+ */
+export function activeCourierFilters(
+  filter: CourierUiFilter,
+  t: TFunction,
+  {
+    originRegions,
+    destinationRegions,
+    spaceKinds,
+  }: {
+    originRegions: readonly RegionOption[];
+    destinationRegions: readonly RegionOption[];
+    /** The bands on offer: every one of them selected is no restriction. */
+    spaceKinds: readonly SpaceKind[];
+  }
+): ActiveFilter<CourierUiFilter>[] {
+  const regionName = (options: readonly RegionOption[], regionId: number) =>
+    options.find((option) => option.id === regionId)?.name ?? `#${regionId}`;
+  const active: ActiveFilter<CourierUiFilter>[] = [];
+  if (filter.originRegionId !== null)
+    active.push({
+      label: t('contractSearch.originRegionLabel'),
+      value: regionName(originRegions, filter.originRegionId),
+      clear: (value) => ({ ...value, originRegionId: null }),
+    });
+  if (filter.destinationRegionId !== null)
+    active.push({
+      label: t('contractSearch.destinationRegionLabel'),
+      value: regionName(destinationRegions, filter.destinationRegionId),
+      clear: (value) => ({ ...value, destinationRegionId: null }),
+    });
+  if (narrowsSpace(filter.destinationSpace, spaceKinds)) {
+    const selected = spaceKinds.filter((kind) => filter.destinationSpace.includes(kind));
+    active.push({
+      label: t('contractSearch.destinationSpaceLabel'),
+      value: summarizeFilterValues(
+        selected.map((kind) => t(`common.spaceOption.${kind}`)),
+        t
+      ),
+      clear: (value) => ({ ...value, destinationSpace: SPACE_KINDS }),
+    });
+  }
+  if (filter.minReward.trim() !== '')
+    active.push({
+      label: t('contractSearch.minRewardLabel'),
+      value: boundText(filter.minReward, formatIskCompact, parseIskAmount),
+      clear: (value) => ({ ...value, minReward: '' }),
+    });
+  if (filter.maxCollateral.trim() !== '')
+    active.push({
+      label: t('contractSearch.maxCollateralLabel'),
+      value: boundText(filter.maxCollateral, formatIskCompact, parseIskAmount),
+      clear: (value) => ({ ...value, maxCollateral: '' }),
+    });
+  if (filter.maxVolume.trim() !== '')
+    active.push({
+      label: t('contractSearch.maxVolumeLabel'),
+      value: boundText(filter.maxVolume, formatCount),
+      clear: (value) => ({ ...value, maxVolume: '' }),
+    });
+  if (filter.minDays.trim() !== '')
+    active.push({
+      label: t('contractSearch.minDaysLabel'),
+      value: boundText(filter.minDays, formatCount),
+      clear: (value) => ({ ...value, minDays: '' }),
+    });
+  if (filter.overRate !== 'all')
+    active.push({
+      label: t('contractSearch.overRateLabel'),
+      value: t(`contractSearch.overRate.${filter.overRate}`),
+      clear: (value) => ({ ...value, overRate: 'all' }),
+    });
+  if (filter.hideUncompletable)
+    active.push({
+      label: t('contractSearch.hideUncompletableLabel'),
+      clear: (value) => ({ ...value, hideUncompletable: false }),
+    });
+  return active;
+}

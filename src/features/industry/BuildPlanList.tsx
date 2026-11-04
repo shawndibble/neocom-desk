@@ -395,6 +395,7 @@ export function BuildPlanList({
             groups={groups}
             search={picker}
             canFilterOwnership={ownedBlueprints !== undefined}
+            resultCount={visiblePlans.length}
           />
         )}
         {filtering && plans.length > 0 && (

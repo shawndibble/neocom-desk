@@ -40,20 +40,22 @@ export function CharactersFilterFields({
   const { t } = useTranslation();
   return (
     <>
-      <div
-        role="group"
-        aria-label={t('characters.filterQueueLabel')}
-        className="flex flex-wrap gap-2"
-      >
-        {QUEUE_FILTER_STATES.map((state) => (
-          <FilterChip
-            key={state}
-            label={t(`characters.queueStates.${state}`)}
-            selected={draft.queue === state}
-            onToggle={() => setDraft({ ...draft, queue: draft.queue === state ? null : state })}
-          />
-        ))}
-      </div>
+      <FilterField label={t('characters.filterQueueLabel')} stretch={false}>
+        <div
+          role="group"
+          aria-label={t('characters.filterQueueLabel')}
+          className="flex flex-wrap gap-2"
+        >
+          {QUEUE_FILTER_STATES.map((state) => (
+            <FilterChip
+              key={state}
+              label={t(`characters.queueStates.${state}`)}
+              selected={draft.queue === state}
+              onToggle={() => setDraft({ ...draft, queue: draft.queue === state ? null : state })}
+            />
+          ))}
+        </div>
+      </FilterField>
       {/* One corp has nothing to narrow to — unless a link already set one, which must stay visible to be cleared. */}
       {(corpOptions.length > 1 || draft.corp !== null) && (
         <FilterField label={t('characters.filterCorpLabel')}>
@@ -111,16 +113,20 @@ export function CharactersFilterFields({
           </Select>
         </FilterField>
       )}
-      <FilterChip
-        label={t('characters.filterStarredOnly')}
-        selected={draft.starredOnly}
-        onToggle={() => setDraft({ ...draft, starredOnly: !draft.starredOnly })}
-      />
-      <FilterChip
-        label={t('characters.filterHasAlerts')}
-        selected={draft.alertsOnly}
-        onToggle={() => setDraft({ ...draft, alertsOnly: !draft.alertsOnly })}
-      />
+      <FilterField label={t('characters.filterStarredOnly')} stretch={false} hideCaption>
+        <FilterChip
+          label={t('characters.filterStarredOnly')}
+          selected={draft.starredOnly}
+          onToggle={() => setDraft({ ...draft, starredOnly: !draft.starredOnly })}
+        />
+      </FilterField>
+      <FilterField label={t('characters.filterHasAlerts')} stretch={false} hideCaption>
+        <FilterChip
+          label={t('characters.filterHasAlerts')}
+          selected={draft.alertsOnly}
+          onToggle={() => setDraft({ ...draft, alertsOnly: !draft.alertsOnly })}
+        />
+      </FilterField>
       <FilterField label={t('characters.sortBy')}>
         <Select
           value={draft.sortKey}

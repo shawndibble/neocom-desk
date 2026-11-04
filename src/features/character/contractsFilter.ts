@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+import type { ActiveFilter } from '@/components/ui';
 import type { Contract } from '@/esi/endpoints';
 import { contractIssuer, contractReceiver } from './contractCounterparty';
 import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from './contractLabels';
@@ -69,20 +71,36 @@ export function contractTypeOptions(contracts: readonly Contract[]): Contract['t
 }
 
 /**
- * How many criteria are active — what the mobile `FilterBar` trigger counts.
- * Text is excluded for the same reason as `activeWalletJournalFilterCount`:
- * the search box never moves into the sheet.
+ * The criteria set away from their default, as `FilterBar` pills — status
+ * first, since it is what a reader scans the History by. Text is left out:
+ * the search box already shows what it holds.
  */
-export function activeContractsFilterCount(filter: ContractsFilter): number {
-  return [filter.status, filter.type].filter((v) => v !== null).length;
+export function activeContractsFilters(
+  filter: ContractsFilter,
+  t: TFunction
+): ActiveFilter<ContractsFilter>[] {
+  const active: ActiveFilter<ContractsFilter>[] = [];
+  if (filter.status !== null)
+    active.push({
+      label: t('contracts.statusFilterLabel'),
+      value: t(CONTRACT_STATUS_KEY[filter.status]),
+      clear: (value) => ({ ...value, status: null }),
+    });
+  if (filter.type !== null)
+    active.push({
+      label: t('contracts.typeFilterLabel'),
+      value: t(CONTRACT_TYPE_KEY[filter.type]),
+      clear: (value) => ({ ...value, type: null }),
+    });
+  return active;
 }
 
 /**
  * Whether any criterion actually narrows the list — what decides if a
  * zero-match empty state offers "Reset filters" (issue #1466). Unlike the
- * count, text counts here; whitespace-only text doesn't, since
+ * pills, text counts here; whitespace-only text doesn't, since
  * `filterContracts` trims it away.
  */
 export function isContractsFilterActive(filter: ContractsFilter): boolean {
-  return filter.text.trim() !== '' || activeContractsFilterCount(filter) > 0;
+  return filter.text.trim() !== '' || filter.status !== null || filter.type !== null;
 }

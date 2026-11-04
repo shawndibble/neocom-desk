@@ -12,10 +12,11 @@
  * controls rather than a filter row.
  *
  * **A `DropdownMenu` at every width.** Six checkbox rows are a menu, not a
- * form: there is no draft to apply and nothing to cancel, so the sheet's
- * Apply/Cancel semantics would be ceremony over a control whose every toggle is
- * already reversible in one tap. `MoonMiningTax` does the same thing with the
- * same primitive.
+ * form, and every toggle is already reversible in one tap. The filter sheet
+ * would wrap that one list in a modal with a caption and a footer (Clear all,
+ * "Show N results") it does not need: the menu commits each tick as made and
+ * its result shows in the panes beside it. `MoonMiningTax` does the same thing
+ * with the same primitive.
  *
  * The trigger states how many types are hidden **as a number**, not as an
  * accent tint — "this list is filtered" may not be carried by colour alone.

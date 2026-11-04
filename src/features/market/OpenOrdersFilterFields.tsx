@@ -56,61 +56,81 @@ export function OpenOrdersFilterFields({
       : t('market.orders.filter.selectedLocationsCount', { count: draft.locationIds.length });
   return (
     <>
-      <FilterChip
-        label={t('orders.buy')}
-        selected={draft.side === 'buy'}
-        onToggle={() => setDraft({ ...draft, side: draft.side === 'buy' ? null : 'buy' })}
-      />
-      <FilterChip
-        label={t('orders.sell')}
-        selected={draft.side === 'sell'}
-        onToggle={() => setDraft({ ...draft, side: draft.side === 'sell' ? null : 'sell' })}
-      />
-      {PROBLEM_FILTER_OPTIONS.map((problem) => {
-        const count = problemCounts[problem];
-        const selected = draft.problems.includes(problem);
-        return (
+      <FilterField label={t('orders.side')} stretch={false}>
+        <div role="group" aria-label={t('orders.side')} className="flex flex-wrap gap-2">
           <FilterChip
-            key={problem}
-            label={t(`market.orders.group.${problem}`)}
-            count={count}
-            selected={selected}
-            // A zero-count problem still renders, still a real
-            // focusable button, so the player can see it's clean
-            // rather than wonder where it went — the `0` itself
-            // is the cue; no `opacity-50` fade below AA on top of
-            // it (issue #1491).
+            label={t('orders.buy')}
+            selected={draft.side === 'buy'}
+            onToggle={() => setDraft({ ...draft, side: draft.side === 'buy' ? null : 'buy' })}
+          />
+          <FilterChip
+            label={t('orders.sell')}
+            selected={draft.side === 'sell'}
+            onToggle={() => setDraft({ ...draft, side: draft.side === 'sell' ? null : 'sell' })}
+          />
+        </div>
+      </FilterField>
+      <FilterField label={t('market.orders.filter.problems')} stretch={false}>
+        <div
+          role="group"
+          aria-label={t('market.orders.filter.problems')}
+          className="flex flex-wrap gap-2"
+        >
+          {PROBLEM_FILTER_OPTIONS.map((problem) => {
+            const count = problemCounts[problem];
+            const selected = draft.problems.includes(problem);
+            return (
+              <FilterChip
+                key={problem}
+                label={t(`market.orders.group.${problem}`)}
+                count={count}
+                selected={selected}
+                // A zero-count problem still renders, still a real
+                // focusable button, so the player can see it's clean
+                // rather than wonder where it went — the `0` itself
+                // is the cue; no `opacity-50` fade below AA on top of
+                // it (issue #1491).
+                onToggle={() =>
+                  setDraft({
+                    ...draft,
+                    problems: selected
+                      ? draft.problems.filter((p) => p !== problem)
+                      : [...draft.problems, problem],
+                  })
+                }
+              />
+            );
+          })}
+        </div>
+      </FilterField>
+      <FilterField label={t('market.orders.filter.costBasis')} stretch={false}>
+        <div
+          role="group"
+          aria-label={t('market.orders.filter.costBasis')}
+          className="flex flex-wrap gap-2"
+        >
+          <FilterChip
+            label={t('market.orders.filter.costBasisLinked')}
+            selected={draft.costBasis === 'linked'}
             onToggle={() =>
               setDraft({
                 ...draft,
-                problems: selected
-                  ? draft.problems.filter((p) => p !== problem)
-                  : [...draft.problems, problem],
+                costBasis: draft.costBasis === 'linked' ? null : 'linked',
               })
             }
           />
-        );
-      })}
-      <FilterChip
-        label={t('market.orders.filter.costBasisLinked')}
-        selected={draft.costBasis === 'linked'}
-        onToggle={() =>
-          setDraft({
-            ...draft,
-            costBasis: draft.costBasis === 'linked' ? null : 'linked',
-          })
-        }
-      />
-      <FilterChip
-        label={t('market.orders.filter.costBasisMissing')}
-        selected={draft.costBasis === 'missing'}
-        onToggle={() =>
-          setDraft({
-            ...draft,
-            costBasis: draft.costBasis === 'missing' ? null : 'missing',
-          })
-        }
-      />
+          <FilterChip
+            label={t('market.orders.filter.costBasisMissing')}
+            selected={draft.costBasis === 'missing'}
+            onToggle={() =>
+              setDraft({
+                ...draft,
+                costBasis: draft.costBasis === 'missing' ? null : 'missing',
+              })
+            }
+          />
+        </div>
+      </FilterField>
       <FilterField captionInline label={t('market.orders.filter.expiringWithin')}>
         <Select
           value={draft.expiringWithinDays === null ? 'any' : String(draft.expiringWithinDays)}

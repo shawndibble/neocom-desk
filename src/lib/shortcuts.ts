@@ -1,4 +1,5 @@
 import type { NavigateFunction } from 'react-router-dom';
+import { focusPageSearch } from './pageSearch';
 
 /**
  * Router `location.state` shape a Fitting's Export menu navigates
@@ -224,8 +225,12 @@ export interface ShortcutDef {
    * Absent for a shortcut whose behaviour already exists elsewhere — Escape
    * closing the open `<dialog>` is native, not something a listener should
    * also handle. Still listed, so it's discoverable per issue #25.
+   *
+   * Returning `false` means "nothing to do here": the key is then left to the
+   * browser rather than swallowed (`/` on a page with no search box keeps
+   * Firefox's quick find).
    */
-  readonly run?: (navigate: NavigateFunction) => void;
+  readonly run?: (navigate: NavigateFunction) => void | boolean | Promise<void>;
 }
 
 /**
@@ -306,6 +311,15 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     sequence: true,
     descriptionKey: 'shortcuts.openSettings',
     run: (navigate) => navigate('/settings'),
+  },
+  {
+    id: 'focus-search',
+    key: '/',
+    displayKey: '/',
+    // Shift+7 on a German layout, and Shift+/ is `?` on a US one anyway.
+    allowsShift: true,
+    descriptionKey: 'shortcuts.focusSearch',
+    run: () => focusPageSearch(),
   },
   {
     id: 'show-shortcuts',

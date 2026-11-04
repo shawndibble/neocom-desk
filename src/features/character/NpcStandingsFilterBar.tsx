@@ -14,7 +14,7 @@ import {
 } from '@/components/ui';
 import {
   NPC_STANDING_KINDS,
-  activeNpcStandingsFilterCount,
+  activeNpcStandingsFilters,
   type NpcStandingKind,
   type NpcStandingsFilter,
 } from '@/features/character/npcStandingsRows';
@@ -131,7 +131,7 @@ export function NpcStandingsFilterBar({
         onChange={onChange}
         search={search}
         actions={columnPicker}
-        activeCount={activeNpcStandingsFilterCount(filter)}
+        active={activeNpcStandingsFilters(filter, t)}
       >
         {(draft, setDraft) => <FilterControls filter={draft} onChange={setDraft} counts={counts} />}
       </FilterBar>

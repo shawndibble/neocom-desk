@@ -463,6 +463,8 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     expect(within(table).getByText('Courier')).toBeInTheDocument();
 
     // The phone chip row (jsdom has no CSS to hide it), not the filter popover.
+    // The status chips sit behind the funnel; a phone-only copy of them is gone.
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
     await user.click(screen.getByRole('button', { name: 'Outstanding' }));
 
     expect(within(table).getByText('Rifter fit')).toBeInTheDocument();
@@ -488,6 +490,8 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     await screen.findByText('Rifter fit');
 
     // The phone chip row (jsdom has no CSS to hide it), not the filter popover.
+    // The status chips sit behind the funnel; a phone-only copy of them is gone.
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
     await user.click(screen.getByRole('button', { name: 'Outstanding' }));
     await user.type(
       screen.getByPlaceholderText('Search issuer, receiver or title…'),

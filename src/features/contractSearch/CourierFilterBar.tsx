@@ -7,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
   FilterBar,
-  countActive,
   FilterChip,
   FilterField,
   IskInput,
@@ -23,7 +22,7 @@ import {
 } from '@/components/ui';
 import type { SpaceKind } from '@/engine/space';
 import {
-  narrowsSpace,
+  activeCourierFilters,
   type CourierUiFilter,
   type MyRegion,
   type RegionOption,
@@ -230,6 +229,8 @@ interface CourierFilterBarProps {
   onPreferenceChange: (preference: RoutePreferenceKind) => void;
   /** The table's column picker, drawn beside the filter trigger. */
   actions?: ReactNode;
+  /** Hauls the filters leave, for the phone sheet's done button. */
+  resultCount?: number;
 }
 
 export function CourierFilterBar({
@@ -244,29 +245,19 @@ export function CourierFilterBar({
   preference,
   onPreferenceChange,
   actions,
+  resultCount,
 }: CourierFilterBarProps) {
   const { t } = useTranslation();
-  // Counted off the controls, not off the parsed engine filter, for the same
-  // reason the item bar does it: a half-typed "1e" parses to `null` there, and
-  // the badge should say the field has been touched.
-  const activeCount = countActive([
-    filter.routeQuery,
-    filter.originRegionId !== null,
-    filter.destinationRegionId !== null,
-    narrowsSpace(filter.destinationSpace, spaceKinds),
-    filter.hideUncompletable,
-    filter.overRate !== 'all',
-    filter.minReward,
-    filter.maxCollateral,
-    filter.maxVolume,
-    filter.minDays,
-  ]);
-
   return (
     <FilterBar
       value={filter}
       onChange={onChange}
-      activeCount={activeCount}
+      active={activeCourierFilters(filter, t, {
+        originRegions,
+        destinationRegions,
+        spaceKinds,
+      })}
+      resultCount={resultCount}
       rowAlign="end"
       actions={actions}
       className="border-b border-line px-3 py-2"
@@ -394,13 +385,19 @@ export function CourierFilterBar({
               </SelectContent>
             </Select>
           </FilterField>
-          <FilterChip
-            size="md"
+          <FilterField
             label={t('contractSearch.hideUncompletableLabel')}
-            tooltip={t('contractSearch.hideUncompletableTooltip')}
-            selected={draft.hideUncompletable}
-            onToggle={() => setDraft({ ...draft, hideUncompletable: !draft.hideUncompletable })}
-          />
+            stretch={false}
+            hideCaption
+          >
+            <FilterChip
+              size="md"
+              label={t('contractSearch.hideUncompletableLabel')}
+              tooltip={t('contractSearch.hideUncompletableTooltip')}
+              selected={draft.hideUncompletable}
+              onToggle={() => setDraft({ ...draft, hideUncompletable: !draft.hideUncompletable })}
+            />
+          </FilterField>
         </>
       )}
     </FilterBar>

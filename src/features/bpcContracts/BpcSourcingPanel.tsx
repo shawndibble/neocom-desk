@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BpcFilterBar, type UiFilter } from './BpcFilterBar';
-import { SOURCE_LABEL_KEYS, waypointItemFor } from './bpcSourcingHelpers';
+import { waypointItemFor } from './bpcSourcingHelpers';
 import { useBpcSourcingData } from './useBpcSourcingData';
 import { useBpcRows } from './useBpcRows';
 import { useBpcColumns } from './useBpcColumns';
@@ -27,20 +27,18 @@ import {
   EmptyState,
   LiveStatus,
   LoadFailedState,
-  FilterChip,
   IconButton,
   IskAmount,
   Panel,
   Spinner,
   StatChip,
   StatChips,
-  textActionClassName,
   CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 
 import { activeOptionClassName } from '@/components/ui/controlStyles';
-import { DEFAULT_SOURCE_TOGGLES, SOURCE_TOGGLES } from './bpcSourcingUrl';
+import { DEFAULT_SOURCE_TOGGLES } from './bpcSourcingUrl';
 import {
   asContract,
   cheapestByRegion,
@@ -74,7 +72,6 @@ import { JumpRangeNote } from '@/features/route/JumpRangeControls';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { cx } from '@/lib/cx';
-import { bpcActiveFilterChips, type BpcFilterChip, type BpcFilterState } from './bpcActiveFilters';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 
 /** Section header over each group in the sourcing strip: Cheapest by region, Market BPOs, Contract BPOs. */
@@ -292,55 +289,7 @@ export function BpcSourcingPanel({
     setParams({ 'sourcing.type': null, 'sourcing.q': '' });
   }
 
-  const filterState: BpcFilterState = {
-    filter: uiFilter,
-    sources,
-    spaceKinds: spaceFilter,
-    jumps,
-  };
   const hideDefaults = { hideAuctions: hideAuctionsDefault, hidePlex: hidePlexDefault };
-  const activeChips = bpcActiveFilterChips(filterState, hideDefaults);
-
-  /** Writes a whole filter state back: the URL group, then the Space preference. */
-  function applyFilterState(next: BpcFilterState) {
-    changeFilter(next.filter);
-    if (next.sources !== sources || next.jumps !== jumps) {
-      setParams({ 'sourcing.src': next.sources, 'sourcing.jumps': next.jumps });
-    }
-    if (next.spaceKinds !== spaceFilter) void setSpaceFilter(next.spaceKinds);
-  }
-
-  function filterChipLabel(chip: BpcFilterChip): string {
-    switch (chip.id) {
-      case 'region':
-        return regionNames.get(chip.value) ?? `#${chip.value}`;
-      case 'jumps':
-        return t(`jumpRange.option.${chip.value}`);
-      case 'minMe':
-      case 'minTe':
-      case 'minRuns':
-      case 'maxPrice':
-        return t(`bpcContracts.chips.${chip.id}`, { value: chip.value });
-      case 'hideAuctions':
-      case 'hidePlex':
-        return t(`bpcContracts.chips.${chip.id}`);
-      case 'sources':
-        // Names for a short pick; a count for a long one, which would
-        // otherwise run the chip off the edge of a phone.
-        return chip.value.length <= 2
-          ? t('bpcContracts.chips.sources', {
-              list: chip.value.map((source) => t(SOURCE_LABEL_KEYS[source])).join(', '),
-            })
-          : t('bpcContracts.chips.sourcesCount', {
-              count: chip.value.length,
-              total: SOURCE_TOGGLES.length,
-            });
-      case 'space':
-        return t('bpcContracts.chips.space', {
-          list: chip.value.map((kind) => t(`common.spaceOption.${kind}`)).join(', '),
-        });
-    }
-  }
 
   /** Includes the Dexie-backed space filter — unlike the sourcing.* params here, nothing else resets it. */
   function resetSourcingFilters() {
@@ -674,6 +623,7 @@ export function BpcSourcingPanel({
               onJumpsChange={(next) => setParams({ 'sourcing.jumps': next })}
               currentSystem={currentSystem}
               searchComboboxProps={searchComboboxProps}
+              {...(!awaitingOffers && { resultCount: displayRows.length })}
               actions={
                 <>
                   <ColumnPickerMenu
@@ -694,34 +644,6 @@ export function BpcSourcingPanel({
                 </>
               }
             />
-            {activeChips.length > 0 && (
-              // Phone only: from `md` up every filter sits inline in the bar
-              // above, so it already shows what it is set to. Below it they
-              // hide in the funnel's sheet, where a count badge was the only
-              // sign any was on.
-              <div className="flex items-center gap-2 overflow-x-auto border-b border-line px-3 py-1.5 md:hidden">
-                {activeChips.map((chip) => (
-                  <FilterChip
-                    key={chip.id}
-                    label={filterChipLabel(chip)}
-                    selected
-                    className="shrink-0"
-                    onToggle={() => applyFilterState(chip.clear(filterState))}
-                  />
-                ))}
-                <button
-                  type="button"
-                  className={cx(textActionClassName(), 'shrink-0 whitespace-nowrap')}
-                  onClick={() =>
-                    applyFilterState(
-                      activeChips.reduce((state, chip) => chip.clear(state), filterState)
-                    )
-                  }
-                >
-                  {t('bpcContracts.chips.clearAll')}
-                </button>
-              </div>
-            )}
             {/* Outside the bar: collapsed, its controls unmount, and this is
               exactly when the pilot needs telling the range is not applied. */}
             {(jumpFilter.status === 'no-origin' || jumpFilter.status === 'unknown') && (

@@ -270,7 +270,7 @@ describe('LoyaltyStore filters', () => {
     renderStore();
     openFilters();
     expect(screen.getByRole('combobox', { name: /Market hub/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Affordable/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Affordable/i })).toBeInTheDocument();
   });
 
   /** The hub is a persisted preference; the phone sheet writes it as it is picked. */
@@ -292,11 +292,11 @@ describe('LoyaltyStore filters', () => {
 
     // "Affordable only" is on by default, so turning it off is one active filter.
     await user.click(storeFiltersButton());
-    await user.click(screen.getByRole('button', { name: /Affordable/i }));
+    await user.click(screen.getByRole('button', { name: /^Affordable/i }));
     await user.keyboard('{Escape}');
 
     await user.click(storeFiltersButton());
-    expect(screen.getByRole('button', { name: /Affordable/i })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /^Affordable/i })).toHaveAttribute(
       'aria-pressed',
       'false'
     );
@@ -316,10 +316,10 @@ describe('LoyaltyStore filters', () => {
     renderStore();
     openFilters();
 
-    await user.click(screen.getByRole('button', { name: /Affordable/i }));
+    await user.click(screen.getByRole('button', { name: /^Affordable/i }));
     await waitFor(() => expect(probe.search).toContain('affordableOnly=0'));
 
-    await user.click(screen.getByRole('button', { name: /Affordable/i }));
+    await user.click(screen.getByRole('button', { name: /^Affordable/i }));
     await waitFor(() => expect(probe.search).toBe(''));
   });
 

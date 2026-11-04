@@ -942,8 +942,8 @@ describe('BpcSourcingPanel result cap', () => {
   });
 });
 
-describe('BpcSourcingPanel active filter chips', () => {
-  it('shows a chip per active filter and clears just that one when tapped', async () => {
+describe('BpcSourcingPanel active filter pills', () => {
+  it('shows a pill per active filter and removes just that one', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([
         row({ contractId: 1, typeId: 638, me: 10 }),
@@ -956,16 +956,19 @@ describe('BpcSourcingPanel active filter chips', () => {
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'No PLEX contracts' })).toBeInTheDocument();
+    const plex = { name: 'Remove filter: Exclude: PLEX contracts' };
+    expect(screen.getByRole('button', plex)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'ME ≥ 8' }));
+    await user.click(screen.getByRole('button', { name: 'Remove filter: Min ME: 8' }));
 
     await waitFor(() => {
       const widened = screen.getByRole('table', { name: 'BPC Sourcing' });
       expect(within(widened).getByText('Caracal Blueprint')).toBeInTheDocument();
     });
-    expect(screen.queryByRole('button', { name: 'ME ≥ 8' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'No PLEX contracts' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Remove filter: Min ME: 8' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', plex)).toBeInTheDocument();
   });
 });
 

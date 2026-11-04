@@ -4,6 +4,10 @@
  * (does the range fan out over regions, do the station-level filters apply).
  */
 import { useCallback, useMemo } from 'react';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
+import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
+import { formatCount } from '@/lib/formatCount';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useRememberedUrlParams, type RememberedDefaults } from '@/lib/useUrlState';
 import { boolParam, enumParam, enumSetParam, intParam } from '@/lib/urlState';
@@ -42,6 +46,51 @@ export interface BrowserFilterValue {
   hideBait: boolean;
 }
 
+/**
+ * The filters set away from their default, most telling first: the range
+ * changes which stations the book is, the rest only thin it.
+ *
+ * Only what this mode shows counts: a Security filter left in the URL does
+ * nothing on a one-station Hub book, so a pill for it would claim a filter
+ * that isn't on.
+ */
+export function activeBrowserFilters(
+  value: BrowserFilterValue,
+  regionMode: boolean,
+  t: TFunction
+): ActiveFilter<BrowserFilterValue>[] {
+  const rangeSet = value.jumps !== DEFAULT_JUMP_RANGE;
+  const spansStations = regionMode || rangeSet;
+  const active: ActiveFilter<BrowserFilterValue>[] = [];
+  if (rangeSet)
+    active.push({
+      label: t('jumpRange.label'),
+      value: t(`jumpRange.option.${value.jumps}`),
+      clear: (v) => ({ ...v, jumps: DEFAULT_JUMP_RANGE }),
+    });
+  if (spansStations && value.sec.size !== SPACE_KINDS.length) {
+    const kinds = SPACE_KINDS.filter((kind) => value.sec.has(kind)).map((kind) =>
+      t(`common.spaceOption.${kind}`)
+    );
+    active.push({
+      label: t('market.filterSecurity'),
+      value: summarizeFilterValues(kinds, t),
+      clear: (v) => ({ ...v, sec: new Set(SPACE_KINDS) }),
+    });
+  }
+  if (value.minQty > 0)
+    active.push({
+      label: t('market.filterMinQuantity'),
+      value: t('filters.atLeast', { value: formatCount(value.minQty) }),
+      clear: (v) => ({ ...v, minQty: 0 }),
+    });
+  if (spansStations && value.npcOnly)
+    active.push({ label: t('market.filterNpcOnly'), clear: (v) => ({ ...v, npcOnly: false }) });
+  if (value.hideBait)
+    active.push({ label: t('market.filterHideBait'), clear: (v) => ({ ...v, hideBait: false }) });
+  return active;
+}
+
 export interface BrowserFilters {
   /** The stored filter defaults have been read; a fetch before this would fire against the wrong ones. */
   hydrated: boolean;
@@ -60,6 +109,8 @@ export interface BrowserFilters {
   hideBait: boolean;
   browserFilterValue: BrowserFilterValue;
   handleBrowserFiltersChange: (next: BrowserFilterValue) => void;
+  /** `activeBrowserFilters` for this mode: the filter bars' pills and badge. */
+  activeFilters: ActiveFilter<BrowserFilterValue>[];
   activeFilterCount: number;
   jumpNoteShown: boolean;
 }
@@ -74,6 +125,7 @@ export interface BrowserFilters {
  * `allowedSystems`/`minQuantity`/`npcStationIds`.
  */
 export function useBrowserFilters(regionMode: boolean): BrowserFilters {
+  const { t } = useTranslation();
   const browserFilterSettingValue = useBrowserFilterSetting((state) => state.value);
   const hydrated = useHydratedStore(useBrowserFilterSetting);
   const setBrowserFilterSettingValue = useBrowserFilterSetting((state) => state.setValue);
@@ -129,16 +181,11 @@ export function useBrowserFilters(regionMode: boolean): BrowserFilters {
     }),
     [jumpRange, spaceKinds, minQuantity, browserFilters, hideBait]
   );
-  // Only what this mode shows counts: a Security filter left in the URL does
-  // nothing on a one-station Hub book, so badging it would claim a filter that
-  // isn't on.
-  const activeFilterCount = [
-    rangeSet,
-    spansStations && spaceKinds.size !== SPACE_KINDS.length,
-    minQuantity > 0,
-    npcOnly,
-    hideBait,
-  ].filter(Boolean).length;
+  const activeFilters = useMemo(
+    () => activeBrowserFilters(browserFilterValue, regionMode, t),
+    [browserFilterValue, regionMode, t]
+  );
+  const activeFilterCount = activeFilters.length;
   const handleBrowserFiltersChange = useCallback(
     (next: BrowserFilterValue) => {
       setBrowserFilters({
@@ -169,6 +216,7 @@ export function useBrowserFilters(regionMode: boolean): BrowserFilters {
     hideBait,
     browserFilterValue,
     handleBrowserFiltersChange,
+    activeFilters,
     activeFilterCount,
     jumpNoteShown,
   };

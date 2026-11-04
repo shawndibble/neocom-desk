@@ -22,6 +22,7 @@ import {
   SearchInput,
   SegmentedControl,
   Spinner,
+  type ActiveFilter,
   type DataTableColumn,
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -389,10 +390,25 @@ export function OwnedBlueprintsPanel({
 
   const filterValue = { kind, activity, includeCorp };
   // Below `lg` the kind filter sits inline above the cards, not in the sheet,
-  // so it doesn't count toward the funnel's badge there.
-  const activeFilterCount = [isDesktop && kind !== 'all', activity !== 'all', includeCorp].filter(
-    Boolean
-  ).length;
+  // so it is no pill there: the control above the cards already shows it.
+  const activeFilters: ActiveFilter<typeof filterValue>[] = [];
+  if (isDesktop && kind !== 'all')
+    activeFilters.push({
+      label: t('industry.ownedBlueprintsKindFilter'),
+      value: t(kind === 'bpo' ? 'industry.bpo' : 'industry.bpc'),
+      clear: (value) => ({ ...value, kind: 'all' }),
+    });
+  if (activity !== 'all')
+    activeFilters.push({
+      label: t('industry.ownedBlueprintsActivityLabel'),
+      value: t(`industry.ownedBlueprintsActivity.${activity}`),
+      clear: (value) => ({ ...value, activity: 'all' }),
+    });
+  if (includeCorp)
+    activeFilters.push({
+      label: t('industry.ownedBlueprintsIncludeCorp'),
+      clear: (value) => ({ ...value, includeCorp: false }),
+    });
   function applyFilter(next: typeof filterValue) {
     if (next.kind !== kind) setKind(next.kind);
     if (next.activity !== activity) setActivity(next.activity);
@@ -403,7 +419,8 @@ export function OwnedBlueprintsPanel({
     <FilterBar
       value={filterValue}
       onChange={applyFilter}
-      activeCount={activeFilterCount}
+      active={activeFilters}
+      resultCount={filteredRows.length}
       className="border-b border-line px-3 py-2"
       search={
         <SearchInput
@@ -459,11 +476,17 @@ export function OwnedBlueprintsPanel({
             />
           </FilterField>
           {corp.available && (
-            <FilterChip
+            <FilterField
               label={t('industry.ownedBlueprintsIncludeCorp')}
-              selected={draft.includeCorp}
-              onToggle={() => setDraft({ ...draft, includeCorp: !draft.includeCorp })}
-            />
+              stretch={false}
+              hideCaption
+            >
+              <FilterChip
+                label={t('industry.ownedBlueprintsIncludeCorp')}
+                selected={draft.includeCorp}
+                onToggle={() => setDraft({ ...draft, includeCorp: !draft.includeCorp })}
+              />
+            </FilterField>
           )}
         </>
       )}
