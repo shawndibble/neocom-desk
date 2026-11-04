@@ -1,4 +1,4 @@
-import { useContext, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useContext, useState, type KeyboardEvent } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
@@ -26,7 +26,6 @@ import {
   IMPLANT_SORTS,
   costPerGain,
   orderBy,
-  savingBetween,
   smallest,
   type ImplantSort,
 } from '@/engine/fittings/implantCost';
@@ -571,13 +570,13 @@ function GradeAction({
 }
 
 /** One way to get an item. A market source is one line; an LP offer is a one-line price with its full breakdown a click away. */
-function SourceRow({ source, badge }: { source: Source; badge?: ReactNode }) {
+function SourceRow({ source }: { source: Source }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   if (source.kind === 'market') {
     return (
       <span className="block">
-        <ImplantSourceLine source={source} /> {badge}
+        <ImplantSourceLine source={source} />
       </span>
     );
   }
@@ -601,7 +600,6 @@ function SourceRow({ source, badge }: { source: Source; badge?: ReactNode }) {
             {short}
           </span>
         )}
-        {badge}
         <button
           type="button"
           aria-expanded={open}
@@ -619,23 +617,6 @@ function SourceRow({ source, badge }: { source: Source; badge?: ReactNode }) {
           <ImplantSourceLine source={source} />
         </span>
       )}
-    </span>
-  );
-}
-
-/** "Saves X": on the cheaper of two sources, in warning tone when the pilot can't redeem it yet. */
-function SavingBadge({ saving, blocked }: { saving: number; blocked: boolean }) {
-  return (
-    <span
-      className={cx(
-        'rounded-xs border px-1 text-[0.625rem] font-semibold tabular-nums',
-        blocked ? 'border-warning/60 text-warning' : 'border-success/60 text-success'
-      )}
-    >
-      <Trans
-        i18nKey={blocked ? 'fittings.implantFinder.savesIfLp' : 'fittings.implantFinder.saves'}
-        components={{ isk: <IskAmount value={saving} decimals={0} /> }}
-      />
     </span>
   );
 }
@@ -709,11 +690,6 @@ function GradeRow({
   // What the pilot can buy now; failing that, the best way there is, warnings and all.
   const shown = best ?? sources?.[0] ?? null;
   const alt = sources && shown ? alternativeSource(sources, shown) : null;
-  const saving = shown && alt ? savingBetween(shown, alt.source) : null;
-  const badgeFor = (source: Source) =>
-    saving?.cheaper === source ? (
-      <SavingBadge saving={saving.saving} blocked={source.kind === 'lp' && source.blocked} />
-    ) : undefined;
   return (
     <li className="flex flex-wrap items-start gap-x-4 gap-y-1 border-t border-line py-1.5">
       <span className="flex min-w-44 items-start gap-1 md:w-52 md:shrink-0 md:flex-col md:gap-0.5">
@@ -725,7 +701,7 @@ function GradeRow({
             label={t('fittings.implantFinder.info', { name })}
             onClick={() => onInfo(row.grade.typeId)}
           />
-          {!inHeader && <span className="font-semibold tabular-nums">{row.grade.code}</span>}
+          {!inHeader && <span className="mr-1.5 font-semibold tabular-nums">{row.grade.code}</span>}
           <span
             className={cx('text-xs tabular-nums', effect.fits ? 'text-success' : 'text-warning')}
           >
@@ -756,14 +732,13 @@ function GradeRow({
         {sources === null ? (
           <span className="text-text-dim">{t('fittings.implantFinder.findingSources')}</span>
         ) : shown ? (
-          <SourceRow source={shown} badge={badgeFor(shown)} />
+          <SourceRow source={shown} />
         ) : (
           <span className="text-text-dim">{t('fittings.implantFinder.noSource')}</span>
         )}
         {alt && (
           <span className="block text-text-dim">
-            {t('fittings.implantFinder.also')}:{' '}
-            <SourceRow source={alt.source} badge={badgeFor(alt.source)} />
+            {t('fittings.implantFinder.also')}: <SourceRow source={alt.source} />
           </span>
         )}
         {replacesName && !row.inSet && row.replaces !== null && (

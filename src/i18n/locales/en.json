@@ -2435,8 +2435,6 @@
       "sourceLpSummaryUnpriced": "{{corp}} LP Store · no market rate for its LP",
       "lpBreakdown": "Breakdown",
       "lpBreakdownHide": "Hide breakdown",
-      "saves": "Saves <isk/> ISK",
-      "savesIfLp": "Saves <isk/> ISK with the LP",
       "perPercent": "≈ <isk/> ISK per +1%",
       "perUnit": "≈ <isk/> ISK per {{unit}} freed",
       "sortLabel": "Sort by",
