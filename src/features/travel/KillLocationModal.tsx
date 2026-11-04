@@ -215,7 +215,11 @@ function KillRow({
     .flatMap((kill) => (kill.victim?.shipTypeId == null ? [] : [typeLabel(kill.victim.shipTypeId)]))
     .join(' + ');
   const values = group.flatMap((kill) => (kill.value == null ? [] : [kill.value]));
-  const value = values.length === 0 ? null : values.reduce((sum, v) => sum + v, 0);
+  // A total only when every mail has a value: a partial sum would pass for the whole loss.
+  const value =
+    values.length === 0 || values.length < group.length
+      ? null
+      : values.reduce((sum, v) => sum + v, 0);
   const minutes = minutesBefore(now, Math.max(...group.map((kill) => kill.time)));
   return (
     <li className="border-b border-line last:border-b-0">
@@ -274,9 +278,9 @@ function KillRow({
       {expanded &&
         group.map((kill) => (
           <div key={kill.killmailId}>
-            {group.length > 1 && (
+            {group.length > 1 && kill.victim?.shipTypeId != null && (
               <p className="bg-panel-2 px-3 pt-2 pl-14 text-xs font-semibold uppercase tracking-wide text-text-dim">
-                {kill.victim?.shipTypeId == null ? '' : typeLabel(kill.victim.shipTypeId)}
+                {typeLabel(kill.victim.shipTypeId)}
               </p>
             )}
             <AttackerList kill={kill} names={names} typeLabel={typeLabel} />
