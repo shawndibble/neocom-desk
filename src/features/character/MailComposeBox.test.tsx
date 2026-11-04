@@ -159,7 +159,7 @@ describe('Reply defaults', () => {
     expect(screen.getByLabelText('Message')).toHaveValue('');
     expect(screen.queryByText(/Original body text/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Show quoted text/ }));
-    expect(screen.getByText(/> Original body text/)).toBeInTheDocument();
+    expect(screen.getByText(/Original body text/)).toBeInTheDocument();
   });
 
   it('still sends the folded quote under what the pilot typed', async () => {
@@ -170,7 +170,7 @@ describe('Reply defaults', () => {
     await user.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(sendMail).toHaveBeenCalled());
     expect(sendMail.mock.calls[0][3]).toBe(
-      'Agreed.\n\nOn Sep 21, 2026 03:14, Sender Sal wrote:\n&gt; Original body text'
+      'Agreed.\n\n--------------------------------\nFrom: Sender Sal\nSent: Sep 21, 2026 03:14\n\nOriginal body text'
     );
   });
 
@@ -213,7 +213,7 @@ describe('send path', () => {
     await user.click(await screen.findByRole('button', { name: 'emit' }));
     await user.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(sendMail).toHaveBeenCalled());
-    expect(sendMail.mock.calls[0][3]).toMatch(/^x<b>ok<\/b>\n\nOn .* wrote:\n/);
+    expect(sendMail.mock.calls[0][3]).toMatch(/^x<b>ok<\/b>\n\n-{32}\n/);
   });
 });
 
@@ -351,7 +351,7 @@ describe('sending', () => {
         { recipient_id: 300, recipient_type: 'character' },
       ],
       'RE: Ratting fleet up',
-      '\n\nOn Sep 21, 2026 03:14, Sender Sal wrote:\n&gt; Original body text'
+      '\n\n--------------------------------\nFrom: Sender Sal\nSent: Sep 21, 2026 03:14\n\nOriginal body text'
     );
     expect(drafts.clearDraft).toHaveBeenCalledWith(CHAR_ID, 7);
     expect(onSent).toHaveBeenCalled();
