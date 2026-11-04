@@ -11,6 +11,7 @@ import {
   loadStructureName,
   loadStructureNameNoRoster,
   readCachedStructureNames,
+  readCachedStructures,
 } from './structures';
 import { seedCharacter } from '@/test/seed';
 
@@ -295,6 +296,21 @@ describe('readCachedStructureNames', () => {
     });
     const names = await readCachedStructureNames([1000000000001, 1000000000002]);
     expect([...names]).toEqual([[1000000000001, 'Cached Keepstar']]);
+  });
+});
+
+describe('readCachedStructures', () => {
+  it('returns each cached structure with the solar system it sits in, with no request', async () => {
+    await db.esiCache.put({
+      characterId: 0,
+      key: 'structure:1000000000001',
+      value: { name: 'Cached Keepstar', owner_id: 1, solar_system_id: 30002187 },
+      fetchedAt: Date.now(),
+    });
+    const structures = await readCachedStructures([1000000000001, 1000000000002]);
+    expect([...structures]).toEqual([
+      [1000000000001, { name: 'Cached Keepstar', systemId: 30002187 }],
+    ]);
   });
 });
 

@@ -43,6 +43,7 @@ import {
   courierCollateral,
   filterCourierContracts,
   type CourierContractFilter,
+  type CourierEndpoint,
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
 import { iskPerJump, iskPerVolume, rewardPerVolumeJump } from '@/engine/contracts/courierRates';
@@ -376,6 +377,8 @@ interface CourierResultsProps {
   regionNames: ReadonlyMap<number, string>;
   /** Non-null: the panel above this one does not render a board without an active character. */
   characterId: number;
+  /** A player structure end the open detail placed; the panel swaps it into every row it ends. */
+  onStructurePlaced?: (endpoint: CourierEndpoint) => void;
 }
 
 /**
@@ -391,7 +394,12 @@ interface CourierResultsProps {
  * hull, am I given long enough) rather than figures worth ranking fifty rows
  * by, and the table's width is owed to the ones that are.
  */
-export function CourierResults({ rows, regionNames, characterId }: CourierResultsProps) {
+export function CourierResults({
+  rows,
+  regionNames,
+  characterId,
+  onStructurePlaced,
+}: CourierResultsProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   // The remembered filter (issue #1719): a default for each field a link
@@ -430,7 +438,17 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   const preferenceOverride = params['courier.pref'];
   const routeQuery = useJumpBasis(preferenceOverride);
   const preference = routeQuery.rules.preference;
-  const [selectedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
+  const [clickedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
+  // The same contract out of the current rows, so an end the open detail
+  // placed (or a refreshed corpus) reaches it; the clicked object only while
+  // the rows no longer hold it.
+  const selectedRow = useMemo(
+    () =>
+      clickedRow === null
+        ? null
+        : (rows.find((row) => row.contractId === clickedRow.contractId) ?? clickedRow),
+    [clickedRow, rows]
+  );
 
   // Where the character is (issue #940), owned here rather than by the control
   // that shows it, because `FilterBar` unmounts its controls on every collapse.
@@ -1094,6 +1112,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           onClose={() => setSelectedRow(null)}
           returnFocusFallback={() => resultsRef.current}
           characterId={characterId}
+          onStructurePlaced={onStructurePlaced}
         />
       )}
     </>

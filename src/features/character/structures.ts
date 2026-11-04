@@ -310,18 +310,33 @@ export async function loadStructureInfo(
 export async function readCachedStructureNames(
   structureIds: readonly number[]
 ): Promise<Map<number, string>> {
-  const unique = [...new Set(structureIds)];
   const names = new Map<number, string>();
-  if (unique.length === 0) return names;
+  for (const [id, { name }] of await readCachedStructures(structureIds)) names.set(id, name);
+  return names;
+}
+
+/**
+ * Like `readCachedStructureNames`, with the solar system each one sits in —
+ * the same ESI row carries both, so a page that measures routes to structures
+ * places them without a request. `systemId` is `null` only for a malformed row.
+ */
+export async function readCachedStructures(
+  structureIds: readonly number[]
+): Promise<Map<number, { name: string; systemId: number | null }>> {
+  const unique = [...new Set(structureIds)];
+  const structures = new Map<number, { name: string; systemId: number | null }>();
+  if (unique.length === 0) return structures;
   const rows = await readCachedEntries<UniverseStructure>(
     GLOBAL_CACHE_CHARACTER_ID,
     unique.map(cacheKey)
   );
   for (const id of unique) {
-    const row = rows.get(cacheKey(id));
-    if (row?.value.name) names.set(id, row.value.name);
+    const value = rows.get(cacheKey(id))?.value;
+    if (!value?.name) continue;
+    const systemId = typeof value.solar_system_id === 'number' ? value.solar_system_id : null;
+    structures.set(id, { name: value.name, systemId });
   }
-  return names;
+  return structures;
 }
 
 /** A structure whose name this device already holds. */
