@@ -18,7 +18,7 @@ import { useOverlayHistory } from '@/lib/useOverlayHistory';
 import { useSheetSwipe } from './useSheetSwipe';
 
 export type ModalPlacement =
-  'center' | 'sheet' | 'sheet-full' | 'medium' | 'wide' | 'page' | 'media';
+  'center' | 'sheet' | 'sheet-full' | 'medium' | 'detail' | 'wide' | 'page' | 'media';
 
 interface ModalProps {
   /** Parent owns the state; the modal never closes itself. */
@@ -47,7 +47,7 @@ interface ModalProps {
    * dialog exists to fill (a quantity), so the user can type straight away.
    */
   initialFocusRef?: RefObject<HTMLElement | null>;
-  /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `sheet-full` for the same drawer at full viewport height (long lists), `page` for a whole page's worth of content as a layer over another (full screen on a phone, content-area wide and tall from `md`), `wide` for multi-column content (e.g. a comparison matrix), `media` for an enlarged image — sized to its content up to 95% of the viewport. */
+  /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `sheet-full` for the same drawer at full viewport height (long lists), `detail` (40rem) for Item Detail's name/value rows, `page` for a whole page's worth of content as a layer over another (full screen on a phone, content-area wide and tall from `md`), `wide` for multi-column content (e.g. a comparison matrix), `media` for an enlarged image — sized to its content up to 95% of the viewport. */
   placement?: ModalPlacement;
   /**
    * Whether the modal owns a history entry so Back closes it (default). Pass
@@ -89,6 +89,12 @@ const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightCla
     heightClass: 'h-dvh max-h-dvh',
   },
   medium: {
+    dialogClass: 'motion-dialog m-auto w-full max-w-3xl',
+    heightClass: 'h-fit max-h-[85vh]',
+  },
+  // Item Detail (Show info): name/value rows that read across, so a name
+  // stays close to its value.
+  detail: {
     dialogClass: 'motion-dialog m-auto w-full max-w-[40rem]',
     heightClass: 'h-fit max-h-[85vh]',
   },

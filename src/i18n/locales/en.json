@@ -2570,8 +2570,8 @@
       "added": "Added"
     },
     "attributeModifier": {
-      "perLevel": "{{skill}}: +{{perLevel}}% per level",
-      "current": "Trained to {{level}} — currently +{{total}}%",
+      "perLevel": "{{skill}}: {{perLevel}}% per level",
+      "current": "Trained to {{level}} — currently {{total}}%",
       "untrained": "Not trained"
     },
     "totalSp": "Total SP",
@@ -13314,7 +13314,6 @@
         "skillLine": "{{name}} {{level}}",
         "implantLine": "{{name}} (implant)",
         "hullLine": "{{name}} hull bonus",
-        "noSources": "Your skills and implants, together.",
         "loading": "Applying your skills…",
         "offer": "Show these values with your skills and implants (a one-time download).",
         "load": "Apply my skills",

@@ -48,25 +48,8 @@ function ResistCell({
           style={{ width: `${pct}%` }}
         />
         <PreviewedFigure keys={statKey && [statKey]}>
-          {base !== undefined && resistReadsDifferently(base, resonance) ? (
-            <span className="relative">
-              {renderSkilled ? (
-                renderSkilled(resistText(base), fmt0(pct))
-              ) : (
-                <>
-                  <span aria-hidden>
-                    <span className="text-text-dim">{resistText(base)} → </span>
-                    <span className="font-semibold text-success">{fmt0(pct)}%</span>
-                  </span>
-                  <span className="sr-only">
-                    {t('fittings.stats.skilledResist', {
-                      base: resistText(base),
-                      value: fmt0(pct),
-                    })}
-                  </span>
-                </>
-              )}
-            </span>
+          {renderSkilled && base !== undefined && resistReadsDifferently(base, resonance) ? (
+            <span className="relative">{renderSkilled(resistText(base), fmt0(pct))}</span>
           ) : unheated === undefined ? (
             <span className="relative">{fmt0(pct)}%</span>
           ) : (

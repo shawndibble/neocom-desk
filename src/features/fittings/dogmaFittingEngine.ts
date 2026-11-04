@@ -47,7 +47,12 @@ import {
 } from '@/engine/fittings/appliedWeapons';
 import { chargesUsedPerMinute, type ChargeChoice } from '@/engine/fittings/chargeChoice';
 import { extractSupport } from '@/engine/fittings/support';
-import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
+import {
+  affectedAttributes,
+  type AffectedAttribute,
+  type AffectedByContext,
+  type AffectedSource,
+} from '@/engine/fittings/affectedBy';
 import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
 import type { SkilledTarget } from '@/engine/fittings/skilledTarget';
 import { skilledSourcesOf, type SkilledSource } from '@/engine/fittings/skilledSources';
@@ -630,31 +635,37 @@ export async function explainModule(
   const calculation = calculate(dogmaFit, { sources: true });
   const result = calculation.items[moduleIndex];
   if (!result) return [];
-  return affectedAttributes(result.attributes, {
+  return affectedAttributes(result.attributes, affectedContextOf(dogmaFit));
+}
+
+/** What `affectedAttributes`' source indices point at in `dogmaFit`. */
+function affectedContextOf(dogmaFit: Fit): AffectedByContext {
+  return {
     shipTypeId: dogmaFit.ship.type_id,
     ...(dogmaFit.ship.mode === undefined ? {} : { modeTypeId: dogmaFit.ship.mode }),
     itemTypeIds: dogmaFit.items.map((item) => item.type_id),
     chargeTypeIds: dogmaFit.items.map((item) => item.charge?.type_id),
     projectedTypeIds: (dogmaFit.incoming?.effects ?? []).map((effect) => effect.type_id),
-  });
+  };
 }
 
 /** A Capsule: no hull bonus, so a module fitted to it shows only the pilot's own effects. */
 const CAPSULE_TYPE_ID = 670;
 
-/**
- * Item Detail's skilled values: every attribute of `target` with `profile`'s
- * skills and implants applied, by attribute id. A hull is calculated empty; a
- * module alone on a Capsule, the way the in-game Show info reads a module
- * before it is fitted (no hull bonus). Only attributes something changed are
- * returned, and never the engine's own derived figures (ids ≤ 0), which Item
- * Detail has no row for.
- */
 /** One skilled value, and what made it (`skilledSourcesOf`). */
 export interface SkilledAttribute {
   value: number;
   sources: SkilledSource[];
 }
+
+/**
+ * Item Detail's skilled values: every attribute of `target` with `profile`'s
+ * skills and implants applied, by attribute id. A hull is calculated empty; a
+ * module alone on a Capsule, the way the in-game Show info reads a module
+ * before it is fitted (no hull bonus). Only attributes the pilot changed are
+ * returned, and never the engine's own derived figures (ids ≤ 0), which Item
+ * Detail has no row for.
+ */
 
 export async function skilledAttributes(
   target: SkilledTarget,
@@ -684,20 +695,52 @@ export async function skilledAttributes(
   const result = target.kind === 'ship' ? calculation.ship : calculation.items[0];
   if (!result) return new Map();
   const sourcesById = new Map(
-    affectedAttributes(result.attributes, {
-      shipTypeId: dogmaFit.ship.type_id,
-      ...(dogmaFit.ship.mode === undefined ? {} : { modeTypeId: dogmaFit.ship.mode }),
-      itemTypeIds: dogmaFit.items.map((item) => item.type_id),
-      chargeTypeIds: dogmaFit.items.map((item) => item.charge?.type_id),
-      projectedTypeIds: [],
-    }).map((row) => [row.attributeId, row.sources])
+    affectedAttributes(result.attributes, affectedContextOf(dogmaFit)).map((row) => [
+      row.attributeId,
+      row.sources,
+    ])
   );
+  /**
+   * The skills behind a hull bonus: the hull applies it, but a ship skill
+   * scales the hull's own bonus attribute (Amarr Cruiser → a Sacrilege's
+   * armor resists), so that skill is named too.
+   */
+  const hullBonusSkills = (attributeId: number): AffectedSource[] =>
+    (result.attributes.get(attributeId)?.sources ?? []).flatMap((source) => {
+      if (
+        source.from.type !== 'ship' ||
+        !source.applied ||
+        source.source_attribute_id === undefined
+      )
+        return [];
+      return (calculation.ship.attributes.get(source.source_attribute_id)?.sources ?? []).flatMap(
+        (bonus): AffectedSource[] =>
+          bonus.from.type === 'skill' && bonus.applied
+            ? [
+                {
+                  kind: 'skill',
+                  typeId: bonus.from.type_id,
+                  operator: bonus.operator,
+                  value: bonus.value,
+                  penalty: null,
+                  applied: true,
+                },
+              ]
+            : []
+      );
+    });
   const skilled = new Map<number, SkilledAttribute>();
   // Only what something changed: an attribute the engine left at its own base
   // can be a dogma default the item doesn't carry (a module's Mass of 1).
   for (const [id, { base, value }] of result.attributes) {
     if (id <= 0 || value === base) continue;
-    skilled.set(id, { value, sources: skilledSourcesOf(sourcesById.get(id) ?? [], profile) });
+    const sources = skilledSourcesOf(
+      [...(sourcesById.get(id) ?? []), ...hullBonusSkills(id)],
+      profile
+    );
+    // Changed by nothing of the pilot's (a Tactical Destroyer's default mode): not theirs to show.
+    if (sources.length === 0) continue;
+    skilled.set(id, { value, sources });
   }
   return skilled;
 }

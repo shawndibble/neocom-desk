@@ -32,7 +32,7 @@ function sourceLine(source: NamedSkilledSource, t: TFunction): string {
 export interface SkilledValueProps {
   /** The base figure, number only (dim, before the arrow); left out where base has its own column. */
   base?: string;
-  /** The pilot's figure, with its unit. */
+  /** The pilot's figure as shown (with its unit, unless a column header carries it). */
   skilled: string;
   /** What a screen reader hears for the whole figure. */
   spoken: string;
@@ -65,24 +65,25 @@ export function SkilledValue({
       )}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" className={cx(figureOpenerClassName, 'font-semibold text-success')}>
+          <button
+            type="button"
+            className={cx(figureOpenerClassName, 'font-semibold text-success')}
+            // §6c figure opener: the press never reaches a row beneath.
+            onClick={(event) => event.stopPropagation()}
+          >
             <span aria-hidden>{skilled}</span>
             <span className="sr-only">{spoken}</span>
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-64 space-y-2 text-xs" aria-label={title}>
           <p className={eyebrowClassName}>{t('market.itemDetail.skilled.sourcesTitle')}</p>
-          {sources.length > 0 ? (
-            <ul className="space-y-0.5">
-              {sources.map((source) => (
-                <li key={`${source.kind}:${source.typeId}`} className="text-text">
-                  {sourceLine(source, t)}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-text-dim">{t('market.itemDetail.skilled.noSources')}</p>
-          )}
+          <ul className="space-y-0.5">
+            {sources.map((source) => (
+              <li key={`${source.kind}:${source.typeId}`} className="text-text">
+                {sourceLine(source, t)}
+              </li>
+            ))}
+          </ul>
           {extra && <div className="space-y-2 border-t border-line pt-2">{extra}</div>}
         </PopoverContent>
       </Popover>

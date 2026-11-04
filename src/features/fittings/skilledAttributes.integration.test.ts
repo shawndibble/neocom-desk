@@ -15,6 +15,8 @@ const MEDIUM_ARMOR_REPAIRER_II = 3530;
 const MECHANICS = 3392;
 const REPAIR_SYSTEMS = 3393;
 const HULL_UPGRADES = 3394;
+const AMARR_CRUISER = 3335;
+const SACRILEGE = 12019;
 const NOBLE_HULL_UPGRADES_HG_1004 = 3481;
 
 const ARMOR_HP = DOGMA_ATTRIBUTE.armorHp;
@@ -45,6 +47,19 @@ describe('skilledAttributes', () => {
     // Each value says what made it.
     expect(skilled.get(ARMOR_HP)?.sources).toEqual([{ kind: 'skill', typeId: HULL_UPGRADES }]);
     expect(skilled.get(STRUCTURE_HP)?.sources).toEqual([{ kind: 'skill', typeId: MECHANICS }]);
+  });
+
+  it('names the ship skill behind a hull bonus, as well as the hull', async () => {
+    const skilled = await skilledAttributes(
+      { kind: 'ship', typeId: SACRILEGE },
+      buildPilotProfile(new Map([[AMARR_CRUISER, 5]]), [])
+    );
+    // Sacrilege: 5% armor resists per level of Amarr Cruiser, through the hull's bonus.
+    expect(skilled.get(DOGMA_ATTRIBUTE.armorEmResonance)?.value).toBeCloseTo(0.5 * 0.75, 6);
+    expect(skilled.get(DOGMA_ATTRIBUTE.armorEmResonance)?.sources).toEqual([
+      { kind: 'skill', typeId: AMARR_CRUISER },
+      { kind: 'hull', typeId: SACRILEGE },
+    ]);
   });
 
   it('names an implant that changes a value', async () => {
