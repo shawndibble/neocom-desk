@@ -687,10 +687,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
           onPay={() => actions.corpPayFromDetail(corpDetail.view.corporationId)}
           onUnmarkPaid={() => unmarkCorpPayment(corpDetail.view.markedPaidIds)}
           notice={
-            corpDetail.view.overlap && (
+            (corpDetail.view.overlap || corpDetail.view.state === 'conflict') && (
               <CorpOverlapNotice
                 view={corpDetail.view}
                 corpName={corpDetail.corpName}
+                recordedAt={corpDetail.view.refineryLabel ?? systemName(detailTarget)}
                 everyAssignment={everyAssignment}
                 payeeById={payeeById}
                 typeNames={typeNames}

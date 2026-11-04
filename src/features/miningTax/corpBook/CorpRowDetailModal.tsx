@@ -1,7 +1,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, InfoTooltip, Modal } from '@/components/ui';
+import { Button, InfoTooltip, Modal, ValueList, ValueRow } from '@/components/ui';
 import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { formatAge, MINUTE_MS } from '@/lib/age';
@@ -17,7 +17,6 @@ import type { DisplayRow } from '../groupRows';
 import { CorpBookDiffModal } from './CorpBookDiffModal';
 import type { CorpBookViewBook } from './corpBookView';
 import { CorpStatusPill } from './CorpStatusPill';
-import { useCorpStateHint } from './useCorpStateText';
 import type { CorpRowInfo } from './corpRows';
 import { formatCount } from '@/lib/formatCount';
 
@@ -41,8 +40,8 @@ interface Props {
 /**
  * Row detail for a day the Corp Tax Book decided (#4065): the layout of
  * `RowDetailModal` for an owed row — who it is owed to and how much, the pilot
- * and system, the ore, how it was priced — with the book's status, locked
- * terms and any dispute added, and none of the Edit / Unassign actions: the
+ * and system, the ore, how it was priced — with the book's status as a few
+ * facts, a Conflict's notice first, and any dispute added, and none of the Edit / Unassign actions: the
  * book owns these figures, not the member's Payees.
  */
 export function CorpRowDetailModal({
@@ -60,7 +59,6 @@ export function CorpRowDetailModal({
 }: Props) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  const hint = useCorpStateHint();
   const now = useTicker(MINUTE_MS);
   const [comparing, setComparing] = useState(false);
   const { view } = corp;
@@ -76,6 +74,34 @@ export function CorpRowDetailModal({
   const synced = book?.summary.lastSyncedAt;
   const personal = view.personalOreLines;
   const payeeName = book?.payee.name ?? t('miningTax.corpBook.payeeName', { corp: corp.corpName });
+  // The book's side of the day as a few labelled facts, not one run-on sentence.
+  const facts: [string, string][] = [];
+  if (view.statementId && (view.state === 'billed' || view.state === 'paid')) {
+    facts.push([
+      t('miningTax.corpBook.detail.factStatement'),
+      t('miningTax.corpBook.detail.factStatementFinal'),
+    ]);
+  } else if (view.state === 'billed') {
+    facts.push([
+      t('miningTax.corpBook.detail.factBilling'),
+      t('miningTax.corpBook.detail.factBillingNext'),
+    ]);
+    facts.push([
+      t('miningTax.corpBook.detail.factSynced'),
+      synced ? formatAge(Math.max(0, now - Date.parse(synced)), t) : '—',
+    ]);
+  }
+  if (view.state === 'paid' && view.settledBy) {
+    facts.push([
+      t('miningTax.corpBook.detail.factSettledBy'),
+      t(`miningTax.corpBook.detail.settledBy.${view.settledBy}`),
+    ]);
+  }
+  if ((view.state === 'dismissed' || view.state === 'waived') && view.billed > 0) {
+    facts.push([t('miningTax.corpBook.detail.factOriginal'), `${formatIsk(view.billed)} ISK`]);
+  }
+  // A conflict is the first thing to read and act on, so its notice leads.
+  const conflict = view.state === 'conflict';
 
   return (
     <>
@@ -121,6 +147,8 @@ export function CorpRowDetailModal({
             </span>
             <CorpStatusPill corp={corp} />
           </div>
+
+          {conflict && notice}
 
           <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
             <p className={eyebrowClassName}>{t('miningTax.oreColumn')}</p>
@@ -180,39 +208,27 @@ export function CorpRowDetailModal({
             </ul>
           </div>
 
-          <p className="rounded-xs border border-line p-2 text-xs text-text-dim">
-            {t('miningTax.corpBook.detail.locked', { corp: corp.corpName })} {hint(corp)}{' '}
-            {view.state === 'paid' && view.settledBy === 'yourMark' && (
-              <>{t('miningTax.corpBook.detail.settled.yourMark', { amount: formatIsk(owed) })} </>
+          <div className="space-y-1.5 rounded-xs border border-line p-2 text-xs">
+            <p className={eyebrowClassName}>{t('miningTax.corpBook.detail.bookTitle')}</p>
+            {facts.length > 0 && (
+              <ValueList variant="plain" className="text-xs">
+                {facts.map(([label, value]) => (
+                  <ValueRow key={label} label={label} value={value} />
+                ))}
+              </ValueList>
+            )}
+            {(view.state === 'dismissed' || view.state === 'waived') && view.dismissalReason && (
+              <p>{t('miningTax.corpBook.detail.reason', { reasons: view.dismissalReason })}</p>
             )}
             {view.settledBy !== 'yourMark' &&
               view.markedPaidIds &&
               view.markedPaidIds.length > 0 && (
-                <>{t('miningTax.corpBook.detail.settled.alsoMarked')} </>
+                <p>{t('miningTax.corpBook.detail.settled.alsoMarked')}</p>
               )}
-            {view.state === 'paid' && view.settledBy === 'donation' && (
-              <>{t('miningTax.corpBook.detail.settled.donation', { corp: corp.corpName })} </>
-            )}
-            {(view.state === 'dismissed' || view.state === 'waived') && view.billed > 0 && (
-              <>{t('miningTax.corpBook.detail.overridden', { billed: formatIsk(view.billed) })} </>
-            )}
-            {/* A day paid before any Statement bills it (a donation sent ahead) has nothing pending to explain. */}
-            {view.statementId
-              ? (view.state === 'billed' || view.state === 'paid') &&
-                t('miningTax.corpBook.detail.onStatement', { corp: corp.corpName })
-              : view.state === 'billed' &&
-                t('miningTax.corpBook.detail.decides', {
-                  corp: corp.corpName,
-                  ago: synced ? formatAge(Math.max(0, now - Date.parse(synced)), t) : '—',
-                })}{' '}
-            {t('miningTax.corpBook.detail.terms', {
-              hub: hub.name,
-              form,
-              pct: view.taxPct,
-              scope,
-              from: view.rateEffectiveFrom ?? view.date,
-            })}
-          </p>
+            <p className="text-text-dim">
+              {t('miningTax.corpBook.detail.lockedShort', { corp: corp.corpName })}
+            </p>
+          </div>
 
           {view.correction && (
             <p className="rounded-xs border border-line p-2 text-xs">
@@ -227,7 +243,7 @@ export function CorpRowDetailModal({
             </p>
           )}
 
-          {notice}
+          {!conflict && notice}
 
           {view.dispute && (
             <div className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs">

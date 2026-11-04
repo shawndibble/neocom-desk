@@ -7769,16 +7769,24 @@
       "detail": {
         "bookAndYou": "{{book}} (book) · {{you}} (you)",
         "priced": "{{hub}} buy · {{form}} ore · {{pct}}% {{scope}} from {{from}}",
-        "onStatement": "It is on {{corp}}'s Statement, which never changes.",
-        "decides": "The book decides this day: it is Billable ({{corp}} synced {{ago}}, after its grace period) and goes on {{corp}}'s next Statement.",
-        "locked": "{{corp}}'s Corp Tax Book records this day, so it can't be edited here. Ask a corp officer about any difference.",
+        "bookTitle": "Corp Tax Book",
+        "lockedShort": "Can't be edited here. Ask a {{corp}} officer about any difference.",
+        "factBilling": "Billing",
+        "factBillingNext": "Next Statement",
+        "factSynced": "Synced",
+        "factStatement": "Statement",
+        "factStatementFinal": "Issued, final",
+        "factSettledBy": "Settled by",
+        "settledBy": {
+          "yourMark": "Your mark",
+          "donation": "Donation",
+          "statement": "Statement payment"
+        },
+        "factOriginal": "Originally billed",
+        "factReason": "Reason",
         "settled": {
-          "yourMark": "You marked this day paid ({{amount}} ISK). The corporation confirms it against its wallet.",
-          "donation": "A donation you sent to {{corp}} covers this day.",
           "alsoMarked": "You also marked this day paid. Unmark it if that was a mistake."
         },
-        "overridden": "The corporation set this day to 0 ISK. It originally billed {{billed}} ISK.",
-        "terms": "Terms are locked to the book: {{hub}} buy, {{form}} ore, {{pct}}% {{scope}} from {{from}}.",
         "disputeHint": "Your own record differs from the book.",
         "corrected": "Corrected by the corporation: {{before}} → {{after}}.",
         "reason": "Their reason: {{reasons}}"
@@ -7786,6 +7794,21 @@
       "line": {
         "corrected": "Corrected by the corporation, was {{before}}.",
         "overlap": "This ore is also on your own list for a payee. Open the line to sort it out."
+      },
+      "conflict": {
+        "region": "Conflict",
+        "title": "Two records claim this ore",
+        "yourEntry": "Your entry: {{payee}} · {{amount}} ISK · {{status}}",
+        "yourEntryUnknown": "Your entry: gives this ore to another Payee",
+        "entryPaid": "marked paid",
+        "entryOwed": "owed",
+        "bookEntry": "{{corp}}'s book: recorded it at {{place}}",
+        "resolves": "Left alone, it goes to {{corp}} on {{date}}.",
+        "fixTitle": "To fix it",
+        "bookRight": "The ore was {{corp}}'s: take it off your entry.",
+        "bookRightPaid": "The ore was {{corp}}'s: unmark your payment, then take it off your entry.",
+        "entryRight": "The ore was {{payee}}'s: ask a {{corp}} officer to correct the book.",
+        "otherPayee": "the other Payee"
       },
       "overlap": {
         "notice": "This ore is also on your list for <strong>{{payee}}</strong>. <strong>{{corp}}</strong> bills it.",
