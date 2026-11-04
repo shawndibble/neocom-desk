@@ -67,7 +67,7 @@ import type {
   MailHeader,
 } from '@/esi/endpoints';
 
-vi.mock('@/features/character/contracts', () => ({ loadContracts: vi.fn() }));
+vi.mock('@/features/character/contracts', () => ({ KEY: 'contracts', loadContracts: vi.fn() }));
 vi.mock('@/features/character/wallet', () => ({ loadWalletJournalWithStatus: vi.fn() }));
 vi.mock('@/features/character/orders', () => ({
   KEYS: { open: 'orders', history: 'orders:history' },
