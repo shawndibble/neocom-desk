@@ -58,12 +58,15 @@ export function isEvePortraitImage(url: URL): boolean {
 }
 
 /**
- * An object of an R2 contract snapshot (ADR 0019): a per-type offers object or
- * the courier rows object. Its name carries its
- * content hash, so the bytes behind a URL never change. The sibling `index.json`
- * is deliberately not matched: it changes every publish. Nor are the offers
- * bundle shards: ~1 MB each and replaced nearly every publish, they would crowd
- * this cache, and the browser's HTTP cache already keeps them (`immutable`).
+ * An object of an R2 contract snapshot (ADR 0019): a per-type offers object (the
+ * layout before 2026-11, still named by an older cached index) or the courier
+ * rows object. Its name carries its content hash, so the bytes behind a URL
+ * never change. The sibling `index.json` is deliberately not matched: it
+ * changes every publish. Nor are the offers bundle shards, which now answer
+ * one-item reads too: ~75 of them, nearly all replaced every half-hour publish,
+ * they would churn this cache, and the browser's HTTP cache already keeps them
+ * (`immutable`). So an offline contract search works only from that HTTP cache
+ * (decision 20261104-065346-r2-snapshots-publish-few-big-objects-not-one).
  */
 export function isContractSnapshotObject(url: URL): boolean {
   return (

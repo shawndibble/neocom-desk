@@ -2,7 +2,7 @@
  * Daily open prices (docs/context/decisions/20261018-121126-price-history-draws-daily-open-buy-and-sell.md):
  * for each hub station and type, the highest buy order and the lowest sell
  * order placed at that station and standing at the end of a UTC day, read
- * from EVE Ref's twice-hourly market-order snapshots and stored one object
+ * from EVE Ref's twice-hourly market-order snapshots and stored one entry
  * per type, holding every hub station, inside its shard `open-prices/shards/<typeId % 4096>.json` in R2
  * (before 2026-11, at `open-prices/<typeId>.json`; decision 20261104-065346-r2-snapshots-publish-few-big-objects-not-one)
  * (layout: decision 20261018-164126-open-prices-one-document-per-type-every-hub;

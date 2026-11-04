@@ -91,12 +91,15 @@ async function publishOffers(
     put: deps.put,
   });
   await writeState(deps.put, OFFERS_STATE_R2_KEY, result.state);
-  const { uploaded, skipped, failed, remaining, indexWritten, bundlesWritten, firstError } = result;
+  const { uploaded, skipped, failed, indexWritten, firstError } = result;
   const outcome = r2PublishOutcome(result);
-  (outcome.kind === 'complete' && bundlesWritten ? console.info : console.warn)(
-    'Contract offers R2 publish',
-    { uploaded, skipped, failed, remaining, indexWritten, bundlesWritten, firstError }
-  );
+  (outcome.kind === 'complete' ? console.info : console.warn)('Contract offers R2 publish', {
+    uploaded,
+    skipped,
+    failed,
+    indexWritten,
+    firstError,
+  });
   return outcome;
 }
 

@@ -1,7 +1,8 @@
 /**
  * Publishes the offers snapshot to Cloudflare R2 (ADR 0019, issue #3745): the
- * bundle shards (every row, a few dozen content-addressed gzip objects, each
- * uploaded only when its content changed), then `index.json` last, naming per
+ * bundle shards (every row, a few dozen content-addressed gzip objects; one
+ * already in R2 is not uploaded again, though with ~30% of types changing per
+ * publish nearly every shard changes), then `index.json` last, naming per
  * type the shard that holds it. The upload itself is injected (`R2Put`) so this
  * stays testable; `createR2Put` is the SigV4 implementation.
  *
@@ -19,7 +20,6 @@ import {
   R2_INDEX_KEY,
   buildBundleObjects,
   buildContractOfferR2Index,
-  buildTypeObjects,
   gzipObjectBody,
 } from './contractOfferObjects.js';
 import {
@@ -41,7 +41,7 @@ export interface R2PublishState {
   /** When every shard was last uploaded in one successful pass; `null` until one completes. */
   fullUploadAt: number | null;
   /** Shard names in R2 as of the last index written. */
-  bundles?: string[];
+  bundles: string[];
 }
 
 export interface R2PublishResult {
@@ -50,11 +50,7 @@ export interface R2PublishResult {
   /** Shards already in R2 (named by content, so unchanged). */
   skipped: number;
   failed: number;
-  /** Always 0: a publish is a few dozen uploads, never cut by a time budget. */
-  remaining: number;
   indexWritten: boolean;
-  /** The index names the shards; the same as `indexWritten`, kept for the run log. */
-  bundlesWritten: boolean;
   /** First upload error message, so an auth or network fault is diagnosable from the log. */
   firstError: string | null;
   state: R2PublishState;
@@ -95,7 +91,7 @@ export async function publishContractOffersToR2(args: {
     previous === null ||
     previous.fullUploadAt === null ||
     now - previous.fullUploadAt >= REFRESH_AFTER_MS;
-  const bundles = buildBundleObjects(buildTypeObjects(rows), rows);
+  const bundles = buildBundleObjects(rows);
   const parts = [...bundles.blueprints, ...bundles.others];
   const inR2 = new Set(refresh ? [] : (previous?.bundles ?? []));
   const changed = parts.filter((part) => !inR2.has(part.name));
@@ -134,9 +130,7 @@ export async function publishContractOffersToR2(args: {
     uploaded,
     skipped: parts.length - changed.length,
     failed,
-    remaining: 0,
     indexWritten,
-    bundlesWritten: indexWritten,
     firstError,
     state: indexWritten
       ? {
@@ -214,26 +208,17 @@ export async function publishCourierContractsToR2(args: {
 
 /**
  * What one R2 publish means for the run (issue #4270). R2 is the only store,
- * so a failed upload or index write fails the run; a run cut short by
- * `UPLOAD_BUDGET_MS` is not a failure — the recorded hashes let the next run
- * resume — but it is not complete either, so the caller keeps the archive
- * fingerprint unstored and that next run happens.
+ * so a failed upload or index write fails the run.
  */
-export type R2PublishOutcome =
-  | { kind: 'complete' }
-  | { kind: 'resumable'; remaining: number }
-  | { kind: 'failed'; error: string };
+export type R2PublishOutcome = { kind: 'complete' } | { kind: 'failed'; error: string };
 
 export function r2PublishOutcome(result: {
   failed?: number;
-  remaining?: number;
   indexWritten: boolean;
   firstError: string | null;
 }): R2PublishOutcome {
   const failed = result.failed ?? 0;
-  const remaining = result.remaining ?? 0;
   if (failed === 0 && result.indexWritten) return { kind: 'complete' };
-  if (failed === 0 && remaining > 0) return { kind: 'resumable', remaining };
   return {
     kind: 'failed',
     error: `${failed > 0 ? `${failed} objects failed` : 'index not written'}; first error: ${result.firstError ?? 'unknown'}`,
@@ -243,8 +228,8 @@ export function r2PublishOutcome(result: {
 /**
  * What the contract-offers job does with both publishes' outcomes (issue
  * #4270): any failure fails the run, naming each snapshot that failed; the
- * archive fingerprint is stored only when both are complete, so a failed or
- * budget-cut run is retried next cycle rather than skipped as "archive
+ * archive fingerprint is stored only when both are complete, so a failed run
+ * is retried next cycle rather than skipped as "archive
  * unchanged".
  */
 export function publicContractsRunVerdict(

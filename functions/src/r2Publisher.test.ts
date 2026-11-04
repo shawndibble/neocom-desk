@@ -83,7 +83,6 @@ describe('publishContractOffersToR2', () => {
     expect(puts.at(-1)!.headers['Cache-Control']).toBe('public, max-age=60');
     expect(puts.at(-1)!.headers['Content-Encoding']).toBeUndefined();
     expect(result).toMatchObject({ uploaded: 2, skipped: 0, failed: 0, indexWritten: true });
-    expect(result.bundlesWritten).toBe(true);
     expect(result.state.fullUploadAt).toBe(1000);
     expect(result.state.bundles).toEqual([
       ...index()!.bundles.blueprints,
@@ -108,7 +107,7 @@ describe('publishContractOffersToR2', () => {
 
   it('uploads just the shard whose rows changed', async () => {
     const first = await publish();
-    const { puts, put } = recorder();
+    const { puts, put, index } = indexRecorder();
     await publish({
       rows: [row({ price: 101 }), rows[1]],
       lastSyncedAt: 2,
@@ -116,7 +115,10 @@ describe('publishContractOffersToR2', () => {
       now: 2000,
       put,
     });
-    expect(shardPuts(puts).map((p) => p.key.split('/').at(-1)!.split('.')[0])).toEqual(['others']);
+    expect(shardPuts(puts).map((p) => p.key)).toEqual(index()!.bundles.others);
+    expect(index()!.bundles.blueprints).toEqual(
+      first.state.bundles.filter((name) => name.includes('/blueprints.'))
+    );
   });
 
   it('re-uploads every shard once the refresh interval passes, so a lifecycle rule cannot expire live objects', async () => {
@@ -136,7 +138,6 @@ describe('publishContractOffersToR2', () => {
     const failing = recorder((key) => key.includes('/bundles/others.'));
     const result = await publish({ put: failing.put });
     expect(result).toMatchObject({ uploaded: 1, failed: 1, indexWritten: false });
-    expect(result.bundlesWritten).toBe(false);
     expect(result.firstError).toContain('boom');
     expect(failing.puts.map((p) => p.key)).not.toContain(INDEX_KEY);
     expect(result.state.fullUploadAt).toBeNull();
@@ -169,30 +170,23 @@ describe('publishContractOffersToR2', () => {
 
 describe('r2PublishOutcome', () => {
   it('is complete once the index is written', () => {
-    expect(
-      r2PublishOutcome({ failed: 0, remaining: 0, indexWritten: true, firstError: null })
-    ).toEqual({ kind: 'complete' });
-  });
-
-  it('fails when an object upload failed, naming the first error', () => {
-    expect(
-      r2PublishOutcome({ failed: 2, remaining: 0, indexWritten: false, firstError: 'boom' })
-    ).toEqual({ kind: 'failed', error: '2 objects failed; first error: boom' });
-  });
-
-  it('fails when only the index write failed', () => {
-    expect(
-      r2PublishOutcome({ failed: 0, remaining: 0, indexWritten: false, firstError: 'denied' })
-    ).toEqual({
-      kind: 'failed',
-      error: 'index not written; first error: denied',
+    expect(r2PublishOutcome({ failed: 0, indexWritten: true, firstError: null })).toEqual({
+      kind: 'complete',
     });
   });
 
-  it('is resumable, not failed, when the time budget ran out', () => {
-    expect(
-      r2PublishOutcome({ failed: 0, remaining: 40, indexWritten: false, firstError: null })
-    ).toEqual({ kind: 'resumable', remaining: 40 });
+  it('fails when an object upload failed, naming the first error', () => {
+    expect(r2PublishOutcome({ failed: 2, indexWritten: false, firstError: 'boom' })).toEqual({
+      kind: 'failed',
+      error: '2 objects failed; first error: boom',
+    });
+  });
+
+  it('fails when only the index write failed', () => {
+    expect(r2PublishOutcome({ failed: 0, indexWritten: false, firstError: 'denied' })).toEqual({
+      kind: 'failed',
+      error: 'index not written; first error: denied',
+    });
   });
 
   it('reads a courier result, which has no per-object counts', () => {
@@ -228,13 +222,6 @@ describe('publicContractsRunVerdict', () => {
   it('fails the run when only one snapshot failed', () => {
     expect(publicContractsRunVerdict(complete, { kind: 'failed', error: 'b' })).toEqual({
       error: 'Public contracts R2 publish failed — offers: b',
-      storeFingerprint: false,
-    });
-  });
-
-  it('does not fail a budget-cut run, but leaves the fingerprint for the next run to resume', () => {
-    expect(publicContractsRunVerdict(complete, { kind: 'resumable', remaining: 9 })).toEqual({
-      error: null,
       storeFingerprint: false,
     });
   });
