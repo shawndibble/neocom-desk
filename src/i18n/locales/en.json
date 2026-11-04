@@ -2348,6 +2348,9 @@
       "sourceOther_other": "{{hub}} · <price/> ISK · {{count}} for sale · not at your Trade Hub",
       "noSource": "Not for sale at any Trade Hub or LP Store",
       "replaces": "Replaces {{name}}",
+      "replacesLabel": "Replaces",
+      "openMarket": "Open market",
+      "openLpStore": "Open {{corp}} LP Store",
       "pricedAt": "Priced at {{hub}} buy-now prices (else the cheapest other Trade Hub), and LP Store offers at ISK + LP × the store’s LP Value + the tags you don’t own.",
       "goals": {
         "cpu": "CPU",

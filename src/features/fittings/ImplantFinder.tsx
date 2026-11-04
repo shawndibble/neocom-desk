@@ -16,8 +16,11 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { ItemInfoLink } from '@/features/entities';
 import { cx } from '@/lib/cx';
+import { nullableTextParam } from '@/lib/urlState';
+import { useUrlParam } from '@/lib/useUrlState';
 import {
   goalById,
+  IMPLANT_GOALS,
   headroom,
   placeAllInSet,
   shortfall,
@@ -47,6 +50,7 @@ import { SectionHeading } from './implantFinderBits';
 import { GoalResults } from './ImplantGoalResults';
 import { SourceNames } from './implantSourceNames';
 import { SetStrip } from './ImplantSetStrip';
+import { IMPLANT_GOAL_PARAM } from './useImplantsModalUrl';
 import { occupantOf, parseSlotKey, slotName } from './implantSlots';
 
 const GROUPS: readonly GoalGroup[] = ['fitting', 'weapons', 'mining', 'tank', 'navigation'];
@@ -74,7 +78,12 @@ export function ImplantFinder({
   const hubId = useMarketHub((state) => state.value);
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const { selected: target } = useTargetProfiles();
-  const [goalId, setGoalId] = useState<ImplantGoalId | null>(null);
+  const [goalParam, setGoalParam] = useUrlParam(IMPLANT_GOAL_PARAM, nullableTextParam());
+  // The open goal rides in the URL, so Back from the market lands on the same list.
+  const goalId = IMPLANT_GOALS.some((g) => g.id === goalParam)
+    ? (goalParam as ImplantGoalId)
+    : null;
+  const setGoalId = (id: ImplantGoalId | null) => setGoalParam(id);
   /** The slot picked on the strip (`slotKey`): goals and results narrow to what goes in it. */
   const [slot, setSlot] = useState<string | null>(null);
   const [query, setQuery] = useState('');

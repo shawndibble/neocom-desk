@@ -12,6 +12,8 @@ import { pickSource, type HubPrice } from './implantFinder';
 export interface LpOfferInput {
   corporationId: number;
   corpName: string;
+  /** The store's offer id, for a link that opens the store on it. */
+  offerId?: number;
   iskCost: number;
   lpCost: number;
   /** Units one redemption hands out. */
@@ -56,6 +58,7 @@ export type Source =
       kind: 'lp';
       corporationId: number;
       corpName: string;
+      offerId: number | undefined;
       iskCost: number;
       lpCost: number;
       quantity: number;
@@ -103,6 +106,7 @@ function lpSource(offer: LpOfferInput, context: SourceContext, spent: Spent): So
     kind: 'lp',
     corporationId: offer.corporationId,
     corpName: offer.corpName,
+    offerId: offer.offerId,
     iskCost: offer.iskCost,
     lpCost: offer.lpCost,
     quantity: offer.quantity,

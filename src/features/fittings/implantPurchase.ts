@@ -61,6 +61,7 @@ export async function loadLpOffersFor(
       list.push({
         corporationId: corporation.id,
         corpName: corporation.name,
+        offerId: offer.offer_id,
         iskCost: offer.isk_cost,
         lpCost: offer.lp_cost,
         quantity: offer.quantity,

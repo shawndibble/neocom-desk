@@ -450,7 +450,12 @@ export function ImplantSetPicker({
 
   if (!finder || !plannedFitting) {
     return (
-      <Modal open={open} onClose={onClose} title={t('fittings.implants.modalTitle')}>
+      <Modal
+        open={open}
+        onClose={onClose}
+        title={t('fittings.implants.modalTitle')}
+        closeOnBack={false}
+      >
         <div className="space-y-3 p-3">
           {inUse}
           {setEditor}
@@ -463,7 +468,13 @@ export function ImplantSetPicker({
     { id: 'set', label: t('fittings.implantFinder.tabSet') },
   ];
   return (
-    <Modal open={open} onClose={onClose} title={t('fittings.implants.modalTitle')} placement="wide">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('fittings.implants.modalTitle')}
+      placement="wide"
+      closeOnBack={false}
+    >
       <div className="space-y-3 p-3">
         {inUse}
         <Tabs

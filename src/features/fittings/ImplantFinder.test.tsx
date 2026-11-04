@@ -126,6 +126,7 @@ vi.mock('@/features/market/ItemDetailModal', () => ({
 const caldariNavy = (lpCost: number, iskCost: number): LpOfferInput => ({
   corporationId: 1000035,
   corpName: 'Caldari Navy',
+  offerId: 4242,
   iskCost,
   lpCost,
   quantity: 1,
@@ -274,6 +275,21 @@ describe('ImplantFinder', () => {
     expect(screen.getByText('Nothing in Booster 3 helps CPU on this fit.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'All slots' }));
     expect((await screen.findAllByRole('button', { name: /EE-605$/ })).length).toBeGreaterThan(0);
+  });
+
+  it('links each source: the market page, and the LP Store opened on that offer', async () => {
+    const user = userEvent.setup();
+    renderFinder();
+    await user.click(await screen.findByRole('button', { name: /CPU\s*18\.4 tf over/ }));
+    const row = (await screen.findByRole('button', { name: /^Add .*EE-603$/ })).closest('li')!;
+    expect(within(row).getByRole('link', { name: 'Open market' })).toHaveAttribute(
+      'href',
+      '/market/browser?type=603'
+    );
+    expect(within(row).getByRole('link', { name: 'Open Caldari Navy LP Store' })).toHaveAttribute(
+      'href',
+      '/wallet/lp-store/1000035?offer=4242'
+    );
   });
 
   it('opens an implant’s full details from its info button', async () => {
