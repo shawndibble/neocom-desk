@@ -78,7 +78,11 @@ export function LoyaltyOfferCost({
   );
 }
 
-/** An offers table's item cell: the name, a BP marker for a blueprint, and its LP + ISK price. */
+/**
+ * An offers table's item cell: the name, a BP marker for a blueprint, and its LP + ISK price.
+ * `showCost` is false on a phone's dense card, which prints the price and the low-volume
+ * warning on its meta line instead.
+ */
 export function LoyaltyOfferItemCell({
   row,
   showCost = true,
@@ -92,11 +96,23 @@ export function LoyaltyOfferItemCell({
   const { t } = useTranslation();
   return (
     <span className="flex flex-col">
-      <span className="inline-flex items-center gap-1.5">
+      {/* Plain inline text, not a flex row: a long name wraps and the tags follow its last word
+          instead of floating beside the wrapped block. The no-break space keeps a tag from
+          starting a line of its own. */}
+      <span>
         <LoyaltyItemName row={row} />
-        {row.isBlueprint && <span className={tagWordClassName}>BP</span>}
-        {isLowVolume(row) && (
-          <span className={tagWordClassName}>{t('loyaltyStore.lowVolumeTag')}</span>
+        {row.isBlueprint && (
+          <>
+            {'\u00a0'}
+            <span className={tagWordClassName}>BP</span>
+          </>
+        )}
+        {/* A phone says it on the meta line (amber sells/day), where the name needs the room. */}
+        {showCost && isLowVolume(row) && (
+          <>
+            {' '}
+            <span className={tagWordClassName}>{t('loyaltyStore.lowVolumeTag')}</span>
+          </>
         )}
       </span>
       {showCost && (

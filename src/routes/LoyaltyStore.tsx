@@ -328,7 +328,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
         )
       }
       padded={false}
-      className={isDesktop ? 'w-80 shrink-0 xl:w-[28rem]' : undefined}
+      className={isDesktop ? 'w-[28rem] shrink-0' : undefined}
     >
       {offersError ? (
         <EmptyState

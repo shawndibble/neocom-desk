@@ -13,6 +13,7 @@ import { LoyaltyOfferCost, LoyaltyOfferItemCell, PhoneUnit } from '@/features/lo
 import {
   formatIskPerLp,
   formatSellsPerDay,
+  isLowVolume,
   iskPerLpTone,
 } from '@/features/loyalty/offerRowDisplay';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
@@ -71,12 +72,18 @@ export function useLoyaltyOfferColumns({
         stackAffix: { after: t('loyaltyStore.perDayAffix') },
         cardCorner: cornerId === 'sellsPerDay',
         sortValue: (row) => row.sellsPerDay ?? undefined,
-        cellClassName: () => 'tabular-nums',
+        // Amber on a phone's meta line, where the name has no room for the "Low volume" tag
+        // (the table keeps the tag beside the name); the screen-reader text below says it.
+        cellClassName: (row) =>
+          `tabular-nums${isPhone && isLowVolume(row) ? ' text-warning!' : ''}`,
         render: (row) => {
           if (row.sellsPerDay === null) return '—';
           if (row.sellsPerDay === 0) return t('loyaltyStore.sellsNone');
           return (
             <>
+              {isPhone && isLowVolume(row) && (
+                <span className="sr-only">{t('loyaltyStore.lowVolumeTag')}: </span>
+              )}
               {formatSellsPerDay(row.sellsPerDay)}
               {cornerId === 'sellsPerDay' && <PhoneUnit>{t('loyaltyStore.perDayAffix')}</PhoneUnit>}
             </>
@@ -139,7 +146,7 @@ export function useLoyaltyOfferColumns({
         },
       },
     }),
-    [t, lpBasis, concord, concordPending, shownIskPerLp, cornerId]
+    [t, lpBasis, concord, concordPending, shownIskPerLp, cornerId, isPhone]
   );
   const itemColumn = useMemo<DataTableColumn<LoyaltyOfferRow>>(
     () => ({
