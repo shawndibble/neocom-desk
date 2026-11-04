@@ -154,8 +154,12 @@ export function SetStrip({
               : t('fittings.implantFinder.slotHint')}
           </span>
         </div>
-        {/* Ten implant slots fill the first row; the boosters start the next. */}
-        <ul className="grid grid-cols-5 gap-1 md:grid-cols-10 md:gap-y-2">{cells.map(cell)}</ul>
+        {/* Desktop: 7 implants, then the other 3, a gap, and the boosters. */}
+        <ul className="grid grid-cols-5 gap-1 md:grid-cols-7 md:gap-y-2">
+          {cells.slice(0, 10).map(cell)}
+          <li aria-hidden className="hidden md:block" />
+          {cells.slice(10).map(cell)}
+        </ul>
       </div>
     </div>
   );
