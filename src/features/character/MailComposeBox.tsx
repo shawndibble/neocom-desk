@@ -5,12 +5,14 @@
  * while a pilot has Reply or Forward open; `Mail.tsx` unmounts it on Cancel,
  * on send, or when the selected mail changes.
  */
-import { useEffect, useId, useRef, useState, type ComponentType } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import { Button, IconButton, TextInput } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
 import {
   buildReplyAllRecipients,
   forwardMailBody,
@@ -88,6 +90,17 @@ export function MailComposeBox({
   const [recipients, setRecipients] = useState<RecipientChip[]>([]);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  // A Reply's quoted history is folded out of the editor: the pilot types above it, and it is
+  // appended to `body` unchanged, so it is still sent and saved with the draft.
+  const quoteMarkup = useMemo(
+    () =>
+      kind === 'reply'
+        ? plainTextToMarkup(quoteMailBody(senderName, formattedTimestamp, bodyText))
+        : '',
+    [kind, senderName, formattedTimestamp, bodyText]
+  );
+  const [quoteFolded, setQuoteFolded] = useState(false);
+  const [showQuote, setShowQuote] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -142,7 +155,9 @@ export function MailComposeBox({
           }))
         );
         setSubject(draft.subject);
-        setBody(draftMarkupBody(draft));
+        const saved = draftMarkupBody(draft);
+        setQuoteFolded(quoteMarkup !== '' && saved.endsWith(quoteMarkup));
+        setBody(saved);
       } else if (kind === 'reply') {
         setRecipients(
           buildReplyAllRecipients(header, characterId).map((r) => ({
@@ -152,7 +167,8 @@ export function MailComposeBox({
         );
         setSubject(prefixSubject('reply', header.subject ?? ''));
         // The quote is plain `> ` lines: formatting stripped, `< > &` escaped to stay literal.
-        setBody(plainTextToMarkup(quoteMailBody(senderName, formattedTimestamp, bodyText)));
+        setQuoteFolded(true);
+        setBody(quoteMarkup);
       } else {
         setRecipients([]);
         setSubject(prefixSubject('forward', header.subject ?? ''));
@@ -373,10 +389,10 @@ export function MailComposeBox({
         </label>
         <BodyEditor
           id={bodyId}
-          value={body}
+          value={quoteFolded ? body.slice(0, body.length - quoteMarkup.length) : body}
           onChange={(next) => {
             touchedRef.current = true;
-            setBody(next);
+            setBody(quoteFolded ? next + quoteMarkup : next);
           }}
           disabled={sending}
           aria-describedby={bodyCountId}
@@ -386,6 +402,23 @@ export function MailComposeBox({
           aria-invalid={bodyOver}
           className="min-h-48"
         />
+        {quoteFolded && (
+          <div className="space-y-1">
+            <button
+              type="button"
+              aria-expanded={showQuote}
+              onClick={() => setShowQuote((open) => !open)}
+              className={cx(inlineLinkClassName, 'text-xs')}
+            >
+              {showQuote ? t('mail.hideQuoted') : t('mail.showQuotedSent')}
+            </button>
+            {showQuote && (
+              <p className="border-l-2 border-line pl-3 text-xs whitespace-pre-wrap text-text-dim">
+                {quoteMailBody(senderName, formattedTimestamp, bodyText).trim()}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {error && (
