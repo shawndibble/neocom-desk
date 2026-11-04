@@ -298,6 +298,7 @@ here — they go one per file in `docs/context/decisions/`.
   **Quickbar**, which is the durable list of items the user returns to across
   sessions. Different lifetimes, so two lists, not one.
 - **Completion Risk**: a condition that could stop a courier haul being delivered after its collateral is already put up — a delivery point that is a player structure, or an end no stargate route reaches. Stated as a condition and its consequence, never as a verdict about whether this player can complete it. A nullsec end is _not_ a completion risk; it is only noted informationally.
+- **Conflict**: A **Corp Tax Book** line for ore the miner's own list gives a **Payee** that is not that corporation's (or gives the corporation's own Payee more than the book recorded). Not owed while it stands; it shows what the book bills for it, because the corporation's next **Statement** bills it regardless. Resolves to the corporation after 14 days. A day the corporation dismissed is never a Conflict.
 - **Contract Search**: The **Contracts** page's Item search and Courier tabs.
   Search over every for-sale line of every public item_exchange/auction
   contract in New Eden, by item name, region, price, quantity and contract

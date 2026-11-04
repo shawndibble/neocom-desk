@@ -96,3 +96,47 @@ describe('OwedBalances prompts (#3120)', () => {
     expect(within(grid as HTMLElement).getByRole('button', { name: /Assign next/ })).toBeVisible();
   });
 });
+
+describe('OwedBalances Conflicts line', () => {
+  it('shows what Conflicts will bill in place of "nothing outstanding", and opens the first', async () => {
+    const onReviewConflicts = vi.fn();
+    renderBalances([balance('a', 0)], {
+      conflicts: {
+        days: 1,
+        amount: 4_271_257,
+        first: {} as never,
+        firstCorpName: 'Bureau of Unified Harvesting',
+      },
+      onReviewConflicts,
+    });
+    expect(screen.queryByText('No moon mining tax outstanding')).not.toBeInTheDocument();
+    expect(screen.getByText('Conflicts')).toBeInTheDocument();
+    expect(screen.getByText('4,271,257')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Not owed yet. Bureau of Unified Harvesting's next Statement bills it unless an officer changes the book."
+      )
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Review' }));
+    expect(onReviewConflicts).toHaveBeenCalledOnce();
+  });
+
+  it('counts several Conflict days, after the owed cards', () => {
+    renderBalances([balance('a', 1_000_000)], {
+      conflicts: {
+        days: 3,
+        amount: 900_000,
+        first: {} as never,
+        firstCorpName: 'Brass',
+      },
+    });
+    expect(
+      screen.getByText(
+        "3 days, not owed yet. Each goes on its corporation's next Statement unless an officer changes the book."
+      )
+    ).toBeInTheDocument();
+    const card = screen.getByText('Payee a');
+    const conflicts = screen.getByText('Conflicts');
+    expect(card.compareDocumentPosition(conflicts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});

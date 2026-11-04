@@ -17,6 +17,8 @@ interface Props {
   typeNames: ReadonlyMap<number, string>;
   busy?: boolean;
   onTakeOver: () => void;
+  /** The first button's text; defaults to "Let the corporation bill it". */
+  label?: string;
   /** Buttons beside "Let the corporation bill it", hidden while it asks to confirm. */
   others?: ReactNode;
 }
@@ -26,7 +28,7 @@ interface Props {
  * changes on the miner's list, the second takes only that ore off. Shared by the overlap
  * notice and a Conflict day's notice, so the take-over reads and behaves the same in both.
  */
-export function TakeoverConfirm({ previews, typeNames, busy, onTakeOver, others }: Props) {
+export function TakeoverConfirm({ previews, typeNames, busy, onTakeOver, label, others }: Props) {
   const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const describe = (lines: readonly OreLine[]) =>
@@ -65,7 +67,7 @@ export function TakeoverConfirm({ previews, typeNames, busy, onTakeOver, others 
         ) : (
           <>
             <Button size="sm" disabled={busy} onClick={() => setConfirming(true)}>
-              {t('miningTax.corpBook.overlap.letBill')}
+              {label ?? t('miningTax.corpBook.overlap.letBill')}
             </Button>
             {others}
           </>

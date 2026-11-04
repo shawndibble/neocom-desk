@@ -1,18 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import { previewTakeover, type BookRowView } from '@/engine/corpTaxBook/personal';
+import {
+  combineOverlaps,
+  previewTakeover,
+  type BookOverlap,
+  type BookRowView,
+} from '@/engine/corpTaxBook/personal';
 import { releaseOre, unsettle } from '../ledgerActions';
 import { useLedgerAction } from '../useLedgerAction';
 import { ConflictNotice } from './ConflictNotice';
+import { resolvesOn } from './useCorpStateText';
 import { OverlapNotice } from './OverlapNotice';
 import { acknowledgeOverlap, overlapAckKey, readOverlapAcks } from './overlapAck';
-import { resolvesOn } from './useCorpStateText';
+
+/** Shared, so the memos below don't see a new empty array on every render. */
+const NO_SIBLINGS: readonly BookRowView[] = [];
 
 interface Props {
   view: BookRowView;
   corpName: string;
   /** Where the book recorded the ore, for a Conflict: the refinery, else the system. */
   recordedAt: string;
+  /**
+   * Other books' Conflict lines on the same day and system. A Conflict's fix then covers
+   * them all: one take-over removes what each corporation recorded, which is the split.
+   */
+  siblings?: readonly BookRowView[];
   everyAssignment: readonly MiningTaxAssignmentRecord[];
   payeeById: ReadonlyMap<string, PayeeRecord>;
   typeNames: ReadonlyMap<number, string>;
@@ -33,12 +46,18 @@ export function CorpOverlapNotice({
   view,
   corpName,
   recordedAt,
+  siblings = NO_SIBLINGS,
   everyAssignment,
   payeeById,
   typeNames,
   onChanged,
 }: Props) {
-  const { overlap } = view;
+  const conflict = view.state === 'conflict';
+  const overlap = useMemo(
+    () =>
+      conflict ? combineOverlaps([view.overlap, ...siblings.map((s) => s.overlap)]) : view.overlap,
+    [conflict, view.overlap, siblings]
+  );
   const { pending, error, run } = useLedgerAction();
   const [acked, setAcked] = useState<Set<string> | null>(null);
   const key = overlapAckKey(view.corporationId, view.characterId, view.date, view.solarSystemId);
@@ -66,21 +85,39 @@ export function CorpOverlapNotice({
         : [],
     [overlap, everyAssignment, view.characterId, view.date, view.solarSystemId]
   );
-  const plan = useMemo(
+  // Each book's line takes only from the Payees it names, one after another, so a day several
+  // corporations contest comes off the right Payee for each, not greedily off whichever is first.
+  const parts = useMemo(
     () =>
-      overlap
-        ? previewTakeover(
-            mine.map((a) => ({
-              payeeId: a.payeeId ?? '',
-              taxPct: a.taxPct,
-              oreLines: a.oreLines,
-              status: a.status,
-            })),
-            overlap.ore
-          )
-        : [],
-    [overlap, mine]
+      (conflict ? [view.overlap, ...siblings.map((s) => s.overlap)] : [view.overlap]).filter(
+        (o): o is BookOverlap => o !== undefined
+      ),
+    [conflict, view.overlap, siblings]
   );
+  const plan = useMemo(() => {
+    const current = mine.map((a) => ({
+      payeeId: a.payeeId ?? '',
+      taxPct: a.taxPct,
+      oreLines: a.oreLines,
+      status: a.status,
+    }));
+    const before = current.map((c) => c.oreLines);
+    for (const part of parts) {
+      const at = current.flatMap((c, i) => (part.payeeIds.includes(c.payeeId) ? [i] : []));
+      for (const step of previewTakeover(
+        at.map((i) => current[i]!),
+        part.ore
+      )) {
+        const i = at[step.index]!;
+        current[i] = { ...current[i]!, oreLines: step.after };
+      }
+    }
+    return current.flatMap((c, index) =>
+      c.oreLines === before[index]
+        ? []
+        : [{ index, payeeId: c.payeeId, before: before[index]!, after: c.oreLines }]
+    );
+  }, [parts, mine]);
 
   const nameOf = (payeeId: string) => payeeById.get(payeeId)?.name ?? payeeId;
   const previews = plan.map((p) => ({
@@ -94,7 +131,7 @@ export function CorpOverlapNotice({
       onChanged
     );
 
-  if (view.state === 'conflict') {
+  if (conflict) {
     return (
       <ConflictNotice
         corpName={corpName}
@@ -107,6 +144,7 @@ export function CorpOverlapNotice({
         }))}
         recordedAt={recordedAt}
         resolvesOn={resolvesOn(view.resolvesAt)}
+        others={siblings.map((s) => ({ corpName: s.corpName, billAmount: s.billed }))}
         previews={previews}
         typeNames={typeNames}
         busy={pending}

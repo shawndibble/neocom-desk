@@ -126,12 +126,23 @@ export function CorpRowDetailModal({
             <span
               className={cx(
                 'shrink-0 text-xl font-medium tabular-nums',
-                owing && owed > 0 && 'text-isk-neg'
+                owing && owed > 0 && 'text-isk-neg',
+                conflict && 'text-text-dim'
               )}
             >
-              {view.taxOwed === null ? '—' : `${formatIsk(owed)} ISK`}
+              {/* A Conflict is not owed yet, but shows what the book bills if it is left. */}
+              {conflict
+                ? `${formatIsk(view.billed)} ISK`
+                : view.taxOwed === null
+                  ? '—'
+                  : `${formatIsk(owed)} ISK`}
             </span>
           </div>
+          {conflict && (
+            <p className="-mt-2 text-right text-xs text-warning">
+              {t('miningTax.corpBook.conflict.headerNotOwed', { corp: corp.corpName })}
+            </p>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-text-dim">
             <span>
               <CharacterLink id={view.characterId}>{dr.row.characterName}</CharacterLink>

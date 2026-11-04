@@ -33,7 +33,15 @@ const base: BookRowView = {
   oreForm: 'compressed',
 };
 
-function Story({ view, conflict = false }: { view: BookRowView; conflict?: boolean }) {
+function Story({
+  view,
+  conflict = false,
+  twoBooks = false,
+}: {
+  view: BookRowView;
+  conflict?: boolean;
+  twoBooks?: boolean;
+}) {
   const corp: Extract<CorpRowInfo, { kind: 'row' }> = { kind: 'row', view, corpName: CORP_NAME };
   const dr = {
     key: view.id,
@@ -60,9 +68,12 @@ function Story({ view, conflict = false }: { view: BookRowView; conflict?: boole
             <ConflictNotice
               corpName={CORP_NAME}
               cause="otherPayee"
-              entries={[{ id: 'a1', payeeName: 'Ashfall Mining', taxOwed: 4_271_257, paid: true }]}
+              entries={[
+                { id: 'a1', payeeName: 'Ashfall Mining', taxOwed: 4_271_257, paid: !twoBooks },
+              ]}
               recordedAt="Talidal - Ishimura Heavy Industries"
               resolvesOn="2026-11-12"
+              others={twoBooks ? [{ corpName: 'Ashfall Prospecting', billAmount: 120_000 }] : []}
               previews={[]}
               typeNames={new Map()}
               onUnmarkPaid={() => {}}
@@ -86,7 +97,13 @@ type S = StoryObj<typeof meta>;
 /** @summary A Conflict day: which entry clashes, when it resolves, and the two ways to fix it. */
 export const Conflict: S = {
   args: {
-    view: { ...base, state: 'conflict', taxOwed: null, resolvesAt: '2026-11-12T11:00:00Z' },
+    view: {
+      ...base,
+      state: 'conflict',
+      taxOwed: null,
+      resolvesAt: '2026-11-12T11:00:00Z',
+      billed: 319_000,
+    },
     conflict: true,
   },
 };
@@ -98,5 +115,20 @@ export const Billed: S = { args: { view: base } };
 export const Dismissed: S = {
   args: {
     view: { ...base, state: 'dismissed', taxOwed: 0, dismissalReason: 'Fleet op, corp-sanctioned' },
+  },
+};
+
+/** @summary A day two corporations' books both contest: one take-over does the split for both. */
+export const ConflictTwoBooks: S = {
+  args: {
+    view: {
+      ...base,
+      state: 'conflict',
+      taxOwed: null,
+      resolvesAt: '2026-11-12T11:00:00Z',
+      billed: 319_000,
+    },
+    conflict: true,
+    twoBooks: true,
   },
 };

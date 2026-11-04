@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  combineOverlaps,
   coverInFlight,
   inFlightDonations,
   overlayCorpBooks,
@@ -259,6 +260,116 @@ describe('overlayCorpBooks', () => {
     });
     // Closed at 18 Oct 00:00 + 30 min grace on the 17th → 14 days after 2026-10-18T00:30.
     expect(out.rows[0].resolvesAt).toBe('2026-11-01T00:30:00.000Z');
+  });
+
+  describe('two books in one system', () => {
+    const SECOND = 98000002;
+    const twoBooks = (ownFirst: string[] = [], ownSecond: string[] = []) => [
+      book({
+        ownPayeeIds: ownFirst,
+        observed: [
+          {
+            characterId: ME,
+            recordedCorporationId: CORP,
+            structureId: 1000,
+            date: '2026-10-17',
+            solarSystemId: SYSTEM,
+            oreLines: [{ typeId: ZEO, quantity: 40_000 }],
+          },
+        ],
+      }),
+      book({
+        corporationId: SECOND,
+        corpName: 'Ashfall Prospecting',
+        ownPayeeIds: ownSecond,
+        observed: [
+          {
+            characterId: ME,
+            recordedCorporationId: SECOND,
+            structureId: 2000,
+            date: '2026-10-17',
+            solarSystemId: SYSTEM,
+            oreLines: [{ typeId: ZEO, quantity: 20_000 }],
+          },
+        ],
+      }),
+    ];
+    const day = (allocations: PersonalEntry['allocations'], free: number) =>
+      entry({
+        oreLines: [{ typeId: ZEO, quantity: 60_000 }],
+        freeOreLines: free > 0 ? [{ typeId: ZEO, quantity: free }] : [],
+        allocations,
+      });
+    const given = (id: string, payeeId: string, quantity: number) => ({
+      id,
+      payeeId,
+      taxPct: 10,
+      oreLines: [{ typeId: ZEO, quantity }],
+      status: 'outstanding' as const,
+    });
+
+    it("flags no overlap when the day is split to each corporation's own Payee", () => {
+      const out = overlay(
+        [day([given('a', 'first', 40_000), given('b', 'second', 20_000)], 0)],
+        twoBooks(['first'], ['second'])
+      );
+      expect(out.rows.map((r) => r.state)).toEqual(['billed', 'billed']);
+      expect(out.rows.every((r) => r.overlap === undefined)).toBe(true);
+    });
+
+    it("leaves the Payee for the next book to name when the first book's line is dismissed", () => {
+      const [first, second] = twoBooks();
+      const dismissed = {
+        ...first!,
+        dismissals: [
+          {
+            id: 'd1',
+            scope: 'record' as const,
+            targetId: `${ME}:1000:2026-10-17`,
+            by: 1,
+            at: '2026-10-18T09:00:00Z',
+            reason: 'Fleet op',
+          },
+        ],
+      };
+      // 40,000 to another Payee, 20,000 free: the dismissed book contests 20,000 of the Payee's
+      // ore but bills none of it, so its share stays the Payee's and the next book still names it.
+      const out = overlay([day([given('x', 'ashfall', 40_000)], 20_000)], [dismissed, second!]);
+      expect(out.rows.filter((r) => r.corporationId === CORP).map((r) => r.state)).toEqual([
+        'dismissed',
+      ]);
+      const conflict = out.rows.find((r) => r.state === 'conflict');
+      expect(conflict?.corporationId).toBe(98000002);
+      expect(conflict?.overlap).toMatchObject({
+        payeeIds: ['ashfall'],
+        ore: [{ typeId: ZEO, quantity: 20_000 }],
+      });
+    });
+
+    it("combines both books' overlaps into what one take-over removes from the entry", () => {
+      const out = overlay([day([given('x', 'ashfall', 30_000)], 30_000)], twoBooks());
+      const combined = combineOverlaps(out.rows.map((r) => r.overlap));
+      expect(combined).toEqual({
+        payeeIds: ['ashfall'],
+        ore: [{ typeId: ZEO, quantity: 30_000 }],
+        paid: false,
+      });
+      expect(combineOverlaps([undefined])).toBeUndefined();
+    });
+
+    it("names the Payee on each book's conflict, each capped at the ore it contests", () => {
+      // 30,000 to another Payee, 30,000 free: the first book takes 30,000 free and contests
+      // 10,000; the second contests all 20,000 of its own.
+      const out = overlay([day([given('x', 'ashfall', 30_000)], 30_000)], twoBooks());
+      const conflicts = out.rows.filter((r) => r.state === 'conflict');
+      expect(conflicts.map((r) => [r.corporationId, r.oreLines[0].quantity])).toEqual([
+        [CORP, 10_000],
+        [SECOND, 20_000],
+      ]);
+      expect(conflicts.map((r) => r.overlap?.ore[0].quantity)).toEqual([10_000, 20_000]);
+      expect(conflicts.every((r) => r.overlap?.payeeIds[0] === 'ashfall')).toBe(true);
+      expect(out.rows.find((r) => r.state === 'billed')?.overlap).toBeUndefined();
+    });
   });
 
   describe('an Assignment a Default System made', () => {

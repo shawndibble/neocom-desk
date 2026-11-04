@@ -1,0 +1,7 @@
+# Scope decisions — A Conflict's coming bill shows on the Tax tab, after the owed cards
+
+_Recorded 2026-11-04._
+
+- **A Corp Tax Book Conflict shows the ISK its book bills for the contested ore, on its card, in its detail's header, and in a "Conflicts" row on the Tax tab, dimmed and marked "Next Statement" / "Not owed yet".** A Conflict is not owed, so it stays out of every owed total, but the corporation's Statement does not know the member's Payees and bills the whole day it recorded when its period closes, which can come before the 14 days a Conflict takes to resolve. "—" and "No moon mining tax outstanding" let that bill arrive as a surprise. The copy names no billing date: the member's book does not carry the Statement cadence, and the resolve date is only when this app starts counting it as owed, which the notice says separately.
+- **The Conflicts row comes after the owed cards and is always a full-width row**, an exception to #3120's tiles-beside-owed-cards split: owed first (`20261004`) still holds, because a Conflict is a warning about the next Statement, not a Payee balance. While any Conflict is listed, "No moon mining tax outstanding" is not shown.
+- **On a day several Conflict lines contest (two books in one system, or one book's two refineries), the fix takes each line's ore off the Payee that line names**, one line after another, in one confirm ("Let each corp bill its share"). A book line's overlap is capped at the ore it contests, so a day split correctly to each corporation's own Payee flags no overlap.
