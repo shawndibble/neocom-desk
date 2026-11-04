@@ -7,6 +7,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, ProgressBar, TypeIcon } from '@/components/ui';
+import { Done } from '@/components/ui/icons';
 import { Pill } from '@/components/ui/Pill';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import type { Resource } from '@/engine/fittings/makeItFit';
@@ -129,7 +130,7 @@ export function MakeItFitFixCard({
                 {fits && (
                   <span className="text-success">
                     {' '}
-                    <span aria-hidden="true">✓</span>
+                    <Done aria-hidden="true" size={12} className="inline align-text-bottom" />
                     <span className="sr-only">{t('fittings.makeItFit.landsFits')}</span>
                   </span>
                 )}
