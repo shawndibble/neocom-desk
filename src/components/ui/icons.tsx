@@ -118,6 +118,7 @@ import { Scales } from '@phosphor-icons/react/dist/csr/Scales';
 import { Spiral } from '@phosphor-icons/react/dist/csr/Spiral';
 import { ShareNetwork } from '@phosphor-icons/react/dist/csr/ShareNetwork';
 import { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck';
+import { StackSimple } from '@phosphor-icons/react/dist/csr/StackSimple';
 import { ShoppingCart } from '@phosphor-icons/react/dist/csr/ShoppingCart';
 import { Sliders } from '@phosphor-icons/react/dist/csr/Sliders';
 import { Square } from '@phosphor-icons/react/dist/csr/Square';
@@ -471,6 +472,8 @@ export const CardsView = withWeight(SquaresFour);
 export const TableView = withWeight(TableGlyph);
 /** Opens the column-visibility picker for a table. */
 export const ColumnsPicker = withWeight(ColumnsGlyph);
+/** Opens a list's group-by choices where the labelled `Select` is too wide for a phone's row (a Skill Plan's entry list). Stacked layers, not `Rows`, which would read as the Columns picker turned sideways. */
+export const GroupBy = withWeight(StackSimple);
 
 /*
  * The nav's page glyphs (`app/navIcons.ts`): one per destination, shown beside

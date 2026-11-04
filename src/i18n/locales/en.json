@@ -2786,6 +2786,7 @@
     "columnPriority": "Priority",
     "attributePairFull": "{{primary}} / {{secondary}} attributes",
     "groupBy": "Group by",
+    "groupByWithValue": "Group by: {{value}}",
     "groupByPriority": "Priority",
     "groupByAttributePair": "Attribute pair",
     "attributePairBand": "{{pair}} attributes",
