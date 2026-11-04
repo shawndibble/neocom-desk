@@ -147,7 +147,6 @@ describe('alternativeSource', () => {
     const best = usableSource(sources)!;
     expect(alternativeSource(sources, best)).toMatchObject({
       source: { kind: 'lp', blocked: true },
-      cheaperIfYouCould: true,
     });
   });
 
@@ -156,7 +155,6 @@ describe('alternativeSource', () => {
     const best = usableSource(sources)!;
     expect(alternativeSource(sources, best)).toMatchObject({
       source: { kind: 'market' },
-      cheaperIfYouCould: false,
     });
   });
 

@@ -12,6 +12,8 @@ import { boolParam, nullableTextParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 
 export const IMPLANT_GOAL_PARAM = 'implantGoal';
+/** The editor's other view state; all of it goes when the editor closes. */
+const VIEW_PARAMS = ['implantSlot', 'implantQuery', 'implantSort', 'implantTab'] as const;
 
 interface ModalState {
   implantsPushed?: boolean;
@@ -19,7 +21,11 @@ interface ModalState {
 
 export function useImplantsModalUrl(param: 'implants' | 'improveImplants') {
   const schema = useMemo(
-    () => ({ [param]: boolParam(false), [IMPLANT_GOAL_PARAM]: nullableTextParam() }),
+    () => ({
+      [param]: boolParam(false),
+      [IMPLANT_GOAL_PARAM]: nullableTextParam(),
+      ...Object.fromEntries(VIEW_PARAMS.map((key) => [key, nullableTextParam()])),
+    }),
     [param]
   );
   const [values, setValues] = useUrlParams(schema);
@@ -41,7 +47,11 @@ export function useImplantsModalUrl(param: 'implants' | 'improveImplants') {
       navigate(-1);
       return;
     }
-    setValues({ [param]: false, [IMPLANT_GOAL_PARAM]: null } as never);
+    setValues({
+      [param]: false,
+      [IMPLANT_GOAL_PARAM]: null,
+      ...Object.fromEntries(VIEW_PARAMS.map((key) => [key, null])),
+    } as never);
   }, [pushed, navigate, setValues, param]);
 
   return { open, openModal, closeModal };

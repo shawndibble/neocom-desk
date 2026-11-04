@@ -55,10 +55,14 @@ import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { loadImplantMarketEntries } from './implantSlotLookup';
 import { loadImplantCatalog } from './useImplantFinder';
 import { guarded } from '@/app/routeChunks';
+import { enumParam } from '@/lib/urlState';
+import { useUrlParam } from '@/lib/useUrlState';
 
 const ImplantFinder = lazy(() =>
   guarded(() => import('./ImplantFinder')).then((m) => ({ default: m.ImplantFinder }))
 );
+
+const TAB_PARAM = enumParam(['find', 'set'] as const, 'find');
 
 interface ImplantSetPickerProps {
   open: boolean;
@@ -319,7 +323,7 @@ export function ImplantSetPicker({
 }: ImplantSetPickerProps) {
   const { t } = useTranslation();
   const tabsId = useTabsId();
-  const [tab, setTab] = useState<'find' | 'set'>('find');
+  const [tab, setTab] = useUrlParam('implantTab', TAB_PARAM);
   const [nameMap, setNameMap] = useState<Map<string, { typeID: number }>>(new Map());
   const [names, setNames] = useState<Map<number, string>>(new Map());
   const [addError, setAddError] = useState<string | null>(null);
