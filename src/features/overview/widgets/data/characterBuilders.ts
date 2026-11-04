@@ -2,7 +2,7 @@
  * The Training, SP and Coming up builders: the Character-clock kinds, split
  * out of `models.ts`.
  */
-import { isAcceleratorLive } from '@/engine/accelerator';
+import { acceleratorSeverity, isAcceleratorLive } from '@/engine/accelerator';
 import { severityForRemaining, type DeadlineSeverity } from '@/engine/character/severity';
 import {
   soonestCalendarDeadline,
@@ -63,7 +63,7 @@ export const training: Builder = (feeds, { t, now, notTrainingAlert, activeChara
       ? {
           label: t('overview.widgets.training.accelerator', { bonus: record.bonus }),
           expiresAt: record.expiresAt,
-          severity: severityForRemaining(record.expiresAt - now),
+          severity: acceleratorSeverity(record.expiresAt - now),
         }
       : null;
   const acceleratorRows: ListRow[] = accelerator
