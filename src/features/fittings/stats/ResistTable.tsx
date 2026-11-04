@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { HintText } from '@/components/ui/HintText';
 import { useTranslation } from 'react-i18next';
 import { resistPct } from '@/engine/fittings/stats';
@@ -8,6 +9,8 @@ import {
   RESIST_TYPES,
   RESONANCE_KEY,
   formatEhp,
+  resistReadsDifferently,
+  resistText,
   type DamageType,
 } from './resistFormat';
 import type { StatChangeKey } from '@/engine/fittings/variationDelta';
@@ -21,6 +24,7 @@ function ResistCell({
   tone,
   unheated,
   statKey,
+  base,
 }: {
   /** The stat a previewed change to it shows in place of the percentage. */
   statKey?: StatChangeKey;
@@ -28,6 +32,8 @@ function ResistCell({
   tone: DamageType;
   /** The unheated resist as shown, when heat changed it ("Overheat all"). */
   unheated?: string;
+  /** Item Detail: the resonance before the pilot's skills; the cell reads "base → skilled" when they print differently. */
+  base?: number;
 }) {
   const { t } = useTranslation();
   const pct = resistPct(resonance);
@@ -39,7 +45,17 @@ function ResistCell({
           style={{ width: `${pct}%` }}
         />
         <PreviewedFigure keys={statKey && [statKey]}>
-          {unheated === undefined ? (
+          {base !== undefined && resistReadsDifferently(base, resonance) ? (
+            <span className="relative">
+              <span aria-hidden>
+                <span className="text-text-dim">{resistText(base)} → </span>
+                <span className="font-semibold">{fmt0(pct)}%</span>
+              </span>
+              <span className="sr-only">
+                {t('fittings.stats.skilledResist', { base: resistText(base), value: fmt0(pct) })}
+              </span>
+            </span>
+          ) : unheated === undefined ? (
             <span className="relative">{fmt0(pct)}%</span>
           ) : (
             <HintText
@@ -80,8 +96,10 @@ function layerKey(
 export interface ResistRow {
   key: string;
   label: string;
-  sub?: string;
+  sub?: ReactNode;
   resonances: Resonances;
+  /** Item Detail: the resonances before the pilot's skills, when they change them. */
+  baseResonances?: Resonances;
   ehp?: number;
   /** Adapted rows read as a note on the row above. */
   tone?: 'note';
@@ -139,6 +157,7 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
                 tone={type}
                 resonance={row.resonances[RESONANCE_KEY[type]]}
                 unheated={row.unheated?.[type]}
+                base={row.baseResonances?.[RESONANCE_KEY[type]]}
                 statKey={layerKey(row.key, RESONANCE_KEY[type])?.[0]}
               />
             ))}

@@ -645,8 +645,9 @@ const CAPSULE_TYPE_ID = 670;
  * Item Detail's skilled values: every attribute of `target` with `profile`'s
  * skills and implants applied, by attribute id. A hull is calculated empty; a
  * module alone on a Capsule, the way the in-game Show info reads a module
- * before it is fitted (no hull bonus). The engine's own derived figures
- * (ids ≤ 0) are left out — Item Detail has no row for them.
+ * before it is fitted (no hull bonus). Only attributes something changed are
+ * returned, and never the engine's own derived figures (ids ≤ 0), which Item
+ * Detail has no row for.
  */
 export async function skilledAttributes(
   target: SkilledTarget,
@@ -674,7 +675,11 @@ export async function skilledAttributes(
   const calculation = calculate(toDogmaFit(fitting, profile));
   const result = target.kind === 'ship' ? calculation.ship : calculation.items[0];
   const skilled = new Map<number, number>();
-  for (const [id, { value }] of result?.attributes ?? []) if (id > 0) skilled.set(id, value);
+  // Only what something changed: an attribute the engine left at its own base
+  // can be a dogma default the item doesn't carry (a module's Mass of 1).
+  for (const [id, { base, value }] of result?.attributes ?? []) {
+    if (id > 0 && value !== base) skilled.set(id, value);
+  }
   return skilled;
 }
 

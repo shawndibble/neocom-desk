@@ -13,38 +13,12 @@ import type { DisplayAttribute } from '@/engine/market/itemAttributes';
 import type { AttributeSection, ResistLayer } from '@/engine/market/itemAttributeSections';
 import { ResistTable, type ResistRow } from '@/features/fittings/stats/ResistTable';
 import { formatAttributeValue } from './format';
+import { rowValueText, skilledChange, skilledHpChange, type SkilledChange } from './skilledFigures';
 
 const SECTION_HEADING = cx(eyebrowClassName, 'border-b border-line pb-1');
 
-/** `value` as an attribute row shows it: the number and its unit. */
-function numberText(value: number, unit: string | null): string {
-  return `${formatAttributeValue(value, unit)}${unit ? ` ${unit}` : ''}`;
-}
-
-/** An attribute row's value as text: its resolved name, or the number and its unit. */
-function attributeValueText(attribute: DisplayAttribute): string {
-  return attribute.displayValue ?? numberText(attribute.value, attribute.unit);
-}
-
-/**
- * A row's "base → skilled" figures, or null when the pilot doesn't change it
- * or the two read the same once formatted (no arrow for an invisible change).
- */
-function skilledChange(attribute: DisplayAttribute): { base: string; skilled: string } | null {
-  if (attribute.skilledValue === undefined || attribute.displayValue !== undefined) return null;
-  const skilled = numberText(attribute.skilledValue, attribute.unit);
-  if (numberText(attribute.value, attribute.unit) === skilled) return null;
-  return { base: formatAttributeValue(attribute.value, attribute.unit), skilled };
-}
-
-/** "base → skilled": the base number dim, the pilot's value with its unit emphasised. */
-function SkilledFigure({
-  attribute,
-  change,
-}: {
-  attribute: DisplayAttribute;
-  change: { base: string; skilled: string };
-}) {
+/** "base → skilled" (§6c): the base dim, the pilot's value emphasised, spoken as a sentence. */
+function SkilledFigure({ change }: { change: SkilledChange }) {
   const { t } = useTranslation();
   return (
     <>
@@ -52,12 +26,7 @@ function SkilledFigure({
         <span className="text-text-dim">{change.base} → </span>
         <span className="font-semibold">{change.skilled}</span>
       </span>
-      <span className="sr-only">
-        {t('market.itemDetail.skilled.change', {
-          base: attributeValueText(attribute),
-          value: change.skilled,
-        })}
-      </span>
+      <span className="sr-only">{t('market.itemDetail.skilled.change', change.spoken)}</span>
     </>
   );
 }
@@ -65,32 +34,26 @@ function SkilledFigure({
 /** A row's value: "base → skilled" when the pilot changes it, else the one value. */
 function attributeValue(attribute: DisplayAttribute): ReactNode {
   const change = skilledChange(attribute);
-  return change ? (
-    <SkilledFigure attribute={attribute} change={change} />
-  ) : (
-    attributeValueText(attribute)
-  );
+  return change ? <SkilledFigure change={change} /> : rowValueText(attribute);
 }
 
 function ResistSection({ layers }: { layers: ResistLayer[] }) {
   const { t } = useTranslation();
-  const rows: ResistRow[] = layers.map(({ layer, hp, resonances, skilled }) => {
-    const skilledHp = skilled?.hp ?? null;
+  const rows: ResistRow[] = layers.map((layer) => {
+    const hpChange = skilledHpChange(layer);
     const sub =
-      hp === null
-        ? undefined
-        : skilledHp !== null && formatAttributeValue(skilledHp) !== formatAttributeValue(hp)
-          ? t('market.itemDetail.layerHpSkilled', {
-              base: formatAttributeValue(hp),
-              value: formatAttributeValue(skilledHp),
-            })
-          : t('market.itemDetail.layerHp', { value: formatAttributeValue(hp) });
+      layer.hp === null ? undefined : hpChange ? (
+        <SkilledFigure change={hpChange} />
+      ) : (
+        t('market.itemDetail.layerHp', { value: formatAttributeValue(layer.hp) })
+      );
     return {
-      key: layer,
-      label: t(`fittings.stats.${layer}`),
+      key: layer.layer,
+      label: t(`fittings.stats.${layer.layer}`),
       ...(sub === undefined ? {} : { sub }),
-      // The pilot's resistances when skills change them: a hull's own rarely do.
-      resonances: skilled?.resonances ?? resonances,
+      // The pilot's resists, each cell reading "base → skilled" where they print differently.
+      resonances: layer.skilled?.resonances ?? layer.resonances,
+      ...(layer.skilled ? { baseResonances: layer.resonances } : {}),
     };
   });
   return (

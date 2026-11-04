@@ -979,8 +979,8 @@ describe('ItemDetailModal best sell/buy price', () => {
     const buy = screen.getByRole('link', { name: /best buy/i });
     // The visible compact figure leads the name, and there is no nested tab stop.
     expect(sell.textContent?.startsWith('450K')).toBe(true);
-    expect(sell).toHaveAccessibleName(/^450K Best sell 450,000 ISK — open in Market$/);
-    expect(buy).toHaveAccessibleName(/^420K Best buy 420,000 ISK — open in Market$/);
+    expect(sell).toHaveAccessibleName(/^450K Best sell 450,000 ISK — open in Market Browser$/);
+    expect(buy).toHaveAccessibleName(/^420K Best buy 420,000 ISK — open in Market Browser$/);
     expect(sell.querySelector('[tabindex]')).toBeNull();
     expect(buy.querySelector('[tabindex]')).toBeNull();
     // Focusing the link reveals the exact figure in a tooltip.

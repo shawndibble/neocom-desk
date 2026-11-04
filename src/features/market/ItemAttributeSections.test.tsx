@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import '@/i18n';
 import type { AttributeSection } from '@/engine/market/itemAttributeSections';
 import { ItemAttributeSections } from './ItemAttributeSections';
+import { sectionsShowSkilled } from './skilledFigures';
 
 const RESONANCES = {
   emResonance: 0.5,
@@ -65,8 +66,38 @@ describe('ItemAttributeSections', () => {
     expect(screen.getByText('10 GJ')).toBeInTheDocument();
   });
 
-  it('gives a resist layer its skilled HP', () => {
-    render(<ItemAttributeSections sections={sections()} />);
-    expect(screen.getByText(/2,250 → 2,812(\.5)? HP/)).toBeInTheDocument();
+  it('gives a resist layer its skilled HP, and a resist the skills change its own arrow', () => {
+    const [grid, ...rest] = sections();
+    const changed: AttributeSection =
+      grid.kind === 'resists'
+        ? {
+            kind: 'resists',
+            layers: grid.layers.map((layer) => ({
+              ...layer,
+              skilled: { hp: 2812.5, resonances: { ...RESONANCES, emResonance: 0.45 } },
+            })),
+          }
+        : grid;
+    render(<ItemAttributeSections sections={[changed, ...rest]} />);
+    expect(screen.getByText('2,250 HP, 2,812.5 HP with your skills')).toBeInTheDocument();
+    expect(screen.getByText('50%, 55% with your skills')).toBeInTheDocument();
+    // Unchanged resists keep one figure.
+    expect(screen.getByText('35%')).toBeInTheDocument();
+  });
+
+  it('says whether any arrow shows, ignoring changes too small to print', () => {
+    expect(sectionsShowSkilled(sections())).toBe(true);
+    const quiet = sections().map((section) =>
+      section.kind === 'group'
+        ? {
+            ...section,
+            group: {
+              ...section.group,
+              attributes: section.group.attributes.filter((a) => a.attributeId === 6),
+            },
+          }
+        : { ...section, layers: section.layers.map((layer) => ({ ...layer, skilled: undefined })) }
+    );
+    expect(sectionsShowSkilled(quiet)).toBe(false);
   });
 });

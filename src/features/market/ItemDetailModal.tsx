@@ -81,6 +81,7 @@ import { loadRegionName } from '@/features/places/regions';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatVolume } from './format';
 import { ItemAttributeSections } from './ItemAttributeSections';
+import { sectionsShowSkilled } from './skilledFigures';
 import {
   useSkilledAttributes,
   type SkilledAttributesState,
@@ -393,7 +394,11 @@ export function ItemDetailModal({
             className="py-8"
           />
           {/* Local SDE data, so they outlive a type-info failure. */}
-          <AbyssalItemDetail typeId={typeId} dynamic={dynamic} />
+          <AbyssalItemDetail
+            typeId={typeId}
+            dynamic={dynamic}
+            skilled={skilled.status === 'ready' ? skilled.values : undefined}
+          />
           <PlanetaryProduction pi={pi} typeId={typeId} />
           <MadeFromSection typeId={typeId} />
           <UsedInSection typeId={typeId} onNavigate={leave} />
@@ -505,7 +510,11 @@ export function ItemDetailModal({
 
               {data.type.description && <ItemDescription markup={data.type.description} />}
 
-              <AbyssalItemDetail typeId={typeId} dynamic={dynamic} />
+              <AbyssalItemDetail
+                typeId={typeId}
+                dynamic={dynamic}
+                skilled={skilled.status === 'ready' ? skilled.values : undefined}
+              />
 
               <RequiredSkillsSection
                 requiredSkills={data.requiredSkills}
@@ -536,11 +545,8 @@ export function ItemDetailModal({
               {attributeSections.length > 0 && (
                 <SkilledValuesNote
                   state={skilled}
-                  changed={attributeSections.some((section) =>
-                    section.kind === 'group'
-                      ? section.group.attributes.some((a) => a.skilledValue !== undefined)
-                      : section.layers.some((layer) => layer.skilled !== undefined)
-                  )}
+                  changed={sectionsShowSkilled(attributeSections)}
+                  key={typeId}
                 />
               )}
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  compareAttributeNames,
   collectAttributeIdReferences,
   groupItemAttributes,
   type AttributeDictionary,
@@ -349,5 +350,22 @@ describe('collectAttributeIdReferences', () => {
       typeIds: [],
       groupIds: [],
     });
+  });
+});
+
+describe('compareAttributeNames', () => {
+  it('sorts damage types EM, Thermal, Kinetic, Explosive, whatever the SDE’s casing', () => {
+    const names = [
+      'Armor Explosive Damage Resistance',
+      'Armor Kinetic Damage Resistance',
+      'Armor Thermal Damage Resistance',
+      'Armor Em Damage Resistance',
+    ];
+    expect([...names].sort(compareAttributeNames)).toEqual([
+      'Armor Em Damage Resistance',
+      'Armor Thermal Damage Resistance',
+      'Armor Kinetic Damage Resistance',
+      'Armor Explosive Damage Resistance',
+    ]);
   });
 });

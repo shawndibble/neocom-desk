@@ -169,7 +169,7 @@ export interface GroupItemAttributesOptions {
 
 /** Damage types in the order the game and the fittings page read them. */
 const DAMAGE_TYPE_WORDS = ['EM', 'Thermal', 'Kinetic', 'Explosive'] as const;
-const DAMAGE_TYPE_WORD = /\b(EM|Thermal|Kinetic|Explosive)\b/;
+const DAMAGE_TYPE_WORD = /\b(EM|Thermal|Kinetic|Explosive)\b/i;
 
 /**
  * Row order inside a group: by name, except that rows differing only in their
@@ -181,8 +181,10 @@ export function compareAttributeNames(a: string, b: string): number {
   const keyOf = (name: string) => {
     const match = DAMAGE_TYPE_WORD.exec(name);
     if (!match) return { stem: name, rank: -1 };
-    const word = match[1] as (typeof DAMAGE_TYPE_WORDS)[number];
-    return { stem: name.replace(DAMAGE_TYPE_WORD, 'EM'), rank: DAMAGE_TYPE_WORDS.indexOf(word) };
+    // Case-blind: the SDE names a few "Em" ("Armor Em Damage Resistance").
+    const word = match[1].toLowerCase();
+    const rank = DAMAGE_TYPE_WORDS.findIndex((w) => w.toLowerCase() === word);
+    return { stem: name.replace(DAMAGE_TYPE_WORD, 'EM'), rank };
   };
   const ka = keyOf(a);
   const kb = keyOf(b);

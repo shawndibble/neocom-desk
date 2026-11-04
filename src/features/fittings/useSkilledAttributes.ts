@@ -70,6 +70,9 @@ export function useSkilledAttributes(
   if (target.status === 'failed' || (target.status === 'ready' && target.data === null)) {
     return { status: 'none' };
   }
+  // Until the item and the pilot are both known, nothing is offered: a download
+  // button flashing on an item that turns out to have no skilled values misleads.
+  if (target.status !== 'ready' || !profile) return { status: 'loading' };
   if (!engineAvailable) {
     if (cached.status !== 'ready' && cached.status !== 'failed') return { status: 'loading' };
     // Nothing cached and no connection: a download button would only fail.

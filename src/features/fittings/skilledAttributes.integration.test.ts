@@ -16,14 +16,12 @@ const MECHANICS = 3392;
 const REPAIR_SYSTEMS = 3393;
 const HULL_UPGRADES = 3394;
 
-const ARMOR_HP = 265;
-const STRUCTURE_HP = 9;
+const ARMOR_HP = DOGMA_ATTRIBUTE.armorHp;
+const STRUCTURE_HP = DOGMA_ATTRIBUTE.hullHp;
 const DURATION = 73;
-const CPU = 50;
-// As `improveMutated.integration.test.ts`.
-const ABYSSAL_DAMAGE_CONTROL = 52227;
-const DAMAGE_CONTROL_II = 2048;
-const DAMAGE_CONTROL_MUTAPLASMID = 52224;
+// Looked up in `public/data/mutaplasmids.json` / `types.json`, 2026-11-03.
+const MEDIUM_ABYSSAL_ARMOR_REPAIRER = 47773;
+const DECAYED_ARMOR_REPAIRER_MUTAPLASMID = 47770;
 
 beforeAll(async () => {
   await loadRealDogmaEngine();
@@ -40,45 +38,44 @@ describe('skilledAttributes', () => {
       []
     );
     const skilled = await skilledAttributes({ kind: 'ship', typeId: ZEALOT }, profile);
+    // Zealot: 2,250 armor and 1,670 structure HP; each skill +5% a level.
     expect(skilled.get(ARMOR_HP)).toBeCloseTo(2250 * 1.25, 3);
-    expect(skilled.get(STRUCTURE_HP)).toBeCloseTo(
-      (
-        await skilledAttributes({ kind: 'ship', typeId: ZEALOT }, buildPilotProfile(new Map(), []))
-      ).get(STRUCTURE_HP)! * 1.25,
-      3
-    );
-    expect(skilled.get(DOGMA_ATTRIBUTE.lowSlots)).toBeGreaterThan(0);
+    expect(skilled.get(STRUCTURE_HP)).toBeCloseTo(1670 * 1.25, 3);
   });
 
   it('applies the pilot’s skills to a module on its own, with no hull bonus', async () => {
-    const untrained = await skilledAttributes(
-      { kind: 'module', typeId: MEDIUM_ARMOR_REPAIRER_II, slot: 'low' },
-      buildPilotProfile(new Map(), [])
-    );
-    const trained = await skilledAttributes(
+    const skilled = await skilledAttributes(
       { kind: 'module', typeId: MEDIUM_ARMOR_REPAIRER_II, slot: 'low' },
       buildPilotProfile(new Map([[REPAIR_SYSTEMS, 5]]), [])
     );
-    const base = untrained.get(DURATION)!;
-    expect(base).toBeGreaterThan(0);
-    expect(trained.get(DURATION)).toBeCloseTo(base * 0.75, 3);
+    // A 12 s cycle, 5% shorter per level of Repair Systems.
+    expect(skilled.get(DURATION)).toBeCloseTo(12000 * 0.75, 3);
   });
 
   it('starts a mutated module from its rolled values', async () => {
     const skilled = await skilledAttributes(
       {
         kind: 'module',
-        typeId: ABYSSAL_DAMAGE_CONTROL,
+        typeId: MEDIUM_ABYSSAL_ARMOR_REPAIRER,
         slot: 'low',
         mutation: {
-          baseTypeId: DAMAGE_CONTROL_II,
-          mutaplasmidTypeId: DAMAGE_CONTROL_MUTAPLASMID,
-          attributes: { [CPU]: 20 },
+          baseTypeId: MEDIUM_ARMOR_REPAIRER_II,
+          mutaplasmidTypeId: DECAYED_ARMOR_REPAIRER_MUTAPLASMID,
+          attributes: { [DURATION]: 11400 },
         },
       },
+      buildPilotProfile(new Map([[REPAIR_SYSTEMS, 5]]), [])
+    );
+    expect(skilled.get(DURATION)).toBeCloseTo(11400 * 0.75, 3);
+  });
+
+  it('reports only what something actually changed, never an engine default', async () => {
+    const skilled = await skilledAttributes(
+      { kind: 'ship', typeId: ZEALOT },
       buildPilotProfile(new Map(), [])
     );
-    expect(skilled.get(CPU)).toBeCloseTo(20, 6);
+    // No skills, no implants: nothing on the hull is modified.
+    expect(skilled.size).toBe(0);
   });
 
   it('leaves out the engine’s own derived (non-positive) attribute ids', async () => {
