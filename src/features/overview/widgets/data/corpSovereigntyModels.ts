@@ -266,7 +266,7 @@ export const corpSovereignty: Builder = (feeds, { t, now }) => {
     deadlines.push({
       at: nextRunOut.runsOutMs,
       note: t(`${W}.hubDeadline`, { subject: nextRunOut.name }),
-      severity: severityForRemaining(nextRunOut.runsOutMs - now),
+      severity: severityForRemaining(nextRunOut.runsOutMs - now, 'logistics'),
     });
   }
 

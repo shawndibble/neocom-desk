@@ -52,15 +52,15 @@ describe('severityForRemaining', () => {
    * may enter into it.
    */
   it('derives urgency from time alone, identically for every source', () => {
-    expect(severityForRemaining(25 * DAY)).toBe('clear');
-    expect(severityForRemaining(2 * DAY)).toBe('warning');
+    expect(severityForRemaining(25 * DAY, 'logistics')).toBe('clear');
+    expect(severityForRemaining(2 * DAY, 'logistics')).toBe('warning');
   });
 
   it('climbs the ladder as the clock runs down', () => {
-    expect(severityForRemaining(30 * DAY)).toBe('clear');
-    expect(severityForRemaining(5 * DAY)).toBe('watch');
-    expect(severityForRemaining(2 * DAY)).toBe('warning');
-    expect(severityForRemaining(6 * HOUR)).toBe('critical');
+    expect(severityForRemaining(30 * DAY, 'logistics')).toBe('clear');
+    expect(severityForRemaining(5 * DAY, 'logistics')).toBe('watch');
+    expect(severityForRemaining(2 * DAY, 'logistics')).toBe('warning');
+    expect(severityForRemaining(6 * HOUR, 'logistics')).toBe('critical');
   });
 
   it('treats an elapsed clock as critical, however far past it is', () => {
@@ -610,9 +610,9 @@ describe('sovereignty raid windows', () => {
     const [far] = sovBoard([raid({ startMs: at(3 * DAY), endMs: at(3 * DAY + HOUR) })]);
     const [soon] = sovBoard([raid({ startMs: at(HOUR), endMs: at(2 * HOUR) })]);
     const [open] = sovBoard([raid({ startMs: at(-HOUR), endMs: at(20 * MINUTE) })]);
-    expect(far!.severity).toBe(severityForRemaining(3 * DAY));
-    expect(soon!.severity).toBe(severityForRemaining(HOUR));
-    expect(open!.severity).toBe(severityForRemaining(20 * MINUTE));
+    expect(far!.severity).toBe(severityForRemaining(3 * DAY, 'logistics'));
+    expect(soon!.severity).toBe(severityForRemaining(HOUR, 'logistics'));
+    expect(open!.severity).toBe(severityForRemaining(20 * MINUTE, 'logistics'));
     expect(open!.severity).not.toBe(far!.severity);
   });
 

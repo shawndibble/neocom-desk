@@ -17,13 +17,20 @@ describe('severityForRemaining', () => {
    * one module is that a second copy could drift a threshold without anything
    * going red. These four cases are that alarm.
    */
-  it('places each threshold on the closed side of its band', () => {
-    expect(severityForRemaining(24 * HOUR)).toBe('critical');
-    expect(severityForRemaining(24 * HOUR + 1)).toBe('warning');
-    expect(severityForRemaining(3 * DAY)).toBe('warning');
-    expect(severityForRemaining(3 * DAY + 1)).toBe('watch');
-    expect(severityForRemaining(7 * DAY)).toBe('watch');
-    expect(severityForRemaining(7 * DAY + 1)).toBe('clear');
+  it('places each default threshold on the closed side of its band', () => {
+    expect(severityForRemaining(HOUR)).toBe('critical');
+    expect(severityForRemaining(HOUR + 1)).toBe('warning');
+    expect(severityForRemaining(24 * HOUR)).toBe('warning');
+    expect(severityForRemaining(24 * HOUR + 1)).toBe('clear');
+  });
+
+  it('keeps the longer lead for the logistics profile', () => {
+    expect(severityForRemaining(24 * HOUR, 'logistics')).toBe('critical');
+    expect(severityForRemaining(24 * HOUR + 1, 'logistics')).toBe('warning');
+    expect(severityForRemaining(3 * DAY, 'logistics')).toBe('warning');
+    expect(severityForRemaining(3 * DAY + 1, 'logistics')).toBe('watch');
+    expect(severityForRemaining(7 * DAY, 'logistics')).toBe('watch');
+    expect(severityForRemaining(7 * DAY + 1, 'logistics')).toBe('clear');
   });
 
   /**
