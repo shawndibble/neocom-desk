@@ -1,15 +1,9 @@
-import { useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
-import type { OreLine } from '@/engine/miningTax/types';
-import { typeLabel } from './typeLabel';
-import { formatCount } from '@/lib/formatCount';
+import { InlineError } from '@/components/ui/InlineError';
+import { TakeoverConfirm, type OverlapPreview } from './TakeoverConfirm';
 
-export interface OverlapPreview {
-  payeeName: string;
-  before: readonly OreLine[];
-  after: readonly OreLine[];
-}
+export type { OverlapPreview } from './TakeoverConfirm';
 
 interface Props {
   corpName: string;
@@ -42,12 +36,7 @@ export function OverlapNotice({
   onPaidAnotherWay,
 }: Props) {
   const { t } = useTranslation();
-  const [confirming, setConfirming] = useState(false);
   const payee = payeeNames.join(', ');
-  const describe = (lines: readonly OreLine[]) =>
-    lines.length === 0
-      ? t('miningTax.corpBook.overlap.nothingLeft')
-      : lines.map((l) => `${formatCount(l.quantity)} ${typeLabel(typeNames, l.typeId)}`).join(', ');
 
   return (
     <div
@@ -66,49 +55,26 @@ export function OverlapNotice({
           />
         )}
       </p>
-      {confirming && (
-        <div className="space-y-1">
-          <p className="text-text-dim">{t('miningTax.corpBook.overlap.previewTitle')}</p>
-          <ul className="space-y-0.5">
-            {previews.map((p) => (
-              <li key={p.payeeName}>
-                {t('miningTax.corpBook.overlap.previewLine', {
-                  payee: p.payeeName,
-                  before: describe(p.before),
-                  after: describe(p.after),
-                })}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {error && (
-        <p role="alert" className="text-danger">
-          {error}
-        </p>
-      )}
-      <div className="flex flex-wrap gap-2">
-        {!paid &&
-          (confirming ? (
-            <>
-              <Button size="sm" variant="primary" disabled={busy} onClick={onTakeOver}>
-                {t('miningTax.corpBook.overlap.confirm')}
-              </Button>
-              <Button size="sm" disabled={busy} onClick={() => setConfirming(false)}>
-                {t('common.cancel')}
-              </Button>
-            </>
-          ) : (
-            <Button size="sm" disabled={busy} onClick={() => setConfirming(true)}>
-              {t('miningTax.corpBook.overlap.letBill')}
-            </Button>
-          ))}
-        {!confirming && (
+      {paid ? (
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" disabled={busy} onClick={onPaidAnotherWay}>
             {t('miningTax.corpBook.overlap.paidOther')}
           </Button>
-        )}
-      </div>
+        </div>
+      ) : (
+        <TakeoverConfirm
+          previews={previews}
+          typeNames={typeNames}
+          busy={busy}
+          onTakeOver={onTakeOver}
+          others={
+            <Button size="sm" disabled={busy} onClick={onPaidAnotherWay}>
+              {t('miningTax.corpBook.overlap.paidOther')}
+            </Button>
+          }
+        />
+      )}
+      {error && <InlineError>{error}</InlineError>}
     </div>
   );
 }

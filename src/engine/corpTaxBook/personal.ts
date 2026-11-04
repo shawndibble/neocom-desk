@@ -53,6 +53,7 @@ import { MINUTE_MS } from '@/lib/age';
 export type BookSettledBy = 'yourMark' | 'statement' | 'donation';
 
 export type BookRowState = 'billed' | 'conflict' | 'dismissed' | 'waived' | 'paid';
+export type ConflictCause = 'otherPayee' | 'overListed';
 /** A relabel of a personal row that has no Payee yet, not a row of its own. */
 export type BookLabelState = 'pending' | 'unattributed';
 
@@ -184,6 +185,12 @@ export interface BookRowView {
   dismissalReason?: string;
   /** A conflict: when it resolves to the corp. */
   resolvesAt?: string;
+  /**
+   * A conflict: why the two records clash. `otherPayee`: the member gave the ore to a Payee
+   * that is not this corporation's. `overListed`: the member's entry for the corporation's own
+   * Payee lists more ore than the book recorded, so it can't stand in for the book's line.
+   */
+  conflictCause?: ConflictCause;
   dispute?: BookDispute;
   /** The refinery that recorded the line. */
   structureId?: number;
@@ -505,7 +512,15 @@ function takeOwnAllocations(
   pool: OverlapPool,
   ownPayeeIds: readonly string[] | undefined,
   share: readonly OreLine[]
-): { lines: OreLine[]; paidLines: OreLine[]; ids: string[]; paidIds: string[] } {
+): {
+  lines: OreLine[];
+  paidLines: OreLine[];
+  ids: string[];
+  paidIds: string[];
+  /** An allocation to the corporation's own Payee lists more than the book observed, so it stays. */
+  overListed: boolean;
+} {
+  let overListed = false;
   const lines: OreLine[][] = [];
   const paid: OreLine[][] = [];
   const ids: string[] = [];
@@ -519,7 +534,10 @@ function takeOwnAllocations(
     // A row needing review is the member's to sort out, not the book's to take.
     if (allocation.status !== 'paid' && allocation.status !== 'outstanding') continue;
     const listed = sumLines(allocation.oreLines);
-    if (listed.some((l) => l.quantity > quantityOfTypes(room, new Set([l.typeId])))) continue;
+    if (listed.some((l) => l.quantity > quantityOfTypes(room, new Set([l.typeId])))) {
+      if (own) overListed = true;
+      continue;
+    }
     room = minusLines(room, listed);
     lines.push(listed);
     if (allocation.status === 'paid') {
@@ -529,7 +547,7 @@ function takeOwnAllocations(
     ids.push(allocation.id);
     pool.splice(i--, 1);
   }
-  return { lines: sumLines(...lines), paidLines: sumLines(...paid), ids, paidIds };
+  return { lines: sumLines(...lines), paidLines: sumLines(...paid), ids, paidIds, overListed };
 }
 
 /**
@@ -637,7 +655,7 @@ export function overlayCorpBooks(input: {
     p: Prepared,
     charge: PreparedCharge,
     lines: readonly OreLine[],
-    conflict: { lines: OreLine[]; resolvesAt: string } | undefined,
+    conflict: { lines: OreLine[]; resolvesAt: string; cause: ConflictCause } | undefined,
     soleBook = true,
     day?: { lines: OreLine[]; sameRate: boolean }
   ) => {
@@ -686,6 +704,7 @@ export function overlayCorpBooks(input: {
         taxOwed: null,
         billed: worth.taxOwed,
         resolvesAt: conflict.resolvesAt,
+        conflictCause: conflict.cause,
         ...(dispute ? { dispute } : {}),
       });
       if (owedLines.length === 0) return;
@@ -763,7 +782,11 @@ export function overlayCorpBooks(input: {
       const contested =
         onStatement || resolved.conflict.length === 0 || resolved.conflictOwed
           ? undefined
-          : { lines: resolved.conflict, resolvesAt: resolved.conflictResolvesAt ?? '' };
+          : {
+              lines: resolved.conflict,
+              resolvesAt: resolved.conflictResolvesAt ?? '',
+              cause: own.overListed ? ('overListed' as const) : ('otherPayee' as const),
+            };
       let remaining = contested?.lines ?? [];
       const day = {
         lines: sumLines(...here.map((c) => c.oreLines)),
@@ -780,18 +803,20 @@ export function overlayCorpBooks(input: {
           .filter((l) => l.quantity > 0);
         remaining = minusLines(remaining, take);
         const firstRow = rows.length;
+        // A dismissed charge owes the corporation nothing, so the Payee's claim on its ore
+        // clashes with nothing: no conflict, and no overlap to sort out.
         buildRows(
           p,
           charge,
           charge.oreLines,
-          contested && take.length > 0
-            ? { lines: take, resolvesAt: contested.resolvesAt }
+          contested && take.length > 0 && !charge.dismissal
+            ? { lines: take, resolvesAt: contested.resolvesAt, cause: contested.cause }
             : undefined,
           claiming.length === 1,
           day
         );
         const overlap = takeOverlap(pool, charge.oreLines);
-        if (overlap && rows[firstRow]) rows[firstRow].overlap = overlap;
+        if (overlap && rows[firstRow] && !charge.dismissal) rows[firstRow].overlap = overlap;
       }
     }
     free.set(key, left);

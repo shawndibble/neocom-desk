@@ -126,7 +126,7 @@ describe('CorpRowDetailModal', () => {
     expect(screen.queryByRole('button', { name: /settle up/i })).not.toBeInTheDocument();
   });
 
-  it('shows a conflict as not owed, with the day it resolves', () => {
+  it('shows a conflict as not owed, with its notice ahead of the ore', () => {
     const conflict: BookRowView = {
       ...view,
       state: 'conflict',
@@ -134,11 +134,11 @@ describe('CorpRowDetailModal', () => {
       resolvesAt: '2026-11-01T06:00:00.000Z',
       dispute: undefined,
     };
-    renderModal({ corp: { ...corp, view: conflict } });
+    renderModal({ corp: { ...corp, view: conflict }, notice: <p>Conflict notice</p> });
     expect(screen.getByText('—')).toBeInTheDocument();
-    expect(
-      screen.getByText(/resolves to Brass Meridian Logistics on 2026-11-01/)
-    ).toBeInTheDocument();
+    const notice = screen.getByText('Conflict notice');
+    const ore = screen.getByText('Ore');
+    expect(notice.compareDocumentPosition(ore) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByRole('button', { name: /settle up/i })).not.toBeInTheDocument();
   });
 
@@ -153,8 +153,11 @@ describe('CorpRowDetailModal', () => {
     };
     renderModal({ corp: { ...corp, view: paid } });
     expect(screen.getByText('957,001 ISK')).toBeInTheDocument();
-    expect(screen.getByText(/can't be edited here/)).toBeInTheDocument();
-    expect(screen.getByText(/It is on Brass Meridian Logistics's Statement/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Can't be edited here\. Ask a Brass Meridian Logistics officer/)
+    ).toBeInTheDocument();
+    expect(screen.getByText('Statement')).toBeInTheDocument();
+    expect(screen.getByText('Issued, final')).toBeInTheDocument();
   });
 
   it('shows a dismissal as 0 ISK and says what the corporation originally billed', () => {
@@ -167,9 +170,9 @@ describe('CorpRowDetailModal', () => {
     };
     renderModal({ corp: { ...corp, view: dismissed } });
     expect(screen.getByText('0 ISK')).toBeInTheDocument();
-    expect(
-      screen.getByText(/set this day to 0 ISK\. It originally billed 957,001 ISK/)
-    ).toBeInTheDocument();
+    expect(screen.getByText('Originally billed')).toBeInTheDocument();
+    expect(screen.getByText('957,001 ISK')).toBeInTheDocument();
+    expect(screen.getByText('Their reason: No tax on this moon')).toBeInTheDocument();
   });
 
   it('lets the member unmark a payment they marked, and says it was theirs', async () => {
@@ -184,7 +187,11 @@ describe('CorpRowDetailModal', () => {
       dispute: undefined,
     };
     renderModal({ corp: { ...corp, view: paid }, onUnmarkPaid });
-    expect(screen.getByText(/You marked this day paid \(957,001 ISK\)/)).toBeInTheDocument();
+    expect(screen.getByText('Settled by')).toBeInTheDocument();
+    expect(screen.getByText('Your mark')).toBeInTheDocument();
+    expect(
+      screen.getByText('The corporation confirms your mark against its wallet.')
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /mark as unpaid/i }));
     expect(onUnmarkPaid).toHaveBeenCalledOnce();
   });

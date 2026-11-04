@@ -252,7 +252,11 @@ describe('overlayCorpBooks', () => {
     });
     const out = overlay([assigned], [book()]);
     expect(out.rows).toHaveLength(1);
-    expect(out.rows[0]).toMatchObject({ state: 'conflict', taxOwed: null });
+    expect(out.rows[0]).toMatchObject({
+      state: 'conflict',
+      taxOwed: null,
+      conflictCause: 'otherPayee',
+    });
     // Closed at 18 Oct 00:00 + 30 min grace on the 17th → 14 days after 2026-10-18T00:30.
     expect(out.rows[0].resolvesAt).toBe('2026-11-01T00:30:00.000Z');
   });
@@ -440,6 +444,24 @@ describe('overlayCorpBooks', () => {
       const out = overlay([big], [book({ ownPayeeIds: ['bmw'] })]);
       expect(out.rows[0].state).toBe('conflict');
       expect(out.absorbed.size).toBe(0);
+    });
+
+    it("says the conflict is the corporation's own Payee listing more than the book recorded", () => {
+      const big = entry({
+        freeOreLines: [],
+        oreLines: [{ typeId: ZEO, quantity: 50_000 }],
+        allocations: [
+          {
+            id: 'a-big',
+            payeeId: 'bmw',
+            taxPct: 10,
+            oreLines: [{ typeId: ZEO, quantity: 50_000 }],
+            status: 'outstanding',
+          },
+        ],
+      });
+      const out = overlay([big], [book({ ownPayeeIds: ['bmw'] })]);
+      expect(out.rows[0]).toMatchObject({ state: 'conflict', conflictCause: 'overListed' });
     });
 
     it('is still a conflict when the book does not name it as its own', () => {
@@ -808,6 +830,49 @@ describe('overlayCorpBooks', () => {
       dismissalReason: 'Fleet op, corp-sanctioned',
     });
     expect(out.takenFromFree.size).toBe(1);
+  });
+
+  describe('a dismissed day the member also gave a Payee', () => {
+    const dismissedBook = (over: Partial<PersonalBook> = {}) =>
+      book({
+        dismissals: [
+          {
+            id: 'd1',
+            scope: 'record',
+            targetId: `${ME}:1000:2026-10-17`,
+            by: 1,
+            at: '2026-10-18T09:00:00Z',
+            reason: 'Fleet op, corp-sanctioned',
+          },
+        ],
+        ...over,
+      });
+    const given = (status: 'outstanding' | 'paid') =>
+      entry({
+        freeOreLines: [],
+        oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+        allocations: [
+          {
+            id: 'a1',
+            payeeId: 'ashfall',
+            taxPct: 10,
+            oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+            status,
+          },
+        ],
+      });
+
+    it('is no conflict: the corporation is owed nothing for it, so the Payee keeps the ore', () => {
+      const out = overlay([given('paid')], [dismissedBook()]);
+      expect(out.rows).toHaveLength(1);
+      expect(out.rows[0]).toMatchObject({ state: 'dismissed', taxOwed: 0 });
+      expect(out.rows[0].resolvesAt).toBeUndefined();
+    });
+
+    it('carries no overlap: the corporation bills none of that ore', () => {
+      const out = overlay([given('outstanding')], [dismissedBook()]);
+      expect(out.rows[0].overlap).toBeUndefined();
+    });
   });
 
   it('ignores a reversed dismissal', () => {
