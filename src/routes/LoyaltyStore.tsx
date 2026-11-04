@@ -254,12 +254,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   // selected id rather than `selectedRow`, so a selected offer filtered out of
   // `filteredRows` simply has no row to mark.
 
-  const { columns, optionalColumns: optionalOfferColumns } = useLoyaltyOfferColumns({
-    lpBasis,
-    concord,
-    concordPending,
-    isColumnVisible: offersColumnVisibility.isVisible,
-  });
   // The full catalog, not just `columns`' currently-visible ids: a sort
   // picked while a column was shown should still resolve once the picker
   // hides it, ready to take effect again the moment it's shown back
@@ -268,6 +262,14 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     'item',
     ...LOYALTY_STORE_OFFERS_COLUMN_IDS,
   ]);
+  const { columns, optionalColumns: optionalOfferColumns } = useLoyaltyOfferColumns({
+    lpBasis,
+    concord,
+    concordPending,
+    isColumnVisible: offersColumnVisibility.isVisible,
+    playerLp,
+    sortColumnId: offersSortProps.sort?.columnId,
+  });
   // Every column, whatever the picker hides.
   const offersCsvColumns = useMemo(
     () => loyaltyOfferCsvColumns(t, { concordRate: concord?.rate ?? null }),

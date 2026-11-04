@@ -26,7 +26,13 @@ import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
 import type { PriceBasis } from './priceBasis';
 import type { LpBasis } from './lpBasis';
 import type { LoyaltyOfferRow } from './offerRows';
-import { iskPerLpTone, resolveLoyaltyRowItem, tagWordClassName } from './offerRowDisplay';
+import {
+  isLowVolume,
+  iskPerLpTone,
+  lpShortfall,
+  resolveLoyaltyRowItem,
+  tagWordClassName,
+} from './offerRowDisplay';
 import { loyaltyOfferMaterialsCsvColumns } from './loyaltyStoreCsv';
 import { formatCount } from '@/lib/formatCount';
 import type { SkillLevels } from '@/engine/industry/types';
@@ -47,11 +53,27 @@ function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
   return <span className={entityLinkClassName()}>{typeId === null ? row.itemName : itemName}</span>;
 }
 
+/** The unit after a phone card's bold corner figure; the table's header says it on desktop. */
+export function PhoneUnit({ children }: { children: string }) {
+  return (
+    <span className="ml-1 text-[0.6875rem] font-normal text-text-dim sm:hidden">{children}</span>
+  );
+}
+
 /** An offer's price: `2,400 LP + 2.4M`. */
-export function LoyaltyOfferCost({ row }: { row: LoyaltyOfferRow }) {
+export function LoyaltyOfferCost({
+  row,
+  playerLp = null,
+}: {
+  row: LoyaltyOfferRow;
+  playerLp?: number | null;
+}) {
+  const { t } = useTranslation();
+  const short = lpShortfall(row, playerLp);
   return (
     <>
       {formatCount(row.offer.lp_cost)} LP + <IskAmount value={row.offer.isk_cost} decimals={0} />
+      {short !== null && <span> · {t('loyaltyStore.needMoreLp', { lp: formatCount(short) })}</span>}
     </>
   );
 }
@@ -60,20 +82,26 @@ export function LoyaltyOfferCost({ row }: { row: LoyaltyOfferRow }) {
 export function LoyaltyOfferItemCell({
   row,
   showCost = true,
+  playerLp = null,
 }: {
   row: LoyaltyOfferRow;
+  playerLp?: number | null;
   /** False on a phone's dense card, where the cost has its own cell on the meta line. */
   showCost?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <span className="flex flex-col">
       <span className="inline-flex items-center gap-1.5">
         <LoyaltyItemName row={row} />
         {row.isBlueprint && <span className={tagWordClassName}>BP</span>}
+        {isLowVolume(row) && (
+          <span className={tagWordClassName}>{t('loyaltyStore.lowVolumeTag')}</span>
+        )}
       </span>
       {showCost && (
         <span className="text-[0.6875rem] text-text-dim">
-          <LoyaltyOfferCost row={row} />
+          <LoyaltyOfferCost row={row} playerLp={playerLp} />
         </span>
       )}
     </span>

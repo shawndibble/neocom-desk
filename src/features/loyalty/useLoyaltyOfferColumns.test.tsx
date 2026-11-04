@@ -107,3 +107,25 @@ describe('phone card (dense stack)', () => {
     ]);
   });
 });
+
+describe('phone card corner follows the sort', () => {
+  const cornerOf = (sortColumnId: string | undefined, visible = true) => {
+    const { result } = renderHook(() =>
+      useLoyaltyOfferColumns({
+        lpBasis: 'lp',
+        concord: null,
+        concordPending: false,
+        isColumnVisible: () => visible,
+        sortColumnId,
+      })
+    );
+    return result.current.columns.find((c) => c.cardCorner)?.id;
+  };
+
+  it('is the sorted column when it is one of the three, else ISK / LP', () => {
+    expect(cornerOf(undefined)).toBe('iskPerLp');
+    expect(cornerOf('item')).toBe('iskPerLp');
+    expect(cornerOf('profit')).toBe('profit');
+    expect(cornerOf('sellsPerDay')).toBe('sellsPerDay');
+  });
+});

@@ -9,7 +9,7 @@ import {
   type LoyaltyStoreOffersColumnId,
 } from '@/features/loyalty/loyaltyStoreColumns';
 import type { LpBasis } from '@/features/loyalty/lpBasis';
-import { LoyaltyOfferCost, LoyaltyOfferItemCell } from '@/features/loyalty/OfferDetail';
+import { LoyaltyOfferCost, LoyaltyOfferItemCell, PhoneUnit } from '@/features/loyalty/OfferDetail';
 import {
   formatIskPerLp,
   formatSellsPerDay,
@@ -29,11 +29,17 @@ export function useLoyaltyOfferColumns({
   concord,
   concordPending,
   isColumnVisible,
+  playerLp = null,
+  sortColumnId,
 }: {
   lpBasis: LpBasis;
   concord: ConcordRate | null;
   concordPending: boolean;
   isColumnVisible: (id: LoyaltyStoreOffersColumnId) => boolean;
+  /** The pilot's LP: an offer they cannot yet afford says how much is missing. */
+  playerLp?: number | null;
+  /** The table's active sort column: on a phone its value is the card's bold figure. */
+  sortColumnId?: string;
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -46,6 +52,11 @@ export function useLoyaltyOfferColumns({
         : row.profit.iskPerLp,
     [lpBasis, concord]
   );
+  // The phone card's bold figure follows the sort when the sorted column is one of the
+  // three; sorting by name, or by a column the picker has hidden, leaves it on ISK / LP.
+  const cornerId: LoyaltyStoreOffersColumnId =
+    LOYALTY_STORE_OFFERS_COLUMN_IDS.find((id) => id === sortColumnId && isColumnVisible(id)) ??
+    'iskPerLp';
   const optionalColumns = useMemo<
     Record<LoyaltyStoreOffersColumnId, DataTableColumn<LoyaltyOfferRow>>
   >(
@@ -58,12 +69,18 @@ export function useLoyaltyOfferColumns({
         headerClassName: 'whitespace-nowrap',
         // Unavailable sorts last, apart from a real zero.
         stackAffix: { after: t('loyaltyStore.perDayAffix') },
+        cardCorner: cornerId === 'sellsPerDay',
         sortValue: (row) => row.sellsPerDay ?? undefined,
         cellClassName: () => 'tabular-nums',
         render: (row) => {
           if (row.sellsPerDay === null) return '—';
           if (row.sellsPerDay === 0) return t('loyaltyStore.sellsNone');
-          return formatSellsPerDay(row.sellsPerDay);
+          return (
+            <>
+              {formatSellsPerDay(row.sellsPerDay)}
+              {cornerId === 'sellsPerDay' && <PhoneUnit>{t('loyaltyStore.perDayAffix')}</PhoneUnit>}
+            </>
+          );
         },
       },
       profit: {
@@ -74,8 +91,18 @@ export function useLoyaltyOfferColumns({
         stackAffix: { after: t('loyaltyStore.profitAffix') },
         sortValue: (row) => row.profit.profit ?? undefined,
         cellClassName: (row) => iskPerLpTone(row.profit.profit),
+        cardCorner: cornerId === 'profit',
         render: (row) =>
-          row.profit.profit === null ? '—' : <IskAmount value={row.profit.profit} decimals={0} />,
+          row.profit.profit === null ? (
+            '—'
+          ) : (
+            <>
+              <IskAmount value={row.profit.profit} decimals={0} />
+              {cornerId === 'profit' && (
+                <PhoneUnit>{t('loyaltyStore.profitAffix').trim()}</PhoneUnit>
+              )}
+            </>
+          ),
       },
       iskPerLp: {
         id: 'iskPerLp',
@@ -85,8 +112,9 @@ export function useLoyaltyOfferColumns({
         align: 'right',
         width: '14ch',
         headerClassName: 'whitespace-nowrap',
+        stackAffix: { after: ` ${t('loyaltyStore.iskPerLpUnit')}` },
         // The phone's dense card has no header row: the bold figure sits at the title line's right.
-        cardCorner: true,
+        cardCorner: cornerId === 'iskPerLp',
         sortValue: (row) => shownIskPerLp(row) ?? undefined,
         cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(shownIskPerLp(row))}`,
         render: (row) => {
@@ -105,15 +133,13 @@ export function useLoyaltyOfferColumns({
           return (
             <>
               {formatIskPerLp(value)}
-              <span className="ml-1 text-[0.6875rem] font-normal text-text-dim sm:hidden">
-                {t('loyaltyStore.iskPerLpUnit')}
-              </span>
+              {cornerId === 'iskPerLp' && <PhoneUnit>{t('loyaltyStore.iskPerLpUnit')}</PhoneUnit>}
             </>
           );
         },
       },
     }),
-    [t, lpBasis, concord, concordPending, shownIskPerLp]
+    [t, lpBasis, concord, concordPending, shownIskPerLp, cornerId]
   );
   const itemColumn = useMemo<DataTableColumn<LoyaltyOfferRow>>(
     () => ({
@@ -125,9 +151,9 @@ export function useLoyaltyOfferColumns({
       // two-line name + cost cell), so the table scrolls in its wrapper below it.
       minWidth: '14rem',
       sortValue: (row) => row.itemName,
-      render: (row) => <LoyaltyOfferItemCell row={row} showCost={!isPhone} />,
+      render: (row) => <LoyaltyOfferItemCell row={row} showCost={!isPhone} playerLp={playerLp} />,
     }),
-    [t, isPhone]
+    [t, isPhone, playerLp]
   );
   // The dense phone card prints every non-title cell on its meta line, so the price
   // the table keeps under the name becomes a cell of its own there.
@@ -136,9 +162,9 @@ export function useLoyaltyOfferColumns({
       id: 'cost',
       header: t('loyaltyStore.colCost'),
       width: '14ch',
-      render: (row) => <LoyaltyOfferCost row={row} />,
+      render: (row) => <LoyaltyOfferCost row={row} playerLp={playerLp} />,
     }),
-    [t]
+    [t, playerLp]
   );
   const columns = useMemo<DataTableColumn<LoyaltyOfferRow>[]>(
     () => [
