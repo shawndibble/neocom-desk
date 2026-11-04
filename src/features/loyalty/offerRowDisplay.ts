@@ -16,6 +16,11 @@ export function formatSellsPerDay(value: number): string {
   return value < 10 ? fixed1(value) : formatCount(value);
 }
 
+/** ISK per LP: whole units with separators from ten up (`88,837`), one decimal below. */
+export function formatIskPerLp(value: number): string {
+  return formatSellsPerDay(value);
+}
+
 export function iskPerLpTone(value: number | null): string {
   return value === null ? 'text-text-dim' : iskToneClass(value);
 }

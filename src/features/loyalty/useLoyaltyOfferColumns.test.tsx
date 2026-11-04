@@ -50,3 +50,24 @@ describe('Item column in a windowed table (issue #5388)', () => {
     expect(rest.every((column) => column.width)).toBe(true);
   });
 });
+
+describe('ISK / LP column', () => {
+  const { result } = renderHook(() =>
+    useLoyaltyOfferColumns({
+      lpBasis: 'lp',
+      concord: null,
+      concordPending: false,
+      isColumnVisible: () => true,
+    })
+  );
+  const column = result.current.optionalColumns.iskPerLp;
+  const text = (iskPerLp: number) =>
+    render(<>{column.render({ profit: { iskPerLp } } as unknown as LoyaltyOfferRow)}</>).container
+      .textContent;
+
+  it('groups thousands instead of printing 88837.4, and is the phone card’s corner figure', () => {
+    expect(text(88837.4)).toContain('88,837');
+    expect(text(5.25)).toContain('5.3');
+    expect(column.cardCorner).toBe(true);
+  });
+});

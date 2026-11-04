@@ -1,4 +1,4 @@
-import { fixed1 } from '@/lib/fixedFormat';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, type DataTableColumn } from '@/components/ui';
@@ -9,8 +9,12 @@ import {
   type LoyaltyStoreOffersColumnId,
 } from '@/features/loyalty/loyaltyStoreColumns';
 import type { LpBasis } from '@/features/loyalty/lpBasis';
-import { LoyaltyOfferItemCell } from '@/features/loyalty/OfferDetail';
-import { formatSellsPerDay, iskPerLpTone } from '@/features/loyalty/offerRowDisplay';
+import { LoyaltyOfferCost, LoyaltyOfferItemCell } from '@/features/loyalty/OfferDetail';
+import {
+  formatIskPerLp,
+  formatSellsPerDay,
+  iskPerLpTone,
+} from '@/features/loyalty/offerRowDisplay';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 
 /**
@@ -32,6 +36,7 @@ export function useLoyaltyOfferColumns({
   isColumnVisible: (id: LoyaltyStoreOffersColumnId) => boolean;
 }) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
   const shownIskPerLp = useCallback(
     (row: LoyaltyOfferRow): number | null =>
       lpBasis === 'concord'
@@ -52,6 +57,7 @@ export function useLoyaltyOfferColumns({
         width: '12ch',
         headerClassName: 'whitespace-nowrap',
         // Unavailable sorts last, apart from a real zero.
+        stackAffix: { after: t('loyaltyStore.perDayAffix') },
         sortValue: (row) => row.sellsPerDay ?? undefined,
         cellClassName: () => 'tabular-nums',
         render: (row) => {
@@ -65,6 +71,7 @@ export function useLoyaltyOfferColumns({
         header: t('loyaltyStore.colProfit'),
         align: 'right',
         width: COL_ISK,
+        stackAffix: { after: t('loyaltyStore.profitAffix') },
         sortValue: (row) => row.profit.profit ?? undefined,
         cellClassName: (row) => iskPerLpTone(row.profit.profit),
         render: (row) =>
@@ -78,13 +85,27 @@ export function useLoyaltyOfferColumns({
         align: 'right',
         width: '14ch',
         headerClassName: 'whitespace-nowrap',
+        // The phone's dense card has no header row: the bold figure sits at the title line's right.
+        cardCorner: true,
         sortValue: (row) => shownIskPerLp(row) ?? undefined,
         cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(shownIskPerLp(row))}`,
         render: (row) => {
           if (lpBasis === 'concord' && concordPending) return '—';
           if (lpBasis === 'concord' && !concord) return t('loyaltyStore.noConcordExchange');
           const value = shownIskPerLp(row);
-          return value === null ? '—' : fixed1(value);
+          if (value === null) return '—';
+          return (
+            <>
+              {formatIskPerLp(value)}
+              <span className="ml-1 text-[0.6875rem] font-normal text-text-dim sm:hidden">
+                {t(
+                  lpBasis === 'concord'
+                    ? 'loyaltyStore.iskPerConcordLpUnit'
+                    : 'loyaltyStore.iskPerLpUnit'
+                )}
+              </span>
+            </>
+          );
         },
       },
     }),
@@ -100,16 +121,28 @@ export function useLoyaltyOfferColumns({
       // two-line name + cost cell), so the table scrolls in its wrapper below it.
       minWidth: '14rem',
       sortValue: (row) => row.itemName,
-      render: (row) => <LoyaltyOfferItemCell row={row} />,
+      render: (row) => <LoyaltyOfferItemCell row={row} showCost={!isPhone} />,
+    }),
+    [t, isPhone]
+  );
+  // The dense phone card prints every non-title cell on its meta line, so the price
+  // the table keeps under the name becomes a cell of its own there.
+  const costColumn = useMemo<DataTableColumn<LoyaltyOfferRow>>(
+    () => ({
+      id: 'cost',
+      header: t('loyaltyStore.colCost'),
+      width: '14ch',
+      render: (row) => <LoyaltyOfferCost row={row} />,
     }),
     [t]
   );
   const columns = useMemo<DataTableColumn<LoyaltyOfferRow>[]>(
     () => [
       itemColumn,
+      ...(isPhone ? [costColumn] : []),
       ...LOYALTY_STORE_OFFERS_COLUMN_IDS.filter(isColumnVisible).map((id) => optionalColumns[id]),
     ],
-    [itemColumn, optionalColumns, isColumnVisible]
+    [itemColumn, costColumn, isPhone, optionalColumns, isColumnVisible]
   );
   return { columns, optionalColumns };
 }
