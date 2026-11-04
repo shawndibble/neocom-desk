@@ -264,7 +264,10 @@ describe('BlueprintAcquisitionModal — Contracts', () => {
     expect(items).toHaveLength(2);
     expect(items[0]).toHaveTextContent(/Original \(BPO\).*20,000,000 ISK.*Cheapest/);
     expect(items[1]).toHaveTextContent(/Copy, 10 runs.*30,000,000 ISK.*3,000,000 ISK\/run/);
-    expect(items[1]).toHaveTextContent('Jita IV - Moon 4');
+    // The station name resolves after the row first renders (as "Unknown Structure"), so wait for it.
+    await waitFor(() =>
+      expect(within(contracts).getAllByRole('listitem')[1]).toHaveTextContent('Jita IV - Moon 4')
+    );
   });
 
   it('widens to every region on request', async () => {
