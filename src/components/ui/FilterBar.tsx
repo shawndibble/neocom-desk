@@ -327,29 +327,29 @@ function FilterTrigger({
   );
 }
 
-/** "Clear all" at the end of an open filter box or popover, while anything is on. */
+/**
+ * "Clear all" at the end of an open filter box or popover, while anything is
+ * on. A line of its own (`basis-full`), right-aligned: the box's controls are
+ * whatever size their page uses (`md` beside a `md` search box), and one row
+ * holds one control height (DESIGN.md §3), so the button never shares theirs.
+ */
 function ClearAllButton<T>({
   value,
   onChange,
   active,
-  className,
 }: {
   value: T;
   onChange: (next: T) => void;
   active: readonly ActiveFilter<T>[];
-  className?: string;
 }) {
   const { t } = useTranslation();
   if (active.length === 0) return null;
   return (
-    <Button
-      size="sm"
-      variant="ghost"
-      className={cx('shrink-0', className)}
-      onClick={() => onChange(clearFilters(value, active))}
-    >
-      {t('filters.clearAll')}
-    </Button>
+    <div className="flex basis-full justify-end">
+      <Button size="sm" variant="ghost" onClick={() => onChange(clearFilters(value, active))}>
+        {t('filters.clearAll')}
+      </Button>
+    </div>
   );
 }
 
@@ -429,7 +429,7 @@ function CollapsibleFilterRow<T>({
           role="group"
         >
           {children(value, onChange)}
-          <ClearAllButton value={value} onChange={onChange} active={active} className="ml-auto" />
+          <ClearAllButton value={value} onChange={onChange} active={active} />
         </div>
       </Collapse>
     </div>
@@ -467,7 +467,7 @@ function FilterPopover<T>({
           className="flex w-max max-w-[min(44rem,calc(100vw-2rem))] flex-wrap items-center gap-2 p-2"
         >
           {children(value, onChange)}
-          <ClearAllButton value={value} onChange={onChange} active={active} className="ml-auto" />
+          <ClearAllButton value={value} onChange={onChange} active={active} />
         </PopoverContent>
       </Popover>
       {trailing}
