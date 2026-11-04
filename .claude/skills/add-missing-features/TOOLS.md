@@ -14,7 +14,7 @@ surfaced.
 **Live, pipeline-relevant (all covered unless a ticket is named):**
 eve-exchange.com (#5002), Eve-Omnitool (#5134), EVE Motor Market / MoMa
 (#3985–#3995), EVE Ledger (#3908–#3910), EVE Farm (#5127, #5128), EVE Console
-(#4530), EVE Market Tool, ForgeWire (#4550), JitaSpace, EVE-NAV, Missioneers'
+(#4530, #5974; every release v0.9.7–0.9.18 read), EVE Market Tool, ForgeWire (#4550), JitaSpace, EVE-NAV, Missioneers'
 Atlas (LP finder = #718/#1050/#1068), IndustrialEVE (PI alerts: kill-tests 12,
 17, #956), EWT PI Tools ("User Planets" = Advisor worklist), Pod Warden (ADR
 0020), EVE Nexus (mobile; EVE Empire/Pod-shaped, cleared item by item),
@@ -250,7 +250,7 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 - #5006 NARROW Skills "Who's closest" (EveLens #137). #5002 NARROW Overview
   Market Trend widget (eve-exchange). #4736 NARROW Transactions missing-margin
   reason + uncosted-revenue total. #4550 NARROW Fitting set, netted shortfall.
-- #4530 NARROW Corp Projects tab (EVE Console). #4022 NARROW Appraisal reads
+- #4530 NARROW Corp Projects tab (EVE Console). #5974 NARROW Stock counts own-contract stock as Listed (EVE Console Inventory Levels). #4022 NARROW Appraisal reads
   grouped quantities (Janice).
 - MoMa batch, ready-for-agent by owner override: #3991 Open Orders
   work-through, #3985 slot-aware schedule (#3988 splits, ready-for-human),
@@ -443,3 +443,4 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   filters (ADR 0013); run logging / ISK per hour (Abyss Tracker, Abyssal
   Tactician; Abyss timer already killed); spawn kill-order guidance (no NPC-
   per-spawn data, decision 20261016-085801 excludes it).
+- **EVE Console v0.9.7–0.9.18 leftovers:** Worklist/station levels/hauling plan (buffer management, second-account scale); Mercenary Dens, Corp Structures fuel/fit alerts, cost-index history, Stock cost column, slot-aware schedule, transaction dedupe (`uniqueTransactions`) = covered; moon notification reprocessed value (KILL: reach, kill-test 13); Indy Parks Compare / System Index (picture of data on screen, kill-test 3); custom colour themes (cosmetic, DESIGN.md owns tokens); mail store/web store/Discord posting (write-side, kill-test 2); plan-vs-reported rig bonus (49).
