@@ -91,18 +91,22 @@ export function useLoyaltyOfferColumns({
         cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(shownIskPerLp(row))}`,
         render: (row) => {
           if (lpBasis === 'concord' && concordPending) return '—';
-          if (lpBasis === 'concord' && !concord) return t('loyaltyStore.noConcordExchange');
+          if (lpBasis === 'concord' && !concord) {
+            // The phone's corner is one unwrapped line beside the name: a dash there, the sentence in the table.
+            return (
+              <>
+                <span className="max-sm:hidden">{t('loyaltyStore.noConcordExchange')}</span>
+                <span className="sm:hidden">—</span>
+              </>
+            );
+          }
           const value = shownIskPerLp(row);
           if (value === null) return '—';
           return (
             <>
               {formatIskPerLp(value)}
               <span className="ml-1 text-[0.6875rem] font-normal text-text-dim sm:hidden">
-                {t(
-                  lpBasis === 'concord'
-                    ? 'loyaltyStore.iskPerConcordLpUnit'
-                    : 'loyaltyStore.iskPerLpUnit'
-                )}
+                {t('loyaltyStore.iskPerLpUnit')}
               </span>
             </>
           );

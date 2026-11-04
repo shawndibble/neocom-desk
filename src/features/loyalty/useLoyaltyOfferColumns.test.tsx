@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { renderHook } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { useLoyaltyOfferColumns } from './useLoyaltyOfferColumns';
 import type { LoyaltyOfferRow } from './offerRows';
 
@@ -69,5 +69,41 @@ describe('ISK / LP column', () => {
     expect(text(88837.4)).toContain('88,837');
     expect(text(5.25)).toContain('5.3');
     expect(column.cardCorner).toBe(true);
+  });
+});
+
+describe('phone card (dense stack)', () => {
+  it('moves the price from the item cell into a cell of its own on a phone', async () => {
+    vi.resetModules();
+    vi.doMock('@/lib/useIsPhone', () => ({ useIsPhone: () => true }));
+    const { useLoyaltyOfferColumns: usePhone } = await import('./useLoyaltyOfferColumns');
+    const { result } = renderHook(() =>
+      usePhone({ lpBasis: 'lp', concord: null, concordPending: false, isColumnVisible: () => true })
+    );
+    expect(result.current.columns.map((c) => c.id)).toEqual([
+      'item',
+      'cost',
+      'sellsPerDay',
+      'profit',
+      'iskPerLp',
+    ]);
+    vi.doUnmock('@/lib/useIsPhone');
+  });
+
+  it('keeps the table’s columns unchanged off a phone', () => {
+    const { result } = renderHook(() =>
+      useLoyaltyOfferColumns({
+        lpBasis: 'lp',
+        concord: null,
+        concordPending: false,
+        isColumnVisible: () => true,
+      })
+    );
+    expect(result.current.columns.map((c) => c.id)).toEqual([
+      'item',
+      'sellsPerDay',
+      'profit',
+      'iskPerLp',
+    ]);
   });
 });
