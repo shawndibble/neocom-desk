@@ -29,5 +29,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [srp](srp/README.md) | Epic #4608 (mockups #4847; build #4848-#4856) | Member filing with lost-ships list, officer queue (approve, reject with reason, override, Mark paid), Director settings with Hull Rules, `corpSrp` widget; phone uses dense cards |
 | [moons-add-my-corps](moons-add-my-corps/README.md) | Grilling session (no issue yet) | Add my other corps: picker, one confirm with How far back, guided sign-in, status list with Yours pills, Hidden corps |
 | [moon-mining-at-scale](moon-mining-at-scale/README.md) | Review request (no issue yet) | Officer pages for one heavy miner across 57 pops: pops folded by month with Statement and owed in each header, payments that filter the pops they cleared, per-pop and per-moon tax adjustments, bulk Statements and reminders |
+| [route-safety-kill-modal](route-safety-kill-modal/README.md) | Issue #5929 | Kill-location modal: per-location trigger, system view with a section per location, kills expand to named attackers |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
