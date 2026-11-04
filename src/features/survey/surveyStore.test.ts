@@ -734,6 +734,50 @@ describe('polling a survey', () => {
     expect(loadShare).toHaveBeenCalledTimes(1);
   });
 
+  it('has two loads at once share one read', async () => {
+    serve({ surveyScans: [scanDoc('s1', 1000)] });
+    const [a, b] = [loadSurvey('abc123XYZ'), loadSurvey('abc123XYZ')];
+    expect(await b).toEqual(await a);
+    expect(loadShare).toHaveBeenCalledTimes(1);
+    expect(getDocs).toHaveBeenCalledTimes(4);
+  });
+
+  it.each([
+    [
+      'a scan',
+      () => addSurveyScan({ id: 'abc123XYZ', text: ROW(10, 5), expiresAt: LIVE, characterId: 1 }),
+    ],
+    ['a cleared marker', () => finishSurvey({ id: 'abc123XYZ', expiresAt: LIVE })],
+    [
+      'an ignore',
+      () =>
+        setSurveyScanIgnored({
+          id: 'abc123XYZ',
+          expiresAt: LIVE,
+          scanId: 's1',
+          ignored: true,
+          characterId: 1,
+        }),
+    ],
+    [
+      'a tax',
+      () => setSurveyTax({ id: 'abc123XYZ', expiresAt: LIVE, name: 'M', pct: 8, characterId: 1 }),
+    ],
+  ])(
+    'reads again after this app writes %s, not joining a load from before it',
+    async (_, write) => {
+      serve({ surveyScans: [scanDoc('s1', 1000)] });
+      let answer!: (v: unknown) => void;
+      loadShare.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+      const before = loadSurvey('abc123XYZ');
+      await write();
+      const after = loadSurvey('abc123XYZ');
+      answer({ ok: true, share: { type: 'survey', payload: { v: 1 }, expiresAt: LIVE } });
+      await Promise.all([before, after]);
+      expect(loadShare).toHaveBeenCalledTimes(2);
+    }
+  );
+
   it('is not-found once the survey has expired, or its share is gone', async () => {
     serve({ surveyScans: [scanDoc('s1', 1000)] });
     await loadSurvey('abc123XYZ');

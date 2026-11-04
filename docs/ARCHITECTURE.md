@@ -592,7 +592,9 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   (`ctx.onPush` in `collectionSync`/`feedSync`/`settingsSync`, bump in `syncCharacter`). A
   `background` full pass (the sweep) reads that one doc and ends there when it equals what
   this device stored at its last full pass (`syncMarkerKey` in `localBookkeeping.ts`, dropped
-  with the pull cursors); 1 read instead of ~16. Foreground passes (boot, sync now, edits)
+  with the pull cursors); 1 read instead of ~16. The stored value counts this device's own
+  successful bumps, so its own push never earns it a full re-read; another device's bump
+  always leaves the remote ahead. Foreground passes (boot, sync now, edits)
   never skip, a full pass is forced every `SAFETY_RECONCILE_INTERVAL_MS` (3 h), and any
   failure clears the stored value. A marker the rules refuse or a failed bump costs only the
   shortcut, never the sync. Functions that only delete synced docs (`purgeFeed`,

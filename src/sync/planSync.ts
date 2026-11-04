@@ -489,7 +489,10 @@ class UnknownCharacterError extends Error {
  * Change marker (issue #5073, syncMarker.ts): a full pass reads the Character's
  * marker first. A `background` one that finds it unchanged since this device's
  * last full pass ends there, one read instead of one query per collection.
- * Every pass that pushes bumps the marker once its pushes landed. The marker
+ * Every pass that pushes bumps the marker once its pushes landed, and counts
+ * that bump into the marker it has seen: the marker only ever moves by +1, so
+ * when it equals what this device saw plus its own bumps, no other device
+ * wrote, and the next idle pass need not re-read its own push. The marker
  * never gates a foreground pass (boot, sync now, an edit), so local edits
  * always push. A marker the rules refuse (not deployed yet) or that fails to
  * bump only costs the shortcut, never the sync.
@@ -523,8 +526,9 @@ async function syncCharacter(
     confirmOwner: () => (confirmed ??= confirmOwnership(characterId, ownerHash)),
   };
 
-  // The marker as it stood before this pass pulled anything: storing it after
-  // is safe whatever lands meanwhile (a later bump just earns one more full pass).
+  // The marker as it stood before this pass pulled anything, plus this pass's
+  // own bump: storing it after is safe whatever lands meanwhile (another
+  // device's bump leaves the remote ahead of it, which earns one more full pass).
   let markerBefore: number | undefined;
   if (scope === 'all') {
     try {
@@ -571,8 +575,19 @@ async function syncCharacter(
     // What did land still has to reach the other devices, failure or not.
     if (pushed) bumped = await bumpMarkerQuietly(firestore, uid, characterId);
   }
-  if (scope === 'all' && markerBefore !== undefined && bumped) {
-    await writeSeenSyncMarker(characterId, { version: markerBefore, fullAt: now });
+  if (scope === 'all') {
+    if (markerBefore !== undefined && bumped) {
+      await writeSeenSyncMarker(characterId, {
+        version: markerBefore + (pushed ? 1 : 0),
+        fullAt: now,
+      });
+    }
+  } else if (pushed && bumped) {
+    // A narrowed pass keeps the last full pass's claim, with its own bump counted.
+    const seen = await readSeenSyncMarker(characterId);
+    if (seen !== undefined) {
+      await writeSeenSyncMarker(characterId, { ...seen, version: seen.version + 1 });
+    }
   }
   // Heartbeat below means "every collection synced", which a narrowed pass
   // has not shown.

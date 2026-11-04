@@ -216,17 +216,57 @@ describe('bumping the marker', () => {
     expect(readRemoteMarker).toHaveBeenCalledTimes(1);
   });
 
-  it('lets this device skip the pass its own push earns only after one more full read', async () => {
+  it('counts its own bump as seen, so the next idle pass reads only the marker', async () => {
     await triggerSync(1);
     pushOnce();
     await triggerSync(1);
     resetPassCounts();
 
-    await backgroundPass(); // marker moved by our own push: one full read
-    expect(collectionPasses()).toBe(COLLECTION_PASSES);
-    resetPassCounts();
-    await backgroundPass(); // now it is idle
+    await backgroundPass();
+
     expect(collectionPasses()).toBe(0);
+  });
+
+  it('counts a narrowed pass bump as seen too', async () => {
+    await triggerSync(1);
+    pushOnce();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    scheduleSync(1, { collections: ['plans'], debounceMs: 0 });
+    await vi.advanceTimersByTimeAsync(0);
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(remote.version).toBe(1));
+    await vi.waitFor(() => expect(getSyncStatus(1).state).toBe('idle'));
+    resetPassCounts();
+
+    await backgroundPass();
+
+    expect(collectionPasses()).toBe(0);
+  });
+
+  it('still reads everything when another device bumped beside its own', async () => {
+    await triggerSync(1);
+    pushOnce();
+    await triggerSync(1);
+    remote.version = (remote.version ?? 0) + 1; // another device's push
+    resetPassCounts();
+
+    await backgroundPass();
+
+    expect(collectionPasses()).toBe(COLLECTION_PASSES);
+  });
+
+  it('still reads everything when another device bumped during its pass', async () => {
+    await triggerSync(1);
+    vi.mocked(syncEditableCollection).mockImplementationOnce(async (_spec, ctx) => {
+      ctx.onPush?.();
+      remote.version = (remote.version ?? 0) + 1; // lands after this pass read the marker
+    });
+    await triggerSync(1);
+    resetPassCounts();
+
+    await backgroundPass();
+
+    expect(collectionPasses()).toBe(COLLECTION_PASSES);
   });
 
   it('bumps even when the pass failed after pushing', async () => {

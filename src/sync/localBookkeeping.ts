@@ -73,8 +73,8 @@ export interface PullCursor {
 
 /**
  * The remote change marker (`characters/{uid}.syncVersion`, syncMarker.ts) this
- * device last saw at the start of a successful full pass, and when that pass
- * ran. An idle background pass that finds the marker unchanged skips its reads.
+ * device last saw at the start of a successful full pass, plus each bump this
+ * device has made since, and when that pass ran. An idle background pass that finds the marker unchanged skips its reads.
  * Dropped with the pull cursors: whatever voids a cursor voids this too.
  */
 export const syncMarkerKey = (characterId: number): string =>
