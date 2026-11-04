@@ -129,3 +129,34 @@ describe('phone card corner follows the sort', () => {
     expect(cornerOf('sellsPerDay')).toBe('sellsPerDay');
   });
 });
+
+describe('low-volume warning on a phone', () => {
+  const lowRow = {
+    itemName: 'Small Vorton Projector',
+    isBlueprint: false,
+    sellsPerDay: 0.2,
+    offer: { lp_cost: 100, isk_cost: 0, type_id: 1 },
+    profit: {},
+  } as unknown as LoyaltyOfferRow;
+
+  async function itemText(isColumnVisible: (id: string) => boolean) {
+    vi.resetModules();
+    vi.doMock('@/lib/useIsPhone', () => ({ useIsPhone: () => true }));
+    const { useLoyaltyOfferColumns: usePhone } = await import('./useLoyaltyOfferColumns');
+    const { result } = renderHook(() =>
+      usePhone({ lpBasis: 'lp', concord: null, concordPending: false, isColumnVisible })
+    );
+    const item = result.current.columns[0]!;
+    const text = render(<>{item.render(lowRow)}</>).container.textContent;
+    vi.doUnmock('@/lib/useIsPhone');
+    return text;
+  }
+
+  it('leaves the name untagged while the amber sells/day carries it', async () => {
+    expect(await itemText(() => true)).not.toContain('lowVolumeTag');
+  });
+
+  it('tags the name when the picker hides sells/day, so the warning never vanishes', async () => {
+    expect(await itemText((id) => id !== 'sellsPerDay')).toContain('lowVolumeTag');
+  });
+});

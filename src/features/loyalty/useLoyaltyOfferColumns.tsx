@@ -75,13 +75,13 @@ export function useLoyaltyOfferColumns({
         // Amber on a phone's meta line, where the name has no room for the "Low volume" tag
         // (the table keeps the tag beside the name); the screen-reader text below says it.
         cellClassName: (row) =>
-          `tabular-nums${isPhone && isLowVolume(row) ? ' text-warning!' : ''}`,
+          `tabular-nums${isPhone && cornerId !== 'sellsPerDay' && isLowVolume(row) ? ' text-warning!' : ''}`,
         render: (row) => {
           if (row.sellsPerDay === null) return '—';
           if (row.sellsPerDay === 0) return t('loyaltyStore.sellsNone');
           return (
             <>
-              {isPhone && isLowVolume(row) && (
+              {isPhone && cornerId !== 'sellsPerDay' && isLowVolume(row) && (
                 <span className="sr-only">{t('loyaltyStore.lowVolumeTag')}: </span>
               )}
               {formatSellsPerDay(row.sellsPerDay)}
@@ -148,6 +148,9 @@ export function useLoyaltyOfferColumns({
     }),
     [t, lpBasis, concord, concordPending, shownIskPerLp, cornerId, isPhone]
   );
+  // A phone shows low volume as the sells/day cell's amber, so the name's tag is redundant
+  // there, unless the picker has hidden that cell or it is the card's bold corner figure.
+  const phoneWarnsInSells = isPhone && isColumnVisible('sellsPerDay') && cornerId !== 'sellsPerDay';
   const itemColumn = useMemo<DataTableColumn<LoyaltyOfferRow>>(
     () => ({
       id: 'item',
@@ -158,9 +161,16 @@ export function useLoyaltyOfferColumns({
       // two-line name + cost cell), so the table scrolls in its wrapper below it.
       minWidth: '14rem',
       sortValue: (row) => row.itemName,
-      render: (row) => <LoyaltyOfferItemCell row={row} showCost={!isPhone} playerLp={playerLp} />,
+      render: (row) => (
+        <LoyaltyOfferItemCell
+          row={row}
+          showCost={!isPhone}
+          lowVolumeTag={!phoneWarnsInSells}
+          playerLp={playerLp}
+        />
+      ),
     }),
-    [t, isPhone, playerLp]
+    [t, phoneWarnsInSells, isPhone, playerLp]
   );
   // The dense phone card prints every non-title cell on its meta line, so the price
   // the table keeps under the name becomes a cell of its own there.

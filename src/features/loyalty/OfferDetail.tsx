@@ -80,18 +80,21 @@ export function LoyaltyOfferCost({
 
 /**
  * An offers table's item cell: the name, a BP marker for a blueprint, and its LP + ISK price.
- * `showCost` is false on a phone's dense card, which prints the price and the low-volume
- * warning on its meta line instead.
+ * `showCost` is false on a phone's dense card, which prints the price on its meta line instead;
+ * `lowVolumeTag` is false there too while the sells/day cell (amber) says it.
  */
 export function LoyaltyOfferItemCell({
   row,
   showCost = true,
+  lowVolumeTag = true,
   playerLp = null,
 }: {
   row: LoyaltyOfferRow;
   playerLp?: number | null;
   /** False on a phone's dense card, where the cost has its own cell on the meta line. */
   showCost?: boolean;
+  /** False when the phone card's amber sells/day already carries the low-volume warning. */
+  lowVolumeTag?: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -108,7 +111,7 @@ export function LoyaltyOfferItemCell({
           </>
         )}
         {/* A phone says it on the meta line (amber sells/day), where the name needs the room. */}
-        {showCost && isLowVolume(row) && (
+        {lowVolumeTag && isLowVolume(row) && (
           <>
             {' '}
             <span className={tagWordClassName}>{t('loyaltyStore.lowVolumeTag')}</span>
