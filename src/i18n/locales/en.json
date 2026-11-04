@@ -2221,7 +2221,7 @@
         "all0": "All 0",
         "allV": "All V"
       },
-      "custom": "Custom levels…",
+      "custom": "Custom levels",
       "customCount_one": "{{count}} level set",
       "customCount_other": "{{count}} levels set",
       "customTitle": "Skill levels for these stats",

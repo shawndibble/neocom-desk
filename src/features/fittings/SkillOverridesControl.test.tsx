@@ -33,7 +33,7 @@ describe('SkillOverridesControl', () => {
     const user = userEvent.setup();
     render(<SkillOverridesControl />);
     await user.click(screen.getByRole('combobox', { name: 'Skills' }));
-    await user.click(await screen.findByRole('option', { name: 'Custom levels…' }));
+    await user.click(await screen.findByRole('option', { name: 'Custom levels' }));
     const dialog = screen.getByRole('dialog');
 
     await user.type(within(dialog).getByRole('searchbox', { name: 'Find a skill' }), 'target');
