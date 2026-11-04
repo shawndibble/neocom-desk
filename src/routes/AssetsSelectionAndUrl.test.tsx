@@ -391,6 +391,9 @@ describe('view state in the URL (issue #1306)', () => {
       'aria-checked',
       'true'
     );
+    // Min value sits in the funnel box; Escape closes the Tools menu first.
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: /^Filters/ }));
     expect(screen.getByLabelText('Minimum value')).toHaveValue('10,000');
   });
 
