@@ -396,6 +396,8 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             rows={filteredRows}
             rowKey={offerRowKey}
             density="compact"
+            stackLayout="dense"
+            className="dt-actions-pinned-only"
             // Not windowed: the virtualizer follows the window scroll, and the modal body scrolls instead.
             sort={offersSortProps.sort}
             onSortChange={offersSortProps.onSortChange}

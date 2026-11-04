@@ -597,7 +597,7 @@ exactly the markup above.
   two centres on a 28px `end` box (Hauling). A table with a tick box and no
   chevron can add `className="dt-dense-lead"`: the box sits on the title's line with a small
   gap, the card keeps its ordinary left padding so line two starts under the box (Mining
-  Tax). No box or ⋮ overhangs the card's padding. BPC Sourcing uses `dt-dense-tight` too,
+  Tax). A dense card prints every non-title cell on its meta line, so a table that keeps a value under its title (the LP store's offer price) shows it there on a phone by adding a cell with `useIsPhone` and dropping it from the title cell. No box or ⋮ overhangs the card's padding. BPC Sourcing uses `dt-dense-tight` too,
   with neither box: its `cardCorner` is an ISK amount, wider than the
   pinned corner's room for a standing icon. The box is at the 36px
   `sm` height on purpose: at 36px its height set the meta line's and opened a

@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { renderHook } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { useLoyaltyOfferColumns } from './useLoyaltyOfferColumns';
 import type { LoyaltyOfferRow } from './offerRows';
 
@@ -48,5 +48,62 @@ describe('Item column in a windowed table (issue #5388)', () => {
     expect(item.minWidth).toBe('14rem');
     expect(item.className).toBeUndefined();
     expect(rest.every((column) => column.width)).toBe(true);
+  });
+});
+
+describe('ISK / LP column', () => {
+  const { result } = renderHook(() =>
+    useLoyaltyOfferColumns({
+      lpBasis: 'lp',
+      concord: null,
+      concordPending: false,
+      isColumnVisible: () => true,
+    })
+  );
+  const column = result.current.optionalColumns.iskPerLp;
+  const text = (iskPerLp: number) =>
+    render(<>{column.render({ profit: { iskPerLp } } as unknown as LoyaltyOfferRow)}</>).container
+      .textContent;
+
+  it('groups thousands instead of printing 88837.4, and is the phone card’s corner figure', () => {
+    expect(text(88837.4)).toContain('88,837');
+    expect(text(5.25)).toContain('5.3');
+    expect(column.cardCorner).toBe(true);
+  });
+});
+
+describe('phone card (dense stack)', () => {
+  it('moves the price from the item cell into a cell of its own on a phone', async () => {
+    vi.resetModules();
+    vi.doMock('@/lib/useIsPhone', () => ({ useIsPhone: () => true }));
+    const { useLoyaltyOfferColumns: usePhone } = await import('./useLoyaltyOfferColumns');
+    const { result } = renderHook(() =>
+      usePhone({ lpBasis: 'lp', concord: null, concordPending: false, isColumnVisible: () => true })
+    );
+    expect(result.current.columns.map((c) => c.id)).toEqual([
+      'item',
+      'cost',
+      'sellsPerDay',
+      'profit',
+      'iskPerLp',
+    ]);
+    vi.doUnmock('@/lib/useIsPhone');
+  });
+
+  it('keeps the table’s columns unchanged off a phone', () => {
+    const { result } = renderHook(() =>
+      useLoyaltyOfferColumns({
+        lpBasis: 'lp',
+        concord: null,
+        concordPending: false,
+        isColumnVisible: () => true,
+      })
+    );
+    expect(result.current.columns.map((c) => c.id)).toEqual([
+      'item',
+      'sellsPerDay',
+      'profit',
+      'iskPerLp',
+    ]);
   });
 });

@@ -47,17 +47,35 @@ function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
   return <span className={entityLinkClassName()}>{typeId === null ? row.itemName : itemName}</span>;
 }
 
+/** An offer's price: `2,400 LP + 2.4M`. */
+export function LoyaltyOfferCost({ row }: { row: LoyaltyOfferRow }) {
+  return (
+    <>
+      {formatCount(row.offer.lp_cost)} LP + <IskAmount value={row.offer.isk_cost} decimals={0} />
+    </>
+  );
+}
+
 /** An offers table's item cell: the name, a BP marker for a blueprint, and its LP + ISK price. */
-export function LoyaltyOfferItemCell({ row }: { row: LoyaltyOfferRow }) {
+export function LoyaltyOfferItemCell({
+  row,
+  showCost = true,
+}: {
+  row: LoyaltyOfferRow;
+  /** False on a phone's dense card, where the cost has its own cell on the meta line. */
+  showCost?: boolean;
+}) {
   return (
     <span className="flex flex-col">
       <span className="inline-flex items-center gap-1.5">
         <LoyaltyItemName row={row} />
         {row.isBlueprint && <span className={tagWordClassName}>BP</span>}
       </span>
-      <span className="text-[0.6875rem] text-text-dim">
-        {formatCount(row.offer.lp_cost)} LP + <IskAmount value={row.offer.isk_cost} decimals={0} />
-      </span>
+      {showCost && (
+        <span className="text-[0.6875rem] text-text-dim">
+          <LoyaltyOfferCost row={row} />
+        </span>
+      )}
     </span>
   );
 }
