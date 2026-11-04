@@ -122,7 +122,7 @@ const SYSTEM_KILL = {
 
 describe('parseSystemKills', () => {
   it("reads each kill's time, location and attacker ships and weapons", () => {
-    expect(parseSystemKills([SYSTEM_KILL])).toEqual([
+    expect(parseSystemKills([SYSTEM_KILL])).toMatchObject([
       {
         killmailId: 138801220,
         time: Date.parse('2026-09-30T04:55:10Z'),
@@ -133,6 +133,40 @@ describe('parseSystemKills', () => {
         ],
       },
     ]);
+  });
+
+  it('keeps who died and who attacked, and the loss value (issue #5929)', () => {
+    const entry = {
+      ...SYSTEM_KILL,
+      victim: { character_id: 9, corporation_id: 8, alliance_id: 7, ship_type_id: 648 },
+      attackers: [
+        {
+          ship_type_id: 17720,
+          weapon_type_id: 2921,
+          character_id: 1,
+          corporation_id: 2,
+          final_blow: true,
+          damage_done: 500,
+        },
+        { ship_type_id: 17722 },
+      ],
+      zkb: { ...SYSTEM_KILL.zkb, totalValue: 412000000 },
+    };
+    expect(parseSystemKills([entry])[0]).toMatchObject({
+      victim: { characterId: 9, corporationId: 8, allianceId: 7, shipTypeId: 648 },
+      value: 412000000,
+      attackers: [
+        {
+          shipTypeId: 17720,
+          weaponTypeId: 2921,
+          characterId: 1,
+          corporationId: 2,
+          finalBlow: true,
+        },
+        { shipTypeId: 17722 },
+      ],
+    });
+    expect(parseSystemKills([entry])[0]?.attackers[1]).not.toHaveProperty('characterId');
   });
 
   it('drops NPC kills', () => {

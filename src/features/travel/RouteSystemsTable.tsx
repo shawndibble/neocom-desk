@@ -218,7 +218,13 @@ function useColumns(
     {
       id: 'recentKills',
       header: t('travel.col.recentKills'),
-      render: (row) => <RecentKillsCell systemId={row.systemId} cell={killsOf(row.systemId)} />,
+      render: (row) => (
+        <RecentKillsCell
+          systemId={row.systemId}
+          systemName={routeSystemName(row)}
+          cell={killsOf(row.systemId)}
+        />
+      ),
     },
     {
       id: 'avoid',
@@ -254,7 +260,7 @@ function RowDetail({ row, cell }: { row: RouteSafetyRow; cell: RouteKillsCell })
   return (
     <div className="space-y-1 text-[0.8125rem]">
       <p>{t('travel.detail.npcKills', { count: count(row.npcKills) })}</p>
-      <RecentKillsDetail cell={cell} />
+      <RecentKillsDetail cell={cell} systemId={row.systemId} systemName={routeSystemName(row)} />
     </div>
   );
 }
