@@ -277,6 +277,26 @@ export function unsettle(
   return commit(charactersOf(assignments), () => unmarkAssignmentsPaid(assignments));
 }
 
+/**
+ * `unsettle` for a caller that holds only ids: a Corp Tax Book row stands in for the member's own
+ * paid marks, and the book rows are not among the Assignments the screen keeps in memory.
+ */
+export function unsettleByIds(
+  ids: readonly string[]
+): Promise<LedgerActionResult<MiningTaxAssignmentRecord[]>> {
+  return commit(
+    (found: MiningTaxAssignmentRecord[]) => charactersOf(found),
+    async () => {
+      const found = (await db.miningTaxAssignments.bulkGet([...ids])).filter(
+        (a): a is MiningTaxAssignmentRecord => a !== undefined
+      );
+      if (found.length === 0) throw new Error('No stored Assignment matches the paid marks');
+      await unmarkAssignmentsPaid(found);
+      return found;
+    }
+  );
+}
+
 /** Takes ore off the miner's own Assignments because the corporation bills it (#4517). */
 export async function releaseOre(
   releases: readonly { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[],

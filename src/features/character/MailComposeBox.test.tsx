@@ -293,6 +293,24 @@ describe('recipient search that ESI refuses', () => {
 });
 
 describe('a saved draft', () => {
+  it('ignores a blank draft and builds the reply defaults', async () => {
+    drafts.loadDraft.mockResolvedValue({
+      id: `${CHAR_ID}:7`,
+      characterId: CHAR_ID,
+      mailId: 7,
+      kind: 'reply',
+      recipients: [],
+      subject: '',
+      body: '',
+      format: 'markup',
+      updatedAt: 1,
+    });
+    renderBox('reply');
+
+    expect(await screen.findByText('Sender Sal')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue(/^RE:/)).toBeInTheDocument();
+  });
+
   it('is used instead of the reply-all defaults', async () => {
     drafts.loadDraft.mockResolvedValue({
       id: `${CHAR_ID}:7`,
@@ -509,5 +527,15 @@ describe('Cancel', () => {
 
     expect(onClose).toHaveBeenCalled();
     expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it('discards the saved draft so the next Reply starts fresh', async () => {
+    const user = userEvent.setup();
+    renderBox('reply');
+    await screen.findByText('Sender Sal');
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(drafts.clearDraft).toHaveBeenCalledWith(CHAR_ID, 7);
   });
 });

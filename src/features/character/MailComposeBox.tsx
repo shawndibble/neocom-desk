@@ -146,7 +146,13 @@ export function MailComposeBox({
         if (!cancelled) setReady(true);
         return;
       }
-      if (draft && draft.kind === kind) {
+      // A draft with nothing in it (everything cleared out) is no draft: build the defaults.
+      const isBlank =
+        draft !== undefined &&
+        draft.recipients.length === 0 &&
+        draft.subject.trim() === '' &&
+        draft.body.trim() === '';
+      if (draft && draft.kind === kind && !isBlank) {
         setRecipients(
           draft.recipients.map((r) => ({
             ...r,
@@ -190,7 +196,7 @@ export function MailComposeBox({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run only on a genuinely new mail/kind, not on every resolver identity change.
   }, [characterId, header.mail_id, kind]);
 
-  // Debounced autosave (decision: Dexie, device-only, cleared on send).
+  // Debounced autosave (decision: Dexie, device-only, cleared on send or Cancel).
   // Gated on `ready` so the hydration above never overwrites a real draft
   // with the still-empty initial state on the first render.
   useEffect(() => {
@@ -443,7 +449,15 @@ export function MailComposeBox({
         blocked={bodyOver}
         onSend={() => void handleSend()}
       >
-        <Button size="sm" onClick={onClose} disabled={sending}>
+        <Button
+          size="sm"
+          onClick={() => {
+            // Cancel discards: a half-written draft would otherwise come back on the next Reply.
+            void clearDraft(characterId, header.mail_id).catch(() => undefined);
+            onClose();
+          }}
+          disabled={sending}
+        >
           {t('mail.cancel')}
         </Button>
         {!online && <span className="truncate text-xs text-text-dim">{t('mail.draftSaved')}</span>}
