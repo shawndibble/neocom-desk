@@ -556,6 +556,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
                         />
                         {organize.canOrganize(selectedRow) && (
                           <MailRowMenu
+                            variant="ghost"
                             label={t('common.moreActions')}
                             isRead={isMailRead(selectedRow, locallyReadKeys, locallyUnreadKeys)}
                             onSetRead={(read) => void organize.setRead([selectedRow], read)}
