@@ -54,6 +54,15 @@ export function worstSeverity(severities: readonly DeadlineSeverity[]): Deadline
 }
 
 /**
+ * Which ladder a source reads. `default` is the pilot's own clocks, where a
+ * day's notice is enough to act: yellow inside 24h, red inside 1h or overdue.
+ * `logistics` is for corp work that needs planning and hauling (structure fuel,
+ * sovereignty run-outs), so it keeps the longer 7d / 3d / 24h lead. A source
+ * picks its profile once; nothing branches on what kind of clock an item is.
+ */
+export type SeverityProfile = 'default' | 'logistics';
+
+/**
  * `remainingMs` is deliberately **unclamped** by every caller: an overdue item
  * arrives as a negative, which is what keeps overdue items ordered against
  * each other instead of collapsing into one tie at zero. Clamping belongs at
@@ -63,10 +72,18 @@ export function worstSeverity(severities: readonly DeadlineSeverity[]): Deadline
  * `fuel_expires` at exactly the moment a structure runs dry. Not knowing is a
  * caution, never an all-clear, so it answers `warning` rather than `clear`.
  */
-export function severityForRemaining(remainingMs: number | null): DeadlineSeverity {
+export function severityForRemaining(
+  remainingMs: number | null,
+  profile: SeverityProfile = 'default'
+): DeadlineSeverity {
   if (remainingMs === null) return 'warning';
-  if (remainingMs <= 24 * HOUR_MS) return 'critical';
-  if (remainingMs <= 3 * DAY_MS) return 'warning';
-  if (remainingMs <= 7 * DAY_MS) return 'watch';
+  if (profile === 'logistics') {
+    if (remainingMs <= 24 * HOUR_MS) return 'critical';
+    if (remainingMs <= 3 * DAY_MS) return 'warning';
+    if (remainingMs <= 7 * DAY_MS) return 'watch';
+    return 'clear';
+  }
+  if (remainingMs <= HOUR_MS) return 'critical';
+  if (remainingMs <= 24 * HOUR_MS) return 'warning';
   return 'clear';
 }
