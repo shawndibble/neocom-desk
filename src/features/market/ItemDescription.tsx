@@ -4,8 +4,9 @@
  * shows the rest in place. The action only appears when the text overflows
  * the clamp, measured live so a resize that lets it fit drops it again. Held
  * to a readable line length (`max-w-[80ch]`) however wide the modal is.
- * `full` shows it all with no toggle: an implant's or booster's bonuses are
- * written in its description, so the text is the stats there.
+ * `full` shows it all with no toggle: an implant's, combat booster's or
+ * accelerator's bonuses are written in its description, so the text is the
+ * stats there.
  */
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';

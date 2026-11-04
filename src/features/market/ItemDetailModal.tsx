@@ -218,7 +218,7 @@ export function ItemDetailModal({
   const loadGroupLine = useCallback(() => loadItemGroupLine(typeId), [typeId]);
   const { data: groupLine } = useKeyedLoad(String(typeId), loadGroupLine);
   const loadCategory = useCallback(() => loadItemCategoryId(typeId), [typeId]);
-  const { data: categoryId } = useKeyedLoad(String(typeId), loadCategory);
+  const category = useKeyedLoad(String(typeId), loadCategory);
 
   // Null until known, so the market line and link don't flash in on an Abyssal type.
   const abyssal = useIsAbyssalType(typeId);
@@ -517,11 +517,12 @@ export function ItemDetailModal({
                 </div>
               </div>
 
-              {data.type.description && (
+              {/* Held until the category is known (it never fails), so an implant never flashes clamped. */}
+              {data.type.description && category.status === 'ready' && (
                 <ItemDescription
                   markup={data.type.description}
-                  // An implant's or booster's bonuses are written in its description.
-                  full={categoryId === IMPLANT_CATEGORY_ID}
+                  // An implant's, combat booster's or accelerator's bonuses are in its description.
+                  full={category.data === IMPLANT_CATEGORY_ID}
                 />
               )}
 
