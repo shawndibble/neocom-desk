@@ -20,6 +20,7 @@ import {
   unassign,
   uncombine,
   undoContinue,
+  unsettleByIds,
 } from './ledgerActions';
 
 const syncMock = vi.hoisted(() => ({ scheduleSync: vi.fn() }));
@@ -477,5 +478,27 @@ describe('deletePayee', () => {
         .map((a) => a.id)
         .sort()
     ).toEqual(['g1', 'g2']);
+  });
+});
+
+describe('unsettleByIds', () => {
+  it('reverts Paid Assignments the caller only knows by id', async () => {
+    await db.miningTaxAssignments.bulkPut([
+      assignment({ id: 'a1', status: 'paid', paidAt: 5 }),
+      assignment({ id: 'a2', status: 'paid', paidAt: 5 }),
+    ]);
+
+    const result = await unsettleByIds(['a1']);
+
+    expect(result.ok).toBe(true);
+    expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('outstanding');
+    expect((await db.miningTaxAssignments.get('a2'))?.status).toBe('paid');
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, expect.anything());
+  });
+
+  it('fails when no id matches a stored Assignment', async () => {
+    const result = await unsettleByIds(['missing']);
+
+    expect(result.ok).toBe(false);
   });
 });
