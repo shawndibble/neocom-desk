@@ -317,18 +317,20 @@ describe('Market Browser: All regions', () => {
     window.history.pushState({}, '', '/market/browser');
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'Filters' }));
-    const distance = screen.getByRole('combobox', { name: 'Distance' });
+    // Always on the page, under the search box: no funnel click needed.
+    const distance = await screen.findByRole('combobox', { name: 'Distance' });
     // No range: the book reads the header's hub, so that is what it says.
     expect(distance).toHaveTextContent('Jita');
     expect(screen.queryByRole('button', { name: /Change current system/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Security' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Security/ })).not.toBeInTheDocument();
 
     await user.click(distance);
     await user.click(await screen.findByRole('option', { name: 'Within 5 jumps' }));
 
+    // The origin appears beside it, still without opening the funnel.
     expect(screen.getByRole('button', { name: /Change current system/ })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Security' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    expect(screen.getByRole('button', { name: /^Security/ })).toBeInTheDocument();
   });
 
   it('with a persisted Jump Range and no matching query param, fetches only the in-range regions from the first request', async () => {
