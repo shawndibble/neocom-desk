@@ -361,12 +361,8 @@ function ShipRowView({
               </span>
             )}
             {(shipClass || row.packaged) && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-text-dim max-sm:ml-1.5 sm:flex">
-                {shipClass && (
-                  <span aria-hidden="true" className="sm:hidden">
-                    ·
-                  </span>
-                )}
+              <span className="inline-flex items-center gap-1.5 text-xs text-text-dim ml-1.5">
+                {shipClass && <span aria-hidden="true">·</span>}
                 {shipClass}
                 {row.packaged && (
                   <Pill tone="warning" className="shrink-0">
