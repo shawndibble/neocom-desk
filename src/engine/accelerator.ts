@@ -7,6 +7,8 @@
  * out; once it has, it counts as gone (the stored record is deleted by
  * `features/accelerator`) and detection from the attribute sheet applies again.
  */
+import { HOUR_MS } from '@/lib/age';
+import type { DeadlineSeverity } from './character/severity';
 
 export interface TypedAccelerator {
   bonus: number;
@@ -42,12 +44,12 @@ export function resolveAccelerator(
 }
 
 /** How far ahead of its end a running accelerator is worth a warning: only then can a new one be queued up. */
-export const ACCELERATOR_WARNING_HOURS = 2;
+const ACCELERATOR_WARNING_HOURS = 2;
 
 /**
  * An accelerator can't be stacked or replaced until it ends, so days of warning
  * are noise; it only turns `warning` inside the last `ACCELERATOR_WARNING_HOURS`.
  */
-export function acceleratorSeverity(remainingMs: number): 'warning' | 'clear' {
-  return remainingMs <= ACCELERATOR_WARNING_HOURS * 3_600_000 ? 'warning' : 'clear';
+export function acceleratorSeverity(remainingMs: number): DeadlineSeverity {
+  return remainingMs <= ACCELERATOR_WARNING_HOURS * HOUR_MS ? 'warning' : 'clear';
 }

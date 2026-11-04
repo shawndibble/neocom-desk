@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { HOUR_MS } from '@/lib/age';
 import { acceleratorSeverity, isAcceleratorLive, resolveAccelerator } from './accelerator';
 
 const NOW = 1_000_000;
@@ -38,7 +39,7 @@ describe('isAcceleratorLive', () => {
 });
 
 describe('acceleratorSeverity', () => {
-  const HOUR = 3_600_000;
+  const HOUR = HOUR_MS;
   it('stays clear until the last two hours', () => {
     expect(acceleratorSeverity(3 * 24 * HOUR)).toBe('clear');
     expect(acceleratorSeverity(2 * HOUR + 1)).toBe('clear');
