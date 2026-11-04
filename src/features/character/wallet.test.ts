@@ -351,7 +351,9 @@ describe('loadWalletTransactionsWithStatus', () => {
     const withArchive = await loadWalletTransactionsWithStatus(CHAR_ID, { archive: true });
 
     expect(live.cached?.data.map((t) => t.transaction_id)).toEqual([9002]);
-    expect(withArchive.cached?.data.map((t) => t.transaction_id).sort()).toContain(9001);
+    expect(withArchive.cached?.data.map((t) => t.transaction_id)).toEqual(
+      expect.arrayContaining([9001, 9002])
+    );
   });
 });
 

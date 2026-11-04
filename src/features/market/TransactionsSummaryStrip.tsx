@@ -30,18 +30,14 @@ export function TransactionsSummaryStrip({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const summary = useMemo(() => summarizeTransactions(transactions), [transactions]);
+  // Filter days and fill dates are both UTC days (the row filter compares `date.slice(0, 10)`).
+  const rangeBound = (filterDay: string | null | undefined, fallback: string | null) => {
+    const iso = filterDay ?? fallback?.slice(0, 10);
+    return iso ? formatDateOnly(new Date(`${iso}T00:00:00Z`), 'UTC') : null;
+  };
   const rangeSet = range != null && (range.startDate !== null || range.endDate !== null);
-  const day = (iso: string) => formatDateOnly(new Date(`${iso}T00:00:00Z`), 'UTC');
-  const rangeFrom = rangeSet
-    ? range.startDate !== null
-      ? day(range.startDate)
-      : summary.oldest && formatDateOnly(new Date(summary.oldest), timeZone)
-    : null;
-  const rangeTo = rangeSet
-    ? range.endDate !== null
-      ? day(range.endDate)
-      : summary.newest && formatDateOnly(new Date(summary.newest), timeZone)
-    : null;
+  const rangeFrom = rangeSet ? rangeBound(range.startDate, summary.oldest) : null;
+  const rangeTo = rangeSet ? rangeBound(range.endDate, summary.newest) : null;
   return (
     <section
       aria-label={t('wallet.transactionsSummaryLabel')}
