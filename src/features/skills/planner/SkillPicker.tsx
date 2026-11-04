@@ -171,7 +171,7 @@ export function SkillPicker({
 
   return (
     <div className={className}>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
         <SearchInput
           ref={searchRef}
           inputClassName="lg:scroll-mt-40"
@@ -183,14 +183,18 @@ export function SkillPicker({
           }}
           placeholder={t('plans.searchPlaceholder')}
           aria-label={t('plans.addSkill')}
-          className="flex-1"
+          className="min-w-0 flex-1"
         />
         <span
           role="status"
           aria-live="polite"
           data-testid="pick-status"
           className={
-            announcementVisible ? 'flex items-center gap-1.5 text-xs text-text-dim' : 'sr-only'
+            // On a phone the confirmation takes a line of its own under the
+            // row, so the search box keeps its controls beside it.
+            announcementVisible
+              ? 'order-last flex basis-full items-center gap-1.5 text-xs text-text-dim sm:order-none sm:basis-auto'
+              : 'sr-only'
           }
         >
           {announcement}
@@ -212,7 +216,7 @@ export function SkillPicker({
           )}
         </span>
         {controls && (
-          <div className="flex flex-wrap items-center gap-2 text-xs whitespace-nowrap text-text-dim">
+          <div className="flex shrink-0 items-center gap-2 text-xs whitespace-nowrap text-text-dim">
             {controls}
           </div>
         )}
