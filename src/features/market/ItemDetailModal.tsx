@@ -31,21 +31,18 @@ import {
   interactiveClassName,
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useInRouterContext, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useInRouterContext, useLocation } from 'react-router-dom';
 import {
   Button,
   buttonClassName,
   EmptyState,
   IskAmount,
-  MenuItem,
   Modal,
   Popover,
   PopoverContent,
   PopoverTrigger,
-  RowActionsContext,
-  RowMoreActions,
   Spinner,
   TabPanel,
   Tabs,
@@ -53,13 +50,12 @@ import {
   TypeIcon,
   useTabsId,
 } from '@/components/ui';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, TRADE_HUBS } from '@/market/hubs';
 import {
   groupItemAttributes,
   type AttributeDictionary,
   type AttributeGroup,
 } from '@/engine/market/itemAttributes';
-import { EveMarkupText } from '@/components/EveMarkupText';
 import { marketItemUrl } from '@/engine/market/urlState';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import {
@@ -72,13 +68,13 @@ import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi, loadSkillAttributeModifiers, loadSkills } from '@/sde/loadSde';
 import type { PiData, SkillAttributeModifierMap } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { extractRequiredSkills, type RequiredSkill } from '@/features/skills/dogma';
 import { useTargetPlan, type TargetPlan } from '@/features/skills/useTargetPlan';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
-import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
-import { useIsNarrow } from '@/lib/useIsNarrow';
+import { loadRegionName } from '@/features/places/regions';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue, formatVolume } from './format';
 import { loadTypeDetail, type TypeDetail } from '@/features/skills/typeDetail';
@@ -88,6 +84,9 @@ import {
   type OrderBookLocation,
 } from './orderBookView';
 import { ItemMarketTab } from './ItemMarketTab';
+import { ItemDescription } from './ItemDescription';
+import { loadItemGroupLine } from './itemGroupLine';
+import { priceMarketOf } from './priceMarket';
 import { RequiredSkillsSection } from './RequiredSkillsSection';
 import { skillNameOrFallback } from './skillNameOrFallback';
 import { MadeFromSection } from './MadeFromSection';
@@ -116,9 +115,10 @@ export interface ItemDetailModalProps {
    */
   location?: OrderBookLocation;
   /**
-   * An "Open in Market" link in the header, for an Item Detail opened away
-   * from the Market Browser (Show info on any page, the Command Palette).
-   * Opt-in: on the Market Browser itself it would link to the page already open.
+   * An "Open in Market Browser" link at the top of the Market tab, for an Item
+   * Detail opened away from the Market Browser (Show info on any page, the
+   * Command Palette). Opt-in: on the Market Browser itself it would link to
+   * the page already open.
    */
   showOpenInMarket?: boolean;
   /**
@@ -163,7 +163,6 @@ export function ItemDetailModal({
 }: ItemDetailModalProps) {
   const { t } = useTranslation();
   const leave = onLeave ?? onClose;
-  const narrow = useIsNarrow();
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -182,6 +181,29 @@ export function ItemDetailModal({
   const savedLocation = useSavedOrderBookLocation(location === undefined);
   const priceLocation = location ?? savedLocation;
   const [priceState, setPriceState] = useState<PriceState>({ status: 'loading' });
+  const priceMarket = priceLocation ? priceMarketOf(typeId, priceLocation) : null;
+  /** A Region-mode market no hub sits in, named off the bundled region list. */
+  const regionToLookUp =
+    priceMarket?.kind === 'region' && priceMarket.name === null ? priceMarket.regionId : null;
+  const loadPriceRegionName = useCallback(
+    () => (regionToLookUp === null ? Promise.resolve(null) : loadRegionName(regionToLookUp)),
+    [regionToLookUp]
+  );
+  const { data: lookedUpRegionName } = useKeyedLoad(
+    regionToLookUp === null ? null : String(regionToLookUp),
+    loadPriceRegionName
+  );
+  const priceMarketName = priceMarket?.name ?? lookedUpRegionName ?? null;
+  /**
+   * Where "Made from" prices its inputs: the Trade Hub (hub prices are per
+   * station, so a Region-mode location still prices inputs at its hub). The
+   * line names it.
+   */
+  const inputPriceHub = priceLocation
+    ? (TRADE_HUBS.find((hub) => hub.stationId === priceLocation.hubStationId) ?? DEFAULT_TRADE_HUB)
+    : null;
+  const loadGroupLine = useCallback(() => loadItemGroupLine(typeId), [typeId]);
+  const { data: groupLine } = useKeyedLoad(String(typeId), loadGroupLine);
 
   // Null until known, so the market line and link don't flash in on an Abyssal type.
   const abyssal = useIsAbyssalType(typeId);
@@ -321,33 +343,17 @@ export function ItemDetailModal({
       onClose={onClose}
       // The URL-backed host already owns the history entry (`?info`).
       closeOnBack={onLeave === undefined}
-      // An abyssal type's roll table has a column per mutaplasmid, up to eight.
-      placement={abyssal || tab === 'market' ? 'wide' : 'center'}
+      // One width for every tab and item kind (48rem), so switching tabs never
+      // jumps the box and text keeps a readable measure on a wide screen. An
+      // abyssal roll table wider than that scrolls sideways in its own box.
+      placement="medium"
       title={itemName}
       titleActions={
-        // Two text buttons squeeze the name to a letter on a phone; there they share one ⋮.
-        narrow && showMarketLink ? (
-          <ItemDetailMoreActions
-            typeId={typeId}
-            itemName={itemName}
-            onNavigate={leave}
-            replace={onLeave !== undefined}
-          />
-        ) : (
-          <>
-            {/* An abyssal type has no market group, so no in-game market window either. */}
-            {abyssal !== true && (
-              <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />
-            )}
-            {showMarketLink && (
-              <OpenInMarketLink
-                typeId={typeId}
-                onNavigate={leave}
-                replace={onLeave !== undefined}
-              />
-            )}
-          </>
-        )
+        // One header action, so a plain button at every width. The Market
+        // Browser link lives in the Market tab: the tab is this modal's one
+        // market entry point, and the best prices below link there too.
+        // An abyssal type has no market group, so no in-game market window either.
+        abyssal !== true && <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />
       }
     >
       {loading ? (
@@ -381,6 +387,15 @@ export function ItemDetailModal({
           )}
           {tab === 'market' && abyssal === false ? (
             <TabPanel tabsId={tabsId} tabId="market">
+              {showMarketLink && (
+                <div className="mb-2 flex justify-end">
+                  <OpenInMarketLink
+                    typeId={typeId}
+                    onNavigate={leave}
+                    replace={onLeave !== undefined}
+                  />
+                </div>
+              )}
               <ItemMarketTab
                 typeId={typeId}
                 itemName={itemName}
@@ -397,10 +412,18 @@ export function ItemDetailModal({
                   height={64}
                   className="shrink-0 rounded-xs border border-line"
                 />
-                <div className="space-y-1 text-xs">
-                  <p className="text-text-dim">
-                    {t('market.itemDetail.volume', { volume: formatVolume(data.type.volume ?? 0) })}
-                  </p>
+                <div className="min-w-0 space-y-1 text-xs">
+                  {groupLine && (
+                    <p className="text-sm text-text">
+                      {groupLine.faction
+                        ? t('market.itemDetail.groupWithFaction', {
+                            group: groupLine.group,
+                            faction: groupLine.faction,
+                          })
+                        : groupLine.group}
+                    </p>
+                  )}
+                  <VolumeLine type={data.type} />
                   {abyssal === null
                     ? null
                     : abyssal
@@ -413,7 +436,17 @@ export function ItemDetailModal({
                           />
                         )
                       : priceState.status !== 'error' && (
-                          <p className="flex gap-4 text-text-dim">
+                          <p className="flex flex-wrap gap-x-4 text-text-dim">
+                            {priceMarket && priceMarketName && (
+                              <span className="text-text">
+                                {t(
+                                  priceMarket.kind === 'hub'
+                                    ? 'market.itemDetail.pricesAtHub'
+                                    : 'market.itemDetail.pricesInRegion',
+                                  { market: priceMarketName }
+                                )}
+                              </span>
+                            )}
                             <PriceFigure
                               label={t('market.itemDetail.bestSell')}
                               side="sell"
@@ -440,11 +473,10 @@ export function ItemDetailModal({
                             />
                           </p>
                         )}
-                  {data.type.description && (
-                    <EveMarkupText markup={data.type.description} className="text-text" />
-                  )}
                 </div>
               </div>
+
+              {data.type.description && <ItemDescription markup={data.type.description} />}
 
               <AbyssalItemDetail typeId={typeId} dynamic={dynamic} />
 
@@ -459,7 +491,18 @@ export function ItemDetailModal({
 
               <PlanetaryProduction pi={pi} typeId={typeId} />
 
-              <MadeFromSection typeId={typeId} />
+              <MadeFromSection
+                typeId={typeId}
+                pricing={
+                  inputPriceHub && abyssal === false
+                    ? {
+                        hub: inputPriceHub,
+                        bestSell:
+                          priceState.status === 'ready' ? priceState.summary.bestSell : undefined,
+                      }
+                    : undefined
+                }
+              />
 
               <UsedInSection typeId={typeId} onNavigate={leave} />
 
@@ -545,41 +588,26 @@ function OpenInMarketLink({
 }
 
 /**
- * Below `md`, the header's two actions as one ⋮ (DESIGN.md §6c Header
- * controls): Open in EVE, and View in Market doing what
- * `OpenInMarketLink` does.
+ * The volume a pilot hauls: packaged where the item has a distinct packaged
+ * volume (a ship: 10,000 m3 packaged, 118,000 m3 assembled), with the
+ * assembled figure second; otherwise the one volume.
  */
-function ItemDetailMoreActions({
-  typeId,
-  itemName,
-  onNavigate,
-  replace,
-}: {
-  typeId: number;
-  itemName: string;
-  onNavigate: () => void;
-  replace: boolean;
-}) {
+function VolumeLine({ type }: { type: TypeDetail }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { search } = useLocation();
-  const items = (
-    <>
-      <OpenInEveMenuItem kind="marketDetails" id={typeId} />
-      <MenuItem
-        onSelect={() => {
-          onNavigate();
-          void navigate(marketItemUrl(typeId, search), { replace });
-        }}
-      >
-        {t('market.itemDetail.openInMarket')}
-      </MenuItem>
-    </>
-  );
+  const volume = type.volume ?? 0;
+  const packaged = type.packaged_volume;
+  if (packaged === undefined || packaged === volume) {
+    return (
+      <p className="text-text-dim">
+        {t('market.itemDetail.volume', { volume: formatVolume(volume) })}
+      </p>
+    );
+  }
   return (
-    <RowActionsContext.Provider value={{ name: itemName, items }}>
-      <RowMoreActions />
-    </RowActionsContext.Provider>
+    <p className="text-text-dim">
+      {t('market.itemDetail.volumePackaged', { volume: formatVolume(packaged) })}{' '}
+      {t('market.itemDetail.volumeAssembled', { volume: formatVolume(volume) })}
+    </p>
   );
 }
 
