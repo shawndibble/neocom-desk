@@ -522,7 +522,9 @@ describe('FilterBar inline key filter', () => {
     render(<InlineHarness placement="below" />);
     const field = screen.getByRole('textbox', { name: 'Space' });
     const funnel = screen.getByRole('button', { name: /^Filters/ });
-    expect(funnel.parentElement?.parentElement).not.toContainElement(field);
+    // The `below` line follows the row that holds the funnel in document order.
+    expect(funnel.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(funnel.closest('div.flex-wrap')).not.toContainElement(field);
   });
 
   it('keeps a row-placed key filter in the box, with a pill and count, between md and lg', async () => {

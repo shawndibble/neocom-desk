@@ -1,14 +1,15 @@
 /**
  * Where the Market Browser's Order Book is looking, said above the book itself
  * — "Within 5 jumps of Badivefi · 6 stations", or the hub station and how far
- * it is — with the same filters the finder's funnel holds, editable in place.
+ * it is — with the filters the finder's funnel holds, editable in place.
  *
- * The filters still live beside the item search (the range is set before
- * searching, scope decision 20260929-204125); this bar mirrors them on the
- * results side, where a reader looks for "why is the book showing this", and
- * is the only way to reach them on a phone once an item is open (the finder
- * column is hidden then). Both bars read and write one `BrowserFilterValue`,
- * so they can never disagree.
+ * The filters live beside the item search (the range is set before searching,
+ * scope decision 20260929-204125, and is the finder's inline select); this bar
+ * mirrors them on the results side, where a reader looks for "why is the book
+ * showing this". The finder column is hidden below `lg` once an item is open,
+ * so there this bar's funnel is the only way to reach the range and origin;
+ * from `lg` up they stay in the finder and the bar only says them in words.
+ * Both bars read and write one `BrowserFilterValue`, so they can never disagree.
  */
 import { fixed1 } from '@/lib/fixedFormat';
 import { JumpsLink } from '@/features/route/JumpsLink';
@@ -170,7 +171,7 @@ function BrowserFilterFields({
 export interface BrowserFilterBarProps {
   value: BrowserFilterValue;
   onChange: (next: BrowserFilterValue) => void;
-  /** `activeBrowserFilters`: the pills under the search, and the funnel's badge. */
+  /** `activeBrowserFilters`: the pills under the search and the funnel's badge (the range is `inline`, so neither counts it). */
   active: readonly ActiveFilter<BrowserFilterValue>[];
   regionMode: boolean;
   scopeLabel: string;
@@ -267,6 +268,8 @@ export function OrderBookScopeBar({
   const ranged = scope.kind === 'range';
   // Below `lg` the finder is hidden while an item is open (Market.tsx), so
   // the range lives here; from `lg` up the finder holds it beside the book.
+  // `useIsDesktop` rather than `FilterBar`'s max-width form: this must match
+  // the query Market.tsx hides the finder on.
   const finderBeside = useIsDesktop();
 
   const summary = (() => {
@@ -363,10 +366,10 @@ export function OrderBookScopeBar({
           title={t('market.scope.sheetTitle')}
           pointerSurface="popover"
         >
-          {(draft, setDraft, surface) => (
+          {(draft, setDraft) => (
             <BrowserFilterFields
-              showRange={surface === 'sheet' || !finderBeside}
-              showOrigin={surface === 'sheet' || !finderBeside}
+              showRange={!finderBeside}
+              showOrigin={!finderBeside}
               draft={draft}
               setDraft={setDraft}
               regionMode={regionMode}

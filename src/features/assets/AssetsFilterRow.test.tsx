@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { BELOW_DESKTOP_QUERY } from '@/lib/useIsBelowDesktop';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { stubViewport } from '@/test/viewport';
 import { AssetsFilterRow } from './AssetsFilterRow';
@@ -80,5 +81,17 @@ describe('AssetsFilterRow', () => {
     expect(sheet.getByLabelText('Blueprints')).toBeInTheDocument();
     expect(sheet.getByLabelText('Minimum value')).toBeInTheDocument();
     expect(sheet.getByRole('combobox', { name: 'Sort' })).toBeInTheDocument();
+  });
+
+  it('keeps Sort in the row but Category and Blueprints in the box between md and lg', async () => {
+    stubViewport(BELOW_DESKTOP_QUERY);
+    const user = userEvent.setup();
+    render(setup());
+    expect(screen.queryByLabelText(/^Category/)).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Sort' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    expect(screen.getByLabelText(/^Category/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Blueprints')).toBeInTheDocument();
+    expect(screen.getByLabelText('Minimum value')).toBeInTheDocument();
   });
 });

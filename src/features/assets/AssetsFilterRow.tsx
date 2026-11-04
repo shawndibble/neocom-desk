@@ -20,8 +20,9 @@ import type { AssetsRows } from './useAssetsRows';
 /**
  * The Items page's one filter row (issue #5601): search, Category, Blueprints
  * (only while something under Blueprints & Reactions is ticked), min value and,
- * in a flat list, sort. Category and Blueprints sit in the row from `md` up
- * (DESIGN.md §4b); on a phone every control is behind the funnel's sheet.
+ * in a flat list, sort. Category and Blueprints sit in the row from `lg` up
+ * (DESIGN.md §4b); between `md` and `lg` they are in the funnel box, and on a
+ * phone every control is behind the funnel's sheet.
  */
 export function AssetsFilterRow({
   assetsData,
@@ -49,9 +50,8 @@ export function AssetsFilterRow({
   const { searchRef, sortField, setSortField, rows } = assetsRows;
 
   // Each control sits in a `FilterField` whose label is its pill's, so a pill
-  // tapped on a phone opens the sheet on that control. Outside a `FilterBar`
-  // (the desktop row) a `FilterField` is `display: contents`, so the inline
-  // layout is untouched.
+  // tapped opens the box or sheet on that control. In the row (`inline`) a
+  // `FilterField` is `display: contents`, so the control sits as it is.
   const category = categoryIndex && pickerIndex && (
     <FilterField label={t('assets.category.label')}>
       <AssetCategoryPicker
@@ -129,6 +129,8 @@ export function AssetsFilterRow({
           {blueprints}
         </>
       )}
+      // Sort arranges rather than narrows, so it is a view control in `actions`
+      // from `md` up (not `inline`, which is capped at two and starts at `lg`).
       actions={!isNarrow && sort}
       active={activeFilters}
       // Only a flat list's rows are results; browsing, they are a place's contents.

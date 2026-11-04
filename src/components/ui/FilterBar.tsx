@@ -144,9 +144,12 @@ function focusField(container: HTMLElement | null, label: string | null): void {
 }
 
 /**
- * What `children` is rendering for: `box` (the pointer-width box or popover,
- * with `inline` filters on the row above it) or `sheet` (the phone sheet, or a
- * box whose row has no room for `inline`): render the inline filters too.
+ * What `children` is rendering for: `box` (the pointer-width box or popover;
+ * any `inline` filters are in the row, so leave them out) or `sheet` (the
+ * phone sheet, or a box whose row holds no `inline` filters: render them too).
+ * Not the same as `useFilterSurface()`, which says only whether the controls
+ * are in the sheet (captions) — between `md` and `lg` a box reads `inline`
+ * there and `sheet` here.
  */
 export type FilterControlsSurface = 'box' | 'sheet';
 
@@ -199,6 +202,7 @@ interface FilterBarProps<T> {
    * where they would show twice.
    * Mark their `active` entries `inline` so they get no pill and no funnel
    * count on a pointer-width screen. Not supported with `pointerSurface="popover"`.
+   * The cap of two is a convention, not enforced: the slot is a node.
    */
   inline?: (value: T, onChange: (next: T) => void) => ReactNode;
   /**
@@ -260,14 +264,16 @@ interface FilterBarProps<T> {
  * controls — in a box under the row on a pointer-width screen, in a bottom
  * sheet below `md`.
  *
- * Always behind the funnel, never laid out inline, so every searchable table
- * reads the same: search, columns, filters, one line. Inline filters wrapped
- * to a second row on most routes and pushed the picker away from the search.
+ * Behind the funnel, so every searchable table reads the same: search,
+ * columns, filters, one line. Inline filters wrapped to a second row on most
+ * routes and pushed the picker away from the search. The one exception is
+ * `inline`: one or two key filters a page chooses to show in the row from
+ * `lg` up (DESIGN.md §4b).
  *
  * While the controls are closed, the filters that are on show as a single
  * line of pills under the row (`active`). Opening the funnel slides the box
  * into that same slot, so a setting is shown as a pill or as its control,
- * never both.
+ * never both (an `inline` filter is its control on the row, with no pill).
  *
  * A row of selects, date fields and chips is fine at 1280px and is most of the
  * screen at 390px — Wallet's journal filters alone stack to four rows on a
@@ -368,9 +374,9 @@ function ClearAllButton<T>({
 }: {
   value: T;
   onChange: (next: T) => void;
-  /** What shows the button: anything on that is not shown inline. */
+  /** The filters with a pill or control in this surface. */
   active: readonly ActiveFilter<T>[];
-  /** What it clears: everything on, inline filters included. */
+  /** What the button shows for and clears: everything on, inline filters included. Defaults to `active`. */
   clearable?: readonly ActiveFilter<T>[];
 }) {
   const { t } = useTranslation();
@@ -417,7 +423,7 @@ function CollapsibleFilterRow<T>({
   // rail) is too narrow for it, the search box and the buttons on one line, so
   // it sits in the box with the rest. A `below` filter has a line to itself.
   const belowDesktop = useIsBelowDesktop();
-  const inlineOn = inlinePlacement === 'below' || !belowDesktop;
+  const inlineOn = inline !== undefined && (inlinePlacement === 'below' || !belowDesktop);
   // An inline filter is already on the row: no pill, no funnel count.
   const pills = inlineOn ? active.filter((filter) => !filter.inline) : active;
   const inlineNode = inlineOn ? inline?.(value, onChange) : null;
