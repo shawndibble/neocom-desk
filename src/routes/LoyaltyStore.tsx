@@ -41,6 +41,7 @@ import {
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import {
   LOYALTY_STORE_OFFERS_COLUMN_IDS,
@@ -116,6 +117,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const pricesUnavailableLabel = usePricesUnavailableLabel();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
+  const isPhone = useIsPhone();
   // Read once, on arrival: a push is an entry this app stacked over where the
   // pilot was (Back returns there); anything else (a pasted link, a reload,
   // Forward) has nowhere in the app to go back to, so Close replaces the URL.
@@ -252,12 +254,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   // selected id rather than `selectedRow`, so a selected offer filtered out of
   // `filteredRows` simply has no row to mark.
 
-  const { columns, optionalColumns: optionalOfferColumns } = useLoyaltyOfferColumns({
-    lpBasis,
-    concord,
-    concordPending,
-    isColumnVisible: offersColumnVisibility.isVisible,
-  });
   // The full catalog, not just `columns`' currently-visible ids: a sort
   // picked while a column was shown should still resolve once the picker
   // hides it, ready to take effect again the moment it's shown back
@@ -266,6 +262,14 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     'item',
     ...LOYALTY_STORE_OFFERS_COLUMN_IDS,
   ]);
+  const { columns, optionalColumns: optionalOfferColumns } = useLoyaltyOfferColumns({
+    lpBasis,
+    concord,
+    concordPending,
+    isColumnVisible: offersColumnVisibility.isVisible,
+    playerLp,
+    sortColumnId: offersSortProps.sort?.columnId,
+  });
   // Every column, whatever the picker hides.
   const offersCsvColumns = useMemo(
     () => loyaltyOfferCsvColumns(t, { concordRate: concord?.rate ?? null }),
@@ -290,7 +294,9 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
 
   const list = (
     <Panel
-      title={t('loyaltyStore.title')}
+      // The modal's own title names the store and the tab bar names the page, so on a
+      // phone the heading only costs a line above the "Jita · Sell order" readout.
+      title={isPhone ? undefined : t('loyaltyStore.title')}
       wrapMeta
       meta={
         ready && (
@@ -322,7 +328,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
         )
       }
       padded={false}
-      className={isDesktop ? 'w-80 shrink-0 xl:w-[28rem]' : undefined}
+      className={isDesktop ? 'w-[28rem] shrink-0' : undefined}
     >
       {offersError ? (
         <EmptyState
@@ -396,6 +402,8 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             rows={filteredRows}
             rowKey={offerRowKey}
             density="compact"
+            stackLayout="dense"
+            className="dt-actions-pinned-only"
             // Not windowed: the virtualizer follows the window scroll, and the modal body scrolls instead.
             sort={offersSortProps.sort}
             onSortChange={offersSortProps.onSortChange}
@@ -459,26 +467,29 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       >
         <div className="flex flex-col gap-3">
           <NearestStationLine corporationId={corporationId} />
-          <LoyaltyOfferFilterBar
-            value={{ hubId, priceBasis, lpBasis, affordableOnly, blueprintsOnly }}
-            onChange={(next) => {
-              // Persisted preferences (hub, price basis) are written here and only
-              // here, so a Cancel in the mobile sheet never has a store write to
-              // roll back — the draft was local until this point.
-              if (next.hubId !== hubId) void setHubId(next.hubId);
-              if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
-              if (next.lpBasis !== lpBasis) void setLpBasis(next.lpBasis);
-              setFilterParams({
-                affordableOnly: next.affordableOnly,
-                blueprintsOnly: next.blueprintsOnly,
-              });
-            }}
-            search={search}
-            onSearchChange={(value) => setFilterParams({ search: value })}
-            affordableCount={affordableCount}
-            columnVisibility={offersColumnVisibility}
-            columnsById={optionalOfferColumns}
-          />
+          {/* On a phone the search row stays put while the offers scroll beneath it. */}
+          <div className="max-sm:sticky max-sm:-top-3 max-sm:z-10 max-sm:-mx-3 max-sm:bg-panel max-sm:px-3 max-sm:py-1.5">
+            <LoyaltyOfferFilterBar
+              value={{ hubId, priceBasis, lpBasis, affordableOnly, blueprintsOnly }}
+              onChange={(next) => {
+                // Persisted preferences (hub, price basis) are written here and only
+                // here, so a Cancel in the mobile sheet never has a store write to
+                // roll back — the draft was local until this point.
+                if (next.hubId !== hubId) void setHubId(next.hubId);
+                if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
+                if (next.lpBasis !== lpBasis) void setLpBasis(next.lpBasis);
+                setFilterParams({
+                  affordableOnly: next.affordableOnly,
+                  blueprintsOnly: next.blueprintsOnly,
+                });
+              }}
+              search={search}
+              onSearchChange={(value) => setFilterParams({ search: value })}
+              affordableCount={affordableCount}
+              columnVisibility={offersColumnVisibility}
+              columnsById={optionalOfferColumns}
+            />
+          </div>
 
           {offersFromCache && <CachedNotice withBadge fetchedAt={offersFetchedAt} />}
 

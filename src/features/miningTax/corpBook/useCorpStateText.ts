@@ -14,7 +14,7 @@ export const PILL_KEY: Record<PillState, string> = {
 };
 
 /** The conflict's resolution day, as the row prints it. */
-const resolvesOn = (iso: string | undefined) => (iso ? iso.slice(0, 10) : '');
+export const resolvesOn = (iso: string | undefined) => (iso ? iso.slice(0, 10) : '');
 
 export function useCorpStateLabel() {
   const { t } = useTranslation();

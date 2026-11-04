@@ -16,8 +16,11 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { ItemInfoLink } from '@/features/entities';
 import { cx } from '@/lib/cx';
+import { enumParam, nullableTextParam, textParam } from '@/lib/urlState';
+import { useUrlParam } from '@/lib/useUrlState';
 import {
   goalById,
+  IMPLANT_GOALS,
   headroom,
   placeAllInSet,
   shortfall,
@@ -26,6 +29,7 @@ import {
   type ImplantGoalId,
   type ImplantKind,
 } from '@/engine/fittings/implantFinder';
+import { IMPLANT_SORTS } from '@/engine/fittings/implantCost';
 import { withBoosters } from '@/engine/fittings/boosterSideEffects';
 import type { ImplantBasis } from '@/engine/fittings/implantBasis';
 import type {
@@ -47,8 +51,13 @@ import { SectionHeading } from './implantFinderBits';
 import { GoalResults } from './ImplantGoalResults';
 import { SourceNames } from './implantSourceNames';
 import { SetStrip } from './ImplantSetStrip';
+import { IMPLANT_GOAL_PARAM } from './useImplantsModalUrl';
 import { occupantOf, parseSlotKey, slotName } from './implantSlots';
 
+const SLOT_PARAM = nullableTextParam();
+const QUERY_PARAM = textParam();
+const SORT_PARAM = enumParam(IMPLANT_SORTS, 'gain');
+const GOAL_PARAM = nullableTextParam();
 const GROUPS: readonly GoalGroup[] = ['fitting', 'weapons', 'mining', 'tank', 'navigation'];
 const EMPTY_SET: FittingImplantSet = { implants: [], boosters: [] };
 
@@ -74,10 +83,19 @@ export function ImplantFinder({
   const hubId = useMarketHub((state) => state.value);
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const { selected: target } = useTargetProfiles();
-  const [goalId, setGoalId] = useState<ImplantGoalId | null>(null);
+  const [goalParam, setGoalParam] = useUrlParam(IMPLANT_GOAL_PARAM, GOAL_PARAM);
+  // The open goal rides in the URL, so Back from the market lands on the same list.
+  const goalId = IMPLANT_GOALS.some((g) => g.id === goalParam)
+    ? (goalParam as ImplantGoalId)
+    : null;
+  const setGoalId = (id: ImplantGoalId | null) => setGoalParam(id);
   /** The slot picked on the strip (`slotKey`): goals and results narrow to what goes in it. */
-  const [slot, setSlot] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
+  const [slotParam, setSlot] = useUrlParam('implantSlot', SLOT_PARAM);
+  // A hand-edited or stale key means no slot picked, not "Slot NaN".
+  const slot =
+    slotParam !== null && Number.isInteger(parseSlotKey(slotParam).slot) ? slotParam : null;
+  const [query, setQuery] = useUrlParam('implantQuery', QUERY_PARAM);
+  const [sort, setSort] = useUrlParam('implantSort', SORT_PARAM);
   const [infoTypeId, setInfoTypeId] = useState<number | null>(null);
   const finder = useImplantFinder({
     open,
@@ -90,6 +108,14 @@ export function ImplantFinder({
   });
   const { baseline, catalog } = finder;
   const set = implantSet ?? EMPTY_SET;
+
+  /** What an item would displace from the set right now; null when its slot is empty or it's already in. */
+  const replacesOf = (id: number): number | null => {
+    const at = catalog?.slotOf(id);
+    if (!at) return null;
+    const occupant = occupantOf(set, catalog!.slotOf, at.kind, at.slot);
+    return occupant === undefined || occupant === id ? null : occupant;
+  };
 
   const label = (id: ImplantGoalId) => t(`fittings.implantFinder.goals.${id}`);
 
@@ -207,7 +233,7 @@ export function ImplantFinder({
           helpfulSlots={helpfulSlots}
           goalLabel={goal ? label(goal.id) : null}
           selected={slot}
-          onSelect={(key) => setSlot((current) => (current === key ? null : key))}
+          onSelect={(key) => setSlot(slot === key ? null : key)}
           onRemove={remove}
         />
 
@@ -271,7 +297,9 @@ export function ImplantFinder({
             )}
           </nav>
 
-          <section className={cx('min-w-0 flex-1 space-y-3', !goal && 'hidden md:block')}>
+          <section
+            className={cx('@container min-w-0 flex-1 space-y-3', !goal && 'hidden md:block')}
+          >
             {!goal ? (
               <p className="text-sm text-text-dim">
                 {slotLabel
@@ -294,6 +322,9 @@ export function ImplantFinder({
                 onAdd={addAll}
                 onRemove={remove}
                 onInfo={setInfoTypeId}
+                replacesOf={replacesOf}
+                sort={sort}
+                onSort={setSort}
               />
             )}
           </section>

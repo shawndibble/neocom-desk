@@ -26,7 +26,13 @@ import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
 import type { PriceBasis } from './priceBasis';
 import type { LpBasis } from './lpBasis';
 import type { LoyaltyOfferRow } from './offerRows';
-import { iskPerLpTone, resolveLoyaltyRowItem, tagWordClassName } from './offerRowDisplay';
+import {
+  isLowVolume,
+  iskPerLpTone,
+  lpShortfall,
+  resolveLoyaltyRowItem,
+  tagWordClassName,
+} from './offerRowDisplay';
 import { loyaltyOfferMaterialsCsvColumns } from './loyaltyStoreCsv';
 import { formatCount } from '@/lib/formatCount';
 import type { SkillLevels } from '@/engine/industry/types';
@@ -47,17 +53,76 @@ function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
   return <span className={entityLinkClassName()}>{typeId === null ? row.itemName : itemName}</span>;
 }
 
-/** An offers table's item cell: the name, a BP marker for a blueprint, and its LP + ISK price. */
-export function LoyaltyOfferItemCell({ row }: { row: LoyaltyOfferRow }) {
+/** The unit after a phone card's bold corner figure; the table's header says it on desktop. */
+export function PhoneUnit({ children }: { children: string }) {
+  return (
+    <span className="ml-1 text-[0.6875rem] font-normal text-text-dim sm:hidden">{children}</span>
+  );
+}
+
+/** An offer's price: `2,400 LP + 2.4M`. */
+export function LoyaltyOfferCost({
+  row,
+  playerLp = null,
+}: {
+  row: LoyaltyOfferRow;
+  playerLp?: number | null;
+}) {
+  const { t } = useTranslation();
+  const short = lpShortfall(row, playerLp);
+  return (
+    <>
+      {formatCount(row.offer.lp_cost)} LP + <IskAmount value={row.offer.isk_cost} decimals={0} />
+      {short !== null && <span> · {t('loyaltyStore.needMoreLp', { lp: formatCount(short) })}</span>}
+    </>
+  );
+}
+
+/**
+ * An offers table's item cell: the name, a BP marker for a blueprint, and its LP + ISK price.
+ * `showCost` is false on a phone's dense card, which prints the price on its meta line instead;
+ * `lowVolumeTag` is false there too while the sells/day cell (amber) says it.
+ */
+export function LoyaltyOfferItemCell({
+  row,
+  showCost = true,
+  lowVolumeTag = true,
+  playerLp = null,
+}: {
+  row: LoyaltyOfferRow;
+  playerLp?: number | null;
+  /** False on a phone's dense card, where the cost has its own cell on the meta line. */
+  showCost?: boolean;
+  /** False when the phone card's amber sells/day already carries the low-volume warning. */
+  lowVolumeTag?: boolean;
+}) {
+  const { t } = useTranslation();
   return (
     <span className="flex flex-col">
-      <span className="inline-flex items-center gap-1.5">
+      {/* Plain inline text, not a flex row: a long name wraps and the tags follow its last word
+          instead of floating beside the wrapped block. The no-break space keeps a tag from
+          starting a line of its own. */}
+      <span>
         <LoyaltyItemName row={row} />
-        {row.isBlueprint && <span className={tagWordClassName}>BP</span>}
+        {row.isBlueprint && (
+          <>
+            {'\u00a0'}
+            <span className={tagWordClassName}>BP</span>
+          </>
+        )}
+        {/* A phone says it on the meta line (amber sells/day), where the name needs the room. */}
+        {lowVolumeTag && isLowVolume(row) && (
+          <>
+            {' '}
+            <span className={tagWordClassName}>{t('loyaltyStore.lowVolumeTag')}</span>
+          </>
+        )}
       </span>
-      <span className="text-[0.6875rem] text-text-dim">
-        {formatCount(row.offer.lp_cost)} LP + <IskAmount value={row.offer.isk_cost} decimals={0} />
-      </span>
+      {showCost && (
+        <span className="text-[0.6875rem] text-text-dim">
+          <LoyaltyOfferCost row={row} playerLp={playerLp} />
+        </span>
+      )}
     </span>
   );
 }

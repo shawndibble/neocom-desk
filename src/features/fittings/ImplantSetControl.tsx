@@ -5,12 +5,12 @@
  * the workspace resolves `basis`); the editor's "Use my clone" drops the
  * set, which is the only way back.
  */
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Expanded } from '@/components/ui/icons';
 import type { ImplantBasis } from '@/engine/fittings/implantBasis';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 import { ImplantSetPicker } from './ImplantSetPicker';
+import { useImplantsModalUrl } from './useImplantsModalUrl';
 import { StatField } from './StatFacts';
 import { STAT_FIELD_WIDTH } from './statKit';
 import { fieldBaseClassName, fieldSizeClassName } from '@/components/ui/controlStyles';
@@ -36,7 +36,7 @@ export function ImplantSetControl({
   profile,
 }: ImplantSetControlProps) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const { open, openModal, closeModal } = useImplantsModalUrl('implants');
 
   const implants = implantSet?.implants.length ?? 0;
   const boosters = implantSet?.boosters.length ?? 0;
@@ -58,7 +58,7 @@ export function ImplantSetControl({
         type="button"
         aria-label={`${label}: ${summary}`}
         aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
+        onClick={openModal}
         className={`flex items-center justify-between gap-1 ${fieldBaseClassName} ${fieldSizeClassName.sm} ${STAT_FIELD_WIDTH}`}
       >
         <span className="truncate">{summary}</span>
@@ -66,7 +66,7 @@ export function ImplantSetControl({
       </button>
       <ImplantSetPicker
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={closeModal}
         implantSet={implantSet}
         onChange={onImplantSetChange}
         {...(canUseCloneBasis ? { onUseClone: () => onImplantSetChange(undefined) } : {})}

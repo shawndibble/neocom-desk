@@ -126,6 +126,7 @@ vi.mock('@/features/market/ItemDetailModal', () => ({
 const caldariNavy = (lpCost: number, iskCost: number): LpOfferInput => ({
   corporationId: 1000035,
   corpName: 'Caldari Navy',
+  offerId: 4242,
   iskCost,
   lpCost,
   quantity: 1,
@@ -205,12 +206,16 @@ describe('ImplantFinder', () => {
 
     // EE-603 from Caldari Navy: 0.5M + 1,000 LP × 1,000 = 1.5M, under Jita's 9M.
     const ee603 = (await screen.findByRole('button', { name: /^Add .*EE-603$/ })).closest('li')!;
+    expect(ee603).toHaveTextContent('Caldari Navy LP Store · ≈');
+    // The full offer is one click away.
+    await user.click(within(ee603).getByRole('button', { name: 'Breakdown' }));
     expect(ee603).toHaveTextContent('Caldari Navy LP Store · 1,000 LP');
     // EE-605's offer needs 4,000 LP; the pilot has 3,200: market first, the offer shown as cheaper.
     const ee605 = screen.getByRole('button', { name: /^Add .*EE-605$/ }).closest('li')!;
     expect(ee605).toHaveTextContent('Fits · 1.6 tf spare');
-    expect(ee605).toHaveTextContent('Cheaper if you could:');
+    expect(ee605).toHaveTextContent('Also:');
     expect(ee605).toHaveTextContent('800 LP short');
+    expect(ee605).toHaveTextContent('with the LP');
     expect(screen.getByRole('button', { name: /^Add .*WU-1001$/ }).closest('li')).toHaveTextContent(
       'Not for sale at any Trade Hub or LP Store'
     );
@@ -243,7 +248,7 @@ describe('ImplantFinder', () => {
     const user = userEvent.setup();
     const onChange = renderFinder();
     await user.click(await screen.findByRole('button', { name: /^Missiles/ }));
-    expect(await screen.findByText('Boosters that help · best first')).toBeInTheDocument();
+    expect(await screen.findByText('Boosters that help')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^Add Standard Crash Booster$/ }));
     expect(onChange).toHaveBeenLastCalledWith({ implants: [], boosters: [CRASH] });
   });
@@ -274,6 +279,45 @@ describe('ImplantFinder', () => {
     expect(screen.getByText('Nothing in Booster 3 helps CPU on this fit.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'All slots' }));
     expect((await screen.findAllByRole('button', { name: /EE-605$/ })).length).toBeGreaterThan(0);
+  });
+
+  it('links each source: the market page, and the LP Store opened on that offer', async () => {
+    const user = userEvent.setup();
+    renderFinder();
+    await user.click(await screen.findByRole('button', { name: /CPU\s*18\.4 tf over/ }));
+    const row = (await screen.findByRole('button', { name: /^Add .*EE-603$/ })).closest('li')!;
+    expect(within(row).getByRole('link', { name: 'View in Market' })).toHaveAttribute(
+      'href',
+      '/market/browser?type=603&hub=jita'
+    );
+    expect(
+      within(row).getByRole('link', { name: 'View in Caldari Navy LP Store' })
+    ).toHaveAttribute('href', '/wallet/lp-store/1000035?offer=4242');
+  });
+
+  it('walks the Replace and Add buttons with the arrow keys', async () => {
+    const user = userEvent.setup();
+    renderFinder();
+    await user.click(await screen.findByRole('button', { name: /CPU\s*18\.4 tf over/ }));
+    const first = await screen.findByRole('button', { name: /^Add .*EE-603$/ });
+    first.focus();
+    await user.keyboard('{ArrowDown}');
+    expect(document.activeElement).not.toBe(first);
+    expect(document.activeElement).toHaveAttribute('data-implant-action');
+    await user.keyboard('{ArrowUp}');
+    expect(document.activeElement).toBe(first);
+  });
+
+  it('reorders the cards by the cheapest source', async () => {
+    const user = userEvent.setup();
+    renderFinder();
+    await user.click(await screen.findByRole('button', { name: /CPU\s*18\.4 tf over/ }));
+    await screen.findByText('Implants that help');
+    await user.click(screen.getByRole('button', { name: 'Cheapest' }));
+    expect(screen.getByRole('button', { name: 'Cheapest' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 
   it('opens an implant’s full details from its info button', async () => {

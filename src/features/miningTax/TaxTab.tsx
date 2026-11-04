@@ -17,6 +17,7 @@ import {
 } from '@/features/miningTax/corpBook/useCorpStateText';
 import { splitLedger } from '@/features/miningTax/ledgerSections';
 import { OwedBalances } from '@/features/miningTax/OwedBalances';
+import { summarizeConflicts } from '@/features/miningTax/corpBook/conflictSummary';
 import { TaxDialogsHost } from '@/features/miningTax/TaxDialogsHost';
 import { dateRangeOf, taxOwedOf } from '@/features/miningTax/taxRowFormat';
 import { useContinuations } from '@/features/miningTax/useContinuations';
@@ -167,6 +168,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     [characterFiltered, resolvedPayeeFilter, payeeAliases]
   );
 
+  const conflicts = useMemo(() => summarizeConflicts(characterFiltered), [characterFiltered]);
   const { balances, unassigned, everyAssignment, linkSuggestions, payeeSystems, owedByPayee } =
     useTaxBalances({
       characterFiltered,
@@ -335,6 +337,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                   hideLinkPayment={(balance) => isCorpPayeeId(balance.payee.id)}
                   onAssignNext={assignNext}
                   onReviewPayments={() => actions.openLinkPayment(true)}
+                  conflicts={conflicts}
+                  onReviewConflicts={() => conflicts && actions.openDetail(conflicts.first)}
                 />
 
                 {data && <PendingGroupingNotice characters={characters} />}

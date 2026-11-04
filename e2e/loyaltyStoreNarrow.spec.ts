@@ -167,9 +167,12 @@ for (const width of [390, 1024, 1280]) {
     await expect(readout).toHaveText('Jita · Sell order');
     const panelHeader = readout.locator('xpath=ancestor::header[1]');
     const title = panelHeader.getByRole('heading', { level: 2 });
+    // A phone drops the heading (the modal title names the store); wider screens keep it.
+    const hasTitle = width >= 640;
+    if (!hasTitle) await expect(title).toHaveCount(0);
     const [r, t, h, actions] = await Promise.all([
       readout.boundingBox(),
-      title.boundingBox(),
+      hasTitle ? title.boundingBox() : Promise.resolve(null),
       panelHeader.boundingBox(),
       panelHeader.getByRole('button').last().boundingBox(),
     ]);
@@ -183,7 +186,7 @@ for (const width of [390, 1024, 1280]) {
       a.x + a.width <= r!.x + 1 ||
       r!.y + r!.height <= a.y + 1 ||
       a.y + a.height <= r!.y + 1;
-    expect(apart(t!)).toBe(true);
+    if (t) expect(apart(t)).toBe(true);
     if (actions) expect(apart(actions)).toBe(true);
 
     const overflow = await page.evaluate(
@@ -209,6 +212,17 @@ for (const width of [1024, 1280, 1440]) {
     await expect(detail).toBeHidden();
     const box = await list.boundingBox();
     if (width >= 1280) expect(box!.width).toBeGreaterThanOrEqual(26 * 16);
+
+    // Real figures are wider than the fixture's dashes: a seven-digit ISK/LP and a
+    // nine-figure profit must still sit inside the list's panel, not spill over its edge.
+    const spill = await list.evaluate((section) => {
+      for (const td of section.querySelectorAll('td')) {
+        if (td.textContent === '—') td.textContent = td.cellIndex === 2 ? '-648.2M' : '1,620,520';
+      }
+      const table = section.querySelector('table')!;
+      return table.getBoundingClientRect().right - section.getBoundingClientRect().right;
+    });
+    expect(spill).toBeLessThanOrEqual(1);
 
     // The detail panel is the list's right-hand sibling: no overlap, no clipping.
     const sibling = list.locator('xpath=following-sibling::*[contains(@class,"min-w-0")][1]');

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 vi.mock('@/sde/loadSde', () => ({
@@ -17,6 +18,29 @@ function renderMarkup(markup: string) {
 }
 
 describe('MailBodyView', () => {
+  it('folds the quoted history under a reply behind a toggle', async () => {
+    const user = userEvent.setup();
+    render(
+      <MailBodyView
+        text={'Sounds good.\n\nOn 10/25/2026, 6:36 PM, Mero wrote:\n> Older note\n> more'}
+      />
+    );
+    expect(screen.getByText(/Sounds good\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Older note/)).toBeNull();
+    const toggle = screen.getByRole('button', { name: 'Show quoted text (3 lines)' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await user.click(toggle);
+    expect(screen.getByText(/Older note/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Hide quoted text' }));
+    expect(screen.queryByText(/Older note/)).toBeNull();
+  });
+
+  it('shows a mail that is nothing but a quote as it is', () => {
+    render(<MailBodyView text={'> only a quote'} />);
+    expect(screen.getByText(/only a quote/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /quoted text/ })).toBeNull();
+  });
+
   it('renders a hand-spaced table as table cells', () => {
     render(<MailBodyView text={'Hi\n\nName     m3      ISK\nOlorf    1,115    9,206\n\nBye'} />);
     expect(screen.getByRole('cell', { name: 'Olorf' })).toBeInTheDocument();

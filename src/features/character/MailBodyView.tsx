@@ -1,7 +1,8 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { HintText } from '@/components/ui/HintText';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { linkifyText } from '@/engine/mail/linkifyText';
 import {
   markupColorToCss,
@@ -12,6 +13,7 @@ import {
   type MarkupLinkTarget,
   type MarkupNode,
 } from '@/engine/mail/eveMarkup';
+import { trailingQuoteStart } from '@/engine/mail/quotedText';
 import { splitMailLines, type MailLineBlock } from '@/engine/mail/mailBodyBlocks';
 import {
   AllianceLink,
@@ -173,6 +175,11 @@ const isBlank = (line: readonly MarkupNode[]): boolean => markupPlainText(line).
  * parsed to a safe node tree, never injected as HTML.
  */
 export function MailBodyView({ text, markup }: { text: string; markup?: string }) {
+  const { t } = useTranslation();
+  // Which body the quote is open for, so picking another mail starts folded again.
+  const [openFor, setOpenFor] = useState<string | null>(null);
+  const bodyKey = `${text}\u0000${markup ?? ''}`;
+  const showQuote = openFor === bodyKey;
   const lines = useMemo((): MarkupNode[][] => {
     if (markup === undefined) {
       return text
@@ -182,6 +189,42 @@ export function MailBodyView({ text, markup }: { text: string; markup?: string }
     return splitMarkupLines(parseEveMarkup(markup));
   }, [text, markup]);
   const onSurface = markup !== undefined;
+  // Older messages quoted under a reply fold behind one toggle, so a long thread doesn't scroll.
+  const quoteAt = useMemo(() => trailingQuoteStart(lines.map((l) => markupPlainText(l))), [lines]);
+  // A quote with nothing written above it is the whole mail: show it.
+  const hasOwnText =
+    quoteAt !== null && lines.slice(0, quoteAt).some((l) => markupPlainText(l).trim() !== '');
+  if (quoteAt === null || !hasOwnText) return <BodyBlocks lines={lines} onSurface={onSurface} />;
+  return (
+    <div className={cx('min-w-0 space-y-2', onSurface && EVE_MAIL_SURFACE_CLASS)}>
+      <BodyBlocks lines={lines.slice(0, quoteAt)} onSurface={onSurface} bare />
+      <button
+        type="button"
+        aria-expanded={showQuote}
+        onClick={() => setOpenFor(showQuote ? null : bodyKey)}
+        className={cx(inlineLinkClassName, 'text-xs')}
+      >
+        {showQuote ? t('mail.hideQuoted') : t('mail.showQuoted', { count: lines.length - quoteAt })}
+      </button>
+      {showQuote && (
+        <div className="border-l-2 border-line pl-3 opacity-80">
+          <BodyBlocks lines={lines.slice(quoteAt)} onSurface={onSurface} bare />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BodyBlocks({
+  lines,
+  onSurface,
+  bare = false,
+}: {
+  lines: MarkupNode[][];
+  onSurface: boolean;
+  /** Inside the folding wrapper, which supplies the surface. */
+  bare?: boolean;
+}) {
   const blocks = useMemo(() => {
     const found = splitMailLines(lines.map((l) => markupPlainText(l)));
     const hasTable = found.some((b) => b.kind === 'table');
@@ -203,7 +246,7 @@ export function MailBodyView({ text, markup }: { text: string; markup?: string }
     <div
       className={cx(
         'min-w-0 space-y-2 overflow-x-auto text-sm break-words',
-        onSurface ? EVE_MAIL_SURFACE_CLASS : 'text-text'
+        !bare && (onSurface ? EVE_MAIL_SURFACE_CLASS : 'text-text')
       )}
     >
       {blocks.map((block, index) => {

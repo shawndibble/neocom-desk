@@ -155,8 +155,22 @@ describe('Reply defaults', () => {
     await screen.findByText('Sender Sal');
 
     expect(screen.getByLabelText('Subject')).toHaveValue('RE: Ratting fleet up');
-    expect(screen.getByLabelText('Message')).toHaveValue(
-      '\n\nOn Sep 21, 2026 03:14, Sender Sal wrote:\n> Original body text'
+    // The quote is folded out of the editor, where the pilot types above it.
+    expect(screen.getByLabelText('Message')).toHaveValue('');
+    expect(screen.queryByText(/Original body text/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Show quoted text/ }));
+    expect(screen.getByText(/> Original body text/)).toBeInTheDocument();
+  });
+
+  it('still sends the folded quote under what the pilot typed', async () => {
+    const user = userEvent.setup();
+    renderBox('reply');
+    await screen.findByText('Sender Sal');
+    await user.type(screen.getByLabelText('Message'), 'Agreed.');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(sendMail).toHaveBeenCalled());
+    expect(sendMail.mock.calls[0][3]).toBe(
+      'Agreed.\n\nOn Sep 21, 2026 03:14, Sender Sal wrote:\n&gt; Original body text'
     );
   });
 
@@ -199,7 +213,7 @@ describe('send path', () => {
     await user.click(await screen.findByRole('button', { name: 'emit' }));
     await user.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(sendMail).toHaveBeenCalled());
-    expect(sendMail.mock.calls[0][3]).toBe('x<b>ok</b>');
+    expect(sendMail.mock.calls[0][3]).toMatch(/^x<b>ok<\/b>\n\nOn .* wrote:\n/);
   });
 });
 

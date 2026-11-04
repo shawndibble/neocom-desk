@@ -16,10 +16,18 @@ interface MailRowMenuProps {
   isRead: boolean;
   onSetRead: (read: boolean) => void;
   onDelete: () => void;
+  /** `ghost` draws the hairline button the reader's Reply and Forward sit beside; a list row keeps the bare `plain` glyph. */
+  variant?: 'plain' | 'ghost';
 }
 
 /** A row's ⋮ menu: Mark as unread / read, and Delete… (which asks first). */
-export function MailRowMenu({ label, isRead, onSetRead, onDelete }: MailRowMenuProps) {
+export function MailRowMenu({
+  label,
+  isRead,
+  onSetRead,
+  onDelete,
+  variant = 'plain',
+}: MailRowMenuProps) {
   const { t } = useTranslation();
   // Delete opens a confirm: hold it until the menu has closed, so focus returns to this button.
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
@@ -27,11 +35,11 @@ export function MailRowMenu({ label, isRead, onSetRead, onDelete }: MailRowMenuP
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <IconButton
-          variant="plain"
+          variant={variant}
           size="row"
           icon={<Icon.More />}
           label={label}
-          className="mr-1 shrink-0"
+          className={variant === 'plain' ? 'mr-1 shrink-0' : 'shrink-0'}
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onCloseAutoFocus={onCloseAutoFocus}>

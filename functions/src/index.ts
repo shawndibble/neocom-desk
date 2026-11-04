@@ -23,7 +23,7 @@ import {
 } from './corpTaxBookVersionTracking.js';
 import { runPurgeNotificationFeed, runPurgeStaleAccounts } from './purgeJobs.js';
 import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, r2ConfigOrThrow } from './r2Publish.js';
-import { openPricesR2Key } from './r2DailySnapshots.js';
+import { readOpenPricesFromR2 } from './r2DailySnapshots.js';
 import { createR2Get } from './r2Publisher.js';
 import { verifyEveAccessToken, verifyOptionsFromEnv, uidForCharacter } from './verifyEveToken.js';
 import {
@@ -911,7 +911,7 @@ function corpSyncDeps(): CorpSyncDeps {
 // The moon owner's view values ore at the book hub's daily open price in R2 (issue #4512).
 // Lazy, so a function without the R2 secrets only fails when it rebuilds a view.
 function r2OpenPrices(typeId: number): Promise<unknown | null> {
-  return createR2Get(r2ConfigOrThrow())(openPricesR2Key(typeId));
+  return readOpenPricesFromR2(createR2Get(r2ConfigOrThrow()), typeId);
 }
 // Proven by the signed-in Character AND the grant's own access token, which must be
 // for that same Character; the corporation and its roles are read with the grant.

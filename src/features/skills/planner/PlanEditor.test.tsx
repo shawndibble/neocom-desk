@@ -18,6 +18,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SkillCatalog } from '../skillMap';
 import type { RemapAvailability } from './remapAvailability';
 import { PlanEditor } from './PlanEditor';
+import { DEFAULT_GROUPING_MODE, useGroupingMode } from './groupingMode';
 import { previewImportFile } from './importPreview';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
@@ -1437,6 +1438,11 @@ describe('PlanEditor prereq promotion', () => {
 });
 
 describe('PlanEditor grouping toggle (#115)', () => {
+  // The pick is a device-wide setting, so one test's regrouping must not leak into the next.
+  beforeEach(() => {
+    useGroupingMode.setState({ value: DEFAULT_GROUPING_MODE, hydrated: false });
+  });
+
   it('defaults to Priority band headers', () => {
     renderEditor();
 
@@ -1463,6 +1469,18 @@ describe('PlanEditor grouping toggle (#115)', () => {
     expect(screen.getByText('PER/WIL attributes')).toBeInTheDocument();
     expect(screen.getByText('INT/MEM attributes')).toBeInTheDocument();
     expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it("the phone's icon menu names the current grouping and regroups the same way", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+
+    await user.click(screen.getByRole('button', { name: 'Group by: Priority' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Attribute pair' }));
+
+    expect(screen.queryByText('High priority')).not.toBeInTheDocument();
+    expect(screen.getByText('PER/WIL attributes')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Group by: Attribute pair' })).toBeInTheDocument();
   });
 });
 
