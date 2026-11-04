@@ -9,10 +9,12 @@ import { contractStockAtMarket, type ContractStockInput } from '@/engine/stockTa
 import { rankMarkets, type MarketSummary } from '@/engine/stockTargets/markets';
 import {
   countAtMarket,
+  biggestFirst,
   holdersAtMarket,
   type HolderCount,
   listedAtMarket,
   sellersAtMarket,
+  totalOf,
 } from '@/engine/stockTargets/onHand';
 import type { StockAlertEntry } from '@/engine/stockTargets/stockAlert';
 import { buildStockRows, summarizeStock, type StockRow } from '@/engine/stockTargets/stockRows';
@@ -156,9 +158,7 @@ function mergeHolders(
   for (const holder of [...orders, ...contracts]) {
     shares.set(holder.characterId, (shares.get(holder.characterId) ?? 0) + holder.quantity);
   }
-  return [...shares]
-    .map(([characterId, quantity]) => ({ characterId, quantity }))
-    .sort((a, b) => b.quantity - a.quantity || a.characterId - b.characterId);
+  return biggestFirst(shares);
 }
 
 function rowsFor(
@@ -178,7 +178,7 @@ function rowsFor(
   return buildStockRows(
     list.items.map((item) => {
       const onContractBy = contracts.get(item.typeId) ?? [];
-      const onContract = onContractBy.reduce((sum, holder) => sum + holder.quantity, 0);
+      const onContract = totalOf(onContractBy);
       return {
         typeId: item.typeId,
         target: item.target,
@@ -393,8 +393,7 @@ export async function loadStockAlertEntries(
       name: names.get(item.typeId) ?? `#${item.typeId}`,
       target: item.target,
       listed: known
-        ? (counts.get(item.typeId)?.listed ?? 0) +
-          (contracts.get(item.typeId) ?? []).reduce((sum, holder) => sum + holder.quantity, 0)
+        ? (counts.get(item.typeId)?.listed ?? 0) + totalOf(contracts.get(item.typeId) ?? [])
         : null,
       inHangar: counts.get(item.typeId)?.inHangar ?? 0,
     }));

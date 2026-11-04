@@ -10,7 +10,7 @@
  */
 import { isOpenOwnContract, type StockContract } from '@/engine/netWorth/contractStock';
 import type { Contract } from '@/esi/endpoints';
-import type { HolderCount } from './onHand';
+import { biggestFirst, type HolderCount } from './onHand';
 
 export interface ContractStockInput {
   /** Whose contract list it came from: the issuer. */
@@ -46,12 +46,7 @@ export function contractStockAtMarket(
   }
   const result = new Map<number, HolderCount[]>();
   for (const typeId of typeIds) {
-    result.set(
-      typeId,
-      [...(shares.get(typeId) ?? [])]
-        .map(([characterId, quantity]) => ({ characterId, quantity }))
-        .sort((a, b) => b.quantity - a.quantity || a.characterId - b.characterId)
-    );
+    result.set(typeId, biggestFirst(shares.get(typeId) ?? new Map()));
   }
   return result;
 }
