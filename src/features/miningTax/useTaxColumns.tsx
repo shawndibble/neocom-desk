@@ -30,7 +30,6 @@ import { CorpStatusPill } from '@/features/miningTax/corpBook/CorpStatusPill';
 import { CorpCorrectedAmount, CorpOverlapMark } from '@/features/miningTax/corpBook/CorpLineMarks';
 import type { CorpRowInfo } from '@/features/miningTax/corpBook/corpRows';
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
-import { resolvesOn } from '@/features/miningTax/corpBook/useCorpStateText';
 import { OreIcon } from './OreIcon';
 import { formatCount } from '@/lib/formatCount';
 import type { TaxColumnId } from './taxColumns';
@@ -319,13 +318,9 @@ export function useTaxColumns({
           dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict' ? (
             <span className="block">
               <span className="block">{`${formatIsk(dr.corp.view.billed)} ISK`}</span>
-              {dr.corp.view.resolvesAt && (
-                <span className="block text-[0.6875rem] font-normal text-warning">
-                  {t('miningTax.corpBook.conflict.cardBills', {
-                    date: resolvesOn(dr.corp.view.resolvesAt),
-                  })}
-                </span>
-              )}
+              <span className="block text-[0.6875rem] font-normal text-warning">
+                {t('miningTax.corpBook.conflict.cardBills')}
+              </span>
             </span>
           ) : dr.assignment && !(dr.corp?.kind === 'row' && dr.corp.view.taxOwed === null) ? (
             withDayLines(
@@ -343,7 +338,12 @@ export function useTaxColumns({
           ) : (
             '—'
           ),
-        sortValue: (dr) => (dr.assignment ? taxOwedOf(dr) : undefined),
+        sortValue: (dr) =>
+          dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict'
+            ? dr.corp.view.billed
+            : dr.assignment
+              ? taxOwedOf(dr)
+              : undefined,
       },
       {
         id: 'status',

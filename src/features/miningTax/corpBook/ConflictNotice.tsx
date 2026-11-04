@@ -21,6 +21,8 @@ interface Props {
   entries: readonly ConflictEntry[];
   /** Where the book recorded the ore: the refinery, else the system. */
   recordedAt: string;
+  /** `YYYY-MM-DD` this app starts counting it as owed (the conflict resolves); empty when unknown. */
+  resolvesOn: string;
   /** Other corporations whose books contest the same day, with what each would bill. */
   others: readonly { corpName: string; billAmount: number }[];
   previews: readonly OverlapPreview[];
@@ -45,6 +47,7 @@ export function ConflictNotice({
   cause,
   entries,
   recordedAt,
+  resolvesOn,
   others,
   previews,
   typeNames,
@@ -82,6 +85,9 @@ export function ConflictNotice({
         )}
         <li>{t(k('bookEntry'), { corp: corpName, place: recordedAt })}</li>
       </ul>
+      {resolvesOn && (
+        <p className="text-text-dim">{t(k('countsFrom'), { corp: corpName, date: resolvesOn })}</p>
+      )}
       {others.length > 0 && (
         <p className="text-text-dim">
           {t(k('alsoContested'), {

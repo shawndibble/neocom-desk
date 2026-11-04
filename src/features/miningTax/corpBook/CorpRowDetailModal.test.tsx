@@ -138,7 +138,7 @@ describe('CorpRowDetailModal', () => {
     expect(screen.getByText('957,001 ISK')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Not owed yet · Brass Meridian Logistics bills it on 2026-11-01 unless you fix it'
+        "Not owed yet · on Brass Meridian Logistics's next Statement unless an officer changes the book"
       )
     ).toBeInTheDocument();
     const notice = screen.getByText('Conflict notice');

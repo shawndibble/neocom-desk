@@ -837,8 +837,9 @@ export function overlayCorpBooks(input: {
         );
         // Only the contested ore overlaps a Payee: ore the book took from free ore is the member's
         // to give, and capping here leaves the rest of the pool for the next book in the system.
-        const overlap = takeOverlap(pool, claimed);
-        if (overlap && rows[firstRow] && !charge.dismissal) rows[firstRow].overlap = overlap;
+        // A dismissed charge leaves the pool alone, so the next book can still name the Payee.
+        const overlap = charge.dismissal ? undefined : takeOverlap(pool, claimed);
+        if (overlap && rows[firstRow]) rows[firstRow].overlap = overlap;
       }
     }
     free.set(key, left);

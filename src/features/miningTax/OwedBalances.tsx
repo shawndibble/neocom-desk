@@ -139,7 +139,8 @@ export function OwedBalances({
     >
       {/* One owed Payee: the single card already carries the name and the
           same amount, so the summary would only repeat it (issue #3065). */}
-      {owed.length === 0 && (
+      {/* With a Conflict on the way, "nothing outstanding" is the reassurance that misleads. */}
+      {owed.length === 0 && !conflicts && (
         <p className="text-xs text-text-dim">{t('miningTax.balancesNothing')}</p>
       )}
       {owed.length > 1 && (
@@ -156,27 +157,6 @@ export function OwedBalances({
         </p>
       )}
 
-      {conflicts &&
-        promptRow(
-          'conflicts',
-          <span className="text-base font-semibold text-warning">
-            {t('miningTax.conflictsTitle')}
-          </span>,
-          <span className="text-sm font-semibold tabular-nums">
-            {formatIsk(conflicts.amount, 0)}
-            <span className="ml-1 text-xs font-normal text-text-dim">ISK</span>
-          </span>,
-          t('miningTax.conflictsHint', {
-            count: conflicts.count,
-            corp: conflicts.firstCorpName,
-            date: conflicts.firstDate,
-          }),
-          onReviewConflicts && (
-            <Button className="shrink-0" onClick={onReviewConflicts}>
-              {t('miningTax.conflictsReview')}
-            </Button>
-          )
-        )}
       {slimPrompts &&
         unassigned.entryCount > 0 &&
         promptRow(
@@ -316,6 +296,26 @@ export function OwedBalances({
           )}
         </div>
       )}
+      {/* After the owed cards: owed comes first (decision 20261004), and a Conflict is not owed
+          yet. Always a full-width row, since it is a warning about the next Statement, not a
+          Payee balance to sit among the cards. */}
+      {conflicts &&
+        promptRow(
+          'conflicts',
+          <span className="text-base font-semibold text-warning">
+            {t('miningTax.conflictsTitle')}
+          </span>,
+          <span className="text-sm font-semibold tabular-nums">
+            {formatIsk(conflicts.amount, 0)}
+            <span className="ml-1 text-xs font-normal text-text-dim">ISK</span>
+          </span>,
+          t('miningTax.conflictsHint', { count: conflicts.days, corp: conflicts.firstCorpName }),
+          onReviewConflicts && (
+            <Button className="shrink-0" onClick={onReviewConflicts}>
+              {t('miningTax.conflictsReview')}
+            </Button>
+          )
+        )}
     </section>
   );
 }

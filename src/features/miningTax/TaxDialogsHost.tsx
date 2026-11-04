@@ -9,6 +9,7 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import type { PayeeBalance } from '@/features/miningTax/balances';
 import { BulkDismissDialog } from '@/features/miningTax/BulkDismissDialog';
 import { CorpOverlapNotice } from '@/features/miningTax/corpBook/CorpOverlapNotice';
+import { conflictSiblings } from '@/features/miningTax/corpBook/conflictSummary';
 import { CorpPayDialog } from '@/features/miningTax/corpBook/CorpPayDialog';
 import { CorpRowDetailModal } from '@/features/miningTax/corpBook/CorpRowDetailModal';
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
@@ -692,14 +693,9 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 view={corpDetail.view}
                 corpName={corpDetail.corpName}
                 recordedAt={corpDetail.view.refineryLabel ?? systemName(detailTarget)}
-                siblings={corpView?.overlay.rows.filter(
-                  (r) =>
-                    r.state === 'conflict' &&
-                    r.corporationId !== corpDetail.view.corporationId &&
-                    r.characterId === corpDetail.view.characterId &&
-                    r.date === corpDetail.view.date &&
-                    r.solarSystemId === corpDetail.view.solarSystemId
-                )}
+                siblings={
+                  corpView ? conflictSiblings(corpView.overlay.rows, corpDetail.view) : undefined
+                }
                 everyAssignment={everyAssignment}
                 payeeById={payeeById}
                 typeNames={typeNames}

@@ -317,6 +317,35 @@ describe('overlayCorpBooks', () => {
       expect(out.rows.every((r) => r.overlap === undefined)).toBe(true);
     });
 
+    it("leaves the Payee for the next book to name when the first book's line is dismissed", () => {
+      const [first, second] = twoBooks();
+      const dismissed = {
+        ...first!,
+        dismissals: [
+          {
+            id: 'd1',
+            scope: 'record' as const,
+            targetId: `${ME}:1000:2026-10-17`,
+            by: 1,
+            at: '2026-10-18T09:00:00Z',
+            reason: 'Fleet op',
+          },
+        ],
+      };
+      // 40,000 to another Payee, 20,000 free: the dismissed book contests 20,000 of the Payee's
+      // ore but bills none of it, so its share stays the Payee's and the next book still names it.
+      const out = overlay([day([given('x', 'ashfall', 40_000)], 20_000)], [dismissed, second!]);
+      expect(out.rows.filter((r) => r.corporationId === CORP).map((r) => r.state)).toEqual([
+        'dismissed',
+      ]);
+      const conflict = out.rows.find((r) => r.state === 'conflict');
+      expect(conflict?.corporationId).toBe(98000002);
+      expect(conflict?.overlap).toMatchObject({
+        payeeIds: ['ashfall'],
+        ore: [{ typeId: ZEO, quantity: 20_000 }],
+      });
+    });
+
     it("combines both books' overlaps into what one take-over removes from the entry", () => {
       const out = overlay([day([given('x', 'ashfall', 30_000)], 30_000)], twoBooks());
       const combined = combineOverlaps(out.rows.map((r) => r.overlap));

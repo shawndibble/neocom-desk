@@ -72,6 +72,7 @@ function Story({
                 { id: 'a1', payeeName: 'Ashfall Mining', taxOwed: 4_271_257, paid: !twoBooks },
               ]}
               recordedAt="Talidal - Ishimura Heavy Industries"
+              resolvesOn="2026-11-12"
               others={twoBooks ? [{ corpName: 'Ashfall Prospecting', billAmount: 120_000 }] : []}
               previews={[]}
               typeNames={new Map()}

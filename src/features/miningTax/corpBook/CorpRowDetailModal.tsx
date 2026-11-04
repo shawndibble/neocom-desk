@@ -17,7 +17,6 @@ import type { DisplayRow } from '../groupRows';
 import { CorpBookDiffModal } from './CorpBookDiffModal';
 import type { CorpBookViewBook } from './corpBookView';
 import { CorpStatusPill } from './CorpStatusPill';
-import { resolvesOn } from './useCorpStateText';
 import type { CorpRowInfo } from './corpRows';
 import { formatCount } from '@/lib/formatCount';
 
@@ -139,12 +138,9 @@ export function CorpRowDetailModal({
                   : `${formatIsk(owed)} ISK`}
             </span>
           </div>
-          {conflict && view.resolvesAt && (
+          {conflict && (
             <p className="-mt-2 text-right text-xs text-warning">
-              {t('miningTax.corpBook.conflict.headerNotOwed', {
-                corp: corp.corpName,
-                date: resolvesOn(view.resolvesAt),
-              })}
+              {t('miningTax.corpBook.conflict.headerNotOwed', { corp: corp.corpName })}
             </p>
           )}
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-text-dim">
