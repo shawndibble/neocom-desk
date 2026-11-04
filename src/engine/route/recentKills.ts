@@ -100,6 +100,33 @@ export function classifyKillTags(kill: RecentKill, { groupOf, band }: KillTagCon
 /** A kill with its own tags, for a location's list (issue #5929). */
 export interface RecentKillView extends RecentKill, KillTags {}
 
+/** A pilot's pod dies within this long of their ship, at the same place. */
+export const SHIP_AND_POD_WINDOW_MS = 5 * MINUTE_MS;
+
+/**
+ * Kills of one pilot that follow each other closely, as one group: the ship
+ * and the pod it left behind. `kills` is newest first (a location's list); a
+ * group is oldest first (ship, then pod) and groups stay newest first. A kill
+ * with no victim pilot is its own group. Display only: counts stay per kill.
+ */
+export function groupVictimKills<T extends RecentKill>(kills: readonly T[]): T[][] {
+  const groups: T[][] = [];
+  for (const kill of kills) {
+    const pilot = kill.victim?.characterId ?? null;
+    const group =
+      pilot === null
+        ? undefined
+        : groups.find(
+            (candidate) =>
+              candidate[0]?.victim?.characterId === pilot &&
+              Math.abs(candidate[0].time - kill.time) <= SHIP_AND_POD_WINDOW_MS
+          );
+    if (group) group.unshift(kill);
+    else groups.push([kill]);
+  }
+  return groups;
+}
+
 /** How many of a list's kills had at least one attacker flying a hull of this group. */
 export interface HullKillCount {
   groupId: number;

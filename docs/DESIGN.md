@@ -935,6 +935,10 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
   calibration" text action right under an over-budget readout opens Make it
   fit — it annotates the red figure it sits under, as "Over by" does, and a
   box there would outweigh the number it fixes (§6c).
+  A third: Route Safety's kill count and kill-location lines ("3 player kills",
+  "3 kills at Stargate (X), last one 4 min ago") open the kills behind that
+  readout. The text is the figure, so it is a `plainTextActionClassName` button;
+  a box around each of several readouts per row would outweigh the row.
   `inlineLinkClassName.test.ts` fails on a hand-rolled `text-accent underline`.
 - Status colors carry meaning; never use them decoratively. ISK amounts use
   `isk-pos`/`isk-neg`, not success/danger.
@@ -1213,13 +1217,13 @@ No typed arrow (`→` `↗` `›`) ends a link label; leaving the app is `Icon.E
 
 Retired meanings, each with its replacement:
 
-| Retired                                               | Use instead                                                                                                                                             |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bare `CaretLeft` for "back to the parent"             | A labelled breadcrumb                                                                                                                                   |
-| ⓘ as a static status glyph (`Icon.Tip`)               | `WarningCircle` or `Lightbulb`                                                                                                                          |
-| Accent left bar for "loaded" or "in use"              | A status word                                                                                                                                           |
-| A gear that navigates                                 | The gear opens _this page's_ settings modal; link to Settings with labelled text                                                                        |
-| `textActionClassName` that navigates or opens a modal | A `Button`; a secondary action beside an existing primary `Button` may be a text action, and so may a budget's "Fix" link under its over-budget readout |
+| Retired                                               | Use instead                                                                                                                                                                                                              |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Bare `CaretLeft` for "back to the parent"             | A labelled breadcrumb                                                                                                                                                                                                    |
+| ⓘ as a static status glyph (`Icon.Tip`)               | `WarningCircle` or `Lightbulb`                                                                                                                                                                                           |
+| Accent left bar for "loaded" or "in use"              | A status word                                                                                                                                                                                                            |
+| A gear that navigates                                 | The gear opens _this page's_ settings modal; link to Settings with labelled text                                                                                                                                         |
+| `textActionClassName` that navigates or opens a modal | A `Button`; a secondary action beside an existing primary `Button` may be a text action, and so may a budget's "Fix" link under its over-budget readout, and so may Route Safety's kill-count and kill-location readouts |
 
 ### Filter set away from its default
 

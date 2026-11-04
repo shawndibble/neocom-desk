@@ -19,6 +19,7 @@ import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Pill } from '@/components/ui/Pill';
 import {
   capAttackers,
+  groupVictimKills,
   type HullKillCount,
   minutesBefore,
   type RecentKillLocation,
@@ -117,6 +118,16 @@ function AttackerList({
       attacker.weaponTypeId !== undefined ||
       (attacker.characterId !== undefined && names.has(attacker.characterId))
   );
+  // Say so only when the list is not the whole mail: a cap, or attackers with nothing to show.
+  const footnote =
+    more > 0
+      ? t('travel.kills.modal.attackersMore', { count: more })
+      : shown.length < kill.attackers.length
+        ? t('travel.kills.modal.attackersShown', {
+            shown: shown.length,
+            total: kill.attackers.length,
+          })
+        : null;
   return (
     <div className="bg-panel-2 px-3 pb-2 pt-1 pl-14 text-sm">
       <ul className="space-y-2 sm:space-y-1">
@@ -130,10 +141,10 @@ function AttackerList({
               className="flex flex-wrap items-center gap-x-3 gap-y-0.5"
             >
               {pilot !== undefined && (
-                <span className="font-medium text-text sm:w-32">{pilot}</span>
+                <span className="font-medium text-text sm:w-44">{pilot}</span>
               )}
               {attacker.shipTypeId !== undefined && (
-                <span className="inline-flex items-center gap-1.5 text-text sm:w-36">
+                <span className="inline-flex items-center gap-1.5 text-text sm:w-40">
                   <TypeIcon typeId={attacker.shipTypeId} size={32} className="size-5 rounded-xs" />
                   {typeLabel(attacker.shipTypeId)}
                 </span>
@@ -156,13 +167,7 @@ function AttackerList({
         })}
       </ul>
       <p className="mt-1 text-xs text-text-dim">
-        {more > 0
-          ? t('travel.kills.modal.attackersMore', { count: more })
-          : t('travel.kills.modal.attackersShown', {
-              shown: shown.length,
-              total: kill.attackers.length,
-            })}{' '}
-        ·{' '}
+        {footnote !== null && <>{footnote} · </>}
         <ExternalLink href={killZkillUrl(kill.killmailId)}>
           {t('travel.kills.modal.killmail')}
         </ExternalLink>
@@ -171,27 +176,47 @@ function AttackerList({
   );
 }
 
+/** How many different attackers a group of mails had; the mails' own sizes when some have no ids. */
+function attackerCount(group: readonly RecentKillView[]): number {
+  const everyone = group.flatMap((kill) => kill.attackers);
+  if (everyone.every((attacker) => attacker.characterId !== undefined)) {
+    return new Set(everyone.map((attacker) => attacker.characterId)).size;
+  }
+  return everyone.length;
+}
+
+/**
+ * One pilot's loss: their ship, and the pod that followed it when there was
+ * one, grouped on one row (`groupVictimKills`). Oldest mail first.
+ */
 function KillRow({
-  kill,
+  group,
   victimNames,
   typeLabel,
   now,
 }: {
-  kill: RecentKillView;
+  group: readonly RecentKillView[];
   victimNames: ReadonlyMap<number, string>;
   typeLabel: (typeId: number) => string;
   now: number;
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
-  const attackerNames = useNames(attackerIds(kill), expanded);
+  const attackerNames = useNames(group.flatMap(attackerIds), expanded);
   const names = useMemo(
     () => new Map([...victimNames, ...attackerNames]),
     [victimNames, attackerNames]
   );
-  const shipTypeId = kill.victim?.shipTypeId ?? null;
-  const pilot = kill.victim?.characterId == null ? undefined : names.get(kill.victim.characterId);
-  const minutes = minutesBefore(now, kill.time);
+  const first = group[0];
+  if (first === undefined) return null;
+  const shipTypeId = first.victim?.shipTypeId ?? null;
+  const pilot = first.victim?.characterId == null ? undefined : names.get(first.victim.characterId);
+  const shipLine = group
+    .flatMap((kill) => (kill.victim?.shipTypeId == null ? [] : [typeLabel(kill.victim.shipTypeId)]))
+    .join(' + ');
+  const values = group.flatMap((kill) => (kill.value == null ? [] : [kill.value]));
+  const value = values.length === 0 ? null : values.reduce((sum, v) => sum + v, 0);
+  const minutes = minutesBefore(now, Math.max(...group.map((kill) => kill.time)));
   return (
     <li className="border-b border-line last:border-b-0">
       <button
@@ -211,36 +236,52 @@ function KillRow({
         )}
         <span className="min-w-0 flex-1">
           {pilot !== undefined && <span className="block font-semibold text-text">{pilot}</span>}
-          {shipTypeId !== null && (
+          {shipLine !== '' && (
             <span
               className={
                 pilot === undefined ? 'block font-semibold text-text' : 'block text-text-dim'
               }
             >
-              {typeLabel(shipTypeId)}
+              {shipLine}
             </span>
           )}
         </span>
         <span className="shrink-0 text-right text-xs tabular-nums text-text-dim">
-          {kill.value != null && (
-            <span className="block font-medium text-text">{formatIskCompact(kill.value)} ISK</span>
+          {value !== null && (
+            <span className="block font-medium text-text">{formatIskCompact(value)} ISK</span>
           )}
           {t('travel.kills.modal.minutesAgo', { minutes })} ·{' '}
-          {t('travel.kills.modal.attackers', { count: kill.attackers.length })}
+          {t('travel.kills.modal.attackers', { count: attackerCount(group) })}
         </span>
         <Caret expanded={expanded} />
         <span className="flex basis-full flex-wrap items-center gap-x-2 gap-y-1 pl-12 empty:hidden">
           <span className="text-xs text-text-dim empty:hidden">
             <Org
-              corporationId={kill.victim?.corporationId}
-              allianceId={kill.victim?.allianceId}
+              corporationId={first.victim?.corporationId}
+              allianceId={first.victim?.allianceId}
               names={names}
             />
           </span>
-          <Tags kill={kill} />
+          <Tags
+            kill={{
+              ...first,
+              bubble: group.some((kill) => kill.bubble),
+              smartbomb: group.some((kill) => kill.smartbomb),
+            }}
+          />
         </span>
       </button>
-      {expanded && <AttackerList kill={kill} names={names} typeLabel={typeLabel} />}
+      {expanded &&
+        group.map((kill) => (
+          <div key={kill.killmailId}>
+            {group.length > 1 && (
+              <p className="bg-panel-2 px-3 pt-2 pl-14 text-xs font-semibold uppercase tracking-wide text-text-dim">
+                {kill.victim?.shipTypeId == null ? '' : typeLabel(kill.victim.shipTypeId)}
+              </p>
+            )}
+            <AttackerList kill={kill} names={names} typeLabel={typeLabel} />
+          </div>
+        ))}
     </li>
   );
 }
@@ -343,16 +384,16 @@ export function KillLocationModal({
               <h3 className="sticky top-0 z-10 flex items-center gap-2 border-y border-line bg-panel px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-text-dim">
                 {location.name ?? t('travel.kills.modal.elsewhere')}
                 {location.onPath && <Pill tone="accent">{t('travel.kills.onPath')}</Pill>}
-                <span className="ml-auto font-normal normal-case tracking-normal">
+                <span className="ml-auto shrink-0 whitespace-nowrap font-normal normal-case tracking-normal">
                   {t('travel.kills.modal.summary', { count: location.count })}
                 </span>
               </h3>
             )}
             <ul>
-              {location.kills.map((kill) => (
+              {groupVictimKills(location.kills).map((group) => (
                 <KillRow
-                  key={kill.killmailId}
-                  kill={kill}
+                  key={group[0]?.killmailId}
+                  group={group}
                   victimNames={names}
                   typeLabel={typeLabel ?? ((id) => `#${id}`)}
                   now={now}
