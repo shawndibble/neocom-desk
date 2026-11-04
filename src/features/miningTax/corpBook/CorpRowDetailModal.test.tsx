@@ -189,6 +189,9 @@ describe('CorpRowDetailModal', () => {
     renderModal({ corp: { ...corp, view: paid }, onUnmarkPaid });
     expect(screen.getByText('Settled by')).toBeInTheDocument();
     expect(screen.getByText('Your mark')).toBeInTheDocument();
+    expect(
+      screen.getByText('The corporation confirms your mark against its wallet.')
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /mark as unpaid/i }));
     expect(onUnmarkPaid).toHaveBeenCalledOnce();
   });

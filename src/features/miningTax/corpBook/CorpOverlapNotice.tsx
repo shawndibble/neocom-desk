@@ -6,12 +6,13 @@ import { useLedgerAction } from '../useLedgerAction';
 import { ConflictNotice } from './ConflictNotice';
 import { OverlapNotice } from './OverlapNotice';
 import { acknowledgeOverlap, overlapAckKey, readOverlapAcks } from './overlapAck';
+import { resolvesOn } from './useCorpStateText';
 
 interface Props {
   view: BookRowView;
   corpName: string;
   /** Where the book recorded the ore, for a Conflict: the refinery, else the system. */
-  recordedAt?: string;
+  recordedAt: string;
   everyAssignment: readonly MiningTaxAssignmentRecord[];
   payeeById: ReadonlyMap<string, PayeeRecord>;
   typeNames: ReadonlyMap<number, string>;
@@ -97,14 +98,15 @@ export function CorpOverlapNotice({
     return (
       <ConflictNotice
         corpName={corpName}
+        cause={view.conflictCause}
         entries={mine.map((a) => ({
           id: a.id,
           payeeName: nameOf(a.payeeId ?? ''),
           taxOwed: a.taxOwed,
           paid: a.status === 'paid',
         }))}
-        recordedAt={recordedAt ?? ''}
-        resolvesOn={view.resolvesAt?.slice(0, 10) ?? ''}
+        recordedAt={recordedAt}
+        resolvesOn={resolvesOn(view.resolvesAt)}
         previews={previews}
         typeNames={typeNames}
         busy={pending}

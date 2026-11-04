@@ -7777,13 +7777,13 @@
         "factStatement": "Statement",
         "factStatementFinal": "Issued, final",
         "factSettledBy": "Settled by",
+        "yourMarkNote": "The corporation confirms your mark against its wallet.",
         "settledBy": {
           "yourMark": "Your mark",
           "donation": "Donation",
           "statement": "Statement payment"
         },
         "factOriginal": "Originally billed",
-        "factReason": "Reason",
         "settled": {
           "alsoMarked": "You also marked this day paid. Unmark it if that was a mistake."
         },
@@ -7797,7 +7797,8 @@
       },
       "conflict": {
         "region": "Conflict",
-        "title": "Two records claim this ore",
+        "titleOtherPayee": "Your entry gives this ore to another Payee",
+        "titleOverListed": "Your entry lists more ore than the book recorded",
         "yourEntry": "Your entry: {{payee}} · {{amount}} ISK · {{status}}",
         "yourEntryUnknown": "Your entry: gives this ore to another Payee",
         "entryPaid": "marked paid",
@@ -7805,10 +7806,9 @@
         "bookEntry": "{{corp}}'s book: recorded it at {{place}}",
         "resolves": "Left alone, it goes to {{corp}} on {{date}}.",
         "fixTitle": "To fix it",
-        "bookRight": "The ore was {{corp}}'s: take it off your entry.",
-        "bookRightPaid": "The ore was {{corp}}'s: unmark your payment, then take it off your entry.",
-        "entryRight": "The ore was {{payee}}'s: ask a {{corp}} officer to correct the book.",
-        "otherPayee": "the other Payee"
+        "bookRight": "If the book is right: take this ore off your entry.",
+        "bookRightPaid": "If the book is right: unmark your payment, then take this ore off your entry.",
+        "entryRight": "If your entry is right: ask a {{corp}} officer to correct the book."
       },
       "overlap": {
         "notice": "This ore is also on your list for <strong>{{payee}}</strong>. <strong>{{corp}}</strong> bills it.",

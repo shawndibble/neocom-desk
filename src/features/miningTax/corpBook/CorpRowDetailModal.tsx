@@ -33,7 +33,7 @@ interface Props {
   onUnmarkPaid?: () => void;
   /** Opens the corp pay dialog; absent when nothing is owed. */
   onPay?: () => void;
-  /** The overlap notice for a day the miner's own list shares with the corporation's bill. */
+  /** The notice for a day the miner's own list shares with the corporation's bill: the overlap notice, or a Conflict's. */
   notice?: ReactNode;
 }
 
@@ -41,8 +41,8 @@ interface Props {
  * Row detail for a day the Corp Tax Book decided (#4065): the layout of
  * `RowDetailModal` for an owed row — who it is owed to and how much, the pilot
  * and system, the ore, how it was priced — with the book's status as a few
- * facts, a Conflict's notice first, and any dispute added, and none of the Edit / Unassign actions: the
- * book owns these figures, not the member's Payees.
+ * facts, a Conflict's notice first and any dispute added, and none of the
+ * Edit / Unassign actions: the book owns these figures, not the member's Payees.
  */
 export function CorpRowDetailModal({
   open,
@@ -208,27 +208,33 @@ export function CorpRowDetailModal({
             </ul>
           </div>
 
-          <div className="space-y-1.5 rounded-xs border border-line p-2 text-xs">
-            <p className={eyebrowClassName}>{t('miningTax.corpBook.detail.bookTitle')}</p>
-            {facts.length > 0 && (
-              <ValueList variant="plain" className="text-xs">
-                {facts.map(([label, value]) => (
-                  <ValueRow key={label} label={label} value={value} />
-                ))}
-              </ValueList>
-            )}
-            {(view.state === 'dismissed' || view.state === 'waived') && view.dismissalReason && (
-              <p>{t('miningTax.corpBook.detail.reason', { reasons: view.dismissalReason })}</p>
-            )}
-            {view.settledBy !== 'yourMark' &&
-              view.markedPaidIds &&
-              view.markedPaidIds.length > 0 && (
-                <p>{t('miningTax.corpBook.detail.settled.alsoMarked')}</p>
+          {/* On a Conflict with nothing else to say, the notice already names who to ask. */}
+          {!(conflict && facts.length === 0) && (
+            <div className="space-y-1.5 rounded-xs border border-line p-2 text-xs">
+              <p className={eyebrowClassName}>{t('miningTax.corpBook.detail.bookTitle')}</p>
+              {facts.length > 0 && (
+                <ValueList variant="plain" className="text-xs">
+                  {facts.map(([label, value]) => (
+                    <ValueRow key={label} label={label} value={value} />
+                  ))}
+                </ValueList>
               )}
-            <p className="text-text-dim">
-              {t('miningTax.corpBook.detail.lockedShort', { corp: corp.corpName })}
-            </p>
-          </div>
+              {view.state === 'paid' && view.settledBy === 'yourMark' && (
+                <p>{t('miningTax.corpBook.detail.yourMarkNote')}</p>
+              )}
+              {(view.state === 'dismissed' || view.state === 'waived') && view.dismissalReason && (
+                <p>{t('miningTax.corpBook.detail.reason', { reasons: view.dismissalReason })}</p>
+              )}
+              {view.settledBy !== 'yourMark' &&
+                view.markedPaidIds &&
+                view.markedPaidIds.length > 0 && (
+                  <p>{t('miningTax.corpBook.detail.settled.alsoMarked')}</p>
+                )}
+              <p className="text-text-dim">
+                {t('miningTax.corpBook.detail.lockedShort', { corp: corp.corpName })}
+              </p>
+            </div>
+          )}
 
           {view.correction && (
             <p className="rounded-xs border border-line p-2 text-xs">

@@ -49,6 +49,7 @@ const renderNotice = (v: BookRowView = view, onChanged = () => {}) =>
     <CorpOverlapNotice
       view={v}
       corpName="Brass Meridian"
+      recordedAt="Efa"
       everyAssignment={[assignment]}
       payeeById={new Map([['p1', payee]])}
       typeNames={new Map([[ZEO, 'Zeolites']])}
@@ -94,6 +95,7 @@ describe('CorpOverlapNotice on a Conflict day', () => {
   const conflict = {
     ...view,
     state: 'conflict',
+    conflictCause: 'otherPayee',
     resolvesAt: '2026-11-12T11:00:00.000Z',
   } as BookRowView;
   const renderConflict = (
@@ -116,11 +118,12 @@ describe('CorpOverlapNotice on a Conflict day', () => {
   it('names the clashing entry, where the book recorded it, and when it resolves', () => {
     renderConflict();
     const region = screen.getByRole('region', { name: 'Conflict' });
+    expect(region).toHaveTextContent('Your entry gives this ore to another Payee');
     expect(region).toHaveTextContent('Your entry: Ashfall · 500 ISK · owed');
     expect(region).toHaveTextContent("Brass Meridian's book: recorded it at Efa - Ore Works");
     expect(region).toHaveTextContent('Left alone, it goes to Brass Meridian on 2026-11-12.');
     expect(region).toHaveTextContent(
-      "The ore was Ashfall's: ask a Brass Meridian officer to correct the book."
+      'If your entry is right: ask a Brass Meridian officer to correct the book.'
     );
   });
 
@@ -148,7 +151,7 @@ describe('CorpOverlapNotice on a Conflict day', () => {
     const region = screen.getByRole('region', { name: 'Conflict' });
     expect(region).toHaveTextContent('Your entry: Ashfall · 500 ISK · marked paid');
     expect(region).toHaveTextContent(
-      "The ore was Brass Meridian's: unmark your payment, then take it off your entry."
+      'If the book is right: unmark your payment, then take this ore off your entry.'
     );
     expect(screen.queryByRole('button', { name: 'Let the corporation bill it' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: /mark as unpaid/i }));
@@ -162,6 +165,13 @@ describe('CorpOverlapNotice on a Conflict day', () => {
     await waitFor(() => expect(screen.queryByRole('region')).toBeNull());
     renderConflict();
     expect(screen.getByRole('region', { name: 'Conflict' })).toBeInTheDocument();
+  });
+
+  it("says so when the corporation's own Payee lists more ore than the book recorded", () => {
+    renderConflict(assignment, { ...conflict, conflictCause: 'overListed' });
+    expect(screen.getByRole('region', { name: 'Conflict' })).toHaveTextContent(
+      'Your entry lists more ore than the book recorded'
+    );
   });
 
   it('says another Payee holds the ore when no entry of yours matches', () => {

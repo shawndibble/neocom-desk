@@ -59,6 +59,7 @@ function Story({ view, conflict = false }: { view: BookRowView; conflict?: boole
           conflict ? (
             <ConflictNotice
               corpName={CORP_NAME}
+              cause="otherPayee"
               entries={[{ id: 'a1', payeeName: 'Ashfall Mining', taxOwed: 4_271_257, paid: true }]}
               recordedAt="Talidal - Ishimura Heavy Industries"
               resolvesOn="2026-11-12"
@@ -75,7 +76,7 @@ function Story({ view, conflict = false }: { view: BookRowView; conflict?: boole
 }
 
 const meta = {
-  title: 'features/miningTax/CorpRowDetailModal',
+  title: 'miningTax/CorpRowDetailModal',
   component: Story,
   parameters: { layout: 'fullscreen' },
 } satisfies Meta<typeof Story>;
