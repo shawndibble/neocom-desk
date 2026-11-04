@@ -1387,6 +1387,7 @@
       "unit": { "cpu": "tf", "powergrid": "MW", "calibration": "points" },
       "resourceName": { "cpu": "CPU", "powergrid": "Powergrid", "calibration": "Calibration" },
       "frees": "Frees {{amount}} {{unit}}",
+      "adds": "Adds {{amount}} {{unit}}",
       "sectionHint": {
         "train": "Free. Takes training time, and your modules stay as they are.",
         "implants": "Plug into your clone. Costs ISK, and your modules stay as they are.",
