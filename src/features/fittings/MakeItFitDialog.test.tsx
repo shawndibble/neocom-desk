@@ -192,7 +192,13 @@ describe('MakeItFitDialog', () => {
     };
     const onImplantSet = vi.fn();
     const onImplantsApplied = vi.fn();
-    renderDialog([option(0, 10, [ehpDown])], { onImplantSet, onImplantsApplied });
+    renderDialog([option(0, 10, [ehpDown])], {
+      onImplantSet,
+      onImplantsApplied,
+      before: { ...stats(0, 0), cpuUsed: 90, cpuTotal: 90 },
+    });
+    // An implant raises what the ship has; it uses no less.
+    expect(screen.getByText('Adds 10 tf')).toBeTruthy();
     expect(screen.queryByText(/EE-605/)).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: /EE-603/ }));
     expect(onImplantSet).toHaveBeenCalledWith({ implants: [GYPSY_CPU], boosters: [] });

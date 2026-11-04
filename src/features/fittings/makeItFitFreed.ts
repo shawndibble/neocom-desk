@@ -38,7 +38,11 @@ export const unitOf = (resource: Resource, t: Translate): string =>
 
 export const roundedAmount = (value: number): string => formatNumber(Math.round(value));
 
-/** What a fix takes off the budget the pilot clicked "Fix" on ("Frees 38 tf"); null when it frees none. */
+/**
+ * What a fix does for the budget the pilot clicked "Fix" on: "Frees 38 tf" when it
+ * lowers what the Fitting uses (a swap), "Adds 42 tf" when it raises what the ship
+ * has (an implant), both when it does both; null when it does neither.
+ */
 export function freedLabel(
   before: FittingStats | null,
   after: FittingStats,
@@ -46,7 +50,12 @@ export function freedLabel(
   t: Translate
 ): string | null {
   if (!before || !resource) return null;
+  const unit = unitOf(resource, t);
   const freed = usedOf(before, resource) - usedOf(after, resource);
-  if (!(freed > 0)) return null;
-  return t('fittings.makeItFit.frees', { amount: whole(freed), unit: unitOf(resource, t) });
+  const added = totalOf(after, resource) - totalOf(before, resource);
+  const parts = [
+    freed > 0 ? t('fittings.makeItFit.frees', { amount: whole(freed), unit }) : null,
+    added > 0 ? t('fittings.makeItFit.adds', { amount: whole(added), unit }) : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : null;
 }

@@ -67,9 +67,10 @@ export function MakeItFitFixCard({
       )}
     >
       {tag && (
-        <Pill tone="success" className="absolute -top-2 left-2">
-          {tag}
-        </Pill>
+        // Opaque under the Pill's translucent tint, so the card's border does not show through the label.
+        <span className="bg-panel absolute -top-2 left-2 rounded-xs">
+          <Pill tone="success">{tag}</Pill>
+        </span>
       )}
       <button
         type="button"
@@ -110,8 +111,9 @@ export function MakeItFitFixCard({
             <ProgressBar
               label={t('fittings.makeItFit.landsAt')}
               value={usedOf(budget.after, budget.resource)}
+              // How full the budget is once the fix is in: what the Fitting uses of what the ship has.
               max={Math.max(
-                usedOf(budget.before, budget.resource),
+                totalOf(budget.after, budget.resource),
                 usedOf(budget.after, budget.resource)
               )}
               tone={fits ? 'success' : 'danger'}
