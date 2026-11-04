@@ -213,21 +213,25 @@ async function runBaselines(
  * window on top of it closes) must not screen the whole catalog again.
  * Keyed by the Fitting object, so any edit to the Fitting starts afresh.
  */
+type DamageProfileArg = Parameters<typeof evaluateImplantSet>[2];
+type ConditionsArg = Parameters<typeof evaluateImplantSet>[3];
+
 interface FinderMemo {
   profile: PilotProfile;
-  damageProfile: unknown;
-  conditions: unknown;
+  damageProfile: DamageProfileArg;
+  conditions: ConditionsArg;
   runs: Map<string, Promise<FittingStats>>;
   /** The screening result per starting set (`setKey`). */
   screened: Map<string, { baselines: Baselines; bestGradeStats: Map<string, FittingStats> }>;
 }
+// Not `memoByRow` (src/lib): this one invalidates on four inputs, not one derived figure.
 const finderMemos = new WeakMap<Fitting, FinderMemo>();
 
 function memoFor(
   fitting: Fitting,
   profile: PilotProfile,
-  damageProfile: unknown,
-  conditions: unknown
+  damageProfile: DamageProfileArg,
+  conditions: ConditionsArg
 ): FinderMemo {
   const known = finderMemos.get(fitting);
   if (
