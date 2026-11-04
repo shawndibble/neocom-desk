@@ -189,14 +189,14 @@ export function priceFix(
 export function alternativeSource(
   sources: readonly Source[],
   shown: Source
-): { source: Source; cheaperIfYouCould: boolean } | null {
+): { source: Source } | null {
   const cheaper = sources
     .filter((s) => s !== shown && s.kind === 'lp' && s.blocked && s.cost !== null)
     .filter(
       (s) => shown.cost !== null && !(shown.kind === 'lp' && shown.blocked) && s.cost! < shown.cost
     )
     .sort((a, b) => a.cost! - b.cost!)[0];
-  if (cheaper) return { source: cheaper, cheaperIfYouCould: true };
+  if (cheaper) return { source: cheaper };
   const next = sources.find((s) => s !== shown);
-  return next ? { source: next, cheaperIfYouCould: false } : null;
+  return next ? { source: next } : null;
 }

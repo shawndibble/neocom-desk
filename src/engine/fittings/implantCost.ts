@@ -22,6 +22,14 @@ export function costPerGain(cost: number | null, gain: number): number | null {
   return cost === null || !(gain > 0) ? null : cost / gain;
 }
 
+/** The smallest number in the list, ignoring nulls; null when there is none. */
+export function smallest(values: readonly (number | null)[]): number | null {
+  return values.reduce<number | null>(
+    (min, v) => (v === null || (min !== null && min <= v) ? min : v),
+    null
+  );
+}
+
 /** Ascending by key, ties keep their order, a null key sorts after every number. */
 export function orderBy<T>(items: readonly T[], key: (item: T) => number | null): T[] {
   return items

@@ -54,6 +54,10 @@ import { SetStrip } from './ImplantSetStrip';
 import { IMPLANT_GOAL_PARAM } from './useImplantsModalUrl';
 import { occupantOf, parseSlotKey, slotName } from './implantSlots';
 
+const SLOT_PARAM = nullableTextParam();
+const QUERY_PARAM = textParam();
+const SORT_PARAM = enumParam(IMPLANT_SORTS, 'gain');
+const GOAL_PARAM = nullableTextParam();
 const GROUPS: readonly GoalGroup[] = ['fitting', 'weapons', 'mining', 'tank', 'navigation'];
 const EMPTY_SET: FittingImplantSet = { implants: [], boosters: [] };
 
@@ -79,16 +83,16 @@ export function ImplantFinder({
   const hubId = useMarketHub((state) => state.value);
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const { selected: target } = useTargetProfiles();
-  const [goalParam, setGoalParam] = useUrlParam(IMPLANT_GOAL_PARAM, nullableTextParam());
+  const [goalParam, setGoalParam] = useUrlParam(IMPLANT_GOAL_PARAM, GOAL_PARAM);
   // The open goal rides in the URL, so Back from the market lands on the same list.
   const goalId = IMPLANT_GOALS.some((g) => g.id === goalParam)
     ? (goalParam as ImplantGoalId)
     : null;
   const setGoalId = (id: ImplantGoalId | null) => setGoalParam(id);
   /** The slot picked on the strip (`slotKey`): goals and results narrow to what goes in it. */
-  const [slot, setSlot] = useUrlParam('implantSlot', nullableTextParam());
-  const [query, setQuery] = useUrlParam('implantQuery', textParam());
-  const [sort, setSort] = useUrlParam('implantSort', enumParam(IMPLANT_SORTS, 'gain'));
+  const [slot, setSlot] = useUrlParam('implantSlot', SLOT_PARAM);
+  const [query, setQuery] = useUrlParam('implantQuery', QUERY_PARAM);
+  const [sort, setSort] = useUrlParam('implantSort', SORT_PARAM);
   const [infoTypeId, setInfoTypeId] = useState<number | null>(null);
   const finder = useImplantFinder({
     open,

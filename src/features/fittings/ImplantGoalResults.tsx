@@ -10,6 +10,7 @@ import {
   TypeIcon,
 } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { Caret } from '@/components/ui/Disclosure';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import {
@@ -25,6 +26,7 @@ import {
   costPerGain,
   orderBy,
   savingBetween,
+  smallest,
   type ImplantSort,
 } from '@/engine/fittings/implantCost';
 import { alternativeSource, type Source } from '@/engine/fittings/implantSources';
@@ -144,16 +146,11 @@ export function GoalResults({
     const e = effect(row.stats);
     return costPerGain(costOf(row), e.gain);
   };
-  const lowest = (values: (number | null)[]) =>
-    values.reduce<number | null>(
-      (min, v) => (v === null || (min !== null && min <= v) ? min : v),
-      null
-    );
   const sorted = (list: FamilyResult[]) =>
     sort === 'gain'
       ? list
       : orderBy(list, ({ grades }) =>
-          lowest(grades.filter((g) => !g.inSet).map(sort === 'cost' ? costOf : perGainOf))
+          smallest(grades.filter((g) => !g.inSet).map(sort === 'cost' ? costOf : perGainOf))
         );
 
   const familyList = (unsorted: FamilyResult[]) => (
@@ -384,7 +381,7 @@ export function GoalResults({
       )}
 
       <div className="space-y-3" onKeyDown={moveBetweenActions}>
-        {!off && (implants.length > 1 || boosters.length + implants.length > 1) && (
+        {!off && implants.length + boosters.length > 1 && (
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <SegmentedControl<ImplantSort>
               label={t('fittings.implantFinder.sortLabel')}
@@ -612,8 +609,9 @@ function SourceRow({ source, badge }: { source: Source; badge?: ReactNode }) {
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className={cx(inlineLinkClassName, 'text-[0.6875rem]')}
+          className={cx(inlineLinkClassName, 'inline-flex items-center text-[0.6875rem]')}
         >
+          <Caret expanded={open} />
           {open
             ? t('fittings.implantFinder.lpBreakdownHide')
             : t('fittings.implantFinder.lpBreakdown')}
