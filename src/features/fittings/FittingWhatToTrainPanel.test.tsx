@@ -257,12 +257,12 @@ describe('FittingWhatToTrainPanel — level picker', () => {
     const row = rowFor('Drones');
 
     // Drones is trained to II: I and II are not offered.
-    await user.click(await within(row).findByRole('combobox', { name: /level to train/i }));
-    const options = (await screen.findAllByRole('option')).map((option) =>
+    await user.click(await within(row).findByRole('button', { name: /level to train/i }));
+    const options = (await screen.findAllByRole('menuitemradio')).map((option) =>
       option.textContent?.replace('✓', '')
     );
     expect(options).toEqual(['III', 'IV', 'V']);
-    await user.click(screen.getByRole('option', { name: 'V' }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'V' }));
 
     // The changes follow the level picked.
     expect(within(row).getByText('Mining yield 100 → 105 m³/h')).toBeInTheDocument();
@@ -292,14 +292,13 @@ describe('FittingWhatToTrainPanel — level picker', () => {
     );
     expect(row).toHaveTextContent('III–IV in plan Drone boat');
     // III and IV are in the plan, so the picker already sits on V.
-    const picker = within(row).getByRole('combobox', { name: /level to train/i });
-    expect(picker).toHaveTextContent('V');
-    await user.click(picker);
-    expect(await screen.findByRole('option', { name: 'III · in plan' })).toHaveAttribute(
+    expect(within(row).getByRole('button', { name: /add to plan/i })).toHaveTextContent('Add V');
+    await user.click(within(row).getByRole('button', { name: /level to train/i }));
+    expect(await screen.findByRole('menuitemradio', { name: 'III · in plan' })).toHaveAttribute(
       'aria-disabled',
       'true'
     );
-    expect(screen.getByRole('option', { name: 'IV · in plan' })).toHaveAttribute(
+    expect(screen.getByRole('menuitemradio', { name: 'IV · in plan' })).toHaveAttribute(
       'aria-disabled',
       'true'
     );
@@ -354,18 +353,18 @@ describe('FittingWhatToTrainPanel — level picker', () => {
 describe('FittingWhatToTrainPanel — Skill Plan button and prerequisites', () => {
   it('opens the Skill Plans page, or the target plan once there is one', async () => {
     renderPanel();
-    expect(await screen.findByRole('link', { name: 'Skill Plan' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Open Skill Plan' })).toHaveAttribute(
       'href',
       '/skills/plans'
     );
   });
 
-  it('opens the target plan from the Skill Plan button', async () => {
+  it('opens the target plan from the Open Skill Plan button', async () => {
     const plan = newPlan(CHARACTER_ID, 'Drone boat');
     await db.skillPlans.put(plan);
     renderPanel();
     await waitFor(() =>
-      expect(screen.getByRole('link', { name: 'Skill Plan' })).toHaveAttribute(
+      expect(screen.getByRole('link', { name: 'Open Skill Plan' })).toHaveAttribute(
         'href',
         `/skills/plans/${plan.id}`
       )

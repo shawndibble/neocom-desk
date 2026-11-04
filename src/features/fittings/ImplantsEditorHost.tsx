@@ -1,7 +1,7 @@
 /**
  * The Implants & Boosters editor, mounted by the Fittings page and open while
  * the URL says `?implants=1`. It lives here and not under the chip that opens
- * it (`ImplantSetControl`, inside the Pilot panel's collapsible section, which
+ * it (`ImplantSetControl`, in the Pilot panel, which
  * a phone mounts only on its Stats tab), so Back from the market lands on an
  * editor that is already open however the page's panels were left.
  */

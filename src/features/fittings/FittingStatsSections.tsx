@@ -11,9 +11,8 @@ import type {
 } from '@/engine/fittings/types';
 import { damageSections, shipSections, tankSections } from './stats/columnSections';
 import { makeFigure } from './stats/statFigures';
-import { YourCharactersSection } from './stats/StatSection';
+import { PanelSection, YourCharactersSection } from './stats/StatSection';
 import { useSectionBuilder } from './stats/useSectionBuilder';
-import { useStatsSectionsPreference, withSectionExpanded } from './statsSectionsPreference';
 import type { Appraisal } from '@/engine/market/appraisal';
 import type { DogmaAssetProgress } from './dogmaFittingEngine';
 import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
@@ -87,8 +86,10 @@ interface FittingStatsSectionsProps {
     /** The open fit's cargo, which offsets the planner's filament cost. */
     cargo: readonly FittingCargoItem[];
   };
-  /** The implant controls, grouped with the skills override under "Implants & skills" — absent where a Fitting has no implants to choose. */
+  /** The implants button, beside the skills select in the Pilot panel — absent where a Fitting has no implants to choose. */
   implants?: ReactNode;
+  /** A note under the implant and skills controls (the clone assumes no implants). */
+  implantsNote?: ReactNode;
   /** "What to train" (`FittingWhatToTrainPanel`) — absent where there's no Character to train. Collapsed by default: it only works anything out once opened. */
   whatToTrain?: ReactNode;
   /** "Your Characters": every Character's gap to this Fitting. Absent with fewer than two Characters. */
@@ -139,6 +140,7 @@ export function FittingStatsSections({
   tacticalMode,
   abyssal,
   implants,
+  implantsNote,
   whatToTrain,
   yourCharacters,
   showDrones = true,
@@ -154,7 +156,7 @@ export function FittingStatsSections({
   // The ship data never downloaded and there is no connection to fetch it: say so, not "couldn't load".
   const shipDataNeedsConnection = useShipDataNeedsConnection();
   const profileName = useDamageProfileName()(damageProfiles.selected);
-  const { isExpanded, section, group } = useSectionBuilder();
+  const { section, group } = useSectionBuilder();
   const projectedShips = useProjectedSources((state) =>
     state.sources.reduce((sum, source) => sum + source.count, 0)
   );
@@ -171,20 +173,19 @@ export function FittingStatsSections({
   if (whatToTrainRequested && panel !== 'pilot') openPanel('pilot');
   // Not tied to a change in the request: a phone mounts this column only once its Stats tab shows.
   const scrollToTrain = useRef(false);
+  const trainRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!whatToTrainRequested) return;
     scrollToTrain.current = true;
-    const store = useStatsSectionsPreference.getState();
-    // Hydrated first: writing over the unread default would wipe the saved layout.
-    void store
-      .hydrate()
-      .then(() =>
-        store.setValue(
-          withSectionExpanded(useStatsSectionsPreference.getState().value, 'whatToTrain', true)
-        )
-      );
     onWhatToTrainShown?.();
   }, [whatToTrainRequested, onWhatToTrainShown]);
+  // After every commit until the list is on screen: the panel and its stats may mount later than the request.
+  useEffect(() => {
+    const el = trainRef.current;
+    if (!scrollToTrain.current || !el) return;
+    scrollToTrain.current = false;
+    el.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  });
   const pilotTriggerRef = useRef<HTMLButtonElement>(null);
   const situationTriggerRef = useRef<HTMLButtonElement>(null);
   const overheatAll = useOverheatAll((state) => state.overheatAll);
@@ -352,41 +353,35 @@ export function FittingStatsSections({
               )}
               {/* Its sections wait on the stats: say why the panel is bare meanwhile. */}
               {!stats && <div className="px-3 py-2 text-xs">{placeholder}</div>}
-              {stats &&
-                section(
-                  'assumptions',
-                  undefined,
-                  <StatFields>
+              {stats && (
+                <div className="space-y-2 border-b border-line px-3 py-2">
+                  {/* One line: both controls carry their label inside. */}
+                  <div className="flex items-center gap-2 text-xs">
                     {implants}
                     <SkillOverridesControl />
-                  </StatFields>,
-                  undefined,
-                  'h3'
-                )}
-              {stats &&
-                whatToTrain &&
-                section(
-                  'whatToTrain',
-                  undefined,
-                  // Mounts once the section is open: the one moment there is something to scroll to.
-                  <div
-                    ref={(el) => {
-                      if (!el || !scrollToTrain.current) return;
-                      scrollToTrain.current = false;
-                      el.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
-                    }}
-                  >
-                    {whatToTrain}
-                  </div>,
-                  undefined,
-                  'h3'
-                )}
+                  </div>
+                  {implantsNote}
+                </div>
+              )}
+              {stats && whatToTrain && (
+                <PanelSection id="whatToTrain" title={t('fittings.stats.section.whatToTrain')}>
+                  {/* Scrolled to once there is something to scroll to: Improve's "What to train" link. */}
+                  <div ref={trainRef}>{whatToTrain}</div>
+                </PanelSection>
+              )}
               {stats && fitting && yourCharacters && (
                 <YourCharactersSection
                   fitting={fitting}
                   characters={yourCharacters}
-                  render={(meta, body) => section('yourCharacters', meta, body, undefined, 'h3')}
-                  expanded={isExpanded('yourCharacters')}
+                  render={(meta, body) => (
+                    <PanelSection
+                      id="yourCharacters"
+                      title={t('fittings.stats.section.yourCharacters')}
+                      meta={meta}
+                    >
+                      {body}
+                    </PanelSection>
+                  )}
                 />
               )}
             </>

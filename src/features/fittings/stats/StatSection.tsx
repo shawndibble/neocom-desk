@@ -68,20 +68,59 @@ export function StatSection({
   );
 }
 
-/** The "Your Characters" row: the headline shows closed too; gaps are only worked out while open. */
+/**
+ * A side-panel section that is always open: the same small-caps title row as
+ * `StatSection`, without the caret, so nothing in the panel hides behind a
+ * click. The headline figure and a previewed-change dot read as on a
+ * collapsible section.
+ */
+export function PanelSection({
+  title,
+  meta,
+  id,
+  children,
+}: {
+  title: string;
+  meta?: ReactNode;
+  id: Section;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const previewed = useSectionPreviewed(id);
+  return (
+    <section className="border-b border-line last:border-b-0">
+      <div className="flex min-h-9 items-center gap-2 px-3">
+        <h3 className={cx('min-w-0 flex-1', STAT_EYEBROW_TYPE, 'font-semibold uppercase')}>
+          {title}
+          {previewed && (
+            <>
+              <span
+                aria-hidden="true"
+                className="ml-2 inline-block size-1.5 rounded-full bg-accent align-middle"
+              />
+              <span className="sr-only">{`, ${t('fittings.stats.previewedChange')}`}</span>
+            </>
+          )}
+        </h3>
+        {meta && <span className="shrink-0 text-sm font-semibold tabular-nums">{meta}</span>}
+      </div>
+      <div className="space-y-3 px-3 pt-1 pb-3 text-xs">{children}</div>
+    </section>
+  );
+}
+
+/** The "Your Characters" section: the headline beside its title, the gaps below. */
 export function YourCharactersSection({
   fitting,
   characters,
-  expanded,
   render,
 }: {
   fitting: Fitting;
   characters: readonly GapCharacter[];
-  expanded: boolean;
   render: (meta: ReactNode, body: ReactNode) => ReactNode;
 }) {
   const { t } = useTranslation();
-  const { rows, headline } = useCharacterGaps(fitting, characters, expanded);
+  const { rows, headline } = useCharacterGaps(fitting, characters, true);
   return render(
     headline ? t('fittings.yourCharacters.headline', headline) : undefined,
     <FittingYourCharactersPanel rows={rows} />

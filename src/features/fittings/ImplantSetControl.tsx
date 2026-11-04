@@ -8,12 +8,11 @@
  * (a closed panel, a phone's other tab) and Back from a link out of it returns.
  */
 import { useTranslation } from 'react-i18next';
-import { Expanded } from '@/components/ui/icons';
+import { Descend } from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
 import type { ImplantBasis } from '@/engine/fittings/implantBasis';
 import type { FittingImplantSet } from '@/engine/fittings/types';
 import { useImplantsModalUrl } from './useImplantsModalUrl';
-import { StatField } from './StatFacts';
-import { STAT_FIELD_WIDTH } from './statKit';
 import { fieldBaseClassName, fieldSizeClassName } from '@/components/ui/controlStyles';
 
 interface ImplantSetControlProps {
@@ -39,19 +38,24 @@ export function ImplantSetControl({ basis, implantSet }: ImplantSetControlProps)
           });
 
   const label = t('fittings.implants.label');
+  // Bordered like the Skills select beside it, but with a right caret (§6c): it opens a dialog, not a list.
   return (
-    <StatField label={label}>
-      {/* Drawn as the selects beside it, though it opens the editor rather than a list. */}
-      <button
-        type="button"
-        aria-label={`${label}: ${summary}`}
-        aria-haspopup="dialog"
-        onClick={openModal}
-        className={`flex items-center justify-between gap-1 ${fieldBaseClassName} ${fieldSizeClassName.sm} ${STAT_FIELD_WIDTH}`}
-      >
-        <span className="truncate">{summary}</span>
-        <Expanded aria-hidden className="shrink-0 text-text-dim" />
-      </button>
-    </StatField>
+    <button
+      type="button"
+      aria-label={`${label}: ${summary}`}
+      aria-haspopup="dialog"
+      onClick={openModal}
+      className={cx(
+        'flex min-w-0 flex-1 items-center justify-between gap-1',
+        fieldBaseClassName,
+        fieldSizeClassName.sm
+      )}
+    >
+      <span className="min-w-0 truncate">
+        <span className="text-text-dim">{label}: </span>
+        {summary}
+      </span>
+      <Descend aria-hidden className="shrink-0 text-text-dim" />
+    </button>
   );
 }

@@ -9,10 +9,10 @@
  * Each skill name opens the shared skill detail modal, read against the
  * target Skill Plan.
  *
- * Skills are ranked at their next level, but each row has a level picker:
+ * Skills are ranked at their next level, but each row's Add button has a level menu:
  * the changes and time follow the level picked, worked out on demand. Levels
  * the pilot has are not offered; levels a Skill Plan already trains are shown
- * grayed out. "Add to plan" puts the picked level into the picked Skill Plan
+ * grayed out. "Add" puts the picked level into the picked Skill Plan
  * (a new one named after the Fitting if the Character has none): the levels
  * below it and any missing prerequisites are the plan's own derived rows,
  * scheduled ahead of it by the same normalizer the Skill Plan editor runs, so
@@ -24,6 +24,12 @@ import { Link } from 'react-router-dom';
 import {
   Button,
   buttonClassName,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+  IconButton,
   Select,
   SelectContent,
   SelectItem,
@@ -65,14 +71,9 @@ import { cx } from '@/lib/cx';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import { rankModuleUpgrades } from '@/engine/fittings/moduleUpgrades';
 import type { SkillPlanRecord } from '@/db';
-import { StatField, StatFields, StatNote } from './StatFacts';
-import {
-  STAT_DETAIL,
-  STAT_EYEBROW_TYPE,
-  STAT_FIELD_WIDTH,
-  joinDetail,
-  statRowClassName,
-} from './statKit';
+import { StatNote } from './StatFacts';
+import { Expanded } from '@/components/ui/icons';
+import { STAT_DETAIL, STAT_EYEBROW_TYPE, joinDetail, statRowClassName } from './statKit';
 
 export interface WhatToTrainRow extends SkillGain {
   name: string;
@@ -189,40 +190,52 @@ function WhatToTrainRanking({
   const rankByLabel = t('fittings.whatToTrain.rankBy');
   return (
     <div className="space-y-3">
-      <StatFields>
-        <StatField label={rankByLabel}>
-          <Select
-            value={activeSort}
-            onValueChange={(value) => {
-              const picked = sorts.find((option) => option === value);
-              if (picked) setSort(picked);
-            }}
-          >
-            <SelectTrigger aria-label={rankByLabel} size="sm" className={STAT_FIELD_WIDTH}>
+      {/* Two rows of one shape: a select that names itself, then what it acts on. */}
+      <div className="space-y-2">
+        <Select
+          value={activeSort}
+          onValueChange={(value) => {
+            const picked = sorts.find((option) => option === value);
+            if (picked) setSort(picked);
+          }}
+        >
+          <SelectTrigger aria-label={rankByLabel} size="sm" className="w-full">
+            <span className="min-w-0 truncate">
+              <span className="text-text-dim">{rankByLabel}: </span>
               <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {sorts.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {t(`fittings.whatToTrain.sort.${option}`)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {sorts.map((option) => (
+              <SelectItem key={option} value={option}>
+                {t(`fittings.whatToTrain.sort.${option}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {/* The plan the Add buttons write to, and the button that opens that same plan. */}
+        <div className="flex items-center gap-2">
+          {target.plans && target.plans.length > 1 ? (
+            <TargetPlanPicker
+              target={target}
+              bare
+              prefix={t('skills.targetPlan.label')}
+              className="min-w-0 flex-1"
+            />
+          ) : (
+            <span className="min-w-0 flex-1 truncate">
+              <span className="text-text-dim">{t('skills.targetPlan.label')}: </span>
+              {targetPlan?.name ?? t('fittings.whatToTrain.newPlan', { name: fittingName })}
+            </span>
+          )}
           <Link
             to={targetPlan ? `/skills/plans/${targetPlan.id}` : '/skills/plans'}
-            className={buttonClassName({ size: 'sm' })}
+            className={cx(buttonClassName({ size: 'sm' }), 'shrink-0')}
           >
             {t('fittings.whatToTrain.openPlan')}
           </Link>
-        </StatField>
-        {/* Only with a plan to choose between (`TargetPlanPicker`). */}
-        {target.plans && target.plans.length > 1 && (
-          <StatField label={t('skills.targetPlan.label')}>
-            <TargetPlanPicker target={target} bare className={STAT_FIELD_WIDTH} />
-          </StatField>
-        )}
-      </StatFields>
+        </div>
+      </div>
       {skillFixes.fixes && skillFixes.fixes.length > 0 && (
         <div className="space-y-1">
           <p className={cx(STAT_EYEBROW_TYPE, 'text-warning')}>
@@ -313,8 +326,8 @@ function levelSpan(from: number, to: number): string {
 
 /**
  * One suggestion: the skill and what it changes on the left, the time it
- * takes at the top right; beneath, the plan it is already in, then a level
- * picker beside Add to plan. The changes and the time follow the level picked.
+ * takes at the top right; beneath, the plan it is already in, then a split
+ * Add button whose menu picks the level. The changes and the time follow the level picked.
  */
 export function WhatToTrainItem({
   row,
@@ -412,39 +425,49 @@ export function WhatToTrainItem({
             </span>
           )}
           {canAdd && (
-            <>
-              <Select value={String(level)} onValueChange={(value) => setPicked(Number(value))}>
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t('fittings.whatToTrain.levelLabel', { skill: row.name })}
-                  className="w-16"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {options.map((option) => (
-                    <SelectItem
-                      key={option.level}
-                      value={String(option.level)}
-                      disabled={option.planned}
-                    >
-                      {option.planned
-                        ? t('fittings.whatToTrain.levelInPlan', {
-                            level: romanLevel(option.level),
-                          })
-                        : romanLevel(option.level)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex">
               <Button
                 size="sm"
+                className={options.length > 1 ? 'rounded-r-none' : undefined}
                 aria-label={t('fittings.whatToTrain.addToPlanLabel', { skill })}
                 onClick={() => void onAdd(row, level)}
               >
-                {t('fittings.whatToTrain.addToPlan')}
+                {t('fittings.whatToTrain.addLevel', { level: romanLevel(level) })}
               </Button>
-            </>
+              {/* Another level than the next one: only when there is one to pick. */}
+              {options.length > 1 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <IconButton
+                      size="sm"
+                      icon={<Expanded />}
+                      label={t('fittings.whatToTrain.levelLabel', { skill: row.name })}
+                      className="-ml-px rounded-l-none"
+                    />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuRadioGroup
+                      value={String(level)}
+                      onValueChange={(value) => setPicked(Number(value))}
+                    >
+                      {options.map((option) => (
+                        <DropdownMenuRadioItem
+                          key={option.level}
+                          value={String(option.level)}
+                          disabled={option.planned}
+                        >
+                          {option.planned
+                            ? t('fittings.whatToTrain.levelInPlan', {
+                                level: romanLevel(option.level),
+                              })
+                            : romanLevel(option.level)}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           )}
         </div>
       )}
