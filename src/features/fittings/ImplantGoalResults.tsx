@@ -15,7 +15,7 @@ import {
 } from '@/engine/fittings/implantFinder';
 import { alternativeSource, type Source } from '@/engine/fittings/implantSources';
 import type { FittingStats } from '@/engine/fittings/types';
-import { marketItemUrl } from '@/engine/market/urlState';
+import { marketLinkParams } from '@/engine/market/urlState';
 import { lpStorePath } from '@/features/loyalty/lpStorePath';
 import { getTradeHub } from '@/market/hubs';
 import { type FamilyResult, type FixResult, type GradeResult } from './useImplantFinder';
@@ -514,7 +514,9 @@ function GradeRow({
   const lpSources = [shown, alt?.source].filter(
     (source): source is Extract<Source, { kind: 'lp' }> => source?.kind === 'lp'
   );
-  const hasMarket = shown?.kind === 'market' || alt?.source.kind === 'market';
+  // The market link opens on the hub the price shown is from.
+  const marketSource = [shown, alt?.source].find((source) => source?.kind === 'market');
+  const hasMarket = marketSource !== undefined;
   return (
     <li className="flex flex-wrap items-start gap-x-4 gap-y-1 border-t border-line py-1.5">
       <span className="flex min-w-44 items-start gap-1 md:w-52 md:shrink-0 md:flex-col md:gap-0.5">
@@ -564,7 +566,16 @@ function GradeRow({
         {(hasMarket || lpSources.length > 0) && (
           <span className="mt-1 flex flex-wrap gap-x-3 text-xs">
             {hasMarket && (
-              <Link to={marketItemUrl(row.grade.typeId, '')} className={inlineLinkClassName}>
+              <Link
+                to={`/market/browser?${new URLSearchParams(
+                  marketLinkParams(
+                    row.grade.typeId,
+                    '',
+                    marketSource?.kind === 'market' ? marketSource.hubId : undefined
+                  )
+                ).toString()}`}
+                className={inlineLinkClassName}
+              >
                 {t('fittings.implantFinder.openMarket')}
               </Link>
             )}

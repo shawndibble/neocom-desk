@@ -282,14 +282,13 @@ describe('ImplantFinder', () => {
     renderFinder();
     await user.click(await screen.findByRole('button', { name: /CPU\s*18\.4 tf over/ }));
     const row = (await screen.findByRole('button', { name: /^Add .*EE-603$/ })).closest('li')!;
-    expect(within(row).getByRole('link', { name: 'Open market' })).toHaveAttribute(
+    expect(within(row).getByRole('link', { name: 'View in Market' })).toHaveAttribute(
       'href',
-      '/market/browser?type=603'
+      '/market/browser?type=603&hub=jita'
     );
-    expect(within(row).getByRole('link', { name: 'Open Caldari Navy LP Store' })).toHaveAttribute(
-      'href',
-      '/wallet/lp-store/1000035?offer=4242'
-    );
+    expect(
+      within(row).getByRole('link', { name: 'View in Caldari Navy LP Store' })
+    ).toHaveAttribute('href', '/wallet/lp-store/1000035?offer=4242');
   });
 
   it('opens an implant’s full details from its info button', async () => {
