@@ -8,7 +8,7 @@ import { syncEditableCollection } from './collectionSync';
 import { syncFeed } from './feedSync';
 import { syncSettings } from './settingsSync';
 import { getSyncStatus, haltSync, resetSyncHalt, scheduleSync, triggerSync } from './planSync';
-import { readSeenSyncMarker } from './localBookkeeping';
+import { readSeenSyncMarker, writeSeenSyncMarker } from './localBookkeeping';
 import { SAFETY_RECONCILE_INTERVAL_MS, bumpRemoteMarker, readRemoteMarker } from './syncMarker';
 import { EDITABLE_COLLECTIONS } from './syncedCollections';
 
@@ -241,6 +241,24 @@ describe('bumping the marker', () => {
     await backgroundPass();
 
     expect(collectionPasses()).toBe(0);
+  });
+
+  it('does not count its bump twice when another tab records the bumped marker meanwhile', async () => {
+    await triggerSync(1);
+    pushOnce();
+    vi.mocked(bumpRemoteMarker).mockImplementationOnce(async (_firestore, _uid, by) => {
+      remote.version = (remote.version ?? 0) + by;
+      // Another tab's full pass runs between the bump and this pass's bookkeeping.
+      await writeSeenSyncMarker(1, { version: remote.version, fullAt: Date.now() });
+    });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    scheduleSync(1, { collections: ['plans'], debounceMs: 0 });
+    await vi.advanceTimersByTimeAsync(0);
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(remote.version).toBe(1));
+    await vi.waitFor(() => expect(getSyncStatus(1).state).toBe('idle'));
+
+    expect((await readSeenSyncMarker(1))?.version).toBe(1);
   });
 
   it('still reads everything when another device bumped beside its own', async () => {

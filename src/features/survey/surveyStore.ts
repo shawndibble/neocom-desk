@@ -113,7 +113,7 @@ export async function addSurveyScan(input: {
       expiresAt: Timestamp.fromMillis(input.expiresAt),
     }
   );
-  markWritten(input.id);
+  dropInflight(input.id);
 }
 
 /**
@@ -142,7 +142,7 @@ export async function finishSurvey(input: {
       expiresAt: Timestamp.fromMillis(input.expiresAt),
     }
   );
-  markWritten(input.id);
+  dropInflight(input.id);
 }
 
 export async function setSurveyTax(input: {
@@ -237,7 +237,7 @@ export async function setSurveyScanIgnored(input: {
       expiresAt: Timestamp.fromMillis(input.expiresAt),
     }
   );
-  markWritten(input.id);
+  dropInflight(input.id);
 }
 
 export type LoadSurveyResult =
@@ -288,7 +288,7 @@ const caches = new Map<string, SurveyCache>();
 /**
  * Loads under way. A second load of the same survey joins one (the page's poll
  * and an Overview widget mounting together, or React's dev double-mount) rather
- * than paying for its own read; `markWritten` drops it, so a load after this
+ * than paying for its own read; `dropInflight` drops it, so a load after this
  * app's own write never joins one that began before it.
  */
 const inflight = new Map<string, Promise<LoadSurveyResult>>();
@@ -307,13 +307,13 @@ export function forgetSurveyCache(): void {
 }
 
 /** This app just wrote to the survey: the next load reads afresh instead of joining one already under way. */
-function markWritten(id: string): void {
+function dropInflight(id: string): void {
   inflight.delete(id);
 }
 
 /** The next load re-reads the share doc, tax and info: this app just changed one. */
 function markDetailsDue(id: string): void {
-  markWritten(id);
+  dropInflight(id);
   const cache = caches.get(id);
   if (cache === undefined) return;
   cache.detailsReadAt = 0;
@@ -399,12 +399,17 @@ function resultOf(cache: SurveyCache): LoadSurveyResult {
 
 /**
  * The survey as it stands now. The scans and ignores are always read (only what
- * is new since the last load, once one has run), so a paste compared against
- * this sees a scan another pilot added a moment ago; the share doc, tax and
- * info are re-read once `SURVEY_DETAILS_TTL_MS` has passed.
+ * is new since the last load, once one has run); the share doc, tax and info
+ * are re-read once `SURVEY_DETAILS_TTL_MS` has passed. A load of the same
+ * survey already under way is joined, unless `fresh`: a paste compared against
+ * the survey must see a scan another pilot added a moment ago, after that load
+ * sent its queries.
  */
-export function loadSurvey(id: string): Promise<LoadSurveyResult> {
-  const running = inflight.get(id);
+export function loadSurvey(
+  id: string,
+  { fresh = false }: { fresh?: boolean } = {}
+): Promise<LoadSurveyResult> {
+  const running = fresh ? undefined : inflight.get(id);
   if (running !== undefined) return running;
   const load = readSurvey(id).finally(() => {
     if (inflight.get(id) === load) inflight.delete(id);

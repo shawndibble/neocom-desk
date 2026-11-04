@@ -739,7 +739,13 @@ describe('polling a survey', () => {
     const [a, b] = [loadSurvey('abc123XYZ'), loadSurvey('abc123XYZ')];
     expect(await b).toEqual(await a);
     expect(loadShare).toHaveBeenCalledTimes(1);
-    expect(getDocs).toHaveBeenCalledTimes(4);
+    expect(getDocs).toHaveBeenCalledTimes(4); // scans, ignores, tax, info
+  });
+
+  it('reads again for a fresh load, not joining one under way', async () => {
+    serve({ surveyScans: [scanDoc('s1', 1000)] });
+    await Promise.all([loadSurvey('abc123XYZ'), loadSurvey('abc123XYZ', { fresh: true })]);
+    expect(loadShare).toHaveBeenCalledTimes(2);
   });
 
   it.each([
@@ -763,6 +769,18 @@ describe('polling a survey', () => {
       'a tax',
       () => setSurveyTax({ id: 'abc123XYZ', expiresAt: LIVE, name: 'M', pct: 8, characterId: 1 }),
     ],
+    [
+      'the info',
+      () =>
+        setSurveyInfo({
+          id: 'abc123XYZ',
+          expiresAt: LIVE,
+          location: null,
+          notes: 'n',
+          characterId: 1,
+        }),
+    ],
+    ['the owner', () => setSurveyOwner({ id: 'abc123XYZ', owner: 'Bob', characterId: 1 })],
   ])(
     'reads again after this app writes %s, not joining a load from before it',
     async (_, write) => {

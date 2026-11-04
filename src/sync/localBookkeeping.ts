@@ -73,8 +73,8 @@ export interface PullCursor {
 
 /**
  * The remote change marker (`characters/{uid}.syncVersion`, syncMarker.ts) this
- * device last saw at the start of a successful full pass, plus each bump this
- * device has made since, and when that pass ran. An idle background pass that finds the marker unchanged skips its reads.
+ * device last saw at the start of a successful full pass (plus each bump it
+ * has made since), and when that pass ran. An idle background pass that finds the marker unchanged skips its reads.
  * Dropped with the pull cursors: whatever voids a cursor voids this too.
  */
 export const syncMarkerKey = (characterId: number): string =>
@@ -98,6 +98,24 @@ export async function writeSeenSyncMarker(
   seen: SeenSyncMarker
 ): Promise<void> {
   await db.settings.put({ key: syncMarkerKey(characterId), value: seen });
+}
+
+/**
+ * Counts one bump this device made into the seen marker, but only while the
+ * stored claim is still `expected` (read before the bump). Another tab's full
+ * pass or clear in between replaces it, and counting the bump on top of that
+ * would claim it twice: the remote could then match while another device's
+ * push is unpulled.
+ */
+export async function advanceSeenSyncMarker(
+  characterId: number,
+  expected: SeenSyncMarker
+): Promise<void> {
+  await db.transaction('rw', db.settings, async () => {
+    const stored = await readSeenSyncMarker(characterId);
+    if (stored?.version !== expected.version || stored.fullAt !== expected.fullAt) return;
+    await writeSeenSyncMarker(characterId, { ...expected, version: expected.version + 1 });
+  });
 }
 
 export async function clearSeenSyncMarker(characterId: number): Promise<void> {
