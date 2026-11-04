@@ -73,12 +73,7 @@ export function LoyaltyOfferCost({
   return (
     <>
       {formatCount(row.offer.lp_cost)} LP + <IskAmount value={row.offer.isk_cost} decimals={0} />
-      {short !== null && (
-        <span className="text-warning">
-          {' '}
-          · {t('loyaltyStore.needMoreLp', { lp: formatCount(short) })}
-        </span>
-      )}
+      {short !== null && <span> · {t('loyaltyStore.needMoreLp', { lp: formatCount(short) })}</span>}
     </>
   );
 }
