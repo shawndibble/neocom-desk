@@ -583,7 +583,7 @@ export function MyShipsView({
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('assets.myShips.searchPlaceholder')}
             aria-label={t('assets.myShips.searchLabel')}
-            className="w-full sm:ml-auto sm:w-64"
+            className="min-w-0 flex-1 sm:ml-auto sm:w-64 sm:flex-none"
             pageSearch
           />
           {state.status === 'ready' && sorted.length > 0 && (
