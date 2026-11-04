@@ -198,16 +198,14 @@ describe('PlanVerdictHero: how owned materials are counted', () => {
   it('says only "profit after fees" when the plan uses no owned materials', () => {
     renderHero();
     expect(screen.getByText('profit after fees')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'sell value' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'resale value' })).not.toBeInTheDocument();
   });
 
-  it('names the comparison and flips the basis in place', async () => {
+  it('labels the basis and flips the basis in place', async () => {
     const onBasisChange = vi.fn();
     renderHero({ basis: 'sellValue', onBasisChange });
-    expect(
-      screen.getByText(/compared with selling your materials, counted at/)
-    ).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'sell value' }));
+    expect(screen.getByText(/Owned materials =/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'resale value' }));
     expect(onBasisChange).toHaveBeenCalledWith('free');
   });
 
@@ -249,13 +247,13 @@ describe('PlanVerdictHero: calculation breakdown', () => {
     renderHero({ openBreakdown: true });
 
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText(/Materials: Jita lowest sell/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Materials: Jita buy now/i)).toBeTruthy();
     expect(within(dialog).getByText(/Ore, ice and gas: priced as themselves/i)).toBeTruthy();
     expect(within(dialog).getByText(/Owned units: 0 ISK/i)).toBeTruthy();
-    expect(within(dialog).getByText(/Rifter: always Jita lowest sell/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Rifter: always the Jita sell order price/i)).toBeTruthy();
   });
 
-  it('lists the order book levels each Depth Price walked, and keeps the product on lowest sell (issue #3993)', () => {
+  it('lists the order book levels each Depth Price walked, and keeps the product on the sell order price (issue #3993)', () => {
     const walk = {
       best: 4,
       avg: 4.5,
@@ -277,7 +275,7 @@ describe('PlanVerdictHero: calculation breakdown', () => {
     expect(within(dialog).getByText('Order book depth')).toBeTruthy();
     expect(within(dialog).getByText(/Tritanium needs at least 1% .* Jita/)).toBeTruthy();
     expect(
-      within(dialog).getByText(/Rifter's own sale price is still the lowest sell/)
+      within(dialog).getByText(/Rifter's own sale price is still the lowest sell order/)
     ).toBeTruthy();
     expect(within(dialog).getByText('Tritanium: 300 needed · 4.50 avg')).toBeTruthy();
     expect(within(dialog).getByText('4.00 ISK × 150')).toBeTruthy();
@@ -293,9 +291,9 @@ describe('PlanVerdictHero: calculation breakdown', () => {
     renderHero({ breakdown: { ...BREAKDOWN, materialPriceBasis: 'buy' }, openBreakdown: true });
 
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText(/Materials: Jita highest buy/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Materials: Jita buy order/i)).toBeTruthy();
     // The product never follows the materials onto the buy side.
-    expect(within(dialog).getByText(/Rifter: always Jita lowest sell/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Rifter: always the Jita sell order price/i)).toBeTruthy();
   });
 
   it("quotes the plan's own figures rather than a generic formula", async () => {
@@ -429,9 +427,9 @@ describe('PlanVerdictHero reaction location warning (issue #2908)', () => {
 });
 
 describe('PlanVerdictHero 90-day median note', () => {
-  it('adds an amber note under the figure when the sell price is 20% or more above its median', () => {
+  it('adds an amber note under the figure when the sell order price is 20% or more above its median', () => {
     renderHero({ vs90dPct: 35.2 });
-    expect(screen.getByText('Sell price is 35% above its 90-day median')).toHaveClass(
+    expect(screen.getByText('Sell order price is 35% above its 90-day median')).toHaveClass(
       'text-warning'
     );
   });

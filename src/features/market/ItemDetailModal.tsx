@@ -31,21 +31,18 @@ import {
   interactiveClassName,
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useInRouterContext, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useInRouterContext, useLocation } from 'react-router-dom';
 import {
   Button,
   buttonClassName,
   EmptyState,
   IskAmount,
-  MenuItem,
   Modal,
   Popover,
   PopoverContent,
   PopoverTrigger,
-  RowActionsContext,
-  RowMoreActions,
   Spinner,
   TabPanel,
   Tabs,
@@ -53,13 +50,15 @@ import {
   TypeIcon,
   useTabsId,
 } from '@/components/ui';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, TRADE_HUBS } from '@/market/hubs';
+import type { AttributeDictionary, AttributeReferenceNames } from '@/engine/market/itemAttributes';
 import {
-  groupItemAttributes,
-  type AttributeDictionary,
-  type AttributeGroup,
-} from '@/engine/market/itemAttributes';
-import { EveMarkupText } from '@/components/EveMarkupText';
+  itemAttributeSections,
+  itemKindOf,
+  withSkilledValues,
+  type AttributeSection,
+  type ItemKind,
+} from '@/engine/market/itemAttributeSections';
 import { marketItemUrl } from '@/engine/market/urlState';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import {
@@ -72,15 +71,21 @@ import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi, loadSkillAttributeModifiers, loadSkills } from '@/sde/loadSde';
 import type { PiData, SkillAttributeModifierMap } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { extractRequiredSkills, type RequiredSkill } from '@/features/skills/dogma';
 import { useTargetPlan, type TargetPlan } from '@/features/skills/useTargetPlan';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
-import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
-import { useIsNarrow } from '@/lib/useIsNarrow';
+import { loadRegionName } from '@/features/places/regions';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
-import { formatAttributeValue, formatVolume } from './format';
+import { formatVolume } from './format';
+import { ItemAttributeSections } from './ItemAttributeSections';
+import { sectionsShowSkilled } from './skilledFigures';
+import {
+  useSkilledAttributes,
+  type SkilledAttributesState,
+} from '@/features/fittings/useSkilledAttributes';
 import { loadTypeDetail, type TypeDetail } from '@/features/skills/typeDetail';
 import {
   loadOrderBookView,
@@ -88,6 +93,11 @@ import {
   type OrderBookLocation,
 } from './orderBookView';
 import { ItemMarketTab } from './ItemMarketTab';
+import { ItemDescription } from './ItemDescription';
+import { loadItemGroupLine } from './itemGroupLine';
+import { loadItemCategoryId } from './itemCategory';
+import { IMPLANT_CATEGORY_ID } from '@/sde/categories';
+import { priceMarketOf } from './priceMarket';
 import { RequiredSkillsSection } from './RequiredSkillsSection';
 import { skillNameOrFallback } from './skillNameOrFallback';
 import { MadeFromSection } from './MadeFromSection';
@@ -95,7 +105,7 @@ import { UsedInSection } from './UsedInSection';
 import { AbyssalItemDetail } from '@/features/abyssal/AbyssalItemDetail';
 import { AbyssalEstimateLine } from '@/features/abyssal/AbyssalEstimateLine';
 import { useIsAbyssalType } from '@/features/abyssal/mutaplasmidData';
-import { useDynamicItem } from '@/features/abyssal/useDynamicItem';
+import { useDynamicItem, useDynamicItemMutation } from '@/features/abyssal/useDynamicItem';
 import { recordAttributes } from '@/features/abyssal/dynamicItems';
 import type { DynamicItemRecord } from '@/db';
 import { formatIsk, formatIskCompact, marketIskDecimals } from '@/lib/isk';
@@ -116,9 +126,10 @@ export interface ItemDetailModalProps {
    */
   location?: OrderBookLocation;
   /**
-   * An "Open in Market" link in the header, for an Item Detail opened away
-   * from the Market Browser (Show info on any page, the Command Palette).
-   * Opt-in: on the Market Browser itself it would link to the page already open.
+   * An "Open in Market Browser" link at the top of the Market tab, for an Item
+   * Detail opened away from the Market Browser (Show info on any page, the
+   * Command Palette). Opt-in: on the Market Browser itself it would link to
+   * the page already open.
    */
   showOpenInMarket?: boolean;
   /**
@@ -132,7 +143,9 @@ export interface ItemDetailModalProps {
 interface DetailData {
   type: TypeDetail;
   /** Skill-requirement rows already excluded — the Required Skills section below owns those instead. */
-  groups: AttributeGroup[];
+  sections: AttributeSection[];
+  /** Orders the sections; a Mutated module's own attributes are grouped by its type's. */
+  kind: ItemKind;
   requiredSkills: RequiredSkill[];
   /** typeID -> name, reused from the same resolution the generic rows already paid for. */
   skillNames: Readonly<Record<number, string>>;
@@ -163,7 +176,6 @@ export function ItemDetailModal({
 }: ItemDetailModalProps) {
   const { t } = useTranslation();
   const leave = onLeave ?? onClose;
-  const narrow = useIsNarrow();
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -182,15 +194,43 @@ export function ItemDetailModal({
   const savedLocation = useSavedOrderBookLocation(location === undefined);
   const priceLocation = location ?? savedLocation;
   const [priceState, setPriceState] = useState<PriceState>({ status: 'loading' });
+  const priceMarket = priceLocation ? priceMarketOf(typeId, priceLocation) : null;
+  /** A Region-mode market no hub sits in, named off the bundled region list. */
+  const regionToLookUp =
+    priceMarket?.kind === 'region' && priceMarket.name === null ? priceMarket.regionId : null;
+  const loadPriceRegionName = useCallback(
+    () => (regionToLookUp === null ? Promise.resolve(null) : loadRegionName(regionToLookUp)),
+    [regionToLookUp]
+  );
+  const { data: lookedUpRegionName } = useKeyedLoad(
+    regionToLookUp === null ? null : String(regionToLookUp),
+    loadPriceRegionName
+  );
+  const priceMarketName = priceMarket?.name ?? lookedUpRegionName ?? null;
+  /**
+   * Where "Made from" prices its inputs: the Trade Hub (hub prices are per
+   * station, so a Region-mode location still prices inputs at its hub). The
+   * line names it.
+   */
+  const inputPriceHub = priceLocation
+    ? (TRADE_HUBS.find((hub) => hub.stationId === priceLocation.hubStationId) ?? DEFAULT_TRADE_HUB)
+    : null;
+  const loadGroupLine = useCallback(() => loadItemGroupLine(typeId), [typeId]);
+  const { data: groupLine } = useKeyedLoad(String(typeId), loadGroupLine);
+  const loadCategory = useCallback(() => loadItemCategoryId(typeId), [typeId]);
+  const category = useKeyedLoad(String(typeId), loadCategory);
 
   // Null until known, so the market line and link don't flash in on an Abyssal type.
   const abyssal = useIsAbyssalType(typeId);
   const dynamic = useDynamicItem(typeId, abyssal ? itemId : undefined);
-  /** The Mutated module's own attributes, grouped as the type's are, for the record they were grouped from. */
-  const [dynamicGrouped, setDynamicGrouped] = useState<{
+  /** Names for the Mutated module's own attributes' ids, for the record they were resolved for. */
+  const [dynamicNames, setDynamicNames] = useState<{
     record: DynamicItemRecord;
-    groups: AttributeGroup[];
+    names: AttributeReferenceNames;
   } | null>(null);
+  // Its rolls show in "This module's rolls", so its groups leave them out.
+  const mutation = useDynamicItemMutation(typeId, dynamic);
+  const skilled = useSkilledAttributes(typeId, mutation ?? undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -264,9 +304,12 @@ export function ItemDetailModal({
         if (cancelled) return;
         const allSkillNames: Record<number, string> = {};
         for (const skill of skills) allSkillNames[skill.typeID] = skill.name;
+        const kind = itemKindOf(type.dogma_attributes, type.dogma_effects);
         setData({
           type,
-          groups: groupItemAttributes(type.dogma_attributes, dictionary, names, {
+          kind,
+          sections: itemAttributeSections(type.dogma_attributes, dictionary, names, {
+            kind,
             omitSkillRequirementRows: true,
           }),
           requiredSkills: extractRequiredSkills(type.dogma_attributes),
@@ -292,22 +335,38 @@ export function ItemDetailModal({
     let cancelled = false;
     const attributes = recordAttributes(dynamicRecord);
     void loadAttributeReferenceNames([attributes], data.dictionary).then((names) => {
-      if (cancelled) return;
-      setDynamicGrouped({
-        record: dynamicRecord,
-        groups: groupItemAttributes(attributes, data.dictionary, names, {
-          omitSkillRequirementRows: true,
-        }),
-      });
+      if (!cancelled) setDynamicNames({ record: dynamicRecord, names });
     });
     return () => {
       cancelled = true;
     };
   }, [data, dynamicRecord]);
-  const attributeGroups =
-    (dynamicRecord && dynamicGrouped?.record === dynamicRecord ? dynamicGrouped.groups : null) ??
-    data?.groups ??
-    [];
+  const baseSections = useMemo(() => {
+    if (!data) return [];
+    if (!dynamicRecord || dynamicNames?.record !== dynamicRecord) return data.sections;
+    return itemAttributeSections(
+      recordAttributes(dynamicRecord),
+      data.dictionary,
+      dynamicNames.names,
+      {
+        kind: data.kind,
+        omitSkillRequirementRows: true,
+        omitAttributeIds: mutation
+          ? new Set(Object.keys(mutation.attributes).map(Number))
+          : undefined,
+      }
+    );
+  }, [data, dynamicRecord, dynamicNames, mutation]);
+  const attributeSections = useMemo(
+    () =>
+      skilled.status === 'ready' ? withSkilledValues(baseSections, skilled.values) : baseSections,
+    [baseSections, skilled]
+  );
+  /** The skills that change an attribute of this item ("which skill changes this"); none without a pilot. */
+  const modifiersOf = (attributeId: number) =>
+    activeCharacterId && data
+      ? findModifyingSkills(attributeId, requiredSkillTypeIds, data.skillAttributeModifiers)
+      : [];
 
   // Gates which attribute-modifier popovers can apply (empty while `data`
   // hasn't loaded yet).
@@ -321,33 +380,17 @@ export function ItemDetailModal({
       onClose={onClose}
       // The URL-backed host already owns the history entry (`?info`).
       closeOnBack={onLeave === undefined}
-      // An abyssal type's roll table has a column per mutaplasmid, up to eight.
-      placement={abyssal || tab === 'market' ? 'wide' : 'center'}
+      // One width for every tab and item kind (40rem), so switching tabs never
+      // jumps the box and a name stays close to its value. An abyssal roll
+      // table wider than that scrolls sideways in its own box.
+      placement="detail"
       title={itemName}
       titleActions={
-        // Two text buttons squeeze the name to a letter on a phone; there they share one ⋮.
-        narrow && showMarketLink ? (
-          <ItemDetailMoreActions
-            typeId={typeId}
-            itemName={itemName}
-            onNavigate={leave}
-            replace={onLeave !== undefined}
-          />
-        ) : (
-          <>
-            {/* An abyssal type has no market group, so no in-game market window either. */}
-            {abyssal !== true && (
-              <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />
-            )}
-            {showMarketLink && (
-              <OpenInMarketLink
-                typeId={typeId}
-                onNavigate={leave}
-                replace={onLeave !== undefined}
-              />
-            )}
-          </>
-        )
+        // One header action, so a plain button at every width. The Market
+        // Browser link lives in the Market tab: the tab is this modal's one
+        // market entry point, and the best prices below link there too.
+        // An abyssal type has no market group, so no in-game market window either.
+        abyssal !== true && <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />
       }
     >
       {loading ? (
@@ -360,7 +403,11 @@ export function ItemDetailModal({
             className="py-8"
           />
           {/* Local SDE data, so they outlive a type-info failure. */}
-          <AbyssalItemDetail typeId={typeId} dynamic={dynamic} />
+          <AbyssalItemDetail
+            typeId={typeId}
+            dynamic={dynamic}
+            skilled={skilled.status === 'ready' ? skilled : undefined}
+          />
           <PlanetaryProduction pi={pi} typeId={typeId} />
           <MadeFromSection typeId={typeId} />
           <UsedInSection typeId={typeId} onNavigate={leave} />
@@ -381,6 +428,15 @@ export function ItemDetailModal({
           )}
           {tab === 'market' && abyssal === false ? (
             <TabPanel tabsId={tabsId} tabId="market">
+              {showMarketLink && (
+                <div className="mb-2 flex justify-end">
+                  <OpenInMarketLink
+                    typeId={typeId}
+                    onNavigate={leave}
+                    replace={onLeave !== undefined}
+                  />
+                </div>
+              )}
               <ItemMarketTab
                 typeId={typeId}
                 itemName={itemName}
@@ -397,10 +453,18 @@ export function ItemDetailModal({
                   height={64}
                   className="shrink-0 rounded-xs border border-line"
                 />
-                <div className="space-y-1 text-xs">
-                  <p className="text-text-dim">
-                    {t('market.itemDetail.volume', { volume: formatVolume(data.type.volume ?? 0) })}
-                  </p>
+                <div className="min-w-0 space-y-1 text-xs">
+                  {groupLine && (
+                    <p className="text-sm text-text">
+                      {groupLine.faction
+                        ? t('market.itemDetail.groupWithFaction', {
+                            group: groupLine.group,
+                            faction: groupLine.faction,
+                          })
+                        : groupLine.group}
+                    </p>
+                  )}
+                  <VolumeLine type={data.type} />
                   {abyssal === null
                     ? null
                     : abyssal
@@ -413,7 +477,17 @@ export function ItemDetailModal({
                           />
                         )
                       : priceState.status !== 'error' && (
-                          <p className="flex gap-4 text-text-dim">
+                          <p className="flex flex-wrap gap-x-4 text-text-dim">
+                            {priceMarket && priceMarketName && (
+                              <span className="text-text">
+                                {t(
+                                  priceMarket.kind === 'hub'
+                                    ? 'market.itemDetail.pricesAtHub'
+                                    : 'market.itemDetail.pricesInRegion',
+                                  { market: priceMarketName }
+                                )}
+                              </span>
+                            )}
                             <PriceFigure
                               label={t('market.itemDetail.bestSell')}
                               side="sell"
@@ -440,13 +514,23 @@ export function ItemDetailModal({
                             />
                           </p>
                         )}
-                  {data.type.description && (
-                    <EveMarkupText markup={data.type.description} className="text-text" />
-                  )}
                 </div>
               </div>
 
-              <AbyssalItemDetail typeId={typeId} dynamic={dynamic} />
+              {/* Held until the category is known (it never fails), so an implant never flashes clamped. */}
+              {data.type.description && category.status === 'ready' && (
+                <ItemDescription
+                  markup={data.type.description}
+                  // An implant's, combat booster's or accelerator's bonuses are in its description.
+                  full={category.data === IMPLANT_CATEGORY_ID}
+                />
+              )}
+
+              <AbyssalItemDetail
+                typeId={typeId}
+                dynamic={dynamic}
+                skilled={skilled.status === 'ready' ? skilled : undefined}
+              />
 
               <RequiredSkillsSection
                 requiredSkills={data.requiredSkills}
@@ -459,55 +543,68 @@ export function ItemDetailModal({
 
               <PlanetaryProduction pi={pi} typeId={typeId} />
 
-              <MadeFromSection typeId={typeId} />
+              <MadeFromSection
+                typeId={typeId}
+                pricing={
+                  inputPriceHub && abyssal === false
+                    ? {
+                        hub: inputPriceHub,
+                        bestSell:
+                          priceState.status === 'ready' ? priceState.summary.bestSell : undefined,
+                      }
+                    : undefined
+                }
+              />
 
               <UsedInSection typeId={typeId} onNavigate={leave} />
 
-              {attributeGroups.length === 0 ? (
-                <p className="text-xs text-text-dim">{t('market.itemDetail.noAttributes')}</p>
+              {attributeSections.length > 0 && (
+                <SkilledValuesNote
+                  state={skilled}
+                  changed={sectionsShowSkilled(attributeSections)}
+                  key={typeId}
+                />
+              )}
+
+              {attributeSections.length === 0 ? (
+                // A Mutated module whose every attribute is a roll has them all above.
+                !mutation && (
+                  <p className="text-xs text-text-dim">{t('market.itemDetail.noAttributes')}</p>
+                )
               ) : (
-                attributeGroups.map((group) => (
-                  <div key={group.category}>
-                    <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
-                      {group.category}
-                    </h3>
-                    <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs">
-                      {group.attributes.map((attribute) => {
-                        const valueText =
-                          attribute.displayValue ??
-                          `${formatAttributeValue(attribute.value, attribute.unit)}${attribute.unit ? ` ${attribute.unit}` : ''}`;
-                        const modifiers = activeCharacterId
-                          ? findModifyingSkills(
-                              attribute.attributeId,
-                              requiredSkillTypeIds,
-                              data.skillAttributeModifiers
-                            )
-                          : [];
-                        return (
-                          <div key={attribute.attributeId} className="contents">
-                            <dt className="text-text-dim">{attribute.name}</dt>
-                            <dd className="text-right text-text">
-                              {modifiers.length > 0 ? (
-                                <AttributeModifierTrigger
-                                  modifiers={modifiers}
-                                  skillNames={data.allSkillNames}
-                                  trainedSkills={trainedSkills}
-                                  target={targetPlan}
-                                  itemName={itemName}
-                                  attributeName={attribute.name}
-                                >
-                                  {valueText}
-                                </AttributeModifierTrigger>
-                              ) : (
-                                valueText
-                              )}
-                            </dd>
-                          </div>
-                        );
-                      })}
-                    </dl>
-                  </div>
-                ))
+                <ItemAttributeSections
+                  sections={attributeSections}
+                  skilledSources={skilled.status === 'ready' ? skilled.sources : undefined}
+                  renderValue={(attribute, valueText) => {
+                    const modifiers = modifiersOf(attribute.attributeId);
+                    return modifiers.length > 0 ? (
+                      <AttributeModifierTrigger
+                        modifiers={modifiers}
+                        skillNames={data.allSkillNames}
+                        trainedSkills={trainedSkills}
+                        target={targetPlan}
+                        itemName={itemName}
+                        attributeName={attribute.name}
+                      >
+                        {valueText}
+                      </AttributeModifierTrigger>
+                    ) : (
+                      valueText
+                    );
+                  }}
+                  renderSkilledExtra={(attribute) => {
+                    const modifiers = modifiersOf(attribute.attributeId);
+                    return modifiers.length > 0 ? (
+                      <AttributeModifierList
+                        modifiers={modifiers}
+                        skillNames={data.allSkillNames}
+                        trainedSkills={trainedSkills}
+                        target={targetPlan}
+                        itemName={itemName}
+                      />
+                    ) : null;
+                  }}
+                />
               )}
             </>
           )}
@@ -545,41 +642,26 @@ function OpenInMarketLink({
 }
 
 /**
- * Below `md`, the header's two actions as one ⋮ (DESIGN.md §6c Header
- * controls): Open in EVE, and View in Market doing what
- * `OpenInMarketLink` does.
+ * The volume a pilot hauls: packaged where the item has a distinct packaged
+ * volume (a ship: 10,000 m3 packaged, 118,000 m3 assembled), with the
+ * assembled figure second; otherwise the one volume.
  */
-function ItemDetailMoreActions({
-  typeId,
-  itemName,
-  onNavigate,
-  replace,
-}: {
-  typeId: number;
-  itemName: string;
-  onNavigate: () => void;
-  replace: boolean;
-}) {
+function VolumeLine({ type }: { type: TypeDetail }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { search } = useLocation();
-  const items = (
-    <>
-      <OpenInEveMenuItem kind="marketDetails" id={typeId} />
-      <MenuItem
-        onSelect={() => {
-          onNavigate();
-          void navigate(marketItemUrl(typeId, search), { replace });
-        }}
-      >
-        {t('market.itemDetail.openInMarket')}
-      </MenuItem>
-    </>
-  );
+  const volume = type.volume ?? 0;
+  const packaged = type.packaged_volume;
+  if (packaged === undefined || packaged === volume) {
+    return (
+      <p className="text-text-dim">
+        {t('market.itemDetail.volume', { volume: formatVolume(volume) })}
+      </p>
+    );
+  }
   return (
-    <RowActionsContext.Provider value={{ name: itemName, items }}>
-      <RowMoreActions />
-    </RowActionsContext.Provider>
+    <p className="text-text-dim">
+      {t('market.itemDetail.volumePackaged', { volume: formatVolume(packaged) })}{' '}
+      {t('market.itemDetail.volumeAssembled', { volume: formatVolume(volume) })}
+    </p>
   );
 }
 
@@ -723,19 +805,47 @@ function AttributeModifierTrigger({
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 space-y-2" aria-label={modifiersLabel}>
-        {modifiers.map((modifier) => (
-          <AttributeModifierRow
-            key={modifier.ownerSkillTypeID}
-            modifier={modifier}
-            skillName={skillNameOrFallback(modifier.ownerSkillTypeID, skillNames)}
-            trainedLevel={trainedSkills.get(modifier.ownerSkillTypeID)?.level ?? 0}
-            target={target}
-            itemName={itemName}
-          />
-        ))}
+        <AttributeModifierList
+          modifiers={modifiers}
+          skillNames={skillNames}
+          trainedSkills={trainedSkills}
+          target={target}
+          itemName={itemName}
+        />
       </PopoverContent>
     </Popover>
   );
+}
+
+/** Each skill's per-level effect on one attribute, with its Add button: the "which skill changes this" lines. */
+function AttributeModifierList({
+  modifiers,
+  skillNames,
+  trainedSkills,
+  target,
+  itemName,
+}: {
+  modifiers: readonly ModifyingSkillEffect[];
+  skillNames: Readonly<Record<number, string>>;
+  trainedSkills: ReadonlyMap<number, TrainedSkill>;
+  target: TargetPlan;
+  itemName: string;
+}) {
+  return modifiers.map((modifier) => (
+    <AttributeModifierRow
+      key={modifier.ownerSkillTypeID}
+      modifier={modifier}
+      skillName={skillNameOrFallback(modifier.ownerSkillTypeID, skillNames)}
+      trainedLevel={trainedSkills.get(modifier.ownerSkillTypeID)?.level ?? 0}
+      target={target}
+      itemName={itemName}
+    />
+  ));
+}
+
+/** A per-level effect with its own sign: "+5", "-5" (the strings no longer hard-code "+"). */
+function signed(value: number): string {
+  return value > 0 ? `+${value}` : String(value);
 }
 
 /** One skill's effect inside `AttributeModifierTrigger`'s popover — `modifier.perLevelValue` is already static SDE data, no fetch needed. */
@@ -758,36 +868,34 @@ function AttributeModifierRow({
       <p className="text-text">
         {t('skills.attributeModifier.perLevel', {
           skill: skillName,
-          perLevel: modifier.perLevelValue,
+          perLevel: signed(modifier.perLevelValue),
         })}
       </p>
       <p className="text-text-dim">
         {trainedLevel > 0
           ? t('skills.attributeModifier.current', {
               level: trainedLevel,
-              total: postPercentMagnitude(modifier.perLevelValue, trainedLevel),
+              total: signed(postPercentMagnitude(modifier.perLevelValue, trainedLevel)),
             })
           : t('skills.attributeModifier.untrained')}
       </p>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={() =>
-          void target.addEntries(
-            [
-              {
-                skillTypeID: modifier.ownerSkillTypeID,
-                targetLevel: Math.min(trainedLevel + 1, 5),
-              },
-            ],
-            itemName
-          )
-        }
-      >
-        {target.plans?.length === 0
-          ? t('skills.fitCheck.createPlanAndAdd')
-          : t('skills.requiredSkills.addToPlan')}
-      </Button>
+      {/* Nothing left to train at V. */}
+      {trainedLevel < 5 && (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() =>
+            void target.addEntries(
+              [{ skillTypeID: modifier.ownerSkillTypeID, targetLevel: trainedLevel + 1 }],
+              itemName
+            )
+          }
+        >
+          {target.plans?.length === 0
+            ? t('skills.fitCheck.createPlanAndAdd')
+            : t('skills.requiredSkills.addToPlan')}
+        </Button>
+      )}
     </div>
   );
 }
@@ -831,6 +939,50 @@ function PlanetaryProduction({ pi, typeId }: { pi: PiData | null; typeId: number
       ) : (
         <p className="mt-1 text-xs text-text-dim">{t('market.itemDetail.planetaryRaw')}</p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Above the attribute sections: what the arrows mean once the pilot's values
+ * are in, or the one-time engine download that brings them
+ * (`useSkilledAttributes`, which never starts it on its own).
+ */
+function SkilledValuesNote({
+  state,
+  changed,
+}: {
+  state: SkilledAttributesState;
+  /** Whether any row the note sits over reads "base → skilled". */
+  changed: boolean;
+}) {
+  const { t } = useTranslation();
+  const [asked, setAsked] = useState(false);
+  if (state.status === 'ready') {
+    if (!changed) return null;
+    return <p className="text-xs text-text-dim">{t('market.itemDetail.skilled.note')}</p>;
+  }
+  if (state.status === 'loading' && asked) {
+    return (
+      <p className="flex items-center gap-2 text-xs text-text-dim" role="status">
+        <Spinner size="sm" />
+        {t('market.itemDetail.skilled.loading')}
+      </p>
+    );
+  }
+  if (state.status !== 'needs-download') return null;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-dim">
+      <span>{t('market.itemDetail.skilled.offer')}</span>
+      <Button
+        size="sm"
+        onClick={() => {
+          setAsked(true);
+          state.load();
+        }}
+      >
+        {t('market.itemDetail.skilled.load')}
+      </Button>
     </div>
   );
 }

@@ -212,7 +212,6 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
               <Field label={t('wallet.goal.amountLabel')} htmlFor="goal-amount">
                 <IskInput
                   id="goal-amount"
-                  mask
                   value={draft.amount}
                   onChange={(amountText) => setDraft({ ...draft, amount: amountText })}
                   className="w-full"

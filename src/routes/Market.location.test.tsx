@@ -57,18 +57,19 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
     await screen.findByRole('table', { name: 'Sell Orders' });
-    // Behind the funnel, like the other search pages.
+    // Distance is the finder's inline key filter; the rest sits behind the funnel.
+    expect(within(finder()).getByRole('combobox', { name: 'Distance' })).toBeInTheDocument();
     expect(screen.queryByRole('spinbutton', { name: 'Min quantity' })).not.toBeInTheDocument();
     await user.click(within(finder()).getByRole('button', { name: 'Filters' }));
     expect(within(finder()).getByRole('spinbutton', { name: 'Min quantity' })).toBeInTheDocument();
-    expect(within(finder()).getByRole('combobox', { name: 'Distance' })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Security' })).not.toBeInTheDocument();
+    expect(within(finder()).getAllByRole('combobox', { name: 'Distance' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /^Security/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'NPC stations only' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Region' }));
 
     expect(await within(finder()).findByRole('combobox', { name: 'Distance' })).toBeInTheDocument();
-    expect(within(finder()).getByRole('group', { name: 'Security' })).toBeInTheDocument();
+    expect(within(finder()).getByRole('button', { name: /^Security/ })).toBeInTheDocument();
     expect(within(finder()).getByRole('button', { name: 'NPC stations only' })).toBeInTheDocument();
   });
 

@@ -13,6 +13,9 @@ import type { ShipTreeHullStatus, ShipTreeNodeDef } from '@/engine/shipTree/type
 import type { PlanEntry } from '@/engine/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { isEntryCovered } from '@/features/skills/planner/reorder';
+import { romanLevel } from '@/engine/projection';
+import type { Translate } from '@/lib/translate';
+import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
 import type {
   ShipTreeData,
   ShipTreeFaction,
@@ -81,6 +84,41 @@ export function masteryFilterActive(f: ShipTreeFilter): boolean {
 
 export function isShipTreeFiltered(f: ShipTreeFilter): boolean {
   return f.fly !== 'all' || masteryFilterActive(f);
+}
+
+/**
+ * The funnel's pills: the fly state, then the Mastery tiers while they are in
+ * effect. Clearing the fly state also drops a Mastery pick that Can't fly was
+ * holding off — no pill showed it, so it must not spring back on as the fly
+ * state goes to All (or under Clear all).
+ */
+export function activeShipTreeFilters(
+  filter: ShipTreeFilter,
+  t: Translate
+): ActiveFilter<ShipTreeFilter>[] {
+  const active: ActiveFilter<ShipTreeFilter>[] = [];
+  if (filter.fly !== 'all')
+    active.push({
+      label: t('ships.tree.fly.label'),
+      value: t(filter.fly === 'canFly' ? 'ships.tree.canFly' : 'ships.tree.cantFly'),
+      clear: (value) => ({
+        ...value,
+        fly: 'all',
+        mastery: masteryFilterActive(value) ? value.mastery : NO_SHIP_TREE_FILTER.mastery,
+      }),
+    });
+  if (masteryFilterActive(filter))
+    active.push({
+      label: t('ships.tree.mastery.label'),
+      value: summarizeFilterValues(
+        MASTERY_TIERS.filter((tier) => filter.mastery.has(tier)).map((tier) =>
+          tier === 0 ? t('ships.tree.mastery.none') : romanLevel(tier)
+        ),
+        t
+      ),
+      clear: (value) => ({ ...value, mastery: NO_SHIP_TREE_FILTER.mastery }),
+    });
+  return active;
 }
 
 /** Whether a hull passes the filter. No status yet (skills unread) reads as can't fly. */

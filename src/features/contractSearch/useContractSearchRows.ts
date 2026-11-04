@@ -5,11 +5,7 @@
  */
 import { useDeferredValue, useMemo } from 'react';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import type {
-  ContractOfferFilter,
-  ContractOfferStats,
-  ContractSaleKind,
-} from '@/engine/contracts/contractSearch';
+import type { ContractOfferFilter, ContractOfferStats } from '@/engine/contracts/contractSearch';
 import type { ContractOfferQuery } from '@/engine/contracts/contractSearchQuery';
 import type { withinJumpRange } from '@/engine/route/jumpRange';
 import type { OfferLocation } from '@/features/contractSearch/offerLocations';
@@ -24,7 +20,7 @@ interface RowsFilter {
   regionId: number | null;
   maxPrice: string;
   minQuantity: string;
-  saleKind: ContractSaleKind | null;
+  hideExchanges: boolean;
   hideAuctions: boolean;
   hidePlex: boolean;
 }
@@ -67,7 +63,7 @@ export function useContractSearchRows({
       regionId: uiFilter.regionId,
       maxPrice: parseNumeric(uiFilter.maxPrice),
       minQuantity: parseNumeric(uiFilter.minQuantity),
-      saleKind: uiFilter.saleKind,
+      hideExchanges: uiFilter.hideExchanges,
       hideAuctions: uiFilter.hideAuctions,
       hidePlexRequests: uiFilter.hidePlex,
       plexPrice,
@@ -76,7 +72,7 @@ export function useContractSearchRows({
       uiFilter.regionId,
       uiFilter.maxPrice,
       uiFilter.minQuantity,
-      uiFilter.saleKind,
+      uiFilter.hideExchanges,
       uiFilter.hideAuctions,
       uiFilter.hidePlex,
       plexPrice,

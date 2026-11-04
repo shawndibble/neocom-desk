@@ -164,7 +164,7 @@ for (const width of [390, 1024, 1280]) {
     await expect(page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ })).toHaveCount(2);
 
     const readout = page.getByTestId('lp-basis-readout');
-    await expect(readout).toHaveText('Jita · Sell');
+    await expect(readout).toHaveText('Jita · Sell order');
     const panelHeader = readout.locator('xpath=ancestor::header[1]');
     const title = panelHeader.getByRole('heading', { level: 2 });
     const [r, t, h, actions] = await Promise.all([

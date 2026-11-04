@@ -607,7 +607,7 @@ export function Market() {
     stationFilterLabel,
     browserFilterValue,
     handleBrowserFiltersChange,
-    activeFilterCount,
+    activeFilters,
     filtersNarrowBook,
     orderBookFailed,
     regionsUnavailable,
@@ -843,7 +843,7 @@ export function Market() {
   const browserFilterBarProps = {
     value: browserFilterValue,
     onChange: handleBrowserFiltersChange,
-    activeCount: activeFilterCount,
+    active: activeFilters,
     regionMode,
     scopeLabel,
     currentSystem,
@@ -1255,7 +1255,7 @@ export function Market() {
                       scope={bookScope}
                       filterValue={browserFilterValue}
                       onFilterChange={handleBrowserFiltersChange}
-                      activeCount={activeFilterCount}
+                      active={activeFilters}
                       regionMode={regionMode}
                       scopeLabel={scopeLabel}
                       currentSystem={currentSystem}

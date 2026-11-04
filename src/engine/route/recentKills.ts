@@ -30,6 +30,19 @@ const BUBBLE_HULL_GROUPS: ReadonlySet<number> = new Set([
 export interface RecentKillAttacker {
   shipTypeId?: number;
   weaponTypeId?: number;
+  characterId?: number;
+  corporationId?: number;
+  allianceId?: number;
+  /** The attacker who landed the killing blow. */
+  finalBlow?: boolean;
+}
+
+/** The victim of a kill; a field zKillboard left out is `null`. */
+export interface RecentKillVictim {
+  characterId: number | null;
+  corporationId: number | null;
+  allianceId: number | null;
+  shipTypeId: number | null;
 }
 
 /** One player kill, as `lib/zkillboard.ts` parses it (NPC kills already dropped). */
@@ -40,6 +53,9 @@ export interface RecentKill {
   /** zKillboard's nearest celestial, stargate or station; `null` when absent. */
   locationId: number | null;
   attackers: readonly RecentKillAttacker[];
+  victim?: RecentKillVictim;
+  /** zKillboard's total value of the loss; `null` or absent when it gave none. */
+  value?: number | null;
 }
 
 /** What a location id resolved to. A location that resolved to nothing is simply absent. */
@@ -81,6 +97,82 @@ export function classifyKillTags(kill: RecentKill, { groupOf, band }: KillTagCon
   return { bubble, smartbomb };
 }
 
+/** A kill with its own tags, for a location's list (issue #5929). */
+export interface RecentKillView extends RecentKill, KillTags {}
+
+/** A pilot's pod dies within this long of their ship, at the same place. */
+export const SHIP_AND_POD_WINDOW_MS = 5 * MINUTE_MS;
+
+/**
+ * Kills of one pilot that follow each other closely, as one group: the ship
+ * and the pod it left behind. `kills` is newest first (a location's list); a
+ * group is oldest first (ship, then pod) and groups stay newest first. A kill
+ * with no victim pilot is its own group. Display only: counts stay per kill.
+ */
+export function groupVictimKills<T extends RecentKill>(kills: readonly T[]): T[][] {
+  const groups: T[][] = [];
+  for (const kill of kills) {
+    const pilot = kill.victim?.characterId ?? null;
+    const group =
+      pilot === null
+        ? undefined
+        : groups.find(
+            (candidate) =>
+              candidate[0]?.victim?.characterId === pilot &&
+              Math.abs(candidate[0].time - kill.time) <= SHIP_AND_POD_WINDOW_MS
+          );
+    if (group) group.unshift(kill);
+    else groups.push([kill]);
+  }
+  return groups;
+}
+
+/** How many of a list's kills had at least one attacker flying a hull of this group. */
+export interface HullKillCount {
+  groupId: number;
+  kills: number;
+}
+
+/**
+ * Hull classes seen among the attackers, counted per kill, never per
+ * attacker: the same pilot repeats on every mail, so a sum of attackers would
+ * say more than the data shows. An attacker with no ship, or a ship with no
+ * known group, is skipped. Most common first; ties by group id.
+ */
+export function hullClassKillCounts(
+  kills: readonly RecentKill[],
+  groupOf: (typeId: number) => number | undefined
+): HullKillCount[] {
+  const counts = new Map<number, number>();
+  for (const kill of kills) {
+    const groups = new Set<number>();
+    for (const attacker of kill.attackers) {
+      if (attacker.shipTypeId === undefined) continue;
+      const group = groupOf(attacker.shipTypeId);
+      if (group !== undefined) groups.add(group);
+    }
+    for (const group of groups) counts.set(group, (counts.get(group) ?? 0) + 1);
+  }
+  return [...counts]
+    .map(([groupId, kills]) => ({ groupId, kills }))
+    .sort((a, b) => b.kills - a.kills || a.groupId - b.groupId);
+}
+
+/**
+ * The first `max` attackers, with the final blow always among them (swapped
+ * in for the last when it fell past the cap), and how many were left out.
+ */
+export function capAttackers<T extends RecentKillAttacker>(
+  attackers: readonly T[],
+  max: number
+): { shown: T[]; more: number } {
+  if (attackers.length <= max) return { shown: [...attackers], more: 0 };
+  const shown = attackers.slice(0, max);
+  const blow = attackers.findIndex((attacker) => attacker.finalBlow === true);
+  if (blow >= max) shown[max - 1] = attackers[blow] as T;
+  return { shown, more: attackers.length - max };
+}
+
 export interface RecentKillLocation extends KillTags {
   /** The location id as a string, or `'other'` for the pooled unnamed group. */
   key: string;
@@ -91,6 +183,9 @@ export interface RecentKillLocation extends KillTags {
   onPath: boolean;
   count: number;
   minutesSinceLast: number;
+  /** This location's kills, newest first. */
+  kills: RecentKillView[];
+  hulls: HullKillCount[];
 }
 
 export interface RecentKillsSummary extends KillTags {
@@ -99,6 +194,7 @@ export interface RecentKillsSummary extends KillTags {
   minutesSinceLast: number | null;
   /** Busiest first; ties go to the most recent. */
   locations: RecentKillLocation[];
+  hulls: HullKillCount[];
 }
 
 export interface RecentKillsContext extends KillTagContext {
@@ -111,7 +207,7 @@ export interface RecentKillsContext extends KillTagContext {
 
 const OTHER_KEY = 'other';
 
-function minutesBefore(now: number, time: number): number {
+export function minutesBefore(now: number, time: number): number {
   return Math.max(0, Math.floor((now - time) / MINUTE_MS));
 }
 
@@ -142,6 +238,8 @@ export function summarizeRecentKills(
           resolved?.kind === 'stargate' && context.pathNeighbours.has(resolved.destinationSystemId),
         count: 0,
         minutesSinceLast: 0,
+        kills: [],
+        hulls: [],
         bubble: false,
         smartbomb: false,
         latest: kill.time,
@@ -149,6 +247,7 @@ export function summarizeRecentKills(
       groups.set(key, group);
     }
     group.count += 1;
+    group.kills.push({ ...kill, ...tags });
     group.latest = Math.max(group.latest, kill.time);
     group.bubble ||= tags.bubble;
     group.smartbomb ||= tags.smartbomb;
@@ -156,10 +255,15 @@ export function summarizeRecentKills(
 
   const locations = [...groups.values()]
     .sort((a, b) => b.count - a.count || b.latest - a.latest)
-    .map(({ latest: groupLatest, ...group }) => ({
-      ...group,
-      minutesSinceLast: minutesBefore(context.now, groupLatest),
-    }));
+    .map(({ latest: groupLatest, ...group }) => {
+      const newestFirst = [...group.kills].sort((a, b) => b.time - a.time);
+      return {
+        ...group,
+        kills: newestFirst,
+        hulls: hullClassKillCounts(newestFirst, context.groupOf),
+        minutesSinceLast: minutesBefore(context.now, groupLatest),
+      };
+    });
 
   return {
     count: kills.length,
@@ -167,5 +271,6 @@ export function summarizeRecentKills(
     bubble,
     smartbomb,
     locations,
+    hulls: hullClassKillCounts(kills, context.groupOf),
   };
 }

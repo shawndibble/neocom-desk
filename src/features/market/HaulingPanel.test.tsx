@@ -956,7 +956,7 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     await user.type(field, '1000{Enter}');
     await user.clear(field);
     await user.type(field, '2.5{Enter}');
-    expect(field).toHaveValue('1000');
+    expect(field).toHaveValue('1,000');
     expect(linkParam('maxprice')).toBe('1000');
   });
 

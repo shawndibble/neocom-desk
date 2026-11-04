@@ -61,7 +61,13 @@ export { FilterChip } from './FilterChip';
 export { EditableValue } from './EditableValue';
 export { SegmentedControl } from './SegmentedControl';
 export { FilterBar, FilterField } from './FilterBar';
-export { countActive } from './countActive';
+export {
+  activeDateRangeFilters,
+  boundText,
+  clearFilters,
+  summarizeFilterValues,
+  type ActiveFilter,
+} from './activeFilters';
 export { DateRangeFields } from './DateRangeFields';
 export { useFilterSurface } from './filterSurface';
 export { Disclosure, Caret } from './Disclosure';
@@ -128,7 +134,7 @@ export type { CheckboxSelectOption, CheckboxSelectProps } from './CheckboxSelect
 export { MultiSelect } from './MultiSelect';
 export type { MultiSelectGroup, MultiSelectOption, MultiSelectProps } from './MultiSelect';
 export { RegionSelect } from './RegionSelect';
-export type { RegionSelectOption, RegionSelectProps } from './RegionSelect';
+export type { RegionSelectOption, RegionSelectProps, RegionSelectShortcut } from './RegionSelect';
 export {
   Select,
   SelectValue,

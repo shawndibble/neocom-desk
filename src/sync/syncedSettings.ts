@@ -158,6 +158,12 @@
 // entries. Never deleted via deleteSyncedSetting: a pruned list is written
 // back. No `legacyKey`: new.
 //
+// sync.miningTaxDefaultOptOuts (decision doc 20261103-154453): the Mining Ledger
+// Entries the pilot unassigned, as `characterId|date|systemId` strings, so a
+// Payee's Default Systems do not assign them again on any device. Pruned to
+// the days the ledger keeps on every write. See features/miningTax/
+// defaultOptOuts.ts. Never deleted via deleteSyncedSetting. No `legacyKey`: new.
+//
 // sync.miningTaxManualMoonOreTypeIds / sync.miningTaxManualIgnoredTypeIds
 // (decision doc 20260923-112603-manual-ore-tags-sync-across-devices,
 // superseding 20260907-090317's device-local call): the Moon Mining Tax ledger's
@@ -366,6 +372,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.marketHub',
   'sync.marketHubByCharacter',
   'sync.marketPricePercent',
+  'sync.miningTaxDefaultOptOuts',
   'sync.miningTaxManualIgnoredTypeIds',
   'sync.miningTaxCompressedOre',
   'sync.miningTaxManualMoonOreTypeIds',

@@ -39,6 +39,8 @@ import {
 } from '@/features/market/useTradeHubStandings';
 import { useWarmLoad } from '@/lib/useWarmLoad';
 import { useAssumedMe } from './assumedMe';
+import type { ProfitBasis } from '@/engine/industry/profitBasis';
+import { useProfitBasis } from './profitBasisSetting';
 import { useCorpOwnedBlueprints, type CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import type { BuildPlanSources, CorpBlueprintSource } from './resolveBuildPlan';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -48,6 +50,8 @@ export interface BuildPlanPricingInputs {
   hydrated: boolean;
   /** ME to quote an unowned sub-build at (`assumedMe.ts`). */
   assumedMe: number;
+  /** How owned materials are counted in a plan's profit (`profitBasisSetting.ts`). */
+  profitBasis: ProfitBasis;
   /** The active Character's corp blueprints, folded into a plan on its own `includeCorpAssets`. */
   corpBlueprints: CorpOwnedBlueprintsState;
   /** The Character's standing toward each Trade Hub's NPC owner, keyed by hub id. */
@@ -72,7 +76,7 @@ export type HubPricingSources = Pick<
 /** What `pricingSourcesForHub` reads. Corp blueprints may be withheld, which reads as unavailable. */
 export type HubPricingSourceArgs = Pick<
   BuildPlanPricingInputs,
-  'assumedMe' | 'standings' | 'bpcRows' | 'communityRows'
+  'assumedMe' | 'profitBasis' | 'standings' | 'bpcRows' | 'communityRows'
 > & { corpBlueprints?: CorpBlueprintSource };
 
 const NO_BPC_ROWS: readonly BpcContractRow[] = [];
@@ -135,6 +139,8 @@ function useBpcContractRows(characterId: number | null): readonly BpcContractRow
 export function useBuildPlanPricingInputs(characterId: number | null): BuildPlanPricingInputs {
   const assumedMe = useAssumedMe((state) => state.value);
   const assumedMeHydrated = useHydratedStore(useAssumedMe);
+  const profitBasis = useProfitBasis((state) => state.value);
+  const profitBasisHydrated = useHydratedStore(useProfitBasis);
 
   const corpBlueprints = useCorpOwnedBlueprints();
   const standings = useTradeHubStandings(characterId);
@@ -143,19 +149,20 @@ export function useBuildPlanPricingInputs(characterId: number | null): BuildPlan
     characterId,
     enabled: isSyncConfigured(),
   });
-  const hydrated = assumedMeHydrated;
+  const hydrated = assumedMeHydrated && profitBasisHydrated;
 
   // One object per distinct state: every surface's pricing memo keys on it.
   return useMemo(
     () => ({
       hydrated,
       assumedMe,
+      profitBasis,
       corpBlueprints,
       standings,
       bpcRows,
       communityRows,
     }),
-    [hydrated, assumedMe, corpBlueprints, standings, bpcRows, communityRows]
+    [hydrated, assumedMe, profitBasis, corpBlueprints, standings, bpcRows, communityRows]
   );
 }
 

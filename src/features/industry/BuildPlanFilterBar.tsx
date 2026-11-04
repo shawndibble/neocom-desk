@@ -19,7 +19,7 @@ import {
   PLAN_ACTIVITIES,
   PLAN_OWNERSHIPS,
   PLAN_VERDICTS,
-  activePlanFilterCount,
+  activePlanFilters,
   type BuildPlanFilterState,
 } from './buildPlanFilter';
 
@@ -31,6 +31,8 @@ interface BuildPlanFilterBarProps {
   search: ReactNode;
   /** Whether a pilot is active; without one no blueprint can be "owned", so that control is hidden. */
   canFilterOwnership: boolean;
+  /** Plans the filters leave, for the phone sheet's done button. */
+  resultCount?: number;
 }
 
 /** The Build Plan list's filters, behind the funnel beside the blueprint picker. */
@@ -40,6 +42,7 @@ export function BuildPlanFilterBar({
   groups,
   search,
   canFilterOwnership,
+  resultCount,
 }: BuildPlanFilterBarProps) {
   const { t } = useTranslation();
   return (
@@ -48,7 +51,8 @@ export function BuildPlanFilterBar({
       onChange={onChange}
       search={search}
       rowAlign="start"
-      activeCount={activePlanFilterCount(filter)}
+      active={activePlanFilters(filter, t, groups)}
+      resultCount={resultCount}
       title={t('industry.planFilters.title')}
     >
       {(draft, setDraft) => (
@@ -63,6 +67,7 @@ export function BuildPlanFilterBar({
               >
                 <SelectTrigger
                   size="sm"
+                  active={draft.ownership !== 'any'}
                   aria-label={t('industry.planFilters.ownership')}
                   className="w-44"
                 >
@@ -80,8 +85,10 @@ export function BuildPlanFilterBar({
           )}
           <FilterField captionInline label={t('industry.planFilters.verdict')}>
             <CheckboxSelect
+              size="sm"
               label={t('industry.planFilters.verdict')}
               className="w-44"
+              active={draft.verdicts.size !== PLAN_VERDICTS.length}
               options={PLAN_VERDICTS.map((value) => ({
                 value,
                 label: t(`industry.planFilters.verdicts.${value}`),
@@ -101,6 +108,7 @@ export function BuildPlanFilterBar({
             >
               <SelectTrigger
                 size="sm"
+                active={draft.activity !== 'any'}
                 aria-label={t('industry.planFilters.activity')}
                 className="w-44"
               >
@@ -123,6 +131,7 @@ export function BuildPlanFilterBar({
               >
                 <SelectTrigger
                   size="sm"
+                  active={draft.group !== GROUP_ANY}
                   aria-label={t('industry.planFilters.group')}
                   className="w-44"
                 >

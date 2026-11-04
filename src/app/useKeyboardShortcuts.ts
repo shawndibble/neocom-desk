@@ -15,8 +15,8 @@ const SEQUENCE_BY_KEY = new Map(
  * `<dialog>` already closes on it (`components/ui/Modal.tsx`), and a second
  * handler here would race that behaviour rather than add to it.
  *
- * Page keys are `g` then a letter (`lib/shortcutSequence.ts`); `?` is the one
- * single key. The Settings "Single-key shortcuts" switch turns all of them off
+ * Page keys are `g` then a letter (`lib/shortcutSequence.ts`); `?` and `/`
+ * are the single keys. The Settings "Single-key shortcuts" switch turns all of them off
  * (scope decision `20261016-*-shortcuts-become-g-sequences-with-an-off-switch`);
  * until it has loaded the listener stays off, so a pilot who switched them off
  * never gets a live key on a cold load. (The setting keeps its "single-key" name
@@ -81,8 +81,9 @@ export function useKeyboardShortcuts(): void {
 
       const single = SHORTCUTS.find((s) => !s.sequence && s.key.toLowerCase() === key);
       if (!single?.run) return;
-      event.preventDefault();
-      single.run(navigate);
+      // After `run`, which may move focus into a field (`/`): still inside
+      // this keydown, so the key is not typed into the field it just focused.
+      if (single.run(navigate) !== false) event.preventDefault();
     }
 
     document.addEventListener('keydown', onKeyDown);

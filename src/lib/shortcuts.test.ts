@@ -100,9 +100,9 @@ describe('SHORTCUTS', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('keeps only ? and Escape as single keys, every page key a g sequence', () => {
+  it('keeps only /, ? and Escape as single keys, every page key a g sequence', () => {
     const singles = SHORTCUTS.filter((s) => !s.sequence).map((s) => s.key);
-    expect(singles.sort()).toEqual(['?', 'Escape']);
+    expect(singles.sort()).toEqual(['/', '?', 'Escape']);
   });
 
   it('never uses the g prefix itself as a second key', () => {

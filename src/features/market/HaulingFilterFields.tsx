@@ -103,14 +103,13 @@ export function IskCapField({
     } else if (held !== 'none') commit(held.amount);
   }
   return (
-    <FilterField label={label}>
+    <FilterField captionInline label={label}>
       <IskInput
         size="sm"
         aria-label={label}
         aria-describedby={hint === undefined ? undefined : hintId}
         placeholder={inSheet ? t('market.hauling.filters.noLimit') : label}
-        // Inline the echo rides beside the box, not under it, so the row keeps one height.
-        className={inSheet ? 'w-40' : 'flex-row! items-center [&>input]:w-40'}
+        className="w-40"
         value={shown}
         onChange={(text) => {
           setTypedText(text);

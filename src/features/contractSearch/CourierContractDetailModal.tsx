@@ -22,7 +22,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Link } from 'react-router-dom';
-import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, SlideOver, Tooltip } from '@/components/ui';
 import { CopyContractIdButton } from '@/features/contracts/CopyContractIdButton';
@@ -59,6 +59,9 @@ import { useJumpBasis } from '@/features/route/jumpBasis';
 import { formatMagnitude } from '@/lib/magnitude';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { courierPlanRouteHref } from '@/features/contractSearch/courierPlanRoute';
+import { HintText } from '@/components/ui/HintText';
+import { loadStructureInfo } from '@/features/character/structures';
+import { placeStructureEndpoint } from '@/features/contractSearch/courierEndpoints';
 import { endpointName, endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { useCourierCollateralRatio } from '@/features/contractSearch/collateralThreshold';
 import { RISK_COPY, WARNING_RISKS } from '@/features/contractSearch/courierRiskLabels';
@@ -104,6 +107,14 @@ export interface CourierContractDetailModalProps {
   reverseLane: ReverseLane;
   /** Where focus lands on close when the row that opened this is gone (the reverse-lane search filters it out). */
   returnFocusFallback?: () => HTMLElement | null;
+  /** The active character, whose access list decides whether a player structure's name is readable. */
+  characterId: number | null;
+  /**
+   * A player structure end this modal placed once ESI named it — its system
+   * comes back with its name. The board swaps it in, so the haul is measured
+   * (jumps, route, going rate) like any station haul.
+   */
+  onStructurePlaced?: (endpoint: CourierEndpoint) => void;
   /** Swap the two region filters and go look, closing this. */
   onSearchReverseLane: () => void;
   onClose: () => void;
@@ -146,13 +157,81 @@ function useRouteExposure(
   return measured?.key === routeKey ? measured.exposure : null;
 }
 
+/**
+ * A player structure's name, asked for once when its haul is opened. ESI names
+ * a structure only to a character on its access list, so a refusal is a normal
+ * answer: it reads "Unknown/Undockable", not an error. With no active
+ * character nothing was asked, so the id stays — that is not a refusal.
+ *
+ * The same answer says which system the structure is in, which is the one fact
+ * the board lacked to measure the haul: it goes to `onPlaced`.
+ */
+type StructureLookup = 'pending' | 'unreadable' | { name: string };
+
+function useStructureLookup(
+  endpoint: CourierEndpoint,
+  characterId: number | null,
+  onPlaced: ((endpoint: CourierEndpoint) => void) | undefined
+): StructureLookup | null {
+  const wanted =
+    endpoint.resolution === 'structure' && endpoint.name === null && characterId !== null;
+  const [answer, setAnswer] = useState<{ id: number; result: string | null } | null>(null);
+  // Read through a ref so a fresh callback, or a new object for the same
+  // unplaced end, does not ask ESI again — the request depends on the id alone.
+  const latest = useRef({ endpoint, onPlaced });
+  useEffect(() => {
+    latest.current = { endpoint, onPlaced };
+  });
+  useEffect(() => {
+    if (!wanted || characterId === null) return;
+    let cancelled = false;
+    void loadStructureInfo(characterId, endpoint.locationId)
+      .catch(() => null)
+      .then(async (structure) => {
+        if (cancelled) return;
+        setAnswer({ id: endpoint.locationId, result: structure?.name ?? null });
+        // ESI's schema requires it, but a malformed cached row must not place
+        // an end in system `undefined`.
+        if (typeof structure?.solar_system_id !== 'number') return;
+        const placed = await placeStructureEndpoint(latest.current.endpoint, {
+          name: structure.name,
+          systemId: structure.solar_system_id,
+        }).catch(() => null);
+        // Not gated on `cancelled`: where a structure sits is true whether or
+        // not this detail is still open, and the board outlives it.
+        if (placed) latest.current.onPlaced?.(placed);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wanted, characterId, endpoint.locationId]);
+  if (!wanted) return null;
+  if (answer?.id !== endpoint.locationId) return 'pending';
+  return answer.result === null ? 'unreadable' : { name: answer.result };
+}
+
 /** The station name, linked to its Place Info once it resolved; the `#id` fallback stays plain. */
-function endpointPlace(endpoint: CourierEndpoint): ReactNode {
-  return endpoint.name === null ? (
-    endpointName(endpoint)
-  ) : (
-    <PlaceLink id={endpoint.locationId}>{endpoint.name}</PlaceLink>
-  );
+function EndpointPlaceName({
+  endpoint,
+  characterId,
+  onPlaced,
+}: {
+  endpoint: CourierEndpoint;
+  characterId: number | null;
+  onPlaced: ((endpoint: CourierEndpoint) => void) | undefined;
+}) {
+  const { t } = useTranslation();
+  const lookup = useStructureLookup(endpoint, characterId, onPlaced);
+  const name = endpoint.name ?? (typeof lookup === 'object' && lookup ? lookup.name : null);
+  if (name !== null) return <PlaceLink id={endpoint.locationId}>{name}</PlaceLink>;
+  if (lookup === 'unreadable') {
+    return (
+      <HintText content={`#${endpoint.locationId}`}>
+        {t('contractSearch.unreadableStation')}
+      </HintText>
+    );
+  }
+  return <>{endpointName(endpoint)}</>;
 }
 
 /**
@@ -228,6 +307,8 @@ export function CourierContractDetailModal({
   onSearchReverseLane,
   onClose,
   returnFocusFallback,
+  characterId,
+  onStructurePlaced,
 }: CourierContractDetailModalProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -356,7 +437,13 @@ export function CourierContractDetailModal({
             {/* Wraps rather than truncates: the station name and its region
                 are the whole reason this row exists, and the old `truncate`
                 clipped the region off both ends. */}
-            <span className="text-sm">{endpointPlace(row.origin)}</span>
+            <span className="text-sm">
+              <EndpointPlaceName
+                endpoint={row.origin}
+                characterId={characterId}
+                onPlaced={onStructurePlaced}
+              />
+            </span>
             {place(row.origin)}
           </div>
 
@@ -417,7 +504,13 @@ export function CourierContractDetailModal({
 
           <div className="flex flex-col gap-0.5">
             <span className={eyebrowClassName}>{t('contractSearch.dropOffLabel')}</span>
-            <span className="text-sm">{endpointPlace(row.destination)}</span>
+            <span className="text-sm">
+              <EndpointPlaceName
+                endpoint={row.destination}
+                characterId={characterId}
+                onPlaced={onStructurePlaced}
+              />
+            </span>
             {place(row.destination)}
             {planRouteHref !== null && (
               <Link
@@ -526,8 +619,7 @@ export function CourierContractDetailModal({
             </li>
             {floor !== null && (
               <li>
-                {t('contractSearch.communityFloorValue', { reward: formatIskAuto(floor) })}
-                {' · '}
+                {t('contractSearch.communityFloorValue', { reward: formatIskAuto(floor) })}{' '}
                 {belowFloor
                   ? t('contractSearch.communityFloorShare', {
                       reward: formatIskAuto(row.reward),

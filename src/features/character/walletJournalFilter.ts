@@ -1,8 +1,11 @@
+import type { TFunction } from 'i18next';
+import { activeDateRangeFilters, type ActiveFilter } from '@/components/ui';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import { defineUrlFilter, nullableTextParam, textParam } from '@/lib/urlState';
 import { journalRefKey, type JournalRow } from '@/engine/journalNetting';
 import { bountyKillsOf } from './bountyKills';
 import { dailyGoalMessageIdOf } from './dailyGoal';
+import { journalRefLabel } from './journalRefLabel';
 
 /**
  * The journal filter bar's state (issue #413): a raw ESI `ref_type`, an
@@ -220,14 +223,53 @@ export function journalRefTypes(entries: readonly JournalRow[]): string[] {
   return [...new Set(entries.map(journalRefKey))].filter(Boolean).sort();
 }
 
+/** An id the filter holds and the name its dropdown shows for it. */
+interface NamedOption {
+  id: string;
+  name: string;
+}
+
 /**
- * How many criteria are active — what the mobile `FilterBar` trigger counts.
- * Text is excluded: the search box stays visible in the row at every width, so
- * counting it on the trigger would attribute a filter to a control that is not
- * behind it.
+ * The criteria set away from their default, as `FilterBar` pills, in the
+ * bar's own order: ref type, player, party, then the date ends.
+ *
+ * Text is excluded: the search box stays visible in the row at every width,
+ * so it already says what it holds. The options only name a picked id; one
+ * with no option (a deep link to a player with no line in this division) reads
+ * `#id`, as the dropdown itself shows it.
  */
-export function activeWalletJournalFilterCount(filter: WalletJournalFilter): number {
-  return [filter.refType, filter.startDate, filter.endDate, filter.player, filter.party].filter(
-    (v) => v !== null
-  ).length;
+export function activeWalletJournalFilters(
+  filter: WalletJournalFilter,
+  t: TFunction,
+  options: { players?: readonly NamedOption[]; parties?: readonly NamedOption[] } = {}
+): ActiveFilter<WalletJournalFilter>[] {
+  const nameOf = (list: readonly NamedOption[] | undefined, id: string) =>
+    list?.find((option) => option.id === id)?.name ?? `#${id}`;
+  const active: ActiveFilter<WalletJournalFilter>[] = [];
+  if (filter.refType !== null)
+    active.push({
+      label: t('wallet.refTypeFilterLabel'),
+      value: journalRefLabel(filter.refType, t),
+      inline: true,
+      clear: (value) => ({ ...value, refType: null }),
+    });
+  if (filter.player !== null)
+    active.push({
+      label: t('wallet.playerFilterLabel'),
+      value: nameOf(options.players, filter.player),
+      clear: (value) => ({ ...value, player: null }),
+    });
+  if (filter.party !== null)
+    active.push({
+      label: t('wallet.partyFilterLabel'),
+      value: nameOf(options.parties, filter.party),
+      clear: (value) => ({ ...value, party: null }),
+    });
+  active.push(
+    ...activeDateRangeFilters(filter, t, {
+      from: t('wallet.dateFromLabel'),
+      to: t('wallet.dateToLabel'),
+    })
+  );
+  return active;
 }

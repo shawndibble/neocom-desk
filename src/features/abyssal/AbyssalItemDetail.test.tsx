@@ -145,6 +145,36 @@ describe('AbyssalItemDetail', () => {
     expect(within(cap).getByText('200')).toBeInTheDocument();
     expect(within(cap).getByText('170')).toBeInTheDocument();
     expect(within(cap).getByText('100%')).toBeInTheDocument();
+    // The best roll the mutaplasmid could make: green, with a full bar.
+    expect(within(cap).getByText('170')).toHaveClass('text-success');
+    expect(
+      within(cap).getByRole('progressbar', { name: 'Roll quality of Activation Cost' })
+    ).toHaveAttribute('aria-valuenow', '100');
+  });
+
+  it('colours a roll by where it sits in its range, not by the base', async () => {
+    const record: DynamicItemRecord = {
+      itemId: 2,
+      typeId: ABYSSAL_NEUT,
+      createdBy: 9,
+      sourceTypeId: NEUT_II,
+      mutatorTypeId: GRAVID,
+      // Base 100 GJ and 12 s; possible 80-130 GJ and 10.8-14.4 s, lower is better.
+      attributes: [
+        [6, 125],
+        [73, 12500],
+      ],
+      savedAt: 0,
+    };
+    renderDetail(ABYSSAL_NEUT, { status: 'ready', record });
+    const table = await screen.findByRole('table', { name: "This module's rolls" });
+    const cap = within(table).getByRole('row', { name: /Activation Cost/ });
+    expect(within(cap).getByText('125')).toHaveClass('text-danger');
+    expect(within(cap).getByText('10%')).toBeInTheDocument();
+    // Slower than base, yet mid-range: fair, not red.
+    const duration = within(table).getByRole('row', { name: /Activation time/ });
+    expect(within(duration).getByText('12.5')).toHaveClass('text-warning');
+    expect(within(duration).getByText('53%')).toBeInTheDocument();
   });
 
   it('still picks a base and shows the ranges when type names fail to load', async () => {

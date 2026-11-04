@@ -128,7 +128,6 @@ export function ImproveSettingsPanel({
           <label className="block space-y-1 text-sm">
             <span>{t('fittings.improve.cap')}</span>
             <IskInput
-              mask
               value={settings.iskBudget === null ? '' : String(settings.iskBudget)}
               onChange={(value) => settings.onIskBudgetChange(value === '' ? null : Number(value))}
             />

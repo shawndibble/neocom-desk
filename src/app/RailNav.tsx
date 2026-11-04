@@ -57,7 +57,7 @@ const GO_TO_HINT = 'goTo';
 /**
  * A one-time "New" cue on the Go to button (§6c "Hints"): until the palette is
  * first opened, by this button or by the chord. Not on a phone, where the rail
- * is not what a pilot sees; and not in a session that showed another hint.
+ * is not what a pilot sees; and not twice in one session.
  */
 function useGoToNudge(): boolean {
   const isDesktop = useMediaQuery(MD_UP_QUERY);

@@ -37,7 +37,12 @@ describe('recordLedgerArrivals', () => {
     await recordLedgerArrivals([ledger([100, 50], '2026-10-04T12:00:00Z')]);
 
     const log = useOreArrivalLog.getState().value;
-    expect(log.entries['91:2026-10-04:30000142']).toMatchObject({ quantity: 150, grewAt: null });
+    expect(log.entries['91:2026-10-04:30000142']).toMatchObject({
+      ores: {
+        '45490': { quantity: 100, grewAt: null },
+        '45491': { quantity: 50, grewAt: null },
+      },
+    });
     expect(log.checkedAt['91']).toBe(Date.parse('2026-10-04T12:00:00Z'));
     expect(await db.settings.get('miningTaxOreArrivals')).toBeDefined();
   });
@@ -46,9 +51,10 @@ describe('recordLedgerArrivals', () => {
     await recordLedgerArrivals([ledger([100], '2026-10-04T12:00:00Z')]);
     await recordLedgerArrivals([ledger([130], '2026-10-04T12:10:00Z')]);
 
-    expect(useOreArrivalLog.getState().value.entries['91:2026-10-04:30000142'].grewAt).toBe(
-      Date.parse('2026-10-04T12:10:00Z')
-    );
+    expect(
+      Object.values(useOreArrivalLog.getState().value.entries['91:2026-10-04:30000142'].ores)[0]
+        .grewAt
+    ).toBe(Date.parse('2026-10-04T12:10:00Z'));
   });
 
   it('skips a character with no ledger at all', async () => {

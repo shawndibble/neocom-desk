@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { HintText } from '@/components/ui/HintText';
 import { useTranslation } from 'react-i18next';
 import { resistPct } from '@/engine/fittings/stats';
@@ -8,6 +9,8 @@ import {
   RESIST_TYPES,
   RESONANCE_KEY,
   formatEhp,
+  resistReadsDifferently,
+  resistText,
   type DamageType,
 } from './resistFormat';
 import type { StatChangeKey } from '@/engine/fittings/variationDelta';
@@ -21,6 +24,8 @@ function ResistCell({
   tone,
   unheated,
   statKey,
+  base,
+  renderSkilled,
 }: {
   /** The stat a previewed change to it shows in place of the percentage. */
   statKey?: StatChangeKey;
@@ -28,6 +33,10 @@ function ResistCell({
   tone: DamageType;
   /** The unheated resist as shown, when heat changed it ("Overheat all"). */
   unheated?: string;
+  /** Item Detail: the resonance before the pilot's skills; the cell reads "base → skilled" when they print differently. */
+  base?: number;
+  /** Draws the pilot's figure when it differs from `base` (Item Detail's opener); plain emphasis without it. */
+  renderSkilled?: (base: string, value: string) => ReactNode;
 }) {
   const { t } = useTranslation();
   const pct = resistPct(resonance);
@@ -39,7 +48,9 @@ function ResistCell({
           style={{ width: `${pct}%` }}
         />
         <PreviewedFigure keys={statKey && [statKey]}>
-          {unheated === undefined ? (
+          {renderSkilled && base !== undefined && resistReadsDifferently(base, resonance) ? (
+            <span className="relative">{renderSkilled(resistText(base), fmt0(pct))}</span>
+          ) : unheated === undefined ? (
             <span className="relative">{fmt0(pct)}%</span>
           ) : (
             <HintText
@@ -80,8 +91,12 @@ function layerKey(
 export interface ResistRow {
   key: string;
   label: string;
-  sub?: string;
+  sub?: ReactNode;
   resonances: Resonances;
+  /** Item Detail: the resonances before the pilot's skills, when they change them. */
+  baseResonances?: Resonances;
+  /** Item Detail: draws a changed resist's "base → skilled" (its sources' opener). */
+  renderSkilled?: (type: DamageType, base: string, value: string) => ReactNode;
   ehp?: number;
   /** Adapted rows read as a note on the row above. */
   tone?: 'note';
@@ -92,10 +107,12 @@ export interface ResistRow {
 /**
  * The Defense table (mockup A): a row per layer — its raw HP beneath the
  * name, a cell per damage type, EHP last — and the Reactive Armor
- * Hardener's adapted resists.
+ * Hardener's adapted resists. With no row carrying an EHP (Item Detail's
+ * base values, which have no Damage Profile), the EHP column is left out.
  */
 export function ResistTable({ rows }: { rows: ResistRow[] }) {
   const { t } = useTranslation();
+  const showEhp = rows.some((row) => row.ehp !== undefined || row.unheated?.ehp !== undefined);
   return (
     <table className="w-full table-fixed border-collapse">
       <thead>
@@ -110,9 +127,11 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
               {t(`fittings.stats.damageTypeShort.${type}`)}
             </th>
           ))}
-          <th scope="col" className={`w-[18%] pb-1 text-right ${STAT_EYEBROW}`}>
-            {t('fittings.stats.ehpColumn')}
-          </th>
+          {showEhp && (
+            <th scope="col" className={`w-[18%] pb-1 text-right ${STAT_EYEBROW}`}>
+              {t('fittings.stats.ehpColumn')}
+            </th>
+          )}
         </tr>
       </thead>
       <tbody>
@@ -135,29 +154,37 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
                 tone={type}
                 resonance={row.resonances[RESONANCE_KEY[type]]}
                 unheated={row.unheated?.[type]}
+                base={row.baseResonances?.[RESONANCE_KEY[type]]}
+                renderSkilled={
+                  row.renderSkilled
+                    ? (base, value) => row.renderSkilled?.(type, base, value)
+                    : undefined
+                }
                 statKey={layerKey(row.key, RESONANCE_KEY[type])?.[0]}
               />
             ))}
-            <td className="text-right text-xs tabular-nums">
-              {row.unheated?.ehp === undefined ? (
-                row.ehp === undefined ? (
-                  ''
+            {showEhp && (
+              <td className="text-right text-xs tabular-nums">
+                {row.unheated?.ehp === undefined ? (
+                  row.ehp === undefined ? (
+                    ''
+                  ) : (
+                    formatEhp(row.ehp)
+                  )
                 ) : (
-                  formatEhp(row.ehp)
-                )
-              ) : (
-                <HintText
-                  content={t('fittings.stats.unheated', { value: row.unheated.ehp })}
-                  className="text-warning"
-                >
-                  {row.ehp === undefined ? '' : formatEhp(row.ehp)}
-                  <span className="sr-only">
-                    {' '}
-                    ({t('fittings.stats.unheated', { value: row.unheated.ehp })})
-                  </span>
-                </HintText>
-              )}
-            </td>
+                  <HintText
+                    content={t('fittings.stats.unheated', { value: row.unheated.ehp })}
+                    className="text-warning"
+                  >
+                    {row.ehp === undefined ? '' : formatEhp(row.ehp)}
+                    <span className="sr-only">
+                      {' '}
+                      ({t('fittings.stats.unheated', { value: row.unheated.ehp })})
+                    </span>
+                  </HintText>
+                )}
+              </td>
+            )}
           </tr>
         ))}
       </tbody>

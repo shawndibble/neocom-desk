@@ -10,17 +10,16 @@
  */
 import { useCallback, useMemo } from 'react';
 import type { BuildPlanRecord } from '@/db';
-import { depthCandidates, depthPriceMap } from '@/engine/industry/depthPrice';
+import { depthPriceMap } from '@/engine/industry/depthPrice';
 import type { HubPrices } from '@/engine/industry/types';
 import type { TradeHub } from '@/market/hubs';
-import { useDepthPrices } from './depthPriceLoader';
+import { planDepthNeeds, useDepthPrices } from './depthPriceLoader';
 import type { MarketSnapshot } from './marketData';
 import {
   resolveBuildPlan,
   type BuildPlanSources,
   type ResolvedBuildPlan,
 } from './resolveBuildPlan';
-import { shoppingListMaterials } from './subBuildPlan';
 
 export interface UseResolvedPlanInput {
   plan: BuildPlanRecord;
@@ -109,14 +108,7 @@ export function useResolvedPlan({
   // never iterated: a need is read off the lowest-sell pass only.
   const depthNeedsOf = useCallback(
     (candidate: BuildPlanRecord, lowestSell: ResolvedBuildPlan) =>
-      lowestSell.result
-        ? depthCandidates(
-            shoppingListMaterials(lowestSell.result.materials),
-            snapshot?.hubSellVolumes ?? {},
-            candidate.materialSourcing,
-            candidate.materialPriceBasis
-          )
-        : new Map<number, number>(),
+      planDepthNeeds(candidate, lowestSell.result, snapshot?.hubSellVolumes ?? {}),
     [snapshot?.hubSellVolumes]
   );
   const topOfBook = useMemo(() => resolveWith(plan), [resolveWith, plan]);

@@ -3,6 +3,8 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { NARROW_QUERY } from '@/lib/useIsNarrow';
+import { stubViewport } from '@/test/viewport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { JournalRow } from '@/engine/journalNetting';
 import { JournalTable, type JournalPartyView } from './WalletJournalTable';
@@ -212,20 +214,44 @@ describe('JournalTable', () => {
     });
   });
 
-  it('shows the active ref type as a selected chip that a click clears', async () => {
-    const onFilterChange = vi.fn();
+  it('shows the active ref type in the inline select, not as a pill', () => {
+    render(
+      <Harness
+        filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, refType: 'bounty_prize' }}
+        netted={false}
+      />
+    );
+    expect(screen.getByRole('combobox', { name: 'Ref type' })).toHaveTextContent('Bounty prize');
+    expect(screen.queryByRole('button', { name: /Remove filter: Ref type/ })).toBeNull();
+  });
+});
+
+describe('JournalTable ref type key filter', () => {
+  it('sits in the row with no pill, and is not repeated in the open box', async () => {
     const user = userEvent.setup();
     render(
       <Harness
         filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, refType: 'bounty_prize' }}
-        onFilterChange={onFilterChange}
         netted={false}
       />
     );
-    const chip = screen.getByRole('button', { name: 'Type: Bounty prize' });
-    expect(chip).toHaveAttribute('aria-pressed', 'true');
-    await user.click(chip);
-    expect(onFilterChange).toHaveBeenCalledWith(EMPTY_WALLET_JOURNAL_FILTER);
+    expect(screen.getAllByRole('combobox', { name: 'Ref type' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /Change filter: Ref type/ })).toBeNull();
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    expect(screen.getAllByRole('combobox', { name: 'Ref type' })).toHaveLength(1);
+  });
+
+  it('moves into the sheet when narrow', async () => {
+    const restore = stubViewport(NARROW_QUERY);
+    try {
+      const user = userEvent.setup();
+      render(<Harness netted={false} />);
+      expect(screen.queryByRole('combobox', { name: 'Ref type' })).toBeNull();
+      await user.click(screen.getByRole('button', { name: /^Filters/ }));
+      expect(await screen.findByRole('combobox', { name: 'Ref type' })).toBeInTheDocument();
+    } finally {
+      restore();
+    }
   });
 });
 

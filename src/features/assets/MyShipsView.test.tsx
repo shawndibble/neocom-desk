@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { LocationProbe } from '@/test/LocationProbe';
 import { MyShipsView } from './MyShipsView';
 
 const read = vi.hoisted(() => ({
@@ -41,10 +42,11 @@ vi.mock('@/features/market/groupNames', () => ({ loadGroupNames: async () => new
 
 function renderShips(
   characterIds: number[],
-  onSkippedChange?: (names: readonly string[] | undefined) => void
+  onSkippedChange?: (names: readonly string[] | undefined) => void,
+  path = '/assets/ships'
 ) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <MyShipsView
         characterIds={characterIds}
         onSkippedChange={onSkippedChange}
@@ -52,9 +54,14 @@ function renderShips(
         hrefFor={() => '/assets'}
         route={{ rules: { preference: 'shortest' } } as never}
       />
+      <LocationProbe />
     </MemoryRouter>
   );
 }
+
+/** One query param off the page's current URL, as `LocationProbe` prints it. */
+const urlParam = (key: string) =>
+  new URLSearchParams(screen.getByTestId('location').textContent?.split('?')[1] ?? '').get(key);
 
 beforeEach(() => {
   read.entries = [];
@@ -112,6 +119,45 @@ describe('MyShipsView packaged ships', () => {
     expect(screen.queryByText('Bestower')).not.toBeInTheDocument();
     expect(screen.getByText('Catalyst')).toBeInTheDocument();
     expect(screen.queryByText('×1')).not.toBeInTheDocument();
+  });
+
+  it('keeps the search in the URL as ships.q: reads it on load and writes what is typed', async () => {
+    read.entries = [
+      {
+        characterId: 1,
+        name: 'Alice',
+        assets: [
+          shipAsset({ item_id: 1, is_singleton: false, quantity: 1 }),
+          shipAsset({ item_id: 2, type_id: 101 }),
+        ],
+      },
+    ];
+    renderShips([1], undefined, '/assets/ships?ships.q=bestower');
+    expect(await screen.findByText('Bestower')).toBeInTheDocument();
+    expect(screen.queryByText('Catalyst')).not.toBeInTheDocument();
+    expect(screen.getByRole('searchbox')).toHaveValue('bestower');
+    await userEvent.clear(screen.getByRole('searchbox'));
+    await userEvent.type(screen.getByRole('searchbox'), 'cata');
+    await waitFor(() => expect(urlParam('ships.q')).toBe('cata'));
+    expect(screen.getByText('Catalyst')).toBeInTheDocument();
+  });
+
+  it('keeps the sort in the URL as ships.sort, leaving the default (nearest first) out', async () => {
+    read.entries = [
+      { characterId: 1, name: 'Alice', assets: [shipAsset({ item_id: 2, type_id: 101 })] },
+    ];
+    renderShips([1], undefined, '/assets/ships?ships.sort=ship:desc');
+    await screen.findByText('Bestower');
+    const shipHeader = screen.getByRole('columnheader', { name: /Ship/ });
+    expect(shipHeader).toHaveAttribute('aria-sort', 'descending');
+    await userEvent.click(screen.getByRole('button', { name: /^Ship/ }));
+    expect(urlParam('ships.sort')).toBe('ship:asc');
+    await userEvent.click(screen.getByRole('button', { name: /^Jumps/ }));
+    expect(urlParam('ships.sort')).toBeNull();
+    expect(screen.getByRole('columnheader', { name: /Jumps/ })).toHaveAttribute(
+      'aria-sort',
+      'ascending'
+    );
   });
 
   it('says what holds a ship that sits in a bay', async () => {

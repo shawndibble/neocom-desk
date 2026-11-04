@@ -214,18 +214,18 @@ describe('LoyaltyStore basis readout', () => {
   it('names the hub and price basis, and CONCORD only on the CONCORD basis', () => {
     renderStore();
     const readout = screen.getByTestId('lp-basis-readout');
-    expect(readout).toHaveTextContent('Jita · Sell');
+    expect(readout).toHaveTextContent('Jita · Sell order');
     expect(readout).not.toHaveTextContent('CONCORD');
 
     act(() => {
       useMarketHub.setState({ value: OTHER_HUB.id });
       usePriceBasis.setState({ value: 'buy' });
     });
-    expect(readout).toHaveTextContent(`${OTHER_HUB.systemName} · Buy`);
+    expect(readout).toHaveTextContent(`${OTHER_HUB.systemName} · Sell now`);
     expect(readout).not.toHaveTextContent('CONCORD');
 
     act(() => useLpBasis.setState({ value: 'concord' }));
-    expect(readout).toHaveTextContent(`${OTHER_HUB.systemName} · Buy · CONCORD LP`);
+    expect(readout).toHaveTextContent(`${OTHER_HUB.systemName} · Sell now · CONCORD LP`);
   });
 });
 
@@ -270,7 +270,7 @@ describe('LoyaltyStore filters', () => {
     renderStore();
     openFilters();
     expect(screen.getByRole('combobox', { name: /Market hub/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Affordable/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Affordable/i })).toBeInTheDocument();
   });
 
   /** The hub is a persisted preference; the phone sheet writes it as it is picked. */
@@ -292,11 +292,11 @@ describe('LoyaltyStore filters', () => {
 
     // "Affordable only" is on by default, so turning it off is one active filter.
     await user.click(storeFiltersButton());
-    await user.click(screen.getByRole('button', { name: /Affordable/i }));
+    await user.click(screen.getByRole('button', { name: /^Affordable/i }));
     await user.keyboard('{Escape}');
 
     await user.click(storeFiltersButton());
-    expect(screen.getByRole('button', { name: /Affordable/i })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /^Affordable/i })).toHaveAttribute(
       'aria-pressed',
       'false'
     );
@@ -316,10 +316,10 @@ describe('LoyaltyStore filters', () => {
     renderStore();
     openFilters();
 
-    await user.click(screen.getByRole('button', { name: /Affordable/i }));
+    await user.click(screen.getByRole('button', { name: /^Affordable/i }));
     await waitFor(() => expect(probe.search).toContain('affordableOnly=0'));
 
-    await user.click(screen.getByRole('button', { name: /Affordable/i }));
+    await user.click(screen.getByRole('button', { name: /^Affordable/i }));
     await waitFor(() => expect(probe.search).toBe(''));
   });
 
@@ -756,7 +756,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     ).toHaveTextContent('3 × Unpriced Faction Tag');
     expect(screen.getAllByText('Not priced').length).toBeGreaterThan(0);
     expect(
-      screen.getByText("Can't be priced at this hub — a required item has no listed sell price.")
+      screen.getByText("Can't be priced at this hub — a required item has no listed buy-now price.")
     ).toBeInTheDocument();
   });
 
@@ -769,7 +769,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
 
     expect(
       screen.getByText(
-        "Can't be priced at this hub — a material or the product has no listed sell price."
+        "Can't be priced at this hub — a material or the product has no listed buy-now price."
       )
     ).toBeInTheDocument();
   });

@@ -130,4 +130,28 @@ describe('rankFitOptions', () => {
     const ranked = rankFitOptions(before, [option(1, 99, null), option(2, 98, 1)]);
     expect(ranked.map((o) => o.swaps[0].toTypeId)).toEqual([2, 1]);
   });
+  describe('identical swaps in interchangeable slots', () => {
+    const inSlot = (slotIndex: number, from: number, to: number, dps: number) => ({
+      swaps: [{ slot: 'high' as const, slotIndex, fromTypeId: from, toTypeId: to }],
+      fitting: fit([to]),
+      after: stats({ dps }),
+      iskDelta: 10,
+    });
+
+    it('offers one of two swaps that replace the same module with the same one, differing only in slot', () => {
+      const ranked = rankFitOptions(before, [inSlot(2, 7, 9, 98), inSlot(3, 7, 9, 98)]);
+      expect(ranked).toHaveLength(1);
+      expect(ranked[0].swaps[0].slotIndex).toBe(2);
+    });
+
+    it('keeps both when the outcome differs (the slots hold different charges)', () => {
+      const ranked = rankFitOptions(before, [inSlot(2, 7, 9, 98), inSlot(3, 7, 9, 90)]);
+      expect(ranked).toHaveLength(2);
+    });
+
+    it('keeps both when they replace different modules', () => {
+      const ranked = rankFitOptions(before, [inSlot(2, 7, 9, 98), inSlot(3, 8, 9, 98)]);
+      expect(ranked).toHaveLength(2);
+    });
+  });
 });

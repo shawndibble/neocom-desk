@@ -145,6 +145,20 @@ export interface RolledAttributeRow {
   quality: number;
 }
 
+/** Where a roll sits in its possible range, for colour: bottom, middle or top third. */
+export type RollQualityTone = 'poor' | 'fair' | 'good';
+
+/**
+ * A roll's tone by its quality (0 worst to 1 best), never by the base value:
+ * a roll a little worse than base can still sit high in what the mutaplasmid
+ * could roll, and colour that disagreed with the quality figure beside it read
+ * as a contradiction.
+ */
+export function rollQualityTone(quality: number): RollQualityTone {
+  if (quality < 1 / 3) return 'poor';
+  return quality < 2 / 3 ? 'fair' : 'good';
+}
+
 /**
  * A Mutated module's rolls (`mutation`) beside its base module's values, one row
  * per attribute the mutaplasmid rolls (`rollRows`), by its order. A roll the item

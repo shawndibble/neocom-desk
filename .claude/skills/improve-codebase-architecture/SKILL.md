@@ -31,7 +31,7 @@ This command is _informed_ by the project's domain model and built on a shared d
 
 Each card carries a **Guardrail check** row: proposed export count, the callers that get simpler, the largest resulting file and module total, and the seam's two adapters, plus one line on guardrails 5, 7, 8 and 9 (one reason to change, layering, surviving tests, no re-implemented primitive). A card that can't fill it in is `Speculative` at best.
 
-Run at most three agents at once, including any design-it-twice fan-out.
+At most three agents at once may commit or run tests, typecheck or a build (`docs/agents/testing-and-ci.md`); read-only exploration and design-it-twice agents have no limit.
 
 ## Process
 

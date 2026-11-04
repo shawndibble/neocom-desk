@@ -604,7 +604,17 @@ export interface PayeeRecord {
   name: string;
   /** Percent, 0-100. What a new Assignment against this Payee prefills. */
   defaultTaxPct: number;
-  /** Solar system id this Payee collects on, for auto-match. Optional — a Payee need not be tied to one system. */
+  /**
+   * The systems this Payee is the default for (GLOSSARY.md, Default Systems): moon ore mined in
+   * one, from `from` (UTC `YYYY-MM-DD`, the day it was added), is assigned to this Payee as it
+   * reaches the ledger. At most one Payee per Character holds a system (`payees.ts`).
+   */
+  defaultSystems?: { systemId: number; from: string }[];
+  /**
+   * The one system the pre-Default-Systems "remember this system" tag stored. Only ever read to
+   * fold it into `defaultSystems` (`migrateLegacyPayeeSystems`) and carried through sync so a
+   * device that still writes it does not lose it; nothing sets it any more.
+   */
   systemId?: number;
   /**
    * Trade hub whose buy orders value this Payee's ore. Optional — absent means
@@ -728,6 +738,13 @@ export interface MiningTaxAssignmentRecord {
    * Assignment: it always collects.
    */
   collectsGrowth?: boolean;
+  /**
+   * `false` on an Assignment a Payee's Default Systems made and no one has changed since. Such a
+   * row is the last resort: a Survey connection takes its ore over and the Corp Tax Book bills it
+   * as ore given to no Payee. Absent means a pilot (or a Survey) assigned it, so every row stored
+   * before this existed is a plain Assignment. Never shown. Any pilot act deletes it.
+   */
+  override?: boolean;
   /**
    * How this Assignment was settled, when it was marked paid through the
    * Settle-up flow rather than a bare "mark paid". Every Assignment covered

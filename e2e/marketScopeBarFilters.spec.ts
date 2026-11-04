@@ -1,6 +1,6 @@
 /**
- * The order book's scope bar shows its distance and origin controls inline
- * from `sm` up, so its funnel popover must not repeat them. The popover's
+ * From `lg` up the finder column beside the order book holds the distance
+ * select, so the scope bar's funnel popover must not repeat it. The popover's
  * fields render on `FilterField`'s inline surface, which used to drop the
  * `sm:hidden` the bar passes, and so showed both controls twice. A phone has
  * no inline controls, so its sheet still holds the distance.
@@ -27,13 +27,15 @@ async function openTritanium(page: Page) {
   await page.getByRole('button', { name: 'Tritanium', exact: true }).click();
 }
 
-test('the scope bar funnel does not repeat the distance control beside it (1440px)', async ({
+test("from lg up the distance is the finder column's, not the scope bar's or its funnel's (1440px)", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openTritanium(page);
   const bar = page.getByRole('region', { name: 'Where the order book is looking' });
-  await expect(bar.getByRole('combobox', { name: 'Distance' })).toBeVisible();
+  await expect(bar.getByRole('combobox', { name: 'Distance' })).toHaveCount(0);
+  // One select on the page, in the finder column beside the book.
+  await expect(page.getByRole('combobox', { name: 'Distance' })).toHaveCount(1);
 
   await bar.getByRole('button', { name: /^Filters/ }).click();
   const popover = page.getByRole('dialog', { name: 'Where to look' });
@@ -41,17 +43,16 @@ test('the scope bar funnel does not repeat the distance control beside it (1440p
   await expect(popover.getByRole('combobox', { name: 'Distance' })).toBeHidden();
 });
 
-test('with a Jump Range set, neither the distance nor the origin repeats in the funnel (1440px)', async ({
+test('with a Jump Range set, the bar says it in words and the origin is not repeated (1440px)', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openTritanium(page);
-  const bar = page.getByRole('region', { name: 'Where the order book is looking' });
-  await bar.getByRole('combobox', { name: 'Distance' }).click();
+  await page.getByRole('combobox', { name: 'Distance' }).click();
   await page.getByRole('option', { name: 'Within 5 jumps' }).click();
-  const fromButtons = page.getByRole('button', { name: /^Change current system/ });
-  await expect(fromButtons).toHaveCount(1);
-  // The range is on the bar, so the funnel's badge does not count it.
+  const bar = page.getByRole('region', { name: 'Where the order book is looking' });
+  await expect(bar.getByText(/Within 5 jumps of/)).toBeVisible();
+  // The range is in the finder, so the bar's funnel does not count it.
   await expect(bar.getByRole('button', { name: 'Filters', exact: true })).toBeVisible();
 
   await bar.getByRole('button', { name: /^Filters/ }).click();
@@ -59,6 +60,23 @@ test('with a Jump Range set, neither the distance nor the origin repeats in the 
   await expect(popover.getByRole('spinbutton', { name: 'Min quantity' })).toBeVisible();
   await expect(popover.getByRole('combobox', { name: 'Distance' })).toBeHidden();
   await expect(popover.getByRole('button', { name: /^Change current system/ })).toBeHidden();
+});
+
+test('between md and lg the scope bar popover with a range set stays clear of the nav rail (768px)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 768, height: 900 });
+  await openTritanium(page);
+  const bar = page.getByRole('region', { name: 'Where the order book is looking' });
+  await bar.getByRole('button', { name: /^Filters/ }).click();
+  const popover = page.getByRole('dialog', { name: 'Where to look' });
+  // Below `lg` the finder is hidden beside an open item: the range is set here.
+  await popover.getByRole('combobox', { name: 'Distance' }).click();
+  await page.getByRole('option', { name: 'Within 5 jumps' }).click();
+  await expect(popover.getByRole('button', { name: /^Change current system/ })).toBeVisible();
+  const nav = (await page.getByRole('navigation').first().boundingBox())!;
+  const box = (await popover.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(nav.x + nav.width);
 });
 
 test('a phone keeps the distance control in the scope bar sheet (390px)', async ({ page }) => {

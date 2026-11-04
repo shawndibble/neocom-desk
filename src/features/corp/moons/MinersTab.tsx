@@ -1,15 +1,22 @@
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Button,
+  clearFilters,
   ColumnPickerMenu,
   DataTable,
+  EmptyState,
+  FilterBar,
   FilterChip,
+  FilterField,
   Panel,
   SearchInput,
   StatChip,
   StatChips,
   sortRows,
+  summarizeFilterValues,
   useOpenAfterMenu,
+  type ActiveFilter,
   type DataTableColumn,
   type DataTableSort,
 } from '@/components/ui';
@@ -22,7 +29,7 @@ import {
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { boolParam, textParam } from '@/lib/urlState';
-import { useUrlParams } from '@/lib/useUrlState';
+import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { useBook } from './useBook';
 import { useTabsProjection } from './useTabsProjection';
 import { isk, shortDate } from './moonsFormat';
@@ -53,6 +60,12 @@ const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 
 const STANDING_RANK: readonly MinerStanding[] = ['member', 'guest', 'left'];
 
 const DEFAULT_SORT: DataTableSort = { columnId: 'overdue', direction: 'desc' };
+
+/** What the funnel edits: which standings the table lists. Search sits in the row, outside it. */
+interface MinersFilter {
+  members: boolean;
+  guests: boolean;
+}
 
 const OPEN_MINER_KEY = 'corpTaxBook.minersTab.openMiner.';
 
@@ -212,12 +225,37 @@ export function MinersTab() {
   const columns = allColumns.filter(
     (c) => c.id === 'miner' || columnVisibility.isVisible(c.id as MinersColumnId)
   );
-  // The table can only sort by a column it shows: while the sorted one is unticked, sort the rows here.
-  const [sort, setSort] = useState<DataTableSort>(DEFAULT_SORT);
+  // In the URL (ADR 0015) as `?sort=`, validated against every column, so a sort on a hidden one
+  // survives. The table can only sort by a column it shows: while the sorted one is unticked, sort
+  // the rows here.
+  const { sort, onSortChange } = useUrlSort(
+    'sort',
+    DEFAULT_SORT,
+    allColumns.map((c) => c.id)
+  );
   const hiddenSortColumn = columns.some((c) => c.id === sort.columnId)
     ? undefined
     : allColumns.find((c) => c.id === sort.columnId);
   const sortedRows = hiddenSortColumn ? sortRows(rows, hiddenSortColumn, sort.direction) : rows;
+
+  const filter: MinersFilter = { members: params.members, guests: params.guests };
+  const standingLabel = t('corpTaxBook.moons.cols.inCorp');
+  const active: ActiveFilter<MinersFilter>[] =
+    filter.members && filter.guests
+      ? []
+      : [
+          {
+            label: standingLabel,
+            value: summarizeFilterValues(
+              [
+                ...(filter.members ? [t('corpTaxBook.moons.miners.members')] : []),
+                ...(filter.guests ? [t('corpTaxBook.moons.miners.nonMembers')] : []),
+              ],
+              t
+            ),
+            clear: (value) => ({ ...value, members: true, guests: true }),
+          },
+        ];
 
   return (
     <div className="space-y-4">
@@ -240,64 +278,97 @@ export function MinersTab() {
         </p>
       )}
       <Panel padded={false}>
-        <div className="flex flex-wrap items-center gap-2 p-3">
-          <SearchInput
-            className="min-w-56 flex-1"
-            value={params.q}
-            onChange={(e) => setParams({ q: e.target.value })}
-            placeholder={t('corpTaxBook.moons.miners.search')}
-            aria-label={t('corpTaxBook.moons.miners.searchLabel')}
+        <FilterBar<MinersFilter>
+          value={filter}
+          onChange={(next) => setParams(next)}
+          active={active}
+          resultCount={rows.length}
+          className="p-3"
+          search={
+            <SearchInput
+              className="min-w-56 flex-1"
+              value={params.q}
+              onChange={(e) => setParams({ q: e.target.value })}
+              placeholder={t('corpTaxBook.moons.miners.search')}
+              aria-label={t('corpTaxBook.moons.miners.searchLabel')}
+            />
+          }
+          actions={
+            <ColumnPickerMenu
+              available={MINERS_COLUMN_IDS}
+              visible={columnVisibility.visible}
+              columnsById={columnsById}
+              onToggle={columnVisibility.toggle}
+              onReset={columnVisibility.reset}
+              buttonLabel={t('common.columnsButton')}
+              menuTitle={t('common.columnsMenuTitle')}
+              resetLabel={t('common.resetColumns')}
+            />
+          }
+        >
+          {(value, onChange) => (
+            <FilterField label={standingLabel} stretch={false}>
+              <div role="group" aria-label={standingLabel} className="flex flex-wrap gap-2">
+                <FilterChip
+                  label={t('corpTaxBook.moons.miners.members')}
+                  selected={value.members}
+                  onToggle={() => onChange({ ...value, members: !value.members })}
+                  count={counts.members}
+                />
+                <FilterChip
+                  label={t('corpTaxBook.moons.miners.nonMembers')}
+                  selected={value.guests}
+                  onToggle={() => onChange({ ...value, guests: !value.guests })}
+                  count={counts.guests}
+                />
+              </div>
+            </FilterField>
+          )}
+        </FilterBar>
+        {rows.length === 0 ? (
+          <EmptyState
+            title={
+              active.length > 0 || params.q.trim() !== ''
+                ? t('corpTaxBook.moons.miners.emptyFiltered')
+                : t('corpTaxBook.moons.miners.empty')
+            }
+            className="border-t border-line py-8"
+            action={
+              active.length > 0 ? (
+                <Button size="sm" onClick={() => setParams(clearFilters(filter, active))}>
+                  {t('common.resetFilters')}
+                </Button>
+              ) : undefined
+            }
           />
-          <FilterChip
-            label={t('corpTaxBook.moons.miners.members')}
-            selected={params.members}
-            onToggle={() => setParams({ members: !params.members })}
-            count={counts.members}
-          />
-          <FilterChip
-            label={t('corpTaxBook.moons.miners.nonMembers')}
-            selected={params.guests}
-            onToggle={() => setParams({ guests: !params.guests })}
-            count={counts.guests}
-          />
-          <ColumnPickerMenu
-            available={MINERS_COLUMN_IDS}
-            visible={columnVisibility.visible}
-            columnsById={columnsById}
-            onToggle={columnVisibility.toggle}
-            onReset={columnVisibility.reset}
-            buttonLabel={t('common.columnsButton')}
-            menuTitle={t('common.columnsMenuTitle')}
-            resetLabel={t('common.resetColumns')}
-            size="sm"
-          />
-        </div>
-        <div ref={tableRef} className="@container overflow-x-auto">
-          <DataTable
-            label={t('corpTaxBook.moons.tabs.miners')}
-            columns={columns}
-            rows={sortedRows}
-            rowKey={(m) => m.id}
-            expandableRow={{
-              renderDetail: (m) => <MinerExpandedRow miner={m} />,
-              leadingIcon: true,
-              initialKey: openMiner,
-              onExpandedChange: (key) =>
-                writeOpenMiner(corporationId, key === null ? null : String(key)),
-            }}
-            stacked={cards}
-            rowClassName={() => 'group'}
-            rowContextMenu={rowContextMenu}
-            rowMoreActions={canEdit}
-            sort={hiddenSortColumn ? null : sort}
-            onSortChange={setSort}
-            mobileSort
-            stackSummary={t('corpTaxBook.moons.miners.summary', {
-              shown: rows.length,
-              total: miners.length,
-            })}
-          />
-        </div>
+        ) : (
+          <div ref={tableRef} className="@container overflow-x-auto">
+            <DataTable
+              label={t('corpTaxBook.moons.tabs.miners')}
+              columns={columns}
+              rows={sortedRows}
+              rowKey={(m) => m.id}
+              expandableRow={{
+                renderDetail: (m) => <MinerExpandedRow miner={m} />,
+                leadingIcon: true,
+                initialKey: openMiner,
+                onExpandedChange: (key) =>
+                  writeOpenMiner(corporationId, key === null ? null : String(key)),
+              }}
+              stacked={cards}
+              rowClassName={() => 'group'}
+              rowContextMenu={rowContextMenu}
+              rowMoreActions={canEdit}
+              sort={hiddenSortColumn ? null : sort}
+              onSortChange={onSortChange}
+              mobileSort
+              stackSummary={t('corpTaxBook.moons.miners.summary', {
+                shown: rows.length,
+                total: miners.length,
+              })}
+            />
+          </div>
+        )}
         {hiddenGuests.length > 0 && (
           <p className="border-t border-line px-3 py-2 text-xs text-text-dim">
             {t('corpTaxBook.moons.miners.nonMembersHidden', {

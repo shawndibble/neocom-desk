@@ -17,6 +17,24 @@ vi.mock('./payeeEntitySearch', () => ({
   resolvePayeeName: searchMock.resolvePayeeName,
 }));
 vi.mock('@/app/useGrantedScopes', () => ({ useEndpointsGranted: () => true }));
+vi.mock('@/features/route/SolarSystemPicker', () => ({
+  SolarSystemPicker: ({
+    onChange,
+    ariaLabel,
+    value,
+  }: {
+    onChange: (id: number) => void;
+    ariaLabel: string;
+    value: number | null;
+  }) => (
+    <button type="button" data-value={String(value)} onClick={() => onChange(30000142)}>
+      {ariaLabel}
+    </button>
+  ),
+}));
+vi.mock('@/features/route/useSolarSystems', () => ({
+  useSystemName: (id: number | null) => (id === 30000142 ? 'Jita' : id === null ? null : `#${id}`),
+}));
 
 const syncMock = vi.hoisted(() => ({
   scheduleSync: vi.fn(),
@@ -132,13 +150,13 @@ describe('PayeeManagerDialog — trade hub', () => {
     expect(screen.getByText('10% · Jita')).toBeInTheDocument();
   });
 
-  it('keeps the remembered system through an edit that only changes the hub', async () => {
+  it('keeps the Default Systems through an edit that only changes the hub', async () => {
     const stored: PayeeRecord = {
       id: 'p1',
       characterId: CHAR,
       name: 'Landlord',
       defaultTaxPct: 10,
-      systemId: SYSTEM,
+      defaultSystems: [{ systemId: SYSTEM, from: '2026-10-01' }],
       updatedAt: 1,
     };
     await db.payees.put(stored);
@@ -148,13 +166,73 @@ describe('PayeeManagerDialog — trade hub', () => {
     await pickHub('Hek');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    // `updatePayee` deletes any field its input omits, so the auto-match
-    // system AssignDialog's "remember this system" learned has to be carried
-    // through this form rather than silently dropped by an unrelated edit.
     await waitFor(async () => {
       expect((await loadPayees(CHAR))[0]?.hubId).toBe('hek');
     });
-    expect((await loadPayees(CHAR))[0]?.systemId).toBe(SYSTEM);
+    // Still defaulted, and still from the day it was added.
+    expect((await loadPayees(CHAR))[0]?.defaultSystems).toEqual([
+      { systemId: SYSTEM, from: '2026-10-01' },
+    ]);
+  });
+});
+
+describe('PayeeManagerDialog — Default Systems', () => {
+  const landlord: PayeeRecord = {
+    id: 'p1',
+    characterId: CHAR,
+    name: 'Landlord',
+    defaultTaxPct: 10,
+    updatedAt: 1,
+  };
+
+  it('adds a system to a Payee and saves it', async () => {
+    await db.payees.put(landlord);
+    renderDialog([landlord]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Landlord' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add a default system' }));
+    expect(screen.getByText('Jita')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => {
+      expect((await loadPayees(CHAR))[0]?.defaultSystems?.map((s) => s.systemId)).toEqual([SYSTEM]);
+    });
+  });
+
+  it('removes a system again', async () => {
+    const held: PayeeRecord = {
+      ...landlord,
+      defaultSystems: [{ systemId: SYSTEM, from: '2026-10-01' }],
+    };
+    await db.payees.put(held);
+    renderDialog([held]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Landlord' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Jita' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => {
+      expect('defaultSystems' in (await loadPayees(CHAR))[0]).toBe(false);
+    });
+  });
+
+  it('says which Payee already has a system, and saves nothing, when another claims it', async () => {
+    const held: PayeeRecord = {
+      ...landlord,
+      defaultSystems: [{ systemId: SYSTEM, from: '2026-10-01' }],
+    };
+    const other: PayeeRecord = { ...landlord, id: 'p2', name: 'Other' };
+    await db.payees.bulkPut([held, other]);
+    renderDialog([held, other]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Other' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add a default system' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Jita is already the default system of Landlord. Remove it there first.'
+    );
+    expect((await loadPayees(CHAR)).find((p) => p.id === 'p2')?.defaultSystems).toBeUndefined();
   });
 });
 

@@ -42,6 +42,7 @@ export function ExtractionStateFilter({
   const listed = FILTER_STATES.filter((s) => s !== 'cancelled' || countOf(s) > 0);
   return phone ? (
     <CheckboxSelect
+      size="sm"
       label={t('corpTaxBook.moons.timeline.filter')}
       options={listed.map((s) => ({
         value: s,

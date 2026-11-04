@@ -1,0 +1,6 @@
+# Scope decisions — Build Plans list and plan page share one profit basis setting
+
+_Recorded 2026-11-03._
+
+- **The Build Plans list and the plan page read one pilot setting, Profit Basis: `sellValue` ("Owned materials = resale value", the default) or `free` ("Owned materials = free").** Resale value charges owned materials at what they would sell for, so profit is what building earns over selling the stock; free counts them as no cost, so profit is only the ISK spent. The list used to count them free while the plan page opened on opportunity cost, so a plan could list as +8.9K and open as -5.4K "sell your materials instead". The page's own "sell value / free" flip in the hero now writes the same setting. It is a device-local view preference, not synced, and set in Settings → Industry (not in the Opportunities modal, which prices with assumed ME alone).
+- **A list row prices as the plan page does: also at Depth Prices.** A material whose need is large against what the hub lists walks the book, so a row's profit no longer differs from the page's for a plan that buys in bulk. The sale side of the owned-stock basis stays on instant sale into buy orders, the page's default; the page's "Use or sell" instant/order choice is not saved per plan, so the list cannot follow it.

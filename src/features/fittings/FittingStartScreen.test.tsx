@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { ComponentProps } from 'react';
@@ -107,9 +107,15 @@ function renderDialog(
   return { workspace, onOpened };
 }
 
-function renderScreen(workspace = makeWorkspace(), onStartHull = vi.fn(), pageTitle?: string) {
+/** A `path` starts the router there (`useNavigate` is mocked, so it never moves). */
+function renderScreen(
+  workspace = makeWorkspace(),
+  onStartHull = vi.fn(),
+  pageTitle?: string,
+  path?: string
+) {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path ?? '/']}>
       <FittingStartScreen
         workspace={workspace}
         catalogue={null}
@@ -195,6 +201,24 @@ describe('FittingStartScreen', () => {
     expect(screen.getByText('PvP Rifter')).toBeInTheDocument();
     expect(screen.queryByText('Armor Drake')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('2 matching fittings');
+  });
+
+  it('keeps the search in the URL as ?q=, so Back from an opened fitting finds it searched', async () => {
+    renderScreen(makeWorkspace(), vi.fn(), undefined, '/ships/fittings?q=drake');
+    expect(await screen.findByText('Armor Drake', {}, { timeout: 5000 })).toBeInTheDocument();
+    const search = screen.getByRole('searchbox', { name: 'Search fittings' });
+    expect(search).toHaveValue('drake');
+    expect(screen.queryByText('Kite')).not.toBeInTheDocument();
+
+    await userEvent.clear(search);
+    await userEvent.type(search, 'kite');
+    // `useNavigate` is mocked in this file, so the write is read off the mock.
+    await waitFor(() =>
+      expect(navigateMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ pathname: '/ships/fittings', search: '?q=kite' }),
+        expect.objectContaining({ replace: true })
+      )
+    );
   });
 
   it('previews the picked row and Open hands a saved one to openSaved', async () => {
@@ -372,6 +396,17 @@ describe('FittingStartScreen in a dialog', () => {
     expect(onOpened).toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'New from hull' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument();
+  });
+
+  it("keeps its search off the URL: it is a passing pick over another page's address", async () => {
+    renderDialog();
+    await screen.findByText('Armor Drake', {}, { timeout: 5000 });
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search fittings' }), 'kite');
+    expect(screen.queryByText('Armor Drake')).not.toBeInTheDocument();
+    // Past the URL's typing debounce: still nothing written. `useNavigate` is
+    // mocked in this file, so "nothing written" is no call to it.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 
   it('keeps the In-game refresh by the search, with no page header to hold it', async () => {

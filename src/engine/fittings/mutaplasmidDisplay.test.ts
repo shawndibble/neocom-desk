@@ -8,6 +8,7 @@ import {
   multiplierPercentRows,
   mutaplasmidsMaking,
   rolledAttributeRows,
+  rollQualityTone,
   strainRangeRows,
 } from './mutaplasmidDisplay';
 
@@ -258,5 +259,17 @@ describe('defaultBaseTypeId', () => {
 
   it('is null with no base', () => {
     expect(defaultBaseTypeId([])).toBeNull();
+  });
+});
+
+describe('rollQualityTone', () => {
+  it('splits the possible range in thirds: poor, fair, good', () => {
+    expect(rollQualityTone(0)).toBe('poor');
+    expect(rollQualityTone(0.33)).toBe('poor');
+    expect(rollQualityTone(1 / 3)).toBe('fair');
+    expect(rollQualityTone(0.5)).toBe('fair');
+    expect(rollQualityTone(2 / 3)).toBe('good');
+    expect(rollQualityTone(0.7)).toBe('good');
+    expect(rollQualityTone(1)).toBe('good');
   });
 });

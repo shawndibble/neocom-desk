@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
+import i18n from '@/i18n';
 import {
   BUILD_PLAN_FILTER,
   DEFAULT_BUILD_PLAN_FILTER,
   activePlanFilterCount,
+  activePlanFilters,
   filterPlans,
   type BuildPlanFilterState,
 } from './buildPlanFilter';
@@ -92,5 +94,49 @@ describe('URL codec', () => {
         verdicts: new Set(['build']),
       })
     ).toBe(3);
+  });
+});
+
+describe('activePlanFilters', () => {
+  const groups = [{ id: 'g1', name: 'Caps' }];
+  const pills = (over: Partial<BuildPlanFilterState>) =>
+    activePlanFilters({ ...DEFAULT_BUILD_PLAN_FILTER, ...over }, i18n.t, groups);
+
+  it('is empty at the defaults', () => {
+    expect(pills({})).toEqual([]);
+  });
+
+  it('names each non-default field, in control order', () => {
+    expect(
+      pills({
+        profitableOnly: true,
+        group: 'g1',
+        activity: 'reaction',
+        verdicts: new Set(['build', 'buy']),
+        ownership: 'bpo',
+      }).map(({ label, value }) => [label, value])
+    ).toEqual([
+      ['Blueprint', 'I own the BPO'],
+      ['Verdict', 'Build, Buy'],
+      ['Activity', 'Reactions'],
+      ['Group', 'Caps'],
+      ['Profit', 'Profitable only'],
+    ]);
+  });
+
+  it('names the ungrouped pick, and leaves an unknown group id unvalued', () => {
+    expect(pills({ group: 'none' })[0]?.value).toBe('Ungrouped');
+    expect(pills({ group: 'gone' })[0]?.value).toBeUndefined();
+  });
+
+  it('each clear resets only its own field', () => {
+    const filter: BuildPlanFilterState = {
+      ...DEFAULT_BUILD_PLAN_FILTER,
+      ownership: 'bpc',
+      profitableOnly: true,
+    };
+    const [ownership, profit] = activePlanFilters(filter, i18n.t, groups);
+    expect(ownership?.clear(filter)).toEqual({ ...filter, ownership: 'any' });
+    expect(profit?.clear(filter)).toEqual({ ...filter, profitableOnly: false });
   });
 });

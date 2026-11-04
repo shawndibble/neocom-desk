@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   FilterChip,
+  FilterField,
   MultiSelect,
   Select,
   SelectContent,
@@ -55,150 +56,179 @@ export function OpenOrdersFilterFields({
       : t('market.orders.filter.selectedLocationsCount', { count: draft.locationIds.length });
   return (
     <>
-      <FilterChip
-        label={t('orders.buy')}
-        selected={draft.side === 'buy'}
-        onToggle={() => setDraft({ ...draft, side: draft.side === 'buy' ? null : 'buy' })}
-      />
-      <FilterChip
-        label={t('orders.sell')}
-        selected={draft.side === 'sell'}
-        onToggle={() => setDraft({ ...draft, side: draft.side === 'sell' ? null : 'sell' })}
-      />
-      {PROBLEM_FILTER_OPTIONS.map((problem) => {
-        const count = problemCounts[problem];
-        const selected = draft.problems.includes(problem);
-        return (
+      <FilterField label={t('orders.side')} stretch={false}>
+        <div role="group" aria-label={t('orders.side')} className="flex flex-wrap gap-2">
           <FilterChip
-            key={problem}
-            label={t(`market.orders.group.${problem}`)}
-            count={count}
-            selected={selected}
-            // A zero-count problem still renders, still a real
-            // focusable button, so the player can see it's clean
-            // rather than wonder where it went — the `0` itself
-            // is the cue; no `opacity-50` fade below AA on top of
-            // it (issue #1491).
+            label={t('orders.buy')}
+            selected={draft.side === 'buy'}
+            onToggle={() => setDraft({ ...draft, side: draft.side === 'buy' ? null : 'buy' })}
+          />
+          <FilterChip
+            label={t('orders.sell')}
+            selected={draft.side === 'sell'}
+            onToggle={() => setDraft({ ...draft, side: draft.side === 'sell' ? null : 'sell' })}
+          />
+        </div>
+      </FilterField>
+      <FilterField label={t('market.orders.filter.problems')} stretch={false}>
+        <div
+          role="group"
+          aria-label={t('market.orders.filter.problems')}
+          className="flex flex-wrap gap-2"
+        >
+          {PROBLEM_FILTER_OPTIONS.map((problem) => {
+            const count = problemCounts[problem];
+            const selected = draft.problems.includes(problem);
+            return (
+              <FilterChip
+                key={problem}
+                label={t(`market.orders.group.${problem}`)}
+                count={count}
+                selected={selected}
+                // A zero-count problem still renders, still a real
+                // focusable button, so the player can see it's clean
+                // rather than wonder where it went — the `0` itself
+                // is the cue; no `opacity-50` fade below AA on top of
+                // it (issue #1491).
+                onToggle={() =>
+                  setDraft({
+                    ...draft,
+                    problems: selected
+                      ? draft.problems.filter((p) => p !== problem)
+                      : [...draft.problems, problem],
+                  })
+                }
+              />
+            );
+          })}
+        </div>
+      </FilterField>
+      <FilterField label={t('market.orders.filter.costBasis')} stretch={false}>
+        <div
+          role="group"
+          aria-label={t('market.orders.filter.costBasis')}
+          className="flex flex-wrap gap-2"
+        >
+          <FilterChip
+            label={t('market.orders.filter.costBasisLinked')}
+            selected={draft.costBasis === 'linked'}
             onToggle={() =>
               setDraft({
                 ...draft,
-                problems: selected
-                  ? draft.problems.filter((p) => p !== problem)
-                  : [...draft.problems, problem],
+                costBasis: draft.costBasis === 'linked' ? null : 'linked',
               })
             }
           />
-        );
-      })}
-      <FilterChip
-        label={t('market.orders.filter.costBasisLinked')}
-        selected={draft.costBasis === 'linked'}
-        onToggle={() =>
-          setDraft({
-            ...draft,
-            costBasis: draft.costBasis === 'linked' ? null : 'linked',
-          })
-        }
-      />
-      <FilterChip
-        label={t('market.orders.filter.costBasisMissing')}
-        selected={draft.costBasis === 'missing'}
-        onToggle={() =>
-          setDraft({
-            ...draft,
-            costBasis: draft.costBasis === 'missing' ? null : 'missing',
-          })
-        }
-      />
-      <Select
-        value={draft.expiringWithinDays === null ? 'any' : String(draft.expiringWithinDays)}
-        onValueChange={(value) =>
-          setDraft({
-            ...draft,
-            expiringWithinDays: value === 'any' ? null : Number(value),
-          })
-        }
-      >
-        <SelectTrigger
-          size="sm"
-          aria-label={t('market.orders.filter.expiringWithin')}
-          className="w-36"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">{t('market.orders.filter.anyExpiry')}</SelectItem>
-          {EXPIRING_WITHIN_DAY_OPTIONS.map((days) => (
-            <SelectItem key={days} value={String(days)}>
-              {t('market.orders.filter.expiringWithinOption', { count: days })}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select
-        value={draft.minIskTiedUp === null ? 'any' : String(draft.minIskTiedUp)}
-        onValueChange={(value) =>
-          setDraft({
-            ...draft,
-            minIskTiedUp: value === 'any' ? null : Number(value),
-          })
-        }
-      >
-        <SelectTrigger
-          size="sm"
-          aria-label={t('market.orders.filter.minIskTiedUp')}
-          className="w-36"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">{t('market.orders.filter.anySize')}</SelectItem>
-          {MIN_ISK_TIED_UP_OPTIONS.map((amount) => (
-            <SelectItem key={amount} value={String(amount)}>
-              {t('market.orders.filter.minIskTiedUpOption', {
-                amount: formatIskCompact(amount),
-              })}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {showLocationFilter && (
-        <MultiSelect
-          label={t('market.orders.filter.location')}
-          size="sm"
-          triggerLabel={locationSummary}
-          options={locationOptions.map((option) => ({
-            id: option.locationId,
-            label: option.label,
-          }))}
-          selected={new Set(draft.locationIds)}
-          onToggle={(locationId) =>
+          <FilterChip
+            label={t('market.orders.filter.costBasisMissing')}
+            selected={draft.costBasis === 'missing'}
+            onToggle={() =>
+              setDraft({
+                ...draft,
+                costBasis: draft.costBasis === 'missing' ? null : 'missing',
+              })
+            }
+          />
+        </div>
+      </FilterField>
+      <FilterField captionInline label={t('market.orders.filter.expiringWithin')}>
+        <Select
+          value={draft.expiringWithinDays === null ? 'any' : String(draft.expiringWithinDays)}
+          onValueChange={(value) =>
             setDraft({
               ...draft,
-              locationIds: draft.locationIds.includes(locationId)
-                ? draft.locationIds.filter((id) => id !== locationId)
-                : [...draft.locationIds, locationId],
+              expiringWithinDays: value === 'any' ? null : Number(value),
             })
           }
-          searchPlaceholder={t('market.orders.filter.locationSearchPlaceholder')}
-          noResultsLabel={t('market.orders.filter.locationNoResults')}
-          extraContent={(close) => (
-            <div className="border-b border-line p-1">
-              <Button
-                variant="ghost"
-                align="start"
-                size="sm"
-                className="w-full"
-                onClick={() => {
-                  setDraft({ ...draft, locationIds: [] });
-                  close();
-                }}
-              >
-                {t('market.orders.filter.allLocations')}
-              </Button>
-            </div>
-          )}
-        />
+        >
+          <SelectTrigger
+            size="sm"
+            aria-label={t('market.orders.filter.expiringWithin')}
+            active={draft.expiringWithinDays !== null}
+            className="w-36"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">{t('market.orders.filter.anyExpiry')}</SelectItem>
+            {EXPIRING_WITHIN_DAY_OPTIONS.map((days) => (
+              <SelectItem key={days} value={String(days)}>
+                {t('market.orders.filter.expiringWithinOption', { count: days })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FilterField>
+      <FilterField captionInline label={t('market.orders.filter.minIskTiedUp')}>
+        <Select
+          value={draft.minIskTiedUp === null ? 'any' : String(draft.minIskTiedUp)}
+          onValueChange={(value) =>
+            setDraft({
+              ...draft,
+              minIskTiedUp: value === 'any' ? null : Number(value),
+            })
+          }
+        >
+          <SelectTrigger
+            size="sm"
+            aria-label={t('market.orders.filter.minIskTiedUp')}
+            active={draft.minIskTiedUp !== null}
+            className="w-36"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">{t('market.orders.filter.anySize')}</SelectItem>
+            {MIN_ISK_TIED_UP_OPTIONS.map((amount) => (
+              <SelectItem key={amount} value={String(amount)}>
+                {t('market.orders.filter.minIskTiedUpOption', {
+                  amount: formatIskCompact(amount),
+                })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FilterField>
+      {showLocationFilter && (
+        <FilterField captionInline label={t('market.orders.filter.location')}>
+          <MultiSelect
+            label={t('market.orders.filter.location')}
+            size="sm"
+            active={draft.locationIds.length > 0}
+            triggerLabel={locationSummary}
+            options={locationOptions.map((option) => ({
+              id: option.locationId,
+              label: option.label,
+            }))}
+            selected={new Set(draft.locationIds)}
+            onToggle={(locationId) =>
+              setDraft({
+                ...draft,
+                locationIds: draft.locationIds.includes(locationId)
+                  ? draft.locationIds.filter((id) => id !== locationId)
+                  : [...draft.locationIds, locationId],
+              })
+            }
+            searchPlaceholder={t('market.orders.filter.locationSearchPlaceholder')}
+            noResultsLabel={t('market.orders.filter.locationNoResults')}
+            extraContent={(close) => (
+              <div className="border-b border-line p-1">
+                <Button
+                  variant="ghost"
+                  align="start"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    setDraft({ ...draft, locationIds: [] });
+                    close();
+                  }}
+                >
+                  {t('market.orders.filter.allLocations')}
+                </Button>
+              </div>
+            )}
+          />
+        </FilterField>
       )}
       <Select
         value={draft.sort}

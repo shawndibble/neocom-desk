@@ -3,7 +3,7 @@ import { Fields } from '@/components/ui';
 import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
 import { useMiningTaxCompressedOre } from '@/features/miningTax/oreForm';
 import { useAutoContinueSessions } from '@/features/miningTax/continueSessionPref';
-import { CheckboxField, DefaultsSyncHint, SettingsFormLoading } from './settingsFields';
+import { CheckboxField, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface MiningTaxSettingsFormProps {
@@ -35,7 +35,6 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
 
   return (
     <div className="space-y-4">
-      <DefaultsSyncHint />
       <Fields variant="form">
         <CheckboxField
           id="settings-mining-tax-compressed-ore"

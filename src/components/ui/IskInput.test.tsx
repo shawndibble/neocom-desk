@@ -8,13 +8,9 @@ import { IskInput } from './IskInput';
 function Harness({
   initial = '',
   onCommit,
-  echo,
-  mask,
 }: {
   initial?: string;
   onCommit: (value: string) => void;
-  echo?: boolean;
-  mask?: boolean;
 }) {
   const [value, setValue] = useState(initial);
   return (
@@ -22,8 +18,6 @@ function Harness({
       <IskInput
         aria-label="Max price"
         value={value}
-        echo={echo}
-        mask={mask}
         onChange={(next) => {
           setValue(next);
           onCommit(next);
@@ -37,7 +31,7 @@ function Harness({
 }
 
 describe('IskInput', () => {
-  it('commits "1b" as the plain digit string and echoes the exact figure', async () => {
+  it('commits "1b" as the plain digit string, leaving the typed shorthand until blur', async () => {
     const user = userEvent.setup();
     const onCommit = vi.fn();
     render(<Harness onCommit={onCommit} />);
@@ -48,7 +42,8 @@ describe('IskInput', () => {
 
     expect(onCommit).toHaveBeenLastCalledWith('1000000000');
     expect(input).toHaveValue('1b');
-    expect(screen.getByText('= 1,000,000,000 ISK')).toBeInTheDocument();
+    await user.tab();
+    expect(input).toHaveValue('1,000,000,000');
   });
 
   it('leaves the committed value alone while the text does not parse yet', async () => {
@@ -97,26 +92,6 @@ describe('IskInput', () => {
 
     expect(input).toHaveValue('');
   });
-
-  it('omits the echo line when asked, for a fixed-height strip', async () => {
-    const user = userEvent.setup();
-    render(<Harness onCommit={() => {}} echo={false} />);
-
-    await user.type(screen.getByRole('textbox', { name: 'Max price' }), '1b');
-
-    expect(screen.queryByText('= 1,000,000,000 ISK')).not.toBeInTheDocument();
-  });
-});
-
-describe('IskInput description', () => {
-  it('describes the field by the echo, only while there is one', async () => {
-    const user = userEvent.setup();
-    render(<Harness onCommit={vi.fn()} />);
-    const input = screen.getByLabelText('Max price');
-    expect(input).not.toHaveAttribute('aria-describedby');
-    await user.type(input, '1b');
-    expect(input).toHaveAccessibleDescription('= 1,000,000,000 ISK');
-  });
 });
 
 describe('IskInput invalid text', () => {
@@ -162,33 +137,31 @@ describe('IskInput invalid text', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     await user.type(input, '1b');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByText('= 1,000,000,000 ISK')).toBeInTheDocument();
   });
 
-  it('shows the error on blur at once, even with the echo off', async () => {
+  it('shows the error on blur at once', async () => {
     const user = userWithFakeClock();
-    render(<Harness onCommit={vi.fn()} echo={false} />);
+    render(<Harness onCommit={vi.fn()} />);
     await user.type(screen.getByRole('textbox', { name: 'Max price' }), '1x');
     await user.tab();
     expect(screen.getByRole('alert')).toHaveTextContent('Not an ISK amount');
   });
 
-  describe('mask', () => {
+  describe('masking', () => {
     it('groups digits with the display separator as they are typed, committing the plain figure', async () => {
       const user = userEvent.setup();
       const onCommit = vi.fn();
-      render(<Harness onCommit={onCommit} mask />);
+      render(<Harness onCommit={onCommit} />);
       const input = screen.getByRole('textbox', { name: 'Max price' });
       await user.type(input, '1234567');
       expect(input).toHaveValue('1,234,567');
       expect(onCommit).toHaveBeenLastCalledWith('1234567');
-      expect(screen.queryByText(/ISK$/)).not.toBeInTheDocument();
     });
 
     it('keeps shorthand as typed and groups a figure set from outside', async () => {
       const user = userEvent.setup();
       const onCommit = vi.fn();
-      render(<Harness onCommit={onCommit} mask initial="50000000" />);
+      render(<Harness onCommit={onCommit} initial="50000000" />);
       const input = screen.getByRole('textbox', { name: 'Max price' });
       expect(input).toHaveValue('50,000,000');
       await user.clear(input);
@@ -203,7 +176,7 @@ describe('IskInput invalid text', () => {
 
     it('keeps every fraction digit before a suffix and leaves a foreign-format paste alone', async () => {
       const user = userEvent.setup();
-      render(<Harness onCommit={vi.fn()} mask />);
+      render(<Harness onCommit={vi.fn()} />);
       const input = screen.getByRole('textbox', { name: 'Max price' });
       await user.type(input, '1.255m');
       expect(input).toHaveValue('1.255m');
@@ -215,7 +188,7 @@ describe('IskInput invalid text', () => {
 
     it('keeps the caret after the digit being edited when the groups shift', async () => {
       const user = userEvent.setup();
-      render(<Harness onCommit={vi.fn()} mask initial="1234" />);
+      render(<Harness onCommit={vi.fn()} initial="1234" />);
       const input = screen.getByRole('textbox', { name: 'Max price' });
       await user.click(input);
       await user.keyboard('{Home}{ArrowRight}9');

@@ -87,11 +87,12 @@ function renderDialog(
     characterId?: number;
     onImplantSet?: (set: unknown) => void;
     onImplantsApplied?: (names: string) => void;
+    before?: FittingStats;
   } = {}
 ) {
   mocks.state = {
     failed: false,
-    before: stats(0, 0),
+    before: props.before ?? stats(0, 0),
     result: { options, nothingFits: props.nothingFits ?? false },
   };
   const onApply = vi.fn();
@@ -191,7 +192,13 @@ describe('MakeItFitDialog', () => {
     };
     const onImplantSet = vi.fn();
     const onImplantsApplied = vi.fn();
-    renderDialog([option(0, 10, [ehpDown])], { onImplantSet, onImplantsApplied });
+    renderDialog([option(0, 10, [ehpDown])], {
+      onImplantSet,
+      onImplantsApplied,
+      before: { ...stats(0, 0), cpuUsed: 90, cpuTotal: 90 },
+    });
+    // An implant raises what the ship has; it uses no less.
+    expect(screen.getByText('Adds 10 tf')).toBeTruthy();
     expect(screen.queryByText(/EE-605/)).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: /EE-603/ }));
     expect(onImplantSet).toHaveBeenCalledWith({ implants: [GYPSY_CPU], boosters: [] });
@@ -199,9 +206,10 @@ describe('MakeItFitDialog', () => {
     mocks.finder = { status: 'loading', updating: false, fixes: [], catalog: null };
   });
 
-  it('summarises each trade-off in a line, with every number in an expander', async () => {
+  it('shows each trade-off as a chip, with every number in an expander', async () => {
     renderDialog([option(0, 1000, [ehpDown, emResist, thermalResist])]);
-    expect(screen.getByText('EHP -293, resists lower')).toBeTruthy();
+    expect(screen.getByText('EHP -293')).toBeTruthy();
+    expect(screen.getByText('resists lower')).toBeTruthy();
     // The per-resist numbers are one click away, not gone.
     expect(screen.queryByText('Shield EM resist 50 to 42%, worse')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'All changes' }));
@@ -214,20 +222,37 @@ describe('MakeItFitDialog', () => {
     expect(screen.getAllByText('Options without a price show no cost.')).toHaveLength(1);
   });
 
-  it('tells identical-looking rows apart by their slot', () => {
+  it('names the new module and what it replaces, with its slot', () => {
     renderDialog([option(0, 10, [ehpDown]), option(1, 10, [ehpDown])]);
-    expect(screen.getByText(/Mid slot 1/)).toBeTruthy();
-    expect(screen.getByText(/Mid slot 2/)).toBeTruthy();
+    expect(screen.getAllByText('Gyrostabilizer II')).toHaveLength(2);
+    expect(screen.getByText('replaces Gyrostabilizer I · Mid slot 1')).toBeTruthy();
+    expect(screen.getByText('replaces Gyrostabilizer I · Mid slot 2')).toBeTruthy();
   });
 
-  it('leaves a lone row without a slot suffix', () => {
-    renderDialog([option(0, 10, [ehpDown])]);
-    expect(screen.queryByText(/Mid slot/)).toBeNull();
+  it('says how far over budget the Fitting is, and what a swap frees', () => {
+    const row = option(0, 10, [ehpDown]);
+    row.after = { ...row.after, cpuUsed: 574, cpuTotal: 580 };
+    renderDialog([row], { before: { ...stats(0, 0), cpuUsed: 612, cpuTotal: 580 } });
+    expect(screen.getByText('CPU is 32 tf over budget')).toBeTruthy();
+    expect(screen.getByText('Frees 38 tf')).toBeTruthy();
+  });
+
+  it('names the other stats a swap changes instead of counting them', () => {
+    const shieldBoost = { key: 'maxVelocity', before: 400, after: 380 };
+    renderDialog([option(0, 10, [ehpDown, shieldBoost])]);
+    expect(screen.getByText('EHP -293')).toBeTruthy();
+    expect(screen.getByText(/Speed|speed|velocity/)).toBeTruthy();
+    expect(screen.queryByText(/other stat/)).toBeNull();
+  });
+
+  it('says so when a swap changes nothing else', () => {
+    renderDialog([option(0, 10, [])]);
+    expect(screen.getByText('Nothing else changes')).toBeTruthy();
   });
 
   it('applies the option when its row is clicked', () => {
     const onApply = renderDialog([option(0, 10, [ehpDown])]);
-    fireEvent.click(screen.getByRole('button', { name: /Gyrostabilizer I → Gyrostabilizer II/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Gyrostabilizer II/ }));
     expect(onApply).toHaveBeenCalledOnce();
   });
 

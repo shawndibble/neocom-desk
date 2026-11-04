@@ -62,6 +62,9 @@ type Story = StoryObj<typeof meta>;
 export const Closed: Story = {};
 
 /** @summary Open with one option ticked; the ticked options carry a check, not colour alone (§6c States, Selected). */
+/** @summary A narrowed filter: `active` draws the accent border (§6c). */
+export const Active: Story = { args: { active: true } };
+
 export const Open: Story = { play: openPopover };
 
 /** @summary `sm` trigger whose visible text names itself ("All hubs"), for a dense filter row. */

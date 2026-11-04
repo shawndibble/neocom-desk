@@ -7,9 +7,11 @@ import { db } from '@/db';
 import { STALE_AFTER, resetRevalidationState } from '@/esi/cache';
 import {
   listCachedStructures,
+  loadStructureAccess,
   loadStructureName,
   loadStructureNameNoRoster,
   readCachedStructureNames,
+  readCachedStructures,
 } from './structures';
 import { seedCharacter } from '@/test/seed';
 
@@ -297,6 +299,21 @@ describe('readCachedStructureNames', () => {
   });
 });
 
+describe('readCachedStructures', () => {
+  it('returns each cached structure with the solar system it sits in, with no request', async () => {
+    await db.esiCache.put({
+      characterId: 0,
+      key: 'structure:1000000000001',
+      value: { name: 'Cached Keepstar', owner_id: 1, solar_system_id: 30002187 },
+      fetchedAt: Date.now(),
+    });
+    const structures = await readCachedStructures([1000000000001, 1000000000002]);
+    expect([...structures]).toEqual([
+      [1000000000001, { name: 'Cached Keepstar', systemId: 30002187 }],
+    ]);
+  });
+});
+
 describe('listCachedStructures', () => {
   it("lists every name on the roster-wide rows, skipping refusals and one Character's own rows", async () => {
     const fetchedAt = Date.now();
@@ -346,5 +363,35 @@ describe('loadStructureNameNoRoster', () => {
     expect((await readCachedStructureNames([1000000000001])).get(1000000000001)).toBe(
       'Own Citadel'
     );
+  });
+});
+
+describe('loadStructureAccess', () => {
+  const ID = 1000000000777;
+
+  it('is `refused` only for a confirmed 403', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/${ID}`, () =>
+        HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
+      )
+    );
+
+    expect(await loadStructureAccess(CHARACTER_ID, ID)).toBe('refused');
+  });
+
+  it('is `unknown`, never `refused`, when the request just fails', async () => {
+    server.use(http.get(`${ESI_BASE_URL}/universe/structures/${ID}`, () => HttpResponse.error()));
+
+    expect(await loadStructureAccess(CHARACTER_ID, ID)).toBe('unknown');
+  });
+
+  it('is `visible` when ESI names the structure', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/${ID}`, () =>
+        HttpResponse.json({ name: 'Efa - Brass Anvil', owner_id: 1, solar_system_id: 30002187 })
+      )
+    );
+
+    expect(await loadStructureAccess(CHARACTER_ID, ID)).toBe('visible');
   });
 });

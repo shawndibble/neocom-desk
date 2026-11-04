@@ -26,6 +26,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   Button,
   CheckboxSelect,
@@ -34,7 +35,6 @@ import {
   EmptyState,
   LoadFailedState,
   FilterBar,
-  countActive,
   FilterChip,
   FilterField,
   IskInput,
@@ -54,6 +54,9 @@ import {
   IskAmount,
   LiveStatus,
   CachedNotice,
+  boundText,
+  summarizeFilterValues,
+  type ActiveFilter,
 } from '@/components/ui';
 import {
   CONTRACT_SEARCH_ITEMS_COLUMN_IDS,
@@ -66,7 +69,6 @@ import {
   isUnpricedOffer,
   offerAskingPrice,
   type ContractOfferStats,
-  type ContractSaleKind,
   type ContractTypeOption,
 } from '@/engine/contracts/contractSearch';
 import {
@@ -74,9 +76,15 @@ import {
   type PublicContractOfferRow,
 } from '@/engine/contracts/contractOffers';
 import { bpcPerRunCheck } from '@/engine/contracts/bpcPerRunCheck';
-import { contractFlagFor, splitFlagged, type ContractFlag } from '@/engine/contracts/contractFlags';
+import {
+  contractFlagFor,
+  contractSavingFor,
+  splitFlagged,
+  type ContractFlag,
+} from '@/engine/contracts/contractFlags';
 import {
   resolveCourierRoutes,
+  type CourierEndpoint,
   type PublicCourierContractRow,
 } from '@/engine/contracts/courierSearch';
 import { loadPublicContractOffers } from '@/features/contractSearch/publicContractOffers';
@@ -118,15 +126,14 @@ import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
-import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import {
-  boolParam,
-  enumParam,
-  optionalEnumParam,
-  optionalIdParam,
-  textParam,
-} from '@/lib/urlState';
+  CONTRACT_ISK_CENTS_BELOW,
+  formatIskAuto,
+  formatIskCompact,
+  parseIskAmount,
+} from '@/lib/isk';
+import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { boolParam, enumParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { DEFAULT_JUMP_RANGE, JUMP_RANGES, type JumpRange } from '@/engine/route/jumpRange';
 import {
   useCurrentSystem,
@@ -150,8 +157,6 @@ const SUGGESTION_LIMIT = 8;
  */
 const TYPE_SEARCH_LIMIT = 50;
 
-const SALE_KINDS: ContractSaleKind[] = ['exchange', 'auction'];
-
 /** Which corpus is showing — the route's Item search or Courier tab. Items is the landing mode. */
 export type ContractMode = 'items' | 'courier';
 
@@ -166,7 +171,7 @@ interface UiFilter {
   regionId: number | null;
   maxPrice: string;
   minQuantity: string;
-  saleKind: ContractSaleKind | null;
+  hideExchanges: boolean;
   hideAuctions: boolean;
   /** Hides a contract asking for PLEX in return (`requestedPlex`). */
   hidePlex: boolean;
@@ -185,7 +190,7 @@ const ITEMS_FILTER_PARAMS = {
   'items.region': optionalIdParam(),
   'items.maxPrice': textParam(),
   'items.minQty': textParam(),
-  'items.kind': optionalEnumParam(SALE_KINDS),
+  'items.hideExchanges': boolParam(),
   'items.hideAuctions': boolParam(),
   'items.hidePlex': boolParam(),
   'items.hideOverpriced': boolParam(),
@@ -213,6 +218,8 @@ interface ContractSearchFilterBarProps {
   itemFlagMultiple: number;
   /** The table's column picker, drawn beside the filter trigger. */
   actions?: ReactNode;
+  /** Rows the filters leave, once there are rows to count: for the phone sheet's done button. */
+  resultCount?: number;
   /** Below market on: its two valuation controls join the filters. They write their own settings at once, not into the draft. */
   belowMarket?: {
     side: PriceSide;
@@ -222,6 +229,67 @@ interface ContractSearchFilterBarProps {
   };
 }
 
+/**
+ * The Item search filters set away from their default, as `FilterBar` pills.
+ *
+ * Read off the controls, not off the parsed engine filter: a half-typed "1e"
+ * parses to `null` there, and the pill should say the field has been touched
+ * rather than vanish mid-keystroke. The item query is left out — its box shows
+ * what it holds — and so are Current system and the Below market valuation
+ * controls, settings that write themselves rather than parts of this filter.
+ */
+function activeItemsFilters(
+  filter: UiFilter,
+  t: TFunction,
+  regionOptions: readonly RegionOption[]
+): ActiveFilter<UiFilter>[] {
+  const active: ActiveFilter<UiFilter>[] = [];
+  const { regionId } = filter;
+  if (regionId !== null)
+    active.push({
+      label: t('contractSearch.regionLabel'),
+      value: regionOptions.find((option) => option.id === regionId)?.name ?? `#${regionId}`,
+      clear: (value) => ({ ...value, regionId: null }),
+    });
+  if (filter.jumps !== DEFAULT_JUMP_RANGE)
+    active.push({
+      label: t('jumpRange.label'),
+      value: t(`jumpRange.option.${filter.jumps}`),
+      clear: (value) => ({ ...value, jumps: DEFAULT_JUMP_RANGE }),
+    });
+  if (filter.maxPrice.trim() !== '')
+    active.push({
+      label: t('contractSearch.maxPriceLabel'),
+      value: boundText(filter.maxPrice, formatIskCompact, parseIskAmount),
+      clear: (value) => ({ ...value, maxPrice: '' }),
+    });
+  if (filter.minQuantity.trim() !== '')
+    active.push({
+      label: t('contractSearch.minQuantityLabel'),
+      value: boundText(filter.minQuantity, formatCount),
+      clear: (value) => ({ ...value, minQuantity: '' }),
+    });
+  // The three hides share one Exclude control, so they are one pill too.
+  const excluded = [
+    filter.hideExchanges && t('contractSearch.hideExchanges'),
+    filter.hideAuctions && t('contractSearch.hideAuctions'),
+    filter.hidePlex && t('contractSearch.hidePlex'),
+  ].filter((name): name is string => typeof name === 'string');
+  if (excluded.length > 0)
+    active.push({
+      label: t('contractSearch.excludeLabel'),
+      value: summarizeFilterValues(excluded, t),
+      clear: (value) => ({ ...value, hideExchanges: false, hideAuctions: false, hidePlex: false }),
+    });
+  if (filter.hideOverpriced)
+    active.push({
+      label: t('contractSearch.priceFlagsLabel'),
+      value: t('contractSearch.filterHideOverpriced'),
+      clear: (value) => ({ ...value, hideOverpriced: false }),
+    });
+  return active;
+}
+
 function ContractSearchFilterBar({
   filter,
   onChange,
@@ -229,29 +297,16 @@ function ContractSearchFilterBar({
   currentSystem,
   itemFlagMultiple,
   actions,
+  resultCount,
   belowMarket,
 }: ContractSearchFilterBarProps) {
   const { t } = useTranslation();
-  // Counted off the controls, not off the parsed engine filter: a half-typed
-  // "1e" parses to `null` there, and the badge should say the field has been
-  // touched rather than silently drop back to zero mid-keystroke.
-  const activeCount = countActive([
-    filter.typeQuery,
-    filter.regionId !== null,
-    filter.maxPrice,
-    filter.minQuantity,
-    filter.saleKind !== null,
-    filter.hideAuctions,
-    filter.hidePlex,
-    filter.hideOverpriced,
-    filter.jumps !== DEFAULT_JUMP_RANGE,
-  ]);
-
   return (
     <FilterBar
       value={filter}
       onChange={onChange}
-      activeCount={activeCount}
+      active={activeItemsFilters(filter, t, regionOptions)}
+      resultCount={resultCount}
       actions={actions}
       className="border-b border-line px-3 py-2"
       search={
@@ -298,29 +353,14 @@ function ContractSearchFilterBar({
               onChange={(event) => setDraft({ ...draft, minQuantity: event.target.value })}
             />
           </FilterField>
-          <div
-            role="group"
-            aria-label={t('contractSearch.saleKindLabel')}
-            className="flex flex-wrap gap-2"
-          >
-            {SALE_KINDS.map((kind) => (
-              <FilterChip
-                key={kind}
-                label={t(`contractSearch.saleKind.${kind}`)}
-                size="md"
-                selected={draft.saleKind === kind}
-                onToggle={() =>
-                  setDraft({ ...draft, saleKind: draft.saleKind === kind ? null : kind })
-                }
-              />
-            ))}
-          </div>
           <FilterField label={t('contractSearch.excludeLabel')}>
             <CheckboxSelect
               label={t('contractSearch.excludeLabel')}
               size="md"
               className="w-44"
+              active={draft.hideExchanges || draft.hideAuctions || draft.hidePlex}
               options={[
+                { value: 'exchanges' as const, label: t('contractSearch.hideExchanges') },
                 { value: 'auctions' as const, label: t('contractSearch.hideAuctions') },
                 {
                   value: 'plex' as const,
@@ -330,37 +370,45 @@ function ContractSearchFilterBar({
               ]}
               selected={
                 new Set([
+                  ...(draft.hideExchanges ? (['exchanges'] as const) : []),
                   ...(draft.hideAuctions ? (['auctions'] as const) : []),
                   ...(draft.hidePlex ? (['plex'] as const) : []),
                 ])
               }
               onToggle={(value) =>
                 setDraft(
-                  value === 'auctions'
-                    ? { ...draft, hideAuctions: !draft.hideAuctions }
-                    : { ...draft, hidePlex: !draft.hidePlex }
+                  value === 'exchanges'
+                    ? { ...draft, hideExchanges: !draft.hideExchanges }
+                    : value === 'auctions'
+                      ? { ...draft, hideAuctions: !draft.hideAuctions }
+                      : { ...draft, hidePlex: !draft.hidePlex }
                 )
               }
             />
           </FilterField>
           {/* A filter, not a view control: it sits in the funnel as Market Browser's Hide bait sells does. */}
-          <FilterChip
-            label={t('contractSearch.filterHideOverpriced')}
-            size="md"
-            tooltip={t('contractSearch.filterHideOverpricedHint', {
-              times: itemFlagMultiple,
-            })}
-            selected={draft.hideOverpriced}
-            onToggle={() => setDraft({ ...draft, hideOverpriced: !draft.hideOverpriced })}
-          />
+          <FilterField label={t('contractSearch.priceFlagsLabel')} stretch={false}>
+            <FilterChip
+              label={t('contractSearch.filterHideOverpriced')}
+              size="md"
+              tooltip={t('contractSearch.filterHideOverpricedHint', {
+                times: itemFlagMultiple,
+              })}
+              selected={draft.hideOverpriced}
+              onToggle={() => setDraft({ ...draft, hideOverpriced: !draft.hideOverpriced })}
+            />
+          </FilterField>
           <FilterField label={t('jumpRange.label')}>
             <JumpRangeSelect
               value={draft.jumps}
+              active={draft.jumps !== DEFAULT_JUMP_RANGE}
               onChange={(jumps) => setDraft({ ...draft, jumps })}
             />
           </FilterField>
           {/* Writes its own setting straight away — not part of this draft, see `currentSystem.ts`. */}
-          <CurrentSystemPicker current={currentSystem} />
+          <FilterField label={t('jumpRange.currentSystemLabel')}>
+            <CurrentSystemPicker current={currentSystem} />
+          </FilterField>
           {belowMarket && (
             <>
               <FilterField label={t('contractSearch.belowMarket.sideLabel')}>
@@ -380,13 +428,18 @@ function ContractSearchFilterBar({
                   </SelectContent>
                 </Select>
               </FilterField>
-              <FilterChip
-                label={t('contractSearch.belowMarket.includeOther')}
-                size="md"
-                selected={belowMarket.includeOther}
-                onToggle={() => belowMarket.onIncludeOtherChange(!belowMarket.includeOther)}
-                tooltip={t('contractSearch.belowMarket.includeOtherTooltip')}
-              />
+              <FilterField
+                label={t('contractSearch.belowMarket.includeOtherLabel')}
+                stretch={false}
+              >
+                <FilterChip
+                  label={t('contractSearch.belowMarket.includeOther')}
+                  size="md"
+                  selected={belowMarket.includeOther}
+                  onToggle={() => belowMarket.onIncludeOtherChange(!belowMarket.includeOther)}
+                  tooltip={t('contractSearch.belowMarket.includeOtherTooltip')}
+                />
+              </FilterField>
             </>
           )}
         </>
@@ -473,7 +526,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
       regionId: itemsParams['items.region'],
       maxPrice: itemsParams['items.maxPrice'],
       minQuantity: itemsParams['items.minQty'],
-      saleKind: itemsParams['items.kind'],
+      hideExchanges: itemsParams['items.hideExchanges'],
       hideAuctions: itemsParams['items.hideAuctions'],
       hidePlex: itemsParams['items.hidePlex'],
       hideOverpriced: itemsParams['items.hideOverpriced'],
@@ -558,7 +611,23 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     // Below market reads every type, so a query matching none still awaits rows.
     !(!belowMarket && typesKnown && typeIds !== null && typeIds.size === 0);
 
-  const { value: endpoints } = useCourierEndpoints(courierRows);
+  const { value: snapshotEndpoints } = useCourierEndpoints(courierRows);
+  // Player structures a haul's detail placed after asking ESI for them. Kept
+  // across corpus refreshes: a structure does not move, and the next load
+  // places it from the device cache anyway.
+  const [placedStructures, setPlacedStructures] = useState<ReadonlyMap<number, CourierEndpoint>>(
+    () => new Map()
+  );
+  const placeStructure = useCallback((endpoint: CourierEndpoint) => {
+    setPlacedStructures((placed) => new Map(placed).set(endpoint.locationId, endpoint));
+  }, []);
+  const endpoints = useMemo(
+    () =>
+      placedStructures.size === 0
+        ? snapshotEndpoints
+        : new Map([...snapshotEndpoints, ...placedStructures]),
+    [snapshotEndpoints, placedStructures]
+  );
   // Synchronous, so the haul list never empties while its ends are being
   // placed: an unresolved end shows its raw location id, exactly as a player
   // structure does once resolution has finished.
@@ -696,6 +765,10 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
       contractFlagFor(row, { hubSell: flagPrices.sellFor(row), threshold: itemFlagMultiple }),
     [flagPrices, itemFlagMultiple]
   );
+  const savingFor = useCallback(
+    (row: PublicContractOfferRow): number | null => contractSavingFor(row, flagPrices.sellFor(row)),
+    [flagPrices]
+  );
   const { shownRows, hiddenOverpriced } = useMemo(() => {
     if (!uiFilter.hideOverpriced) return { shownRows: displayRows, hiddenOverpriced: 0 };
     const { kept, hidden } = splitFlagged(displayRows, flagFor);
@@ -774,7 +847,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
       'items.region': next.regionId,
       'items.maxPrice': next.maxPrice,
       'items.minQty': next.minQuantity,
-      'items.kind': next.saleKind,
+      'items.hideExchanges': next.hideExchanges,
       'items.hideAuctions': next.hideAuctions,
       'items.hidePlex': next.hidePlex,
       'items.hideOverpriced': next.hideOverpriced,
@@ -800,7 +873,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
       regionId: null,
       maxPrice: '',
       minQuantity: '',
-      saleKind: null,
+      hideExchanges: false,
       hideAuctions: false,
       hidePlex: false,
       hideOverpriced: false,
@@ -826,6 +899,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     visibleItemsColumns,
     priceFlag,
     flagFor,
+    savingFor,
   });
 
   const itemsSortProps = useUrlSort(
@@ -968,6 +1042,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
               rows={courierRoutes}
               regionNames={regionNames}
               characterId={activeCharacterId}
+              onStructurePlaced={placeStructure}
             />
           ) : (
             <>
@@ -977,6 +1052,17 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                 regionOptions={regionOptions}
                 currentSystem={currentSystem}
                 itemFlagMultiple={itemFlagMultiple}
+                // Only once the board has an answer: before a search, or mid-load,
+                // a count of zero would claim the filters emptied the list.
+                resultCount={
+                  !searchActive || awaitingRows || awaitingQuery
+                    ? undefined
+                    : belowMarket
+                      ? belowMarketState.status === 'ready'
+                        ? belowMarketRows.length
+                        : undefined
+                      : shownRows.length
+                }
                 belowMarket={
                   belowMarket
                     ? {

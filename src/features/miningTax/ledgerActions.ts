@@ -54,6 +54,7 @@ import {
   type SplitPrices,
   type UpdateCombinedInput,
 } from './assignments';
+import { recordDefaultOptOuts } from './defaultOptOuts';
 import type { GroupMember } from './groupRows';
 import { removePayeeRecord } from './payees';
 import type { SessionContinuation } from './sessionContinuation';
@@ -231,10 +232,15 @@ export function uncombine(
 }
 
 /** Unassigns one Assignment (or undoes a dismissal), or every day of a Combined Entry together. */
-export function unassign(
+export async function unassign(
   assignments: readonly MiningTaxAssignmentRecord[]
 ): Promise<LedgerActionResult> {
-  return commit(charactersOf(assignments), () => deleteAssignments(assignments));
+  const result = await commit(charactersOf(assignments), () => deleteAssignments(assignments));
+  // Unassign sticks: a Payee's Default Systems must not assign the entry again. Written after
+  // the commit (the synced setting is not Dexie-only); a failure here only means the default may
+  // try once more, so it never undoes the unassign.
+  if (result.ok) await recordDefaultOptOuts(assignments).catch(() => undefined);
+  return result;
 }
 
 /**
@@ -273,7 +279,9 @@ export function unsettle(
 
 /** Takes ore off the miner's own Assignments because the corporation bills it (#4517). */
 export async function releaseOre(
-  releases: readonly { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[]
+  releases: readonly { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[],
+  /** True when a Survey connection takes ore off a Default System's Assignment (`surveyConnections.ts`): the rest stays the default's. */
+  takeoverFromDefault = false
 ): Promise<LedgerActionResult> {
   // Priced before the write: pricing reads market data outside the ledger's transaction.
   let priced: ReleasePrices[];
@@ -284,7 +292,7 @@ export async function releaseOre(
   }
   return commit(charactersOf(releases.map((r) => r.assignment)), async () => {
     for (const [i, r] of releases.entries())
-      await releaseOreFromAssignment(r.assignment, r.after, priced[i]!);
+      await releaseOreFromAssignment(r.assignment, r.after, priced[i]!, takeoverFromDefault);
   });
 }
 

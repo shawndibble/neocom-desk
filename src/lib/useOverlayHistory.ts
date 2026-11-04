@@ -5,6 +5,13 @@ const OVERLAY_KEY = '__neocomOverlay';
 
 let nextId = 0;
 
+/**
+ * Open overlays' ids, oldest first. Only the top one may treat a `popstate`
+ * as Back: a pop that lands on a lower overlay's entry (the top one closing
+ * itself with `history.back()`) must not read as Back to the ones beneath it.
+ */
+const openStack: string[] = [];
+
 function ownerOf(state: unknown): string | undefined {
   if (typeof state !== 'object' || state === null) return undefined;
   const value = (state as Record<string, unknown>)[OVERLAY_KEY];
@@ -129,6 +136,7 @@ export function useOverlayHistory(open: boolean, onClose: () => void, enabled = 
     if (!active) return;
     const id = (idRef.current ??= `overlay-${(nextId += 1)}`);
     liveRef.current = true;
+    openStack.push(id);
     if (ownerOf(window.history.state) !== id) {
       pushOwnEntry(id);
     }
@@ -136,6 +144,8 @@ export function useOverlayHistory(open: boolean, onClose: () => void, enabled = 
 
     let popped = false;
     const onPop = () => {
+      // A pop under another overlay is that one's Back, or its own close.
+      if (openStack[openStack.length - 1] !== id) return;
       // Our entry is gone from under the user: they pressed Back.
       if (ownerOf(window.history.state) === id) return;
       popped = true;
@@ -155,6 +165,8 @@ export function useOverlayHistory(open: boolean, onClose: () => void, enabled = 
       window.removeEventListener('popstate', onPop);
       release();
       liveRef.current = false;
+      const at = openStack.lastIndexOf(id);
+      if (at !== -1) openStack.splice(at, 1);
       // Deferred a tick so a StrictMode remount (which re-runs this effect
       // straight away and finds our entry still on top) cancels the removal.
       setTimeout(() => {

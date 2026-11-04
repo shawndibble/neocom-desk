@@ -15,17 +15,12 @@ export function SettingsHint({ children }: { children: ReactNode }) {
 }
 
 /** Where a setting lives: on every device through sync, or on this one only. */
-export type SettingsScope = 'synced' | 'device';
+export type SettingsScope = 'device';
 
 /** The one fixed line a panel opens with to say where its settings live. */
 export function SettingsScopeHint({ scope }: { scope: SettingsScope }) {
   const { t } = useTranslation();
   return <SettingsHint>{t(`settings.scope.${scope}`)}</SettingsHint>;
-}
-
-/** The line every synced-defaults form opens with. */
-export function DefaultsSyncHint() {
-  return <SettingsScopeHint scope="synced" />;
 }
 
 /** A line after a button press. Success and info are a polite status; an error is an alert. */

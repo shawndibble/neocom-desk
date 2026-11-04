@@ -27,6 +27,7 @@ const PINNED = [
   'characterFilterPicks',
   'corp.assetsExpanded',
   'industryLastOpenedPlan',
+  'industryProfitBasis',
   'loyaltyStorePriceBasis',
   'mailFolders',
   'marketLocationMode',

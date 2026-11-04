@@ -25,7 +25,7 @@ import {
   SecurityPenaltyNote,
 } from '@/features/route/TravelRuleFields';
 import { SavedRouteNetworkFields } from '@/features/travel/SavedRouteNetworkFields';
-import { DefaultsSyncHint, SettingsHint, SettingsPanelLoading } from './settingsFields';
+import { SettingsHint, SettingsPanelLoading } from './settingsFields';
 import { AvoidedSystemsPanel } from './AvoidedSystemsPanel';
 import { usePhoneFold } from './usePhoneFold';
 
@@ -57,7 +57,6 @@ export function TravelSettingsPanel() {
       {hydrated ? (
         <Panel title={t('settings.travel.routeTitle')}>
           <div className="space-y-4">
-            <DefaultsSyncHint />
             <SettingsHint>{t('settings.travel.hint')}</SettingsHint>
 
             <Fields variant="form">

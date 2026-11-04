@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  compareAttributeNames,
   collectAttributeIdReferences,
   groupItemAttributes,
   type AttributeDictionary,
@@ -206,6 +207,89 @@ describe('groupItemAttributes', () => {
   });
 });
 
+describe('groupItemAttributes: values as the game shows them', () => {
+  const UNITS: AttributeDictionary = {
+    55: { name: 'Capacitor Recharge time', unit: 's', category: 'Capacitor', unitId: 101 },
+    73: { name: 'Activation time / duration', unit: 's', category: 'Miscellaneous', unitId: 101 },
+    267: { name: 'Armor EM Damage Resistance', unit: '%', category: 'Armor', unitId: 108 },
+    268: { name: 'Armor Explosive Damage Resistance', unit: '%', category: 'Armor', unitId: 108 },
+    269: { name: 'Armor Kinetic Damage Resistance', unit: '%', category: 'Armor', unitId: 108 },
+    270: { name: 'Armor Thermal Damage Resistance', unit: '%', category: 'Armor', unitId: 108 },
+    265: { name: 'Armor Hitpoints', unit: 'HP', category: 'Armor', unitId: 113 },
+    422: { name: 'Tech Level', unit: 'Level', category: 'Miscellaneous', unitId: 140 },
+    633: { name: 'Meta Level', unit: 'Level', category: 'Miscellaneous', unitId: 140 },
+  };
+  const valueOf = (groups: ReturnType<typeof groupItemAttributes>, attributeId: number) =>
+    groups.flatMap((g) => g.attributes).find((a) => a.attributeId === attributeId);
+
+  it('shows a resonance as the resistance the game prints (Zealot armor)', () => {
+    const groups = groupItemAttributes(
+      [
+        { attribute_id: 267, value: 0.5 },
+        { attribute_id: 268, value: 0.2 },
+        { attribute_id: 269, value: 0.375 },
+        { attribute_id: 270, value: 0.65 },
+      ],
+      UNITS
+    );
+    expect(valueOf(groups, 267)).toMatchObject({ value: 50, unit: '%', unitId: 108 });
+    expect(valueOf(groups, 268)?.value).toBeCloseTo(80);
+    expect(valueOf(groups, 269)?.value).toBeCloseTo(62.5);
+    expect(valueOf(groups, 270)?.value).toBeCloseTo(35);
+  });
+
+  it('shows milliseconds as seconds (Zealot cap recharge, a scoop cycle)', () => {
+    const groups = groupItemAttributes(
+      [
+        { attribute_id: 55, value: 285000 },
+        { attribute_id: 73, value: 41416 },
+      ],
+      UNITS
+    );
+    expect(valueOf(groups, 55)).toMatchObject({ value: 285, unit: 's' });
+    expect(valueOf(groups, 73)?.value).toBeCloseTo(41.416);
+  });
+
+  it('drops a unit that only repeats the attribute name: Meta Level 5, not 5 Level', () => {
+    const groups = groupItemAttributes(
+      [
+        { attribute_id: 633, value: 5 },
+        { attribute_id: 422, value: 2 },
+      ],
+      UNITS
+    );
+    expect(valueOf(groups, 633)).toMatchObject({ value: 5, unit: null });
+    expect(valueOf(groups, 422)).toMatchObject({ value: 2, unit: null });
+  });
+
+  it('orders damage-type rows EM, Thermal, Kinetic, Explosive among the rest', () => {
+    const groups = groupItemAttributes(
+      [
+        { attribute_id: 268, value: 0.2 },
+        { attribute_id: 265, value: 2250 },
+        { attribute_id: 269, value: 0.375 },
+        { attribute_id: 267, value: 0.5 },
+        { attribute_id: 270, value: 0.65 },
+      ],
+      UNITS
+    );
+    expect(groups[0].attributes.map((a) => a.attributeId)).toEqual([267, 270, 269, 268, 265]);
+  });
+
+  it('leaves out the attribute ids it is asked to', () => {
+    const groups = groupItemAttributes(
+      [
+        { attribute_id: 55, value: 285000 },
+        { attribute_id: 73, value: 41416 },
+      ],
+      UNITS,
+      {},
+      { omitAttributeIds: new Set([73]) }
+    );
+    expect(groups.flatMap((g) => g.attributes.map((a) => a.attributeId))).toEqual([55]);
+  });
+});
+
 describe('collectAttributeIdReferences', () => {
   it('splits the ids an item references by the kind of thing they name', () => {
     expect(
@@ -266,5 +350,22 @@ describe('collectAttributeIdReferences', () => {
       typeIds: [],
       groupIds: [],
     });
+  });
+});
+
+describe('compareAttributeNames', () => {
+  it('sorts damage types EM, Thermal, Kinetic, Explosive, whatever the SDE’s casing', () => {
+    const names = [
+      'Armor Explosive Damage Resistance',
+      'Armor Kinetic Damage Resistance',
+      'Armor Thermal Damage Resistance',
+      'Armor Em Damage Resistance',
+    ];
+    expect([...names].sort(compareAttributeNames)).toEqual([
+      'Armor Em Damage Resistance',
+      'Armor Thermal Damage Resistance',
+      'Armor Kinetic Damage Resistance',
+      'Armor Explosive Damage Resistance',
+    ]);
   });
 });

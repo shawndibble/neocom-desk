@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter, useLocation, useNavigate } from 'react-router-dom';
 import '@/i18n';
@@ -81,5 +81,44 @@ describe('useOverlayHistory', () => {
     expect(window.history.pushState).not.toBe(original);
     view.unmount();
     expect(window.history.pushState).toBe(original);
+  });
+});
+
+function Stack() {
+  const [open, setOpen] = useState({ a: true, b: true, c: true });
+  const layer = (k: 'a' | 'b' | 'c') => (
+    <Modal
+      open={open[k]}
+      onClose={() => setOpen((o) => ({ ...o, [k]: false }))}
+      title={`Layer ${k}`}
+    >
+      <p>{k}</p>
+    </Modal>
+  );
+  return (
+    <>
+      {layer('a')}
+      {layer('b')}
+      {layer('c')}
+    </>
+  );
+}
+
+describe('stacked overlays', () => {
+  it('closing the top one leaves the ones beneath it open', async () => {
+    window.history.replaceState(null, '', '/overview');
+    const user = userEvent.setup();
+    render(
+      <BrowserRouter>
+        <Stack />
+      </BrowserRouter>
+    );
+    const top = await screen.findByRole('dialog', { name: 'Layer c' });
+    await user.click(within(top).getByRole('button', { name: /close/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Layer c' })).toBeNull());
+    // popstate from the closing layer's own history.back() lands after a tick.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByRole('dialog', { name: 'Layer b' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Layer a' })).toBeInTheDocument();
   });
 });

@@ -6,7 +6,9 @@ import { disabledClassName, focusRingClassName, interactiveClassName } from './c
  * underline at rest, no box and no accent. For a secondary action tucked under
  * a primary control (the "Choose permissions" under "Log in"), where an accent
  * word would compete with the primary and a `Button` box would read as a
- * second one. It is not a link in a sentence (`inlineLinkClassName`) and not an
+ * second one. Also the readout that opens its own detail (Route Safety's kill
+ * count and kill-location lines): the text is the figure, so a box would
+ * outweigh it. It is not a link in a sentence (`inlineLinkClassName`) and not an
  * uppercase header action (`textActionClassName`).
  *
  * Like `textActionClassName`, a class helper so it lands on a `<button>` and a

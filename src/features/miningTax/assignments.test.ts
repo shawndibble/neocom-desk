@@ -1699,3 +1699,121 @@ describe('releaseOreFromAssignment', () => {
     ]);
   });
 });
+
+describe('override (a Default System made it, and nobody has changed it)', () => {
+  const made = (id = 'dm', overrides: Partial<MiningTaxAssignmentRecord> = {}) =>
+    ({
+      id,
+      characterId: CHAR_A,
+      date: '2026-10-03',
+      solarSystemId: 1,
+      payeeId: 'landlord',
+      oreLines: [
+        { typeId: TYPE_A, quantity: 100 },
+        { typeId: TYPE_B, quantity: 50 },
+      ],
+      taxPct: 5,
+      estimatedValue: 1000,
+      taxOwed: 50,
+      status: 'outstanding',
+      override: false,
+      updatedAt: 1,
+      ...overrides,
+    }) satisfies MiningTaxAssignmentRecord;
+
+  it('is written as false only when a Default System assigns', async () => {
+    const input = {
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      payeeId: 'landlord',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      markPaid: false,
+    };
+    expect((await createAssignment({ ...input, byDefault: true })).override).toBe(false);
+    await db.miningTaxAssignments.clear();
+    expect('override' in (await createAssignment(input))).toBe(false);
+  });
+
+  it('is cleared when the pilot edits the entry', async () => {
+    const row = made();
+    await db.miningTaxAssignments.put(row);
+    await updateCombinedAssignments([row], {
+      payeeId: 'landlord',
+      taxPct: 6,
+      members: { dm: { estimatedValue: 1000, taxOwed: 60 } },
+    });
+    expect('override' in (await db.miningTaxAssignments.get('dm'))!).toBe(false);
+  });
+
+  it('is cleared when the pilot changes the Payee', async () => {
+    const row = made();
+    await db.miningTaxAssignments.put(row);
+    await moveAssignmentsToPayee([row], 'bureau');
+    expect('override' in (await db.miningTaxAssignments.get('dm'))!).toBe(false);
+  });
+
+  it('is cleared on the kept side of a split, and the new side was never a default', async () => {
+    const row = made();
+    await db.miningTaxAssignments.put(row);
+    const prices = new Map([
+      [TYPE_A, 10],
+      [TYPE_B, 4],
+    ]);
+    const { kept, created } = await splitAssignment(
+      row,
+      {
+        moves: [{ typeId: TYPE_A, quantity: 40 }],
+        payeeId: 'payee-2',
+        taxPct: 8,
+        collector: 'original',
+      },
+      { kept: prices, moved: prices }
+    );
+    expect('override' in kept).toBe(false);
+    expect('override' in created).toBe(false);
+  });
+
+  it('is cleared when the pilot joins entries', async () => {
+    const row = made();
+    await db.miningTaxAssignments.put(row);
+    const [joined] = await joinAssignments(
+      [{ characterId: CHAR_A, date: row.date, solarSystemId: 1, assignment: row }],
+      'landlord',
+      5,
+      () => new Map()
+    );
+    expect('override' in joined).toBe(false);
+  });
+
+  const priced = { prices: new Map([[TYPE_B, 4]]), compressed: true };
+
+  it('survives a Survey takeover releasing some of its ore: the rest is still the default’s', async () => {
+    const row = made();
+    await db.miningTaxAssignments.put(row);
+    const next = await releaseOreFromAssignment(
+      row,
+      [{ typeId: TYPE_B, quantity: 50 }],
+      priced,
+      true
+    );
+    expect(next?.override).toBe(false);
+  });
+
+  it('is cleared when the pilot lets the corporation bill some of the ore', async () => {
+    const row = made();
+    await db.miningTaxAssignments.put(row);
+    const next = await releaseOreFromAssignment(row, [{ typeId: TYPE_B, quantity: 50 }], priced);
+    expect(next && 'override' in next).toBe(false);
+  });
+
+  it('is cleared when the pilot marks it paid', async () => {
+    const row = made();
+    await db.miningTaxAssignments.put(row);
+    await markAssignmentsPaid([row]);
+    expect('override' in (await db.miningTaxAssignments.get('dm'))!).toBe(false);
+  });
+});

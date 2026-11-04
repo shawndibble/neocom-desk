@@ -169,6 +169,7 @@ export const FULL_PAYEE: Required<PayeeRecord> = {
   characterId: 1,
   name: 'Moon Corp',
   defaultTaxPct: 10,
+  defaultSystems: [{ systemId: 30000142, from: '2026-10-21' }],
   systemId: 30000142,
   hubId: 'amarr',
   entityId: 98000001,
@@ -201,6 +202,7 @@ export const FULL_MINING_TAX_ASSIGNMENT: Required<MiningTaxAssignmentRecord> = {
   paidAt: UPDATED_AT - 1000,
   groupId: 'grp1',
   collectsGrowth: true,
+  override: false,
   payment: {
     paymentId: 'pay1',
     paidOn: '2026-09-05',

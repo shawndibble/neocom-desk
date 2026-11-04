@@ -10,6 +10,7 @@
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { HintText } from '@/components/ui/HintText';
+import * as Icon from '@/components/ui/icons';
 import { CourierFilterBar } from '@/features/contractSearch/CourierFilterBar';
 import {
   UNASKED,
@@ -42,6 +43,7 @@ import {
   courierCollateral,
   filterCourierContracts,
   type CourierContractFilter,
+  type CourierEndpoint,
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
 import { iskPerJump, iskPerVolume, rewardPerVolumeJump } from '@/engine/contracts/courierRates';
@@ -375,6 +377,8 @@ interface CourierResultsProps {
   regionNames: ReadonlyMap<number, string>;
   /** Non-null: the panel above this one does not render a board without an active character. */
   characterId: number;
+  /** A player structure end the open detail placed; the panel swaps it into every row it ends. */
+  onStructurePlaced?: (endpoint: CourierEndpoint) => void;
 }
 
 /**
@@ -390,7 +394,12 @@ interface CourierResultsProps {
  * hull, am I given long enough) rather than figures worth ranking fifty rows
  * by, and the table's width is owed to the ones that are.
  */
-export function CourierResults({ rows, regionNames, characterId }: CourierResultsProps) {
+export function CourierResults({
+  rows,
+  regionNames,
+  characterId,
+  onStructurePlaced,
+}: CourierResultsProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   // The remembered filter (issue #1719): a default for each field a link
@@ -429,7 +438,17 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   const preferenceOverride = params['courier.pref'];
   const routeQuery = useJumpBasis(preferenceOverride);
   const preference = routeQuery.rules.preference;
-  const [selectedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
+  const [clickedRow, setClickedRow] = useState<CourierRouteRow | null>(null);
+  // The same contract out of the current rows, so an end the open detail
+  // placed (or a refreshed corpus) reaches it; the clicked object only while
+  // the rows no longer hold it.
+  const selectedRow = useMemo(
+    () =>
+      clickedRow === null
+        ? null
+        : (rows.find((row) => row.contractId === clickedRow.contractId) ?? clickedRow),
+    [clickedRow, rows]
+  );
 
   // Where the character is (issue #940), owned here rather than by the control
   // that shows it, because `FilterBar` unmounts its controls on every collapse.
@@ -673,7 +692,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   const resultsRef = useRef<HTMLDivElement>(null);
 
   function searchReverseLane(row: CourierRouteRow) {
-    setSelectedRow(null);
+    setClickedRow(null);
     // The row that opened the detail is filtered out, so focus goes to the results.
     focusAfterCommit(resultsRef);
     changeFilter({
@@ -801,28 +820,26 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
                 should be.
               */}
               {multiple !== null && (
-                <span className="flex items-center gap-1">
-                  <span
-                    className={
-                      paysFarAboveGoingRate(multiple)
-                        ? 'text-[0.6875rem] font-normal text-warning'
-                        : 'text-[0.6875rem] font-normal text-text-dim'
-                    }
-                  >
-                    {t('contractSearch.goingRateMultiple', {
-                      multiple: formatMagnitude(multiple),
-                    })}
-                  </span>
-                  {/* Colour alone used to be the only tell that this multiple
-                      is flagged (DESIGN.md §7) — the mobile lane header
-                      already names it via `RiskMarker`; this repeats that
-                      same word here. */}
+                <span
+                  className={
+                    paysFarAboveGoingRate(multiple)
+                      ? 'flex items-center gap-1 text-[0.6875rem] font-normal text-warning'
+                      : 'text-[0.6875rem] font-normal text-text-dim'
+                  }
+                >
+                  {/* The multiple alone names the rate; a flagged one also
+                      wears the warning glyph so colour is never the only cue
+                      (DESIGN.md §7). The word "Over rate" stays for screen
+                      readers, and the modal and the filter spell it out. */}
                   {paysFarAboveGoingRate(multiple) && (
-                    <RiskMarker
-                      kind="over-rate"
-                      detailOptions={{ multiple: formatMagnitude(multiple) }}
-                    />
+                    <>
+                      <Icon.Warn className="size-3" aria-hidden="true" />
+                      <span className="sr-only">{t('contractSearch.risk.overRateShort')}</span>
+                    </>
                   )}
+                  {t('contractSearch.goingRateMultiple', {
+                    multiple: formatMagnitude(multiple),
+                  })}
                 </span>
               )}
             </div>
@@ -886,8 +903,8 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         sortValue: (row) =>
           `${endpointSystemName(row.origin)} ${endpointSystemName(row.destination)}`,
         render: (row) => (
-          <div className="flex flex-col gap-0.5">
-            <span className="truncate">
+          <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+            <span className="max-w-full truncate">
               <EndpointSystem endpoint={row.origin} />
               <EndpointSecurity security={row.origin.security} />
               {originRegion(row) && (
@@ -895,7 +912,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
               )}
               <EndpointRiskMarkers endpoint={row.origin} end="origin" />
             </span>
-            <span className="truncate text-text-dim">
+            <span className="max-w-full truncate text-text-dim">
               {'→ '}
               <EndpointSystem endpoint={row.destination} />
               <EndpointSecurity security={row.destination.security} />
@@ -1004,6 +1021,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         originRegions={originRegions}
         destinationRegions={destinationRegions}
         spaceKinds={spaceKinds}
+        resultCount={displayRows.length}
         preference={preference}
         onPreferenceChange={changePreference}
         actions={
@@ -1060,7 +1078,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
               // a unique key.
               rowKey={(row) => String(row.contractId)}
               {...courierSortProps}
-              onRowClick={setSelectedRow}
+              onRowClick={setClickedRow}
               // Hundreds of hauls are scanned, not read: the dense two-line card
               // fits three times the labelled one on a phone.
               stackLayout="dense"
@@ -1091,8 +1109,10 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           preference={preference}
           reverseLane={reverseLane}
           onSearchReverseLane={() => searchReverseLane(selectedRow)}
-          onClose={() => setSelectedRow(null)}
+          onClose={() => setClickedRow(null)}
           returnFocusFallback={() => resultsRef.current}
+          characterId={characterId}
+          onStructurePlaced={onStructurePlaced}
         />
       )}
     </>

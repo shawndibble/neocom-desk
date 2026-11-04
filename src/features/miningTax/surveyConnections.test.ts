@@ -163,6 +163,89 @@ describe('applySurveyConnections', () => {
     await removeSurveyConnection('s1', CHAR);
     expect(await applySurveyConnections([ledger(50)], NOW)).toEqual([]);
   });
+
+  describe('over an Assignment a Default System made', () => {
+    const OTHER_ORE = 45490;
+    const madeByDefault = (oreLines: { typeId: number; quantity: number }[], over = {}) => ({
+      id: 'dflt',
+      characterId: CHAR,
+      date: '2026-10-21',
+      solarSystemId: SYSTEM,
+      payeeId: 'landlord',
+      oreLines,
+      taxPct: 7,
+      estimatedValue: 5000,
+      taxOwed: 350,
+      status: 'outstanding' as const,
+      override: false,
+      updatedAt: 1,
+      ...over,
+    });
+
+    it('takes the whole of it over: the default’s row goes and the Survey’s Payee holds the ore', async () => {
+      const payee = await createPayee(CHAR, { name: 'Moon Corp', defaultTaxPct: 5 });
+      await db.miningTaxAssignments.put(madeByDefault([{ typeId: ORE, quantity: 50 }]));
+      await startSurveyConnection(connection({ payeeId: payee.id }));
+
+      const created = await applySurveyConnections([ledger(50)], NOW);
+
+      expect(created).toHaveLength(1);
+      expect(created[0]).toMatchObject({ payeeId: payee.id, taxPct: 10 });
+      expect('override' in created[0]).toBe(false);
+      expect((await db.miningTaxAssignments.toArray()).map((a) => a.id)).toEqual([created[0].id]);
+    });
+
+    it('takes only its own ore types and leaves the rest with the default', async () => {
+      const payee = await createPayee(CHAR, { name: 'Moon Corp', defaultTaxPct: 5 });
+      await db.miningTaxAssignments.put(
+        madeByDefault([
+          { typeId: OTHER_ORE, quantity: 20 },
+          { typeId: ORE, quantity: 50 },
+        ])
+      );
+      await startSurveyConnection(connection({ payeeId: payee.id }));
+      const mixed = {
+        characterId: CHAR,
+        entries: [
+          {
+            characterId: CHAR,
+            date: '2026-10-21',
+            solarSystemId: SYSTEM,
+            oreLines: [
+              { typeId: OTHER_ORE, quantity: 20 },
+              { typeId: ORE, quantity: 50 },
+            ],
+          },
+        ],
+      };
+
+      await applySurveyConnections([mixed], NOW);
+
+      const rows = await db.miningTaxAssignments.toArray();
+      const kept = rows.find((a) => a.id === 'dflt');
+      expect(kept?.oreLines).toEqual([{ typeId: OTHER_ORE, quantity: 20 }]);
+      expect(kept?.override).toBe(false);
+      expect(rows.find((a) => a.id !== 'dflt')).toMatchObject({
+        payeeId: payee.id,
+        oreLines: [{ typeId: ORE, quantity: 50 }],
+      });
+    });
+
+    it('leaves one the pilot changed, or already paid, alone', async () => {
+      const payee = await createPayee(CHAR, { name: 'Moon Corp', defaultTaxPct: 5 });
+      await db.miningTaxAssignments.put(
+        madeByDefault([{ typeId: ORE, quantity: 50 }], { override: undefined })
+      );
+      await startSurveyConnection(connection({ payeeId: payee.id }));
+      expect(await applySurveyConnections([ledger(50)], NOW)).toEqual([]);
+      expect((await db.miningTaxAssignments.get('dflt'))?.payeeId).toBe('landlord');
+
+      await db.miningTaxAssignments.put(
+        madeByDefault([{ typeId: ORE, quantity: 50 }], { status: 'paid' })
+      );
+      expect(await applySurveyConnections([ledger(50)], NOW)).toEqual([]);
+    });
+  });
 });
 
 describe('surveyMoonOreTypeIds', () => {

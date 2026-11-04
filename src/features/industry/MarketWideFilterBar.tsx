@@ -16,17 +16,19 @@ import { RARELY_SOLD_PER_DAY } from '@/engine/industry/marketWideSanity';
 import { toggleInSet } from '@/lib/sets';
 import {
   BUILD_COST_CAPS,
-  activeFilterCount,
+  activeMarketWideFilters,
   type BuildCostCap,
   type MarketWideFilterState,
 } from './marketWideFilter';
-import { SALES_SHARE_OPTIONS } from './salesSharePref';
+import { DEFAULT_SALES_SHARE, SALES_SHARE_OPTIONS } from './salesSharePref';
 
 interface MarketWideFilterBarProps {
   filter: MarketWideFilterState;
   onChange: (next: MarketWideFilterState) => void;
   /** Rows no Character on the account can build, shown as the skill chip's count. */
   gatedCount: number;
+  /** Rows the filters leave, for the phone sheet's done button; omitted before a scan. */
+  resultCount?: number;
 }
 
 /**
@@ -34,13 +36,19 @@ interface MarketWideFilterBarProps {
  * state: below `md` it opens `FilterBar`'s sheet, with a pointer a popover
  * off the funnel — a box unfolding beneath it would open inside the bar.
  */
-export function MarketWideFilterBar({ filter, onChange, gatedCount }: MarketWideFilterBarProps) {
+export function MarketWideFilterBar({
+  filter,
+  onChange,
+  gatedCount,
+  resultCount,
+}: MarketWideFilterBarProps) {
   const { t } = useTranslation();
   return (
     <FilterBar
       value={filter}
       onChange={onChange}
-      activeCount={activeFilterCount(filter)}
+      active={activeMarketWideFilters(filter, t)}
+      resultCount={resultCount}
       triggerSize="sm"
       pointerSurface="popover"
     >
@@ -55,6 +63,7 @@ export function MarketWideFilterBar({ filter, onChange, gatedCount }: MarketWide
             >
               <SelectTrigger
                 size="sm"
+                active={draft.maxBuildCost !== 'any'}
                 aria-label={t('industry.marketOpportunitiesFilters.maxBuildCost')}
                 className="w-52"
               >
@@ -73,6 +82,7 @@ export function MarketWideFilterBar({ filter, onChange, gatedCount }: MarketWide
             label={t('industry.marketOpportunitiesFilters.tier')}
             members={PRODUCT_TIERS}
             selected={draft.tiers}
+            active={draft.tiers.size !== PRODUCT_TIERS.length}
             labelFor={(tier) => t(`industry.marketOpportunitiesFilters.tiers.${tier}`)}
             onToggle={(tier) => setDraft({ ...draft, tiers: toggleInSet(draft.tiers, tier) })}
           />
@@ -80,6 +90,7 @@ export function MarketWideFilterBar({ filter, onChange, gatedCount }: MarketWide
             label={t('industry.marketOpportunitiesFilters.category')}
             members={PRODUCT_CATEGORIES}
             selected={draft.categories}
+            active={draft.categories.size !== PRODUCT_CATEGORIES.length}
             labelFor={(category) => t(`industry.marketOpportunitiesFilters.categories.${category}`)}
             onToggle={(category) =>
               setDraft({ ...draft, categories: toggleInSet(draft.categories, category) })
@@ -89,6 +100,7 @@ export function MarketWideFilterBar({ filter, onChange, gatedCount }: MarketWide
             label={t('industry.marketOpportunitiesBlueprintSource')}
             members={BLUEPRINT_SOURCES}
             selected={draft.sources}
+            active={draft.sources.size !== BLUEPRINT_SOURCES.length}
             labelFor={(source) => t(`industry.marketOpportunitiesBlueprintSources.${source}`)}
             onToggle={(source) =>
               setDraft({ ...draft, sources: toggleInSet(draft.sources, source) })
@@ -117,6 +129,7 @@ export function MarketWideFilterBar({ filter, onChange, gatedCount }: MarketWide
             >
               <SelectTrigger
                 size="sm"
+                active={draft.salesShare !== DEFAULT_SALES_SHARE}
                 aria-label={t('industry.marketOpportunitiesFilters.salesShare')}
                 className="w-52"
               >
@@ -158,18 +171,22 @@ function FilterMultiSelect<V extends string>({
   selected,
   labelFor,
   onToggle,
+  active,
 }: {
   label: string;
   members: readonly V[];
   selected: ReadonlySet<V>;
   labelFor: (member: V) => string;
   onToggle: (member: V) => void;
+  active?: boolean;
 }) {
   return (
     <FilterField label={label}>
       <CheckboxSelect
+        size="sm"
         label={label}
         className="w-44"
+        active={active}
         options={members.map((member) => ({ value: member, label: labelFor(member) }))}
         selected={selected}
         onToggle={onToggle}

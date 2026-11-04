@@ -33,6 +33,7 @@ import { TRADE_HUBS } from '@/market/hubs';
 import type { NpcAgent } from '@/sde/agents';
 import { fixed2 } from '@/lib/fixedFormat';
 import type { Translate } from '@/lib/translate';
+import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
 import type { NpcStationEntry } from '@/sde/marketTypes';
 
 export type NpcStandingKind = 'faction' | 'corp' | 'agent';
@@ -238,17 +239,39 @@ export const EVERY_NPC_STANDING: NpcStandingsFilter = {
   feesOnly: false,
 };
 
-/** Filters set away from their default; the search text is not counted (it sits outside the funnel). */
-export function activeNpcStandingsFilterCount({
-  kinds,
-  minAccess,
-  feesOnly,
-}: NpcStandingsFilter): number {
-  return (
-    (kinds.size === NPC_STANDING_KINDS.length ? 0 : 1) +
-    (minAccess === null ? 0 : 1) +
-    (feesOnly ? 1 : 0)
-  );
+/**
+ * Filters set away from their default, for `FilterBar`'s pills. The search
+ * text is not one: it sits outside the funnel, in its own box.
+ */
+export function activeNpcStandingsFilters(
+  { kinds, minAccess, feesOnly }: NpcStandingsFilter,
+  t: Translate
+): ActiveFilter<NpcStandingsFilter>[] {
+  const active: ActiveFilter<NpcStandingsFilter>[] = [];
+  if (kinds.size !== NPC_STANDING_KINDS.length)
+    active.push({
+      label: t('contacts.standings.typeFilter'),
+      value: summarizeFilterValues(
+        NPC_STANDING_KINDS.filter((kind) => kinds.has(kind)).map((kind) =>
+          t(`contacts.standingsKind.${kind}`)
+        ),
+        t
+      ),
+      clear: (filter) => ({ ...filter, kinds: EVERY_NPC_STANDING.kinds }),
+    });
+  if (minAccess !== null)
+    active.push({
+      label: t('contacts.standings.accessFilter'),
+      value: t('contacts.standings.accessAtLeastShort', { level: minAccess }),
+      clear: (filter) => ({ ...filter, minAccess: null }),
+    });
+  if (feesOnly)
+    active.push({
+      label: t('contacts.standings.feesFilter'),
+      value: t('contacts.standings.usedForFees'),
+      clear: (filter) => ({ ...filter, feesOnly: false }),
+    });
+  return active;
 }
 
 /** Name, what it belongs to (and an agent's division), or numeric id substring, as `filterContacts` matches. */

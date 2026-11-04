@@ -78,7 +78,7 @@ Three tiers, all in Dexie `db.settings` (key/value) unless noted:
 
 Sync: Firestore, per-Character uid, `src/sync/planSync.ts`; background sweep every >= 5 min active Character / 20 min others, on tick + `visibilitychange` (`src/app/backgroundSync.ts:36-45`). Sync state is a dot in the app shell (`SyncStatusDot.tsx`: idle/syncing/error/offline) — there is no sync UI inside Settings. Setup: `docs/SYNC-SETUP.md`. FAQ "What We Store": `src/features/faq/whatWeStore.ts`.
 
-Settings forms show `DefaultsSyncHint` ("Kept across your devices") on every synced section (`settingsFields.tsx`).
+Synced sections carry no scope line; what syncs is answered in Help & FAQ. Device-only sections and fields say "Stays on this device" (`SettingsScopeHint`, `settingsFields.tsx`).
 
 ## Settings catalog
 
@@ -204,7 +204,7 @@ Per event row (all Characters): two checkboxes (Device, Alerts), default both on
 
 Events (`NOTIFICATION_EVENTS`, `events.ts`), with scope endpoint:
 
-- Skills: `skillLevelComplete`, `characterNotTraining`, `skillQueueEnding` (queue); `acceleratorExpiring` (typed-in accelerator, no scope), `acceleratorEnded` (typed expiry passed or detected accelerator gone, no scope); `spExtractionReady` (skills; opt-in via SP extraction monitoring setting)
+- Skills: `skillLevelComplete`, `characterNotTraining`, `skillQueueEnding`, `omegaLapsed` (queue; the latter inferred from the active skill's finish date doubling); `acceleratorExpiring` (typed-in accelerator, no scope), `acceleratorEnded` (typed expiry passed or detected accelerator gone, no scope); `spExtractionReady` (skills; opt-in via SP extraction monitoring setting)
 - Industry: `industryJobComplete`; `cloneJumpReady` (clones); `newMail`; `planetaryExtractionDone`, `planetaryExtractorExpiring`, `mercenaryDenReinforced`, `mercenaryDenAnarchy` (planets; the anarchy row says it fires only while the app is open)
 - Market/contracts: `marketOrderFilled`, `marketOrderUndercut` (orders); `contractAccepted`, `contractCompleted`, `contractFailed`, `courierDeliveryDue`, `contractExpiring` (contracts); `ordersLapsing` (orders); `walletBalanceChanged` (wallet)
 - Calendar: `newCalendarEvent`, `calendarEventStarting`

@@ -52,6 +52,7 @@ import {
   TabPanel,
   Tabs,
   useTabsId,
+  type ActiveFilter,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
@@ -94,6 +95,7 @@ import { NO_MOVE_PLAN } from '@/features/assets/movePlanUrl';
 import { loadTypeCategories, type AssetCategory } from '@/features/corp/assetCategories';
 import { AssetCategoryPicker, BlueprintKindSelect } from '@/features/assets/AssetCategoryPicker';
 import {
+  activeAssetKindFilters,
   assetPassesKindFilter,
   blueprintKindParam,
   blueprintsTicked,
@@ -101,6 +103,7 @@ import {
   expandLegacyCategoryIds,
   filterIsOpen,
   pickIsAll,
+  type AssetCategoryIndex,
   type AssetKindFilter,
   type BlueprintKind,
   type CategoryPick,
@@ -111,8 +114,10 @@ import {
   filterClassified,
   makeLedgerLabels,
   officeUsage,
+  type LedgerLabels,
   type LocationRow,
 } from '@/features/corp/assetLedgerView';
+import type { Translate } from '@/lib/translate';
 import { CorpAssetItemTable, type ItemTableRow } from '@/features/corp/CorpAssetItemTable';
 import { CorpAssetLocationTable } from '@/features/corp/CorpAssetLocationTable';
 import { useCorpStockTargets } from '@/features/corp/stockTargets';
@@ -307,6 +312,51 @@ interface PlaceFilter {
   div: number | null;
   cat: CategoryPick;
   bp: BlueprintKind;
+}
+
+/**
+ * The funnel's filters that are on, as `FilterBar` pills: where first, then
+ * what. A place reads as its chip name ("Efa"), as the ledger's chips do, so a
+ * long station name does not crowd out the other pills.
+ */
+function activePlaceFilters(
+  filter: PlaceFilter,
+  {
+    labels,
+    categoryIndex,
+    showBlueprintSelect,
+  }: {
+    labels: LedgerLabels;
+    categoryIndex: AssetCategoryIndex | null;
+    showBlueprintSelect: boolean;
+  },
+  t: Translate
+): ActiveFilter<PlaceFilter>[] {
+  const active: ActiveFilter<PlaceFilter>[] = [];
+  if (filter.loc !== null)
+    active.push({
+      label: t('corp.assets.filter.location'),
+      value: labels.shortPlaceName(filter.loc) ?? labels.placeName(filter.loc),
+      clear: (next) => ({ ...next, loc: null }),
+    });
+  if (filter.div !== null)
+    active.push({
+      label: t('corp.assets.filter.division'),
+      value: labels.divisionName(filter.div),
+      clear: (next) => ({ ...next, div: null }),
+    });
+  active.push(
+    ...activeAssetKindFilters(
+      filter,
+      {
+        index: categoryIndex,
+        showBlueprintSelect,
+        categoryLabel: t('corp.assets.filter.category'),
+      },
+      t
+    )
+  );
+  return active;
 }
 
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
@@ -662,10 +712,11 @@ function CorpAssetsView({
     cat: categoryPick,
     bp: params.bp,
   };
-  const activeFilterCount =
-    [params.loc, params.div].filter((v) => v !== null).length +
-    (categoryIndex && !pickIsAll(categoryPick) ? 1 : 0) +
-    (params.bp !== 'any' && showBlueprintSelect ? 1 : 0);
+  const activeFilters = activePlaceFilters(
+    placeFilter,
+    { labels, categoryIndex, showBlueprintSelect },
+    t
+  );
   const shownCount = byLocation ? locationRows.length : itemRows.length;
 
   const ledgerTabs = CORP_ASSET_TABS.filter(
@@ -698,7 +749,8 @@ function CorpAssetsView({
       <FilterBar<PlaceFilter>
         value={placeFilter}
         onChange={(next) => setParams({ loc: next.loc, div: next.div, cat: next.cat, bp: next.bp })}
-        activeCount={activeFilterCount}
+        active={activeFilters}
+        resultCount={shownCount}
         title={t('corp.assets.filtersTitle')}
         search={
           <SearchInput
@@ -722,7 +774,11 @@ function CorpAssetsView({
                 value={draft.loc === null ? ALL : String(draft.loc)}
                 onValueChange={(v) => setDraft({ ...draft, loc: v === ALL ? null : Number(v) })}
               >
-                <SelectTrigger aria-label={t('corp.assets.filter.location')} className="w-56">
+                <SelectTrigger
+                  aria-label={t('corp.assets.filter.location')}
+                  active={draft.loc !== null}
+                  className="w-56"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -740,7 +796,11 @@ function CorpAssetsView({
                 value={draft.div === null ? ALL : String(draft.div)}
                 onValueChange={(v) => setDraft({ ...draft, div: v === ALL ? null : Number(v) })}
               >
-                <SelectTrigger aria-label={t('corp.assets.filter.division')} className="w-44">
+                <SelectTrigger
+                  aria-label={t('corp.assets.filter.division')}
+                  active={draft.div !== null}
+                  className="w-44"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -758,6 +818,7 @@ function CorpAssetsView({
                 <AssetCategoryPicker
                   index={categoryIndex}
                   pick={draft.cat}
+                  active={!pickIsAll(draft.cat)}
                   onChange={(cat) => setDraft({ ...draft, cat })}
                 />
               </FilterField>
@@ -766,6 +827,7 @@ function CorpAssetsView({
               <FilterField label={t('assets.blueprints.label')}>
                 <BlueprintKindSelect
                   value={draft.bp}
+                  active={draft.bp !== 'any'}
                   onChange={(bp) => setDraft({ ...draft, bp })}
                 />
               </FilterField>

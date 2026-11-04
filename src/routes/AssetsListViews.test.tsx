@@ -46,6 +46,12 @@ vi.mock('@/lib/downloadCsv', async (importOriginal) =>
 
 installAssetsHarness();
 
+/** Min value lives in the funnel box (Category and Blueprints are the row's inline filters). */
+async function minValueBox(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
+  await user.click(screen.getByRole('button', { name: /^Filters/ }));
+  return screen.getByLabelText('Minimum value');
+}
+
 describe('item context menu (issue #83)', () => {
   it('opens the same menu from a visible More actions button on the row (#1497)', async () => {
     const user = userEvent.setup({ delay: null });
@@ -199,7 +205,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
 
-    await user.type(screen.getByLabelText('Minimum value'), '10000');
+    await user.type(await minValueBox(user), '10000');
 
     await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
@@ -287,12 +293,11 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
 
-    await user.type(screen.getByLabelText('Minimum value'), '10t');
+    await user.type(await minValueBox(user), '10t');
 
     await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
     await waitFor(() => expect(window.location.search).toContain('min=10000'));
-    expect(screen.queryByText(/= 10,000 ISK/)).not.toBeInTheDocument();
   });
 
   it('sorts the flat list by value, highest first', async () => {
@@ -347,7 +352,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
 
-    await user.type(screen.getByLabelText('Minimum value'), '10000');
+    await user.type(await minValueBox(user), '10000');
     await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
     await waitFor(() => expect(window.location.search).toContain('min=10000'));
     unmount();
@@ -358,7 +363,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     await clickTool(user, 'All items');
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByLabelText('Minimum value')).toHaveValue('');
+    expect(await minValueBox(user)).toHaveValue('');
   });
 
   it('applies the same min-value filter and sort to active search results', async () => {
@@ -368,7 +373,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     await user.type(screen.getByPlaceholderText(/search items/i), 'i');
     await screen.findByText('Tritanium');
 
-    await user.type(screen.getByLabelText('Minimum value'), '10000');
+    await user.type(await minValueBox(user), '10000');
 
     await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
     expect(screen.getByText('Pyerite')).toBeInTheDocument();

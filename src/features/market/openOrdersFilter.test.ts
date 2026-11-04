@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import i18n from '@/i18n';
 import {
   activeFilterCount,
+  activeOpenOrdersFilters,
   EMPTY_OPEN_ORDERS_FILTER,
   filterOpenOrders,
   locationFilterOptions,
@@ -8,6 +10,7 @@ import {
   OPEN_ORDERS_FILTER_PARAMS,
   sortOpenOrders,
   type OpenOrdersFilter,
+  type OpenOrdersFilterNames,
 } from './openOrdersFilter';
 import type { OpenOrderRow } from './openOrdersModel';
 import { UNDERCUT_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
@@ -312,6 +315,60 @@ describe('activeFilterCount', () => {
       sort: 'item',
     };
     expect(activeFilterCount(filter)).toBe(10);
+  });
+});
+
+describe('activeOpenOrdersFilters', () => {
+  const names: OpenOrdersFilterNames = { location: (id) => `Station ${id}` };
+  const pills = (filter: OpenOrdersFilter, extra: Partial<OpenOrdersFilterNames> = {}) =>
+    activeOpenOrdersFilters(filter, i18n.t, { ...names, ...extra }).map((pill) => [
+      pill.label,
+      pill.value,
+    ]);
+
+  it('is empty for the empty filter, and ignores sort, view and the search text', () => {
+    expect(pills(EMPTY_OPEN_ORDERS_FILTER)).toEqual([]);
+    expect(pills({ ...EMPTY_OPEN_ORDERS_FILTER, sort: 'item', view: 'all', text: 'trit' })).toEqual(
+      []
+    );
+  });
+
+  it('gives one pill per field, however many values it holds', () => {
+    const filter: OpenOrdersFilter = {
+      ...EMPTY_OPEN_ORDERS_FILTER,
+      side: 'buy',
+      locationIds: [1, 2, 3],
+      problems: ['belowFloor', 'outbid'],
+      expiringWithinDays: 7,
+      costBasis: 'missing',
+      minIskTiedUp: 100_000_000,
+    };
+    expect(pills(filter)).toEqual([
+      ['Problems', 'Priced below cost, Outbid buy order'],
+      ['Side', 'Buy'],
+      ['Location', 'Station 1, Station 2 +1'],
+      ['Cost basis', 'No cost basis'],
+      ['Expires within', '7 days'],
+      ['ISK tied up over', '100M ISK'],
+    ]);
+  });
+
+  it('names the Character pick only when given a way to name it', () => {
+    const filter = { ...EMPTY_OPEN_ORDERS_FILTER, characterIds: [2] };
+    expect(pills(filter)).toEqual([]);
+    expect(pills(filter, { character: () => 'Beta' })).toEqual([['Characters', 'Beta']]);
+  });
+
+  it('clears each field back to its default, leaving the rest', () => {
+    const filter: OpenOrdersFilter = {
+      ...EMPTY_OPEN_ORDERS_FILTER,
+      text: 'trit',
+      side: 'sell',
+      problems: ['outbid'],
+    };
+    const [problems, side] = activeOpenOrdersFilters(filter, i18n.t, names);
+    expect(problems.clear(filter)).toEqual({ ...filter, problems: [] });
+    expect(side.clear(filter)).toEqual({ ...filter, side: null });
   });
 });
 

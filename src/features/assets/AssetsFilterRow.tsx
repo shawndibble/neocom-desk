@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   FilterBar,
+  FilterField,
   IskInput,
   SearchInput,
   Select,
@@ -11,6 +12,7 @@ import {
 } from '@/components/ui';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { AssetCategoryPicker, BlueprintKindSelect } from './AssetCategoryPicker';
+import { pickIsAll } from './assetCategoryFilter';
 import type { AssetSortField } from './assetSortPreference';
 import type { AssetsData } from './useAssetsData';
 import type { AssetsRows } from './useAssetsRows';
@@ -18,7 +20,9 @@ import type { AssetsRows } from './useAssetsRows';
 /**
  * The Items page's one filter row (issue #5601): search, Category, Blueprints
  * (only while something under Blueprints & Reactions is ticked), min value and,
- * in a flat list, sort. Inline from `md` up; behind the funnel's sheet on a phone.
+ * in a flat list, sort. Category and Blueprints sit in the row from `lg` up
+ * (DESIGN.md §4b); between `md` and `lg` they are in the funnel box, and on a
+ * phone every control is behind the funnel's sheet.
  */
 export function AssetsFilterRow({
   assetsData,
@@ -40,45 +44,65 @@ export function AssetsFilterRow({
     categoryPick,
     blueprintKind,
     showBlueprintSelect,
-    activeFilterCount,
+    filterValue,
+    activeFilters,
   } = assetsData;
-  const { searchRef, sortField, setSortField } = assetsRows;
+  const { searchRef, sortField, setSortField, rows } = assetsRows;
 
+  // Each control sits in a `FilterField` whose label is its pill's, so a pill
+  // tapped opens the box or sheet on that control. In the row (`inline`) a
+  // `FilterField` is `display: contents`, so the control sits as it is.
   const category = categoryIndex && pickerIndex && (
-    <AssetCategoryPicker
-      index={categoryIndex}
-      visibleIndex={pickerIndex}
-      pick={categoryPick}
-      onChange={(cat) => setView({ cat })}
-    />
+    <FilterField label={t('assets.category.label')}>
+      <AssetCategoryPicker
+        index={categoryIndex}
+        visibleIndex={pickerIndex}
+        pick={categoryPick}
+        active={!pickIsAll(categoryPick)}
+        onChange={(cat) => setView({ cat })}
+      />
+    </FilterField>
   );
 
   const blueprints = showBlueprintSelect && (
-    <BlueprintKindSelect value={blueprintKind} onChange={(bp) => setView({ bp })} />
+    <FilterField label={t('assets.blueprints.label')}>
+      <BlueprintKindSelect
+        value={blueprintKind}
+        active={blueprintKind !== 'any'}
+        onChange={(bp) => setView({ bp })}
+      />
+    </FilterField>
   );
 
   const minValue = (
-    <IskInput
-      echo={false}
-      value={minValueInput}
-      onChange={(min) => setView({ min })}
-      placeholder={t('assets.minValue.placeholder')}
-      aria-label={t('assets.minValue.label')}
-      className="w-full md:w-28"
-    />
+    <FilterField label={t('assets.minValue.label')}>
+      <IskInput
+        value={minValueInput}
+        onChange={(min) => setView({ min })}
+        placeholder={t('assets.minValue.placeholder')}
+        aria-label={t('assets.minValue.label')}
+        className="w-full md:w-28"
+      />
+    </FilterField>
   );
 
+  // Sort orders the list rather than narrowing it, so it is never a pill.
   const sort = flatModeActive && (
-    <Select value={sortField} onValueChange={(value) => void setSortField(value as AssetSortField)}>
-      <SelectTrigger aria-label={t('assets.sort.label')} className="w-full md:w-32">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="name">{t('assets.sort.name')}</SelectItem>
-        <SelectItem value="value">{t('assets.sort.value')}</SelectItem>
-        <SelectItem value="quantity">{t('assets.sort.quantity')}</SelectItem>
-      </SelectContent>
-    </Select>
+    <FilterField label={t('assets.sort.label')}>
+      <Select
+        value={sortField}
+        onValueChange={(value) => void setSortField(value as AssetSortField)}
+      >
+        <SelectTrigger aria-label={t('assets.sort.label')} className="w-full md:w-32">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="name">{t('assets.sort.name')}</SelectItem>
+          <SelectItem value="value">{t('assets.sort.value')}</SelectItem>
+          <SelectItem value="quantity">{t('assets.sort.quantity')}</SelectItem>
+        </SelectContent>
+      </Select>
+    </FilterField>
   );
 
   const searchBox = (
@@ -91,33 +115,36 @@ export function AssetsFilterRow({
     />
   );
 
-  if (isNarrow) {
-    return (
-      <FilterBar
-        value={null}
-        onChange={() => {}}
-        search={searchBox}
-        activeCount={activeFilterCount}
-        title={t('assets.filters.title')}
-      >
-        {() => (
-          <div className="flex flex-col gap-2">
-            {category}
-            {blueprints}
-            {minValue}
-            {sort}
-          </div>
-        )}
-      </FilterBar>
-    );
-  }
+  // Category and Blueprints are the key filters: in the row on a pointer-width
+  // screen (no pill), in the sheet only on a phone. Sort orders the list, so on
+  // a pointer it is a view control beside the funnel, in the sheet on a phone.
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {searchBox}
-      {category}
-      {blueprints}
-      {minValue}
-      {sort}
-    </div>
+    <FilterBar
+      value={filterValue}
+      onChange={(next) => setView({ cat: next.cat, bp: next.bp, min: next.min })}
+      search={searchBox}
+      inline={() => (
+        <>
+          {category}
+          {blueprints}
+        </>
+      )}
+      // Sort arranges rather than narrows, so it is a view control in `actions`
+      // from `md` up (not `inline`, which is capped at two and starts at `lg`).
+      actions={!isNarrow && sort}
+      active={activeFilters}
+      // Only a flat list's rows are results; browsing, they are a place's contents.
+      resultCount={flatModeActive ? rows.length : undefined}
+      title={t('assets.filters.title')}
+    >
+      {(_value, _onChange, surface) => (
+        <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+          {surface === 'sheet' && category}
+          {surface === 'sheet' && blueprints}
+          {minValue}
+          {isNarrow && sort}
+        </div>
+      )}
+    </FilterBar>
   );
 }

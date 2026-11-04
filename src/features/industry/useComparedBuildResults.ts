@@ -33,8 +33,8 @@
  * resolves at lowest sells first, each hub's need is summed across members,
  * the books are walked once per material, and the members resolve again at
  * those prices. Rows are held until that second pass, so a rollup never
- * shows lowest-sell totals and then jumps. The plan list and Compare keep
- * lowest sells.
+ * shows lowest-sell totals and then jumps. The plan list and Compare
+ * walk only the depth their own plan needs, as the plan page does.
  */
 import { useEffect, useRef, useState } from 'react';
 import { depthPriceMap, summedDepthNeeds } from '@/engine/industry/depthPrice';
@@ -46,10 +46,11 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
-import { loadDepthPrices, type DepthPrices } from './depthPriceLoader';
+import { loadDepthPrices, planDepthNeeds, type DepthPrices } from './depthPriceLoader';
 import { loadPlanSnapshots, type PlanSnapshots } from './planSnapshots';
 import { createYielder } from './yieldToMain';
 import { shoppingListMaterials } from './subBuildPlan';
+import { onPlanHeroBasis } from './planOwnedBasis';
 import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
 import {
   isPricingReady,
@@ -149,23 +150,53 @@ async function computeRow(
     const blueprintPurchaseOffersFor = await priced.blueprintOffers;
     const inventionMarket = await priced.inventionMarket;
     const hub: TradeHub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
-    const { result, error, groupResult, groupError } = resolveBuildPlan(
-      plan,
-      {
-        ...sources,
-        ...pricingSourcesForHub(pricing, hub),
-        blueprintPurchaseOffersFor,
-        inventionMarket,
-        catalog,
-      },
-      { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex, depthPrices },
-      { withGroupResult: computeGroupResult }
-    );
+    const hubSources = pricingSourcesForHub(pricing, hub);
+    const resolveAt = (prices: HubPrices | undefined) =>
+      resolveBuildPlan(
+        plan,
+        { ...sources, ...hubSources, blueprintPurchaseOffersFor, inventionMarket, catalog },
+        {
+          snapshot,
+          reactionSystemCostIndex: reactionSnapshot?.systemCostIndex,
+          depthPrices: prices,
+        },
+        { withGroupResult: computeGroupResult }
+      );
+    let resolved = resolveAt(depthPrices);
+    // The plan page re-prices materials whose need is large against what the
+    // hub lists at Depth Prices; so does the row, or its profit drifts from
+    // the page's (one re-resolve, read off the lowest-sell pass, as there).
+    // A group walk (`depthPrices` given) already did this for the whole group.
+    if (!depthPrices && resolved.result) {
+      const needs = planDepthNeeds(plan, resolved.result, snapshot.hubSellVolumes);
+      if (needs.size > 0) {
+        const depth = await loadDepthPrices(hub, needs).catch(() => null);
+        if (depth && depth.size > 0) resolved = resolveAt(depthPriceMap(depth));
+      }
+    }
+    const { result, error, groupResult, groupError } = resolved;
     // The group pass's own error surfaces on the row too (only reachable
     // when the primary pass succeeded, since `error` already wins otherwise)
     // — a member whose group computation alone failed must not silently
     // vanish from the rollup with no explanation.
-    return { ...base, result, groupResult, error: error ?? groupError };
+    // The pilot's Profit Basis setting (`profitBasisSetting.ts`) is read by the
+    // plan page too, so the row's profit, margin and ISK/hour agree with it:
+    // owned materials free, or charged at what they would sell for.
+    const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID);
+    const heroBasis =
+      result && entry && pricing.profitBasis === 'sellValue'
+        ? onPlanHeroBasis(result, {
+            snapshot,
+            modifiers: sources.modifiers,
+            standing: hubSources.standing,
+            productQuantity: (entry.blueprint.products[0]?.quantity ?? 0) * plan.runs,
+            productUnitPrice:
+              entry.productTypeID !== null
+                ? (snapshot.hubPrices[entry.productTypeID] ?? null)
+                : null,
+          }).result
+        : result;
+    return { ...base, result: heroBasis, groupResult, error: error ?? groupError };
   } catch (err) {
     return {
       ...base,
@@ -237,7 +268,7 @@ export function useComparedBuildResults({
   // Read field by field, not as the whole object, for the same reason: only
   // a change that can move a price restarts the fetch.
   const ready = isPricingReady(pricingInputs);
-  const { assumedMe, standings, bpcRows, communityRows } = pricingInputs;
+  const { assumedMe, profitBasis, standings, bpcRows, communityRows } = pricingInputs;
 
   // Latest-ref pattern (useCompareRows.ts): a fresh `plans` array reference
   // lands on nearly every render, so the fetch effect below keys on a
@@ -279,6 +310,7 @@ export function useComparedBuildResults({
         { pi, ownedBlueprints, modifiers },
         {
           assumedMe,
+          profitBasis,
           corpBlueprints: corpForPlans,
           standings,
           bpcRows,
@@ -338,6 +370,7 @@ export function useComparedBuildResults({
     corpForPlans,
     ready,
     assumedMe,
+    profitBasis,
     standings,
     bpcRows,
     communityRows,

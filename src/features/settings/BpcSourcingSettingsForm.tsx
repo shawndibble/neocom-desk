@@ -14,7 +14,7 @@ import {
 } from '@/features/bpcContracts/sourcingDefaults';
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { CheckboxField, DefaultsSyncHint, SettingsFormLoading } from './settingsFields';
+import { CheckboxField, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** BPC Sourcing's settings: Settings → Industry, and the BPC Sourcing tab's settings modal. */
@@ -35,7 +35,6 @@ export function BpcSourcingSettingsForm() {
 
   return (
     <div className="space-y-4">
-      <DefaultsSyncHint />
       <Fields variant="form">
         {/* The same synced Default trade hub as Settings → Market defaults. */}
         <Field

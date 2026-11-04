@@ -1,9 +1,10 @@
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import { defaultPayeeForSystem } from '@/engine/miningTax/defaultSystems';
 
 export interface PayeeSuggestion {
   /** The Payee to pre-select, or `undefined` when nothing in the pilot's own history points at one. */
   suggested: PayeeRecord | undefined;
-  /** Whether `suggested` is the Payee last used in this system (rather than the legacy remembered `systemId`) — only then may the UI say "last used here". */
+  /** Whether `suggested` is the Payee last used in this system (rather than its Default Payee) — only then may the UI say "last used here". */
   fromHistory: boolean;
   /** Every Payee, best first: the suggestion, then by uses in this system, then by name. */
   ranked: PayeeRecord[];
@@ -33,14 +34,16 @@ export function systemsByPayee(
  * system three landlords share or a landlord with moons in three systems. The
  * pilot's own Assignments can: the one most recently mined in this system is
  * the best guess for the next, and how often each other Payee was used here
- * orders the rest. The legacy `systemId` only breaks a tie when this system
- * has no history at all. Still only ever a pre-selection the pilot confirms,
- * never an Assignment made on their behalf.
+ * orders the rest. The system's Default Payee (`Payee.defaultSystems`) is the
+ * last resort, used only when this system has no history at all. Still only
+ * ever a pre-selection the pilot confirms, never an Assignment made on their
+ * behalf (that is `defaultAssignments.ts`).
  */
 export function suggestPayeeForSystem(
   assignments: readonly MiningTaxAssignmentRecord[],
   payees: readonly PayeeRecord[],
-  solarSystemId: number
+  solarSystemId: number,
+  characterId: number
 ): PayeeSuggestion {
   const byId = new Map(payees.map((p) => [p.id, p]));
   const usesHere = new Map<string, number>();
@@ -56,7 +59,7 @@ export function suggestPayeeForSystem(
   }
 
   const fromHistory = last?.payeeId !== undefined ? byId.get(last.payeeId) : undefined;
-  const suggested = fromHistory ?? payees.find((p) => p.systemId === solarSystemId);
+  const suggested = fromHistory ?? defaultPayeeForSystem(payees, characterId, solarSystemId);
 
   const ranked = [...payees].sort((a, b) => {
     if (a.id === suggested?.id) return -1;

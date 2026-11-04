@@ -15,6 +15,30 @@ vi.mock('@/features/route/routeExposure', () => ({
   routeExposure: () => routeExposure(),
 }));
 
+const loadStructureInfo = vi.hoisted(() =>
+  vi.fn<
+    (
+      c: number,
+      id: number
+    ) => Promise<{ name: string; owner_id: number; solar_system_id: number } | null>
+  >()
+);
+vi.mock('@/features/character/structures', () => ({ loadStructureInfo }));
+
+// The SDE read behind placement is `courierEndpoints.test.ts`'s; here it only
+// has to say the end was placed in the system the lookup returned.
+vi.mock('@/features/contractSearch/courierEndpoints', () => ({
+  placeStructureEndpoint: async (
+    endpoint: CourierEndpoint,
+    structure: { name: string; systemId: number }
+  ): Promise<CourierEndpoint> => ({
+    ...endpoint,
+    name: structure.name,
+    systemId: structure.systemId,
+    systemName: 'Ainsan',
+  }),
+}));
+
 const openInEve = vi.hoisted(() => ({ unavailable: false }));
 vi.mock('@/features/openInEve/useOpenInEve', () => ({
   useOpenInEve: () => ({
@@ -77,12 +101,16 @@ const KNOWN: RouteExposure = {
 
 function renderModal(
   jumps: CourierJumps = { kind: 'known', count: 2 },
-  extra: { returnFocusFallback?: () => HTMLElement | null } = {}
+  extra: { returnFocusFallback?: () => HTMLElement | null } = {},
+  row: CourierRouteRow = ROW,
+  characterId: number | null = 9001,
+  onStructurePlaced?: (endpoint: CourierEndpoint) => void
 ) {
   return render(
     <MemoryRouter>
       <CourierContractDetailModal
-        row={ROW}
+        row={row}
+        characterId={characterId}
         regionNames={new Map()}
         jumps={jumps}
         goingRateMultiple={null}
@@ -90,6 +118,7 @@ function renderModal(
         reverseLane={{ kind: 'unresolved' }}
         onSearchReverseLane={() => {}}
         onClose={() => {}}
+        onStructurePlaced={onStructurePlaced}
         {...extra}
       />
     </MemoryRouter>
@@ -97,6 +126,7 @@ function renderModal(
 }
 
 beforeEach(() => {
+  loadStructureInfo.mockReset();
   routeExposure.mockReset();
   lawlessSystems = new Set();
   openInEve.unavailable = false;
@@ -225,5 +255,67 @@ describe('CourierContractDetailModal plan route', () => {
       'href',
       '/travel/route?pref=prefer-highsec&stops=30000142%3A60003760%2C30002187%3A60003760'
     );
+  });
+});
+
+describe('CourierContractDetailModal player structure names', () => {
+  const STRUCTURE_ID = 1049588174021;
+  const unnamed: CourierEndpoint = {
+    locationId: STRUCTURE_ID,
+    name: null,
+    systemName: null,
+    systemId: null,
+    regionId: 10000002,
+    security: null,
+    space: null,
+    resolution: 'structure',
+    hasStargates: null,
+  };
+  const structureRow: CourierRouteRow = { ...ROW, destination: unnamed };
+  beforeEach(() => routeExposure.mockResolvedValue(KNOWN));
+
+  it('names a structure the character can read', async () => {
+    loadStructureInfo.mockResolvedValue({
+      name: 'Perimeter - Keepstar',
+      owner_id: 1,
+      solar_system_id: 30000144,
+    });
+    renderModal({ kind: 'known', count: 2 }, {}, structureRow);
+
+    expect(await screen.findByText('Perimeter - Keepstar')).toBeInTheDocument();
+    expect(loadStructureInfo).toHaveBeenCalledWith(9001, STRUCTURE_ID);
+  });
+
+  it('hands the board the structure placed in its system, so the haul gets a jump count', async () => {
+    loadStructureInfo.mockResolvedValue({
+      name: "Ainsan - Mav's Watering Hole",
+      owner_id: 1,
+      solar_system_id: 30002162,
+    });
+    const onStructurePlaced = vi.fn();
+    renderModal({ kind: 'known', count: null }, {}, structureRow, 9001, onStructurePlaced);
+
+    await waitFor(() =>
+      expect(onStructurePlaced).toHaveBeenCalledWith({
+        ...unnamed,
+        name: "Ainsan - Mav's Watering Hole",
+        systemId: 30002162,
+        systemName: 'Ainsan',
+      })
+    );
+  });
+
+  it('says "Unknown/Undockable" when ESI refuses', async () => {
+    loadStructureInfo.mockResolvedValue(null);
+    renderModal({ kind: 'known', count: 2 }, {}, structureRow);
+
+    expect(await screen.findByText('Unknown/Undockable')).toBeInTheDocument();
+  });
+
+  it('keeps the bare id, and asks nothing, with no active character', () => {
+    renderModal({ kind: 'known', count: 2 }, {}, structureRow, null);
+
+    expect(screen.getByText(`#${STRUCTURE_ID}`)).toBeInTheDocument();
+    expect(loadStructureInfo).not.toHaveBeenCalled();
   });
 });

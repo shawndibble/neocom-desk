@@ -40,6 +40,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // Skill Plans, not the trained-skills read view: the fix this warning
   // prompts is queuing more steps from a plan before the queue goes idle.
   skillQueueEnding: '/skills',
+  omegaLapsed: '/skills',
   acceleratorExpiring: '/characters',
   acceleratorEnded: '/characters',
   // The Characters table view, not the skill tree: "ready to extract" is a

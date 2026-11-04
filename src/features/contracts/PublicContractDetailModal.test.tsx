@@ -486,7 +486,7 @@ describe('PublicContractDetailModal — system row', () => {
     showItems([item({ record_id: 1, type_id: ABYSSAL_TYPE, item_id: 11 })]);
     renderModal();
 
-    expect(await screen.findByText('Abyssal modules (MutaMarket estimate)')).toBeInTheDocument();
+    expect(await screen.findByText('Abyssal modules')).toBeInTheDocument();
     expect(await screen.findByText('90,000,000')).toBeInTheDocument();
     expect(mutamarket.getAbyssalEstimate).toHaveBeenCalledWith(ABYSSAL_TYPE, 11, {
       characterId: 1,
@@ -511,11 +511,11 @@ describe('PublicContractDetailModal — flag sentences (#4773)', () => {
 
     expect(
       await screen.findByText(
-        'Asks 10 times the Jita sell price (1,000,000,000 ISK each). At the hub the same 2 would cost about 2,000,000,000 ISK.'
+        'Asks 10 times the Jita buy-now price (1,000,000,000 ISK each). At the hub the same 2 would cost about 2,000,000,000 ISK.'
       )
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Flagged at 10 times the hub sell. Change it in Settings › Market.')
+      screen.getByText('Flagged at 10 times the hub buy-now price. Change it in Settings › Market.')
     ).toBeInTheDocument();
   });
 

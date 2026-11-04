@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   NOT_ON_MARKET,
+  activeAssetKindFilters,
   assetPassesKindFilter,
   blueprintKindParam,
   blueprintsTicked,
@@ -8,6 +9,7 @@ import {
   categoryPickParam,
   expandLegacyCategoryIds,
   headingState,
+  pickedCategoryNames,
   pruneCategoryIndex,
   toggleHeading,
   toggleOption,
@@ -168,5 +170,56 @@ describe('pruneCategoryIndex blueprints', () => {
     expect(pruned.blueprintOptionIds.size).toBe(0);
     expect(blueprintsTicked(pruned, 'all')).toBe(false);
     expect(blueprintsTicked(pruneCategoryIndex(index, [200], 'all'), 'all')).toBe(true);
+  });
+});
+
+describe('pickedCategoryNames', () => {
+  it('names a fully ticked heading once, else its ticked rows', () => {
+    expect(pickedCategoryNames(index, 'all')).toEqual([]);
+    expect(pickedCategoryNames(index, new Set([11, 12, NOT_ON_MARKET]))).toEqual([
+      'Ships',
+      'Not on the market',
+    ]);
+    expect(pickedCategoryNames(index, new Set([11]))).toEqual(['Frigates']);
+    expect(pickedCategoryNames(index, new Set())).toEqual([]);
+  });
+});
+
+describe('activeAssetKindFilters', () => {
+  // Echoes the key and its options, so the assertions read what was asked for.
+  const t = (key: string, opts?: Record<string, unknown>) =>
+    opts ? `${key}(${JSON.stringify(opts)})` : key;
+  const options = { index, showBlueprintSelect: true, categoryLabel: 'Category' };
+
+  it('is empty at the defaults', () => {
+    expect(activeAssetKindFilters({ cat: 'all', bp: 'any' }, options, t)).toEqual([]);
+  });
+
+  it('pills a narrowed Category and a set Blueprints, and each clears only itself', () => {
+    const value = { cat: new Set([11]), bp: 'copy' as const, other: 1 };
+    const active = activeAssetKindFilters(value, options, t);
+    expect(active.map(({ label, value: text }) => [label, text])).toEqual([
+      ['Category', 'Frigates'],
+      ['assets.blueprints.label', 'assets.blueprints.copy'],
+    ]);
+    expect(active[0].clear(value)).toEqual({ cat: 'all', bp: 'copy', other: 1 });
+    expect(active[1].clear(value)).toEqual({ cat: value.cat, bp: 'any', other: 1 });
+  });
+
+  it('says None for an empty pick', () => {
+    const [category] = activeAssetKindFilters({ cat: new Set<number>(), bp: 'any' }, options, t);
+    expect(category.value).toBe('filters.none');
+  });
+
+  it('leaves out Blueprints while its select is hidden, and Category before the tree loads', () => {
+    const value = { cat: new Set([11]), bp: 'copy' as const };
+    expect(
+      activeAssetKindFilters(value, { ...options, showBlueprintSelect: false }, t).map(
+        (filter) => filter.label
+      )
+    ).toEqual(['Category']);
+    expect(
+      activeAssetKindFilters(value, { ...options, index: null }, t).map((f) => f.label)
+    ).toEqual(['assets.blueprints.label']);
   });
 });

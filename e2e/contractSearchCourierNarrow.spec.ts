@@ -293,7 +293,7 @@ test.describe('courier board — 390px width', () => {
     ).toBeGreaterThanOrEqual(TOUCH_TARGET_PX);
   });
 
-  test('the ISK filters take shorthand and echo the parsed figure (issue #1722)', async ({
+  test('the ISK filters take shorthand and group digits as typed (issue #1722)', async ({
     page,
   }) => {
     await signInAndGoto(page);
@@ -303,10 +303,12 @@ test.describe('courier board — 390px width', () => {
     await page.getByRole('main').getByRole('tab', { name: 'Courier' }).click();
     await page.getByRole('button', { name: /^Filters/ }).click();
 
-    await page.getByRole('textbox', { name: 'Min reward' }).fill('1b');
-    await expect(page.getByText('= 1,000,000,000 ISK')).toBeVisible();
-    await page.getByRole('textbox', { name: 'Max collateral' }).fill('500m');
-    await expect(page.getByText('= 500,000,000 ISK')).toBeVisible();
+    const minReward = page.getByRole('textbox', { name: 'Min reward' });
+    await minReward.fill('1b');
+    await expect(minReward).toHaveValue('1b');
+    const maxCollateral = page.getByRole('textbox', { name: 'Max collateral' });
+    await maxCollateral.fill('500000000');
+    await expect(maxCollateral).toHaveValue('500,000,000');
   });
 });
 

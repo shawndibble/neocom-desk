@@ -1,5 +1,6 @@
 import type { Location } from 'react-router-dom';
 import { looksLikeEftFit } from '@/engine/import/eftFit';
+import { isSurveyScanText } from '@/engine/survey/parseScan';
 import type { PasteDestination } from '@/engine/import/pasteDestination';
 import { FITTINGS_PATH } from '@/features/fittings/fittingRoutes';
 import { tabPath } from '@/lib/pageTabs';
@@ -148,6 +149,10 @@ export async function routePaste(
   text: string,
   here: Pick<Location, 'pathname' | 'search'>
 ): Promise<PasteRoute> {
+  // A Survey Scanner copy is the first detector and needs none of the lazy
+  // data, so it routes before any of it loads: after a tab sat idle those
+  // loads are slow or fail, and the paste would otherwise be dropped.
+  if (isSurveyScanText(text)) return { route: DESTINATIONS.survey(text, here), unreadable: false };
   let classified: Classified;
   try {
     classified = await classifyPaste(text);

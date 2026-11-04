@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+import { activeDateRangeFilters, type ActiveFilter } from '@/components/ui';
 import type { ProductionRunRecord } from '@/db';
 import { formatLocalDate } from '@/lib/localDate';
 
@@ -43,6 +45,13 @@ export function filterProductionRunsByDate(
   });
 }
 
-export function activeProductionLogFilterCount(filter: ProductionLogFilter): number {
-  return [filter.startDate, filter.endDate].filter((v) => v !== null).length;
+/** The log's From/To bounds as pills, the same way Wallet's date ranges read. */
+export function activeProductionLogFilters(
+  filter: ProductionLogFilter,
+  t: TFunction
+): ActiveFilter<ProductionLogFilter>[] {
+  return activeDateRangeFilters(filter, t, {
+    from: t('industry.dateFromLabel'),
+    to: t('industry.dateToLabel'),
+  });
 }

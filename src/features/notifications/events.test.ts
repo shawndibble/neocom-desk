@@ -15,6 +15,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'skillLevelComplete',
       'characterNotTraining',
       'skillQueueEnding',
+      'omegaLapsed',
       'spExtractionReady',
       'industryJobComplete',
       'cloneJumpReady',

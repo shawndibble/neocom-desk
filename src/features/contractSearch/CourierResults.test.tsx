@@ -84,6 +84,14 @@ function renderBoard(characterId = CHARACTER_ID, initialEntries: string[] = ['/'
 
 const myRegionButton = () => screen.getByRole('button', { name: 'From my region' });
 
+/** The shortcut is a row inside the From region picker: open the picker first if it is closed. */
+async function pressMyRegion(user: ReturnType<typeof userEvent.setup>) {
+  if (!screen.queryByRole('button', { name: 'From my region' })) {
+    await user.click(screen.getByRole('combobox', { name: 'From region' }));
+  }
+  await user.click(myRegionButton());
+}
+
 beforeEach(() => {
   loadCharacterRegionId.mockReset();
   vi.mocked(localJumpCountsForRoutes).mockResolvedValue({ kind: 'unknown' });
@@ -133,6 +141,33 @@ describe('CourierResults column picker', () => {
   });
 });
 
+describe('CourierResults destination space key filter', () => {
+  it('sits in the row with no pill, and is not repeated in the open box', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await waitFor(() =>
+      expect(screen.getByRole('group', { name: 'Destination space' })).toBeInTheDocument()
+    );
+    expect(screen.queryByRole('button', { name: /Change filter: Destination space/ })).toBeNull();
+    await openFilters(user);
+    expect(screen.getAllByRole('group', { name: 'Destination space' })).toHaveLength(1);
+  });
+
+  it('moves into the sheet when narrow', async () => {
+    const restore = stubViewport(NARROW_QUERY);
+    try {
+      const user = userEvent.setup();
+      renderBoard();
+      await screen.findByRole('table', { name: 'Courier Contract Search' });
+      expect(screen.queryByRole('group', { name: 'Destination space' })).toBeNull();
+      await openFilters(user);
+      expect(await screen.findByRole('group', { name: 'Destination space' })).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+});
+
 describe('CourierResults "From my region" shortcut', () => {
   it('costs nothing until it is pressed', async () => {
     loadCharacterRegionId.mockResolvedValue(THE_FORGE);
@@ -140,6 +175,7 @@ describe('CourierResults "From my region" shortcut', () => {
     renderBoard();
 
     await openFilters(user);
+    await user.click(screen.getByRole('combobox', { name: 'From region' }));
 
     expect(myRegionButton()).toBeInTheDocument();
     expect(loadCharacterRegionId).not.toHaveBeenCalled();
@@ -158,12 +194,14 @@ describe('CourierResults "From my region" shortcut', () => {
     renderBoard();
     await openFilters(user);
 
-    await user.click(myRegionButton());
+    await pressMyRegion(user);
     await waitFor(() => expect(myRegionButton()).toBeDisabled());
     await user.click(myRegionButton());
     release(THE_FORGE);
 
-    await waitFor(() => expect(myRegionButton()).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'From region' })).toHaveTextContent('The Forge')
+    );
     expect(loadCharacterRegionId).toHaveBeenCalledTimes(1);
   });
 
@@ -173,7 +211,7 @@ describe('CourierResults "From my region" shortcut', () => {
     renderBoard();
     await openFilters(user);
 
-    await user.click(screen.getByRole('button', { name: 'From my region' }));
+    await pressMyRegion(user);
 
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'From region' })).toHaveTextContent('The Forge')
@@ -187,7 +225,7 @@ describe('CourierResults "From my region" shortcut', () => {
     renderBoard();
     await openFilters(user);
 
-    await user.click(screen.getByRole('button', { name: 'From my region' }));
+    await pressMyRegion(user);
 
     await waitFor(() =>
       expect(screen.getByText('No hauls start in your region')).toBeInTheDocument()
@@ -204,7 +242,7 @@ describe('CourierResults "From my region" shortcut', () => {
     renderBoard();
     await openFilters(user);
 
-    await user.click(screen.getByRole('button', { name: 'From my region' }));
+    await pressMyRegion(user);
 
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'From my region' })).toBeDisabled()
@@ -222,12 +260,12 @@ describe('CourierResults "From my region" shortcut', () => {
     const user = userEvent.setup();
     renderBoard();
     await openFilters(user);
-    await user.click(myRegionButton());
+    await pressMyRegion(user);
     await waitFor(() => expect(loadCharacterRegionId).toHaveBeenCalledTimes(1));
 
     await openFilters(user); // collapse
     await openFilters(user); // reopen
-    await user.click(myRegionButton());
+    await pressMyRegion(user);
 
     expect(loadCharacterRegionId).toHaveBeenCalledTimes(1);
   });
@@ -237,7 +275,7 @@ describe('CourierResults "From my region" shortcut', () => {
     const user = userEvent.setup();
     const { rerender } = renderBoard();
     await openFilters(user);
-    await user.click(myRegionButton());
+    await pressMyRegion(user);
     await waitFor(() => expect(myRegionButton()).toBeDisabled());
 
     loadCharacterRegionId.mockResolvedValue(THE_FORGE);
@@ -249,7 +287,7 @@ describe('CourierResults "From my region" shortcut', () => {
 
     // The previous character's "no hauls start there" must not survive them.
     await waitFor(() => expect(myRegionButton()).toBeEnabled());
-    await user.click(myRegionButton());
+    await pressMyRegion(user);
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'From region' })).toHaveTextContent('The Forge')
     );
@@ -264,7 +302,7 @@ describe('CourierResults "From my region" shortcut', () => {
       renderBoard();
       await openFilters(user);
 
-      await user.click(myRegionButton());
+      await pressMyRegion(user);
       await waitFor(() => expect(loadCharacterRegionId).toHaveBeenCalledTimes(1));
       await user.keyboard('{Escape}');
 
@@ -381,8 +419,54 @@ describe('CourierResults route cell', () => {
   });
 });
 
+describe('CourierResults open detail', () => {
+  it('follows its row when the structure it ends at is placed', async () => {
+    const user = userEvent.setup();
+    const structureEnd: CourierEndpoint = {
+      ...amarr(),
+      name: "Ainsan - Mav's Watering Hole",
+      systemName: null,
+      systemId: null,
+      security: null,
+      space: null,
+      resolution: 'structure',
+      hasStargates: null,
+      locationId: 1_039_000_000_001,
+    };
+    const unplaced: CourierRouteRow = {
+      ...laneRow(1, 5_000_000, 1_000),
+      destination: structureEnd,
+    };
+    const board = (rows: readonly CourierRouteRow[]) => (
+      <MemoryRouter>
+        <CourierResults rows={rows} regionNames={REGION_NAMES} characterId={CHARACTER_ID} />
+      </MemoryRouter>
+    );
+    const { rerender } = render(board([unplaced]));
+    await user.click(within(screen.getAllByRole('row')[1]).getAllByRole('cell')[0]);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('link', { name: 'Amarr' })).not.toBeInTheDocument();
+
+    rerender(
+      board([
+        {
+          ...unplaced,
+          destination: {
+            ...structureEnd,
+            systemName: 'Amarr',
+            systemId: AMARR_SYSTEM,
+            security: 1,
+          },
+        },
+      ])
+    );
+
+    expect(await within(dialog).findByRole('link', { name: 'Amarr' })).toBeInTheDocument();
+  });
+});
+
 describe('CourierResults ISK/jump cell', () => {
-  it('names an over-rate haul in text on the desktop table too, not only by border colour', async () => {
+  it('shows the going-rate multiple for an over-rate haul with a warning glyph, not a separate label', async () => {
     knownJumps();
     renderLanes();
 
@@ -391,10 +475,15 @@ describe('CourierResults ISK/jump cell', () => {
       if (!row) throw new Error('expected the bait row');
       return row as HTMLElement;
     });
-    expect(within(baitRow).getByText('Over rate')).toBeInTheDocument();
+    const multiple = within(baitRow).getByText(/x going rate$/);
+    // Not colour alone: the flagged multiple carries a glyph and a screen-reader label.
+    expect(multiple.querySelector('svg')).not.toBeNull();
+    expect(within(multiple).getByText('Over rate')).toHaveClass('sr-only');
 
-    // An ordinary haul on the same lane carries the multiple with no marker.
+    // An ordinary haul on the same lane carries the multiple with neither.
     const ordinaryRow = document.querySelector('tr[data-row-key="100"]') as HTMLElement;
+    const ordinary = within(ordinaryRow).getByText(/x going rate$/);
+    expect(ordinary.querySelector('svg')).toBeNull();
     expect(within(ordinaryRow).queryByText('Over rate')).not.toBeInTheDocument();
   });
 
@@ -506,7 +595,7 @@ describe('CourierResults remembered filter (issue #1719)', () => {
     renderBoard(CHARACTER_ID, ['/']);
 
     await openFilters(user);
-    expect(screen.getByLabelText('Max collateral')).toHaveValue('50000000');
+    expect(screen.getByLabelText('Max collateral')).toHaveValue('50,000,000');
   });
 
   it("lets a shared link's URL param win over a remembered filter value", async () => {
@@ -518,7 +607,7 @@ describe('CourierResults remembered filter (issue #1719)', () => {
     renderBoard(CHARACTER_ID, ['/?courier.maxCollateral=1000']);
 
     await openFilters(user);
-    expect(screen.getByLabelText('Max collateral')).toHaveValue('1000');
+    expect(screen.getByLabelText('Max collateral')).toHaveValue('1,000');
   });
 
   it('remembers a filter change for the next visit', async () => {
@@ -552,14 +641,13 @@ describe('CourierResults remembered filter (issue #1719)', () => {
 });
 
 describe('CourierResults ISK filters', () => {
-  it('accepts shorthand in Min reward and echoes the parsed figure', async () => {
+  it('accepts shorthand in Min reward', async () => {
     const user = userEvent.setup();
     renderBoard();
     await openFilters(user);
     const field = screen.getByRole('textbox', { name: 'Min reward' });
     await user.type(field, '1b');
     expect(field).toHaveValue('1b');
-    expect(screen.getByText('= 1,000,000,000 ISK')).toBeInTheDocument();
   });
 
   it('filters on the shorthand value, and plain digits still work', async () => {
@@ -572,7 +660,7 @@ describe('CourierResults ISK filters', () => {
     expect(screen.queryAllByText(/Jita/)).toHaveLength(0);
     await user.clear(field);
     await user.type(field, '5000000');
-    expect(screen.getByText('= 5,000,000 ISK')).toBeInTheDocument();
+    expect(field).toHaveValue('5,000,000');
     expect(screen.getAllByText(/Jita/).length).toBeGreaterThan(0);
   });
 

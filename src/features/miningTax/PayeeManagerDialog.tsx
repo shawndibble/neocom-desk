@@ -20,10 +20,18 @@ import * as Icon from '@/components/ui/icons';
 import type { PayeeRecord } from '@/db';
 import { formatIsk } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { useSystemName } from '@/features/route/useSolarSystems';
+import { DefaultSystemsField } from './DefaultSystemsField';
 import { deletePayee } from './ledgerActions';
 import { PayeeNameField } from './PayeeNameField';
 import { resolvePayeeName, type PayeeEntityMatch } from './payeeEntitySearch';
-import { createPayee, loadPayees, updatePayee, type PayeeEntityKind } from './payees';
+import {
+  DefaultSystemTakenError,
+  createPayee,
+  loadPayees,
+  updatePayee,
+  type PayeeEntityKind,
+} from './payees';
 import { payeeSystemNames } from './payeeSystemNames';
 import { hubForPayee } from './pricing';
 import type { TrackedCharacter } from './snapshot';
@@ -76,13 +84,8 @@ interface DraftPayee {
    * entry and a "Jita" entry that a pilot would have to be told are the same.
    */
   hubId: TradeHub['id'];
-  /**
-   * Carried through the edit round-trip untouched. `updatePayee` deletes any
-   * field its input omits, so not carrying this would make an ordinary rename
-   * silently forget the system `AssignDialog`'s "remember this system"
-   * checkbox learned.
-   */
-  systemId?: number;
+  /** The systems this Payee is the default for (`PayeeRecord.defaultSystems`); the start day of each is kept by `updatePayee`. */
+  defaultSystemIds: number[];
   /**
    * The EVE entity this Payee is: set by picking a suggestion, or carried from
    * the stored Payee (a payment may have taught it the id without a kind).
@@ -93,11 +96,23 @@ interface DraftPayee {
   verifiedName?: string;
 }
 
+/** Which Payee already has the system the pilot tried to add. */
+function DefaultSystemTaken({ systemId, holderName }: { systemId: number; holderName: string }) {
+  const { t } = useTranslation();
+  const system = useSystemName(systemId) ?? `#${systemId}`;
+  return (
+    <InlineError>
+      {t('miningTax.payees.defaultSystemTaken', { system, payee: holderName })}
+    </InlineError>
+  );
+}
+
 const EMPTY_DRAFT: DraftPayee = {
   id: null,
   name: '',
   defaultTaxPct: '',
   hubId: DEFAULT_TRADE_HUB.id,
+  defaultSystemIds: [],
 };
 
 /**
@@ -106,9 +121,7 @@ const EMPTY_DRAFT: DraftPayee = {
  * tracked character — a landlord doesn't change depending on which alt is
  * looking — so this lists the union of all of them rather than gating on one
  * character at a time. Name, default tax %, and the trade hub the Payee's ore
- * is valued at — the moon/system tag (GLOSSARY.md's Payee entry) is set from
- * `AssignDialog`'s "remember this system" checkbox instead, at the moment
- * it's actually useful, rather than asking for a system id here.
+ * is valued at, and its Default Systems (GLOSSARY.md), which only this form edits.
  *
  * The hub belongs to the Payee rather than to this device because the figure
  * it produces is a bill one player sends another: a device-local pick would
@@ -135,6 +148,8 @@ export function PayeeManagerDialog({
   // the dialog is for. An empty list shows it regardless (see `showForm`).
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A Default System another of the Character's Payees already holds: shown above Save.
+  const [taken, setTaken] = useState<{ systemId: number; holderName: string } | null>(null);
   // Shown above the list: the add/edit form (and its own error line) may be closed.
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletingPayee, setDeletingPayee] = useState<PayeeRecord | null>(null);
@@ -168,6 +183,7 @@ export function PayeeManagerDialog({
   function closeForm() {
     setDraft(EMPTY_DRAFT);
     setError(null);
+    setTaken(null);
     setFormOpen(false);
   }
 
@@ -185,7 +201,7 @@ export function PayeeManagerDialog({
       // A stored hub this build doesn't know reads as Jita here exactly as it
       // does when pricing — the picker never opens on a blank selection.
       hubId: hubForPayee(payee.hubId).id,
-      systemId: payee.systemId,
+      defaultSystemIds: payee.defaultSystems?.map((s) => s.systemId) ?? [],
       entityId: payee.entityId,
       entityKind: payee.entityKind,
       // Only a kind-verified name is tied to its entity; an id learned from a
@@ -228,17 +244,26 @@ export function PayeeManagerDialog({
     const input = {
       name,
       defaultTaxPct: pct,
-      systemId: draft.systemId,
+      defaultSystemIds: draft.defaultSystemIds,
       entityId: entityId ?? null,
       // An id with no kind (learned from a payment) keeps whatever the record has.
       entityKind: entityKind ?? (entityId === undefined ? null : undefined),
       ...(draft.hubId === DEFAULT_TRADE_HUB.id ? {} : { hubId: draft.hubId }),
     };
     const existing = draft.id ? payees.find((p) => p.id === draft.id) : undefined;
-    if (existing) {
-      await updatePayee(existing, input);
-    } else {
-      await createPayee(initialCharacterId, input);
+    try {
+      if (existing) {
+        await updatePayee(existing, input);
+      } else {
+        await createPayee(initialCharacterId, input);
+      }
+    } catch (cause) {
+      // One Default Payee per system: say who has it instead of saving.
+      if (cause instanceof DefaultSystemTakenError) {
+        setTaken({ systemId: cause.systemId, holderName: cause.holderName });
+        return;
+      }
+      throw cause;
     }
     closeForm();
     await refresh();
@@ -433,7 +458,22 @@ export function PayeeManagerDialog({
                   </SelectContent>
                 </Select>
               </Field>
+              <Field
+                label={t('miningTax.payees.defaultSystemsLabel')}
+                note={t('miningTax.payees.defaultSystemsHint')}
+              >
+                <DefaultSystemsField
+                  systemIds={draft.defaultSystemIds}
+                  onChange={(defaultSystemIds) => {
+                    setTaken(null);
+                    setDraft({ ...draft, defaultSystemIds });
+                  }}
+                />
+              </Field>
             </Fields>
+            {taken && (
+              <DefaultSystemTaken systemId={taken.systemId} holderName={taken.holderName} />
+            )}
             {error && <InlineError>{error}</InlineError>}
             <div className="flex justify-end gap-2">
               {draft.id && (

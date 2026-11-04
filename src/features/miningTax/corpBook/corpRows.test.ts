@@ -277,4 +277,32 @@ describe('personalEntriesOf', () => {
       },
     ]);
   });
+
+  it('marks an unpaid Assignment a Default System made as releasable, and nothing else', () => {
+    const base = {
+      characterId: ME,
+      date: '2026-10-17',
+      solarSystemId: 30003838,
+      payeeId: 'p1',
+      oreLines: [{ typeId: ZEO, quantity: 600 }],
+      taxPct: 10,
+      estimatedValue: 0,
+      taxOwed: 0,
+      updatedAt: 0,
+    };
+    const [entry] = personalEntriesOf([
+      mined('2026-10-17', {
+        assignments: [
+          { ...base, id: 'made', status: 'outstanding' as const, override: false },
+          { ...base, id: 'paid', status: 'paid' as const, override: false },
+          { ...base, id: 'mine', status: 'outstanding' as const },
+        ],
+      }),
+    ]);
+    expect(entry.allocations.map((a) => [a.id, a.releasable === true])).toEqual([
+      ['made', true],
+      ['paid', false],
+      ['mine', false],
+    ]);
+  });
 });

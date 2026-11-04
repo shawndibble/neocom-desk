@@ -4,6 +4,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { LocationProbe } from '@/test/LocationProbe';
 import {
   buildBookView,
   nextRunPeriod,
@@ -88,11 +89,15 @@ const verdict: OfficerVerdict = {
   expiresAt: 0,
 };
 
-function renderBook(ui: ReactElement, overrides: Partial<BookViewInput> = {}) {
+function renderBook(
+  ui: ReactElement,
+  overrides: Partial<BookViewInput> = {},
+  path = '/corp/moons/miners'
+) {
   const view = buildBookView(input(overrides));
   const reload = vi.fn();
   const { unmount } = render(
-    <MemoryRouter initialEntries={['/corp/moons/miners']}>
+    <MemoryRouter initialEntries={[path]}>
       <BookProvider
         value={{
           characterId: 7,
@@ -132,9 +137,60 @@ describe('MinersTab', () => {
     const table = screen.getByRole('table', { name: 'Miners' });
     expect(within(table).getByText('Pilot 1')).toBeInTheDocument();
     expect(within(table).getByText('Pilot 2')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /Non-members/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Non-members/ }));
     expect(within(table).queryByText('Pilot 2')).not.toBeInTheDocument();
     expect(screen.getByText(/1 non-member hidden · .* owed/)).toBeInTheDocument();
+  });
+
+  it('one filter row: search, Columns and the funnel; the standing chips sit behind the funnel (§4b)', async () => {
+    renderBook(<MinersTab />);
+    expect(screen.getByRole('searchbox', { name: 'Search Miners' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Columns' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Non-members/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const group = await screen.findByRole('group', { name: 'In corp' });
+    expect(within(group).getByRole('button', { name: /^Members/ })).toBeInTheDocument();
+    expect(within(group).getByRole('button', { name: /Non-members/ })).toBeInTheDocument();
+  });
+
+  it('reads the standings from the URL as a pill, and Reset filters brings the rows back', async () => {
+    renderBook(
+      <>
+        <MinersTab />
+        <LocationProbe />
+      </>,
+      {},
+      '/corp/moons/miners?members=0&guests=0'
+    );
+    expect(screen.queryByRole('table', { name: 'Miners' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Remove filter: In corp: None' })
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+    const table = await screen.findByRole('table', { name: 'Miners' });
+    expect(within(table).getByText('Pilot 1')).toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/corp\/moons\/miners$/);
+  });
+
+  it('keeps the sort in the URL: reads ?sort= and writes a header click back', async () => {
+    renderBook(
+      <>
+        <MinersTab />
+        <LocationProbe />
+      </>,
+      {},
+      '/corp/moons/miners?sort=miner:desc'
+    );
+    const table = screen.getByRole('table', { name: 'Miners' });
+    expect(within(table).getByRole('columnheader', { name: /^Miner/ })).toHaveAttribute(
+      'aria-sort',
+      'descending'
+    );
+    await userEvent.click(within(table).getByRole('button', { name: /^Credit/ }));
+    const search = screen.getByTestId('location').textContent?.split('?')[1] ?? '';
+    expect(new URLSearchParams(search).get('sort')).toMatch(/^credit:(asc|desc)$/);
   });
 
   it('sorts by Standing and Credit, and the Columns menu hides a column but never the Miner', async () => {

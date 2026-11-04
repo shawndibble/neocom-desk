@@ -34,6 +34,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary A filter set away from its default: `active` draws the accent border (§6c). */
+export const Active: Story = {
+  render: (args) => (
+    <Select {...args}>
+      <SelectTrigger aria-label="Hub" className="w-56" active>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="jita">Jita</SelectItem>
+      </SelectContent>
+    </Select>
+  ),
+};
+
 /** @summary Closed trigger with a value: the trailing `CaretDown` is the "opens a list" cue (§6c). */
 export const Closed: Story = {};
 

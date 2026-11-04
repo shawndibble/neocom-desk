@@ -4,14 +4,14 @@
  */
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
-  Button,
   FilterBar,
-  countActive,
   FilterChip,
   FilterField,
   IskInput,
   RegionSelect,
+  type RegionSelectShortcut,
   Select,
   SelectContent,
   SelectItem,
@@ -22,7 +22,7 @@ import {
 } from '@/components/ui';
 import type { SpaceKind } from '@/engine/space';
 import {
-  narrowsSpace,
+  activeCourierFilters,
   type CourierUiFilter,
   type MyRegion,
   type RegionOption,
@@ -37,15 +37,17 @@ function RegionFilterField({
   value,
   options,
   onChange,
+  shortcut,
 }: {
   label: string;
   value: number | null;
   options: RegionOption[];
   onChange: (regionId: number | null) => void;
+  shortcut?: RegionSelectShortcut;
 }) {
   const { t } = useTranslation();
   return (
-    <FilterField label={label}>
+    <FilterField captionInline label={label}>
       <RegionSelect
         options={options}
         value={value}
@@ -55,6 +57,7 @@ function RegionFilterField({
         noResultsLabel={t('common.noRegionMatches')}
         aria-label={label}
         className="w-44"
+        shortcut={shortcut}
       />
     </FilterField>
   );
@@ -67,6 +70,8 @@ function RegionFilterField({
  * Region, not station or system, and the label says so. ESI answers this
  * question with a solar system; the filter beside it is region-scoped, so
  * naming anything finer would claim a precision the control does not have.
+ *
+ * The shortcut is a pinned row inside the From region picker, not a control of its own.
  *
  * The answer is *not* held here. `FilterBar` unmounts its controls whenever
  * the funnel closes or the sheet is dismissed, so state kept in this component
@@ -82,22 +87,20 @@ function RegionFilterField({
  * character whose grant predates `esi-location.read_location.v1` should find a
  * convenience missing, never a re-auth banner.
  */
-function MyRegionButton({
+function myRegionShortcut({
+  t,
   state,
   pending,
   options,
   onResolve,
-  onPick,
 }: {
+  t: TFunction;
   state: MyRegion;
   pending: boolean;
   options: RegionOption[];
   /** Asks the board to resolve the location, and answers with what it found. */
   onResolve: () => Promise<MyRegion>;
-  onPick: (regionId: number) => void;
-}) {
-  const { t } = useTranslation();
-
+}): RegionSelectShortcut {
   const offered = (regionId: number) => options.some((option) => option.id === regionId);
   const eligible = state.kind === 'region' && offered(state.regionId);
   // Disabled while in flight as much as for the answer: on a phone a double
@@ -105,44 +108,25 @@ function MyRegionButton({
   const disabled =
     pending || state.kind === 'unavailable' || (state.kind === 'region' && !eligible);
 
-  const message =
+  const note =
     state.kind === 'unavailable'
       ? t('contractSearch.fromMyRegionUnavailable')
       : state.kind === 'region' && !eligible
         ? t('contractSearch.noHaulsFromMyRegion')
         : null;
 
-  async function handleClick() {
-    // Already known and offered — the only way this click is reachable with an
-    // answer in hand, since every other answer disables the button.
-    if (state.kind === 'region') {
-      onPick(state.regionId);
-      return;
-    }
-    const resolved = await onResolve();
-    if (resolved.kind === 'region' && offered(resolved.regionId)) onPick(resolved.regionId);
-  }
-
-  // A plain group rather than a `FilterField`: the button's own text is its
-  // caption, and `FilterField` would stack an identical one above it in the
-  // sheet. Same shape as the space chips below.
-  return (
-    <div className="flex flex-col items-start gap-1">
-      <Button size="sm" disabled={disabled} onClick={() => void handleClick()}>
-        {t('contractSearch.fromMyRegion')}
-      </Button>
-      {/*
-        The reason, announced and not only drawn: the button goes unfocusable
-        in the same commit that renders this, so a screen reader following the
-        control would otherwise be told nothing at all about why it died.
-      */}
-      {message && (
-        <span role="status" className="text-xs text-text-dim">
-          {message}
-        </span>
-      )}
-    </div>
-  );
+  return {
+    label: t('contractSearch.fromMyRegion'),
+    disabled,
+    note,
+    onSelect: async () => {
+      // Already known and offered — the only way this is reachable with an
+      // answer in hand, since every other answer disables the row.
+      if (state.kind === 'region') return state.regionId;
+      const resolved = await onResolve();
+      return resolved.kind === 'region' && offered(resolved.regionId) ? resolved.regionId : null;
+    },
+  };
 }
 
 /** An ISK bound — reward floor, collateral ceiling — through the shared `IskInput`. */
@@ -158,7 +142,7 @@ function IskFilterField({
   onChange: (value: string) => void;
 }) {
   return (
-    <FilterField label={label}>
+    <FilterField captionInline label={label}>
       <IskInput
         aria-label={label}
         placeholder={label}
@@ -184,7 +168,7 @@ function NumericFilterField({
   onChange: (value: string) => void;
 }) {
   return (
-    <FilterField label={label}>
+    <FilterField captionInline label={label}>
       <TextInput
         type="number"
         inputMode="numeric"
@@ -215,7 +199,7 @@ function RoutePreferenceField({
   const { t } = useTranslation();
   const label = t('contractSearch.routePreferenceLabel');
   return (
-    <FilterField label={label}>
+    <FilterField captionInline label={label}>
       <Select value={value} onValueChange={(next) => onChange(next as RoutePreferenceKind)}>
         <SelectTrigger aria-label={label} className="w-44">
           <SelectValue />
@@ -245,6 +229,8 @@ interface CourierFilterBarProps {
   onPreferenceChange: (preference: RoutePreferenceKind) => void;
   /** The table's column picker, drawn beside the filter trigger. */
   actions?: ReactNode;
+  /** Hauls the filters leave, for the phone sheet's done button. */
+  resultCount?: number;
 }
 
 export function CourierFilterBar({
@@ -259,29 +245,53 @@ export function CourierFilterBar({
   preference,
   onPreferenceChange,
   actions,
+  resultCount,
 }: CourierFilterBarProps) {
   const { t } = useTranslation();
-  // Counted off the controls, not off the parsed engine filter, for the same
-  // reason the item bar does it: a half-typed "1e" parses to `null` there, and
-  // the badge should say the field has been touched.
-  const activeCount = countActive([
-    filter.routeQuery,
-    filter.originRegionId !== null,
-    filter.destinationRegionId !== null,
-    narrowsSpace(filter.destinationSpace, spaceKinds),
-    filter.hideUncompletable,
-    filter.overRate !== 'all',
-    filter.minReward,
-    filter.maxCollateral,
-    filter.maxVolume,
-    filter.minDays,
-  ]);
-
+  // The one key filter: on the row at pointer width, in the sheet when narrow.
+  // Named for the endpoint, not the route: there is deliberately no "avoid
+  // lowsec" control, which would be a safety claim about the whole trip made
+  // from data that only describes its two ends. Hidden entirely when no band
+  // is on offer (endpoints still being placed, or no local station snapshot).
+  const spaceField = (draft: CourierUiFilter, setDraft: (next: CourierUiFilter) => void) =>
+    spaceKinds.length > 0 && (
+      <FilterField captionInline label={t('contractSearch.destinationSpaceLabel')} stretch={false}>
+        <div
+          role="group"
+          aria-label={t('contractSearch.destinationSpaceLabel')}
+          className="flex flex-nowrap items-center gap-2"
+        >
+          {spaceKinds.map((kind) => (
+            <FilterChip
+              key={kind}
+              size="md"
+              label={t(`common.spaceOption.${kind}`)}
+              selected={draft.destinationSpace.includes(kind)}
+              onToggle={() =>
+                setDraft({
+                  ...draft,
+                  destinationSpace: draft.destinationSpace.includes(kind)
+                    ? draft.destinationSpace.filter((existing) => existing !== kind)
+                    : [...draft.destinationSpace, kind],
+                })
+              }
+            />
+          ))}
+        </div>
+      </FilterField>
+    );
   return (
     <FilterBar
       value={filter}
+      inline={spaceField}
       onChange={onChange}
-      activeCount={activeCount}
+      active={activeCourierFilters(filter, t, {
+        originRegions,
+        destinationRegions,
+        spaceKinds,
+      })}
+      resultCount={resultCount}
+      rowAlign="end"
       actions={actions}
       className="border-b border-line px-3 py-2"
       search={
@@ -293,20 +303,20 @@ export function CourierFilterBar({
         />
       }
     >
-      {(draft, setDraft) => (
+      {(draft, setDraft, surface) => (
         <>
           <RegionFilterField
             label={t('contractSearch.originRegionLabel')}
             value={draft.originRegionId}
             options={originRegions}
             onChange={(originRegionId) => setDraft({ ...draft, originRegionId })}
-          />
-          <MyRegionButton
-            state={myRegion}
-            pending={myRegionPending}
-            onResolve={onResolveMyRegion}
-            options={originRegions}
-            onPick={(originRegionId) => setDraft({ ...draft, originRegionId })}
+            shortcut={myRegionShortcut({
+              t,
+              state: myRegion,
+              pending: myRegionPending,
+              options: originRegions,
+              onResolve: onResolveMyRegion,
+            })}
           />
           <RegionFilterField
             label={t('contractSearch.destinationRegionLabel')}
@@ -314,41 +324,7 @@ export function CourierFilterBar({
             options={destinationRegions}
             onChange={(destinationRegionId) => setDraft({ ...draft, destinationRegionId })}
           />
-          {/*
-            Named for the endpoint, not the route: this says where a haul ends,
-            and there is deliberately no "avoid lowsec" control beside it — that
-            would be a safety claim about the whole trip made from data that
-            only describes its two ends.
-
-            Hidden entirely when no band is on offer, rather than shown as a
-            label with nothing under it: that is the state while the endpoints
-            are still being placed, and the permanent state if the local station
-            snapshot cannot be read at all.
-          */}
-          {spaceKinds.length > 0 && (
-            <div
-              role="group"
-              aria-label={t('contractSearch.destinationSpaceLabel')}
-              className="flex flex-wrap items-center gap-2"
-            >
-              <span className="text-text-dim">{t('contractSearch.destinationSpaceLabel')}</span>
-              {spaceKinds.map((kind) => (
-                <FilterChip
-                  key={kind}
-                  label={t(`common.spaceOption.${kind}`)}
-                  selected={draft.destinationSpace.includes(kind)}
-                  onToggle={() =>
-                    setDraft({
-                      ...draft,
-                      destinationSpace: draft.destinationSpace.includes(kind)
-                        ? draft.destinationSpace.filter((existing) => existing !== kind)
-                        : [...draft.destinationSpace, kind],
-                    })
-                  }
-                />
-              ))}
-            </div>
-          )}
+          {surface === 'sheet' && spaceField(draft, setDraft)}
           <IskFilterField
             label={t('contractSearch.minRewardLabel')}
             value={draft.minReward}
@@ -381,12 +357,16 @@ export function CourierFilterBar({
             to decide, which is more than the label has room to say: hence the
             tooltip, which states both halves and the nullsec exclusion.
           */}
-          <FilterField label={t('contractSearch.overRateLabel')}>
+          <FilterField captionInline label={t('contractSearch.overRateLabel')}>
             <Select
               value={draft.overRate}
               onValueChange={(value) => setDraft({ ...draft, overRate: value as OverRateFilter })}
             >
-              <SelectTrigger className="w-44" aria-label={t('contractSearch.overRateLabel')}>
+              <SelectTrigger
+                className="w-44"
+                aria-label={t('contractSearch.overRateLabel')}
+                active={draft.overRate !== 'all'}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -398,12 +378,19 @@ export function CourierFilterBar({
               </SelectContent>
             </Select>
           </FilterField>
-          <FilterChip
+          <FilterField
             label={t('contractSearch.hideUncompletableLabel')}
-            tooltip={t('contractSearch.hideUncompletableTooltip')}
-            selected={draft.hideUncompletable}
-            onToggle={() => setDraft({ ...draft, hideUncompletable: !draft.hideUncompletable })}
-          />
+            stretch={false}
+            hideCaption
+          >
+            <FilterChip
+              size="md"
+              label={t('contractSearch.hideUncompletableLabel')}
+              tooltip={t('contractSearch.hideUncompletableTooltip')}
+              selected={draft.hideUncompletable}
+              onToggle={() => setDraft({ ...draft, hideUncompletable: !draft.hideUncompletable })}
+            />
+          </FilterField>
         </>
       )}
     </FilterBar>

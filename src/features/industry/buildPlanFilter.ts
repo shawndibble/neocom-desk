@@ -1,7 +1,10 @@
 /** The Build Plan list's filter: its shape, URL codec and the pure predicate. */
+import type { TFunction } from 'i18next';
+import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { boolParam, defineUrlFilter, enumParam, enumSetParam, textParam } from '@/lib/urlState';
+import type { BuildGroup } from './buildGroups';
 import type { PlanIndexStats, PlanVerdictTag } from './BuildPlanList';
 
 /** Which copy of a plan's blueprint the pilot holds. `owned` is any copy; `none` is neither. */
@@ -54,6 +57,59 @@ export function activePlanFilterCount(filter: BuildPlanFilterState): number {
     filter.activity !== 'any',
     filter.group !== GROUP_ANY,
   ].filter(Boolean).length;
+}
+
+/**
+ * The filters set away from their default, in the order their controls sit,
+ * so a pill reads left to right like the box it opens. `groups` names the
+ * picked Build Group; an id it does not hold shows as the bare caption.
+ */
+export function activePlanFilters(
+  filter: BuildPlanFilterState,
+  t: TFunction,
+  groups: readonly Pick<BuildGroup, 'id' | 'name'>[]
+): ActiveFilter<BuildPlanFilterState>[] {
+  const active: ActiveFilter<BuildPlanFilterState>[] = [];
+  if (filter.ownership !== 'any')
+    active.push({
+      label: t('industry.planFilters.ownership'),
+      value: t(`industry.planFilters.ownerships.${filter.ownership}`),
+      clear: (value) => ({ ...value, ownership: DEFAULT_BUILD_PLAN_FILTER.ownership }),
+    });
+  if (filter.verdicts.size !== PLAN_VERDICTS.length) {
+    const names = PLAN_VERDICTS.filter((verdict) => filter.verdicts.has(verdict)).map((verdict) =>
+      t(`industry.planFilters.verdicts.${verdict}`)
+    );
+    active.push({
+      label: t('industry.planFilters.verdict'),
+      value: summarizeFilterValues(names, t),
+      clear: (value) => ({ ...value, verdicts: DEFAULT_BUILD_PLAN_FILTER.verdicts }),
+    });
+  }
+  if (filter.activity !== 'any')
+    active.push({
+      label: t('industry.planFilters.activity'),
+      value: t(`industry.planFilters.activities.${filter.activity}`),
+      clear: (value) => ({ ...value, activity: DEFAULT_BUILD_PLAN_FILTER.activity }),
+    });
+  if (filter.group !== GROUP_ANY) {
+    const name =
+      filter.group === GROUP_NONE
+        ? t('industry.planFilters.groupNone')
+        : groups.find((group) => group.id === filter.group)?.name;
+    active.push({
+      label: t('industry.planFilters.group'),
+      ...(name !== undefined && { value: name }),
+      clear: (value) => ({ ...value, group: DEFAULT_BUILD_PLAN_FILTER.group }),
+    });
+  }
+  if (filter.profitableOnly)
+    active.push({
+      label: t('industry.planFilters.profit'),
+      value: t('industry.planFilters.profitableOnly'),
+      clear: (value) => ({ ...value, profitableOnly: DEFAULT_BUILD_PLAN_FILTER.profitableOnly }),
+    });
+  return active;
 }
 
 interface FilterContext {

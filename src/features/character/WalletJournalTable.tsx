@@ -37,14 +37,14 @@ import * as Icon from '@/components/ui/icons';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import { journalRefKey, type JournalCoverage, type JournalRow } from '@/engine/journalNetting';
 import { CharacterRowMenu } from '@/features/corp/corpRowMenus';
-import { ActiveFilterRow } from '@/features/character/ActiveFilterRow';
+import { JournalSummaryRow } from '@/features/character/JournalSummaryRow';
 import { InsuranceLossHost } from '@/features/character/InsuranceLossHost';
 import { IskFlowChart } from '@/features/character/IskFlowChart';
 import { IskBreakdownPanel } from '@/features/character/IskBreakdownPanel';
 import { journalRefLabel } from '@/features/character/journalRefLabel';
 import {
   EMPTY_WALLET_JOURNAL_FILTER,
-  activeWalletJournalFilterCount,
+  activeWalletJournalFilters,
   journalNet,
   journalPartyBreakdown,
   journalRefTypeBreakdown,
@@ -95,6 +95,8 @@ interface JournalFilterBarProps {
   partyOptions?: readonly PlayerOption[];
   /** The column picker, inline between the search box and the funnel. */
   actions?: ReactNode;
+  /** Entries the filter leaves, for the phone sheet's done button. */
+  resultCount?: number;
 }
 
 /**
@@ -112,13 +114,49 @@ function JournalFilterBar({
   playerOptions,
   partyOptions,
   actions,
+  resultCount,
 }: JournalFilterBarProps) {
   const { t } = useTranslation();
+  // The one key filter: on the row at pointer width, in the sheet when narrow.
+  const refTypeField = (
+    draft: WalletJournalFilter,
+    setDraft: (next: WalletJournalFilter) => void
+  ) => (
+    <FilterField label={t('wallet.refTypeFilterLabel')}>
+      <Select
+        value={draft.refType ?? ALL_OPTION}
+        onValueChange={(value) =>
+          setDraft({ ...draft, refType: value === ALL_OPTION ? null : value })
+        }
+      >
+        <SelectTrigger
+          aria-label={t('wallet.refTypeFilterLabel')}
+          className="w-44"
+          active={draft.refType !== null}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL_OPTION}>{t('wallet.refTypeFilterAll')}</SelectItem>
+          {refTypeOptions.map((refType) => (
+            <SelectItem key={refType} value={refType}>
+              {journalRefLabel(refType, t)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </FilterField>
+  );
   return (
     <FilterBar
       value={filter}
+      inline={refTypeField}
       onChange={onChange}
-      activeCount={activeWalletJournalFilterCount(filter)}
+      active={activeWalletJournalFilters(filter, t, {
+        players: playerOptions,
+        parties: partyOptions,
+      })}
+      resultCount={resultCount}
       className="border-b border-line px-3 py-2"
       search={
         <SearchInput
@@ -130,28 +168,9 @@ function JournalFilterBar({
       }
       actions={actions}
     >
-      {(draft, setDraft) => (
+      {(draft, setDraft, surface) => (
         <>
-          <FilterField label={t('wallet.refTypeFilterLabel')}>
-            <Select
-              value={draft.refType ?? ALL_OPTION}
-              onValueChange={(value) =>
-                setDraft({ ...draft, refType: value === ALL_OPTION ? null : value })
-              }
-            >
-              <SelectTrigger aria-label={t('wallet.refTypeFilterLabel')} className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_OPTION}>{t('wallet.refTypeFilterAll')}</SelectItem>
-                {refTypeOptions.map((refType) => (
-                  <SelectItem key={refType} value={refType}>
-                    {journalRefLabel(refType, t)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FilterField>
+          {surface === 'sheet' && refTypeField(draft, setDraft)}
           {playerOptions && (
             <FilterField label={t('wallet.playerFilterLabel')}>
               <Select
@@ -160,7 +179,11 @@ function JournalFilterBar({
                   setDraft({ ...draft, player: value === ALL_OPTION ? null : value })
                 }
               >
-                <SelectTrigger aria-label={t('wallet.playerFilterLabel')} className="w-44">
+                <SelectTrigger
+                  aria-label={t('wallet.playerFilterLabel')}
+                  className="w-44"
+                  active={draft.player !== null}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -191,6 +214,7 @@ function JournalFilterBar({
                 }
                 triggerAriaLabel={t('wallet.partyFilterLabel')}
                 className="w-44"
+                active={draft.party !== null}
                 options={partyOptions.map((p) => ({ id: p.id, label: p.name }))}
                 selected={new Set(draft.party === null ? [] : [draft.party])}
                 onToggle={(id) => setDraft({ ...draft, party: draft.party === id ? null : id })}
@@ -508,7 +532,8 @@ export function JournalTable({
   );
   // A filter with no criteria active still runs (it's the identity filter), so
   // "is a filter active" is asked separately here rather than read off the result.
-  const filterIsActive = activeWalletJournalFilterCount(filter) > 0 || filter.text.trim() !== '';
+  const filterIsActive =
+    activeWalletJournalFilters(filter, t).length > 0 || filter.text.trim() !== '';
   return (
     <>
       <JournalFilterBar
@@ -517,6 +542,7 @@ export function JournalTable({
         refTypeOptions={refTypeOptions}
         playerOptions={playerOptions}
         partyOptions={partyView?.options}
+        resultCount={filteredJournal.length}
         actions={
           <>
             <IconButton
@@ -540,13 +566,10 @@ export function JournalTable({
         }
       />
       <div className="border-b border-line px-3 py-2">
-        <ActiveFilterRow
-          filter={filter}
-          onChange={onFilterChange}
+        <JournalSummaryRow
           totals={totals}
           entryCount={filteredJournal.length}
           showInternal={panel.coverage !== undefined}
-          partyNameFor={partyView?.nameFor}
           // Phone: the sort is an icon at the row's end, so the table has no sort bar.
           sortControl={
             isPhone && filteredJournal.length > 0 ? (

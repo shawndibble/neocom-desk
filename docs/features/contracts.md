@@ -57,7 +57,7 @@ User goal by tab:
 - Route `UNGATED` (`routeScopes.ts:230`): History needs a scope but Search does not, and Search is the landing tab, so a page gate would put a re-login wall in front of it. Decision `20260912-200442-contracts-is-ungated-its-scope-is-gated-per`.
 - No active Character → `/characters` (`Contracts.tsx:550`). Search tabs still require an active Character (they need a session and a location ACL identity).
 - URL state (ADR `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`):
-  - Items: `items.q`, `items.type`, `items.region`, `items.maxPrice`, `items.minQty`, `items.kind` (exchange|auction), `items.hideAuctions`, `items.hidePlex`, `items.jumps`, `items.sort` (default price asc).
+  - Items: `items.q`, `items.type`, `items.region`, `items.maxPrice`, `items.minQty`, `items.hideExchanges`, `items.hideAuctions`, `items.hidePlex`, `items.jumps`, `items.sort` (default price asc).
   - Courier: `courier.q`, `.origin`, `.dest`, `.space` (set), `.hideRisky`, `.overRate` (all|only|hide), `.minReward`, `.maxCollateral`, `.maxVolume`, `.minDays`, `.pref`, `.sort` (default iskPerJump desc).
   - History: `history.q`, `history.status`, `history.type`, `history.sort` (default issued desc).
   - `highlight=<contractId>` pulses a History row (target of `contractAccepted` alerts and of the wallet journal "Contract" link).
@@ -113,8 +113,7 @@ States (in order, `ContractSearchPanel.tsx:964-1031`):
 - Search box "Search item name…": ranked search (`rankedSearch`) over only item types currently listed (`listedContractTypeOptions`), limit 50 types for free text; `deferredTypeQuery` so a keystroke does not stall on ~370k rows (#2024).
 - Region (`RegionSelect`, searchable; only regions present in rows) → `items.region`.
 - Max price (`IskInput`, shorthand ok). Min quantity (number).
-- Sale kind chips Exchange / Auction (toggle; `items.kind`).
-- Exclude (`CheckboxSelect`): Hide auctions; Hide PLEX requests (tooltip "Hide contracts asking for PLEX in return, rather than ISK").
+- Exclude (`CheckboxSelect`): Item Exchange (`items.hideExchanges`), Auctions (`items.hideAuctions`), PLEX contracts (`items.hidePlex`, tooltip "Hide contracts asking for PLEX in return, rather than ISK"). Nothing is excluded by default. There is no separate type chip.
 - Hide overpriced chip (`items.hideOverpriced`, in the funnel like Market Browser's Hide bait sells): drops the rows the price flag marks and prints a dim "N overpriced contracts hidden" under the filter bar. Judged after the engine's filter, since it needs hub prices.
 - Jump range (`JumpRangeSelect`): Any, current system only, 3/5/10/15/20 jumps under the Jump Basis. `CurrentSystemPicker`: game location by default or a hand-picked system, stored device-local per Character (`currentSystemPicks`), writes immediately (not part of the draft). `JumpRangeNote` explains missing origin.
 - Column picker (button "Columns") + export menu in the bar's actions.
@@ -127,7 +126,7 @@ States (in order, `ContractSearchPanel.tsx:964-1031`):
 
 ### Table
 
-- Columns: Item (always; plain accent text since the row opens the modal), then optional Qty, Price, System (+ security), Jumps, Region, Expires. All default visible, device-local `contractSearchItemsVisibleColumns` (non-empty list required).
+- Columns: Item (always; plain accent text since the row opens the modal), then optional Qty, ISK/unit, Price, Saving, System (+ security), Jumps, Region, Expires. All default visible, device-local `contractSearchItemsVisibleColumns` (non-empty list required).
 - Default order cheapest first. Unpriced rows (barter, 0 ISK, or PLEX ask with no PLEX price) sort last in the default view and under the Price column sort in either direction (sortValue `undefined`), issue #1080.
 - Price cell: `IskAmount` (compact, long-press exact); auctions get a suffix "Buyout" or "Starting bid"; PLEX asks show "includes N PLEX"; barter shows "unpriced" marker.
 - System cell: "…" while resolving, "—" if unplaced (player structure), else name + `SecurityStatus`.
@@ -163,13 +162,13 @@ Purpose: hauls as routes. Own component because a haul has no item/quantity/pric
 
 ### Filter bar
 
-Search "Search pickup or drop-off…" (station or system name, either end). Pick up From region + **From my region** button (one `getCharacterLocation` on first press, region from local `solarSystems.json`; states: disabled while pending, "unavailable" if no grant/offline/unplaceable, "No hauls from my region" if none start there — never a re-auth banner). To region. Destination space chips (only bands actually present; with every band selected it is no filter, so unplaced destinations stay visible; `narrowsSpace`). Min reward (ISK), Max collateral (ISK), Max volume m³, Min days. Route preference select (Travel route kinds; `courier.pref`, absent = Settings → Travel default). Pay vs going rate select: Any / Only far above / Hide far above. Chip **Hide risky routes** (tooltip: hides player-structure drop-offs and ends no stargate reaches; nullsec stays).
+Search "Search pickup or drop-off…" (station or system name, either end). Pick up From region, with a **From my region** row pinned inside its picker (one `getCharacterLocation` on first press, region from local `solarSystems.json`; states: disabled while pending, "unavailable" if no grant/offline/unplaceable, "No hauls from my region" if none start there — never a re-auth banner). To region. Destination space chips (only bands actually present; with every band selected it is no filter, so unplaced destinations stay visible; `narrowsSpace`). Min reward (ISK), Max collateral (ISK), Max volume m³, Min days. Route preference select (Travel route kinds; `courier.pref`, absent = Settings → Travel default). Pay vs going rate select: Any / Only far above / Hide far above. Chip **Hide risky routes** (tooltip: hides player-structure drop-offs and ends no stargate reaches; nullsec stays).
 
 Persistence: all but `courier.q` and `courier.pref` are remembered device-local (`contractSearchCourierFilter`) as defaults for fields a URL leaves out; never mirrored back to the URL; URL wins (`useRememberedUrlParams`, decision `20260922-221531`/ADR 0015). Rejected whole if any stored field is invalid.
 
 ### Table
 
-Route (always): origin system + security + region + risk markers, then "→" destination likewise. Optional (device-local `courierVisibleColumns`): Reward, Collateral ("—" if none asked; real zero is a distinct offer), Jumps, ISK/jump (+ going-rate multiple line and Over-rate marker), ISK/m³, Expires. Default sort ISK/jump desc; rows with no rate sort last either direction. Before jump counts land, order is by reward and ISK/jump cells show "…". Volume and deadline are filters and modal figures, not columns (decision `20260912-141100`).
+Route (always): origin system + security + region + risk markers, then "→" destination likewise; the two share a line when they fit and wrap at the arrow only when they do not. Optional (device-local `courierVisibleColumns`): Reward, Collateral ("—" if none asked; real zero is a distinct offer), Jumps, ISK/jump (+ going-rate multiple line; a flagged one wears a warning glyph and a screen-reader "Over rate", not a visible label), ISK/m³, Expires. Default sort ISK/jump desc; rows with no rate sort last either direction. Before jump counts land, order is by reward and ISK/jump cells show "…". Volume and deadline are filters and modal figures, not columns (decision `20260912-141100`).
 
 Phone: dense cards; hauls between the same two systems fold into a **lane** group (collapsed by default) whose header shows lane, N hauls, regions, best ISK/jump, and the union of members' risk markers (so bait in a collapsed lane is not hidden). Summary "N hauls · M lanes". `groupBy` laneKey (system pair; unplaced ends never group).
 
@@ -186,7 +185,7 @@ States: no rows "No public courier contracts synced yet"; filtered empty "No cou
 - High collateral: `collateral / reward ≥ threshold` (default 50, `HIGH_COLLATERAL_RATIO`; reward ≤ 0 → null). Threshold is a synced setting `sync.courierHighCollateralRatio` with presets 20/50/100/200 (`collateralThreshold.ts`, set in `routes/Settings.tsx`); decision `20260925-234907`, `20260926-195118`. Modal-only, no row marker (`20260912-172628`, issue #1720).
 - Freighter note: volume > 350,000 m³ (`FREIGHTER_VOLUME_M3`); warning tone only when route crosses ≤0.5 systems. Observed: a known freighter-gank contract runs 0.8x going rate, so rate alone misses it.
 - Hours to expiry floored, min 0, pinned at modal open.
-- Endpoint risks (`courierRisk.ts`): `player-structure` only for the **destination** and only when endpoint resolution is `structure`; `no-gate-route` when the end has no stargates or region id in [11,000,000, 12,000,000) (wormhole), and then nothing else (so Thera does not also read nullsec); `gank-chokepoint` (named list `route/chokepoints.ts`); `nullsec` note. `blocksCompletion` = structure or no-gate; nullsec never blocks. Marked-on-row risks: structure, no-gate, over-rate, chokepoint (nullsec is deliberately unmarked: the security number already shows). Warning set adds high-collateral.
+- Endpoint risks (`courierRisk.ts`): `player-structure` only for the **destination** and only when endpoint resolution is `structure`; `no-gate-route` when the end has no stargates or region id in [11,000,000, 12,000,000) (wormhole), and then nothing else (so Thera does not also read nullsec); `gank-chokepoint` (named list `route/chokepoints.ts`); `nullsec` note. `blocksCompletion` = structure or no-gate; nullsec never blocks. Marked-on-row risks: structure, no-gate, over-rate (a word on the phone lane header; a glyph on the desktop ISK/jump cell), chokepoint (nullsec is deliberately unmarked: the security number already shows). Warning set adds high-collateral.
 - Reverse lane: swaps the two region filters; count narrowed by the same completable and over-rate stages as the board; separately counts "unplaceable" return hauls; zero is plain text, never a dead link (`courierReverseLane.ts`).
 - Principle: every flag states a condition and consequence, never a verdict on the contract or player (decision `20260912-172628`); app cannot read access lists, cargo or intent.
 
@@ -234,13 +233,14 @@ Dense cards and mobile sort on both search tabs; filters in a funnel sheet; pane
 - No corporation contracts view: no `getCorporationContracts` in `esi/registry.ts`; Corp section is Members/Wallet/Assets only.
 - Item search and Courier need no sync backend (R2 only since #4270); R2 unreachable with nothing cached shows the unreachable state.
 - Public snapshot is ≤ 30 min old and can list a contract already gone; only discovered on modal open (404 → "no longer listed").
-- Courier endpoints that are player structures show only an id: local snapshots hold NPC stations only; wormhole hauls always unplaced.
+- Courier player structures are named only from the device's structure cache on the board (no requests); the detail modal resolves the opened haul's structure once and shows "Unknown/Undockable" when ESI refuses. Uncached ones stay an id on the board and in the modal title; local snapshots hold NPC stations only; wormhole hauls always unplaced.
 - Courier region filter cannot match unplaced ends; Space chip row hides bands with no data (Wormhole never offered).
 - History rows are not clickable as a whole; only the Type button opens detail (and in dense Search cards the whole row does).
 - History modal item lists exist only for item_exchange/auction; courier/loan show no contents.
 - Jump counts on Courier use local graph under Travel rules, not live ESI; "—" for unplaced ends or unreachable.
 - No saved searches or price alerts on contract searches; no notifications for new matching offers.
 - Items tab's ISK/unit column (beside Qty, on by default for users who have not customised their columns) shows the asking price per unit only for single-type contracts (`lineCount` of 1); it is "–" for bundles, rows not yet stamped with a line count and unpriced offers, and sorts those last. It uses the Price column's own asking price (buyout else starting bid, PLEX at market), and is in the CSV export.
+- Items tab's Saving column is the detail modal's Saving for the row: the units at the hub's best sell, less the ask, as a signed percent of that value (green unless it prints as a loss; sorts biggest first). `contractSavingFor` (engine `contractFlags.ts`) states it only where the row alone can, like the price flag: one line, not a blueprint copy, no item or PLEX ask, not a barter, an auction only with a buyout, and a hub price known (so "–" on a wide browse past 100 types). Not in the CSV.
 - Help/FAQ do not describe Contracts at all (only the stored-data list).
 - BPC Sourcing (Industry tab) reads the same snapshot with BPC-only filters, and `/bpc-contracts` appears in ARCHITECTURE as a route; documented in Industry, not here.
 
@@ -249,7 +249,6 @@ Dense cards and mobile sort on both search tabs; filters in a funnel sheet; pane
 - Saved search / alert when a matching offer appears under a price (reuses Quickbar price alerts).
 - Corporation contracts under `/corp`.
 - Make the whole History row open the modal (keep button for a11y).
-- Show structure names for courier destinations the Character can resolve (cache-only lookups).
 - Surface the going-rate figure itself (median ISK/m³/jump) in the Courier header.
 - Explain "Median" over priced offers only.
 - Add Contracts/Courier/wallet entries to Help/FAQ.

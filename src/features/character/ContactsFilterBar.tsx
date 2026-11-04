@@ -1,11 +1,18 @@
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FilterBar, FilterChip, SearchInput } from '@/components/ui';
+import {
+  FilterBar,
+  FilterChip,
+  FilterField,
+  SearchInput,
+  type ActiveFilter,
+} from '@/components/ui';
 import {
   ALL_CONTACT_KINDS,
   CONTACT_KIND_KEY,
   STANDING_CATEGORIES,
-  activeContactsFilterCount,
+  STANDING_FILTER_KEY,
+  activeContactsFilters,
   type ContactKind,
   type ContactsFilter,
   type StandingCategory,
@@ -16,12 +23,6 @@ export interface ContactCounts {
   standing: Record<StandingCategory, number>;
   type: Record<ContactKind, number>;
 }
-
-const STANDING_FILTER_KEY: Record<StandingCategory, string> = {
-  good: 'contacts.filterGood',
-  neutral: 'contacts.filterNeutral',
-  bad: 'contacts.filterBad',
-};
 
 /**
  * `ContactsFilter` plus the Across tab's own criterion, so `FilterBar`'s value
@@ -62,9 +63,19 @@ export function ContactsFilterBar({
   actions,
 }: ContactsFilterBarProps) {
   const { t } = useTranslation();
-  const activeCount =
-    activeContactsFilterCount(filter) + (view === 'across' && disagreementsOnly ? 1 : 0);
   const value: ContactsBarValue = { ...filter, disagreementsOnly };
+  const disagreementsLabel = t('contacts.acrossDisagreementsOnly');
+  const active: ActiveFilter<ContactsBarValue>[] = [
+    ...activeContactsFilters(value, t),
+    ...(view === 'across' && disagreementsOnly
+      ? [
+          {
+            label: disagreementsLabel,
+            clear: (next: ContactsBarValue) => ({ ...next, disagreementsOnly: false }),
+          },
+        ]
+      : []),
+  ];
   const handleChange = (next: ContactsBarValue) => {
     const { disagreementsOnly: nextDisagreementsOnly, ...nextFilter } = next;
     onChange(nextFilter);
@@ -75,7 +86,7 @@ export function ContactsFilterBar({
     <FilterBar
       value={value}
       onChange={handleChange}
-      activeCount={activeCount}
+      active={active}
       actions={actions}
       search={
         <SearchInput
@@ -89,45 +100,51 @@ export function ContactsFilterBar({
     >
       {(draft, setDraft) => (
         <>
-          <div
-            role="group"
-            aria-label={t('contacts.typeFilterLabel')}
-            className="flex flex-wrap gap-2"
-          >
-            {ALL_CONTACT_KINDS.map((type) => (
-              <FilterChip
-                key={type}
-                label={t(CONTACT_KIND_KEY[type])}
-                selected={draft.types.has(type)}
-                onToggle={() => setDraft({ ...draft, types: toggleInSet(draft.types, type) })}
-                count={counts.type[type]}
-              />
-            ))}
-          </div>
-          <div
-            role="group"
-            aria-label={t('contacts.standingFilterLabel')}
-            className="flex flex-wrap gap-2"
-          >
-            {STANDING_CATEGORIES.map((category) => (
-              <FilterChip
-                key={category}
-                label={t(STANDING_FILTER_KEY[category])}
-                selected={draft.standings.has(category)}
-                onToggle={() =>
-                  setDraft({ ...draft, standings: toggleInSet(draft.standings, category) })
-                }
-                count={counts.standing[category]}
-              />
-            ))}
-          </div>
+          <FilterField label={t('contacts.typeFilterLabel')} stretch={false}>
+            <div
+              role="group"
+              aria-label={t('contacts.typeFilterLabel')}
+              className="flex flex-wrap gap-2"
+            >
+              {ALL_CONTACT_KINDS.map((type) => (
+                <FilterChip
+                  key={type}
+                  label={t(CONTACT_KIND_KEY[type])}
+                  selected={draft.types.has(type)}
+                  onToggle={() => setDraft({ ...draft, types: toggleInSet(draft.types, type) })}
+                  count={counts.type[type]}
+                />
+              ))}
+            </div>
+          </FilterField>
+          <FilterField label={t('contacts.standingFilterLabel')} stretch={false}>
+            <div
+              role="group"
+              aria-label={t('contacts.standingFilterLabel')}
+              className="flex flex-wrap gap-2"
+            >
+              {STANDING_CATEGORIES.map((category) => (
+                <FilterChip
+                  key={category}
+                  label={t(STANDING_FILTER_KEY[category])}
+                  selected={draft.standings.has(category)}
+                  onToggle={() =>
+                    setDraft({ ...draft, standings: toggleInSet(draft.standings, category) })
+                  }
+                  count={counts.standing[category]}
+                />
+              ))}
+            </div>
+          </FilterField>
           {view === 'across' && (
-            <FilterChip
-              label={t('contacts.acrossDisagreementsOnly')}
-              selected={draft.disagreementsOnly}
-              onToggle={() => setDraft({ ...draft, disagreementsOnly: !draft.disagreementsOnly })}
-              count={disagreementCount}
-            />
+            <FilterField label={disagreementsLabel} stretch={false} hideCaption>
+              <FilterChip
+                label={disagreementsLabel}
+                selected={draft.disagreementsOnly}
+                onToggle={() => setDraft({ ...draft, disagreementsOnly: !draft.disagreementsOnly })}
+                count={disagreementCount}
+              />
+            </FilterField>
           )}
         </>
       )}

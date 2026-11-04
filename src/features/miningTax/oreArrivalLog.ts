@@ -21,7 +21,12 @@ export const useOreArrivalLog = createLocalSetting<OreArrivalLog>({
   // Its own record, never edited by hand: a shape check is enough to fall
   // back to empty after a format change rather than crash.
   parse: (raw) =>
-    isPlainRecord(raw) && isPlainRecord(raw.entries) && isPlainRecord(raw.checkedAt)
+    isPlainRecord(raw) &&
+    isPlainRecord(raw.entries) &&
+    Object.values(raw.entries).every(
+      (entry) => isPlainRecord(entry) && isPlainRecord(entry.ores)
+    ) &&
+    isPlainRecord(raw.checkedAt)
       ? (raw as unknown as OreArrivalLog)
       : null,
 });
@@ -48,7 +53,7 @@ export async function recordLedgerArrivals(
         ledger.entries.map((entry) => ({
           date: entry.date,
           solarSystemId: entry.solarSystemId,
-          quantity: entry.oreLines.reduce((sum, line) => sum + line.quantity, 0),
+          oreLines: entry.oreLines,
         })),
         ledger.fetchedAt.getTime()
       );

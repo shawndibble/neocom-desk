@@ -223,6 +223,7 @@ describe('planSurveyAutoAssign', () => {
           { typeId: COBALTITE, quantity: 500 },
         ],
         entryOreLines: e.oreLines,
+        takeovers: [],
       },
     ]);
   });
@@ -313,5 +314,67 @@ describe('planSurveyAutoAssign', () => {
     const e = entry([{ typeId: BITUMENS, quantity: 1000 }]);
     const b = connection({ surveyId: 'b', payeeId: 'p2' });
     expect(planSurveyAutoAssign([e], [], [connection(), b], NOON)).toEqual([]);
+  });
+});
+
+describe('planSurveyAutoAssign over a Default Systems Assignment', () => {
+  const byDefault = (oreLines: MiningLedgerEntry['oreLines'], overrides = {}) =>
+    assignment(oreLines, { id: 'd1', payeeId: 'default-payee', override: false, ...overrides });
+
+  it('takes over ore a default assigned, as if it were unassigned', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1000 }]);
+    const plan = planSurveyAutoAssign(
+      [e],
+      [byDefault([{ typeId: BITUMENS, quantity: 1000 }])],
+      [connection()],
+      NOON
+    );
+    expect(plan).toHaveLength(1);
+    expect(plan[0].oreLines).toEqual([{ typeId: BITUMENS, quantity: 1000 }]);
+    expect(plan[0].takeovers).toEqual([{ assignmentId: 'd1', typeIds: [BITUMENS] }]);
+  });
+
+  it('takes only the survey’s own ore types and leaves the rest with the default', () => {
+    const e = entry([
+      { typeId: BITUMENS, quantity: 1000 },
+      { typeId: ZEOLITES, quantity: 800 },
+    ]);
+    const held = byDefault([
+      { typeId: BITUMENS, quantity: 1000 },
+      { typeId: ZEOLITES, quantity: 800 },
+    ]);
+    const plan = planSurveyAutoAssign([e], [held], [connection()], NOON);
+    expect(plan.map((s) => s.oreLines)).toEqual([[{ typeId: BITUMENS, quantity: 1000 }]]);
+    expect(plan[0].takeovers).toEqual([{ assignmentId: 'd1', typeIds: [BITUMENS] }]);
+  });
+
+  it('takes over even when the default bills the same Payee at the same rate', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1000 }]);
+    const held = byDefault([{ typeId: BITUMENS, quantity: 1000 }], { payeeId: 'p1', taxPct: 10 });
+    expect(planSurveyAutoAssign([e], [held], [connection()], NOON)).toHaveLength(1);
+  });
+
+  it('never takes a paid one', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1000 }]);
+    const held = byDefault([{ typeId: BITUMENS, quantity: 1000 }], { status: 'paid' });
+    expect(planSurveyAutoAssign([e], [held], [connection()], NOON)).toEqual([]);
+  });
+
+  it('never takes an Assignment the pilot made or changed', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1000 }]);
+    const mine = byDefault([{ typeId: BITUMENS, quantity: 1000 }], { override: undefined });
+    expect(planSurveyAutoAssign([e], [mine], [connection()], NOON)).toEqual([]);
+  });
+
+  it('takes the whole day’s ore, including ore mined before the survey started', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1500 }]);
+    const held = byDefault([{ typeId: BITUMENS, quantity: 1000 }]);
+    const plan = planSurveyAutoAssign([e], [held], [connection()], NOON);
+    expect(plan[0].oreLines).toEqual([{ typeId: BITUMENS, quantity: 1500 }]);
+  });
+
+  it('adds no takeover to a slice that held nothing', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1000 }]);
+    expect(planSurveyAutoAssign([e], [], [connection()], NOON)[0].takeovers).toEqual([]);
   });
 });

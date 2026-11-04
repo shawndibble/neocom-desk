@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import {
   CheckboxSelect,
   FilterBar,
-  FilterChip,
   FilterField,
   SearchInput,
   SegmentedControl,
@@ -21,7 +20,7 @@ import { PriceBasisSelect } from './PriceBasisSelect';
 import { TradeHubSelect } from './TradeHubSelect';
 import {
   MIN_SELLS_PER_DAY_OPTIONS,
-  lpLandingActiveFilterCount,
+  activeLpLandingFilters,
   type LpLandingFilters,
   type MinSellsPerDay,
 } from './lpLanding';
@@ -40,6 +39,9 @@ function toggleCategory(
   );
   return next === 'all' ? [] : [...next];
 }
+
+const SHOW_ONLY_KEYS = ['mineOnly', 'affordableOnly', 'noTurnIns', 'hideFactionWarfare'] as const;
+type ShowOnlyKey = (typeof SHOW_ONLY_KEYS)[number];
 
 export type LpLandingView = 'stores' | 'offers';
 
@@ -81,12 +83,11 @@ export function LpLandingFilterBar({
 }) {
   const { t } = useTranslation();
   const noLp = heldStores === 0;
-  const heldCount = heldStores ?? undefined;
   return (
     <FilterBar
       value={value}
       onChange={onChange}
-      activeCount={lpLandingActiveFilterCount(value)}
+      active={activeLpLandingFilters(value, t, { factions, categories })}
       rowAlign="end"
       search={
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -117,19 +118,19 @@ export function LpLandingFilterBar({
     >
       {(draft, setDraft) => (
         <>
-          <FilterField label={t('loyaltyStore.hubLabel')}>
+          <FilterField captionInline label={t('loyaltyStore.hubLabel')}>
             <TradeHubSelect
               value={draft.hubId}
               onValueChange={(hubId) => setDraft({ ...draft, hubId })}
             />
           </FilterField>
-          <FilterField label={t('loyaltyStore.priceBasisLabel')}>
+          <FilterField captionInline label={t('loyaltyStore.priceBasisLabel')}>
             <PriceBasisSelect
               value={draft.priceBasis}
               onValueChange={(priceBasis) => setDraft({ ...draft, priceBasis })}
             />
           </FilterField>
-          <FilterField label={t('loyaltyStore.landing.factionLabel')}>
+          <FilterField captionInline label={t('loyaltyStore.landing.factionLabel')}>
             <Select
               value={String(draft.faction)}
               onValueChange={(next) =>
@@ -139,7 +140,10 @@ export function LpLandingFilterBar({
                 })
               }
             >
-              <SelectTrigger aria-label={t('loyaltyStore.landing.factionLabel')}>
+              <SelectTrigger
+                aria-label={t('loyaltyStore.landing.factionLabel')}
+                active={draft.faction !== 'all'}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -153,20 +157,24 @@ export function LpLandingFilterBar({
               </SelectContent>
             </Select>
           </FilterField>
-          <FilterField label={t('jumpRange.label')}>
+          <FilterField captionInline label={t('jumpRange.label')}>
             <JumpRangeSelect
               value={draft.range}
+              active={draft.range !== 'any'}
               onChange={(range) => setDraft({ ...draft, range })}
             />
           </FilterField>
-          <FilterField label={t('loyaltyStore.landing.minSellsLabel')}>
+          <FilterField captionInline label={t('loyaltyStore.landing.minSellsLabel')}>
             <Select
               value={String(draft.minSellsPerDay)}
               onValueChange={(next) =>
                 setDraft({ ...draft, minSellsPerDay: Number(next) as MinSellsPerDay })
               }
             >
-              <SelectTrigger aria-label={t('loyaltyStore.landing.minSellsLabel')}>
+              <SelectTrigger
+                aria-label={t('loyaltyStore.landing.minSellsLabel')}
+                active={draft.minSellsPerDay !== 0}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -181,9 +189,11 @@ export function LpLandingFilterBar({
             </Select>
           </FilterField>
           {categories.length > 0 && (
-            <FilterField label={t('loyaltyStore.landing.categoryLabel')}>
+            <FilterField captionInline label={t('loyaltyStore.landing.categoryLabel')}>
               <CheckboxSelect
                 label={t('loyaltyStore.landing.categoryLabel')}
+                size="md"
+                active={draft.categories.length > 0}
                 options={categories.map((category) => ({
                   value: category.id,
                   label: category.name,
@@ -202,48 +212,41 @@ export function LpLandingFilterBar({
               />
             </FilterField>
           )}
-          {/* `md:contents`: inline the chips join the row; in the sheet they wrap under one caption. */}
-          <FilterField label={t('loyaltyStore.landing.showOnlyLabel')} stretch={false}>
-            <div className="flex flex-wrap gap-2 md:contents">
-              <FilterChip
-                label={t('loyaltyStore.landing.mineOnly')}
-                selected={draft.mineOnly}
-                onToggle={() => setDraft({ ...draft, mineOnly: !draft.mineOnly })}
-                count={noLp ? undefined : heldCount}
-                countLabel={t('loyaltyStore.landing.mineOnlyCount')}
-                disabled={noLp && !draft.mineOnly}
-                tooltip={noLp ? t('loyaltyStore.landing.noLpHeld') : undefined}
-                size="md"
-              />
-              <FilterChip
-                label={t('loyaltyStore.landing.affordable')}
-                selected={draft.affordableOnly}
-                onToggle={() => setDraft({ ...draft, affordableOnly: !draft.affordableOnly })}
-                disabled={noLp && !draft.affordableOnly}
-                tooltip={
-                  noLp
+          <FilterField captionInline label={t('loyaltyStore.landing.showOnlyLabel')}>
+            <CheckboxSelect<ShowOnlyKey>
+              label={t('loyaltyStore.landing.showOnlyLabel')}
+              size="md"
+              active={SHOW_ONLY_KEYS.some((key) => draft[key])}
+              noneLabel={t('loyaltyStore.landing.showOnlyAny')}
+              options={[
+                {
+                  value: 'mineOnly',
+                  label: t('loyaltyStore.landing.mineOnly'),
+                  description: noLp ? t('loyaltyStore.landing.noLpHeld') : undefined,
+                  disabled: noLp && !draft.mineOnly,
+                },
+                {
+                  value: 'affordableOnly',
+                  label: t('loyaltyStore.landing.affordable'),
+                  description: noLp
                     ? t('loyaltyStore.landing.noLpHeld')
-                    : t('loyaltyStore.landing.affordableHelp')
-                }
-                size="md"
-              />
-              <FilterChip
-                label={t('loyaltyStore.landing.noTurnIns')}
-                selected={draft.noTurnIns}
-                onToggle={() => setDraft({ ...draft, noTurnIns: !draft.noTurnIns })}
-                tooltip={t('loyaltyStore.landing.noTurnInsHelp')}
-                size="md"
-              />
-              <FilterChip
-                label={t('loyaltyStore.landing.hideFactionWarfare')}
-                selected={draft.hideFactionWarfare}
-                onToggle={() =>
-                  setDraft({ ...draft, hideFactionWarfare: !draft.hideFactionWarfare })
-                }
-                tooltip={t('loyaltyStore.landing.hideFactionWarfareHelp')}
-                size="md"
-              />
-            </div>
+                    : t('loyaltyStore.landing.affordableHelp'),
+                  disabled: noLp && !draft.affordableOnly,
+                },
+                {
+                  value: 'noTurnIns',
+                  label: t('loyaltyStore.landing.noTurnIns'),
+                  description: t('loyaltyStore.landing.noTurnInsHelp'),
+                },
+                {
+                  value: 'hideFactionWarfare',
+                  label: t('loyaltyStore.landing.hideFactionWarfare'),
+                  description: t('loyaltyStore.landing.hideFactionWarfareHelp'),
+                },
+              ]}
+              selected={new Set(SHOW_ONLY_KEYS.filter((key) => draft[key]))}
+              onToggle={(key) => setDraft({ ...draft, [key]: !draft[key] })}
+            />
           </FilterField>
         </>
       )}

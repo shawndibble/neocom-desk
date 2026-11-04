@@ -70,7 +70,10 @@ function Training({
   }
 
   return (
-    <MakeItFitSection heading={t('fittings.makeItFit.section.train')}>
+    <MakeItFitSection
+      heading={t('fittings.makeItFit.section.train')}
+      hint={t('fittings.makeItFit.sectionHint.train')}
+    >
       {fixes === null ? (
         <p className="text-text-dim flex items-center gap-2 text-xs">
           <Spinner /> {t('fittings.makeItFit.checkingSkills')}

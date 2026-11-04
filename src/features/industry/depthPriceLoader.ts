@@ -8,7 +8,10 @@
  * Order Book outage must not leave a plan unpriced.
  */
 import { useCallback, useMemo } from 'react';
-import { walkSellBook, type DepthPrice } from '@/engine/industry/depthPrice';
+import { depthCandidates, walkSellBook, type DepthPrice } from '@/engine/industry/depthPrice';
+import type { BuildResult, HubPrices } from '@/engine/industry/types';
+import type { BuildPlanRecord } from '@/db';
+import { shoppingListMaterials } from './subBuildPlan';
 import type { HubOrder } from '@/engine/market/haulingMarket';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
@@ -45,6 +48,26 @@ function walkBooks(
     if (walk) depth.set(typeID, walk);
   }
   return depth;
+}
+
+/**
+ * The materials a plan walks the hub's book for, and how many it needs: read
+ * off its lowest-sell resolution, so the page and the Build Plans list agree
+ * on which materials get Depth Prices.
+ */
+export function planDepthNeeds(
+  plan: Pick<BuildPlanRecord, 'materialSourcing' | 'materialPriceBasis'>,
+  lowestSell: Pick<BuildResult, 'materials'> | null,
+  sellVolumes: HubPrices
+): Map<number, number> {
+  return lowestSell
+    ? depthCandidates(
+        shoppingListMaterials(lowestSell.materials),
+        sellVolumes,
+        plan.materialSourcing,
+        plan.materialPriceBasis
+      )
+    : new Map<number, number>();
 }
 
 export async function loadDepthPrices(

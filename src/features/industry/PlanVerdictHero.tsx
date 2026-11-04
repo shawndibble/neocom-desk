@@ -308,9 +308,7 @@ export function PlanVerdictHero({
                   t('industry.hero.leadPlain')
                 ) : (
                   <>
-                    {basis === 'sellValue'
-                      ? t('industry.hero.leadSellValue')
-                      : t('industry.hero.leadFree')}{' '}
+                    {t('industry.hero.leadOwned')}{' '}
                     {/* §6c: accent text, no underline, tooltip naming the press — a value that flips in place. */}
                     <Tooltip content={t('industry.hero.basisFlipHint')}>
                       <button

@@ -264,6 +264,7 @@ export function MinerDetail({ id }: { id: string }) {
       render: (d) => (
         <PlaceCell
           refinery={names.refinery(d.structureId)}
+          undockable={names.undockable?.(d.structureId)}
           moon={dayMoon(d)}
           to={d.extractionId === undefined ? undefined : extractionPath(d.extractionId)}
         />
@@ -528,6 +529,7 @@ export function MinerDetail({ id }: { id: string }) {
       render: (m) => (
         <PlaceCell
           refinery={names.refinery(m.structureId)}
+          undockable={names.undockable?.(m.structureId)}
           moon={m.moonId === undefined ? undefined : names.moon(m.moonId)}
         />
       ),

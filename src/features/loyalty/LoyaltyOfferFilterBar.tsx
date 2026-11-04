@@ -11,6 +11,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  type ActiveFilter,
   type DataTableColumn,
 } from '@/components/ui';
 import {
@@ -52,11 +53,20 @@ export function LoyaltyOfferFilterBar({
   columnsById: Record<LoyaltyStoreOffersColumnId, DataTableColumn<LoyaltyOfferRow>>;
 }): ReactNode {
   const { t } = useTranslation();
+  const affordableLabel = t('loyaltyStore.affordableFilter');
+  const blueprintsLabel = t('loyaltyStore.blueprintsFilter');
+  // The hub and the two bases are what the numbers are priced at, not filters:
+  // they never hide a row, so they never show as a pill.
+  const active: ActiveFilter<LoyaltyOfferFilterValue>[] = [];
+  if (value.affordableOnly)
+    active.push({ label: affordableLabel, clear: (next) => ({ ...next, affordableOnly: false }) });
+  if (value.blueprintsOnly)
+    active.push({ label: blueprintsLabel, clear: (next) => ({ ...next, blueprintsOnly: false }) });
   return (
     <FilterBar
       value={value}
       onChange={onChange}
-      activeCount={(value.affordableOnly ? 1 : 0) + (value.blueprintsOnly ? 1 : 0)}
+      active={active}
       search={
         <SearchInput
           placeholder={t('loyaltyStore.searchPlaceholder')}
@@ -114,19 +124,23 @@ export function LoyaltyOfferFilterBar({
               </SelectContent>
             </Select>
           </FilterField>
-          <FilterChip
-            label={t('loyaltyStore.affordableFilter')}
-            selected={draft.affordableOnly}
-            onToggle={() => setDraft({ ...draft, affordableOnly: !draft.affordableOnly })}
-            count={affordableCount}
-            size="md"
-          />
-          <FilterChip
-            label={t('loyaltyStore.blueprintsFilter')}
-            selected={draft.blueprintsOnly}
-            onToggle={() => setDraft({ ...draft, blueprintsOnly: !draft.blueprintsOnly })}
-            size="md"
-          />
+          <FilterField label={affordableLabel} stretch={false} hideCaption>
+            <FilterChip
+              label={affordableLabel}
+              selected={draft.affordableOnly}
+              onToggle={() => setDraft({ ...draft, affordableOnly: !draft.affordableOnly })}
+              count={affordableCount}
+              size="md"
+            />
+          </FilterField>
+          <FilterField label={blueprintsLabel} stretch={false} hideCaption>
+            <FilterChip
+              label={blueprintsLabel}
+              selected={draft.blueprintsOnly}
+              onToggle={() => setDraft({ ...draft, blueprintsOnly: !draft.blueprintsOnly })}
+              size="md"
+            />
+          </FilterField>
         </>
       )}
     </FilterBar>

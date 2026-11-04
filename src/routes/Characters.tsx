@@ -79,7 +79,7 @@ import { CharactersCardView } from '@/features/character/CharactersCardView';
 import { useCharacterGroupActions } from '@/features/character/useCharacterGroupActions';
 import { useCharactersHousekeeping } from '@/features/character/useCharactersHousekeeping';
 import { characterLastSynced } from '@/features/character/rosterQueueChip';
-import { useCharactersView, activeRosterFilterCount } from '@/features/character/useCharactersView';
+import { useCharactersView, activeRosterFilters } from '@/features/character/useCharactersView';
 import { buildColumns } from '@/features/character/charactersTableColumns';
 import { useCharacterWhereabouts } from '@/features/character/useCharacterWhereabouts';
 import { useCharacterAchievements } from '@/features/character/useCharacterAchievements';
@@ -437,7 +437,7 @@ export function Characters() {
                 alerts: next.alertsOnly,
               })
             }
-            activeCount={activeRosterFilterCount(rosterFilter)}
+            active={activeRosterFilters(rosterFilter, t, groupFilterOptions)}
             search={
               <SearchInput
                 value={search}

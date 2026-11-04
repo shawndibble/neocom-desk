@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import type { TFunction } from 'i18next';
 import {
   EMPTY_WALLET_TRANSACTION_FILTER,
-  activeWalletTransactionFilterCount,
+  activeWalletTransactionFilters,
   filterWalletTransactions,
   type WalletTransactionFilter,
 } from './walletTransactionFilter';
@@ -95,31 +96,48 @@ describe('filterWalletTransactions', () => {
   });
 });
 
-describe('activeWalletTransactionFilterCount', () => {
-  it('counts nothing for an empty filter', () => {
-    expect(activeWalletTransactionFilterCount(EMPTY_WALLET_TRANSACTION_FILTER)).toBe(0);
+describe('activeWalletTransactionFilters', () => {
+  // Echoes the key, except for the "+N" summary, so a station pick's value reads.
+  function echo(key: string, options?: { values?: string; count?: number }): string {
+    return options?.values === undefined ? key : `${options.values} +${options.count}`;
+  }
+  const t = echo as unknown as TFunction;
+  const labels = (value: WalletTransactionFilter) =>
+    activeWalletTransactionFilters(value, t).map((pill) => pill.label);
+
+  it('is empty for an empty filter', () => {
+    expect(activeWalletTransactionFilters(EMPTY_WALLET_TRANSACTION_FILTER, t)).toEqual([]);
   });
 
-  it('counts side and each date end', () => {
-    expect(
-      activeWalletTransactionFilterCount(
-        filter({ side: 'buy', startDate: '2026-09-01', endDate: '2026-09-04' })
-      )
-    ).toBe(3);
+  it('lists side and each date end', () => {
+    expect(labels(filter({ side: 'buy', startDate: '2026-09-01', endDate: '2026-09-04' }))).toEqual(
+      ['wallet.sideFilterLabel', 'wallet.dateFromLabel', 'wallet.dateToLabel']
+    );
   });
 
-  it('counts a station pick as one filter, however many stations', () => {
-    expect(activeWalletTransactionFilterCount(filter({ stations: [1, 2] }))).toBe(1);
+  it('makes a station pick one pill, however many stations, named from the options', () => {
+    const active = activeWalletTransactionFilters(filter({ stations: [1, 2, 3] }), t, [
+      { id: 1, label: 'Jita' },
+      { id: 2, label: 'Amarr' },
+    ]);
+    expect(active).toHaveLength(1);
+    expect(active[0].value).toBe('Jita, Amarr +1');
   });
 
   it('leaves the view and station order out, because they arrange rather than narrow', () => {
-    expect(
-      activeWalletTransactionFilterCount(filter({ view: 'station', stationsBy: 'name' }))
-    ).toBe(0);
+    expect(labels(filter({ view: 'station', stationsBy: 'name' }))).toEqual([]);
   });
 
   it('leaves the text out, because its box never hides', () => {
-    expect(activeWalletTransactionFilterCount(filter({ text: 'tritanium' }))).toBe(0);
+    expect(labels(filter({ text: 'tritanium' }))).toEqual([]);
+  });
+
+  it('clears just its own field', () => {
+    const value = filter({ side: 'sell', startDate: '2026-09-01', stations: [1] });
+    const [side, from, stations] = activeWalletTransactionFilters(value, t);
+    expect(side.clear(value)).toEqual({ ...value, side: 'all' });
+    expect(from.clear(value)).toEqual({ ...value, startDate: null });
+    expect(stations.clear(value)).toEqual({ ...value, stations: [] });
   });
 });
 
