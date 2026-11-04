@@ -20,7 +20,8 @@ import {
   type CachedResult,
 } from '@/esi/cache';
 
-function cacheKey(contractId: number): string {
+/** The cache key of one contract's items; Stock reads these rows without a network call. */
+export function contractItemsCacheKey(contractId: number): string {
   return `contract-items:${contractId}`;
 }
 
@@ -63,8 +64,8 @@ export async function loadContractItemsDetailed(
   };
   const key =
     corporationId === undefined
-      ? cacheKey(contractId)
-      : corpCacheKey(corporationId, cacheKey(contractId));
+      ? contractItemsCacheKey(contractId)
+      : corpCacheKey(corporationId, contractItemsCacheKey(contractId));
   const result = await loadWithCache(characterId, key, observed, {
     staleAfterMs: STALE_AFTER.static,
     conditional,

@@ -238,17 +238,25 @@ export function StockManagerTable({
       headerCellClassName: 'sm:w-24',
       className: 'tabular-nums',
       stackAffix: { after: ` ${t('stockTargets.table.listedAffix')}` },
-      render: (row) =>
-        characterName && row.listedBy ? (
-          <StockHolders
-            total={row.listed}
-            holders={row.listedBy}
-            heading={t('stockTargets.holders.listedBy')}
-            nameOf={characterName}
-          />
-        ) : (
-          formatNumber(row.listed)
-        ),
+      render: (row) => (
+        <>
+          {characterName && row.listedBy ? (
+            <StockHolders
+              total={row.listed}
+              holders={row.listedBy}
+              heading={t('stockTargets.holders.listedBy')}
+              nameOf={characterName}
+            />
+          ) : (
+            formatNumber(row.listed)
+          )}
+          {row.onContract ? (
+            <span className="block text-xs text-text-dim">
+              {t('stockTargets.table.onContract', { count: row.onContract })}
+            </span>
+          ) : null}
+        </>
+      ),
       sortValue: (row) => row.listed,
     },
     {
