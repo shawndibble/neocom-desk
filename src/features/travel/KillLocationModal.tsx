@@ -12,6 +12,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, TypeIcon } from '@/components/ui';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { Caret } from '@/components/ui/Disclosure';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Pill } from '@/components/ui/Pill';
@@ -196,7 +198,11 @@ function KillRow({
         type="button"
         aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full flex-wrap items-start gap-x-3 gap-y-1 px-3 py-2 text-left hover:bg-panel-2"
+        className={cx(
+          'flex w-full flex-wrap items-start gap-x-3 gap-y-1 px-3 py-2 text-left',
+          rowInteractiveClassName,
+          focusRingInsetClassName
+        )}
       >
         {shipTypeId !== null ? (
           <TypeIcon typeId={shipTypeId} size={64} className="mt-0.5 size-9 shrink-0 rounded-xs" />
