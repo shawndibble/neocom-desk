@@ -92,10 +92,12 @@ export interface ResistRow {
 /**
  * The Defense table (mockup A): a row per layer — its raw HP beneath the
  * name, a cell per damage type, EHP last — and the Reactive Armor
- * Hardener's adapted resists.
+ * Hardener's adapted resists. With no row carrying an EHP (Item Detail's
+ * base values, which have no Damage Profile), the EHP column is left out.
  */
 export function ResistTable({ rows }: { rows: ResistRow[] }) {
   const { t } = useTranslation();
+  const showEhp = rows.some((row) => row.ehp !== undefined || row.unheated?.ehp !== undefined);
   return (
     <table className="w-full table-fixed border-collapse">
       <thead>
@@ -110,9 +112,11 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
               {t(`fittings.stats.damageTypeShort.${type}`)}
             </th>
           ))}
-          <th scope="col" className={`w-[18%] pb-1 text-right ${STAT_EYEBROW}`}>
-            {t('fittings.stats.ehpColumn')}
-          </th>
+          {showEhp && (
+            <th scope="col" className={`w-[18%] pb-1 text-right ${STAT_EYEBROW}`}>
+              {t('fittings.stats.ehpColumn')}
+            </th>
+          )}
         </tr>
       </thead>
       <tbody>
@@ -138,26 +142,28 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
                 statKey={layerKey(row.key, RESONANCE_KEY[type])?.[0]}
               />
             ))}
-            <td className="text-right text-xs tabular-nums">
-              {row.unheated?.ehp === undefined ? (
-                row.ehp === undefined ? (
-                  ''
+            {showEhp && (
+              <td className="text-right text-xs tabular-nums">
+                {row.unheated?.ehp === undefined ? (
+                  row.ehp === undefined ? (
+                    ''
+                  ) : (
+                    formatEhp(row.ehp)
+                  )
                 ) : (
-                  formatEhp(row.ehp)
-                )
-              ) : (
-                <HintText
-                  content={t('fittings.stats.unheated', { value: row.unheated.ehp })}
-                  className="text-warning"
-                >
-                  {row.ehp === undefined ? '' : formatEhp(row.ehp)}
-                  <span className="sr-only">
-                    {' '}
-                    ({t('fittings.stats.unheated', { value: row.unheated.ehp })})
-                  </span>
-                </HintText>
-              )}
-            </td>
+                  <HintText
+                    content={t('fittings.stats.unheated', { value: row.unheated.ehp })}
+                    className="text-warning"
+                  >
+                    {row.ehp === undefined ? '' : formatEhp(row.ehp)}
+                    <span className="sr-only">
+                      {' '}
+                      ({t('fittings.stats.unheated', { value: row.unheated.ehp })})
+                    </span>
+                  </HintText>
+                )}
+              </td>
+            )}
           </tr>
         ))}
       </tbody>

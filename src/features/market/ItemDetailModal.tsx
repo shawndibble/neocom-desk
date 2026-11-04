@@ -31,7 +31,7 @@ import {
   interactiveClassName,
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useInRouterContext, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -54,11 +54,13 @@ import {
   useTabsId,
 } from '@/components/ui';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import type { AttributeDictionary, AttributeReferenceNames } from '@/engine/market/itemAttributes';
 import {
-  groupItemAttributes,
-  type AttributeDictionary,
-  type AttributeGroup,
-} from '@/engine/market/itemAttributes';
+  itemAttributeSections,
+  itemKindOf,
+  type AttributeSection,
+  type ItemKind,
+} from '@/engine/market/itemAttributeSections';
 import { EveMarkupText } from '@/components/EveMarkupText';
 import { marketItemUrl } from '@/engine/market/urlState';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
@@ -80,7 +82,8 @@ import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
-import { formatAttributeValue, formatVolume } from './format';
+import { formatVolume } from './format';
+import { ItemAttributeSections } from './ItemAttributeSections';
 import { loadTypeDetail, type TypeDetail } from '@/features/skills/typeDetail';
 import {
   loadOrderBookView,
@@ -95,7 +98,7 @@ import { UsedInSection } from './UsedInSection';
 import { AbyssalItemDetail } from '@/features/abyssal/AbyssalItemDetail';
 import { AbyssalEstimateLine } from '@/features/abyssal/AbyssalEstimateLine';
 import { useIsAbyssalType } from '@/features/abyssal/mutaplasmidData';
-import { useDynamicItem } from '@/features/abyssal/useDynamicItem';
+import { useDynamicItem, useDynamicItemMutation } from '@/features/abyssal/useDynamicItem';
 import { recordAttributes } from '@/features/abyssal/dynamicItems';
 import type { DynamicItemRecord } from '@/db';
 import { formatIsk, formatIskCompact, marketIskDecimals } from '@/lib/isk';
@@ -132,7 +135,9 @@ export interface ItemDetailModalProps {
 interface DetailData {
   type: TypeDetail;
   /** Skill-requirement rows already excluded — the Required Skills section below owns those instead. */
-  groups: AttributeGroup[];
+  sections: AttributeSection[];
+  /** Orders the sections; a Mutated module's own attributes are grouped by its type's. */
+  kind: ItemKind;
   requiredSkills: RequiredSkill[];
   /** typeID -> name, reused from the same resolution the generic rows already paid for. */
   skillNames: Readonly<Record<number, string>>;
@@ -186,11 +191,13 @@ export function ItemDetailModal({
   // Null until known, so the market line and link don't flash in on an Abyssal type.
   const abyssal = useIsAbyssalType(typeId);
   const dynamic = useDynamicItem(typeId, abyssal ? itemId : undefined);
-  /** The Mutated module's own attributes, grouped as the type's are, for the record they were grouped from. */
-  const [dynamicGrouped, setDynamicGrouped] = useState<{
+  /** Names for the Mutated module's own attributes' ids, for the record they were resolved for. */
+  const [dynamicNames, setDynamicNames] = useState<{
     record: DynamicItemRecord;
-    groups: AttributeGroup[];
+    names: AttributeReferenceNames;
   } | null>(null);
+  // Its rolls show in "This module's rolls", so its groups leave them out.
+  const mutation = useDynamicItemMutation(typeId, dynamic);
 
   useEffect(() => {
     let cancelled = false;
@@ -264,9 +271,12 @@ export function ItemDetailModal({
         if (cancelled) return;
         const allSkillNames: Record<number, string> = {};
         for (const skill of skills) allSkillNames[skill.typeID] = skill.name;
+        const kind = itemKindOf(type.dogma_attributes, type.dogma_effects);
         setData({
           type,
-          groups: groupItemAttributes(type.dogma_attributes, dictionary, names, {
+          kind,
+          sections: itemAttributeSections(type.dogma_attributes, dictionary, names, {
+            kind,
             omitSkillRequirementRows: true,
           }),
           requiredSkills: extractRequiredSkills(type.dogma_attributes),
@@ -292,22 +302,28 @@ export function ItemDetailModal({
     let cancelled = false;
     const attributes = recordAttributes(dynamicRecord);
     void loadAttributeReferenceNames([attributes], data.dictionary).then((names) => {
-      if (cancelled) return;
-      setDynamicGrouped({
-        record: dynamicRecord,
-        groups: groupItemAttributes(attributes, data.dictionary, names, {
-          omitSkillRequirementRows: true,
-        }),
-      });
+      if (!cancelled) setDynamicNames({ record: dynamicRecord, names });
     });
     return () => {
       cancelled = true;
     };
   }, [data, dynamicRecord]);
-  const attributeGroups =
-    (dynamicRecord && dynamicGrouped?.record === dynamicRecord ? dynamicGrouped.groups : null) ??
-    data?.groups ??
-    [];
+  const attributeSections = useMemo(() => {
+    if (!data) return [];
+    if (!dynamicRecord || dynamicNames?.record !== dynamicRecord) return data.sections;
+    return itemAttributeSections(
+      recordAttributes(dynamicRecord),
+      data.dictionary,
+      dynamicNames.names,
+      {
+        kind: data.kind,
+        omitSkillRequirementRows: true,
+        omitAttributeIds: mutation
+          ? new Set(Object.keys(mutation.attributes).map(Number))
+          : undefined,
+      }
+    );
+  }, [data, dynamicRecord, dynamicNames, mutation]);
 
   // Gates which attribute-modifier popovers can apply (empty while `data`
   // hasn't loaded yet).
@@ -463,51 +479,38 @@ export function ItemDetailModal({
 
               <UsedInSection typeId={typeId} onNavigate={leave} />
 
-              {attributeGroups.length === 0 ? (
-                <p className="text-xs text-text-dim">{t('market.itemDetail.noAttributes')}</p>
+              {attributeSections.length === 0 ? (
+                // A Mutated module whose every attribute is a roll has them all above.
+                !mutation && (
+                  <p className="text-xs text-text-dim">{t('market.itemDetail.noAttributes')}</p>
+                )
               ) : (
-                attributeGroups.map((group) => (
-                  <div key={group.category}>
-                    <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
-                      {group.category}
-                    </h3>
-                    <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs">
-                      {group.attributes.map((attribute) => {
-                        const valueText =
-                          attribute.displayValue ??
-                          `${formatAttributeValue(attribute.value, attribute.unit)}${attribute.unit ? ` ${attribute.unit}` : ''}`;
-                        const modifiers = activeCharacterId
-                          ? findModifyingSkills(
-                              attribute.attributeId,
-                              requiredSkillTypeIds,
-                              data.skillAttributeModifiers
-                            )
-                          : [];
-                        return (
-                          <div key={attribute.attributeId} className="contents">
-                            <dt className="text-text-dim">{attribute.name}</dt>
-                            <dd className="text-right text-text">
-                              {modifiers.length > 0 ? (
-                                <AttributeModifierTrigger
-                                  modifiers={modifiers}
-                                  skillNames={data.allSkillNames}
-                                  trainedSkills={trainedSkills}
-                                  target={targetPlan}
-                                  itemName={itemName}
-                                  attributeName={attribute.name}
-                                >
-                                  {valueText}
-                                </AttributeModifierTrigger>
-                              ) : (
-                                valueText
-                              )}
-                            </dd>
-                          </div>
-                        );
-                      })}
-                    </dl>
-                  </div>
-                ))
+                <ItemAttributeSections
+                  sections={attributeSections}
+                  renderValue={(attribute, valueText) => {
+                    const modifiers = activeCharacterId
+                      ? findModifyingSkills(
+                          attribute.attributeId,
+                          requiredSkillTypeIds,
+                          data.skillAttributeModifiers
+                        )
+                      : [];
+                    return modifiers.length > 0 ? (
+                      <AttributeModifierTrigger
+                        modifiers={modifiers}
+                        skillNames={data.allSkillNames}
+                        trainedSkills={trainedSkills}
+                        target={targetPlan}
+                        itemName={itemName}
+                        attributeName={attribute.name}
+                      >
+                        {valueText}
+                      </AttributeModifierTrigger>
+                    ) : (
+                      valueText
+                    );
+                  }}
+                />
               )}
             </>
           )}

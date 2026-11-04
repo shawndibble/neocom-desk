@@ -13290,6 +13290,8 @@
       "usedInReaction": "Reaction",
       "usedInShowMore": "Show more ({{shown}} of {{total}})",
       "noAttributes": "No fitting attributes for this item.",
+      "resistsTitle": "Resistances",
+      "layerHp": "{{value}} HP",
       "errorTitle": "Couldn't load item info",
       "errorHint": "Try again, or reload the page."
     },

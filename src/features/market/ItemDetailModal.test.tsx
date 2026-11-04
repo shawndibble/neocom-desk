@@ -160,6 +160,60 @@ describe('ItemDetailModal', () => {
     expect(screen.getByText('250 m/sec')).toBeInTheDocument();
   });
 
+  it('leads a hull with fitting and one resist grid, values as the game shows them', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Zealot',
+          description: '',
+          group_id: 358,
+          published: true,
+          dogma_attributes: [
+            { attribute_id: 55, value: 285000 },
+            { attribute_id: 14, value: 5 },
+            { attribute_id: 265, value: 2250 },
+            { attribute_id: 267, value: 0.5 },
+            { attribute_id: 268, value: 0.2 },
+            { attribute_id: 269, value: 0.375 },
+            { attribute_id: 270, value: 0.65 },
+            { attribute_id: 633, value: 5 },
+          ],
+        })
+      )
+    );
+    const resist = (name: string) => ({ name, unit: '%', category: 'Armor', unitId: 108 });
+    mockedLoadDictionary.mockResolvedValue({
+      55: { name: 'Capacitor Recharge time', unit: 's', category: 'Capacitor', unitId: 101 },
+      14: { name: 'High Slots', unit: '', category: 'Fitting', unitId: 122 },
+      265: { name: 'Armor Hitpoints', unit: 'HP', category: 'Armor', unitId: 113 },
+      267: resist('Armor EM Damage Resistance'),
+      268: resist('Armor Explosive Damage Resistance'),
+      269: resist('Armor Kinetic Damage Resistance'),
+      270: resist('Armor Thermal Damage Resistance'),
+      633: { name: 'Meta Level', unit: 'Level', category: 'Miscellaneous', unitId: 140 },
+    });
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Zealot" onClose={() => {}} />);
+
+    expect(await screen.findByText('Resistances')).toBeInTheDocument();
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(headings.indexOf('Fitting')).toBeLessThan(headings.indexOf('Resistances'));
+    expect(headings.indexOf('Resistances')).toBeLessThan(headings.indexOf('Capacitor'));
+    expect(headings.at(-1)).toBe('Miscellaneous');
+
+    const armor = screen.getByRole('rowheader', { name: /Armor/ }).closest('tr')!;
+    expect(armor).toHaveTextContent('2,250 HP');
+    expect(
+      within(armor)
+        .getAllByRole('cell')
+        .map((c) => c.textContent)
+    ).toEqual(['50%', '35%', '63%', '80%']);
+    expect(screen.queryByText('Armor EM Damage Resistance')).not.toBeInTheDocument();
+    expect(screen.getByText('285 s')).toBeInTheDocument();
+    expect(screen.getByText('Meta Level').nextSibling).toHaveTextContent(/^5$/);
+  });
+
   it('opens a Market tab with the Price History for the item and a region picker', async () => {
     let historyRegion: string | null = null;
     server.use(
@@ -1078,6 +1132,7 @@ describe('ItemDetailModal — an owned abyssal module', () => {
     });
     mockedLoadDictionary.mockResolvedValue({
       9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
+      37: { name: 'Maximum Velocity', unit: 'm/sec', category: 'Speed and Travel' },
     });
     // The abyssal type's own shard carries no hit points; the base's does.
     mockedLoadTypeInfo.mockImplementation(async (typeId: number) => ({
@@ -1092,7 +1147,10 @@ describe('ItemDetailModal — an owned abyssal module', () => {
           created_by: 1,
           mutator_type_id: MUTAPLASMID,
           source_type_id: BASE_TYPE,
-          dogma_attributes: [{ attribute_id: 9, value: 1150 }],
+          dogma_attributes: [
+            { attribute_id: 9, value: 1150 },
+            { attribute_id: 37, value: 300 },
+          ],
           dogma_effects: [],
         })
       ),
@@ -1117,8 +1175,10 @@ describe('ItemDetailModal — an owned abyssal module', () => {
 
     const rolls = await screen.findByRole('table', { name: "This module's rolls" });
     expect(within(rolls).getByText('1,150')).toBeInTheDocument();
-    // The grouped attributes are the module's own (1,150 HP), not its type's empty shard.
-    expect(await screen.findByText('1,150 HP')).toBeInTheDocument();
+    // The grouped attributes are the module's own, not its type's empty shard, and
+    // leave out what the rolls already show.
+    expect(await screen.findByText('300 m/sec')).toBeInTheDocument();
+    expect(screen.queryByText('1,150 HP')).not.toBeInTheDocument();
     expect(screen.queryByText('Best sell:')).not.toBeInTheDocument();
     // No market order exists for an abyssal type: no book is read, no Market link offered,
     // and no in-game market window to open (the type has no market group).

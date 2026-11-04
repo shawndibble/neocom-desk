@@ -42,8 +42,7 @@ import { formatAttributeValue } from '@/features/market/format';
 import { useAttributeDictionary } from '@/features/fittings/useAttributeDictionary';
 import { groupMutaplasmidsByStrain } from '@/engine/fittings/mutationEdit';
 import { useMutaplasmidLookup } from './mutaplasmidData';
-import { mutationFromRecord } from './dynamicItems';
-import type { DynamicItemState } from './useDynamicItem';
+import { useDynamicItemMutation, type DynamicItemState } from './useDynamicItem';
 
 const SECTION_HEADING = `border-b border-line pb-1 ${eyebrowClassName}`;
 
@@ -109,13 +108,7 @@ export interface AbyssalItemDetailProps {
 export function AbyssalItemDetail({ typeId, dynamic }: AbyssalItemDetailProps) {
   const lookup = useMutaplasmidLookup();
   const dictionary = useAttributeDictionary();
-  const mutation = useMemo(
-    () =>
-      lookup && dynamic.status === 'ready'
-        ? mutationFromRecord(typeId, dynamic.record, lookup)
-        : null,
-    [lookup, dynamic, typeId]
-  );
+  const mutation = useDynamicItemMutation(typeId, dynamic);
 
   if (!lookup || !dictionary) return null;
   const mutaplasmid = lookup.mutaplasmid(typeId);
