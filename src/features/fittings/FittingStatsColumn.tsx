@@ -105,22 +105,12 @@ export function FittingStatsColumn({
         }
         yourCharacters={yourCharacters.length > 1 ? yourCharacters : undefined}
         implants={
-          <>
-            <ImplantSetControl
-              basis={workspace.implantBasis}
-              canUseCloneBasis={workspace.canUseCloneBasis}
-              implantSet={fitting.implantSet}
-              onImplantSetChange={workspace.setImplantSet}
-              fitting={fitting}
-              profile={workspace.profile}
-            />
-            {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
-              // Across both columns of the stats column's controls grid.
-              <div className="col-span-2">
-                <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
-              </div>
-            )}
-          </>
+          <ImplantSetControl basis={workspace.implantBasis} implantSet={fitting.implantSet} />
+        }
+        implantsNote={
+          workspace.implantBasis === 'clone' && workspace.canUseCloneBasis ? (
+            <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
+          ) : undefined
         }
         abyssal={{
           hullGroupId: catalogue?.types[String(fitting.shipTypeId)]?.groupID,

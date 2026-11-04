@@ -77,7 +77,7 @@ Load (`loadMiningYieldSnapshot(showRefining, compressed)`, `yieldSnapshot.ts:158
 1. Per Character ledger (fan-out at `ESI_FANOUT_CONCURRENCY`), merged into device history, grouped by (date, system) over harvested set = ore + ice + gas clouds + manual moon tags + manual ignores (`groupMiningYield`).
 2. Pricing type per ore = Compressed counterpart when Ore Form = Compressed and one exists (`oreFormTypeId`, `src/engine/miningTax/oreForm.ts:7`). Gas prices as itself.
 3. If Show refining: load reprocessing recipes (`loadReprocessing`), Character modifiers (skills, implants). If off: skip recipes, material prices, skills/implants.
-4. Server hub-station Open Prices (R2, `open-prices/<typeId>.json`, one read per priced type): each day's closing Jita 4-4 best buy and best sell. A type with no object prices as nothing.
+4. Server hub-station Open Prices (R2, the type's shard `open-prices/shards/<typeId % 4096>.json`, else its old `open-prices/<typeId>.json`; one read per shard): each day's closing Jita 4-4 best buy and best sell. A type with no object prices as nothing.
 5. Live Jita book from Fuzzwork for every priced type, for today/yesterday before the day is published and for the "now" bases. Nothing is saved on the device (decision 20261019-131707).
 6. Every row valued on all four bases up front (`byBasis`), so switching basis never refetches.
 7. Volumes: SDE, else live ESI `getUniverseType`, cached `STALE_AFTER.static`; a confirmed `null` volume is also cached.

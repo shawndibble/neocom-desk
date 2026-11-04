@@ -43,6 +43,7 @@ describe('stockCsvColumns', () => {
       'stockTargets.table.csvGroup',
       'stockTargets.table.target',
       'stockTargets.table.listed',
+      'stockTargets.table.csvOnContract',
       'stockTargets.table.csvListedBy',
       'stockTargets.table.inHangar',
       'stockTargets.table.csvInHangarBy',

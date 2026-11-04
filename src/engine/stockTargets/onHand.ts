@@ -60,11 +60,16 @@ export interface MarketHolders {
   inHangarBy: HolderCount[];
 }
 
+/** The units a holder list adds up to. */
+export const totalOf = (holders: readonly HolderCount[]): number =>
+  holders.reduce((sum, holder) => sum + holder.quantity, 0);
+
 function addHolder(shares: Map<number, number>, characterId: number, quantity: number) {
   shares.set(characterId, (shares.get(characterId) ?? 0) + quantity);
 }
 
-const biggestFirst = (shares: Map<number, number>): HolderCount[] =>
+/** Per-Character shares as holders: zero shares dropped, biggest first. */
+export const biggestFirst = (shares: Map<number, number>): HolderCount[] =>
   [...shares]
     .map(([characterId, quantity]) => ({ characterId, quantity }))
     .filter((share) => share.quantity > 0)

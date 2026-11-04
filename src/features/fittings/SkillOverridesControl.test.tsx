@@ -32,7 +32,8 @@ describe('SkillOverridesControl', () => {
   it('sets a single skill to a level on top, and clears it again', async () => {
     const user = userEvent.setup();
     render(<SkillOverridesControl />);
-    await user.click(screen.getByRole('button', { name: 'Set levels' }));
+    await user.click(screen.getByRole('combobox', { name: 'Skills' }));
+    await user.click(await screen.findByRole('option', { name: 'Custom levels' }));
     const dialog = screen.getByRole('dialog');
 
     await user.type(within(dialog).getByRole('searchbox', { name: 'Find a skill' }), 'target');
@@ -56,6 +57,8 @@ describe('SkillOverridesControl', () => {
   it('says how many levels are set', () => {
     useSkillOverrides.setState({ skills: { base: 'character', levels: { 3300: 1, 3429: 4 } } });
     render(<SkillOverridesControl />);
-    expect(screen.getByRole('button', { name: '2 levels set' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Skills' })).toHaveTextContent(
+      'Own skills + 2 levels set'
+    );
   });
 });

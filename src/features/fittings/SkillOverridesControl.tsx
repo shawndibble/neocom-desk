@@ -15,6 +15,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui';
@@ -24,8 +25,6 @@ import { withSkillLevel, type SkillBase } from '@/engine/fittings/skillOverrides
 import { loadSkills } from '@/sde/loadSde';
 import type { SkillType } from '@/sde/types';
 import { useSkillOverrides } from './statsConditions';
-import { StatField } from './StatFacts';
-import { STAT_FIELD_WIDTH_NARROW } from './statKit';
 
 const BASES: readonly SkillBase[] = ['character', 'all0', 'allV'];
 const LEVELS = [0, 1, 2, 3, 4, 5];
@@ -159,6 +158,9 @@ function CustomLevelsModal({ open, onClose }: { open: boolean; onClose: () => vo
   );
 }
 
+/** The select's value for "Custom levels…": an action, never stored — the base stays what it was. */
+const CUSTOM_ENTRY = 'custom';
+
 export function SkillOverridesControl() {
   const { t } = useTranslation();
   const skills = useSkillOverrides((state) => state.skills);
@@ -167,15 +169,28 @@ export function SkillOverridesControl() {
   const label = t('fittings.skillOverrides.label');
   const customCount = Object.keys(skills.levels).length;
   const overridden = skills.base !== 'character' || customCount > 0;
+  const shown = [
+    t(`fittings.skillOverrides.base.${skills.base}`),
+    customCount > 0 && t('fittings.skillOverrides.customCount', { count: customCount }),
+  ]
+    .filter(Boolean)
+    .join(' + ');
 
   return (
-    <StatField label={label} tone={overridden ? 'warning' : undefined}>
+    <>
       <Select
         value={skills.base}
-        onValueChange={(base) => setSkills({ ...skills, base: base as SkillBase })}
+        onValueChange={(value) => {
+          if (value === CUSTOM_ENTRY) setEditing(true);
+          else setSkills({ ...skills, base: value as SkillBase });
+        }}
       >
-        <SelectTrigger aria-label={label} size="sm" className={STAT_FIELD_WIDTH_NARROW}>
-          <SelectValue />
+        {/* The label sits in the trigger, so the settings strip fits one line. */}
+        <SelectTrigger aria-label={label} size="sm" active={overridden} className="min-w-0 flex-1">
+          <span className="min-w-0 truncate">
+            <span className="text-text-dim">{label}: </span>
+            <SelectValue>{shown}</SelectValue>
+          </span>
         </SelectTrigger>
         <SelectContent>
           {BASES.map((base) => (
@@ -183,14 +198,11 @@ export function SkillOverridesControl() {
               {t(`fittings.skillOverrides.base.${base}`)}
             </SelectItem>
           ))}
+          <SelectSeparator />
+          <SelectItem value={CUSTOM_ENTRY}>{t('fittings.skillOverrides.custom')}</SelectItem>
         </SelectContent>
       </Select>
-      <Button size="sm" className={tappableRowClassName} onClick={() => setEditing(true)}>
-        {customCount > 0
-          ? t('fittings.skillOverrides.customCount', { count: customCount })
-          : t('fittings.skillOverrides.custom')}
-      </Button>
       <CustomLevelsModal open={editing} onClose={() => setEditing(false)} />
-    </StatField>
+    </>
   );
 }

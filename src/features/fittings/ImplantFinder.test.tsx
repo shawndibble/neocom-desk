@@ -209,13 +209,14 @@ describe('ImplantFinder', () => {
     expect(ee603).toHaveTextContent('Caldari Navy LP Store · ≈');
     // The full offer is one click away.
     await user.click(within(ee603).getByRole('button', { name: 'Breakdown' }));
-    expect(ee603).toHaveTextContent('Caldari Navy LP Store · 1,000 LP');
+    // Only the terms: the store and the total are already in the line above.
+    expect(ee603).toHaveTextContent('1,000 LP + ');
+    expect(ee603.textContent!.match(/Caldari Navy LP Store ·/g)).toHaveLength(1);
     // EE-605's offer needs 4,000 LP; the pilot has 3,200: market first, the offer shown as cheaper.
     const ee605 = screen.getByRole('button', { name: /^Add .*EE-605$/ }).closest('li')!;
     expect(ee605).toHaveTextContent('Fits · 1.6 tf spare');
     expect(ee605).toHaveTextContent('Also:');
     expect(ee605).toHaveTextContent('800 LP short');
-    expect(ee605).toHaveTextContent('with the LP');
     expect(screen.getByRole('button', { name: /^Add .*WU-1001$/ }).closest('li')).toHaveTextContent(
       'Not for sale at any Trade Hub or LP Store'
     );

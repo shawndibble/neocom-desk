@@ -217,7 +217,7 @@ describe('FittingStatsSections rule breaks', () => {
 });
 
 describe('FittingStatsSections implants & skills group', () => {
-  it('starts collapsed, holding the implant controls and the skills override', async () => {
+  it('shows the implant controls and the skills override open, with no section to unfold', async () => {
     render(
       <FittingStatsSections
         stats={stats()}
@@ -230,14 +230,12 @@ describe('FittingStatsSections implants & skills group', () => {
         implants={<span>Implant controls</span>}
       />
     );
-    expect(screen.queryByRole('button', { name: 'Implants & skills' })).toBeNull();
-    await openPanel('Pilot');
-    const toggle = screen.getByRole('button', { name: 'Implants & skills' });
-
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('Implant controls')).toBeNull();
-    await userEvent.click(toggle);
-    expect(screen.getByText('Implant controls')).toBeInTheDocument();
+    const pilot = within(await openPanel('Pilot'));
+
+    expect(pilot.getByText('Implant controls')).toBeInTheDocument();
+    expect(pilot.getByRole('combobox', { name: 'Skills' })).toBeInTheDocument();
+    expect(pilot.queryByRole('button', { name: 'Implants & skills' })).toBeNull();
   });
 });
 
@@ -1486,13 +1484,8 @@ describe('FittingStatsSections — column and side panels', () => {
       />
     );
     const pilot = within(await screen.findByRole('dialog', { name: 'Pilot' }));
-    // The section unfolds once the saved layout has hydrated, after the panel opens.
-    await waitFor(() =>
-      expect(pilot.getByRole('button', { name: 'What to train' })).toHaveAttribute(
-        'aria-expanded',
-        'true'
-      )
-    );
+    // Always open: nothing to unfold before the list shows.
+    expect(pilot.getByRole('heading', { name: 'What to train' })).toBeInTheDocument();
     expect(pilot.getByText('Train list')).toBeInTheDocument();
     expect(onShown).toHaveBeenCalled();
   });
@@ -1517,9 +1510,10 @@ describe('FittingStatsSections — column and side panels', () => {
         whatToTrain={<span>Train list</span>}
       />
     );
-    for (const name of ['Implants & skills', 'What to train', 'Projected effects']) {
+    for (const name of ['Projected effects']) {
       expect(screen.queryByRole('button', { name })).toBeNull();
     }
+    expect(screen.queryByRole('combobox', { name: 'Skills' })).toBeNull();
     expect(screen.queryByRole('checkbox', { name: 'Overheat all' })).toBeNull();
     const pilotTrigger = screen.getByRole('button', { name: /^Pilot/ });
     // Just the label and any skill gap: the name reads in the panel.
@@ -1530,8 +1524,10 @@ describe('FittingStatsSections — column and side panels', () => {
     expect(pilotTrigger).toHaveAttribute('aria-expanded', 'true');
     expect(pilot.getByText('Test Pilot, own skills')).toBeInTheDocument();
     expect(pilot.getByText('Missing chip')).toBeInTheDocument();
-    expect(pilot.getByRole('button', { name: 'Implants & skills' })).toBeInTheDocument();
-    expect(pilot.getByRole('button', { name: 'What to train' })).toBeInTheDocument();
+    expect(pilot.getByRole('combobox', { name: 'Skills' })).toBeInTheDocument();
+    expect(pilot.getByRole('heading', { name: 'What to train' })).toBeInTheDocument();
+    // No collapsible sections in the Pilot panel.
+    expect(pilot.queryByRole('button', { name: 'What to train' })).toBeNull();
     await user.click(pilot.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('dialog')).toBeNull();
 
@@ -1558,7 +1554,7 @@ describe('FittingStatsSections — column and side panels', () => {
     expect(await screen.findByRole('dialog', { name: 'Situation' })).toBe(panel);
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
     expect(screen.getByRole('checkbox', { name: 'Overheat all' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Implants & skills' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Skills' })).toBeNull();
     expect(screen.getByRole('button', { name: /^Situation/ })).toHaveAttribute(
       'aria-expanded',
       'true'

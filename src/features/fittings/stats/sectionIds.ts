@@ -1,6 +1,5 @@
 /** Stable ids — the remembered layout (`statsSectionsPreference.ts`) is keyed on them. */
 export type Section =
-  | 'assumptions'
   | 'whatToTrain'
   | 'yourCharacters'
   | 'offense'

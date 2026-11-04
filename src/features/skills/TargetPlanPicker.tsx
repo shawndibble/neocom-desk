@@ -8,10 +8,17 @@ export interface TargetPlanPickerProps {
   bare?: boolean;
   /** The select's width when `bare`. */
   className?: string;
+  /** When `bare`: a dim label drawn inside the select, before its value. */
+  prefix?: string;
 }
 
 /** Renders nothing under 2 plans — nothing to choose (0: the Add button itself offers to create one; 1: auto-picked). */
-export function TargetPlanPicker({ target, bare = false, className }: TargetPlanPickerProps) {
+export function TargetPlanPicker({
+  target,
+  bare = false,
+  className,
+  prefix,
+}: TargetPlanPickerProps) {
   const { t } = useTranslation();
   const { plans, targetPlanId, setTargetPlanId } = target;
 
@@ -20,7 +27,14 @@ export function TargetPlanPicker({ target, bare = false, className }: TargetPlan
   const select = (
     <Select value={targetPlanId ?? undefined} onValueChange={setTargetPlanId}>
       <SelectTrigger size="sm" aria-label={t('skills.targetPlan.label')} className={className}>
-        <SelectValue />
+        {prefix ? (
+          <span>
+            <span className="text-text-dim">{prefix}: </span>
+            <SelectValue />
+          </span>
+        ) : (
+          <SelectValue />
+        )}
       </SelectTrigger>
       <SelectContent>
         {plans.map((plan) => (

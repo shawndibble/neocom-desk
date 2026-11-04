@@ -37,100 +37,157 @@ describe('publishLpStoreOffersToR2', () => {
 });
 
 describe('writeOpenPricesToR2', () => {
-  it('merges into the stored object and creates a missing one', async () => {
+  const day = (date: string, buy: number | null, sell: number | null) => ({
+    date,
+    stations: { 1: { buy, sell } },
+  });
+  const SIBLING = 34 + OPEN_PRICES_SHARD_COUNT;
+  const shardOf = (puts: ReturnType<typeof fakeR2>['puts'], typeId: number) =>
+    (puts.find((p) => p.key === openPricesShardR2Key(typeId))?.json as {
+      types: Record<string, unknown>;
+    }) ?? null;
+
+  it("merges into the type's entry in its shard, with an hour's cache", async () => {
     const { get, put, puts } = fakeR2({
+      [openPricesShardR2Key(34)]: {
+        types: {
+          34: { typeId: 34, dates: ['2026-10-16'], stations: { 1: { buy: [1], sell: [2] } } },
+        },
+      },
+    });
+    const result = await writeOpenPricesToR2(
+      [{ typeId: 34, days: [day('2026-10-17', 3, 4)] }],
+      mergeDays,
+      { get, put }
+    );
+    expect(result).toEqual({ written: 1, skipped: 0, failed: 0, firstError: null });
+    expect(shardOf(puts, 34).types['34']).toEqual({
+      typeId: 34,
+      dates: ['2026-10-16', '2026-10-17'],
+      stations: { 1: { buy: [1, 3], sell: [2, 4] } },
+    });
+    expect(puts[0].headers['Cache-Control']).toBe('public, max-age=3600');
+    expect(puts[0].headers['Content-Encoding']).toBe('gzip');
+  });
+
+  it("seeds a type new to its shard from the type's own object, so its history carries over", async () => {
+    const reads: string[] = [];
+    const r2 = fakeR2({
       [openPricesR2Key(34)]: {
         typeId: 34,
         dates: ['2026-10-16'],
         stations: { 1: { buy: [1], sell: [2] } },
       },
     });
+    const get = async (key: string) => (reads.push(key), r2.get(key));
+    await writeOpenPricesToR2(
+      [
+        { typeId: 34, days: [day('2026-10-17', 3, 4)] },
+        { typeId: 35, days: [day('2026-10-17', null, 5)] },
+      ],
+      mergeDays,
+      { get, put: r2.put }
+    );
+    expect(shardOf(r2.puts, 34).types['34']).toMatchObject({ dates: ['2026-10-16', '2026-10-17'] });
+    expect(shardOf(r2.puts, 35).types['35']).toMatchObject({
+      dates: ['2026-10-17'],
+      stations: { 1: { buy: [null], sell: [5] } },
+    });
+    expect(r2.puts.some((p) => p.key === openPricesR2Key(34))).toBe(false);
+    expect(reads).toContain(openPricesR2Key(34));
+  });
+
+  it("never reads the type's own object once its shard holds it", async () => {
+    const reads: string[] = [];
+    const r2 = fakeR2({
+      [openPricesShardR2Key(34)]: {
+        types: {
+          34: { typeId: 34, dates: ['2026-10-16'], stations: { 1: { buy: [1], sell: [2] } } },
+        },
+      },
+    });
+    const get = async (key: string) => (reads.push(key), r2.get(key));
+    await writeOpenPricesToR2([{ typeId: 34, days: [day('2026-10-17', 3, 4)] }], mergeDays, {
+      get,
+      put: r2.put,
+    });
+    expect(reads).toEqual([openPricesShardR2Key(34)]);
+  });
+
+  it('writes the types that share a shard in one put, keeping the ones not priced today', async () => {
+    const kept = { typeId: 34 + 2 * OPEN_PRICES_SHARD_COUNT, dates: ['2026-10-01'], stations: {} };
+    const { get, put, puts } = fakeR2({
+      [openPricesShardR2Key(34)]: { types: { [kept.typeId]: kept } },
+    });
     const result = await writeOpenPricesToR2(
       [
-        { typeId: 34, days: [{ date: '2026-10-17', stations: { 1: { buy: 3, sell: 4 } } }] },
-        { typeId: 35, days: [{ date: '2026-10-17', stations: { 1: { buy: null, sell: 5 } } }] },
+        { typeId: 34, days: [day('2026-10-17', 1, 2)] },
+        { typeId: SIBLING, days: [day('2026-10-17', 3, 4)] },
       ],
       mergeDays,
       { get, put }
     );
-    expect(result).toEqual({ written: 2, skipped: 0, failed: 0, firstError: null });
-    const byKey = Object.fromEntries(puts.map((p) => [p.key, p]));
-    expect(byKey['open-prices/34.json'].json).toEqual({
-      typeId: 34,
-      dates: ['2026-10-16', '2026-10-17'],
-      stations: { 1: { buy: [1, 3], sell: [2, 4] } },
-    });
-    expect(byKey['open-prices/35.json'].json).toMatchObject({
-      dates: ['2026-10-17'],
-      stations: { 1: { buy: [null], sell: [5] } },
-    });
-    expect(byKey['open-prices/34.json'].headers['Cache-Control']).toBe('public, max-age=3600');
+    expect(result.written).toBe(1);
+    expect(puts.map((p) => p.key)).toEqual([openPricesShardR2Key(34)]);
+    expect(Object.keys(shardOf(puts, 34).types).sort()).toEqual(
+      [String(kept.typeId), '34', String(SIBLING)].sort()
+    );
+    expect(shardOf(puts, 34).types[String(kept.typeId)]).toEqual(kept);
   });
 
-  it('skips the put when the merge leaves the stored object unchanged', async () => {
-    const stored = {
-      typeId: 34,
-      dates: ['2026-10-16'],
-      stations: { 1: { buy: [1], sell: [2] } },
-    };
-    const { get, put, puts } = fakeR2({ [openPricesR2Key(34)]: stored });
+  it('skips the put when the merge leaves the shard unchanged', async () => {
+    const stored = { typeId: 34, dates: ['2026-10-16'], stations: { 1: { buy: [1], sell: [2] } } };
+    const { get, put, puts } = fakeR2({ [openPricesShardR2Key(34)]: { types: { 34: stored } } });
     const seen: number[] = [];
     const result = await writeOpenPricesToR2(
       [
-        { typeId: 34, days: [{ date: '2026-10-16', stations: { 1: { buy: 1, sell: 2 } } }] },
-        { typeId: 35, days: [{ date: '2026-10-16', stations: { 1: { buy: 1, sell: 2 } } }] },
+        { typeId: 34, days: [day('2026-10-16', 1, 2)] },
+        { typeId: 35, days: [day('2026-10-16', 1, 2)] },
       ],
       mergeDays,
       { get, put },
       (n) => seen.push(n)
     );
     expect(result).toEqual({ written: 1, skipped: 1, failed: 0, firstError: null });
-    expect(puts.map((p) => p.key)).toEqual(['open-prices/35.json']);
+    expect(puts.map((p) => p.key)).toEqual([openPricesShardR2Key(35)]);
     expect(seen.at(-1)).toBe(1);
   });
 
-  it('still writes when the stored object differs from the merge', async () => {
-    const stored = {
-      typeId: 34,
-      dates: ['2026-10-16'],
-      stations: { 1: { buy: [1], sell: [2] } },
-    };
-    const { get, put, puts } = fakeR2({ [openPricesR2Key(34)]: stored });
-    const result = await writeOpenPricesToR2(
-      [{ typeId: 34, days: [{ date: '2026-10-16', stations: { 1: { buy: 1, sell: 3 } } }] }],
-      mergeDays,
-      { get, put }
-    );
-    expect(result).toEqual({ written: 1, skipped: 0, failed: 0, firstError: null });
-    expect(puts.map((p) => p.key)).toEqual(['open-prices/34.json']);
-  });
-
-  it('counts a failing type instead of throwing, and keeps going', async () => {
+  it('counts a shard it cannot read instead of throwing, never overwrites it, and keeps going', async () => {
     const { put, puts } = fakeR2();
     const get = async (key: string) => {
-      if (key === openPricesR2Key(34)) throw new Error('R2 GET open-prices/34.json failed: 500');
+      if (key === openPricesShardR2Key(34)) throw new Error('R2 GET failed: 500');
       return null;
     };
-    const day = { date: '2026-10-17', stations: { 1: { buy: 1, sell: 2 } } };
     const result = await writeOpenPricesToR2(
       [
-        { typeId: 34, days: [day] },
-        { typeId: 35, days: [day] },
+        { typeId: 34, days: [day('2026-10-17', 1, 2)] },
+        { typeId: 35, days: [day('2026-10-17', 1, 2)] },
       ],
       mergeDays,
       { get, put }
     );
-    expect(result.written).toBe(1);
-    expect(result.failed).toBe(1);
+    expect(result).toMatchObject({ written: 1, failed: 1 });
     expect(result.firstError).toContain('500');
-    expect(puts.map((p) => p.key)).toEqual(['open-prices/35.json']);
+    expect(puts.map((p) => p.key)).toEqual([openPricesShardR2Key(35)]);
+  });
+
+  it('fails a shard not shaped like one rather than overwriting it', async () => {
+    const { get, put, puts } = fakeR2({ [openPricesShardR2Key(34)]: ['nope'] });
+    const result = await writeOpenPricesToR2(
+      [{ typeId: 34, days: [day('2026-10-17', 1, 2)] }],
+      mergeDays,
+      { get, put }
+    );
+    expect(result).toMatchObject({ written: 0, failed: 1 });
+    expect(puts).toEqual([]);
   });
 
   it('consumes a lazy iterable and reports progress', async () => {
     const { get, put } = fakeR2();
     function* items() {
       for (let typeId = 1; typeId <= 70; typeId += 1) {
-        yield { typeId, days: [{ date: '2026-10-17', stations: { 1: { buy: 1, sell: 2 } } }] };
+        yield { typeId, days: [day('2026-10-17', 1, 2)] };
       }
     }
     const seen: number[] = [];

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { FittingImplantSet } from '@/engine/fittings/types';
@@ -9,21 +10,42 @@ vi.mock('@/features/skills/typeCatalog', () => ({ loadItemNameMap: async () => n
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: async () => new Map() }));
 
 const { ImplantSetControl } = await import('./ImplantSetControl');
+const { ImplantsEditorHost } = await import('./ImplantsEditorHost');
 
 function setup(implantSet: FittingImplantSet | undefined, canUseClone = true) {
   const onImplantSetChange = vi.fn();
+  const basis = implantSet === undefined && canUseClone ? 'clone' : 'fitting';
+  // The page mounts the editor beside the chip; the URL joins them.
   renderInRouter(
-    <ImplantSetControl
-      basis={implantSet === undefined && canUseClone ? 'clone' : 'fitting'}
-      canUseCloneBasis={canUseClone}
-      implantSet={implantSet}
-      onImplantSetChange={onImplantSetChange}
-    />
+    <>
+      <ImplantSetControl basis={basis} implantSet={implantSet} />
+      <ImplantsEditorHost
+        basis={basis}
+        canUseCloneBasis={canUseClone}
+        implantSet={implantSet}
+        onImplantSetChange={onImplantSetChange}
+      />
+    </>
   );
   return { onImplantSetChange };
 }
 
 describe('ImplantSetControl', () => {
+  it('opens an editor the URL already asks for, with no click', async () => {
+    const onImplantSetChange = vi.fn();
+    render(
+      <MemoryRouter initialEntries={['/ships/fittings/edit?implants=1']}>
+        <ImplantsEditorHost
+          basis="fitting"
+          canUseCloneBasis
+          implantSet={{ implants: [1], boosters: [] }}
+          onImplantSetChange={onImplantSetChange}
+        />
+      </MemoryRouter>
+    );
+    expect(await screen.findByRole('dialog', { name: 'Implants & boosters' })).toBeInTheDocument();
+  });
+
   it('reads "My clone" when the Fitting carries no set of its own', () => {
     setup(undefined);
     expect(screen.getByRole('button', { name: 'Implants: My clone' })).toBeInTheDocument();

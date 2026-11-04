@@ -2,8 +2,9 @@
  * Daily open buy and sell prices for one item: the read half of the
  * `syncMarketOpenPrices` Cloud Function (docs/context/decisions/
  * 20261018-121126-price-history-draws-daily-open-buy-and-sell.md; layout:
- * 20261018-164126-open-prices-one-document-per-type-every-hub.md). One object per
- * type holding every Trade Hub station, a static file in Cloudflare R2 (20261018-201511-moving-the-daily-snapshots-to-r2.md), so — like the contract snapshots — this
+ * 20261018-164126-open-prices-one-document-per-type-every-hub.md). One entry per
+ * type holding every Trade Hub station, in a shard shared with a few other types
+ * (20261104-065346-r2-snapshots-publish-few-big-objects-not-one.md), a static file in Cloudflare R2 (20261018-201511-moving-the-daily-snapshots-to-r2.md), so — like the contract snapshots — this
  * needs no Firebase session and the read costs no egress.
  *
  * The prices are the hub *station*'s (Jita 4-4), keyed by station id.

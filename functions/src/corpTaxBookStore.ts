@@ -105,7 +105,7 @@ import {
 } from './actorAuth.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
 
-/** One type's parsed R2 `open-prices/<typeId>.json` object, or null when R2 has none. Throws on a failed read. */
+/** One type's parsed R2 open-prices object (`readOpenPricesFromR2`), or null when R2 has none. Throws on a failed read. */
 export type OpenPricesReader = (typeId: number) => Promise<unknown | null>;
 
 export interface BookDeps {
