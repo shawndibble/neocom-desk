@@ -167,9 +167,12 @@ for (const width of [390, 1024, 1280]) {
     await expect(readout).toHaveText('Jita · Sell order');
     const panelHeader = readout.locator('xpath=ancestor::header[1]');
     const title = panelHeader.getByRole('heading', { level: 2 });
+    // A phone drops the heading (the modal title names the store); wider screens keep it.
+    const hasTitle = width >= 640;
+    if (!hasTitle) await expect(title).toHaveCount(0);
     const [r, t, h, actions] = await Promise.all([
       readout.boundingBox(),
-      title.boundingBox(),
+      hasTitle ? title.boundingBox() : Promise.resolve(null),
       panelHeader.boundingBox(),
       panelHeader.getByRole('button').last().boundingBox(),
     ]);
@@ -183,7 +186,7 @@ for (const width of [390, 1024, 1280]) {
       a.x + a.width <= r!.x + 1 ||
       r!.y + r!.height <= a.y + 1 ||
       a.y + a.height <= r!.y + 1;
-    expect(apart(t!)).toBe(true);
+    if (t) expect(apart(t)).toBe(true);
     if (actions) expect(apart(actions)).toBe(true);
 
     const overflow = await page.evaluate(
