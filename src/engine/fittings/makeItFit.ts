@@ -89,7 +89,30 @@ function statLoss(before: FittingStats, after: FittingStats): number {
   return pairs.reduce((sum, [b, a]) => (b > 0 ? sum + Math.max(0, (b - a) / b) : sum), 0);
 }
 
-/** Smallest stat loss first; options within `STAT_TOLERANCE` of the best are ordered by ISK, unpriced last. */
+/**
+ * Two options are the same offer when they replace the same module types with the same
+ * ones in the same racks and land on the same figures: only the slot differs (two
+ * Ballistic Control Systems, either one can be swapped). The figures are in the key so
+ * slots that differ in what they hold (a loaded charge) stay separate.
+ */
+function offerKey(option: FitOption): string {
+  const swaps = option.swaps
+    .map((swap) => `${swap.slot}:${swap.fromTypeId}>${swap.toTypeId}`)
+    .sort()
+    .join('|');
+  const { after } = option;
+  const figures = [
+    after.offense.dps,
+    after.ehp,
+    after.navigation.maxVelocity,
+    after.cpuUsed,
+    after.powergridUsed,
+    after.calibrationUsed,
+  ].join(',');
+  return `${swaps}#${figures}`;
+}
+
+/** Smallest stat loss first; options within `STAT_TOLERANCE` of the best are ordered by ISK, unpriced last; a repeat of the same offer in another slot is dropped. */
 export function rankFitOptions(before: FittingStats, options: readonly FitOption[]): FitOption[] {
   const scored = options
     .map((option) => ({ option, loss: statLoss(before, option.after) }))
@@ -106,7 +129,15 @@ export function rankFitOptions(before: FittingStats, options: readonly FitOption
     if (bi === null) return -1;
     return ai - bi || a.loss - b.loss;
   });
-  return [...near, ...far].map((entry) => entry.option);
+  const seen = new Set<string>();
+  return [...near, ...far]
+    .map((entry) => entry.option)
+    .filter((option) => {
+      const key = offerKey(option);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
 export interface FindFitSwapsParams {
