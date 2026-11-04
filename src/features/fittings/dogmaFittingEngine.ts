@@ -49,6 +49,7 @@ import { chargesUsedPerMinute, type ChargeChoice } from '@/engine/fittings/charg
 import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
+import type { SkilledTarget } from '@/engine/fittings/skilledTarget';
 import { COVERT_CLOAK_EFFECT, extractExplore } from '@/engine/fittings/explore';
 import { extractModuleFigures } from '@/engine/fittings/moduleFigures';
 import { extractCrystalFigures, extractMining, miningYield } from '@/engine/fittings/mining';
@@ -635,6 +636,46 @@ export async function explainModule(
     chargeTypeIds: dogmaFit.items.map((item) => item.charge?.type_id),
     projectedTypeIds: (dogmaFit.incoming?.effects ?? []).map((effect) => effect.type_id),
   });
+}
+
+/** A Capsule: no hull bonus, so a module fitted to it shows only the pilot's own effects. */
+const CAPSULE_TYPE_ID = 670;
+
+/**
+ * Item Detail's skilled values: every attribute of `target` with `profile`'s
+ * skills and implants applied, by attribute id. A hull is calculated empty; a
+ * module alone on a Capsule, the way the in-game Show info reads a module
+ * before it is fitted (no hull bonus). The engine's own derived figures
+ * (ids ≤ 0) are left out — Item Detail has no row for them.
+ */
+export async function skilledAttributes(
+  target: SkilledTarget,
+  profile: PilotProfile
+): Promise<Map<number, number>> {
+  await loadDogmaEngine();
+  const fitting: Fitting =
+    target.kind === 'ship'
+      ? { shipTypeId: target.typeId, name: '', modules: [], drones: [], cargo: [] }
+      : {
+          shipTypeId: CAPSULE_TYPE_ID,
+          name: '',
+          modules: [
+            {
+              slot: target.slot,
+              slotIndex: 0,
+              typeId: target.typeId,
+              state: 'online',
+              ...(target.mutation ? { mutation: target.mutation } : {}),
+            },
+          ],
+          drones: [],
+          cargo: [],
+        };
+  const calculation = calculate(toDogmaFit(fitting, profile));
+  const result = target.kind === 'ship' ? calculation.ship : calculation.items[0];
+  const skilled = new Map<number, number>();
+  for (const [id, { value }] of result?.attributes ?? []) if (id > 0) skilled.set(id, value);
+  return skilled;
 }
 
 /**
