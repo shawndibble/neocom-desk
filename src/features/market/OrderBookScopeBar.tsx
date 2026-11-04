@@ -1,14 +1,15 @@
 /**
  * Where the Market Browser's Order Book is looking, said above the book itself
  * — "Within 5 jumps of Badivefi · 6 stations", or the hub station and how far
- * it is — with the same filters the finder's funnel holds, editable in place.
+ * it is — with the filters the finder's funnel holds, editable in place.
  *
- * The filters still live beside the item search (the range is set before
- * searching, scope decision 20260929-204125); this bar mirrors them on the
- * results side, where a reader looks for "why is the book showing this", and
- * is the only way to reach them on a phone once an item is open (the finder
- * column is hidden then). Both bars read and write one `BrowserFilterValue`,
- * so they can never disagree.
+ * The filters live beside the item search (the range is set before searching,
+ * scope decision 20260929-204125, and is the finder's inline select); this bar
+ * mirrors them on the results side, where a reader looks for "why is the book
+ * showing this". The finder column is hidden below `lg` once an item is open,
+ * so there this bar's funnel is the only way to reach the range and origin;
+ * from `lg` up they stay in the finder and the bar only says them in words.
+ * Both bars read and write one `BrowserFilterValue`, so they can never disagree.
  */
 import { fixed1 } from '@/lib/fixedFormat';
 import { JumpsLink } from '@/features/route/JumpsLink';
@@ -34,13 +35,26 @@ import { securityStatusColor } from '@/engine/securityStatus';
 import type { CurrentSystemState } from '@/features/route/currentSystem';
 import { CurrentSystemPicker, JumpRangeSelect } from '@/features/route/JumpRangeControls';
 import { useSystemName } from '@/features/route/useSolarSystems';
-import { useIsPhone } from '@/lib/useIsPhone';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { BrowserFilterValue } from './useBrowserFilters';
 
 /** A Min quantity box's text as a count; blank or junk is no minimum. */
 function parseMinQuantity(raw: string): number {
   const n = Number.parseInt(raw, 10);
   return Number.isSafeInteger(n) && n > 0 ? n : 0;
+}
+
+function rangeSelectProps(
+  draft: BrowserFilterValue,
+  setDraft: (next: BrowserFilterValue) => void,
+  scopeLabel: string
+) {
+  return {
+    value: draft.jumps,
+    onChange: (jumps: BrowserFilterValue['jumps']) => setDraft({ ...draft, jumps }),
+    anyLabel: scopeLabel,
+    active: draft.jumps !== DEFAULT_JUMP_RANGE,
+  };
 }
 
 interface BrowserFilterFieldsProps {
@@ -52,11 +66,13 @@ interface BrowserFilterFieldsProps {
   scopeLabel: string;
   currentSystem: CurrentSystemState;
   /**
-   * Extra classes for the distance field. The scope bar passes `sm:hidden`:
-   * from `sm` up its distance and origin sit inline beside the funnel, so
-   * the popover would only repeat them; a phone's sheet still holds them.
+   * Whether the Jump Range select is in these fields. The finder shows it
+   * inline on its own line, so its box and sheet hold it only in the sheet;
+   * the scope bar holds it only where the finder is not beside the book.
    */
-  rangeFieldClassName?: string;
+  showRange: boolean;
+  /** Whether the "From system" picker (while a range is set) is in these fields. */
+  showOrigin: boolean;
 }
 
 /**
@@ -69,27 +85,27 @@ function BrowserFilterFields({
   regionMode,
   scopeLabel,
   currentSystem,
-  rangeFieldClassName,
+  showRange,
+  showOrigin,
 }: BrowserFilterFieldsProps) {
   const { t } = useTranslation();
   const inSheet = useFilterSurface() === 'sheet';
   const spansStations = regionMode || draft.jumps !== DEFAULT_JUMP_RANGE;
   return (
     <>
-      {/* Keyed on the draft, so the picker and the many-station filters
-          appear as soon as a distance is picked, before it is applied. */}
-      <FilterField label={t('jumpRange.label')} className={rangeFieldClassName}>
-        <div className="flex flex-wrap items-center gap-2">
+      {showRange && (
+        <FilterField label={t('jumpRange.label')}>
           <JumpRangeSelect
-            value={draft.jumps}
-            onChange={(jumps) => setDraft({ ...draft, jumps })}
-            anyLabel={scopeLabel}
-            active={draft.jumps !== DEFAULT_JUMP_RANGE}
+            {...rangeSelectProps(draft, setDraft, scopeLabel)}
             className="w-40 max-md:w-full"
           />
-          {draft.jumps !== DEFAULT_JUMP_RANGE && <CurrentSystemPicker current={currentSystem} />}
-        </div>
-      </FilterField>
+        </FilterField>
+      )}
+      {showOrigin && draft.jumps !== DEFAULT_JUMP_RANGE && (
+        <FilterField label={t('jumpRange.label')} stretch={false} hideCaption>
+          <CurrentSystemPicker current={currentSystem} />
+        </FilterField>
+      )}
       <FilterField label={t('market.filterMinQuantity')}>
         <TextInput
           type="number"
@@ -155,7 +171,7 @@ function BrowserFilterFields({
 export interface BrowserFilterBarProps {
   value: BrowserFilterValue;
   onChange: (next: BrowserFilterValue) => void;
-  /** `activeBrowserFilters`: the pills under the search, and the funnel's badge. */
+  /** `activeBrowserFilters`: the pills under the search and the funnel's badge (the range is `inline`, so neither counts it). */
   active: readonly ActiveFilter<BrowserFilterValue>[];
   regionMode: boolean;
   scopeLabel: string;
@@ -188,9 +204,15 @@ export function BrowserFilterBar({
       active={active}
       search={search}
       className={className}
+      inline={(draft, setDraft) => (
+        <JumpRangeSelect {...rangeSelectProps(draft, setDraft, scopeLabel)} className="w-full" />
+      )}
+      inlinePlacement="below"
     >
-      {(draft, setDraft) => (
+      {(draft, setDraft, surface) => (
         <BrowserFilterFields
+          showRange={surface === 'sheet'}
+          showOrigin
           draft={draft}
           setDraft={setDraft}
           regionMode={regionMode}
@@ -244,21 +266,20 @@ export function OrderBookScopeBar({
   const { t } = useTranslation();
   const originName = useSystemName(currentSystem.systemId);
   const ranged = scope.kind === 'range';
-  // From `sm` up the range sits on the bar, not in the funnel, so the
-  // funnel's badge and Clear all leave it out; a phone's sheet still holds it.
-  const isPhone = useIsPhone();
-  const rangeLabel = t('jumpRange.label');
-  const funnelActive = isPhone ? active : active.filter((filter) => filter.label !== rangeLabel);
+  // Below `lg` the finder is hidden while an item is open (Market.tsx), so
+  // the range lives here; from `lg` up the finder holds it beside the book.
+  // `useIsDesktop` rather than `FilterBar`'s max-width form: this must match
+  // the query Market.tsx hides the finder on.
+  const finderBeside = useIsDesktop();
 
   const summary = (() => {
     switch (scope.kind) {
       case 'range':
         return (
           <>
-            {/* From `sm` up the distance and origin controls beside it
-                already say this; a phone, whose controls live in the sheet,
-                still needs it in words. */}
-            <span className="font-semibold text-accent sm:hidden">
+            {/* In words at every width: it is where the origin system shows
+                from `lg` up, where the finder's select holds only the distance. */}
+            <span className="font-semibold text-accent">
               {scope.jumps === 'system'
                 ? t('market.scope.inSystem', { system: originName ?? '…' })
                 : t('market.scope.within', {
@@ -329,42 +350,31 @@ export function OrderBookScopeBar({
             'm-0 flex min-w-0 flex-1 items-center gap-2',
             // A station name needs the room; a range's count and Clear link
             // do not, and share the line with the controls.
-            !ranged && 'sm:min-w-[18rem]'
+            !ranged && 'md:min-w-[18rem]'
           )}
         >
           <Icon.Location aria-hidden className={cx('shrink-0', ranged && 'text-accent')} />
           <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">{summary}</span>
           {note && <InfoTooltip label={t('market.scope.noteLabel')} content={note} />}
         </p>
-        {/* The one control a pilot changes most, in reach without a click —
-            not on a phone, whose sheet holds it with the rest. */}
-        <span className="flex items-center gap-2 max-sm:hidden">
-          <JumpRangeSelect
-            value={filterValue.jumps}
-            onChange={(jumps) => onFilterChange({ ...filterValue, jumps })}
-            anyLabel={scopeLabel}
-            active={filterValue.jumps !== DEFAULT_JUMP_RANGE}
-            className="w-44"
-          />
-          {filterValue.jumps !== DEFAULT_JUMP_RANGE && (
-            <CurrentSystemPicker current={currentSystem} />
-          )}
-        </span>
         <FilterBar
           value={filterValue}
           onChange={onFilterChange}
-          active={funnelActive}
+          // From `lg` up the finder's inline select holds the range: not in
+          // this popover, so not in its badge or its Clear all either.
+          active={finderBeside ? active.filter((filter) => !filter.inline) : active}
           title={t('market.scope.sheetTitle')}
           pointerSurface="popover"
         >
           {(draft, setDraft) => (
             <BrowserFilterFields
+              showRange={!finderBeside}
+              showOrigin={!finderBeside}
               draft={draft}
               setDraft={setDraft}
               regionMode={regionMode}
               scopeLabel={scopeLabel}
               currentSystem={currentSystem}
-              rangeFieldClassName="sm:hidden"
             />
           )}
         </FilterBar>

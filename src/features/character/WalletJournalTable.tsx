@@ -117,9 +117,40 @@ function JournalFilterBar({
   resultCount,
 }: JournalFilterBarProps) {
   const { t } = useTranslation();
+  // The one key filter: on the row at pointer width, in the sheet when narrow.
+  const refTypeField = (
+    draft: WalletJournalFilter,
+    setDraft: (next: WalletJournalFilter) => void
+  ) => (
+    <FilterField label={t('wallet.refTypeFilterLabel')}>
+      <Select
+        value={draft.refType ?? ALL_OPTION}
+        onValueChange={(value) =>
+          setDraft({ ...draft, refType: value === ALL_OPTION ? null : value })
+        }
+      >
+        <SelectTrigger
+          aria-label={t('wallet.refTypeFilterLabel')}
+          className="w-44"
+          active={draft.refType !== null}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL_OPTION}>{t('wallet.refTypeFilterAll')}</SelectItem>
+          {refTypeOptions.map((refType) => (
+            <SelectItem key={refType} value={refType}>
+              {journalRefLabel(refType, t)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </FilterField>
+  );
   return (
     <FilterBar
       value={filter}
+      inline={refTypeField}
       onChange={onChange}
       active={activeWalletJournalFilters(filter, t, {
         players: playerOptions,
@@ -137,32 +168,9 @@ function JournalFilterBar({
       }
       actions={actions}
     >
-      {(draft, setDraft) => (
+      {(draft, setDraft, surface) => (
         <>
-          <FilterField label={t('wallet.refTypeFilterLabel')}>
-            <Select
-              value={draft.refType ?? ALL_OPTION}
-              onValueChange={(value) =>
-                setDraft({ ...draft, refType: value === ALL_OPTION ? null : value })
-              }
-            >
-              <SelectTrigger
-                aria-label={t('wallet.refTypeFilterLabel')}
-                className="w-44"
-                active={draft.refType !== null}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_OPTION}>{t('wallet.refTypeFilterAll')}</SelectItem>
-                {refTypeOptions.map((refType) => (
-                  <SelectItem key={refType} value={refType}>
-                    {journalRefLabel(refType, t)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FilterField>
+          {surface === 'sheet' && refTypeField(draft, setDraft)}
           {playerOptions && (
             <FilterField label={t('wallet.playerFilterLabel')}>
               <Select

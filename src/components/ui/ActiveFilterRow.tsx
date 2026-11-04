@@ -45,6 +45,8 @@ const pillPartClassName = cx(
 
 interface ActiveFilterRowProps<T> {
   active: readonly ActiveFilter<T>[];
+  /** What Clear all clears, when more than the pills shown (inline filters). Defaults to `active`. */
+  clearable?: readonly ActiveFilter<T>[];
   value: T;
   onChange: (next: T) => void;
   /** Open the filter controls, focusing the one captioned `label`. */
@@ -61,6 +63,7 @@ interface ActiveFilterRowProps<T> {
  */
 export function ActiveFilterRow<T>({
   active,
+  clearable = active,
   value,
   onChange,
   onOpen,
@@ -99,7 +102,7 @@ export function ActiveFilterRow<T>({
     onCleared();
   };
   const clearAll = () => {
-    onChange(clearFilters(value, active));
+    onChange(clearFilters(value, clearable));
     onCleared();
   };
   const visible = active.slice(0, Math.min(fit, active.length));

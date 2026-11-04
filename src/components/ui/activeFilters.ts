@@ -32,6 +32,13 @@ export interface ActiveFilter<T> {
    * `label` — a one-day range's "Day" pill, which opens on the From field.
    */
   field?: string;
+  /**
+   * The filter is shown inline in the `FilterBar` row on a pointer-width
+   * screen (`FilterBar`'s `inline`): it gets no pill and no funnel count
+   * there, but both on a phone, whose row does not hold it, and Clear all
+   * still clears it.
+   */
+  inline?: boolean;
 }
 
 export function activeFilterText(filter: { label: string; value?: string }): string {

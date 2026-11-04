@@ -248,9 +248,42 @@ export function CourierFilterBar({
   resultCount,
 }: CourierFilterBarProps) {
   const { t } = useTranslation();
+  // The one key filter: on the row at pointer width, in the sheet when narrow.
+  // Named for the endpoint, not the route: there is deliberately no "avoid
+  // lowsec" control, which would be a safety claim about the whole trip made
+  // from data that only describes its two ends. Hidden entirely when no band
+  // is on offer (endpoints still being placed, or no local station snapshot).
+  const spaceField = (draft: CourierUiFilter, setDraft: (next: CourierUiFilter) => void) =>
+    spaceKinds.length > 0 && (
+      <FilterField captionInline label={t('contractSearch.destinationSpaceLabel')} stretch={false}>
+        <div
+          role="group"
+          aria-label={t('contractSearch.destinationSpaceLabel')}
+          className="flex flex-nowrap items-center gap-2"
+        >
+          {spaceKinds.map((kind) => (
+            <FilterChip
+              key={kind}
+              size="md"
+              label={t(`common.spaceOption.${kind}`)}
+              selected={draft.destinationSpace.includes(kind)}
+              onToggle={() =>
+                setDraft({
+                  ...draft,
+                  destinationSpace: draft.destinationSpace.includes(kind)
+                    ? draft.destinationSpace.filter((existing) => existing !== kind)
+                    : [...draft.destinationSpace, kind],
+                })
+              }
+            />
+          ))}
+        </div>
+      </FilterField>
+    );
   return (
     <FilterBar
       value={filter}
+      inline={spaceField}
       onChange={onChange}
       active={activeCourierFilters(filter, t, {
         originRegions,
@@ -270,7 +303,7 @@ export function CourierFilterBar({
         />
       }
     >
-      {(draft, setDraft) => (
+      {(draft, setDraft, surface) => (
         <>
           <RegionFilterField
             label={t('contractSearch.originRegionLabel')}
@@ -291,47 +324,7 @@ export function CourierFilterBar({
             options={destinationRegions}
             onChange={(destinationRegionId) => setDraft({ ...draft, destinationRegionId })}
           />
-          {/*
-            Named for the endpoint, not the route: this says where a haul ends,
-            and there is deliberately no "avoid lowsec" control beside it — that
-            would be a safety claim about the whole trip made from data that
-            only describes its two ends.
-
-            Hidden entirely when no band is on offer, rather than shown as a
-            label with nothing under it: that is the state while the endpoints
-            are still being placed, and the permanent state if the local station
-            snapshot cannot be read at all.
-          */}
-          {spaceKinds.length > 0 && (
-            <FilterField
-              captionInline
-              label={t('contractSearch.destinationSpaceLabel')}
-              stretch={false}
-            >
-              <div
-                role="group"
-                aria-label={t('contractSearch.destinationSpaceLabel')}
-                className="flex flex-wrap items-center gap-2"
-              >
-                {spaceKinds.map((kind) => (
-                  <FilterChip
-                    key={kind}
-                    size="md"
-                    label={t(`common.spaceOption.${kind}`)}
-                    selected={draft.destinationSpace.includes(kind)}
-                    onToggle={() =>
-                      setDraft({
-                        ...draft,
-                        destinationSpace: draft.destinationSpace.includes(kind)
-                          ? draft.destinationSpace.filter((existing) => existing !== kind)
-                          : [...draft.destinationSpace, kind],
-                      })
-                    }
-                  />
-                ))}
-              </div>
-            </FilterField>
-          )}
+          {surface === 'sheet' && spaceField(draft, setDraft)}
           <IskFilterField
             label={t('contractSearch.minRewardLabel')}
             value={draft.minReward}
