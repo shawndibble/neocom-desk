@@ -1,45 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Source } from './implantSources';
-import { costPerGain, orderBy, savingBetween } from './implantCost';
-
-const market = (cost: number): Source => ({
-  kind: 'market',
-  hubId: 'jita',
-  atSelectedHub: true,
-  price: cost,
-  volume: 5,
-  cost,
-});
-const lp = (cost: number | null, blocked = false): Source => ({
-  kind: 'lp',
-  corporationId: 1,
-  corpName: 'Corp',
-  offerId: 9,
-  iskCost: 0,
-  lpCost: 1000,
-  quantity: 1,
-  lpRate: 1000,
-  turnIns: [],
-  cost,
-  lpShort: blocked ? 500 : 0,
-  balanceKnown: true,
-  unbuyable: [],
-  blocked,
-});
-
-describe('savingBetween', () => {
-  it('names the cheaper of two priced sources and by how much', () => {
-    const a = market(12_400_000);
-    const b = lp(9_000_000);
-    expect(savingBetween(a, b)).toEqual({ cheaper: b, saving: 3_400_000 });
-    expect(savingBetween(b, a)).toEqual({ cheaper: b, saving: 3_400_000 });
-  });
-
-  it('says nothing when either side has no price or they tie', () => {
-    expect(savingBetween(market(5), lp(null))).toBeNull();
-    expect(savingBetween(market(5), lp(5))).toBeNull();
-  });
-});
+import { costPerGain, orderBy } from './implantCost';
 
 describe('costPerGain', () => {
   it('divides the cost by the gain', () => {

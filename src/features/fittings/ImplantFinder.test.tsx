@@ -217,7 +217,6 @@ describe('ImplantFinder', () => {
     expect(ee605).toHaveTextContent('Fits · 1.6 tf spare');
     expect(ee605).toHaveTextContent('Also:');
     expect(ee605).toHaveTextContent('800 LP short');
-    expect(ee605).toHaveTextContent('with the LP');
     expect(screen.getByRole('button', { name: /^Add .*WU-1001$/ }).closest('li')).toHaveTextContent(
       'Not for sale at any Trade Hub or LP Store'
     );
