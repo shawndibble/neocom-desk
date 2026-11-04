@@ -303,6 +303,8 @@ export function MailComposeBox({
   const headingKey = kind === 'reply' ? 'mail.composeReplyHeading' : 'mail.composeForwardHeading';
   const bodyLength = composeBodyLength(body);
   const bodyOver = bodyLength > MAX_BODY_LENGTH;
+  // A long quote can push a short reply over the limit: unfold it so the pilot can trim it.
+  if (quoteFolded && bodyOver) setQuoteFolded(false);
   const noRecipientsError = error !== null && recipients.length === 0;
   // Plain stacked labels, not the `Fields`/`Field` label-column primitive: a
   // side label column would take width from the 8-row message box in the

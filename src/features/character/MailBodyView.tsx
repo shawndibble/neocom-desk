@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { HintText } from '@/components/ui/HintText';
@@ -176,8 +176,10 @@ const isBlank = (line: readonly MarkupNode[]): boolean => markupPlainText(line).
  */
 export function MailBodyView({ text, markup }: { text: string; markup?: string }) {
   const { t } = useTranslation();
-  const [showQuote, setShowQuote] = useState(false);
-  const quoteId = `${useId()}-quote`;
+  // Which body the quote is open for, so picking another mail starts folded again.
+  const [openFor, setOpenFor] = useState<string | null>(null);
+  const bodyKey = `${text}\u0000${markup ?? ''}`;
+  const showQuote = openFor === bodyKey;
   const lines = useMemo((): MarkupNode[][] => {
     if (markup === undefined) {
       return text
@@ -189,21 +191,23 @@ export function MailBodyView({ text, markup }: { text: string; markup?: string }
   const onSurface = markup !== undefined;
   // Older messages quoted under a reply fold behind one toggle, so a long thread doesn't scroll.
   const quoteAt = useMemo(() => trailingQuoteStart(lines.map((l) => markupPlainText(l))), [lines]);
-  if (quoteAt === null || quoteAt === 0) return <BodyBlocks lines={lines} onSurface={onSurface} />;
+  // A quote with nothing written above it is the whole mail: show it.
+  const hasOwnText =
+    quoteAt !== null && lines.slice(0, quoteAt).some((l) => markupPlainText(l).trim() !== '');
+  if (quoteAt === null || !hasOwnText) return <BodyBlocks lines={lines} onSurface={onSurface} />;
   return (
     <div className={cx('min-w-0 space-y-2', onSurface && EVE_MAIL_SURFACE_CLASS)}>
       <BodyBlocks lines={lines.slice(0, quoteAt)} onSurface={onSurface} bare />
       <button
         type="button"
         aria-expanded={showQuote}
-        aria-controls={quoteId}
-        onClick={() => setShowQuote((open) => !open)}
+        onClick={() => setOpenFor(showQuote ? null : bodyKey)}
         className={cx(inlineLinkClassName, 'text-xs')}
       >
         {showQuote ? t('mail.hideQuoted') : t('mail.showQuoted', { count: lines.length - quoteAt })}
       </button>
       {showQuote && (
-        <div id={quoteId} className="border-l-2 border-line pl-3 opacity-80">
+        <div className="border-l-2 border-line pl-3 opacity-80">
           <BodyBlocks lines={lines.slice(quoteAt)} onSurface={onSurface} bare />
         </div>
       )}

@@ -23,8 +23,6 @@ export function trailingQuoteStart(
       start = i;
     } else if (line.trim() === '') {
       if (start === null) continue;
-      // A blank line inside the tail belongs to it only if quote lines sit above it too.
-      if (i === 0) break;
     } else if (ATTRIBUTION.test(line) && sawQuote) {
       start = i;
     } else {
