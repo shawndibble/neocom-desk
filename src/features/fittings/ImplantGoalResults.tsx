@@ -106,7 +106,6 @@ export function GoalResults({
   const familyList = (list: FamilyResult[]) => (
     <ul className="space-y-2">
       {list.map(({ family, grades }) => {
-        const lowest = family.grades[0]!;
         const highest = family.grades[family.grades.length - 1]!;
         // Every grade usually displaces the same item: say so once, not on each row.
         const displaced = new Set(
@@ -123,19 +122,12 @@ export function GoalResults({
                 <p className="font-semibold">{family.name}</p>
                 <p className="flex flex-wrap items-baseline gap-x-1.5 text-xs text-text-dim">
                   <span>
-                    {family.grades.length > 1
-                      ? t(
-                          family.kind === 'booster'
-                            ? 'fittings.implantFinder.boosterSlotGrades'
-                            : 'fittings.implantFinder.slotGrades',
-                          { slot: family.slot, low: lowest.code, high: highest.code }
-                        )
-                      : t(
-                          family.kind === 'booster'
-                            ? 'fittings.implantFinder.boosterSlotLong'
-                            : 'fittings.implantFinder.slot',
-                          { slot: family.slot }
-                        )}
+                    {t(
+                      family.kind === 'booster'
+                        ? 'fittings.implantFinder.boosterSlotLong'
+                        : 'fittings.implantFinder.slot',
+                      { slot: family.slot }
+                    )}
                   </span>
                   {sharedReplaces !== null && (
                     <ReplacesLine

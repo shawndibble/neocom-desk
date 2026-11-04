@@ -2398,7 +2398,6 @@
       "updating": "Updating for your change…",
       "budgetOver": "{{used}} / {{total}} {{unit}} · {{value}} {{unit}} over",
       "budgetSpare": "{{used}} / {{total}} {{unit}} · {{value}} {{unit}} spare",
-      "slotGrades": "Slot {{slot}} · {{low}} (smallest bonus) to {{high}} (largest)",
       "group": {
         "fitting": "Fitting",
         "weapons": "Weapons",
@@ -2428,7 +2427,6 @@
       "searchingStores": "Searching LP Stores: {{done}} of {{total}}…",
       "boostersHeading": "Boosters that help · best first",
       "boosterSideEffects": "Side effects aren’t counted here. Switch them on under Your set to see the worst case.",
-      "boosterSlotGrades": "Booster slot {{slot}} · each strength is its own item, from {{low}} to {{high}}",
       "boosterSlotLong": "Booster slot {{slot}}",
       "info": "Show details of {{name}}",
       "findingSources": "Finding where to get it…",
