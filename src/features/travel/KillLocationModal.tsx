@@ -322,38 +322,40 @@ export function KillLocationModal({
 
   return (
     <Modal open={open} onClose={onClose} placement={phone ? 'sheet-full' : 'wide'} title={title}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-line px-3 py-2 text-xs text-text-dim">
-        {chips.map((chip) => (
-          <span key={chip}>{chip}</span>
+      <div className="text-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-line px-3 py-2 text-xs text-text-dim">
+          {chips.map((chip, index) => (
+            <span key={index}>{chip}</span>
+          ))}
+          <ExternalLink href={systemZkillUrl(systemId)} className="ml-auto">
+            {t('travel.kills.modal.systemOnZkill')}
+          </ExternalLink>
+        </div>
+        {ordered.map((location) => (
+          <section key={location.key}>
+            {ordered.length > 1 && (
+              <h3 className="sticky top-0 z-10 flex items-center gap-2 border-y border-line bg-panel px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-text-dim">
+                {location.name ?? t('travel.kills.modal.elsewhere')}
+                {location.onPath && <Pill tone="accent">{t('travel.kills.onPath')}</Pill>}
+                <span className="ml-auto font-normal normal-case tracking-normal">
+                  {t('travel.kills.modal.summary', { count: location.count })}
+                </span>
+              </h3>
+            )}
+            <ul>
+              {location.kills.map((kill) => (
+                <KillRow
+                  key={kill.killmailId}
+                  kill={kill}
+                  victimNames={names}
+                  typeLabel={typeLabel ?? ((id) => `#${id}`)}
+                  now={now}
+                />
+              ))}
+            </ul>
+          </section>
         ))}
-        <ExternalLink href={systemZkillUrl(systemId)} className="ml-auto">
-          {t('travel.kills.modal.systemOnZkill')}
-        </ExternalLink>
       </div>
-      {ordered.map((location) => (
-        <section key={location.key}>
-          {ordered.length > 1 && (
-            <h3 className="sticky top-0 z-10 flex items-center gap-2 border-y border-line bg-panel px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-text-dim">
-              {location.name ?? t('travel.kills.modal.elsewhere')}
-              {location.onPath && <Pill tone="accent">{t('travel.kills.onPath')}</Pill>}
-              <span className="ml-auto font-normal normal-case tracking-normal">
-                {t('travel.kills.modal.summary', { count: location.count })}
-              </span>
-            </h3>
-          )}
-          <ul>
-            {location.kills.map((kill) => (
-              <KillRow
-                key={kill.killmailId}
-                kill={kill}
-                victimNames={names}
-                typeLabel={typeLabel ?? ((id) => `#${id}`)}
-                now={now}
-              />
-            ))}
-          </ul>
-        </section>
-      ))}
     </Modal>
   );
 }
