@@ -40,3 +40,14 @@ export function resolveAccelerator(
   }
   return { kind: 'none' };
 }
+
+/** How far ahead of its end a running accelerator is worth a warning: only then can a new one be queued up. */
+export const ACCELERATOR_WARNING_HOURS = 2;
+
+/**
+ * An accelerator can't be stacked or replaced until it ends, so days of warning
+ * are noise; it only turns `warning` inside the last `ACCELERATOR_WARNING_HOURS`.
+ */
+export function acceleratorSeverity(remainingMs: number): 'warning' | 'clear' {
+  return remainingMs <= ACCELERATOR_WARNING_HOURS * 3_600_000 ? 'warning' : 'clear';
+}

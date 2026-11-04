@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAcceleratorLive, resolveAccelerator } from './accelerator';
+import { acceleratorSeverity, isAcceleratorLive, resolveAccelerator } from './accelerator';
 
 const NOW = 1_000_000;
 
@@ -34,5 +34,17 @@ describe('isAcceleratorLive', () => {
     expect(isAcceleratorLive({ expiresAt: NOW + 1 }, NOW)).toBe(true);
     expect(isAcceleratorLive({ expiresAt: NOW }, NOW)).toBe(false);
     expect(isAcceleratorLive(null, NOW)).toBe(false);
+  });
+});
+
+describe('acceleratorSeverity', () => {
+  const HOUR = 3_600_000;
+  it('stays clear until the last two hours', () => {
+    expect(acceleratorSeverity(3 * 24 * HOUR)).toBe('clear');
+    expect(acceleratorSeverity(2 * HOUR + 1)).toBe('clear');
+  });
+  it('warns inside two hours', () => {
+    expect(acceleratorSeverity(2 * HOUR)).toBe('warning');
+    expect(acceleratorSeverity(1)).toBe('warning');
   });
 });
