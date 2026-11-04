@@ -199,11 +199,12 @@ export function AlertGroupRow({
         )}
       </div>
       {!danger && (
-        // Real space between the two: a destructive × beside a ⋮ is a mis-tap hazard (§6c), and
-        // the hit areas must not touch (WCAG 2.5.8).
-        <span className="relative flex shrink-0 items-center gap-3 touch:gap-4">
+        // A check, not a ×: dismissing is marking read, and an Undo toast backs it, so it sits
+        // close to the ⋮ (§6c). The hit areas still never touch (WCAG 2.5.8). The negative end
+        // margin lets the buttons' padding, not the row's, set the ⋮'s distance from the edge.
+        <span className="relative -me-2 flex shrink-0 items-center gap-1 touch:gap-2">
           <IconButton
-            icon={<Icon.Close />}
+            icon={<Icon.Done />}
             label={
               many
                 ? t('alerts.panel.dismissAllLabel', { title: label, count: group.count })
@@ -237,7 +238,7 @@ export function AlertGroupRow({
               aria-hidden="true"
               className="absolute inset-y-0 flex w-20 items-center justify-center bg-panel-2 text-text-dim ltr:right-0 rtl:left-0"
             >
-              <Icon.Close />
+              <Icon.Done />
             </div>
           )}
           <div
