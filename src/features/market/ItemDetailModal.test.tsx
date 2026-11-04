@@ -8,8 +8,17 @@ import { http, HttpResponse } from 'msw';
 import '@/i18n';
 import { ESI_BASE_URL } from '@/esi/client';
 import { ItemDetailModal } from './ItemDetailModal';
-import { loadAttributeDictionary, loadGlobalMarkets } from '@/sde/loadMarketSde';
-import { loadMutaplasmids, loadPi, loadSkillAttributeModifiers, loadSkills } from '@/sde/loadSde';
+import { loadAttributeDictionary, loadGlobalMarkets, loadMarketRegions } from '@/sde/loadMarketSde';
+import {
+  loadGroupCategories,
+  loadMutaplasmids,
+  loadPi,
+  loadShipTree,
+  loadSkillAttributeModifiers,
+  loadSkills,
+  loadTypes,
+} from '@/sde/loadSde';
+import type { ShipTreeData, TypeMap } from '@/sde/types';
 import { resetMutaplasmidLookupForTests } from '@/features/abyssal/mutaplasmidData';
 import { resetDynamicItemFailuresForTests } from '@/features/abyssal/dynamicItems';
 import { loadTypeInfo } from '@/sde/loadTypeInfo';
@@ -21,7 +30,6 @@ import { mswServer } from '@/test/msw';
 import { stubViewport } from '@/test/viewport';
 import { clearOrderBookCache } from './orderBook';
 import type { RegionOrder } from '@/esi/endpoints';
-import { LocationProbe } from '@/test/LocationProbe';
 
 const OPEN_WINDOW_CHARACTER = 4242;
 
@@ -36,6 +44,8 @@ vi.mock('@/sde/loadMarketSde', () => ({
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => ({})),
+  loadGroupCategories: vi.fn(async () => ({})),
+  loadShipTree: vi.fn(async () => ({ factions: [], groups: {}, ships: [] })),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadSkillAttributeModifiers: vi.fn(async () => ({})),
   loadMutaplasmids: vi.fn(async () => ({
@@ -83,23 +93,37 @@ const server = mswServer(
 );
 
 describe('ItemDetailModal', () => {
-  it('offers View in Market only when asked, closing itself on the way', async () => {
+  it('offers the Market Browser link in the Market tab only when asked, closing itself on the way', async () => {
     await seedGrant(OPEN_WINDOW_CHARACTER, ['esi-ui.open_window.v1']);
     useActiveCharacter.setState({ activeCharacterId: OPEN_WINDOW_CHARACTER, hydrated: true });
-    // Fails fast: a request left hanging would hold an ESI slot the next tests need.
-    server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => HttpResponse.error()));
-    mockedLoadDictionary.mockReturnValue(new Promise(() => {}));
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Rifter',
+          description: '',
+          group_id: 25,
+          published: true,
+          volume: 27289,
+          dogma_attributes: [],
+        })
+      ),
+      http.get(`${ESI_BASE_URL}/markets/:regionId/history`, () => HttpResponse.json([]))
+    );
+    mockedLoadDictionary.mockResolvedValue({});
     const onClose = vi.fn();
     const { rerender } = render(
       <MemoryRouter initialEntries={['/overview']}>
         <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={onClose} showOpenInMarket />
       </MemoryRouter>
     );
-    // Waits for the mutaplasmid data: an abyssal type offers no View in Market.
-    const link = await screen.findByRole('link', { name: 'View in Market' });
+    // One header action: Open in EVE. The market entry point is the tab.
+    expect(await screen.findByRole('button', { name: 'Open in EVE: Rifter' })).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Market' }));
+    const link = screen.getByRole('link', { name: 'Open in Market Browser' });
     expect(link).toHaveAttribute('href', `/market/browser?type=${TYPE_ID}`);
-    expect(screen.getByRole('button', { name: 'Open in EVE: Rifter' })).toBeInTheDocument();
-    await userEvent.setup().click(link);
+    await user.click(link);
     expect(onClose).toHaveBeenCalledTimes(1);
 
     rerender(
@@ -107,7 +131,63 @@ describe('ItemDetailModal', () => {
         <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={onClose} />
       </MemoryRouter>
     );
-    expect(screen.queryByRole('link', { name: 'View in Market' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Open in Market Browser' })).not.toBeInTheDocument();
+  });
+
+  it("subtitles the title with the item's Group and a ship's faction", async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Rifter',
+          description: '',
+          group_id: 25,
+          published: true,
+          volume: 27289,
+          dogma_attributes: [],
+        })
+      ),
+      http.get(`${ESI_BASE_URL}/universe/groups/25`, () =>
+        HttpResponse.json({
+          group_id: 25,
+          name: 'Frigate',
+          category_id: 6,
+          published: true,
+          types: [],
+        })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({});
+    vi.mocked(loadTypes).mockResolvedValueOnce({
+      [TYPE_ID]: { name: 'Rifter', groupID: 25, volume: 27289 },
+    } as unknown as TypeMap);
+    vi.mocked(loadGroupCategories).mockResolvedValueOnce({ 25: 6 });
+    vi.mocked(loadShipTree).mockResolvedValueOnce({
+      factions: [{ id: 500002, name: 'Minmatar Republic', description: '' }],
+      groups: {},
+      ships: [{ typeID: TYPE_ID, name: 'Rifter', factionID: 500002 }],
+    } as unknown as ShipTreeData);
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
+
+    expect(await screen.findByText('Frigate · Minmatar Republic')).toBeInTheDocument();
+  });
+
+  it('shows a hull its packaged volume first, the assembled one after it', async () => {
+    mockedLoadTypeInfo.mockResolvedValueOnce({
+      description: '',
+      attributes: [],
+      effects: [],
+      volume: 118000,
+      packagedVolume: 10000,
+    });
+    mockedLoadDictionary.mockResolvedValue({});
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Zealot" onClose={() => {}} />);
+
+    expect(
+      await screen.findByText('Volume: 10,000 m3 packaged (118,000 m3 assembled)')
+    ).toBeInTheDocument();
   });
 
   it('shows a loading state while ESI and the attribute dictionary are in flight', () => {
@@ -868,8 +948,8 @@ describe('ItemDetailModal best sell/buy price', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByRole('link', { name: 'View in Market' })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: /best sell 450,000 ISK/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Market' })).toBeInTheDocument();
     mockedLoadMutaplasmids.mockResolvedValue({
       attributeNames: {},
       mutaplasmids: {},
@@ -940,6 +1020,8 @@ describe('ItemDetailModal best sell/buy price', () => {
 
     expect(await screen.findByText('500,000 ISK', { selector: '.sr-only' })).toBeInTheDocument();
     expect(screen.queryByText('300,000 ISK', { selector: '.sr-only' })).not.toBeInTheDocument();
+    // The figures name the market they were read at.
+    expect(screen.getByText('At Jita 4-4:')).toBeInTheDocument();
   });
 
   it('reads every station in the region when handed a Region-mode location', async () => {
@@ -968,6 +1050,7 @@ describe('ItemDetailModal best sell/buy price', () => {
     );
 
     expect(await screen.findByText('300,000 ISK', { selector: '.sr-only' })).toBeInTheDocument();
+    expect(screen.getByText('In The Forge:')).toBeInTheDocument();
   });
 
   it('reads a Global Market Region item from its own region', async () => {
@@ -984,6 +1067,32 @@ describe('ItemDetailModal best sell/buy price', () => {
     render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
 
     expect(await screen.findByText('4,000,000 ISK', { selector: '.sr-only' })).toBeInTheDocument();
+  });
+
+  it('names a Region-mode market no hub sits in, from the region list', async () => {
+    serveRifter();
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/10000060/orders`, () =>
+        HttpResponse.json([order({ order_id: 1, price: 600_000, location_id: 61000001 })])
+      )
+    );
+    vi.mocked(loadMarketRegions).mockResolvedValueOnce([{ id: 10000060, name: 'Delve' }]);
+
+    render(
+      <ItemDetailModal
+        typeId={TYPE_ID}
+        itemName="Rifter"
+        onClose={() => {}}
+        location={{
+          mode: 'region',
+          regionId: 10000060,
+          hubStationId: 60003760,
+          globalMarkets: new Map(),
+        }}
+      />
+    );
+
+    expect(await screen.findByText('In Delve:')).toBeInTheDocument();
   });
 
   it('hides the price row rather than blanking the modal when the order book fetch fails', async () => {
@@ -1192,30 +1301,7 @@ describe('ItemDetailModal header actions on a phone', () => {
   /** jsdom's `matchMedia` never matches; the ⋮ branch needs the narrow query to. */
   const goNarrow = () => stubViewport(NARROW_QUERY);
 
-  it('folds Open in EVE and View in Market into one ⋮, so the name keeps the room', async () => {
-    goNarrow();
-    server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => HttpResponse.error()));
-    mockedLoadDictionary.mockReturnValue(new Promise(() => {}));
-    const onClose = vi.fn();
-    render(
-      <MemoryRouter initialEntries={['/overview']}>
-        <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={onClose} showOpenInMarket />
-        <LocationProbe />
-      </MemoryRouter>
-    );
-    const more = await screen.findByRole('button', { name: 'More actions for Rifter' });
-    expect(screen.queryByRole('link', { name: 'View in Market' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Open in EVE: Rifter' })).not.toBeInTheDocument();
-
-    const user = userEvent.setup();
-    await user.click(more);
-    expect(await screen.findByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
-    await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('location')).toHaveTextContent(`/market/browser?type=${TYPE_ID}`);
-  });
-
-  it('keeps a single action as its plain button, with no ⋮', async () => {
+  it('keeps its single action as a plain button, with no ⋮, even away from the Market Browser', async () => {
     await seedGrant(OPEN_WINDOW_CHARACTER, ['esi-ui.open_window.v1']);
     useActiveCharacter.setState({ activeCharacterId: OPEN_WINDOW_CHARACTER, hydrated: true });
     goNarrow();
@@ -1223,7 +1309,7 @@ describe('ItemDetailModal header actions on a phone', () => {
     mockedLoadDictionary.mockReturnValue(new Promise(() => {}));
     render(
       <MemoryRouter initialEntries={['/overview']}>
-        <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />
+        <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} showOpenInMarket />
       </MemoryRouter>
     );
     expect(await screen.findByRole('button', { name: 'Open in EVE: Rifter' })).toBeInTheDocument();
