@@ -1,5 +1,5 @@
 /** "Your set" strip of the implant finder: every implant and booster slot, and the helpers that read a slot. */
-import { useState, type CSSProperties, type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret, IconButton, Tooltip } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
@@ -154,14 +154,8 @@ export function SetStrip({
               : t('fittings.implantFinder.slotHint')}
           </span>
         </div>
-        <ul
-          style={{ '--booster-slots': boosterSlots.length } as CSSProperties}
-          className="grid grid-cols-5 gap-1 md:grid-cols-[repeat(10,minmax(0,1fr))_0.5rem_repeat(var(--booster-slots),minmax(0,1fr))]"
-        >
-          {cells.slice(0, 10).map(cell)}
-          <li aria-hidden className="hidden md:block" />
-          {cells.slice(10).map(cell)}
-        </ul>
+        {/* Ten implant slots fill the first row; the boosters start the next. */}
+        <ul className="grid grid-cols-5 gap-1 md:grid-cols-10 md:gap-y-2">{cells.map(cell)}</ul>
       </div>
     </div>
   );

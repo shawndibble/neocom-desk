@@ -207,6 +207,48 @@ async function runBaselines(
   return { set, stats, emptied };
 }
 
+/**
+ * What the finder worked out for one Fitting under one set of conditions,
+ * kept past the window closing: reopening it (say, after the item-detail
+ * window on top of it closes) must not screen the whole catalog again.
+ * Keyed by the Fitting object, so any edit to the Fitting starts afresh.
+ */
+interface FinderMemo {
+  profile: PilotProfile;
+  damageProfile: unknown;
+  conditions: unknown;
+  runs: Map<string, Promise<FittingStats>>;
+  /** The screening result per starting set (`setKey`). */
+  screened: Map<string, { baselines: Baselines; bestGradeStats: Map<string, FittingStats> }>;
+}
+const finderMemos = new WeakMap<Fitting, FinderMemo>();
+
+function memoFor(
+  fitting: Fitting,
+  profile: PilotProfile,
+  damageProfile: unknown,
+  conditions: unknown
+): FinderMemo {
+  const known = finderMemos.get(fitting);
+  if (
+    known &&
+    known.profile === profile &&
+    known.damageProfile === damageProfile &&
+    known.conditions === conditions
+  ) {
+    return known;
+  }
+  const fresh: FinderMemo = {
+    profile,
+    damageProfile,
+    conditions,
+    runs: new Map(),
+    screened: new Map(),
+  };
+  finderMemos.set(fitting, fresh);
+  return fresh;
+}
+
 function setKey(set: FittingImplantSet): string {
   const sorted = (ids: readonly number[] | undefined) => idSetKey(ids ?? []);
   return `${sorted(set.implants)}|${sorted(set.boosters)}|${sorted(set.boosterSideEffects)}`;
@@ -256,9 +298,13 @@ export function useImplantFinder({
   } | null>(null);
 
   // One cache per Fitting and conditions: a goal switch or a hub change re-reads it, never the engine.
+  const memo = useMemo(
+    () => (fitting && profile ? memoFor(fitting, profile, damageProfile, conditions) : null),
+    [fitting, profile, damageProfile, conditions]
+  );
   const evaluate = useMemo<Evaluate | null>(() => {
-    if (!fitting || !profile) return null;
-    const runs = new Map<string, Promise<FittingStats>>();
+    if (!fitting || !profile || !memo) return null;
+    const { runs } = memo;
     return (set) => {
       const key = setKey(set);
       let run = runs.get(key);
@@ -269,11 +315,11 @@ export function useImplantFinder({
       }
       return run;
     };
-  }, [fitting, profile, damageProfile, conditions]);
+  }, [fitting, profile, damageProfile, conditions, memo]);
 
   // 1. The catalog, then each family's best grade on this Fitting.
   useEffect(() => {
-    if (!open || !evaluate || !fitting) return;
+    if (!open || !evaluate || !fitting || !memo) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -281,6 +327,13 @@ export function useImplantFinder({
         if (cancelled) return;
         setCatalog(cat);
         const set = fitting.implantSet ?? EMPTY_SET;
+        const done = memo.screened.get(setKey(set));
+        if (done) {
+          setProgress({ done: cat.families.length, total: cat.families.length });
+          setScreening({ fitting, ...done });
+          setFailed(false);
+          return;
+        }
         const baselines = await runBaselines(evaluate, set, cat.slotOf);
         const bestGradeStats = new Map<string, FittingStats>();
         setProgress({ done: 0, total: cat.families.length });
@@ -293,6 +346,7 @@ export function useImplantFinder({
         }
         if (cancelled) return;
         setProgress({ done: cat.families.length, total: cat.families.length });
+        memo.screened.set(setKey(set), { baselines, bestGradeStats });
         setScreening({ fitting, baselines, bestGradeStats });
         setFailed(false);
       } catch {
@@ -302,7 +356,7 @@ export function useImplantFinder({
     return () => {
       cancelled = true;
     };
-  }, [open, evaluate, fitting]);
+  }, [open, evaluate, fitting, memo]);
 
   /** The screening, once it describes the Fitting now open — later stages wait for it. */
   const current = screening?.fitting === fitting ? screening : null;
