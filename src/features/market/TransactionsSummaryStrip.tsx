@@ -15,6 +15,8 @@ interface TransactionsSummaryStripProps {
   transactions: readonly WalletTransaction[];
   /** Margin, matched count and broker fees over the same fills; omitted while they can't be worked out. */
   trading?: TradingSummary;
+  /** The filter's start/end days (YYYY-MM-DD); the range line shows only while one is set. */
+  range?: { startDate: string | null; endDate: string | null };
   className?: string;
 }
 
@@ -22,11 +24,24 @@ interface TransactionsSummaryStripProps {
 export function TransactionsSummaryStrip({
   transactions,
   trading,
+  range,
   className,
 }: TransactionsSummaryStripProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const summary = useMemo(() => summarizeTransactions(transactions), [transactions]);
+  const rangeSet = range != null && (range.startDate !== null || range.endDate !== null);
+  const day = (iso: string) => formatDateOnly(new Date(`${iso}T00:00:00Z`), 'UTC');
+  const rangeFrom = rangeSet
+    ? range.startDate !== null
+      ? day(range.startDate)
+      : summary.oldest && formatDateOnly(new Date(summary.oldest), timeZone)
+    : null;
+  const rangeTo = rangeSet
+    ? range.endDate !== null
+      ? day(range.endDate)
+      : summary.newest && formatDateOnly(new Date(summary.newest), timeZone)
+    : null;
   return (
     <section
       aria-label={t('wallet.transactionsSummaryLabel')}
@@ -35,12 +50,9 @@ export function TransactionsSummaryStrip({
         className
       )}
     >
-      {summary.oldest && summary.newest && (
+      {rangeFrom && rangeTo && (
         <p className="text-xs text-text-dim">
-          {t('wallet.transactionsRange', {
-            from: formatDateOnly(new Date(summary.oldest), timeZone),
-            to: formatDateOnly(new Date(summary.newest), timeZone),
-          })}
+          {t('wallet.transactionsRange', { from: rangeFrom, to: rangeTo })}
         </p>
       )}
       <dl className="grid grid-cols-2 items-start gap-x-4 gap-y-3 tabular-nums min-[26rem]:grid-cols-3 lg:grid-cols-5">

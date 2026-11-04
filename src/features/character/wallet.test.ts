@@ -333,6 +333,26 @@ describe('loadWalletTransactionsWithStatus', () => {
     expect(result.cached?.data.map((t) => t.transaction_id)).toEqual([2, 1]);
     expect(result.cached?.truncated).toBe(true);
   });
+
+  it('adds archived fills ESI no longer returns only when asked', async () => {
+    const put = (rows: ReturnType<typeof txn>[]) =>
+      db.esiCache.put({
+        characterId: CHAR_ID,
+        key: 'wallet:transactions',
+        value: rows,
+        fetchedAt: Date.now(),
+        truncated: false,
+      });
+    await put([txn(9002), txn(9001)]);
+    await loadWalletTransactionsWithStatus(CHAR_ID); // archives both
+    await put([txn(9002)]);
+
+    const live = await loadWalletTransactionsWithStatus(CHAR_ID);
+    const withArchive = await loadWalletTransactionsWithStatus(CHAR_ID, { archive: true });
+
+    expect(live.cached?.data.map((t) => t.transaction_id)).toEqual([9002]);
+    expect(withArchive.cached?.data.map((t) => t.transaction_id).sort()).toContain(9001);
+  });
 });
 
 const CHAR_A = 1;
