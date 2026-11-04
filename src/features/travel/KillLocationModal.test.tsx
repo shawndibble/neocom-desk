@@ -147,6 +147,35 @@ describe('KillLocationModal', () => {
     expect(screen.queryByText('Name 1019')).not.toBeInTheDocument();
   });
 
+  it("groups a pilot's ship and the pod after it on one row with the value summed", async () => {
+    render(
+      <KillLocationModal
+        open
+        onClose={() => undefined}
+        systemId={1}
+        systemName="Tama"
+        scope="location"
+        hulls={[]}
+        locations={[
+          location('Stargate (X)', [
+            kill(2, 7, {
+              victim: { characterId: 101, corporationId: 200, allianceId: null, shipTypeId: 4306 },
+              value: 10_000,
+            }),
+            kill(1, 8, {
+              victim: { characterId: 101, corporationId: 200, allianceId: null, shipTypeId: 648 },
+              value: 3_000_000,
+            }),
+          ]),
+        ]}
+      />
+    );
+    const row = await screen.findByRole('button', { name: /Name 101/ });
+    expect(row).toHaveTextContent('Badger + Tornado');
+    expect(row).toHaveTextContent('3M ISK');
+    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(1);
+  });
+
   it('leaves out a name that never resolved and invents nothing', async () => {
     resolveNames.mockResolvedValue(new Map());
     loadGroupNames.mockResolvedValue(new Map());

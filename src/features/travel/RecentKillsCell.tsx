@@ -10,7 +10,7 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Spinner } from '@/components/ui';
+import { Spinner, plainTextActionClassName } from '@/components/ui';
 import type { KillTags, RecentKillLocation } from '@/engine/route/recentKills';
 import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import { KillLocationModal } from './KillLocationModal';
@@ -60,11 +60,15 @@ function LocationLine({
         });
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
-      <Button size="sm" onClick={() => setOpen(true)}>
-        <span className={location.onPath ? 'font-semibold text-text' : 'text-text-dim'}>
-          {text}
-        </span>
-      </Button>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={plainTextActionClassName(
+          location.onPath ? 'text-left font-semibold' : 'text-left'
+        )}
+      >
+        {text}
+      </button>
       {location.onPath && (
         <span className={`${BADGE} bg-panel-2 text-text`}>{t('travel.kills.onPath')}</span>
       )}
@@ -117,9 +121,13 @@ export function RecentKillsCell({
       data-dense-omit={summary.count === 0 ? '' : undefined}
     >
       {summary.count > 0 ? (
-        <Button size="sm" onClick={() => setSystemOpen(true)}>
+        <button
+          type="button"
+          onClick={() => setSystemOpen(true)}
+          className={plainTextActionClassName('whitespace-nowrap')}
+        >
           {t('travel.kills.count', { count: summary.count })}
-        </Button>
+        </button>
       ) : (
         <span>{t('travel.kills.count', { count: summary.count })}</span>
       )}

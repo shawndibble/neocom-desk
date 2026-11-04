@@ -5,6 +5,7 @@ import {
   SMART_BOMB_GROUP_ID,
   capAttackers,
   classifyKillTags,
+  groupVictimKills,
   hullClassKillCounts,
   summarizeRecentKills,
   type RecentKill,
@@ -310,5 +311,45 @@ describe('summarizeRecentKills kill lists', () => {
       { groupId: 1201, kills: 1 },
     ]);
     expect(summary.locations.find((l) => l.key === 'other')?.kills).toHaveLength(1);
+  });
+});
+
+describe('groupVictimKills', () => {
+  const victim = (id: number) => ({
+    characterId: id,
+    corporationId: null,
+    allianceId: null,
+    shipTypeId: null,
+  });
+  const view = (id: number, time: string, pilot: number | null) => ({
+    ...kill(id, time, null),
+    victim: pilot === null ? undefined : victim(pilot),
+    bubble: false,
+    smartbomb: false,
+  });
+
+  it("puts a pilot's ship and the pod that followed it in one group, ship first", () => {
+    const groups = groupVictimKills([
+      view(2, '2026-09-30T05:20:30Z', 7), // the pod
+      view(1, '2026-09-30T05:20:00Z', 7), // the ship
+      view(3, '2026-09-30T05:10:00Z', 8),
+    ]);
+    expect(groups.map((group) => group.map((k) => k.killmailId))).toEqual([[1, 2], [3]]);
+  });
+
+  it('keeps the same pilot dying again much later as a separate group', () => {
+    const groups = groupVictimKills([
+      view(2, '2026-09-30T05:20:00Z', 7),
+      view(1, '2026-09-30T04:50:00Z', 7),
+    ]);
+    expect(groups).toHaveLength(2);
+  });
+
+  it('never groups kills with no victim pilot', () => {
+    const groups = groupVictimKills([
+      view(1, '2026-09-30T05:20:00Z', null),
+      view(2, '2026-09-30T05:20:10Z', null),
+    ]);
+    expect(groups).toHaveLength(2);
   });
 });
