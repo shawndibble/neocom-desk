@@ -353,18 +353,18 @@ describe('FittingWhatToTrainPanel — level picker', () => {
 describe('FittingWhatToTrainPanel — Skill Plan button and prerequisites', () => {
   it('opens the Skill Plans page, or the target plan once there is one', async () => {
     renderPanel();
-    expect(await screen.findByRole('link', { name: 'Open plan' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Open Skill Plan' })).toHaveAttribute(
       'href',
       '/skills/plans'
     );
   });
 
-  it('opens the target plan from the Open plan button', async () => {
+  it('opens the target plan from the Open Skill Plan button', async () => {
     const plan = newPlan(CHARACTER_ID, 'Drone boat');
     await db.skillPlans.put(plan);
     renderPanel();
     await waitFor(() =>
-      expect(screen.getByRole('link', { name: 'Open plan' })).toHaveAttribute(
+      expect(screen.getByRole('link', { name: 'Open Skill Plan' })).toHaveAttribute(
         'href',
         `/skills/plans/${plan.id}`
       )

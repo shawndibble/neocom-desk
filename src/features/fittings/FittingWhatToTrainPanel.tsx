@@ -29,6 +29,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
+  IconButton,
   Select,
   SelectContent,
   SelectItem,
@@ -199,7 +200,7 @@ function WhatToTrainRanking({
           }}
         >
           <SelectTrigger aria-label={rankByLabel} size="sm" className="w-full">
-            <span>
+            <span className="min-w-0 truncate">
               <span className="text-text-dim">{rankByLabel}: </span>
               <SelectValue />
             </span>
@@ -437,13 +438,12 @@ export function WhatToTrainItem({
               {options.length > 1 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button
+                    <IconButton
                       size="sm"
-                      aria-label={t('fittings.whatToTrain.levelLabel', { skill: row.name })}
-                      className="-ml-px rounded-l-none px-1!"
-                    >
-                      <Expanded aria-hidden="true" />
-                    </Button>
+                      icon={<Expanded />}
+                      label={t('fittings.whatToTrain.levelLabel', { skill: row.name })}
+                      className="-ml-px rounded-l-none"
+                    />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuRadioGroup

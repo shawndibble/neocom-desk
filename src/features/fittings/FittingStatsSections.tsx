@@ -173,11 +173,19 @@ export function FittingStatsSections({
   if (whatToTrainRequested && panel !== 'pilot') openPanel('pilot');
   // Not tied to a change in the request: a phone mounts this column only once its Stats tab shows.
   const scrollToTrain = useRef(false);
+  const trainRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!whatToTrainRequested) return;
     scrollToTrain.current = true;
     onWhatToTrainShown?.();
   }, [whatToTrainRequested, onWhatToTrainShown]);
+  // After every commit until the list is on screen: the panel and its stats may mount later than the request.
+  useEffect(() => {
+    const el = trainRef.current;
+    if (!scrollToTrain.current || !el) return;
+    scrollToTrain.current = false;
+    el.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  });
   const pilotTriggerRef = useRef<HTMLButtonElement>(null);
   const situationTriggerRef = useRef<HTMLButtonElement>(null);
   const overheatAll = useOverheatAll((state) => state.overheatAll);
@@ -358,15 +366,7 @@ export function FittingStatsSections({
               {stats && whatToTrain && (
                 <PanelSection id="whatToTrain" title={t('fittings.stats.section.whatToTrain')}>
                   {/* Scrolled to once there is something to scroll to: Improve's "What to train" link. */}
-                  <div
-                    ref={(el) => {
-                      if (!el || !scrollToTrain.current) return;
-                      scrollToTrain.current = false;
-                      el.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
-                    }}
-                  >
-                    {whatToTrain}
-                  </div>
+                  <div ref={trainRef}>{whatToTrain}</div>
                 </PanelSection>
               )}
               {stats && fitting && yourCharacters && (

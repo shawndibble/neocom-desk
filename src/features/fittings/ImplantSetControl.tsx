@@ -38,7 +38,7 @@ export function ImplantSetControl({ basis, implantSet }: ImplantSetControlProps)
           });
 
   const label = t('fittings.implants.label');
-  // Drawn as the select beside it, with a right caret: it opens the editor rather than a list.
+  // Bordered like the Skills select beside it, but with a right caret (§6c): it opens a dialog, not a list.
   return (
     <button
       type="button"
