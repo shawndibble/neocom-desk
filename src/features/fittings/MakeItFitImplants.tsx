@@ -8,14 +8,15 @@
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IskAmount, Spinner } from '@/components/ui';
-import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import { Spinner } from '@/components/ui';
 import { cloneSeedSet, type ImplantBasis } from '@/engine/fittings/implantBasis';
 import { placeAllInSet } from '@/engine/fittings/implantFinder';
 import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 import { useMarketHub } from '@/features/market/hub';
-import { cx } from '@/lib/cx';
+import type { FittingStats } from '@/engine/fittings/types';
+import { freedLabel } from './makeItFitFreed';
+import { MakeItFitFixCard } from './MakeItFitFixCard';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { FitResource } from './makeItFitContext';
 import { MakeItFitSection } from './MakeItFitSection';
@@ -35,19 +36,30 @@ export interface MakeItFitImplantsInput {
 interface Props {
   open: boolean;
   resource: FitResource | null;
+  /** The Fitting's stats as they stand, to say what each fix frees; null until known. */
+  before: FittingStats | null;
   implants: MakeItFitImplantsInput;
   /** After a fix is put in the set, with the implants' names. */
   onApplied: (names: string) => void;
 }
 
-export function MakeItFitImplants({ open, resource, implants, onApplied }: Props) {
+export function MakeItFitImplants({ open, resource, before, implants, onApplied }: Props) {
   if (resource !== 'cpu' && resource !== 'powergrid') return null;
-  return <Implants open={open} goalId={resource} implants={implants} onApplied={onApplied} />;
+  return (
+    <Implants
+      open={open}
+      goalId={resource}
+      before={before}
+      implants={implants}
+      onApplied={onApplied}
+    />
+  );
 }
 
 function Implants({
   open,
   goalId,
+  before,
   implants,
   onApplied,
 }: Omit<Props, 'resource'> & { goalId: 'cpu' | 'powergrid' }) {
@@ -76,6 +88,7 @@ function Implants({
   });
   const names = useMemo(() => implantNames(finder.catalog?.families ?? []), [finder.catalog]);
   const fixes = finder.fixes.filter((fix) => fitsResourceBudget(fix.stats)).slice(0, FIX_LIMIT);
+  const cheapest = Math.min(...fixes.map((fix) => fix.cost));
   const searching = finder.status === 'loading' || finder.updating;
 
   if (finder.status === 'error' || (!searching && fixes.length === 0)) return null;
@@ -88,7 +101,10 @@ function Implants({
   }
 
   return (
-    <MakeItFitSection heading={t('fittings.makeItFit.section.implants')}>
+    <MakeItFitSection
+      heading={t('fittings.makeItFit.section.implants')}
+      hint={t('fittings.makeItFit.sectionHint.implants')}
+    >
       {searching ? (
         <p className="text-text-dim flex items-center gap-2 text-xs">
           <Spinner />{' '}
@@ -98,28 +114,22 @@ function Implants({
           })}
         </p>
       ) : (
-        <ul className="space-y-1">
+        <ul className="m-0 list-none space-y-2.5 p-0">
           {fixes.map((fix) => (
-            <li key={fix.typeIds.join()} className="border-line rounded-xs border">
-              <button
-                type="button"
-                className={cx(
-                  'w-full rounded-xs p-2 text-left text-sm',
-                  rowInteractiveClassName,
-                  focusRingInsetClassName
-                )}
-                onClick={() => apply(fix.typeIds)}
-              >
-                {fix.typeIds.map((id) => (
-                  <p key={id} className="font-medium">
-                    {names.get(id)?.full ?? `#${id}`}
-                  </p>
-                ))}
-                <p className="mt-0.5 text-xs">
-                  {t('fittings.makeItFit.costs')} <IskAmount value={fix.cost} />
-                </p>
-              </button>
-            </li>
+            <MakeItFitFixCard
+              key={fix.typeIds.join()}
+              tone="accent"
+              tag={fix.cost === cheapest ? t('fittings.makeItFit.tagCheapest') : undefined}
+              items={fix.typeIds.map((id) => ({
+                key: String(id),
+                typeId: id,
+                name: names.get(id)?.full ?? `#${id}`,
+              }))}
+              freed={freedLabel(before, fix.stats, goalId, t)}
+              budget={before ? { resource: goalId, before, after: fix.stats } : null}
+              cost={fix.cost}
+              onApply={() => apply(fix.typeIds)}
+            />
           ))}
         </ul>
       )}
