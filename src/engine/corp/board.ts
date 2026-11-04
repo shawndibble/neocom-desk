@@ -249,7 +249,7 @@ function timedItem(
     deadlineMs,
     remainingMs,
     timing: 'timed',
-    severity: severityForRemaining(remainingMs),
+    severity: severityForRemaining(remainingMs, 'logistics'),
     // Strictly ahead of us and inside the window: an elapsed deadline is
     // certain however stale the read, so only a live countdown can be doubted.
     withinStaleWindow: remainingMs > 0 && remainingMs < staleWindowMs,

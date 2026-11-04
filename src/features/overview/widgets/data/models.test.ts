@@ -348,7 +348,7 @@ describe('training', () => {
       expect(view.deadlines).toContainEqual({
         at: expiresAt,
         note: 'overview.board.acceleratorEnds',
-        severity: 'critical',
+        severity: 'clear',
         to: '/skills/plans',
       });
       expect(view.deadlines).toHaveLength(2);
