@@ -205,7 +205,7 @@ describe('Travel › Route Safety', () => {
 
     const table = await screen.findByRole('table', { name: 'Systems on the route' });
     const body = (await within(table).findAllByRole('row')).slice(1);
-    await within(body[2]).findByRole('link', { name: /^2 player kills\s*\(opens/ });
+    await within(body[2]).findByRole('button', { name: '2 player kills' });
     await user.click(within(body[2]).getByText('Uedama'));
     expect(await within(table).findByText('NPC kills in the last hour: 2')).toBeInTheDocument();
     expect(
@@ -246,8 +246,9 @@ describe('Travel › Route Safety', () => {
     const body = (await within(table).findAllByRole('row')).slice(1);
 
     const uedama = within(body[2]);
-    const count = await uedama.findByRole('link', { name: /^2 player kills\s*\(opens/ });
-    expect(count).toHaveAttribute('href', `https://zkillboard.com/system/${UEDAMA}/`);
+    expect(await uedama.findByRole('button', { name: '2 player kills' })).toHaveTextContent(
+      '2 player kills'
+    );
     expect(
       await uedama.findByText('2 kills at Stargate (Perimeter), last one 12 min ago')
     ).toBeInTheDocument();
@@ -258,9 +259,7 @@ describe('Travel › Route Safety', () => {
     expect(
       await within(body[1]).findByText('zKillboard is rate-limiting requests. Try again shortly.')
     ).toBeInTheDocument();
-    expect(
-      await within(body[0]).findByRole('link', { name: /^0 player kills\s*\(opens/ })
-    ).toBeInTheDocument();
+    expect(await within(body[0]).findByText('0 player kills')).toBeInTheDocument();
   });
 
   it('starts from the Current System when the link names no start', async () => {

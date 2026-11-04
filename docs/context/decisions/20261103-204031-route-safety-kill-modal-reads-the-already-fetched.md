@@ -1,0 +1,8 @@
+# Scope decisions — Route Safety kill modal reads the already-fetched kills and names pilots lazily (issue #5929)
+
+_Recorded 2026-11-03 · issue #5929._
+
+- **Each Route Safety location line, and the kill count, is a `Button` that opens a modal of that place's kills.** The location line opens that one location; the count opens the whole system, one section per location, on-path gates first. The zKillboard system link moved inside the modal. A system with no kills shows the count as plain text. DESIGN.md §6c already says a control that opens a modal is a `Button`.
+- **The modal makes no zKillboard request.** The route walk keeps each location's kills (victim, attackers with ship, weapon, final blow, loss value) in the row's summary. Attackers are stored trimmed to ids.
+- **Names come from ESI `POST /universe/names`, lazily.** Victims resolve when the modal opens, one batched read; a kill's attackers resolve when it is expanded, capped at 15 shown with the final blow always among them, then "and N more". A name that does not resolve is left out, never replaced with a placeholder, and never blocks the row. Pilot names on killmails are public data and Pilot Lookup already shows them.
+- **The hull summary counts kills, not attackers.** "Battlecruiser on 3 of 4 kills": the same pilot repeats on every mail, so a sum of attackers would say more than the data shows. Hull class names are ESI group names (`loadGroupNames`); a class whose name did not resolve is left out. Conditions only, no verdict wording (decision `20260912-172628`).
