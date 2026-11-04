@@ -26,15 +26,24 @@ export function openPricesUrl(typeId: number): string {
   return `${R2_SNAPSHOT_ORIGIN}/open-prices/${typeId}.json`;
 }
 
+/**
+ * Types share an object, `typeId % OPEN_PRICES_SHARD_COUNT`, so the daily job
+ * writes a few thousand objects instead of one per type (each write is a billed
+ * R2 operation). Mirrors the writer in `functions/src/r2DailySnapshots.ts`.
+ */
+export const OPEN_PRICES_SHARD_COUNT = 4096;
+
+export function openPricesShardUrl(typeId: number): string {
+  return `${R2_SNAPSHOT_ORIGIN}/open-prices/shards/${typeId % OPEN_PRICES_SHARD_COUNT}.json`;
+}
+
 const READ_TIMEOUT_MS = 20_000;
 
-/** The type's object, or `null` when R2 has none (404); any other failure throws. */
-async function fetchTypeObject(typeId: number): Promise<unknown | null> {
-  const response = await fetch(openPricesUrl(typeId), {
-    signal: AbortSignal.timeout(READ_TIMEOUT_MS),
-  });
+/** The object at `url`, or `null` when R2 has none (404); any other failure throws. */
+async function fetchObject(url: string): Promise<unknown | null> {
+  const response = await fetch(url, { signal: AbortSignal.timeout(READ_TIMEOUT_MS) });
   if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`open prices ${typeId}: ${response.status}`);
+  if (!response.ok) throw new Error(`${url}: ${response.status}`);
   return response.json();
 }
 
@@ -93,10 +102,56 @@ const cache = new Map<number, { at: number; stored: StoredOpenPrices | null }>()
 /** One read per type even when several regions ask at once; resolves undefined on failure. */
 const inflight = new Map<number, Promise<StoredOpenPrices | null | undefined>>();
 
+/** A shard's `types` record, or `null` when R2 has no shard yet (the per-type layout). */
+type ShardTypes = Record<string, unknown> | null;
+const shardCache = new Map<number, { at: number; types: ShardTypes }>();
+/** One read per shard however many of its types are asked at once; rejects on failure. */
+const shardInflight = new Map<number, Promise<ShardTypes>>();
+
 /** For tests: forget every cached document. */
 export function resetMarketOpenPricesCache(): void {
   cache.clear();
   inflight.clear();
+  shardCache.clear();
+  shardInflight.clear();
+}
+
+function readShard(typeId: number, now: number): Promise<ShardTypes> {
+  const shard = typeId % OPEN_PRICES_SHARD_COUNT;
+  const hit = shardCache.get(shard);
+  if (hit && now - hit.at < CACHE_TTL_MS) return Promise.resolve(hit.types);
+  let pending = shardInflight.get(shard);
+  if (!pending) {
+    const read = fetchObject(openPricesShardUrl(typeId))
+      .then((body) => {
+        if (body !== null && !(isRecord(body) && isRecord(body.types))) {
+          throw new Error(`open prices shard ${shard}: bad shape`);
+        }
+        const types = body === null ? null : (body.types as Record<string, unknown>);
+        shardCache.set(shard, { at: now, types });
+        return types;
+      })
+      .finally(() => {
+        if (shardInflight.get(shard) === read) shardInflight.delete(shard);
+      });
+    pending = read;
+    shardInflight.set(shard, read);
+  }
+  return pending;
+}
+
+/**
+ * The type's stored object: out of its shard, or — only while R2 has no shard
+ * for it, before the writer moved to shards — the type's own object.
+ */
+async function fetchStored(typeId: number, now: number): Promise<StoredOpenPrices | null> {
+  const types = await readShard(typeId, now);
+  if (types !== null) {
+    const entry = types[String(typeId)];
+    return entry === undefined ? null : parseOpenPricesByType(entry);
+  }
+  const body = await fetchObject(openPricesUrl(typeId));
+  return body === null ? null : parseOpenPricesByType(body);
 }
 
 function readType(typeId: number, now: number): Promise<StoredOpenPrices | null | undefined> {
@@ -105,9 +160,8 @@ function readType(typeId: number, now: number): Promise<StoredOpenPrices | null 
     // Started inside the chain, so a synchronous failure is a failed read too,
     // never a rejection.
     const read: Promise<StoredOpenPrices | null | undefined> = Promise.resolve()
-      .then(() => fetchTypeObject(typeId))
-      .then((body) => {
-        const stored = body === null ? null : parseOpenPricesByType(body);
+      .then(() => fetchStored(typeId, now))
+      .then((stored) => {
         cache.set(typeId, { at: now, stored });
         return stored;
       })

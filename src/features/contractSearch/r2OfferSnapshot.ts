@@ -9,7 +9,9 @@
  * every blueprint type (BPC Sourcing) reads the index's bundle shards instead:
  * the same rows in a handful of big objects, where thousands of small reads
  * took minutes. An index published before the shards existed falls back to the
- * per-type objects.
+ * per-type objects. A type's entry may also name the shard holding it instead
+ * of an object of its own (fewer R2 writes per publish), so a per-type read
+ * narrows what it reads to the asked types.
  *
  * Reading the objects the index names is what rules out a half-old, half-new
  * snapshot: an object's name carries its content hash, so it never changes, and
@@ -50,7 +52,9 @@ function isIndexEntry(value: unknown): value is R2OfferIndex['types'][string] {
     (cheapest === null || typeof cheapest === 'number') &&
     Array.isArray(objects) &&
     objects.length > 0 &&
-    objects.every((name) => typeof name === 'string' && OBJECT_NAME.test(name))
+    objects.every(
+      (name) => typeof name === 'string' && (OBJECT_NAME.test(name) || BUNDLE_NAME.test(name))
+    )
   );
 }
 
@@ -141,14 +145,17 @@ export function resetR2ObjectMemo(): void {
   objectMemo.clear();
 }
 
-/** The object names the index gives these types, in type order. Types it does not list contribute nothing. */
+/**
+ * The object names the index gives these types, in type order, each once: types
+ * may share a bundle shard. Types it does not list contribute nothing.
+ */
 export function r2ObjectsForTypes(index: R2OfferIndex, typeIds: Iterable<number>): string[] {
-  const names: string[] = [];
+  const names = new Set<string>();
   for (const typeId of typeIds) {
     const entry = index.types[String(typeId)];
-    if (entry) names.push(...entry.objects);
+    if (entry) for (const name of entry.objects) names.add(name);
   }
-  return names;
+  return [...names];
 }
 
 /**
@@ -184,12 +191,18 @@ async function readObjects(
   return wanted.flatMap((name) => byName.get(name) ?? []);
 }
 
-/** The offers of just these types, from only the objects the index names; `null` when a read failed. */
-export function loadR2TypeRows(
+/**
+ * The offers of just these types, from only the objects the index names; `null`
+ * when a read failed. A type may name the bundle shard holding it, which carries
+ * other types' rows too, so the rows are narrowed to the asked types.
+ */
+export async function loadR2TypeRows(
   index: R2OfferIndex,
   typeIds: Iterable<number>
 ): Promise<PublicContractOfferRow[] | null> {
-  return readObjects(index, r2ObjectsForTypes(index, typeIds));
+  const wanted = new Set(typeIds);
+  const rows = await readObjects(index, r2ObjectsForTypes(index, wanted));
+  return rows && rows.filter((row) => wanted.has(row.typeId));
 }
 
 /** Every offer: the bundle shards when the index names them, else every type's objects. */

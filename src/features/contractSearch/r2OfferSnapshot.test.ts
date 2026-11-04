@@ -87,6 +87,15 @@ describe('parseR2OfferIndex', () => {
     expect(parseR2OfferIndex(withBundles)).toEqual(withBundles);
   });
 
+  it('accepts a type that names the bundle shard holding it', () => {
+    const sharded = {
+      ...INDEX,
+      types: { '34': { count: 1, cheapest: 10, objects: [bundle('others', 0)] } },
+      bundles: BUNDLES,
+    };
+    expect(parseR2OfferIndex(sharded)).toEqual(sharded);
+  });
+
   it.each([
     ['a name outside the bundles prefix', { blueprints: ['../x.json'], others: [] }],
     ['a missing group', { blueprints: [] }],
@@ -176,6 +185,22 @@ describe('loadR2TypeRows', () => {
   it('is null, not partial rows, when any object cannot be read', async () => {
     serve({ [`${ORIGIN}/${obj(34, 'aaaa')}`]: [row(34, 1)] });
     expect(await loadR2TypeRows(INDEX, [34, 35])).toBeNull();
+  });
+
+  it('reads a shard several asked types share once, keeping only their rows', async () => {
+    const shard = bundle('others', 0);
+    const sharded: R2OfferIndex = {
+      ...INDEX,
+      types: {
+        '34': { count: 1, cheapest: 10, objects: [shard] },
+        '35': { count: 1, cheapest: 20, objects: [shard] },
+        '36': { count: 1, cheapest: 30, objects: [shard] },
+      },
+      bundles: { blueprints: [], others: [shard] },
+    };
+    const fetchMock = serve({ [`${ORIGIN}/${shard}`]: [row(34, 1), row(35, 2), row(36, 3)] });
+    expect(await loadR2TypeRows(sharded, [34, 35])).toEqual([row(34, 1), row(35, 2)]);
+    expect(urlsRead(fetchMock)).toEqual([shard]);
   });
 
   it('retries an object that failed instead of remembering the failure', async () => {
