@@ -12,7 +12,7 @@ import type { KillmailVictim } from '@/engine/fittings/linkLoader';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 import { createTtlCache } from '@/lib/ttlCache';
 import type { KillRecord, KillSpace } from '@/engine/pilotList/killActivity';
-import type { RecentKill, RecentKillAttacker } from '@/engine/route/recentKills';
+import type { RecentKill, RecentKillAttacker, RecentKillVictim } from '@/engine/route/recentKills';
 import { isRecord } from '@/engine/guards';
 import { MINUTE_MS } from '@/lib/age';
 
@@ -660,7 +660,26 @@ function parseAttacker(value: unknown): RecentKillAttacker | null {
   const attacker: RecentKillAttacker = {};
   if (typeof value.ship_type_id === 'number') attacker.shipTypeId = value.ship_type_id;
   if (typeof value.weapon_type_id === 'number') attacker.weaponTypeId = value.weapon_type_id;
+  // Who flew it, for the kill-location modal (issue #5929). NPCs and
+  // structures carry no character id.
+  const characterId = finiteOrNull(value.character_id);
+  const corporationId = finiteOrNull(value.corporation_id);
+  const allianceId = finiteOrNull(value.alliance_id);
+  if (characterId !== null) attacker.characterId = characterId;
+  if (corporationId !== null) attacker.corporationId = corporationId;
+  if (allianceId !== null) attacker.allianceId = allianceId;
+  if (value.final_blow === true) attacker.finalBlow = true;
   return attacker;
+}
+
+function parseKillVictim(value: unknown): RecentKillVictim | undefined {
+  if (!isRecord(value)) return undefined;
+  return {
+    characterId: finiteOrNull(value.character_id),
+    corporationId: finiteOrNull(value.corporation_id),
+    allianceId: finiteOrNull(value.alliance_id),
+    shipTypeId: finiteOrNull(value.ship_type_id),
+  };
 }
 
 /** One killmail entry as a `RecentKill`; `null` for an NPC kill or one with no id or readable time. */
@@ -670,6 +689,8 @@ function parseRecentKill(entry: unknown): RecentKill | null {
   if (!Number.isFinite(time)) return null;
   const zkb = isRecord(entry.zkb) ? entry.zkb : {};
   if (zkb.npc === true) return null;
+  const victim = parseKillVictim(entry.victim);
+  const value = finiteOrNull(zkb.totalValue);
   return {
     killmailId: entry.killmail_id,
     time,
@@ -677,6 +698,8 @@ function parseRecentKill(entry: unknown): RecentKill | null {
     attackers: Array.isArray(entry.attackers)
       ? entry.attackers.flatMap((attacker) => parseAttacker(attacker) ?? [])
       : [],
+    ...(victim ? { victim } : {}),
+    ...(value !== null ? { value } : {}),
   };
 }
 
@@ -781,6 +804,10 @@ export async function fetchRegionRecentKills(
 
 export function systemZkillUrl(systemId: number): string {
   return `https://zkillboard.com/system/${systemId}/`;
+}
+
+export function killZkillUrl(killmailId: number): string {
+  return `https://zkillboard.com/kill/${killmailId}/`;
 }
 
 export function warZkillUrl(warId: number): string {

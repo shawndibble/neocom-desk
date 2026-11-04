@@ -155,6 +155,7 @@ export function activeCourierFilters(
         selected.map((kind) => t(`common.spaceOption.${kind}`)),
         t
       ),
+      inline: true,
       clear: (value) => ({ ...value, destinationSpace: SPACE_KINDS }),
     });
   }

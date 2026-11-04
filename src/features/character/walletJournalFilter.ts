@@ -250,6 +250,7 @@ export function activeWalletJournalFilters(
     active.push({
       label: t('wallet.refTypeFilterLabel'),
       value: journalRefLabel(filter.refType, t),
+      inline: true,
       clear: (value) => ({ ...value, refType: null }),
     });
   if (filter.player !== null)

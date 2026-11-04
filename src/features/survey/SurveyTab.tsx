@@ -135,7 +135,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
         if (choice === 'new') return await startWith(text);
         // Read fresh, not from the polled state: another pilot may have added a
         // scan since, and a paste is compared against the latest one.
-        const found = currentId === null ? null : await loadSurvey(currentId);
+        const found = currentId === null ? null : await loadSurvey(currentId, { fresh: true });
         if (found?.ok) {
           // Against what the survey counts: a removed bad paste is no field to match.
           const counted = countedScans(found.scans, found.ignored);

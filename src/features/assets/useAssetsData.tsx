@@ -373,11 +373,11 @@ export function useAssetsData() {
     [categoryPick, blueprintKind, minValueInput]
   );
   const activeFilters = useMemo<ActiveFilter<AssetsFilterValue>[]>(() => {
-    const active = activeAssetKindFilters(
+    const active: ActiveFilter<AssetsFilterValue>[] = activeAssetKindFilters(
       filterValue,
       { index: pickerIndex, showBlueprintSelect, categoryLabel: t('assets.category.label') },
       t
-    );
+    ).map((filter) => ({ ...filter, inline: true })); // Category and Blueprints are in the row
     // The typed amount, not the threshold: while prices load the threshold is
     // held at 0, but the box still holds the pilot's setting.
     const min = parseIskAmount(filterValue.min) ?? 0;

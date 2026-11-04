@@ -8,12 +8,12 @@
  * Stargate (Nourvukaiken), last one 32 min ago", "Smartbombs involved" —
  * never a word about what that means for the pilot.
  */
-import { ExternalLink } from '@/components/ui/ExternalLink';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Spinner } from '@/components/ui';
+import { Button, Spinner } from '@/components/ui';
 import type { KillTags, RecentKillLocation } from '@/engine/route/recentKills';
 import { zkillFailureKey } from '@/lib/zkillFailureKey';
-import { systemZkillUrl } from '@/lib/zkillboard';
+import { KillLocationModal } from './KillLocationModal';
 import type { RouteKillsCell } from './useRouteKills';
 
 const BADGE = 'rounded-xs px-1.5 text-[0.6875rem]';
@@ -36,8 +36,17 @@ function Tags({ tags }: { tags: KillTags }) {
   );
 }
 
-function LocationLine({ location }: { location: RecentKillLocation }) {
+function LocationLine({
+  location,
+  systemId,
+  systemName,
+}: {
+  location: RecentKillLocation;
+  systemId: number;
+  systemName: string;
+}) {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
   const text =
     location.name === null
       ? t('travel.kills.elsewhere', {
@@ -51,11 +60,26 @@ function LocationLine({ location }: { location: RecentKillLocation }) {
         });
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
-      <span className={location.onPath ? 'font-semibold text-text' : 'text-text-dim'}>{text}</span>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <span className={location.onPath ? 'font-semibold text-text' : 'text-text-dim'}>
+          {text}
+        </span>
+      </Button>
       {location.onPath && (
         <span className={`${BADGE} bg-panel-2 text-text`}>{t('travel.kills.onPath')}</span>
       )}
       <Tags tags={location} />
+      {open && (
+        <KillLocationModal
+          open
+          onClose={() => setOpen(false)}
+          systemId={systemId}
+          systemName={systemName}
+          locations={[location]}
+          hulls={location.hulls}
+          scope="location"
+        />
+      )}
     </span>
   );
 }
@@ -66,8 +90,17 @@ function LocationLine({ location }: { location: RecentKillLocation }) {
  * (`RecentKillsDetail`), so a row stays short. The on-route line wraps in a
  * narrow column rather than widening the table past its panel.
  */
-export function RecentKillsCell({ systemId, cell }: { systemId: number; cell: RouteKillsCell }) {
+export function RecentKillsCell({
+  systemId,
+  systemName,
+  cell,
+}: {
+  systemId: number;
+  systemName: string;
+  cell: RouteKillsCell;
+}) {
   const { t } = useTranslation();
+  const [systemOpen, setSystemOpen] = useState(false);
   if (cell.status === 'loading') return <Spinner size="sm" label={t('travel.kills.loading')} />;
   if (cell.status === 'unavailable') {
     return (
@@ -83,20 +116,48 @@ export function RecentKillsCell({ systemId, cell }: { systemId: number; cell: Ro
       // Nothing to say on a phone card's meta line; the table column keeps it.
       data-dense-omit={summary.count === 0 ? '' : undefined}
     >
-      <ExternalLink href={systemZkillUrl(systemId)}>
-        {t('travel.kills.count', { count: summary.count })}
-      </ExternalLink>
+      {summary.count > 0 ? (
+        <Button size="sm" onClick={() => setSystemOpen(true)}>
+          {t('travel.kills.count', { count: summary.count })}
+        </Button>
+      ) : (
+        <span>{t('travel.kills.count', { count: summary.count })}</span>
+      )}
       {summary.locations
         .filter((location) => location.onPath)
         .map((location) => (
-          <LocationLine key={location.key} location={location} />
+          <LocationLine
+            key={location.key}
+            location={location}
+            systemId={systemId}
+            systemName={systemName}
+          />
         ))}
+      {systemOpen && (
+        <KillLocationModal
+          open
+          onClose={() => setSystemOpen(false)}
+          systemId={systemId}
+          systemName={systemName}
+          locations={summary.locations}
+          hulls={summary.hulls}
+          scope="system"
+        />
+      )}
     </span>
   );
 }
 
 /** Every kill location off the route's own gates, for the row's expanded detail. */
-export function RecentKillsDetail({ cell }: { cell: RouteKillsCell }) {
+export function RecentKillsDetail({
+  cell,
+  systemId,
+  systemName,
+}: {
+  cell: RouteKillsCell;
+  systemId: number;
+  systemName: string;
+}) {
   const { t } = useTranslation();
   if (cell.status !== 'ready') return null;
   const elsewhere = cell.summary.locations.filter((location) => !location.onPath);
@@ -106,7 +167,7 @@ export function RecentKillsDetail({ cell }: { cell: RouteKillsCell }) {
     <ul className="space-y-0.5">
       {elsewhere.map((location) => (
         <li key={location.key}>
-          <LocationLine location={location} />
+          <LocationLine location={location} systemId={systemId} systemName={systemName} />
         </li>
       ))}
     </ul>

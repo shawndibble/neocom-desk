@@ -1,0 +1,9 @@
+# Scope decisions — Key filters inline on desktop, superseding funnel-at-every-width (issue #5925)
+
+_Recorded 2026-11-03 · issue #5925._
+
+- **A page may show one or two key filters in its `FilterBar` row from `lg` up.** This supersedes the "filters behind the funnel at every width" clause of `20260924-213255-searchable-tables-search-column-picker-and-filter-funnel`. The filters a pilot changes on nearly every visit cost a click each time, and the app is desktop-first beside the EVE client. Never more than two, one fixed control each, so the row stays one line, which is what that clause was protecting. Below `lg` (the content column is about 500px at 768, beside the nav rail) a `row` filter sits in the funnel box with the rest; below `md` the sheet holds everything.
+- **A narrow column may put its key filter on a line of its own** (`inlinePlacement="below"`, from `md` up): Market's finder, whose search box and funnel fill the line. Jump Range is its one inline filter.
+- **Chosen pages:** Courier (destination space), Wallet Journal (ref type), Market finder (Jump Range), Assets (Category, Blueprints; Min value moves into the box, Sort into `actions`). Industry Opportunities was dropped: its build-mode control is a page-level view toggle, not a filter.
+- **Market's order-book scope bar drops its range select and "From system" picker from `lg` up**, because the finder column beside the book holds the select. The bar keeps its summary words (they name the origin), "Clear range" and its funnel. The origin picker is now only in the finder's funnel box, while a range is set. Below `lg` the finder is hidden once an item is open, so the bar keeps both.
+- **An inline filter gets no pill and no funnel count where it is inline; Clear all still clears it** (the scope bar's popover is the exception: it does not hold the range at `lg`, and "Clear range" is the way to take it off there).

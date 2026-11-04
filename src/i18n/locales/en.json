@@ -16438,7 +16438,25 @@
       "onPath": "On your route",
       "bubbles": "Interdictor or HIC on the mail",
       "smartbombs": "Smartbombs involved",
-      "noneElsewhere": "No zKillboard kills elsewhere in the system in the last hour."
+      "noneElsewhere": "No zKillboard kills elsewhere in the system in the last hour.",
+      "modal": {
+        "system": "{{system}}, last hour",
+        "summary_one": "{{count}} kill",
+        "summary_other": "{{count}} kills",
+        "summaryPlaces": "{{kills}} at {{places}} places",
+        "lastKill": "Last {{minutes}} min ago",
+        "hullOn": "{{hull}} on {{count}} of {{total}} kills",
+        "elsewhere": "Elsewhere in the system",
+        "minutesAgo": "{{minutes}} min ago",
+        "attackers_one": "{{count}} attacker",
+        "attackers_other": "{{count}} attackers",
+        "attackersShown": "{{shown}} of {{total}} attackers",
+        "attackersMore_one": "and {{count}} more",
+        "attackersMore_other": "and {{count}} more",
+        "finalBlow": "Final blow",
+        "killmail": "Killmail on zKillboard",
+        "systemOnZkill": "System on zKillboard"
+      }
     },
     "chokepoint": "Gank Chokepoint",
     "chokepointHint": "One of the systems haulers are most often killed in, as named by the community. A property of traffic, not of security status.",

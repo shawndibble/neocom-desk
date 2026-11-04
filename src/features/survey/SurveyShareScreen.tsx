@@ -49,7 +49,7 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
       try {
         // Read fresh: the comparison is against the latest scan, which another
         // pilot may have just added.
-        const found = await loadSurvey(shareId);
+        const found = await loadSurvey(shareId, { fresh: true });
         if (!found.ok) return 'failed';
         const counted = countedScans(found.scans, found.ignored);
         const latest = counted[counted.length - 1];

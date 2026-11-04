@@ -3,7 +3,9 @@ import {
   HEAVY_INTERDICTION_CRUISER_GROUP_ID,
   INTERDICTOR_GROUP_ID,
   SMART_BOMB_GROUP_ID,
+  capAttackers,
   classifyKillTags,
+  hullClassKillCounts,
   summarizeRecentKills,
   type RecentKill,
   type ResolvedLocation,
@@ -135,6 +137,7 @@ describe('summarizeRecentKills', () => {
       bubble: false,
       smartbomb: false,
       locations: [],
+      hulls: [],
     });
   });
 
@@ -160,6 +163,8 @@ describe('summarizeRecentKills', () => {
         onPath: true,
         count: 3,
         minutesSinceLast: 32,
+        kills: expect.any(Array),
+        hulls: expect.any(Array),
         bubble: false,
         smartbomb: true,
       },
@@ -170,6 +175,8 @@ describe('summarizeRecentKills', () => {
         onPath: false,
         count: 1,
         minutesSinceLast: 20,
+        kills: expect.any(Array),
+        hulls: expect.any(Array),
         bubble: true,
         smartbomb: false,
       },
@@ -180,6 +187,8 @@ describe('summarizeRecentKills', () => {
         onPath: false,
         count: 1,
         minutesSinceLast: 30,
+        kills: expect.any(Array),
+        hulls: expect.any(Array),
         bubble: false,
         smartbomb: false,
       },
@@ -200,6 +209,8 @@ describe('summarizeRecentKills', () => {
         onPath: false,
         count: 2,
         minutesSinceLast: 25,
+        kills: expect.any(Array),
+        hulls: expect.any(Array),
         bubble: false,
         smartbomb: false,
       },
@@ -225,5 +236,79 @@ describe('summarizeRecentKills', () => {
       pathNeighbours: new Set([TAMA]),
     });
     expect(summary.locations[0].onPath).toBe(false);
+  });
+});
+
+describe('hullClassKillCounts', () => {
+  it('counts kills carrying a hull class, never attackers', () => {
+    const kills = [
+      kill(1, '2026-09-30T05:20:00Z', null, [
+        { shipTypeId: TORNADO },
+        { shipTypeId: TORNADO },
+        { shipTypeId: SABRE },
+      ]),
+      kill(2, '2026-09-30T05:10:00Z', null, [{ shipTypeId: TORNADO }]),
+      kill(3, '2026-09-30T05:00:00Z', null, [{ shipTypeId: HURRICANE }]),
+    ];
+    expect(hullClassKillCounts(kills, groupOf)).toEqual([
+      { groupId: 1201, kills: 2 },
+      { groupId: 26, kills: 1 },
+      { groupId: INTERDICTOR_GROUP_ID, kills: 1 },
+    ]);
+  });
+
+  it('skips attackers with no ship or no known group', () => {
+    const kills = [
+      kill(1, '2026-09-30T05:20:00Z', null, [{ weaponTypeId: HURRICANE }, { shipTypeId: 1 }]),
+    ];
+    expect(hullClassKillCounts(kills, groupOf)).toEqual([]);
+  });
+});
+
+describe('capAttackers', () => {
+  const crowd: RecentKill['attackers'][number][] = Array.from({ length: 30 }, (_, i) => ({
+    shipTypeId: i,
+    characterId: i + 1,
+  }));
+
+  it('shows everyone at or under the cap', () => {
+    expect(capAttackers(crowd.slice(0, 5), 10)).toEqual({ shown: crowd.slice(0, 5), more: 0 });
+  });
+
+  it('keeps the final blow in the shown list and counts the rest', () => {
+    const list = crowd.map((a, i) => (i === 25 ? { ...a, finalBlow: true } : a));
+    const { shown, more } = capAttackers(list, 10);
+    expect(shown).toHaveLength(10);
+    expect(shown.some((a) => a.finalBlow)).toBe(true);
+    expect(more).toBe(20);
+  });
+});
+
+describe('summarizeRecentKills kill lists', () => {
+  it("keeps each location's kills newest first with their own tags", () => {
+    const summary = summarizeRecentKills(
+      [
+        kill(1, '2026-09-30T05:00:00Z', NOURVUKAIKEN_GATE, [{ shipTypeId: HURRICANE }]),
+        kill(2, '2026-09-30T05:25:00Z', NOURVUKAIKEN_GATE, [
+          { shipTypeId: TORNADO, weaponTypeId: LARGE_EMP_SMARTBOMB_II },
+        ]),
+        kill(3, '2026-09-30T05:10:00Z', MOON),
+      ],
+      {
+        groupOf,
+        band: 'nullsec',
+        locations: LOCATIONS,
+        pathNeighbours: new Set([NOURVUKAIKEN]),
+        now: NOW,
+      }
+    );
+    const gate = summary.locations.find((l) => l.key === String(NOURVUKAIKEN_GATE));
+    expect(gate?.kills.map((k) => k.killmailId)).toEqual([2, 1]);
+    expect(gate?.kills.map((k) => k.smartbomb)).toEqual([true, false]);
+    expect(gate?.hulls).toEqual([
+      { groupId: 26, kills: 1 },
+      { groupId: 1201, kills: 1 },
+    ]);
+    expect(summary.locations.find((l) => l.key === 'other')?.kills).toHaveLength(1);
   });
 });

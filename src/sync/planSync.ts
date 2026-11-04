@@ -37,10 +37,12 @@ import {
 import { getSyncFirestore } from './firebaseApp';
 import { handleOwnerHashChange } from './ownerHash';
 import {
+  advanceSeenSyncMarker,
   appendTombstones,
   clearSeenSyncMarker,
   heartbeatKey,
   readSeenSyncMarker,
+  type SeenSyncMarker,
   tombstoneKey,
   writeSeenSyncMarker,
 } from './localBookkeeping';
@@ -489,7 +491,10 @@ class UnknownCharacterError extends Error {
  * Change marker (issue #5073, syncMarker.ts): a full pass reads the Character's
  * marker first. A `background` one that finds it unchanged since this device's
  * last full pass ends there, one read instead of one query per collection.
- * Every pass that pushes bumps the marker once its pushes landed. The marker
+ * Every pass that pushes bumps the marker once its pushes landed, and counts
+ * that bump into the marker it has seen: the marker only ever moves by +1, so
+ * when it equals what this device saw plus its own bumps, no other device
+ * wrote, and the next idle pass need not re-read its own push. The marker
  * never gates a foreground pass (boot, sync now, an edit), so local edits
  * always push. A marker the rules refuse (not deployed yet) or that fails to
  * bump only costs the shortcut, never the sync.
@@ -557,6 +562,7 @@ async function syncCharacter(
     { name: SYNCED_SETTINGS.remoteName, run: () => syncSettings(ctx) },
   ];
   let bumped = true;
+  let seenBeforeBump: SeenSyncMarker | undefined;
   try {
     await settleAllThenThrow(
       scope === 'all' ? tasks : tasks.filter((task) => scope.has(task.name)),
@@ -569,10 +575,23 @@ async function syncCharacter(
     throw error;
   } finally {
     // What did land still has to reach the other devices, failure or not.
-    if (pushed) bumped = await bumpMarkerQuietly(firestore, uid, characterId);
+    if (pushed) {
+      // A narrowed pass counts its bump into the claim as it stood before it.
+      seenBeforeBump = scope === 'all' ? undefined : await readSeenSyncMarker(characterId);
+      bumped = await bumpMarkerQuietly(firestore, uid, characterId);
+    }
   }
-  if (scope === 'all' && markerBefore !== undefined && bumped) {
-    await writeSeenSyncMarker(characterId, { version: markerBefore, fullAt: now });
+  if (scope === 'all') {
+    if (markerBefore !== undefined && bumped) {
+      // Plus this pass's own bump, if it made one: the marker only moves by +1,
+      // so another device's bump still leaves the remote ahead of this.
+      await writeSeenSyncMarker(characterId, {
+        version: markerBefore + (pushed ? 1 : 0),
+        fullAt: now,
+      });
+    }
+  } else if (pushed && bumped && seenBeforeBump !== undefined) {
+    await advanceSeenSyncMarker(characterId, seenBeforeBump);
   }
   // Heartbeat below means "every collection synced", which a narrowed pass
   // has not shown.
