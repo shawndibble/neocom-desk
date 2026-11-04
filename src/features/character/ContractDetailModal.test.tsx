@@ -854,7 +854,7 @@ describe('ContractDetailModal', () => {
       expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument(); // the Tritanium only
       expect(screen.getByText('Abyssal modules (MutaMarket estimate)')).toBeInTheDocument();
       expect(screen.getByText('Not priced')).toBeInTheDocument();
-      expect(screen.getByText(/worth its own rolls/)).toBeInTheDocument();
+      expect(screen.getByText(/couldn't be estimated/)).toBeInTheDocument();
     });
   });
 

@@ -211,6 +211,33 @@ function AttributeCell({
   );
 }
 
+/**
+ * The base value, an arrow, the rolled value: green when the roll improved the
+ * stat, red when it made it worse. The words ride along for screen readers,
+ * so colour is never the only signal.
+ */
+function BeforeAfter({ row, unit }: { row: RolledAttributeRow; unit: string | null }) {
+  const { t } = useTranslation();
+  const change = Math.sign(row.rolled - row.base);
+  const better = change === 0 ? null : change > 0 === row.range.highIsGood;
+  return (
+    <span className="inline-flex items-baseline gap-1">
+      <span className="text-text-dim">{formatAttributeValue(row.base, unit)}</span>
+      <span aria-hidden="true" className="text-text-dim">
+        →
+      </span>
+      <span className={better === null ? undefined : better ? 'text-success' : 'text-danger'}>
+        {formatAttributeValue(row.rolled, unit)}
+      </span>
+      {better !== null && (
+        <span className="sr-only">
+          {better ? t('market.itemDetail.abyssal.better') : t('market.itemDetail.abyssal.worse')}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function RangeText({ range, unit }: { range: DisplayRange | null; unit: string | null }) {
   const { t } = useTranslation();
   if (!range) {
@@ -231,7 +258,27 @@ function RangeText({ range, unit }: { range: DisplayRange | null; unit: string |
   );
 }
 
-/** Both roll tables' leading columns: the attribute (sticky) and the base module's value. */
+/** Both roll tables' leading column: the attribute, sticky. */
+function attributeColumn<R extends { attributeId: number }>(
+  t: TFunction,
+  dictionary: AttributeDictionary,
+  lookup: MutaplasmidLookup,
+  highIsGood: (row: R) => boolean
+): DataTableColumn<R> {
+  return {
+    id: 'attribute',
+    header: t('market.itemDetail.abyssal.attributeColumn'),
+    stickyStart: true,
+    stickyStartOnPanel: true,
+    className: 'min-w-36',
+    render: (row) => {
+      const { name, unit } = attributeLabel(row.attributeId, dictionary, lookup);
+      return <AttributeCell name={name} unit={unit} highIsGood={highIsGood(row)} />;
+    },
+  };
+}
+
+/** The range table's leading columns: the attribute and the base module's value. */
 function attributeAndBaseColumns<R extends { attributeId: number; base: number }>(
   t: TFunction,
   dictionary: AttributeDictionary,
@@ -239,17 +286,7 @@ function attributeAndBaseColumns<R extends { attributeId: number; base: number }
   highIsGood: (row: R) => boolean
 ): DataTableColumn<R>[] {
   return [
-    {
-      id: 'attribute',
-      header: t('market.itemDetail.abyssal.attributeColumn'),
-      stickyStart: true,
-      stickyStartOnPanel: true,
-      className: 'min-w-36',
-      render: (row) => {
-        const { name, unit } = attributeLabel(row.attributeId, dictionary, lookup);
-        return <AttributeCell name={name} unit={unit} highIsGood={highIsGood(row)} />;
-      },
-    },
+    attributeColumn(t, dictionary, lookup, highIsGood),
     {
       id: 'base',
       header: t('market.itemDetail.abyssal.baseColumn'),
@@ -411,18 +448,13 @@ function OwnedRollsSection({
   const unitOf = (row: RolledAttributeRow) => dictionary[row.attributeId]?.unit ?? null;
 
   const columns: DataTableColumn<RolledAttributeRow>[] = [
-    ...attributeAndBaseColumns<RolledAttributeRow>(
-      t,
-      dictionary,
-      lookup,
-      (row) => row.range.highIsGood
-    ),
+    attributeColumn<RolledAttributeRow>(t, dictionary, lookup, (row) => row.range.highIsGood),
     {
-      id: 'rolled',
-      header: t('market.itemDetail.abyssal.rolledColumn'),
+      id: 'change',
+      header: t('market.itemDetail.abyssal.changeColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => formatAttributeValue(row.rolled, unitOf(row)),
+      render: (row) => <BeforeAfter row={row} unit={unitOf(row)} />,
     },
     {
       id: 'range',
