@@ -1,8 +1,8 @@
 /**
  * The market open prices job for the GitHub Actions runner
  * (`scripts/public-data/market-open-prices.mjs`, `.github/workflows/public-data-market-open-prices.yml`).
- * It replaces the `syncMarketOpenPrices` Cloud Function: same fold, same R2 objects
- * (`open-prices/<typeId>.json`). The shrink guard's last-run record, which the function
+ * It replaces the `syncMarketOpenPrices` Cloud Function: same fold, written to the R2 shards
+ * (`open-prices/shards/<n>.json`, one per `typeId % 4096`). The shrink guard's last-run record, which the function
  * kept in Firestore, lives in an R2 object next to the output. Touches no Firestore.
  */
 import { ESI_USER_AGENT } from './esiClient.js';
@@ -23,7 +23,7 @@ import { r2ConfigFromEnv } from './publicDataActiveWars.js';
 import { writeOpenPricesToR2 } from './r2DailySnapshots.js';
 import { createR2Get, createR2Put, type R2Get, type R2Put } from './r2Client.js';
 
-/** The last published day and each region's priced-type count; outside `open-prices/<typeId>.json`. */
+/** The last published day and each region's priced-type count; outside the `open-prices/shards/` objects. */
 export const MARKET_OPEN_PRICES_STATE_R2_KEY = 'open-prices-state/last-run.json';
 const STATE_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 
@@ -95,7 +95,7 @@ export async function publishMarketOpenPrices(deps: PublicMarketOpenPricesDeps):
   if (failed > 0) {
     // The state is only recorded for a complete day; the merge is idempotent, so a later slot repeats it.
     throw new Error(
-      `Market open prices: ${failed} types failed to write to R2 (${written} written, ${skipped} unchanged); first error: ${firstError}`
+      `Market open prices: ${failed} shards failed to write to R2 (${written} written, ${skipped} unchanged); first error: ${firstError}`
     );
   }
   await deps.put(

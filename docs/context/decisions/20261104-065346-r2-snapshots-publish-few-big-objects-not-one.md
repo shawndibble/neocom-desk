@@ -16,7 +16,11 @@ _Recorded 2026-11-04._
   The bundle shards (20261023-072929) already hold every row with no type
   straddling two shards, so the per-type objects are dropped and shards shrink
   enough that a one-item search stays a small read. ~80 writes a run instead of
-  ~3,500. Readers narrow a shard's rows to the asked types.
+  ~3,500 (nearly every shard changes each publish, since ~30% of types do and
+  a size change shifts later shard boundaries). Readers narrow a shard's rows
+  to the asked types. The service worker does not cache the shards (they churn
+  every half hour), so an offline one-item contract search now relies on the
+  browser's HTTP cache alone.
 - **Open prices: `open-prices/shards/<typeId % 4096>.json`, `{ types: { <id>: … } }`.**
   ~5 types a shard, ~27 KB gzipped against ~5.5 KB for one type's object; R2
   has no egress fee, so the extra bytes cost nothing and 4,096 writes a day
