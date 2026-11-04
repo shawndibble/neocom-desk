@@ -90,7 +90,10 @@ export function ImplantFinder({
     : null;
   const setGoalId = (id: ImplantGoalId | null) => setGoalParam(id);
   /** The slot picked on the strip (`slotKey`): goals and results narrow to what goes in it. */
-  const [slot, setSlot] = useUrlParam('implantSlot', SLOT_PARAM);
+  const [slotParam, setSlot] = useUrlParam('implantSlot', SLOT_PARAM);
+  // A hand-edited or stale key means no slot picked, not "Slot NaN".
+  const slot =
+    slotParam !== null && Number.isInteger(parseSlotKey(slotParam).slot) ? slotParam : null;
   const [query, setQuery] = useUrlParam('implantQuery', QUERY_PARAM);
   const [sort, setSort] = useUrlParam('implantSort', SORT_PARAM);
   const [infoTypeId, setInfoTypeId] = useState<number | null>(null);

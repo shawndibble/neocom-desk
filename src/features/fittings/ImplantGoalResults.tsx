@@ -16,6 +16,7 @@ import { cx } from '@/lib/cx';
 import {
   displayValue,
   headroom,
+  headroomGain,
   shortfall,
   type GoalContext,
   type ImplantGoal,
@@ -103,7 +104,8 @@ export function GoalResults({
     if (goal.kind === 'budget') {
       const budget = goal.read(after);
       const over = shortfall(budget);
-      const freed = Math.max(0, goal.read(baseline).used - budget.used);
+      // Headroom gained, so an implant that raises the total counts as well as one that cuts the use.
+      const freed = headroomGain(goal, baseline, after);
       return over > 0
         ? {
             text: t('fittings.implantFinder.stillOver', { value: n(over), unit }),
@@ -146,8 +148,10 @@ export function GoalResults({
     const e = effect(row.stats);
     return costPerGain(costOf(row), e.gain);
   };
+  // Prices stream in: until every grade has its sources, keep the order, so cards don't jump under the cursor.
+  const pricing = (results ?? []).some(({ grades }) => grades.some((g) => g.sources === null));
   const sorted = (list: FamilyResult[]) =>
-    sort === 'gain'
+    sort === 'gain' || pricing
       ? list
       : orderBy(list, ({ grades }) =>
           smallest(grades.filter((g) => !g.inSet).map(sort === 'cost' ? costOf : perGainOf))
