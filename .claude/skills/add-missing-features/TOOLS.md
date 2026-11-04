@@ -36,7 +36,7 @@ CLI Metenox Calculator, Eden Buyback, Lazy Blacksmith, EVE Orchestra,
 Alysii's PI Scheme, EVE Planetary Planner, Upwell Fuel Monitor, ETM v2,
 AllianceAuth Market Manager, EVE Tycoon MCP server, EVE Metro, EVE Omni (4.0.74–5.5.1 changelog re-read: wallet analysis, T2 planner, Upwell hold, gank systems, trade guards all built),
 Eve Deep Industry, SNOW//OPS, New Eden Command, eve-hub.ru,
-Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas, Gatewatch, EVE
+eve-gatecheck.space (basic checker = Route Safety; premium waypoints/ship types/finder/war intel read; #5929), Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas, Gatewatch, EVE
 PvP Corp Activity Search, Forge Ledger, New Eden Trade, Keystar, AstraCore,
 evehelper.pages.dev, eve-webtools PI, LedgerParser, IntelParser and Fitlab (roadmap.json and changelog.json per app; every item shipped here or killed: mining history = 90-day overview, PI alerts/forecast/ISK-hr = Advisor, Local threat/Pilot lookup, fit cost + Improve). EVE Crews (lore roleplay layer, no
 market endpoint) and Isktracker Incursions (non-pipeline) are out of remit.
@@ -217,6 +217,8 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 
 ## Filed candidates
 
+- #5929 NARROW Route Safety: attacker hull classes as "on N of M kills" per gate kill group (eve-gatecheck premium; never sum attackers across mails). Low value, haulers only.
+
 `SHIP` is the hostile review's verdict, not the ticket's fate (#858 carried
 `SHIP` and was closed). Check `gh api repos/shawndibble/neocom-desk/issues/<n>`.
 
@@ -287,6 +289,8 @@ Other open: #642, #718, #819, #821, #824, #880, #926, #1015, #1017, #1018,
   prefetch/retention cuts as human decisions. Mockup: `mail-organize`.
 
 ## Killed / dropped candidates (never filed)
+
+- eve-gatecheck gatecamp finder (map-wide zKill, combat intel off remit; camp radar PARTIAL); war-target intel (no ESI corp war list, decision 20261021-140400; Pilot Lookup covers per-pilot); waypoints (shipped, 20261003-175151).
 
 The reason is what stops a re-pitch. Numbers are kill-tests.
 
