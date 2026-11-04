@@ -51,10 +51,8 @@ export function ContractAbyssalValue({
         )}
       </div>
       <p className="mt-0.5 text-[0.6875rem] text-text-dim">
-        {value.priced > 0 && t('contracts.detailAbyssalEstimateNote')}
-        {value.priced > 0 && value.unpriced > 0 && ' '}
-        {value.unpriced > 0 && t('contracts.detailAbyssalWhy')}{' '}
-        <ExternalLink href={MUTAMARKET_SITE_URL}>{t('market.mutamarket.priceFrom')}</ExternalLink>
+        {value.unpriced > 0 && `${t('contracts.detailAbyssalWhy')} `}
+        <ExternalLink href={MUTAMARKET_SITE_URL}>{t('contracts.detailAbyssalSource')}</ExternalLink>
       </p>
       {onToggleAbyssalOnly && (
         <div className="mt-1 flex justify-end">

@@ -486,7 +486,7 @@ describe('PublicContractDetailModal — system row', () => {
     showItems([item({ record_id: 1, type_id: ABYSSAL_TYPE, item_id: 11 })]);
     renderModal();
 
-    expect(await screen.findByText('Abyssal modules (MutaMarket estimate)')).toBeInTheDocument();
+    expect(await screen.findByText('Abyssal modules')).toBeInTheDocument();
     expect(await screen.findByText('90,000,000')).toBeInTheDocument();
     expect(mutamarket.getAbyssalEstimate).toHaveBeenCalledWith(ABYSSAL_TYPE, 11, {
       characterId: 1,
