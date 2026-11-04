@@ -91,7 +91,7 @@ Page ungated; see card table. Missing scope: that card goes warning with a re-lo
 
 ## Formulas and thresholds
 
-- Severity rank critical < warning < watch < clear; `worstSeverity` takes minimum (`src/engine/character/severity.ts`). `severityForRemaining`: null warning; <= 24 h critical; <= 3 d warning; <= 7 d watch; else clear.
+- Severity rank critical < warning < watch < clear; `worstSeverity` takes minimum (`src/engine/character/severity.ts`). `severityForRemaining`: null warning; default profile <= 1 h (or overdue) critical, <= 24 h warning, else clear; `logistics` profile (corp ops board, sovereignty run-outs) <= 24 h critical, <= 3 d warning, <= 7 d watch, else clear. A running Accelerator is its own rule: warning only in its last 2 h (`acceleratorSeverity`).
 - SP extraction (`engine/skills/spExtraction.ts`): floor 5,000,000 SP; `extractable = max(0,total-floor)`; extractor = 500,000 SP; ready when extractable >= threshold (default one chunk); off monitoring = clear.
 - Contracts (`engine/contracts/contractsBoard.ts`): counts accepted couriers where this Character is acceptor; deadline = courier deliver-by, falls back to offer expiry; overdue = deadline <= now; due soon = within 24 h (`LISTING_WINDOW_MS`); own outstanding non-corp listings count only in their last 24 h; soonest drives strip clock.
 - Industry: completing soon = remaining in (0, 1 h] (`features/industry/jobs.ts`); next-job clock severity fixed watch.

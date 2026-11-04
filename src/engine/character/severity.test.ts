@@ -15,7 +15,7 @@ describe('severityForRemaining', () => {
    * The boundaries, pinned exactly. This ladder is shared by the corp ops
    * board and the character's Coming Up rail, and the whole reason it lives in
    * one module is that a second copy could drift a threshold without anything
-   * going red. These four cases are that alarm.
+   * going red. These boundary cases are that alarm.
    */
   it('places each default threshold on the closed side of its band', () => {
     expect(severityForRemaining(HOUR)).toBe('critical');
