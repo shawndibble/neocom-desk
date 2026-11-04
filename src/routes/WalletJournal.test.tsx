@@ -143,9 +143,8 @@ describe('Wallet', () => {
     const bountyRow = within(breakdown).getByText('Bounty prize').closest('tr') as HTMLElement;
     await user.click(bountyRow);
     expect(screen.queryByText('Donation')).toBeNull();
-    expect(
-      screen.getByRole('button', { name: 'Remove filter: Ref type: Bounty prize' })
-    ).toBeInTheDocument();
+    // Ref type is an inline key filter: the select shows it, with no pill.
+    expect(screen.getByRole('combobox', { name: 'Ref type' })).toHaveTextContent('Bounty prize');
     // The breakdown ignores the ref-type filter, so every type is still listed.
     expect(within(breakdown).getAllByRole('row').length).toBeGreaterThan(2);
 
