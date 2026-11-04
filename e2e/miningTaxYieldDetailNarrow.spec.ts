@@ -57,8 +57,13 @@ const JITA_STATION_ID = 60003760;
  * the ids requested include each ore's Compressed counterpart and every
  * material it refines into, none of which this spec should have to re-derive.
  * A later `page.route` wins over an earlier one — see `support/testBase.ts`.
+ * The shard each type is read from first is a 404 here, so the reader falls
+ * back to these per-type objects.
  */
 async function mockOpenPrices(page: Page): Promise<void> {
+  await page.route('https://data.neocomdesk.com/open-prices/shards/*.json', (route) =>
+    route.fulfill({ status: 404, body: '' })
+  );
   await page.route('https://data.neocomdesk.com/open-prices/*.json', async (route) => {
     const dates = [daysAgo(5), daysAgo(4), ENTRY_DATE];
     const body = {
