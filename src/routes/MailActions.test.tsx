@@ -70,6 +70,8 @@ describe('Mail', () => {
 
     await user.click(fleetSubject);
     expect(within(fleetRow).getByText('Fleet up!')).toHaveClass('font-normal', 'text-text-dim');
+    // A phone's header holds only Back and the actions; the date sits with From/To.
+    expect(await screen.findByText('Date:')).toBeInTheDocument();
 
     // Mobile layout shows one pane at a time — back to the list to reach the filter row.
     await user.click(screen.getByRole('button', { name: 'Back' }));

@@ -2,6 +2,7 @@ import type { Ref, RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { CharacterLink } from '@/features/entities';
 import { StandingTag } from '@/features/character/StandingTag';
 import { MailComposeBox } from '@/features/character/MailComposeBox';
@@ -35,6 +36,10 @@ interface MailReaderBodyProps {
   resolveRecipientName: (r: { recipient_id: number; recipient_type: string }) => string;
   composeKind: ComposeKind | null;
   timeZone: Parameters<typeof formatTimestamp>[1];
+  /** A phone carries the date and the "for" owner here; the desktop header carries them. */
+  isDesktop: boolean;
+  /** All-characters scope: the mail belongs to one of several owners. */
+  isAll: boolean;
   onCloseCompose: () => void;
   onSent: (ownerId: number) => void;
 }
@@ -57,6 +62,8 @@ export function MailReaderBody({
   resolveRecipientName,
   composeKind,
   timeZone,
+  isDesktop,
+  isAll,
   onCloseCompose,
   onSent,
 }: MailReaderBodyProps) {
@@ -152,6 +159,25 @@ export function MailReaderBody({
                     {index < recipients.length - 1 ? ', ' : ''}
                   </span>
                 ))}
+              </p>
+            )}
+            {!isDesktop && selectedHeader?.timestamp && (
+              <p className="flex flex-wrap items-center gap-1.5">
+                {t('mail.date')}
+                <span className="tabular-nums text-text">
+                  {formatTimestamp(new Date(selectedHeader.timestamp), timeZone)}
+                </span>
+              </p>
+            )}
+            {!isDesktop && isAll && selectedRow && (
+              <p className="flex flex-wrap items-center gap-1.5">
+                <CharacterAvatar
+                  characterId={selectedRow.ownerId}
+                  size="sm"
+                  loading="lazy"
+                  className="rounded-full"
+                />
+                {t('mail.readingFor', { name: selectedRow.ownerName })}
               </p>
             )}
             <MailLabelTags names={selectedRow?.labelNames ?? []} />
