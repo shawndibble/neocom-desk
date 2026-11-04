@@ -8,7 +8,7 @@
  * if anything in them refuses to wrap. Playwright rather than jsdom because
  * only a real layout engine can tell.
  */
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { SCOPES } from './support/fixtureData';
@@ -277,13 +277,18 @@ test.describe('PI Colonies — alt group data age (issue #2291)', () => {
     await expect(badge).toHaveAttribute('datetime', new Date(listFetchedAt).toISOString());
 
     // One row: the badge and the Switch action sit level with the name,
-    // which truncates rather than pushing either onto a second line.
-    const nameBox = (await header.getByText(LONG_NAME, { exact: true }).boundingBox())!;
-    const badgeBox = (await badge.boundingBox())!;
-    const switchBox = (await header.getByRole('button').boundingBox())!;
+    // which truncates rather than pushing either onto a second line. The
+    // header gains its summary and ISK-a-day text as the seeded colony's
+    // prices and details resolve, so measure until the layout has settled
+    // rather than once, mid-reflow.
     const midline = (box: { y: number; height: number }) => box.y + box.height / 2;
-    expect(Math.abs(midline(badgeBox) - midline(nameBox))).toBeLessThan(4);
-    expect(Math.abs(midline(switchBox) - midline(nameBox))).toBeLessThan(4);
+    const offsetFromName = async (target: Locator) => {
+      const nameBox = await header.getByText(LONG_NAME, { exact: true }).boundingBox();
+      const targetBox = await target.boundingBox();
+      return nameBox && targetBox ? Math.abs(midline(targetBox) - midline(nameBox)) : Infinity;
+    };
+    await expect.poll(() => offsetFromName(badge)).toBeLessThan(4);
+    await expect.poll(() => offsetFromName(header.getByRole('button'))).toBeLessThan(4);
     await expectNoPageOverflow(page);
   });
 });
