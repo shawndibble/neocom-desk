@@ -20,7 +20,14 @@ import { createNumberFormat } from '@/lib/numberLocale';
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { DataTable, NativeSelect, Spinner, type DataTableColumn } from '@/components/ui';
+import {
+  DataTable,
+  NativeSelect,
+  ProgressBar,
+  Spinner,
+  type DataTableColumn,
+  type ProgressBarTone,
+} from '@/components/ui';
 import { ItemInfoLink } from '@/features/entities';
 import type { Mutaplasmid, MutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
 import {
@@ -28,8 +35,10 @@ import {
   multiplierPercentRows,
   mutaplasmidsMaking,
   rolledAttributeRows,
+  rollQualityTone,
   strainRangeRows,
   type DisplayRange,
+  type RollQualityTone,
   type RolledAttributeRow,
   type StrainRangeRow,
 } from '@/engine/fittings/mutaplasmidDisplay';
@@ -205,28 +214,31 @@ function AttributeCell({
 }
 
 /**
- * The base value, an arrow, the rolled value: green when the roll improved the
- * stat, red when it made it worse. The words ride along for screen readers,
- * so colour is never the only signal.
+ * One meaning for a roll's colour: where it sits in what the mutaplasmid could
+ * roll (DESIGN.md §6c "A Mutated module's roll"), never better or worse than
+ * base — so it always agrees with the quality figure printed beside it.
  */
-function BeforeAfter({ row, unit }: { row: RolledAttributeRow; unit: string | null }) {
+const ROLL_TONE: Readonly<Record<RollQualityTone, { text: string; bar: ProgressBarTone }>> = {
+  good: { text: 'text-success', bar: 'success' },
+  fair: { text: 'text-warning', bar: 'warning' },
+  poor: { text: 'text-danger', bar: 'danger' },
+};
+
+/** The roll's quality as a short bar and its percentage, in the roll's tone. */
+function RollQuality({ row, name }: { row: RolledAttributeRow; name: string }) {
   const { t } = useTranslation();
-  const change = Math.sign(row.rolled - row.base);
-  const better = change === 0 ? null : change > 0 === row.range.highIsGood;
   return (
-    <span className="inline-flex items-baseline gap-1">
-      <span className="text-text-dim">{formatAttributeValue(row.base, unit)}</span>
-      <span aria-hidden="true" className="text-text-dim">
-        →
+    <span className="inline-flex items-center justify-end gap-2">
+      <ProgressBar
+        label={t('market.itemDetail.abyssal.qualityBar', { attribute: name })}
+        value={Math.round(row.quality * 100)}
+        tone={ROLL_TONE[rollQualityTone(row.quality)].bar}
+        size="sm"
+        className="w-14"
+      />
+      <span className="w-9 text-right">
+        {t('market.itemDetail.abyssal.quality', { pct: Math.round(row.quality * 100) })}
       </span>
-      <span className={better === null ? undefined : better ? 'text-success' : 'text-danger'}>
-        {formatAttributeValue(row.rolled, unit)}
-      </span>
-      {better !== null && (
-        <span className="sr-only">
-          {better ? t('market.itemDetail.abyssal.better') : t('market.itemDetail.abyssal.worse')}
-        </span>
-      )}
     </span>
   );
 }
@@ -440,14 +452,22 @@ function OwnedRollsSection({
     : null;
   const unitOf = (row: RolledAttributeRow) => dictionary[row.attributeId]?.unit ?? null;
 
+  // Base and rolled in columns of their own, not "base → rolled": that arrow
+  // is the fit-change cue (§6c), whose colour means better or worse than before.
   const columns: DataTableColumn<RolledAttributeRow>[] = [
-    attributeColumn<RolledAttributeRow>(t, dictionary, lookup, (row) => row.range.highIsGood),
+    ...attributeAndBaseColumns<RolledAttributeRow>(
+      t,
+      dictionary,
+      lookup,
+      (row) => row.range.highIsGood
+    ),
     {
-      id: 'change',
-      header: t('market.itemDetail.abyssal.changeColumn'),
+      id: 'rolled',
+      header: t('market.itemDetail.abyssal.rolledColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => <BeforeAfter row={row} unit={unitOf(row)} />,
+      cellClassName: (row) => ROLL_TONE[rollQualityTone(row.quality)].text,
+      render: (row) => formatAttributeValue(row.rolled, unitOf(row)),
     },
     {
       id: 'range',
@@ -462,8 +482,9 @@ function OwnedRollsSection({
       headerTooltip: t('market.itemDetail.abyssal.qualityHint'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) =>
-        t('market.itemDetail.abyssal.quality', { pct: Math.round(row.quality * 100) }),
+      render: (row) => (
+        <RollQuality row={row} name={attributeLabel(row.attributeId, dictionary, lookup).name} />
+      ),
     },
   ];
 
@@ -492,7 +513,9 @@ function OwnedRollsSection({
         <p className="mt-2 text-xs text-text-dim">{t('market.itemDetail.abyssal.noRolls')}</p>
       ) : (
         // Own scroller, as the ranges table: Roll quality sits past a phone's edge.
-        <div className="mt-2 overflow-x-auto">
+        // Sized to its content (w-fit), not the modal: five short columns spread
+        // across it left the figures far from their names.
+        <div className="mt-2 w-fit max-w-full overflow-x-auto">
           <DataTable
             label={t('market.itemDetail.abyssal.rollsTitle')}
             columns={columns}
