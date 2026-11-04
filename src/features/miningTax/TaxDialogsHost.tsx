@@ -27,6 +27,7 @@ import {
   uncombine,
   unlinkTransaction,
   unsettle,
+  unsettleByIds,
   type LedgerActionResult,
 } from '@/features/miningTax/ledgerActions';
 import { buildPriceBreakdown } from '@/features/miningTax/usePriceBreakdown';
@@ -473,9 +474,9 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
 
   /** Undoes the member's own "paid" on Assignments a Corp Tax Book row stands in for. */
   function unmarkCorpPayment(ids: readonly string[] | undefined) {
-    const marked = everyAssignment.filter((a) => ids?.includes(a.id));
-    if (marked.length === 0) return;
-    void runAndClose(() => unsettle(marked));
+    if (!ids || ids.length === 0) return;
+    // By id, not from `everyAssignment`: that list leaves out the rows the book decided.
+    void runAndClose(() => unsettleByIds(ids));
   }
 
   function resolveEntry(dr: DisplayRow, fromMenu = false) {
