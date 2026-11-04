@@ -143,7 +143,7 @@ export function TransactionsFilterBar({
           value={filter.text}
           onChange={(event) => onChange({ ...filter, text: event.target.value })}
           placeholder={t('wallet.transactionsSearchPlaceholder')}
-          className="min-w-32 flex-1"
+          className="min-w-28 flex-1"
         />
       }
       actions={actions}
