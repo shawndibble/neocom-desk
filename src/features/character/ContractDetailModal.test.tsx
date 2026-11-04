@@ -852,7 +852,7 @@ describe('ContractDetailModal', () => {
 
       const check = await screen.findByRole('region', { name: /^Price check/ });
       expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument(); // the Tritanium only
-      expect(screen.getByText('Abyssal modules (MutaMarket estimate)')).toBeInTheDocument();
+      expect(screen.getByText('Abyssal modules')).toBeInTheDocument();
       expect(screen.getByText('Not priced')).toBeInTheDocument();
       expect(screen.getByText(/couldn't be estimated/)).toBeInTheDocument();
     });
