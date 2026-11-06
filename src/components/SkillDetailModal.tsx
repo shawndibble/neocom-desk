@@ -31,8 +31,7 @@ import {
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { loadSkillCatalog } from '@/features/skills/skillMap';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { loadItemUnlocks } from '@/features/skills/loadItemUnlocks';
-import type { ItemUnlockRow } from '@/features/skills/skillUnlockLevels';
+import { useItemUnlocks } from '@/features/skills/loadItemUnlocks';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import type { EngineSkill, TrainedSkill } from '@/engine/types';
@@ -48,7 +47,6 @@ type ModalState =
       /** With `trainedSkills`: `SkillPlanAdd`'s inputs. */
       engineSkills: ReadonlyMap<number, EngineSkill>;
       trainedSkills: ReadonlyMap<number, TrainedSkill>;
-      itemUnlocks: ItemUnlockRow[];
     };
 
 const IDLE: ModalState = { status: 'idle' };
@@ -60,6 +58,8 @@ export function SkillDetailModal() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
   const [state, setState] = useState<ModalState>(IDLE);
+  // Loaded beside the skill, not before it: the description and prerequisites never wait on item data.
+  const itemUnlocks = useItemUnlocks(request?.typeID ?? null);
   // Bumped by "Try again" to re-run the load effect in place — the page's
   // own Refresh sits behind the modal overlay, out of reach.
   const [attempt, setAttempt] = useState(0);
@@ -78,7 +78,6 @@ export function SkillDetailModal() {
     void (async () => {
       setState({ status: 'loading' });
       try {
-        const itemUnlocksLoad = loadItemUnlocks(request.typeID);
         const catalog = await loadSkillCatalog();
         if (cancelled) return;
 
@@ -97,7 +96,6 @@ export function SkillDetailModal() {
           request.typeID,
           request.planEntries
         );
-        const itemUnlocks = await itemUnlocksLoad;
         if (cancelled) return;
         setState(
           requirements
@@ -106,7 +104,6 @@ export function SkillDetailModal() {
                 data: requirements,
                 engineSkills: catalog.engineSkills,
                 trainedSkills,
-                itemUnlocks,
               }
             : { status: 'not-found' }
         );
@@ -195,7 +192,7 @@ export function SkillDetailModal() {
               skillTypeID={request.typeID}
               prereqs={state.data.prereqs}
               unlocks={state.data.unlocks}
-              itemUnlocks={state.itemUnlocks}
+              itemUnlocks={itemUnlocks}
               trainedLevel={state.trainedSkills.get(request.typeID)?.level ?? 0}
               planEntries={request.planEntries}
             />

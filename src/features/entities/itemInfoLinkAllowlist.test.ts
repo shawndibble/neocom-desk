@@ -33,6 +33,8 @@ const REVIEWED = new Set<string>([
   'src/features/market/TransactionsPanel.tsx',
   'src/features/market/MadeFromSection.tsx',
   'src/features/market/UsedInSection.tsx',
+  // A skill's per-level unlock list: plain name rows with no action of their own.
+  'src/features/skills/SkillRequirementsList.tsx',
   'src/features/travel/PilotShips.tsx',
   'src/features/travel/ZkillStatsSection.tsx',
 ]);
