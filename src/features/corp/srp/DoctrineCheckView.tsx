@@ -5,6 +5,7 @@
  * text, never colour alone.
  */
 import { useTranslation } from 'react-i18next';
+import { TypeIconLabel } from '@/components/TypeIconLabel';
 import { Pill } from '@/components/ui/Pill';
 import type { DoctrineCheckRecord } from '../srpTypes';
 import { diffSections, diffTypeIds } from './doctrineDiff';
@@ -45,9 +46,11 @@ export function DoctrineCheckView({ check, audience }: Props) {
                 <ul className="grid gap-0.5">
                   {lines.map(({ typeId, count }) => (
                     <li key={typeId}>
-                      {count > 1
-                        ? t('srp.doctrine.diff.line', { count, name: typeName(typeId) })
-                        : typeName(typeId)}
+                      <TypeIconLabel typeId={typeId}>
+                        {count > 1
+                          ? t('srp.doctrine.diff.line', { count, name: typeName(typeId) })
+                          : typeName(typeId)}
+                      </TypeIconLabel>
                     </li>
                   ))}
                 </ul>
