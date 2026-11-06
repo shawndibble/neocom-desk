@@ -3,7 +3,14 @@
 // anywhere except login.eveonline.com.
 
 import { generateVerifier, challengeFromVerifier } from './pkce';
-import { buildAuthorizeUrl, exchangeCode, refreshToken, type TokenResponse } from './sso';
+import {
+  AuthError,
+  buildAuthorizeUrl,
+  exchangeCode,
+  refreshToken,
+  type TokenResponse,
+} from './sso';
+import { emitDeadGrant } from './deadGrantSignal';
 import { decodeAccessToken, type DecodedAccessToken } from './jwt';
 import { db, type CharacterRecord } from '@/db';
 import {
@@ -827,7 +834,7 @@ async function completeIntentLogin(
 // and that rotation is coming for native (PKCE) clients like this one; they
 // don't say whether the old token dies on use. If it does, two concurrent
 // refreshes with one token would fail the second as `invalid_grant`, which
-// reads as a dead grant (`app/tokenProvider.ts`). Serialising is cheap
+// reads as a dead grant (`deadGrantSignal.ts`). Serialising is cheap
 // insurance either way, and saves the duplicate round trip.
 const inflightRefresh = new Map<number, Promise<string>>();
 
@@ -862,7 +869,14 @@ export function getValidAccessToken(characterId: number, config?: SsoConfig): Pr
     if (!record) throw new Error(`No token stored for character ${characterId}`);
     if (record.expiresAt - Date.now() > EXPIRY_BUFFER_MS) return record.accessToken;
 
-    const tokens = await refreshToken({ clientId, refreshToken: record.refreshToken });
+    let tokens: TokenResponse;
+    try {
+      tokens = await refreshToken({ clientId, refreshToken: record.refreshToken });
+    } catch (err) {
+      // Every caller needs the re-login prompt, not just the ESI client.
+      if (err instanceof AuthError && err.code === 'invalid_grant') emitDeadGrant(characterId);
+      throw err;
+    }
     await persistTokens(tokens);
     return tokens.access_token;
   }).finally(() => inflightRefresh.delete(characterId));
