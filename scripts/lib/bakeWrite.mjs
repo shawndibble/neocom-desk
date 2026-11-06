@@ -20,7 +20,7 @@ export async function writeOutputs({
   marketWideTrees,
   reprocessing,
   typeMap,
-  groups,
+  groupCategories,
   pi,
   piPlanetRadiusKm,
   piSystemPlanets,
@@ -31,6 +31,7 @@ export async function writeOutputs({
   shipTree,
   typeNames,
   typeEffects,
+  skillItemUnlocks,
   mutaplasmids,
   wormholeMass,
   shipMass,
@@ -91,7 +92,7 @@ export async function writeOutputs({
     // groupID -> categoryID: which Specialised Holds accept an item is keyed
     // partly by category (`engine/market/cargoHolds.ts`), and `types.json`
     // carries only the group.
-    ['groupCategories.json', Object.fromEntries([...groups].map(([id, g]) => [id, g.categoryID]))],
+    ['groupCategories.json', groupCategories],
     ['pi.json', pi],
     // Its own file, not folded into pi.json: it is one entry per planet in New
     // Eden and every other consumer of pi.json would pay for it on load.
@@ -107,6 +108,8 @@ export async function writeOutputs({
     ['typeNames.json', typeNames],
     // Which types carry the dogma effects the app reads (the engine's results hold none); see lib/typeEffects.mjs.
     ['typeEffects.json', typeEffects],
+    // Skill -> the ships, modules and other items it unlocks, for the skill Show info; see lib/skillItemUnlocks.mjs.
+    ['skillItemUnlocks.json', skillItemUnlocks],
     ['mutaplasmids.json', mutaplasmids],
     ['wormholeMass.json', wormholeMass],
     ['shipMass.json', shipMass],

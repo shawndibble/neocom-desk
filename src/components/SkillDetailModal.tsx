@@ -1,6 +1,7 @@
 /**
  * Shared skill detail lookup (GLOSSARY.md round 49): description, price,
- * prerequisites (trained vs. still needed), unlocks and Add to Skill Plan for one skill, opened
+ * prerequisites (trained vs. still needed), what each level unlocks (skills, ships,
+ * modules and other items) and Add to Skill Plan for one skill, opened
  * from any feature that renders a skill name via
  * `openSkillDetailModal`/`useSkillDetailModal` (`stores/skillDetailModal.ts`).
  * Mounted once in `App.tsx`, same "always mounted, driven by a global
@@ -30,6 +31,7 @@ import {
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { loadSkillCatalog } from '@/features/skills/skillMap';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { useItemUnlocks } from '@/features/skills/loadItemUnlocks';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import type { EngineSkill, TrainedSkill } from '@/engine/types';
@@ -56,6 +58,8 @@ export function SkillDetailModal() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
   const [state, setState] = useState<ModalState>(IDLE);
+  // Loaded beside the skill, not before it: the description and prerequisites never wait on item data.
+  const itemUnlocks = useItemUnlocks(request?.typeID ?? null);
   // Bumped by "Try again" to re-run the load effect in place — the page's
   // own Refresh sits behind the modal overlay, out of reach.
   const [attempt, setAttempt] = useState(0);
@@ -185,8 +189,11 @@ export function SkillDetailModal() {
             )}
             <SkillPriceSection typeID={request.typeID} npcPrice={state.data.npcPrice} />
             <SkillRequirementsList
+              skillTypeID={request.typeID}
               prereqs={state.data.prereqs}
               unlocks={state.data.unlocks}
+              itemUnlocks={itemUnlocks}
+              trainedLevel={state.trainedSkills.get(request.typeID)?.level ?? 0}
               planEntries={request.planEntries}
             />
           </div>

@@ -133,6 +133,8 @@ export const CHAR_ATTR_NAMES = {
   168: 'willpower',
 };
 export const SKILL_CATEGORY_ID = 16;
+export const MATERIAL_CATEGORY_ID = 4;
+export const ASTEROID_CATEGORY_ID = 25;
 export const SHIP_CATEGORY_ID = 6;
 export const BLUEPRINT_CATEGORY_ID = 9;
 // invention.json plausibility (issue #3987), counted against dump
