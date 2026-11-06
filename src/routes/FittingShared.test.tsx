@@ -197,6 +197,8 @@ describe('FittingShared', () => {
     renderAt(`/share/fitting?f=${encodeURIComponent(encoded.payload)}`);
 
     expect(await screen.findByRole('heading', { level: 2, name: 'Rifter' })).toBeInTheDocument();
-    expect(await screen.findByText('Tritanium x500')).toBeInTheDocument();
+    expect((await screen.findByText('Tritanium')).closest('li')).toHaveTextContent(
+      'Tritanium x500'
+    );
   });
 });
