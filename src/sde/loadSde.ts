@@ -133,6 +133,14 @@ export const loadMutaplasmids = cached<MutaplasmidData>('mutaplasmids.json');
  */
 export const loadTypeEffects = cached<Record<string, number[]>>('typeEffects.json');
 
+/**
+ * Skill typeID -> `[itemTypeID, levelNeeded]` for every ship, module and other
+ * non-skill item whose required skills name it (`scripts/lib/skillItemUnlocks.mjs`),
+ * for the skill Show info's Unlocks. Precached: ~22 KB gzipped.
+ */
+export const loadSkillItemUnlocks =
+  cached<Record<string, [number, number][]>>('skillItemUnlocks.json');
+
 /** The Ship Tree's classes, factions and hulls — see `ShipTreeData`. */
 export const loadShipTree = cached<ShipTreeData>('shipTree.json');
 

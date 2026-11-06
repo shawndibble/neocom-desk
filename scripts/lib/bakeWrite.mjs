@@ -31,6 +31,7 @@ export async function writeOutputs({
   shipTree,
   typeNames,
   typeEffects,
+  skillItemUnlocks,
   mutaplasmids,
   wormholeMass,
   shipMass,
@@ -107,6 +108,8 @@ export async function writeOutputs({
     ['typeNames.json', typeNames],
     // Which types carry the dogma effects the app reads (the engine's results hold none); see lib/typeEffects.mjs.
     ['typeEffects.json', typeEffects],
+    // Skill -> the ships, modules and other items it unlocks, for the skill Show info; see lib/skillItemUnlocks.mjs.
+    ['skillItemUnlocks.json', skillItemUnlocks],
     ['mutaplasmids.json', mutaplasmids],
     ['wormholeMass.json', wormholeMass],
     ['shipMass.json', shipMass],

@@ -6,6 +6,8 @@ import { EntityInfoRoute } from '@/features/entities';
 import '@/i18n';
 import { SkillRequirementsList } from './SkillRequirementsList';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
+import { useItemInfoModalStore } from '@/stores/itemInfoModal';
+import type { ItemUnlockRow } from './skillUnlockLevels';
 
 /** Skill names are links that open the modal through the URL, so every render sits in a router with its `EntityInfoRoute`. */
 function RoutedWithInfo({ children }: { children: ReactNode }) {
@@ -21,6 +23,7 @@ const render = (ui: ReactElement) => rtlRender(ui, { wrapper: RoutedWithInfo });
 
 beforeEach(() => {
   useSkillDetailModalStore.setState({ request: null });
+  useItemInfoModalStore.setState({ request: null });
 });
 
 describe('SkillRequirementsList', () => {
@@ -93,5 +96,46 @@ describe('SkillRequirementsList', () => {
     fireEvent.click(screen.getByText('Spaceship Command'));
 
     expect(useSkillDetailModalStore.getState().request).toEqual({ typeID: 3300, planEntries });
+  });
+
+  it('groups skills and items under the level each needs, an item name opening its Item Detail', () => {
+    render(
+      <SkillRequirementsList
+        prereqs={[]}
+        unlocks={[{ typeID: 3301, name: 'Destroyer', level: 4 }]}
+        itemUnlocks={[
+          { typeID: 587, name: 'Rifter', level: 1, kind: 'ship' },
+          { typeID: 3074, name: '150mm Railgun I', level: 1, kind: 'module' },
+        ]}
+        trainedLevel={1}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /Level 1 · Trained/ })).toHaveAccessibleName(
+      /1 ship · 1 module/
+    );
+    expect(screen.getByRole('button', { name: /Level 4/ })).toHaveAccessibleName(/1 skill/);
+
+    fireEvent.click(screen.getByText('Rifter'));
+    expect(useItemInfoModalStore.getState().request).toMatchObject({ typeId: 587 });
+  });
+
+  it('starts a long unlock list collapsed to a per-level summary, opening a level on click', () => {
+    const itemUnlocks: ItemUnlockRow[] = Array.from({ length: 20 }, (_, i) => ({
+      typeID: 1000 + i,
+      name: `Module ${i}`,
+      level: i < 10 ? 1 : 3,
+      kind: 'module',
+    }));
+    render(<SkillRequirementsList prereqs={[]} unlocks={[]} itemUnlocks={itemUnlocks} />);
+
+    const level1 = screen.getByRole('button', { name: /Level 1/ });
+    expect(level1).toHaveAttribute('aria-expanded', 'false');
+    expect(level1).toHaveAccessibleName(/10 modules/);
+    expect(screen.queryByText('Module 0')).not.toBeInTheDocument();
+
+    fireEvent.click(level1);
+    expect(screen.getByText('Module 0')).toBeInTheDocument();
+    expect(screen.queryByText('Module 10')).not.toBeInTheDocument();
   });
 });

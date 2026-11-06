@@ -1,6 +1,7 @@
 /**
  * Shared skill detail lookup (GLOSSARY.md round 49): description, price,
- * prerequisites (trained vs. still needed), unlocks and Add to Skill Plan for one skill, opened
+ * prerequisites (trained vs. still needed), what each level unlocks (skills, ships,
+ * modules and other items) and Add to Skill Plan for one skill, opened
  * from any feature that renders a skill name via
  * `openSkillDetailModal`/`useSkillDetailModal` (`stores/skillDetailModal.ts`).
  * Mounted once in `App.tsx`, same "always mounted, driven by a global
@@ -30,6 +31,8 @@ import {
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { loadSkillCatalog } from '@/features/skills/skillMap';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { buildItemUnlocks, type ItemUnlockRow } from '@/features/skills/skillUnlockLevels';
+import { loadGroupCategories, loadSkillItemUnlocks, loadTypes } from '@/sde/loadSde';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import type { EngineSkill, TrainedSkill } from '@/engine/types';
@@ -45,9 +48,24 @@ type ModalState =
       /** With `trainedSkills`: `SkillPlanAdd`'s inputs. */
       engineSkills: ReadonlyMap<number, EngineSkill>;
       trainedSkills: ReadonlyMap<number, TrainedSkill>;
+      itemUnlocks: ItemUnlockRow[];
     };
 
 const IDLE: ModalState = { status: 'idle' };
+
+/** The ships, modules and other items a skill unlocks; none when that data can't load, so the skill still shows. */
+async function loadItemUnlocks(typeID: number): Promise<ItemUnlockRow[]> {
+  try {
+    const [index, types, groupCategories] = await Promise.all([
+      loadSkillItemUnlocks(),
+      loadTypes(),
+      loadGroupCategories(),
+    ]);
+    return buildItemUnlocks(typeID, index, types, groupCategories);
+  } catch {
+    return [];
+  }
+}
 
 export function SkillDetailModal() {
   const { t } = useTranslation();
@@ -74,6 +92,7 @@ export function SkillDetailModal() {
     void (async () => {
       setState({ status: 'loading' });
       try {
+        const itemUnlocksLoad = loadItemUnlocks(request.typeID);
         const catalog = await loadSkillCatalog();
         if (cancelled) return;
 
@@ -92,6 +111,7 @@ export function SkillDetailModal() {
           request.typeID,
           request.planEntries
         );
+        const itemUnlocks = await itemUnlocksLoad;
         if (cancelled) return;
         setState(
           requirements
@@ -100,6 +120,7 @@ export function SkillDetailModal() {
                 data: requirements,
                 engineSkills: catalog.engineSkills,
                 trainedSkills,
+                itemUnlocks,
               }
             : { status: 'not-found' }
         );
@@ -187,6 +208,8 @@ export function SkillDetailModal() {
             <SkillRequirementsList
               prereqs={state.data.prereqs}
               unlocks={state.data.unlocks}
+              itemUnlocks={state.itemUnlocks}
+              trainedLevel={state.trainedSkills.get(request.typeID)?.level ?? 0}
               planEntries={request.planEntries}
             />
           </div>
