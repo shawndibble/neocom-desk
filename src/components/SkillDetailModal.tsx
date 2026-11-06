@@ -31,8 +31,8 @@ import {
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { loadSkillCatalog } from '@/features/skills/skillMap';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { buildItemUnlocks, type ItemUnlockRow } from '@/features/skills/skillUnlockLevels';
-import { loadGroupCategories, loadSkillItemUnlocks, loadTypes } from '@/sde/loadSde';
+import { loadItemUnlocks } from '@/features/skills/loadItemUnlocks';
+import type { ItemUnlockRow } from '@/features/skills/skillUnlockLevels';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import type { EngineSkill, TrainedSkill } from '@/engine/types';
@@ -52,20 +52,6 @@ type ModalState =
     };
 
 const IDLE: ModalState = { status: 'idle' };
-
-/** The ships, modules and other items a skill unlocks; none when that data can't load, so the skill still shows. */
-async function loadItemUnlocks(typeID: number): Promise<ItemUnlockRow[]> {
-  try {
-    const [index, types, groupCategories] = await Promise.all([
-      loadSkillItemUnlocks(),
-      loadTypes(),
-      loadGroupCategories(),
-    ]);
-    return buildItemUnlocks(typeID, index, types, groupCategories);
-  } catch {
-    return [];
-  }
-}
 
 export function SkillDetailModal() {
   const { t } = useTranslation();

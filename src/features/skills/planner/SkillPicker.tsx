@@ -14,6 +14,7 @@ import type { SkillType } from '@/sde/types';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
+import { useItemUnlocks } from '../loadItemUnlocks';
 import { SkillRequirementsList } from '../SkillRequirementsList';
 import { buildSkillRequirements } from '../skillRequirements';
 import type { SkillCatalog } from '../skillMap';
@@ -145,6 +146,7 @@ export function SkillPicker({
     () => (selected === null ? null : buildSkillRequirements(catalog, trainedSkills, selected)),
     [selected, catalog, trainedSkills]
   );
+  const itemUnlocks = useItemUnlocks(selected);
 
   function pick(skillTypeID: number, targetLevel: number, skillName: string, levelLabel: string) {
     onAdd({ skillTypeID, targetLevel });
@@ -316,6 +318,8 @@ export function SkillPicker({
                     <SkillRequirementsList
                       prereqs={requirements.prereqs}
                       unlocks={requirements.unlocks}
+                      itemUnlocks={itemUnlocks}
+                      trainedLevel={trainedSkills.get(skill.typeID)?.level ?? 0}
                     />
                   )}
                 </div>
