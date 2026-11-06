@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { reportEsiAuthFailure, subscribeToEsiAuthFailures, useAuthFailure } from './authFailure';
 import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
+import { emitDeadGrant } from '@/auth/deadGrantSignal';
 
 const CHARACTER_ID = 5;
 
@@ -115,6 +116,18 @@ describe('subscribeToEsiAuthFailures', () => {
       useAuthFailure.getState().markNeedsLogin(CHARACTER_ID);
       useAuthFailure.getState().dismissNeedsLogin(CHARACTER_ID);
       expect(useAuthFailure.getState().needsLogin).toEqual([]);
+    });
+  });
+});
+
+describe('subscribeToEsiAuthFailures: dead grant', () => {
+  it('reports a token failure when any caller hits a dead grant', () => {
+    const off = subscribeToEsiAuthFailures();
+    emitDeadGrant(CHARACTER_ID);
+    off();
+    expect(useAuthFailure.getState().failure).toEqual({
+      characterId: CHARACTER_ID,
+      kind: 'token',
     });
   });
 });

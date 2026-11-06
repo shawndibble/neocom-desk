@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { TypeIconLabel } from '@/components/TypeIconLabel';
 import { Panel } from '@/components/ui';
 import { ItemInfoLink } from '@/features/entities';
 import { FITTING_SLOT_KINDS, type Fitting } from '@/engine/fittings/types';
@@ -24,8 +25,15 @@ export function FittingModuleList({
   linkNames = false,
 }: FittingModuleListProps) {
   const { t } = useTranslation();
-  const name = (typeId: number) =>
-    linkNames ? <ItemInfoLink typeId={typeId}>{typeName(typeId)}</ItemInfoLink> : typeName(typeId);
+  const name = (typeId: number) => (
+    <TypeIconLabel typeId={typeId}>
+      {linkNames ? (
+        <ItemInfoLink typeId={typeId}>{typeName(typeId)}</ItemInfoLink>
+      ) : (
+        typeName(typeId)
+      )}
+    </TypeIconLabel>
+  );
 
   const groups = FITTING_SLOT_KINDS.map((rack) => ({
     rack,

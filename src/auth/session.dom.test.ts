@@ -19,6 +19,7 @@ import {
   isCachePurgePending,
 } from '@/esi/cachePurge';
 import { createFakeLockManager } from '@/lib/fakeLockManager';
+import { onDeadGrant } from './deadGrantSignal';
 
 const CHAR_ID = 2112625428;
 
@@ -382,6 +383,64 @@ describe('getValidAccessToken', () => {
     });
     await getValidAccessToken(CHAR_ID, cfg);
     expect(tokenRequests).toHaveLength(2); // map entry cleared on settle
+  });
+
+  it('announces a dead grant to any caller, not only the ESI client', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'stale-access',
+      refreshToken: 'refresh-dead',
+      expiresAt: Date.now() + 30_000,
+      scopes: [],
+    });
+    const heard: number[] = [];
+    const off = onDeadGrant((id) => heard.push(id));
+    await expect(getValidAccessToken(CHAR_ID, cfg)).rejects.toMatchObject({
+      code: 'invalid_grant',
+    });
+    off();
+    expect(heard).toEqual([CHAR_ID]);
+  });
+
+  it('announces a dead grant once for concurrent callers', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'stale-access',
+      refreshToken: 'refresh-dead',
+      expiresAt: Date.now() + 30_000,
+      scopes: [],
+    });
+    const heard: number[] = [];
+    const off = onDeadGrant((id) => heard.push(id));
+    await Promise.allSettled([
+      getValidAccessToken(CHAR_ID, cfg),
+      getValidAccessToken(CHAR_ID, cfg),
+    ]);
+    off();
+    expect(heard).toEqual([CHAR_ID]);
+  });
+
+  it('stays quiet when there is no stored token to refresh', async () => {
+    const heard: number[] = [];
+    const off = onDeadGrant((id) => heard.push(id));
+    await expect(getValidAccessToken(999, cfg)).rejects.toThrow();
+    off();
+    expect(heard).toEqual([]);
+  });
+
+  it('stays quiet when the refresh works', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'stale-access',
+      refreshToken: 'refresh-old',
+      expiresAt: Date.now() + 30_000,
+      scopes: [],
+    });
+    const heard: number[] = [];
+    const off = onDeadGrant((id) => heard.push(id));
+    await getValidAccessToken(CHAR_ID, cfg);
+    off();
+    expect(heard).toEqual([]);
   });
 
   it('throws when no token exists for the character', async () => {

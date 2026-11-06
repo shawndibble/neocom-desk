@@ -25,6 +25,7 @@ import { bakeMutaplasmids, dogmaAttributeInfo } from './lib/mutaplasmids.mjs';
 import { bakeAgents, bakeNpcCorporations } from './lib/npcAgents.mjs';
 import { ccpBuildFromSdeJsonl, fetchFuzzworkDump } from './lib/sdeBuild.mjs';
 import { buildShipTree } from './lib/shipTree.mjs';
+import { bakeSkillItemUnlocks } from './lib/skillItemUnlocks.mjs';
 import { bakeTypeEffects } from './lib/typeEffects.mjs';
 import { bakeTypeInfoShards } from './lib/typeInfo.mjs';
 import { bakeTypeNames } from './lib/typeNames.mjs';
@@ -166,6 +167,13 @@ async function main() {
   const typeDogma = parseJsonl(ccpStaticData['typeDogma.jsonl']);
   const typeInfoShards = bakeTypeInfoShards(ccpTypes, typeDogma);
 
+  // --- skillItemUnlocks.json: the items each skill unlocks; see lib/skillItemUnlocks.mjs ---
+  const groupCategories = Object.fromEntries([...groups].map(([id, g]) => [id, g.categoryID]));
+  const skillItemUnlocks = bakeSkillItemUnlocks(typeInfoShards, typeMap, groupCategories);
+  if (!skillItemUnlocks[3329]?.some(([typeId, level]) => typeId === 587 && level === 1)) {
+    throw new Error('skillItemUnlocks.json looks wrong: Rifter is not under Minmatar Frigate I');
+  }
+
   // --- typeEffects.json: the types carrying each effect we read; see lib/typeEffects.mjs ---
   const typeEffects = bakeTypeEffects(ccpTypes, typeDogma);
   if (!typeEffects[980].includes(11578)) {
@@ -230,7 +238,7 @@ async function main() {
     marketWideTrees,
     reprocessing,
     typeMap,
-    groups,
+    groupCategories,
     pi,
     piPlanetRadiusKm,
     piSystemPlanets,
@@ -241,6 +249,7 @@ async function main() {
     shipTree,
     typeNames,
     typeEffects,
+    skillItemUnlocks,
     mutaplasmids,
     wormholeMass,
     shipMass,

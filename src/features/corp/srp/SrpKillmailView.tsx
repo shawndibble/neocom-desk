@@ -6,6 +6,7 @@
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { TypeIconLabel } from '@/components/TypeIconLabel';
 import { Spinner, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -190,11 +191,11 @@ function Fit({
           <ul className="text-sm">
             {g.lines.map((l) => (
               <li key={`${l.typeId}-${l.mark}`} className="flex items-center gap-2">
-                <span>
+                <TypeIconLabel typeId={l.typeId}>
                   {l.count > 1
                     ? t('srp.doctrine.diff.line', { count: l.count, name: typeName(l.typeId) })
                     : typeName(l.typeId)}
-                </span>
+                </TypeIconLabel>
                 {l.mark !== null && <DoctrineMark mark={l.mark} />}
               </li>
             ))}

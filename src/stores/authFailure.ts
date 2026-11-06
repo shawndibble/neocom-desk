@@ -7,6 +7,7 @@
 // do `dismiss()` and a character switch — which is what keeps a re-auth prompt
 // from pinning on forever for a failure re-authing cannot fix.
 import { create } from 'zustand';
+import { onDeadGrant } from '@/auth/deadGrantSignal';
 import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 import type { EsiEndpointId } from '@/esi/registry';
 
@@ -89,9 +90,16 @@ export const useAuthFailure = create<AuthFailureState>((set, get) => ({
  * Wired here, once from the shell, so `esi` need not know this store exists.
  */
 export function subscribeToEsiAuthFailures(): () => void {
-  return onEsiAuthFailure((characterId, endpointId) => {
+  const offRequest = onEsiAuthFailure((characterId, endpointId) => {
     useAuthFailure.getState().reportRequestFailure(characterId, endpointId);
   });
+  const offGrant = onDeadGrant((characterId) => {
+    useAuthFailure.getState().reportTokenFailure(characterId);
+  });
+  return () => {
+    offRequest();
+    offGrant();
+  };
 }
 
 /** Direct publish, for tests and non-React callers that already hold a store. */
