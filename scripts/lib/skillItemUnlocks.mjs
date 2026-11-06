@@ -5,6 +5,8 @@
 // "what does Gunnery IV unlock?" in the skill Show info. Skill-on-skill unlocks
 // are not here: the app derives those from skills.json's prereqs.
 
+import { ASTEROID_CATEGORY_ID, MATERIAL_CATEGORY_ID, SKILL_CATEGORY_ID } from './bakeConstants.mjs';
+
 /**
  * requiredSkillN / requiredSkillNLevel dogma attribute id pairs. Mirrors
  * `SKILL_REQUIREMENT_PAIRS` in `src/engine/market/itemAttributes.ts` (the test
@@ -24,7 +26,11 @@ export const REQUIRED_SKILL_ATTRIBUTE_PAIRS = [
  * asteroids and raw materials, whose "required skill" is the one to mine or
  * reprocess them, not one that unlocks using them.
  */
-export const EXCLUDED_CATEGORY_IDS = new Set([16, 25, 4]);
+export const EXCLUDED_CATEGORY_IDS = new Set([
+  SKILL_CATEGORY_ID,
+  ASTEROID_CATEGORY_ID,
+  MATERIAL_CATEGORY_ID,
+]);
 
 /**
  * `{ "<skillTypeId>": [[typeId, level], ...] }`, pairs sorted by typeId, for

@@ -138,8 +138,10 @@ export const loadTypeEffects = cached<Record<string, number[]>>('typeEffects.jso
  * non-skill item whose required skills name it (`scripts/lib/skillItemUnlocks.mjs`),
  * for the skill Show info's Unlocks. Precached: ~22 KB gzipped.
  */
-export const loadSkillItemUnlocks =
-  cached<Record<string, [number, number][]>>('skillItemUnlocks.json');
+export const loadSkillItemUnlocks = cached<SkillItemUnlockIndex>('skillItemUnlocks.json');
+
+/** `skillItemUnlocks.json`: skill typeID -> `[itemTypeID, levelNeeded]` pairs. */
+export type SkillItemUnlockIndex = Readonly<Record<string, readonly (readonly [number, number])[]>>;
 
 /** The Ship Tree's classes, factions and hulls — see `ShipTreeData`. */
 export const loadShipTree = cached<ShipTreeData>('shipTree.json');

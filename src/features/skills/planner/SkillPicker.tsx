@@ -316,6 +316,7 @@ export function SkillPicker({
                   </div>
                   {requirements && (
                     <SkillRequirementsList
+                      skillTypeID={skill.typeID}
                       prereqs={requirements.prereqs}
                       unlocks={requirements.unlocks}
                       itemUnlocks={itemUnlocks}

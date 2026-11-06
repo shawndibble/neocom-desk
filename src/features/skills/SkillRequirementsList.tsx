@@ -11,6 +11,8 @@ import { groupUnlocksByLevel, type ItemUnlockRow, type UnlockLevel } from './ski
 const EXPAND_ALL_UNLOCKS_AT_MOST = 12;
 
 interface SkillRequirementsListProps {
+  /** The skill these rows belong to: a different skill starts the per-level list from its own default expansion. */
+  skillTypeID: number;
   prereqs: readonly PrereqRow[];
   unlocks: readonly UnlockRow[];
   /** Ships, modules and other items the skill unlocks, listed with the skills under each level. */
@@ -120,6 +122,7 @@ function UnlockLevels({ levels, trainedLevel, planEntries }: UnlockLevelsProps) 
 
 /** A skill's prerequisites (trained vs. still needed) and what each of its levels unlocks. No chrome of its own. */
 export function SkillRequirementsList({
+  skillTypeID,
   prereqs,
   unlocks,
   itemUnlocks = [],
@@ -174,8 +177,8 @@ export function SkillRequirementsList({
           <p className="mt-1 text-xs text-text-dim">{t('skills.inspector.noUnlocks')}</p>
         ) : (
           <UnlockLevels
-            // A different skill (or newly loaded items) starts from its own default expansion.
-            key={unlockLevels.map((l) => `${l.level}:${l.count}`).join()}
+            // Another skill, or its items arriving, starts from its own default expansion.
+            key={`${skillTypeID}:${itemUnlocks.length}`}
             levels={unlockLevels}
             trainedLevel={trainedLevel}
             planEntries={planEntries}

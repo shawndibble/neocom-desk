@@ -192,6 +192,7 @@ export function SkillDetailModal() {
             )}
             <SkillPriceSection typeID={request.typeID} npcPrice={state.data.npcPrice} />
             <SkillRequirementsList
+              skillTypeID={request.typeID}
               prereqs={state.data.prereqs}
               unlocks={state.data.unlocks}
               itemUnlocks={state.itemUnlocks}

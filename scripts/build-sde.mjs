@@ -168,11 +168,8 @@ async function main() {
   const typeInfoShards = bakeTypeInfoShards(ccpTypes, typeDogma);
 
   // --- skillItemUnlocks.json: the items each skill unlocks; see lib/skillItemUnlocks.mjs ---
-  const skillItemUnlocks = bakeSkillItemUnlocks(
-    typeInfoShards,
-    typeMap,
-    Object.fromEntries([...groups].map(([id, g]) => [id, g.categoryID]))
-  );
+  const groupCategories = Object.fromEntries([...groups].map(([id, g]) => [id, g.categoryID]));
+  const skillItemUnlocks = bakeSkillItemUnlocks(typeInfoShards, typeMap, groupCategories);
   if (!skillItemUnlocks[3329]?.some(([typeId, level]) => typeId === 587 && level === 1)) {
     throw new Error('skillItemUnlocks.json looks wrong: Rifter is not under Minmatar Frigate I');
   }
@@ -241,7 +238,7 @@ async function main() {
     marketWideTrees,
     reprocessing,
     typeMap,
-    groups,
+    groupCategories,
     pi,
     piPlanetRadiusKm,
     piSystemPlanets,

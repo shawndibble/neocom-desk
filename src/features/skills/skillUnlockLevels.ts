@@ -4,6 +4,8 @@
  * other items whose required skills name it (`skillItemUnlocks.json`, baked by
  * `scripts/lib/skillItemUnlocks.mjs`), bucketed by the level each needs.
  */
+import { IMPLANT_CATEGORY_ID, SHIP_CATEGORY_ID } from '@/sde/categories';
+import type { SkillItemUnlockIndex } from '@/sde/loadSde';
 import type { UnlockRow } from './skillRequirements';
 
 /** How the skill Show info groups an unlocked item, in display order after skills. */
@@ -15,11 +17,8 @@ export interface ItemUnlockRow extends UnlockRow {
   kind: ItemUnlockKind;
 }
 
-/** `skillItemUnlocks.json`: skill typeID -> `[itemTypeID, levelNeeded]` pairs. */
-export type SkillItemUnlockIndex = Readonly<Record<string, readonly (readonly [number, number])[]>>;
-
 const KIND_BY_CATEGORY: Readonly<Record<number, ItemUnlockKind>> = {
-  6: 'ship',
+  [SHIP_CATEGORY_ID]: 'ship',
   7: 'module',
   // Subsystems and structure modules are fitted like modules.
   32: 'module',
@@ -28,7 +27,7 @@ const KIND_BY_CATEGORY: Readonly<Record<number, ItemUnlockKind>> = {
   // Fighters sit with drones, as in the in-game Drone Bay.
   18: 'drone',
   87: 'drone',
-  20: 'implant',
+  [IMPLANT_CATEGORY_ID]: 'implant',
 };
 
 /** An inventory category id's unlock kind; anything unlisted is 'other'. */

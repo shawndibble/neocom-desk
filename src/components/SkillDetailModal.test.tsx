@@ -68,10 +68,17 @@ const FIXTURE_SKILLS: SkillType[] = [
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => FIXTURE_SKILLS),
   // Frigate (2) unlocks a ship at level 1; Small Hybrid Turret (1) a module at level 2.
-  loadSkillItemUnlocks: vi.fn(async () => ({ 2: [[587, 1]], 1: [[3074, 2]] })),
+  loadSkillItemUnlocks: vi.fn(async () => ({
+    2: [[587, 1]],
+    1: [
+      [3075, 1],
+      [3074, 2],
+    ],
+  })),
   loadTypes: vi.fn(async () => ({
     587: { name: 'Rifter', groupID: 25, volume: 1 },
     3074: { name: '150mm Railgun I', groupID: 74, volume: 1 },
+    3075: { name: '125mm Railgun I', groupID: 74, volume: 1 },
   })),
   loadGroupCategories: vi.fn(async () => ({ 25: 6, 74: 7 })),
 }));
@@ -140,10 +147,14 @@ describe('SkillDetailModal', () => {
     act(() => useSkillDetailModalStore.getState().open(1));
 
     const dialog = await screen.findByRole('dialog');
-    const level2 = await within(dialog).findByRole('button', { name: /Level 2/ });
+    expect(
+      await within(dialog).findByRole('button', { name: /Level 1 · Trained/ })
+    ).toHaveAccessibleName(/1 module/);
+    const level2 = within(dialog).getByRole('button', { name: /Level 2/ });
+    expect(level2).not.toHaveAccessibleName(/Trained/);
     expect(level2).toHaveAccessibleName(/1 module/);
     expect(within(dialog).getByText('150mm Railgun I')).toBeInTheDocument();
-    // Level 3 unlocks the Frigate skill; level 1 is trained, but nothing needs only level 1.
+    // Level 3 unlocks the Frigate skill.
     expect(within(dialog).getByRole('button', { name: /Level 3/ })).toHaveAccessibleName(/1 skill/);
   });
 

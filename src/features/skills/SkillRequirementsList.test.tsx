@@ -30,6 +30,7 @@ describe('SkillRequirementsList', () => {
   it('opens the shared Skill Detail popover for a prereq name (#405)', () => {
     render(
       <SkillRequirementsList
+        skillTypeID={1}
         prereqs={[
           { typeID: 3300, name: 'Spaceship Command', level: 1, trained: true, planned: false },
         ]}
@@ -44,7 +45,11 @@ describe('SkillRequirementsList', () => {
 
   it('opens the shared Skill Detail popover for an unlock name (#405)', () => {
     render(
-      <SkillRequirementsList prereqs={[]} unlocks={[{ typeID: 3301, name: 'Frigate', level: 3 }]} />
+      <SkillRequirementsList
+        skillTypeID={1}
+        prereqs={[]}
+        unlocks={[{ typeID: 3301, name: 'Frigate', level: 3 }]}
+      />
     );
 
     fireEvent.click(screen.getByText('Frigate'));
@@ -54,6 +59,7 @@ describe('SkillRequirementsList', () => {
   it('renders its section headings and level badge at the shared 0.6875rem chip rung (#882)', () => {
     const { container } = render(
       <SkillRequirementsList
+        skillTypeID={1}
         prereqs={[
           { typeID: 3300, name: 'Spaceship Command', level: 1, trained: true, planned: false },
         ]}
@@ -70,6 +76,7 @@ describe('SkillRequirementsList', () => {
   it('shows Planned rather than Level needed for an untrained prereq an open plan already targets', () => {
     render(
       <SkillRequirementsList
+        skillTypeID={1}
         prereqs={[
           { typeID: 3300, name: 'Spaceship Command', level: 2, trained: false, planned: true },
         ]}
@@ -85,6 +92,7 @@ describe('SkillRequirementsList', () => {
     const planEntries = [{ skillTypeID: 1, targetLevel: 5 }];
     render(
       <SkillRequirementsList
+        skillTypeID={1}
         prereqs={[
           { typeID: 3300, name: 'Spaceship Command', level: 1, trained: true, planned: false },
         ]}
@@ -101,6 +109,7 @@ describe('SkillRequirementsList', () => {
   it('groups skills and items under the level each needs, an item name opening its Item Detail', () => {
     render(
       <SkillRequirementsList
+        skillTypeID={1}
         prereqs={[]}
         unlocks={[{ typeID: 3301, name: 'Destroyer', level: 4 }]}
         itemUnlocks={[
@@ -127,7 +136,9 @@ describe('SkillRequirementsList', () => {
       level: i < 10 ? 1 : 3,
       kind: 'module',
     }));
-    render(<SkillRequirementsList prereqs={[]} unlocks={[]} itemUnlocks={itemUnlocks} />);
+    render(
+      <SkillRequirementsList skillTypeID={1} prereqs={[]} unlocks={[]} itemUnlocks={itemUnlocks} />
+    );
 
     const level1 = screen.getByRole('button', { name: /Level 1/ });
     expect(level1).toHaveAttribute('aria-expanded', 'false');
