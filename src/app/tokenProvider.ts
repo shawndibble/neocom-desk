@@ -28,7 +28,9 @@ export function isTotalAuthFailure(err: unknown): boolean {
 /**
  * `getValidAccessToken`, plus: a dead grant is published to the auth-failure
  * store, a live one clears that character's stale failure. Rethrows unchanged
- * either way — callers must keep seeing the original error.
+ * either way — callers must keep seeing the original error. The dead-grant report
+ * also arrives via `auth/deadGrantSignal` for every caller; the overlap is
+ * idempotent and kept so this path works without the shell's subscription.
  */
 export async function getAccessTokenReportingFailures(characterId: number): Promise<string> {
   try {
