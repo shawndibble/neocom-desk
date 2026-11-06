@@ -129,6 +129,10 @@ beforeEach(async () => {
   await db.tokens.clear();
   await db.settings.clear();
   await db.esiCache.clear();
+  // The History tab now merges the wallet archive, so fills archived by an earlier test would leak in.
+  await db.walletTransactionArchive.clear();
+  await db.walletJournalArchive.clear();
+  await db.walletArchiveCoverage.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
 
