@@ -708,7 +708,8 @@ describe('Skills', () => {
     const unlocksHeading = await within(dialog).findByText('Unlocks');
     const unlocksSection = unlocksHeading.closest('section')!;
     expect(within(unlocksSection).getByText('Frigate')).toBeInTheDocument();
-    expect(within(unlocksSection).getByText('Level 3')).toBeInTheDocument();
+    // The level row names the level; this character has trained it.
+    expect(within(unlocksSection).getByRole('button', { name: /^Level 3/ })).toBeInTheDocument();
   });
 
   it('does not render a tooltip bubble for a skill row with no description', async () => {
