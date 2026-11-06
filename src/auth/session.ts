@@ -834,7 +834,7 @@ async function completeIntentLogin(
 // and that rotation is coming for native (PKCE) clients like this one; they
 // don't say whether the old token dies on use. If it does, two concurrent
 // refreshes with one token would fail the second as `invalid_grant`, which
-// reads as a dead grant (`deadGrantSignal.ts`). Serialising is cheap
+// reads as a dead grant (`deadGrantSignal.ts`, `app/tokenProvider.ts`). Serialising is cheap
 // insurance either way, and saves the duplicate round trip.
 const inflightRefresh = new Map<number, Promise<string>>();
 
@@ -873,7 +873,8 @@ export function getValidAccessToken(characterId: number, config?: SsoConfig): Pr
     try {
       tokens = await refreshToken({ clientId, refreshToken: record.refreshToken });
     } catch (err) {
-      // Every caller needs the re-login prompt, not just the ESI client.
+      // Every caller needs the re-login prompt, not just the ESI client. Match on the
+      // code, never the status (same rule as `app/tokenProvider.ts` isTotalAuthFailure).
       if (err instanceof AuthError && err.code === 'invalid_grant') emitDeadGrant(characterId);
       throw err;
     }
