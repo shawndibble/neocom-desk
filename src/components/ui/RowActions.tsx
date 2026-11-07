@@ -436,12 +436,18 @@ export function RowMoreActions({
   size = 'row',
   label,
   focusTarget = false,
+  hints = true,
 }: {
   className?: string;
   /** The button's accessible name, when "More actions for {name}" is not the wording ("Settings for Wallet"). */
   label?: string;
   /** Marks the button as the place focus returns to (`data-focus-target`). */
   focusTarget?: boolean;
+  /**
+   * `false` keeps both row tips (the one-time hint and the menu footer) off this
+   * ⋮ and unspent, for a host that is not a row (an Overview widget card).
+   */
+  hints?: boolean;
   /** `ghost` draws the hairline border, for a ⋮ that stands beside a `Button` rather than inside a row. */
   variant?: Extract<IconButtonVariant, 'ghost' | 'plain'>;
   /** `sm` matches `Button size="sm"`'s height. */
@@ -452,7 +458,8 @@ export function RowMoreActions({
   const [tip, setTip] = useState(false);
   // Only once a pilot is logged in: never on /login, where no Character exists yet.
   const loggedIn = useCharacterCount() > 0;
-  const [hintShown, dismissHint] = useOneTimeHint(ROW_HINT, actions !== null && loggedIn);
+  const tips = hints && loggedIn;
+  const [hintShown, dismissHint] = useOneTimeHint(ROW_HINT, actions !== null && tips);
   const context = useTouchContext();
   if (!actions) return null;
   const onOpenChange = (open: boolean) => {
@@ -460,8 +467,7 @@ export function RowMoreActions({
       if (hintShown) dismissHint();
       // Counted per open, but the footer stays for the open that earned it.
       const { value, hydrated } = useHintCounts.getState();
-      const earned =
-        loggedIn && hydrated && hintSeenCount(value, ROW_MENU_TIP) < ROW_MENU_TIP_OPENS;
+      const earned = tips && hydrated && hintSeenCount(value, ROW_MENU_TIP) < ROW_MENU_TIP_OPENS;
       setTip(earned);
       if (earned) recordHintSeen(ROW_MENU_TIP);
     }
