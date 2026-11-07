@@ -1,7 +1,7 @@
 /**
- * Build Opportunities (issue #642): ranks every manufacturing blueprint the
- * chosen character(s) own by ISK/hour, owned-materials-adjusted, at the
- * default trade hub — the same seeding/sorting/costing layer over
+ * Build Opportunities (issue #642): ranks every manufacturing blueprint and
+ * reaction formula (issue #5990) the chosen character(s) own by ISK/hour,
+ * owned-materials-adjusted, at the default trade hub — the same seeding/sorting/costing layer over
  * `computeBuildPlan`/`buildVsBuy` that Build Plan Compare already prices
  * plans with, just run over every owned blueprint instead of a hand-picked
  * set. Selected rows seed real Build Plans into Compare via `onAddToCompare`.
@@ -29,7 +29,6 @@ import {
   Modal,
   Panel,
   Spinner,
-  StatChip,
   type DataTableColumn,
   Checkbox,
   ColumnPickerMenu,
@@ -53,8 +52,15 @@ import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from '
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { formatPercent, numericCell } from './format';
 import { MobileOpportunityList } from './MobileOpportunityList';
-import { OPPORTUNITIES_DEFAULT_SORT, OPPORTUNITIES_SORT_KEY } from './opportunitiesUrl';
 import {
+  OPPORTUNITIES_ACTIVITY_KEY,
+  OPPORTUNITIES_ACTIVITY_PARAM,
+  OPPORTUNITIES_DEFAULT_SORT,
+  OPPORTUNITIES_SORT_KEY,
+} from './opportunitiesUrl';
+import { OpportunityBlueprintChip } from './OpportunityBlueprintChip';
+import {
+  matchesActivityFilter,
   matchesStockFilter,
   ORDER_DEPTH_RANK,
   ORDER_DEPTH_TONE,
@@ -65,6 +71,7 @@ import type { OwnedStockSnapshot } from './ownedStockDetection';
 import {
   AUTO_RECALCULATE_MAX,
   hubForCharacter,
+  isReaction,
   type OpportunityPlanSeed,
   type OpportunityRow,
 } from './opportunities';
@@ -82,7 +89,7 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { useIndustryCharacterFilter } from './industryCharacterFilter';
 import { useColumnVisibility } from '@/lib/columnVisibility';
-import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import { useUrlParam, useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { enumParam } from '@/lib/urlState';
 import { OwnedBlueprintsPanel } from './OwnedBlueprintsPanel';
 import { CorpProjectsPanel } from './corpProjects/CorpProjectsPanel';
@@ -153,9 +160,16 @@ const SORT_VALUE = {
 const VIEW_PARAM = enumParam(['ranked', 'owned', 'corp'] as const, 'ranked');
 /** "Use my stock" (issue #2847): narrow Ranked to builds owned stock covers. */
 const STOCK_PARAM = enumParam(['any', 'mostly', 'full'] as const, 'any');
+/** Ranked's two row filters, read and written as one so Reset clears both in one URL write. */
+const FILTER_PARAMS = {
+  'opps.stock': STOCK_PARAM,
+  [OPPORTUNITIES_ACTIVITY_KEY]: OPPORTUNITIES_ACTIVITY_PARAM,
+};
 
 /** Module-level so the table's windowing sees one stable function. */
 const opportunityRowKey = (row: OpportunityRow) => row.candidate.id;
+const opportunityRowClassName = (row: OpportunityRow) =>
+  row.reactionLocation ? 'text-text-dim' : undefined;
 
 export function OpportunitiesPanel({
   catalog,
@@ -177,7 +191,9 @@ export function OpportunitiesPanel({
   const { candidates: characterCandidates, namesById: characterNames } = useAccountCharacters();
 
   const [urlView, setView] = useUrlParam('opps.view', VIEW_PARAM);
-  const [stockFilter, setStockFilter] = useUrlParam('opps.stock', STOCK_PARAM);
+  const [filters, setFilters] = useUrlParams(FILTER_PARAMS);
+  const stockFilter = filters['opps.stock'];
+  const activityFilter = filters[OPPORTUNITIES_ACTIVITY_KEY];
   // Industry's one page-wide filter; its picker rides in the Industry `PageHeader`.
   const [characterFilter] = useIndustryCharacterFilter();
   const {
@@ -293,7 +309,10 @@ export function OpportunitiesPanel({
   const rows = useMemo(
     () =>
       allRows
-        .filter((row) => matchesStockFilter(row, stockFilter))
+        .filter(
+          (row) =>
+            matchesActivityFilter(row, activityFilter) && matchesStockFilter(row, stockFilter)
+        )
         .map((row) => ({
           ...row,
           vs90d: priceVsMedianFor(
@@ -302,7 +321,7 @@ export function OpportunitiesPanel({
             row.candidate.catalogEntry.productTypeID
           ),
         })),
-    [allRows, stockFilter, priceVsMedian]
+    [allRows, activityFilter, stockFilter, priceVsMedian]
   );
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   function toggleSelected(id: string) {
@@ -454,18 +473,7 @@ export function OpportunitiesPanel({
       header: t('industry.opportunitiesBlueprint'),
       width: '20ch',
       sortValue: SORT_VALUE.blueprint,
-      render: (row) => {
-        const original = row.candidate.blueprint.runs === -1;
-        return (
-          <StatChip
-            label={original ? t('industry.bpo') : t('industry.bpc')}
-            value={
-              original ? t('industry.opportunitiesUnlimitedRuns') : row.candidate.blueprint.runs
-            }
-            tone={original ? 'accent' : 'default'}
-          />
-        );
-      },
+      render: (row) => <OpportunityBlueprintChip candidate={row.candidate} />,
     },
     {
       id: 'unitMargin',
@@ -479,12 +487,15 @@ export function OpportunitiesPanel({
         return margin !== null ? iskToneClass(margin) : undefined;
       },
       render: (row) =>
-        numericCell(
-          unitMargin(row),
-          // Tap: the figure is inert — the row's own controls are buttons of their own.
-          (v) => <IskAmount value={v} decimals={0} />,
-          unknown
-        ),
+        // Blank, not "unknown": the ISK/hour cell says what to do (issue #5990).
+        row.reactionLocation
+          ? null
+          : numericCell(
+              unitMargin(row),
+              // Tap: the figure is inert — the row's own controls are buttons of their own.
+              (v) => <IskAmount value={v} decimals={0} />,
+              unknown
+            ),
     },
     {
       id: 'margin',
@@ -493,7 +504,8 @@ export function OpportunitiesPanel({
       align: 'right',
       className: 'tabular-nums',
       sortValue: SORT_VALUE.margin,
-      render: (row) => numericCell(row.result.marginPct, formatPercent, unknown),
+      render: (row) =>
+        row.reactionLocation ? null : numericCell(row.result.marginPct, formatPercent, unknown),
     },
     {
       id: 'vs90d',
@@ -547,12 +559,14 @@ export function OpportunitiesPanel({
       cellClassName: (row) =>
         row.result.iskPerHour !== null ? iskToneClass(row.result.iskPerHour) : undefined,
       render: (row) =>
-        numericCell(
-          row.result.iskPerHour,
-          // Tap: the figure is inert — the row's own controls are buttons of their own.
-          (v) => <IskAmount value={v} decimals={0} />,
-          unknown
-        ),
+        row.reactionLocation
+          ? t('industry.opportunitiesSetReactionLocation')
+          : numericCell(
+              row.result.iskPerHour,
+              // Tap: the figure is inert — the row's own controls are buttons of their own.
+              (v) => <IskAmount value={v} decimals={0} />,
+              unknown
+            ),
     },
     {
       id: 'orderDepth',
@@ -636,16 +650,20 @@ export function OpportunitiesPanel({
   const empty = ownsNoBlueprints
     ? { title: t('industry.opportunitiesEmptyTitle'), hint: t('industry.opportunitiesEmptyHint') }
     : {
-        title: t('industry.opportunitiesNoManufacturingTitle'),
-        hint: t('industry.opportunitiesNoManufacturingHint'),
+        title: t('industry.opportunitiesNothingRankableTitle'),
+        hint: t('industry.opportunitiesNothingRankableHint'),
       };
+  const ownsReactions = useMemo(() => candidates.some(isReaction), [candidates]);
   const meta = hideFilters ? undefined : (
     <OpportunitiesFilterBar
       view={view}
       onViewChange={setView}
       showCorpProjects={corpOptionShown}
       stockFilter={stockFilter}
-      onStockFilterChange={setStockFilter}
+      onStockFilterChange={(next) => setFilters({ 'opps.stock': next })}
+      activityFilter={activityFilter}
+      onActivityFilterChange={(next) => setFilters({ [OPPORTUNITIES_ACTIVITY_KEY]: next })}
+      showActivityFilter={ownsReactions || activityFilter !== 'all'}
     />
   );
   const title = isDesktop ? t('industry.opportunitiesTitle') : undefined;
@@ -782,12 +800,27 @@ export function OpportunitiesPanel({
             hint={t('industry.opportunitiesNeedsRefreshHint')}
             className="py-8"
           />
-        ) : stockFilter !== 'any' && rows.length === 0 && allRows.length > 0 ? (
+        ) : (stockFilter !== 'any' || activityFilter !== 'all') &&
+          rows.length === 0 &&
+          allRows.length > 0 ? (
           <EmptyState
-            title={t('industry.opportunitiesStockEmptyTitle')}
-            hint={t('industry.opportunitiesStockEmptyHint')}
+            title={t(
+              activityFilter === 'all'
+                ? 'industry.opportunitiesStockEmptyTitle'
+                : 'industry.opportunitiesFilterEmptyTitle'
+            )}
+            hint={t(
+              activityFilter === 'all'
+                ? 'industry.opportunitiesStockEmptyHint'
+                : 'industry.opportunitiesFilterEmptyHint'
+            )}
             action={
-              <Button size="sm" onClick={() => setStockFilter('any')}>
+              <Button
+                size="sm"
+                onClick={() =>
+                  setFilters({ 'opps.stock': 'any', [OPPORTUNITIES_ACTIVITY_KEY]: 'all' })
+                }
+              >
                 {t('common.resetFilters')}
               </Button>
             }
@@ -800,6 +833,7 @@ export function OpportunitiesPanel({
               columns={shownColumns}
               rows={rows}
               rowKey={opportunityRowKey}
+              rowClassName={opportunityRowClassName}
               virtualize="auto"
               label={t('industry.opportunitiesTableLabel')}
               onRowClick={startPlanFromRow}

@@ -17,6 +17,9 @@ describe('OpportunitiesFilterBar', () => {
         view="ranked"
         onViewChange={noop}
         stockFilter="any"
+        activityFilter="all"
+        onActivityFilterChange={noop}
+        showActivityFilter={false}
         onStockFilterChange={noop}
         showCorpProjects
       />
@@ -36,6 +39,9 @@ describe('OpportunitiesFilterBar', () => {
         view="ranked"
         onViewChange={noop}
         stockFilter="any"
+        activityFilter="all"
+        onActivityFilterChange={noop}
+        showActivityFilter={false}
         onStockFilterChange={noop}
         showCorpProjects={false}
       />
@@ -50,6 +56,9 @@ describe('OpportunitiesFilterBar', () => {
         view="corp"
         onViewChange={noop}
         stockFilter="any"
+        activityFilter="all"
+        onActivityFilterChange={noop}
+        showActivityFilter={false}
         onStockFilterChange={noop}
         showCorpProjects
       />
@@ -67,6 +76,9 @@ describe('stock filter', () => {
         view="ranked"
         onViewChange={noop}
         stockFilter="any"
+        activityFilter="all"
+        onActivityFilterChange={noop}
+        showActivityFilter={false}
         onStockFilterChange={onStock}
         showCorpProjects={false}
       />
@@ -88,6 +100,9 @@ describe('stock filter', () => {
         view="ranked"
         onViewChange={noop}
         stockFilter="full"
+        activityFilter="all"
+        onActivityFilterChange={noop}
+        showActivityFilter={false}
         onStockFilterChange={noop}
         showCorpProjects={false}
       />
@@ -99,6 +114,50 @@ describe('stock filter', () => {
     await userEvent.click(trigger);
     expect(await screen.findByRole('option', { name: 'Fully covered' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '75%+ covered' })).toBeInTheDocument();
+  });
+});
+
+describe('activity filter (issue #5990)', () => {
+  it('offers Manufacturing / Reactions on Ranked once a reaction formula is owned, and sets it', () => {
+    desktop.value = true;
+    const onActivity = vi.fn();
+    render(
+      <OpportunitiesFilterBar
+        view="ranked"
+        onViewChange={noop}
+        stockFilter="any"
+        onStockFilterChange={noop}
+        activityFilter="all"
+        onActivityFilterChange={onActivity}
+        showActivityFilter
+        showCorpProjects={false}
+      />
+    );
+    const group = screen.getByRole('group', { name: 'Activity' });
+    expect(Array.from(group.querySelectorAll('button')).map((b) => b.textContent)).toEqual([
+      'All',
+      'Manufacturing',
+      'Reaction',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Reaction' }));
+    expect(onActivity).toHaveBeenCalledWith('reaction');
+  });
+
+  it('leaves the filter out when there is nothing for it to choose', () => {
+    desktop.value = true;
+    render(
+      <OpportunitiesFilterBar
+        view="ranked"
+        onViewChange={noop}
+        stockFilter="any"
+        onStockFilterChange={noop}
+        activityFilter="all"
+        onActivityFilterChange={noop}
+        showActivityFilter={false}
+        showCorpProjects={false}
+      />
+    );
+    expect(screen.queryByRole('group', { name: 'Activity' })).toBeNull();
   });
 });
 

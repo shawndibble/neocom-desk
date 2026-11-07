@@ -1,8 +1,9 @@
 /**
  * The Opportunities panel's header controls (issue #4253): the Ranked / Owned
- * view picker, the Character filter and the "Use my stock" filter. Desktop
- * lays them out as segmented controls beside the title; below `lg` the view
- * picker is the title itself.
+ * view picker, the Character filter, the Manufacturing / Reactions filter
+ * (issue #5990) and the "Use my stock" filter. Desktop lays them out as
+ * segmented controls beside the title; below `lg` the view picker is the
+ * title itself.
  */
 import { useTranslation } from 'react-i18next';
 import {
@@ -14,7 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import { MOSTLY_COVERED_PCT } from './opportunityMetrics';
+import { activityFilterOptions, MOSTLY_COVERED_PCT } from './opportunityMetrics';
+import type { OpportunitiesActivityFilter } from './opportunitiesUrl';
 
 export type OpportunitiesView = 'ranked' | 'owned' | 'corp';
 export type OpportunitiesStockFilter = 'any' | 'mostly' | 'full';
@@ -120,8 +122,37 @@ function StockFilterControl({
   );
 }
 
+function ActivityFilterControl({
+  value,
+  onChange,
+}: {
+  value: OpportunitiesActivityFilter;
+  onChange: (next: OpportunitiesActivityFilter) => void;
+}) {
+  const { t } = useTranslation();
+  const isDesktop = useIsDesktop();
+  const options = activityFilterOptions(t);
+  const label = t('industry.ownedBlueprintsActivityLabel');
+  return isDesktop ? (
+    <SegmentedControl label={label} size="sm" value={value} onChange={onChange} options={options} />
+  ) : (
+    <Select value={value} onValueChange={(next) => onChange(next as OpportunitiesActivityFilter)}>
+      <SelectTrigger size="sm" aria-label={label} className="min-w-0">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 /**
- * The panel's `meta` slot: view toggle (desktop) and stock filter. The
+ * The panel's `meta` slot: view toggle (desktop), activity and stock filters. The
  * Character filter is the Industry page's own, in its `PageHeader`.
  */
 export function OpportunitiesFilterBar({
@@ -129,19 +160,31 @@ export function OpportunitiesFilterBar({
   onViewChange,
   stockFilter,
   onStockFilterChange,
+  activityFilter,
+  onActivityFilterChange,
+  showActivityFilter,
   showCorpProjects,
 }: {
   view: OpportunitiesView;
   onViewChange: (next: OpportunitiesView) => void;
   stockFilter: OpportunitiesStockFilter;
   onStockFilterChange: (next: OpportunitiesStockFilter) => void;
+  activityFilter: OpportunitiesActivityFilter;
+  onActivityFilterChange: (next: OpportunitiesActivityFilter) => void;
+  /** Ranked holds a reaction formula (or the filter is off its default): with none, the filter would choose nothing. */
+  showActivityFilter: boolean;
   /** The Corp projects view exists for this Character (the hide rule); it is absent otherwise. */
   showCorpProjects: boolean;
 }) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
-  const stockFilterControl = view === 'ranked' && (
-    <StockFilterControl value={stockFilter} onChange={onStockFilterChange} />
+  const rankedFilters = view === 'ranked' && (
+    <>
+      {showActivityFilter && (
+        <ActivityFilterControl value={activityFilter} onChange={onActivityFilterChange} />
+      )}
+      <StockFilterControl value={stockFilter} onChange={onStockFilterChange} />
+    </>
   );
   return isDesktop ? (
     <span className="flex flex-wrap items-center gap-2">
@@ -158,10 +201,10 @@ export function OpportunitiesFilterBar({
             : []),
         ]}
       />
-      {stockFilterControl}
+      {rankedFilters}
     </span>
   ) : (
     // One row with the view picker and the actions on a phone; none on All owned.
-    stockFilterControl || null
+    rankedFilters || null
   );
 }
