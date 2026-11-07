@@ -27,19 +27,15 @@ const TABS = Object.values(PAGE_TABS).flatMap((page) =>
 );
 
 /**
- * Wait until the page has stopped loading: no spinner and no open-ended
- * progress bar. Some routes say "loading" with a bar rather than a spinner,
- * and show a different row once it ends: Item search shows its filter row
- * while the contract index downloads, then swaps it for the "couldn't reach"
- * state when the fixture's 404 lands. Measuring before that counts a funnel
- * that is about to unmount.
+ * No spinner and no open-ended progress bar in `main`. Item search loads behind a bar,
+ * not a spinner, and its filter row unmounts when the fixture's 404 lands.
  */
 async function waitForPageSettled(page: Page): Promise<void> {
   await expect(page.locator('main')).toBeVisible();
-  await expect(page.locator('main .animate-spin')).toHaveCount(0, { timeout: 8000 });
-  await expect(page.locator('main [role="progressbar"]:not([aria-valuenow])')).toHaveCount(0, {
-    timeout: 8000,
-  });
+  // One locator, so neither indicator can hand over to the other between two checks.
+  await expect(
+    page.locator('main .animate-spin, main [role="progressbar"]:not([aria-valuenow])')
+  ).toHaveCount(0, { timeout: 8000 });
 }
 
 for (const url of [...new Set([...ROUTES, ...TABS])]) {
