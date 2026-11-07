@@ -14224,11 +14224,11 @@
             },
             "jumpClone": {
               "term": "Jump clone",
-              "definition": "A second body kept in another station. Jumping into it moves you there at once, without your ship or items, and the next jump waits 24 hours."
+              "definition": "A second body kept in another station. Jumping into it moves you there at once, without your ship or items, and the next jump waits 24 hours, less with training."
             },
             "implants": {
               "term": "Implants",
-              "definition": "Plug-ins for a clone’s head that raise its attributes (how fast it trains) or boost a skill. They stay in that clone, and are lost if your pod is destroyed."
+              "definition": "Plug-ins for a clone’s head that raise its attributes (how fast it trains) or improve how a ship or module performs. They stay in that clone, and are lost if your pod is destroyed."
             },
             "blueprints": {
               "term": "BPO / BPC",
@@ -14239,7 +14239,7 @@
               "definition": "Material Efficiency and Time Efficiency, a blueprint’s research levels: higher ME needs fewer materials per build, higher TE builds faster."
             },
             "tradeHub": {
-              "term": "Trade hub (Jita 4-4)",
+              "term": "Trade Hub (Jita 4-4)",
               "definition": "A station where most of a region’s buying and selling happens. Jita IV - Moon 4 - Caldari Navy Assembly Plant is by far the largest."
             },
             "collateral": {
@@ -14266,7 +14266,7 @@
           "securityLowsec": "Lowsec (0.4 to 0.1): no CONCORD. Sentry guns at stargates and stations fire on an attacker; elsewhere in the system, no NPC responds.",
           "securityNullsec": "Nullsec (0.0 and below): no NPC responds to an attack. Players claim much of it, and can deploy bubbles that stop a ship from warping.",
           "securityWormhole": "Wormhole space: no stargates, and the wormholes that lead in open and close. No NPC responds to an attack, bubbles are allowed, and Local lists a pilot only once they speak.",
-          "securityRoute": "<route>Travel › Route Safety</route> lists every system on a route with its security and the ships destroyed there in the last hour. Its route preference “{{preference}}” picks higher-security systems, even when the route is longer.",
+          "securityRoute": "<route>Travel › Route Safety</route> lists every system on a route with its security and the ships destroyed there in the last hour. In its Route rules, the Route preference “{{preference}}” picks higher-security systems, even when the route is longer.",
           "learnMore": "<uni>EVE University’s New Player Index</uni> explains the game’s core ideas, and its <money>Making Money</money> page compares ways to earn ISK. Account, billing and in-game problems go to <ccp>CCP’s support site</ccp>, not to Neocom Desk."
         },
         "delete": "Settings › Log out & delete › Delete all data removes every Character's synced data from our server, then erases this device. Another logged-in device keeps its own copy and can sync it back. Log out of all characters clears this device only. Delete all data also offers to leave your Communities (ticked by default), which deletes what you shared there, plus your Requests and Pledges, right away; untick it to stay in them. A Community's admin can't leave, so a Community you run is skipped: hand it over or delete it, which deletes it for every Member. A Character with no sync for 90 days is removed from its Communities automatically. SRP Claims and Corp Tax Book lines belong to the corporation's records and stay with it; How long is my data stored? says when they go.",

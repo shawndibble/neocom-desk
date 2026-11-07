@@ -319,7 +319,7 @@ describe('FaqPanel: New to EVE?', () => {
       'Implants',
       'BPO / BPC',
       'ME / TE',
-      'Trade hub (Jita 4-4)',
+      'Trade Hub (Jita 4-4)',
       'Collateral',
       'D-Scan',
       'Local',
@@ -341,9 +341,9 @@ describe('FaqPanel: New to EVE?', () => {
     expect(hrefOf('Travel › Route Safety')).toBe('/travel/route');
   });
 
-  it('names the Route preference by the label Route Safety shows', () => {
+  it('names the Route preference by the label Route rules shows', () => {
     renderFaq();
-    expect(screen.getByText(/Its route preference “Prefer safer” picks/)).toBeInTheDocument();
+    expect(screen.getByText(/the Route preference “Safer” picks/)).toBeInTheDocument();
   });
 
   it('sends the rest of the game to EVE University and CCP', () => {

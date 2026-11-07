@@ -22,6 +22,7 @@ import {
   WALLET_TABS,
 } from '@/app/pageTabs';
 import { SHIPS_TABS } from '@/features/fittings/shipsTabs';
+import { ROUTE_PREFERENCE_SHORT_LABEL_KEYS } from '@/features/route/routePreferences';
 import {
   RETENTION_GROUPS,
   WHAT_WE_STORE_GROUPS,
@@ -233,8 +234,8 @@ export function FaqPanel() {
           <p>
             <Trans
               i18nKey={`${NEW_TO_EVE}.securityRoute`}
-              // The label Route Safety shows, so the answer can't drift from it.
-              values={{ preference: t('contractSearch.routePreference.prefer-highsec') }}
+              // Route rules' own label, so the answer can't drift from it.
+              values={{ preference: t(ROUTE_PREFERENCE_SHORT_LABEL_KEYS['prefer-highsec']) }}
               components={{ route: <Link to={tabPath(TRAVEL_TABS, 'route')} className={LINK} /> }}
             />
           </p>
