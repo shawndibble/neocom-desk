@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   focusRingInsetClassName,
@@ -31,20 +32,14 @@ export function HullPickerRow({
   onStart,
 }: HullPickerRowProps) {
   const { t } = useTranslation();
+  const statusId = useId();
   return (
     <button
       type="button"
       aria-pressed={selected}
-      aria-label={
-        mark
-          ? t('ships.tree.tileLabel', {
-              name: hull.name,
-              status: mark.needsOmega
-                ? `${flyLabel(t, mark.status)}, ${t('ships.tree.omega')}`
-                : flyLabel(t, mark.status),
-            })
-          : undefined
-      }
+      // The status describes, never renames: the name stays the hull's alone.
+      aria-label={hull.name}
+      aria-describedby={mark ? statusId : undefined}
       onClick={onSelect}
       onDoubleClick={onStart}
       className={cx(
@@ -64,6 +59,13 @@ export function HullPickerRow({
       {mark?.needsOmega && (
         <span aria-hidden="true" className="font-serif font-bold text-omega">
           Ω
+        </span>
+      )}
+      {mark && (
+        <span id={statusId} className="sr-only">
+          {mark.needsOmega
+            ? `${flyLabel(t, mark.status)}, ${t('ships.tree.omega')}`
+            : flyLabel(t, mark.status)}
         </span>
       )}
     </button>

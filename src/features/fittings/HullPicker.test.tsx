@@ -126,11 +126,12 @@ describe('HullPicker', () => {
       );
       render(<HullPicker catalogue={catalogue} onStart={() => {}} />);
       search('r');
-      const rifter = screen.getByRole('button', { name: 'Rifter — Can fly' });
+      const rifter = screen.getByRole('button', { name: 'Rifter', description: 'Can fly' });
       expect(rifter.querySelector('[data-shape="dot"]')).toBeTruthy();
       expect(rifter.textContent).not.toContain('Ω');
       const vexor = screen.getByRole('button', {
-        name: 'Vexor — 1h 0m to fly, Needs an Omega clone',
+        name: 'Vexor',
+        description: '1h 0m to fly, Needs an Omega clone',
       });
       expect(vexor.querySelector('[data-shape="ring"]')).toBeTruthy();
       expect(vexor.textContent).toContain('Ω');
