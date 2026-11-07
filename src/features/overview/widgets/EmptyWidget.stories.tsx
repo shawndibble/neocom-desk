@@ -39,7 +39,10 @@ function tile(id: string, kind: WidgetModel['kind']): WidgetModel {
 function Board(): ReactNode {
   const { t } = useTranslation();
   const cards: [WidgetModel, KindView][] = [
-    [tile('yield', 'miningYield'), emptyView('/mining')],
+    [
+      tile('yield', 'miningYield'),
+      emptyView('/mining', t('overview.widgets.miningYield.emptyLink')),
+    ],
     [tile('survey', 'survey'), emptyView('/mining/survey', t('overview.widgets.survey.emptyLink'))],
     [
       tile('route', 'routeSafety'),

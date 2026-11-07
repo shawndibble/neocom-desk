@@ -617,6 +617,21 @@ describe('miningYield (world)', () => {
     expect(withUnits.table!.columns.map((c) => c.key)).toEqual(['ore', 'isk', 'share', 'units']);
     expect(text(withUnits.table!.rows[0]!.cells[2])).toBe('75%');
   });
+
+  it('links an empty yield to the Mining page', () => {
+    const empty = ok({
+      rows: [],
+      typeNames: new Map(),
+      trackedIds: [91],
+      reauthIds: [],
+      oldestSaved: null,
+      fetchedAt: new Date(NOW),
+    });
+    const view = buildView('miningYield', { miningYield: empty }, ctx({ range: 7 }));
+    expect(view.status.isEmpty).toBe(true);
+    expect(view.to).toBe('/mining');
+    expect(view.emptyLinkLabel).toBe('overview.widgets.miningYield.emptyLink');
+  });
 });
 
 describe('industry job slots', () => {

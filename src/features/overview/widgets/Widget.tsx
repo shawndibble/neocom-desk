@@ -419,7 +419,7 @@ function WidgetFrame({
     body = (
       <div className="grid gap-2 p-3 text-[0.8125rem]">
         <b>{view.emptyMessage ?? t(keys.emptyMessageKey)}</b>
-        {/* What the kind is for, so a new pilot's empty card explains itself. Remove stays in ⋮. */}
+        {/* What the kind is for, so a new pilot's empty card explains itself. */}
         {!view.emptyHealthy && (
           <span className="text-text-dim">{view.emptyHint ?? t(kind.descKey)}</span>
         )}

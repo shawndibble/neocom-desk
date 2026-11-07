@@ -374,6 +374,7 @@ export const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCha
       to,
       statusOf(feed, { needsPermission, isEmpty: !needsPermission && rows.length === 0 })
     ),
+    emptyLinkLabel: t('overview.widgets.miningYield.emptyLink'),
     fetchedAt: data.fetchedAt,
     number: {
       value: formatIskCompact(average),

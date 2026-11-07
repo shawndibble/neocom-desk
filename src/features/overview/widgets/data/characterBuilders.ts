@@ -275,6 +275,8 @@ export const comingUp: Builder = (feeds, { t, now, calendarEvents }) => {
       })
     ),
     emptyMessage: all ? t('overview.widgets.comingUp.emptyAll') : undefined,
+    // The description names accepted events only; under All it would contradict the message.
+    emptyHealthy: all,
     fetchedAt: data.fetchedAt,
     number: next
       ? {

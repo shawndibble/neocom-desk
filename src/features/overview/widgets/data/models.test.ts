@@ -481,6 +481,7 @@ describe('comingUp', () => {
       calendar: ok({ events: [], needsReauth: false, fetchedAt: new Date(NOW) }),
     };
     expect(buildView('comingUp', feeds, ctx()).emptyHint).toBeUndefined();
+    expect(buildView('comingUp', feeds, ctx({ calendarEvents: 'all' })).emptyHealthy).toBe(true);
   });
 });
 

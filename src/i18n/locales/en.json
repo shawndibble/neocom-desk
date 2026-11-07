@@ -5686,6 +5686,7 @@
         "title": "Mining yield",
         "description": "ISK per day from your mining",
         "empty": "No mining recorded in this range.",
+        "emptyLink": "Open Mining",
         "col": {
           "ore": "Ore",
           "isk": "ISK",

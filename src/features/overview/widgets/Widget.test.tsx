@@ -706,12 +706,7 @@ describe('WidgetGrid', () => {
     const onAdd = vi.fn();
     render(
       <MemoryRouter>
-        <WidgetGrid
-          widgets={[]}
-
-          onAdd={onAdd}
-          onRoles={() => undefined}
-        />
+        <WidgetGrid widgets={[]} onAdd={onAdd} onRoles={() => undefined} />
       </MemoryRouter>
     );
     expect(screen.getByText('Your Overview is empty')).toBeInTheDocument();
