@@ -1,8 +1,9 @@
 /**
- * The two lists of Fittings the library offers — the active Character's saved
- * ones (My Fittings, Dexie) and their In-game ones (ESI) — read once here so
- * the tabbed panels and the Start screen's single searchable list show the
- * same rows.
+ * The Fittings the library offers — the active Character's saved ones (My
+ * Fittings, Dexie), their In-game ones (ESI), their Active Fit (the ship they
+ * fly, read off their assets) and the ones shared into their Communities —
+ * read once here so the tabbed panels and the Start screen's single
+ * searchable list show the same rows.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,12 +27,20 @@ import type { CachedResult } from '@/esi/cache';
 import type { CharacterFitting } from '@/esi/endpoints';
 import { loadTypes } from '@/sde/loadSde';
 import { loadInGameFittings } from './inGameFittings';
+import { activeShipItems, isCapsuleGroup } from '@/engine/fittings/activeShip';
+import type { Fitting } from '@/engine/fittings/types';
+import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
+import { loadCharacterShip } from '@/features/character/ship';
+import { loadCharacterAssets } from '@/features/assets/assets';
+import { shipItemsToFitting } from './assetShipLocation';
 
-/** A saved or In-game Fitting as one row of the Start screen's list. */
+/** One row of the Start screen's list: a saved, In-game, Active or shared Fitting. */
 export type LibraryRow = MyFittingRow &
   (
     | { source: 'saved'; record: FittingRecord }
     | { source: 'inGame'; inGame: CharacterFitting }
+    /** The ship the Character is flying; its modules lag the game by up to an hour. */
+    | { source: 'active'; fitting: Fitting }
     | {
         source: 'shared';
         shared: SharedFittingRow;
@@ -236,4 +245,70 @@ export function sharedRows(
     sharer: sharerNames.get(shared.ownerUid) ?? null,
     communityNames: shared.communityIds.map((id) => communityName.get(id) ?? ''),
   }));
+}
+
+/** The Fitting an In-game or Active Fit row carries itself; null for a row that only has a code. */
+export function heldFitting(row: LibraryRow): Fitting | null {
+  if (row.source === 'active') return row.fitting;
+  return row.source === 'inGame' ? esiFittingToFitting(row.inGame).fitting : null;
+}
+
+/** The Active Fit's row (never grouped by hull: it leads the list). */
+export type ActiveRow = Extract<LibraryRow, { source: 'active' }>;
+
+/** The Character's Active Fit: the flown ship with the assets inside it. Null without both grants. */
+export function useActiveFitting(characterId: number | null) {
+  const { t } = useTranslation();
+  const granted = useEndpointsGranted(['getCharacterShip', 'getCharacterAssets']);
+  const [state, setState] = useState<{ forCharacter: number; row: ActiveRow | null } | null>(null);
+  const requestIdRef = useRef(0);
+
+  const refresh = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    if (characterId === null || granted !== true) {
+      // A dropped grant takes the row with it.
+      setState(null);
+      return;
+    }
+    let row: ActiveRow | null = null;
+    try {
+      const [ship, types, assets] = await Promise.all([
+        loadCharacterShip(characterId),
+        loadTypes(),
+        loadCharacterAssets(characterId),
+      ]);
+      const hull = ship ? types[String(ship.ship_type_id)] : undefined;
+      // A pod has nothing to fit; an unread asset list is not an empty ship, so no row rather than a bare hull.
+      if (ship && !isCapsuleGroup(hull?.groupID) && assets.cached && !assets.needsReauth) {
+        const hullName = typeNameOr(t, hull?.name, ship.ship_type_id);
+        const name = ship.ship_name.trim() || hullName;
+        const fitting = await shipItemsToFitting(
+          { typeId: ship.ship_type_id, name },
+          activeShipItems(assets.cached.data, ship.ship_item_id)
+        );
+        row = {
+          id: `active-${ship.ship_item_id}`,
+          name,
+          hull: hullName,
+          source: 'active',
+          fitting,
+        };
+      }
+    } catch {
+      // Offline or a failed read: no Active Fit, the rest of the list stands.
+    }
+    if (requestId === requestIdRef.current) setState({ forCharacter: characterId, row });
+  }, [characterId, granted, t]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a Character or grant change re-reads the flown ship, not a render-time derivation
+    void refresh();
+  }, [refresh]);
+
+  // A previous Character's ship is not this one's until its own lands.
+  const current = state?.forCharacter === characterId ? state : null;
+  /** Until this Character's read lands, the list waits: the row arriving late would move the pick and every row under a tap. */
+  const pending =
+    characterId !== null && (granted === undefined || (granted === true && current === null));
+  return { row: current?.row ?? null, pending, refresh };
 }

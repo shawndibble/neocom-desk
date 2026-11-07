@@ -39,7 +39,9 @@ describe('loadCharacterShipTypeId', () => {
     server.use(http.get(SHIP_URL, () => HttpResponse.json(SHIP)));
 
     expect(await loadCharacterShipTypeId(CHARACTER_ID)).toBe(22544);
-    expect((await db.esiCache.get([CHARACTER_ID, 'characterShip']))?.value).toBe(22544);
+    expect((await db.esiCache.get([CHARACTER_ID, 'characterShip:full']))?.value).toMatchObject({
+      ship_type_id: 22544,
+    });
   });
 
   it('returns null on a 403 (missing grant) WITHOUT signalling a re-auth failure', async () => {
