@@ -34,27 +34,24 @@ const CommunityPlansDialog = lazyNamed(
  * narrow header the width a second labelled button would. Owns the dialogs
  * those starts open, so every place that offers "New plan" gets the same set.
  * A host that also offers the certified start elsewhere (the no-plans card's
- * hint link) passes `certifiedOpen`/`onCertifiedOpenChange` to drive this
- * dialog rather than rendering a second one.
+ * hint link) passes `certified` to drive this dialog, not render a second one.
  */
 export function NewPlanSplitButton({
   activeCharacterId,
   remapInfo,
-  certifiedOpen: certifiedOpenProp,
-  onCertifiedOpenChange,
+  certified,
 }: {
   activeCharacterId: number;
   remapInfo: RemapAvailability | null;
-  certifiedOpen?: boolean;
-  onCertifiedOpenChange?: (open: boolean) => void;
+  certified?: { open: boolean; onOpenChange: (open: boolean) => void };
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const newPlanMenu = useOpenAfterMenu();
   const [certifiedOpenState, setCertifiedOpenState] = useState(false);
-  const certifiedOpen = certifiedOpenProp ?? certifiedOpenState;
-  const setCertifiedOpen = onCertifiedOpenChange ?? setCertifiedOpenState;
+  const certifiedOpen = certified ? certified.open : certifiedOpenState;
+  const setCertifiedOpen = certified ? certified.onOpenChange : setCertifiedOpenState;
   // `?browse=community` (the Community page's link) opens the browse straight away.
   const [communityOpen, setCommunityOpen] = useState(
     () => new URLSearchParams(location.search).get('browse') === 'community'

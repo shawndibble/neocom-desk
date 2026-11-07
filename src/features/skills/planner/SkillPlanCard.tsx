@@ -96,8 +96,7 @@ export function SkillPlanCard({
       <NewPlanSplitButton
         activeCharacterId={activeCharacterId}
         remapInfo={remapInfo}
-        certifiedOpen={certifiedOpen}
-        onCertifiedOpenChange={setCertifiedOpen}
+        certified={{ open: certifiedOpen, onOpenChange: setCertifiedOpen }}
       />
     </div>
   );
@@ -115,7 +114,11 @@ export function SkillPlanCard({
               <button
                 type="button"
                 className={inlineLinkClassName}
-                onClick={() => setCertifiedOpen(true)}
+                onClick={(e) => {
+                  // Safari doesn't focus a clicked button; the dialog returns focus here.
+                  e.currentTarget.focus();
+                  setCertifiedOpen(true);
+                }}
               />
             ),
             shipTree: <Link to="/ships/tree" className={inlineLinkClassName} />,
