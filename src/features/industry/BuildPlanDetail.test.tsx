@@ -575,7 +575,7 @@ describe('BuildPlanDetail Auto Build (issue #695)', () => {
 
     await applyBuildStrategy(user, 'Build');
 
-    expect(toastStatus()).toHaveTextContent('Build strategy applied: 2 parts built here.');
+    expect(await toastStatus()).toHaveTextContent('Build strategy applied: 2 parts built here.');
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [] });
   });
