@@ -284,6 +284,8 @@ export function FittingStartScreen({
         <button
           type="button"
           data-row-id={row.id}
+          // A list row, not a toolbar control: a second line (hull, sharer) makes it taller than Compare.
+          data-inline-height="exempt"
           aria-pressed={previewing ? isSelected : undefined}
           onClick={() => (previewing ? setSelectedId(row.id) : open(row))}
           onDoubleClick={previewing ? () => open(row) : undefined}
