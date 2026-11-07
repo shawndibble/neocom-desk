@@ -13,7 +13,8 @@ import { parseHiddenNav, parseRecentNav, pushRecentNav } from './navRail';
 export const useHiddenNav = createSyncedSetting<readonly string[]>({
   key: 'sync.navHidden',
   // Empty: a new pilot sees every page, and hides what they don't play with
-  // Customize (scope decision `New pilots see the full rail`).
+  // Customize (scope decision
+  // `20261107-004603-new-pilots-see-the-full-rail`).
   defaultValue: [],
   parse: parseHiddenNav,
 });

@@ -312,7 +312,7 @@ describe('the rail', () => {
   });
 
   it('shows every page on the rail by default', () => {
-    expect(useHiddenNav.getState().value).toEqual([]);
+    useHiddenNav.setState({ value: useHiddenNav.getInitialState().value });
     renderAt('/overview');
 
     for (const name of ['Mining', 'PI', 'Contracts', 'Mail', 'Skills', 'Market', 'Travel']) {

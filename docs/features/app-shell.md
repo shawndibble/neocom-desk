@@ -50,7 +50,7 @@ Everything around the feature pages: router and route table, the signed-in `Layo
   - `web: locked feature screen explaining a missing permission with one grant button`
   - `ios: bottom tab bar with four tabs and a More tab opening a grid of every section`
   - `ios: account switcher listing several profiles with avatars and the active one marked`
-- **Flow queries:** `web: first-run choice of which sections to show in navigation`.
+- **Flow queries:** `web: customizing which sections show in navigation`.
 - **Mobbin won't help with:** EVE Permissions and scopes, Corp Access rules.
 
 ## Routes (`src/app/App.tsx`)
