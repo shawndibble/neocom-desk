@@ -259,7 +259,7 @@ describe('BuildPlanDetail Use all / Use none', () => {
     await user.click(await screen.findByRole('button', { name: 'Use all' }));
 
     expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 100 } }]);
-    expect(toastStatus()).toHaveTextContent('Filled Have on 1 material from your assets');
+    expect(await toastStatus()).toHaveTextContent('Filled Have on 1 material from your assets');
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 0 } }]);
@@ -320,7 +320,7 @@ describe('BuildPlanDetail Use all / Use none', () => {
     await user.click(await screen.findByRole('button', { name: 'Use all' }));
 
     expect(onSourcing).not.toHaveBeenCalled();
-    expect(toastStatus()).toHaveTextContent(/^Nothing to fill/);
+    expect(await toastStatus()).toHaveTextContent(/^Nothing to fill/);
   });
 });
 
