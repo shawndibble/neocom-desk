@@ -38,7 +38,13 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { useCorpOwnedBlueprints } from './corpOwnedBlueprints';
 import { numericCell } from './format';
-import { OWNED_DEFAULT_SORT, OWNED_SORT_KEY } from './opportunitiesUrl';
+import {
+  OPPORTUNITIES_ACTIVITY_KEY,
+  OPPORTUNITIES_ACTIVITY_PARAM,
+  OWNED_DEFAULT_SORT,
+  OWNED_SORT_KEY,
+} from './opportunitiesUrl';
+import { activityFilterOptions } from './opportunityMetrics';
 import type { OpportunityPlanSeed, OpportunityRow } from './opportunities';
 import {
   OWNED_BLUEPRINT_SORT_VALUE,
@@ -73,7 +79,6 @@ const useVisibleOwnedBlueprintsColumns = createColumnVisibilitySetting({
 });
 
 const KIND_PARAM = enumParam(['all', 'bpo', 'bpc'] as const, 'all');
-const ACTIVITY_PARAM = enumParam(['all', 'manufacturing', 'reaction'] as const, 'all');
 const SEARCH_PARAM = textParam();
 const CORP_PARAM = boolParam(false);
 const ownedRowKey = (row: OwnedBlueprintRow) => row.id;
@@ -124,7 +129,10 @@ export function OwnedBlueprintsPanel({
   const isDesktop = useIsDesktop();
 
   const [kind, setKind] = useUrlParam('opps.kind', KIND_PARAM);
-  const [activity, setActivity] = useUrlParam('opps.activity', ACTIVITY_PARAM);
+  const [activity, setActivity] = useUrlParam(
+    OPPORTUNITIES_ACTIVITY_KEY,
+    OPPORTUNITIES_ACTIVITY_PARAM
+  );
   const [search, setSearch] = useUrlParam('opps.q', SEARCH_PARAM);
   const [includeCorp, setIncludeCorp] = useUrlParam('opps.corp', CORP_PARAM);
   const corp = useCorpOwnedBlueprints();
@@ -149,6 +157,11 @@ export function OwnedBlueprintsPanel({
     );
     return baseRows.map((row) => ({ ...row, iskPerHour: iskPerHourById.get(row.id) ?? null }));
   }, [baseRows, rankedRows]);
+  // Ranked's dimmed reaction rows (issue #5990): the same instruction here, not "Unknown".
+  const needsReactionLocation = useMemo(
+    () => new Set(rankedRows.filter((row) => row.reactionLocation).map((row) => row.candidate.id)),
+    [rankedRows]
+  );
   const filteredRows = useMemo(
     () => filterOwnedBlueprints(rows, { kind, activity, search }),
     [rows, kind, activity, search]
@@ -343,7 +356,9 @@ export function OwnedBlueprintsPanel({
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.iskPerHour,
       cellClassName: (row) => (row.iskPerHour !== null ? iskToneClass(row.iskPerHour) : undefined),
       render: (row) =>
-        numericCell(row.iskPerHour, (v) => <IskAmount value={v} decimals={0} />, unknown),
+        needsReactionLocation.has(row.id)
+          ? t('industry.opportunitiesSetReactionLocation')
+          : numericCell(row.iskPerHour, (v) => <IskAmount value={v} decimals={0} />, unknown),
     },
     {
       id: 'action',
@@ -465,14 +480,7 @@ export function OwnedBlueprintsPanel({
               size="sm"
               value={draft.activity}
               onChange={(next) => setDraft({ ...draft, activity: next })}
-              options={[
-                { value: 'all', label: t('industry.ownedBlueprintsAll') },
-                {
-                  value: 'manufacturing',
-                  label: t('industry.ownedBlueprintsActivity.manufacturing'),
-                },
-                { value: 'reaction', label: t('industry.ownedBlueprintsActivity.reaction') },
-              ]}
+              options={activityFilterOptions(t)}
             />
           </FilterField>
           {corp.available && (

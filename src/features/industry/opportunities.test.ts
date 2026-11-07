@@ -79,15 +79,14 @@ function owned(typeId: number, overrides: Partial<CharacterBlueprint> = {}): Cha
 }
 
 describe('buildOpportunityCandidates', () => {
-  it('excludes reaction blueprints', () => {
+  it('ranks reaction formulas beside manufacturing blueprints (issue #5990)', () => {
     const cat = catalog([catalogEntry(1, 'manufacturing'), catalogEntry(2, 'reaction')]);
     const candidates = buildOpportunityCandidates(
       new Map([[100, [owned(1), owned(2)]]]),
       new Map([[100, 'Pilot']]),
       cat
     );
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]!.catalogEntry.blueprintTypeID).toBe(1);
+    expect(candidates.map((c) => c.catalogEntry.blueprintTypeID)).toEqual([1, 2]);
   });
 
   it('excludes an owned blueprint the SDE catalog does not recognise', () => {
@@ -587,6 +586,121 @@ describe('rows price with the plan page’s settings', () => {
   });
 });
 
+describe('reaction rows (issue #5990)', () => {
+  const entry = catalogEntry(1, 'reaction');
+  const manufacturingEntry = catalogEntry(7);
+  const cat = catalog([entry, manufacturingEntry]);
+  const formula = owned(1, { material_efficiency: 0, time_efficiency: 0, runs: 15 });
+  const candidate: OpportunityCandidate = {
+    id: '100:1',
+    characterId: 100,
+    characterName: 'Pilot',
+    blueprint: formula,
+    catalogEntry: entry,
+  };
+  const snapshot: MarketSnapshot = {
+    hubPrices: { 2: 100_000, 8: 100_000, 34: 5 },
+    hubBuyPrices: {},
+    hubSellVolumes: { 2: 10, 8: 10 },
+    adjustedPrices: { 34: 1 },
+    systemCostIndex: 0.05,
+  };
+  const recipeFor = recipeForLookup({ catalog: cat, pi: null, ownedBlueprints: [formula] });
+  const atReactionLocation = (
+    reaction: Partial<typeof DEFAULT_ACTIVITY_FACILITY_DEFAULTS.reaction>
+  ) => ({
+    ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+    reaction: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.reaction, ...reaction },
+  });
+  const lowsec = atReactionLocation({
+    security: 'lowsec',
+    buildSystemId: 30002537,
+    buildSystemName: 'Amamake',
+    setOnPlanPage: true,
+  });
+  const rowAt = (
+    facilityDefaults: typeof DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+    of: OpportunityCandidate = candidate
+  ) =>
+    computeOpportunityRow(
+      of,
+      snapshot,
+      facilityDefaults,
+      NO_CHARACTER_MODIFIERS,
+      new Map(),
+      { recipeFor, depth: 0 },
+      DEFAULT_TRADE_HUB
+    )!;
+
+  it('prices like the reaction Build Plan it opens: same profit, margin and ISK/hour', () => {
+    const row = rowAt(lowsec);
+    const plan = planForOpportunityCandidate(
+      candidate,
+      lowsec,
+      row.materialSourcing,
+      row.buildHere,
+      candidate.characterId,
+      row.hub
+    );
+    const { result } = resolveBuildPlan(
+      plan,
+      {
+        catalog: cat,
+        pi: null,
+        ownedBlueprints: [formula],
+        assumedMe: 0,
+        modifiers: NO_CHARACTER_MODIFIERS,
+        bpcOffersFor: () => [],
+      },
+      { snapshot }
+    );
+    expect(row.reactionLocation).toBeUndefined();
+    expect(row.result.profit).not.toBeNull();
+    expect(row.result.profit).toBe(result!.profit);
+    expect(row.result.marginPct).toBe(result!.marginPct);
+    expect(row.result.iskPerHour).toBe(result!.iskPerHour);
+  });
+
+  it('shows no profit, margin or ISK/hour while the reaction Build Location is unset', () => {
+    const row = rowAt(DEFAULT_ACTIVITY_FACILITY_DEFAULTS);
+    expect(row.reactionLocation).toBe('unset');
+    expect(row.result.profit).toBeNull();
+    expect(row.result.marginPct).toBeNull();
+    expect(row.result.iskPerHour).toBeNull();
+    // The job's own cost and time still read: only the sell-side figures blank.
+    expect(row.result.totalCost).toBeGreaterThan(0);
+  });
+
+  it('shows no profit, margin or ISK/hour at a highsec reaction Build Location', () => {
+    const row = rowAt(
+      atReactionLocation({ security: 'highsec', buildSystemId: 30000142, buildSystemName: 'Jita' })
+    );
+    expect(row.reactionLocation).toBe('highsec');
+    expect(row.result.iskPerHour).toBeNull();
+  });
+
+  it('ranks a row with an unset reaction Build Location below every priced row', () => {
+    const blocked = rowAt(DEFAULT_ACTIVITY_FACILITY_DEFAULTS);
+    const priced = rowAt(lowsec, { ...candidate, id: '100:2' });
+    const ranked = rankOpportunityRows([blocked, priced]);
+    expect(ranked.map((r) => r.candidate.id)).toEqual(['100:2', '100:1']);
+  });
+
+  it('leaves a manufacturing row untouched by the reaction Build Location', () => {
+    const manufacturing: OpportunityCandidate = {
+      ...candidate,
+      id: '100:7',
+      blueprint: owned(7),
+      catalogEntry: manufacturingEntry,
+    };
+    const before = rowAt(DEFAULT_ACTIVITY_FACILITY_DEFAULTS, manufacturing);
+    const after = rowAt(lowsec, manufacturing);
+    expect(after.reactionLocation).toBeUndefined();
+    expect(after.result.iskPerHour).toBe(before.result.iskPerHour);
+    expect(after.result.profit).toBe(before.result.profit);
+  });
+});
+
 describe('opportunitiesBatchKey', () => {
   function candidate(id: string): OpportunityCandidate {
     return {
@@ -673,16 +787,33 @@ describe('opportunitiesInputsKey', () => {
     );
   });
 
-  it('is the same when only the reaction location changes, which no row reads', () => {
-    // Every candidate is a manufacturing blueprint, so only the manufacturing
-    // record seeds or prices a row; a Reaction Location set on some plan page
-    // must not ask for a Refresh.
+  it('is the same when only the reaction location changes and no row is a reaction', () => {
+    // A batch of manufacturing blueprints reads only the manufacturing record;
+    // a Reaction Location set on some plan page must not ask it for a Refresh.
     expect(opportunitiesInputsKey(INPUTS)).toBe(
       opportunitiesInputsKey({
         ...INPUTS,
         facilityDefaults: {
           ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
           reaction: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.reaction, facility: 'tatara' },
+        },
+      })
+    );
+  });
+
+  it('changes when the reaction location changes and the batch holds a reaction (issue #5990)', () => {
+    const withReactions = { ...INPUTS, pricesReactions: true };
+    expect(opportunitiesInputsKey(withReactions)).not.toBe(
+      opportunitiesInputsKey({
+        ...withReactions,
+        facilityDefaults: {
+          ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+          reaction: {
+            ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.reaction,
+            security: 'lowsec',
+            buildSystemId: 30002537,
+            buildSystemName: 'Amamake',
+          },
         },
       })
     );
@@ -779,6 +910,21 @@ describe('groupCandidatesByHub — build systems', () => {
   });
   it('keeps one group per hub when no system is named', () => {
     expect(groupCandidatesByHub([mk('a', 1), mk('b', 2)], () => DEFAULT_TRADE_HUB)).toHaveLength(1);
+  });
+  it('splits reactions from manufacturing at one hub: each reads its own cost index (issue #5990)', () => {
+    const reaction: OpportunityCandidate = {
+      ...mk('r', 1),
+      catalogEntry: catalogEntry(5, 'reaction'),
+    };
+    const groups = groupCandidatesByHub(
+      [mk('a', 1), reaction, mk('b', 1)],
+      () => DEFAULT_TRADE_HUB,
+      (_characterId, activity) => (activity === 'reaction' ? 30002537 : undefined)
+    );
+    expect(groups.map((g) => [g.activity, g.candidates.map((c) => c.id)])).toEqual([
+      ['manufacturing', ['a', 'b']],
+      ['reaction', ['r']],
+    ]);
   });
 });
 
@@ -889,6 +1035,28 @@ describe('opportunitySnapshotRequest — where the job fee is charged', () => {
       DEFAULT_ACTIVITY_FACILITY_DEFAULTS
     );
     expect('costIndexSystemId' in request).toBe(false);
+  });
+
+  it('reads the reaction cost index at the reaction Build Location for a reaction group (issue #5990)', () => {
+    const request = opportunitySnapshotRequest(
+      [],
+      DEFAULT_TRADE_HUB,
+      catalog([]),
+      null,
+      {
+        ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+        reaction: {
+          ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.reaction,
+          security: 'lowsec',
+          buildSystemId: 30002537,
+          buildSystemName: 'Amamake',
+        },
+      },
+      null,
+      'reaction'
+    );
+    expect(request.activity).toBe('reaction');
+    expect(request.costIndexSystemId).toBe(30002537);
   });
 
   it('prices at the hub when the remembered facility cannot manufacture', () => {

@@ -65,7 +65,11 @@ for (const size of [
     expect(nameDims.scrollWidth).toBeGreaterThan(nameDims.clientWidth);
 
     const listBox = (await list.boundingBox())!;
-    const rows = list.locator('li');
+    // The Active Fit (the mocked flown ship) leads with no source badge; only the library rows line up.
+    const rows = list
+      .locator('section')
+      .filter({ hasNot: page.getByRole('heading', { name: 'Active fit' }) })
+      .locator('li');
     const count = await rows.count();
     expect(count).toBe(4);
     const badgeRights = new Set<number>();

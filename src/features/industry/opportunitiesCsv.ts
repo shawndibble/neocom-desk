@@ -4,7 +4,7 @@ import { joined } from '@/lib/exportSheets';
 import type { MarketWideDayRow } from './marketWideOpportunities';
 import type { OpportunityRow } from './opportunities';
 import { nameForType, type BlueprintCatalog } from './blueprintCatalog';
-import { stockCoverage, unitMargin } from './opportunityMetrics';
+import { blueprintKindKey, stockCoverage, unitMargin } from './opportunityMetrics';
 import { romanLevel } from '@/engine/projection';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 
@@ -86,7 +86,7 @@ export function opportunitiesCsvColumns(
     { header: t('industry.csvCharacter'), value: (row) => row.candidate.characterName },
     {
       header: t('industry.opportunitiesBlueprint'),
-      value: (row) => (row.candidate.blueprint.runs === -1 ? t('industry.bpo') : t('industry.bpc')),
+      value: (row) => t(blueprintKindKey(row.candidate)),
     },
     {
       // A BPO's -1 is "unlimited", not a count.
