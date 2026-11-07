@@ -29,27 +29,34 @@ async function tops(page: import('@playwright/test').Page) {
   };
 }
 
-for (const withClones of [true, false]) {
-  const state = withClones ? 'a verdict from 2 jump clones' : 'a note verdict';
-  test(`the verdict sits above the summary panels at 390px with ${state}`, async ({ page }) => {
-    await page.setViewportSize(PHONE);
-    if (withClones) {
-      await page.route(`**/characters/${CHARACTER_ID}/clones`, (route) =>
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ jump_clones: [clone(1), clone(2)] }),
-        })
-      );
-    }
-    await signInAndGoto(page, './clones');
-    const y = await tops(page);
-    expect(y.verdict).toBeLessThan(y.panel);
-  });
+async function mockTwoClones(page: import('@playwright/test').Page) {
+  await page.route(`**/characters/${CHARACTER_ID}/clones`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ jump_clones: [clone(1), clone(2)] }),
+    })
+  );
 }
+
+test('the verdict sits above the summary panels at 390px', async ({ page }) => {
+  await page.setViewportSize(PHONE);
+  await mockTwoClones(page);
+  await signInAndGoto(page, './clones');
+  const y = await tops(page);
+  expect(y.verdict).toBeLessThan(y.panel);
+});
+
+test('zero jump clones shows no verdict, since nothing compares', async ({ page }) => {
+  await page.setViewportSize(PHONE);
+  await signInAndGoto(page, './clones');
+  await expect(page.getByRole('region', { name: 'You are in' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Training verdict' })).toHaveCount(0);
+});
 
 test('the summary panels stay above the verdict at 1024px', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
+  await mockTwoClones(page);
   await signInAndGoto(page, './clones');
   const y = await tops(page);
   expect(y.panel).toBeLessThan(y.verdict);
