@@ -47,7 +47,6 @@ function Shell({ phone = false }: { phone?: boolean }) {
         <WidgetGrid
           widgets={edit.layout.widgets}
           editing={edit.editing}
-          onRemove={edit.remove}
           onAdd={() => setGallery(true)}
         />
       )}

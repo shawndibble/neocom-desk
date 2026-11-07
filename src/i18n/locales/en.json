@@ -5686,6 +5686,7 @@
         "title": "Mining yield",
         "description": "ISK per day from your mining",
         "empty": "No mining recorded in this range.",
+        "emptyLink": "Open Mining",
         "col": {
           "ore": "Ore",
           "isk": "ISK",
@@ -5927,7 +5928,6 @@
         "title": "Coming up",
         "description": "Calendar events you accepted or may attend",
         "empty": "No accepted or tentative events ahead.",
-        "emptyHint": "Click the 3 dots menu to change to view all events.",
         "emptyAll": "No events ahead.",
         "more": "+{{count}} more in 24h",
         "col": {
@@ -5983,8 +5983,6 @@
         "nothing": "Nothing was saved to show.",
         "retry": "Retry"
       },
-      "emptyHint": "This widget has no data for this Character.",
-      "remove": "Remove widget",
       "opensPage": "Opens the {{title}} page",
       "settingsFor": "Settings for {{title}}",
       "tone": {

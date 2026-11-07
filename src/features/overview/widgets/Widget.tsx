@@ -81,8 +81,6 @@ interface WidgetProps {
    * signed-out landing page's demo, where every destination is a route the visitor cannot reach.
    */
   inertTitle?: boolean;
-  /** The empty state's Remove widget. */
-  onRemove: (id: string) => void;
 }
 
 const SECONDARY_TONE = {
@@ -321,7 +319,6 @@ function WidgetFrame({
   view,
   hideHeader = false,
   inertTitle = false,
-  onRemove,
   rememberHeight = false,
 }: Omit<WidgetProps, 'previewView'> & {
   view: KindView;
@@ -422,20 +419,14 @@ function WidgetFrame({
     body = (
       <div className="grid gap-2 p-3 text-[0.8125rem]">
         <b>{view.emptyMessage ?? t(keys.emptyMessageKey)}</b>
+        {/* What the kind is for, so a new pilot's empty card explains itself. */}
         {!view.emptyHealthy && (
-          <span className="text-text-dim">{view.emptyHint ?? t('overview.widgets.emptyHint')}</span>
+          <span className="text-text-dim">{view.emptyHint ?? t(kind.descKey)}</span>
         )}
         {view.to !== null && view.emptyLinkLabel !== undefined && (
           <Link to={view.to} className={entityLinkClassName('w-fit')}>
             {view.emptyLinkLabel}
           </Link>
-        )}
-        {!view.emptyHealthy && (
-          <span>
-            <Button size="sm" onClick={() => onRemove(widget.id)}>
-              {t('overview.widgets.remove')}
-            </Button>
-          </span>
         )}
       </div>
     );

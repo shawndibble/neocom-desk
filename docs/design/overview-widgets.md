@@ -164,7 +164,9 @@ hauling, incursions, location.
 - **needs permission** — "Needs permission", the ESI permission name, **Grant
   access** (reuses the app's existing Grant note / `beginGrant`).
 - **failed** — "Could not load", last good value (dimmed), **Retry**.
-- **empty** — the kind's message ("No colonies yet"), **Remove widget**.
+- **empty** — the kind's message ("No colonies yet"), then what the kind is for
+  (its Gallery description) and its **Open …** link if it has one. No Remove
+  button: Remove lives in the ⋮ menu.
 
 ### Charts
 Honest and accessible: Orders chart is Not-undercut vs Undercut (expiring is a

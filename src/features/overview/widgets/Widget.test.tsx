@@ -56,17 +56,16 @@ function renderWidget(
 ) {
   const store = createFeedStore();
   setup(store);
-  const onRemove = vi.fn();
   render(
     <MemoryRouter>
       <FeedStoreContext.Provider value={store}>
         <OverviewRefreshContext.Provider value={{ epoch: 0, refresh }}>
-          <Widget widget={widget} onRemove={onRemove} {...props} />
+          <Widget widget={widget} {...props} />
         </OverviewRefreshContext.Provider>
       </FeedStoreContext.Provider>
     </MemoryRouter>
   );
-  return { onRemove, refresh };
+  return { refresh };
 }
 
 describe('remembered skeleton height', () => {
@@ -306,9 +305,8 @@ describe('Widget states', () => {
     expect(within(region).getByText('Nothing was saved to show.')).toBeInTheDocument();
   });
 
-  it('says what the kind has nothing of, with a Remove widget action', async () => {
-    const user = userEvent.setup();
-    const { onRemove } = renderWidget(model({ kind: 'priceWatch' }), (store) =>
+  it('says what the kind has nothing of and what it is for, with no Remove widget button', () => {
+    renderWidget(model({ kind: 'priceWatch' }), (store) =>
       store.set('priceAlerts', {
         data: { alerts: [], checkedAt: null },
         error: false,
@@ -317,8 +315,13 @@ describe('Widget states', () => {
     );
     const region = screen.getByRole('region', { name: 'Price watch' });
     expect(within(region).getByText(/No Quickbar item has a price target/)).toBeInTheDocument();
-    await user.click(within(region).getByRole('button', { name: 'Remove widget' }));
-    expect(onRemove).toHaveBeenCalledWith('w1');
+    expect(
+      within(region).getByText('Prices you track and the alerts that fired')
+    ).toBeInTheDocument();
+    expect(
+      within(region).queryByText('This widget has no data for this Character.')
+    ).not.toBeInTheDocument();
+    expect(within(region).queryByRole('button', { name: /remove/i })).not.toBeInTheDocument();
   });
 
   it('links the Mining survey empty state to the Mining Survey tab', () => {
@@ -331,6 +334,10 @@ describe('Widget states', () => {
     );
     const region = screen.getByRole('region', { name: 'Mining survey' });
     expect(within(region).getByText('No survey yet')).toBeInTheDocument();
+    expect(
+      within(region).getByText('When your survey will be mined out, and what is left')
+    ).toBeInTheDocument();
+    expect(within(region).queryByRole('button', { name: /remove/i })).not.toBeInTheDocument();
     expect(within(region).getByRole('link', { name: 'Open Mining Survey' })).toHaveAttribute(
       'href',
       '/mining/survey'
@@ -347,6 +354,8 @@ describe('Widget states', () => {
     );
     const region = screen.getByRole('region', { name: 'Hauling' });
     expect(within(region).getByText('No scan yet')).toBeInTheDocument();
+    expect(within(region).getByText('Profitable hauls near you')).toBeInTheDocument();
+    expect(within(region).queryByRole('button', { name: /remove/i })).not.toBeInTheDocument();
     expect(within(region).getByRole('link', { name: 'Open Hauling' })).toHaveAttribute(
       'href',
       '/market/hauling'
@@ -683,7 +692,6 @@ describe('WidgetGrid', () => {
               model({ id: 'b', kind: 'fromTheFuture' }),
               model({ id: 'c', kind: 'mail', size: 'F' }),
             ]}
-            onRemove={() => undefined}
           />
         </FeedStoreContext.Provider>
       </MemoryRouter>
@@ -698,12 +706,7 @@ describe('WidgetGrid', () => {
     const onAdd = vi.fn();
     render(
       <MemoryRouter>
-        <WidgetGrid
-          widgets={[]}
-          onRemove={() => undefined}
-          onAdd={onAdd}
-          onRoles={() => undefined}
-        />
+        <WidgetGrid widgets={[]} onAdd={onAdd} onRoles={() => undefined} />
       </MemoryRouter>
     );
     expect(screen.getByText('Your Overview is empty')).toBeInTheDocument();
@@ -715,7 +718,7 @@ describe('WidgetGrid', () => {
   it('says so when none of the stored widgets can be drawn', () => {
     render(
       <MemoryRouter>
-        <WidgetGrid widgets={[model({ kind: 'fromTheFuture' })]} onRemove={() => undefined} />
+        <WidgetGrid widgets={[model({ kind: 'fromTheFuture' })]} />
       </MemoryRouter>
     );
     expect(screen.getByText('There are no widgets to show on this Overview.')).toBeInTheDocument();

@@ -97,7 +97,7 @@ function Preview({ kind, preset }: { kind: WidgetKindDef; preset?: GalleryPreset
       className="pointer-events-none relative max-h-44 overflow-hidden rounded-xs border border-line bg-bg p-2.5 select-none"
     >
       <div className={cx('mx-auto max-w-full', PREVIEW_WIDTH[size])}>
-        <Widget widget={widget} onRemove={noop} previewView={view} hideHeader />
+        <Widget widget={widget} previewView={view} hideHeader />
       </div>
       <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-bg to-transparent" />
     </div>
