@@ -27,9 +27,14 @@ export function useActiveNpcCorporation(): NpcCorporation | null | undefined {
   return { name };
 }
 
-/** The line naming the NPC corporation, or its nameless fallback while public info is unloaded. */
-export function npcCorporationText(t: Translate, npc: NpcCorporation): string {
-  return npc.name === null
-    ? t('corp.npcCorporationUnnamed')
-    : t('corp.npcCorporation', { corporation: npc.name });
+/**
+ * The line naming the NPC corporation, or its nameless fallback while public info is unloaded.
+ * `key` picks the page's own pair: `<key>` takes `{{corporation}}`, `<key>Unnamed` doesn't.
+ */
+export function npcCorporationText(
+  t: Translate,
+  npc: NpcCorporation,
+  key = 'corp.npcCorporation'
+): string {
+  return npc.name === null ? t(`${key}Unnamed`) : t(key, { corporation: npc.name });
 }
