@@ -458,8 +458,8 @@ export function RowMoreActions({
   const [tip, setTip] = useState(false);
   // Only once a pilot is logged in: never on /login, where no Character exists yet.
   const loggedIn = useCharacterCount() > 0;
-  const tips = hints && loggedIn;
-  const [hintShown, dismissHint] = useOneTimeHint(ROW_HINT, actions !== null && tips);
+  const showTips = hints && loggedIn;
+  const [hintShown, dismissHint] = useOneTimeHint(ROW_HINT, actions !== null && showTips);
   const context = useTouchContext();
   if (!actions) return null;
   const onOpenChange = (open: boolean) => {
@@ -467,7 +467,8 @@ export function RowMoreActions({
       if (hintShown) dismissHint();
       // Counted per open, but the footer stays for the open that earned it.
       const { value, hydrated } = useHintCounts.getState();
-      const earned = tips && hydrated && hintSeenCount(value, ROW_MENU_TIP) < ROW_MENU_TIP_OPENS;
+      const earned =
+        showTips && hydrated && hintSeenCount(value, ROW_MENU_TIP) < ROW_MENU_TIP_OPENS;
       setTip(earned);
       if (earned) recordHintSeen(ROW_MENU_TIP);
     }
