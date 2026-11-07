@@ -121,12 +121,13 @@ test('a Base Grant pilot sees no den clocks and no "new login" notice (issue #59
 
   // The board reads every source together, so a shown event means the den read landed too.
   await expect(page.getByText('Base grant fleet op').first()).toBeVisible();
-  await expect(page.getByText(/need a new login/i)).toHaveCount(0);
+  await expect(page.getByText(/needs? a new login/i)).toHaveCount(0);
   await expect(page.getByText('leaves reinforcement')).toHaveCount(0);
 
   await page
     .getByRole('button', { name: /filter/i })
     .first()
     .click();
+  await expect(page.getByRole('menuitemcheckbox', { name: /Calendar events/ })).toBeVisible();
   await expect(page.getByRole('menuitemcheckbox', { name: /Mercenary dens/ })).toHaveCount(0);
 });

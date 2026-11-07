@@ -130,8 +130,8 @@ export function CalendarKindFilterMenu({
    * a choice the pilot never made.
    */
   function hasRow(kind: CharacterBoardItemKind) {
-    if (OPT_IN_KINDS.has(kind) && !readable.has(kind)) return false;
-    if (hiddenSet.has(kind) || needsReauth.has(kind) || !readable.has(kind)) return true;
+    if (hiddenSet.has(kind) || needsReauth.has(kind)) return true;
+    if (!readable.has(kind)) return !OPT_IN_KINDS.has(kind);
     return (counts.get(kind) ?? 0) > 0;
   }
 

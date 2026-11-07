@@ -9,7 +9,8 @@ async function openMenu(
   hidden: CharacterBoardItemKind[],
   onShowAll = vi.fn(),
   counts = new Map<CharacterBoardItemKind, number>(),
-  readableKinds: readonly CharacterBoardItemKind[] = CHARACTER_BOARD_ITEM_KINDS
+  readableKinds: readonly CharacterBoardItemKind[] = CHARACTER_BOARD_ITEM_KINDS,
+  reauthKinds: readonly CharacterBoardItemKind[] = []
 ) {
   const user = userEvent.setup();
   render(
@@ -19,7 +20,7 @@ async function openMenu(
       onShowAll={onShowAll}
       counts={counts}
       readableKinds={readableKinds}
-      reauthKinds={[]}
+      reauthKinds={reauthKinds}
       skillPlanChoices={[]}
       chosenSkillPlanId={null}
       skillPlanError={null}
@@ -80,5 +81,11 @@ describe('CalendarKindFilterMenu empty kinds', () => {
     const readable = CHARACTER_BOARD_ITEM_KINDS.filter((kind) => kind !== 'mercenaryDen');
     await openMenu([], vi.fn(), new Map(), readable);
     expect(screen.queryByRole('menuitemcheckbox', { name: /mercenary dens/i })).toBeNull();
+  });
+
+  it('keeps Mercenary dens when a granted den scope needs a new login', async () => {
+    const readable = CHARACTER_BOARD_ITEM_KINDS.filter((kind) => kind !== 'mercenaryDen');
+    await openMenu([], vi.fn(), new Map(), readable, ['mercenaryDen']);
+    expect(screen.getByRole('menuitemcheckbox', { name: /mercenary dens/i })).toBeTruthy();
   });
 });
