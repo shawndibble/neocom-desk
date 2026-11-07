@@ -118,8 +118,8 @@ async function loadTransactionsSnapshot(
   // A journal that fails to load only blanks the Margin column, never the tab.
   const [{ cached: transactionsResult, needsReauth: transactionsNeedsReauth }, journalResult] =
     await Promise.all([
-      loadWalletTransactionsWithStatus(characterId),
-      loadWalletJournal(characterId).catch(() => null),
+      loadWalletTransactionsWithStatus(characterId, { archive: true }),
+      loadWalletJournal(characterId, { archive: true }).catch(() => null),
     ]);
   const transactionsTruncated = transactionsResult?.truncated ?? false;
   // Already superseded: skip the ESI name resolve, its result would be discarded.
@@ -669,7 +669,11 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     <div className="space-y-4">
       {headerChrome}
       {hasRows && filteredTransactions.length > 0 && (
-        <TransactionsSummaryStrip transactions={filteredTransactions} trading={trading} />
+        <TransactionsSummaryStrip
+          transactions={filteredTransactions}
+          trading={trading}
+          range={rowsFilter}
+        />
       )}
       <Panel padded={false}>
         {!allScope && transactionsNeedsReauth ? (
