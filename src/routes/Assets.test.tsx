@@ -459,7 +459,7 @@ describe('Assets', () => {
     expect(await screen.findByText('No items')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Items and ships you own in any station show here, grouped by where they are.'
+        'Items and ships you own in any station or structure show here, grouped by where they are.'
       )
     ).toBeInTheDocument();
     expect(screen.queryByText('Nothing stored here.')).not.toBeInTheDocument();

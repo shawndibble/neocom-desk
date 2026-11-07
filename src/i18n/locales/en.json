@@ -8656,7 +8656,7 @@
     },
     "emptyLocation": "Nothing stored here.",
     "emptyRootTitle": "No items",
-    "emptyRootHint": "Items and ships you own in any station show here, grouped by where they are.",
+    "emptyRootHint": "Items and ships you own in any station or structure show here, grouped by where they are.",
     "section": {
       "pinned": "Pinned",
       "allLocations_one": "All locations · {{count}}",
@@ -9222,7 +9222,7 @@
     "emptyTitle": "No jump clones cached",
     "emptyHint": "Couldn't load this character's jump clones yet. Try again shortly.",
     "emptyFetchedTitle": "No jump clones",
-    "emptyFetchedHint": "A jump clone is a spare body in another station that you can switch into.",
+    "emptyFetchedHint": "A jump clone is a spare body in another station or structure that you can switch into.",
     "location": "Location",
     "implants": "Implants",
     "noImplants": "No implants",

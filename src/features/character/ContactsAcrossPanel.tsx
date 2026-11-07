@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  CachedEmptyState,
   DataTable,
   EmptyState,
   Panel,
@@ -226,12 +225,9 @@ export function AcrossCharactersPanel({
     // Every character's contacts were read and none holds any: really empty.
     const allRead = effectiveLists.length > 0 && effectiveLists.every((list) => list.read);
     return (
-      <CachedEmptyState
-        result={allRead ? { fromCache: false } : null}
-        title={t('contacts.acrossEmptyTitle')}
-        hint={t('contacts.acrossEmptyHint')}
-        fetchedTitle={t('contacts.emptyFetchedTitle')}
-        fetchedHint={t('contacts.emptyFetchedHint')}
+      <EmptyState
+        title={t(allRead ? 'contacts.emptyFetchedTitle' : 'contacts.acrossEmptyTitle')}
+        hint={t(allRead ? 'contacts.emptyFetchedHint' : 'contacts.acrossEmptyHint')}
       />
     );
   }

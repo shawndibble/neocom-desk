@@ -23,7 +23,7 @@ export interface CharacterContactList {
   contacts: readonly CharacterContact[];
   /** This character's own fetch stopped short (pages missing) — see `CachedResult.truncated`. */
   truncated: boolean;
-  /** Its contacts were read at all (a cached copy, or a live fetch that worked), so an empty list is really empty. */
+  /** A saved copy exists (only a successful fetch writes one), so an empty list is really empty, not unloaded. */
   read: boolean;
 }
 
