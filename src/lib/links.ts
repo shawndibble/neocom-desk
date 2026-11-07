@@ -16,3 +16,15 @@ export const DISCORD_URL = 'https://discord.gg/Jr7WRMCBPE';
 
 /** CCP's page where a signed-in player views and revokes the third-party apps they've authorized. */
 export const AUTHORIZED_APPS_URL = 'https://developers.eveonline.com/authorized-apps';
+
+/** EVE University's entry page for new players: the game's core ideas, with links onward. */
+export const EVE_UNI_NEW_PLAYER_URL = 'https://wiki.eveuniversity.org/New_Player_Index';
+
+/** EVE University's overview of the ways to earn ISK, by skill and capital needed. */
+export const EVE_UNI_MAKING_MONEY_URL = 'https://wiki.eveuniversity.org/Making_Money';
+
+/** EVE University's lexicon of EVE's jargon, beyond the few words the FAQ defines. */
+export const EVE_UNI_LEXICON_URL = 'https://wiki.eveuniversity.org/EVE_Lexicon';
+
+/** CCP's support site: account, billing and in-game problems Neocom Desk cannot help with. */
+export const CCP_SUPPORT_URL = 'https://support.eveonline.com/hc/en-us';

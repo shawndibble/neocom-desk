@@ -488,7 +488,11 @@ describe('Asset Category filter (issue #5601)', () => {
     window.history.replaceState({}, '', '/assets/items?cat=');
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'Reset filters' }));
+    const reset = await screen.findByRole('button', { name: 'Reset filters' });
+    // A filter emptied the list, not an empty hangar: the plain line, not what fills the page.
+    expect(screen.getByText('Nothing stored here.')).toBeInTheDocument();
+    expect(screen.queryByText('No items')).not.toBeInTheDocument();
+    await user.click(reset);
 
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     expect(window.location.search).not.toContain('cat=');

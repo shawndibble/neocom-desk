@@ -7,6 +7,8 @@ import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { IndustrySettingsForm } from '@/features/settings/IndustrySettingsForm';
 import { BpcSourcingSettingsForm } from '@/features/settings/BpcSourcingSettingsForm';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
+import { IndustryExplainerTrigger } from './IndustryExplainer';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { IndustryCharacterPicker } from './IndustryCharacterPicker';
 import { useHasProductionLogs } from './useHasProductionLogs';
 import { INDUSTRY_TABS_ID, industryTabs, type IndustryTab } from './industryTabs';
@@ -25,7 +27,7 @@ export interface IndustryHeaderProps {
   tabsActivation?: 'automatic' | 'manual';
   /** Beside the page title — the current tab's `DataAgeBadge`, when it has one. */
   meta?: ReactNode;
-  /** Before the settings gear — the current tab's own buttons (BPC Sourcing's Refresh). */
+  /** After "New to Industry?", before the settings gear — the current tab's own buttons (BPC Sourcing's Refresh). */
   actions?: ReactNode;
 }
 
@@ -59,8 +61,8 @@ function tabSettings(tab: IndustryTab, t: TFunction): ReactNode {
 }
 
 /**
- * The chrome every Industry page shares above its own content: title (and
- * the current tab's settings gear beside it), Active Jobs, the reauth
+ * The chrome every Industry page shares above its own content: title (with
+ * "New to Industry?" and the current tab's settings gear beside it), Active Jobs, the reauth
  * banner, and the 4-tab strip — identical whether this is the index or a
  * plan/group's own full-width page, so moving
  * between them reads as "only the content under the tabs changed," not a
@@ -79,6 +81,7 @@ export function IndustryHeader({
 }: IndustryHeaderProps) {
   const { t } = useTranslation();
   const showLogs = useHasProductionLogs();
+  const isPhone = useIsPhone();
   const tabs = industryTabs(t, { showLogs, activeTab });
   const onChange = (id: string) => onTabChange(id as IndustryTab);
   return (
@@ -88,14 +91,12 @@ export function IndustryHeader({
         meta={meta}
         scope={<IndustryCharacterPicker activeCharacterId={activeCharacterId} />}
         actions={
-          actions ? (
-            <>
-              {actions}
-              {tabSettings(activeTab, t)}
-            </>
-          ) : (
-            tabSettings(activeTab, t)
-          )
+          <>
+            {/* A `scope` header never wraps: on a phone, a tab with its own actions (BPC Sourcing's Refresh) leaves no room for the labelled trigger. */}
+            {!(isPhone && actions) && <IndustryExplainerTrigger />}
+            {actions}
+            {tabSettings(activeTab, t)}
+          </>
         }
       />
       <ActiveJobsPanel characterId={activeCharacterId} />

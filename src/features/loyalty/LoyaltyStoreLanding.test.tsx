@@ -134,6 +134,15 @@ describe('LoyaltyStoreLanding', () => {
     expect(screen.getByText('300,000 in 1 store')).toBeInTheDocument();
   });
 
+  it('says what LP is under the tabs (#6004)', () => {
+    renderLanding();
+    expect(
+      screen.getByText(
+        "LP (loyalty points) is paid by a corporation's mission agents on top of ISK. Spend it here on items you can use or sell."
+      )
+    ).toBeInTheDocument();
+  });
+
   it('counts the default sales floor on the funnel', () => {
     renderLanding();
     expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();

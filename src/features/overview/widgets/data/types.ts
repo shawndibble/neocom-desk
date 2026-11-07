@@ -254,9 +254,9 @@ export interface KindView {
   to: string | null;
   /** Overrides the kind's own empty message, when the reason is not "nothing there". */
   emptyMessage?: string;
-  /** Overrides the generic line under the empty message, when the kind has something more useful to say. */
+  /** Overrides the kind's description under the empty message, when the kind has something more useful to say. */
   emptyHint?: string;
-  /** The empty state is good news (nothing wrong to report): just the message, no hint, no Remove. */
+  /** The message says it all (good news, or a mode the kind's description doesn't fit): no description. */
   emptyHealthy?: boolean;
   /** Endpoints whose permission is missing while the rest of the widget reads fine: a Grant access is drawn under the body. */
   grantEndpoints?: readonly EsiEndpointId[];

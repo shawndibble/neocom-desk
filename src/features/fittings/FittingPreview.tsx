@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Button, Panel, Tooltip } from '@/components/ui';
 import { encodeFittingShare } from '@/engine/fittings/fittingShare';
-import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import {
@@ -21,7 +20,7 @@ import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue'
 import { useCompareFittings } from './useCompareFittings';
 import { useCompareStats } from './useCompareStats';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
-import type { LibraryRow } from './useLibraryFittings';
+import { heldFitting, type LibraryRow } from './useLibraryFittings';
 
 interface FittingPreviewProps {
   row: LibraryRow;
@@ -54,23 +53,23 @@ function rowCode(row: LibraryRow): string | null {
   return row.source === 'shared' ? row.shared.code : null;
 }
 
-/** A saved or shared Fitting decodes from its code; an In-game one maps straight from ESI's own shape. */
+/** In-game and Active Fit rows hold their Fitting, no code: encoded only when needed. */
+const holdsFitting = (row: LibraryRow) => row.source === 'inGame' || row.source === 'active';
+
 function usePreviewFitting(row: LibraryRow): Fitting | null {
   const savedCode = rowCode(row);
   const codes = useMemo(() => (savedCode === null ? [] : [savedCode]), [savedCode]);
   const decoded = useCompareFittings(codes)[0]?.fitting ?? null;
-  const inGame = useMemo(
-    () => (row.source === 'inGame' ? esiFittingToFitting(row.inGame).fitting : null),
-    [row]
-  );
-  return row.source === 'inGame' ? inGame : decoded;
+  const held = useMemo(() => heldFitting(row), [row]);
+  return holdsFitting(row) ? held : decoded;
 }
 
-/** The Fitting Share Code compare needs: a saved Fitting has one, an In-game one is encoded once; null when too large. */
+/** The Fitting Share Code compare needs: a saved Fitting has one, an In-game or Active Fit one is encoded once; null when too large. */
 function useShareCode(row: LibraryRow, fitting: Fitting | null): string | null | undefined {
   const [encoded, setEncoded] = useState<{ fitting: Fitting; code: string | null } | null>(null);
+  const encodes = holdsFitting(row);
   useEffect(() => {
-    if (row.source !== 'inGame' || fitting === null) return;
+    if (!encodes || fitting === null) return;
     let cancelled = false;
     void encodeFittingShare(fittingToShareInput(fitting)).then((result) => {
       if (!cancelled) setEncoded({ fitting, code: result.ok ? result.payload : null });
@@ -78,8 +77,8 @@ function useShareCode(row: LibraryRow, fitting: Fitting | null): string | null |
     return () => {
       cancelled = true;
     };
-  }, [row.source, fitting]);
-  if (row.source !== 'inGame') return rowCode(row);
+  }, [encodes, fitting]);
+  if (!encodes) return rowCode(row);
   return encoded?.fitting === fitting ? encoded.code : undefined;
 }
 
@@ -155,7 +154,9 @@ export function FittingPreview({
               ? t('fittings.start.sourceSaved')
               : row.source === 'inGame'
                 ? t('fittings.start.sourceInGame')
-                : sharedByText(row, t)}
+                : row.source === 'active'
+                  ? t('fittings.start.sourceActive')
+                  : sharedByText(row, t)}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {row.source === 'saved' && (

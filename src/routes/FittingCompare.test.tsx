@@ -42,7 +42,7 @@ describe('FittingCompare', () => {
     renderAt('/ships/fittings/compare?f=not-a-real-code');
     const removeButton = await screen.findByRole('button', { name: /^Remove .* from comparison$/ });
     await user.click(removeButton);
-    expect(await screen.findByText('Add a Fitting to start comparing.')).toBeInTheDocument();
+    expect(await screen.findByText('Nothing to compare yet')).toBeInTheDocument();
   });
 
   it('moves focus on after Remove takes its column: the next Remove, then Compare with', async () => {
@@ -61,6 +61,22 @@ describe('FittingCompare', () => {
     renderAt('/ships/fittings/compare');
     const heading = await screen.findByRole('heading', { name: 'Compare Fittings' });
     expect(heading.closest('.max-w-page')).toBeInTheDocument();
+  });
+
+  it('hides the profile pickers until a Fitting is added, and points to the Fittings library', async () => {
+    renderAt('/ships/fittings/compare');
+    await screen.findByText('Nothing to compare yet');
+    expect(screen.queryByTestId('compare-controls')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Fittings library' })).toHaveAttribute(
+      'href',
+      '/ships/fittings'
+    );
+  });
+
+  it('shows the profile pickers once a Fitting is in the comparison', async () => {
+    renderAt('/ships/fittings/compare?f=not-a-real-code');
+    await screen.findByRole('button', { name: /^Remove .* from comparison$/ });
+    expect(screen.getByTestId('compare-controls')).toBeInTheDocument();
   });
 
   it('shows exactly one primary Add Fitting button in the empty state', async () => {

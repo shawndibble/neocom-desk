@@ -67,6 +67,10 @@ describe('checkWorkbenchFit', () => {
         [2185, 5],
       ])
     );
+    // What the editor's Missing skills chip checks once it's opened: no cargo.
+    expect([...check.requirementTypeIds].sort((a, b) => a - b)).toEqual([
+      626, 2048, 2185, 3001, 12789,
+    ]);
   });
 
   it('an item the game no longer has makes the fit out of date, keeps what did load, and is never seen', () => {
@@ -124,6 +128,7 @@ describe('checkWorkbenchFit', () => {
     expect(check.hullTypeId).toBeNull();
     expect(check.modules).toEqual([]);
     expect(check.items).toEqual([]);
+    expect(check.requirementTypeIds).toEqual([]);
     expect(check.sightingKey).toBeNull();
   });
 });

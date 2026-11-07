@@ -55,7 +55,7 @@ Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailAll,mailScopePref
 - Not hydrated / loading with no data: spinner.
 - `needsReauth` (401/403 or failed token refresh on headers, labels or lists): `GrantBanner` asking for `getCharacterMailHeaders` permission, title "Log in again to see your mail".
 - Load error: `EmptyState` "load failed".
-- No headers: `CachedEmptyState` ("No mail cached" when nothing cached and offline; "No mail" when a fetch succeeded empty).
+- No headers: `CachedEmptyState` ("No mail cached" when nothing cached and offline; "No mail" plus what fills it when a fetch succeeded empty).
 - Served from cache: amber "offline" line above the chips (`common.offlineTitle`).
 - Loaded but the list is empty (#3972): `listState` names the first stage that emptied it. No folders on: `no-folders`, "Show all folders" button. Folders hold nothing: `empty-folder`, `CachedEmptyState` ("No mail in this folder", or "No saved mail…" when served from cache), no action; "No recent mail…" pointing at Load more while older pages are unloaded. Search matched nothing: `no-search-matches`, "Clear search" button (clears and focuses the search box). Only Hide read is hiding mail: `all-read-hidden`, "Show read mail" button (focus lands on the search box, Hide read next).
 - Reading pane with nothing selected, wide screen only: `EmptyState` "No message open" with a Compose button calling the same `openNewMail` as the header. Not rendered on a phone (the list is the whole screen; Compose floats) or while the inline composer is open.

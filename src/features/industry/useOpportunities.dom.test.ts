@@ -34,7 +34,11 @@ const FACILITY_DEFAULTS = DEFAULT_ACTIVITY_FACILITY_DEFAULTS;
 const STOCK = { sources: [] } as unknown as UseOpportunitiesArgs['ownedStockSnapshot'];
 
 function candidate(itemId: number): OpportunityCandidate {
-  return { id: `1:${itemId}`, characterId: 1 } as unknown as OpportunityCandidate;
+  return {
+    id: `1:${itemId}`,
+    characterId: 1,
+    catalogEntry: { blueprint: { activity: 'manufacturing' } },
+  } as unknown as OpportunityCandidate;
 }
 
 function argsWith(overrides: Partial<UseOpportunitiesArgs> = {}): UseOpportunitiesArgs {

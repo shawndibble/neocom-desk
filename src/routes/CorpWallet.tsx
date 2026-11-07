@@ -720,6 +720,7 @@ export function CorpWallet() {
           reason={gate.reason}
           title={t('corp.wallet.noAccessTitle')}
           hint={t('corp.wallet.noAccessHint')}
+          roleLine={t('corp.wallet.roleLine')}
         />
       </div>
     ) : gate.status === 'ready' ? (

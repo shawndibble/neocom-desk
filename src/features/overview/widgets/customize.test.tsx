@@ -47,7 +47,6 @@ function Shell({ phone = false }: { phone?: boolean }) {
         <WidgetGrid
           widgets={edit.layout.widgets}
           editing={edit.editing}
-          onRemove={edit.remove}
           onAdd={() => setGallery(true)}
         />
       )}
@@ -409,6 +408,19 @@ describe('RoleChooser', () => {
     await user.click(screen.getByRole('button', { name: 'Build my Overview' }));
     const kinds = (built as OverviewLayout | null)?.widgets.map((x) => x.kind);
     expect(kinds).toEqual(['wallet', 'training', 'comingUp', 'mail', 'planetary']);
+  });
+
+  it('leaves out corp widgets while the corp roles are not known', async () => {
+    const user = userEvent.setup();
+    let built: OverviewLayout | null = null;
+    render(<RoleChooser firstRun onChoose={(l) => (built = l)} />);
+    await user.click(screen.getByRole('button', { name: 'Miner' }));
+    await user.click(screen.getByRole('button', { name: 'Industrialist' }));
+    await user.click(screen.getByRole('button', { name: 'Build my Overview' }));
+    const kinds = (built as OverviewLayout | null)?.widgets.map((x) => x.kind);
+    expect(kinds).toContain('miningYield');
+    expect(kinds).not.toContain('moonChunks');
+    expect(kinds).not.toContain('structures');
   });
 
   it('Just the basics is the base four', async () => {

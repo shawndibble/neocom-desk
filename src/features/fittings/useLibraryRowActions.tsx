@@ -5,7 +5,7 @@
  * touch-and-hold) the row, or its ⋮ button.
  *
  * A row names a Fitting without holding one: a saved row has only its Share
- * Link code, an In-game one ESI's own shape. Each action that needs the
+ * Link code, an In-game one ESI's own shape, the Active Fit its asset-built Fitting. Each action that needs the
  * Fitting itself works it out when chosen, never while the list renders.
  */
 import { useState, type ReactNode } from 'react';
@@ -20,7 +20,6 @@ import {
 } from '@/engine/communities/sharedFittings';
 import type { CommunitySummary } from '@/features/communities/communityStore';
 import { decodeFittingShare, encodeFittingShare } from '@/engine/fittings/fittingShare';
-import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -28,7 +27,7 @@ import { exportFitting } from './fittingExportText';
 import { fittingCompareHref } from './fittingRoutes';
 import { saveFitting } from './myFittings';
 import { useOnline } from '@/stores/network';
-import type { LibraryRow } from './useLibraryFittings';
+import { heldFitting, type LibraryRow } from './useLibraryFittings';
 import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
 import { LazySaveToEveDialog } from './LazySaveToEveDialog';
 
@@ -42,7 +41,7 @@ async function rowFitting(
     if (!decoded.ok) return null;
     return { fitting: shareToFitting(decoded.value, row.name), code };
   }
-  const { fitting } = esiFittingToFitting(row.inGame);
+  const fitting = heldFitting(row)!;
   const encoded = await encodeFittingShare(fittingToShareInput(fitting));
   return { fitting, code: encoded.ok ? encoded.payload : null };
 }

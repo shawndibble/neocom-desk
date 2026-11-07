@@ -7,7 +7,14 @@
  */
 import type { StatChipTone } from '@/components/ui';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
-import { pricedRuns, type OpportunityRow } from './opportunities';
+import type { TFunction } from 'i18next';
+import {
+  isReaction,
+  pricedRuns,
+  type OpportunityCandidate,
+  type OpportunityRow,
+} from './opportunities';
+import type { OpportunitiesActivityFilter } from './opportunitiesUrl';
 
 export const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   deep: 'success',
@@ -65,6 +72,28 @@ export function stockCoverage(row: OpportunityRow): StockCoverage | null {
   const total = ownedValue + stillToBuyIsk;
   if (total <= 0) return null;
   return { coveredPct: (ownedValue / total) * 100, stillToBuyIsk };
+}
+
+export function matchesActivityFilter(
+  row: OpportunityRow,
+  filter: OpportunitiesActivityFilter
+): boolean {
+  return filter === 'all' || row.candidate.catalogEntry.blueprint.activity === filter;
+}
+
+/** The Manufacturing / Reactions filter's options, for Ranked and All owned alike. */
+export function activityFilterOptions(t: TFunction) {
+  return [
+    { value: 'all' as const, label: t('industry.ownedBlueprintsAll') },
+    { value: 'manufacturing' as const, label: t('industry.ownedBlueprintsActivity.manufacturing') },
+    { value: 'reaction' as const, label: t('industry.ownedBlueprintsActivity.reaction') },
+  ];
+}
+
+/** What a row was priced from, as the table chip and the export name it: a formula, a BPO or a BPC. */
+export function blueprintKindKey(candidate: OpportunityCandidate): string {
+  if (isReaction(candidate)) return 'industry.ownedBlueprintsActivity.reaction';
+  return candidate.blueprint.runs === -1 ? 'industry.bpo' : 'industry.bpc';
 }
 
 export function matchesStockFilter(row: OpportunityRow, filter: StockFilter): boolean {

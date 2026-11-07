@@ -249,14 +249,15 @@ describe('Settings', () => {
     expect((await db.settings.get(FONT_SCALE_KEY))?.value).toBe(1.125);
   });
 
-  it('lists the keyboard shortcuts on Help, its first tab, and redirects the old Settings link (issue #25)', async () => {
+  it('lists the keyboard shortcuts on Help, its last tab, and redirects the old Settings link (issue #25)', async () => {
     window.history.pushState({}, '', '/settings/shortcuts');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /help & faq/i });
 
     expect(window.location.pathname).toBe('/help/shortcuts');
+    // FAQ first, the tab /help opens on (issue #5998).
     const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
-    expect(tabs).toEqual(['Shortcuts', 'FAQ', 'Support']);
+    expect(tabs).toEqual(['FAQ', 'Support', 'Shortcuts']);
     // The off switch lives in Settings › Display, not on Help.
     expect(
       screen.queryByRole('checkbox', { name: /single-key shortcuts/i })

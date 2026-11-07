@@ -32,7 +32,8 @@ import type { EventRowContext } from './eventRowSupport';
 import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { db } from '@/db';
 import { useCharacters } from '@/features/character/useCharacters';
-import { NOTIFICATION_EVENT_IDS, eventLabelKey } from './events';
+import { NOTIFICATION_EVENT_IDS, eventLabelKey, isCorpEventId } from './events';
+import { corpEventsApply } from './eventGroups';
 import { useNotificationPreferences, hydrateNotificationPreferences } from './preferences';
 import { EVE_ALLOWED_TYPES, extraEveTypes } from './eventSelection';
 import { eveTypeLabel } from './eveTypeLabel';
@@ -200,13 +201,14 @@ export function NotificationsPanel() {
       ),
     [orderedCharacters, eventLabels, search, eveTypeLabels]
   );
-  const visibleEventIds = useMemo(
-    () =>
+  const showCorpEvents = corpEventsApply(characterList.map((c) => c.corporationId));
+  const visibleEventIds = useMemo(() => {
+    const ids =
       filterResult === null
         ? NOTIFICATION_EVENT_IDS
-        : NOTIFICATION_EVENT_IDS.filter((id) => filterResult.visibleEventIds.has(id)),
-    [filterResult]
-  );
+        : NOTIFICATION_EVENT_IDS.filter((id) => filterResult.visibleEventIds.has(id));
+    return showCorpEvents ? ids : ids.filter((id) => !isCorpEventId(id));
+  }, [filterResult, showCorpEvents]);
 
   // A denied grant disables the *browser* column and its Enable button: JS
   // cannot re-request one. It does not blank the panel, because the Overview

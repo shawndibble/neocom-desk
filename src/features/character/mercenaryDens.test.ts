@@ -173,8 +173,14 @@ describe('loadMercenaryDensWidget', () => {
 });
 
 describe('loadCharacterDenRows', () => {
-  it('asks to log in again when the token lacks the den scope', async () => {
+  it('is off, never a reauth, when the den scope was never granted', async () => {
     tokens.push({ characterId: 1, scopes: [] });
+    expect(await loadCharacterDenRows(1)).toEqual({ cached: null, needsReauth: false });
+  });
+
+  it('asks to log in again when the den scope was granted and ESI refuses it', async () => {
+    tokens.push({ characterId: 1, scopes: [DEN_SCOPE] });
+    cache.set('1:mercenaryDens', 'reauth');
     expect(await loadCharacterDenRows(1)).toEqual({ cached: null, needsReauth: true });
   });
 

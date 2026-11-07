@@ -4,6 +4,7 @@
  * its Fittings menu, so both get the same dialogs.
  */
 import { useTranslation } from 'react-i18next';
+import { useTouchContext } from '@/lib/useMediaQuery';
 import { Modal } from '@/components/ui';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import type { HullEntry } from '@/engine/fittings/hullCatalogue';
@@ -42,19 +43,24 @@ export function ImportFittingCard({
   /** A Fitting the card listed (an EVE XML file's) was opened. */
   onOpened?: () => void;
 }) {
+  const { t } = useTranslation();
+  const context = useTouchContext();
   return (
-    <FittingLoadCard
-      bare
-      onLoad={workspace.loadFromInput}
-      lastLoad={workspace.lastLoad}
-      shareError={workspace.shareError}
-      tooLargeToShare={workspace.tooLargeToShare}
-      onLoadFittingXmlDocument={workspace.loadFittingXmlDocument}
-      onOpenLoaded={async (loaded) => {
-        await workspace.openLoaded(loaded);
-        onOpened?.();
-      }}
-    />
+    <div className="space-y-3">
+      <p className="text-xs text-text-dim">{t('fittings.start.importHint', { context })}</p>
+      <FittingLoadCard
+        bare
+        onLoad={workspace.loadFromInput}
+        lastLoad={workspace.lastLoad}
+        shareError={workspace.shareError}
+        tooLargeToShare={workspace.tooLargeToShare}
+        onLoadFittingXmlDocument={workspace.loadFittingXmlDocument}
+        onOpenLoaded={async (loaded) => {
+          await workspace.openLoaded(loaded);
+          onOpened?.();
+        }}
+      />
+    </div>
   );
 }
 

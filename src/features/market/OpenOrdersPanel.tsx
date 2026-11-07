@@ -674,6 +674,7 @@ export function OpenOrdersPanel({
                 fetchedTitle={t(
                   corporation ? 'market.orders.corp.emptyFetchedTitle' : 'orders.emptyFetchedTitle'
                 )}
+                fetchedHint={corporation ? undefined : t('orders.emptyFetchedHint')}
                 className="py-8"
               />
             )

@@ -164,6 +164,31 @@ describe('Contacts', () => {
       expect(await screen.findByText(/last cached/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Fetch every character' })).toBeInTheDocument();
     });
+
+    it('says what fills the comparison when every character was read and none has contacts', async () => {
+      server.use(http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.json([])));
+      await addSecondCharacter();
+      await cacheSecondCharacterContacts([]);
+      window.history.replaceState({}, '', '/contacts/across');
+      render(<App />);
+
+      expect(
+        await screen.findByText(
+          'Pilots, corporations and alliances you add as contacts in EVE show here, with the standing you set.'
+        )
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^All characters · 2$/ })).toBeInTheDocument();
+      expect(screen.queryByText('No contacts cached for any character')).not.toBeInTheDocument();
+    });
+
+    it('keeps the not-loaded copy while a character has never been read', async () => {
+      server.use(http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.json([])));
+      await addSecondCharacter();
+      window.history.replaceState({}, '', '/contacts/across');
+      render(<App />);
+
+      expect(await screen.findByText('No contacts cached for any character')).toBeInTheDocument();
+    });
   });
 });
 

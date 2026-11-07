@@ -4,7 +4,6 @@ const status = vi.hoisted(() => vi.fn());
 vi.mock('./srpMemberBackend', () => ({ srpMemberBackend: () => ({ status }) }));
 
 import {
-  isPlayerCorporation,
   probeSrp,
   readSrpProbe,
   recordSrpProbe,
@@ -18,13 +17,6 @@ const CORP = 98000001;
 beforeEach(() => {
   localStorage.clear();
   status.mockReset();
-});
-
-describe('isPlayerCorporation', () => {
-  it('is false for an NPC corporation, which can never run SRP', () => {
-    expect(isPlayerCorporation(1000125)).toBe(false);
-    expect(isPlayerCorporation(CORP)).toBe(true);
-  });
 });
 
 describe('the cached answer', () => {

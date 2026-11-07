@@ -379,6 +379,11 @@ describe('Clones', () => {
     );
     render(<App />);
     expect(await screen.findByText('No jump clones')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'A jump clone is a spare body in another station or structure that you can switch into.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('carries the same character header the Overview tab shows, not a page title', async () => {

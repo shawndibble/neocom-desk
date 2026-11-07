@@ -16,6 +16,9 @@ export interface HullEntry {
   group: string;
 }
 
+/** A hull to start a Fitting on: all a new Fitting reads of a picked hull. */
+export type StartHull = Pick<HullEntry, 'typeId' | 'name'>;
+
 export interface HullClass {
   id: number;
   name: string;

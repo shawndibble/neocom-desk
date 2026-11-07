@@ -3,8 +3,9 @@
  * each one brings. Pure data plus the builders that turn an answer (or none)
  * into an Overview Layout.
  */
+import type { CorpCapabilities } from '@/engine/corpRoles';
 import { presetSeed } from './galleryPresets';
-import { isAddable, type WidgetKindId } from './kinds';
+import { getKind, isAddable, kindOpenTo, type WidgetKindDef, type WidgetKindId } from './kinds';
 import {
   MAX_WIDGETS,
   seedKind,
@@ -44,14 +45,20 @@ export function seqId(prefix: string): MakeId {
   return () => `${prefix}${++n}`;
 }
 
-function fromSeeds(seeds: readonly WidgetSeed[], makeId: MakeId): OverviewLayout {
+function fromSeeds(
+  seeds: readonly WidgetSeed[],
+  makeId: MakeId,
+  canDraw: (kind: WidgetKindDef) => boolean = () => true
+): OverviewLayout {
   const widgets: Widget[] = [];
   const seen = new Set<string>();
   for (const seed of seeds) {
     const kind = seedKind(seed);
     // One widget per kind and Show: the base Wallet and a Role's Wallet flow both stay.
     const key = typeof seed === 'string' ? kind : `${kind}:${seed.show ?? ''}`;
-    if (seen.has(key) || !isAddable(kind) || widgets.length >= MAX_WIDGETS) continue;
+    const def = getKind(kind);
+    if (seen.has(key) || !def || !isAddable(kind) || !canDraw(def)) continue;
+    if (widgets.length >= MAX_WIDGETS) break;
     seen.add(key);
     const w = seedWidget(seed, makeId());
     if (w) widgets.push(w);
@@ -59,14 +66,19 @@ function fromSeeds(seeds: readonly WidgetSeed[], makeId: MakeId): OverviewLayout
   return { version: 1, widgets };
 }
 
-/** Base kinds first, then each chosen role's kinds in order, deduped, coming-soon left out. */
+/**
+ * Base kinds first, then each chosen role's kinds in order, deduped, coming-soon left out.
+ * Corp kinds outside `held` (`null`: not known yet) are left out too, since they could
+ * only draw as unreadable; the Gallery still offers them.
+ */
 export function buildLayoutFromRoles(
   roles: readonly RoleId[],
+  held: CorpCapabilities | null,
   makeId: MakeId = seqId('r')
 ): OverviewLayout {
   const kinds: WidgetSeed[] = [...BASE_KINDS];
   for (const role of roles) kinds.push(...(ROLES[role] ?? []));
-  return fromSeeds(kinds, makeId);
+  return fromSeeds(kinds, makeId, (kind) => kindOpenTo(kind, held));
 }
 
 /** "Just the basics". */

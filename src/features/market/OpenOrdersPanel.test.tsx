@@ -260,6 +260,16 @@ describe('OpenOrdersPanel', () => {
     expect(beginEveLogin).toHaveBeenCalledWith({ characterId: 2, groups: ['marketOrders'] });
   });
 
+  it('says what fills the list when the character really has no open orders', async () => {
+    mockedLoadAll.mockResolvedValue(snapshot([entry([])]));
+    renderPanel();
+
+    expect(await screen.findByText('No open orders')).toBeInTheDocument();
+    expect(
+      screen.getByText('Buy and sell orders you list on the market show here.')
+    ).toBeInTheDocument();
+  });
+
   it('carries the item context menu on order rows and asks for the blueprint catalog on open', async () => {
     mockedLoadAll.mockResolvedValue(snapshot([entry([EXPIRING_ORDER])]));
     renderPanel();

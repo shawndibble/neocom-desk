@@ -416,6 +416,7 @@ export function Clones() {
                 title={t('clones.emptyTitle')}
                 hint={t('clones.emptyHint')}
                 fetchedTitle={t('clones.emptyFetchedTitle')}
+                fetchedHint={t('clones.emptyFetchedHint')}
               />
             )}
           </>

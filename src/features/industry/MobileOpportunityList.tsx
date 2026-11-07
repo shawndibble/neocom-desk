@@ -34,7 +34,6 @@ import {
   IconButton,
   InfoTooltip,
   IskAmount,
-  StatChip,
   sortRows,
   Checkbox,
   textActionClassName,
@@ -54,6 +53,7 @@ import { formatPercent } from './format';
 import { vs90dReadout } from './vs90d';
 import type { OpportunityPlanSeed, OpportunityRow } from './opportunities';
 import { MobileSortToolbar } from './MobileSortToolbar';
+import { OpportunityBlueprintChip } from './OpportunityBlueprintChip';
 import { SkillGateMarker } from './SkillGateMarker';
 import { useUrlSort } from '@/lib/useUrlState';
 import { OPPORTUNITIES_DEFAULT_SORT, OPPORTUNITIES_SORT_KEY } from './opportunitiesUrl';
@@ -175,6 +175,9 @@ function sortFields(t: ReturnType<typeof useTranslation>['t']): Record<
   };
 }
 
+/** Figures blanked on a reaction row that can't run where it would build (issue #5990). */
+const PROFIT_FIELDS: ReadonlySet<SortFieldId> = new Set(['iskPerHour', 'unitMargin', 'margin']);
+
 const SORT_FIELD_ORDER: readonly SortFieldId[] = [
   'iskPerHour',
   'unitMargin',
@@ -242,10 +245,13 @@ export function MobileOpportunityList({
 
       <ul className="-mx-3 flex flex-col" aria-label={t('industry.opportunitiesTableLabel')}>
         {groups.map(({ first: row, members }) => {
-          const hero = fields[activeFieldId].hero(row);
+          const blanked = (id: SortFieldId) =>
+            row.reactionLocation !== undefined && PROFIT_FIELDS.has(id);
+          const hero: HeroValue = blanked(activeFieldId)
+            ? { node: t('industry.opportunitiesSetReactionLocation') }
+            : fields[activeFieldId].hero(row);
           const productTypeID = row.candidate.catalogEntry.productTypeID;
           const productName = row.candidate.catalogEntry.productName;
-          const original = row.candidate.blueprint.runs === -1;
           const skillGateVerdict = productTypeID !== null ? skillGateFor(productTypeID) : undefined;
           const selected = selectedIds.has(row.candidate.id);
           const depthTone = ORDER_DEPTH_TONE[row.orderDepth];
@@ -261,7 +267,8 @@ export function MobileOpportunityList({
               }}
               className={cx(
                 'grid grid-cols-[2.25rem_minmax(0,1fr)_auto] border-b border-line pr-1 last:border-b-0',
-                selected ? selectedRowClassName : 'border-l-2 border-l-transparent'
+                selected ? selectedRowClassName : 'border-l-2 border-l-transparent',
+                row.reactionLocation && 'text-text-dim'
               )}
             >
               <label
@@ -314,16 +321,13 @@ export function MobileOpportunityList({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.6875rem] text-text-dim tabular-nums">
-                  <StatChip
-                    label={original ? t('industry.bpo') : t('industry.bpc')}
-                    value={
-                      original
-                        ? t('industry.opportunitiesUnlimitedRuns')
-                        : row.candidate.blueprint.runs
-                    }
-                    tone={original ? 'accent' : 'default'}
-                  />
+                  <OpportunityBlueprintChip candidate={row.candidate} />
+                  {/* The hero says it when a profit figure leads; otherwise say it here. */}
+                  {row.reactionLocation && !blanked(activeFieldId) && (
+                    <span>{t('industry.opportunitiesSetReactionLocation')}</span>
+                  )}
                   {SORT_FIELD_ORDER.filter((id) => id !== activeFieldId).map((id) => {
+                    if (blanked(id)) return null;
                     const secondary = fields[id].hero(row);
                     if (secondary.node === null) return null;
                     return (

@@ -50,7 +50,9 @@ afterEach(() => {
 describe('MemberSrp', () => {
   it('explains a corporation without SRP instead of locking', async () => {
     setup({ enabled: false });
-    expect(await screen.findByText('SRP is not set up for your corporation')).toBeTruthy();
+    expect(
+      await screen.findByText('Ship replacement (SRP) is not set up for your corporation')
+    ).toBeTruthy();
     expect(screen.queryByLabelText('Killmail link')).toBeNull();
   });
 

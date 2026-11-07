@@ -134,7 +134,6 @@ function Board({ characterId, layout }: BoardProps) {
         <WidgetGrid
           widgets={layout.widgets}
           editing={editing}
-          onRemove={edit.remove}
           onAdd={() => setGalleryOpen(true)}
           onRoles={() => setRolesOpen(true)}
         />

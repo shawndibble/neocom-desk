@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import { getKind, isAddable } from './kinds';
 import { presetSeed } from './galleryPresets';
 import {
@@ -34,7 +35,7 @@ describe('buildLayoutFromRoles', () => {
   };
 
   it('puts the base four first, then role kinds in order', () => {
-    const l = buildLayoutFromRoles(['trader'], ids());
+    const l = buildLayoutFromRoles(['trader'], null, ids());
     expect(kindsOf(l)).toEqual([
       'wallet',
       'training',
@@ -53,12 +54,12 @@ describe('buildLayoutFromRoles', () => {
   });
 
   it('dedupes kinds shared between roles', () => {
-    const l = buildLayoutFromRoles(['trader', 'industrialist'], ids());
+    const l = buildLayoutFromRoles(['trader', 'industrialist'], null, ids());
     expect(kindsOf(l).filter((k) => k === 'stock')).toHaveLength(1);
   });
 
   it('leaves out coming-soon kinds and keeps built ones', () => {
-    const l = buildLayoutFromRoles(['miner', 'fighter', 'explorerHauler'], ids());
+    const l = buildLayoutFromRoles(['miner', 'fighter', 'explorerHauler'], null, ids());
     for (const k of kindsOf(l)) expect(isAddable(k), k).toBe(true);
     expect(kindsOf(l)).toContain('survey');
     expect(kindsOf(l)).toContain('miningYield');
@@ -66,15 +67,38 @@ describe('buildLayoutFromRoles', () => {
   });
 
   it('gives unique ids and kind default sizes and views', () => {
-    const l = buildLayoutFromRoles(['trader'], ids());
+    const l = buildLayoutFromRoles(['trader'], null, ids());
     expect(new Set(l.widgets.map((w) => w.id)).size).toBe(l.widgets.length);
     const orders = l.widgets.find((w) => w.kind === 'orders')!;
     expect(orders).toMatchObject({ size: 'L', view: 'table', scope: 'header', showOnPhone: true });
   });
 
+  it('leaves out corp kinds the character cannot open', () => {
+    for (const held of [null, NO_CORP_CAPABILITIES]) {
+      expect(kindsOf(buildLayoutFromRoles(['miner'], held, ids()))).not.toContain('moonChunks');
+      expect(kindsOf(buildLayoutFromRoles(['industrialist'], held, ids()))).not.toContain(
+        'structures'
+      );
+    }
+    // The rest of the Role still comes.
+    expect(kindsOf(buildLayoutFromRoles(['miner'], null, ids()))).toContain('miningYield');
+  });
+
+  it('keeps a corp kind whose capability is held', () => {
+    const moons = { ...NO_CORP_CAPABILITIES, canReadMoonExtractions: true };
+    expect(kindsOf(buildLayoutFromRoles(['miner'], moons, ids()))).toContain('moonChunks');
+    expect(kindsOf(buildLayoutFromRoles(['industrialist'], moons, ids()))).not.toContain(
+      'structures'
+    );
+    const structures = { ...NO_CORP_CAPABILITIES, canReadStructures: true };
+    expect(kindsOf(buildLayoutFromRoles(['industrialist'], structures, ids()))).toContain(
+      'structures'
+    );
+  });
+
   it('ignores an unknown role and with no roles is just the basics', () => {
-    expect(kindsOf(buildLayoutFromRoles(['nope' as never], ids()))).toEqual([...BASE_KINDS]);
-    expect(kindsOf(buildLayoutFromRoles([], ids()))).toEqual([...BASE_KINDS]);
+    expect(kindsOf(buildLayoutFromRoles(['nope' as never], null, ids()))).toEqual([...BASE_KINDS]);
+    expect(kindsOf(buildLayoutFromRoles([], null, ids()))).toEqual([...BASE_KINDS]);
   });
 });
 

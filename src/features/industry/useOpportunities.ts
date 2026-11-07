@@ -49,6 +49,7 @@ import {
   deleteOpportunitiesCache,
   detectOpportunityStock,
   groupCandidatesByHub,
+  isReaction,
   opportunitiesBatchKey,
   opportunitiesInputsKey,
   opportunitySnapshotRequest,
@@ -158,6 +159,7 @@ export function useOpportunities({
         defaultsByCharacter: new Map(
           candidates.map((c) => [c.characterId, defaultsForCharacter(c.characterId)] as const)
         ),
+        pricesReactions: candidates.some(isReaction),
       }),
     [
       assumedMe,
@@ -219,12 +221,13 @@ export function useOpportunities({
     void (async () => {
       // Grouped by hub (issue #2055's "batched per Character/hub, not per
       // row"): one snapshot request per distinct hub the batch's owning
-      // Characters resolve to, not one shared hard-coded default.
+      // Characters resolve to, not one shared hard-coded default. Also per
+      // build system and activity, since a snapshot carries one cost index.
       const hubGroups = groupCandidatesByHub(
         currentCandidates,
         hubForCharacter,
-        (characterId) =>
-          startingLocation('manufacturing', facilityDefaults, defaultsRef.current(characterId))
+        (characterId, activity) =>
+          startingLocation(activity, facilityDefaults, defaultsRef.current(characterId))
             .buildSystemId
       );
       const requests = hubGroups.map((group) =>
@@ -235,13 +238,18 @@ export function useOpportunities({
           pi,
           facilityDefaults,
           // One build system per group, so any member's latest plan names it.
-          defaultsRef.current(group.candidates[0]!.characterId)
+          defaultsRef.current(group.candidates[0]!.characterId),
+          group.activity
         )
       );
       const snapshots = await Promise.all(loadMarketSnapshots(requests));
       if (cancelled) return;
-      const snapshotByHubId = new Map(
-        hubGroups.map((group, i) => [group.hub.id, snapshots[i]!] as const)
+      // By candidate, not hub: one hub can hold several groups (build
+      // systems, activities), each with its own cost index.
+      const snapshotByCandidateId = new Map(
+        hubGroups.flatMap((group, i) =>
+          group.candidates.map((candidate) => [candidate.id, snapshots[i]!] as const)
+        )
       );
 
       const stock = detectOpportunityStock(ownedStockSnapshot.sources, currentCandidates);
@@ -262,7 +270,7 @@ export function useOpportunities({
           const hub = hubForCharacter(candidate.characterId);
           const row = computeOpportunityRow(
             candidate,
-            snapshotByHubId.get(hub.id)!,
+            snapshotByCandidateId.get(candidate.id)!,
             facilityDefaults,
             modifiersByCharacter.get(candidate.characterId) ?? NO_CHARACTER_MODIFIERS,
             stock,

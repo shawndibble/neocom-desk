@@ -45,7 +45,6 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.miningTaxOreValueMode',
   'sync.miningTaxSurveyConnections',
   'sync.navHidden',
-  'sync.navSetupAnswered',
   'sync.notificationFeedPrefs',
   'sync.oreRefiningStructureRate',
   'sync.overviewCardOrder',

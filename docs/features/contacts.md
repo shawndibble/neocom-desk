@@ -65,7 +65,7 @@ A Standings name opens the shared info modal (`?info=faction-<id>`, `corporation
 
 - Not hydrated: spinner. No active Character: redirect `/characters`.
 - Loading with no data: spinner (filter bar waits for first good counts).
-- Across view renders regardless of This-character errors; This character view order of checks: reauth (`GrantBanner` for `getCharacterContacts`), error (`EmptyState` load failed), empty (`CachedEmptyState`: "no contacts cached" offline vs "No contacts" after a successful empty fetch), then table.
+- Across view renders regardless of This-character errors; This character view order of checks: reauth (`GrantBanner` for `getCharacterContacts`), error (`EmptyState` load failed), empty (`CachedEmptyState`: "no contacts cached" offline vs "No contacts" plus what fills it after a successful empty fetch; Across shows the same once every character has a saved copy), then table.
 - Served from cache: amber "offline" line. Paginated fetch cut short: amber "incomplete" line (`contactsTruncated`), CSV filename gets `-partial`.
 - Filters empty the list: `noResults` with "Reset filters" button when any filter is active.
 - Across view: empty (no contact anywhere) `acrossEmptyTitle/Hint`; no rows after filters `acrossNoResults`; until "Fetch all" is pressed a hint says data is "what each character last cached... may look emptier than it is".

@@ -30,7 +30,7 @@ import {
   focusRingInsetClassName,
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
-import type { ShipAssetItem } from '@/engine/fittings/assetShipMapper';
+import { shipAssetItem, type ShipAssetItem } from '@/engine/fittings/assetShipMapper';
 import { findShips, type OwnedAsset, type ShipRow } from '@/engine/myShips';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
@@ -115,12 +115,7 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
   for (const asset of owned) {
     if (asset.location_type !== 'item' || !shipIds.has(asset.location_id)) continue;
     const list = contentsByShip.get(asset.location_id) ?? [];
-    list.push({
-      typeId: asset.type_id,
-      quantity: asset.quantity,
-      flag: asset.location_flag,
-      itemId: asset.item_id,
-    });
+    list.push(shipAssetItem(asset));
     contentsByShip.set(asset.location_id, list);
   }
   return {
@@ -621,7 +616,11 @@ export function MyShipsView({
           {state.status === 'ready' && sorted.length === 0 && !allSkipped && (
             <EmptyState
               title={t('assets.myShips.emptyTitle')}
-              hint={query.trim() ? t('assets.myShips.noMatches') : t('assets.myShips.emptyHint')}
+              hint={
+                query.trim()
+                  ? t('assets.myShips.noMatches')
+                  : t(showCharacter ? 'assets.myShips.emptyHint' : 'assets.myShips.emptyHintOne')
+              }
               action={
                 !query.trim() &&
                 onShowAllCharacters && (

@@ -248,10 +248,10 @@ describe('access states (AC1)', () => {
 
   it.each(['not-granted', 'roles-without-grant'] as const)(
     'offers the Grant, and no board, for a %s character who reached the URL anyway',
-    (state) => {
+    async (state) => {
       mockedAccess.mockReturnValue(accessOf(state, {}));
       renderCorp();
-      expect(screen.getByText("Corporation data isn't granted")).toBeInTheDocument();
+      expect(await screen.findByText('Corp officer pages')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Grant corporation access' })).toBeInTheDocument();
       expect(screen.queryByRole('navigation', { name: 'Corporation' })).not.toBeInTheDocument();
     }

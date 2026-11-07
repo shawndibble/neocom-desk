@@ -711,6 +711,13 @@
     },
     "popular": {
       "title": "Popular fits",
+      "caption": "Fits other pilots actually fly: from recent kills (zKillboard) and published guides (EVE Workbench).",
+      "verdict": {
+        "canFly": "Can fly",
+        "missing_one": "Missing {{count}} skill",
+        "missing_other": "Missing {{count}} skills",
+        "unknown": "Skills unknown"
+      },
       "loading": "Loading popular fits from zKillboard…",
       "failed": "Couldn't load popular fits from zKillboard right now. Everything else still works.",
       "empty": "No recent losses of this hull with a full fit.",
@@ -761,8 +768,14 @@
       "listLabel": "Your fittings",
       "sourceSaved": "Saved",
       "sourceInGame": "In-game",
+      "sourceActive": "Active fit",
+      "activeHeading": "Active fit",
+      "activeLag": "The ship you fly now. Its modules can be up to an hour behind the game.",
       "emptyTitle": "No fittings yet",
-      "emptyHint": "Start one from a hull, or import an EFT block, a link or a fittings file. You can also press Ctrl+V anywhere in the app to paste an EFT block.",
+      "emptyHint": "A fitting is the set of modules on a ship. Start from the ship you fly, or see which ships you can fly in the <shipTree>Ship Tree</shipTree>.",
+      "fitFlown": "Fit your {{ship}}",
+      "importHint": "Paste an EFT block (the fit text EVE and other fitting tools copy) or a link, or pick a fittings file. You can also press Ctrl+V anywhere in the app to paste an EFT block.",
+      "importHint_touch": "Paste an EFT block (the fit text EVE and other fitting tools copy) or a link, or pick a fittings file.",
       "noMatches": "No saved or In-game fitting matches that search.",
       "matches_one": "{{count}} matching fitting",
       "matches_other": "{{count}} matching fittings",
@@ -1995,7 +2008,7 @@
       "removeNamed": "Remove {{name}} from comparison",
       "slotFallback": "Fitting {{n}}",
       "emptyTitle": "Nothing to compare yet",
-      "emptyHint": "Add a Fitting to start comparing.",
+      "emptyHint": "Add a Fitting to start comparing. Your saved and In-game fittings are in the <library>Fittings library</library>.",
       "differencesOnly": "Show differences only",
       "pagePrev": "Previous",
       "pageNext": "Next",
@@ -2842,6 +2855,7 @@
     "planCardTitle": "Skill plan",
     "planCardMeta": "{{duration}} · finishes {{date}}",
     "planCardEmpty": "No skill plans yet.",
+    "planCardEmptyHint": "Create a plan to start training toward a goal. Start from a <certified>Certified Plan</certified>, or pick a ship in the <shipTree>Ship Tree</shipTree>. You can also press Ctrl+V anywhere in the app to paste a skill plan.",
     "allPlansButton": "All plans",
     "allPlansTitle": "All plans",
     "computeError": "Couldn't compute this plan: {{message}}",
@@ -3253,6 +3267,38 @@
     "rename": "Rename",
     "emptyTitle": "No build plans yet",
     "emptyHint": "Create a plan to price out a manufacturing job. Or press Ctrl+V anywhere in the app to paste a blueprint list as a Build Group.",
+    "emptyHint_touch": "Create a plan to price out a manufacturing job.",
+    "newToIndustry": "New to Industry?",
+    "explainer": {
+      "title": "New to Industry? The short explainer",
+      "intro": "Manufacturing turns a blueprint and materials into an item. You start the job at a station or structure with a factory, and the item is ready when the job's timer ends. A brand-new pilot can do it.",
+      "blueprint": "A blueprint",
+      "blueprintBody": "The recipe. It lists the materials one run needs and how long the run takes.",
+      "plus": "Plus",
+      "materials": "Materials",
+      "materialsBody": "Minerals such as Tritanium, and parts for bigger items. Buy them on the market, or mine and refine them.",
+      "facility": "Station or structure with a factory",
+      "item": "The item",
+      "itemBody": "A Rifter, for example. Sell it or use it yourself.",
+      "blueprints": "Two kinds of blueprint",
+      "original": "Blueprint original",
+      "originalBody": "Reusable: it never runs out. You can research it so it uses fewer materials and less time.",
+      "copy": "Blueprint copy",
+      "copyBody": "Made from an original, with a set number of runs. When the runs are used, it is gone.",
+      "firstBlueprint": "Your first blueprint",
+      "firstBlueprintBody": "The NPC market sells blueprint originals for many Tech 1 ships, modules and ammo. Search the market for the item's name followed by \"Blueprint\".",
+      "alpha": "What an Alpha can train",
+      "alphaIntro": "Alpha clones can train these industry skills:",
+      "alphaSkill": "{{name}}, up to level {{level}}",
+      "alphaRest": "Higher levels, and the other manufacturing and research skills, need Omega.",
+      "thisPage": "How this page helps",
+      "buildPlan": "Build Plan",
+      "buildPlanBody": "Pick a blueprint. The plan prices every material and the job fee, and says whether building beats buying.",
+      "opportunities": "Opportunities",
+      "opportunitiesBody": "Ranks what is worth building by ISK per hour: the blueprints you own, and products across the whole market.",
+      "learnMore": "Learn more:",
+      "learnLink": "EVE University: Manufacturing"
+    },
     "selectHint": "Select a build plan, or create one.",
     "backToList": "Back to Build Plans",
     "profitColumn": "Profit",
@@ -4158,6 +4204,9 @@
     "opportunitiesStockFullShort": "Full",
     "opportunitiesStockEmptyTitle": "No builds match your stock",
     "opportunitiesStockEmptyHint": "None of these blueprints are covered enough by what you own, or they have no price yet.",
+    "opportunitiesFilterEmptyTitle": "No builds match these filters",
+    "opportunitiesFilterEmptyHint": "Change or reset the filters to see the rest.",
+    "opportunitiesSetReactionLocation": "Set reaction location",
     "opportunitiesOrderDepthLabel": "Depth",
     "opportunitiesOrderDepth": {
       "deep": "Deep",
@@ -4169,8 +4218,10 @@
     "opportunitiesLoadFailedHint": "Your blueprints aren't saved on this device yet, so there is nothing to rank. They load once ESI answers.",
     "opportunitiesSomeFailed_one": "Couldn't load blueprints for {{count}} character — their blueprints are missing here",
     "opportunitiesSomeFailed_other": "Couldn't load blueprints for {{count}} characters — their blueprints are missing here",
-    "opportunitiesEmptyTitle": "No manufacturing blueprints found",
-    "opportunitiesEmptyHint": "Own a blueprint original or copy, then refresh — reaction blueprints are not ranked here.",
+    "opportunitiesEmptyTitle": "You own no blueprints yet",
+    "opportunitiesEmptyHint": "The scan above includes blueprints you can buy.",
+    "opportunitiesNothingRankableTitle": "None of your blueprints can be ranked",
+    "opportunitiesNothingRankableHint": "The scan above includes blueprints you can buy.",
     "opportunitiesProgress": "{{done}} of {{total}} calculated",
     "opportunitiesRefresh": "Refresh",
     "opportunitiesManualOnly": "More than {{count}} blueprints: prices recalculate only when you refresh.",
@@ -4184,7 +4235,7 @@
     "opportunitiesViewHistory": "View {{name}} price history",
     "opportunitiesPriceHistoryTitle": "{{name}} — Price History",
     "marketOpportunitiesTitle": "What's profitable",
-    "marketOpportunitiesLiquidityTooltip": "Only products you can actually build are scanned: the blueprint is one your characters own, or one you can buy from the NPC market, a public contract, or an LP store you hold points with. Of those, only products with enough sell-order value at the hub to matter count, and only the top few per Market Group category. A sell price far above what the item actually trades for is treated as a troll order and replaced by that average. Each row is priced at the ME/TE a plan opened from it starts at: your owned copy's, else your assumed ME/TE. Sub-builds are folded into the product, so a plan can still differ slightly.",
+    "marketOpportunitiesLiquidityTooltip": "Ranks items you could build for profit, including blueprints you can buy. Only products you can actually build are scanned: the blueprint is one your characters own, or one you can buy from the NPC market, a public contract, or an LP store you hold points with. Of those, only products with enough sell-order value at the hub to matter count, and only the top few per Market Group category. A sell price far above what the item actually trades for is treated as a troll order and replaced by that average. Each row is priced at the ME/TE a plan opened from it starts at: your owned copy's, else your assumed ME/TE. Sub-builds are folded into the product, so a plan can still differ slightly.",
     "marketOpportunitiesRunScan": "Scan",
     "marketOpportunitiesScanning": "Scanning…",
     "marketOpportunitiesEmptyTitle": "Nothing scanned yet",
@@ -5651,6 +5702,7 @@
         "title": "Mining yield",
         "description": "ISK per day from your mining",
         "empty": "No mining recorded in this range.",
+        "emptyLink": "Open Mining",
         "col": {
           "ore": "Ore",
           "isk": "ISK",
@@ -5892,7 +5944,6 @@
         "title": "Coming up",
         "description": "Calendar events you accepted or may attend",
         "empty": "No accepted or tentative events ahead.",
-        "emptyHint": "Click the 3 dots menu to change to view all events.",
         "emptyAll": "No events ahead.",
         "more": "+{{count}} more in 24h",
         "col": {
@@ -5948,8 +5999,6 @@
         "nothing": "Nothing was saved to show.",
         "retry": "Retry"
       },
-      "emptyHint": "This widget has no data for this Character.",
-      "remove": "Remove widget",
       "opensPage": "Opens the {{title}} page",
       "settingsFor": "Settings for {{title}}",
       "tone": {
@@ -6886,7 +6935,7 @@
       "acknowledgeAll": "Acknowledge all {{count}}",
       "danger": "Danger",
       "empty": "You are all caught up",
-      "emptyHint": "New alerts will appear here and on the bell.",
+      "emptyHint": "Alerts show here and on the bell. By default you get one when a skill queue is about to run out, a character stops training, or new mail arrives.",
       "notifyMe": "Manage Notification Settings",
       "pushOn": "Push on this device: On",
       "pushOff": "Push on this device: Off"
@@ -7063,13 +7112,15 @@
     "filterToParty": "Filter to {{party}}",
     "everMarks": "EverMarks",
     "everMarksTooltipLabel": "About EverMarks",
-    "everMarksTooltip": "EverMarks are loyalty points for the Paragon corporation, spent in its own LP Store — separate from the per-corporation LP under Loyalty Points.",
+    "everMarksTooltip": "EverMarks are loyalty points from Paragon (the in-game cosmetics store), spent in its own LP Store. They are separate from the LP (loyalty points) that corporations pay, listed under Loyalty Points.",
     "journalEmptyTitle": "No journal entries cached",
     "journalEmptyHint": "Couldn't load this character's wallet journal yet. Try again shortly.",
     "journalEmptyFetchedTitle": "No journal entries",
+    "journalEmptyFetchedHint": "Every ISK in or out shows here: mission rewards, bounties, market sales and fees.",
     "transactionsEmptyTitle": "No transactions cached",
     "transactionsEmptyHint": "Couldn't load this character's recent transactions yet. Try again shortly.",
     "transactionsEmptyFetchedTitle": "No transactions",
+    "transactionsEmptyFetchedHint": "Items you buy or sell on the market show here, with the profit on each sale.",
     "date": "Date",
     "amount": "Amount",
     "balanceCol": "Balance",
@@ -7625,10 +7676,10 @@
       "stopFailed": "Couldn't stop that. Try again."
     },
     "emptyTitle": "No mining ledger entries match this filter",
-    "emptyHint": "Mine a moon and check back — ESI's personal mining ledger updates daily.",
+    "emptyHint": "Mine a moon and check back — EVE's personal mining ledger updates daily.",
     "managePayeesAction": "Payees",
     "firstPayeeTitle": "Create a Payee first",
-    "firstPayeeHint": "Mining tax is owed to a Payee, such as the corporation that owns the moon. Use the Payees button above to add one, then your mining ledger entries show up here to assign.",
+    "firstPayeeHint": "Only needed if someone charges you for mining at their moon. Mining in normal asteroid belts is not taxed here. Mining tax is owed to a Payee, such as the corporation that owns the moon. Use the Payees button above to add one, then your mining ledger entries show up here to assign.",
     "managePayeesTitle": "Manage Payees",
     "payeesEmpty": "No Payees yet.",
     "editPayee": "Edit {{name}}",
@@ -8071,7 +8122,7 @@
       "otherTypes_one": "Other ({{count}} type)",
       "otherTypes_other": "Other ({{count}} types)",
       "emptyTitle": "No mining ledger entries in this window",
-      "emptyHint": "Mine some ore, ice or gas and check back — ESI's personal mining ledger updates daily.",
+      "emptyHint": "Ore, ice and gas you mine show here once EVE updates your mining ledger, which can take up to a day. To start: fly a Venture (it needs the Mining Frigate skill) to an asteroid belt in highsec. Alpha clones can do this.",
       "detail": {
         "title": "Mined {{date}} — {{system}}",
         "unitsColumn": "Units",
@@ -8653,6 +8704,8 @@
       "itemsSuffix": ", {{items}}"
     },
     "emptyLocation": "Nothing stored here.",
+    "emptyRootTitle": "No items",
+    "emptyRootHint": "Items and ships you own in any station or structure show here, grouped by where they are.",
     "section": {
       "pinned": "Pinned",
       "allLocations_one": "All locations · {{count}}",
@@ -8687,6 +8740,7 @@
       "error": "Could not read your ships.",
       "emptyTitle": "No ships found",
       "emptyHint": "No ships in the assets of the chosen characters.",
+      "emptyHintOne": "No ships in this character's assets.",
       "showAllCharacters": "Show all characters",
       "packaged": "Packaged",
       "csvClass": "Class",
@@ -8811,6 +8865,7 @@
     "emptyTitle": "No mail cached",
     "emptyHint": "Couldn't load this character's mail yet. Try again shortly.",
     "emptyFetchedTitle": "No mail",
+    "emptyFetchedHint": "EVE mail from players, your corporation and alliance shows here.",
     "readerEmptyTitle": "No message open",
     "selectHint": "Select a message from the list to read it.",
     "unknownSender": "Unknown sender",
@@ -9216,6 +9271,7 @@
     "emptyTitle": "No jump clones cached",
     "emptyHint": "Couldn't load this character's jump clones yet. Try again shortly.",
     "emptyFetchedTitle": "No jump clones",
+    "emptyFetchedHint": "A jump clone is a spare body in another station or structure that you can switch into.",
     "location": "Location",
     "implants": "Implants",
     "noImplants": "No implants",
@@ -10644,6 +10700,7 @@
     "emptyTitle": "No contracts cached",
     "emptyHint": "Couldn't load this character's contracts yet. Try again shortly.",
     "emptyFetchedTitle": "No contracts",
+    "emptyFetchedHint": "Contracts you issue or accept show here: item trades, couriers and auctions.",
     "status": "Status",
     "type": "Type",
     "price": "Price / reward",
@@ -11704,6 +11761,7 @@
     "emptyTitle": "No contacts cached",
     "emptyHint": "Couldn't load this character's contacts yet. Try again shortly.",
     "emptyFetchedTitle": "No contacts",
+    "emptyFetchedHint": "Pilots, corporations and alliances you add as contacts in EVE show here, with the standing you set.",
     "noResults": "No contacts match the selected filters",
     "noResultsHint": "Widen the filters above to see contacts.",
     "name": "Name",
@@ -11872,7 +11930,7 @@
     "iskPerLpUnit": "ISK/LP",
     "colIskPerLp": "ISK / LP",
     "emptyTitle": "No offers",
-    "emptyHint": "This corporation's LP store has no offers right now.",
+    "emptyHint": "This corporation has no LP Store. Corporations whose agents give missions run one.",
     "errorTitle": "Couldn't load this LP store",
     "errorHint": "EVE's servers didn't answer, and nothing was saved from an earlier visit. This is not an empty store.",
     "retry": "Try again",
@@ -11893,6 +11951,7 @@
     "landingTitle": "Pick a corporation",
     "landingHint": "Search any NPC corporation's LP Store to browse its offers — you don't need LP with it first.",
     "landing": {
+      "whatIsLp": "LP (loyalty points) is paid by a corporation's mission agents on top of ISK. Spend it here on items you can use or sell.",
       "viewLabel": "Show",
       "viewStores": "Stores",
       "viewOffers": "Offers",
@@ -12010,6 +12069,7 @@
     "emptyTitle": "No open orders cached",
     "emptyHint": "Couldn't load this character's orders yet. Try again shortly.",
     "emptyFetchedTitle": "No open orders",
+    "emptyFetchedHint": "Buy and sell orders you list on the market show here.",
     "item": "Item",
     "side": "Side",
     "buy": "Buy",
@@ -14166,10 +14226,16 @@
     "faq": {
       "storeIntro": "What you make here syncs between your devices. What we read from EVE stays on this one. Exceptions are listed below.",
       "groups": {
+        "newToEve": "New to EVE?",
         "using": "Using Neocom Desk",
         "data": "Your data"
       },
       "q": {
+        "eveTerms": "What do these EVE words mean?",
+        "makeIsk": "How do I make ISK as a new pilot?",
+        "firstShip": "What ship can I fly, and what should I train?",
+        "securitySpace": "What do highsec, lowsec, nullsec and wormholes mean for my safety?",
+        "learnMore": "Where can I learn the rest of the game?",
         "permissions": "Why does login ask for so many permissions?",
         "dataLag": "Why do my numbers differ from, or lag behind, the game?",
         "alerts": "What are Alerts, and how do I get them when the app is closed?",
@@ -14193,6 +14259,76 @@
         "backups": "How do backups work?"
       },
       "a": {
+        "newToEve": {
+          "termsIntro": "The words the game and this app use without explaining. <glossary>EVE University’s lexicon</glossary> has the rest.",
+          "terms": {
+            "sp": {
+              "term": "SP (skill points)",
+              "definition": "What a Character earns by training skills. Training runs in real time, even while you are logged off."
+            },
+            "isk": {
+              "term": "ISK",
+              "definition": "EVE’s money. Ships, modules and skill books are all bought with it."
+            },
+            "clones": {
+              "term": "Alpha / Omega clone",
+              "definition": "Alpha is the free way to play: a limited set of skills, and the skill queue stops at 5 million SP. Omega is the paid subscription: every skill, with no such limit."
+            },
+            "lp": {
+              "term": "LP (loyalty points)",
+              "definition": "Earned from an NPC corporation’s missions, and spent only in that corporation’s LP store."
+            },
+            "security": {
+              "term": "Security status",
+              "definition": "A solar system’s security level runs from 1.0 down to -1.0: highsec is 1.0 to 0.5, lowsec 0.4 to 0.1, and nullsec 0.0 and below. Wormhole space, reached only through wormholes, is -1.0. A pilot has a security status of their own too, which drops when they attack other pilots in highsec or lowsec."
+            },
+            "jumpClone": {
+              "term": "Jump clone",
+              "definition": "A second body kept in another station. Jumping into it moves you there at once, without your ship or items, and the next jump waits 24 hours, less with training."
+            },
+            "implants": {
+              "term": "Implants",
+              "definition": "Plug-ins for a clone’s head that raise its attributes (how fast it trains) or improve how a ship or module performs. They stay in that clone, and are lost if your pod is destroyed."
+            },
+            "blueprints": {
+              "term": "BPO / BPC",
+              "definition": "A blueprint original builds as many runs as you have materials for, and can be researched. A blueprint copy has a set number of runs."
+            },
+            "meTe": {
+              "term": "ME / TE",
+              "definition": "Material Efficiency and Time Efficiency, a blueprint’s research levels: higher ME needs fewer materials per build, higher TE builds faster."
+            },
+            "tradeHub": {
+              "term": "Trade Hub (Jita 4-4)",
+              "definition": "A station where most of a region’s buying and selling happens. Jita IV - Moon 4 - Caldari Navy Assembly Plant is by far the largest."
+            },
+            "collateral": {
+              "term": "Collateral",
+              "definition": "ISK a hauler puts up to accept a courier contract. If the delivery fails, the contract’s issuer gets it."
+            },
+            "dscan": {
+              "term": "D-Scan",
+              "definition": "The directional scanner every ship has. It shows ships and objects up to about 14 AU away, in the direction you point it."
+            },
+            "local": {
+              "term": "Local",
+              "definition": "The solar system’s chat channel. Its member list shows the pilots in the system; in wormhole space, only those who have spoken."
+            }
+          },
+          "makeIskIntro": "Ways open to an Alpha clone, and where Neocom Desk helps:",
+          "makeIskMissions": "Missions. Career agents teach the basics and pay ISK, plus ships, modules or skill books. An NPC corporation’s security missions pay ISK and LP; <lp>Wallet › LP Store</lp> shows what that LP buys.",
+          "makeIskMining": "Mining. Mine ore in a highsec asteroid belt and sell it. <mining>Mining</mining> shows what you mined, from EVE’s daily mining ledger.",
+          "makeIskLoot": "Loot. Sell what missions and wrecks drop: paste it into <appraisal>Market › Appraisal</appraisal> to see what it is worth.",
+          "makeIskCourier": "Hauling. Courier contracts pay you to carry cargo, once you put up the collateral. <courier>Contracts › Courier</courier> lists the public ones.",
+          "firstShip": "It depends on the skills your Character has trained. <tree>Ships › Tree</tree> lays out the hulls: open one, and Skills & Mastery shows what it needs and adds it to your plan.",
+          "firstShipPlan": "For a plan someone has already thought through, follow a CCP career path: <plans>Skills › Plans</plans> › the arrow beside New plan › From a Certified Plan.",
+          "securityHighsec": "Highsec (1.0 to 0.5): CONCORD, the NPC police, destroys a pilot who attacks another without cause. It arrives after the attack, within seconds, and later in a 0.5 system than in a 0.9 one.",
+          "securityLowsec": "Lowsec (0.4 to 0.1): no CONCORD. Sentry guns at stargates and stations fire on an attacker; elsewhere in the system, no NPC responds.",
+          "securityNullsec": "Nullsec (0.0 and below): no NPC responds to an attack. Players claim much of it, and can deploy bubbles that stop a ship from warping.",
+          "securityWormhole": "Wormhole space: no stargates, and the wormholes that lead in open and close. No NPC responds to an attack, bubbles are allowed, and Local lists a pilot only once they speak.",
+          "securityRoute": "<route>Travel › Route Safety</route> lists every system on a route with its security and the ships destroyed there in the last hour. In its Route rules, the Route preference “{{preference}}” picks higher-security systems, even when the route is longer.",
+          "learnMore": "<uni>EVE University’s New Player Index</uni> explains the game’s core ideas, and its <money>Making Money</money> page compares ways to earn ISK. Account, billing and in-game problems go to <ccp>CCP’s support site</ccp>, not to Neocom Desk."
+        },
         "delete": "Settings › Log out & delete › Delete all data removes every Character's synced data from our server, then erases this device. Another logged-in device keeps its own copy and can sync it back. Log out of all characters clears this device only. Delete all data also offers to leave your Communities (ticked by default), which deletes what you shared there, plus your Requests and Pledges, right away; untick it to stay in them. A Community's admin can't leave, so a Community you run is skipped: hand it over or delete it, which deletes it for every Member. A Character with no sync for 90 days is removed from its Communities automatically. SRP Claims and Corp Tax Book lines belong to the corporation's records and stay with it; How long is my data stored? says when they go.",
         "install": "<link>Settings › App & backup › Install this app</link> shows the steps for your browser, or an Install button if it has one. On iPhone and iPad, installing is also what makes notifications work.",
         "update": "The app updates itself in the background. For a new version now: Settings › App & backup › Update now: it checks and reloads.",
@@ -14238,7 +14374,7 @@
             "skills": "Skills: Alpha/Omega per character, the target skill plan, SP Extraction monitoring and its threshold, and which characters you marked as SP Farm. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, how the Assign form edits ore values, the moon surveys you connected to a payee with Assign Taxes, and the ledger days you unassigned so a payee's default systems leave them alone. Assets: the refining rate you type for your own structure, and its reprocessing tax, and the nicknames you gave your stations and structures (shown on the Assets page only). Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates, and the corporations you hid from Add my other corps.",
-            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your Corp Board layout, the stock targets you set on corporation assets, hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
+            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your Corp Board layout, the stock targets you set on corporation assets, hidden and reordered Overview cards from before the widget grid, and pages hidden from the navigation.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs. The notes you wrote on solar systems (up to 500 characters each, so don't put anything private in them)."
           }
         },
@@ -14944,9 +15080,12 @@
     "refresh": "Refresh corp data",
     "boardTitle": "Ops board",
     "dataAgeNote": "EVE caches corporation data for about an hour, so anything due sooner than that may already have happened — check the game client before acting on a short timer.",
-    "notGrantedTitle": "Corporation data isn't granted",
-    "notGrantedHint": "Corporation data isn't granted for this character. If you hold a corp role, grant it:",
+    "officerPagesTitle": "Corp officer pages",
+    "notGrantedHint": "{{roles}} If that's you, grant corporation access for this character:",
     "notGrantedAction": "Grant corporation access",
+    "npcCorporation": "You're in {{corporation}}, an NPC corporation. These pages are for officers (Director, Accountant…) of a player-run corporation.",
+    "npcCorporationUnnamed": "You're in an NPC corporation. These pages are for officers (Director, Accountant…) of a player-run corporation.",
+    "roleLine": "Corp pages are for officers: Director, Accountant, Station Manager and others.",
     "noAccessTitle": "No corporation access",
     "noAccessHint": "This character's in-game corporation roles do not open any corp data. Roles can only be changed in game.",
     "vitalsTitle": "Vitals",
@@ -15041,6 +15180,7 @@
       "noFilterMatchesHint": "Clear the search or reset the dark-only, ship and location filters to see every member.",
       "noAccessTitle": "Member tracking needs Director",
       "noAccessHint": "EVE only opens the member list and its last-login dates to a Director. No other corporation role can see them, and granting access here will not change that.",
+      "roleLine": "Member tracking needs Director.",
       "searchPlaceholder": "Search name, ship, location…",
       "shipFilterLabel": "Ship",
       "shipFilterAll": "Any ship",
@@ -15087,7 +15227,8 @@
       "viewLabel": "Wallet view",
       "transactionsView": "Transactions",
       "noAccessTitle": "Corp wallet needs Accountant",
-      "noAccessHint": "EVE only opens the corporation wallet to a Director, Accountant or Junior Accountant. Roles can only be changed in game, and granting access here will not change that."
+      "noAccessHint": "EVE only opens the corporation wallet to a Director, Accountant or Junior Accountant. Roles can only be changed in game, and granting access here will not change that.",
+      "roleLine": "The corporation wallet needs Director, Accountant or Junior Accountant."
     },
     "assets": {
       "title": "Corp Assets",
@@ -15097,6 +15238,7 @@
       "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this corporation has more.",
       "noAccessTitle": "Corp assets need Director",
       "noAccessHint": "EVE only opens the corporation asset list to a Director. No other corporation role can see it, and granting access here will not change that.",
+      "roleLine": "The corporation asset list needs Director.",
       "loadFailedTitle": "Could not load corp assets",
       "loadFailedHint": "The corporation asset read failed and nothing is cached yet. Try refreshing.",
       "searchPlaceholder": "Search items…",
@@ -15246,7 +15388,8 @@
     "moons": {
       "title": "Moons",
       "noAccessTitle": "Moons need the Accountant role",
-      "noAccessHint": "EVE only opens the refinery ledger to an Accountant, Director or CEO, so the Corp Tax Book is not available to your roles."
+      "noAccessHint": "EVE only opens the refinery ledger to an Accountant, Director or CEO, so the Corp Tax Book is not available to your roles.",
+      "roleLine": "The Corp Tax Book needs Accountant, Director or CEO."
     },
     "grid": {
       "customize": {
@@ -18815,9 +18958,12 @@
   "srpMember": {
     "title": "SRP",
     "notSetUp": {
-      "title": "SRP is not set up for your corporation",
+      "title": "Ship replacement (SRP) is not set up for your corporation",
       "hint": "Your corp has not turned on ship replacement. There is no SRP item in the menu until it does. Ask a director if you expected one."
     },
+    "npcTitle": "No ship replacement (SRP) in an NPC corporation",
+    "npcCorporation": "{{corporation}} is an NPC corporation. Ship replacement (SRP) is run by player corporations to pay back ships lost on corp operations.",
+    "npcCorporationUnnamed": "You're in an NPC corporation. Ship replacement (SRP) is run by player corporations to pay back ships lost on corp operations.",
     "loadFailed": "Couldn't load SRP",
     "file": {
       "title": "File a claim",
@@ -19083,6 +19229,7 @@
     "officer": {
       "deniedTitle": "SRP claims are not open to your roles",
       "deniedHint": "EVE did not confirm an SRP officer role for this character. Roles can only be changed in game.",
+      "roleLine": "SRP review needs Accountant or Director.",
       "loadFailed": "Couldn't load SRP claims",
       "summary": {
         "pending_one": "{{count}} pending",

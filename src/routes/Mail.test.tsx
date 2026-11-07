@@ -263,6 +263,17 @@ describe('Mail', () => {
     expect(await screen.findByText(/no mail cached/i)).toBeInTheDocument();
   });
 
+  it('says what fills the page when the character really has no mail', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () => HttpResponse.json([]))
+    );
+    render(<App />);
+    expect(await screen.findByText('No mail')).toBeInTheDocument();
+    expect(
+      screen.getByText('EVE mail from players, your corporation and alliance shows here.')
+    ).toBeInTheDocument();
+  });
+
   it('falls back to the unknown-sender label when a header has no sender', async () => {
     // `cond && map.get(x) ?? fallback` yields `false` for a missing sender,
     // and React renders `false` as nothing — the label never appeared.

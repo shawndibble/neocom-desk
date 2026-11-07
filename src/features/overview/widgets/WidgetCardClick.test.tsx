@@ -31,7 +31,6 @@ function setup({ to = '/mail', editing = false }: { to?: string | null; editing?
           widget={widget}
           editing={editing}
           previewView={view}
-          onRemove={() => undefined}
           menu={(card, target) => (
             <WidgetMenu widget={widget} to={target}>
               {card}

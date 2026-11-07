@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   canHide,
-  DEFAULT_SHOWN_NAV,
-  defaultHiddenNav,
   parseHiddenNav,
   parseRecentNav,
   pushRecentNav,
@@ -96,26 +94,5 @@ describe('recent views', () => {
   it('parses only known view paths from storage', () => {
     expect(parseRecentNav(['/market/orders', '/nowhere', 7])).toEqual(['/market/orders']);
     expect(parseRecentNav({})).toBeNull();
-  });
-});
-
-describe('the default rail', () => {
-  it('shows the eight starting pages and hides every other hideable page', () => {
-    const hidden = defaultHiddenNav();
-    for (const path of DEFAULT_SHOWN_NAV) expect(hidden).not.toContain(path);
-    expect(hidden).toEqual(
-      expect.arrayContaining(['/mining', '/planetary-industry', '/contracts', '/mail'])
-    );
-    expect(hidden.every((path) => canHide(path))).toBe(true);
-  });
-
-  it('never hides a page the pilot could not hide themselves', () => {
-    expect(defaultHiddenNav()).not.toContain('/settings');
-    expect(DEFAULT_SHOWN_NAV).toEqual(expect.arrayContaining(['/corp', '/corp/moons']));
-    expect(defaultHiddenNav().filter((path) => path.startsWith('/corp'))).toEqual([]);
-  });
-
-  it('is in nav order, as a stored list is', () => {
-    expect(parseHiddenNav(defaultHiddenNav())).toEqual(defaultHiddenNav());
   });
 });

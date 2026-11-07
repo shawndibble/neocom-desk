@@ -11,6 +11,8 @@ interface PopularFitRowProps {
   title: string;
   /** What follows the title, dimmed: " · last seen 2h ago · ~87.5M ISK". */
   meta?: ReactNode;
+  /** At the end of the title line, never truncated: the can-fly verdict (`PopularFitVerdict`). */
+  verdict?: ReactNode;
   modules: ComponentProps<typeof RackIconStrip>['modules'];
   names: ComponentProps<typeof RackIconStrip>['names'];
   /** Lines under the icons: a sighting, a failure. */
@@ -32,6 +34,7 @@ interface PopularFitRowProps {
 export function PopularFitRow({
   title,
   meta,
+  verdict,
   modules,
   names,
   children,
@@ -56,18 +59,21 @@ export function PopularFitRow({
         disabled ? 'cursor-not-allowed' : cx(rowInteractiveClassName, 'cursor-pointer')
       )}
     >
-      {/* -mx/px: room inside the truncating box for the title's focus ring. */}
-      <p className="-mx-1 truncate border-b border-line/50 px-1 pt-1 pb-2 text-sm">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={onOpen}
-          className={entityLinkClassName(disabledClassName)}
-        >
-          {title}
-        </button>
-        <span className="text-text-dim">{meta}</span>
-      </p>
+      <div className="-mx-1 flex items-center gap-2 border-b border-line/50 px-1 pt-1 pb-2">
+        {/* -mx/px: room inside the truncating box for the title's focus ring. */}
+        <p className="-mx-1 min-w-0 flex-1 truncate px-1 text-sm">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onOpen}
+            className={entityLinkClassName(disabledClassName)}
+          >
+            {title}
+          </button>
+          <span className="text-text-dim">{meta}</span>
+        </p>
+        {verdict}
+      </div>
       <RackIconStrip modules={modules} names={names} />
       {children}
     </div>

@@ -127,7 +127,7 @@ beforeEach(async () => {
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: true });
   // Likewise the Recent row: one test's visits must not show up as another's links.
   useRecentNav.setState({ value: [], hydrated: true });
-  // These tests list the whole rail; the short default set is RailNav.test's.
+  // These tests list the whole rail: every page shows, as for a new pilot.
   useHiddenNav.setState({ value: [], hydrated: true });
 });
 

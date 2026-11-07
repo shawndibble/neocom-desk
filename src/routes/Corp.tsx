@@ -79,8 +79,7 @@ const PhoneCustomizeList = lazy(() =>
 /** The header, edit bar and grid, below the providers. */
 function CorpGrid({ layout }: { layout: OverviewLayout }) {
   const { t } = useTranslation();
-  const edit = useOverviewEdit();
-  const { editing } = edit;
+  const { editing } = useOverviewEdit();
   const isPhone = useIsPhone();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const summary = useOverviewSummary(layout.widgets);
@@ -110,12 +109,7 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
           <PhoneCustomizeList />
         </Suspense>
       ) : (
-        <WidgetGrid
-          widgets={layout.widgets}
-          editing={editing}
-          onRemove={edit.remove}
-          onAdd={() => setGalleryOpen(true)}
-        />
+        <WidgetGrid widgets={layout.widgets} editing={editing} onAdd={() => setGalleryOpen(true)} />
       )}
       <Suspense fallback={null}>
         {galleryOpen && <Gallery open onClose={() => setGalleryOpen(false)} />}
@@ -206,6 +200,7 @@ export function Corp() {
           reason={gate.reason}
           title={t('corp.noAccessTitle')}
           hint={t('corp.noAccessHint')}
+          roleLine={t('corp.roleLine')}
         />
       </div>
     ) : gate.status === 'ready' ? (

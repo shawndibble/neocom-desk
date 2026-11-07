@@ -15,11 +15,12 @@ import { useEffect, useState } from 'react';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { loadWithCache } from '@/esi/cache';
 import { isCredentialFailure } from '@/esi/client';
-import { getCharacterShip } from '@/esi/endpoints';
+import { getCharacterShip, type CharacterShip } from '@/esi/endpoints';
 import { requiredScopesForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
-const CACHE_KEY = 'characterShip';
+// The whole ship, not just its type: the Active Fit needs its item id. A new key, since the old one held a bare type id.
+const CACHE_KEY = 'characterShip:full';
 export const SHIP_STALE_AFTER_MS = 90_000;
 const SHIP_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterShip'];
 
@@ -30,17 +31,26 @@ export interface ShipTypeRead {
   fetchedAt: Date | null;
 }
 
-export async function loadCharacterShipTypeRead(characterId: number): Promise<ShipTypeRead> {
-  const result = await loadWithCache(
+function loadShipRow(characterId: number) {
+  return loadWithCache(
     characterId,
     CACHE_KEY,
-    async () => (await getCharacterShip(characterId)).data?.ship_type_id ?? null,
+    async () => (await getCharacterShip(characterId)).data ?? null,
     {
       staleAfterMs: SHIP_STALE_AFTER_MS,
       detectAuthFailure: isCredentialFailure,
     }
   );
-  return { typeId: result?.data ?? null, fetchedAt: result?.fetchedAt ?? null };
+}
+
+export async function loadCharacterShipTypeRead(characterId: number): Promise<ShipTypeRead> {
+  const result = await loadShipRow(characterId);
+  return { typeId: result?.data?.ship_type_id ?? null, fetchedAt: result?.fetchedAt ?? null };
+}
+
+/** The flown ship whole (item id, hull, name): the Active Fit finds its modules among the assets by that item id. */
+export async function loadCharacterShip(characterId: number): Promise<CharacterShip | null> {
+  return (await loadShipRow(characterId))?.data ?? null;
 }
 
 /** The type id of the ship the character is flying, or null if unresolvable (missing grant, offline, or uncached). */

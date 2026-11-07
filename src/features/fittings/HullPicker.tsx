@@ -1,9 +1,4 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import {
-  focusRingInsetClassName,
-  rowInteractiveClassName,
-  selectedRowClassName,
-} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +6,9 @@ import { Button, SearchInput, TypeIcon } from '@/components/ui';
 import { buildHullCatalogue, searchHulls, type HullEntry } from '@/engine/fittings/hullCatalogue';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { CatalogueLoadingNote } from './FittingDataNotices';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { HullPickerRow } from './HullPickerRow';
+import { useHullFlyMarks, type HullFlyMarks } from './useHullFlyMarks';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import { guarded } from '@/app/routeChunks';
 
@@ -31,9 +29,29 @@ interface HullPickerProps {
  * (nothing is listed until the player types), hulls grouped by Ships market
  * class, pick one, and Start fitting opens
  * the bare hull. Needs only the static market data, so it works before the
- * ship data (dogma engine) has downloaded.
+ * ship data (dogma engine) has downloaded. Each hull carries the Ship Tree's
+ * can-fly mark for the active Character once that has loaded (#6011).
  */
-export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProps) {
+export function HullPicker(props: HullPickerProps) {
+  const characterId = useActiveCharacter((state) => state.activeCharacterId);
+  // No Character, no marks: the Ship Tree's data isn't loaded at all.
+  return characterId === null ? (
+    <HullPickerView {...props} flyMarks={null} />
+  ) : (
+    <MarkedHullPicker {...props} characterId={characterId} />
+  );
+}
+
+function MarkedHullPicker({ characterId, ...props }: HullPickerProps & { characterId: number }) {
+  return <HullPickerView {...props} flyMarks={useHullFlyMarks(characterId)} />;
+}
+
+function HullPickerView({
+  catalogue,
+  onStart,
+  onOpenPopular,
+  flyMarks,
+}: HullPickerProps & { flyMarks: HullFlyMarks | null }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<HullEntry | null>(null);
@@ -76,29 +94,18 @@ export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProp
                   <span className="tabular-nums">{hullClass.hulls.length}</span>
                 </h3>
                 <ul>
-                  {hullClass.hulls.map((hull) => {
-                    const isSelected = selected?.typeId === hull.typeId;
-                    return (
-                      <li key={hull.typeId}>
-                        <button
-                          type="button"
-                          aria-pressed={isSelected}
-                          onClick={() => setSelected(hull)}
-                          onDoubleClick={() => onStart(hull)}
-                          className={cx(
-                            'flex min-h-9 w-full items-center px-2 text-left text-sm',
-                            rowInteractiveClassName,
-                            focusRingInsetClassName,
-                            isSelected
-                              ? `${selectedRowClassName} text-accent`
-                              : 'border-l-2 border-l-transparent'
-                          )}
-                        >
-                          {hull.name}
-                        </button>
-                      </li>
-                    );
-                  })}
+                  {hullClass.hulls.map((hull) => (
+                    <li key={hull.typeId}>
+                      <HullPickerRow
+                        hull={hull}
+                        mark={flyMarks?.(hull.typeId)}
+                        marked={flyMarks !== null}
+                        selected={selected?.typeId === hull.typeId}
+                        onSelect={() => setSelected(hull)}
+                        onStart={() => onStart(hull)}
+                      />
+                    </li>
+                  ))}
                 </ul>
               </section>
             ))}

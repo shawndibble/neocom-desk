@@ -135,6 +135,43 @@ describe('BuildPlanList', () => {
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 
+  function renderEmpty() {
+    return render(
+      <BuildPlanList
+        plans={[]}
+        catalog={CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+      />
+    );
+  }
+
+  it('offers the Ctrl+V paste in the empty hint with a mouse', () => {
+    renderEmpty();
+    expect(screen.getByText(/press Ctrl\+V anywhere/)).toBeInTheDocument();
+  });
+
+  it('drops the Ctrl+V line from the empty hint under a finger (#6002)', () => {
+    const matchMedia = window.matchMedia;
+    window.matchMedia = (query: string) =>
+      ({ ...matchMedia(query), matches: query === '(pointer: coarse)' }) as MediaQueryList;
+    try {
+      renderEmpty();
+      expect(
+        screen.getByText('Create a plan to price out a manufacturing job.')
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/Ctrl\+V/)).not.toBeInTheDocument();
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+  });
+
   it('explains the verdict on hover with the build and buy totals it compared', async () => {
     render(
       <BuildPlanList
