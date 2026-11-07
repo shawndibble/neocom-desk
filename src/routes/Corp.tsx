@@ -79,8 +79,7 @@ const PhoneCustomizeList = lazy(() =>
 /** The header, edit bar and grid, below the providers. */
 function CorpGrid({ layout }: { layout: OverviewLayout }) {
   const { t } = useTranslation();
-  const edit = useOverviewEdit();
-  const { editing } = edit;
+  const { editing } = useOverviewEdit();
   const isPhone = useIsPhone();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const summary = useOverviewSummary(layout.widgets);

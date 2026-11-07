@@ -405,7 +405,7 @@ describe('Overview widget grid', () => {
     expect(
       within(coming).getByText('Calendar events you accepted or may attend')
     ).toBeInTheDocument();
-    expect(within(coming).queryByRole('button', { name: 'Remove widget' })).toBeNull();
+    expect(within(coming).queryByRole('button', { name: /remove/i })).toBeNull();
     await user.click(within(coming).getByRole('button', { name: 'Settings for Coming up' }));
     await user.click(screen.getByRole('menuitem', { name: 'Remove from Overview' }));
 
