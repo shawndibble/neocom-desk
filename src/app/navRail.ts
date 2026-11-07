@@ -104,39 +104,6 @@ export function parseHiddenNav(raw: unknown): string[] | null {
   return kept && kept.sort((a, b) => order(a) - order(b));
 }
 
-/** What a new pilot sees on the rail (scope decision `20261009-163837-pinned-rail-...`). */
-export const DEFAULT_SHOWN_NAV: readonly string[] = [
-  '/overview',
-  '/skills',
-  '/industry',
-  '/ships',
-  '/market',
-  '/assets',
-  '/wallet',
-  '/travel',
-  // Corp pages render only behind Corp Access, so they are no clutter for anyone without it.
-  '/corp',
-  '/corp/members',
-  '/corp/wallet',
-  '/corp/assets',
-  '/corp/moons',
-  // Officer SRP: behind `canManageSrp`, so no clutter for anyone else.
-  '/corp/srp',
-];
-
-function hiddenExcept(shown: ReadonlySet<string>): string[] {
-  // A page with no rail row (the Alerts bell's) has nothing to fold away.
-  return (NAV_PAGES as readonly NavPage[])
-    .filter((page) => page.inRail !== false)
-    .map((page) => page.path as string)
-    .filter((path) => canHide(path) && !shown.has(path));
-}
-
-/** The hidden list of a pilot who has not chosen anything: every page outside the default set. */
-export function defaultHiddenNav(): string[] {
-  return hiddenExcept(new Set(DEFAULT_SHOWN_NAV));
-}
-
 /** How many recent views are kept: one more than are shown, so the current one can be skipped. */
 const RECENT_KEPT = 4;
 const RECENT_SHOWN = 3;

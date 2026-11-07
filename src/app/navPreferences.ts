@@ -12,17 +12,11 @@ import { parseHiddenNav, parseRecentNav, pushRecentNav } from './navRail';
 
 export const useHiddenNav = createSyncedSetting<readonly string[]>({
   key: 'sync.navHidden',
-  // Empty, not the short rail: `[]` is also a real choice, so "never asked" is
-  // `useNavSetupAnswered`'s to say, and answering writes the starting list.
+  // Empty: a new pilot sees every page, and hides what they don't play with
+  // Customize (scope decision
+  // `20261107-004603-new-pilots-see-the-full-rail`).
   defaultValue: [],
   parse: parseHiddenNav,
-});
-
-/** Whether the first-run "What do you do in EVE?" question was answered or skipped. */
-export const useNavSetupAnswered = createSyncedSetting<boolean>({
-  key: 'sync.navSetupAnswered',
-  defaultValue: false,
-  parse: (raw) => (typeof raw === 'boolean' ? raw : null),
 });
 
 export const useRecentNav = createLocalSetting<readonly string[]>({

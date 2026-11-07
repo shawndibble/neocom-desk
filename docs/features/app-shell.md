@@ -50,7 +50,7 @@ Everything around the feature pages: router and route table, the signed-in `Layo
   - `web: locked feature screen explaining a missing permission with one grant button`
   - `ios: bottom tab bar with four tabs and a More tab opening a grid of every section`
   - `ios: account switcher listing several profiles with avatars and the active one marked`
-- **Flow queries:** `web: first-run choice of which sections to show in navigation`.
+- **Flow queries:** `web: customizing which sections show in navigation`.
 - **Mobbin won't help with:** EVE Permissions and scopes, Corp Access rules.
 
 ## Routes (`src/app/App.tsx`)
@@ -87,7 +87,7 @@ Locks: `NAV_LOCK_PATHS` (`:311`) = every `scope` page and its sub-views; `useLoc
 
 ### Hide rules (`src/app/navRail.ts`)
 
-`NEVER_HIDDEN` (`:88`) = every footer page (Help, Settings, Characters) and Corporation. `canHide(path)` (`:94`) = known nav path and not in that set. `parseHiddenNav` (`:111`) keeps known paths in nav order, drops never-hide paths, and **keeps unknown paths** (written by a newer build) at the end so an older build cannot un-hide them. Stored as `sync.navHidden` (`src/app/navPreferences.ts:14`, default `[]`; the first-run question, gated by `sync.navSetupAnswered`, writes the short rail's list (`defaultHiddenNav`)), synced across devices ("which parts of EVE a pilot plays is about the pilot"). Decision: `20261002-145653-rail-opens-the-current-page-icons-hiding-and.md`.
+`NEVER_HIDDEN` (`:88`) = every footer page (Help, Settings, Characters) and Corporation. `canHide(path)` (`:94`) = known nav path and not in that set. `parseHiddenNav` (`:111`) keeps known paths in nav order, drops never-hide paths, and **keeps unknown paths** (written by a newer build) at the end so an older build cannot un-hide them. Stored as `sync.navHidden` (`src/app/navPreferences.ts:14`, default `[]`, so a new pilot sees every page and hides pages with Customize), synced across devices ("which parts of EVE a pilot plays is about the pilot"). Decision: `20261002-145653-rail-opens-the-current-page-icons-hiding-and.md`.
 
 ## Phone: tab bar and More sheet
 
