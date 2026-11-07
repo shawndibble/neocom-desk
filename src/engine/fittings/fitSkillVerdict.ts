@@ -1,9 +1,6 @@
 /**
- * A Popular fits row's can-fly verdict (zKillboard or EVE Workbench) for the
- * active Character: "Can fly", or "Missing N skills" with "Omega only" when an Alpha needs a
- * skill past the Alpha cap. Pure, and the same rules the editor's Missing
- * skills chip shows for the fit once opened: `missingSkillEntries` for the
- * count, `exceedsAlphaCap` on an Alpha for the cap.
+ * A Popular fits row's can-fly verdict (#6011). Same rules as the editor's
+ * Missing skills chip, so a row never disagrees with the fit once opened.
  */
 import { exceedsAlphaCap } from '@/engine/alphaCap';
 import type { RequiredSkill } from '@/engine/import/fitToSkills';

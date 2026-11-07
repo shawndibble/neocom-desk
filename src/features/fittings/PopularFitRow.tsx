@@ -59,8 +59,8 @@ export function PopularFitRow({
         disabled ? 'cursor-not-allowed' : cx(rowInteractiveClassName, 'cursor-pointer')
       )}
     >
-      {/* -mx/px: room inside the truncating box for the title's focus ring. */}
       <div className="-mx-1 flex items-center gap-2 border-b border-line/50 px-1 pt-1 pb-2">
+        {/* -mx/px: room inside the truncating box for the title's focus ring. */}
         <p className="-mx-1 min-w-0 flex-1 truncate px-1 text-sm">
           <button
             type="button"

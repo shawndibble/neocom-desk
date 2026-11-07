@@ -8,11 +8,7 @@ const TONE: Record<FitSkillVerdict['kind'], PillTone> = {
   unknown: 'neutral',
 };
 
-/**
- * A Popular fits row's can-fly verdict for the active Character, as a tinted
- * pill (§6c's computed-verdict cue): "Can fly", "Missing 3 skills · Omega
- * only", or "Skills unknown". Nothing until known.
- */
+/** A Popular fits row's can-fly verdict as a tinted pill: §6c's computed-verdict cue. */
 export function PopularFitVerdict({ verdict }: { verdict: FitSkillVerdict | undefined }) {
   const { t } = useTranslation();
   if (verdict === undefined) return null;

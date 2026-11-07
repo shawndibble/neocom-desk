@@ -12,9 +12,9 @@ import type { HullFlyMark } from './useHullFlyMarks';
 
 interface HullPickerRowProps {
   hull: HullEntry;
-  /** Its can-fly mark; `undefined` for a hull the Ship Tree doesn't list. */
+  /** `undefined` before marks load, or for a hull the Ship Tree doesn't list. */
   mark: HullFlyMark | undefined;
-  /** Marks are shown in this list: keep the mark's column so names line up. */
+  /** Keep the mark's column, so names line up. */
   marked: boolean;
   selected: boolean;
   onSelect: () => void;

@@ -16,7 +16,8 @@
  * false one is not.
  *
  * What it keeps is small on purpose — rack and type per module, counts per
- * type, the type ids its skills are checked on — since a caller caches one per fit across every hull it has shown.
+ * type, the type ids its skills are checked on — since a caller caches one
+ * per fit across every hull it has shown.
  */
 import { classifyFitCurrency, type FitCurrency, type HullSlotCounts } from './fitCurrency';
 import { loadEftFitting, type EftSlotLookup, type EftTypeLookup } from './eftLoader';
@@ -50,10 +51,7 @@ export interface WorkbenchFitCheck {
    * Empty when the hull didn't load.
    */
   items: readonly ItemCount[];
-  /**
-   * Every type whose skills gate flying it — hull, modules, charges, drones,
-   * fighters — for its can-fly verdict (#6011). Empty when the hull didn't load.
-   */
+  /** Its `fittingRequirementTypeIds`, for its can-fly verdict; empty when the hull didn't load. */
   requirementTypeIds: readonly number[];
   /** Its `popularFitKey`; `null` when any line failed to load in a way that rules matching out. */
   sightingKey: string | null;

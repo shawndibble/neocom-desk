@@ -244,7 +244,7 @@ export interface WorkbenchRow {
   fit: WorkbenchFit;
   /** The modules its EFT loaded, rack and type only. */
   modules: readonly RackModule[];
-  /** Every type whose skills gate flying it, for its can-fly verdict (#6011). */
+  /** Its `fittingRequirementTypeIds`, for its can-fly verdict. */
   requirementTypeIds: readonly number[];
   /** Its price at `hub`; `undefined` while pricing, or when nothing in it has a sell order. */
   price: FitSellPrice | undefined;
