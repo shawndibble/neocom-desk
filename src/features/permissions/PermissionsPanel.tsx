@@ -12,6 +12,9 @@
  * the roles scope is itself in the `corp` group — until it is granted, whether
  * this Character holds a role is unknowable, and this row is the only way in
  * (docs/context/decisions/20260910-123303-move-read-corporation-roles-into-the-corp-scope.md).
+ * A Character in a known NPC corporation can never hold a Corp Role, so it is
+ * treated like `none` and the Corporation projects row hides with it
+ * (docs/context/decisions/20261107-000911-a-known-npc-corporation-is-treated-like-none.md).
  *
  * Scoped to the active Character, like `useCorpAccess` itself: roles are only
  * knowable by asking ESI per Character, so a section per stored Character
@@ -30,6 +33,7 @@ import { isPermissionGranted } from '@/esi/scopes';
 import { AUTHORIZED_APPS_URL } from '@/lib/links';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useCorpAccess, type CorpAccessState } from '@/features/corp/useCorpAccess';
+import { useActiveNpcCorporation } from '@/features/corp/useActiveNpcCorporation';
 import { corpRoleLabel } from '@/features/corp/roles';
 import { SettingsHint } from '@/features/settings/settingsFields';
 import { usePhoneFold } from '@/features/settings/usePhoneFold';
@@ -80,6 +84,7 @@ export function PermissionsPanel() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const granted = useGrantedScopes();
   const corp = useCorpAccess();
+  const inNpcCorporation = useActiveNpcCorporation() != null;
   // A phone keeps the rows that need action open and folds the Granted ones.
   const grantedFold = usePhoneFold();
   // Tagged with its Character so a switch drops the ticks instead of carrying them over.
@@ -113,7 +118,10 @@ export function PermissionsPanel() {
     });
   }
 
-  const groups = SCOPE_GROUPS.filter((group) => group !== 'corp' || corp.state !== 'none');
+  const hideCorp = inNpcCorporation || corp.state === 'none';
+  const groups = SCOPE_GROUPS.filter(
+    (group) => !(group === 'corp' && hideCorp) && !(group === 'corpProjects' && inNpcCorporation)
+  );
   const missing = groups.filter((group) => statusOf(group) === 'missing');
   // Actionable rows first (stable: catalogue order within each half); a row still checking keeps the Granted half.
   const rows = [...missing, ...groups.filter((group) => statusOf(group) !== 'missing')];

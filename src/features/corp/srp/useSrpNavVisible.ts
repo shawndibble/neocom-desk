@@ -1,7 +1,8 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
-import { isPlayerCorporation, probeSrp, readSrpProbe, subscribeSrpProbe } from './srpNavProbe';
+import { isNpcCorporationId } from '@/esi/entityIds';
+import { probeSrp, readSrpProbe, subscribeSrpProbe } from './srpNavProbe';
 
 /**
  * Whether the SRP nav entry shows for a pilot with no Corp Access: their corporation has SRP on
@@ -12,7 +13,7 @@ export function useSrpNavVisible(): boolean {
   const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   const corporationId = useActiveCorporationId();
   const eligible =
-    characterId !== null && corporationId !== null && isPlayerCorporation(corporationId);
+    characterId !== null && corporationId !== null && !isNpcCorporationId(corporationId);
 
   const cached = useSyncExternalStore(subscribeSrpProbe, () =>
     eligible ? (readSrpProbe(characterId, corporationId, Date.now())?.on ?? null) : null

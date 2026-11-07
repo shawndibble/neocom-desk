@@ -2,7 +2,8 @@
  * The named groups Settings > Notifications files the Notification Events
  * under: what a person is thinking about when they look for a row, not how
  * the catalog is ordered. Corp events keep their own "Corp notifications"
- * group (one permission line, one best-effort note) and EVE notifications
+ * group (one permission line, one best-effort note), dropped when no Character
+ * could ever use it (`corpEventsApply`), and EVE notifications
  * stay last, where their long list cannot push the rest off screen.
  *
  * Display only. The catalog's own order (`events.ts`) is what the poller and
@@ -10,6 +11,7 @@
  * which only arrange EVE notification types.
  */
 import { type NotificationEventId } from './events';
+import { isNpcCorporationId } from '@/esi/entityIds';
 
 export const EVENT_GROUP_KEYS = [
   'skills',
@@ -65,6 +67,18 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
 };
 
 const PRICE_ALERT: NotificationEventId = 'priceAlertTriggered';
+
+/**
+ * Whether the corp events belong in the list for these Characters' corporations: not when
+ * every one is a known NPC corporation, whose members can never hold a Corp Role.
+ * A corporation not learned yet (undefined) might be a player one, so it keeps them.
+ */
+export function corpEventsApply(corporationIds: readonly (number | undefined)[]): boolean {
+  return (
+    corporationIds.length === 0 ||
+    corporationIds.some((id) => id === undefined || !isNpcCorporationId(id))
+  );
+}
 
 export interface NotificationEventGroups {
   readonly groups: readonly { key: EventGroupKey; eventIds: readonly NotificationEventId[] }[];

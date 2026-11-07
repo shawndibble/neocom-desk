@@ -383,6 +383,7 @@ export function CorpMoons() {
           reason={access.state === 'none' ? 'none' : access.state}
           title={t('corp.moons.noAccessTitle')}
           hint={t('corp.moons.noAccessHint')}
+          roleLine={t('corp.moons.roleLine')}
         />
       </div>
     );

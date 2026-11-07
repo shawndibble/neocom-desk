@@ -15070,9 +15070,12 @@
     "refresh": "Refresh corp data",
     "boardTitle": "Ops board",
     "dataAgeNote": "EVE caches corporation data for about an hour, so anything due sooner than that may already have happened — check the game client before acting on a short timer.",
-    "notGrantedTitle": "Corporation data isn't granted",
-    "notGrantedHint": "Corporation data isn't granted for this character. If you hold a corp role, grant it:",
+    "officerPagesTitle": "Corp officer pages",
+    "notGrantedHint": "{{roles}} If that's you, grant corporation access for this character:",
     "notGrantedAction": "Grant corporation access",
+    "npcCorporation": "You're in {{corporation}}, an NPC corporation. These pages are for officers (Director, Accountant…) of a player-run corporation.",
+    "npcCorporationUnnamed": "You're in an NPC corporation. These pages are for officers (Director, Accountant…) of a player-run corporation.",
+    "roleLine": "Corp pages are for officers: Director, Accountant, Station Manager and others.",
     "noAccessTitle": "No corporation access",
     "noAccessHint": "This character's in-game corporation roles do not open any corp data. Roles can only be changed in game.",
     "vitalsTitle": "Vitals",
@@ -15167,6 +15170,7 @@
       "noFilterMatchesHint": "Clear the search or reset the dark-only, ship and location filters to see every member.",
       "noAccessTitle": "Member tracking needs Director",
       "noAccessHint": "EVE only opens the member list and its last-login dates to a Director. No other corporation role can see them, and granting access here will not change that.",
+      "roleLine": "Member tracking needs Director.",
       "searchPlaceholder": "Search name, ship, location…",
       "shipFilterLabel": "Ship",
       "shipFilterAll": "Any ship",
@@ -15213,7 +15217,8 @@
       "viewLabel": "Wallet view",
       "transactionsView": "Transactions",
       "noAccessTitle": "Corp wallet needs Accountant",
-      "noAccessHint": "EVE only opens the corporation wallet to a Director, Accountant or Junior Accountant. Roles can only be changed in game, and granting access here will not change that."
+      "noAccessHint": "EVE only opens the corporation wallet to a Director, Accountant or Junior Accountant. Roles can only be changed in game, and granting access here will not change that.",
+      "roleLine": "The corporation wallet needs Director, Accountant or Junior Accountant."
     },
     "assets": {
       "title": "Corp Assets",
@@ -15223,6 +15228,7 @@
       "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this corporation has more.",
       "noAccessTitle": "Corp assets need Director",
       "noAccessHint": "EVE only opens the corporation asset list to a Director. No other corporation role can see it, and granting access here will not change that.",
+      "roleLine": "The corporation asset list needs Director.",
       "loadFailedTitle": "Could not load corp assets",
       "loadFailedHint": "The corporation asset read failed and nothing is cached yet. Try refreshing.",
       "searchPlaceholder": "Search items…",
@@ -15372,7 +15378,8 @@
     "moons": {
       "title": "Moons",
       "noAccessTitle": "Moons need the Accountant role",
-      "noAccessHint": "EVE only opens the refinery ledger to an Accountant, Director or CEO, so the Corp Tax Book is not available to your roles."
+      "noAccessHint": "EVE only opens the refinery ledger to an Accountant, Director or CEO, so the Corp Tax Book is not available to your roles.",
+      "roleLine": "The Corp Tax Book needs Accountant, Director or CEO."
     },
     "grid": {
       "customize": {
@@ -19209,6 +19216,7 @@
     "officer": {
       "deniedTitle": "SRP claims are not open to your roles",
       "deniedHint": "EVE did not confirm an SRP officer role for this character. Roles can only be changed in game.",
+      "roleLine": "SRP review needs Accountant or Director.",
       "loadFailed": "Couldn't load SRP claims",
       "summary": {
         "pending_one": "{{count}} pending",

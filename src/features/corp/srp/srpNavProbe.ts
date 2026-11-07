@@ -5,12 +5,6 @@
 export const SRP_PROBE_TTL_MS = 60 * 60 * 1000;
 /** After a failed probe (dead token, offline) nothing re-asks for this long. */
 export const SRP_PROBE_FAILURE_BACKOFF_MS = 5 * 60 * 1000;
-/** Player corporation ids start here; NPC corporations (1,000,000s) never run SRP. */
-const FIRST_PLAYER_CORPORATION_ID = 98_000_000;
-
-export const isPlayerCorporation = (corporationId: number): boolean =>
-  corporationId >= FIRST_PLAYER_CORPORATION_ID;
-
 const keyOf = (characterId: number, corporationId: number) =>
   `neocom:srp-on:${characterId}:${corporationId}`;
 

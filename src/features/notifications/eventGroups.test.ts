@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NOTIFICATION_EVENT_IDS, isCorpEventId } from './events';
-import { groupNotificationEvents, EVENT_GROUP_KEYS } from './eventGroups';
+import { corpEventsApply, groupNotificationEvents, EVENT_GROUP_KEYS } from './eventGroups';
 
 describe('groupNotificationEvents', () => {
   it('files every catalog event exactly once', () => {
@@ -34,5 +34,15 @@ describe('groupNotificationEvents', () => {
     expect(layout.groups).toEqual([{ key: 'mailCalendar', eventIds: ['newMail'] }]);
     expect(layout.corp).toEqual(['corpMemberJoined']);
     expect(layout.eve).toBeNull();
+  });
+});
+
+describe('corpEventsApply', () => {
+  it('drops corp events only when every Character is in a known NPC corporation', () => {
+    expect(corpEventsApply([1000125, 1000167])).toBe(false);
+    expect(corpEventsApply([1000125, 98000001])).toBe(true);
+    // A corporation not learned yet might be a player one.
+    expect(corpEventsApply([1000125, undefined])).toBe(true);
+    expect(corpEventsApply([])).toBe(true);
   });
 });

@@ -28,6 +28,7 @@ export function CorpSrp() {
           reason={gate.reason}
           title={t('srp.officer.deniedTitle')}
           hint={t('srp.officer.deniedHint')}
+          roleLine={t('srp.officer.roleLine')}
         />
       </div>
     ) : gate.status === 'ready' ? (
