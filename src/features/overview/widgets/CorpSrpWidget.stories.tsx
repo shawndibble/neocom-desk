@@ -89,7 +89,7 @@ function Srp({ data, view }: { data: CorpSrpFeed; view: WidgetModel['view'] }): 
     <div className="mx-auto grid max-w-page gap-3 px-4 pt-3 pb-8">
       <PageHeader title="Corp Board" meta="Ashen Vanguard" />
       <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Widget widget={tile(view)} previewView={built} onRemove={() => undefined} />
+        <Widget widget={tile(view)} previewView={built} />
       </div>
     </div>
   );

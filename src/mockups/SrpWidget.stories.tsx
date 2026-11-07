@@ -15,7 +15,7 @@ import type { Widget as WidgetModel } from '@/features/overview/widgets/layout';
  *
  * Officer-only: a pilot without the SRP officer capability sees no tile at all
  * (hidden, never locked). When SRP is off, an officer's tile is the empty state
- * with a link to SRP settings; its Remove widget button is the shell's own.
+ * with a link to SRP settings; Remove lives in the shell's ⋮ menu.
  *
  * New components in this mockup: none. The Number and Table bodies, the empty
  * state and the tile are the Widget shell; only the board frame (header and
@@ -187,7 +187,6 @@ function Neighbour({ kind }: { kind: 'corpKills' | 'corpContracts' }) {
         showOnPhone: true,
       }}
       previewView={view}
-      onRemove={() => undefined}
     />
   );
 }
@@ -210,7 +209,7 @@ function Srp({ view, widgetView }: { view: KindView; widgetView: WidgetModel['vi
   const shown = phone && view.table ? { ...view, table: phoneTable(view.table) } : view;
   return (
     <Board>
-      <Widget widget={tile(widgetView)} previewView={shown} onRemove={() => undefined} />
+      <Widget widget={tile(widgetView)} previewView={shown} />
     </Board>
   );
 }

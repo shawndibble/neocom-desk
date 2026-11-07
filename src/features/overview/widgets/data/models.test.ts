@@ -476,13 +476,11 @@ describe('comingUp', () => {
     expect(rows.every((row) => row.detail === undefined)).toBe(true);
   });
 
-  it('points an empty accepted-and-tentative widget at the menu', () => {
+  it('leaves an empty accepted-and-tentative widget to its description', () => {
     const feeds: Feeds = {
       calendar: ok({ events: [], needsReauth: false, fetchedAt: new Date(NOW) }),
     };
-    expect(buildView('comingUp', feeds, ctx()).emptyHint).toBe(
-      'overview.widgets.comingUp.emptyHint'
-    );
+    expect(buildView('comingUp', feeds, ctx()).emptyHint).toBeUndefined();
   });
 });
 

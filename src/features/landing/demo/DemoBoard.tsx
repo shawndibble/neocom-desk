@@ -91,7 +91,6 @@ export default function DemoBoard() {
               widget={widget}
               previewView={views.get(widget.id)}
               inertTitle
-              onRemove={none}
               menu={(card) => (
                 <WidgetMenu widget={widget} inert>
                   {card}

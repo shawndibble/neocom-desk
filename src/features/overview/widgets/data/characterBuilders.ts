@@ -275,7 +275,6 @@ export const comingUp: Builder = (feeds, { t, now, calendarEvents }) => {
       })
     ),
     emptyMessage: all ? t('overview.widgets.comingUp.emptyAll') : undefined,
-    emptyHint: all ? undefined : t('overview.widgets.comingUp.emptyHint'),
     fetchedAt: data.fetchedAt,
     number: next
       ? {

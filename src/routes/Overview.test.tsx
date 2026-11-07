@@ -392,7 +392,7 @@ describe('Overview widget grid', () => {
     expect(within(orders).getByRole('button', { name: 'Grant access' })).toBeInTheDocument();
   });
 
-  it('says what is missing when a widget has nothing, and Remove widget drops and saves it', async () => {
+  it('says what is missing and what the widget is for, and its ⋮ menu removes and saves it', async () => {
     const user = userEvent.setup();
     await grantScopes([CALENDAR_SCOPE]);
     await seedLayout(widget('w', 'wallet', { size: 'S' }), widget('c', 'comingUp'));
@@ -402,7 +402,12 @@ describe('Overview widget grid', () => {
     expect(
       await within(coming).findByText('No accepted or tentative events ahead.')
     ).toBeInTheDocument();
-    await user.click(within(coming).getByRole('button', { name: 'Remove widget' }));
+    expect(
+      within(coming).getByText('Calendar events you accepted or may attend')
+    ).toBeInTheDocument();
+    expect(within(coming).queryByRole('button', { name: 'Remove widget' })).toBeNull();
+    await user.click(within(coming).getByRole('button', { name: 'Settings for Coming up' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Remove from Overview' }));
 
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Coming up' })).not.toBeInTheDocument()

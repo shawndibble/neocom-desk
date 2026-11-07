@@ -110,12 +110,7 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
           <PhoneCustomizeList />
         </Suspense>
       ) : (
-        <WidgetGrid
-          widgets={layout.widgets}
-          editing={editing}
-          onRemove={edit.remove}
-          onAdd={() => setGalleryOpen(true)}
-        />
+        <WidgetGrid widgets={layout.widgets} editing={editing} onAdd={() => setGalleryOpen(true)} />
       )}
       <Suspense fallback={null}>
         {galleryOpen && <Gallery open onClose={() => setGalleryOpen(false)} />}

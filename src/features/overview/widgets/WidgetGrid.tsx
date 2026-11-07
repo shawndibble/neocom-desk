@@ -51,7 +51,6 @@ import { WidgetMenu } from './WidgetMenu';
 interface WidgetGridProps {
   widgets: readonly WidgetModel[];
   editing?: boolean;
-  onRemove: (id: string) => void;
   /** The empty board's Add widget; absent where there is no Gallery to open. */
   onAdd?: () => void;
   /** The empty board's Start from a role. */
@@ -132,22 +131,12 @@ interface CellProps {
   first: boolean;
   last: boolean;
   isPhone: boolean;
-  onRemove: (id: string) => void;
   /** Set only inside the sortable context. */
   sortable?: boolean;
 }
 
 /** One widget in its flex cell: scroll-and-flash on add, and the edit chrome. */
-function Cell({
-  widget,
-  title,
-  editing,
-  first,
-  last,
-  isPhone,
-  onRemove,
-  sortable = false,
-}: CellProps) {
+function Cell({ widget, title, editing, first, last, isPhone, sortable = false }: CellProps) {
   const { t } = useTranslation();
   const edit = useOverviewEdit();
   const flashing = edit.flashId === widget.id;
@@ -208,7 +197,6 @@ function Cell({
       <Widget
         widget={widget}
         editing={editing}
-        onRemove={onRemove}
         menu={(card, to) => (
           <WidgetMenu widget={widget} to={to}>
             {card}
@@ -243,13 +231,7 @@ function EmptyBoard({ onAdd, onRoles }: Pick<WidgetGridProps, 'onAdd' | 'onRoles
   );
 }
 
-export function WidgetGrid({
-  widgets,
-  editing = false,
-  onRemove,
-  onAdd,
-  onRoles,
-}: WidgetGridProps) {
+export function WidgetGrid({ widgets, editing = false, onAdd, onRoles }: WidgetGridProps) {
   const { t } = useTranslation();
   const edit = useOverviewEdit();
   const titleOf = useWidgetTitle();
@@ -319,7 +301,6 @@ export function WidgetGrid({
       first={index === 0}
       last={index === shown.length - 1}
       isPhone={isPhone}
-      onRemove={onRemove}
       sortable={sortable}
     />
   ));
