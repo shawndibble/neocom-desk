@@ -27,6 +27,7 @@ export interface IconButtonClassNameOptions {
    * The button also shows a text label from `md` up, so it is wider than a
    * square there. `'always'`: the label shows at every width, so the button is
    * never a square (a "New to …?" explainer trigger, DESIGN.md §6c Header controls).
+   * Toolbar height only: `size` is not read.
    */
   withText?: boolean | 'always';
   className?: string;

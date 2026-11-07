@@ -3277,7 +3277,7 @@
       "alpha": "What an Alpha can train",
       "alphaIntro": "Alpha clones can train these industry skills:",
       "alphaSkill": "{{name}}, up to level {{level}}",
-      "alphaRest": "The other industry skills need Omega.",
+      "alphaRest": "Higher levels, and the other manufacturing and research skills, need Omega.",
       "thisPage": "How this page helps",
       "buildPlan": "Build Plan",
       "buildPlanBody": "Pick a blueprint. The plan prices every material and the job fee, and says whether building beats buying.",

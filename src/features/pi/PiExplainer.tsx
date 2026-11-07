@@ -1,10 +1,8 @@
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { SlideOver, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { ExplainerArrow, ExplainerRow } from '@/components/ExplainerRow';
+import { ExplainerArrow, ExplainerRow, ExplainerSection } from '@/components/ExplainerRow';
 import { PlanetImage } from './PlanetImage';
 import { TierChip } from './DirectiveRow';
 
@@ -53,7 +51,7 @@ export function PiExplainer({ open, onClose }: { open: boolean; onClose: () => v
           trailing={<TierChip tier={2} />}
         />
         <ExplainerArrow label={t('piPlan.explainer.toMarket')} />
-        <h3 className={cx(eyebrowClassName, 'pt-3 pb-1')}>{t('piPlan.explainer.buildings')}</h3>
+        <ExplainerSection title={t('piPlan.explainer.buildings')} />
         <ExplainerRow
           art={<Icon.PiCommandCenter size={Icon.ICON_SIZE.lg} />}
           title={t('piPlan.explainer.commandCenter')}

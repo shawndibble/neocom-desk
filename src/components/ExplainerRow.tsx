@@ -31,6 +31,11 @@ export function ExplainerRow({
   );
 }
 
+/** A drawer section's eyebrow heading ("The buildings", "Two kinds of blueprint"). */
+export function ExplainerSection({ title }: { title: string }) {
+  return <h3 className={cx(eyebrowClassName, 'pt-3 pb-1')}>{title}</h3>;
+}
+
 /** The down arrow between two `ExplainerRow` steps of a chain, naming what moves things on. */
 export function ExplainerArrow({ label }: { label: string }) {
   return (

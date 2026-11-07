@@ -8,6 +8,7 @@ import { IndustrySettingsForm } from '@/features/settings/IndustrySettingsForm';
 import { BpcSourcingSettingsForm } from '@/features/settings/BpcSourcingSettingsForm';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
 import { IndustryExplainerTrigger } from './IndustryExplainer';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { IndustryCharacterPicker } from './IndustryCharacterPicker';
 import { useHasProductionLogs } from './useHasProductionLogs';
 import { INDUSTRY_TABS_ID, industryTabs, type IndustryTab } from './industryTabs';
@@ -80,6 +81,7 @@ export function IndustryHeader({
 }: IndustryHeaderProps) {
   const { t } = useTranslation();
   const showLogs = useHasProductionLogs();
+  const isPhone = useIsPhone();
   const tabs = industryTabs(t, { showLogs, activeTab });
   const onChange = (id: string) => onTabChange(id as IndustryTab);
   return (
@@ -90,7 +92,8 @@ export function IndustryHeader({
         scope={<IndustryCharacterPicker activeCharacterId={activeCharacterId} />}
         actions={
           <>
-            <IndustryExplainerTrigger />
+            {/* A `scope` header never wraps: on a phone, a tab with its own actions (BPC Sourcing's Refresh) leaves no room for the labelled trigger. */}
+            {!(isPhone && actions) && <IndustryExplainerTrigger />}
             {actions}
             {tabSettings(activeTab, t)}
           </>

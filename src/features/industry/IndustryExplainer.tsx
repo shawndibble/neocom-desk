@@ -2,10 +2,8 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton, SlideOver, TypeIcon } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import * as Icon from '@/components/ui/icons';
-import { ExplainerArrow, ExplainerRow } from '@/components/ExplainerRow';
-import { cx } from '@/lib/cx';
+import { ExplainerArrow, ExplainerRow, ExplainerSection } from '@/components/ExplainerRow';
 import { loadSkills } from '@/sde/loadSde';
 import {
   alphaIndustrySkills,
@@ -35,10 +33,6 @@ function useAlphaIndustrySkills(open: boolean): AlphaIndustrySkill[] | null {
     };
   }, [open, skills]);
   return skills;
-}
-
-function Section({ title }: { title: string }) {
-  return <h3 className={cx(eyebrowClassName, 'pt-3 pb-1')}>{title}</h3>;
 }
 
 /**
@@ -72,7 +66,7 @@ export function IndustryExplainer({ open, onClose }: { open: boolean; onClose: (
           body={t('industry.explainer.itemBody')}
         />
 
-        <Section title={t('industry.explainer.blueprints')} />
+        <ExplainerSection title={t('industry.explainer.blueprints')} />
         <ExplainerRow
           art={<Icon.Blueprint size={Icon.ICON_SIZE.lg} />}
           title={t('industry.explainer.original')}
@@ -91,7 +85,7 @@ export function IndustryExplainer({ open, onClose }: { open: boolean; onClose: (
 
         {alphaSkills !== null && alphaSkills.length > 0 && (
           <>
-            <Section title={t('industry.explainer.alpha')} />
+            <ExplainerSection title={t('industry.explainer.alpha')} />
             <p className="border-t border-line pt-2.5 text-xs text-text-dim">
               {t('industry.explainer.alphaIntro')}
             </p>
@@ -106,7 +100,7 @@ export function IndustryExplainer({ open, onClose }: { open: boolean; onClose: (
           </>
         )}
 
-        <Section title={t('industry.explainer.thisPage')} />
+        <ExplainerSection title={t('industry.explainer.thisPage')} />
         <ExplainerRow
           art={<Icon.Industry size={Icon.ICON_SIZE.lg} />}
           title={t('industry.explainer.buildPlan')}

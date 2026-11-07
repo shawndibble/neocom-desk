@@ -1,8 +1,8 @@
 import type { SkillType } from '@/sde/types';
 
 /** SDE skill groups a manufacturing beginner trains first. */
-const PRODUCTION_GROUP = 268;
-const SCIENCE_GROUP = 270;
+export const PRODUCTION_SKILL_GROUP_ID = 268;
+export const SCIENCE_SKILL_GROUP_ID = 270;
 
 export interface AlphaIndustrySkill {
   typeID: number;
@@ -22,7 +22,7 @@ export function alphaIndustrySkills(
   return skills
     .filter(
       (s) =>
-        (s.groupID === PRODUCTION_GROUP || s.groupID === SCIENCE_GROUP) &&
+        (s.groupID === PRODUCTION_SKILL_GROUP_ID || s.groupID === SCIENCE_SKILL_GROUP_ID) &&
         (s.alphaMaxLevel ?? 0) > 0
     )
     .map((s) => ({ typeID: s.typeID, name: s.name, level: s.alphaMaxLevel! }))
