@@ -235,10 +235,6 @@
 // again writes []), so the tombstone edge above does not bite it. No
 // `legacyKey`: new.
 //
-// sync.navSetupAnswered: whether the pilot answered (or skipped) the rail's
-// first-run "What do you do in EVE?" question — one flag for the account, so a
-// second device does not ask again. See app/navPreferences.ts. No `legacyKey`: new.
-//
 // sync.overviewHiddenCards: which Overview board cards the pilot switched off
 // from the board's edit menu — a list of hidden card keys, one for the whole
 // account rather than per Character, because "I don't do mining tax" is about
@@ -379,7 +375,6 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.miningTaxOreValueMode',
   'sync.miningTaxSurveyConnections',
   'sync.navHidden',
-  'sync.navSetupAnswered',
   'sync.notificationFeedPrefs',
   'sync.oreRefiningStructureRate',
   'sync.overviewCardOrder',

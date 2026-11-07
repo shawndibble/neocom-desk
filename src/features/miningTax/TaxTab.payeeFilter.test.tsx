@@ -166,3 +166,21 @@ describe('TaxTab: Payee filter Select all / Select none', () => {
     expect(await openHeading(2)).toBeInTheDocument();
   });
 });
+
+describe('TaxTab: first Payee empty state', () => {
+  it('says a Payee is only needed for moon mining someone charges for', async () => {
+    const payees = snapshot.payeesByCharacter;
+    snapshot.payeesByCharacter = new Map();
+    try {
+      renderTab();
+      expect(await screen.findByText('Create a Payee first')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /^Only needed if someone charges you for mining at their moon\. Mining in normal asteroid belts is not taxed here\./
+        )
+      ).toBeInTheDocument();
+    } finally {
+      snapshot.payeesByCharacter = payees;
+    }
+  });
+});
