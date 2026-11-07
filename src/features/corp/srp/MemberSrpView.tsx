@@ -15,7 +15,8 @@ export function MemberSrpView() {
   const corporationId = useActiveCorporationIdState();
   // An NPC corporation has no directors and can never turn SRP on, so "ask a director" can't apply.
   const npc = useActiveNpcCorporation();
-  if (characterId === null || corporationId === undefined) {
+  // `npc` runs its own corporation-id read; wait for it too, or an NPC pilot briefly mounts MemberSrp.
+  if (characterId === null || corporationId === undefined || npc === undefined) {
     return (
       <div className="flex justify-center py-10">
         <Spinner />

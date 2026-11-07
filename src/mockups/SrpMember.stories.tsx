@@ -72,7 +72,7 @@ const BLOCKED_FORM = {
 const notSetUpPanel = (
   <Panel>
     <EmptyState
-      title="SRP is not set up for your corporation"
+      title="Ship replacement (SRP) is not set up for your corporation"
       hint="Your corp has not turned on ship replacement. There is no SRP item in the menu until it does. Ask a director if you expected one."
     />
   </Panel>
