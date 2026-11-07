@@ -523,7 +523,12 @@ function WidgetFrame({
           {scope.chip && <AllCharactersReadout compact={widget.size === 'S'} />}
           <span className="flex-1" />
           {menu && (
-            <RowMoreActions label={t('overview.widgets.settingsFor', { title })} focusTarget />
+            // A card is not a row: the row tips wait for the first real table row.
+            <RowMoreActions
+              label={t('overview.widgets.settingsFor', { title })}
+              focusTarget
+              hints={false}
+            />
           )}
         </div>
       )}

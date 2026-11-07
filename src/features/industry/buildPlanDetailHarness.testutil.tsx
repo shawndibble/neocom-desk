@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { beforeEach, expect, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import type userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -36,11 +36,13 @@ export const costIndexSystem = (name: string) =>
       el.closest('div')?.textContent?.includes('Cost index') === true
   );
 
-/** The toast's status region: the sr-only LiveStatus regions are empty here. */
-export function toastStatus() {
-  const live = screen.getAllByRole('status').filter((el) => el.textContent);
-  expect(live).toHaveLength(1);
-  return live[0];
+/** The toast's status region: the sr-only LiveStatus regions are empty here. Waits: the toast can land a render after the action. */
+export async function toastStatus() {
+  return waitFor(() => {
+    const live = screen.getAllByRole('status').filter((el) => el.textContent);
+    expect(live).toHaveLength(1);
+    return live[0]!;
+  });
 }
 
 // BuildPlanDetail fetches a market snapshot in an effect on mount; a real
