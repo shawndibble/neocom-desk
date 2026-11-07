@@ -81,6 +81,14 @@ describe('IconButton visibleLabel', () => {
     expect(button).not.toHaveClass('md:size-9');
   });
 
+  it('keeps the text below md too with labelAtEveryWidth, never a square', () => {
+    render(<IconButton icon="x" label="New to PI?" visibleLabel="New to PI?" labelAtEveryWidth />);
+    const button = screen.getByRole('button', { name: 'New to PI?' });
+    expect(screen.getByText('New to PI?')).not.toHaveClass('hidden');
+    expect(button).toHaveClass('h-9', 'px-2.5');
+    expect(button).not.toHaveClass('size-9');
+  });
+
   it('stays a bare icon without it', () => {
     render(<IconButton icon="x" label="Go" />);
     expect(screen.getByRole('button')).toHaveTextContent('x');

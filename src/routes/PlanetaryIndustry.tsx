@@ -182,6 +182,7 @@ export function PlanetaryIndustry() {
                       icon={<Icon.Tip />}
                       label={t('piPlan.newToPi')}
                       visibleLabel={t('piPlan.newToPi')}
+                      labelAtEveryWidth
                       onClick={() => setExplainerOpen(true)}
                     />
                     <PageSettingsButton pageName={t('pi.title')} section="industry">
