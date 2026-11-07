@@ -74,7 +74,6 @@ export function stockCoverage(row: OpportunityRow): StockCoverage | null {
   return { coveredPct: (ownedValue / total) * 100, stillToBuyIsk };
 }
 
-/** The Manufacturing / Reactions filter (issue #5990): which activity a row's blueprint runs. */
 export function matchesActivityFilter(
   row: OpportunityRow,
   filter: OpportunitiesActivityFilter

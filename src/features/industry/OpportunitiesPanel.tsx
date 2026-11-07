@@ -1,7 +1,7 @@
 /**
  * Build Opportunities (issue #642): ranks every manufacturing blueprint and
- * reaction formula (issue #5990) the chosen character(s) own by ISK/hour, owned-materials-adjusted, at the
- * default trade hub — the same seeding/sorting/costing layer over
+ * reaction formula (issue #5990) the chosen character(s) own by ISK/hour,
+ * owned-materials-adjusted, at the default trade hub — the same seeding/sorting/costing layer over
  * `computeBuildPlan`/`buildVsBuy` that Build Plan Compare already prices
  * plans with, just run over every owned blueprint instead of a hand-picked
  * set. Selected rows seed real Build Plans into Compare via `onAddToCompare`.
@@ -168,7 +168,6 @@ const FILTER_PARAMS = {
 
 /** Module-level so the table's windowing sees one stable function. */
 const opportunityRowKey = (row: OpportunityRow) => row.candidate.id;
-/** A reaction row its Build Location can't price yet reads dimmed (issue #5990). */
 const opportunityRowClassName = (row: OpportunityRow) =>
   row.reactionLocation ? 'text-text-dim' : undefined;
 
@@ -654,7 +653,7 @@ export function OpportunitiesPanel({
         title: t('industry.opportunitiesNothingRankableTitle'),
         hint: t('industry.opportunitiesNothingRankableHint'),
       };
-  const ownsReactions = candidates.some(isReaction);
+  const ownsReactions = useMemo(() => candidates.some(isReaction), [candidates]);
   const meta = hideFilters ? undefined : (
     <OpportunitiesFilterBar
       view={view}

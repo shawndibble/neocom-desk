@@ -24,6 +24,7 @@ import type { MarketSnapshot, MarketSnapshotRequest } from './marketData';
 import { materialPricesFor } from './priceBasis';
 import { onPlanHeroBasis } from './planOwnedBasis';
 import { planReactionLocation } from './planReactionLocation';
+import type { ReactionLocationState } from '@/engine/industry/reactionLocation';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { detectOwnedStock, type DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
 import { takeEveryOffer } from '@/engine/industry/ownedStockOffer';
@@ -56,7 +57,6 @@ export interface OpportunityCandidate {
   catalogEntry: BlueprintCatalogEntry;
 }
 
-/** A reaction formula rather than a manufacturing blueprint (issue #5990). */
 export function isReaction(candidate: Pick<OpportunityCandidate, 'catalogEntry'>): boolean {
   return candidate.catalogEntry.blueprint.activity === 'reaction';
 }
@@ -273,12 +273,10 @@ export interface UnrankedOpportunityRow {
   /** ISK the owned stock this job uses would net if sold, charged against `result.profit` (the plan hero's sell-value basis); 0 when none is charged. */
   forgoneSale: number;
   /**
-   * Set only on a reaction row whose Build Location can't host it yet
-   * (issue #5990): never chosen, or in highsec. Its profit, margin and
-   * ISK/hour are null, so it ranks below every priced row instead of on
-   * numbers no reactor could earn. Absent on every row that prices.
+   * Why a reaction row can't run where it would build (issue #5990). Its
+   * profit, margin and ISK/hour are then null, never lowsec guesses.
    */
-  reactionLocation?: 'unset' | 'highsec';
+  reactionLocation?: Exclude<ReactionLocationState, 'ok'>;
 }
 
 /**
@@ -408,8 +406,7 @@ export function computeOpportunityRow(
   const reactionState = isReaction(candidate)
     ? planReactionLocation(plan, 'reaction')?.state
     : undefined;
-  const reactionLocation =
-    reactionState === 'unset' || reactionState === 'highsec' ? reactionState : undefined;
+  const reactionLocation = reactionState && reactionState !== 'ok' ? reactionState : undefined;
 
   return {
     candidate,

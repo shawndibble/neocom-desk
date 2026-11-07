@@ -175,7 +175,7 @@ function sortFields(t: ReturnType<typeof useTranslation>['t']): Record<
   };
 }
 
-/** The figures a reaction row its Build Location can't price yet leaves blank (issue #5990). */
+/** Figures blanked on a reaction row that can't run where it would build (issue #5990). */
 const PROFIT_FIELDS: ReadonlySet<SortFieldId> = new Set(['iskPerHour', 'unitMargin', 'margin']);
 
 const SORT_FIELD_ORDER: readonly SortFieldId[] = [
