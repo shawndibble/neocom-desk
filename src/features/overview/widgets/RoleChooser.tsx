@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, Modal } from '@/components/ui';
+import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { makeWidgetId } from './ids';
 import type { OverviewLayout } from './layout';
 import { ROLE_IDS, basicsLayout, buildLayoutFromRoles, type RoleId } from './roles';
@@ -25,6 +26,8 @@ interface RoleChooserProps {
 export function RoleChooser({ firstRun, onChoose, onCancel }: RoleChooserProps) {
   const { t } = useTranslation();
   const [picked, setPicked] = useState<readonly RoleId[]>([]);
+  // No capability until the roles read lands, so an NPC-corp pilot never gets a corp kind.
+  const { capabilities } = useCorpAccess();
   const toggle = (role: RoleId) =>
     setPicked((current) =>
       current.includes(role) ? current.filter((r) => r !== role) : [...current, role]
@@ -53,7 +56,7 @@ export function RoleChooser({ firstRun, onChoose, onCancel }: RoleChooserProps) 
       <span className="flex flex-wrap gap-2">
         <Button
           variant="primary"
-          onClick={() => onChoose(buildLayoutFromRoles(picked, makeWidgetId))}
+          onClick={() => onChoose(buildLayoutFromRoles(picked, capabilities, makeWidgetId))}
         >
           {t('overview.roles.build')}
         </Button>

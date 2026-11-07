@@ -3,8 +3,9 @@
  * each one brings. Pure data plus the builders that turn an answer (or none)
  * into an Overview Layout.
  */
+import type { CorpCapabilities } from '@/engine/corpRoles';
 import { presetSeed } from './galleryPresets';
-import { isAddable, type WidgetKindId } from './kinds';
+import { getKind, isAddable, kindOpenTo, type WidgetKindId } from './kinds';
 import {
   MAX_WIDGETS,
   seedKind,
@@ -59,13 +60,23 @@ function fromSeeds(seeds: readonly WidgetSeed[], makeId: MakeId): OverviewLayout
   return { version: 1, widgets };
 }
 
-/** Base kinds first, then each chosen role's kinds in order, deduped, coming-soon left out. */
+/**
+ * Base kinds first, then each chosen role's kinds in order, deduped, coming-soon left out.
+ * A corp kind the character can't open (`held`; `null` while unknown) is left out too:
+ * it would only draw "Your corp roles don't cover this." The Gallery still offers it.
+ */
 export function buildLayoutFromRoles(
   roles: readonly RoleId[],
+  held: CorpCapabilities | null,
   makeId: MakeId = seqId('r')
 ): OverviewLayout {
   const kinds: WidgetSeed[] = [...BASE_KINDS];
-  for (const role of roles) kinds.push(...(ROLES[role] ?? []));
+  for (const role of roles) {
+    for (const seed of ROLES[role] ?? []) {
+      const kind = getKind(seedKind(seed));
+      if (kind && kindOpenTo(kind, held)) kinds.push(seed);
+    }
+  }
   return fromSeeds(kinds, makeId);
 }
 
