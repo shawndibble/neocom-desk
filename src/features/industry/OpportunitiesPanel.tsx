@@ -622,12 +622,23 @@ export function OpportunitiesPanel({
       showCorpProjects={corpOptionShown}
     />
   );
-  // A pilot who owns no blueprint at all (issue #6003) has nothing to filter:
-  // the scan above is the first step, so Ranked's filter rows stay hidden. They
-  // stay while the Corp projects view is offered (the toggle is its only way in)
-  // and off Ranked, so a pilot on another view can always switch back.
+  // Owning no blueprint at all leaves nothing to filter: the scan above is the
+  // first step, so Ranked's filter rows hide. Only once every read has landed
+  // (an empty map also means loading or failed), never while Corp projects is
+  // offered (the toggle is its only way in). The phone's view picker stays: it is the title.
   const ownsNoBlueprints = [...ownedByCharacter.values()].every((list) => list.length === 0);
-  const hideFilters = ownsNoBlueprints && view === 'ranked' && !corpOptionShown;
+  const hideFilters =
+    ownsNoBlueprints &&
+    !blueprintsLoading &&
+    failedCount === 0 &&
+    view === 'ranked' &&
+    !corpOptionShown;
+  const empty = ownsNoBlueprints
+    ? { title: t('industry.opportunitiesEmptyTitle'), hint: t('industry.opportunitiesEmptyHint') }
+    : {
+        title: t('industry.opportunitiesNoManufacturingTitle'),
+        hint: t('industry.opportunitiesNoManufacturingHint'),
+      };
   const meta = hideFilters ? undefined : (
     <OpportunitiesFilterBar
       view={view}
@@ -764,19 +775,7 @@ export function OpportunitiesPanel({
             cachedAt !== null && <CachedNotice className="px-3 pt-2" fetchedAt={cachedAt} />
           ))}
         {candidates.length === 0 ? (
-          <EmptyState
-            title={t(
-              ownsNoBlueprints
-                ? 'industry.opportunitiesEmptyTitle'
-                : 'industry.opportunitiesNoManufacturingTitle'
-            )}
-            hint={t(
-              ownsNoBlueprints
-                ? 'industry.opportunitiesEmptyHint'
-                : 'industry.opportunitiesNoManufacturingHint'
-            )}
-            className="py-8"
-          />
+          <EmptyState title={empty.title} hint={empty.hint} className="py-8" />
         ) : needsRefresh ? (
           <EmptyState
             title={t('industry.opportunitiesNeedsRefreshTitle')}

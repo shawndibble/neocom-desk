@@ -75,6 +75,28 @@ const CATALOG: BlueprintCatalog = {
   typesById: {} as unknown as BlueprintCatalog['typesById'],
 };
 
+/** Builds one product (blueprint 100), for cases that need a rankable or buildable entry. */
+const HURRICANE = {
+  blueprintTypeID: 100,
+  blueprint: {
+    name: 'Hurricane Blueprint',
+    time: 600,
+    materials: [],
+    products: [{ typeID: 24702, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
+  productTypeID: 24702,
+  productName: 'Hurricane',
+  productNameLower: 'hurricane',
+};
+const BUILDS_HURRICANE: BlueprintCatalog = {
+  entries: [HURRICANE],
+  byBlueprintTypeID: new Map([[100, HURRICANE]]),
+  byProductTypeID: new Map([[24702, HURRICANE]]),
+  typesById: {} as unknown as BlueprintCatalog['typesById'],
+} as unknown as BlueprintCatalog;
+
 const SNAPSHOT: OwnedStockSnapshot = {
   sources: [],
   characterNames: new Map(),
@@ -255,31 +277,24 @@ describe('OpportunitiesPanel', () => {
       expect(screen.getByRole('button', { name: 'All owned' })).toBeInTheDocument();
     });
 
+    it('keeps the filter rows while blueprints are still loading', async () => {
+      loadCharacterBlueprints.mockReturnValue(new Promise(() => {}));
+      renderPanel();
+      expect(await screen.findByRole('button', { name: 'Ranked' })).toBeInTheDocument();
+    });
+
+    it('keeps the filter rows when a read failed, since ownership is unknown', async () => {
+      loadCharacterBlueprints.mockResolvedValue({ cached: null, needsReauth: false });
+      renderPanel();
+      expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
+      expect(screen.getByRole('button', { name: 'Ranked' })).toBeInTheDocument();
+    });
+
     it('shows the filter rows once a manufacturing blueprint is owned', async () => {
-      const hurricane = {
-        blueprintTypeID: 100,
-        blueprint: {
-          name: 'Hurricane Blueprint',
-          time: 600,
-          materials: [],
-          products: [{ typeID: 24702, quantity: 1 }],
-          skills: [],
-          activity: 'manufacturing',
-        },
-        productTypeID: 24702,
-        productName: 'Hurricane',
-        productNameLower: 'hurricane',
-      };
-      const catalog = {
-        entries: [hurricane],
-        byBlueprintTypeID: new Map([[100, hurricane]]),
-        byProductTypeID: new Map([[24702, hurricane]]),
-        typesById: {} as unknown as BlueprintCatalog['typesById'],
-      } as unknown as BlueprintCatalog;
       loadCharacterBlueprints.mockResolvedValue({
         cached: { data: [blueprint(100)], fetchedAt: new Date() },
       });
-      renderPanel(catalog);
+      renderPanel(BUILDS_HURRICANE);
       expect(await screen.findByRole('button', { name: 'Ranked' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Any' })).toBeInTheDocument();
       expect(screen.queryByText(/You own no/)).toBeNull();
@@ -571,26 +586,6 @@ describe('OpportunitiesPanel', () => {
           wrapper: ({ children }) => <MemoryRouter initialEntries={[url]}>{children}</MemoryRouter>,
         }
       );
-    const hurricane = {
-      blueprintTypeID: 100,
-      blueprint: {
-        name: 'Hurricane Blueprint',
-        time: 600,
-        materials: [],
-        products: [{ typeID: 24702, quantity: 1 }],
-        skills: [],
-        activity: 'manufacturing',
-      },
-      productTypeID: 24702,
-      productName: 'Hurricane',
-      productNameLower: 'hurricane',
-    };
-    const BUILDS_HURRICANE: BlueprintCatalog = {
-      entries: [hurricane],
-      byBlueprintTypeID: new Map([[100, hurricane]]),
-      byProductTypeID: new Map([[24702, hurricane]]),
-      typesById: {} as unknown as BlueprintCatalog['typesById'],
-    } as unknown as BlueprintCatalog;
     const project = {
       id: 'p1',
       name: 'Hulls',
