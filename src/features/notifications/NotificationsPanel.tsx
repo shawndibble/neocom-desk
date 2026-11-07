@@ -201,7 +201,6 @@ export function NotificationsPanel() {
       ),
     [orderedCharacters, eventLabels, search, eveTypeLabels]
   );
-  // No Corp topic when every Character is in an NPC corporation: none could ever use it (#6009).
   const showCorpEvents = corpEventsApply(characterList.map((c) => c.corporationId));
   const visibleEventIds = useMemo(() => {
     const ids =

@@ -6,7 +6,7 @@
  * Settings. `none` and a capability miss on an already-granted Character keep
  * the route's own copy, with no Grant, because granting would change nothing.
  * Nor would it for a Character in a known NPC corporation, whatever the
- * reason: they are told so instead (issue #6009).
+ * reason: they are told so instead (decision 20261107-000911).
  */
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, NeedsConnection } from '@/components/ui';

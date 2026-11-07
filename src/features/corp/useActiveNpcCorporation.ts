@@ -27,7 +27,7 @@ export function useActiveNpcCorporation(): NpcCorporation | null | undefined {
   return { name };
 }
 
-/** "You're in {{corporation}}, an NPC corporation. These pages are for officers…" */
+/** The line naming the NPC corporation, or its nameless fallback while public info is unloaded. */
 export function npcCorporationText(t: Translate, npc: NpcCorporation): string {
   return npc.name === null
     ? t('corp.npcCorporationUnnamed')

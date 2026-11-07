@@ -13,7 +13,8 @@
  * this Character holds a role is unknowable, and this row is the only way in
  * (docs/context/decisions/20260910-123303-move-read-corporation-roles-into-the-corp-scope.md).
  * A Character in a known NPC corporation can never hold a Corp Role, so it is
- * treated like `none` and the Corporation projects row hides with it (#6009).
+ * treated like `none` and the Corporation projects row hides with it
+ * (docs/context/decisions/20261107-000911-a-known-npc-corporation-is-treated-like-none.md).
  *
  * Scoped to the active Character, like `useCorpAccess` itself: roles are only
  * knowable by asking ESI per Character, so a section per stored Character
@@ -117,10 +118,10 @@ export function PermissionsPanel() {
     });
   }
 
-  const groups = SCOPE_GROUPS.filter((group) => {
-    if (inNpcCorporation && (group === 'corp' || group === 'corpProjects')) return false;
-    return group !== 'corp' || corp.state !== 'none';
-  });
+  const hideCorp = inNpcCorporation || corp.state === 'none';
+  const groups = SCOPE_GROUPS.filter(
+    (group) => !(group === 'corp' && hideCorp) && !(group === 'corpProjects' && inNpcCorporation)
+  );
   const missing = groups.filter((group) => statusOf(group) === 'missing');
   // Actionable rows first (stable: catalogue order within each half); a row still checking keeps the Granted half.
   const rows = [...missing, ...groups.filter((group) => statusOf(group) !== 'missing')];
