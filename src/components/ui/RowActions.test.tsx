@@ -438,6 +438,32 @@ describe('row menu hints', () => {
     render(plainRow);
     expect(screen.queryByText(/to open its actions/)).not.toBeInTheDocument();
   });
+
+  it('leaves both tips to a real row when a ⋮ opts out (an Overview card)', async () => {
+    const user = userEvent.setup();
+    const card = (
+      <RowActionsMenu name="Wallet" items={<MenuItem>Remove</MenuItem>}>
+        <div>
+          Wallet
+          <RowMoreActions hints={false} />
+        </div>
+      </RowActionsMenu>
+    );
+    const { unmount } = render(card);
+    expect(screen.queryByText(/to open its actions/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'More actions for Wallet' }));
+    await screen.findByRole('menuitem', { name: 'Remove' });
+    expect(screen.queryByText('Tip: right-click any row')).not.toBeInTheDocument();
+    const { value } = useHintCounts.getState();
+    expect(hintSeenCount(value, 'rowHint')).toBe(0);
+    expect(hintSeenCount(value, 'rowMenuTip')).toBe(0);
+    unmount();
+
+    render(plainRow);
+    expect(
+      await screen.findByText('Tip: right-click any row to open its actions')
+    ).toBeInTheDocument();
+  });
 });
 
 describe('MenuGroup', () => {
