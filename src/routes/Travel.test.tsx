@@ -439,6 +439,11 @@ describe('Travel copy', () => {
     walk(Object.entries(catalog.travel).filter(([key]) => key !== 'pilot'));
     walk([catalog.nav.travel]);
     walk(catalog.contractSearch.routePreference);
+    // Help › FAQ's answer on what each security band means, and its question.
+    const faq = (catalog.settings as Record<string, Record<string, Record<string, unknown>>>).faq;
+    const newToEve = faq.a.newToEve as Record<string, unknown>;
+    walk([faq.q.securitySpace, newToEve.terms]);
+    walk(Object.entries(newToEve).filter(([key]) => key.startsWith('security')));
     for (const text of strings) {
       expect(text, text).not.toMatch(/\b(safe|safest|unsafe|dangerous|danger|camp\w*)\b/i);
     }

@@ -14166,10 +14166,16 @@
     "faq": {
       "storeIntro": "What you make here syncs between your devices. What we read from EVE stays on this one. Exceptions are listed below.",
       "groups": {
+        "newToEve": "New to EVE?",
         "using": "Using Neocom Desk",
         "data": "Your data"
       },
       "q": {
+        "eveTerms": "What do these EVE words mean?",
+        "makeIsk": "How do I make ISK as a new pilot?",
+        "firstShip": "What ship can I fly, and what should I train?",
+        "securitySpace": "What do highsec, lowsec, nullsec and wormholes mean for my safety?",
+        "learnMore": "Where can I learn the rest of the game?",
         "permissions": "Why does login ask for so many permissions?",
         "dataLag": "Why do my numbers differ from, or lag behind, the game?",
         "alerts": "What are Alerts, and how do I get them when the app is closed?",
@@ -14193,6 +14199,76 @@
         "backups": "How do backups work?"
       },
       "a": {
+        "newToEve": {
+          "termsIntro": "The words the game and this app use without explaining. <glossary>EVE University’s lexicon</glossary> has the rest.",
+          "terms": {
+            "sp": {
+              "term": "SP (skill points)",
+              "definition": "What a Character earns by training skills. Training runs in real time, even while you are logged off."
+            },
+            "isk": {
+              "term": "ISK",
+              "definition": "EVE’s money. Ships, modules and skill books are all bought with it."
+            },
+            "clones": {
+              "term": "Alpha / Omega clone",
+              "definition": "Alpha is the free way to play: a limited set of skills, and the skill queue stops at 5 million SP. Omega is the paid subscription: every skill, with no such limit."
+            },
+            "lp": {
+              "term": "LP (loyalty points)",
+              "definition": "Earned from an NPC corporation’s missions, and spent only in that corporation’s LP store."
+            },
+            "security": {
+              "term": "Security status",
+              "definition": "A solar system’s security level runs from 1.0 down to -1.0: highsec is 1.0 to 0.5, lowsec 0.4 to 0.1, and nullsec 0.0 and below. Wormhole space, reached only through wormholes, is -1.0. A pilot has a security status of their own too, which drops when they attack other pilots in highsec or lowsec."
+            },
+            "jumpClone": {
+              "term": "Jump clone",
+              "definition": "A second body kept in another station. Jumping into it moves you there at once, without your ship or items, and the next jump waits 24 hours."
+            },
+            "implants": {
+              "term": "Implants",
+              "definition": "Plug-ins for a clone’s head that raise its attributes (how fast it trains) or boost a skill. They stay in that clone, and are lost if your pod is destroyed."
+            },
+            "blueprints": {
+              "term": "BPO / BPC",
+              "definition": "A blueprint original builds as many runs as you have materials for, and can be researched. A blueprint copy has a set number of runs."
+            },
+            "meTe": {
+              "term": "ME / TE",
+              "definition": "Material Efficiency and Time Efficiency, a blueprint’s research levels: higher ME needs fewer materials per build, higher TE builds faster."
+            },
+            "tradeHub": {
+              "term": "Trade hub (Jita 4-4)",
+              "definition": "A station where most of a region’s buying and selling happens. Jita IV - Moon 4 - Caldari Navy Assembly Plant is by far the largest."
+            },
+            "collateral": {
+              "term": "Collateral",
+              "definition": "ISK a hauler puts up to accept a courier contract. If the delivery fails, the contract’s issuer gets it."
+            },
+            "dscan": {
+              "term": "D-Scan",
+              "definition": "The directional scanner every ship has. It shows ships and objects up to about 14 AU away, in the direction you point it."
+            },
+            "local": {
+              "term": "Local",
+              "definition": "The solar system’s chat channel. Its member list shows the pilots in the system; in wormhole space, only those who have spoken."
+            }
+          },
+          "makeIskIntro": "Ways open to an Alpha clone, and where Neocom Desk helps:",
+          "makeIskMissions": "Missions. Career agents teach the basics and pay ISK, plus ships, modules or skill books. An NPC corporation’s security missions pay ISK and LP; <lp>Wallet › LP Store</lp> shows what that LP buys.",
+          "makeIskMining": "Mining. Mine ore in a highsec asteroid belt and sell it. <mining>Mining</mining> shows what you mined, from EVE’s daily mining ledger.",
+          "makeIskLoot": "Loot. Sell what missions and wrecks drop: paste it into <appraisal>Market › Appraisal</appraisal> to see what it is worth.",
+          "makeIskCourier": "Hauling. Courier contracts pay you to carry cargo, once you put up the collateral. <courier>Contracts › Courier</courier> lists the public ones.",
+          "firstShip": "It depends on the skills your Character has trained. <tree>Ships › Tree</tree> lays out the hulls: open one, and Skills & Mastery shows what it needs and adds it to your plan.",
+          "firstShipPlan": "For a plan someone has already thought through, follow a CCP career path: <plans>Skills › Plans</plans> › the arrow beside New plan › From a Certified Plan.",
+          "securityHighsec": "Highsec (1.0 to 0.5): CONCORD, the NPC police, destroys a pilot who attacks another without cause. It arrives after the attack, within seconds, and later in a 0.5 system than in a 0.9 one.",
+          "securityLowsec": "Lowsec (0.4 to 0.1): no CONCORD. Sentry guns at stargates and stations fire on an attacker; elsewhere in the system, no NPC responds.",
+          "securityNullsec": "Nullsec (0.0 and below): no NPC responds to an attack. Players claim much of it, and can deploy bubbles that stop a ship from warping.",
+          "securityWormhole": "Wormhole space: no stargates, and the wormholes that lead in open and close. No NPC responds to an attack, bubbles are allowed, and Local lists a pilot only once they speak.",
+          "securityRoute": "<route>Travel › Route Safety</route> lists every system on a route with its security and the ships destroyed there in the last hour. Its route preference “{{preference}}” picks higher-security systems, even when the route is longer.",
+          "learnMore": "<uni>EVE University’s New Player Index</uni> explains the game’s core ideas, and its <money>Making Money</money> page compares ways to earn ISK. Account, billing and in-game problems go to <ccp>CCP’s support site</ccp>, not to Neocom Desk."
+        },
         "delete": "Settings › Log out & delete › Delete all data removes every Character's synced data from our server, then erases this device. Another logged-in device keeps its own copy and can sync it back. Log out of all characters clears this device only. Delete all data also offers to leave your Communities (ticked by default), which deletes what you shared there, plus your Requests and Pledges, right away; untick it to stay in them. A Community's admin can't leave, so a Community you run is skipped: hand it over or delete it, which deletes it for every Member. A Character with no sync for 90 days is removed from its Communities automatically. SRP Claims and Corp Tax Book lines belong to the corporation's records and stay with it; How long is my data stored? says when they go.",
         "install": "<link>Settings › App & backup › Install this app</link> shows the steps for your browser, or an Install button if it has one. On iPhone and iPad, installing is also what makes notifications work.",
         "update": "The app updates itself in the background. For a new version now: Settings › App & backup › Update now: it checks and reloads.",

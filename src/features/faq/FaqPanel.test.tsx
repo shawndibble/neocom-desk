@@ -1,11 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { ARCHIVE_DAYS } from '@/engine/wallet/archiveCoverage';
-import { AUTHORIZED_APPS_URL } from '@/lib/links';
+import {
+  AUTHORIZED_APPS_URL,
+  CCP_SUPPORT_URL,
+  EVE_UNI_LEXICON_URL,
+  EVE_UNI_MAKING_MONEY_URL,
+  EVE_UNI_NEW_PLAYER_URL,
+} from '@/lib/links';
 import { REMOTE_COLLECTIONS } from '@/sync/syncedCollections';
 import { SYNCED_SETTING_KEYS } from '@/sync/syncedSettings';
 import { FaqPanel } from './FaqPanel';
@@ -23,7 +29,7 @@ const functionsFile = (file: string) =>
 const daysIn = (source: string, name: string) =>
   Number(new RegExp(`${name} = (\\d+) \\* 24`).exec(source)?.[1]);
 
-const QUESTIONS = 21;
+const QUESTIONS = 26;
 
 /** Renders the FAQ with every question opened, as the content tests read the answers. */
 function renderFaq(initialEntry = '/help/faq') {
@@ -117,6 +123,8 @@ function syncedItemIds(): Set<string> {
 
 /** The always-open sub-list under the "find skills to train" question. */
 const TRAIN_SKILLS_STEPS = 6;
+/** The bullets of "How do I make ISK?" and "What do highsec… mean?". */
+const NEW_TO_EVE_BULLETS = 4 + 4;
 
 describe('FaqPanel — What We Store', () => {
   // Which line accounts for each remote collection is declared on the
@@ -212,6 +220,7 @@ describe('FaqPanel — What We Store', () => {
     const lines =
       QUESTIONS +
       TRAIN_SKILLS_STEPS +
+      NEW_TO_EVE_BULLETS +
       RETENTION_GROUPS.reduce((sum, g) => sum + g.items.length, 0) +
       items.length +
       items.reduce((sum, item) => sum + (item.detailKeys?.length ?? 0), 0);
@@ -274,8 +283,76 @@ describe('FaqPanel — What We Store', () => {
 
   it('points to the Help page’s Support tab', () => {
     renderFaq();
-    const link = screen.getByRole('link', { name: /support/i });
+    const link = screen.getByRole('link', { name: /^support$/i });
     expect(link).toHaveAttribute('href', '/help/support');
+  });
+});
+
+describe('FaqPanel: New to EVE?', () => {
+  it('is the first group, with the five questions a new pilot asks', () => {
+    renderFaq();
+    const groups = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(groups).toEqual(['New to EVE?', 'Using Neocom Desk', 'Your data']);
+    expect(
+      questionButtons()
+        .slice(0, 5)
+        .map((button) => button.textContent)
+    ).toEqual([
+      'What do these EVE words mean?',
+      'How do I make ISK as a new pilot?',
+      'What ship can I fly, and what should I train?',
+      'What do highsec, lowsec, nullsec and wormholes mean for my safety?',
+      'Where can I learn the rest of the game?',
+    ]);
+  });
+
+  it('defines each EVE word in one line', () => {
+    renderFaq();
+    const terms = screen.getAllByRole('term').map((term) => term.textContent);
+    expect(terms).toEqual([
+      'SP (skill points)',
+      'ISK',
+      'Alpha / Omega clone',
+      'LP (loyalty points)',
+      'Security status',
+      'Jump clone',
+      'Implants',
+      'BPO / BPC',
+      'ME / TE',
+      'Trade hub (Jita 4-4)',
+      'Collateral',
+      'D-Scan',
+      'Local',
+    ]);
+    expect(screen.getAllByRole('definition')).toHaveLength(terms.length);
+    expect(screen.getByText(/highsec is 1\.0 to 0\.5, lowsec 0\.4 to 0\.1/)).toBeInTheDocument();
+  });
+
+  it('links every page an answer names', () => {
+    renderFaq();
+    const hrefOf = (name: string) =>
+      screen.getByRole('link', { name: new RegExp(`^${name}$`) }).getAttribute('href');
+    expect(hrefOf('Wallet › LP Store')).toBe('/wallet/lp-store');
+    expect(hrefOf('Mining')).toBe('/mining/overview');
+    expect(hrefOf('Market › Appraisal')).toBe('/market/appraisal');
+    expect(hrefOf('Contracts › Courier')).toBe('/contracts/search/courier');
+    expect(hrefOf('Ships › Tree')).toBe('/ships/tree');
+    expect(hrefOf('Skills › Plans')).toBe('/skills/plans');
+    expect(hrefOf('Travel › Route Safety')).toBe('/travel/route');
+  });
+
+  it('names the Route preference by the label Route Safety shows', () => {
+    renderFaq();
+    expect(screen.getByText(/Its route preference “Prefer safer” picks/)).toBeInTheDocument();
+  });
+
+  it('sends the rest of the game to EVE University and CCP', () => {
+    renderFaq();
+    const hrefOf = (name: RegExp) => screen.getByRole('link', { name }).getAttribute('href');
+    expect(hrefOf(/EVE University’s lexicon/)).toBe(EVE_UNI_LEXICON_URL);
+    expect(hrefOf(/EVE University’s New Player Index/)).toBe(EVE_UNI_NEW_PLAYER_URL);
+    expect(hrefOf(/Making Money/)).toBe(EVE_UNI_MAKING_MONEY_URL);
+    expect(hrefOf(/CCP’s support site/)).toBe(CCP_SUPPORT_URL);
   });
 });
 
@@ -446,9 +523,11 @@ describe('FaqPanel: Using Neocom Desk', () => {
 
   it('lists the ways to find skills to train under a FAQ question', () => {
     renderFaq();
-    expect(screen.getByText(/From skill queue/i)).toBeInTheDocument();
-    expect(screen.getByText(/Certified Plan/i)).toBeInTheDocument();
-    expect(screen.getByText(/Ships › Tree/)).toBeInTheDocument();
+    // "What ship can I fly?" names Certified Plans and Ships › Tree too.
+    const answer = within(document.getElementById('train-skills')!);
+    expect(answer.getByText(/From skill queue/i)).toBeInTheDocument();
+    expect(answer.getByText(/Certified Plan/i)).toBeInTheDocument();
+    expect(answer.getByText(/Ships › Tree/)).toBeInTheDocument();
   });
 
   it('points the permissions answer at EVE’s authorized-apps page', () => {
