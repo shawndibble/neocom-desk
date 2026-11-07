@@ -29,11 +29,12 @@ import { loadTypes } from '@/sde/loadSde';
 import { loadInGameFittings } from './inGameFittings';
 import { activeShipItems, isCapsuleGroup } from '@/engine/fittings/activeShip';
 import type { Fitting } from '@/engine/fittings/types';
+import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { loadCharacterShip } from '@/features/character/ship';
 import { loadCharacterAssets } from '@/features/assets/assets';
 import { shipItemsToFitting } from './assetShipLocation';
 
-/** A saved or In-game Fitting as one row of the Start screen's list. */
+/** One row of the Start screen's list: a saved, In-game, Active or shared Fitting. */
 export type LibraryRow = MyFittingRow &
   (
     | { source: 'saved'; record: FittingRecord }
@@ -246,14 +247,16 @@ export function sharedRows(
   }));
 }
 
-/** The Active Fit's row, alone (never grouped by hull: it leads the list). */
+/** The Fitting an In-game or Active Fit row carries itself; null for a row that only has a code. */
+export function heldFitting(row: LibraryRow): Fitting | null {
+  if (row.source === 'active') return row.fitting;
+  return row.source === 'inGame' ? esiFittingToFitting(row.inGame).fitting : null;
+}
+
+/** The Active Fit's row (never grouped by hull: it leads the list). */
 export type ActiveRow = Extract<LibraryRow, { source: 'active' }>;
 
-/**
- * The Character's Active Fit: the flown ship (`getCharacterShip`) with the
- * assets inside it (`getCharacterAssets`). Null without both grants, in a pod,
- * or when either read fails; nothing asks for a grant, the list just lacks the row.
- */
+/** The Character's Active Fit: the flown ship with the assets inside it. Null without both grants. */
 export function useActiveFitting(characterId: number | null) {
   const { t } = useTranslation();
   const granted = useEndpointsGranted(['getCharacterShip', 'getCharacterAssets']);
@@ -269,12 +272,14 @@ export function useActiveFitting(characterId: number | null) {
     }
     let row: ActiveRow | null = null;
     try {
-      const [ship, types] = await Promise.all([loadCharacterShip(characterId), loadTypes()]);
+      const [ship, types, assets] = await Promise.all([
+        loadCharacterShip(characterId),
+        loadTypes(),
+        loadCharacterAssets(characterId),
+      ]);
       const hull = ship ? types[String(ship.ship_type_id)] : undefined;
-      const assets =
-        ship && !isCapsuleGroup(hull?.groupID) ? await loadCharacterAssets(characterId) : null;
-      // An unread asset list is not an empty ship: no row rather than a bare hull.
-      if (ship && assets?.cached && !assets.needsReauth) {
+      // A pod has nothing to fit; an unread asset list is not an empty ship, so no row rather than a bare hull.
+      if (ship && !isCapsuleGroup(hull?.groupID) && assets.cached && !assets.needsReauth) {
         const hullName = typeNameOr(t, hull?.name, ship.ship_type_id);
         const name = ship.ship_name.trim() || hullName;
         const fitting = await shipItemsToFitting(

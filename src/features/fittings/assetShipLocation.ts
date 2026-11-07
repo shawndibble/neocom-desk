@@ -5,7 +5,11 @@
  * as its Fitting Share Code. Null when it's too large for one.
  */
 import type { AssetTreeContainerNode, AssetTreeNode } from '@/engine/assetTree';
-import { assetShipToFitting, type ShipAssetItem } from '@/engine/fittings/assetShipMapper';
+import {
+  assetShipToFitting,
+  shipAssetItem,
+  type ShipAssetItem,
+} from '@/engine/fittings/assetShipMapper';
 import { loadFittingSlots } from '@/sde/loadSde';
 import type { Fitting, ItemMutation } from '@/engine/fittings/types';
 import { mutationsForItems } from '@/features/abyssal/dynamicItems';
@@ -20,12 +24,7 @@ function shipItems(ship: AssetTreeContainerNode): ShipAssetItem[] {
       node.children.forEach(visit);
       return;
     }
-    items.push({
-      typeId: node.asset.type_id,
-      quantity: node.asset.quantity,
-      flag: node.asset.location_flag,
-      itemId: node.asset.item_id,
-    });
+    items.push(shipAssetItem(node.asset));
   };
   ship.children.forEach(visit);
   return items;

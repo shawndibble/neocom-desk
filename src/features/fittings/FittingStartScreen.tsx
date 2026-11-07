@@ -107,9 +107,9 @@ function MaybeTabPanel({
 }
 
 /**
- * Every way into a Fitting, as one list (scope decisions `20260925-152418`
- * and `20261001-210222`; the Active Fit leading it, `20261106-233825`): one search over the Character's saved and In-game
- * Fittings, grouped by hull. On a desktop page the picked row is previewed
+ * Every way into a Fitting, as one list (scope decisions `20260925-152418`,
+ * `20261001-210222` and `20261106-233825`): one search over the Character's
+ * Active Fit, then their saved and In-game Fittings grouped by hull. On a desktop page the picked row is previewed
  * beside the list and a double-click (or Enter) opens it; everywhere else —
  * a phone, the editor's Open dialog, the Compare picker — a tap opens it.
  */
@@ -187,16 +187,16 @@ export function FittingStartScreen({
     [saved.records, saved.hulls, inGame.result, inGame.hullNames, community.rows, hasCharacter, t]
   );
   const groups = useMemo(() => groupByHull(filterMyFittings(rows, query)), [rows, query]);
-  // The Active Fit leads the list, above the hulls, so it is the first pick.
+  // Above the hulls, so it is the first pick.
   const activeShown = useMemo(
-    () => (hasCharacter && active.row ? filterMyFittings([active.row], query) : []),
-    [active.row, hasCharacter, query]
+    () => (active.row ? filterMyFittings([active.row], query) : []),
+    [active.row, query]
   );
   const visible = useMemo(
     () => [...activeShown, ...groups.flatMap((group) => group.rows)],
     [activeShown, groups]
   );
-  const hasRows = rows.length > 0 || (hasCharacter && active.row !== null);
+  const hasRows = rows.length > 0 || active.row !== null;
   const selected = visible.find((row) => row.id === selectedId) ?? visible[0] ?? null;
   const searching = query.trim() !== '';
 
@@ -241,13 +241,12 @@ export function FittingStartScreen({
       <p className="text-xs text-warning">{t('common.loadFailedHint')}</p>
     ) : null;
 
-  // Saved Fittings still being read or their hulls decoded, In-game ones or the Active Fit
-  // still loading: "No fittings yet" must not flash before they land.
+  // Saved Fittings still being read or their hulls decoded, or In-game ones still loading:
+  // "No fittings yet" must not flash before either lands.
   const savedPending =
     hasCharacter && (saved.records === undefined || saved.hulls.size < saved.records.length);
   const loading =
     savedPending ||
-    (hasCharacter && active.pending) ||
     (hasCharacter && (inGame.granted === undefined || (inGame.loading && !inGame.result)));
 
   const refreshInGameButton =
@@ -310,7 +309,7 @@ export function FittingStartScreen({
                   .join(' · ')}
               </span>
             )}
-            {/* The Active Fit sits under its own heading, not its hull's: the row names the hull. */}
+            {/* Its heading isn't its hull's, so the row names the hull. */}
             {row.source === 'active' && row.hull !== row.name && (
               <span className="block truncate text-xs text-text-dim">{row.hull}</span>
             )}
@@ -421,8 +420,7 @@ export function FittingStartScreen({
           </p>
         )}
 
-        {/* The list waits on the Active Fit even with other rows in hand: it leads, so landing late would shift them. */}
-        {(loading && !hasRows) || (hasCharacter && active.pending) ? (
+        {active.pending || (loading && !hasRows) ? (
           <Spinner block="panel" label={t('common.loading')} />
         ) : !hasRows ? (
           <EmptyState

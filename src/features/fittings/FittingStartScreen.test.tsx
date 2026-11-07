@@ -578,7 +578,7 @@ describe('FittingStartScreen Active Fit', () => {
     await screen.findByText('Armor Drake');
     await waitFor(() => expect(loadCharacterShipMock).toHaveBeenCalled());
     expect(screen.queryByRole('heading', { name: 'Active fit' })).not.toBeInTheDocument();
-    expect(loadCharacterAssetsMock).not.toHaveBeenCalled();
+    expect(shipItemsToFittingMock).not.toHaveBeenCalled();
   });
 
   it('is left out without the ship and assets grants, and reads nothing', async () => {

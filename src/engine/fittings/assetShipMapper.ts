@@ -29,6 +29,21 @@ export interface ShipAssetItem {
   itemId?: number;
 }
 
+/** One asset inside a ship, as the mapper reads it. */
+export function shipAssetItem(asset: {
+  type_id: number;
+  quantity: number;
+  location_flag: string;
+  item_id: number;
+}): ShipAssetItem {
+  return {
+    typeId: asset.type_id,
+    quantity: asset.quantity,
+    flag: asset.location_flag,
+    itemId: asset.item_id,
+  };
+}
+
 /** `mutations`: rolls by item id (`mutationsForItems`); an abyssal item absent from it loads base unknown. */
 export function assetShipToFitting(
   ship: { typeId: number; name: string },

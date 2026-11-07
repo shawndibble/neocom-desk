@@ -19,7 +19,8 @@ import { getCharacterShip, type CharacterShip } from '@/esi/endpoints';
 import { requiredScopesForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
-const CACHE_KEY = 'characterShip';
+// The whole ship, not just its type: the Active Fit needs its item id. A new key, since the old one held a bare type id.
+const CACHE_KEY = 'characterShip:full';
 export const SHIP_STALE_AFTER_MS = 90_000;
 const SHIP_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterShip'];
 
@@ -30,35 +31,26 @@ export interface ShipTypeRead {
   fetchedAt: Date | null;
 }
 
-export async function loadCharacterShipTypeRead(characterId: number): Promise<ShipTypeRead> {
-  const result = await loadWithCache(
+function loadShipRow(characterId: number) {
+  return loadWithCache(
     characterId,
     CACHE_KEY,
-    async () => (await getCharacterShip(characterId)).data?.ship_type_id ?? null,
-    {
-      staleAfterMs: SHIP_STALE_AFTER_MS,
-      detectAuthFailure: isCredentialFailure,
-    }
-  );
-  return { typeId: result?.data ?? null, fetchedAt: result?.fetchedAt ?? null };
-}
-
-/**
- * The flown ship whole — item id, hull, name — for the Active Fit, which
- * finds its modules among the assets by that item id. Its own cache key: the
- * type-only read above caches a bare number.
- */
-export async function loadCharacterShip(characterId: number): Promise<CharacterShip | null> {
-  const result = await loadWithCache(
-    characterId,
-    `${CACHE_KEY}:full`,
     async () => (await getCharacterShip(characterId)).data ?? null,
     {
       staleAfterMs: SHIP_STALE_AFTER_MS,
       detectAuthFailure: isCredentialFailure,
     }
   );
-  return result?.data ?? null;
+}
+
+export async function loadCharacterShipTypeRead(characterId: number): Promise<ShipTypeRead> {
+  const result = await loadShipRow(characterId);
+  return { typeId: result?.data?.ship_type_id ?? null, fetchedAt: result?.fetchedAt ?? null };
+}
+
+/** The flown ship whole (item id, hull, name): the Active Fit finds its modules among the assets by that item id. */
+export async function loadCharacterShip(characterId: number): Promise<CharacterShip | null> {
+  return (await loadShipRow(characterId))?.data ?? null;
 }
 
 /** The type id of the ship the character is flying, or null if unresolvable (missing grant, offline, or uncached). */
