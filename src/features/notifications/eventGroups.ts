@@ -10,6 +10,7 @@
  * which only arrange EVE notification types.
  */
 import { type NotificationEventId } from './events';
+import { isPlayerCorporation } from '@/features/corp/playerCorporation';
 
 export const EVENT_GROUP_KEYS = [
   'skills',
@@ -65,6 +66,18 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
 };
 
 const PRICE_ALERT: NotificationEventId = 'priceAlertTriggered';
+
+/**
+ * Whether the corp events belong in the list for these Characters' corporations: not when
+ * every one is a known NPC corporation, whose members can never hold a Corp Role (#6009).
+ * A corporation not learned yet (undefined) might be a player one, so it keeps them.
+ */
+export function corpEventsApply(corporationIds: readonly (number | undefined)[]): boolean {
+  return !(
+    corporationIds.length > 0 &&
+    corporationIds.every((id) => id !== undefined && !isPlayerCorporation(id))
+  );
+}
 
 export interface NotificationEventGroups {
   readonly groups: readonly { key: EventGroupKey; eventIds: readonly NotificationEventId[] }[];

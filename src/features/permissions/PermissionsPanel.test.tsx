@@ -3,6 +3,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import i18n from '@/i18n';
+import { db } from '@/db';
 import type { StatusResult } from '@/esi/cache';
 import type { CharacterCorporationRoles } from '@/esi/endpoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -54,8 +55,9 @@ function row(label: string): HTMLElement {
   return screen.getByText(label, { selector: 'div' }).closest('li')!;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
+  await db.characters.clear();
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
   mockedGrantedScopes.mockReturnValue([]);
   mockedLoadRoles.mockResolvedValue(rolesResolvingTo([]));
@@ -340,6 +342,25 @@ describe('PermissionsPanel — the Corporation row', () => {
     expect(
       within(row('Corporation')).queryByRole('button', { name: /Grant/ })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('PermissionsPanel — an NPC corporation', () => {
+  it('hides the Corporation and Corporation projects rows, which no NPC member can use', async () => {
+    await db.characters.put({
+      characterId: CHARACTER_ID,
+      name: 'Pilot',
+      ownerHash: 'hash',
+      addedAt: 0,
+      corporationId: 1000125,
+    });
+    mockedGrantedScopes.mockReturnValue([...SCOPES]);
+    renderPanel();
+    await waitFor(() =>
+      expect(screen.getAllByRole('listitem')).toHaveLength(SCOPE_GROUPS.length - 2)
+    );
+    expect(screen.queryByText('Corporation', { selector: 'div' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Corporation projects', { selector: 'div' })).not.toBeInTheDocument();
   });
 });
 

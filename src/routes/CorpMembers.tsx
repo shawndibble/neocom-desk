@@ -579,6 +579,7 @@ export function CorpMembers() {
           reason={gate.reason}
           title={t('corp.members.noAccessTitle')}
           hint={t('corp.members.noAccessHint')}
+          roleLine={t('corp.members.roleLine')}
         />
       </div>
     ) : gate.status === 'ready' ? (

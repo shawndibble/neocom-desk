@@ -1,7 +1,8 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
-import { isPlayerCorporation, probeSrp, readSrpProbe, subscribeSrpProbe } from './srpNavProbe';
+import { isPlayerCorporation } from '../playerCorporation';
+import { probeSrp, readSrpProbe, subscribeSrpProbe } from './srpNavProbe';
 
 /**
  * Whether the SRP nav entry shows for a pilot with no Corp Access: their corporation has SRP on

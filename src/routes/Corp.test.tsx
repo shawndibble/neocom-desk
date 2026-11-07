@@ -251,7 +251,7 @@ describe('access states (AC1)', () => {
     (state) => {
       mockedAccess.mockReturnValue(accessOf(state, {}));
       renderCorp();
-      expect(screen.getByText("Corporation data isn't granted")).toBeInTheDocument();
+      expect(screen.getByText('Corp officer pages')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Grant corporation access' })).toBeInTheDocument();
       expect(screen.queryByRole('navigation', { name: 'Corporation' })).not.toBeInTheDocument();
     }

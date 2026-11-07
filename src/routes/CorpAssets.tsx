@@ -1088,6 +1088,7 @@ export function CorpAssets() {
           reason={gate.reason}
           title={t('corp.assets.noAccessTitle')}
           hint={t('corp.assets.noAccessHint')}
+          roleLine={t('corp.assets.roleLine')}
         />
       </div>
     ) : gate.status === 'ready' ? (
