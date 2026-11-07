@@ -35,7 +35,12 @@ describe('loadLocationWidget age', () => {
         value: 30000142,
         fetchedAt: locationAt,
       },
-      { characterId: CHARACTER_ID, key: 'characterShip', value: 587, fetchedAt: shipAt },
+      {
+        characterId: CHARACTER_ID,
+        key: 'characterShip:full',
+        value: { ship_item_id: 1, ship_type_id: 587, ship_name: 'Zipper' },
+        fetchedAt: shipAt,
+      },
     ]);
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/ship`, () => HttpResponse.error()),
