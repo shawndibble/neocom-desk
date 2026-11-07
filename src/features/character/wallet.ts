@@ -104,7 +104,8 @@ export function oldestCachedBalanceAt(
 
 /** Journal. `truncated` on the result means pages were missing. */
 export async function loadWalletJournal(
-  characterId: number
+  characterId: number,
+  options: { archive?: boolean } = {}
 ): Promise<CachedResult<WalletJournalEntry[]> | null> {
   const { fetchLive, conditional } = conditionalPagedFetch((options) =>
     getCharacterWalletJournal(characterId, options)
@@ -112,7 +113,8 @@ export async function loadWalletJournal(
   const result = await loadPaginatedWithCache(characterId, KEYS.journal, fetchLive, {
     conditional,
   });
-  return archiveResult('journal', characterId, result);
+  const archived = await archiveResult('journal', characterId, result);
+  return options.archive ? journalWithArchive(characterId, archived) : archived;
 }
 
 /**
@@ -179,7 +181,8 @@ export async function loadWalletTransactionsHistory(
  * Wallet Permission rather than a "reconnect" empty state (issue #2236).
  */
 export async function loadWalletTransactionsWithStatus(
-  characterId: number
+  characterId: number,
+  options: { archive?: boolean } = {}
 ): Promise<StatusResult<WalletTransaction[]>> {
   const { cached, needsReauth } = await loadPaginatedWithCacheStatus(
     characterId,
@@ -187,8 +190,11 @@ export async function loadWalletTransactionsWithStatus(
     () => getCharacterWalletTransactions(characterId)
   );
   await archiveResult('transactions', characterId, cached);
+  const live = cached && { ...cached, data: uniqueTransactions(cached.data) };
+  // `archive` adds fills older than ESI's window, so a date range reaching back is not cut short.
+  const merged = options.archive ? await transactionsWithArchive(characterId, live) : live;
   return {
-    cached: cached && { ...cached, data: uniqueTransactions(cached.data) },
+    cached: merged && { ...merged, data: uniqueTransactions(merged.data) },
     needsReauth,
   };
 }

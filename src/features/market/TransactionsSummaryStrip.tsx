@@ -15,6 +15,8 @@ interface TransactionsSummaryStripProps {
   transactions: readonly WalletTransaction[];
   /** Margin, matched count and broker fees over the same fills; omitted while they can't be worked out. */
   trading?: TradingSummary;
+  /** The filter's start/end days (YYYY-MM-DD); the range line shows only while one is set. */
+  range?: { startDate: string | null; endDate: string | null };
   className?: string;
 }
 
@@ -22,11 +24,20 @@ interface TransactionsSummaryStripProps {
 export function TransactionsSummaryStrip({
   transactions,
   trading,
+  range,
   className,
 }: TransactionsSummaryStripProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const summary = useMemo(() => summarizeTransactions(transactions), [transactions]);
+  // Filter days and fill dates are both UTC days (the row filter compares `date.slice(0, 10)`).
+  const rangeBound = (filterDay: string | null | undefined, fallback: string | null) => {
+    const iso = filterDay ?? fallback?.slice(0, 10);
+    return iso ? formatDateOnly(new Date(`${iso}T00:00:00Z`), 'UTC') : null;
+  };
+  const rangeSet = range != null && (range.startDate !== null || range.endDate !== null);
+  const rangeFrom = rangeSet ? rangeBound(range.startDate, summary.oldest) : null;
+  const rangeTo = rangeSet ? rangeBound(range.endDate, summary.newest) : null;
   return (
     <section
       aria-label={t('wallet.transactionsSummaryLabel')}
@@ -35,12 +46,9 @@ export function TransactionsSummaryStrip({
         className
       )}
     >
-      {summary.oldest && summary.newest && (
+      {rangeFrom && rangeTo && (
         <p className="text-xs text-text-dim">
-          {t('wallet.transactionsRange', {
-            from: formatDateOnly(new Date(summary.oldest), timeZone),
-            to: formatDateOnly(new Date(summary.newest), timeZone),
-          })}
+          {t('wallet.transactionsRange', { from: rangeFrom, to: rangeTo })}
         </p>
       )}
       <dl className="grid grid-cols-2 items-start gap-x-4 gap-y-3 tabular-nums min-[26rem]:grid-cols-3 lg:grid-cols-5">
