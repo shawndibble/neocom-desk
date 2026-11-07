@@ -1,6 +1,6 @@
 /**
- * One Popular fit's can-fly verdict for the active Character (issue #6011):
- * "Can fly", or "Missing N skills" with "Omega only" when an Alpha needs a
+ * A Popular fits row's can-fly verdict (zKillboard or EVE Workbench) for the
+ * active Character: "Can fly", or "Missing N skills" with "Omega only" when an Alpha needs a
  * skill past the Alpha cap. Pure, and the same rules the editor's Missing
  * skills chip shows for the fit once opened: `missingSkillEntries` for the
  * count, `exceedsAlphaCap` on an Alpha for the cap.

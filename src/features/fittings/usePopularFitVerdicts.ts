@@ -18,7 +18,7 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { loadSkills } from '@/sde/loadSde';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useReconnectCount } from '@/stores/network';
-import { loadActivePilotProfile } from './fittingPilotProfile';
+import { loadActivePilotProfileState } from './fittingPilotProfile';
 import { loadRequirementsForTypes } from './skillRequirements';
 
 /** One listed fit: its row key, and every type that gates flying it (`fittingRequirementTypeIds`). */
@@ -29,7 +29,7 @@ export interface VerdictFit {
 
 /** What the verdicts are read from; tests pass stand-ins. */
 export interface FitVerdictSources {
-  /** The Character's Effective Skill Levels. */
+  /** The Character's Effective Skill Levels; rejects when they couldn't be read. */
   skillLevels: (characterId: number) => Promise<ReadonlyMap<number, number>>;
   /** Each readable type's required skills; a type left out is unknown. */
   requirements: (
@@ -40,7 +40,12 @@ export interface FitVerdictSources {
 }
 
 export const fitVerdictSources: FitVerdictSources = {
-  skillLevels: async (characterId) => (await loadActivePilotProfile(characterId)).skillLevels,
+  skillLevels: async (characterId) => {
+    const { profile, skillsKnown } = await loadActivePilotProfileState(characterId);
+    // An empty skill sheet would make every fit read "Missing N skills".
+    if (!skillsKnown) throw new Error('skills unknown');
+    return profile.skillLevels;
+  },
   requirements: async (typeIds) => (await loadRequirementsForTypes(typeIds)).byType,
   skills: async () => new Map((await loadSkills()).map((skill) => [skill.typeID, skill])),
 };

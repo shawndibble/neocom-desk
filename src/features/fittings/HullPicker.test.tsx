@@ -1,6 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import '@/i18n';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { HullPicker } from './HullPicker';
 
 const { usePopularFitsMock, useHullFlyMarksMock } = vi.hoisted(() => ({
@@ -111,7 +112,11 @@ describe('HullPicker', () => {
   });
 
   describe('can-fly marks', () => {
-    afterEach(() => useHullFlyMarksMock.mockReset().mockReturnValue(null));
+    beforeEach(() => useActiveCharacter.setState({ activeCharacterId: 7 }));
+    afterEach(() => {
+      useHullFlyMarksMock.mockReset().mockReturnValue(null);
+      useActiveCharacter.setState({ activeCharacterId: null });
+    });
 
     it("marks each hull as the Ship Tree does: can fly, can't fly yet, needs Omega", () => {
       useHullFlyMarksMock.mockReturnValue((typeId) =>
@@ -136,6 +141,14 @@ describe('HullPicker', () => {
       search('r');
       const vexor = screen.getByRole('button', { name: 'Vexor' });
       expect(vexor.querySelector('[data-shape]')).toBeNull();
+    });
+
+    it('never reads the Ship Tree with no Character', () => {
+      useActiveCharacter.setState({ activeCharacterId: null });
+      render(<HullPicker catalogue={catalogue} onStart={() => {}} />);
+      search('r');
+      expect(useHullFlyMarksMock).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Vexor' })).toBeTruthy();
     });
   });
 });

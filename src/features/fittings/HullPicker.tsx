@@ -1,9 +1,4 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import {
-  focusRingInsetClassName,
-  rowInteractiveClassName,
-  selectedRowClassName,
-} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,9 +6,9 @@ import { Button, SearchInput, TypeIcon } from '@/components/ui';
 import { buildHullCatalogue, searchHulls, type HullEntry } from '@/engine/fittings/hullCatalogue';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { CatalogueLoadingNote } from './FittingDataNotices';
-import { FlyDot } from './shipTree/FlyDot';
-import { flyLabel } from './shipTree/flyLabel';
-import { useHullFlyMarks } from './useHullFlyMarks';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { HullPickerRow } from './HullPickerRow';
+import { useHullFlyMarks, type HullFlyMarks } from './useHullFlyMarks';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import { guarded } from '@/app/routeChunks';
 
@@ -37,11 +32,29 @@ interface HullPickerProps {
  * ship data (dogma engine) has downloaded. Each hull carries the Ship Tree's
  * can-fly mark for the active Character once that has loaded (#6011).
  */
-export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProps) {
+export function HullPicker(props: HullPickerProps) {
+  const characterId = useActiveCharacter((state) => state.activeCharacterId);
+  // No Character, no marks: the Ship Tree's data isn't loaded at all.
+  return characterId === null ? (
+    <HullPickerView {...props} flyMarks={null} />
+  ) : (
+    <MarkedHullPicker {...props} characterId={characterId} />
+  );
+}
+
+function MarkedHullPicker({ characterId, ...props }: HullPickerProps & { characterId: number }) {
+  return <HullPickerView {...props} flyMarks={useHullFlyMarks(characterId)} />;
+}
+
+function HullPickerView({
+  catalogue,
+  onStart,
+  onOpenPopular,
+  flyMarks,
+}: HullPickerProps & { flyMarks: HullFlyMarks | null }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<HullEntry | null>(null);
-  const flyMarks = useHullFlyMarks();
 
   const hulls = useMemo(
     () =>
@@ -81,51 +94,18 @@ export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProp
                   <span className="tabular-nums">{hullClass.hulls.length}</span>
                 </h3>
                 <ul>
-                  {hullClass.hulls.map((hull) => {
-                    const isSelected = selected?.typeId === hull.typeId;
-                    const mark = flyMarks?.(hull.typeId);
-                    return (
-                      <li key={hull.typeId}>
-                        <button
-                          type="button"
-                          aria-pressed={isSelected}
-                          aria-label={
-                            mark
-                              ? t('ships.tree.tileLabel', {
-                                  name: hull.name,
-                                  status: mark.needsOmega
-                                    ? `${flyLabel(t, mark.status)}, ${t('ships.tree.omega')}`
-                                    : flyLabel(t, mark.status),
-                                })
-                              : undefined
-                          }
-                          onClick={() => setSelected(hull)}
-                          onDoubleClick={() => onStart(hull)}
-                          className={cx(
-                            'flex min-h-9 w-full items-center gap-2 px-2 text-left text-sm',
-                            rowInteractiveClassName,
-                            focusRingInsetClassName,
-                            isSelected
-                              ? `${selectedRowClassName} text-accent`
-                              : 'border-l-2 border-l-transparent'
-                          )}
-                        >
-                          {flyMarks && (
-                            // Same width marked or not, so names line up down the column.
-                            <span className="flex w-2.5 shrink-0 justify-center">
-                              {mark && <FlyDot status={mark.status} />}
-                            </span>
-                          )}
-                          <span className="min-w-0 flex-1">{hull.name}</span>
-                          {mark?.needsOmega && (
-                            <span aria-hidden="true" className="font-serif font-bold text-omega">
-                              Ω
-                            </span>
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
+                  {hullClass.hulls.map((hull) => (
+                    <li key={hull.typeId}>
+                      <HullPickerRow
+                        hull={hull}
+                        mark={flyMarks?.(hull.typeId)}
+                        marked={flyMarks !== null}
+                        selected={selected?.typeId === hull.typeId}
+                        onSelect={() => setSelected(hull)}
+                        onStart={() => onStart(hull)}
+                      />
+                    </li>
+                  ))}
                 </ul>
               </section>
             ))}

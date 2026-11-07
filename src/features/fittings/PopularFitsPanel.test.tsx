@@ -703,6 +703,14 @@ describe('Popular fits can-fly verdicts', () => {
     );
   });
 
+  it("shows no verdict when the pilot's skills could not be read", async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    renderWith({ skillLevels: () => Promise.reject(new Error('skills unknown')) });
+    await screen.findByText('12 losses');
+    await act(async () => {});
+    expect(screen.queryByTestId('popular-fit-verdict')).toBeNull();
+  });
+
   it('never reads a fit with an unreadable type as flyable', async () => {
     useActiveCharacter.setState({ activeCharacterId: 7 });
     const partial = new Map(REQUIREMENTS);

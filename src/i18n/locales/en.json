@@ -716,7 +716,6 @@
         "canFly": "Can fly",
         "missing_one": "Missing {{count}} skill",
         "missing_other": "Missing {{count}} skills",
-        "omegaOnly": "Omega only",
         "unknown": "Skills unknown"
       },
       "loading": "Loading popular fits from zKillboard…",
