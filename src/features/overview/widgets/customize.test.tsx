@@ -411,7 +411,7 @@ describe('RoleChooser', () => {
     expect(kinds).toEqual(['wallet', 'training', 'comingUp', 'mail', 'planetary']);
   });
 
-  it('leaves out corp widgets a character with no corp roles cannot open', async () => {
+  it('leaves out corp widgets while the corp roles are not known', async () => {
     const user = userEvent.setup();
     let built: OverviewLayout | null = null;
     render(<RoleChooser firstRun onChoose={(l) => (built = l)} />);
