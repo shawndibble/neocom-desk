@@ -732,7 +732,7 @@ describe('reaction rows (issue #5990)', () => {
     return (await screen.findByText('Fullerite Polymer')).closest('tr')!;
   }
 
-  it('dims a reaction row with no Reaction Location and asks for one in place of its figures', async () => {
+  it('dims a reaction row with no lowsec Build Location and asks for one in place of its figures', async () => {
     const row = await renderRows();
     expect(row).toHaveClass('text-text-dim');
     expect(within(row).getByText('Set reaction location')).toBeInTheDocument();

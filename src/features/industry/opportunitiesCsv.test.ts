@@ -59,6 +59,22 @@ describe('opportunitiesCsvColumns', () => {
     ]);
   });
 
+  it('names a reaction formula as a reaction, not a BPO, as the table chip does (issue #5990)', () => {
+    const base = opportunity(-1, 1000);
+    const formula: OpportunityRow = {
+      ...base,
+      candidate: {
+        ...base.candidate,
+        catalogEntry: {
+          ...base.candidate.catalogEntry,
+          blueprint: { ...base.candidate.catalogEntry.blueprint, activity: 'reaction' },
+        },
+      },
+    };
+    const kind = columns.find((c) => c.header === 'industry.opportunitiesBlueprint')!;
+    expect(kind.value(formula)).toBe('industry.ownedBlueprintsActivity.reaction');
+  });
+
   it('exports a BPC with its runs and per-unit margin raw', () => {
     expect(columns.map((c) => c.value(opportunity(5, 1000)))).toEqual([
       'Rifter',

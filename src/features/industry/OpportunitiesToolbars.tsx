@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import { MOSTLY_COVERED_PCT } from './opportunityMetrics';
+import { activityFilterOptions, MOSTLY_COVERED_PCT } from './opportunityMetrics';
 import type { OpportunitiesActivityFilter } from './opportunitiesUrl';
 
 export type OpportunitiesView = 'ranked' | 'owned' | 'corp';
@@ -131,11 +131,7 @@ function ActivityFilterControl({
 }) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
-  const options = [
-    { value: 'all' as const, label: t('industry.ownedBlueprintsAll') },
-    { value: 'manufacturing' as const, label: t('industry.ownedBlueprintsActivity.manufacturing') },
-    { value: 'reaction' as const, label: t('industry.ownedBlueprintsActivity.reaction') },
-  ];
+  const options = activityFilterOptions(t);
   const label = t('industry.ownedBlueprintsActivityLabel');
   return isDesktop ? (
     <SegmentedControl label={label} size="sm" value={value} onChange={onChange} options={options} />

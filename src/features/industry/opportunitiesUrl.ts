@@ -17,8 +17,6 @@ export const OWNED_DEFAULT_SORT = { columnId: 'blueprint', direction: 'asc' } as
  * "All owned", so switching views keeps the pilot's choice.
  */
 export const OPPORTUNITIES_ACTIVITY_KEY = 'opps.activity';
-export const OPPORTUNITIES_ACTIVITY_PARAM = enumParam(
-  ['all', 'manufacturing', 'reaction'] as const,
-  'all'
-);
-export type OpportunitiesActivityFilter = 'all' | 'manufacturing' | 'reaction';
+const ACTIVITY_FILTERS = ['all', 'manufacturing', 'reaction'] as const;
+export type OpportunitiesActivityFilter = (typeof ACTIVITY_FILTERS)[number];
+export const OPPORTUNITIES_ACTIVITY_PARAM = enumParam(ACTIVITY_FILTERS, 'all');

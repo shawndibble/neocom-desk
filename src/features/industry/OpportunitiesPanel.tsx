@@ -71,6 +71,7 @@ import type { OwnedStockSnapshot } from './ownedStockDetection';
 import {
   AUTO_RECALCULATE_MAX,
   hubForCharacter,
+  isReaction,
   type OpportunityPlanSeed,
   type OpportunityRow,
 } from './opportunities';
@@ -167,7 +168,7 @@ const FILTER_PARAMS = {
 
 /** Module-level so the table's windowing sees one stable function. */
 const opportunityRowKey = (row: OpportunityRow) => row.candidate.id;
-/** A reaction row its Reaction Location can't price yet reads dimmed (issue #5990). */
+/** A reaction row its Build Location can't price yet reads dimmed (issue #5990). */
 const opportunityRowClassName = (row: OpportunityRow) =>
   row.reactionLocation ? 'text-text-dim' : undefined;
 
@@ -650,10 +651,10 @@ export function OpportunitiesPanel({
   const empty = ownsNoBlueprints
     ? { title: t('industry.opportunitiesEmptyTitle'), hint: t('industry.opportunitiesEmptyHint') }
     : {
-        title: t('industry.opportunitiesNoManufacturingTitle'),
-        hint: t('industry.opportunitiesNoManufacturingHint'),
+        title: t('industry.opportunitiesNothingRankableTitle'),
+        hint: t('industry.opportunitiesNothingRankableHint'),
       };
-  const ownsReactions = candidates.some((c) => c.catalogEntry.blueprint.activity === 'reaction');
+  const ownsReactions = candidates.some(isReaction);
   const meta = hideFilters ? undefined : (
     <OpportunitiesFilterBar
       view={view}

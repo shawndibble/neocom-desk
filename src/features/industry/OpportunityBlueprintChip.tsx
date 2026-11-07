@@ -4,23 +4,17 @@
  */
 import { useTranslation } from 'react-i18next';
 import { StatChip } from '@/components/ui';
-import type { OpportunityCandidate } from './opportunities';
+import { isReaction, type OpportunityCandidate } from './opportunities';
+import { blueprintKindKey } from './opportunityMetrics';
 
 export function OpportunityBlueprintChip({ candidate }: { candidate: OpportunityCandidate }) {
   const { t } = useTranslation();
   const original = candidate.blueprint.runs === -1;
-  const reaction = candidate.catalogEntry.blueprint.activity === 'reaction';
   return (
     <StatChip
-      label={
-        reaction
-          ? t('industry.ownedBlueprintsActivity.reaction')
-          : original
-            ? t('industry.bpo')
-            : t('industry.bpc')
-      }
+      label={t(blueprintKindKey(candidate))}
       value={original ? t('industry.opportunitiesUnlimitedRuns') : candidate.blueprint.runs}
-      tone={original && !reaction ? 'accent' : 'default'}
+      tone={original && !isReaction(candidate) ? 'accent' : 'default'}
     />
   );
 }

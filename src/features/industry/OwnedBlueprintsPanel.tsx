@@ -44,6 +44,7 @@ import {
   OWNED_DEFAULT_SORT,
   OWNED_SORT_KEY,
 } from './opportunitiesUrl';
+import { activityFilterOptions } from './opportunityMetrics';
 import type { OpportunityPlanSeed, OpportunityRow } from './opportunities';
 import {
   OWNED_BLUEPRINT_SORT_VALUE,
@@ -156,6 +157,11 @@ export function OwnedBlueprintsPanel({
     );
     return baseRows.map((row) => ({ ...row, iskPerHour: iskPerHourById.get(row.id) ?? null }));
   }, [baseRows, rankedRows]);
+  // Ranked's dimmed reaction rows (issue #5990): the same instruction here, not "Unknown".
+  const needsReactionLocation = useMemo(
+    () => new Set(rankedRows.filter((row) => row.reactionLocation).map((row) => row.candidate.id)),
+    [rankedRows]
+  );
   const filteredRows = useMemo(
     () => filterOwnedBlueprints(rows, { kind, activity, search }),
     [rows, kind, activity, search]
@@ -350,7 +356,9 @@ export function OwnedBlueprintsPanel({
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.iskPerHour,
       cellClassName: (row) => (row.iskPerHour !== null ? iskToneClass(row.iskPerHour) : undefined),
       render: (row) =>
-        numericCell(row.iskPerHour, (v) => <IskAmount value={v} decimals={0} />, unknown),
+        needsReactionLocation.has(row.id)
+          ? t('industry.opportunitiesSetReactionLocation')
+          : numericCell(row.iskPerHour, (v) => <IskAmount value={v} decimals={0} />, unknown),
     },
     {
       id: 'action',
@@ -472,14 +480,7 @@ export function OwnedBlueprintsPanel({
               size="sm"
               value={draft.activity}
               onChange={(next) => setDraft({ ...draft, activity: next })}
-              options={[
-                { value: 'all', label: t('industry.ownedBlueprintsAll') },
-                {
-                  value: 'manufacturing',
-                  label: t('industry.ownedBlueprintsActivity.manufacturing'),
-                },
-                { value: 'reaction', label: t('industry.ownedBlueprintsActivity.reaction') },
-              ]}
+              options={activityFilterOptions(t)}
             />
           </FilterField>
           {corp.available && (

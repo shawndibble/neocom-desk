@@ -175,7 +175,7 @@ function sortFields(t: ReturnType<typeof useTranslation>['t']): Record<
   };
 }
 
-/** The figures a reaction row its Reaction Location can't price yet leaves blank (issue #5990). */
+/** The figures a reaction row its Build Location can't price yet leaves blank (issue #5990). */
 const PROFIT_FIELDS: ReadonlySet<SortFieldId> = new Set(['iskPerHour', 'unitMargin', 'margin']);
 
 const SORT_FIELD_ORDER: readonly SortFieldId[] = [
@@ -322,6 +322,10 @@ export function MobileOpportunityList({
 
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.6875rem] text-text-dim tabular-nums">
                   <OpportunityBlueprintChip candidate={row.candidate} />
+                  {/* The hero says it when a profit figure leads; otherwise say it here. */}
+                  {row.reactionLocation && !blanked(activeFieldId) && (
+                    <span>{t('industry.opportunitiesSetReactionLocation')}</span>
+                  )}
                   {SORT_FIELD_ORDER.filter((id) => id !== activeFieldId).map((id) => {
                     if (blanked(id)) return null;
                     const secondary = fields[id].hero(row);

@@ -56,6 +56,11 @@ export interface OpportunityCandidate {
   catalogEntry: BlueprintCatalogEntry;
 }
 
+/** A reaction formula rather than a manufacturing blueprint (issue #5990). */
+export function isReaction(candidate: Pick<OpportunityCandidate, 'catalogEntry'>): boolean {
+  return candidate.catalogEntry.blueprint.activity === 'reaction';
+}
+
 /**
  * Every owned blueprint across the given characters that can be ranked:
  * manufacturing blueprints and reaction formulas (issue #5990) the SDE
@@ -118,7 +123,7 @@ export function groupCandidatesByHub(
    * The build system each owning Character's rows are charged a job fee at.
    * A snapshot carries one system's cost index, so two Characters at one hub
    * who build in different systems are different groups. Asked per activity:
-   * reactions run at the Reaction Location, not the manufacturing one.
+   * reactions run at the reaction Remembered Location, not the manufacturing one.
    */
   buildSystemFor: (characterId: number, activity: IndustryActivity) => number | undefined = () =>
     undefined
@@ -268,7 +273,7 @@ export interface UnrankedOpportunityRow {
   /** ISK the owned stock this job uses would net if sold, charged against `result.profit` (the plan hero's sell-value basis); 0 when none is charged. */
   forgoneSale: number;
   /**
-   * Set only on a reaction row whose Reaction Location can't host it yet
+   * Set only on a reaction row whose Build Location can't host it yet
    * (issue #5990): never chosen, or in highsec. Its profit, margin and
    * ISK/hour are null, so it ranks below every priced row instead of on
    * numbers no reactor could earn. Absent on every row that prices.
@@ -400,10 +405,9 @@ export function computeOpportunityRow(
 
   // The same answer the reaction Build Plan's own warning reads, so a row is
   // dimmed exactly when the plan it opens says "Not set" or warns of highsec.
-  const reactionState =
-    candidate.catalogEntry.blueprint.activity === 'reaction'
-      ? planReactionLocation(plan, 'reaction')?.state
-      : undefined;
+  const reactionState = isReaction(candidate)
+    ? planReactionLocation(plan, 'reaction')?.state
+    : undefined;
   const reactionLocation =
     reactionState === 'unset' || reactionState === 'highsec' ? reactionState : undefined;
 
@@ -495,7 +499,7 @@ export interface OpportunityPricingInputs {
   ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
   /** Each owning Character's latest plan, whose price basis and build location rows start from — as a new plan does. */
   defaultsByCharacter: ReadonlyMap<number, BuildPlanRecord | null>;
-  /** The batch holds a reaction formula, so the Reaction Location prices a row too (issue #5990). */
+  /** The batch holds a reaction formula, so the reaction Remembered Location prices a row too (issue #5990). */
   pricesReactions?: boolean;
 }
 

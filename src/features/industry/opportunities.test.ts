@@ -661,7 +661,7 @@ describe('reaction rows (issue #5990)', () => {
     expect(row.result.iskPerHour).toBe(result!.iskPerHour);
   });
 
-  it('shows no profit, margin or ISK/hour while the Reaction Location is unset', () => {
+  it('shows no profit, margin or ISK/hour while the reaction Build Location is unset', () => {
     const row = rowAt(DEFAULT_ACTIVITY_FACILITY_DEFAULTS);
     expect(row.reactionLocation).toBe('unset');
     expect(row.result.profit).toBeNull();
@@ -671,7 +671,7 @@ describe('reaction rows (issue #5990)', () => {
     expect(row.result.totalCost).toBeGreaterThan(0);
   });
 
-  it('shows no profit, margin or ISK/hour at a highsec Reaction Location', () => {
+  it('shows no profit, margin or ISK/hour at a highsec reaction Build Location', () => {
     const row = rowAt(
       atReactionLocation({ security: 'highsec', buildSystemId: 30000142, buildSystemName: 'Jita' })
     );
@@ -679,14 +679,14 @@ describe('reaction rows (issue #5990)', () => {
     expect(row.result.iskPerHour).toBeNull();
   });
 
-  it('ranks a row with an unset Reaction Location below every priced row', () => {
+  it('ranks a row with an unset reaction Build Location below every priced row', () => {
     const blocked = rowAt(DEFAULT_ACTIVITY_FACILITY_DEFAULTS);
     const priced = rowAt(lowsec, { ...candidate, id: '100:2' });
     const ranked = rankOpportunityRows([blocked, priced]);
     expect(ranked.map((r) => r.candidate.id)).toEqual(['100:2', '100:1']);
   });
 
-  it('leaves a manufacturing row untouched by the Reaction Location', () => {
+  it('leaves a manufacturing row untouched by the reaction Build Location', () => {
     const manufacturing: OpportunityCandidate = {
       ...candidate,
       id: '100:7',
@@ -1037,7 +1037,7 @@ describe('opportunitySnapshotRequest — where the job fee is charged', () => {
     expect('costIndexSystemId' in request).toBe(false);
   });
 
-  it('reads the reaction cost index at the Reaction Location for a reaction group (issue #5990)', () => {
+  it('reads the reaction cost index at the reaction Build Location for a reaction group (issue #5990)', () => {
     const request = opportunitySnapshotRequest(
       [],
       DEFAULT_TRADE_HUB,

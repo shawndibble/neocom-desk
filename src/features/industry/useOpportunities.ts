@@ -49,6 +49,7 @@ import {
   deleteOpportunitiesCache,
   detectOpportunityStock,
   groupCandidatesByHub,
+  isReaction,
   opportunitiesBatchKey,
   opportunitiesInputsKey,
   opportunitySnapshotRequest,
@@ -158,7 +159,7 @@ export function useOpportunities({
         defaultsByCharacter: new Map(
           candidates.map((c) => [c.characterId, defaultsForCharacter(c.characterId)] as const)
         ),
-        pricesReactions: candidates.some((c) => c.catalogEntry.blueprint.activity === 'reaction'),
+        pricesReactions: candidates.some(isReaction),
       }),
     [
       assumedMe,
