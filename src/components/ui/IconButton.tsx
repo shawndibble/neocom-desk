@@ -1,5 +1,6 @@
 import { forwardRef, type ButtonHTMLAttributes, type MouseEvent, type ReactNode } from 'react';
 import { Tooltip } from './Tooltip';
+import { cx } from '@/lib/cx';
 import {
   iconButtonClassName,
   type IconButtonSize,
@@ -71,6 +72,12 @@ interface IconButtonProps extends Omit<
    * accessible name and tooltip are unchanged.
    */
   visibleLabel?: string;
+  /**
+   * With `visibleLabel`: keep the text below `md` too, never collapsing to the
+   * icon. Only for a control whose words are the cue (a "New to …?" explainer
+   * trigger, DESIGN.md §6c Header controls).
+   */
+  labelAtEveryWidth?: boolean;
   className?: string;
 }
 
@@ -105,6 +112,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
     size = 'md',
     openOnTap,
     visibleLabel,
+    labelAtEveryWidth = false,
     className = '',
     ...rest
   },
@@ -135,7 +143,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
           variant,
           tone,
           size,
-          withText: visibleLabel !== undefined,
+          withText: visibleLabel === undefined ? false : labelAtEveryWidth ? 'always' : true,
           pressed,
           // `aria-disabled` (a tooltip-bearing inert button) must not hover either.
           disabled: disabled || ariaDisabled,
@@ -146,7 +154,10 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
           {icon}
         </span>
         {visibleLabel !== undefined && (
-          <span aria-hidden="true" className="hidden text-xs font-medium md:inline">
+          <span
+            aria-hidden="true"
+            className={cx('text-xs font-medium', !labelAtEveryWidth && 'hidden md:inline')}
+          >
             {visibleLabel}
           </span>
         )}

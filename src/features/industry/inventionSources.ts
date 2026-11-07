@@ -19,10 +19,9 @@ import type { TradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 import { loadInvention, loadSkills } from '@/sde/loadSde';
 import type { InventionData, SkillType } from '@/sde/types';
+import { SCIENCE_SKILL_GROUP_ID } from '@/engine/industry/alphaIndustrySkills';
 import type { BlueprintCatalog } from './blueprintCatalog';
 
-/** The skill group every invention science and encryption skill sits in. */
-const SCIENCE_SKILL_GROUP_ID = 270;
 const ENCRYPTION_SKILL_SUFFIX = 'Encryption Methods';
 
 export interface InventionSkill {

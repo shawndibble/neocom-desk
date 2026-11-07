@@ -15,6 +15,7 @@ import { Button, EmptyState, IconButton, Panel } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useStableCallback } from './useStableCallback';
 import { useUrlFilter } from '@/lib/useUrlState';
+import { useTouchContext } from '@/lib/useMediaQuery';
 import { BuildPlanFilterBar } from './BuildPlanFilterBar';
 import {
   BUILD_PLAN_FILTER,
@@ -150,6 +151,7 @@ export function BuildPlanList({
   ownedBlueprints,
 }: BuildPlanListProps) {
   const { t } = useTranslation();
+  const touchContext = useTouchContext();
   // Parents pass inline handlers; stable wrappers keep the memoised PlanRows
   // from re-rendering on every list render.
   const onSelect = useStableCallback(onSelectProp);
@@ -407,7 +409,7 @@ export function BuildPlanList({
         {plans.length === 0 && groups.length === 0 ? (
           <EmptyState
             title={t('industry.emptyTitle')}
-            hint={t('industry.emptyHint')}
+            hint={t('industry.emptyHint', { context: touchContext })}
             className="py-6"
           />
         ) : filtering && visiblePlans.length === 0 ? (
