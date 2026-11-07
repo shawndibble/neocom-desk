@@ -7,6 +7,7 @@ import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { CHARACTER_ID } from './support/fixtureData';
 import { signInAndGoto } from './support/authSeed';
+import { SCOPES as BASE_GRANT } from '../src/esi/scopes';
 
 const HOUR = 3_600_000;
 const iso = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
@@ -93,4 +94,39 @@ test('den clocks show on the phone rail too', async ({ page }) => {
   if (process.env.SHOT_DIR) {
     await page.screenshot({ path: `${process.env.SHOT_DIR}/calendar-390.png` });
   }
+});
+
+test('a Base Grant pilot sees no den clocks and no "new login" notice (issue #5997)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // Dens mocked anyway: a regression that read them without the grant would show rows.
+  await mockDens(page);
+  await page.route(`**/characters/${CHARACTER_ID}/calendar`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          event_id: 1,
+          event_date: iso(20 * HOUR),
+          title: 'Base grant fleet op',
+          importance: 0,
+          event_response: 'not_responded',
+        },
+      ]),
+    })
+  );
+  await signInAndGoto(page, './calendar', BASE_GRANT);
+
+  // The board reads every source together, so a shown event means the den read landed too.
+  await expect(page.getByText('Base grant fleet op').first()).toBeVisible();
+  await expect(page.getByText(/need a new login/i)).toHaveCount(0);
+  await expect(page.getByText('leaves reinforcement')).toHaveCount(0);
+
+  await page
+    .getByRole('button', { name: /filter/i })
+    .first()
+    .click();
+  await expect(page.getByRole('menuitemcheckbox', { name: /Mercenary dens/ })).toHaveCount(0);
 });

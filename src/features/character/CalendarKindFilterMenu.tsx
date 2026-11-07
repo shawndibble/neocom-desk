@@ -78,6 +78,13 @@ function KindGlyph({ kind }: { kind: CharacterBoardItemKind }) {
   return <Glyph aria-hidden="true" className={`size-4 shrink-0 ${KIND_TEXT[kind]}`} />;
 }
 
+/** Kinds read through an opt-in Permission: no row while unreadable. */
+const OPT_IN_KINDS: ReadonlySet<CharacterBoardItemKind> = new Set([
+  'moonChunk',
+  'skyhookRaid',
+  'mercenaryDen',
+]);
+
 export function CalendarKindFilterMenu({
   hidden,
   onToggle,
@@ -117,10 +124,13 @@ export function CalendarKindFilterMenu({
    * the pilot hid (the row is how they turn it back on — their choice is
    * remembered, so it must stay reachable), one that could not be read or
    * needs a scope (the row says why, and absence would hide that), and the
-   * Skill plan row while no plan is chosen.
+   * Skill plan row while no plan is chosen. The opt-in kinds (moon chunks,
+   * skyhook raids, mercenary dens) are the exception: unreadable usually means
+   * the Permission is off, and an "Unavailable" row would blame the network for
+   * a choice the pilot never made.
    */
   function hasRow(kind: CharacterBoardItemKind) {
-    if ((kind === 'moonChunk' || kind === 'skyhookRaid') && !readable.has(kind)) return false;
+    if (OPT_IN_KINDS.has(kind) && !readable.has(kind)) return false;
     if (hiddenSet.has(kind) || needsReauth.has(kind) || !readable.has(kind)) return true;
     return (counts.get(kind) ?? 0) > 0;
   }

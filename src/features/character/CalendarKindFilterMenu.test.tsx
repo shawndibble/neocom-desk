@@ -8,7 +8,8 @@ import { CalendarKindFilterMenu } from './CalendarKindFilterMenu';
 async function openMenu(
   hidden: CharacterBoardItemKind[],
   onShowAll = vi.fn(),
-  counts = new Map<CharacterBoardItemKind, number>()
+  counts = new Map<CharacterBoardItemKind, number>(),
+  readableKinds: readonly CharacterBoardItemKind[] = CHARACTER_BOARD_ITEM_KINDS
 ) {
   const user = userEvent.setup();
   render(
@@ -17,7 +18,7 @@ async function openMenu(
       onToggle={() => {}}
       onShowAll={onShowAll}
       counts={counts}
-      readableKinds={[...CHARACTER_BOARD_ITEM_KINDS]}
+      readableKinds={readableKinds}
       reauthKinds={[]}
       skillPlanChoices={[]}
       chosenSkillPlanId={null}
@@ -73,5 +74,11 @@ describe('CalendarKindFilterMenu empty kinds', () => {
     const [first, second] = CHARACTER_BOARD_ITEM_KINDS;
     await openMenu([second], vi.fn(), new Map([[first, 2]]));
     expect(screen.getAllByRole('menuitemcheckbox')).toHaveLength(2);
+  });
+
+  it('drops Mercenary dens when the Character cannot read them (an opt-in that is off)', async () => {
+    const readable = CHARACTER_BOARD_ITEM_KINDS.filter((kind) => kind !== 'mercenaryDen');
+    await openMenu([], vi.fn(), new Map(), readable);
+    expect(screen.queryByRole('menuitemcheckbox', { name: /mercenary dens/i })).toBeNull();
   });
 });

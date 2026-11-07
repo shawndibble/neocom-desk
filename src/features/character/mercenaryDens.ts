@@ -322,14 +322,16 @@ export async function loadMercenaryDensWidget(
 /**
  * One Character's dens as rows, for the Calendar's den clocks: the same reads
  * as the widget, without the other Characters, jumps or owner names. `cached`
- * is null when the list could not be read; `needsReauth` when the token lacks
- * the den scope or ESI refused it.
+ * is null when the list could not be read or the den scope was never granted;
+ * `needsReauth` only when the scope was granted and ESI refused it. Mercenary
+ * dens is an opt-in Permission, so a grant without it is "off", never a
+ * reauth (issue #5997).
  */
 export async function loadCharacterDenRows(
   characterId: number
 ): Promise<StatusResult<MercenaryDenRow[]>> {
   const scopes = (await db.tokens.get(characterId))?.scopes ?? [];
-  if (!scopes.includes(DEN_SCOPE)) return { cached: null, needsReauth: true };
+  if (!scopes.includes(DEN_SCOPE)) return { cached: null, needsReauth: false };
   const entry = await loadCharacterDens(characterId, '', scopes.includes(OPERATION_SCOPE)).catch(
     () => null
   );
