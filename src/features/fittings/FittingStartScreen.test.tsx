@@ -19,7 +19,13 @@ const loadInGameFittingsMock = vi.hoisted(() => vi.fn());
 vi.mock('./inGameFittings', () => ({ loadInGameFittings: loadInGameFittingsMock }));
 vi.mock('./popularFits', () => ({ usePopularFits: () => ({ ok: true, fits: [] }) }));
 const loadCharacterShipMock = vi.hoisted(() => vi.fn());
-vi.mock('@/features/character/ship', () => ({ loadCharacterShip: loadCharacterShipMock }));
+const shipTypeIdMock = vi.hoisted(() =>
+  vi.fn((): { typeId: number | null; status: string } => ({ typeId: null, status: 'needsScope' }))
+);
+vi.mock('@/features/character/ship', () => ({
+  loadCharacterShip: loadCharacterShipMock,
+  useCharacterShipTypeId: shipTypeIdMock,
+}));
 const loadCharacterAssetsMock = vi.hoisted(() => vi.fn());
 vi.mock('@/features/assets/assets', () => ({ loadCharacterAssets: loadCharacterAssetsMock }));
 // The asset-to-Fitting mapping has its own tests; here only which items reach it matters.
@@ -153,6 +159,7 @@ beforeEach(async () => {
   isPhoneMock.mockReturnValue(false);
   await db.fittings.clear();
   useEndpointsGrantedMock.mockReturnValue(true);
+  shipTypeIdMock.mockReturnValue({ typeId: null, status: 'needsScope' });
   loadCharacterShipMock.mockResolvedValue(null);
   loadCharacterAssetsMock.mockResolvedValue({ cached: { data: [] }, needsReauth: false });
   const encoded = await encodeFittingShare(fittingToShareInput(RIFTER));
@@ -345,6 +352,66 @@ describe('FittingStartScreen', () => {
     });
     renderScreen();
     expect(await screen.findByText('No fittings yet')).toBeInTheDocument();
+  });
+
+  describe('empty library', () => {
+    async function emptyLibrary() {
+      await db.fittings.clear();
+      loadInGameFittingsMock.mockResolvedValue({
+        cached: { data: [], fetchedAt: new Date(), fromCache: false, truncated: false },
+        needsReauth: false,
+      });
+    }
+
+    it('says what a fitting is and links the Ship Tree, with no EFT jargon', async () => {
+      await emptyLibrary();
+      renderScreen();
+      await screen.findByText('No fittings yet');
+      const link = screen.getByRole('link', { name: 'Ship Tree' });
+      expect(link).toHaveAttribute('href', '/ships/tree');
+      const hint = link.closest('p')!;
+      expect(hint).toHaveTextContent('A fitting is the set of modules on a ship.');
+      expect(hint.textContent).not.toMatch(/EFT|Ctrl\+V/);
+    });
+
+    it('offers to fit the flown hull beside New from hull, and opens the editor on it', async () => {
+      await emptyLibrary();
+      shipTypeIdMock.mockReturnValue({ typeId: 587, status: 'ready' });
+      const onStartHull = vi.fn();
+      renderScreen(makeWorkspace(), onStartHull);
+      const fit = await screen.findByRole('button', { name: 'Fit your Rifter' });
+      expect(fit.className).toContain('bg-accent');
+      // One New from hull: the empty state's, not a second one in the toolbar.
+      expect(screen.getAllByRole('button', { name: 'New from hull' })).toHaveLength(1);
+      await userEvent.click(fit);
+      expect(onStartHull).toHaveBeenCalledWith({ typeId: 587, name: 'Rifter' });
+    });
+
+    it('shows only New from hull without the current-ship grant', async () => {
+      await emptyLibrary();
+      renderScreen();
+      await screen.findByText('No fittings yet');
+      expect(screen.queryByRole('button', { name: /^Fit your/ })).not.toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'New from hull' })).toHaveLength(1);
+    });
+
+    it('never offers to fit a pod', async () => {
+      await emptyLibrary();
+      shipTypeIdMock.mockReturnValue({ typeId: 670, status: 'ready' });
+      renderScreen();
+      await screen.findByText('No fittings yet');
+      await waitFor(() => expect(screen.getByRole('link', { name: 'Ship Tree' })).toBeVisible());
+      expect(screen.queryByRole('button', { name: /^Fit your/ })).not.toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'New from hull' })).toHaveLength(1);
+    });
+  });
+
+  it('explains EFT and Ctrl+V in the Import dialog', async () => {
+    renderScreen();
+    await screen.findByText('Armor Drake');
+    await userEvent.click(screen.getByRole('button', { name: 'Import' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/press Ctrl\+V anywhere/)).toBeInTheDocument();
   });
 
   it('shows a re-auth banner, and never fetches, when the fittings scope is missing', async () => {

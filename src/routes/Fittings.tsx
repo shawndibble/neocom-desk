@@ -36,7 +36,6 @@ import { useChargeLoading } from '@/features/fittings/useChargeLoading';
 import { useEditorItemActions } from '@/features/fittings/useEditorItemActions';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { useEditorShare } from '@/features/fittings/useEditorShare';
-import type { HullEntry } from '@/engine/fittings/hullCatalogue';
 import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
 import { FittingEditorHeader } from '@/features/fittings/FittingEditorHeader';
 import { FittingEditorLayout } from '@/features/fittings/FittingEditorLayout';
@@ -44,6 +43,7 @@ import { useMakeItFitDialog } from '@/features/fittings/useMakeItFitDialog';
 import { useImproveDrawer } from '@/features/fittings/useImproveDrawer';
 import type { LibraryAction } from '@/features/fittings/FittingHeader';
 import { FittingStartScreen } from '@/features/fittings/FittingStartScreen';
+import type { StartHull } from '@/features/fittings/FittingLibraryEmpty';
 import { FittingLibraryDialogs } from '@/features/fittings/FittingLibraryDialogs';
 import { FittingEditorPanes } from '@/features/fittings/FittingEditorPanes';
 import { FittingRackSheet } from '@/features/fittings/FittingRackSheet';
@@ -438,7 +438,7 @@ function FittingsPage() {
     damageProfile: workspace.damageProfiles.selected,
   });
 
-  const startHull = (hull: HullEntry) =>
+  const startHull = (hull: StartHull) =>
     void workspace.openFitting(newFitting(hull.typeId, hull.name));
   // Reopening the Fitting already open changes nothing to close on, so an
   // explicit open closes the Fittings menu's dialog itself.

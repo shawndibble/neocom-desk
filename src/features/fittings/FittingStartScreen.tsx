@@ -25,7 +25,6 @@ import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import type { FittingRecord } from '@/db';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
-import type { HullEntry } from '@/engine/fittings/hullCatalogue';
 import { filterMyFittings, groupByHull } from '@/engine/fittings/myFittings';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -36,6 +35,7 @@ import { warmDogmaEngine } from './dogmaFittingEngine';
 import { StatNote } from './StatFacts';
 import { FittingPreview } from './FittingPreview';
 import { ImportFittingCard, ImportFittingDialog, NewFromHullDialog } from './FittingStartDialogs';
+import { FittingLibraryEmpty, type StartHull } from './FittingLibraryEmpty';
 import { setFittingNotes } from './myFittings';
 import { FittingExportNotice } from './FittingExportMenu';
 import { DeleteFittingModal, RenameFittingModal } from './SavedFittingModals';
@@ -68,7 +68,7 @@ interface FittingStartScreenProps {
    */
   variant?: 'page' | 'dialog';
   /** The page's New from hull button. */
-  onStartHull?: (hull: HullEntry) => void;
+  onStartHull?: (hull: StartHull) => void;
   /** A dialog's Import, swapping the list for the Load card in place, so no dialog opens over a dialog. */
   importInline?: boolean;
   /** Each row's ⋮ and right-click menu (Rename, Delete, Compare, Export…). Off in the Compare picker, where a row is only ever picked. */
@@ -363,6 +363,13 @@ export function FittingStartScreen({
   const listHeight = previewing ? 'max-h-72 lg:max-h-[36rem]' : '';
   const showNew = page && onStartHull !== undefined;
   const showImport = page || importInline;
+  const empty = !hasRows && !active.pending && !loading;
+  // An empty page's New from hull sits in its empty state, beside Fit your ship.
+  const showNewInToolbar = showNew && !empty;
+  const startHull = (hull: StartHull) => {
+    onStartHull?.(hull);
+    onOpened?.();
+  };
 
   return (
     <div className={cx('space-y-3', pageTitle && 'mx-auto max-w-page')}>
@@ -393,9 +400,9 @@ export function FittingStartScreen({
           {/* A dialog has no page header for the In-game refresh: it sits by the search. */}
           {!pageTitle && refreshInGameButton}
           {/* On a phone they share the row beneath the search, half each. */}
-          {(showNew || showImport) && (
+          {(showNewInToolbar || showImport) && (
             <div className={`flex gap-2 ${isPhone ? 'w-full *:flex-1' : ''}`}>
-              {showNew && (
+              {showNewInToolbar && (
                 <Button variant="primary" onClick={() => setHullOpen(true)}>
                   {t('fittings.start.newFromHull')}
                 </Button>
@@ -423,10 +430,14 @@ export function FittingStartScreen({
         {active.pending || (loading && !hasRows) ? (
           <Spinner block="panel" label={t('common.loading')} />
         ) : !hasRows ? (
-          <EmptyState
-            title={t('fittings.start.emptyTitle')}
-            hint={t(showNew ? 'fittings.start.emptyHint' : 'fittings.start.emptyHintList')}
-          />
+          showNew ? (
+            <FittingLibraryEmpty onNewFromHull={() => setHullOpen(true)} onStartHull={startHull} />
+          ) : (
+            <EmptyState
+              title={t('fittings.start.emptyTitle')}
+              hint={t('fittings.start.emptyHintList')}
+            />
+          )
         ) : (
           <div
             className={`grid grid-cols-1 items-start gap-3 ${previewing ? 'lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]' : ''}`}
@@ -505,15 +516,14 @@ export function FittingStartScreen({
         )}
       </MaybeTabPanel>
 
-      {showNew && onStartHull && (
+      {showNew && (
         <NewFromHullDialog
           open={hullOpen}
           onClose={() => setHullOpen(false)}
           catalogue={catalogue}
           onStart={(hull) => {
             setHullOpen(false);
-            onStartHull(hull);
-            onOpened?.();
+            startHull(hull);
           }}
           onOpenPopular={async (loaded) => {
             await workspace.openLoaded(loaded);

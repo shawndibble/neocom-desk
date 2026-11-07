@@ -105,16 +105,25 @@ test.describe('Fitting Compare long names at 390px', () => {
 test.describe('Fitting Compare control toolbar', () => {
   const LABELS = ['Damage profile', 'Abyssal weather', 'Target profile'];
 
+  // The pickers only show once a Fitting is in the comparison (#6012).
+  async function gotoWithOneFit(page: Page) {
+    await signInAndGoto(page, './ships/fittings/compare');
+    await answerAnyType(page);
+    await expect(page.getByTestId('compare-controls')).toHaveCount(0);
+    await addFitting(page, FIT_A);
+    await expect(page.getByTestId('compare-controls')).toBeVisible();
+  }
+
   test('at 390 the Target profile summary reads as text, not a raw i18n key', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await signInAndGoto(page, './ships/fittings/compare');
+    await gotoWithOneFit(page);
     await expect(page.getByText(/\d+ m sig · \d+ m\/s/).first()).toBeVisible();
     expect(await page.locator('body').innerText()).not.toMatch(/\bfittings\.\w+\./);
   });
 
   test('at 1440 the three selects share one row', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await signInAndGoto(page, './ships/fittings/compare');
+    await gotoWithOneFit(page);
     const ys: number[] = [];
     for (const name of LABELS) {
       const box = await page.getByRole('combobox', { name }).boundingBox();
@@ -125,7 +134,7 @@ test.describe('Fitting Compare control toolbar', () => {
 
   test('at 1024 the block is compact and each label sits beside its select', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
-    await signInAndGoto(page, './ships/fittings/compare');
+    await gotoWithOneFit(page);
     const block = await page.getByTestId('compare-controls').boundingBox();
     expect(block!.height).toBeLessThan(70);
     for (const name of LABELS) {
@@ -140,16 +149,15 @@ test.describe('Fitting Compare control toolbar', () => {
       page,
     }) => {
       await page.setViewportSize({ width, height: 900 });
-      await signInAndGoto(page, './ships/fittings/compare');
-      await answerAnyType(page);
+      await gotoWithOneFit(page);
       const controls = page.getByTestId('compare-controls');
-      const empty = (await controls.boundingBox())!.height;
-      for (const [i, eft] of [FIT_A, FIT_B, FIT_C].entries()) {
-        await addFitting(page, i === 0 ? eft : `${eft}\n125mm Gatling AutoCannon I`);
+      const one = (await controls.boundingBox())!.height;
+      for (const eft of [FIT_B, FIT_C]) {
+        await addFitting(page, `${eft}\n125mm Gatling AutoCannon I`);
       }
       await expect(page.locator('table')).toHaveCount(2, { timeout: 20_000 });
-      expect(empty).toBeLessThan(70);
-      expect((await controls.boundingBox())!.height).toBeLessThanOrEqual(empty + 1);
+      expect(one).toBeLessThan(70);
+      expect((await controls.boundingBox())!.height).toBeLessThanOrEqual(one + 1);
       const target = (await page.getByRole('combobox', { name: 'Target profile' }).boundingBox())!;
       const manage = (await page.getByRole('button', { name: /manage targets/i }).boundingBox())!;
       expect(

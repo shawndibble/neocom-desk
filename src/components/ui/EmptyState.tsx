@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 interface EmptyStateProps {
   /** @summary Already-translated headline saying what is missing. */
   title: string;
-  /** @summary One line on why it is empty or what to do next. */
-  hint?: string;
+  /** @summary One line on why it is empty or what to do next; may hold an inline link. */
+  hint?: ReactNode;
   /** @summary Decorative glyph above the title. */
   icon?: ReactNode;
   /** @summary The one control that resolves the empty state, e.g. a `Button`. */
