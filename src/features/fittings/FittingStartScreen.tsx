@@ -241,12 +241,13 @@ export function FittingStartScreen({
       <p className="text-xs text-warning">{t('common.loadFailedHint')}</p>
     ) : null;
 
-  // Saved Fittings still being read or their hulls decoded, or In-game ones still loading:
-  // "No fittings yet" must not flash before either lands.
+  // Saved Fittings still being read or their hulls decoded, In-game ones or the Active Fit
+  // still loading: "No fittings yet" must not flash before they land.
   const savedPending =
     hasCharacter && (saved.records === undefined || saved.hulls.size < saved.records.length);
   const loading =
     savedPending ||
+    (hasCharacter && active.pending) ||
     (hasCharacter && (inGame.granted === undefined || (inGame.loading && !inGame.result)));
 
   const refreshInGameButton =
@@ -310,7 +311,7 @@ export function FittingStartScreen({
               </span>
             )}
             {/* The Active Fit sits under its own heading, not its hull's: the row names the hull. */}
-            {row.source === 'active' && (
+            {row.source === 'active' && row.hull !== row.name && (
               <span className="block truncate text-xs text-text-dim">{row.hull}</span>
             )}
           </span>
@@ -420,7 +421,8 @@ export function FittingStartScreen({
           </p>
         )}
 
-        {loading && !hasRows ? (
+        {/* The list waits on the Active Fit even with other rows in hand: it leads, so landing late would shift them. */}
+        {(loading && !hasRows) || (hasCharacter && active.pending) ? (
           <Spinner block="panel" label={t('common.loading')} />
         ) : !hasRows ? (
           <EmptyState

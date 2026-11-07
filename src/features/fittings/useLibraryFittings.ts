@@ -262,19 +262,24 @@ export function useActiveFitting(characterId: number | null) {
 
   const refresh = useCallback(async () => {
     const requestId = ++requestIdRef.current;
-    if (characterId === null || granted !== true) return;
+    if (characterId === null || granted !== true) {
+      // A dropped grant takes the row with it.
+      setState(null);
+      return;
+    }
     let row: ActiveRow | null = null;
     try {
-      const ship = await loadCharacterShip(characterId);
-      const types = await loadTypes();
+      const [ship, types] = await Promise.all([loadCharacterShip(characterId), loadTypes()]);
       const hull = ship ? types[String(ship.ship_type_id)] : undefined;
-      if (ship && !isCapsuleGroup(hull?.groupID)) {
-        const { cached } = await loadCharacterAssets(characterId);
+      const assets =
+        ship && !isCapsuleGroup(hull?.groupID) ? await loadCharacterAssets(characterId) : null;
+      // An unread asset list is not an empty ship: no row rather than a bare hull.
+      if (ship && assets?.cached && !assets.needsReauth) {
         const hullName = typeNameOr(t, hull?.name, ship.ship_type_id);
         const name = ship.ship_name.trim() || hullName;
         const fitting = await shipItemsToFitting(
           { typeId: ship.ship_type_id, name },
-          activeShipItems(cached?.data ?? [], ship.ship_item_id)
+          activeShipItems(assets.cached.data, ship.ship_item_id)
         );
         row = {
           id: `active-${ship.ship_item_id}`,
@@ -291,9 +296,14 @@ export function useActiveFitting(characterId: number | null) {
   }, [characterId, granted, t]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a Character or grant change re-reads the flown ship, not a render-time derivation
     void refresh();
   }, [refresh]);
 
   // A previous Character's ship is not this one's until its own lands.
-  return { row: state?.forCharacter === characterId ? state.row : null, refresh };
+  const current = state?.forCharacter === characterId ? state : null;
+  /** Until this Character's read lands, the list waits: the row arriving late would move the pick and every row under a tap. */
+  const pending =
+    characterId !== null && (granted === undefined || (granted === true && current === null));
+  return { row: current?.row ?? null, pending, refresh };
 }

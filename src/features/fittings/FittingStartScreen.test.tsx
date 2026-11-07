@@ -550,6 +550,24 @@ describe('FittingStartScreen Active Fit', () => {
     expect(screen.queryByRole('heading', { name: 'Active fit' })).not.toBeInTheDocument();
   });
 
+  it('holds the list until it lands, so the pick never jumps to it', async () => {
+    let land!: (ship: unknown) => void;
+    loadCharacterShipMock.mockReturnValue(new Promise((resolve) => (land = resolve)));
+    renderScreen();
+    await waitFor(() => expect(loadCharacterShipMock).toHaveBeenCalled());
+    expect(screen.queryByText('Armor Drake')).not.toBeInTheDocument();
+    land({ ship_item_id: SHIP_ID, ship_type_id: 587, ship_name: 'Zipper' });
+    expect(await screen.findByText('preview of Zipper')).toBeInTheDocument();
+  });
+
+  it('is left out when the assets could not be read, not shown as an empty hull', async () => {
+    loadCharacterAssetsMock.mockResolvedValue({ cached: null, needsReauth: false });
+    renderScreen();
+    await screen.findByText('Armor Drake');
+    expect(screen.queryByRole('heading', { name: 'Active fit' })).not.toBeInTheDocument();
+    expect(shipItemsToFittingMock).not.toHaveBeenCalled();
+  });
+
   it('is left out in a pod', async () => {
     loadCharacterShipMock.mockResolvedValue({
       ship_item_id: SHIP_ID,
