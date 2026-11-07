@@ -108,7 +108,7 @@ function MaybeTabPanel({
 
 /**
  * Every way into a Fitting, as one list (scope decisions `20260925-152418`
- * and `20261001-210222`): one search over the Character's saved and In-game
+ * and `20261001-210222`; the Active Fit leading it, `20261106-233825`): one search over the Character's saved and In-game
  * Fittings, grouped by hull. On a desktop page the picked row is previewed
  * beside the list and a double-click (or Enter) opens it; everywhere else —
  * a phone, the editor's Open dialog, the Compare picker — a tap opens it.
