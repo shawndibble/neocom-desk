@@ -40,8 +40,8 @@ test('a phone sort control changes the Offers table order at 390px (issue #2174)
   page,
 }) => {
   await mockLoyaltyOffers(page);
-  // `affordableOnly` defaults true and the fixture pilot has 0 LP, which
-  // would otherwise filter both fixture offers out of `filteredRows`.
+  // Pinned off: Affordable defaults on whenever the LP balance isn't a known
+  // 0, which could filter both fixture offers out of `filteredRows`.
   await signInAndGoto(page, `./wallet/lp-store/${CORPORATION_ID}?affordableOnly=0`);
   await page.setViewportSize(PHONE);
 

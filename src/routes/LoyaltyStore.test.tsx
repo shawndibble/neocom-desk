@@ -388,6 +388,90 @@ describe('LoyaltyStore filters', () => {
   });
 });
 
+describe('LoyaltyStore Affordable default (issue #6004)', () => {
+  const UNAFFORDABLE: LoyaltyOfferRow = {
+    ...ITEM_ROW,
+    profit: { ...PROFIT, affordableLp: false },
+  };
+
+  function mockLp(playerLp: number | null) {
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
+      rows: [UNAFFORDABLE, BLUEPRINT_ROW],
+      catalog: null,
+      playerLp,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+  }
+
+  it('opens with Affordable off and every offer listed at 0 LP with the corporation', () => {
+    useDesktopViewport();
+    mockLp(0);
+    renderStore();
+
+    expect(screen.getByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).toBeInTheDocument();
+    openFilters();
+    expect(screen.getByRole('button', { name: /^Affordable/i })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(probe.search).toBe('');
+  });
+
+  it('keeps Affordable on by default when the pilot holds some LP', () => {
+    useDesktopViewport();
+    mockLp(50);
+    renderStore();
+
+    expect(screen.queryByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).toBeNull();
+  });
+
+  it('lets an explicit affordableOnly in the URL override the 0 LP default', () => {
+    useDesktopViewport();
+    mockLp(0);
+    renderStore('?affordableOnly=1');
+
+    expect(screen.queryByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).toBeNull();
+  });
+
+  it('lets an explicit affordableOnly in the URL override the some-LP default', () => {
+    useDesktopViewport();
+    mockLp(50);
+    renderStore('?affordableOnly=0');
+
+    expect(screen.getByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).toBeInTheDocument();
+  });
+
+  it('writes Affordable to the URL at 0 LP, omitted again once it is back off', async () => {
+    mockLp(0);
+    const user = userEvent.setup();
+    renderStore();
+    openFilters();
+
+    await user.click(screen.getByRole('button', { name: /^Affordable/i }));
+    await waitFor(() => expect(probe.search).toContain('affordableOnly=1'));
+
+    await user.click(screen.getByRole('button', { name: /^Affordable/i }));
+    await waitFor(() => expect(probe.search).toBe(''));
+  });
+
+  it('says the corporation has no LP Store when it has no offers', () => {
+    renderStore();
+    expect(
+      screen.getByText(
+        'This corporation has no LP Store. Corporations whose agents give missions run one.'
+      )
+    ).toBeInTheDocument();
+  });
+});
+
 describe('LoyaltyStore selected offer (issue #1490)', () => {
   it('keeps the item name plain (row selects) and shows the row menu trigger (#2654)', () => {
     useDesktopViewport();

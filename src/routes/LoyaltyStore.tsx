@@ -49,7 +49,7 @@ import {
 } from '@/features/loyalty/loyaltyStoreColumns';
 import { loyaltyOfferCsvColumns } from '@/features/loyalty/loyaltyStoreCsv';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
-import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
+import { boolParam, optionalBoolParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { useMarketHub } from '@/features/market/hub';
 import { usePriceBasis } from '@/features/loyalty/priceBasis';
@@ -80,12 +80,13 @@ const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
 /**
  * The filter row's three fields, in the URL (ADR 0015, issue #1302): all
  * three as one `useUrlParams` group, so a click and a keystroke in the same
- * update write together. `affordableOnly` defaults `true` — the offer list's
- * own opening state — so it is the one omitted from the URL when left alone.
+ * update write together. `affordableOnly` is `null` when left alone: its
+ * default hangs on the pilot's LP with this corporation (see
+ * `defaultAffordableOnly`), which a codec can't see.
  */
 const FILTER_PARAMS = {
   search: textParam(),
-  affordableOnly: boolParam(true),
+  affordableOnly: optionalBoolParam(),
   blueprintsOnly: boolParam(false),
   /** The selected offer: a link (BPC Sourcing's LP rows) arrives with one already picked. */
   offer: optionalIdParam(),
@@ -161,7 +162,13 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   );
 
   const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
-  const { search, affordableOnly, blueprintsOnly } = filterParams;
+  const { search, blueprintsOnly } = filterParams;
+  // At 0 LP every offer is unaffordable, so the filter would open on an empty
+  // list (#6004). Unknown LP (`null`) keeps the old default. A URL value wins.
+  const defaultAffordableOnly = playerLp !== 0;
+  const affordableOnly = filterParams.affordableOnly ?? defaultAffordableOnly;
+  /** The URL value for an Affordable choice: none when it matches the default. */
+  const affordableParam = (next: boolean) => (next === defaultAffordableOnly ? null : next);
   // Rows filter on a deferred copy so a keystroke paints the box first
   // (`useUrlFilter`'s rule); the search box keeps the immediate one.
   const rowsSearch = useDeferredValue(search);
@@ -353,7 +360,11 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
               <Button
                 size="sm"
                 onClick={() =>
-                  setFilterParams({ search: '', affordableOnly: false, blueprintsOnly: false })
+                  setFilterParams({
+                    search: '',
+                    affordableOnly: affordableParam(false),
+                    blueprintsOnly: false,
+                  })
                 }
               >
                 {t('common.resetFilters')}
@@ -479,7 +490,11 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
                 if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
                 if (next.lpBasis !== lpBasis) void setLpBasis(next.lpBasis);
                 setFilterParams({
-                  affordableOnly: next.affordableOnly,
+                  // Only a changed choice is written, so another filter's change
+                  // never pins the LP-based default into the URL.
+                  ...(next.affordableOnly !== affordableOnly && {
+                    affordableOnly: affordableParam(next.affordableOnly),
+                  }),
                   blueprintsOnly: next.blueprintsOnly,
                 });
               }}
