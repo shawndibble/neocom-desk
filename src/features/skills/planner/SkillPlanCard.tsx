@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useMemo, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { Button, Panel, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -37,6 +38,8 @@ export function SkillPlanCard({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const isDesktop = useIsDesktop();
+  // The hint's Certified Plan link opens the split button's own picker.
+  const [certifiedOpen, setCertifiedOpen] = useState(false);
   const plans = useLiveQuery(
     async () => db.skillPlans.where('characterId').equals(activeCharacterId).toArray(),
     [activeCharacterId]
@@ -90,7 +93,38 @@ export function SkillPlanCard({
   const actions = (
     <div className="flex items-center justify-between gap-2">
       {plans.length > 0 ? allPlans : <span />}
-      <NewPlanSplitButton activeCharacterId={activeCharacterId} remapInfo={remapInfo} />
+      <NewPlanSplitButton
+        activeCharacterId={activeCharacterId}
+        remapInfo={remapInfo}
+        certified={{ open: certifiedOpen, onOpenChange: setCertifiedOpen }}
+      />
+    </div>
+  );
+
+  // A new pilot's first look: the ways to start, with the two that live
+  // elsewhere one tap away.
+  const empty = (
+    <div className="space-y-1">
+      <p className="text-sm text-text-dim">{t('plans.planCardEmpty')}</p>
+      <p className="text-xs text-text-dim">
+        <Trans
+          i18nKey="plans.planCardEmptyHint"
+          components={{
+            certified: (
+              <button
+                type="button"
+                className={inlineLinkClassName}
+                onClick={(e) => {
+                  // Safari doesn't focus a clicked button; the dialog returns focus here.
+                  e.currentTarget.focus();
+                  setCertifiedOpen(true);
+                }}
+              />
+            ),
+            shipTree: <Link to="/ships/tree" className={inlineLinkClassName} />,
+          }}
+        />
+      </p>
     </div>
   );
 
@@ -107,7 +141,7 @@ export function SkillPlanCard({
             {meta && <span className="block text-xs text-text-dim">{meta}</span>}
           </Link>
         ) : (
-          <p className="text-sm text-text-dim">{t('plans.planCardEmpty')}</p>
+          empty
         )}
         <div className="mt-2">{actions}</div>
       </Panel>
@@ -128,7 +162,7 @@ export function SkillPlanCard({
           </span>
         </Link>
       ) : (
-        <p className="text-sm text-text-dim">{t('plans.planCardEmpty')}</p>
+        empty
       )}
       {actions}
     </div>

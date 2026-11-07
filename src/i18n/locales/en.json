@@ -2842,6 +2842,7 @@
     "planCardTitle": "Skill plan",
     "planCardMeta": "{{duration}} · finishes {{date}}",
     "planCardEmpty": "No skill plans yet.",
+    "planCardEmptyHint": "Create a plan to start training toward a goal. Start from a <certified>Certified Plan</certified>, or pick a ship in the <shipTree>Ship Tree</shipTree>. You can also press Ctrl+V anywhere in the app to paste a skill plan.",
     "allPlansButton": "All plans",
     "allPlansTitle": "All plans",
     "computeError": "Couldn't compute this plan: {{message}}",
