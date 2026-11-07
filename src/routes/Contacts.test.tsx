@@ -223,6 +223,17 @@ describe('Contacts', () => {
     expect(await screen.findByText(/no contacts cached/i)).toBeInTheDocument();
   });
 
+  it('says what fills the page when the character really has no contacts', async () => {
+    server.use(http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.json([])));
+    render(<App />);
+    expect(await screen.findByText('No contacts')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Pilots, corporations and alliances you add as contacts in EVE show here, with the standing you set.'
+      )
+    ).toBeInTheDocument();
+  });
+
   it('shows a re-login prompt (not a silent empty state) when the contacts scope was revoked', async () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () =>

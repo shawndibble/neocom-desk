@@ -151,6 +151,10 @@ export function AssetsList({
     !isUnresolvedParent(resolved.station, mergedLocationNames)
       ? { locationId: resolved.station.locationId, name: stationLabelFor(resolved.station) }
       : null;
+  // The unfiltered top level is empty: nothing owned at all, so the empty
+  // state says what this page lists. A filter or a drilled-in place that came
+  // up empty keeps the plain line.
+  const nothingOwned = !flatModeActive && resolved.station === null && activeFilterCount === 0;
   const headingClassName =
     'min-w-0 truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
   const parentHref =
@@ -475,7 +479,14 @@ export function AssetsList({
             />
           ) : rows.length === 0 ? (
             <EmptyState
-              title={flatModeActive ? t('assets.noResults') : t('assets.emptyLocation')}
+              title={
+                flatModeActive
+                  ? t('assets.noResults')
+                  : nothingOwned
+                    ? t('assets.emptyRootTitle')
+                    : t('assets.emptyLocation')
+              }
+              hint={nothingOwned ? t('assets.emptyRootHint') : undefined}
               className="py-8"
               action={
                 activeFilterCount > 0 ? (

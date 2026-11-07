@@ -23,6 +23,8 @@ export interface CharacterContactList {
   contacts: readonly CharacterContact[];
   /** This character's own fetch stopped short (pages missing) — see `CachedResult.truncated`. */
   truncated: boolean;
+  /** Its contacts were read at all (a cached copy, or a live fetch that worked), so an empty list is really empty. */
+  read: boolean;
 }
 
 export interface ContactHolder {
@@ -104,6 +106,7 @@ async function loadCacheOnly(
     name: c.name,
     contacts: rows.get(c.characterId)?.data ?? [],
     truncated: rows.get(c.characterId)?.truncated ?? false,
+    read: rows.has(c.characterId),
   }));
 }
 
@@ -120,12 +123,14 @@ async function loadLive(
     name: c.name,
     contacts: [],
     truncated: false,
+    read: false,
   }));
   await mapWithConcurrencyLimit(lists, ESI_FANOUT_CONCURRENCY, async (list) => {
     try {
       const { cached } = await loadContacts(list.characterId);
       list.contacts = cached?.data ?? [];
       list.truncated = cached?.truncated ?? false;
+      list.read = cached !== null;
     } catch {
       // Stays empty, which the merge reports as a gap rather than hiding.
     }

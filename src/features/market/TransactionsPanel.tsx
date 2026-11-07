@@ -692,6 +692,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
             title={t('wallet.transactionsEmptyTitle')}
             hint={t('wallet.transactionsEmptyHint')}
             fetchedTitle={t('wallet.transactionsEmptyFetchedTitle')}
+            fetchedHint={t('wallet.transactionsEmptyFetchedHint')}
             className="py-8"
           />
         ) : (

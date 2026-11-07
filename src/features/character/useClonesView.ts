@@ -71,7 +71,8 @@ export function useClonesView({
   const cloneLabel = (clone: JumpClone) => cloneOwnName(clone, nicknames) ?? locationLabel(clone);
 
   const verdictCard: CloneVerdictCardState | null = (() => {
-    if (!data) return null;
+    // No jump clone to compare against, so there is no verdict to give.
+    if (!data || clones.length === 0) return null;
     const note = (message: string): CloneVerdictCardState => ({ kind: 'note', message });
     const gate = cloneVerdictGate(
       {

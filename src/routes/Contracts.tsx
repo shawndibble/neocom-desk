@@ -364,16 +364,19 @@ export function Contracts() {
       emptyTitle: t('contracts.emptyTitle'),
       emptyHint: t('contracts.emptyHint'),
       fetchedTitle: t('contracts.emptyFetchedTitle'),
+      fetchedHint: t('contracts.emptyFetchedHint'),
     },
     all: {
       emptyTitle: t('contracts.emptyTitle'),
       emptyHint: t('contracts.allEmptyHint'),
       fetchedTitle: t('contracts.emptyFetchedTitle'),
+      fetchedHint: t('contracts.emptyFetchedHint'),
     },
     corporation: {
       emptyTitle: t('contracts.corpEmptyTitle'),
       emptyHint: t('contracts.corpEmptyHint'),
       fetchedTitle: t('contracts.corpEmptyFetchedTitle'),
+      fetchedHint: undefined,
     },
   }[source];
 
@@ -480,6 +483,7 @@ export function Contracts() {
             title={sourceLabel.emptyTitle}
             hint={sourceLabel.emptyHint}
             fetchedTitle={sourceLabel.fetchedTitle}
+            fetchedHint={sourceLabel.fetchedHint}
           />
         ) : (
           <Panel padded={false}>

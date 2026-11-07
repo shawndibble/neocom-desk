@@ -251,6 +251,18 @@ describe('TransactionsPanel — desktop filter and totals', () => {
     expect(screen.queryByRole('row', { name: /Tritanium/ })).not.toBeInTheDocument();
   });
 
+  it('says what fills the list when the character really has no transactions', async () => {
+    load([]);
+    renderPanel();
+
+    expect(await screen.findByText('No transactions')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Items you buy or sell on the market show here, with the profit on each sale.'
+      )
+    ).toBeInTheDocument();
+  });
+
   it('says so when the filter matches nothing, rather than showing a blank table', async () => {
     load(FILLS);
     renderPanel('/market/history?txn.q=nothing-like-this');

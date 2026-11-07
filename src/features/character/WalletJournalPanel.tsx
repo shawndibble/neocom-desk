@@ -119,6 +119,7 @@ export function WalletJournalPanel({
           title={t('wallet.journalEmptyTitle')}
           hint={t('wallet.journalEmptyHint')}
           fetchedTitle={t('wallet.journalEmptyFetchedTitle')}
+          fetchedHint={t('wallet.journalEmptyFetchedHint')}
           className="py-8"
         />
       ) : (

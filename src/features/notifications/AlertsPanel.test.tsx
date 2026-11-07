@@ -120,6 +120,11 @@ describe('AlertsPanel', () => {
   it('shows the empty state when nothing waits', async () => {
     renderPanel();
     expect(await screen.findByText('You are all caught up')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Alerts show here and on the bell. By default you get one when a skill queue is about to run out, a character stops training, or new mail arrives.'
+      )
+    ).toBeInTheDocument();
     expect(screen.getByText('Alerts, all read')).toBeInTheDocument();
   });
 

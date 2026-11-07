@@ -27,5 +27,10 @@ export const NeverFetched: Story = { args: { result: null } };
 /** @summary Unknown state (§6c): served from cache, so the list may be out of date. */
 export const FromCache: Story = { args: { result: { fromCache: true } } };
 
-/** @summary Empty state (§4): a fetch just succeeded and found nothing, a plain "none". */
-export const FetchedEmpty: Story = { args: { result: { fromCache: false } } };
+/** @summary Empty state (§4): a fetch just succeeded and found nothing, a plain "none" and what fills the list. */
+export const FetchedEmpty: Story = {
+  args: {
+    result: { fromCache: false },
+    fetchedHint: 'Contracts you issue or accept show here: item trades, couriers and auctions.',
+  },
+};

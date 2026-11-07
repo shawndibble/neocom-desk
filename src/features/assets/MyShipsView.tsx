@@ -621,7 +621,11 @@ export function MyShipsView({
           {state.status === 'ready' && sorted.length === 0 && !allSkipped && (
             <EmptyState
               title={t('assets.myShips.emptyTitle')}
-              hint={query.trim() ? t('assets.myShips.noMatches') : t('assets.myShips.emptyHint')}
+              hint={
+                query.trim()
+                  ? t('assets.myShips.noMatches')
+                  : t(showCharacter ? 'assets.myShips.emptyHint' : 'assets.myShips.emptyHintOne')
+              }
               action={
                 !query.trim() &&
                 onShowAllCharacters && (

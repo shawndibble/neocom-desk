@@ -418,6 +418,21 @@ describe('Contracts', () => {
     expect(await screen.findByText(/no contracts cached/i)).toBeInTheDocument();
   });
 
+  it('says what fills the page when the character really has no contracts', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
+        HttpResponse.json([])
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('No contracts')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Contracts you issue or accept show here: item trades, couriers and auctions.'
+      )
+    ).toBeInTheDocument();
+  });
+
   it('shows a re-login prompt (not a silent empty state) when the contracts scope was revoked', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>

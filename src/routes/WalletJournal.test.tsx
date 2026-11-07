@@ -305,6 +305,23 @@ describe('Wallet', () => {
     expect(beginEveLogin).toHaveBeenCalled();
   });
 
+  it('says what fills the journal when the character really has no entries', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, () =>
+        HttpResponse.json([], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    expect(await screen.findByText('No journal entries')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Every ISK in or out shows here: mission rewards, bounties, market sales and fees.'
+      )
+    ).toBeInTheDocument();
+  });
+
   it('shows the re-login banner, not the empty state, when the journal scope was revoked', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, () =>

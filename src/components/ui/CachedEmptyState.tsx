@@ -12,6 +12,8 @@ interface CachedEmptyStateProps {
   hint?: string;
   /** Plain "none" line for a successful fetch that found nothing. */
   fetchedTitle: string;
+  /** What the list shows and what fills it, under `fetchedTitle` on a real empty result. */
+  fetchedHint?: string;
   className?: string;
 }
 
@@ -20,8 +22,10 @@ export function CachedEmptyState({
   title,
   hint,
   fetchedTitle,
+  fetchedHint,
   className,
 }: CachedEmptyStateProps) {
-  if (result && !result.fromCache) return <EmptyState title={fetchedTitle} className={className} />;
+  if (result && !result.fromCache)
+    return <EmptyState title={fetchedTitle} hint={fetchedHint} className={className} />;
   return <EmptyState title={title} hint={hint} className={className} />;
 }
