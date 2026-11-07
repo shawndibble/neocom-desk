@@ -7,7 +7,7 @@ interface EmptyStateProps {
   hint?: ReactNode;
   /** @summary Decorative glyph above the title. */
   icon?: ReactNode;
-  /** @summary The one control that resolves the empty state, e.g. a `Button`. */
+  /** @summary The control that resolves the empty state, e.g. a `Button`; two only when they start different things. */
   action?: ReactNode;
   className?: string;
 }

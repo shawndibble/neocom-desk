@@ -391,6 +391,7 @@ describe('FittingStartScreen', () => {
       await emptyLibrary();
       renderScreen();
       await screen.findByText('No fittings yet');
+      await screen.findByRole('button', { name: 'New from hull' });
       expect(screen.queryByRole('button', { name: /^Fit your/ })).not.toBeInTheDocument();
       expect(screen.getAllByRole('button', { name: 'New from hull' })).toHaveLength(1);
     });
@@ -400,7 +401,8 @@ describe('FittingStartScreen', () => {
       shipTypeIdMock.mockReturnValue({ typeId: 670, status: 'ready' });
       renderScreen();
       await screen.findByText('No fittings yet');
-      await waitFor(() => expect(screen.getByRole('link', { name: 'Ship Tree' })).toBeVisible());
+      // The buttons wait for the hull's type to load, so this is after the pod check ran.
+      await screen.findByRole('button', { name: 'New from hull' });
       expect(screen.queryByRole('button', { name: /^Fit your/ })).not.toBeInTheDocument();
       expect(screen.getAllByRole('button', { name: 'New from hull' })).toHaveLength(1);
     });

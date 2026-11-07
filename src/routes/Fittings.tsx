@@ -43,7 +43,7 @@ import { useMakeItFitDialog } from '@/features/fittings/useMakeItFitDialog';
 import { useImproveDrawer } from '@/features/fittings/useImproveDrawer';
 import type { LibraryAction } from '@/features/fittings/FittingHeader';
 import { FittingStartScreen } from '@/features/fittings/FittingStartScreen';
-import type { StartHull } from '@/features/fittings/FittingLibraryEmpty';
+import type { StartHull } from '@/engine/fittings/hullCatalogue';
 import { FittingLibraryDialogs } from '@/features/fittings/FittingLibraryDialogs';
 import { FittingEditorPanes } from '@/features/fittings/FittingEditorPanes';
 import { FittingRackSheet } from '@/features/fittings/FittingRackSheet';
