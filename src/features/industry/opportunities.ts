@@ -4,8 +4,9 @@
  * calculation engine — `computeBuildPlan`/`buildVsBuy` already do the actual
  * job math, `materialResolution.ts`'s owned-materials claiming already runs
  * inside it, and `src/engine/industry/opportunities.ts` already ranks and
- * classifies. What's new here is turning "every manufacturing blueprint a
- * set of characters owns" into the inputs those already-tested pieces need.
+ * classifies. What's new here is turning "every blueprint and reaction
+ * formula a set of characters owns" into the inputs those already-tested
+ * pieces need.
  */
 import { mostRecentlyUpdatedPlan, newBuildPlan, startingLocation } from './newBuildPlan';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
@@ -22,6 +23,7 @@ import { buildPlanTypeIds } from './recipes';
 import type { MarketSnapshot, MarketSnapshotRequest } from './marketData';
 import { materialPricesFor } from './priceBasis';
 import { onPlanHeroBasis } from './planOwnedBasis';
+import { planReactionLocation } from './planReactionLocation';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { detectOwnedStock, type DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
 import { takeEveryOffer } from '@/engine/industry/ownedStockOffer';
@@ -30,6 +32,7 @@ import {
   FACILITY_PRESETS,
   resolveRigFit,
   type BuildResult,
+  type IndustryActivity,
   type MaterialSourcingMap,
 } from '@/engine/industry/types';
 import { autoBuildHere } from '@/engine/industry/autoMakeOrBuy';
@@ -55,8 +58,8 @@ export interface OpportunityCandidate {
 
 /**
  * Every owned blueprint across the given characters that can be ranked:
- * manufacturing only (reaction blueprints stay excluded, per the ticket),
- * and only ones the SDE catalog actually recognises.
+ * manufacturing blueprints and reaction formulas (issue #5990) the SDE
+ * catalog actually recognises.
  */
 export function buildOpportunityCandidates(
   ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>,
@@ -68,7 +71,7 @@ export function buildOpportunityCandidates(
     const characterName = characterNames.get(characterId) ?? '';
     for (const blueprint of blueprints) {
       const catalogEntry = catalog.byBlueprintTypeID.get(blueprint.type_id);
-      if (!catalogEntry || catalogEntry.blueprint.activity === 'reaction') continue;
+      if (!catalogEntry) continue;
       candidates.push({
         id: `${characterId}:${blueprint.item_id}`,
         characterId,
@@ -97,6 +100,8 @@ export function hubForCharacter(
 
 export interface OpportunityHubGroup {
   hub: TradeHub;
+  /** A snapshot reads one activity's cost index, so reactions and manufacturing never share a group. */
+  activity: IndustryActivity;
   candidates: OpportunityCandidate[];
 }
 
@@ -112,17 +117,20 @@ export function groupCandidatesByHub(
   /**
    * The build system each owning Character's rows are charged a job fee at.
    * A snapshot carries one system's cost index, so two Characters at one hub
-   * who build in different systems are different groups.
+   * who build in different systems are different groups. Asked per activity:
+   * reactions run at the Reaction Location, not the manufacturing one.
    */
-  buildSystemFor: (characterId: number) => number | undefined = () => undefined
+  buildSystemFor: (characterId: number, activity: IndustryActivity) => number | undefined = () =>
+    undefined
 ): OpportunityHubGroup[] {
   const byKey = new Map<string, OpportunityHubGroup>();
   for (const candidate of candidates) {
     const hub = hubFor(candidate.characterId);
-    const key = `${hub.id}|${buildSystemFor(candidate.characterId) ?? ''}`;
+    const activity = candidate.catalogEntry.blueprint.activity;
+    const key = `${hub.id}|${activity}|${buildSystemFor(candidate.characterId, activity) ?? ''}`;
     const group = byKey.get(key);
     if (group) group.candidates.push(candidate);
-    else byKey.set(key, { hub, candidates: [candidate] });
+    else byKey.set(key, { hub, activity, candidates: [candidate] });
   }
   return [...byKey.values()];
 }
@@ -135,7 +143,9 @@ export function opportunitySnapshotRequest(
   pi: PiData | null,
   facilityDefaults: ActivityFacilityDefaults,
   /** The latest plan a new plan would start its build location from when none is remembered. */
-  defaultsFrom?: BuildPlanRecord | null
+  defaultsFrom?: BuildPlanRecord | null,
+  /** The group's activity: which cost index the snapshot reads, and which remembered location names its system. */
+  activity: IndustryActivity = 'manufacturing'
 ): MarketSnapshotRequest {
   const typeIds = new Set<number>();
   for (const candidate of candidates) {
@@ -146,11 +156,11 @@ export function opportunitySnapshotRequest(
   // remembered one, through the same resolution `newBuildPlan` uses — so a
   // row and the plan "Add to Compare" makes from it quote the same fee. Half
   // a pair builds at the hub, as it does on a plan.
-  const location = startingLocation('manufacturing', facilityDefaults, defaultsFrom);
+  const location = startingLocation(activity, facilityDefaults, defaultsFrom);
   return {
     hub,
     typeIds: [...typeIds],
-    activity: 'manufacturing',
+    activity,
     ...(location.buildSystemId !== undefined && location.buildSystemName !== undefined
       ? { costIndexSystemId: location.buildSystemId }
       : {}),
@@ -257,6 +267,13 @@ export interface UnrankedOpportunityRow {
   defaultsFrom: BuildPlanRecord | null;
   /** ISK the owned stock this job uses would net if sold, charged against `result.profit` (the plan hero's sell-value basis); 0 when none is charged. */
   forgoneSale: number;
+  /**
+   * Set only on a reaction row whose Reaction Location can't host it yet
+   * (issue #5990): never chosen, or in highsec. Its profit, margin and
+   * ISK/hour are null, so it ranks below every priced row instead of on
+   * numbers no reactor could earn. Absent on every row that prices.
+   */
+  reactionLocation?: 'unset' | 'highsec';
 }
 
 /**
@@ -381,9 +398,21 @@ export function computeOpportunityRow(
   const sellDepthIsk =
     sellPrice !== undefined && sellVolume !== undefined ? sellPrice * sellVolume : null;
 
+  // The same answer the reaction Build Plan's own warning reads, so a row is
+  // dimmed exactly when the plan it opens says "Not set" or warns of highsec.
+  const reactionState =
+    candidate.catalogEntry.blueprint.activity === 'reaction'
+      ? planReactionLocation(plan, 'reaction')?.state
+      : undefined;
+  const reactionLocation =
+    reactionState === 'unset' || reactionState === 'highsec' ? reactionState : undefined;
+
   return {
     candidate,
-    result: planResult,
+    result: reactionLocation
+      ? { ...planResult, profit: null, marginPct: null, iskPerHour: null }
+      : planResult,
+    ...(reactionLocation ? { reactionLocation } : {}),
     sellDepthIsk,
     hub,
     materialSourcing,
@@ -466,6 +495,8 @@ export interface OpportunityPricingInputs {
   ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
   /** Each owning Character's latest plan, whose price basis and build location rows start from — as a new plan does. */
   defaultsByCharacter: ReadonlyMap<number, BuildPlanRecord | null>;
+  /** The batch holds a reaction formula, so the Reaction Location prices a row too (issue #5990). */
+  pricesReactions?: boolean;
 }
 
 /**
@@ -517,9 +548,12 @@ export function opportunitiesInputsKey(inputs: OpportunityPricingInputs): string
     assumedMe: inputs.assumedMe,
     modifiers,
     standings,
-    // Only the manufacturing record: every candidate is a manufacturing
-    // blueprint, so a Reaction Location set on some plan page changes no row.
-    facilityDefaults: inputs.facilityDefaults.manufacturing,
+    // The reaction record only when a reaction row reads it: a batch of
+    // manufacturing blueprints isn't asked to Refresh because a Reaction
+    // Location was set on some plan page.
+    facilityDefaults: inputs.pricesReactions
+      ? inputs.facilityDefaults
+      : inputs.facilityDefaults.manufacturing,
     defaults,
     research,
   });

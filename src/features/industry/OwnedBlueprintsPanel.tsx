@@ -38,7 +38,12 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { useCorpOwnedBlueprints } from './corpOwnedBlueprints';
 import { numericCell } from './format';
-import { OWNED_DEFAULT_SORT, OWNED_SORT_KEY } from './opportunitiesUrl';
+import {
+  OPPORTUNITIES_ACTIVITY_KEY,
+  OPPORTUNITIES_ACTIVITY_PARAM,
+  OWNED_DEFAULT_SORT,
+  OWNED_SORT_KEY,
+} from './opportunitiesUrl';
 import type { OpportunityPlanSeed, OpportunityRow } from './opportunities';
 import {
   OWNED_BLUEPRINT_SORT_VALUE,
@@ -73,7 +78,6 @@ const useVisibleOwnedBlueprintsColumns = createColumnVisibilitySetting({
 });
 
 const KIND_PARAM = enumParam(['all', 'bpo', 'bpc'] as const, 'all');
-const ACTIVITY_PARAM = enumParam(['all', 'manufacturing', 'reaction'] as const, 'all');
 const SEARCH_PARAM = textParam();
 const CORP_PARAM = boolParam(false);
 const ownedRowKey = (row: OwnedBlueprintRow) => row.id;
@@ -124,7 +128,10 @@ export function OwnedBlueprintsPanel({
   const isDesktop = useIsDesktop();
 
   const [kind, setKind] = useUrlParam('opps.kind', KIND_PARAM);
-  const [activity, setActivity] = useUrlParam('opps.activity', ACTIVITY_PARAM);
+  const [activity, setActivity] = useUrlParam(
+    OPPORTUNITIES_ACTIVITY_KEY,
+    OPPORTUNITIES_ACTIVITY_PARAM
+  );
   const [search, setSearch] = useUrlParam('opps.q', SEARCH_PARAM);
   const [includeCorp, setIncludeCorp] = useUrlParam('opps.corp', CORP_PARAM);
   const corp = useCorpOwnedBlueprints();

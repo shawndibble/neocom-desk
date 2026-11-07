@@ -262,13 +262,13 @@ describe('OpportunitiesPanel', () => {
       expect(screen.getByText('Build')).toBeInTheDocument();
     });
 
-    it('keeps the filter rows and names reactions when only non-manufacturing blueprints are owned', async () => {
+    it('keeps the filter rows when no owned blueprint can be ranked', async () => {
       // Not in the (empty) catalog, so nothing to rank, but All owned still lists it.
       loadCharacterBlueprints.mockResolvedValue({
         cached: { data: [blueprint(46166)], fetchedAt: new Date() },
       });
       renderPanel();
-      expect(await screen.findByText('You own no manufacturing blueprints')).toBeInTheDocument();
+      expect(await screen.findByText('None of your blueprints can be ranked')).toBeInTheDocument();
       expect(screen.queryByText('You own no blueprints yet')).toBeNull();
       expect(screen.getByRole('button', { name: 'Ranked' })).toHaveAttribute(
         'aria-pressed',
@@ -639,5 +639,112 @@ describe('OpportunitiesPanel', () => {
         'true'
       );
     });
+  });
+});
+
+describe('reaction rows (issue #5990)', () => {
+  function entry(blueprintTypeID: number, activity: 'manufacturing' | 'reaction', name: string) {
+    return {
+      blueprintTypeID,
+      blueprint: { activity, skills: [], products: [{ typeID: blueprintTypeID + 1, quantity: 1 }] },
+      productTypeID: blueprintTypeID + 1,
+      productName: name,
+      productNameLower: name.toLowerCase(),
+    };
+  }
+  const widget = entry(900, 'manufacturing', 'Widget Alpha');
+  const fullerite = entry(910, 'reaction', 'Fullerite Polymer');
+  const catalog = {
+    ...CATALOG,
+    byBlueprintTypeID: new Map([
+      [900, widget],
+      [910, fullerite],
+    ]),
+  } as unknown as BlueprintCatalog;
+
+  function rowFor(e: typeof widget, itemId: number, overrides: object = {}) {
+    return {
+      candidate: {
+        id: `${CHARACTER_ID}:${itemId}`,
+        characterId: CHARACTER_ID,
+        characterName: 'Pilot One',
+        blueprint: { item_id: itemId, type_id: e.blueprintTypeID, runs: 10 },
+        catalogEntry: e,
+      },
+      result: {
+        seconds: 3600,
+        materials: [],
+        iskPerHour: 1_000_000,
+        marginPct: 12,
+        profit: 1_000_000,
+        totalCost: 5_000_000,
+        revenue: 6_000_000,
+      },
+      orderDepth: 'deep',
+      hub: { id: 'jita', regionId: 10000002 },
+      forgoneSale: 0,
+      ...overrides,
+    };
+  }
+
+  async function renderRows() {
+    loadCharacterBlueprints.mockResolvedValue({
+      cached: {
+        data: [
+          { item_id: 1, type_id: 900, runs: 10, material_efficiency: 0, time_efficiency: 0 },
+          { item_id: 2, type_id: 910, runs: 10, material_efficiency: 0, time_efficiency: 0 },
+        ],
+        fetchedAt: new Date(),
+      },
+    });
+    stub.rows = [
+      rowFor(widget, 1),
+      rowFor(fullerite, 2, {
+        reactionLocation: 'unset',
+        result: {
+          seconds: 3600,
+          materials: [],
+          iskPerHour: null,
+          marginPct: null,
+          profit: null,
+          totalCost: 5_000_000,
+          revenue: 6_000_000,
+        },
+      }),
+    ] as unknown as typeof stub.rows;
+    render(
+      withItemActions(
+        <OpportunitiesPanel
+          catalog={catalog}
+          pi={null}
+          facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
+          activeCharacterId={CHARACTER_ID}
+          ownedStockSnapshot={SNAPSHOT}
+          assumedMe={0}
+          pricingInputs={PRICING_INPUTS_FIXTURE}
+          onAddToCompare={() => {}}
+          onAddProjectsToCompare={() => {}}
+          onStartPlan={() => Promise.resolve(false)}
+        />
+      ),
+      { wrapper: MemoryRouter }
+    );
+    return (await screen.findByText('Fullerite Polymer')).closest('tr')!;
+  }
+
+  it('dims a reaction row with no Reaction Location and asks for one in place of its figures', async () => {
+    const row = await renderRows();
+    expect(row).toHaveClass('text-text-dim');
+    expect(within(row).getByText('Set reaction location')).toBeInTheDocument();
+    expect(within(row).queryByText('Unknown')).toBeNull();
+    expect(screen.getByText('Widget Alpha').closest('tr')).not.toHaveClass('text-text-dim');
+  });
+
+  it('filters Ranked to manufacturing or reactions', async () => {
+    await renderRows();
+    const group = screen.getByRole('group', { name: 'Activity' });
+    fireEvent.click(within(group).getByRole('button', { name: 'Manufacturing' }));
+    await waitFor(() => expect(screen.queryByText('Fullerite Polymer')).toBeNull());
+    expect(screen.getByText('Widget Alpha')).toBeInTheDocument();
   });
 });
