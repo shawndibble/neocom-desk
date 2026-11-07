@@ -169,21 +169,21 @@ describe('OpportunitiesPanel', () => {
         { wrapper: MemoryRouter }
       );
 
-    it('says it could not load, not "No manufacturing blueprints found", and retries', async () => {
+    it('says it could not load, not "You own no blueprints yet", and retries', async () => {
       loadCharacterBlueprints.mockResolvedValue({ cached: null, needsReauth: false });
       renderPanel();
 
       expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
-      expect(screen.queryByText('No manufacturing blueprints found')).toBeNull();
+      expect(screen.queryByText('You own no blueprints yet')).toBeNull();
 
       loadCharacterBlueprints.mockResolvedValue({ cached: { data: [], fetchedAt: new Date() } });
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-      expect(await screen.findByText('No manufacturing blueprints found')).toBeInTheDocument();
+      expect(await screen.findByText('You own no blueprints yet')).toBeInTheDocument();
     });
 
-    it('still says "No manufacturing blueprints found" for a successful empty read', async () => {
+    it('still says "You own no blueprints yet" for a successful empty read', async () => {
       renderPanel();
-      expect(await screen.findByText('No manufacturing blueprints found')).toBeInTheDocument();
+      expect(await screen.findByText('You own no blueprints yet')).toBeInTheDocument();
       expect(screen.queryByText(/Couldn't load/)).toBeNull();
     });
 
@@ -193,6 +193,96 @@ describe('OpportunitiesPanel', () => {
       });
       renderPanel();
       expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    });
+  });
+
+  describe('with no owned blueprints (issue #6003)', () => {
+    const blueprint = (typeId: number) => ({
+      item_id: typeId * 10,
+      type_id: typeId,
+      runs: -1,
+      material_efficiency: 0,
+      time_efficiency: 0,
+      quantity: -1,
+      location_id: 60003760,
+      location_flag: 'Hangar',
+    });
+    const renderPanel = (catalog: BlueprintCatalog = CATALOG) =>
+      render(
+        withItemActions(
+          <OpportunitiesPanel
+            catalog={catalog}
+            pi={null}
+            facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
+            activeCharacterId={CHARACTER_ID}
+            ownedStockSnapshot={SNAPSHOT}
+            assumedMe={0}
+            pricingInputs={PRICING_INPUTS_FIXTURE}
+            onAddToCompare={() => {}}
+            onAddProjectsToCompare={() => {}}
+            onStartPlan={() => Promise.resolve(false)}
+          />
+        ),
+        { wrapper: MemoryRouter }
+      );
+
+    it('points at the scan above, with no dead-end call to action and no filter rows', async () => {
+      renderPanel();
+      expect(await screen.findByText('You own no blueprints yet')).toBeInTheDocument();
+      expect(
+        screen.getByText('The scan above includes blueprints you can buy.')
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/Own a blueprint/)).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Ranked' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'All owned' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Any' })).toBeNull();
+      // The panel itself stays, titled as before.
+      expect(screen.getByText('Build')).toBeInTheDocument();
+    });
+
+    it('keeps the filter rows and names reactions when only non-manufacturing blueprints are owned', async () => {
+      // Not in the (empty) catalog, so nothing to rank, but All owned still lists it.
+      loadCharacterBlueprints.mockResolvedValue({
+        cached: { data: [blueprint(46166)], fetchedAt: new Date() },
+      });
+      renderPanel();
+      expect(await screen.findByText('You own no manufacturing blueprints')).toBeInTheDocument();
+      expect(screen.queryByText('You own no blueprints yet')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Ranked' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      expect(screen.getByRole('button', { name: 'All owned' })).toBeInTheDocument();
+    });
+
+    it('shows the filter rows once a manufacturing blueprint is owned', async () => {
+      const hurricane = {
+        blueprintTypeID: 100,
+        blueprint: {
+          name: 'Hurricane Blueprint',
+          time: 600,
+          materials: [],
+          products: [{ typeID: 24702, quantity: 1 }],
+          skills: [],
+          activity: 'manufacturing',
+        },
+        productTypeID: 24702,
+        productName: 'Hurricane',
+        productNameLower: 'hurricane',
+      };
+      const catalog = {
+        entries: [hurricane],
+        byBlueprintTypeID: new Map([[100, hurricane]]),
+        byProductTypeID: new Map([[24702, hurricane]]),
+        typesById: {} as unknown as BlueprintCatalog['typesById'],
+      } as unknown as BlueprintCatalog;
+      loadCharacterBlueprints.mockResolvedValue({
+        cached: { data: [blueprint(100)], fetchedAt: new Date() },
+      });
+      renderPanel(catalog);
+      expect(await screen.findByRole('button', { name: 'Ranked' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Any' })).toBeInTheDocument();
+      expect(screen.queryByText(/You own no/)).toBeNull();
     });
   });
 
@@ -521,10 +611,8 @@ describe('OpportunitiesPanel', () => {
 
     it('reads a stale ?opps.view=corp as Ranked once the reads settle empty', async () => {
       renderAt('/?opps.view=corp');
-      expect(await screen.findByRole('button', { name: 'Ranked' })).toHaveAttribute(
-        'aria-pressed',
-        'true'
-      );
+      // Ranked's own empty state; with nothing owned its filter rows stay hidden (issue #6003).
+      expect(await screen.findByText('You own no blueprints yet')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Corp projects' })).toBeNull();
     });
 

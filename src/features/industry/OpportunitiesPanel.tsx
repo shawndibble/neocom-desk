@@ -622,7 +622,13 @@ export function OpportunitiesPanel({
       showCorpProjects={corpOptionShown}
     />
   );
-  const meta = (
+  // A pilot who owns no blueprint at all (issue #6003) has nothing to filter:
+  // the scan above is the first step, so Ranked's filter rows stay hidden. They
+  // stay while the Corp projects view is offered (the toggle is its only way in)
+  // and off Ranked, so a pilot on another view can always switch back.
+  const ownsNoBlueprints = [...ownedByCharacter.values()].every((list) => list.length === 0);
+  const hideFilters = ownsNoBlueprints && view === 'ranked' && !corpOptionShown;
+  const meta = hideFilters ? undefined : (
     <OpportunitiesFilterBar
       view={view}
       onViewChange={setView}
@@ -759,8 +765,16 @@ export function OpportunitiesPanel({
           ))}
         {candidates.length === 0 ? (
           <EmptyState
-            title={t('industry.opportunitiesEmptyTitle')}
-            hint={t('industry.opportunitiesEmptyHint')}
+            title={t(
+              ownsNoBlueprints
+                ? 'industry.opportunitiesEmptyTitle'
+                : 'industry.opportunitiesNoManufacturingTitle'
+            )}
+            hint={t(
+              ownsNoBlueprints
+                ? 'industry.opportunitiesEmptyHint'
+                : 'industry.opportunitiesNoManufacturingHint'
+            )}
             className="py-8"
           />
         ) : needsRefresh ? (
