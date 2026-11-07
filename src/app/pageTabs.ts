@@ -75,12 +75,14 @@ export const SETTINGS_TABS = definePageTabs(
 
 /**
  * Help & FAQ, moved out of Settings (`/settings/shortcuts`, `/settings/faq` and
- * `/settings/help` redirect here). Shortcuts first: the tab `/help` opens on.
+ * `/settings/help` redirect here). FAQ first, the tab `/help` opens on: a new
+ * pilot, often on a phone with no keyboard, needs the answers before the chords
+ * (scope decision `20261106-215246-faq-is-helps-opening-tab`).
  */
 export const HELP_TABS = definePageTabs('/help', [
-  { id: 'shortcuts', labelKey: 'settings.help.tabShortcuts' },
   { id: 'faq', labelKey: 'settings.help.tabFaq' },
   { id: 'support', labelKey: 'settings.help.tabSupport' },
+  { id: 'shortcuts', labelKey: 'settings.help.tabShortcuts' },
 ]);
 
 export const PI_TABS = definePageTabs('/planetary-industry', [

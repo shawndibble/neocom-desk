@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
+  HELP_TABS,
   isTabRedirectPath,
   MARKET_TABS,
   pageKeyFor,
@@ -124,6 +125,13 @@ describe('a tabbed page with its own nested detail routes (Industry)', () => {
     expect(isTabRedirectPath('/industry/plans/abc')).toBe(false);
     expect(isTabRedirectPath('/industry/groups/g1')).toBe(false);
     expect(tabbedPagePathFor('/industry/plans/abc')).toBeNull();
+  });
+});
+
+describe('Help', () => {
+  it('opens on FAQ, so a new pilot meets the answers before the keyboard chords (issue #5998)', () => {
+    expect(HELP_TABS.defaultTab).toBe('faq');
+    expect(HELP_TABS.tabs.map((tab) => tab.id)).toEqual(['faq', 'support', 'shortcuts']);
   });
 });
 

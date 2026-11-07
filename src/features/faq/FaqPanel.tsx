@@ -2,11 +2,27 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { AUTHORIZED_APPS_URL } from '@/lib/links';
+import {
+  AUTHORIZED_APPS_URL,
+  CCP_SUPPORT_URL,
+  EVE_UNI_LEXICON_URL,
+  EVE_UNI_MAKING_MONEY_URL,
+  EVE_UNI_NEW_PLAYER_URL,
+} from '@/lib/links';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { QuestionRow } from '@/components/ui/QuestionRow';
 import { tabPath } from '@/lib/pageTabs';
-import { HELP_TABS, SETTINGS_TABS } from '@/app/pageTabs';
+import {
+  CONTRACTS_TABS,
+  HELP_TABS,
+  MARKET_TABS,
+  MINING_TABS,
+  SETTINGS_TABS,
+  TRAVEL_TABS,
+  WALLET_TABS,
+} from '@/app/pageTabs';
+import { SHIPS_TABS } from '@/features/fittings/shipsTabs';
+import { ROUTE_PREFERENCE_SHORT_LABEL_KEYS } from '@/features/route/routePreferences';
 import {
   RETENTION_GROUPS,
   WHAT_WE_STORE_GROUPS,
@@ -24,6 +40,35 @@ const TRAIN_SKILLS_PATHS = [
   'settings.faq.a.trainSkillsPaste',
 ] as const;
 const LIST = 'list-disc space-y-1 pl-5 marker:text-text-faint';
+const NEW_TO_EVE = 'settings.faq.a.newToEve';
+/** The EVE words "What do these EVE words mean?" defines, in the order a new pilot meets them. */
+const EVE_TERMS = [
+  'sp',
+  'isk',
+  'clones',
+  'lp',
+  'security',
+  'jumpClone',
+  'implants',
+  'blueprints',
+  'meTe',
+  'tradeHub',
+  'collateral',
+  'dscan',
+  'local',
+] as const;
+const MAKE_ISK_WAYS = [
+  'makeIskMissions',
+  'makeIskMining',
+  'makeIskLoot',
+  'makeIskCourier',
+] as const;
+const SECURITY_SPACES = [
+  'securityHighsec',
+  'securityLowsec',
+  'securityNullsec',
+  'securityWormhole',
+] as const;
 
 /** One store group's description and lines, as a question's answer. */
 function StoreGroup({ group }: { group: WhatWeStoreGroup }) {
@@ -103,6 +148,117 @@ export function FaqPanel() {
   const { t } = useTranslation();
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const { hash } = useLocation();
+
+  // "New to EVE?" teaches the game, not the app: each answer points to the page
+  // that helps, and out to EVE University and CCP for the rest. Facts only, so
+  // the security answer gives no verdicts (the travel copy rule).
+  const newToEve: readonly FaqEntry[] = [
+    {
+      id: 'eve-terms',
+      questionKey: 'settings.faq.q.eveTerms',
+      answer: (
+        <>
+          <p>
+            <Trans
+              i18nKey={`${NEW_TO_EVE}.termsIntro`}
+              components={{ glossary: <ExternalLink href={EVE_UNI_LEXICON_URL} /> }}
+            />
+          </p>
+          <dl className="space-y-2">
+            {EVE_TERMS.map((term) => (
+              <div key={term}>
+                <dt className="font-semibold text-text">{t(`${NEW_TO_EVE}.terms.${term}.term`)}</dt>
+                <dd className="text-text-dim">{t(`${NEW_TO_EVE}.terms.${term}.definition`)}</dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      ),
+    },
+    {
+      id: 'make-isk',
+      questionKey: 'settings.faq.q.makeIsk',
+      answer: (
+        <>
+          <p>{t(`${NEW_TO_EVE}.makeIskIntro`)}</p>
+          <ul className={LIST}>
+            {MAKE_ISK_WAYS.map((key) => (
+              <li key={key}>
+                <Trans
+                  i18nKey={`${NEW_TO_EVE}.${key}`}
+                  components={{
+                    lp: <Link to={tabPath(WALLET_TABS, 'lp-store')} className={LINK} />,
+                    mining: <Link to={tabPath(MINING_TABS, 'overview')} className={LINK} />,
+                    appraisal: <Link to={tabPath(MARKET_TABS, 'appraisal')} className={LINK} />,
+                    courier: (
+                      <Link to={tabPath(CONTRACTS_TABS, 'search/courier')} className={LINK} />
+                    ),
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
+        </>
+      ),
+    },
+    {
+      id: 'first-ship',
+      questionKey: 'settings.faq.q.firstShip',
+      answer: (
+        <>
+          <p>
+            <Trans
+              i18nKey={`${NEW_TO_EVE}.firstShip`}
+              components={{ tree: <Link to={tabPath(SHIPS_TABS, 'tree')} className={LINK} /> }}
+            />
+          </p>
+          <p>
+            <Trans
+              i18nKey={`${NEW_TO_EVE}.firstShipPlan`}
+              components={{ plans: <Link to="/skills/plans" className={LINK} /> }}
+            />
+          </p>
+        </>
+      ),
+    },
+    {
+      id: 'security-space',
+      questionKey: 'settings.faq.q.securitySpace',
+      answer: (
+        <>
+          <ul className={LIST}>
+            {SECURITY_SPACES.map((key) => (
+              <li key={key}>{t(`${NEW_TO_EVE}.${key}`)}</li>
+            ))}
+          </ul>
+          <p>
+            <Trans
+              i18nKey={`${NEW_TO_EVE}.securityRoute`}
+              // Route rules' own label, so the answer can't drift from it.
+              values={{ preference: t(ROUTE_PREFERENCE_SHORT_LABEL_KEYS['prefer-highsec']) }}
+              components={{ route: <Link to={tabPath(TRAVEL_TABS, 'route')} className={LINK} /> }}
+            />
+          </p>
+        </>
+      ),
+    },
+    {
+      id: 'learn-more',
+      questionKey: 'settings.faq.q.learnMore',
+      answer: (
+        <p>
+          <Trans
+            i18nKey={`${NEW_TO_EVE}.learnMore`}
+            components={{
+              uni: <ExternalLink href={EVE_UNI_NEW_PLAYER_URL} />,
+              money: <ExternalLink href={EVE_UNI_MAKING_MONEY_URL} />,
+              ccp: <ExternalLink href={CCP_SUPPORT_URL} />,
+            }}
+          />
+        </p>
+      ),
+    },
+  ];
 
   const using: readonly FaqEntry[] = [
     {
@@ -272,7 +428,7 @@ export function FaqPanel() {
   // question and scrolls to it. Other questions keep whatever state they have.
   // The open set follows the hash while rendering (not in an effect), so the
   // linked question is already open on the first paint.
-  const linked = [...using, ...data].some((entry) => entry.id === anchorOf(hash))
+  const linked = [...newToEve, ...using, ...data].some((entry) => entry.id === anchorOf(hash))
     ? anchorOf(hash)
     : null;
   const [seenLink, setSeenLink] = useState<string | null>(null);
@@ -293,6 +449,7 @@ export function FaqPanel() {
     });
 
   const sections = [
+    { id: 'newToEve', titleKey: 'settings.faq.groups.newToEve', entries: newToEve },
     { id: 'using', titleKey: 'settings.faq.groups.using', entries: using },
     { id: 'data', titleKey: 'settings.faq.groups.data', entries: data },
   ] as const;

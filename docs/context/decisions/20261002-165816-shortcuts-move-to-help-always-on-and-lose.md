@@ -19,3 +19,5 @@ _Recorded 2026-10-02._
   button) is the global search now. Market's focus-on-arrival hook went with it.
 
 > **Partly superseded** by `20261016-121137-shortcuts-become-g-sequences-with-an-off-switch`: page keys are `G` sequences and the Settings off switch is back. The move to Help and the removal of `/` stand.
+
+> **Partly superseded** by `20261106-215246-faq-is-helps-opening-tab`: `/help` opens on FAQ, and Shortcuts is Help's last tab.
