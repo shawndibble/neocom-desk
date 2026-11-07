@@ -1,10 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@/i18n';
 import { gameItemLookup } from '@/engine/fittings/fitCurrency';
 import { loadText } from '@/engine/fittings/load';
 import type { PopularFit } from '@/engine/fittings/popularFits';
 import { useMarketHub } from '@/features/market/hub';
+import { useCloneStates } from '@/features/skills/cloneState';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { PopularFitsResult } from './popularFits';
 import { PopularFitsPanel, type PopularFitsSources } from './PopularFitsPanel';
 import type { WorkbenchFit, WorkbenchFitsResult } from './workbenchFits';
@@ -25,6 +27,23 @@ const NAMES: Record<number, string> = {
 };
 
 const never = <T,>() => new Promise<T>(() => {});
+
+const CRUISERS = 3335;
+const GUNNERY = 3300;
+const DRONES = 3436;
+/** Hull, the zKillboard fit's gun and drone, and the Workbench fit's gun; the charge needs nothing. */
+const REQUIREMENTS = new Map([
+  [626, [{ skillTypeID: CRUISERS, level: 1 }]],
+  [100, [{ skillTypeID: GUNNERY, level: 5 }]],
+  [500, [{ skillTypeID: DRONES, level: 1 }]],
+  [900, []],
+  [3001, [{ skillTypeID: GUNNERY, level: 5 }]],
+]);
+const ALL_TRAINED = new Map([
+  [CRUISERS, 1],
+  [GUNNERY, 5],
+  [DRONES, 1],
+]);
 
 /** Fake sources: one Vexor with a single high slot, and real EFT through the real text Load. */
 function sources(overrides: Partial<PopularFitsSources> = {}): PopularFitsSources {
@@ -49,6 +68,16 @@ function sources(overrides: Partial<PopularFitsSources> = {}): PopularFitsSource
         eveWorkbenchEft: never,
       }),
     typeName: (typeId) => Promise.resolve(NAMES[typeId] ?? `Type ${typeId}`),
+    skillLevels: () => Promise.resolve(ALL_TRAINED),
+    requirements: () => Promise.resolve(REQUIREMENTS),
+    skills: () =>
+      Promise.resolve(
+        new Map([
+          [CRUISERS, { alphaMaxLevel: 4 }],
+          [GUNNERY, { alphaMaxLevel: 4 }],
+          [DRONES, { alphaMaxLevel: 4 }],
+        ])
+      ),
     ...overrides,
   };
 }
@@ -616,5 +645,101 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
       await screen.findByText(/^Fit 80/);
       expect(loadButtons()).toHaveLength(80);
     });
+  });
+});
+
+describe('Popular fits can-fly verdicts', () => {
+  beforeEach(() => {
+    resetWorkbenchCheckCache();
+    useMarketHub.setState({ value: 'jita' });
+  });
+  afterEach(() => {
+    useActiveCharacter.setState({ activeCharacterId: null });
+    useCloneStates.setState({ value: {} });
+  });
+
+  const renderWith = (overrides: Partial<PopularFitsSources>) =>
+    render(
+      <PopularFitsPanel
+        shipTypeId={626}
+        hullName="Vexor"
+        onOpen={vi.fn()}
+        sources={sources({
+          popularFits: () => Promise.resolve({ ok: true, fits: [fit('a', 12)] }),
+          ...overrides,
+        })}
+      />
+    );
+
+  it('says where the fits come from', () => {
+    renderWith({});
+    expect(
+      screen.getByText(
+        'Fits other pilots actually fly: from recent kills (zKillboard) and published guides (EVE Workbench).'
+      )
+    ).toBeTruthy();
+  });
+
+  it('shows no verdict with no Character', async () => {
+    renderWith({});
+    await screen.findByText('12 losses');
+    expect(screen.queryByTestId('popular-fit-verdict')).toBeNull();
+  });
+
+  it('ends a fit the Character can fly with Can fly', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    renderWith({});
+    const row = (await screen.findByText('12 losses')).closest('li')!;
+    expect((await within(row).findByTestId('popular-fit-verdict')).textContent).toBe('Can fly');
+  });
+
+  it('counts the missing skills across hull, modules and drones, Omega only for an Alpha', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    useCloneStates.setState({ value: { 7: 'alpha' } });
+    renderWith({ skillLevels: () => Promise.resolve(new Map([[CRUISERS, 1]])) });
+    const row = (await screen.findByText('12 losses')).closest('li')!;
+    expect((await within(row).findByTestId('popular-fit-verdict')).textContent).toBe(
+      'Missing 2 skills · Omega only'
+    );
+  });
+
+  it("shows no verdict when the pilot's skills could not be read", async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    renderWith({ skillLevels: () => Promise.reject(new Error('skills unknown')) });
+    await screen.findByText('12 losses');
+    await act(async () => {});
+    expect(screen.queryByTestId('popular-fit-verdict')).toBeNull();
+  });
+
+  it('never reads a fit with an unreadable type as flyable', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    const partial = new Map(REQUIREMENTS);
+    partial.delete(500);
+    renderWith({ requirements: () => Promise.resolve(partial) });
+    const row = (await screen.findByText('12 losses')).closest('li')!;
+    expect((await within(row).findByTestId('popular-fit-verdict')).textContent).toBe(
+      'Skills unknown'
+    );
+  });
+
+  it('gives each EVE Workbench fit its verdict too', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    const workbenchFit: WorkbenchFit = {
+      id: 'w',
+      name: 'Rail Vexor',
+      authorId: 1,
+      authorName: 'Saryna Dach',
+      dateAdded: Date.now(),
+      eft: '[Vexor, Rail Vexor]\nHeavy Neutron Blaster II',
+    };
+    renderWith({
+      workbenchFits: () => Promise.resolve({ ok: true, fits: [workbenchFit] }),
+      skillLevels: () => Promise.resolve(new Map([[CRUISERS, 1]])),
+    });
+    fireEvent.click(screen.getByRole('tab', { name: 'EVE Workbench' }));
+    await screen.findByText('Rail Vexor');
+    await waitFor(() =>
+      expect(screen.getByTestId('popular-fit-verdict').textContent).toBe('Missing 1 skill')
+    );
   });
 });
