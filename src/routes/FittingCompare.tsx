@@ -1,6 +1,6 @@
 import { useCharacters } from '@/features/character/useCharacters';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
   Button,
@@ -29,7 +29,8 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useCompareCodes, MAX_COMPARE_SLOTS } from '@/features/fittings/compareUrl';
 import { FittingComparePicker } from '@/features/fittings/FittingComparePicker';
-import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
+import { FITTINGS_PATH, fittingEditLocation } from '@/features/fittings/fittingRoutes';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { FittingCompareModulesSummary } from '@/features/fittings/FittingCompareModulesSummary';
 import {
   FittingCompareTable,
@@ -332,20 +333,29 @@ export function FittingCompare() {
         }
       />
 
-      {/* One wrapping toolbar from `md` up (label + select stay adjacent per group); phones keep the stacked rows. The differences toggle lives in the Stats panel header so loading fits never wraps this row. */}
-      <div
-        data-testid="compare-controls"
-        className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-start md:gap-x-2 md:gap-y-2"
-      >
-        <DamageProfilePicker damageProfiles={damageProfiles} />
-        <AbyssalWeatherPicker />
-        <TargetProfilePicker targetProfiles={targetProfiles} />
-      </div>
+      {/* One wrapping toolbar from `md` up (label + select stay adjacent per group); phones keep the stacked rows. The differences toggle lives in the Stats panel header so loading fits never wraps this row. Nothing to measure until a Fitting is added, so no pickers before then. */}
+      {count > 0 && (
+        <div
+          data-testid="compare-controls"
+          className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-start md:gap-x-2 md:gap-y-2"
+        >
+          <DamageProfilePicker damageProfiles={damageProfiles} />
+          <AbyssalWeatherPicker />
+          <TargetProfilePicker targetProfiles={targetProfiles} />
+        </div>
+      )}
 
       {count === 0 ? (
         <EmptyState
           title={t('fittings.compare.emptyTitle')}
-          hint={t('fittings.compare.emptyHint')}
+          hint={
+            <Trans
+              i18nKey="fittings.compare.emptyHint"
+              components={{
+                library: <Link to={FITTINGS_PATH} className={inlineLinkClassName} />,
+              }}
+            />
+          }
           action={
             <Button onClick={() => setPickerOpen(true)}>{t('fittings.compare.addFitting')}</Button>
           }
