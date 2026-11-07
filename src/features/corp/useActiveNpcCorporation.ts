@@ -1,29 +1,29 @@
 /**
- * The active Character's corporation, when it is a known NPC corporation: a pilot there can
- * never hold a Corp Role, so the corp Grant would send them through EVE login for nothing
- * (docs/context/decisions/20261107-000911-a-known-npc-corporation-is-treated-like-none.md). Null for a player corporation, and for one not yet
- * learned, which keeps today's Grant.
+ * The active Character's corporation when it is a known NPC corporation, whose members can never
+ * hold a Corp Role: the corp Grant would unlock nothing (decision 20261107-000911).
  */
+import { isNpcCorporationId } from '@/esi/entityIds';
 import type { Translate } from '@/lib/translate';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { useActiveCorporationId } from './owner';
-import { isPlayerCorporation } from './playerCorporation';
+import { useActiveCorporationIdState } from './owner';
 
 export interface NpcCorporation {
   /** Read, never fetched: whatever already loaded the public info. */
   name: string | null;
 }
 
-export function useActiveNpcCorporation(): NpcCorporation | null {
+/** `undefined` while the corporation id loads; null for a player corporation or one not yet learned. */
+export function useActiveNpcCorporation(): NpcCorporation | null | undefined {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const corporationId = useActiveCorporationId();
+  const corporationId = useActiveCorporationIdState();
   const name = usePublicInfo((state) =>
     activeCharacterId === null
       ? null
       : (state.byCharacterId[activeCharacterId]?.corporationName ?? null)
   );
-  if (corporationId === null || isPlayerCorporation(corporationId)) return null;
+  if (corporationId === undefined) return undefined;
+  if (corporationId === null || !isNpcCorporationId(corporationId)) return null;
   return { name };
 }
 

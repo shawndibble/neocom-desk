@@ -54,7 +54,7 @@ describe('CorpDenied', () => {
     async (reason) => {
       await seedCorporation(PLAYER_CORPORATION);
       renderDenied(reason);
-      expect(screen.getByText('Corp officer pages')).toBeInTheDocument();
+      expect(await screen.findByText('Corp officer pages')).toBeInTheDocument();
       expect(
         screen.getByText(/^Member tracking needs Director\. If that's you/)
       ).toBeInTheDocument();
@@ -67,9 +67,11 @@ describe('CorpDenied', () => {
     }
   );
 
-  it('keeps the Grant when the corporation is not known yet', () => {
+  it('keeps the Grant when the corporation is not known yet', async () => {
     renderDenied('not-granted');
-    expect(screen.getByRole('button', { name: /grant corporation access/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /grant corporation access/i })
+    ).toBeInTheDocument();
   });
 
   it.each(['none', 'capability'] as const)(

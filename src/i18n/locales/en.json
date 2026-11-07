@@ -15069,7 +15069,7 @@
     "notGrantedAction": "Grant corporation access",
     "npcCorporation": "You're in {{corporation}}, an NPC corporation. These pages are for officers (Director, Accountant…) of a player-run corporation.",
     "npcCorporationUnnamed": "You're in an NPC corporation. These pages are for officers (Director, Accountant…) of a player-run corporation.",
-    "roleLine": "Corp pages show what your corporation roles open, such as Director, Accountant or Station Manager.",
+    "roleLine": "Corp pages are for officers: Director, Accountant, Station Manager and others.",
     "noAccessTitle": "No corporation access",
     "noAccessHint": "This character's in-game corporation roles do not open any corp data. Roles can only be changed in game.",
     "vitalsTitle": "Vitals",

@@ -29,11 +29,13 @@ export function CorpDenied({ reason, title, hint, roleLine }: CorpDeniedProps) {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const npc = useActiveNpcCorporation();
 
-  if (npc !== null) {
+  if (npc != null) {
     return <EmptyState title={t('corp.officerPagesTitle')} hint={npcCorporationText(t, npc)} />;
   }
   const grantable = reason === 'not-granted' || reason === 'roles-without-grant';
   if (!grantable || activeCharacterId === null) return <EmptyState title={title} hint={hint} />;
+  // Not until the corporation is known: an NPC pilot must never see the Grant flash in.
+  if (npc === undefined) return null;
 
   return (
     <EmptyState

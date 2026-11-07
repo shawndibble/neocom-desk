@@ -83,7 +83,7 @@ export function PermissionsPanel() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const granted = useGrantedScopes();
   const corp = useCorpAccess();
-  const npcCorporation = useActiveNpcCorporation() !== null;
+  const inNpcCorporation = useActiveNpcCorporation() != null;
   // A phone keeps the rows that need action open and folds the Granted ones.
   const grantedFold = usePhoneFold();
   // Tagged with its Character so a switch drops the ticks instead of carrying them over.
@@ -117,11 +117,10 @@ export function PermissionsPanel() {
     });
   }
 
-  const groups = SCOPE_GROUPS.filter((group) =>
-    group === 'corp'
-      ? corp.state !== 'none' && !npcCorporation
-      : group !== 'corpProjects' || !npcCorporation
-  );
+  const groups = SCOPE_GROUPS.filter((group) => {
+    if (inNpcCorporation && (group === 'corp' || group === 'corpProjects')) return false;
+    return group !== 'corp' || corp.state !== 'none';
+  });
   const missing = groups.filter((group) => statusOf(group) === 'missing');
   // Actionable rows first (stable: catalogue order within each half); a row still checking keeps the Granted half.
   const rows = [...missing, ...groups.filter((group) => statusOf(group) !== 'missing')];

@@ -10,7 +10,7 @@
  * which only arrange EVE notification types.
  */
 import { type NotificationEventId } from './events';
-import { isPlayerCorporation } from '@/features/corp/playerCorporation';
+import { isNpcCorporationId } from '@/esi/entityIds';
 
 export const EVENT_GROUP_KEYS = [
   'skills',
@@ -73,9 +73,9 @@ const PRICE_ALERT: NotificationEventId = 'priceAlertTriggered';
  * A corporation not learned yet (undefined) might be a player one, so it keeps them.
  */
 export function corpEventsApply(corporationIds: readonly (number | undefined)[]): boolean {
-  return !(
-    corporationIds.length > 0 &&
-    corporationIds.every((id) => id !== undefined && !isPlayerCorporation(id))
+  return (
+    corporationIds.length === 0 ||
+    corporationIds.some((id) => id === undefined || !isNpcCorporationId(id))
   );
 }
 

@@ -28,7 +28,7 @@ export function CorpDefaultsPanel() {
     return (
       <Panel>
         <SettingsHint>
-          {npc === null ? t('settings.corpUnavailable') : npcCorporationText(t, npc)}
+          {npc == null ? t('settings.corpUnavailable') : npcCorporationText(t, npc)}
         </SettingsHint>
       </Panel>
     );
