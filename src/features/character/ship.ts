@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { loadWithCache } from '@/esi/cache';
 import { isCredentialFailure } from '@/esi/client';
-import { getCharacterShip } from '@/esi/endpoints';
+import { getCharacterShip, type CharacterShip } from '@/esi/endpoints';
 import { requiredScopesForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
@@ -41,6 +41,24 @@ export async function loadCharacterShipTypeRead(characterId: number): Promise<Sh
     }
   );
   return { typeId: result?.data ?? null, fetchedAt: result?.fetchedAt ?? null };
+}
+
+/**
+ * The flown ship whole — item id, hull, name — for the Active Fit, which
+ * finds its modules among the assets by that item id. Its own cache key: the
+ * type-only read above caches a bare number.
+ */
+export async function loadCharacterShip(characterId: number): Promise<CharacterShip | null> {
+  const result = await loadWithCache(
+    characterId,
+    `${CACHE_KEY}:full`,
+    async () => (await getCharacterShip(characterId)).data ?? null,
+    {
+      staleAfterMs: SHIP_STALE_AFTER_MS,
+      detectAuthFailure: isCredentialFailure,
+    }
+  );
+  return result?.data ?? null;
 }
 
 /** The type id of the ship the character is flying, or null if unresolvable (missing grant, offline, or uncached). */

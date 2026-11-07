@@ -7,7 +7,7 @@
 import type { AssetTreeContainerNode, AssetTreeNode } from '@/engine/assetTree';
 import { assetShipToFitting, type ShipAssetItem } from '@/engine/fittings/assetShipMapper';
 import { loadFittingSlots } from '@/sde/loadSde';
-import type { ItemMutation } from '@/engine/fittings/types';
+import type { Fitting, ItemMutation } from '@/engine/fittings/types';
 import { mutationsForItems } from '@/features/abyssal/dynamicItems';
 import { loadMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { fittingEditLocationFor } from './fittingEditLink';
@@ -64,8 +64,16 @@ export async function shipItemsEditLocation(
   ship: { typeId: number; name: string },
   items: readonly ShipAssetItem[]
 ): Promise<{ pathname: string; search: string } | null> {
+  return fittingEditLocationFor(await shipItemsToFitting(ship, items));
+}
+
+/** A ship's direct contents as a Fitting, each mutated item with its real rolls (the Active Fit reads this too). */
+export async function shipItemsToFitting(
+  ship: { typeId: number; name: string },
+  items: readonly ShipAssetItem[]
+): Promise<Fitting> {
   const [rackOf, mutations] = await Promise.all([loadFittingSlots(), shipMutations(items)]);
-  const fitting = assetShipToFitting(
+  return assetShipToFitting(
     ship,
     items,
     // A module has a rack; a charge in its slot doesn't (a drone's rack is its bay).
@@ -75,5 +83,4 @@ export async function shipItemsEditLocation(
     },
     mutations
   );
-  return fittingEditLocationFor(fitting);
 }

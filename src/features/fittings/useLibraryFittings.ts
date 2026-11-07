@@ -1,8 +1,9 @@
 /**
- * The two lists of Fittings the library offers — the active Character's saved
- * ones (My Fittings, Dexie) and their In-game ones (ESI) — read once here so
- * the tabbed panels and the Start screen's single searchable list show the
- * same rows.
+ * The Fittings the library offers — the active Character's saved ones (My
+ * Fittings, Dexie), their In-game ones (ESI), their Active Fit (the ship they
+ * fly, read off their assets) and the ones shared into their Communities —
+ * read once here so the tabbed panels and the Start screen's single
+ * searchable list show the same rows.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,12 +27,19 @@ import type { CachedResult } from '@/esi/cache';
 import type { CharacterFitting } from '@/esi/endpoints';
 import { loadTypes } from '@/sde/loadSde';
 import { loadInGameFittings } from './inGameFittings';
+import { activeShipItems, isCapsuleGroup } from '@/engine/fittings/activeShip';
+import type { Fitting } from '@/engine/fittings/types';
+import { loadCharacterShip } from '@/features/character/ship';
+import { loadCharacterAssets } from '@/features/assets/assets';
+import { shipItemsToFitting } from './assetShipLocation';
 
 /** A saved or In-game Fitting as one row of the Start screen's list. */
 export type LibraryRow = MyFittingRow &
   (
     | { source: 'saved'; record: FittingRecord }
     | { source: 'inGame'; inGame: CharacterFitting }
+    /** The ship the Character is flying; its modules lag the game by up to an hour. */
+    | { source: 'active'; fitting: Fitting }
     | {
         source: 'shared';
         shared: SharedFittingRow;
@@ -236,4 +244,56 @@ export function sharedRows(
     sharer: sharerNames.get(shared.ownerUid) ?? null,
     communityNames: shared.communityIds.map((id) => communityName.get(id) ?? ''),
   }));
+}
+
+/** The Active Fit's row, alone (never grouped by hull: it leads the list). */
+export type ActiveRow = Extract<LibraryRow, { source: 'active' }>;
+
+/**
+ * The Character's Active Fit: the flown ship (`getCharacterShip`) with the
+ * assets inside it (`getCharacterAssets`). Null without both grants, in a pod,
+ * or when either read fails; nothing asks for a grant, the list just lacks the row.
+ */
+export function useActiveFitting(characterId: number | null) {
+  const { t } = useTranslation();
+  const granted = useEndpointsGranted(['getCharacterShip', 'getCharacterAssets']);
+  const [state, setState] = useState<{ forCharacter: number; row: ActiveRow | null } | null>(null);
+  const requestIdRef = useRef(0);
+
+  const refresh = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    if (characterId === null || granted !== true) return;
+    let row: ActiveRow | null = null;
+    try {
+      const ship = await loadCharacterShip(characterId);
+      const types = await loadTypes();
+      const hull = ship ? types[String(ship.ship_type_id)] : undefined;
+      if (ship && !isCapsuleGroup(hull?.groupID)) {
+        const { cached } = await loadCharacterAssets(characterId);
+        const hullName = typeNameOr(t, hull?.name, ship.ship_type_id);
+        const name = ship.ship_name.trim() || hullName;
+        const fitting = await shipItemsToFitting(
+          { typeId: ship.ship_type_id, name },
+          activeShipItems(cached?.data ?? [], ship.ship_item_id)
+        );
+        row = {
+          id: `active-${ship.ship_item_id}`,
+          name,
+          hull: hullName,
+          source: 'active',
+          fitting,
+        };
+      }
+    } catch {
+      // Offline or a failed read: no Active Fit, the rest of the list stands.
+    }
+    if (requestId === requestIdRef.current) setState({ forCharacter: characterId, row });
+  }, [characterId, granted, t]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  // A previous Character's ship is not this one's until its own lands.
+  return { row: state?.forCharacter === characterId ? state.row : null, refresh };
 }

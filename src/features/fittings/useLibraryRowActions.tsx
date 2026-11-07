@@ -5,7 +5,8 @@
  * touch-and-hold) the row, or its ⋮ button.
  *
  * A row names a Fitting without holding one: a saved row has only its Share
- * Link code, an In-game one ESI's own shape. Each action that needs the
+ * Link code, an In-game one ESI's own shape (the Active Fit is the exception:
+ * it holds its Fitting, read off the assets). Each action that needs the
  * Fitting itself works it out when chosen, never while the list renders.
  */
 import { useState, type ReactNode } from 'react';
@@ -42,7 +43,7 @@ async function rowFitting(
     if (!decoded.ok) return null;
     return { fitting: shareToFitting(decoded.value, row.name), code };
   }
-  const { fitting } = esiFittingToFitting(row.inGame);
+  const fitting = row.source === 'active' ? row.fitting : esiFittingToFitting(row.inGame).fitting;
   const encoded = await encodeFittingShare(fittingToShareInput(fitting));
   return { fitting, code: encoded.ok ? encoded.payload : null };
 }

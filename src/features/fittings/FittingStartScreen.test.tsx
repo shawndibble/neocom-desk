@@ -18,8 +18,27 @@ vi.mock('@/app/useGrantedScopes', () => ({ useEndpointsGranted: useEndpointsGran
 const loadInGameFittingsMock = vi.hoisted(() => vi.fn());
 vi.mock('./inGameFittings', () => ({ loadInGameFittings: loadInGameFittingsMock }));
 vi.mock('./popularFits', () => ({ usePopularFits: () => ({ ok: true, fits: [] }) }));
+const loadCharacterShipMock = vi.hoisted(() => vi.fn());
+vi.mock('@/features/character/ship', () => ({ loadCharacterShip: loadCharacterShipMock }));
+const loadCharacterAssetsMock = vi.hoisted(() => vi.fn());
+vi.mock('@/features/assets/assets', () => ({ loadCharacterAssets: loadCharacterAssetsMock }));
+// The asset-to-Fitting mapping has its own tests; here only which items reach it matters.
+const shipItemsToFittingMock = vi.hoisted(() =>
+  vi.fn(async (ship: { typeId: number; name: string }) => ({
+    name: ship.name,
+    shipTypeId: ship.typeId,
+    modules: [],
+    drones: [],
+    cargo: [],
+  }))
+);
+vi.mock('./assetShipLocation', () => ({ shipItemsToFitting: shipItemsToFittingMock }));
 vi.mock('@/sde/loadSde', () => ({
-  loadTypes: vi.fn(async () => ({ '587': { name: 'Rifter' }, '24698': { name: 'Drake' } })),
+  loadTypes: vi.fn(async () => ({
+    '587': { name: 'Rifter', groupID: 25 },
+    '24698': { name: 'Drake', groupID: 419 },
+    '670': { name: 'Capsule', groupID: 29 },
+  })),
   loadTypeEffects: vi.fn(async () => ({})),
 }));
 // The preview's numbers are the compare hooks' job; here it only proves which row is picked.
@@ -134,6 +153,8 @@ beforeEach(async () => {
   isPhoneMock.mockReturnValue(false);
   await db.fittings.clear();
   useEndpointsGrantedMock.mockReturnValue(true);
+  loadCharacterShipMock.mockResolvedValue(null);
+  loadCharacterAssetsMock.mockResolvedValue({ cached: { data: [] }, needsReauth: false });
   const encoded = await encodeFittingShare(fittingToShareInput(RIFTER));
   if (!encoded.ok) throw new Error('encode failed');
   await db.fittings.add({
@@ -456,5 +477,97 @@ describe('FittingStartScreen in a dialog', () => {
     renderDialog({}, { ...makeWorkspace(), tooLargeToShare: true });
     await screen.findByText('Armor Drake');
     expect(screen.queryByText(/too large/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('FittingStartScreen Active Fit', () => {
+  const SHIP_ID = 1_000_000_001;
+  beforeEach(() => {
+    loadCharacterShipMock.mockResolvedValue({
+      ship_item_id: SHIP_ID,
+      ship_type_id: 587,
+      ship_name: 'Zipper',
+    });
+    loadCharacterAssetsMock.mockResolvedValue({
+      cached: {
+        data: [
+          {
+            item_id: 11,
+            type_id: 484,
+            quantity: 1,
+            location_id: SHIP_ID,
+            location_type: 'item',
+            location_flag: 'HiSlot0',
+            is_singleton: true,
+          },
+          // Another ship's module.
+          {
+            item_id: 12,
+            type_id: 484,
+            quantity: 1,
+            location_id: 99,
+            location_type: 'item',
+            location_flag: 'HiSlot0',
+            is_singleton: true,
+          },
+        ],
+      },
+      needsReauth: false,
+    });
+  });
+
+  it('leads the list under its own heading, is picked first, and says its modules can lag', async () => {
+    renderScreen();
+    const list = await screen.findByRole('navigation', { name: 'Your fittings' });
+    const heading = await within(list).findByRole('heading', { name: 'Active fit' });
+    const section = heading.closest('section') as HTMLElement;
+    expect(within(section).getByText('Zipper')).toBeInTheDocument();
+    expect(within(section).getByText('Rifter')).toBeInTheDocument();
+    expect(within(section).getByText(/up to an hour behind/)).toBeInTheDocument();
+    expect(within(list).getAllByRole('heading')[0]).toBe(heading);
+    expect(await screen.findByText('preview of Zipper')).toBeInTheDocument();
+    // Only what sits inside the flown ship is read as its fit.
+    expect(shipItemsToFittingMock).toHaveBeenCalledWith({ typeId: 587, name: 'Zipper' }, [
+      { typeId: 484, quantity: 1, flag: 'HiSlot0', itemId: 11 },
+    ]);
+  });
+
+  it('Open hands the flown ship to openLoaded', async () => {
+    const workspace = renderScreen();
+    await screen.findByText('preview of Zipper');
+    await userEvent.click(screen.getByRole('button', { name: 'Open fitting' }));
+    expect(workspace.openLoaded).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fitting: expect.objectContaining({ name: 'Zipper', shipTypeId: 587 }),
+      })
+    );
+  });
+
+  it('a search can hide it', async () => {
+    renderScreen();
+    await screen.findByRole('heading', { name: 'Active fit' });
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search fittings' }), 'drake');
+    expect(screen.queryByRole('heading', { name: 'Active fit' })).not.toBeInTheDocument();
+  });
+
+  it('is left out in a pod', async () => {
+    loadCharacterShipMock.mockResolvedValue({
+      ship_item_id: SHIP_ID,
+      ship_type_id: 670,
+      ship_name: 'Capsule',
+    });
+    renderScreen();
+    await screen.findByText('Armor Drake');
+    await waitFor(() => expect(loadCharacterShipMock).toHaveBeenCalled());
+    expect(screen.queryByRole('heading', { name: 'Active fit' })).not.toBeInTheDocument();
+    expect(loadCharacterAssetsMock).not.toHaveBeenCalled();
+  });
+
+  it('is left out without the ship and assets grants, and reads nothing', async () => {
+    useEndpointsGrantedMock.mockReturnValue(false);
+    renderScreen();
+    await screen.findByText('Kite');
+    expect(loadCharacterShipMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: 'Active fit' })).not.toBeInTheDocument();
   });
 });

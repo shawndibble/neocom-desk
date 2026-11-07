@@ -33,6 +33,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { textParam } from '@/lib/urlState';
 import { useUrlParam } from '@/lib/useUrlState';
 import { warmDogmaEngine } from './dogmaFittingEngine';
+import { StatNote } from './StatFacts';
 import { FittingPreview } from './FittingPreview';
 import { ImportFittingCard, ImportFittingDialog, NewFromHullDialog } from './FittingStartDialogs';
 import { setFittingNotes } from './myFittings';
@@ -45,6 +46,7 @@ import type { FittingLibrarySource } from './useFittingPicker';
 import {
   inGameRows,
   savedRows,
+  useActiveFitting,
   useCommunityFittings,
   useInGameFittings,
   useSavedFittings,
@@ -162,6 +164,7 @@ export function FittingStartScreen({
   const saved = useSavedFittings(characterId);
   const inGame = useInGameFittings(characterId);
   const community = useCommunityFittings(characterId);
+  const active = useActiveFitting(characterId);
   const timeZone = useTimeZone();
   const hasCharacter = characterId !== null;
   const { refresh: refreshInGame } = inGame;
@@ -184,7 +187,16 @@ export function FittingStartScreen({
     [saved.records, saved.hulls, inGame.result, inGame.hullNames, community.rows, hasCharacter, t]
   );
   const groups = useMemo(() => groupByHull(filterMyFittings(rows, query)), [rows, query]);
-  const visible = useMemo(() => groups.flatMap((group) => group.rows), [groups]);
+  // The Active Fit leads the list, above the hulls, so it is the first pick.
+  const activeShown = useMemo(
+    () => (hasCharacter && active.row ? filterMyFittings([active.row], query) : []),
+    [active.row, hasCharacter, query]
+  );
+  const visible = useMemo(
+    () => [...activeShown, ...groups.flatMap((group) => group.rows)],
+    [activeShown, groups]
+  );
+  const hasRows = rows.length > 0 || (hasCharacter && active.row !== null);
   const selected = visible.find((row) => row.id === selectedId) ?? visible[0] ?? null;
   const searching = query.trim() !== '';
 
@@ -192,6 +204,14 @@ export function FittingStartScreen({
     if (row.source === 'saved') workspace.openSaved(row.record);
     // A Community's Fitting opens like an import: stated for this pilot, nothing saved until they save.
     else if (row.source === 'shared') void workspace.loadFromInput(row.shared.code);
+    // The flown ship opens as an In-game Fitting does (the Compare picker has no other way in).
+    else if (row.source === 'active')
+      void workspace.openLoaded({
+        kind: 'fitting',
+        source: 'in-game',
+        fitting: row.fitting,
+        unresolved: [],
+      });
     else void workspace.openLoaded(esiFittingToFitting(row.inGame));
     onOpened?.();
   }
@@ -235,7 +255,10 @@ export function FittingStartScreen({
         size="md"
         icon={<Icon.Refresh />}
         label={t('fittings.inGame.refresh')}
-        onClick={() => void inGame.refresh()}
+        onClick={() => {
+          void inGame.refresh();
+          void active.refresh();
+        }}
         disabled={inGame.loading}
       />
     ) : null;
@@ -252,6 +275,88 @@ export function FittingStartScreen({
       </div>
     );
   }
+
+  /** One row of the list: a tap previews it (or opens it, with no preview), its menu the rest. */
+  const renderRow = (row: LibraryRow) => {
+    const isSelected = previewing && selected?.id === row.id;
+    const item = (
+      <li className="flex items-center">
+        <button
+          type="button"
+          data-row-id={row.id}
+          aria-pressed={previewing ? isSelected : undefined}
+          onClick={() => (previewing ? setSelectedId(row.id) : open(row))}
+          onDoubleClick={previewing ? () => open(row) : undefined}
+          onKeyDown={(event) => {
+            // Enter opens, as a double-click does; Space still selects.
+            if (!previewing || event.key !== 'Enter') return;
+            event.preventDefault();
+            open(row);
+          }}
+          className={cx(
+            'group flex min-h-9 min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm',
+            rowInteractiveClassName,
+            focusRingInsetClassName,
+            isSelected ? `${selectedRowClassName} text-accent` : 'border-l-2 border-l-transparent'
+          )}
+        >
+          <span className="min-w-0 flex-1 py-1">
+            <span className="block truncate">{row.name}</span>
+            {row.source === 'shared' && (
+              <span className="block truncate text-xs text-text-dim">
+                {[row.sharer ?? t('fittings.share.unknownSharer'), row.communityNames.join(', ')]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            )}
+            {/* The Active Fit sits under its own heading, not its hull's: the row names the hull. */}
+            {row.source === 'active' && (
+              <span className="block truncate text-xs text-text-dim">{row.hull}</span>
+            )}
+          </span>
+          {row.source === 'shared' ? (
+            <Tooltip
+              content={t(
+                row.shared.source === 'game'
+                  ? 'fittings.share.tooltipAsOf'
+                  : 'fittings.share.tooltipUpdated',
+                {
+                  name: row.sharer ?? t('fittings.share.unknownSharer'),
+                  communities: row.communityNames.join(', '),
+                  when: formatTimestamp(new Date(row.shared.updatedAt), timeZone),
+                }
+              )}
+            >
+              <span tabIndex={0} className="shrink-0 text-text-dim">
+                <Icon.NavCommunities aria-label={t('fittings.share.sourceLabel')} role="img" />
+              </span>
+            </Tooltip>
+          ) : row.source === 'active' ? null : (
+            <span className="shrink-0 text-[0.625rem] tracking-widest text-text-dim uppercase">
+              {row.source === 'saved'
+                ? t('fittings.start.sourceSaved')
+                : t('fittings.start.sourceInGame')}
+            </span>
+          )}
+          {/* Without the preview pane a row opens the editor (it loads state, so no href). */}
+          {!previewing && !rowMenus && (
+            <Icon.Descend
+              aria-hidden
+              className="shrink-0 text-text-faint group-hover:text-accent"
+            />
+          )}
+        </button>
+        {rowMenus && <RowMoreActions className="shrink-0" />}
+      </li>
+    );
+    return rowMenus ? (
+      <RowActionsMenu key={row.id} name={row.name} items={rowActions.itemsFor(row)}>
+        {item}
+      </RowActionsMenu>
+    ) : (
+      <Fragment key={row.id}>{item}</Fragment>
+    );
+  };
 
   // Beside a preview the list scrolls in its own box; elsewhere the page or
   // the dialog's body scrolls it.
@@ -315,9 +420,9 @@ export function FittingStartScreen({
           </p>
         )}
 
-        {loading && rows.length === 0 ? (
+        {loading && !hasRows ? (
           <Spinner block="panel" label={t('common.loading')} />
-        ) : rows.length === 0 ? (
+        ) : !hasRows ? (
           <EmptyState
             title={t('fittings.start.emptyTitle')}
             hint={t(showNew ? 'fittings.start.emptyHint' : 'fittings.start.emptyHintList')}
@@ -353,104 +458,26 @@ export function FittingStartScreen({
                   {t('fittings.start.matches', { count: visible.length })}
                 </p>
               )}
-              {groups.length === 0 && (
+              {visible.length === 0 && (
                 <p className="p-3 text-xs text-text-dim">{t('fittings.start.noMatches')}</p>
+              )}
+              {activeShown.length > 0 && (
+                <section className="pb-1">
+                  <h3 className={cx(eyebrowClassName, 'px-3 pt-3 pb-1')}>
+                    {t('fittings.start.activeHeading')}
+                  </h3>
+                  <ul>{activeShown.map(renderRow)}</ul>
+                  <div className="px-3 pt-1">
+                    <StatNote>{t('fittings.start.activeLag')}</StatNote>
+                  </div>
+                </section>
               )}
               {groups.map((group) => (
                 <section key={group.hull ?? ''} className="pb-1">
                   <h3 className={cx(eyebrowClassName, 'px-3 pt-3 pb-1')}>
                     {group.hull ?? t('fittings.myFittings.unknownHull')}
                   </h3>
-                  <ul>
-                    {group.rows.map((row) => {
-                      const isSelected = previewing && selected?.id === row.id;
-                      const item = (
-                        <li className="flex items-center">
-                          <button
-                            type="button"
-                            data-row-id={row.id}
-                            aria-pressed={previewing ? isSelected : undefined}
-                            onClick={() => (previewing ? setSelectedId(row.id) : open(row))}
-                            onDoubleClick={previewing ? () => open(row) : undefined}
-                            onKeyDown={(event) => {
-                              // Enter opens, as a double-click does; Space still selects.
-                              if (!previewing || event.key !== 'Enter') return;
-                              event.preventDefault();
-                              open(row);
-                            }}
-                            className={cx(
-                              'group flex min-h-9 min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm',
-                              rowInteractiveClassName,
-                              focusRingInsetClassName,
-                              isSelected
-                                ? `${selectedRowClassName} text-accent`
-                                : 'border-l-2 border-l-transparent'
-                            )}
-                          >
-                            <span className="min-w-0 flex-1 py-1">
-                              <span className="block truncate">{row.name}</span>
-                              {row.source === 'shared' && (
-                                <span className="block truncate text-xs text-text-dim">
-                                  {[
-                                    row.sharer ?? t('fittings.share.unknownSharer'),
-                                    row.communityNames.join(', '),
-                                  ]
-                                    .filter(Boolean)
-                                    .join(' · ')}
-                                </span>
-                              )}
-                            </span>
-                            {row.source === 'shared' ? (
-                              <Tooltip
-                                content={t(
-                                  row.shared.source === 'game'
-                                    ? 'fittings.share.tooltipAsOf'
-                                    : 'fittings.share.tooltipUpdated',
-                                  {
-                                    name: row.sharer ?? t('fittings.share.unknownSharer'),
-                                    communities: row.communityNames.join(', '),
-                                    when: formatTimestamp(new Date(row.shared.updatedAt), timeZone),
-                                  }
-                                )}
-                              >
-                                <span tabIndex={0} className="shrink-0 text-text-dim">
-                                  <Icon.NavCommunities
-                                    aria-label={t('fittings.share.sourceLabel')}
-                                    role="img"
-                                  />
-                                </span>
-                              </Tooltip>
-                            ) : (
-                              <span className="shrink-0 text-[0.625rem] tracking-widest text-text-dim uppercase">
-                                {row.source === 'saved'
-                                  ? t('fittings.start.sourceSaved')
-                                  : t('fittings.start.sourceInGame')}
-                              </span>
-                            )}
-                            {/* Without the preview pane a row opens the editor (it loads state, so no href). */}
-                            {!previewing && !rowMenus && (
-                              <Icon.Descend
-                                aria-hidden
-                                className="shrink-0 text-text-faint group-hover:text-accent"
-                              />
-                            )}
-                          </button>
-                          {rowMenus && <RowMoreActions className="shrink-0" />}
-                        </li>
-                      );
-                      return rowMenus ? (
-                        <RowActionsMenu
-                          key={row.id}
-                          name={row.name}
-                          items={rowActions.itemsFor(row)}
-                        >
-                          {item}
-                        </RowActionsMenu>
-                      ) : (
-                        <Fragment key={row.id}>{item}</Fragment>
-                      );
-                    })}
-                  </ul>
+                  <ul>{group.rows.map(renderRow)}</ul>
                 </section>
               ))}
             </nav>
