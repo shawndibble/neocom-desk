@@ -244,6 +244,8 @@ export interface WorkbenchRow {
   fit: WorkbenchFit;
   /** The modules its EFT loaded, rack and type only. */
   modules: readonly RackModule[];
+  /** Every type whose skills gate flying it, for its can-fly verdict (#6011). */
+  requirementTypeIds: readonly number[];
   /** Its price at `hub`; `undefined` while pricing, or when nothing in it has a sell order. */
   price: FitSellPrice | undefined;
   /** Seen on zKillboard; `undefined` when not (yet) seen. */
@@ -345,13 +347,17 @@ export function useWorkbenchHullRows(
 
   const rows = useMemo(() => {
     if (checking) return [];
-    return current.map((fit): WorkbenchRow => ({
-      fit,
-      modules: checks?.get(fit.id)?.modules ?? [],
-      price: priceById.get(fit.id),
-      sighting: sightings.get(fit.id),
-      loadFailed: failedId === fit.id,
-    }));
+    return current.map((fit): WorkbenchRow => {
+      const check = checks?.get(fit.id);
+      return {
+        fit,
+        modules: check?.modules ?? [],
+        requirementTypeIds: check?.requirementTypeIds ?? [],
+        price: priceById.get(fit.id),
+        sighting: sightings.get(fit.id),
+        loadFailed: failedId === fit.id,
+      };
+    });
   }, [checking, checks, current, priceById, sightings, failedId]);
 
   async function load(fit: WorkbenchFit, onOpen: (loaded: LoadedFitting) => void) {

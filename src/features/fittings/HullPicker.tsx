@@ -11,6 +11,9 @@ import { Button, SearchInput, TypeIcon } from '@/components/ui';
 import { buildHullCatalogue, searchHulls, type HullEntry } from '@/engine/fittings/hullCatalogue';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { CatalogueLoadingNote } from './FittingDataNotices';
+import { FlyDot } from './shipTree/FlyDot';
+import { flyLabel } from './shipTree/flyLabel';
+import { useHullFlyMarks } from './useHullFlyMarks';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import { guarded } from '@/app/routeChunks';
 
@@ -31,12 +34,14 @@ interface HullPickerProps {
  * (nothing is listed until the player types), hulls grouped by Ships market
  * class, pick one, and Start fitting opens
  * the bare hull. Needs only the static market data, so it works before the
- * ship data (dogma engine) has downloaded.
+ * ship data (dogma engine) has downloaded. Each hull carries the Ship Tree's
+ * can-fly mark for the active Character once that has loaded (#6011).
  */
 export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<HullEntry | null>(null);
+  const flyMarks = useHullFlyMarks();
 
   const hulls = useMemo(
     () =>
@@ -78,15 +83,26 @@ export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProp
                 <ul>
                   {hullClass.hulls.map((hull) => {
                     const isSelected = selected?.typeId === hull.typeId;
+                    const mark = flyMarks?.(hull.typeId);
                     return (
                       <li key={hull.typeId}>
                         <button
                           type="button"
                           aria-pressed={isSelected}
+                          aria-label={
+                            mark
+                              ? t('ships.tree.tileLabel', {
+                                  name: hull.name,
+                                  status: mark.needsOmega
+                                    ? `${flyLabel(t, mark.status)}, ${t('ships.tree.omega')}`
+                                    : flyLabel(t, mark.status),
+                                })
+                              : undefined
+                          }
                           onClick={() => setSelected(hull)}
                           onDoubleClick={() => onStart(hull)}
                           className={cx(
-                            'flex min-h-9 w-full items-center px-2 text-left text-sm',
+                            'flex min-h-9 w-full items-center gap-2 px-2 text-left text-sm',
                             rowInteractiveClassName,
                             focusRingInsetClassName,
                             isSelected
@@ -94,7 +110,18 @@ export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProp
                               : 'border-l-2 border-l-transparent'
                           )}
                         >
-                          {hull.name}
+                          {flyMarks && (
+                            // Same width marked or not, so names line up down the column.
+                            <span className="flex w-2.5 shrink-0 justify-center">
+                              {mark && <FlyDot status={mark.status} />}
+                            </span>
+                          )}
+                          <span className="min-w-0 flex-1">{hull.name}</span>
+                          {mark?.needsOmega && (
+                            <span aria-hidden="true" className="font-serif font-bold text-omega">
+                              Ω
+                            </span>
+                          )}
                         </button>
                       </li>
                     );

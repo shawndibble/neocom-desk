@@ -19,8 +19,10 @@ export function moduleKey(module: Pick<FittingModule, 'slot' | 'slotIndex'>): st
   return `${module.slot}-${module.slotIndex}`;
 }
 
-/** Every type id whose requirements gate this Fitting. */
-export function fittingRequirementTypeIds(fitting: Fitting): number[] {
+/** Every type id whose requirements gate this Fitting (cargo never does). */
+export function fittingRequirementTypeIds(
+  fitting: Pick<Fitting, 'shipTypeId' | 'modules' | 'drones' | 'fighters'>
+): number[] {
   const ids = new Set<number>([fitting.shipTypeId]);
   for (const module of fitting.modules) {
     ids.add(module.typeId);
@@ -73,27 +75,46 @@ export function firstResourceOverage(stats: FittingStats): ResourceBudgetOverage
   return checks.find((check) => check.amount > 0) ?? null;
 }
 
-export function computeSkillGaps(
-  fitting: Fitting,
+function lacksSkillAt(skillLevels: ReadonlyMap<number, number>) {
+  return (req: RequiredSkill) => (skillLevels.get(req.skillTypeID) ?? 0) < req.level;
+}
+
+/**
+ * The skills a pilot lacks to use every one of `typeIds`: one entry per skill,
+ * at the highest level any of them requires. The one "Missing N skills" rule —
+ * the editor's chip and each Popular fit's verdict both read it.
+ */
+export function missingSkillEntries(
+  typeIds: Iterable<number>,
   requirementsByType: ReadonlyMap<number, readonly RequiredSkill[]>,
   skillLevels: ReadonlyMap<number, number>
-): SkillGaps {
-  const lacksSkill = (req: RequiredSkill) => (skillLevels.get(req.skillTypeID) ?? 0) < req.level;
-
-  const unusable = new Set<string>();
-  for (const module of fitting.modules) {
-    if ((requirementsByType.get(module.typeId) ?? []).some(lacksSkill))
-      unusable.add(moduleKey(module));
-  }
-
+): PlanEntry[] {
+  const lacksSkill = lacksSkillAt(skillLevels);
   const highest = new Map<number, number>();
-  for (const typeId of fittingRequirementTypeIds(fitting)) {
+  for (const typeId of typeIds) {
     for (const req of requirementsByType.get(typeId) ?? []) {
       if (lacksSkill(req))
         highest.set(req.skillTypeID, Math.max(highest.get(req.skillTypeID) ?? 0, req.level));
     }
   }
-  const missing = [...highest].map(([skillTypeID, targetLevel]) => ({ skillTypeID, targetLevel }));
+  return [...highest].map(([skillTypeID, targetLevel]) => ({ skillTypeID, targetLevel }));
+}
 
+export function computeSkillGaps(
+  fitting: Fitting,
+  requirementsByType: ReadonlyMap<number, readonly RequiredSkill[]>,
+  skillLevels: ReadonlyMap<number, number>
+): SkillGaps {
+  const lacksSkill = lacksSkillAt(skillLevels);
+  const unusable = new Set<string>();
+  for (const module of fitting.modules) {
+    if ((requirementsByType.get(module.typeId) ?? []).some(lacksSkill))
+      unusable.add(moduleKey(module));
+  }
+  const missing = missingSkillEntries(
+    fittingRequirementTypeIds(fitting),
+    requirementsByType,
+    skillLevels
+  );
   return { unusableModuleKeys: unusable, missing };
 }

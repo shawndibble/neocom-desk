@@ -763,7 +763,9 @@ act at once and never move into the sheet.
 A **status dot** (`size-2 rounded-full bg-current`, `aria-hidden`, phone only)
 may lead a dense card's title in the row's status tone, so a scan down the list
 reads outcome at a glance. It is never the only cue: the status word stays on
-the card's meta line.
+the card's meta line. A Popular fit row's can-fly verdict (`PopularFitVerdict`)
+is the one at every width: the dot leads its word ("Can fly", "Missing 3
+skills") at the end of the title line, which truncates before it does.
 
 ## 5. Icons
 

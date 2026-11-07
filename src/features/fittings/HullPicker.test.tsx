@@ -1,10 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import '@/i18n';
 import { HullPicker } from './HullPicker';
 
-const { usePopularFitsMock } = vi.hoisted(() => ({ usePopularFitsMock: vi.fn() }));
+const { usePopularFitsMock, useHullFlyMarksMock } = vi.hoisted(() => ({
+  usePopularFitsMock: vi.fn(),
+  useHullFlyMarksMock: vi.fn<() => HullFlyMarks | null>(() => null),
+}));
 vi.mock('./popularFits', () => ({ usePopularFits: usePopularFitsMock }));
+vi.mock('./useHullFlyMarks', () => ({ useHullFlyMarks: useHullFlyMarksMock }));
+import type { HullFlyMarks } from './useHullFlyMarks';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
 const groups = [
@@ -103,5 +108,34 @@ describe('HullPicker', () => {
         fitting: expect.objectContaining({ name: 'Rifter popular fit 1', shipTypeId: 587 }),
       })
     );
+  });
+
+  describe('can-fly marks', () => {
+    afterEach(() => useHullFlyMarksMock.mockReset().mockReturnValue(null));
+
+    it("marks each hull as the Ship Tree does: can fly, can't fly yet, needs Omega", () => {
+      useHullFlyMarksMock.mockReturnValue((typeId) =>
+        typeId === 587
+          ? { status: { canFly: true, secondsToFly: 0, mastery: 1 }, needsOmega: false }
+          : { status: { canFly: false, secondsToFly: 3_600, mastery: 0 }, needsOmega: true }
+      );
+      render(<HullPicker catalogue={catalogue} onStart={() => {}} />);
+      search('r');
+      const rifter = screen.getByRole('button', { name: 'Rifter — Can fly' });
+      expect(rifter.querySelector('[data-shape="dot"]')).toBeTruthy();
+      expect(rifter.textContent).not.toContain('Ω');
+      const vexor = screen.getByRole('button', {
+        name: 'Vexor — 1h 0m to fly, Needs an Omega clone',
+      });
+      expect(vexor.querySelector('[data-shape="ring"]')).toBeTruthy();
+      expect(vexor.textContent).toContain('Ω');
+    });
+
+    it('lists hulls unmarked until the marks are known', () => {
+      render(<HullPicker catalogue={catalogue} onStart={() => {}} />);
+      search('r');
+      const vexor = screen.getByRole('button', { name: 'Vexor' });
+      expect(vexor.querySelector('[data-shape]')).toBeNull();
+    });
   });
 });
