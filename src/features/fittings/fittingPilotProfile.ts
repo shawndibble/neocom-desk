@@ -18,7 +18,7 @@ import { loadSkills } from '@/sde/loadSde';
  * empty map, which `skillsKnown: false` marks so the stats can say they assume
  * no skills instead of passing that off as the pilot's.
  */
-async function loadActivePilotProfileState(
+export async function loadActivePilotProfileState(
   characterId: number
 ): Promise<{ profile: PilotProfile; skillsKnown: boolean }> {
   const [corrected, implants] = await Promise.all([

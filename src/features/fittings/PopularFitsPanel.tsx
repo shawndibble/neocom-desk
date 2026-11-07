@@ -5,6 +5,7 @@ import { IskAmount, Spinner, TabPanel, Tabs, useTabsId } from '@/components/ui';
 import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { popularFitLoad } from '@/engine/fittings/popularFits';
+import { fittingRequirementTypeIds } from '@/engine/fittings/skillGaps';
 import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { useNow } from '@/lib/useNow';
@@ -12,6 +13,13 @@ import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import { typeName } from '@/sde/loadSde';
 import { usePopularFits } from './popularFits';
 import { PopularFitRow } from './PopularFitRow';
+import { PopularFitVerdict } from './PopularFitVerdict';
+import {
+  fitVerdictSources,
+  usePopularFitVerdicts,
+  type FitVerdictSources,
+  type VerdictFit,
+} from './usePopularFitVerdicts';
 import { useModuleNames } from './useModuleNames';
 import { FIT_ROW_CLASS, VirtualFitList } from './VirtualFitList';
 import {
@@ -23,13 +31,14 @@ import {
 import { OutOfDateNote } from './WorkbenchOutOfDate';
 import { WorkbenchSightingBadge } from './WorkbenchSightingBadge';
 
-/** What both tabs read from outside: the Workbench rows' sources, and module names. */
-export interface PopularFitsSources extends WorkbenchHullSources {
+/** What both tabs read from outside: the Workbench rows' sources, module names, and can-fly verdicts. */
+export interface PopularFitsSources extends WorkbenchHullSources, FitVerdictSources {
   typeName: (typeId: number) => Promise<string>;
 }
 
 const POPULAR_FITS_SOURCES: PopularFitsSources = {
   ...workbenchHullSources,
+  ...fitVerdictSources,
   // Read when called, not now: a test mocking `@/sde/loadSde` may leave it out.
   typeName: (typeId) => typeName(typeId),
 };
@@ -56,7 +65,8 @@ type PopularFitsSource = 'zkillboard' | 'workbench';
  * recent losses grouped into distinct fits. EVE Workbench: the community fits
  * published there for the hull, from our own synced copy in R2 (`workbenchFits.ts`).
  * Either opens a fit in the editor; a failure is a one-line note — the rest of
- * the page works without it.
+ * the page works without it. Each row ends with whether the active Character
+ * can fly it (#6011).
  */
 export function PopularFitsPanel(props: PopularFitsPanelProps) {
   const { t } = useTranslation();
@@ -65,6 +75,7 @@ export function PopularFitsPanel(props: PopularFitsPanelProps) {
 
   return (
     <section aria-label={t('fittings.popular.title')} className="space-y-2">
+      <p className="text-xs text-text-dim">{t('fittings.popular.caption')}</p>
       <Tabs
         tabsId={tabsId}
         label={t('fittings.popular.sourceLabel')}
@@ -100,6 +111,15 @@ function ZkillboardFits({
     [fits]
   );
   const names = useModuleNames(typeIds, sources.typeName);
+  const verdictFits = useMemo(
+    () =>
+      fits?.map((fit): VerdictFit => ({
+        key: fit.key,
+        typeIds: fittingRequirementTypeIds({ shipTypeId: fit.parts.hullTypeId, ...fit.parts }),
+      })) ?? null,
+    [fits]
+  );
+  const verdicts = usePopularFitVerdicts(verdictFits, sources);
 
   return (
     <>
@@ -117,6 +137,7 @@ function ZkillboardFits({
             <li key={fit.key} className={FIT_ROW_CLASS}>
               <PopularFitRow
                 title={t('fittings.popular.losses', { count: fit.count })}
+                verdict={<PopularFitVerdict verdict={verdicts?.get(fit.key)} />}
                 meta={
                   <>
                     {fit.lastSeen !== null &&
@@ -179,6 +200,14 @@ function WorkbenchFits({
   const names = useModuleNames(tab.moduleTypeIds, sources.typeName);
   const now = useNow();
   const listed = tab.status === 'ready';
+  const verdictFits = useMemo(
+    () =>
+      listed
+        ? tab.rows.map((row): VerdictFit => ({ key: row.fit.id, typeIds: row.requirementTypeIds }))
+        : null,
+    [listed, tab.rows]
+  );
+  const verdicts = usePopularFitVerdicts(verdictFits, sources);
 
   return (
     <>
@@ -200,6 +229,7 @@ function WorkbenchFits({
           renderItem={({ fit, modules, price, sighting, loadFailed }) => (
             <PopularFitRow
               title={fit.name || t('fittings.popular.workbench.unnamed')}
+              verdict={<PopularFitVerdict verdict={verdicts?.get(fit.id)} />}
               meta={
                 <>
                   {` · ${t('fittings.popular.workbench.created', {

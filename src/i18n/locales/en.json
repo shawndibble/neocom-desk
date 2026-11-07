@@ -711,6 +711,13 @@
     },
     "popular": {
       "title": "Popular fits",
+      "caption": "Fits other pilots actually fly: from recent kills (zKillboard) and published guides (EVE Workbench).",
+      "verdict": {
+        "canFly": "Can fly",
+        "missing_one": "Missing {{count}} skill",
+        "missing_other": "Missing {{count}} skills",
+        "unknown": "Skills unknown"
+      },
       "loading": "Loading popular fits from zKillboard…",
       "failed": "Couldn't load popular fits from zKillboard right now. Everything else still works.",
       "empty": "No recent losses of this hull with a full fit.",
