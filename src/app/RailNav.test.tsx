@@ -11,7 +11,6 @@ import { useCommandPalette } from '@/features/commandPalette/store';
 import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
 import { claimSessionHint, hintSeenCount, resetSessionHints, useHintCounts } from '@/lib/hintFlags';
 import { useHiddenNav, useRecentNav } from './navPreferences';
-import { defaultHiddenNav } from './navRail';
 import { Layout } from './Layout';
 import { useSrpNavVisible } from '@/features/corp/srp/useSrpNavVisible';
 
@@ -299,15 +298,26 @@ describe('the rail', () => {
     expect(within(economy).getByRole('link', { name: 'Market' })).toBeInTheDocument();
   });
 
-  it('starts a new pilot on the eight-page default, the rest hidden with no "more pages" row', () => {
-    useHiddenNav.setState({ value: defaultHiddenNav() });
+  it('leaves a hidden list’s pages off the rail, with no "more pages" row', () => {
+    useHiddenNav.setState({ value: ['/mining', '/planetary-industry', '/contracts', '/mail'] });
     renderAt('/overview');
 
-    expect(within(rail()).queryByRole('link', { name: 'Mining' })).not.toBeInTheDocument();
+    for (const name of ['Mining', 'PI', 'Contracts', 'Mail']) {
+      expect(within(rail()).queryByRole('link', { name })).not.toBeInTheDocument();
+    }
     for (const name of ['Skills', 'Industry', 'Ships', 'Market', 'Assets', 'Wallet', 'Travel']) {
       expect(within(rail()).getByRole('link', { name })).toBeInTheDocument();
     }
     expect(within(rail()).queryByRole('button', { name: /more pages/ })).not.toBeInTheDocument();
+  });
+
+  it('shows every page on the rail by default', () => {
+    expect(useHiddenNav.getState().value).toEqual([]);
+    renderAt('/overview');
+
+    for (const name of ['Mining', 'PI', 'Contracts', 'Mail', 'Skills', 'Market', 'Travel']) {
+      expect(within(rail()).getByRole('link', { name })).toBeInTheDocument();
+    }
   });
 
   it('hides and shows pages from the rail editor, and never offers to hide Corporation or Settings', async () => {
