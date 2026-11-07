@@ -363,7 +363,7 @@ export function FittingStartScreen({
 
   // Beside a preview the list scrolls in its own box; elsewhere the page or
   // the dialog's body scrolls it.
-  const listHeight = previewing ? 'max-h-72 lg:max-h-[36rem]' : '';
+  const listHeight = previewing ? 'max-h-72 lg:h-[calc(100dvh-11rem)] lg:max-h-none' : '';
   const showNew = page && onStartHull !== undefined;
   const showImport = page || importInline;
   const empty = !hasRows && !active.pending && !loading;
