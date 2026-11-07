@@ -399,6 +399,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
           title={t('mail.emptyTitle')}
           hint={t('mail.emptyHint')}
           fetchedTitle={t('mail.emptyFetchedTitle')}
+          fetchedHint={t('mail.emptyFetchedHint')}
         />
       ) : (
         <>

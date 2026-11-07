@@ -55,7 +55,7 @@ ESI cache (Dexie) key `clones`; route snapshot `cacheKey: 'clones'`. The list so
 
 ## States
 
-Spinner (first load, until hydrated) -> no active Character: `Navigate('/characters')` -> reauth `GrantBanner` (list hidden, export empty) -> load error (`common.loadFailedTitle`) -> no data ("No jump clones cached / Reconnect...") -> data with zero clones (`CachedEmptyState`, "No jump clones" if fetched) -> list. Offline: warning "Offline" line when `fromCache`. The top strip and Wearing now show whenever clones data loaded, even with zero jump clones (the empty state sits below them).
+Spinner (first load, until hydrated) -> no active Character: `Navigate('/characters')` -> reauth `GrantBanner` (list hidden, export empty) -> load error (`common.loadFailedTitle`) -> no data ("No jump clones cached / Reconnect...") -> data with zero clones (`CachedEmptyState`, "No jump clones" plus what a jump clone is, if fetched; no verdict card with zero jump clones) -> list. Offline: warning "Offline" line when `fromCache`. The top strip and Wearing now show whenever clones data loaded, even with zero jump clones (the empty state sits below them).
 
 ## Scopes
 

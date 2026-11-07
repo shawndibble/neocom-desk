@@ -29,7 +29,7 @@ function answer(provider: PaletteProvider, query: string): readonly PaletteResul
 }
 
 function list(characterId: number, name: string, contacts: CharacterContact[]) {
-  return { characterId, name, contacts, truncated: false };
+  return { characterId, name, contacts, truncated: false, read: true };
 }
 
 /** The Contacts page's own merge, then the palette's reduction of it. */

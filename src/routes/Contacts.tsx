@@ -379,6 +379,7 @@ export function Contacts() {
                 title={t('contacts.emptyTitle')}
                 hint={t('contacts.emptyHint')}
                 fetchedTitle={t('contacts.emptyFetchedTitle')}
+                fetchedHint={t('contacts.emptyFetchedHint')}
               />
             ) : (
               <Panel padded={false}>

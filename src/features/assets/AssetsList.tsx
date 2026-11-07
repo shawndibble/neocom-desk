@@ -151,6 +151,18 @@ export function AssetsList({
     !isUnresolvedParent(resolved.station, mergedLocationNames)
       ? { locationId: resolved.station.locationId, name: stationLabelFor(resolved.station) }
       : null;
+  // Unfiltered top level of a fresh, complete read is empty: nothing owned, so
+  // say what this page lists.
+  const nothingOwned =
+    resolved.station === null &&
+    activeFilterCount === 0 &&
+    !assetsResult?.fromCache &&
+    !assetsTruncated;
+  const emptyCopy = flatModeActive
+    ? { title: t('assets.noResults') }
+    : nothingOwned
+      ? { title: t('assets.emptyRootTitle'), hint: t('assets.emptyRootHint') }
+      : { title: t('assets.emptyLocation') };
   const headingClassName =
     'min-w-0 truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
   const parentHref =
@@ -475,7 +487,8 @@ export function AssetsList({
             />
           ) : rows.length === 0 ? (
             <EmptyState
-              title={flatModeActive ? t('assets.noResults') : t('assets.emptyLocation')}
+              title={emptyCopy.title}
+              hint={emptyCopy.hint}
               className="py-8"
               action={
                 activeFilterCount > 0 ? (

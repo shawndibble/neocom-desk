@@ -186,7 +186,19 @@ describe('MyShipsView with unreadable assets', () => {
     read.entries = [{ characterId: 1, name: 'Alice', assets: [] }];
     renderShips([1]);
     expect(await screen.findByText('No ships found')).toBeInTheDocument();
+    expect(screen.getByText("No ships in this character's assets.")).toBeInTheDocument();
     expect(screen.queryByText(/missing here/)).not.toBeInTheDocument();
+  });
+
+  it('speaks of the chosen characters only when more than one is chosen', async () => {
+    read.entries = [
+      { characterId: 1, name: 'Alice', assets: [] },
+      { characterId: 2, name: 'Bob', assets: [] },
+    ];
+    renderShips([1, 2]);
+    expect(
+      await screen.findByText('No ships in the assets of the chosen characters.')
+    ).toBeInTheDocument();
   });
 
   it('hands a skipped Character up to the header picker instead of naming it in the body', async () => {

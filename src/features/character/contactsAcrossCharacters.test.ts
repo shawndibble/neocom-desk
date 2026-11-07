@@ -20,7 +20,7 @@ function contact(
 }
 
 function list(overrides: Partial<CharacterContactList> = {}): CharacterContactList {
-  return { characterId: 1, name: 'Main', contacts: [], truncated: false, ...overrides };
+  return { characterId: 1, name: 'Main', contacts: [], truncated: false, read: true, ...overrides };
 }
 
 const MAIN: CharacterContactList = list({ contacts: [contact(10, 10)] });

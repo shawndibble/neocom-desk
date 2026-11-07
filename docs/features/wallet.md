@@ -169,7 +169,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 - Filtered summary line when a filter/search is active: "N entries, net ±ISK" (net toned by sign; net counts missing `amount` as 0; `journalNetTotal`).
 - Filtered-empty state "No journal entries match this filter." with **Reset filters** button when a filter is active.
 - Banners: offline (`common.offlineTitle`/refresh-failed) when `fromCache`; truncation "Incomplete — Some pages failed to load. Refresh to try again."
-- Empty (no data): `CachedEmptyState` ("No journal entries cached / Reconnect…" vs "No journal entries").
+- Empty (no data): `CachedEmptyState` ("No journal entries cached / Reconnect…" vs "No journal entries" plus what fills it).
 - Highlight: `highlightRowKey` from `?highlight=<journal id>` (`useHighlightParam`) scrolls to and pulses that row. Target of `walletBalanceChanged` alerts (decision `20260905-195857`).
 
 ### Description cell (`JournalDescriptionCell.tsx`)

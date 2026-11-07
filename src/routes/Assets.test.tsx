@@ -451,6 +451,20 @@ describe('Assets', () => {
     expect(screen.queryByText('Total value')).not.toBeInTheDocument();
   });
 
+  it('says what fills the page when the character really owns nothing', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () => HttpResponse.json([]))
+    );
+    render(<App />);
+    expect(await screen.findByText('No items')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Items and ships you own in any station or structure show here, grouped by where they are.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Nothing stored here.')).not.toBeInTheDocument();
+  });
+
   it('shows a re-login prompt (not a silent empty state) when the assets scope was revoked', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>

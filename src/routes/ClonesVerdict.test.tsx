@@ -89,7 +89,7 @@ function clonesBody() {
   };
 }
 
-mswServer(
+const server = mswServer(
   http.get(`${ESI}/characters/${CHAR_ID}/clones`, () => HttpResponse.json(clonesBody())),
   http.get(`${ESI}/characters/${CHAR_ID}/skills`, () =>
     HttpResponse.json({ skills: [], total_sp: 0, unallocated_sp: 0 })
@@ -278,6 +278,20 @@ describe('Clones training verdict', () => {
     expect(list).toHaveClass('sr-only');
     expect(within(list as HTMLElement).getAllByText(/: \d+[dhm]/).length).toBeGreaterThan(0);
     expect(bar).not.toHaveAttribute('tabindex');
+  });
+
+  it('shows no verdict, not even Stay put, with no jump clone to compare', async () => {
+    scenario.worn = [IMPLANT_INT5];
+    scenario.intelligence = 25;
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/clones`, () =>
+        HttpResponse.json({ ...clonesBody(), jump_clones: [] })
+      )
+    );
+    render(<App />);
+    await screen.findByText('No jump clones');
+    expect(screen.queryByRole('region', { name: 'Training verdict' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Stay put')).not.toBeInTheDocument();
   });
 
   it('shows no verdict for an empty queue', async () => {
