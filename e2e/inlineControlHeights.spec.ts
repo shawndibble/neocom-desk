@@ -10,6 +10,7 @@
  * no Community backend) are covered by their own specs, e.g.
  * `communitiesControlHeights.dev.spec.ts`.
  */
+import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CONTROL_ROW_WIDTHS, expectInlineControlsAligned } from './support/controlHeights';
@@ -25,14 +26,29 @@ const TABS = Object.values(PAGE_TABS).flatMap((page) =>
   page.tabs.map((tab) => tabPath(page, tab.id))
 );
 
+/**
+ * Wait until the page has stopped loading: no spinner and no open-ended
+ * progress bar. Some routes say "loading" with a bar rather than a spinner,
+ * and show a different row once it ends: Item search shows its filter row
+ * while the contract index downloads, then swaps it for the "couldn't reach"
+ * state when the fixture's 404 lands. Measuring before that counts a funnel
+ * that is about to unmount.
+ */
+async function waitForPageSettled(page: Page): Promise<void> {
+  await expect(page.locator('main')).toBeVisible();
+  await expect(page.locator('main .animate-spin')).toHaveCount(0, { timeout: 8000 });
+  await expect(page.locator('main [role="progressbar"]:not([aria-valuenow])')).toHaveCount(0, {
+    timeout: 8000,
+  });
+}
+
 for (const url of [...new Set([...ROUTES, ...TABS])]) {
   test(`${url}: inline controls share one height`, async ({ page }) => {
     await page.setViewportSize({ width: CONTROL_ROW_WIDTHS[0], height: 900 });
     await signInAndGoto(page, url);
     for (const width of CONTROL_ROW_WIDTHS) {
       await page.setViewportSize({ width, height: 900 });
-      await expect(page.locator('main')).toBeVisible();
-      await expect(page.locator('main .animate-spin')).toHaveCount(0, { timeout: 8000 });
+      await waitForPageSettled(page);
       await expectInlineControlsAligned(page, `${url} @${width}`);
     }
   });
@@ -45,8 +61,7 @@ for (const url of [...new Set([...ROUTES, ...TABS])]) {
   test(`${url}: the open filters share one height`, async ({ page }) => {
     await page.setViewportSize({ width: CONTROL_ROW_WIDTHS[0], height: 900 });
     await signInAndGoto(page, url);
-    await expect(page.locator('main')).toBeVisible();
-    await expect(page.locator('main .animate-spin')).toHaveCount(0, { timeout: 8000 });
+    await waitForPageSettled(page);
     const funnels = page.getByRole('button', { name: /^Filters/ });
     const count = await funnels.count();
     for (let i = 0; i < count; i += 1) {
