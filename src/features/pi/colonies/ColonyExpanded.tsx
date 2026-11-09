@@ -7,6 +7,7 @@ import * as Icon from '@/components/ui/icons';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { extractorState } from '@/engine/pi/colonyStatus';
+import { importedInputs } from '@/engine/pi/importedInputs';
 import { isSaving } from '@/engine/pi/planAdvice';
 import {
   extractorCycleYields,
@@ -125,6 +126,7 @@ export function ColonyExpanded({
   }
   const extractors = pins.filter((pin) => pinRole(pin) === 'extractor');
   const factories = groupFactoryPins(pins);
+  const imported = pi ? importedInputs(pins, pi) : [];
   const { storage, load } = row;
   const fullIn =
     storage.hoursToFull === null
@@ -260,6 +262,32 @@ export function ColonyExpanded({
             <p className="text-xs text-danger">
               {t('piColonies.expanded.idle', { count: row.idleFactories })}
             </p>
+          )}
+          {imported.length > 0 && (
+            <div className="flex flex-col gap-1 pt-1">
+              <h4 className={MICRO}>{t('piColonies.expanded.broughtIn')}</h4>
+              {imported.map((line) => (
+                <div key={line.typeId} className="flex flex-wrap items-center gap-x-2 text-xs">
+                  <TypeIcon typeId={line.typeId} size={32} width={20} height={20} />
+                  <span className="min-w-0 flex-1 truncate">
+                    <PiProductLink typeId={line.typeId}>{line.name}</PiProductLink>
+                  </span>
+                  <span className="tabular-nums">
+                    {t('piColonies.expanded.broughtInPerDay', {
+                      units: formatCount(line.unitsPerDay),
+                    })}
+                  </span>
+                  {line.m3PerDay !== null && (
+                    <span className="text-text-dim tabular-nums">
+                      {t('piColonies.expanded.broughtInM3', { m3: formatCount(line.m3PerDay) })}
+                    </span>
+                  )}
+                  <span className="w-full pl-7 text-text-dim">
+                    {t('piColonies.expanded.broughtInCaption', { count: line.factories })}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
 
           <h4 className={`flex items-center gap-1.5 pt-2 ${MICRO}`}>
