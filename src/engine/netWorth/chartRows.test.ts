@@ -103,6 +103,8 @@ describe('lastDays', () => {
       ['2026-10-01', true, 150],
       ['2026-10-02', false, 150],
     ]);
+  });
+  it('is empty for no rows', () => {
     expect(lastDays([], 7)).toEqual([]);
   });
 });

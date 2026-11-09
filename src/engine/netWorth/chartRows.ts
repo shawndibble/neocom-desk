@@ -27,7 +27,6 @@ export interface StackRow {
 
 const ZERO: LayerValues = { isk: 0, assets: 0, escrow: 0, sellOrders: 0, contracts: 0 };
 
-/** Days with no snapshot are drawn from `estimateLayers` and flagged `estimated`. */
 /** A day before the first record: the first row's layers, drawn as a guess. */
 export const guessStackRow = (first: StackRow): StackRow => ({
   ...first,
@@ -35,6 +34,7 @@ export const guessStackRow = (first: StackRow): StackRow => ({
   estimated: true,
 });
 
+/** Days with no snapshot are drawn from `estimateLayers` and flagged `estimated`. */
 export function stackRows(series: CharacterSeries, shown: readonly LayerId[]): StackRow[] {
   const estimates = estimateLayers(series.points);
   return series.points.map((point, i) => {
