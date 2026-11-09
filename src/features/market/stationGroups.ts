@@ -25,12 +25,12 @@ export function distinctLocationIds(fills: readonly Pick<StationFill, 'location_
 }
 
 const newestMs = (fills: readonly StationFill[]) =>
-  Math.max(...fills.map((fill) => Date.parse(fill.date)));
+  fills.reduce((newest, fill) => Math.max(newest, Date.parse(fill.date) || 0), 0);
 
 /**
  * Orders two station groups for the "Stations by" picker. Latest trade, Net and
- * Trades rank highest first; every tie falls back to the station's name, so the order is
- * the same on every render and for every equal pair.
+ * Trades rank highest first; every tie falls back to the station's name, so the
+ * order is the same on every render and for every equal pair.
  */
 export function compareStationGroups(
   order: StationOrder,
