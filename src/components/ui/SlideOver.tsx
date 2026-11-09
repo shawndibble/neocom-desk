@@ -104,6 +104,8 @@ export function SlideOver({
             if (document.querySelector('dialog[open]')) event.preventDefault();
           }}
           aria-describedby={undefined}
+          // Lets a page that has room reserve the panel's width (`body:has([data-slide-over=right])`).
+          data-slide-over={side}
           tabIndex={-1}
           onOpenAutoFocus={(event) => {
             // Focus the panel, not its first control: the Close button's
