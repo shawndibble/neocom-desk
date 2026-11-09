@@ -36,6 +36,7 @@
  * shows lowest-sell totals and then jumps. The plan list and Compare
  * walk only the depth their own plan needs, as the plan page does.
  */
+import { capProductPrice } from './productPriceCap';
 import { useEffect, useRef, useState } from 'react';
 import { depthPriceMap, summedDepthNeeds } from '@/engine/industry/depthPrice';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
@@ -192,7 +193,9 @@ async function computeRow(
             productQuantity: (entry.blueprint.products[0]?.quantity ?? 0) * plan.runs,
             productUnitPrice:
               entry.productTypeID !== null
-                ? (snapshot.hubPrices[entry.productTypeID] ?? null)
+                ? (capProductPrice(snapshot, entry.productTypeID).snapshot.hubPrices[
+                    entry.productTypeID
+                  ] ?? null)
                 : null,
           }).result
         : result;
