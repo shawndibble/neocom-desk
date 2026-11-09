@@ -641,6 +641,20 @@ describe('TransactionsPanel — By station view', () => {
     expect(headers()[0]).toHaveTextContent('Jita IV - Moon 4');
   });
 
+  it('orders the groups from the sort button beside the funnel, only in the By station view', async () => {
+    const user = userEvent.setup();
+    renderPanel('/market/history?txn.view=station&txn.stationsBy=net');
+    await screen.findAllByRole('link', { name: 'Damage Control II' });
+    expect(headers()[0]).toHaveTextContent('Amarr VIII');
+    await user.click(screen.getByRole('button', { name: 'Stations by' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Trades' }));
+    expect(headers()[0]).toHaveTextContent('Jita IV - Moon 4');
+    cleanup();
+    renderPanel();
+    await screen.findAllByRole('link', { name: 'Damage Control II' });
+    expect(screen.queryByRole('button', { name: 'Stations by' })).not.toBeInTheDocument();
+  });
+
   it('keeps only the picked stations, and the strip totals them', async () => {
     renderPanel(`/market/history?txn.view=station&txn.stations=${JITA}`);
     await screen.findAllByRole('link', { name: 'Damage Control II' });

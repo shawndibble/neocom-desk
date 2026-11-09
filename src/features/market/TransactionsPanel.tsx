@@ -75,6 +75,7 @@ import {
 } from './transactionMargins';
 import { summarizeTrading } from './tradingSummary';
 import { summarizeTransactions } from './transactionDays';
+import { StationSortMenu } from './StationSortMenu';
 import { compareStationGroups, distinctLocationIds, stationGroupKey } from './stationGroups';
 import { signedIsk } from '@/lib/signedIsk';
 import { useAllCharacterFills, useArchiveSince } from './useAllCharacterFills';
@@ -726,6 +727,12 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
                       setFilter({ ...filter, view: filter.view === 'station' ? 'flat' : 'station' })
                     }
                   />
+                  {filter.view === 'station' && (
+                    <StationSortMenu
+                      value={filter.stationsBy}
+                      onChange={(stationsBy) => setFilter({ ...filter, stationsBy })}
+                    />
+                  )}
                   <ColumnPickerMenu
                     available={TRANSACTIONS_COLUMN_IDS}
                     visible={visible}
