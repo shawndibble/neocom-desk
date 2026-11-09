@@ -26,6 +26,7 @@ import {
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
+import { DAY_MS } from '@/lib/age';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { formatDateOnly } from '@/lib/timestamp';
 import { timeAxisTicks } from '@/engine/wallet/timeTicks';
@@ -61,7 +62,7 @@ function dayLabel(x: number): string {
 }
 
 /** Contiguous runs of estimated days, as [from, to] x ranges ending on the next real day. */
-function gapRuns(rows: readonly StackRow[]): [number, number][] {
+function estimatedRuns(rows: readonly StackRow[]): [number, number][] {
   const runs: [number, number][] = [];
   let start: number | null = null;
   let prev: number | null = null;
@@ -74,7 +75,8 @@ function gapRuns(rows: readonly StackRow[]): [number, number][] {
       start = prev = null;
     }
   }
-  if (start !== null && prev !== null) runs.push([start, prev]);
+  // A trailing run has no real day after it; start it on the real day before so a one-day run has width.
+  if (start !== null && prev !== null) runs.push([start - DAY_MS, prev]);
   return runs;
 }
 
@@ -203,7 +205,7 @@ export default function NetWorthChart(props: NetWorthChartProps) {
               {xAxis}
               {yAxis}
               <Tooltip content={(p) => <StackTooltip {...p} shown={props.shown} />} />
-              {gapRuns(props.rows).map(([from, to]) => (
+              {estimatedRuns(props.rows).map(([from, to]) => (
                 <ReferenceArea
                   key={from}
                   x1={from}

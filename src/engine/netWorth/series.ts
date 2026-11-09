@@ -53,7 +53,7 @@ export interface SeriesPoint {
   day: string;
   /** Wallet balance that day; `null` only before anything is known. */
   isk: number | null;
-  /** `null` outside a snapshot day: layers are never interpolated. */
+  /** `null` outside a snapshot day; `estimateLayers` fills those days in for drawing. */
   layers: LayerValues | null;
   kind: PointKind;
 }

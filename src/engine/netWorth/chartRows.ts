@@ -39,7 +39,7 @@ export function stackRows(series: CharacterSeries, shown: readonly LayerId[]): S
       day: point.day,
       x: Date.parse(point.day),
       kind: point.kind,
-      estimated: point.kind !== 'snapshot',
+      estimated: point.kind !== 'snapshot' && estimates[i] !== null,
       values,
       total: netWorthOf(values, shown),
     };
@@ -68,7 +68,11 @@ export function lineRows(
     series.points.forEach((point, i) => {
       const row = byDay.get(point.day) ?? { day: point.day, x: Date.parse(point.day) };
       const values = estimates[i];
-      row[lineKey(characterId)] = values ? netWorthOf(values, shown) : point.isk;
+      row[lineKey(characterId)] = values
+        ? netWorthOf(values, shown)
+        : shown.includes('isk')
+          ? point.isk
+          : null;
       byDay.set(point.day, row);
     });
   }

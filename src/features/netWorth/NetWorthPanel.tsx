@@ -354,6 +354,7 @@ export function NetWorthPanel({
   );
 
   const firstSnapshot = singleSeries.firstSnapshotDay;
+  const showsFirstDays = mode === 'single' && snapshotDays > 0 && snapshotDays <= 2;
   const panel = (
     <Panel
       title={title ?? t('wallet.netWorth.title')}
@@ -406,14 +407,14 @@ export function NetWorthPanel({
       )}
       {notices}
       <div className="mt-3">{data.ready ? chart : <Spinner label={t('common.loading')} />}</div>
-      {mode === 'single' && snapshotDays > 0 && snapshotDays <= 2 && firstSnapshot && (
+      {showsFirstDays && firstSnapshot && (
         <p className="mt-2 text-xs text-text-dim">
           {t('wallet.netWorth.firstDays', {
             date: formatDateOnly(new Date(Date.parse(firstSnapshot)), 'UTC'),
           })}
         </p>
       )}
-      {mode === 'single' && singleSeries.gapDays.length > 0 && (
+      {mode === 'single' && !showsFirstDays && singleRows.some((r) => r.estimated) && (
         <p className="mt-2 text-xs text-text-dim">{t('wallet.netWorth.gapNote')}</p>
       )}
     </Panel>
