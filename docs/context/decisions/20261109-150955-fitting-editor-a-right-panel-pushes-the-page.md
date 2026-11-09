@@ -11,3 +11,7 @@ _Recorded 2026-11-09._
 - **`SlideOver` carries `data-slide-over="left|right"`**, and the page reserves
   the room in CSS (`body:has([data-slide-over=right])`), so the panel, which
   portals out of the page, needs no state shared with it.
+- **Builds on** `20261016-171349` (the 120rem page cap and the Ring track). With
+  the Add slide-out also open (`pushed`, 26rem on the left) a right panel takes
+  another 26rem: the Ring track can then fall below its floor, and the page
+  simply tightens as it already does for a narrow screen.

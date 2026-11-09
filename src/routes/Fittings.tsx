@@ -94,9 +94,10 @@ export function Fittings() {
 }
 
 /**
- * A right slide-over (the Pilot or Situation panel, 25rem) takes its width off the
+ * A right slide-over (the Pilot or Situation panel, 25rem; any right one) takes its width off the
  * page where there is room for the nav, the panel and all three columns (browser,
  * Ring at its 29rem floor, stats) at once; narrower it covers the stats as before.
+ * 26rem is `SlideOver`'s 25rem cap plus a 1rem gutter, as in `Wallet`; change them together.
  */
 const RIGHT_PANEL_ROOM = 'min-[115rem]:[body:has([data-slide-over=right])_&]:pr-[26rem]';
 
