@@ -71,6 +71,7 @@ import type {
 } from './kindLoaders';
 import type { MarketTrendFeed } from './marketTrendLoader';
 import type { Translate } from '@/lib/translate';
+import type { LayerId } from '@/engine/netWorth/series';
 
 /**
  * The one line under the headline figure. It must add a fact the headline
@@ -379,6 +380,8 @@ export interface BuildContext {
   raidsRadius?: number;
   /** Profit: which earnings it adds up; left out, Builds. */
   profitSource?: ProfitSource;
+  /** Net worth: the layers switched off; left out, all show. */
+  hiddenLayers?: LayerId[];
   /** Market Trend: the items it draws; left out, the Quickbar's first. */
   trendItems?: number[];
   /** Market Trend: the Trade Hubs it prices at; left out, the pilot's Market hub. */

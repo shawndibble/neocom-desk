@@ -22,6 +22,7 @@ import type {
   WidgetSize,
   WidgetView,
 } from './layout';
+import type { LayerId } from '@/engine/netWorth/series';
 import type { RowsPerPage } from './tableSortPage';
 
 export interface OverviewEditActions {
@@ -49,6 +50,7 @@ export interface OverviewEditActions {
   setProfitSource: (id: string, source: ProfitSource) => void;
   setTrendItems: (id: string, items: number[]) => void;
   setTrendHubs: (id: string, hubs: string[]) => void;
+  setHiddenLayers: (id: string, layers: LayerId[]) => void;
   setShow: (id: string, show: WidgetShow) => void;
   rename: (id: string, title: string) => void;
   setShowOnPhone: (id: string, show: boolean) => void;
@@ -95,6 +97,7 @@ export const OverviewEditContext = createContext<OverviewEdit>({
   setRaidsRadius: none,
   setTrendItems: none,
   setTrendHubs: none,
+  setHiddenLayers: none,
   setShow: none,
   rename: none,
   setShowOnPhone: none,

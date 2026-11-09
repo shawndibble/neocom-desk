@@ -27,6 +27,7 @@ import {
   type OverviewLayout,
   type Widget,
   type WidgetRange,
+  cleanHiddenLayers,
 } from './layout';
 import { migrateRetiredKind } from './migrate';
 import { SIZES } from './sizes';
@@ -70,6 +71,9 @@ function parseWidget(stored: unknown): Widget | null {
   }
   if (!def.hasPlexPlan || !isPlexPlan(raw.plexPer30Days)) delete out.plexPer30Days;
   if (!def.hasProfitSource) delete out.profitSource;
+  const hiddenLayers = cleanHiddenLayers(raw.hiddenLayers);
+  if (!def.hasLayerPicker || hiddenLayers.length === 0) delete out.hiddenLayers;
+  else out.hiddenLayers = hiddenLayers;
   // The default Show is never stored, so an older build's layout and this one's read alike.
   const show = storedShow(def, raw.show);
   if (show) out.show = show;

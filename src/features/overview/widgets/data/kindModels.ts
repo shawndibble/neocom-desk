@@ -125,7 +125,7 @@ export const walletFlow: Builder = (feeds, { t, now, range }) => {
 
 // --- Net worth ------------------------------------------------------------------
 
-const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
+const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll, hiddenLayers }) => {
   const feed = feeds.netWorth;
   const data = feed?.data ?? null;
   const to = '/wallet';
@@ -153,12 +153,16 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
   for (const character of included) {
     for (const id of Object.keys(layers) as LayerId[]) layers[id] += character.layers[id];
   }
-  const total = layers.isk + layers.assets + layers.escrow + layers.sellOrders + layers.contracts;
   const day = included.reduce((latest, c) => (c.day > latest ? c.day : latest), '');
   // ISK and assets are always layers; the rest only when something is in them.
-  const shown = NET_WORTH_BAR.filter(
+  const listed = NET_WORTH_BAR.filter(
     ({ id }) => id === 'isk' || id === 'assets' || layers[id] !== 0
   );
+  // The pilot's own switch-offs; if they leave nothing to draw, every listed layer stays.
+  const kept = listed.filter(({ id }) => !hiddenLayers?.includes(id));
+  const shown = kept.length > 0 ? kept : listed;
+  // What the widget claims is the layers it draws, so the headline and the change agree with the chart.
+  const total = shown.reduce((sum, { id }) => sum + layers[id], 0);
   const parts: StackPart[] = shown.map(({ id, color }) => ({
     key: id,
     label: t(LAYER_LABEL_KEYS[id]),
@@ -170,7 +174,13 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
     total: formatIskCompact(total),
     parts: parts.map((p) => `${p.label} ${p.text}`).join(', '),
   });
-  const series = netWorthSeries(included);
+  const fullSeries = netWorthSeries(included);
+  const series = {
+    ...fullSeries,
+    totals: fullSeries.days.map((_, i) =>
+      shown.reduce((sum, { id }) => sum + (fullSeries.layers[id][i] ?? 0), 0)
+    ),
+  };
   const note = t(`${C}.netWorth.note`, { day });
   return {
     ...blank(to, statusOf(feed)),

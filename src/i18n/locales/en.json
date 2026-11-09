@@ -6846,6 +6846,7 @@
       },
       "radius": "Radius",
       "radiusJumps": "{{count}} jumps",
+      "layers": "Layers",
       "profitSource": "Source",
       "profitSourceChoice": {
         "builds": "Builds",

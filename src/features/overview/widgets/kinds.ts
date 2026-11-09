@@ -93,6 +93,8 @@ export interface WidgetKindDef {
   hasRaidsWhere: boolean;
   /** Whether the kind has the Source setting (Builds / Trading / Both): Profit. */
   hasProfitSource: boolean;
+  /** Whether the pilot picks which net worth layers the widget draws (Net worth). */
+  hasLayerPicker: boolean;
   /** The Show setting's options, the default first; empty for a kind without one. */
   shows: readonly WidgetShow[];
   /** Shows that read no time window, so Range does not apply to them. */
@@ -133,6 +135,7 @@ interface Spec {
   calendarEvents?: true;
   raidsWhere?: true;
   profitSource?: true;
+  layerPicker?: true;
   /** The Show options, the default first. */
   shows?: readonly WidgetShow[];
   /** Shows that read no window (a kind with `range` and a Show only some of whose options are ranged). */
@@ -202,6 +205,7 @@ const SPECS = {
     views: NCT,
     view: 'chart',
     size: 'M',
+    layerPicker: true,
     endpoints: ['getCharacterWallet', 'getCharacterAssets', 'getCharacterOrders'],
   },
   orders: {
@@ -564,6 +568,7 @@ export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(
   hasCalendarEvents: s.calendarEvents === true,
   hasRaidsWhere: s.raidsWhere === true,
   hasProfitSource: s.profitSource === true,
+  hasLayerPicker: s.layerPicker === true,
   shows: s.shows ?? [],
   rangelessShows: s.rangelessShows ?? [],
   hasNamedShows: s.namedShows === true,

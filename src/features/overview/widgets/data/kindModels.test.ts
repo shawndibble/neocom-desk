@@ -173,6 +173,27 @@ describe('netWorth', () => {
     history: [],
   });
 
+  it('leaves a switched-off layer out of the legend and the total', () => {
+    const view = buildView(
+      'netWorth',
+      { netWorth: ok({ characters: [char(91)] }) },
+      { ...ctx(), hiddenLayers: ['assets'] }
+    );
+    expect(view.number.iskAmount).toBe(3000);
+    expect(view.chart?.kind).toBe('stack');
+    if (view.chart?.kind !== 'stack') return;
+    expect(view.chart.parts.map((p) => p.key)).not.toContain('assets');
+  });
+
+  it('keeps every listed layer if the switch-offs would leave none', () => {
+    const view = buildView(
+      'netWorth',
+      { netWorth: ok({ characters: [char(91)] }) },
+      { ...ctx(), hiddenLayers: ['isk', 'assets', 'sellOrders'] }
+    );
+    expect(view.number.iskAmount).toBe(12_000);
+  });
+
   it('is history, not a cached read: it never sets fromCache, so the header notice stays off online', () => {
     const view = buildView('netWorth', { netWorth: ok({ characters: [char(91)] }) }, ctx());
     expect(view.fromCache).toBe(false);
