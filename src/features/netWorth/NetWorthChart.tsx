@@ -26,6 +26,7 @@ import {
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
+import { DAY_MS } from '@/lib/age';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { formatDateOnly } from '@/lib/timestamp';
 import { timeAxisTicks } from '@/engine/wallet/timeTicks';
@@ -81,7 +82,8 @@ function estimatedRuns(rows: readonly StackRow[]): [number, number][] {
     }
   }
   if (start !== null) runs.push([start, end]);
-  return runs;
+  // A one-day run with no real day beside it still needs width to be drawn.
+  return runs.map(([from, to]) => [from === to ? from - DAY_MS : from, to]);
 }
 
 function StackTooltip({
