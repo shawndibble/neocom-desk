@@ -93,6 +93,13 @@ export function Fittings() {
   return redirectTo === null ? <FittingsPage /> : <Navigate to={redirectTo} replace />;
 }
 
+/**
+ * A right slide-over (the Pilot or Situation panel, 25rem) takes its width off the
+ * page where there is room for the nav, the panel and all three columns (browser,
+ * Ring at its 29rem floor, stats) at once; narrower it covers the stats as before.
+ */
+const RIGHT_PANEL_ROOM = 'min-[115rem]:[body:has([data-slide-over=right])_&]:pr-[26rem]';
+
 function FittingsPage() {
   const { t } = useTranslation();
   // Opening Fittings online is intent to use it offline later: fetch the
@@ -551,7 +558,9 @@ function FittingsPage() {
           {/* Capped and centred, so a wide screen gets even gutters rather than an empty Ring
         panel (scope decision `20261016-171349`). */}
           {/* Pushed (the Add slide-out): from the panel's edge, not centred, so a wide screen leaves no gap beside it. */}
-          <div className={`max-w-[120rem] space-y-3 ${pushed ? 'pl-[26rem]' : 'mx-auto'}`}>
+          <div
+            className={`max-w-[120rem] space-y-3 ${pushed ? 'pl-[26rem]' : 'mx-auto'} ${RIGHT_PANEL_ROOM}`}
+          >
             <FittingEditorHeader
               workspace={workspace}
               fitting={fitting}
