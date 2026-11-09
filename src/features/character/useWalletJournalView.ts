@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -9,6 +9,7 @@ import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
 import { miningTaxEntryHref } from '@/features/miningTax/paymentDeepLink';
+import { autoLinkRecordedPaymentsFromJournals } from '@/features/miningTax/autoLinkFromJournal';
 import { linkedAssignmentsByRef } from '@/features/miningTax/paymentLinks';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import { classifyJournal, journalCoverage, type JournalLine } from '@/engine/journalNetting';
@@ -223,6 +224,17 @@ export function useWalletJournalView({
           : journal,
     [allJournalsData, showingBeyondActive, journal, activeCharacterId]
   );
+  // A recorded tax payment links to its journal entry as soon as the journal
+  // shows it, without waiting for a visit to Moon Mining Tax.
+  useEffect(() => {
+    void autoLinkRecordedPaymentsFromJournals(
+      allJournalsData
+        ? allJournalsData.loaded.map((c) => ({ characterId: c.characterId, entries: c.journal }))
+        : activeCharacterId !== null && !showingBeyondActive
+          ? [{ characterId: activeCharacterId, entries: journal }]
+          : []
+    );
+  }, [allJournalsData, activeCharacterId, showingBeyondActive, journal]);
   const trackedIds = useMemo(() => {
     const ids = new Set(scopedCharacterIds ?? []);
     for (const c of allJournalsData?.loaded ?? []) ids.add(c.characterId);
