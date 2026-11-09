@@ -352,6 +352,44 @@ describe('BuildGroupPanel — Members list', () => {
   });
 });
 
+describe('BuildGroupPanel — Used by (issue #6042)', () => {
+  const openRowMenu = async (name: string) => {
+    const needsPanel = screen.getByText('Everything this group needs').closest('section')!;
+    const row = within(needsPanel).getByText(name).closest('tr')!;
+    await userEvent.pointer({ keys: '[MouseRight]', target: row });
+  };
+
+  it('lists each plan that needs a shared material, with its quantity and a plan link', async () => {
+    mockedUseComparedBuildResults.mockReturnValue([
+      row('a', [material(34, 100)]),
+      row('b', [material(34, 250)]),
+    ]);
+    renderPanel([plan('a', 'jita'), plan('b', 'jita')]);
+
+    await openRowMenu('Tritanium');
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Used by' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Tritanium · used by 2 plans/)).toBeTruthy();
+    expect(within(dialog).getAllByRole('link')).toHaveLength(2);
+    expect(within(dialog).getByText('100')).toBeTruthy();
+    expect(within(dialog).getByText('250')).toBeTruthy();
+    expect(within(dialog).getByText('Table total 350 · plans need 350')).toBeTruthy();
+  });
+
+  it('offers no Used by for a material only one plan needs', async () => {
+    mockedUseComparedBuildResults.mockReturnValue([
+      row('a', [material(34, 100)]),
+      row('b', [material(35, 250)]),
+    ]);
+    renderPanel([plan('a', 'jita'), plan('b', 'jita')]);
+
+    await openRowMenu('Tritanium');
+    await screen.findAllByRole('menuitem');
+    expect(screen.queryByRole('menuitem', { name: 'Used by' })).toBeNull();
+  });
+});
+
 describe('BuildGroupPanel — Auto Build (issue #696)', () => {
   it("pre-fills Build Strategy from the group's persisted default", () => {
     mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
