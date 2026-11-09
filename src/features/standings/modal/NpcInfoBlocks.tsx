@@ -7,9 +7,8 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Eyebrow, StandingIcon } from '@/components/ui';
+import { Button, Eyebrow, StandingIcon } from '@/components/ui';
 import { SecurityStatus } from '@/components/SecurityStatus';
-import { focusRingClassName } from '@/components/ui/controlStyles';
 import { HintText } from '@/components/ui/HintText';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { CharacterLink, CorporationLink, PlaceLink } from '@/features/entities';
@@ -419,16 +418,16 @@ function AgentLevelSection({ group }: { group: AgentLevelGroup }) {
         ))}
       </ul>
       {truncated && (
-        <button
-          type="button"
+        <Button
+          size="sm"
           aria-expanded={showAll}
-          className={cx('self-start text-xs text-accent hover:underline', focusRingClassName)}
+          className="self-start"
           onClick={() => setShowAll((open) => !open)}
         >
           {showAll
             ? t('publicInfo.npc.known.showFewer')
             : t('publicInfo.npc.known.showAll', { count: group.rows.length })}
-        </button>
+        </Button>
       )}
     </section>
   );

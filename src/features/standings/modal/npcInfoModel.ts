@@ -433,7 +433,11 @@ export interface AgentLevelGroup {
 /** The agents grouped by level, level 5 first, each group nearest first. */
 export function groupAgentRows(rows: readonly KnownAgentRow[]): AgentLevelGroup[] {
   const byLevel = new Map<number, KnownAgentRow[]>();
-  for (const row of rows) byLevel.set(row.level, [...(byLevel.get(row.level) ?? []), row]);
+  for (const row of rows) {
+    const group = byLevel.get(row.level) ?? [];
+    group.push(row);
+    byLevel.set(row.level, group);
+  }
   return [...byLevel]
     .sort(([a], [b]) => b - a)
     .map(([level, group]) => ({
