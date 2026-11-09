@@ -27,7 +27,7 @@ import { inlineLinkClassName, touchCheckboxLabelClassName } from '@/components/u
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { walletBalancesCsvColumns } from '@/features/character/walletBalancesCsv';
 import { iskToneClass } from '@/features/character/format';
-import { lastDays, lineRows, stackRows } from '@/engine/netWorth/chartRows';
+import { guessStackRow, lastDays, lineRows, stackRows } from '@/engine/netWorth/chartRows';
 import {
   buildCharacterSeries,
   layerValues,
@@ -221,7 +221,7 @@ export function NetWorthPanel({
   const range = useWalletRange((state) => state.value);
   // Estimates are drawn from the whole series first, so a range edge never changes them.
   const singleRows = useMemo(
-    () => lastDays(stackRows(singleSeries, shown), Number(range)),
+    () => lastDays(stackRows(singleSeries, shown), Number(range), guessStackRow),
     [singleSeries, shown, range]
   );
   const multiSeries = useMemo(

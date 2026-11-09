@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { lastDays, lineKey, lineRows, stackRows, tooltipLines, type LineRow } from './chartRows';
+import {
+  guessStackRow,
+  lastDays,
+  lineKey,
+  lineRows,
+  stackRows,
+  tooltipLines,
+  type LineRow,
+} from './chartRows';
 import { buildCharacterSeries } from './series';
 import type { NetWorthSnapshotRow } from './snapshot';
 
@@ -69,13 +77,34 @@ describe('stackRows', () => {
 
 describe('lastDays', () => {
   const days = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04'].map((day) => ({
+    day,
     x: Date.parse(day),
   }));
   it('keeps the newest N daily rows', () => {
     expect(lastDays(days, 2)).toEqual(days.slice(2));
   });
-  it('keeps everything when the series is shorter than the range', () => {
-    expect(lastDays(days, 90)).toEqual(days);
+  it('extends a shorter series back to the range with copies of its first row', () => {
+    const rows = lastDays(days, 6);
+    expect(rows.map((r) => r.day)).toEqual([
+      '2026-09-29',
+      '2026-09-30',
+      '2026-10-01',
+      '2026-10-02',
+      '2026-10-03',
+      '2026-10-04',
+    ]);
+    expect(rows.slice(2)).toEqual(days);
+  });
+  it('marks stack rows before the first record as guesses from it', () => {
+    const series = buildCharacterSeries({ walletByDay: new Map(), snapshots: [row('2026-10-02')] });
+    const rows = lastDays(stackRows(series, ['isk', 'assets']), 3, guessStackRow);
+    expect(rows.map((r) => [r.day, r.estimated, r.total])).toEqual([
+      ['2026-09-30', true, 150],
+      ['2026-10-01', true, 150],
+      ['2026-10-02', false, 150],
+    ]);
+  });
+  it('is empty for no rows', () => {
     expect(lastDays([], 7)).toEqual([]);
   });
 });
