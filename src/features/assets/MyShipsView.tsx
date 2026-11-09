@@ -308,6 +308,19 @@ function ShipRowView({
         data.contentsByShip.get(row.itemId) ?? []
       )
     );
+  const classTag =
+    shipClass || row.packaged ? (
+      <span className="inline-flex items-center gap-1.5 text-xs text-text-dim ml-1.5">
+        {shipClass && <span aria-hidden="true">·</span>}
+        {shipClass}
+        {row.packaged && (
+          <Pill tone="warning" className="shrink-0">
+            {t('assets.myShips.packaged')}
+          </Pill>
+        )}
+      </span>
+    ) : null;
+
   return (
     <RowActionsMenu
       name={shipName}
@@ -348,24 +361,17 @@ function ShipRowView({
               {gameName ?? shipName}
             </button>
             {gameName !== undefined && (
-              <span className="block text-xs font-normal text-text-dim">{shipName}</span>
+              <span className="block text-xs font-normal text-text-dim">
+                {shipName}
+                {classTag}
+              </span>
             )}
             {row.quantity > 1 && (
               <span className="ml-1.5 text-xs text-text-dim tabular-nums">
                 {t('assets.myShips.quantity', { count: row.quantity })}
               </span>
             )}
-            {(shipClass || row.packaged) && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-text-dim ml-1.5">
-                {shipClass && <span aria-hidden="true">·</span>}
-                {shipClass}
-                {row.packaged && (
-                  <Pill tone="warning" className="shrink-0">
-                    {t('assets.myShips.packaged')}
-                  </Pill>
-                )}
-              </span>
-            )}
+            {gameName === undefined && classTag}
           </span>
           {openInFittings.pending && (
             <Spinner size="sm" label={t('assets.myShips.openingFitting')} className="shrink-0" />
