@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { nextDataTableSort } from '@/components/ui';
+import type { DataTableSort } from '@/components/ui';
+import { splitLevelNodes, sortLevelItems, type LevelSortColumn } from './assetLevelSort';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -72,6 +75,7 @@ export function useAssetsRows(assetsData: AssetsData) {
     abyssal,
     priceByTypeId,
     itemValueByItemId,
+    volumeByTypeId,
     mergedTypeNames,
     mergedLocationNames,
     assetsByItemId,
@@ -116,6 +120,11 @@ export function useAssetsRows(assetsData: AssetsData) {
   // already in memory, so the worst a late hydrate does is re-sort it — there
   // is no request to spend on the default first.
   const sortField = useAssetSort((state) => state.value);
+  // The level's plain items, re-sorted from their column labels; null keeps name order.
+  const [levelSort, setLevelSort] = useState<DataTableSort | null>(null);
+  function toggleLevelSort(columnId: LevelSortColumn) {
+    setLevelSort((prev) => nextDataTableSort(prev, columnId, columnId === 'name' ? 'asc' : 'desc'));
+  }
   const setSortField = useAssetSort((state) => state.setValue);
   useHydratedStore(useAssetSort);
 
@@ -326,11 +335,27 @@ export function useAssetsRows(assetsData: AssetsData) {
       }));
     }
     if (pathStationId !== null) {
-      return resolved.children.map((node) => ({
-        kind: 'node' as const,
-        key: assetNodeSegment(node),
-        node,
-      }));
+      const { containers, items } = splitLevelNodes(resolved.children);
+      const sortedItems = sortLevelItems(items, levelSort, {
+        name: (node) => nodeLabel(node),
+        volume: (node) => volumeByTypeId.get(node.asset.type_id),
+        value: (node) => assetStackValue(node.asset, priceByTypeId, itemValueByItemId),
+      });
+      const nodeRows = (nodes: readonly AssetTreeNode[]): BrowseRow[] =>
+        nodes.map((node) => ({ kind: 'node', key: assetNodeSegment(node), node }));
+      const both = containers.length > 0 && sortedItems.length > 0;
+      const heading = (key: string, label: string): BrowseRow => ({
+        kind: 'heading',
+        key,
+        label,
+        tone: 'default',
+      });
+      return [
+        ...(both ? [heading('h:containers', t('assets.section.shipsAndContainers'))] : []),
+        ...nodeRows(containers),
+        ...(both ? [heading('h:items', t('assets.section.items'))] : []),
+        ...nodeRows(sortedItems),
+      ];
     }
 
     const pinned: BrowseRow[] = [];
@@ -384,6 +409,11 @@ export function useAssetsRows(assetsData: AssetsData) {
     flatMatches,
     pathStationId,
     resolved,
+    levelSort,
+    volumeByTypeId,
+    priceByTypeId,
+    itemValueByItemId,
+    mergedTypeNames,
     sortedTree,
     pins,
     activeCharacterId,
@@ -533,6 +563,8 @@ export function useAssetsRows(assetsData: AssetsData) {
   }
 
   return {
+    levelSort,
+    toggleLevelSort,
     pathStationId,
     pathSegments,
     scrollParentRef,

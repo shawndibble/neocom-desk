@@ -597,6 +597,38 @@ describe('Assets', () => {
     expect(names).toEqual(['Pyerite', 'Tritanium']);
   });
 
+  it('groups ships and containers ahead of the items, and re-sorts only the items from a column label', async () => {
+    const row = { ...assetPage1[0], location_id: 60003760, location_type: 'station' as const };
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            { ...row, item_id: 1, type_id: 34, quantity: 5 }, // Tritanium
+            { ...row, item_id: 2, type_id: 35, quantity: 50 }, // Pyerite
+            { ...row, item_id: 10, type_id: 650, quantity: 1, is_singleton: true }, // Drake
+            { ...row, item_id: 11, type_id: 36, location_id: 10, location_type: 'item' as const }, // in the Drake
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    const user = userEvent.setup({ delay: null });
+    render(<App />);
+    await openLocation(user, JITA);
+    await screen.findByRole('heading', { name: 'Drake' });
+    const order = () =>
+      screen
+        .getAllByText(/^(Ships and containers|Items|Drake|Tritanium|Pyerite)$/)
+        .map((el) => el.textContent)
+        .slice(-5); // the tab strip also says Items
+    expect(order()).toEqual(['Ships and containers', 'Drake', 'Items', 'Pyerite', 'Tritanium']);
+    // A first click on a number starts high to low; a second flips it.
+    await user.click(screen.getByRole('button', { name: 'Sort by Qty' }));
+    expect(order()).toEqual(['Ships and containers', 'Drake', 'Items', 'Pyerite', 'Tritanium']);
+    await user.click(screen.getByRole('button', { name: 'Qty, sorted descending' }));
+    expect(order()).toEqual(['Ships and containers', 'Drake', 'Items', 'Tritanium', 'Pyerite']);
+  });
+
   it('shows the singular "item" form of a container badge when it holds exactly one', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
@@ -678,13 +710,14 @@ describe('Assets', () => {
     await screen.findByRole('heading', { name: 'Drake' });
     expect(screen.getByText('50 items · 0 ISK')).toBeInTheDocument();
     expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
-    // The ship row's menu offers where it sits (Set waypoint) and its name; "Open in Fittings" lives in the opened ship's header.
+    // The ship row's menu offers where it sits (Set waypoint), its name, and Open in Fittings.
     await user.click(screen.getByRole('button', { name: 'More actions for Drake' }));
     // The menu re-renders once its station lookup lands, so each assertion
     // re-queries instead of holding an item the re-render may have replaced.
     await waitFor(() => {
       expect(screen.getByRole('menuitem', { name: /set waypoint/i })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Open in Fittings' })).toBeInTheDocument();
     });
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('button', { name: 'Open in Fittings' })).not.toBeInTheDocument();

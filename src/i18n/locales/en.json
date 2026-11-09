@@ -8708,6 +8708,8 @@
     "emptyRootHint": "Items and ships you own in any station or structure show here, grouped by where they are.",
     "section": {
       "pinned": "Pinned",
+      "shipsAndContainers": "Ships and containers",
+      "items": "Items",
       "allLocations_one": "All locations · {{count}}",
       "allLocations_other": "All locations · {{count}}",
       "locationCount_one": "{{count}} location",
@@ -8803,7 +8805,11 @@
     },
     "columns": {
       "quantity": "Qty",
-      "volume": "m³"
+      "volume": "m³",
+      "asc": "ascending",
+      "desc": "descending",
+      "sortAria": "Sort by {{label}}",
+      "sortedAria": "{{label}}, sorted {{direction}}"
     },
     "breadcrumb": {
       "back": "Back one level"

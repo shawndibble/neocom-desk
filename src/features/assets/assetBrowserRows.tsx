@@ -39,6 +39,8 @@ import { PlaceJumpsLink } from '@/features/route/JumpsLink';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import type { BlueprintKind } from '@/engine/blueprintKind';
 import type { Translate } from '@/lib/translate';
+import type { DataTableSort } from '@/components/ui';
+import type { LevelSortColumn } from './assetLevelSort';
 
 /* ------------------------------------------------------------------ badges */
 
@@ -323,6 +325,8 @@ interface ContainerRowProps {
   characterBadge: string | null;
   /** The station the container sits in: its menu sets a waypoint there. Null when unknown. */
   stationId: number | null;
+  /** More menu entries after the place actions (a ship's Open in Fittings). */
+  extraItems?: ReactNode;
   /** A bay (Cargo Hold/Drone Bay/Fitting) has no asset of its own — plain text, not a heading, same as a station's `h2`/an item's plain name. A ship or container names a real, ownable entity and gets an `h3`, same distinction the tree view made. */
   named: boolean;
   selectMode: boolean;
@@ -340,6 +344,7 @@ export function ContainerRow({
   estimatedValue,
   characterBadge,
   stationId,
+  extraItems,
   named,
   selectMode,
   selectionState,
@@ -352,6 +357,7 @@ export function ContainerRow({
     resolved: stationId !== null,
   });
   const name = gameName ?? label;
+  const hasMenu = actions.length >= 2 || extraItems !== undefined;
   const row = (
     <div className="flex items-center gap-2 border-b border-line pl-3 hover:bg-panel-2">
       {selectMode && (
@@ -387,18 +393,23 @@ export function ContainerRow({
         </span>
         <Icon.Descend size={Icon.ICON_SIZE.sm} className={rowCaretClassName} />
       </Link>
-      {actions.length >= 2 && (
+      {hasMenu && (
         <span className="flex pr-2">
           <RowMoreActions />
         </span>
       )}
     </div>
   );
-  if (actions.length < 2) return row;
+  if (!hasMenu) return row;
   return (
     <RowActionsMenu
       name={name}
-      items={<PlaceRowMenuItems actions={actions} placeId={stationId} placeName={name} t={t} />}
+      items={
+        <>
+          <PlaceRowMenuItems actions={actions} placeId={stationId} placeName={name} t={t} />
+          {extraItems}
+        </>
+      }
     >
       {row}
     </RowActionsMenu>
@@ -428,28 +439,64 @@ const ITEM_MENU_SLOT = 'md:flex md:w-7 md:shrink-0 md:justify-end';
 const ITEM_MENU_SPACER = 'md:w-7 md:shrink-0';
 
 interface ItemColumnLabelsProps {
+  sort: DataTableSort | null;
+  onSort: (column: LevelSortColumn) => void;
   t: Translate;
 }
 
 /**
- * The label strip above a level's item rows, md+ only. Right-aligned to the
- * same cells `ItemRow` lays out; container rows in the same level keep their
- * own shape and simply have no figures under it.
+ * The sortable label strip above a level's item rows, md+ only. Right-aligned
+ * to the same cells `ItemRow` lays out; container rows in the same level keep
+ * their own shape and simply have no figures under it.
  */
-export function ItemColumnLabels({ t }: ItemColumnLabelsProps) {
+export function ItemColumnLabels({ sort, onSort, t }: ItemColumnLabelsProps) {
+  const column = (id: LevelSortColumn, label: string, cellClass: string) => {
+    const active = sort?.columnId === id;
+    const SortGlyph = !active
+      ? Icon.Sort
+      : sort.direction === 'asc'
+        ? Icon.Ascending
+        : Icon.Descending;
+    return (
+      <button
+        type="button"
+        onClick={() => onSort(id)}
+        aria-label={
+          active
+            ? t('assets.columns.sortedAria', {
+                label,
+                direction: t(`assets.columns.${sort.direction}`),
+              })
+            : t('assets.columns.sortAria', { label })
+        }
+        className={cx(
+          cellClass,
+          'inline-flex items-center gap-1 hover:text-text',
+          id !== 'name' && 'justify-end',
+          focusRingInsetClassName
+        )}
+      >
+        <span className="truncate">{label}</span>
+        <SortGlyph
+          aria-hidden="true"
+          size={Icon.ICON_SIZE.sm}
+          className={cx('shrink-0', active ? 'text-accent' : 'text-text-faint')}
+        />
+      </button>
+    );
+  };
   return (
     <div
-      aria-hidden="true"
       data-testid="item-column-labels"
       className={cx(
         eyebrowClassName,
         'sticky top-0 z-10 hidden shrink-0 items-center gap-2.5 border-b border-line bg-panel-2 py-1 pr-3 pl-3 md:flex'
       )}
     >
-      <span className={cx('min-w-0 truncate', ITEM_NAME_CELL)}>{t('assets.sort.name')}</span>
-      <span className={ITEM_QUANTITY_CELL}>{t('assets.columns.quantity')}</span>
-      <span className={ITEM_VOLUME_CELL}>{t('assets.columns.volume')}</span>
-      <span className={ITEM_VALUE_CELL}>{t('assets.sort.value')}</span>
+      {column('name', t('assets.sort.name'), cx('min-w-0', ITEM_NAME_CELL))}
+      {column('quantity', t('assets.columns.quantity'), ITEM_QUANTITY_CELL)}
+      {column('volume', t('assets.columns.volume'), ITEM_VOLUME_CELL)}
+      {column('value', t('assets.sort.value'), ITEM_VALUE_CELL)}
       <span className={ITEM_MENU_SPACER} />
     </div>
   );
