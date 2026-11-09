@@ -122,7 +122,8 @@ Replaces the old journal balance-history chart. Maths in `src/engine/netWorth/` 
 
 ### ISK flow panel (`features/netWorth/CashFlowPanel.tsx`)
 
-- Above ISK waiting on Balance: earned, spent, net and average per day over 7, 30 or 90 UTC days (`cashFlow`, `engine/netWorth/waiting` sibling `cashFlow.ts`), the earned change against the period before (only when the journal history reaches that far back), and the Journal's own daily bars (`IskFlowChartBars`). A day on the bars opens the Journal on that day (no separate Journal link). Figures are full ISK with no unit after them; the other Balance panels use shorthand (`IskAmount`).
+- Above ISK waiting on Balance: earned, spent, net and average per day over the page's 7, 30 or 90 day range (`cashFlow`, `engine/netWorth/waiting` sibling `cashFlow.ts`), the earned change against the period before (only when the journal history reaches that far back), and the Journal's own daily bars (`IskFlowChartBars`). A day on the bars opens the Journal on that day (no separate Journal link). Figures are full ISK with no unit after them; the other Balance panels use shorthand (`IskAmount`).
+- The range is one device-local page setting (`walletRange.ts`), picked in the page header beside Refresh (`WalletRangeControl`: segmented buttons from `md`, a select below it) and shared by the Worth chart and ISK flow. It only slices data already loaded.
 - Reads the picked, drilled or active Characters' cached journals (`loadAllCharactersJournals`); transfers between the pilot's own Characters are left out. A period the history only partly covers says so. By-source breakdown stays on the Journal tab.
 
 ### ISK waiting and Goals panels (`features/netWorth/WalletWaitingGoal.tsx`)

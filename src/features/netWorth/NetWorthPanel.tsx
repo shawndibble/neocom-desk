@@ -27,7 +27,7 @@ import { inlineLinkClassName, touchCheckboxLabelClassName } from '@/components/u
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { walletBalancesCsvColumns } from '@/features/character/walletBalancesCsv';
 import { iskToneClass } from '@/features/character/format';
-import { lineRows, stackRows } from '@/engine/netWorth/chartRows';
+import { lastDays, lineRows, stackRows } from '@/engine/netWorth/chartRows';
 import {
   buildCharacterSeries,
   layerValues,
@@ -45,6 +45,7 @@ import { formatDateOnly } from '@/lib/timestamp';
 import { CharacterSwatch } from './CharacterSwatch';
 import { LAYER_LABEL_KEYS, LAYER_SWATCH } from './layerMeta';
 import { useNetWorthHiddenCharacters, useNetWorthHiddenLayers } from './netWorthSettings';
+import { useWalletRange } from './walletRange';
 import { buildTableRows, type NetWorthTableRow } from './tableRows';
 import { useNetWorthData } from './useNetWorthData';
 
@@ -217,12 +218,20 @@ export function NetWorthPanel({
 
   const single = mode === 'single' ? (characters[0] ?? null) : null;
   const singleSeries = single ? (seriesById.get(single.characterId) ?? NO_SERIES) : NO_SERIES;
-  const singleRows = useMemo(() => stackRows(singleSeries, shown), [singleSeries, shown]);
+  const range = useWalletRange((state) => state.value);
+  // Estimates are drawn from the whole series first, so a range edge never changes them.
+  const singleRows = useMemo(
+    () => lastDays(stackRows(singleSeries, shown), Number(range)),
+    [singleSeries, shown, range]
+  );
   const multiSeries = useMemo(
     () => new Map(included.map((id) => [id, seriesById.get(id) ?? NO_SERIES] as const)),
     [included, seriesById]
   );
-  const multiRows = useMemo(() => lineRows(multiSeries, shown), [multiSeries, shown]);
+  const multiRows = useMemo(
+    () => lastDays(lineRows(multiSeries, shown), Number(range)),
+    [multiSeries, shown, range]
+  );
   const lines = useMemo(
     () => characters.filter((c) => included.includes(c.characterId)),
     [characters, included]

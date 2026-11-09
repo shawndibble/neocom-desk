@@ -61,23 +61,29 @@ function dayLabel(x: number): string {
   return formatDateOnly(new Date(x), 'UTC');
 }
 
-/** Contiguous runs of estimated days, as [from, to] x ranges ending on the next real day. */
+/**
+ * Contiguous runs of estimated days as [from, to] x ranges. A run is drawn from
+ * the last real day before it to the next real day after it, so the whole
+ * stretch the line is guessing across is marked, not just the days between.
+ */
 function estimatedRuns(rows: readonly StackRow[]): [number, number][] {
   const runs: [number, number][] = [];
+  let lastReal: number | null = null;
   let start: number | null = null;
-  let prev: number | null = null;
+  let end = 0;
   for (const row of rows) {
     if (row.estimated) {
-      start ??= row.x;
-      prev = row.x;
-    } else if (start !== null && prev !== null) {
-      runs.push([start, row.x]);
-      start = prev = null;
+      start ??= lastReal ?? row.x;
+      end = row.x;
+    } else {
+      if (start !== null) runs.push([start, row.x]);
+      start = null;
+      lastReal = row.x;
     }
   }
-  // A trailing run has no real day after it; start it on the real day before so a one-day run has width.
-  if (start !== null && prev !== null) runs.push([start - DAY_MS, prev]);
-  return runs;
+  if (start !== null) runs.push([start, end]);
+  // A one-day run with no real day beside it still needs width to be drawn.
+  return runs.map(([from, to]) => [from === to ? from - DAY_MS : from, to]);
 }
 
 function StackTooltip({

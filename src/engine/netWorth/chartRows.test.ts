@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lineKey, lineRows, stackRows, tooltipLines, type LineRow } from './chartRows';
+import { lastDays, lineKey, lineRows, stackRows, tooltipLines, type LineRow } from './chartRows';
 import { buildCharacterSeries } from './series';
 import type { NetWorthSnapshotRow } from './snapshot';
 
@@ -64,6 +64,19 @@ describe('stackRows', () => {
   it('draws the estimate for the layers shown even when the ISK layer is off', () => {
     const rows = stackRows(series, ['assets']);
     expect(rows[0]!.total).toBe(50);
+  });
+});
+
+describe('lastDays', () => {
+  const days = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04'].map((day) => ({
+    x: Date.parse(day),
+  }));
+  it('keeps the newest N daily rows', () => {
+    expect(lastDays(days, 2)).toEqual(days.slice(2));
+  });
+  it('keeps everything when the series is shorter than the range', () => {
+    expect(lastDays(days, 90)).toEqual(days);
+    expect(lastDays([], 7)).toEqual([]);
   });
 });
 
