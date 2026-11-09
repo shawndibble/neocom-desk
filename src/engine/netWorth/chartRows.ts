@@ -4,6 +4,7 @@
  * Pure; the Recharts component only draws what these say.
  */
 import {
+  estimateLayers,
   netWorthOf,
   type CharacterSeries,
   type LayerId,
@@ -16,24 +17,29 @@ export interface StackRow {
   /** UTC midnight, epoch ms — the numeric x axis. */
   x: number;
   kind: PointKind;
+  /** True when the day has no snapshot and the layers are a guess. */
+  estimated: boolean;
   values: LayerValues;
   total: number;
 }
 
 const ZERO: LayerValues = { isk: 0, assets: 0, escrow: 0, sellOrders: 0, contracts: 0 };
 
-/** Only the wallet exists off a snapshot day; the other layers are drawn as a hatched band, not a value. */
+/** Days with no snapshot are drawn from `estimateLayers` and flagged `estimated`. */
 export function stackRows(series: CharacterSeries, shown: readonly LayerId[]): StackRow[] {
-  return series.points.map((point) => {
+  const estimates = estimateLayers(series.points);
+  return series.points.map((point, i) => {
     const values: LayerValues = { ...ZERO };
+    const source = estimates[i];
     for (const id of shown) {
-      if (point.layers) values[id] = point.layers[id];
+      if (source) values[id] = source[id];
       else if (id === 'isk') values.isk = point.isk ?? 0;
     }
     return {
       day: point.day,
       x: Date.parse(point.day),
       kind: point.kind,
+      estimated: point.kind !== 'snapshot' && estimates[i] !== null,
       values,
       total: netWorthOf(values, shown),
     };
@@ -48,26 +54,27 @@ export function lineKey(characterId: number): string {
 }
 
 /**
- * Per-Character net worth by day. A snapshot day plots the shown layers'
- * total; any other day plots the wallet only when ISK is the only layer shown,
- * and is a break otherwise — a wallet-only value would read as a collapse.
+ * Per-Character net worth by day. A day with no snapshot plots the estimate
+ * from `estimateLayers`, so a missed day joins its neighbours instead of
+ * dipping to the wallet alone.
  */
 export function lineRows(
   seriesById: ReadonlyMap<number, CharacterSeries>,
   shown: readonly LayerId[]
 ): LineRow[] {
   const byDay = new Map<string, LineRow>();
-  const walletOnly = shown.length === 1 && shown[0] === 'isk';
   for (const [characterId, series] of seriesById) {
-    for (const point of series.points) {
+    const estimates = estimateLayers(series.points);
+    series.points.forEach((point, i) => {
       const row = byDay.get(point.day) ?? { day: point.day, x: Date.parse(point.day) };
-      row[lineKey(characterId)] = point.layers
-        ? netWorthOf(point.layers, shown)
-        : walletOnly
+      const values = estimates[i];
+      row[lineKey(characterId)] = values
+        ? netWorthOf(values, shown)
+        : shown.includes('isk')
           ? point.isk
           : null;
       byDay.set(point.day, row);
-    }
+    });
   }
   const rows = [...byDay.values()].sort((a, b) => a.x - b.x);
   for (const row of rows) {
