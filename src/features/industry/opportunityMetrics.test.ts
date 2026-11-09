@@ -23,6 +23,7 @@ function row(runs: number, profit: number | null, productQuantity = 1): Opportun
     location_flag: 'Hangar',
   };
   return {
+    priceCapped: false,
     candidate: {
       id: 'a',
       characterId: 1,

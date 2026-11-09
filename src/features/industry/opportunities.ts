@@ -20,6 +20,7 @@ import {
   type BlueprintCatalogEntry,
 } from './blueprintCatalog';
 import { buildPlanTypeIds } from './recipes';
+import { capProductPrice } from './productPriceCap';
 import type { MarketSnapshot, MarketSnapshotRequest } from './marketData';
 import { materialPricesFor } from './priceBasis';
 import { onPlanHeroBasis } from './planOwnedBasis';
@@ -272,6 +273,8 @@ export interface UnrankedOpportunityRow {
   defaultsFrom: BuildPlanRecord | null;
   /** ISK the owned stock this job uses would net if sold, charged against `result.profit` (the plan hero's sell-value basis); 0 when none is charged. */
   forgoneSale: number;
+  /** True when the product is priced at CCP's average because the hub's cheapest sell order is a troll price (`capProductPrice`). */
+  priceCapped: boolean;
   /**
    * Why a reaction row can't run where it would build (issue #5990). Its
    * profit, margin and ISK/hour are then null, never lowsec guesses.
@@ -322,7 +325,7 @@ export interface OpportunityAutoBuildOptions {
  */
 export function computeOpportunityRow(
   candidate: OpportunityCandidate,
-  snapshot: MarketSnapshot,
+  rawSnapshot: MarketSnapshot,
   facilityDefaults: ActivityFacilityDefaults,
   modifiers: CharacterModifiers,
   stock: DetectedOwnedStockMap,
@@ -334,6 +337,11 @@ export function computeOpportunityRow(
   defaultsFrom: BuildPlanRecord | null = null
 ): UnrankedOpportunityRow | null {
   const blueprint = toIndustryBlueprint(candidate.catalogEntry.blueprint);
+  // The plan this row opens prices the product the same way (`capProductPrice`).
+  const { snapshot, capped: priceCapped } = capProductPrice(
+    rawSnapshot,
+    candidate.catalogEntry.productTypeID
+  );
   const materialSourcing = ownedMaterialSourcing(candidate.catalogEntry.blueprint.materials, stock);
   const basePlan = planForOpportunityCandidate(
     candidate,
@@ -420,6 +428,7 @@ export function computeOpportunityRow(
     buildHere,
     defaultsFrom,
     forgoneSale: forgone,
+    priceCapped,
   };
 }
 

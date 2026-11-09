@@ -119,6 +119,7 @@ export function opportunitiesCsvColumns(
     },
     { header: t('industry.csvRevenue'), value: (row) => row.result.revenue },
     { header: t('industry.csvForgoneSale'), value: (row) => row.forgoneSale },
+    { header: t('industry.csvPriceCapped'), value: (row) => exportFlag(t, row.priceCapped) },
     ...skillGateColumns<OpportunityRow>(t, (row) => row.candidate.catalogEntry.productTypeID, gate),
   ];
 }

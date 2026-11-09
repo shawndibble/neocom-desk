@@ -564,7 +564,17 @@ export function OpportunitiesPanel({
           : numericCell(
               row.result.iskPerHour,
               // Tap: the figure is inert — the row's own controls are buttons of their own.
-              (v) => <IskAmount value={v} decimals={0} />,
+              (v) => (
+                <span className="inline-flex items-center justify-end gap-1">
+                  <IskAmount value={v} decimals={0} />
+                  {row.priceCapped && (
+                    <InfoTooltip
+                      label={t('industry.marketOpportunitiesPriceCapped')}
+                      content={t('industry.marketOpportunitiesPriceCapped')}
+                    />
+                  )}
+                </span>
+              ),
               unknown
             ),
     },

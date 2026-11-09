@@ -32,6 +32,20 @@ export function reliableSellPrice(
     : { price: hubSellMin, capped: false };
 }
 
+/**
+ * `reliableSellPrice` for a surface that keeps pricing a product CCP has no
+ * average for (Ranked and the Build Plan): no average means no cap, not no
+ * price.
+ */
+export function cappedSellPrice(
+  hubSellMin: number,
+  averagePrice: number | null | undefined
+): { price: number; capped: boolean } {
+  return (
+    reliableSellPrice(hubSellMin, averagePrice ?? null) ?? { price: hubSellMin, capped: false }
+  );
+}
+
 /** How many days back `averageDailyVolume` looks. */
 const SALES_WINDOW_DAYS = 30;
 

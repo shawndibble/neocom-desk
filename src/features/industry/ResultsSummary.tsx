@@ -88,6 +88,8 @@ interface ResultsSummaryProps {
   productTypeID: number | null;
   /** Product's lowest hub sell price (per unit); null when unpriced at this hub. */
   productUnitPrice: number | null;
+  /** True when `productUnitPrice` is CCP's average because the hub's cheapest sell order is a troll price. */
+  productPriceCapped?: boolean;
   /** Units produced by the job (per-run product quantity x runs); null when the blueprint has no product. */
   productQuantity: number | null;
   /** Short solar-system name the build's cost index applies to. */
@@ -149,6 +151,7 @@ export function ResultsSummary({
   productName,
   productTypeID,
   productUnitPrice,
+  productPriceCapped = false,
   productQuantity,
   costIndexSystemName,
   costIndexSystemId,
@@ -229,6 +232,12 @@ export function ResultsSummary({
                       price: formatIsk(productUnitPrice),
                     })}
                   </span>
+                )}
+                {productPriceCapped && (
+                  <InfoTooltip
+                    label={t('industry.marketOpportunitiesPriceCapped')}
+                    content={t('industry.marketOpportunitiesPriceCapped')}
+                  />
                 )}
               </span>
             }

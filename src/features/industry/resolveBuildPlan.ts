@@ -45,6 +45,7 @@ import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { clampInt } from './clampInt';
 import { computeBuildPlan } from './computeBuildPlan';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
+import { capProductPrice } from './productPriceCap';
 import type { MarketSnapshot } from './marketData';
 import { facilityContextFor, reactionPlanFacilityContextFor } from './planFacilityContext';
 import { materialPriceBasisOf, materialPricesFor } from './priceBasis';
@@ -264,7 +265,13 @@ function prepareResolution(
 ) {
   // The pilot's own cost index outranks ESI's (absent for J-Space), applied
   // here once so the page, Compare and every Group Rollup price the same fee.
-  const snapshot = applyCostIndexOverride(prices.snapshot, plan.costIndexOverridePct);
+  const snapshot = applyCostIndexOverride(
+    capProductPrice(
+      prices.snapshot,
+      sources.catalog.byBlueprintTypeID.get(plan.blueprintTypeID)?.productTypeID
+    ).snapshot,
+    plan.costIndexOverridePct
+  );
   const ownedBlueprints = planOwnedBlueprints(
     plan,
     sources.ownedBlueprints,
