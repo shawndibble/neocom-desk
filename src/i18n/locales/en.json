@@ -7079,11 +7079,10 @@
       "allCharacters": "All characters",
       "chartLabel": "Net worth over time",
       "excludes": "Excludes {{layers}}",
-      "walletOnlyBefore": "Wallet only before {{date}}",
       "emptyTitle": "No net worth history yet",
       "emptyHint": "A snapshot is recorded each day the app is open. Wallet history comes from your journal.",
-      "firstDays": "Layers start on {{date}}. The chart fills in as days are recorded.",
-      "gapNote": "Hatched days: the app was not open, so only the wallet is known. Nothing is estimated.",
+      "firstDays": "We started recording on {{date}}. Earlier days are a guess based on that first day. The chart fills in as days are recorded.",
+      "gapNote": "The striped part of the chart is a guess. The app wasn't open on those days, so we drew a line between the days we did record. Your ISK balance is still the real number.",
       "walletCrumb": "Wallet",
       "layers": {
         "isk": "ISK",

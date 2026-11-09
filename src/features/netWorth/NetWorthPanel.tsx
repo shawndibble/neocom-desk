@@ -334,14 +334,6 @@ export function NetWorthPanel({
           label={t('wallet.netWorth.chartLabel')}
           rows={singleRows}
           shown={shown}
-          firstSnapshotDay={singleSeries.firstSnapshotDay}
-          walletOnlyLabel={
-            singleSeries.firstSnapshotDay
-              ? t('wallet.netWorth.walletOnlyBefore', {
-                  date: formatDateOnly(new Date(Date.parse(singleSeries.firstSnapshotDay)), 'UTC'),
-                })
-              : ''
-          }
         />
       ) : (
         <LazyNetWorthChart

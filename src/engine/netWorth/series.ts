@@ -96,6 +96,34 @@ export function buildCharacterSeries(input: {
   return { points, firstSnapshotDay, gapDays: findMissingDays(snapDays) };
 }
 
+/**
+ * Layer values for every point, for drawing: a snapshot day keeps its own;
+ * any other day is a guess. Between two snapshots the non-wallet layers run in
+ * a straight line from one to the next, before the first (a new user) they
+ * repeat the first snapshot, after the last they repeat the last. The wallet is
+ * always the day's real balance when the journal has one. `null` only when the
+ * series has no snapshot at all.
+ */
+export function estimateLayers(points: readonly SeriesPoint[]): (LayerValues | null)[] {
+  const snapIdx = points.flatMap((p, i) => (p.layers ? [i] : []));
+  return points.map((point, i) => {
+    if (point.layers) return point.layers;
+    const prev = [...snapIdx].reverse().find((j) => j < i);
+    const next = snapIdx.find((j) => j > i);
+    const from = prev === undefined ? undefined : points[prev]!.layers!;
+    const to = next === undefined ? undefined : points[next]!.layers!;
+    const base = from ?? to;
+    if (!base) return null;
+    const out: LayerValues = { ...base };
+    if (from && to) {
+      const f = (i - prev!) / (next! - prev!);
+      for (const id of LAYER_IDS) out[id] = from[id] + (to[id] - from[id]) * f;
+    }
+    if (point.isk !== null) out.isk = point.isk;
+    return out;
+  });
+}
+
 export function totalsFor(
   latest: ReadonlyMap<number, LayerValues>,
   opts: { included: readonly number[]; hidden: readonly number[]; shown: readonly LayerId[] }

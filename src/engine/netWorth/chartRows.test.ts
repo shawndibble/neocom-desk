@@ -33,16 +33,37 @@ describe('stackRows', () => {
     });
   });
 
-  it('keeps only the wallet on wallet-only and gap days', () => {
+  it('backfills the layers before the first snapshot from it, keeping the real wallet', () => {
     const rows = stackRows(series, ['isk', 'assets']);
-    expect(rows[0]).toMatchObject({ day: '2026-10-01', kind: 'wallet-only', total: 90 });
-    expect(rows[2]).toMatchObject({ day: '2026-10-03', kind: 'gap', total: 100 });
-    expect(rows[2]!.values.assets).toBe(0);
+    expect(rows[0]).toMatchObject({ day: '2026-10-01', kind: 'wallet-only', estimated: true });
+    expect(rows[0]).toMatchObject({ total: 140 });
+    expect(rows[1]!.estimated).toBe(false);
   });
 
-  it('contributes nothing from the wallet when the ISK layer is off', () => {
+  it('joins a missed day to its neighbours instead of dropping to the wallet', () => {
+    const gapped = buildCharacterSeries({
+      walletByDay: new Map(),
+      snapshots: [row('2026-10-01', 1, 100), { ...row('2026-10-03', 1, 100), assetValue: 150 }],
+    });
+    const rows = stackRows(gapped, ['isk', 'assets']);
+    expect(rows[1]).toMatchObject({ kind: 'gap', estimated: true, total: 200 });
+    expect(rows[1]!.values.assets).toBe(100);
+  });
+
+  it('repeats the last snapshot after it', () => {
+    const trailing = buildCharacterSeries({
+      walletByDay: new Map([['2026-10-02', 120]]),
+      snapshots: [row('2026-10-01', 1, 100)],
+    });
+    expect(stackRows(trailing, ['isk', 'assets'])[1]).toMatchObject({
+      estimated: true,
+      total: 170,
+    });
+  });
+
+  it('draws the estimate for the layers shown even when the ISK layer is off', () => {
     const rows = stackRows(series, ['assets']);
-    expect(rows[0]!.total).toBe(0);
+    expect(rows[0]!.total).toBe(50);
   });
 });
 
@@ -69,13 +90,13 @@ describe('lineRows', () => {
     expect(rows[1]).toMatchObject({ c1: 150, c2: 550 });
   });
 
-  it('plots the wallet through non-snapshot days only when ISK alone is shown', () => {
+  it('plots an estimate through non-snapshot days', () => {
     const g = buildCharacterSeries({
       walletByDay: new Map([['2026-10-01', 70]]),
       snapshots: [row('2026-10-02')],
     });
     expect(lineRows(new Map([[1, g]]), ['isk'])[0]).toMatchObject({ c1: 70 });
-    expect(lineRows(new Map([[1, g]]), ['isk', 'assets'])[0]).toMatchObject({ c1: null });
+    expect(lineRows(new Map([[1, g]]), ['isk', 'assets'])[0]).toMatchObject({ c1: 120 });
   });
 });
 
