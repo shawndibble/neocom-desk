@@ -629,6 +629,11 @@ Skills › Certificates is a third: below `sm` its sort `Select` is replaced by 
 icon-only `IconButton` + radio `DropdownMenu` (`Icon.Sort`), so the group select,
 the Grade filter and the sort share one phone row.
 
+Market History's By station view has a fourth, at every width: a sort is not a
+filter, so "Stations by" (which orders the groups) is an icon-only `IconButton` +
+radio `DropdownMenu` (`Icon.Sort`) beside the funnel, shown only while the view is
+on and applied on pick, never a field inside the funnel popover.
+
 The sort bar and grouping are **deliberate exceptions to "one DOM at every
 width"**, for the same kind of reason `FilterBar` is (§4b): the bar replaces
 controls CSS has hidden and cannot re-present, and a collapsed group's
