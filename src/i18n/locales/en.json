@@ -76,6 +76,7 @@
     "alerts": "Alerts",
     "needsAttention": "{{label}}, needs attention",
     "upgrade": "Upgrade",
+    "upgradeCallout": "A new version is ready.",
     "alertsWithCount_one": "Alerts, {{count}} waiting",
     "alertsWithCount_other": "Alerts, {{count}} waiting",
     "railLabel": "Main navigation",

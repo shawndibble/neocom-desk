@@ -2166,7 +2166,10 @@ describe('Settings — update state', () => {
     const nav = settingsNav();
     expect(await within(nav).findByRole('img', { name: 'Update available' })).toBeInTheDocument();
     const panel = screen.getByText('Update available', { selector: 'p' });
-    expect(screen.getByRole('button', { name: 'Update now' })).toBeInTheDocument();
+    // The page's own button; the rail's callout carries a second one.
+    expect(
+      within(screen.getByRole('main')).getByRole('button', { name: 'Update now' })
+    ).toBeInTheDocument();
 
     act(() => useUpdateStatus.setState({ status: 'current' }));
     expect(within(nav).queryByRole('img', { name: 'Update available' })).not.toBeInTheDocument();
