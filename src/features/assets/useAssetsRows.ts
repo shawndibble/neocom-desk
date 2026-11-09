@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { nextDataTableSort } from '@/components/ui';
 import type { DataTableSort } from '@/components/ui';
-import { splitLevelNodes, sortLevelItems, type LevelSortColumn } from './assetLevelSort';
+import { splitLevelNodes, sortLevelNodes, type LevelSortColumn } from './assetLevelSort';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -335,15 +335,25 @@ export function useAssetsRows(assetsData: AssetsData) {
       }));
     }
     if (pathStationId !== null) {
-      const { containers, items } = splitLevelNodes(resolved.children);
-      const sortedItems = sortLevelItems(items, levelSort, {
+      const { bays, containers, items } = splitLevelNodes(resolved.children);
+      // A ship or container sorts by what its row shows: its game name, the
+      // items inside and their value; its hull volume is the one hidden figure.
+      const sortedContainers = sortLevelNodes(containers, levelSort, {
+        name: (node) => assetNames[node.asset.item_id] ?? nodeLabel(node),
+        quantity: (node) => node.itemCount,
+        volume: (node) => volumeByTypeId.get(node.asset.type_id),
+        value: (node) => node.estimatedValue,
+      });
+      const sortedItems = sortLevelNodes(items, levelSort, {
         name: (node) => nodeLabel(node),
+        quantity: (node) => node.asset.quantity,
         volume: (node) => volumeByTypeId.get(node.asset.type_id),
         value: (node) => assetStackValue(node.asset, priceByTypeId, itemValueByItemId),
       });
+      const openable = [...bays, ...sortedContainers];
       const nodeRows = (nodes: readonly AssetTreeNode[]): BrowseRow[] =>
         nodes.map((node) => ({ kind: 'node', key: assetNodeSegment(node), node }));
-      const both = containers.length > 0 && sortedItems.length > 0;
+      const both = openable.length > 0 && sortedItems.length > 0;
       const heading = (key: string, label: string): BrowseRow => ({
         kind: 'heading',
         key,
@@ -352,7 +362,7 @@ export function useAssetsRows(assetsData: AssetsData) {
       });
       return [
         ...(both ? [heading('h:containers', t('assets.section.shipsAndContainers'))] : []),
-        ...nodeRows(containers),
+        ...nodeRows(openable),
         ...(both ? [heading('h:items', t('assets.section.items'))] : []),
         ...nodeRows(sortedItems),
       ];
@@ -410,6 +420,7 @@ export function useAssetsRows(assetsData: AssetsData) {
     pathStationId,
     resolved,
     levelSort,
+    assetNames,
     volumeByTypeId,
     priceByTypeId,
     itemValueByItemId,

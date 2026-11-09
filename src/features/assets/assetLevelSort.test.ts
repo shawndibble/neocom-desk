@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { DataTableSort } from '@/components/ui';
 import type { AssetTreeItemNode, AssetTreeNode } from '@/engine/assetTree';
-import { sortLevelItems, splitLevelNodes } from './assetLevelSort';
+import { sortLevelNodes, splitLevelNodes } from './assetLevelSort';
 
 function item(id: number, quantity: number): AssetTreeItemNode {
   return {
@@ -13,24 +14,26 @@ const bay = { kind: 'bay', children: [] } as unknown as AssetTreeNode;
 
 const figures = {
   name: (n: AssetTreeItemNode) => `n${n.asset.item_id}`,
+  quantity: (n: AssetTreeItemNode) => n.asset.quantity,
   volume: (n: AssetTreeItemNode) => (n.asset.item_id === 3 ? undefined : n.asset.item_id),
   value: (n: AssetTreeItemNode) => 100 - n.asset.item_id,
 };
 
 describe('splitLevelNodes', () => {
-  it('puts ships, containers and bays apart from items, keeping order', () => {
+  it('puts bays, ships and containers apart from items, keeping order', () => {
     const a = item(1, 1);
     const b = item(2, 1);
-    const { containers, items } = splitLevelNodes([a, ship, b, bay]);
-    expect(containers).toEqual([ship, bay]);
+    const { bays, containers, items } = splitLevelNodes([a, ship, b, bay]);
+    expect(bays).toEqual([bay]);
+    expect(containers).toEqual([ship]);
     expect(items).toEqual([a, b]);
   });
 });
 
-describe('sortLevelItems', () => {
+describe('sortLevelNodes', () => {
   const items = [item(1, 5), item(2, 50), item(3, 9)];
-  const ids = (sort: Parameters<typeof sortLevelItems>[1]) =>
-    sortLevelItems(items, sort, figures).map((n) => n.asset.item_id);
+  const ids = (sort: DataTableSort | null) =>
+    sortLevelNodes(items, sort, figures).map((n) => n.asset.item_id);
 
   it('keeps the incoming order without a sort', () => expect(ids(null)).toEqual([1, 2, 3]));
   it('sorts by quantity', () => {

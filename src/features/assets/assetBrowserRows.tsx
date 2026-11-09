@@ -427,7 +427,7 @@ export function ContainerRow({
 /**
  * The name cell: capped at 24rem so the figures sit beside it instead of a
  * screen away at the panel's far edge, but free to shrink when the panel is
- * narrower. The rest of the row stays blank to the right of the menu slot.
+ * narrower. The menu slot sits at the row's far right, past the blank space.
  */
 const ITEM_NAME_CELL = 'md:flex-[0_1_24rem]';
 const ITEM_CELL = 'md:shrink-0 md:truncate md:text-right';
@@ -435,7 +435,7 @@ const ITEM_QUANTITY_CELL = cx(ITEM_CELL, 'md:w-24');
 const ITEM_VOLUME_CELL = cx(ITEM_CELL, 'md:w-28');
 const ITEM_VALUE_CELL = cx(ITEM_CELL, 'md:w-24');
 /** The row menu button's md+ box (`IconButton` size `row`, `md:size-7`), reserved even when the row has no menu. */
-const ITEM_MENU_SLOT = 'md:flex md:w-7 md:shrink-0 md:justify-end';
+const ITEM_MENU_SLOT = 'md:ml-auto md:flex md:w-7 md:shrink-0 md:justify-end';
 const ITEM_MENU_SPACER = 'md:w-7 md:shrink-0';
 
 interface ItemColumnLabelsProps {
