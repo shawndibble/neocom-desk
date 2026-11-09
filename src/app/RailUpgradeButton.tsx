@@ -19,12 +19,14 @@ export function RailUpgradeButton() {
   const { t } = useTranslation();
   const available = useUpdateStatus((state) => state.status === 'available');
   const { updating, notice, update } = useApplyUpdate();
-  // `available` only clears with a reload, so one dismissal lasts until the next build is found.
-  const [dismissed, setDismissed] = useState(false);
+  // `available` only clears with a reload, so a dismissal is keyed to `found`:
+  // a second, different build found in the same tab opens the callout again.
+  const found = useUpdateStatus((state) => state.found);
+  const [dismissedAt, setDismissedAt] = useState<number | null>(null);
   if (!available) return null;
   return (
     <>
-      <Popover open={!dismissed} onOpenChange={(open) => !open && setDismissed(true)}>
+      <Popover open={dismissedAt !== found} onOpenChange={(open) => !open && setDismissedAt(found)}>
         <PopoverAnchor asChild>
           <IconButton
             variant="plain"
@@ -47,13 +49,13 @@ export function RailUpgradeButton() {
           // Focus moving elsewhere is not an answer; a press outside or Escape is.
           onFocusOutside={(event) => event.preventDefault()}
         >
-          <p role="status">{t('nav.upgradeCallout')}</p>
+          <p>{t('nav.upgradeCallout')}</p>
           <Button
             size="sm"
             variant="accent"
             loading={updating}
             onClick={() => {
-              setDismissed(true);
+              setDismissedAt(found);
               update();
             }}
           >

@@ -10,7 +10,7 @@ vi.mock('@/app/forceUpdate', () => ({ forceUpdate: () => forceUpdate() }));
 
 afterEach(() => {
   forceUpdate.mockReset();
-  useUpdateStatus.setState({ status: 'unknown' });
+  useUpdateStatus.setState({ status: 'unknown', build: null, found: 0 });
 });
 
 describe('RailUpgradeButton', () => {
@@ -50,5 +50,16 @@ describe('RailUpgradeButton', () => {
     render(<RailUpgradeButton />);
     await userEvent.click(await screen.findByRole('button', { name: 'Update now' }));
     expect(forceUpdate).toHaveBeenCalledOnce();
+  });
+
+  it('opens again when a second, different build is found in the same tab', async () => {
+    useUpdateStatus.setState({ status: 'available', build: 'neocom-desk@9', found: 0 });
+    render(<RailUpgradeButton />);
+    await screen.findByText('A new version is ready.');
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByText('A new version is ready.')).toBeNull();
+
+    act(() => useUpdateStatus.setState({ build: 'neocom-desk@10', found: 1 }));
+    expect(await screen.findByText('A new version is ready.')).toBeInTheDocument();
   });
 });
