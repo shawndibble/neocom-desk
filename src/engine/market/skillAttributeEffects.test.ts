@@ -70,6 +70,14 @@ describe('nextLevelValues', () => {
     expect(nextLevelValues(100, -10, 1, 1)[0]?.value).toBeCloseTo(88.89, 2);
   });
 
+  it('scales a base figure from level 0 when the skills are not in it', () => {
+    expect(nextLevelValues(12000, 5, 3, 1, 0)[0]).toEqual({ level: 4, value: 14400 });
+  });
+
+  it('returns nothing when the shown figure is zeroed by the bonus', () => {
+    expect(nextLevelValues(0, -25, 4, 1)).toEqual([]);
+  });
+
   it('returns nothing at V', () => {
     expect(nextLevelValues(100, 5, 5, 3)).toEqual([]);
   });

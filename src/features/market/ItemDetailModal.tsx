@@ -71,10 +71,10 @@ import { useTargetPlan, type TargetPlan } from '@/features/skills/useTargetPlan'
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { loadRegionName } from '@/features/places/regions';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
-import { formatAttributeValue, formatVolume } from './format';
+import { formatVolume } from './format';
 import { romanLevel } from '@/engine/projection';
 import { ItemAttributeSections } from './ItemAttributeSections';
-import { sectionsShowSkilled } from './skilledFigures';
+import { numberText, sectionsShowSkilled } from './skilledFigures';
 import {
   useSkilledAttributes,
   type SkilledAttributesState,
@@ -577,10 +577,16 @@ export function ItemDetailModal({
                         trainedSkills={trainedSkills}
                         target={targetPlan}
                         itemName={itemName}
-                        figure={{
-                          value: attribute.skilledValue ?? attribute.value,
-                          unit: attribute.unit,
-                        }}
+                        figure={
+                          // A resolved name ("Medium") has no number to preview.
+                          attribute.displayValue === undefined
+                            ? {
+                                value: attribute.skilledValue ?? attribute.value,
+                                unit: attribute.unit,
+                                skillsApplied: attribute.skilledValue !== undefined,
+                              }
+                            : null
+                        }
                       />
                     ) : null;
                   }}
@@ -755,8 +761,8 @@ function AttributeModifierList({
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   target: TargetPlan;
   itemName: string;
-  /** The figure as shown, which each skill's next levels scale. */
-  figure: { value: number; unit: string | null };
+  /** The figure as shown, which each skill's next levels scale; null where it is not a number. */
+  figure: AttributeFigure | null;
 }) {
   return modifiers.map((modifier) => (
     <AttributeModifierRow
@@ -769,6 +775,14 @@ function AttributeModifierList({
       figure={figure}
     />
   ));
+}
+
+/** An attribute's figure as Item Detail shows it, for previewing a skill's next levels. */
+interface AttributeFigure {
+  value: number;
+  unit: string | null;
+  /** Whether the pilot's skills are already in `value` (else it is the base figure). */
+  skillsApplied: boolean;
 }
 
 /** How many levels past the trained one a skill's popover previews. */
@@ -793,7 +807,7 @@ function AttributeModifierRow({
   trainedLevel: number;
   target: TargetPlan;
   itemName: string;
-  figure: { value: number; unit: string | null };
+  figure: AttributeFigure | null;
 }) {
   const { t } = useTranslation();
   return (
@@ -812,16 +826,22 @@ function AttributeModifierRow({
             })
           : t('skills.attributeModifier.untrained')}
       </p>
-      {nextLevelValues(figure.value, modifier.perLevelValue, trainedLevel, NEXT_LEVELS_SHOWN).map(
-        (next) => (
+      {figure &&
+        nextLevelValues(
+          figure.value,
+          modifier.perLevelValue,
+          trainedLevel,
+          NEXT_LEVELS_SHOWN,
+          // A base figure has none of this skill in it yet, even when it is trained.
+          figure.skillsApplied ? trainedLevel : 0
+        ).map((next) => (
           <p key={next.level} className="tabular-nums text-text-dim">
             {t('skills.attributeModifier.nextLevel', {
               level: romanLevel(next.level),
-              value: `${formatAttributeValue(next.value, figure.unit)}${figure.unit ? ` ${figure.unit}` : ''}`,
+              value: numberText(next.value, figure.unit),
             })}
           </p>
-        )
-      )}
+        ))}
       {/* Nothing left to train at V. */}
       {trainedLevel < 5 && (
         <Button

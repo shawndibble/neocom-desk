@@ -51,18 +51,23 @@ export interface NextLevelValue {
  * What `current` (the figure as shown, with the skill at `trainedLevel`) reads
  * once the skill reaches each of the next `count` levels, capped at V. A
  * PostPercent bonus multiplies the attribute by `1 + perLevelValue% × level`,
- * so a level's value is `current` scaled by that factor's change.
+ * so a level's value is `current` scaled by that factor's change. `shownLevel`
+ * is the level `current` already includes: the trained level for a skilled
+ * figure, 0 for a base one (default `trainedLevel`).
  */
 export function nextLevelValues(
   current: number,
   perLevelValue: number,
   trainedLevel: number,
-  count: number
+  count: number,
+  shownLevel = trainedLevel
 ): NextLevelValue[] {
   const factor = (level: number) => 1 + (perLevelValue * level) / 100;
+  const shown = factor(shownLevel);
+  if (shown === 0) return [];
   const result: NextLevelValue[] = [];
   for (let level = trainedLevel + 1; level <= Math.min(5, trainedLevel + count); level++) {
-    result.push({ level, value: (current * factor(level)) / factor(trainedLevel) });
+    result.push({ level, value: (current * factor(level)) / shown });
   }
   return result;
 }
