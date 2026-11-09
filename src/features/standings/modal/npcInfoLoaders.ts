@@ -31,6 +31,7 @@ import {
   knownCorporationRows,
   loyaltyModel,
   stationsModel,
+  type AgentSystem,
   type KnownAgentRow,
   type KnownCorporationRow,
   type LoyaltyModel,
@@ -206,7 +207,16 @@ export async function loadCorporationFaction(
 export type KnownRows =
   { kind: 'agents'; rows: KnownAgentRow[] } | { kind: 'corporations'; rows: KnownCorporationRow[] };
 
-/** A corporation's agents or a faction's corporations the pilot holds a standing with. */
+async function loadAgentSystems(systemIds: readonly number[]): Promise<Map<number, AgentSystem>> {
+  const found = await Promise.all(systemIds.map((id) => lookupSolarSystem(id)));
+  const systems = new Map<number, AgentSystem>();
+  for (const system of found) {
+    if (system) systems.set(system.id, { name: system.name, security: system.security });
+  }
+  return systems;
+}
+
+/** A corporation's agents (all of them) or a faction's corporations the pilot holds a standing with. */
 export async function loadKnownRows(
   characterId: number,
   target: OwnerTarget,
@@ -233,8 +243,14 @@ export async function loadKnownRows(
   const systemIds = [
     ...new Set(known.flatMap(({ agent }) => stationSystems.get(agent.stationId) ?? [])),
   ];
-  const jumps = await jumpsFromCurrent(characterId, systemIds);
-  return { kind: 'agents', rows: knownAgentRows(known, stations, jumps) };
+  const [jumps, systems] = await Promise.all([
+    jumpsFromCurrent(characterId, systemIds),
+    loadAgentSystems(systemIds),
+  ]);
+  return {
+    kind: 'agents',
+    rows: knownAgentRows(known, stations, jumps, systems, data.skills !== null),
+  };
 }
 
 /** `null` for a corporation with neither a store nor points, or when the balances are unreadable. */

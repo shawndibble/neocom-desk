@@ -10,6 +10,7 @@ import {
   AGENT_LEVEL_STANDING,
   NO_SOCIAL_SKILLS,
   agentAccess,
+  asAgentLevel,
   bestLink,
   blockingLink,
   brokerFeeComparison,
@@ -368,28 +369,87 @@ export interface KnownAgentRow {
   level: number;
   divisionName: string | undefined;
   effective: number;
+  /** True when the pilot has a standing row toward this agent; otherwise `effective` is inherited from the corporation and faction. */
+  hasStanding: boolean;
+  /** An agent that can be located in the game's agent finder. */
+  isLocator: boolean;
+  /** Whether the pilot's standings open this agent; null when their skills are unknown (decision 20261028) or the level is not 1-5. */
+  access: { open: boolean; needs: number | null } | null;
   /** Where the agent sits and how far; null when its station is not in the snapshot. */
-  place: { systemId: number; jumps: number | null } | null;
+  place: {
+    systemId: number;
+    systemName: string | null;
+    security: number | null;
+    jumps: number | null;
+  } | null;
 }
 
-/** `known` is best first already (`agentsOfCorporation`); the rows keep that order. */
+export interface AgentSystem {
+  name: string;
+  security: number;
+}
+
+/** `known` arrives best standing first (`agentsOfCorporation`); `groupAgentRows` orders them for display. */
 export function knownAgentRows(
   known: readonly KnownAgent[],
   stations: readonly NpcStationEntry[],
-  jumps: ReadonlyMap<number, number>
+  jumps: ReadonlyMap<number, number>,
+  systems: ReadonlyMap<number, AgentSystem>,
+  skillsKnown: boolean
 ): KnownAgentRow[] {
   const systemOf = new Map(stations.map((station) => [station.id, station.systemId]));
-  return known.map(({ agent, divisionName, effective }) => {
+  return known.map(({ agent, divisionName, effective, hasStanding, chain }) => {
     const systemId = systemOf.get(agent.stationId);
+    const level = asAgentLevel(agent.level);
+    const access = skillsKnown && level !== null ? agentAccess(chain, level) : null;
     return {
       agentId: agent.id,
       name: agent.name,
       level: agent.level,
       divisionName,
       effective,
-      place: systemId === undefined ? null : { systemId, jumps: jumps.get(systemId) ?? null },
+      hasStanding,
+      isLocator: agent.isLocator,
+      access: access && { open: access.open, needs: access.needs },
+      place:
+        systemId === undefined
+          ? null
+          : {
+              systemId,
+              systemName: systems.get(systemId)?.name ?? null,
+              security: systems.get(systemId)?.security ?? null,
+              jumps: jumps.get(systemId) ?? null,
+            },
     };
   });
+}
+
+export interface AgentLevelGroup {
+  level: number;
+  /** Nearest first (unknown distance last), then by division and name. */
+  rows: KnownAgentRow[];
+}
+
+/** The agents grouped by level, level 5 first, each group nearest first. */
+export function groupAgentRows(rows: readonly KnownAgentRow[]): AgentLevelGroup[] {
+  const byLevel = new Map<number, KnownAgentRow[]>();
+  for (const row of rows) {
+    const group = byLevel.get(row.level) ?? [];
+    group.push(row);
+    byLevel.set(row.level, group);
+  }
+  return [...byLevel]
+    .sort(([a], [b]) => b - a)
+    .map(([level, group]) => ({
+      level,
+      rows: group.sort(
+        (a, b) =>
+          (a.place?.jumps ?? Infinity) - (b.place?.jumps ?? Infinity) ||
+          (a.divisionName ?? '').localeCompare(b.divisionName ?? '') ||
+          a.name.localeCompare(b.name) ||
+          a.agentId - b.agentId
+      ),
+    }));
 }
 
 export interface KnownCorporationRow {

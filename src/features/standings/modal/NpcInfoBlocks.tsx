@@ -4,10 +4,11 @@
  * rows, which sentence) was made by the builder. Each card hugs its content
  * (`w-fit max-w-full`); `NpcInfoView` puts them in two columns from `md`.
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Eyebrow, StandingIcon } from '@/components/ui';
+import { Button, Eyebrow, StandingIcon } from '@/components/ui';
+import { SecurityStatus } from '@/components/SecurityStatus';
 import { HintText } from '@/components/ui/HintText';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { CharacterLink, CorporationLink, PlaceLink } from '@/features/entities';
@@ -16,6 +17,7 @@ import { cx } from '@/lib/cx';
 import { fixed1, fixed2 } from '@/lib/fixedFormat';
 import { formatCount } from '@/lib/formatCount';
 import type { KnownRows } from './npcInfoLoaders';
+import { groupAgentRows, type AgentLevelGroup, type KnownAgentRow } from './npcInfoModel';
 import type {
   AccessModel,
   LoyaltyModel,
@@ -338,7 +340,100 @@ export function WhereBlock({ rows }: { rows: readonly WhereRow[] }) {
   );
 }
 
-/** Agents (of a corporation) or corporations (of a faction) the pilot already has a standing with. */
+/** How many agents of a level show before "Show all". */
+const AGENTS_SHOWN_PER_LEVEL = 3;
+
+function AgentRow({ row }: { row: KnownAgentRow }) {
+  const { t } = useTranslation();
+  return (
+    <li className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+      {row.hasStanding ? (
+        <>
+          <StandingIcon value={row.effective} />
+          <span className="w-10 text-right tabular-nums">{fixed2(row.effective)}</span>
+        </>
+      ) : (
+        <span className="w-[calc(1rem+2.5rem+0.5rem)] shrink-0" aria-hidden="true" />
+      )}
+      <CharacterLink id={row.agentId} className="min-w-0 truncate">
+        {row.name}
+      </CharacterLink>
+      <span className="text-xs whitespace-nowrap text-text-dim">
+        {row.divisionName ?? ''}
+        {row.isLocator && (
+          <>
+            {row.divisionName !== undefined && ' · '}
+            {t('publicInfo.npc.known.locator')}
+          </>
+        )}
+      </span>
+      {row.access && (
+        <span
+          className={cx(
+            'text-xs whitespace-nowrap',
+            row.access.open ? 'text-text-dim' : 'text-warning'
+          )}
+        >
+          {row.access.open
+            ? t('publicInfo.npc.known.accessOpen')
+            : t('publicInfo.npc.known.accessNeeds', { needs: fixed1(row.access.needs ?? 0) })}
+        </span>
+      )}
+      {row.place && (
+        <span className="flex items-center gap-1 text-xs whitespace-nowrap">
+          {row.place.systemName !== null && (
+            <span>
+              {row.place.systemName}
+              {row.place.security !== null && (
+                <>
+                  {' ('}
+                  <SecurityStatus security={row.place.security} />
+                  {')'}
+                </>
+              )}
+            </span>
+          )}
+          {row.place.jumps != null && (
+            <Jumps systemId={row.place.systemId} count={row.place.jumps} />
+          )}
+        </span>
+      )}
+    </li>
+  );
+}
+
+function AgentLevelSection({ group }: { group: AgentLevelGroup }) {
+  const { t } = useTranslation();
+  const [showAll, setShowAll] = useState(false);
+  const truncated = group.rows.length > AGENTS_SHOWN_PER_LEVEL;
+  const shown = showAll ? group.rows : group.rows.slice(0, AGENTS_SHOWN_PER_LEVEL);
+  return (
+    <section className="flex flex-col gap-1.5">
+      <h4 className="text-xs font-semibold text-text-dim">
+        {t('publicInfo.npc.known.levelHeading', { level: group.level })}
+      </h4>
+      <ul className={cx('flex flex-col gap-1.5', showAll && 'max-h-64 overflow-y-auto')}>
+        {shown.map((row) => (
+          <AgentRow key={row.agentId} row={row} />
+        ))}
+      </ul>
+      {truncated && (
+        <Button
+          size="sm"
+          aria-expanded={showAll}
+          className="self-start"
+          onClick={() => setShowAll((open) => !open)}
+        >
+          {showAll
+            ? t('publicInfo.npc.known.showFewer')
+            : t('publicInfo.npc.known.showAll', { count: group.rows.length })}
+        </Button>
+      )}
+    </section>
+  );
+}
+
+/** Every basic agent of a corporation, by level, or the corporations of a faction the pilot has a standing with. */
 export function KnownBlock({ known }: { known: KnownRows }) {
   const { t } = useTranslation();
   return (
@@ -349,40 +444,25 @@ export function KnownBlock({ known }: { known: KnownRows }) {
           : 'publicInfo.npc.known.corporations'
       )}
     >
-      <ul className="flex max-h-64 flex-col gap-1.5 overflow-y-auto">
-        {known.kind === 'corporations'
-          ? known.rows.map((row) => (
-              <li key={row.corporationId} className="flex items-center gap-2">
-                <StandingIcon value={row.effective} />
-                <span className="w-10 text-right tabular-nums">{fixed2(row.effective)}</span>
-                <CorporationLink id={row.corporationId} className="min-w-0 truncate">
-                  {row.name}
-                </CorporationLink>
-              </li>
-            ))
-          : known.rows.map((row) => (
-              <li key={row.agentId} className="flex items-center gap-2">
-                <StandingIcon value={row.effective} />
-                <span className="w-10 text-right tabular-nums">{fixed2(row.effective)}</span>
-                <CharacterLink id={row.agentId} className="min-w-0 truncate">
-                  {row.name}
-                </CharacterLink>
-                <span className="text-xs whitespace-nowrap text-text-dim">
-                  {row.divisionName === undefined
-                    ? t('publicInfo.npc.known.agentLevelNoDivision', { level: row.level })
-                    : t('publicInfo.npc.known.agentLevel', {
-                        level: row.level,
-                        division: row.divisionName,
-                      })}
-                </span>
-                {row.place?.jumps != null && (
-                  <span className="whitespace-nowrap">
-                    <Jumps systemId={row.place.systemId} count={row.place.jumps} />
-                  </span>
-                )}
-              </li>
-            ))}
-      </ul>
+      {known.kind === 'agents' ? (
+        <div className="flex flex-col gap-3">
+          {groupAgentRows(known.rows).map((group) => (
+            <AgentLevelSection key={group.level} group={group} />
+          ))}
+        </div>
+      ) : (
+        <ul className="flex max-h-64 flex-col gap-1.5 overflow-y-auto">
+          {known.rows.map((row) => (
+            <li key={row.corporationId} className="flex items-center gap-2">
+              <StandingIcon value={row.effective} />
+              <span className="w-10 text-right tabular-nums">{fixed2(row.effective)}</span>
+              <CorporationLink id={row.corporationId} className="min-w-0 truncate">
+                {row.name}
+              </CorporationLink>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }
