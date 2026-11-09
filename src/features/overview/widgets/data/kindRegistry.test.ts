@@ -145,6 +145,7 @@ const ALT: Record<keyof typeof VIEW_SETTINGS, Variant[]> = {
   ],
   // Each kind's own second Show: the options differ by kind.
   show: [(k) => ({ kind: '', scopeAll: false, show: k.shows[1] })],
+  layers: [{ kind: '', scopeAll: false, hiddenLayers: ['assets'] }],
   trend: [
     { kind: '', scopeAll: false, trendItems: [34] },
     { kind: '', scopeAll: false, trendHubs: ['amarr'] },

@@ -20,6 +20,7 @@ import {
   setRaidsRadius,
   setRaidsWhere,
   setProfitSource,
+  setHiddenLayers,
   setTrendHubs,
   setTrendItems,
   setPlexPer30Days,
@@ -251,6 +252,22 @@ describe('setTrendItems and setTrendHubs', () => {
     const next = setTrendHubs(l, 'a', ['jita', 'nowhere', 'amarr', 'rens', 'hek']);
     expect(next.widgets[0].trendHubs).toEqual(['jita', 'amarr', 'rens']);
     expect(setTrendHubs(next, 'a', []).widgets[0]).not.toHaveProperty('trendHubs');
+  });
+});
+
+describe('setHiddenLayers', () => {
+  const l = layoutOf(w('a', 'netWorth'), w('b', 'wallet'));
+
+  it('stores known layers once, and clears on an empty list', () => {
+    const next = setHiddenLayers(l, 'a', ['assets', 'nope', 'assets']);
+    expect(next.widgets[0].hiddenLayers).toEqual(['assets']);
+    expect(setHiddenLayers(next, 'a', []).widgets[0]).not.toHaveProperty('hiddenLayers');
+  });
+
+  it('never hides every layer, and ignores a kind without the picker', () => {
+    const all = ['isk', 'assets', 'escrow', 'sellOrders', 'contracts'];
+    expect(setHiddenLayers(l, 'a', all)).toBe(l);
+    expect(setHiddenLayers(l, 'b', ['assets'])).toBe(l);
   });
 });
 
