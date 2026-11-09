@@ -44,11 +44,13 @@ describe('RailUpgradeButton', () => {
     expect(screen.getByRole('button', { name: 'Upgrade' })).toBeInTheDocument();
   });
 
-  it('applies the update from the callout button', async () => {
+  it('has no button of its own: the icon it points at applies', async () => {
     forceUpdate.mockResolvedValue(undefined);
     useUpdateStatus.setState({ status: 'available' });
     render(<RailUpgradeButton />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Update now' }));
+    await screen.findByText('A new version is ready.');
+    expect(screen.queryByRole('button', { name: 'Update now' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Upgrade' }));
     expect(forceUpdate).toHaveBeenCalledOnce();
   });
 

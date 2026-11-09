@@ -21,8 +21,13 @@ export const PopoverAnchor = PopoverPrimitive.Anchor;
 export function PopoverContent({
   className,
   sideOffset = 4,
+  arrow = false,
+  children,
   ...props
-}: ComponentProps<typeof PopoverPrimitive.Content>) {
+}: ComponentProps<typeof PopoverPrimitive.Content> & {
+  /** A pointer toward the anchor, for a hint that names the control it sits beside. */
+  arrow?: boolean;
+}) {
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
   // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
   const container = usePortalContainer();
@@ -36,7 +41,17 @@ export function PopoverContent({
           sideOffset={sideOffset}
           className={cx(menuContentClassName, 'motion-pop-exit', className)}
           {...props}
-        />
+        >
+          {children}
+          {arrow && (
+            <PopoverPrimitive.Arrow
+              width={12}
+              height={6}
+              className="fill-panel stroke-line"
+              aria-hidden
+            />
+          )}
+        </PopoverPrimitive.Content>
       </PopoverPrimitive.Portal>
     </RowTappableContext.Provider>
   );
