@@ -7,6 +7,7 @@
 import type { PlanetPin } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { pinRole, factorySchematicId } from '@/engine/pi/colonyPins';
+import { rawById } from '@/engine/pi/rawIndex';
 import { DAY_MS } from '@/lib/age';
 
 export interface ImportedInput {
@@ -48,8 +49,7 @@ export function importedInputs(pins: readonly PlanetPin[], pi: PiData): Imported
     for (const input of inputs) {
       if (local.has(input.typeID)) continue;
       const volume =
-        pi.schematics[String(input.typeID)]?.volume ??
-        pi.raw.find((r) => r.typeID === input.typeID)?.volume;
+        pi.schematics[String(input.typeID)]?.volume ?? rawById(pi).get(input.typeID)?.volume;
       const unitsPerDay = count * input.quantity * (DAY_MS / 1000 / cycleTime);
       const line = totals.get(input.typeID) ?? {
         typeId: input.typeID,
