@@ -17,7 +17,7 @@ import { longestRemainingSeconds, secondsLeft } from '@/engine/clone/jumpTimers'
 import { liveRaids, raidState } from '@/engine/corp/sovereignty';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
-import type { LayerId } from '@/engine/netWorth/series';
+import { netWorthOf, type LayerId } from '@/engine/netWorth/series';
 import { summarizeRouteKills, type KillLevel } from '@/engine/route/routeKillTrend';
 import type { ChartColor, StackPart } from '../charts/types';
 import {
@@ -162,7 +162,10 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll, hiddenLayers
   const kept = listed.filter(({ id }) => !hiddenLayers?.includes(id));
   const shown = kept.length > 0 ? kept : listed;
   // What the widget claims is the layers it draws, so the headline and the change agree with the chart.
-  const total = shown.reduce((sum, { id }) => sum + layers[id], 0);
+  const total = netWorthOf(
+    layers,
+    shown.map(({ id }) => id)
+  );
   const parts: StackPart[] = shown.map(({ id, color }) => ({
     key: id,
     label: t(LAYER_LABEL_KEYS[id]),

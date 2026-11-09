@@ -9,7 +9,7 @@ import { DAY_MS } from '@/lib/age';
 import { isPriceSpike } from '@/engine/market/priceVsMedian';
 import { formatVsMedianPct } from '@/features/market/format';
 import type { WalletJournalEntry } from '@/esi/endpoints';
-import { LAYER_IDS, type LayerId, type LayerValues } from '@/engine/netWorth/series';
+import { LAYER_IDS, netWorthOf, type LayerId, type LayerValues } from '@/engine/netWorth/series';
 import { humanizeRefType } from '@/features/character/format';
 import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { formatAge } from '@/lib/age';
@@ -306,7 +306,7 @@ export function netWorthTable(
   series: NetWorthSeries,
   layers: readonly LayerId[]
 ): TableModel {
-  const total = LAYER_IDS.reduce((sum, id) => sum + now[id], 0);
+  const total = netWorthOf(now, layers);
   return {
     columns: [
       { key: 'layer', label: t(`${W}.netWorth.col.layer`), priority: 0 },

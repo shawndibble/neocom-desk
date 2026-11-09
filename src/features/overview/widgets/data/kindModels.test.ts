@@ -185,6 +185,16 @@ describe('netWorth', () => {
     expect(view.chart.parts.map((p) => p.key)).not.toContain('assets');
   });
 
+  it('shares in the table add up to the layers drawn, not all of them', () => {
+    const view = buildView(
+      'netWorth',
+      { netWorth: ok({ characters: [char(91)] }) },
+      { ...ctx(), hiddenLayers: ['assets'] }
+    );
+    const shares = view.table?.rows.map((r) => r.cells[2]);
+    expect(JSON.stringify(shares)).toContain('67');
+  });
+
   it('keeps every listed layer if the switch-offs would leave none', () => {
     const view = buildView(
       'netWorth',
