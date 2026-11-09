@@ -510,11 +510,24 @@ export async function linkRecordedPayment(
 ): Promise<void> {
   if (assignments.length === 0) return;
   const now = Date.now();
-  const updated = assignments.map((a): MiningTaxAssignmentRecord => {
-    if (!a.payment) return a;
-    return { ...a, payment: withLink(a.payment, ref, 'auto'), updatedAt: now };
+  // Two matchers (the journal's and Moon Mining Tax's) can race to the same
+  // payment: re-read inside the transaction and skip what already carries the
+  // link, so it is attached once.
+  await db.transaction('rw', db.miningTaxAssignments, async () => {
+    const current = await db.miningTaxAssignments.bulkGet(assignments.map((a) => a.id));
+    const updated = current.flatMap((a): MiningTaxAssignmentRecord[] => {
+      if (!a?.payment || hasLink(a.payment, ref)) return [];
+      return [{ ...a, payment: withLink(a.payment, ref, 'auto'), updatedAt: now }];
+    });
+    await db.miningTaxAssignments.bulkPut(updated);
   });
-  await db.miningTaxAssignments.bulkPut(updated);
+}
+
+function hasLink(payment: MiningTaxPaymentInfo, ref: PaymentTransactionRef): boolean {
+  const normalized = normalizePaymentInfo(payment);
+  return 'journalRefId' in ref
+    ? (normalized.journalLinks ?? []).some((l) => l.refId === ref.journalRefId)
+    : (normalized.contractLinks ?? []).some((l) => l.refId === ref.contractId);
 }
 
 /** A minimal payment to create from the transaction's own data, when the target Assignment(s) have no `payment` yet — see `linkPaymentTransaction`. */

@@ -52,4 +52,14 @@ describe('autoLinkRecordedPaymentsFromJournals', () => {
       autoLinkRecordedPaymentsFromJournals([{ characterId: CHAR, entries: [entry(1, -100)] }])
     ).resolves.toBeUndefined();
   });
+
+  it('attaches the link once when run twice at the same time', async () => {
+    await seedRecorded('p1', 100);
+    const journals = [{ characterId: CHAR, entries: [entry(1, -100)] }];
+    await Promise.all([
+      autoLinkRecordedPaymentsFromJournals(journals),
+      autoLinkRecordedPaymentsFromJournals(journals),
+    ]);
+    expect((await linksOf('a-p1'))?.journalLinks).toEqual([{ refId: 1, source: 'auto' }]);
+  });
 });
