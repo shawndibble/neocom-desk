@@ -104,6 +104,8 @@ export function AssetsList({
     flatMatches,
     rows,
     showItemColumns,
+    levelSort,
+    toggleLevelSort,
     levelHeadingRef,
     searchRef,
     toggleNodeSelection,
@@ -506,7 +508,9 @@ export function AssetsList({
               aria-label={t('assets.treeLabel')}
               className="min-h-0 flex-1 overflow-y-auto"
             >
-              {showItemColumns && <ItemColumnLabels t={t} />}
+              {showItemColumns && (
+                <ItemColumnLabels sort={levelSort} onSort={toggleLevelSort} t={t} />
+              )}
               <div
                 role="presentation"
                 style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
