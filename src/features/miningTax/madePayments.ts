@@ -36,7 +36,10 @@ const COMPLETED_CONTRACT_STATUSES = new Set<Contract['status']>([
 ]);
 
 /** Outgoing hand-made ISK movements: the journal half of "what have I paid?". */
-function fromJournal(entries: readonly WalletJournalEntry[], characterId: number): MadePayment[] {
+export function fromJournal(
+  entries: readonly WalletJournalEntry[],
+  characterId: number
+): MadePayment[] {
   return entries
     .filter(
       (entry) =>
