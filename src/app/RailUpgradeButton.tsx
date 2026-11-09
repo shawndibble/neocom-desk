@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, IconButton, Popover, PopoverAnchor, PopoverContent } from '@/components/ui';
+import { IconButton, Popover, PopoverAnchor, PopoverContent } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useApplyUpdate } from '@/features/settings/useUpdateState';
 import { useUpdateStatus } from './updateAvailable';
@@ -11,9 +11,10 @@ import { useUpdateStatus } from './updateAvailable';
  * the boot cover) with no trip into Settings. When the page stays up, the
  * reason is read out and replaces the tooltip.
  *
- * Each time a build is found it also opens a small callout beside the icon, so
- * a tab left open notices it. The callout never takes focus and never reloads
- * anything: a press outside or Escape dismisses it, the button applies.
+ * Each time a build is found it also opens a small callout pointing at the icon,
+ * so a tab left open notices it. The callout has no button of its own: the icon
+ * it points at applies. It never takes focus and never reloads anything; a
+ * press outside (the icon included) or Escape dismisses it.
  */
 export function RailUpgradeButton() {
   const { t } = useTranslation();
@@ -41,8 +42,9 @@ export function RailUpgradeButton() {
         </PopoverAnchor>
         <PopoverContent
           side="right"
-          align="end"
-          className="flex max-w-60 flex-col items-start gap-2 p-2 text-xs"
+          sideOffset={8}
+          arrow
+          className="max-w-60 px-2 py-1.5 text-xs"
           // A callout never takes focus from where the pilot is working.
           onOpenAutoFocus={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => event.preventDefault()}
@@ -50,17 +52,6 @@ export function RailUpgradeButton() {
           onFocusOutside={(event) => event.preventDefault()}
         >
           <p>{t('nav.upgradeCallout')}</p>
-          <Button
-            size="sm"
-            variant="accent"
-            loading={updating}
-            onClick={() => {
-              setDismissedAt(found);
-              update();
-            }}
-          >
-            {t('settings.updateAction')}
-          </Button>
         </PopoverContent>
       </Popover>
       {notice && (
