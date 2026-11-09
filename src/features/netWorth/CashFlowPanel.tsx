@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { guarded } from '@/app/routeChunks';
-import { IskDelta, Panel, SegmentedControl, Spinner, StatChip, StatChips } from '@/components/ui';
+import { IskDelta, Panel, Spinner, StatChip, StatChips } from '@/components/ui';
 import { classifyJournal, type JournalRow } from '@/engine/journalNetting';
 import { utcDay } from '@/engine/localDay';
 import { useNow } from '@/lib/useNow';
@@ -15,13 +15,12 @@ import type { FanOutCharacter } from '@/features/character/allCharactersFanOut';
 import { JOURNAL_FIELD_TO_PARAM } from '@/features/character/walletJournalFilter';
 import { IskFlowLegend } from '@/features/character/IskFlowLegend';
 import { formatIsk } from '@/lib/isk';
+import { useWalletRange } from './walletRange';
 import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 
 const LazyIskFlowChartBars = lazy(() =>
   guarded(() => import('@/features/character/IskFlowChartBars'))
 );
-
-const PERIOD_VALUES = ['7', '30', '90'] as const;
 
 interface CashFlowPanelProps {
   characters: readonly FanOutCharacter[];
@@ -36,7 +35,7 @@ export function CashFlowPanel({ characters }: CashFlowPanelProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const touch = useMediaQuery(COARSE_POINTER_QUERY);
-  const [period, setPeriod] = useState<'7' | '30' | '90'>('30');
+  const period = useWalletRange((state) => state.value);
   const today = utcDay(useNow());
   const [snapshot, setSnapshot] = useState<AllJournalsSnapshot | null>(null);
 
@@ -90,22 +89,7 @@ export function CashFlowPanel({ characters }: CashFlowPanelProps) {
   const truncated = snapshot.loaded.some((entry) => entry.truncated);
 
   return (
-    <Panel
-      title={t('wallet.cashFlow.title')}
-      actions={
-        <SegmentedControl
-          label={t('wallet.cashFlow.period')}
-          options={PERIOD_VALUES.map((value) => ({
-            value,
-            label: t('wallet.cashFlow.periodDays', { count: Number(value) }),
-          }))}
-          value={period}
-          onChange={setPeriod}
-          size="sm"
-          uppercase={false}
-        />
-      }
-    >
+    <Panel title={t('wallet.cashFlow.title')}>
       <StatChips>
         <StatChip label={t('wallet.cashFlow.earned')} value={formatIsk(flow.earned)} />
         <StatChip label={t('wallet.cashFlow.spent')} value={formatIsk(flow.spent)} />

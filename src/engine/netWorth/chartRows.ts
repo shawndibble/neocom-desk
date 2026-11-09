@@ -3,6 +3,7 @@
  * day for a single Character, one value per Character per day for several.
  * Pure; the Recharts component only draws what these say.
  */
+import { DAY_MS } from '@/lib/age';
 import {
   estimateLayers,
   netWorthOf,
@@ -44,6 +45,14 @@ export function stackRows(series: CharacterSeries, shown: readonly LayerId[]): S
       total: netWorthOf(values, shown),
     };
   });
+}
+
+/** The last `days` days of rows, counted back from the newest row. Rows are daily and ascending. */
+export function lastDays<R extends { x: number }>(rows: readonly R[], days: number): R[] {
+  const newest = rows[rows.length - 1]?.x;
+  if (newest === undefined) return [];
+  const from = newest - (days - 1) * DAY_MS;
+  return rows.filter((row) => row.x >= from);
 }
 
 export type LineRow = { day: string; x: number } & Record<string, number | string | null>;
