@@ -350,6 +350,8 @@ export function BuildGroupPanel({
           pi={pi}
           ownedStockSnapshot={ownedStockSnapshot}
           rollup={rollup}
+          members={members}
+          onOpenPlan={onOpenPlan}
           buyRows={buyRows}
           nothingToBuy={buyRows.length === 0 && craftedTypeIds.length === 0}
           depthByType={depthByType}

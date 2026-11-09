@@ -4,16 +4,17 @@
  * panel scroll-lengths away.
  */
 import { formatCount } from '@/lib/formatCount';
-import { useCallback, useMemo, type ReactElement } from 'react';
+import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
-import { Button, DataTable, EmptyState, Panel } from '@/components/ui';
+import { Button, DataTable, EmptyState, MenuItem, Panel } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { BuildPlanRecord } from '@/db';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
+import type { BuildGroupMember } from '@/engine/industry/groupRollup';
 import { rowVolume } from '@/engine/industry/materialVolume';
 import type { OwnedStockScope } from '@/engine/industry/ownedStock';
 import { ownedStockOffer } from '@/engine/industry/ownedStockOffer';
@@ -25,7 +26,9 @@ import type { BuildGroup } from './buildGroups';
 import { DepthPriceLine } from './DepthPriceLine';
 import { formatVolume } from './format';
 import { groupMaterialsCsvColumns } from './groupMaterialsCsv';
+import { groupMaterialConsumers } from './groupMaterialConsumers';
 import type { GroupRollupView } from './groupRollupView';
+import { GroupUsedByModal } from './GroupUsedByModal';
 import { OwnedStockHint } from './OwnedStockHint';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
@@ -47,6 +50,9 @@ interface GroupMaterialsPanelProps {
   pi: PiData | null;
   ownedStockSnapshot: OwnedStockSnapshot;
   rollup: GroupRollupView['rollup'];
+  /** The settled members, whose own tables say which plan needs how much of a material. */
+  members: readonly BuildGroupMember[];
+  onOpenPlan: (planId: string) => void;
   buyRows: readonly BuyMaterialRow[];
   /** True when no material is left to buy *and* none is crafted. */
   nothingToBuy: boolean;
@@ -67,6 +73,8 @@ export function GroupMaterialsPanel({
   pi,
   ownedStockSnapshot,
   rollup,
+  members,
+  onOpenPlan,
   buyRows,
   nothingToBuy,
   depthByType,
@@ -75,13 +83,27 @@ export function GroupMaterialsPanel({
 }: GroupMaterialsPanelProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  // Stable: `DataTable` memoizes its rows on `rowContextMenu`.
-  const rowContextMenu = useMemo(() => {
-    const { itemMenuFor } = buildItemMenuProps(catalog, (typeId) =>
-      navigate(bpcSourcingHref(typeId))
-    );
-    return (material: BuyMaterialRow, tr: ReactElement) => itemMenuFor(material.typeID, tr);
-  }, [catalog, navigate]);
+  const [usedByTypeId, setUsedByTypeId] = useState<number | null>(null);
+  const menuProps = useMemo(
+    () => buildItemMenuProps(catalog, (typeId) => navigate(bpcSourcingHref(typeId))),
+    [catalog, navigate]
+  );
+  // Stable: `DataTable` memoizes its rows on `rowContextMenu`. "Used by" is
+  // offered only for a material two or more plans need: for one plan the row
+  // already says it.
+  const rowContextMenu = useMemo(
+    () => (material: BuyMaterialRow, tr: ReactElement) =>
+      menuProps.itemMenuFor(
+        material.typeID,
+        tr,
+        groupMaterialConsumers(members, material.typeID).length >= 2 ? (
+          <MenuItem onSelect={() => setUsedByTypeId(material.typeID)}>
+            {t('industry.usedBy.menuItem')}
+          </MenuItem>
+        ) : undefined
+      ),
+    [menuProps, members, t]
+  );
 
   // Every type any member's whole tree can show, not only each blueprint's
   // own materials: the buy table lists sub-build leaves
@@ -329,6 +351,18 @@ export function GroupMaterialsPanel({
         </Panel>
         <p className="text-xs text-text-dim">{t('industry.groupEstimateNote')}</p>
       </div>
+      <GroupUsedByModal
+        typeID={usedByTypeId}
+        onClose={() => setUsedByTypeId(null)}
+        tableTotal={
+          rollup.tableMaterials.find((line) => line.typeID === usedByTypeId)?.quantity ?? null
+        }
+        consumers={usedByTypeId === null ? [] : groupMaterialConsumers(members, usedByTypeId)}
+        nameFor={(typeId) => nameForType(catalog, typeId)}
+        onOpenPlan={onOpenPlan}
+        itemMenuFor={menuProps.itemMenuFor}
+        itemActionsFor={menuProps.itemActionsFor}
+      />
       {ownedBulk.toast}
     </>
   );
