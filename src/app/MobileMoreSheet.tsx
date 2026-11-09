@@ -20,6 +20,7 @@ import {
 import { canHide, FOOTER_PAGES, recentNavFor, viewPathFor } from './navRail';
 import { useHiddenNav, useRecentNav } from './navPreferences';
 import { NavHideToggle, NavItem } from './NavItem';
+import { MoreSheetUpdateRow } from './MoreSheetUpdateRow';
 import { useSettingsNeedsAttention } from './settingsAttention';
 
 export const MORE_SHEET_ID = 'mobile-more-sheet';
@@ -209,6 +210,8 @@ export function MobileMoreSheet({
             </div>
           </section>
         )}
+
+        <MoreSheetUpdateRow />
 
         {groups.map((group) => (
           <section
