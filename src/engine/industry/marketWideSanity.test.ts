@@ -4,6 +4,7 @@ import {
   averageDailyOrders,
   averageDailyVolume,
   isRarelySold,
+  cappedSellPrice,
   reliableSellPrice,
   TROLL_PRICE_RATIO,
 } from './marketWideSanity';
@@ -75,5 +76,20 @@ describe('isRarelySold', () => {
   it('is true under the threshold and false at or above it', () => {
     expect(isRarelySold(RARELY_SOLD_PER_DAY - 0.1)).toBe(true);
     expect(isRarelySold(RARELY_SOLD_PER_DAY)).toBe(false);
+  });
+});
+
+describe('cappedSellPrice', () => {
+  it('caps a troll price at the average', () => {
+    expect(cappedSellPrice(100_000, 100)).toEqual({ price: 100, capped: true });
+  });
+
+  it('keeps the hub price below the ratio', () => {
+    expect(cappedSellPrice(120, 100)).toEqual({ price: 120, capped: false });
+  });
+
+  it('keeps the hub price, uncapped, when CCP has no average', () => {
+    expect(cappedSellPrice(100_000, null)).toEqual({ price: 100_000, capped: false });
+    expect(cappedSellPrice(100_000, undefined)).toEqual({ price: 100_000, capped: false });
   });
 });

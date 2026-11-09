@@ -37,6 +37,7 @@ import { usePlanEdits } from './usePlanEdits';
 import { usePlanFacilityContexts } from './usePlanFacilityContexts';
 import { usePlanJobSchedule } from './usePlanJobSchedule';
 import { usePlanMaterialsExport } from './usePlanMaterialsExport';
+import { capProductPrice } from './productPriceCap';
 import { usePlanOwnedStock } from './usePlanOwnedStock';
 import { usePlanPricing } from './usePlanPricing';
 import { useReactionLocationBlock } from './useReactionLocationBlock';
@@ -260,8 +261,12 @@ export function BuildPlanDetail({
 
   const { itemMenuFor, itemActionsFor } = buildItemMenuProps(catalog, onSearchBpcSourcing);
 
+  const { snapshot: pricedSnapshot, capped: productPriceCapped } = capProductPrice(
+    snapshot,
+    entry.productTypeID
+  );
   const productUnitPrice =
-    entry.productTypeID !== null ? (snapshot?.hubPrices[entry.productTypeID] ?? null) : null;
+    entry.productTypeID !== null ? (pricedSnapshot?.hubPrices[entry.productTypeID] ?? null) : null;
 
   const breakdownContext = planBreakdownContext({
     plan,
@@ -510,6 +515,7 @@ export function BuildPlanDetail({
             productName={entry.productName}
             productTypeID={entry.productTypeID}
             productUnitPrice={productUnitPrice}
+            productPriceCapped={productPriceCapped}
             productQuantity={productQuantity}
             buildSystem={buildSystem}
             hub={hub}

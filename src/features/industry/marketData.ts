@@ -56,6 +56,12 @@ export interface MarketSnapshot {
   /** Global adjusted prices (job-cost EIV). Null when the live ESI call failed. */
   adjustedPrices: AdjustedPrices | null;
   /**
+   * CCP's average traded price per type (`/markets/prices/`), the reference a
+   * troll sell order is judged against (`capProductPrice`). Null when the live
+   * ESI call failed: no cap is then applied.
+   */
+  averagePrices?: HubPrices | null;
+  /**
    * Manufacturing cost index for the system the job runs in — `costIndexSystemId`
    * when the caller names one, else the hub's own system. Null only when the
    * live ESI call failed (the offline signal). A system ESI answered for but
@@ -180,14 +186,19 @@ export interface MarketSnapshotRequest {
 }
 
 /** Never rejects: a dead ESI is the offline signal, not an error to propagate. */
-async function loadAdjustedPrices(): Promise<AdjustedPrices | null> {
+async function loadGlobalPrices(): Promise<{
+  adjusted: AdjustedPrices;
+  average: HubPrices;
+} | null> {
   try {
-    const adjusted = await getAdjustedPrices();
-    const prices: AdjustedPrices = {};
-    for (const [typeId, price] of adjusted) {
-      if (price.adjusted !== null) prices[typeId] = price.adjusted;
+    const global = await getAdjustedPrices();
+    const adjusted: AdjustedPrices = {};
+    const average: HubPrices = {};
+    for (const [typeId, price] of global) {
+      if (price.adjusted !== null) adjusted[typeId] = price.adjusted;
+      if (price.average !== null) average[typeId] = price.average;
     }
-    return prices;
+    return { adjusted, average };
   } catch {
     return null;
   }
@@ -237,7 +248,7 @@ export function loadMarketSnapshots(
     hubBatches.set(stationId, getHubPricesWithStatus(group.hub, [...group.typeIds]));
   }
 
-  const adjustedPrices = loadAdjustedPrices();
+  const globalPrices = loadGlobalPrices();
 
   // Distinct activities can resolve side by side: `loadSystemCostIndices`
   // shares one in-flight fetch of the raw ESI response, so two activities on
@@ -278,13 +289,14 @@ export function loadMarketSnapshots(
         ? await Promise.all([indexIn('copying'), indexIn('invention')])
         : [undefined, undefined];
 
-    const adjusted = await adjustedPrices;
+    const global = await globalPrices;
     const regionId = (await lookupSolarSystem(systemId))?.regionId;
     return {
       hubPrices,
       hubBuyPrices,
       hubSellVolumes,
-      adjustedPrices: adjusted,
+      adjustedPrices: global?.adjusted ?? null,
+      averagePrices: global?.average ?? null,
       systemCostIndex,
       systemCostIndexMissing,
       regionalTaxPct: regionalJobTaxPct(regionId),

@@ -31,6 +31,7 @@ interface PlanCostsPanelProps {
   productName: string;
   productTypeID: number | null;
   productUnitPrice: number | null;
+  productPriceCapped: boolean;
   productQuantity: number | null;
   buildSystem: { id: number; name: string } | null;
   hub: TradeHub;
@@ -59,6 +60,7 @@ export function PlanCostsPanel({
   productName,
   productTypeID,
   productUnitPrice,
+  productPriceCapped,
   productQuantity,
   buildSystem,
   hub,
@@ -154,6 +156,7 @@ export function PlanCostsPanel({
         productName={productName}
         productTypeID={productTypeID}
         productUnitPrice={productUnitPrice}
+        productPriceCapped={productPriceCapped}
         productQuantity={productQuantity}
         costIndexSystemName={buildSystem?.name ?? hub.systemName}
         costIndexSystemId={buildSystem?.id}
