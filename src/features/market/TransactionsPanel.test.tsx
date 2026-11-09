@@ -618,10 +618,10 @@ describe('TransactionsPanel — By station view', () => {
   });
 
   it('shows one header per station with its trades and totals, names resolved with Location hidden', async () => {
-    renderPanel('/market/history?txn.view=station');
+    renderPanel('/market/history?txn.view=station&txn.stationsBy=net');
     await screen.findAllByRole('link', { name: 'Damage Control II' });
     const [first, second] = headers();
-    // Net ranks first by default: Amarr +1,000 before Jita +200.
+    // Net ranks highest first: Amarr +1,000 before Jita +200.
     expect(first).toHaveTextContent('Amarr VIII');
     expect(first).toHaveTextContent('1 trade');
     expect(first).toHaveTextContent(/Net \+1,000/);

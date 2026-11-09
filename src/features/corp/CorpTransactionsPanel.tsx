@@ -96,9 +96,10 @@ interface CorpTransactionsPanelProps {
 /** Radix needs a value here, and `''` reads to it as "nothing selected". */
 const SIDE_OPTIONS: readonly TransactionSide[] = ['all', 'buy', 'sell'];
 
-const STATION_ORDER_OPTIONS: readonly StationOrder[] = ['net', 'name', 'trades'];
+const STATION_ORDER_OPTIONS: readonly StationOrder[] = ['recent', 'net', 'name', 'trades'];
 
 const STATION_ORDER_LABEL: Record<StationOrder, string> = {
+  recent: 'wallet.stationsByRecent',
   net: 'wallet.stationsByNet',
   name: 'wallet.stationsByName',
   trades: 'wallet.stationsByTrades',

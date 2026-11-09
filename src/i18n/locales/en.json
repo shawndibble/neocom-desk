@@ -7195,6 +7195,7 @@
     "stationsSearchPlaceholder": "Search stations…",
     "stationsNoResults": "No stations match.",
     "stationsByLabel": "Stations by",
+    "stationsByRecent": "Latest trade",
     "stationsByNet": "Net",
     "stationsByName": "Name",
     "stationsByTrades": "Trades",
