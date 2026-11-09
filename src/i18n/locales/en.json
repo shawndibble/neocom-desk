@@ -2616,7 +2616,8 @@
     "attributeModifier": {
       "perLevel": "{{skill}}: {{perLevel}}% per level",
       "current": "Trained to {{level}} — currently {{total}}%",
-      "untrained": "Not trained"
+      "untrained": "Not trained",
+      "nextLevel": "Level {{level}}: {{value}}"
     },
     "totalSp": "Total SP",
     "unallocatedSp": "Unallocated SP",

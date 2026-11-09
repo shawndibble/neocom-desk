@@ -83,7 +83,7 @@ describe('ItemAttributeSections', () => {
             ],
           ])
         }
-        renderSkilledExtra={() => <p>Per-level effects</p>}
+        renderSkillList={() => <p>Per-level effects</p>}
       />
     );
     await user.click(screen.getByRole('button', { name: '285 s, 213.75 s with your skills' }));
@@ -102,6 +102,15 @@ describe('ItemAttributeSections', () => {
     render(<ItemAttributeSections sections={sections()} />);
     expect(screen.getByText('1,500 GJ')).toBeInTheDocument();
     expect(screen.getByText('10 GJ')).toBeInTheDocument();
+  });
+
+  it('opens the skill list from a plain base figure the pilot does not change', async () => {
+    const user = userEvent.setup();
+    render(
+      <ItemAttributeSections sections={sections()} renderSkillList={() => <p>Skill lines</p>} />
+    );
+    await user.click(screen.getByRole('button', { name: /^1,500 GJ/ }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Skill lines');
   });
 
   it('gives a resist layer its skilled HP, and a resist the skills change its own arrow', () => {

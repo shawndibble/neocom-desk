@@ -24,13 +24,7 @@
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
-import {
-  fieldBaseClassName,
-  focusRingClassName,
-  inlineLinkClassName,
-  interactiveClassName,
-} from '@/components/ui/controlStyles';
-import * as Icon from '@/components/ui/icons';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useInRouterContext, useLocation } from 'react-router-dom';
@@ -40,9 +34,6 @@ import {
   EmptyState,
   IskAmount,
   Modal,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
   Spinner,
   TabPanel,
   Tabs,
@@ -63,6 +54,7 @@ import { marketItemUrl } from '@/engine/market/urlState';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import {
   findModifyingSkills,
+  nextLevelValues,
   postPercentMagnitude,
   type ModifyingSkillEffect,
 } from '@/engine/market/skillAttributeEffects';
@@ -79,7 +71,8 @@ import { useTargetPlan, type TargetPlan } from '@/features/skills/useTargetPlan'
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { loadRegionName } from '@/features/places/regions';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
-import { formatVolume } from './format';
+import { formatAttributeValue, formatVolume } from './format';
+import { romanLevel } from '@/engine/projection';
 import { ItemAttributeSections } from './ItemAttributeSections';
 import { sectionsShowSkilled } from './skilledFigures';
 import {
@@ -575,24 +568,7 @@ export function ItemDetailModal({
                 <ItemAttributeSections
                   sections={attributeSections}
                   skilledSources={skilled.status === 'ready' ? skilled.sources : undefined}
-                  renderValue={(attribute, valueText) => {
-                    const modifiers = modifiersOf(attribute.attributeId);
-                    return modifiers.length > 0 ? (
-                      <AttributeModifierTrigger
-                        modifiers={modifiers}
-                        skillNames={data.allSkillNames}
-                        trainedSkills={trainedSkills}
-                        target={targetPlan}
-                        itemName={itemName}
-                        attributeName={attribute.name}
-                      >
-                        {valueText}
-                      </AttributeModifierTrigger>
-                    ) : (
-                      valueText
-                    );
-                  }}
-                  renderSkilledExtra={(attribute) => {
+                  renderSkillList={(attribute) => {
                     const modifiers = modifiersOf(attribute.attributeId);
                     return modifiers.length > 0 ? (
                       <AttributeModifierList
@@ -601,6 +577,10 @@ export function ItemDetailModal({
                         trainedSkills={trainedSkills}
                         target={targetPlan}
                         itemName={itemName}
+                        figure={{
+                          value: attribute.skilledValue ?? attribute.value,
+                          unit: attribute.unit,
+                        }}
                       />
                     ) : null;
                   }}
@@ -761,75 +741,22 @@ function priceCell(price: number | null): ReactNode {
   return price != null ? <IskAmount value={price} decimals={marketIskDecimals(price)} /> : '—';
 }
 
-/**
- * "Which skill changes this?" — wraps an attribute's displayed value in a
- * click-to-reveal popover. `modifiers` is already resolved
- * (`findModifyingSkills`) to the skills that actually apply to this item,
- * each already carrying its own per-level value — no fetch needed to render.
- */
-function AttributeModifierTrigger({
-  modifiers,
-  skillNames,
-  trainedSkills,
-  target,
-  itemName,
-  attributeName,
-  children,
-}: {
-  modifiers: readonly ModifyingSkillEffect[];
-  skillNames: Readonly<Record<number, string>>;
-  trainedSkills: ReadonlyMap<number, TrainedSkill>;
-  target: TargetPlan;
-  itemName: string;
-  attributeName: string;
-  children: ReactNode;
-}) {
-  const { t } = useTranslation();
-  const modifiersLabel = t('market.itemDetail.modifiersFor', { attribute: attributeName });
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cx(
-            fieldBaseClassName,
-            'inline-flex items-center gap-1 px-1.5 py-0.5 text-xs',
-            interactiveClassName,
-            focusRingClassName
-          )}
-        >
-          {children}
-          <span className="sr-only">{modifiersLabel}</span>
-          <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 space-y-2" aria-label={modifiersLabel}>
-        <AttributeModifierList
-          modifiers={modifiers}
-          skillNames={skillNames}
-          trainedSkills={trainedSkills}
-          target={target}
-          itemName={itemName}
-        />
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-/** Each skill's per-level effect on one attribute, with its Add button: the "which skill changes this" lines. */
+/** Each skill's effect on one attribute, what its next levels would make the figure, and its Add button: the popover of every skill-affected figure. */
 function AttributeModifierList({
   modifiers,
   skillNames,
   trainedSkills,
   target,
   itemName,
+  figure,
 }: {
   modifiers: readonly ModifyingSkillEffect[];
   skillNames: Readonly<Record<number, string>>;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   target: TargetPlan;
   itemName: string;
+  /** The figure as shown, which each skill's next levels scale. */
+  figure: { value: number; unit: string | null };
 }) {
   return modifiers.map((modifier) => (
     <AttributeModifierRow
@@ -839,28 +766,34 @@ function AttributeModifierList({
       trainedLevel={trainedSkills.get(modifier.ownerSkillTypeID)?.level ?? 0}
       target={target}
       itemName={itemName}
+      figure={figure}
     />
   ));
 }
+
+/** How many levels past the trained one a skill's popover previews. */
+const NEXT_LEVELS_SHOWN = 3;
 
 /** A per-level effect with its own sign: "+5", "-5" (the strings no longer hard-code "+"). */
 function signed(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
-/** One skill's effect inside `AttributeModifierTrigger`'s popover — `modifier.perLevelValue` is already static SDE data, no fetch needed. */
+/** One skill's effect inside a figure's popover — `modifier.perLevelValue` is already static SDE data, no fetch needed. */
 function AttributeModifierRow({
   modifier,
   skillName,
   trainedLevel,
   target,
   itemName,
+  figure,
 }: {
   modifier: ModifyingSkillEffect;
   skillName: string;
   trainedLevel: number;
   target: TargetPlan;
   itemName: string;
+  figure: { value: number; unit: string | null };
 }) {
   const { t } = useTranslation();
   return (
@@ -879,6 +812,16 @@ function AttributeModifierRow({
             })
           : t('skills.attributeModifier.untrained')}
       </p>
+      {nextLevelValues(figure.value, modifier.perLevelValue, trainedLevel, NEXT_LEVELS_SHOWN).map(
+        (next) => (
+          <p key={next.level} className="tabular-nums text-text-dim">
+            {t('skills.attributeModifier.nextLevel', {
+              level: romanLevel(next.level),
+              value: `${formatAttributeValue(next.value, figure.unit)}${figure.unit ? ` ${figure.unit}` : ''}`,
+            })}
+          </p>
+        )
+      )}
       {/* Nothing left to train at V. */}
       {trainedLevel < 5 && (
         <Button

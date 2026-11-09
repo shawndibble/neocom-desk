@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { findModifyingSkills, postPercentMagnitude } from './skillAttributeEffects';
+import {
+  findModifyingSkills,
+  nextLevelValues,
+  postPercentMagnitude,
+} from './skillAttributeEffects';
 import type { SkillAttributeModifierMap } from '@/sde/types';
 
 // Sharpshooter (3311, 5%/level) boosts attribute 54 on items requiring
@@ -45,5 +49,28 @@ describe('postPercentMagnitude', () => {
 
   it('is zero at an untrained level', () => {
     expect(postPercentMagnitude(5, 0)).toBe(0);
+  });
+});
+
+describe('nextLevelValues', () => {
+  it('scales the shown figure by the change in the skill bonus, up to the next count levels', () => {
+    const next = nextLevelValues(12000, 5, 0, 3);
+    expect(next.map((n) => n.level)).toEqual([1, 2, 3]);
+    expect(next[0]?.value).toBeCloseTo(12600);
+    expect(next[2]?.value).toBeCloseTo(13800);
+  });
+
+  it('starts from the trained level and stops at V', () => {
+    const next = nextLevelValues(13200, 5, 4, 3);
+    expect(next).toHaveLength(1);
+    expect(next[0]).toEqual({ level: 5, value: expect.closeTo(13750, 3) });
+  });
+
+  it('handles a negative bonus', () => {
+    expect(nextLevelValues(100, -10, 1, 1)[0]?.value).toBeCloseTo(88.89, 2);
+  });
+
+  it('returns nothing at V', () => {
+    expect(nextLevelValues(100, 5, 5, 3)).toEqual([]);
   });
 });

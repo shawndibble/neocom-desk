@@ -41,3 +41,28 @@ export function findModifyingSkills(
 export function postPercentMagnitude(perLevelValue: number, trainedLevel: number): number {
   return perLevelValue * trainedLevel;
 }
+
+export interface NextLevelValue {
+  level: number;
+  value: number;
+}
+
+/**
+ * What `current` (the figure as shown, with the skill at `trainedLevel`) reads
+ * once the skill reaches each of the next `count` levels, capped at V. A
+ * PostPercent bonus multiplies the attribute by `1 + perLevelValue% × level`,
+ * so a level's value is `current` scaled by that factor's change.
+ */
+export function nextLevelValues(
+  current: number,
+  perLevelValue: number,
+  trainedLevel: number,
+  count: number
+): NextLevelValue[] {
+  const factor = (level: number) => 1 + (perLevelValue * level) / 100;
+  const result: NextLevelValue[] = [];
+  for (let level = trainedLevel + 1; level <= Math.min(5, trainedLevel + count); level++) {
+    result.push({ level, value: (current * factor(level)) / factor(trainedLevel) });
+  }
+  return result;
+}
