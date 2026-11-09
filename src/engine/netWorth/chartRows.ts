@@ -4,6 +4,7 @@
  * Pure; the Recharts component only draws what these say.
  */
 import { DAY_MS } from '@/lib/age';
+import { utcDay } from './snapshot';
 import {
   estimateLayers,
   netWorthOf,
@@ -27,6 +28,13 @@ export interface StackRow {
 const ZERO: LayerValues = { isk: 0, assets: 0, escrow: 0, sellOrders: 0, contracts: 0 };
 
 /** Days with no snapshot are drawn from `estimateLayers` and flagged `estimated`. */
+/** A day before the first record: the first row's layers, drawn as a guess. */
+export const guessStackRow = (first: StackRow): StackRow => ({
+  ...first,
+  kind: 'wallet-only',
+  estimated: true,
+});
+
 export function stackRows(series: CharacterSeries, shown: readonly LayerId[]): StackRow[] {
   const estimates = estimateLayers(series.points);
   return series.points.map((point, i) => {
@@ -47,12 +55,27 @@ export function stackRows(series: CharacterSeries, shown: readonly LayerId[]): S
   });
 }
 
-/** The last `days` days of rows, counted back from the newest row. Rows are daily and ascending. */
-export function lastDays<R extends { x: number }>(rows: readonly R[], days: number): R[] {
+/**
+ * Exactly the last `days` days of rows, counted back from the newest row. Rows
+ * are daily and ascending. A series that starts later than the window is
+ * extended back to it with copies of its first row (`guess` marks them), so the
+ * chart always spans the range picked and the stretch before any record reads
+ * as a guess from the first entry.
+ */
+export function lastDays<R extends { day: string; x: number }>(
+  rows: readonly R[],
+  days: number,
+  guess: (first: R) => R = (first) => first
+): R[] {
+  const first = rows[0];
   const newest = rows[rows.length - 1]?.x;
-  if (newest === undefined) return [];
+  if (!first || newest === undefined) return [];
   const from = newest - (days - 1) * DAY_MS;
-  return rows.filter((row) => row.x >= from);
+  const padding: R[] = [];
+  for (let x = from; x < first.x; x += DAY_MS) {
+    padding.push({ ...guess(first), day: utcDay(x), x });
+  }
+  return [...padding, ...rows.filter((row) => row.x >= from)];
 }
 
 export type LineRow = { day: string; x: number } & Record<string, number | string | null>;
