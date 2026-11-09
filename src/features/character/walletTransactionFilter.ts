@@ -29,7 +29,7 @@ export type TransactionSide = 'all' | 'buy' | 'sell';
 export type TransactionView = 'flat' | 'station';
 
 /** What the By station view ranks its groups on (the "Stations by" picker). */
-export type StationOrder = 'net' | 'name' | 'trades';
+export type StationOrder = 'recent' | 'net' | 'name' | 'trades';
 
 export interface WalletTransactionFilter {
   side: TransactionSide;
@@ -52,7 +52,7 @@ export const EMPTY_WALLET_TRANSACTION_FILTER: WalletTransactionFilter = {
   text: '',
   stations: [],
   view: 'flat',
-  stationsBy: 'net',
+  stationsBy: 'recent',
 };
 
 /** The corp Transactions filter bar's fields in the URL (issue #570, #1302), scoped `txn.`. */
@@ -69,7 +69,7 @@ export const {
   view: { key: 'txn.view', codec: enumParam<TransactionView>(['flat', 'station'], 'flat') },
   stationsBy: {
     key: 'txn.stationsBy',
-    codec: enumParam<StationOrder>(['net', 'name', 'trades'], 'net'),
+    codec: enumParam<StationOrder>(['recent', 'net', 'name', 'trades'], 'recent'),
   },
 });
 

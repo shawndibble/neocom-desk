@@ -24,10 +24,13 @@ export function distinctLocationIds(fills: readonly Pick<StationFill, 'location_
   return [...new Set(fills.map((fill) => fill.location_id))].sort((a, b) => a - b);
 }
 
+const newestMs = (fills: readonly StationFill[]) =>
+  fills.reduce((newest, fill) => Math.max(newest, Date.parse(fill.date) || 0), 0);
+
 /**
- * Orders two station groups for the "Stations by" picker. Net and Trades rank
- * highest first; every tie falls back to the station's name, so the order is
- * the same on every render and for every equal pair.
+ * Orders two station groups for the "Stations by" picker. Latest trade, Net and
+ * Trades rank highest first; every tie falls back to the station's name, so the
+ * order is the same on every render and for every equal pair.
  */
 export function compareStationGroups(
   order: StationOrder,
@@ -40,7 +43,9 @@ export function compareStationGroups(
     const diff =
       order === 'trades'
         ? b.length - a.length
-        : summarizeTransactions(b).net - summarizeTransactions(a).net;
+        : order === 'recent'
+          ? newestMs(b) - newestMs(a)
+          : summarizeTransactions(b).net - summarizeTransactions(a).net;
     return diff !== 0 ? diff : byName(a, b);
   };
 }
