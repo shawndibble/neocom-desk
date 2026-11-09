@@ -435,7 +435,7 @@ const ITEM_QUANTITY_CELL = cx(ITEM_CELL, 'md:w-24');
 const ITEM_VOLUME_CELL = cx(ITEM_CELL, 'md:w-28');
 const ITEM_VALUE_CELL = cx(ITEM_CELL, 'md:w-24');
 /** The row menu button's md+ box (`IconButton` size `row`, `md:size-7`), reserved even when the row has no menu. */
-const ITEM_MENU_SLOT = 'md:flex md:w-7 md:shrink-0 md:justify-end';
+const ITEM_MENU_SLOT = 'md:ml-auto md:flex md:w-7 md:shrink-0 md:justify-end';
 const ITEM_MENU_SPACER = 'md:w-7 md:shrink-0';
 
 interface ItemColumnLabelsProps {
