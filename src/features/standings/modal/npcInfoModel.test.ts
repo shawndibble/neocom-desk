@@ -11,11 +11,13 @@ import {
   agentWhereRows,
   corporationWhereRows,
   factionWhereRows,
+  groupAgentRows,
   knownAgentRows,
   knownCorporationRows,
   loyaltyModel,
   standingModel,
   stationsModel,
+  type KnownAgentRow,
 } from './npcInfoModel';
 
 const CALDARI = 500001;
@@ -439,24 +441,69 @@ describe('knownAgentRows', () => {
     divisionName: 'Security',
     base: effective,
     effective,
+    hasStanding: true,
+    chain: chainOf([agent(effective)]),
   });
+  const systems = new Map([[30000143, { name: 'Jita', security: 0.95 }]]);
 
   it('keeps the order given and attaches each agent’s system and jumps', () => {
     const rows = knownAgentRows(
       [known(3009001, 2, 7.65), known(3009002, 3, 6.56)],
       CALDARI_STATIONS,
-      new Map([[30000143, 6]])
+      new Map([[30000143, 6]]),
+      systems,
+      true
     );
     expect(rows.map((row) => [row.agentId, row.place])).toEqual([
-      [3009001, { systemId: 30000143, jumps: 6 }],
-      [3009002, { systemId: 30000144, jumps: null }],
+      [3009001, { systemId: 30000143, systemName: 'Jita', security: 0.95, jumps: 6 }],
+      [3009002, { systemId: 30000144, systemName: null, security: null, jumps: null }],
     ]);
     expect(rows[0]).toMatchObject({ name: 'Agent 3009001', level: 3, divisionName: 'Security' });
   });
 
   it('has no place for an agent whose station is not in the snapshot', () => {
-    const [row] = knownAgentRows([known(3009001, 999, 1)], CALDARI_STATIONS, new Map());
+    const [row] = knownAgentRows(
+      [known(3009001, 999, 1)],
+      CALDARI_STATIONS,
+      new Map(),
+      systems,
+      true
+    );
     expect(row!.place).toBeNull();
+  });
+
+  it('says whether the pilot’s standings open each agent, and omits it when skills are unknown', () => {
+    const opens = knownAgentRows([known(1, 2, 3.5)], CALDARI_STATIONS, new Map(), systems, true);
+    expect(opens[0]!.access).toEqual({ open: true, needs: 3 });
+    const shut = knownAgentRows([known(1, 2, 0.5)], CALDARI_STATIONS, new Map(), systems, true);
+    expect(shut[0]!.access).toEqual({ open: false, needs: 3 });
+    const unknown = knownAgentRows([known(1, 2, 3.5)], CALDARI_STATIONS, new Map(), systems, false);
+    expect(unknown[0]!.access).toBeNull();
+  });
+});
+
+describe('groupAgentRows', () => {
+  const row = (agentId: number, level: number, jumps: number | null, division = 'Security') =>
+    ({
+      agentId,
+      name: `A${agentId}`,
+      level,
+      divisionName: division,
+      place: jumps === null ? null : { systemId: 1, systemName: null, security: null, jumps },
+    }) as unknown as KnownAgentRow;
+
+  it('groups by level, level 5 first, nearest first with unknown distance last', () => {
+    const groups = groupAgentRows([
+      row(1, 3, null),
+      row(2, 5, 4),
+      row(3, 3, 7),
+      row(4, 3, 2),
+      row(5, 5, 4, 'Mining'),
+    ]);
+    expect(groups.map((g) => [g.level, g.rows.map((r) => r.agentId)])).toEqual([
+      [5, [5, 2]],
+      [3, [4, 3, 1]],
+    ]);
   });
 });
 

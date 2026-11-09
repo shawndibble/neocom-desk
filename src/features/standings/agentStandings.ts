@@ -38,12 +38,16 @@ export interface KnownAgent {
   base: number;
   /** With the pilot's social skills. */
   effective: number;
+  /** Whether ESI reports a standing row toward this very agent. */
+  hasStanding: boolean;
+  /** The faction, corporation and agent links that govern it (its last link is `base`/`effective`). */
+  chain: StandingChain;
 }
 
 /**
- * The corporation's agents the pilot holds a standing row with, best effective
- * standing first (ties by agent id). Rejects when the agent or corporation
- * files cannot be read.
+ * Every basic agent of the corporation, whether or not the pilot has met them,
+ * best effective standing first (ties by agent id). Rejects when the agent or
+ * corporation files cannot be read.
  */
 export async function agentsOfCorporation(
   corporationId: number,
@@ -54,18 +58,18 @@ export async function agentsOfCorporation(
     loadAgents(),
     loadCorporationFactions(),
   ]);
-  const known = agents
-    .agentsByCorporation(corporationId)
-    .filter((agent) => standings.some((entry) => entry.from_id === agent.id))
-    .map((agent): KnownAgent => {
-      const target = { kind: 'agent', id: agent.id, corporationId } as const;
-      const { base, effective } = buildChain(
-        target,
-        standings,
-        corporationFactions,
-        skills
-      ).links.at(-1)!;
-      return { agent, divisionName: agents.divisionName(agent.divisionId), base, effective };
-    });
+  const known = agents.agentsByCorporation(corporationId).map((agent): KnownAgent => {
+    const target = { kind: 'agent', id: agent.id, corporationId } as const;
+    const chain = buildChain(target, standings, corporationFactions, skills);
+    const { base, effective } = chain.links.at(-1)!;
+    return {
+      agent,
+      divisionName: agents.divisionName(agent.divisionId),
+      base,
+      effective,
+      hasStanding: standings.some((entry) => entry.from_id === agent.id),
+      chain,
+    };
+  });
   return known.sort((a, b) => b.effective - a.effective || a.agent.id - b.agent.id);
 }

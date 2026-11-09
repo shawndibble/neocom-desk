@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { buildAgentIndex } from '@/sde/agents';
@@ -236,11 +236,12 @@ describe('NpcInfoView, a corporation', () => {
 
   it('lists the agents you know with a jumps link to each agent’s system', async () => {
     renderView('corporation', ISHUKONE);
-    const heading = await screen.findByRole('heading', { name: 'Agents you know' });
+    const heading = await screen.findByRole('heading', { name: 'Agents' });
     const card = heading.closest('section')!;
     const rows = within(card).getAllByRole('listitem');
-    expect(rows[0]).toHaveTextContent('7.65Hanna KurosawaL3 Security6 jumps');
-    expect(rows[1]).toHaveTextContent('1.00Mika HosokawaL2 Security6 jumps');
+    expect(within(card).getByRole('heading', { name: 'Level 3' })).toBeInTheDocument();
+    expect(rows[0]).toHaveTextContent(/7\.65Hanna KurosawaSecurity.*6 jumps/);
+    expect(rows[1]).toHaveTextContent(/1\.00Mika HosokawaSecurity.*6 jumps/);
     expect(within(rows[0]!).getByRole('link', { name: '6 jumps' })).toHaveAttribute(
       'href',
       routeToHref(HASATEEM)
@@ -249,6 +250,29 @@ describe('NpcInfoView, a corporation', () => {
       'href',
       `/?info=character-${HANNA}`
     );
+  });
+
+  it('lists agents the pilot never met, three per level, with Show all for the rest', async () => {
+    mocks.agents.mockResolvedValue(
+      buildAgentIndex({
+        divisions: { 22: 'Security' },
+        agents: [
+          [HANNA, 'Hanna Kurosawa', 3, 22, ISHUKONE, 60000020, 0],
+          [3009101, 'Never Met A', 3, 22, ISHUKONE, 60000020, 1],
+          [3009102, 'Never Met B', 3, 22, ISHUKONE, 60000020, 0],
+          [3009103, 'Never Met C', 3, 22, ISHUKONE, 60000020, 0],
+        ],
+      } as never)
+    );
+    renderView('corporation', ISHUKONE);
+    const card = (await screen.findByRole('heading', { name: 'Agents' })).closest('section')!;
+    expect(within(card).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(card).getAllByRole('listitem')[1]).toHaveTextContent(
+      'Never Met ASecurity · Locator'
+    );
+    fireEvent.click(within(card).getByRole('button', { name: 'Show all 4' }));
+    expect(within(card).getAllByRole('listitem')).toHaveLength(4);
+    expect(within(card).getByRole('button', { name: 'Show fewer' })).toBeInTheDocument();
   });
 
   it('shows the loyalty points and a link to the LP store', async () => {

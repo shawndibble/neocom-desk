@@ -15552,10 +15552,14 @@
         "agentValueNoDivision": "Level {{level}}"
       },
       "known": {
-        "agents": "Agents you know",
+        "agents": "Agents",
         "corporations": "Corporations you know",
-        "agentLevel": "L{{level}} {{division}}",
-        "agentLevelNoDivision": "L{{level}}"
+        "levelHeading": "Level {{level}}",
+        "locator": "Locator",
+        "accessOpen": "Open",
+        "accessNeeds": "Needs {{needs}}",
+        "showAll": "Show all {{count}}",
+        "showFewer": "Show fewer"
       },
       "loyalty": {
         "title": "Loyalty points",
