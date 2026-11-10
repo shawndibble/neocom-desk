@@ -721,11 +721,14 @@ describe('ItemDetailModal', () => {
 
     const chip = await screen.findByRole('button', { name: /^12,000 m.*skills that change/ });
     await user.click(chip);
-    expect(await screen.findByRole('dialog', { name: /skills that change/ })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: /What changes/ })).toBeInTheDocument();
 
     const skillLine = await screen.findByText('Sharpshooter: +5% per level');
     const popoverContent = skillLine.closest('div') as HTMLElement;
     expect(within(popoverContent).getByText('Not trained')).toBeInTheDocument();
+    // What the next levels would make the figure.
+    expect(within(popoverContent).getByText('Level I: 12,600 m')).toBeInTheDocument();
+    expect(within(popoverContent).getByText('Level III: 13,800 m')).toBeInTheDocument();
 
     // Zero plans yet -> "Create Skill Plan and add", matching FitCheckPanel/MasteryPanel's
     // convention. The item's own Required Skills section also has a button

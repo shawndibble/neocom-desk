@@ -70,6 +70,7 @@ export default function DemoBoard() {
       setProfitSource: none,
       setTrendItems: none,
       setTrendHubs: none,
+      setHiddenLayers: none,
       setShow: none,
       rename: none,
       setShowOnPhone: none,

@@ -50,6 +50,7 @@ export function opportunityRow(
 ): OpportunityRow {
   const { result, ...rest } = overrides;
   return {
+    priceCapped: false,
     candidate: {
       id: '1:1',
       characterId: 1,

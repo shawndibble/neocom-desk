@@ -1,4 +1,4 @@
-import { useEffect, type ComponentProps } from 'react';
+import { useEffect, type ComponentProps, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MenuItem } from '@/components/ui';
 import { assetShipEditLocation } from '@/features/fittings/assetShipLocation';
@@ -61,6 +61,7 @@ export function NodeContainerRow({
   gameName,
   characterBadge,
   stationId,
+  extraItems,
   selectMode,
   selectedIds,
   onToggleSelection,
@@ -74,6 +75,8 @@ export function NodeContainerRow({
   characterBadge: string | null;
   /** The station it sits in, for its menu's Set waypoint; null when unknown. */
   stationId: number | null;
+  /** More menu entries (a ship's Open in Fittings). */
+  extraItems?: ReactNode;
 }) {
   return (
     <ContainerRow
@@ -84,6 +87,7 @@ export function NodeContainerRow({
       estimatedValue={node.estimatedValue}
       characterBadge={characterBadge}
       stationId={stationId}
+      extraItems={extraItems}
       named={node.kind !== 'bay'}
       selectMode={selectMode}
       selectionState={selectionStateForIds(collectItemIds(node), selectedIds)}
@@ -344,6 +348,7 @@ function NodeRowView({
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
   const actions = useAssetItemActions();
   const pageActions = useItemActions();
+  const openInFittings = useOpenInFittings();
   const label = nodeLabel(node);
   const gameName = node.kind === 'bay' ? undefined : assetNames[node.asset.item_id];
   const badge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, characterBadges);
@@ -362,6 +367,16 @@ function NodeRowView({
         gameName={gameName}
         characterBadge={badge}
         stationId={pathStationId}
+        extraItems={
+          node.kind === 'ship' ? (
+            <MenuItem
+              disabled={openInFittings.pending}
+              onSelect={() => openInFittings.open(() => assetShipEditLocation(node, label))}
+            >
+              {t('assets.openInFittings')}
+            </MenuItem>
+          ) : undefined
+        }
         selectMode={selectMode}
         selectedIds={selectedIds}
         onToggleSelection={onToggleSelection}

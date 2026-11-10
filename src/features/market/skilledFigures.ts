@@ -10,7 +10,7 @@ import { resistReadsDifferently } from '@/features/fittings/stats/resistFormat';
 import { formatAttributeValue } from './format';
 
 /** `value` as an attribute row shows it: the number and its unit. */
-function numberText(value: number, unit: string | null): string {
+export function numberText(value: number, unit: string | null): string {
   return `${formatAttributeValue(value, unit)}${unit ? ` ${unit}` : ''}`;
 }
 

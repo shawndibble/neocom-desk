@@ -13,7 +13,23 @@ export type UpdateStatus = 'unknown' | 'checking' | 'current' | 'available' | 'o
 // Longer than the install wait, so a slow precache is not cut off first.
 const UPDATE_PROBE_CAP_MS = INSTALL_TIMEOUT_MS + 5_000;
 
-export const useUpdateStatus = create<{ status: UpdateStatus }>(() => ({ status: 'unknown' }));
+/**
+ * `build` is the published release last seen to differ from the running one;
+ * `found` counts how many times a *different* build replaced it, so a callout
+ * can tell a second deploy from the first. `available` itself stays set.
+ */
+export const useUpdateStatus = create<{
+  status: UpdateStatus;
+  build: string | null;
+  found: number;
+}>(() => ({ status: 'unknown', build: null, found: 0 }));
+
+function noteBuild(release: string | null) {
+  if (release === null) return;
+  const { build, found } = useUpdateStatus.getState();
+  if (release === build) return;
+  useUpdateStatus.setState({ build: release, found: build === null ? found : found + 1 });
+}
 
 // `available` only clears when the build is applied (a reload): a late or
 // overlapping check must not report "current" or "offline" over a build we saw.
@@ -47,9 +63,11 @@ async function probe(registration: ServiceWorkerRegistration): Promise<UpdateSta
   // The published release says at once whether a build exists, with no wait on
   // the download: a newer one is `available` now, and the worker fetches it in
   // the background (applying it, `forceUpdate`, waits on that install itself).
-  const verdict = compareRelease(await fetchLatestRelease(), __APP_RELEASE__);
+  const latest = await fetchLatestRelease();
+  const verdict = compareRelease(latest, __APP_RELEASE__);
   if (verdict === 'same') return 'current';
   if (verdict === 'different') {
+    noteBuild(latest);
     registration.update().catch(() => undefined);
     return 'available';
   }
@@ -69,9 +87,11 @@ async function probe(registration: ServiceWorkerRegistration): Promise<UpdateSta
  * Rejects when the worker check fails; the caller treats that as "next tick".
  */
 export async function pollForUpdate(registration: ServiceWorkerRegistration): Promise<void> {
-  const verdict = compareRelease(await fetchLatestRelease(), __APP_RELEASE__);
+  const latest = await fetchLatestRelease();
+  const verdict = compareRelease(latest, __APP_RELEASE__);
   if (verdict === 'same') return;
   if (verdict === 'different') {
+    noteBuild(latest);
     setStatus('available');
     registration.update().catch(() => undefined);
     return;

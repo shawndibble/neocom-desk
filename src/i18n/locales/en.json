@@ -76,6 +76,7 @@
     "alerts": "Alerts",
     "needsAttention": "{{label}}, needs attention",
     "upgrade": "Upgrade",
+    "upgradeCallout": "A new version is ready.",
     "alertsWithCount_one": "Alerts, {{count}} waiting",
     "alertsWithCount_other": "Alerts, {{count}} waiting",
     "railLabel": "Main navigation",
@@ -2615,7 +2616,8 @@
     "attributeModifier": {
       "perLevel": "{{skill}}: {{perLevel}}% per level",
       "current": "Trained to {{level}} — currently {{total}}%",
-      "untrained": "Not trained"
+      "untrained": "Not trained",
+      "nextLevel": "Level {{level}}: {{value}}"
     },
     "totalSp": "Total SP",
     "unallocatedSp": "Unallocated SP",
@@ -3595,7 +3597,11 @@
       "runs": "Runs",
       "quantity": "Quantity",
       "total": "Table total {{total}} · jobs need {{jobs}}",
-      "totalRoundUp": "Table total {{total}} · jobs need {{jobs}} (each job rounds its quantities up)"
+      "totalRoundUp": "Table total {{total}} · jobs need {{jobs}} (each job rounds its quantities up)",
+      "groupTitle_one": "{{material}} · used by {{count}} plan",
+      "groupTitle_other": "{{material}} · used by {{count}} plans",
+      "plan": "Plan",
+      "groupTotal": "Table total {{total}} · plans need {{plans}}"
     },
     "buildRecipe": {
       "action": "Build it",
@@ -6846,6 +6852,7 @@
       },
       "radius": "Radius",
       "radiusJumps": "{{count}} jumps",
+      "layers": "Layers",
       "profitSource": "Source",
       "profitSourceChoice": {
         "builds": "Builds",
@@ -7078,11 +7085,10 @@
       "allCharacters": "All characters",
       "chartLabel": "Net worth over time",
       "excludes": "Excludes {{layers}}",
-      "walletOnlyBefore": "Wallet only before {{date}}",
       "emptyTitle": "No net worth history yet",
       "emptyHint": "A snapshot is recorded each day the app is open. Wallet history comes from your journal.",
-      "firstDays": "Layers start on {{date}}. The chart fills in as days are recorded.",
-      "gapNote": "Hatched days: the app was not open, so only the wallet is known. Nothing is estimated.",
+      "firstDays": "We started recording on {{date}}. Earlier days are a guess based on that first day. The chart fills in as days are recorded.",
+      "gapNote": "The striped part of the chart is a guess. The app wasn't open on those days, so we drew a line between the days we did record. Your ISK balance is still the real number.",
       "walletCrumb": "Wallet",
       "layers": {
         "isk": "ISK",
@@ -7194,6 +7200,7 @@
     "stationsSearchPlaceholder": "Search stations…",
     "stationsNoResults": "No stations match.",
     "stationsByLabel": "Stations by",
+    "stationsByRecent": "Latest trade",
     "stationsByNet": "Net",
     "stationsByName": "Name",
     "stationsByTrades": "Trades",
@@ -8708,6 +8715,8 @@
     "emptyRootHint": "Items and ships you own in any station or structure show here, grouped by where they are.",
     "section": {
       "pinned": "Pinned",
+      "shipsAndContainers": "Ships and containers",
+      "items": "Items",
       "allLocations_one": "All locations · {{count}}",
       "allLocations_other": "All locations · {{count}}",
       "locationCount_one": "{{count}} location",
@@ -8803,7 +8812,11 @@
     },
     "columns": {
       "quantity": "Qty",
-      "volume": "m³"
+      "volume": "m³",
+      "asc": "ascending",
+      "desc": "descending",
+      "sortAria": "Sort by {{label}}",
+      "sortedAria": "{{label}}, sorted {{direction}}"
     },
     "breadcrumb": {
       "back": "Back one level"
@@ -10555,6 +10568,11 @@
       "production": "Production",
       "noFactories": "No factories on this planet.",
       "factoryLine": "{{count}}×",
+      "broughtIn": "Brought in",
+      "broughtInPerDay": "{{units}} a day",
+      "broughtInM3": "{{m3}} m³",
+      "broughtInCaption_one": "to keep the {{count}} factory running",
+      "broughtInCaption_other": "to keep all {{count}} factories running",
       "idle_one": "{{count}} idle factory: no input.",
       "idle_other": "{{count}} idle factories: no input.",
       "commandCenter": "Command Center",
@@ -15543,10 +15561,14 @@
         "agentValueNoDivision": "Level {{level}}"
       },
       "known": {
-        "agents": "Agents you know",
+        "agents": "Agents",
         "corporations": "Corporations you know",
-        "agentLevel": "L{{level}} {{division}}",
-        "agentLevelNoDivision": "L{{level}}"
+        "levelHeading": "Level {{level}}",
+        "locator": "Locator",
+        "accessOpen": "Open",
+        "accessNeeds": "Needs {{needs}}",
+        "showAll": "Show all {{count}}",
+        "showFewer": "Show fewer"
       },
       "loyalty": {
         "title": "Loyalty points",

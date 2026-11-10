@@ -24,6 +24,8 @@ import {
 
 export type { WidgetKindId, WidgetShow, WidgetSize, WidgetView };
 
+import { LAYER_IDS, type LayerId } from '@/engine/netWorth/series';
+
 export type WidgetScope = 'header' | 'all';
 export type CalendarEventsChoice = 'committed' | 'all';
 export const CALENDAR_EVENTS_CHOICES: readonly CalendarEventsChoice[] = ['committed', 'all'];
@@ -93,6 +95,8 @@ export interface Widget {
   raidsWhere?: 'near';
   /** Skyhook raids only: jumps for Near me. Absent means the default (8). */
   raidsRadius?: number;
+  /** Net worth only: the layers the pilot switched off. Absent means all show; never every layer. */
+  hiddenLayers?: LayerId[];
   /** Profit only: which earnings it adds up. Absent means Builds (a widget saved before the setting). */
   profitSource?: ProfitSource;
   /** Market Trend only: the items it draws, newest pick last. Absent means the Quickbar's first items. */
@@ -536,6 +540,13 @@ export function cleanTrendHubs(raw: unknown): string[] {
   return [...new Set(ids)].slice(0, MAX_TREND_HUBS);
 }
 
+/** Known layers only, once each, in the widget's own order; never all of them (a chart needs one). */
+export function cleanHiddenLayers(raw: unknown): LayerId[] {
+  if (!Array.isArray(raw)) return [];
+  const hidden = LAYER_IDS.filter((id) => raw.includes(id));
+  return hidden.length >= LAYER_IDS.length ? [] : hidden;
+}
+
 const sameList = (a: readonly unknown[] | undefined, b: readonly unknown[]) =>
   (a ?? []).length === b.length && b.every((v, i) => a![i] === v);
 
@@ -564,5 +575,23 @@ export function setTrendHubs(layout: OverviewLayout, id: string, hubs: unknown):
       return rest;
     }
     return { ...w, trendHubs: next };
+  });
+}
+
+/** An empty list clears the setting, so every layer shows again. */
+export function setHiddenLayers(
+  layout: OverviewLayout,
+  id: string,
+  layers: unknown
+): OverviewLayout {
+  const next = cleanHiddenLayers(layers);
+  return update(layout, id, (w) => {
+    if (!getKind(w.kind)?.hasLayerPicker || sameList(w.hiddenLayers, next)) return null;
+    if (next.length === 0) {
+      const { hiddenLayers: _dropped, ...rest } = w;
+      void _dropped;
+      return rest;
+    }
+    return { ...w, hiddenLayers: next };
   });
 }

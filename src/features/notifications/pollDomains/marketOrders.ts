@@ -98,6 +98,7 @@ export const marketOrderDomain = defineDomain<
 >({
   source: SNAPSHOT_SOURCES.marketOrders,
   stateKey: 'notifications.pollerState.marketOrders',
+  slow: true,
   entriesKey: 'entries',
   isEntry: isMarketOrderEntrySnapshot,
   load: async (characterId) => {

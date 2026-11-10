@@ -80,16 +80,17 @@ function ResistSection({ layers, sources }: { layers: ResistLayer[]; sources?: S
 export function ItemAttributeSections({
   sections,
   skilledSources,
-  renderValue = (_, content) => content,
-  renderSkilledExtra,
+  renderSkillList,
 }: {
   sections: readonly AttributeSection[];
   /** What made each skilled value; a changed figure opens these. */
   skilledSources?: SourcesById;
-  /** Wraps a value the pilot doesn't change, e.g. in the "which skill changes this" popover. */
-  renderValue?: (attribute: DisplayAttribute, content: ReactNode) => ReactNode;
-  /** More for a changed figure's popover (that row's per-skill lines), so one number is one trigger. */
-  renderSkilledExtra?: (attribute: DisplayAttribute) => ReactNode;
+  /**
+   * The skills that change a row, for its popover (null when none do): on a
+   * changed figure they join the sources; on an unchanged one they are all it
+   * opens, from the plain base number. One number, one trigger either way.
+   */
+  renderSkillList?: (attribute: DisplayAttribute) => ReactNode;
 }) {
   const { t } = useTranslation();
   return sections.map((section) =>
@@ -101,6 +102,7 @@ export function ItemAttributeSections({
         <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs">
           {section.group.attributes.map((attribute) => {
             const change = skilledChange(attribute);
+            const skillList = renderSkillList?.(attribute);
             return (
               <div key={attribute.attributeId} className="contents">
                 <dt className="text-text-dim">{attribute.name}</dt>
@@ -112,10 +114,19 @@ export function ItemAttributeSections({
                       spoken={t('market.itemDetail.skilled.change', change.spoken)}
                       label={attribute.name}
                       sources={skilledSources?.get(attribute.attributeId) ?? []}
-                      extra={renderSkilledExtra?.(attribute)}
+                      extra={skillList}
+                    />
+                  ) : skillList ? (
+                    <SkilledValue
+                      neutral
+                      skilled={rowValueText(attribute)}
+                      spoken={`${rowValueText(attribute)} ${t('market.itemDetail.modifiersFor', { attribute: attribute.name })}`}
+                      label={attribute.name}
+                      sources={[]}
+                      extra={skillList}
                     />
                   ) : (
-                    renderValue(attribute, rowValueText(attribute))
+                    rowValueText(attribute)
                   )}
                 </dd>
               </div>

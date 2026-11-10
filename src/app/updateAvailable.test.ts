@@ -31,7 +31,7 @@ beforeEach(() => {
   // Default: the published release is unreadable, so the worker is asked (the
   // pre-existing path the tests below exercise).
   fetchLatestRelease.mockReset().mockResolvedValue(null);
-  useUpdateStatus.setState({ status: 'unknown' });
+  useUpdateStatus.setState({ status: 'unknown', build: null, found: 0 });
 });
 
 describe('checkForUpdate', () => {
@@ -135,6 +135,17 @@ describe('pollForUpdate', () => {
     await pollForUpdate(registration as never);
     expect(status()).toBe('available');
     expect(registration.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts a second, different release as another find, and the same one only once', async () => {
+    const registration = fakeRegistration();
+    registration.update.mockResolvedValue(undefined);
+    for (const release of ['neocom-desk@9', 'neocom-desk@9', 'neocom-desk@10']) {
+      fetchLatestRelease.mockResolvedValue(release);
+      await pollForUpdate(registration as never);
+    }
+    // The first build is not a "second find"; only @10 replacing @9 is.
+    expect(useUpdateStatus.getState().found).toBe(1);
   });
 
   it('does not wait on the download it started', async () => {

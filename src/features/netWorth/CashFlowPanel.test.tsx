@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { shiftUtcDate, utcDay } from '@/engine/localDay';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import { loadAllCharactersJournals } from '@/features/character/walletJournalAll';
 import { CashFlowPanel } from './CashFlowPanel';
+import { useWalletRange } from './walletRange';
 
 vi.mock('@/features/character/walletJournalAll', () => ({
   loadAllCharactersJournals: vi.fn(),
@@ -52,7 +52,10 @@ const renderPanel = () =>
     </MemoryRouter>
   );
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  void useWalletRange.getState().setValue('30');
+});
 
 describe('CashFlowPanel', () => {
   it('shows earned, spent and net for 30 days, with no unit after the figures', async () => {
@@ -75,11 +78,10 @@ describe('CashFlowPanel', () => {
 
   it('narrows to 7 days', async () => {
     load([line(0, 1000), line(10, 4000)]);
-    const user = userEvent.setup();
     renderPanel();
     expect(await screen.findByText('5,000')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '7d' }));
-    expect(screen.getByText('1,000')).toBeInTheDocument();
+    act(() => void useWalletRange.getState().setValue('7'));
+    expect(await screen.findByText('1,000')).toBeInTheDocument();
     expect(screen.queryByText('5,000')).not.toBeInTheDocument();
   });
 

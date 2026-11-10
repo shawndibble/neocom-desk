@@ -27,6 +27,7 @@ import type {
 import { currentEsiLane } from '@/esi/lane';
 import {
   runForegroundPoll,
+  regainPollDue,
   type DomainPollState,
   type PollDependencies,
   type CharacterRef,
@@ -1197,6 +1198,62 @@ describe('runForegroundPoll', () => {
     });
     await runForegroundPoll(deps);
     expect(loadWalletJournal).not.toHaveBeenCalled();
+  });
+
+  it('loads a slow-clock domain once per 14 minutes per character, not every poll', async () => {
+    const loadWalletJournal = vi.fn(async () => []);
+    let nowMs = 1_000_000;
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE]),
+      eventPrefsFor: async () => ({ walletBalanceChanged: { browser: true } }),
+      loadWalletJournal,
+      lastSlowLoadAt: new Map(),
+      now: () => nowMs,
+    });
+    await runForegroundPoll(deps);
+    nowMs += 5 * 60 * 1000;
+    await runForegroundPoll(deps);
+    expect(loadWalletJournal).toHaveBeenCalledTimes(1);
+    nowMs += 10 * 60 * 1000;
+    await runForegroundPoll(deps);
+    expect(loadWalletJournal).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries a slow-clock domain on the next poll when its load came back null', async () => {
+    const loadWalletJournal = vi.fn(async () => null);
+    let nowMs = 1_000_000;
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE]),
+      eventPrefsFor: async () => ({ walletBalanceChanged: { browser: true } }),
+      loadWalletJournal,
+      lastSlowLoadAt: new Map(),
+      now: () => nowMs,
+    });
+    await runForegroundPoll(deps);
+    nowMs += 5 * 60 * 1000;
+    await runForegroundPoll(deps);
+    expect(loadWalletJournal).toHaveBeenCalledTimes(2);
+  });
+
+  it('polls the active character first', async () => {
+    const order: number[] = [];
+    const other = { characterId: 2, name: 'Other' };
+    const deps = baseDeps({
+      characters: async () => [other, CHAR],
+      activeCharacterId: () => CHAR.characterId,
+      loadSkillQueue: async (characterId) => {
+        order.push(characterId);
+        return [];
+      },
+    });
+    await runForegroundPoll(deps);
+    expect(order[0]).toBe(CHAR.characterId);
+  });
+
+  it('skips a regain poll right after one, but not after two minutes', () => {
+    expect(regainPollDue(null, 5)).toBe(true);
+    expect(regainPollDue(1_000, 1_000 + 60_000)).toBe(false);
+    expect(regainPollDue(1_000, 1_000 + 120_000)).toBe(true);
   });
 
   it('leaves the wallet high-water mark untouched and fires nothing when the load is truncated', async () => {

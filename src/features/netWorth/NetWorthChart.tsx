@@ -4,8 +4,8 @@
  * must only ever be reached through a dynamic `import()`.
  *
  * One Character: layers stacked as areas. Several: one line per Character,
- * clickable to drill in. Days without a snapshot are a hatched band (never an
- * interpolated value); the wallet line carries on through them.
+ * clickable to drill in. Days without a snapshot are estimated (joined from the
+ * neighbouring snapshots) and sit under a dashed, hatched band.
  */
 import { scalePx } from '@/lib/fontScale';
 import { useMemo } from 'react';
@@ -17,7 +17,6 @@ import {
   Line,
   LineChart,
   ReferenceArea,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -27,6 +26,7 @@ import {
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
+import { DAY_MS } from '@/lib/age';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { formatDateOnly } from '@/lib/timestamp';
 import { timeAxisTicks } from '@/engine/wallet/timeTicks';
@@ -48,9 +48,6 @@ export type NetWorthChartProps = { label: string } & (
       mode: 'single';
       rows: StackRow[];
       shown: readonly LayerId[];
-      /** Marks where the layers join the wallet; `null` when there is no snapshot yet. */
-      firstSnapshotDay: string | null;
-      walletOnlyLabel: string;
     }
   | {
       mode: 'multi';
@@ -64,22 +61,29 @@ function dayLabel(x: number): string {
   return formatDateOnly(new Date(x), 'UTC');
 }
 
-/** Contiguous runs of days with no snapshot after the first, as [from, to] x ranges. */
-function gapRuns(rows: readonly StackRow[]): [number, number][] {
+/**
+ * Contiguous runs of estimated days as [from, to] x ranges. A run is drawn from
+ * the last real day before it to the next real day after it, so the whole
+ * stretch the line is guessing across is marked, not just the days between.
+ */
+function estimatedRuns(rows: readonly StackRow[]): [number, number][] {
   const runs: [number, number][] = [];
+  let lastReal: number | null = null;
   let start: number | null = null;
-  let prev: number | null = null;
+  let end = 0;
   for (const row of rows) {
-    if (row.kind === 'gap') {
-      start ??= row.x;
-      prev = row.x;
-    } else if (start !== null && prev !== null) {
-      runs.push([start, row.x]);
-      start = prev = null;
+    if (row.estimated) {
+      start ??= lastReal ?? row.x;
+      end = row.x;
+    } else {
+      if (start !== null) runs.push([start, row.x]);
+      start = null;
+      lastReal = row.x;
     }
   }
-  if (start !== null && prev !== null) runs.push([start, prev]);
-  return runs;
+  if (start !== null) runs.push([start, end]);
+  // A one-day run with no real day beside it still needs width to be drawn.
+  return runs.map(([from, to]) => [from === to ? from - DAY_MS : from, to]);
 }
 
 function StackTooltip({
@@ -207,22 +211,17 @@ export default function NetWorthChart(props: NetWorthChartProps) {
               {xAxis}
               {yAxis}
               <Tooltip content={(p) => <StackTooltip {...p} shown={props.shown} />} />
-              {gapRuns(props.rows).map(([from, to]) => (
-                <ReferenceArea key={from} x1={from} x2={to} fill={`url(#${HATCH_ID})`} />
-              ))}
-              {props.firstSnapshotDay !== null && props.rows[0]?.kind === 'wallet-only' && (
-                <ReferenceLine
-                  x={Date.parse(props.firstSnapshotDay)}
+              {estimatedRuns(props.rows).map(([from, to]) => (
+                <ReferenceArea
+                  key={from}
+                  x1={from}
+                  x2={to}
+                  fill={`url(#${HATCH_ID})`}
                   stroke="var(--color-text-dim)"
                   strokeDasharray="4 3"
-                  label={{
-                    value: props.walletOnlyLabel,
-                    position: 'insideTopLeft',
-                    fontSize: '0.6875rem',
-                    fill: 'var(--color-text-dim)',
-                  }}
+                  strokeOpacity={0.6}
                 />
-              )}
+              ))}
               {LAYER_IDS.filter((id) => props.shown.includes(id)).map((id) => (
                 <Area
                   key={id}

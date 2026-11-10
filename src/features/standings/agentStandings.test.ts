@@ -67,13 +67,9 @@ describe('chainForAgent', () => {
 });
 
 describe('agentsOfCorporation', () => {
-  it('lists the agents the pilot holds a standing with, best effective standing first', async () => {
+  it('lists every agent of the corporation, best effective standing first', async () => {
     const known = await agentsOfCorporation(CALDARI_NAVY, STANDINGS, NO_SOCIAL_SKILLS);
-    expect(known.map((k) => [k.agent.id, k.effective])).toEqual([
-      [3009002, 6],
-      [3009001, 4],
-      [3009003, -3],
-    ]);
+    expect(known.map((k) => k.agent.id)).toEqual([3009002, 3009001, 3009004, 3009003]);
   });
 
   it('carries level, division name, station and both standings', async () => {
@@ -86,9 +82,16 @@ describe('agentsOfCorporation', () => {
     expect(first.effective).toBeCloseTo(6 + 4 * 0.2, 10);
   });
 
-  it('leaves out an agent the pilot has no standing row for', async () => {
+  it('includes an agent the pilot has no standing row for, flagged, with its chain', async () => {
     const known = await agentsOfCorporation(CALDARI_NAVY, STANDINGS, SKILLS);
-    expect(known.map((k) => k.agent.id)).not.toContain(3009004);
+    expect(known.map((k) => [k.agent.id, k.hasStanding])).toEqual([
+      [3009002, true],
+      [3009001, true],
+      [3009004, false],
+      [3009003, true],
+    ]);
+    const delta = known.find((k) => k.agent.id === 3009004)!;
+    expect(delta.chain.links.map((l) => l.kind)).toEqual(['faction', 'corporation', 'agent']);
   });
 
   it('lifts a pirate corporation agent by Criminal Connections, not Connections', async () => {
@@ -102,7 +105,7 @@ describe('agentsOfCorporation', () => {
       { from_id: 3009001, from_type: 'agent', standing: 3 },
     ];
     const known = await agentsOfCorporation(CALDARI_NAVY, tied, NO_SOCIAL_SKILLS);
-    expect(known.map((k) => k.agent.id)).toEqual([3009001, 3009002]);
+    expect(known.map((k) => k.agent.id).slice(0, 2)).toEqual([3009001, 3009002]);
   });
 
   it('is empty for a corporation with no agents', async () => {

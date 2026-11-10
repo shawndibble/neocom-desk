@@ -4,6 +4,8 @@
  * a plain button whose popover says what made it: each skill at the pilot's
  * level, each implant, the hull's own bonus. `extra` joins the same popover
  * (a row's "which skill changes this" lines), so one number is one trigger.
+ * A figure the pilot's skills don't change (`neutral`) is the same opener on
+ * the plain base number: dashed underline, no bold, no green, no arrow.
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -41,6 +43,8 @@ export interface SkilledValueProps {
   sources: readonly NamedSkilledSource[];
   /** More lines for the same popover (a row's per-skill effects and Add buttons). */
   extra?: ReactNode;
+  /** The pilot's skills leave this figure at its base value: no green, no bold. */
+  neutral?: boolean;
   className?: string;
 }
 
@@ -51,6 +55,7 @@ export function SkilledValue({
   label,
   sources,
   extra,
+  neutral = false,
   className,
 }: SkilledValueProps) {
   const { t } = useTranslation();
@@ -67,7 +72,7 @@ export function SkilledValue({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className={cx(figureOpenerClassName, 'font-semibold text-success')}
+            className={cx(figureOpenerClassName, !neutral && 'font-semibold text-success')}
             // §6c figure opener: the press never reaches a row beneath.
             onClick={(event) => event.stopPropagation()}
           >
@@ -76,15 +81,23 @@ export function SkilledValue({
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-64 space-y-2 text-xs" aria-label={title}>
-          <p className={eyebrowClassName}>{t('market.itemDetail.skilled.sourcesTitle')}</p>
-          <ul className="space-y-0.5">
-            {sources.map((source) => (
-              <li key={`${source.kind}:${source.typeId}`} className="text-text">
-                {sourceLine(source, t)}
-              </li>
-            ))}
-          </ul>
-          {extra && <div className="space-y-2 border-t border-line pt-2">{extra}</div>}
+          {sources.length > 0 && (
+            <>
+              <p className={eyebrowClassName}>{t('market.itemDetail.skilled.sourcesTitle')}</p>
+              <ul className="space-y-0.5">
+                {sources.map((source) => (
+                  <li key={`${source.kind}:${source.typeId}`} className="text-text">
+                    {sourceLine(source, t)}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {extra && (
+            <div className={cx('space-y-2', sources.length > 0 && 'border-t border-line pt-2')}>
+              {extra}
+            </div>
+          )}
         </PopoverContent>
       </Popover>
     </span>

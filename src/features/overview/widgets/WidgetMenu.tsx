@@ -35,6 +35,8 @@ import { kindSumsAcrossCharacters } from './data/models';
 import { boardKey, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { getKind, rangeAppliesTo, showOf, widgetKeys } from './kinds';
+import { LAYER_IDS, toggleHidden } from '@/engine/netWorth/series';
+import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { TrendHubsMenuGroup, TrendItemsDialog } from './TrendPicks';
 import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
 import {
@@ -362,6 +364,33 @@ export function WidgetMenu({
           </MenuRadioGroup>
         </>
       )}
+      {kind.hasLayerPicker && (
+        <>
+          <MenuSeparator />
+          <MenuLabel>{t('overview.menu.layers')}</MenuLabel>
+          {LAYER_IDS.map((id) => {
+            const hidden = widget.hiddenLayers ?? [];
+            const on = !hidden.includes(id);
+            return (
+              <MenuCheckboxItem
+                key={id}
+                checked={on}
+                // At least one layer stays, so the chart is never empty.
+                disabled={on && toggleHidden(hidden, id, LAYER_IDS) === hidden}
+                // The menu stays open, so several layers are one visit.
+                onSelect={(event) => event.preventDefault()}
+                onCheckedChange={(next) =>
+                  next === on
+                    ? undefined
+                    : edit.setHiddenLayers(widget.id, [...toggleHidden(hidden, id, LAYER_IDS)])
+                }
+              >
+                {t(LAYER_LABEL_KEYS[id])}
+              </MenuCheckboxItem>
+            );
+          })}
+        </>
+      )}
       {kind.hasTrendSources && (
         <>
           <MenuSeparator />
@@ -386,6 +415,7 @@ export function WidgetMenu({
         kind.hasCalendarEvents ||
         kind.hasRaidsWhere ||
         kind.hasProfitSource ||
+        kind.hasLayerPicker ||
         kind.hasTrendSources ||
         kind.hasPlexPlan) && <MenuSeparator />}
       <MenuItem onSelect={() => run(() => (inert ? undefined : setRenaming(true)))}>

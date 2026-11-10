@@ -26,6 +26,12 @@ export interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFi
   readonly entriesKey: string;
   /** Guard for one element of that array, so a stale stored shape is discarded. */
   readonly isEntry: (raw: unknown) => boolean;
+  /**
+   * On the slow clock: fetched at most once per `SLOW_DOMAIN_GAP_MS` per
+   * character (`pollCharacter`), not on every poll. For data whose page has a
+   * manual refresh and whose alerts tolerate the wait.
+   */
+  readonly slow?: boolean;
   /** Fetches this domain for one character, or null to skip it this poll. */
   readonly load: (characterId: number) => Promise<TRaw[] | null>;
   /**
@@ -90,6 +96,7 @@ export interface PollDomain {
   /** This domain's events, in catalog order — derived from the Event Entries naming its source. */
   readonly eventIds: readonly NotificationEventId[];
   readonly stateKey: string;
+  readonly slow: boolean;
   readonly store: LocalSettingStore<PollerState<unknown>>;
   readonly load: (characterId: number) => Promise<readonly unknown[] | null>;
   readonly toSnapshot: (raw: readonly unknown[], nowMs: number, prevSnapshot?: unknown) => unknown;
@@ -130,6 +137,7 @@ export function defineDomain<TRaw, TSnapshot, TFire extends AnyNotificationFire,
     id: spec.source.id,
     eventIds,
     stateKey: spec.stateKey,
+    slow: spec.slow ?? false,
     store: store as unknown as LocalSettingStore<PollerState<unknown>>,
     load: spec.load,
     toSnapshot: (raw, nowMs, prevSnapshot) =>

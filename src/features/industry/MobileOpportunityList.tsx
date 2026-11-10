@@ -311,8 +311,19 @@ export function MobileOpportunityList({
                     )}
                   </div>
                   <span className="flex shrink-0 flex-col items-end text-right leading-tight tabular-nums">
-                    <span className={cx('text-sm font-semibold', hero.toneClassName)}>
+                    <span
+                      className={cx(
+                        'inline-flex items-center gap-1 text-sm font-semibold',
+                        hero.toneClassName
+                      )}
+                    >
                       {hero.node ?? unknown}
+                      {activeFieldId === 'iskPerHour' && row.priceCapped && (
+                        <InfoTooltip
+                          label={t('industry.marketOpportunitiesPriceCapped')}
+                          content={t('industry.marketOpportunitiesPriceCapped')}
+                        />
+                      )}
                     </span>
                     <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">
                       {fields[activeFieldId].label}

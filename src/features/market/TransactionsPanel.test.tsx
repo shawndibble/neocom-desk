@@ -618,10 +618,10 @@ describe('TransactionsPanel — By station view', () => {
   });
 
   it('shows one header per station with its trades and totals, names resolved with Location hidden', async () => {
-    renderPanel('/market/history?txn.view=station');
+    renderPanel('/market/history?txn.view=station&txn.stationsBy=net');
     await screen.findAllByRole('link', { name: 'Damage Control II' });
     const [first, second] = headers();
-    // Net ranks first by default: Amarr +1,000 before Jita +200.
+    // Net ranks highest first: Amarr +1,000 before Jita +200.
     expect(first).toHaveTextContent('Amarr VIII');
     expect(first).toHaveTextContent('1 trade');
     expect(first).toHaveTextContent(/Net \+1,000/);
@@ -639,6 +639,20 @@ describe('TransactionsPanel — By station view', () => {
     renderPanel('/market/history?txn.view=station&txn.stationsBy=trades');
     await screen.findAllByRole('link', { name: 'Damage Control II' });
     expect(headers()[0]).toHaveTextContent('Jita IV - Moon 4');
+  });
+
+  it('orders the groups from the sort button beside the funnel, only in the By station view', async () => {
+    const user = userEvent.setup();
+    renderPanel('/market/history?txn.view=station&txn.stationsBy=net');
+    await screen.findAllByRole('link', { name: 'Damage Control II' });
+    expect(headers()[0]).toHaveTextContent('Amarr VIII');
+    await user.click(screen.getByRole('button', { name: 'Stations by' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Trades' }));
+    expect(headers()[0]).toHaveTextContent('Jita IV - Moon 4');
+    cleanup();
+    renderPanel();
+    await screen.findAllByRole('link', { name: 'Damage Control II' });
+    expect(screen.queryByRole('button', { name: 'Stations by' })).not.toBeInTheDocument();
   });
 
   it('keeps only the picked stations, and the strip totals them', async () => {

@@ -41,10 +41,20 @@ describe('compareStationGroups', () => {
   const jita = [fill(1, false, 100), fill(1, true, 40)]; // net +60, 2 trades
   const amarr = [fill(2, false, 500)]; // net +500, 1 trade
   const dodixie = [fill(3, true, 30), fill(3, true, 30), fill(3, true, 30)]; // net -90, 3 trades
-  const order = (mode: 'net' | 'name' | 'trades') =>
+  const order = (mode: 'recent' | 'net' | 'name' | 'trades') =>
     [jita, amarr, dodixie]
       .sort(compareStationGroups(mode, nameOf))
       .map((rows) => nameOf(rows[0]!.location_id));
+
+  it('ranks by latest trade, newest first', () => {
+    const at = (location: number, date: string) => ({ ...fill(location, false, 1), date });
+    const groups = [[at(1, '2026-01-01T00:00:00Z')], [at(2, '2026-03-01T00:00:00Z')]];
+    expect(
+      groups
+        .sort(compareStationGroups('recent', nameOf))
+        .map((rows) => nameOf(rows[0]!.location_id))
+    ).toEqual(['Amarr', 'Jita']);
+  });
 
   it('ranks by net, highest first', () => {
     expect(order('net')).toEqual(['Amarr', 'Jita', 'Dodixie']);

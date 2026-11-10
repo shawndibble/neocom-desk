@@ -29,6 +29,7 @@ import { tabPath } from '@/lib/pageTabs';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
 import { useNetWorthMissingNames } from '@/features/netWorth/useNetWorthData';
+import { WalletRangeControl } from '@/features/netWorth/WalletRangeControl';
 import { WalletBalanceTab } from '@/features/character/WalletBalanceTab';
 import { WalletJournalPanel } from '@/features/character/WalletJournalPanel';
 import { useWalletBalances } from '@/features/character/useWalletBalances';
@@ -229,12 +230,15 @@ export function Wallet() {
         meta={oldestFetchedAt ? <DataAgeBadge date={oldestFetchedAt} /> : undefined}
         scope={walletScopePicker}
         actions={
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('wallet.refresh')}
-            onClick={handlePersonalRefresh}
-            disabled={loading || journalView.loading}
-          />
+          <>
+            {tab === 'balance' && <WalletRangeControl />}
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('wallet.refresh')}
+              onClick={handlePersonalRefresh}
+              disabled={loading || journalView.loading}
+            />
+          </>
         }
       />
 

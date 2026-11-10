@@ -66,5 +66,20 @@ export const WithForm: Story = {
   },
 };
 
+/** @summary `arrow`: a hint that names the control it sits beside points at it (the rail's update callout). */
+export const WithArrow: Story = {
+  args: {
+    defaultOpen: true,
+    children: (
+      <>
+        {trigger}
+        <PopoverContent side="right" sideOffset={8} arrow className="max-w-60 px-2 py-1.5 text-xs">
+          <p>A new version is ready.</p>
+        </PopoverContent>
+      </>
+    ),
+  },
+};
+
 /** @summary Closed at rest: the trigger alone. */
 export const Closed: Story = { args: { children: trigger } };

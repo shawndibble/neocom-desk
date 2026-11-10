@@ -51,7 +51,6 @@ import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import {
   activeWalletTransactionFilters,
   EMPTY_WALLET_TRANSACTION_FILTER,
-  type StationOrder,
   type TransactionSide,
   type WalletTransactionFilter,
 } from '@/features/character/walletTransactionFilter';
@@ -96,14 +95,6 @@ interface CorpTransactionsPanelProps {
 /** Radix needs a value here, and `''` reads to it as "nothing selected". */
 const SIDE_OPTIONS: readonly TransactionSide[] = ['all', 'buy', 'sell'];
 
-const STATION_ORDER_OPTIONS: readonly StationOrder[] = ['net', 'name', 'trades'];
-
-const STATION_ORDER_LABEL: Record<StationOrder, string> = {
-  net: 'wallet.stationsByNet',
-  name: 'wallet.stationsByName',
-  trades: 'wallet.stationsByTrades',
-};
-
 const SIDE_LABEL: Record<TransactionSide, string> = {
   all: 'wallet.sideFilterAll',
   buy: 'wallet.buy',
@@ -124,9 +115,8 @@ export function TransactionsFilterBar({
   /** Transactions the filter leaves, for the phone sheet's done button. */
   resultCount?: number;
   /**
-   * The stations to pick from. Market History passes them (its Station filter
-   * and, in the By station view, the "Stations by" picker); the corp wallet
-   * doesn't, and gets neither field.
+   * The stations to pick from. Market History passes them for its Station
+   * filter; the corp wallet doesn't, and gets no such field.
    */
   stationOptions?: readonly MultiSelectOption<number>[];
 }) {
@@ -208,25 +198,6 @@ export function TransactionsFilterBar({
                 active={draft.stations.length > 0}
                 className="w-44"
               />
-            </FilterField>
-          )}
-          {stationOptions && draft.view === 'station' && (
-            <FilterField label={t('wallet.stationsByLabel')}>
-              <Select
-                value={draft.stationsBy}
-                onValueChange={(value) => setDraft({ ...draft, stationsBy: value as StationOrder })}
-              >
-                <SelectTrigger aria-label={t('wallet.stationsByLabel')} className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATION_ORDER_OPTIONS.map((order) => (
-                    <SelectItem key={order} value={order}>
-                      {t(STATION_ORDER_LABEL[order])}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </FilterField>
           )}
         </>

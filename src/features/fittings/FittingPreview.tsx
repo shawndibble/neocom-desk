@@ -187,7 +187,7 @@ export function FittingPreview({
         ) : (
           // Container query: the pane sits beside the list, far narrower than the viewport.
           <div className="@container min-w-0">
-            <div className="grid items-start gap-4 @2xl:grid-cols-[16rem_minmax(0,1fr)]">
+            <div className="grid items-start gap-4 @2xl:grid-cols-[minmax(16rem,min(34rem,45%))_minmax(0,1fr)]">
               <div className="min-w-0 space-y-4">
                 {fitting && (
                   <FittingRing

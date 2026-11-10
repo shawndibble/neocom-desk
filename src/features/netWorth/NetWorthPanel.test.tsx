@@ -246,7 +246,7 @@ describe('NetWorthPanel, one Character', () => {
   it('says the layers start on the first snapshot day while history is short', async () => {
     await seed({ covered: [1] });
     renderPanel({ mode: 'single', characters: [A] });
-    expect(await screen.findByText(/Layers start on/)).toBeInTheDocument();
+    expect(await screen.findByText(/We started recording on/)).toBeInTheDocument();
     expect(screen.queryByText(/PLEX/)).not.toBeInTheDocument();
   });
 });

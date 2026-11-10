@@ -985,6 +985,7 @@ describe('rankOpportunityRows', () => {
 
   function row(id: string, iskPerHour: number | null): UnrankedOpportunityRow {
     return {
+      priceCapped: false,
       candidate: {
         id,
         characterId: 1,
