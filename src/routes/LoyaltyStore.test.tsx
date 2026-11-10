@@ -1007,11 +1007,19 @@ describe('LoyaltyStore switching stores through the search', () => {
     expect(within(dialog).getByText('12,000').className).not.toMatch(/accent/);
   });
 
-  it('closes by going Back when the app pushed the store, keeping the search', async () => {
+  it('closes onto the landing with its search when the app pushed the store', async () => {
     const user = userEvent.setup();
     function Opener() {
       const navigate = useNavigate();
-      return <button onClick={() => navigate('/loyalty/1000168')}>open store</button>;
+      return (
+        <button
+          onClick={() =>
+            navigate('/loyalty/1000168', { state: { from: 'lp-search', search: '?q=tritanium' } })
+          }
+        >
+          open store
+        </button>
+      );
     }
     render(
       <MemoryRouter initialEntries={['/loyalty?q=tritanium']}>
@@ -1035,14 +1043,51 @@ describe('LoyaltyStore switching stores through the search', () => {
               </>
             }
           />
+          <Route path="*" element={<LocationProbe />} />
         </Routes>
       </MemoryRouter>
     );
     await user.click(screen.getByRole('button', { name: 'open store' }));
     expect(probe.pathname).toBe('/loyalty/1000168');
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
-    await waitFor(() => expect(probe.pathname).toBe('/loyalty'));
+    await waitFor(() => expect(probe.pathname).toBe('/wallet/lp-store'));
     expect(probe.search).toBe('?q=tritanium');
+  });
+
+  it('closes onto the landing, not whatever page pushed the store', async () => {
+    const user = userEvent.setup();
+    function Opener() {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate('/loyalty/1000168')}>open store</button>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/overview']}>
+        <Routes>
+          <Route
+            path="/overview"
+            element={
+              <>
+                <Opener />
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route
+            path="/loyalty/:corporationId"
+            element={
+              <>
+                <LoyaltyStore />
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route path="*" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await user.click(screen.getByRole('button', { name: 'open store' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(probe.pathname).toBe('/wallet/lp-store'));
   });
 
   it('closes by replacing with the search when the store was opened directly', async () => {

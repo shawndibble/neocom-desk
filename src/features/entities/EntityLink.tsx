@@ -25,7 +25,6 @@ import { entityInfoHref, parseEntityInfo, type EntityInfoTarget } from '@/lib/en
 import { useItemInfoModalStore } from '@/stores/itemInfoModal';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import { routeToHref } from '@/features/route/routeSafetyLink';
-import { ENTITY_INFO_PUSHED_STATE } from './entityInfoState';
 
 type AnchorProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href' | 'id'>;
 
@@ -55,7 +54,7 @@ const InfoLink = forwardRef<HTMLAnchorElement, EntityLinkProps & { entity: Entit
         ref={ref}
         to={entityInfoHref(location, entity)}
         replace={drillDown}
-        state={drillDown ? location.state : ENTITY_INFO_PUSHED_STATE}
+        state={drillDown ? location.state : undefined}
         className={entityLinkClassName(className)}
       >
         {children}

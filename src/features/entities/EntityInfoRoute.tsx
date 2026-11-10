@@ -10,12 +10,13 @@
  * - The stores' `open`/`close` go through the navigator registered here, so a
  *   programmatic open makes the same history entry a link click does.
  *
- * Closing: an entry this app pushed carries `{ entityInfo: true }` in its
- * history state, so Close is `navigate(-1)` and Back/Close agree. An entry
- * with no marker — the URL opened cold in a new tab — is replaced by the same
- * URL without `info`, so Close never leaves the app. Opening while a modal is
- * already open (a drill-down from a character to its corporation) replaces
- * instead of pushing, so a single Close or Back always returns to the page.
+ * Closing replaces the entry with the same URL without `info`: it never goes
+ * Back, so the page under the modal stays as it is (any param it changed
+ * while the modal was open included) and Close cannot leave the app, cold
+ * link or not. Browser Back still closes the modal, as the entry before it has
+ * no `info`. Opening while a modal is already open (a drill-down from a
+ * character to its corporation) replaces instead of pushing, so a single Back
+ * always returns to the page.
  */
 import { useCallback, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useNavigationType, type Location } from 'react-router-dom';
@@ -26,7 +27,6 @@ import { useItemInfoModalStore } from '@/stores/itemInfoModal';
 import { usePlaceInfoModalStore } from '@/stores/placeInfoModal';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
-import { ENTITY_INFO_PUSHED_STATE, wasPushedHere } from './entityInfoState';
 
 export function EntityInfoRoute() {
   const navigate = useNavigate();
@@ -46,7 +46,7 @@ export function EntityInfoRoute() {
           if (alreadyOpen) {
             navigate(href, { replace: true, state: here.state });
           } else {
-            navigate(href, { state: ENTITY_INFO_PUSHED_STATE });
+            navigate(href);
           }
         },
         close: () => {
@@ -56,8 +56,6 @@ export function EntityInfoRoute() {
             useSkillDetailModalStore.getState().clear();
             useItemInfoModalStore.getState().clear();
             usePlaceInfoModalStore.getState().clear();
-          } else if (wasPushedHere(here.state)) {
-            navigate(-1);
           } else {
             navigate(`${here.pathname}${withoutEntityInfo(here.search)}${here.hash}`, {
               replace: true,

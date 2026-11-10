@@ -9,7 +9,6 @@ import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { MenuItem, RowActionsMenu } from '@/components/ui';
 import { ExternalMark } from '@/components/ui/ExternalLink';
-import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { writeToClipboard } from '@/lib/clipboard';
 import { entityInfoHref, parseEntityInfo, type EntityInfoTarget } from '@/lib/entityInfo';
@@ -27,7 +26,7 @@ export function EntityShowInfoMenuItem({ entity }: { entity: EntityInfoTarget })
         const drillDown = parseEntityInfo(location.search) !== null;
         navigate(entityInfoHref(location, entity), {
           replace: drillDown,
-          state: drillDown ? location.state : ENTITY_INFO_PUSHED_STATE,
+          state: drillDown ? location.state : undefined,
         });
       }}
     >

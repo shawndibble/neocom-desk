@@ -11,7 +11,6 @@ import {
   piPlanetHref,
   piProductHref,
   productNavigation,
-  PI_PRODUCT_PUSHED_STATE,
 } from './piPlanLink';
 
 describe('piPlanHref', () => {
@@ -81,17 +80,19 @@ describe('productNavigation', () => {
     ).toEqual({ replace: false, state: null });
   });
 
-  it('pushes with the marker on the Map when no drawer is open', () => {
+  it('pushes on the Map when no drawer is open', () => {
     expect(productNavigation({ pathname: MAP, search: '?goals=1', state: null })).toEqual({
       replace: false,
-      state: PI_PRODUCT_PUSHED_STATE,
+      state: null,
     });
   });
 
   it('replaces, keeping the entry state, when a product is already open', () => {
-    expect(
-      productNavigation({ pathname: MAP, search: '?product=2393', state: PI_PRODUCT_PUSHED_STATE })
-    ).toEqual({ replace: true, state: PI_PRODUCT_PUSHED_STATE });
+    const state = { from: 'somewhere' };
+    expect(productNavigation({ pathname: MAP, search: '?product=2393', state })).toEqual({
+      replace: true,
+      state,
+    });
   });
 });
 
