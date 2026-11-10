@@ -15,6 +15,7 @@
 import { db } from '@/db';
 import type { ContractNotificationFire } from '@/engine/notificationDiffs';
 import type { ProjectionRow } from '@/engine/projection';
+import { MINUTE_MS } from '@/lib/age';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
@@ -65,7 +66,7 @@ export const POLL_INTERVAL_MS = 5 * 60 * 1000;
 export const POLL_FANOUT_CONCURRENCY = 3;
 
 /** A visibility regain inside this long after a poll started does not poll again. */
-export const REGAIN_MIN_GAP_MS = 2 * 60 * 1000;
+export const REGAIN_MIN_GAP_MS = 2 * MINUTE_MS;
 
 export function regainPollDue(lastPollAt: number | null, now: number): boolean {
   return lastPollAt === null || now - lastPollAt >= REGAIN_MIN_GAP_MS;
@@ -106,7 +107,7 @@ export interface PollDependencies {
    * dependencies' module scope, so it spans polls; absent (tests), every poll
    * loads everything.
    */
-  lastSlowLoadAt?: Map<number, number>;
+  lastSlowLoadAt?: Map<string, number>;
   /** The active character, polled first so what is on screen is freshest. */
   activeCharacterId?: () => number | null;
   now: () => number;
@@ -337,7 +338,7 @@ async function currentNotificationPreferences() {
 }
 
 /** Real dependencies, wired against Dexie/ESI/the browser Notification API. */
-const lastSlowLoadAt = new Map<number, number>();
+const lastSlowLoadAt = new Map<string, number>();
 
 export function liveDependencies(): PollDependencies {
   return {

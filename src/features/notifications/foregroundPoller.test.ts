@@ -1219,6 +1219,22 @@ describe('runForegroundPoll', () => {
     expect(loadWalletJournal).toHaveBeenCalledTimes(2);
   });
 
+  it('retries a slow-clock domain on the next poll when its load came back null', async () => {
+    const loadWalletJournal = vi.fn(async () => null);
+    let nowMs = 1_000_000;
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE]),
+      eventPrefsFor: async () => ({ walletBalanceChanged: { browser: true } }),
+      loadWalletJournal,
+      lastSlowLoadAt: new Map(),
+      now: () => nowMs,
+    });
+    await runForegroundPoll(deps);
+    nowMs += 5 * 60 * 1000;
+    await runForegroundPoll(deps);
+    expect(loadWalletJournal).toHaveBeenCalledTimes(2);
+  });
+
   it('polls the active character first', async () => {
     const order: number[] = [];
     const other = { characterId: 2, name: 'Other' };

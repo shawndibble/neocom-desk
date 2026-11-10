@@ -48,9 +48,9 @@ export const skyhookNearbyDomain = defineDomain<
   entriesKey: 'entries',
   isEntry: isSkyhookAlertEntry,
   load: async (characterId) => {
-    const originSystemId = // A raid window lasts hours: a location up to the default window old is
-      // plenty, and the 5 s page window would send every poll to ESI.
-      await loadCurrentSystemId(characterId, STALE_AFTER.default);
+    // A raid window lasts hours: a location up to the default window old is
+    // plenty, and the 5 s page window would send every poll to ESI.
+    const originSystemId = await loadCurrentSystemId(characterId, STALE_AFTER.default);
     if (originSystemId === null) return null;
     const list = await loadRaidableList().catch(() => null);
     if (list === null) return null;

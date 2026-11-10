@@ -4,6 +4,7 @@
  * (#4111).
  */
 import { occurrenceKey } from '@/engine/occurrenceKey';
+import { MINUTE_MS } from '@/lib/age';
 import { inBackgroundLane } from '@/esi/lane';
 import { hasEventScope, type NotificationEventId } from '../events';
 import type { AnyNotificationFire, PollDomain } from '../pollDomains';
@@ -12,7 +13,7 @@ import { isEventEnabledFor, type EventEnabledMap, type EveTypeEnabledMap } from 
 import type { CharacterRef, DomainPollState, PollDependencies } from '../foregroundPoller';
 
 /** A slow-clock domain is refetched once this long has passed — a minute under 3 polls, so a jittered tick never skips a whole extra one. */
-export const SLOW_DOMAIN_GAP_MS = 14 * 60 * 1000;
+export const SLOW_DOMAIN_GAP_MS = 14 * MINUTE_MS;
 
 /** Which delivery channels are live for this poll, before per-event opinions. */
 export interface LiveChannels {
@@ -110,10 +111,6 @@ export async function pollCharacter(
   const walletFoldEnabled = await deps.walletFoldEnabled(character.characterId);
   let walletStandalone = false;
   const lastSlow = deps.lastSlowLoadAt;
-  const slowDue =
-    !lastSlow ||
-    deps.now() - (lastSlow.get(character.characterId) ?? -Infinity) >= SLOW_DOMAIN_GAP_MS;
-  let slowLoaded = false;
 
   for (const run of runs) {
     const enabledEvents = new Set(
@@ -142,8 +139,15 @@ export async function pollCharacter(
     // The slow clock (the contract fold above is the exception: it reads this
     // journal to explain a contract alert, so it must be as fresh as the
     // contracts it explains).
-    if (run.domain.slow && !slowDue && !foldForced) continue;
-    if (run.domain.slow) slowLoaded = true;
+    const slowKey = `${character.characterId}:${run.domain.id}`;
+    if (
+      run.domain.slow &&
+      !foldForced &&
+      lastSlow &&
+      deps.now() - (lastSlow.get(slowKey) ?? -Infinity) < SLOW_DOMAIN_GAP_MS
+    ) {
+      continue;
+    }
     // Background at the ESI gate (issue #2271): a poll across every
     // Character must not queue the page in view behind it. Wraps only the
     // synchronous call — the lane cannot outlive an `await` (`esi/lane.ts`).
@@ -152,6 +156,9 @@ export async function pollCharacter(
     // load persists no snapshot and fires nothing, leaving the previous
     // baseline for the next complete poll.
     if (rows === null) continue;
+    // Stamped only by a complete load, and not by the fold's forced one, so
+    // a failed load retries next poll and the fold cannot starve the clock.
+    if (run.domain.slow && !foldForced) lastSlow?.set(slowKey, deps.now());
     const previous = run.next[character.characterId];
     // `previous` goes to `toSnapshot` as well as `diff` (issue #1423): a
     // domain whose own snapshot needs to carry state forward across a poll
@@ -180,8 +187,6 @@ export async function pollCharacter(
       );
     }
   }
-
-  if (slowLoaded) lastSlow?.set(character.characterId, deps.now());
 
   // Fills an earlier poll could only date by when it noticed them; the feed
   // rows this poll writes below get their turn on the next one.
