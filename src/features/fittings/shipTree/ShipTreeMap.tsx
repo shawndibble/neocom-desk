@@ -15,6 +15,7 @@ import { useFontScale } from '@/lib/fontScale';
 import type { ShipTreeEdge, ShipTreeHullStatus, ShipTreeLayout } from '@/engine/shipTree/types';
 import type { ShipTreeFaction, ShipTreeShip } from '@/sde/types';
 import { ClassNode } from './ClassNode';
+import { SHIP_INFO_WINDOW_REM } from './ShipInfoWindow';
 import { HoverCard } from './HoverCard';
 import { FactionGrid } from './FactionGrid';
 import { Legend } from './Legend';
@@ -48,6 +49,7 @@ export function ShipTreeMap({
   source,
   tree,
   selectedTypeID,
+  windowOpen,
   onFaction,
   onOpenShip,
   viewSwitch,
@@ -55,7 +57,10 @@ export function ShipTreeMap({
 }: {
   source: ShipTreeSource;
   tree: FactionTree;
+  /** The hull to mark: the open one, else the last one opened. */
   selectedTypeID: number | null;
+  /** Whether the Ship Info window is open over the map. */
+  windowOpen: boolean;
   onFaction: (factionID: number) => void;
   onOpenShip: (ship: ShipTreeShip) => void;
   viewSwitch: ReactNode;
@@ -68,6 +73,9 @@ export function ShipTreeMap({
   const [showNames, setShowNames] = useState(false);
   const [hover, setHover] = useState<{ ship: ShipTreeShip; rect: DOMRect } | null>(null);
   const [viewport, setViewport] = useState<Size>({ width: 0, height: 0 });
+  // Px of the map's right edge the open Ship Info slide-out covers (0 on a phone's bottom sheet).
+  const [coveredRight, setCoveredRight] = useState(0);
+  const rightInset = windowOpen && showFactionGrid ? coveredRight : 0;
   // Fit beside the faction panel when the canvas is wide enough to spare it.
   const fitInset =
     showFactionGrid && viewport.width - FACTION_PANEL_SPACE >= MIN_FIT_WIDTH
@@ -100,14 +108,19 @@ export function ShipTreeMap({
     moved?.factionID === factionID && moved.scale === scale
       ? moved.cam
       : focusNode
-        ? focusCamera(focusNode, viewport, initial.z, scale)
+        ? focusCamera(focusNode, viewport, initial.z, scale, rightInset)
         : initial;
 
   useObservedMeasure(
     () => (viewportRef.current ? [viewportRef.current] : null),
     () => {
       const vp = viewportRef.current;
-      if (vp) setViewport({ width: vp.clientWidth, height: vp.clientHeight });
+      if (!vp) return;
+      setViewport({ width: vp.clientWidth, height: vp.clientHeight });
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      const windowLeft =
+        window.innerWidth - Math.min(SHIP_INFO_WINDOW_REM * rem, window.innerWidth);
+      setCoveredRight(Math.max(0, Math.round(vp.getBoundingClientRect().right - windowLeft)));
     },
     []
   );
@@ -201,7 +214,7 @@ export function ShipTreeMap({
       onFaction(ship.factionID);
     } else {
       const node = nodeById.get(ship.treeGroupID);
-      if (node) moveTo(focusCamera(node, viewport, cam.z, scale));
+      if (node) moveTo(focusCamera(node, viewport, cam.z, scale, rightInset));
     }
     onOpenShip(ship);
   }

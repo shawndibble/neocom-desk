@@ -64,6 +64,24 @@ describe('focusCamera', () => {
   });
 });
 
+describe('focusCamera with a covered right edge', () => {
+  it('centres the class in the part the slide-out leaves visible', () => {
+    const node = {
+      def: { id: 8, parent: null, lane: 'main' as const },
+      x: 100,
+      y: 100,
+      cols: 1,
+      w: 100,
+      h: 100,
+    };
+    expect(focusCamera(node, { width: 1000, height: 600 }, 0.5, 1, 400)).toEqual({
+      z: 0.8,
+      x: 180,
+      y: 180,
+    });
+  });
+});
+
 describe('zoomAround', () => {
   it('keeps the point under the pointer still', () => {
     const cam = zoomAround({ x: 0, y: 0, z: 1 }, 2, 100, 50);

@@ -65,17 +65,18 @@ export function initialCamera(world: Size, viewport: Size, leftInset = 0, scale 
   return centreAt(world, viewport, scale, leftInset);
 }
 
-/** One class centred in the viewport. */
+/** One class centred in the viewport; `rightInset`: px a slide-out covers on the right. */
 export function focusCamera(
   node: ShipTreeNode,
   viewport: Size,
   currentZoom: number,
-  scale = 1
+  scale = 1,
+  rightInset = 0
 ): Camera {
   const z = Math.max(currentZoom, FOCUS_ZOOM * scale);
   return {
     z,
-    x: viewport.width / 2 - (node.x + node.w / 2) * z,
+    x: (viewport.width - rightInset) / 2 - (node.x + node.w / 2) * z,
     y: viewport.height / 2 - (node.y + node.h / 2) * z,
   };
 }
