@@ -36,6 +36,7 @@ describe('useImplantsModalUrl', () => {
     const { result } = setup(['/fittings?tab=a']);
     act(() => result.current.modal.openModal());
     expect(result.current.search).toBe('?tab=a&implants=1');
+    // The page's own URL write, carrying an old `implantsPushed` marker that must now be ignored.
     act(
       () =>
         void result.current.navigate('/fittings?tab=b&implants=1', {

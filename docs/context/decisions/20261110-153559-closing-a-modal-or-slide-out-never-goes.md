@@ -1,7 +1,8 @@
 # Scope decisions — Closing a modal or slide-out never goes Back
 
 _Recorded 2026-11-10._ Replaces the "Back when the app pushed the entry" Close
-of the entity-modal rule (ADR 0015) for every window the URL backs.
+(`docs/features/entities-share.md`, and the same pattern copied to the Ship Info
+window, Implants editor, LP store and PI drawer) for every window the URL backs.
 
 - **Close writes the URL; it never calls `navigate(-1)`.** A modal or slide-out
   sits over a page the pilot wants to see as they left it. Going Back lands on
