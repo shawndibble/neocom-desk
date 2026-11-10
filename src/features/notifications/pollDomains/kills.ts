@@ -35,6 +35,7 @@ export const killsDomain = defineDomain<
 >({
   source: SNAPSHOT_SOURCES.kills,
   stateKey: 'notifications.pollerState.kills',
+  slow: true,
   entriesKey: 'entries',
   isEntry: isShipLossEntrySnapshot,
   load: async (characterId) => {
