@@ -701,6 +701,25 @@ describe('ShipTreeTab — ?ship= window', () => {
     expect(screen.queryByRole('dialog', { name: 'Crow' })).not.toBeInTheDocument();
   });
 
+  it('closes a hull picked from another faction in place, not back to the old faction', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await user.type(
+      await screen.findByRole('searchbox', { name: 'Search hulls in every faction' }),
+      'worm'
+    );
+    await user.click(
+      within(screen.getByRole('list', { name: 'Matching hulls' })).getByRole('button', {
+        name: /Worm/,
+      })
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Worm' });
+    expect(location()).toContain('faction=500010');
+    await user.click(within(dialog).getByRole('button', { name: /close/i }));
+    await waitFor(() => expect(location()).not.toContain('ship='));
+    expect(location()).toContain('faction=500010');
+  });
+
   it('keeps the last opened hull marked on the map after the window closes', async () => {
     const user = userEvent.setup();
     renderTab();
