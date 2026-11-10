@@ -6,7 +6,7 @@
  * opens its Ship Info window. The page header and tab bar are the Ships
  * route's.
  */
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, SegmentedControl, Spinner } from '@/components/ui';
@@ -128,6 +128,9 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
         : (source.data.ships.find((ship) => ship.typeID === params.ship) ?? null),
     [params.ship, source.data.ships]
   );
+  // The hull the map marks once the window closes: the last one opened.
+  const [lastOpened, setLastOpened] = useState<number | null>(null);
+  if (selected && selected.typeID !== lastOpened) setLastOpened(selected.typeID);
   // Arrival with `?ship=`: show the faction behind the window; an unknown id
   // is dropped without a word.
   // Once per hull: the window is non-modal on a desktop, so a later faction pick stands.
@@ -216,7 +219,8 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
         <ShipTreeMap
           source={source}
           tree={tree}
-          selectedTypeID={selected?.typeID ?? null}
+          selectedTypeID={selected?.typeID ?? lastOpened}
+          windowOpen={selected !== null}
           onFaction={onFaction}
           onOpenShip={openShip}
           viewSwitch={viewSwitch}

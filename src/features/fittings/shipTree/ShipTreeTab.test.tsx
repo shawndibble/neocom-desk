@@ -700,4 +700,15 @@ describe('ShipTreeTab — ?ship= window', () => {
     await waitFor(() => expect(location()).not.toContain('ship='));
     expect(screen.queryByRole('dialog', { name: 'Crow' })).not.toBeInTheDocument();
   });
+
+  it('keeps the last opened hull marked on the map after the window closes', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    const crow = await screen.findByRole('button', { name: /^Crow/ });
+    await user.click(crow);
+    const dialog = await screen.findByRole('dialog', { name: 'Crow' });
+    await user.click(within(dialog).getByRole('button', { name: /close/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Crow' })).toBeNull());
+    expect(screen.getByRole('button', { name: /^Crow/ })).toHaveClass('selected');
+  });
 });

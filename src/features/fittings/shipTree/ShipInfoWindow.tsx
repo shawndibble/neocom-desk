@@ -24,6 +24,8 @@ import { factionNameOf } from './shipTreeModel';
 import type { ShipTreeSource } from './useShipTreeData';
 
 type InfoTab = 'description' | 'fitting' | 'skills' | 'blueprint';
+/** The desktop slide-out's max width in rem — keep in step with its `max-w-[40rem]!` below. */
+export const SHIP_INFO_WINDOW_REM = 40;
 const TABS: readonly InfoTab[] = ['description', 'fitting', 'skills', 'blueprint'];
 export function ShipInfoWindow({
   ship,

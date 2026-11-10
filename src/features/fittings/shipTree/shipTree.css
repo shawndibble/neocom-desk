@@ -73,6 +73,10 @@
 .isis-tile.selected {
   border-color: #b7ddef;
   background: #1d313d;
+  /* The open hull, and the last one opened once the window closes. */
+  box-shadow:
+    0 0 0 1px #5cb8ff,
+    0 0 14px 3px rgba(92, 184, 255, 0.65);
 }
 .isis-tile.locked {
   background: #0a1015;
