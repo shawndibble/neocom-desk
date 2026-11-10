@@ -4,6 +4,7 @@ import {
   liveDependencies,
   FIRST_POLL_DELAY_MS,
   POLL_INTERVAL_MS,
+  regainPollDue,
 } from './foregroundPoller';
 import { refreshAppBadge } from './appBadge';
 import { joinTabElection, runUnlessRunningElsewhere } from '@/lib/tabLeader';
@@ -43,6 +44,8 @@ export function ForegroundNotificationPoller() {
       if (firstPollDue) poll();
     });
 
+    let lastPollAt: number | null = null;
+
     function poll() {
       // Offline, every domain would just fail into its cached row: nothing new
       // can be found. The reconnect catch-up below makes up for the missed ticks.
@@ -51,6 +54,7 @@ export function ForegroundNotificationPoller() {
       // in flight: both would fire, and feed, the same occurrences. A poll cut
       // short by iOS aborting its IndexedDB transactions (the tab went to the
       // background mid-save) is just a missed tick — the next one redoes it.
+      lastPollAt = Date.now();
       void ignoreIdbTeardown(
         runUnlessRunningElsewhere('neocom:poll', () => runForegroundPoll(liveDependencies()))
       );
@@ -63,7 +67,7 @@ export function ForegroundNotificationPoller() {
     const interval = setInterval(poll, POLL_INTERVAL_MS);
 
     function onVisibilityChange() {
-      if (!document.hidden) poll();
+      if (!document.hidden && regainPollDue(lastPollAt, Date.now())) poll();
     }
     document.addEventListener('visibilitychange', onVisibilityChange);
 

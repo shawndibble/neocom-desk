@@ -104,9 +104,12 @@ export function useCurrentSystem(): CurrentSystemState {
  * poller): the game location or a pick, as `useCurrentSystem` resolves them.
  * `null` when neither is known.
  */
-export async function loadCurrentSystemId(characterId: number): Promise<number | null> {
+export async function loadCurrentSystemId(
+  characterId: number,
+  staleAfterMs?: number
+): Promise<number | null> {
   const [gameSystemId] = await Promise.all([
-    loadCharacterSolarSystemId(characterId).catch(() => null),
+    loadCharacterSolarSystemId(characterId, staleAfterMs).catch(() => null),
     usePickedSystems.getState().hydrate(),
   ]);
   const picked = usePickedSystems.getState().value[String(characterId)] ?? null;

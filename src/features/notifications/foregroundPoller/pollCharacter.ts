@@ -11,6 +11,9 @@ import type { PollerState } from '../pollerState';
 import { isEventEnabledFor, type EventEnabledMap, type EveTypeEnabledMap } from '../eventSelection';
 import type { CharacterRef, DomainPollState, PollDependencies } from '../foregroundPoller';
 
+/** A slow-clock domain is refetched once this long has passed — a minute under 3 polls, so a jittered tick never skips a whole extra one. */
+export const SLOW_DOMAIN_GAP_MS = 14 * 60 * 1000;
+
 /** Which delivery channels are live for this poll, before per-event opinions. */
 export interface LiveChannels {
   browser: boolean;
@@ -106,11 +109,17 @@ export async function pollCharacter(
   const snapshots = new Map<DomainRun, unknown>();
   const walletFoldEnabled = await deps.walletFoldEnabled(character.characterId);
   let walletStandalone = false;
+  const lastSlow = deps.lastSlowLoadAt;
+  const slowDue =
+    !lastSlow ||
+    deps.now() - (lastSlow.get(character.characterId) ?? -Infinity) >= SLOW_DOMAIN_GAP_MS;
+  let slowLoaded = false;
 
   for (const run of runs) {
     const enabledEvents = new Set(
       enabledEventsFor(run.domain.eventIds, scopes, eventPrefs, channels)
     );
+    let foldForced = false;
     if (enabledEvents.has('walletBalanceChanged')) walletStandalone = true;
     // The journal is fetched anyway when a contract alert wants to count its
     // lines, even with Wallet Balance Changed itself off: the fold drops
@@ -125,10 +134,16 @@ export async function pollCharacter(
       )
     ) {
       enabledEvents.add('walletBalanceChanged');
+      foldForced = true;
     }
     // Nothing this domain could fire is both in scope and switched on for a
     // live channel: no fetch at all (AC5).
     if (enabledEvents.size === 0) continue;
+    // The slow clock (the contract fold above is the exception: it reads this
+    // journal to explain a contract alert, so it must be as fresh as the
+    // contracts it explains).
+    if (run.domain.slow && !slowDue && !foldForced) continue;
+    if (run.domain.slow) slowLoaded = true;
     // Background at the ESI gate (issue #2271): a poll across every
     // Character must not queue the page in view behind it. Wraps only the
     // synchronous call — the lane cannot outlive an `await` (`esi/lane.ts`).
@@ -165,6 +180,8 @@ export async function pollCharacter(
       );
     }
   }
+
+  if (slowLoaded) lastSlow?.set(character.characterId, deps.now());
 
   // Fills an earlier poll could only date by when it noticed them; the feed
   // rows this poll writes below get their turn on the next one.

@@ -6,6 +6,7 @@ import type {
 } from '@/engine/skyhooks/skyhookAlert';
 import { planetInfo } from '@/features/overview/widgets/data/spaceLookups';
 import { loadRaidableList } from '@/features/overview/widgets/data/sovRaidsLoader';
+import { STALE_AFTER } from '@/esi/cache';
 import { loadCurrentSystemId } from '@/features/route/currentSystem';
 import { loadJumpBasis } from '@/features/route/jumpBasis';
 import { localJumpDistances } from '@/features/route/localRoute';
@@ -47,7 +48,9 @@ export const skyhookNearbyDomain = defineDomain<
   entriesKey: 'entries',
   isEntry: isSkyhookAlertEntry,
   load: async (characterId) => {
-    const originSystemId = await loadCurrentSystemId(characterId);
+    const originSystemId = // A raid window lasts hours: a location up to the default window old is
+      // plenty, and the 5 s page window would send every poll to ESI.
+      await loadCurrentSystemId(characterId, STALE_AFTER.default);
     if (originSystemId === null) return null;
     const list = await loadRaidableList().catch(() => null);
     if (list === null) return null;

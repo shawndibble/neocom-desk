@@ -15,7 +15,8 @@
 import { db } from '@/db';
 import type { ContractNotificationFire } from '@/engine/notificationDiffs';
 import type { ProjectionRow } from '@/engine/projection';
-import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
+import { mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
 import { POLL_DOMAINS, type AnyNotificationFire, type PollDomain } from './pollDomains';
 import { withCharacterSnapshot, type PollerState } from './pollerState';
@@ -60,6 +61,26 @@ export { reviseContractFeedRow };
 
 export const POLL_INTERVAL_MS = 5 * 60 * 1000;
 
+/** Characters polled at once: a 20-character account spreads over ~a minute instead of one burst. */
+export const POLL_FANOUT_CONCURRENCY = 3;
+
+/** A visibility regain inside this long after a poll started does not poll again. */
+export const REGAIN_MIN_GAP_MS = 2 * 60 * 1000;
+
+export function regainPollDue(lastPollAt: number | null, now: number): boolean {
+  return lastPollAt === null || now - lastPollAt >= REGAIN_MIN_GAP_MS;
+}
+
+/** Active character first, the rest in stored order. */
+export function activeFirst<T extends { characterId: number }>(
+  characters: readonly T[],
+  activeId: number | null
+): T[] {
+  return [...characters].sort(
+    (a, b) => Number(b.characterId === activeId) - Number(a.characterId === activeId)
+  );
+}
+
 /**
  * How long after mount the first poll waits. A poll reads every Character's
  * notification domains, and at boot those reads would queue against the
@@ -80,6 +101,14 @@ export interface DomainPollState {
 }
 
 export interface PollDependencies {
+  /**
+   * When each character's slow-clock domains last loaded. Lives in the live
+   * dependencies' module scope, so it spans polls; absent (tests), every poll
+   * loads everything.
+   */
+  lastSlowLoadAt?: Map<number, number>;
+  /** The active character, polled first so what is on screen is freshest. */
+  activeCharacterId?: () => number | null;
   now: () => number;
   characters: () => Promise<CharacterRef[]>;
   grantedScopes: (characterId: number) => Promise<ReadonlySet<string>>;
@@ -232,7 +261,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
   if (!browserEnabled && !feedEnabled) return;
   const channels: LiveChannels = { browser: browserEnabled, feed: feedEnabled };
 
-  const characters = await deps.characters();
+  const characters = activeFirst(await deps.characters(), deps.activeCharacterId?.() ?? null);
   if (characters.length === 0) return;
 
   const runs: DomainRun[] = await Promise.all(
@@ -243,7 +272,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
   );
 
   const updates: CharacterUpdate[] = [];
-  await mapWithConcurrencyLimit(characters, ESI_FANOUT_CONCURRENCY, async (character) => {
+  await mapWithConcurrencyLimit(characters, POLL_FANOUT_CONCURRENCY, async (character) => {
     const update = await pollCharacter(deps, runs, channels, character);
     if (update) updates.push(update);
   });
@@ -308,8 +337,12 @@ async function currentNotificationPreferences() {
 }
 
 /** Real dependencies, wired against Dexie/ESI/the browser Notification API. */
+const lastSlowLoadAt = new Map<number, number>();
+
 export function liveDependencies(): PollDependencies {
   return {
+    lastSlowLoadAt,
+    activeCharacterId: () => useActiveCharacter.getState().activeCharacterId,
     now: () => Date.now(),
     characters: async () =>
       (await db.characters.toArray()).map((c) => ({ characterId: c.characterId, name: c.name })),

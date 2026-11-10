@@ -30,22 +30,28 @@ export interface SolarSystemRead {
   fetchedAt: Date | null;
 }
 
-export async function loadCharacterSolarSystemRead(characterId: number): Promise<SolarSystemRead> {
+export async function loadCharacterSolarSystemRead(
+  characterId: number,
+  staleAfterMs: number = LOCATION_FRESH_MS
+): Promise<SolarSystemRead> {
   const result = await loadWithCache(
     characterId,
     cacheKey(),
     async () => (await getCharacterLocation(characterId)).data?.solar_system_id ?? null,
     {
       detectAuthFailure: isCredentialFailure,
-      staleAfterMs: LOCATION_FRESH_MS,
+      staleAfterMs,
     }
   );
   return { systemId: result?.data ?? null, fetchedAt: result?.fetchedAt ?? null };
 }
 
 /** The character's current solar system id, or null if unresolvable (missing grant, offline, or uncached). */
-export async function loadCharacterSolarSystemId(characterId: number): Promise<number | null> {
-  return (await loadCharacterSolarSystemRead(characterId)).systemId;
+export async function loadCharacterSolarSystemId(
+  characterId: number,
+  staleAfterMs?: number
+): Promise<number | null> {
+  return (await loadCharacterSolarSystemRead(characterId, staleAfterMs)).systemId;
 }
 
 /** Where a character is: the solar system, plus the station or structure when docked. */

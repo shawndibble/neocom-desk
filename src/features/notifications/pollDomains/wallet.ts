@@ -44,6 +44,7 @@ export const walletDomain = defineDomain<
 >({
   source: SNAPSHOT_SOURCES.wallet,
   stateKey: 'notifications.pollerState.wallet',
+  slow: true,
   entriesKey: 'entries',
   isEntry: isWalletJournalEntrySnapshot,
   load: async (characterId) => {
