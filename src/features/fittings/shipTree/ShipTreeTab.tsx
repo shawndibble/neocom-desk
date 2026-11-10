@@ -147,13 +147,17 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
     }
   }, [params.ship, params.faction, selected, setParams]);
   // A hull opened while a window is already open replaces; otherwise Back closes it.
+  // Opening one in another faction replaces too: Close going Back would put the map
+  // on the old faction, away from the hull just found.
   const openShip = useCallback(
     (ship: ShipTreeShip) =>
       setParams(
         { ship: ship.typeID, faction: ship.factionID },
-        params.ship === null ? { push: true, state: ENTITY_INFO_PUSHED_STATE } : undefined
+        params.ship === null && ship.factionID === factionID
+          ? { push: true, state: ENTITY_INFO_PUSHED_STATE }
+          : undefined
       ),
-    [setParams, params.ship]
+    [setParams, params.ship, factionID]
   );
   // ADR 0015's entity-modal rule: Back when the app pushed the entry, else replace.
   const closeShip = useCallback(() => {
