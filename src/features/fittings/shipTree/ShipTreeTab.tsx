@@ -7,10 +7,8 @@
  * route's.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, SegmentedControl, Spinner } from '@/components/ui';
-import { ENTITY_INFO_PUSHED_STATE, wasPushedHere } from '@/features/entities/entityInfoState';
 import { enumParam, enumSetParam, intParam, optionalIdParam } from '@/lib/urlState';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -119,8 +117,6 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
     [setParams, masteriesLoaded]
   );
   const tree = useFactionTree(source, factionID);
-  const navigate = useNavigate();
-  const location = useLocation();
   const selected = useMemo<ShipTreeShip | null>(
     () =>
       params.ship === null
@@ -147,23 +143,16 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
     }
   }, [params.ship, params.faction, selected, setParams]);
   // A hull opened while a window is already open replaces; otherwise Back closes it.
-  // Opening one in another faction replaces too: Close going Back would put the map
-  // on the old faction, away from the hull just found.
   const openShip = useCallback(
     (ship: ShipTreeShip) =>
       setParams(
         { ship: ship.typeID, faction: ship.factionID },
-        params.ship === null && ship.factionID === factionID
-          ? { push: true, state: ENTITY_INFO_PUSHED_STATE }
-          : undefined
+        params.ship === null ? { push: true } : undefined
       ),
-    [setParams, params.ship, factionID]
+    [setParams, params.ship]
   );
-  // ADR 0015's entity-modal rule: Back when the app pushed the entry, else replace.
-  const closeShip = useCallback(() => {
-    if (wasPushedHere(location.state)) void navigate(-1);
-    else setParams({ ship: null });
-  }, [location.state, navigate, setParams]);
+  // Close never goes Back: the tree under the window stays as the pilot left it.
+  const closeShip = useCallback(() => setParams({ ship: null }), [setParams]);
 
   const isPhone = useIsPhone();
   const storedView = useShipTreeViewPreference((state) => state.value);

@@ -720,6 +720,19 @@ describe('ShipTreeTab — ?ship= window', () => {
     expect(location()).toContain('faction=500010');
   });
 
+  it('closing keeps a faction picked while the window was open, rather than going Back past it', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(await screen.findByRole('button', { name: /^Crow/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Crow' });
+    const bar = screen.getByRole('group', { name: 'Factions' });
+    await user.click(within(bar).getByRole('button', { name: /Guristas/ }));
+    await waitFor(() => expect(location()).toContain('faction=500010'));
+    await user.click(within(dialog).getByRole('button', { name: /close/i }));
+    await waitFor(() => expect(location()).not.toContain('ship='));
+    expect(location()).toContain('faction=500010');
+  });
+
   it('keeps the last opened hull marked on the map after the window closes', async () => {
     const user = userEvent.setup();
     renderTab();

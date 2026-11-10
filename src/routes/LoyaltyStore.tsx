@@ -22,7 +22,7 @@ import {
   useState,
   type ReactElement,
 } from 'react';
-import { useLocation, useNavigate, useNavigationType, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
 import {
@@ -119,12 +119,8 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const isPhone = useIsPhone();
-  // Read once, on arrival: a push is an entry this app stacked over where the
-  // pilot was (Back returns there); anything else (a pasted link, a reload,
-  // Forward) has nowhere in the app to go back to, so Close replaces the URL.
-  const navigationType = useNavigationType();
+  // Read once, on arrival: the landing view this store was opened from.
   const location = useLocation();
-  const [arrivedByPush] = useState(() => navigationType === 'PUSH');
   const [arrivedState] = useState(() => location.state as Partial<LpSearchCrumbState> | null);
 
   const hubId = useMarketHub((s) => s.value);
@@ -289,12 +285,9 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     qualifier: corpName ?? undefined,
   });
 
+  // Close shows the landing under the store: it replaces the URL, never goes Back,
+  // which would land on whatever page pushed the store.
   function closeStore() {
-    if (arrivedByPush) {
-      navigate(-1);
-      return;
-    }
-    // Back to the landing view this store was opened from.
     const search = arrivedState?.from === 'lp-search' ? arrivedState.search : undefined;
     navigate(`/wallet/lp-store${search?.startsWith('?') ? search : ''}`, { replace: true });
   }

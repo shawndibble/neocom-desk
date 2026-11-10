@@ -102,25 +102,18 @@ export function hrefWithout(location: UrlLocation, keys: readonly string[]): str
  */
 export const MAP_ONLY_PARAMS = [PI_PRODUCT_PARAM, PI_PLANET_PARAM] as const;
 
-/** History state a product link or tile click carries, so Close can go Back instead of replacing. */
-export const PI_PRODUCT_PUSHED_STATE = { piProduct: true } as const;
-
-export function wasProductPushedHere(state: unknown): boolean {
-  return typeof state === 'object' && state !== null && 'piProduct' in state;
-}
-
 /**
- * How opening a product navigates from `location`. On the Map, a first open
- * pushes with the marker, so Back and Close agree; a second open while one is
- * already open replaces it, so one Back still closes the drawer. From Plan or
- * Colonies it pushes with no marker: Back returns there, and Close keeps the
- * pilot on the Map they were taken to.
+ * How opening a product navigates from `location`. A first open pushes, so
+ * Back closes the drawer (or returns to Plan or Colonies, from there); a second
+ * open while one is already open replaces it, so one Back still closes it.
+ * Close never goes Back (see `dropProduct`).
  */
 export function productNavigation(location: { pathname: string; search: string; state: unknown }): {
   replace: boolean;
   state: unknown;
 } {
-  if (!location.pathname.startsWith(PI_MAP_HREF)) return { replace: false, state: null };
-  if (parsePiProduct(location.search) !== null) return { replace: true, state: location.state };
-  return { replace: false, state: PI_PRODUCT_PUSHED_STATE };
+  if (location.pathname.startsWith(PI_MAP_HREF) && parsePiProduct(location.search) !== null) {
+    return { replace: true, state: location.state };
+  }
+  return { replace: false, state: null };
 }

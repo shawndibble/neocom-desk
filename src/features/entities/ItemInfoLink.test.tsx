@@ -88,7 +88,7 @@ describe('ItemInfoLink', () => {
     expect(await screen.findByRole('heading', { name: 'Looked up 35' })).toBeInTheDocument();
   });
 
-  it('Close goes back to the page without info', async () => {
+  it('Close shows the page without info', async () => {
     renderAt('/assets?x=1');
     fireEvent.click(screen.getByRole('link', { name: 'Tritanium' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Close item' }));
