@@ -214,7 +214,9 @@ export function ShipTreeMap({
       onFaction(ship.factionID);
     } else {
       const node = nodeById.get(ship.treeGroupID);
-      if (node) moveTo(focusCamera(node, viewport, cam.z, scale, rightInset));
+      // The window opens right after this, so centre for it already.
+      if (node)
+        moveTo(focusCamera(node, viewport, cam.z, scale, showFactionGrid ? coveredRight : 0));
     }
     onOpenShip(ship);
   }
