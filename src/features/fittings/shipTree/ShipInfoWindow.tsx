@@ -1,6 +1,6 @@
 /**
  * The Ship Info window a hull opens (map click, ladder tap): the hull's
- * header, then four tabs as in game — Description, Fitting, Skills &
+ * header, then four tabs as in game — Attributes, Fitting, Skills &
  * Mastery, Blueprint. On a desktop a right slide-over, non-modal so the
  * tree behind keeps steering it; on a phone a bottom sheet.
  */
@@ -14,7 +14,7 @@ import { cx } from '@/lib/cx';
 import { typeRenderUrl } from '@/lib/eveImages';
 import type { ShipTreeShip } from '@/sde/types';
 import { BlueprintTab } from './BlueprintTab';
-import { DescriptionTab } from './DescriptionTab';
+import { AttributesTab } from './AttributesTab';
 import { FittingTab } from './FittingTab';
 import { FlyDot } from './FlyDot';
 import { MasteryBadge } from './IsisTile';
@@ -23,10 +23,10 @@ import { flyLabel } from './flyLabel';
 import { factionNameOf } from './shipTreeModel';
 import type { ShipTreeSource } from './useShipTreeData';
 
-type InfoTab = 'description' | 'fitting' | 'skills' | 'blueprint';
+type InfoTab = 'attributes' | 'fitting' | 'skills' | 'blueprint';
 /** The desktop slide-out's max width in rem — keep in step with its `max-w-[40rem]!` below. */
 export const SHIP_INFO_WINDOW_REM = 40;
-const TABS: readonly InfoTab[] = ['description', 'fitting', 'skills', 'blueprint'];
+const TABS: readonly InfoTab[] = ['attributes', 'fitting', 'skills', 'blueprint'];
 export function ShipInfoWindow({
   ship,
   source,
@@ -39,7 +39,7 @@ export function ShipInfoWindow({
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const tabsId = useTabsId();
-  const [tab, setTab] = useState<InfoTab>('description');
+  const [tab, setTab] = useState<InfoTab>('attributes');
   // Here rather than in the tab, so Undo survives a tab switch or a new hull.
   const [added, setAdded] = useState<AddedToPlan | null>(null);
   const target = useTargetPlan(source.characterId);
@@ -60,7 +60,7 @@ export function ShipInfoWindow({
       />
       {/* Keyed by hull: retargeting the window starts each tab afresh. */}
       <TabPanel key={ship.typeID} tabsId={tabsId} tabId={tab}>
-        {tab === 'description' && <DescriptionTab ship={ship} source={source} />}
+        {tab === 'attributes' && <AttributesTab ship={ship} source={source} />}
         {tab === 'fitting' && <FittingTab ship={ship} />}
         {tab === 'skills' && (
           <SkillsMasteryTab ship={ship} source={source} target={target} onAdded={setAdded} />
