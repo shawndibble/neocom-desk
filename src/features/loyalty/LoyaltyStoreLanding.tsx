@@ -307,7 +307,6 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
       <WalletTabBar tabsId={tabsId} />
       <TabPanel tabsId={tabsId} tabId="lp-store">
         <div className="flex flex-col gap-3">
-          <p className="text-xs text-text-dim">{t('loyaltyStore.landing.whatIsLp')}</p>
           {holdings && (
             <StatChips>
               <StatChip
