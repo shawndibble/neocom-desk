@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@/i18n';
 import { StartLinkHelp } from './StartLinkHelp';
+import { ShortLinkLimited } from './shortStartLink';
 
 const makeShortLink = vi.hoisted(() => vi.fn());
-vi.mock('./shortStartLink', () => ({
+vi.mock('./shortStartLink', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./shortStartLink')>()),
   makeShortLink,
   shortStartLinkEndpoint: () => 'https://fn.test/shortStartLink',
 }));
@@ -39,6 +41,13 @@ describe('StartLinkHelp', () => {
     render(<StartLinkHelp path="/survey?rate=5" />);
     fireEvent.click(screen.getByRole('button', { name: 'Make short link' }));
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+  });
+
+  it('says how long to wait when the service asks it to slow down', async () => {
+    makeShortLink.mockRejectedValue(new ShortLinkLimited(20));
+    render(<StartLinkHelp path="/survey?rate=5" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Make short link' }));
+    expect(await screen.findByText(/Try again in 20 seconds/)).toBeTruthy();
   });
 
   it('documents the POST and GET calls with the endpoint', () => {

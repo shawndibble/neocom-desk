@@ -6,6 +6,13 @@
  */
 import { appUrl } from '@/features/share/shareStore';
 
+/** The service refused for now: one new short link every 30 seconds, 30 an hour. */
+export class ShortLinkLimited extends Error {
+  constructor(readonly retryAfterSeconds: number) {
+    super('short link limit reached');
+  }
+}
+
 /** Functions run in the default region of the shared Firebase project. */
 export function shortStartLinkEndpoint(): string | null {
   const project = import.meta.env.VITE_FIREBASE_PROJECT_ID;
@@ -25,6 +32,10 @@ export async function makeShortLink(startLinkPath: string): Promise<string> {
   const answer: unknown = await response.json().catch(() => null);
   const id =
     typeof answer === 'object' && answer !== null ? (answer as { id?: unknown }).id : undefined;
+  if (response.status === 429) {
+    const wait = (answer as { retryAfterSeconds?: unknown } | null)?.retryAfterSeconds;
+    throw new ShortLinkLimited(typeof wait === 'number' && wait > 0 ? wait : 30);
+  }
   if (!response.ok || typeof id !== 'string') throw new Error('could not make a short link');
   return appUrl(`/s/${id}`);
 }

@@ -20,5 +20,10 @@ _Recorded 2026-11-11._
   collision with a different live link takes the next hash attempt.
 - **The page re-validates.** `/s/<id>` of this type navigates to `/survey?<query>`; the
   start page caps and checks every value as for a hand-written link.
-- **Not rate limited per caller.** `maxInstances: 5` is the hobby-scale cap; repeating a
-  request adds nothing. Add a per-IP limit if it is abused.
+- **Per-caller limit: one new link every 30 seconds, 30 an hour.** The caller is the
+  request IP, SHA-256 hashed (the address is never stored), noted in `shortLinkLimits/<hash>`
+  with the last link's time and the count in a fixed one-hour window, in the same
+  transaction that stores the link. The TTL policy on `shortLinkLimits.expiresAt`
+  (`firestore.indexes.json`, deployed by hand) removes it after the window. Asking again for
+  a link that is still live is free and uncounted. A refused call answers `429` with a
+  `Retry-After` header; `maxInstances: 5` stays as the concurrency cap.

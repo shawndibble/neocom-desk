@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { makeShortLink, shortStartLinkEndpoint } from './shortStartLink';
+import { ShortLinkLimited, makeShortLink, shortStartLinkEndpoint } from './shortStartLink';
 
 const fetchMock = vi.fn();
 
@@ -30,6 +30,15 @@ describe('makeShortLink', () => {
     await expect(makeShortLink('/survey?rate=500')).rejects.toThrow();
     fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve(null) });
     await expect(makeShortLink('/survey?rate=5')).rejects.toThrow();
+  });
+
+  it('reports a rate limit with how long to wait', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: () => Promise.resolve({ retryAfterSeconds: 17 }),
+    });
+    await expect(makeShortLink('/survey?rate=5')).rejects.toEqual(new ShortLinkLimited(17));
   });
 
   it('has no endpoint without a Firebase project', () => {
