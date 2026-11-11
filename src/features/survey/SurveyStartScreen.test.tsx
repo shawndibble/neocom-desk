@@ -153,6 +153,9 @@ describe('SurveyStartScreen', () => {
   it('names a place given by ID alone', async () => {
     resolvePlaceId.mockResolvedValue({ ok: true, name: 'Efa' });
     renderScreen('?placeId=30001');
+    // The ID boxes stay folded away until asked for.
+    expect(screen.queryByLabelText('Place ID')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Add IDs instead' }));
     expect(await screen.findByText('Found: Efa')).toBeTruthy();
     pasteScan();
     await waitFor(() => expect(startSurvey).toHaveBeenCalled());
@@ -197,5 +200,22 @@ describe('SurveyStartScreen', () => {
     fireEvent.paste(document.body, { clipboardData: { getData: () => 'hello' } });
     await new Promise((r) => setTimeout(r, 20));
     expect(startSurvey).not.toHaveBeenCalled();
+  });
+});
+
+describe('SurveyStartScreen payee from an ID alone', () => {
+  it('shows the name ESI gave the payee ID in the name box, keeping the ID', async () => {
+    resolvePayeeId.mockResolvedValue({
+      ok: true,
+      name: 'Bureau of Unified Harvesting',
+      kind: 'corporation',
+      id: 98837836,
+    });
+    renderScreen('?payeeId=98837836&rate=5');
+    await waitFor(() =>
+      expect((screen.getByLabelText('Moon tax payee') as HTMLInputElement).value).toBe(
+        'Bureau of Unified Harvesting'
+      )
+    );
   });
 });

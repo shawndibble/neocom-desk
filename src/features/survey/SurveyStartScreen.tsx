@@ -89,11 +89,8 @@ export function SurveyStartScreen() {
   const [rateText, setRateText] = useState(() => parseStartLink(search).rate?.toString() ?? '');
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   const [howTo, setHowTo] = useState(false);
-  // IDs are for link writers: open when the link already carries one.
-  const [ids, setIds] = useState(() => {
-    const start = parseStartLink(search);
-    return start.payee?.id != null || (start.place?.id != null && start.place.name === '');
-  });
+  // IDs are for link writers: shown only when asked for, even if the link carries one.
+  const [ids, setIds] = useState(false);
   const names = useStartLinkNames(fields);
   const savedPayees = useLiveQuery(
     () => (characterId === null ? [] : loadPayees(characterId)),
@@ -229,8 +226,13 @@ export function SurveyStartScreen() {
         <div className="flex flex-col gap-4">
           <p className="text-xs text-text-dim">{t('survey.start.detailsHint')}</p>
           <SurveyDetailsFields
-            place={fields.place}
-            payeeName={fields.payee?.name ?? ''}
+            // A link with only IDs shows the names ESI gave them; the IDs stay in the link.
+            place={
+              fields.place && fields.place.name === '' && resolvedPlace !== undefined
+                ? { ...fields.place, name: resolvedPlace }
+                : fields.place
+            }
+            payeeName={fields.payee?.name || resolvedPayee || ''}
             rateText={rateText}
             notes={fields.notes}
             characterId={characterId}
