@@ -22,6 +22,9 @@ const DEPLOYED = [
   // Firestore triggers (issue #5121): community alerts pushed on the backend's own write.
   'pushCommunityAlert',
   'pushCommunityPledge',
+  // HTTP trigger: a script POSTs/GETs start-link fields and gets a short link; it has no Firebase
+  // session to call a callable with, and the function is the only writer of `survey-start` shares.
+  'shortStartLink',
   'syncCorpTaxBooks',
 ];
 

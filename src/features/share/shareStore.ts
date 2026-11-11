@@ -53,8 +53,12 @@ export function shareFirestore(characterId?: number): Firestore {
 export const SHARES_COLLECTION = 'shares';
 export const SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Every page a Share Link can open. Mirrored by the `type in [...]` check in `firestore.rules`. */
-export const SHARE_TYPES = ['appraisal', 'fitting', 'dscan', 'survey'] as const;
+/**
+ * Every page a Share Link can open. Mirrored by the `type in [...]` check in `firestore.rules`,
+ * except `survey-start`: the `shortStartLink` function writes those (a short link to the
+ * Survey start page) and the rules refuse it from any client.
+ */
+export const SHARE_TYPES = ['appraisal', 'fitting', 'dscan', 'survey', 'survey-start'] as const;
 export type ShareType = (typeof SHARE_TYPES)[number];
 
 export interface StoredShare {

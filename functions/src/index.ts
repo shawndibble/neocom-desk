@@ -4,10 +4,15 @@
 // against EVE's published JWKS before any Firebase credential is minted.
 
 import { callerFromAuth, signedInCharacter, verifyAccessToken, type Caller } from './actorAuth.js';
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { createActionGroup, type CallableHandler } from './callableRouter.js';
 import type { CallableAction } from './callableManifest.js';
 import { runDailyHousekeeping } from './dailyHousekeeping.js';
+import {
+  SURVEY_START_SHARE_TYPE,
+  makeShortStartLink,
+  type ShortLinkStore,
+} from './shortStartLink.js';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
@@ -16,6 +21,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getMessaging } from 'firebase-admin/messaging';
 import { firestore } from './firestore.js';
+import { Timestamp } from 'firebase-admin/firestore';
 import {
   installBookWriteTracking,
   stampBook,
@@ -1456,6 +1462,58 @@ export const mutamarketEstimate = onCall<unknown>(
         throw new HttpsError('unavailable', 'MutaMarket is unavailable');
       }
       throw err;
+    }
+  }
+);
+
+/**
+ * shortStartLink (shortStartLink.ts): an HTTP endpoint, `POST` (JSON or form body) or `GET`
+ * (query string), that turns a Survey start link's fields into a short `/s/<id>` link, for a
+ * script that puts one in an EVE calendar event. It is an HTTP trigger and not a callable
+ * action because a script has no Firebase session to call a callable with. It is the only
+ * writer of `survey-start` shares: the rules refuse that type from any client. `maxInstances`
+ * is the hobby-scale abuse cap; the same details always give the same id, so repeating a
+ * request adds nothing.
+ */
+const shortLinkStore: ShortLinkStore = {
+  claim: (id, search, now, expiresAt) => {
+    const ref = firestore().collection('shares').doc(id);
+    return firestore().runTransaction(async (tx) => {
+      const held = await tx.get(ref);
+      const data = held.data() as
+        { payload?: { search?: unknown }; expiresAt?: { toMillis(): number } } | undefined;
+      const live = data?.expiresAt !== undefined && data.expiresAt.toMillis() > now;
+      if (held.exists && live && data?.payload?.search !== search) return 'taken' as const;
+      tx.set(ref, {
+        type: SURVEY_START_SHARE_TYPE,
+        payload: { v: 1, search },
+        createdAt: Timestamp.fromMillis(now),
+        expiresAt: Timestamp.fromMillis(expiresAt),
+      });
+      return 'ok' as const;
+    });
+  },
+};
+
+export const shortStartLink = onRequest(
+  { cors: true, maxInstances: 5 },
+  async (request, response) => {
+    if (request.method !== 'GET' && request.method !== 'POST') {
+      response.set('Allow', 'GET, POST').status(405).json({ error: 'use GET or POST' });
+      return;
+    }
+    const input = request.method === 'POST' ? request.body : request.query;
+    try {
+      const result = await makeShortStartLink(
+        input,
+        shortLinkStore,
+        Date.now(),
+        process.env.APP_URL ?? 'https://neocomdesk.com'
+      );
+      response.status(result.status).json(result.body);
+    } catch (err) {
+      logError('shortStartLink failed', err);
+      response.status(500).json({ error: 'could not make a short link' });
     }
   }
 );
