@@ -13,9 +13,11 @@ const FIND = ['findPlace', 'findStructure', 'findPayee', 'findLoggedIn'] as cons
 export function StartLinkHelp() {
   const { t } = useTranslation();
   return (
-    <details className="rounded-xs border border-line bg-panel/85 p-3 text-sm">
-      <summary className="cursor-pointer font-medium">{t('survey.start.help.title')}</summary>
-      <div className="mt-3 space-y-3">
+    <details className="rounded-xs border border-line bg-panel/60 text-sm">
+      <summary className="cursor-pointer select-none px-3 py-2 text-text-dim touch:py-3">
+        {t('survey.start.help.title')}
+      </summary>
+      <div className="space-y-3 border-t border-line px-3 py-3">
         <p>{t('survey.start.help.intro')}</p>
         <dl className="space-y-2">
           {PARAMS.map((name) => (
