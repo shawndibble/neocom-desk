@@ -10,7 +10,7 @@ import { appUrl } from '@/features/share/shareStore';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { START_LINK_PATH } from './startLink';
-import { ShortLinkLimited, makeShortLink, shortStartLinkEndpoint } from './shortStartLink';
+import { SHORT_LINK_ENDPOINT, ShortLinkLimited, makeShortLink } from './shortStartLink';
 
 const PARAMS = ['place', 'placeId', 'payee', 'payeeId', 'rate', 'notes'] as const;
 
@@ -33,7 +33,6 @@ export function StartLinkHelp({ path = START_LINK_PATH }: { path?: string }) {
   const [wait, setWait] = useState<number | null>(null);
   const shortUrl = made && short?.path === path ? short.url : null;
   const url = shortUrl ?? appUrl(made ? path : EXAMPLE_PATH);
-  const endpoint = shortStartLinkEndpoint();
 
   async function makeShort() {
     setShortState('busy');
@@ -72,7 +71,7 @@ export function StartLinkHelp({ path = START_LINK_PATH }: { path?: string }) {
               ? t('survey.start.copyLink')
               : t(copied === 'copied' ? 'survey.start.copied' : 'survey.start.copyFailed')}
           </Button>
-          {made && endpoint !== null && shortUrl === null && (
+          {made && shortUrl === null && (
             <Button size="sm" loading={shortState === 'busy'} onClick={() => void makeShort()}>
               {t('survey.start.help.makeShort')}
             </Button>
@@ -108,24 +107,20 @@ export function StartLinkHelp({ path = START_LINK_PATH }: { path?: string }) {
             <li key={key}>{t(`survey.start.help.${key}`)}</li>
           ))}
         </ul>
-        {endpoint !== null && (
-          <>
-            <h3 className="font-medium">{t('survey.start.help.shortTitle')}</h3>
-            <p className="text-text-dim">{t('survey.start.help.shortIntro')}</p>
-            <pre className="overflow-x-auto rounded-xs bg-bg p-2 text-xs">
-              {`curl -X POST ${endpoint} \\
+        <h3 className="font-medium">{t('survey.start.help.shortTitle')}</h3>
+        <p className="text-text-dim">{t('survey.start.help.shortIntro')}</p>
+        <pre className="overflow-x-auto rounded-xs bg-bg p-2 text-xs">
+          {`curl -X POST ${SHORT_LINK_ENDPOINT} \\
   -H 'Content-Type: application/json' \\
   -d '{"placeId":1055970837740,"place":"Ainsan - Coesite Collector","payeeId":98834802,"rate":5}'`}
-            </pre>
-            <pre className="overflow-x-auto rounded-xs bg-bg p-2 text-xs">
-              {`curl '${endpoint}?placeId=30003889&payeeId=98834802&rate=5'`}
-            </pre>
-            <p className="text-text-dim">{t('survey.start.help.shortAnswer')}</p>
-            <pre className="overflow-x-auto rounded-xs bg-bg p-2 text-xs">
-              {`{"id":"xk3p9q","path":"/s/xk3p9q","url":"https://neocomdesk.com/s/xk3p9q","expiresAt":"…"}`}
-            </pre>
-          </>
-        )}
+        </pre>
+        <pre className="overflow-x-auto rounded-xs bg-bg p-2 text-xs">
+          {`curl '${SHORT_LINK_ENDPOINT}?placeId=30003889&payeeId=98834802&rate=5'`}
+        </pre>
+        <p className="text-text-dim">{t('survey.start.help.shortAnswer')}</p>
+        <pre className="overflow-x-auto rounded-xs bg-bg p-2 text-xs">
+          {`{"id":"xk3p9q","path":"/s/xk3p9q","url":"https://neocomdesk.com/s/xk3p9q","expiresAt":"…"}`}
+        </pre>
       </div>
     </details>
   );

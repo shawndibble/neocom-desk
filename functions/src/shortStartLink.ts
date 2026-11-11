@@ -16,7 +16,7 @@
  * isn't counted. Pure apart from
  * the injected store.
  */
-import { createHash } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 export const SURVEY_START_SHARE_TYPE = 'survey-start';
 export const START_LINK_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -177,6 +177,43 @@ export function clientIp(forwardedFor: string | string[] | undefined, fallback?:
     .filter((part) => part !== '')
     .pop();
   return last ?? fallback ?? 'unknown';
+}
+
+/** The headers the proxy Worker (`workers/short-link-proxy`) sets; see `callerAddress`. */
+export const PROXY_CLIENT_HEADER = 'x-short-link-client';
+export const PROXY_SECRET_HEADER = 'x-short-link-proxy';
+
+function sameSecret(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+/**
+ * Who is calling. Through the proxy Worker the request comes from Cloudflare, so the Worker
+ * says who the caller is in `x-short-link-client`, and the function believes that only when
+ * `x-short-link-proxy` carries the shared secret (`SHORT_LINK_PROXY_SECRET`); anyone else
+ * calling the function directly is identified as by `clientIp`.
+ */
+export function callerAddress(request: {
+  proxyClient: string | undefined;
+  proxySecret: string | undefined;
+  forwardedFor: string | string[] | undefined;
+  ip: string | undefined;
+  expectedSecret: string | undefined;
+}): string {
+  const { proxyClient, proxySecret, expectedSecret } = request;
+  if (
+    expectedSecret !== undefined &&
+    expectedSecret !== '' &&
+    proxySecret !== undefined &&
+    proxyClient !== undefined &&
+    proxyClient.trim() !== '' &&
+    sameSecret(proxySecret, expectedSecret)
+  ) {
+    return proxyClient.trim();
+  }
+  return clientIp(request.forwardedFor, request.ip);
 }
 
 /** What identifies a caller in the store: the IP, hashed, so the raw address is never kept. */

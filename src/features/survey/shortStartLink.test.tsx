@@ -1,16 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ShortLinkLimited, makeShortLink, shortStartLinkEndpoint } from './shortStartLink';
+import { SHORT_LINK_ENDPOINT, ShortLinkLimited, makeShortLink } from './shortStartLink';
 
 const fetchMock = vi.fn();
 
 beforeEach(() => {
-  vi.stubEnv('VITE_FIREBASE_PROJECT_ID', 'demo-proj');
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
 
@@ -19,7 +17,8 @@ describe('makeShortLink', () => {
     fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 'xk3p9q' }) });
     const url = await makeShortLink('/survey?place=Efa&placeId=7&rate=5');
     const [endpoint, init] = fetchMock.mock.calls[0]!;
-    expect(endpoint).toBe('https://us-central1-demo-proj.cloudfunctions.net/shortStartLink');
+    expect(endpoint).toBe('https://api.neocomdesk.com/short');
+    expect(endpoint).toBe(SHORT_LINK_ENDPOINT);
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body)).toEqual({ place: 'Efa', placeId: '7', rate: '5' });
     expect(url.endsWith('/s/xk3p9q')).toBe(true);
@@ -39,10 +38,5 @@ describe('makeShortLink', () => {
       json: () => Promise.resolve({ retryAfterSeconds: 17 }),
     });
     await expect(makeShortLink('/survey?rate=5')).rejects.toEqual(new ShortLinkLimited(17));
-  });
-
-  it('has no endpoint without a Firebase project', () => {
-    vi.stubEnv('VITE_FIREBASE_PROJECT_ID', '');
-    expect(shortStartLinkEndpoint()).toBeNull();
   });
 });

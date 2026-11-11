@@ -8,7 +8,6 @@ const makeShortLink = vi.hoisted(() => vi.fn());
 vi.mock('./shortStartLink', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./shortStartLink')>()),
   makeShortLink,
-  shortStartLinkEndpoint: () => 'https://fn.test/shortStartLink',
 }));
 
 beforeEach(() => {
@@ -52,6 +51,7 @@ describe('StartLinkHelp', () => {
 
   it('documents the POST and GET calls with the endpoint', () => {
     render(<StartLinkHelp />);
-    expect(screen.getAllByText(/fn\.test\/shortStartLink/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/api\.neocomdesk\.com\/short/).length).toBeGreaterThan(0);
+    expect(document.body.textContent).not.toContain('cloudfunctions.net');
   });
 });

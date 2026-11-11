@@ -1,0 +1,12 @@
+name = "neocom-desk-short-link-proxy"
+main = "index.mjs"
+compatibility_date = "2026-10-01"
+
+# Scripts and the app call this, so it needs a public URL: the custom domain
+# below, whose DNS record and certificate `wrangler deploy` creates.
+workers_dev = false
+preview_urls = false
+routes = [{ pattern = "api.neocomdesk.com", custom_domain = true }]
+
+[observability]
+enabled = true

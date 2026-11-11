@@ -7,6 +7,7 @@ import {
   type CallerState,
   START_LINK_TTL_MS,
   callerKey,
+  callerAddress,
   clientIp,
   canonicalSearch,
   makeShortStartLink,
@@ -94,6 +95,31 @@ describe('clientIp', () => {
   it('falls back to the socket address, then to a shared bucket', () => {
     expect(clientIp(undefined, '10.0.0.1')).toBe('10.0.0.1');
     expect(clientIp('', undefined)).toBe('unknown');
+  });
+});
+
+describe('callerAddress', () => {
+  const base = {
+    proxyClient: '203.0.113.9',
+    proxySecret: 's3cret',
+    forwardedFor: '6.6.6.6, 198.51.100.7',
+    ip: '10.0.0.1',
+    expectedSecret: 's3cret',
+  };
+
+  it('believes the proxy about who the caller is, when it knows the secret', () => {
+    expect(callerAddress(base)).toBe('203.0.113.9');
+  });
+
+  it('ignores the claim without the right secret, using the address the front end saw', () => {
+    expect(callerAddress({ ...base, proxySecret: 'guess' })).toBe('198.51.100.7');
+    expect(callerAddress({ ...base, proxySecret: undefined })).toBe('198.51.100.7');
+  });
+
+  it('ignores the claim when no secret is configured here, or the client is blank', () => {
+    expect(callerAddress({ ...base, expectedSecret: undefined })).toBe('198.51.100.7');
+    expect(callerAddress({ ...base, expectedSecret: '', proxySecret: '' })).toBe('198.51.100.7');
+    expect(callerAddress({ ...base, proxyClient: ' ' })).toBe('198.51.100.7');
   });
 });
 

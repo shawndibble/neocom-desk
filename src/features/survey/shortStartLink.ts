@@ -1,6 +1,7 @@
 /**
  * Turns a Survey start link into a short `/s/<id>` link by asking the
- * `shortStartLink` HTTP function (`functions/src/shortStartLink.ts`), the same
+ * `shortStartLink` HTTP function (`functions/src/shortStartLink.ts`) through its
+ * Worker at `api.neocomdesk.com/short` (`workers/short-link-proxy`), the same
  * endpoint a script can call. It needs no login. The short link holds the same
  * fields for 30 days and opens the start page with them filled in.
  */
@@ -13,18 +14,13 @@ export class ShortLinkLimited extends Error {
   }
 }
 
-/** Functions run in the default region of the shared Firebase project. */
-export function shortStartLinkEndpoint(): string | null {
-  const project = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-  return project ? `https://us-central1-${project}.cloudfunctions.net/shortStartLink` : null;
-}
+/** The Worker that fronts the function, so no cloudfunctions.net address is shown or called. */
+export const SHORT_LINK_ENDPOINT = 'https://api.neocomdesk.com/short';
 
 /** The short link for a start link's path (`/survey?place=…`), on this site's own address. */
 export async function makeShortLink(startLinkPath: string): Promise<string> {
-  const endpoint = shortStartLinkEndpoint();
-  if (endpoint === null) throw new Error('no short link service configured');
   const query = new URL(startLinkPath, 'https://start.invalid').searchParams;
-  const response = await fetch(endpoint, {
+  const response = await fetch(SHORT_LINK_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(Object.fromEntries(query)),
