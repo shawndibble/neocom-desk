@@ -133,6 +133,8 @@ describe('firestore.indexes.json field overrides', () => {
       'miners',
       // The feeder mirror's packed lines would index every nested key (corpTaxBookFeederRollup.ts).
       'feederObserved',
+      // Each caller's last new short link, removed by TTL an hour later (shortStartLink.ts).
+      'shortLinkLimits',
       // Scheduled sweeps query across every parent instead of once per parent (#5049).
       ...SWEEP_GROUP_FIELDS.map(([group]) => group),
     ]);
