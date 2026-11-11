@@ -6,11 +6,11 @@
  * query string is unreadable.
  *
  * Stored as a `shares` doc of type `survey-start` holding the canonical query, for
- * 30 days (the `shares.expiresAt` TTL policy removes it). Only this function writes
+ * 60 days (the `shares.expiresAt` TTL policy removes it). Only this function writes
  * one (the rules refuse any client create of that type); the page that opens it
  * (`/s/<id>`) re-validates the query as it does for a hand-written start link. The
  * id comes from the query itself, so asking again for the same link returns the
- * same short link and renews its 30 days, and a script can't fill the collection
+ * same short link and renews its 60 days, and a script can't fill the collection
  * by repeating a request. A caller (an IP, hashed) may make one *new* link every 30
  * seconds (`NEW_LINK_GAP_MS`) and 30 an hour (`NEW_LINKS_PER_WINDOW`); repeating an existing link
  * isn't counted. Pure apart from
@@ -19,7 +19,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 
 export const SURVEY_START_SHARE_TYPE = 'survey-start';
-export const START_LINK_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const START_LINK_TTL_MS = 60 * 24 * 60 * 60 * 1000;
 /** One new short link per caller (IP) in this long; asking again for an existing link is free. */
 export const NEW_LINK_GAP_MS = 30_000;
 /** Where each caller's last new link is noted (a hashed IP and a time), and for how long. */

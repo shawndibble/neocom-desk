@@ -3,7 +3,7 @@
  * `shortStartLink` HTTP function (`functions/src/shortStartLink.ts`) through its
  * Worker at `api.neocomdesk.com/short` (`workers/short-link-proxy`), the same
  * endpoint a script can call. It needs no login. The short link holds the same
- * fields for 30 days and opens the start page with them filled in.
+ * fields for 60 days and opens the start page with them filled in.
  */
 import { appUrl } from '@/features/share/shareStore';
 
