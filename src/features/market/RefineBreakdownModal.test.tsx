@@ -286,6 +286,7 @@ describe('RefineBreakdownModal, typing the reprocessing yield', () => {
       screen.queryByRole('button', { name: /Edit Reprocessing yield/ })
     ).not.toBeInTheDocument();
     expect(screen.getByText('80% – 90%')).toBeInTheDocument();
+    expect(screen.getByText(/Some items use different skill modifiers/)).toBeInTheDocument();
   });
 
   it('is a readout on a shared link', () => {

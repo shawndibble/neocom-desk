@@ -13206,6 +13206,7 @@
         "efficiency": "Reprocessing yield",
         "efficiencyHelp": "Facility base yield times your skills: the share of each portion's materials that comes back. It is the yield the EVE client shows in its Reprocessing window, and the efficiency other tools ask for. Type it here and the facility base yield is worked out for you.",
         "assumingNpc": "Assuming an NPC station's 50% base yield. At a structure, enter its base yield, or type the reprocessing yield your EVE client shows, and everything below follows.",
+        "skillsRangeNote": "Some items use different skill modifiers, so Skills and Reprocessing yield show a range.",
         "assumingNpcShared": "These numbers use an NPC station's 50% base yield, which may not be where the sharer refines.",
         "neverWins": "No yield up to 100% makes refining win on {{basis}}. You are at {{yours}}.",
         "topOfBook": "Figures use the best price at the hub, so a very large pile will sell for less.",
