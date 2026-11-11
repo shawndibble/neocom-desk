@@ -4,6 +4,7 @@
  * up; `loading` that its answer has not landed; otherwise the answer.
  */
 import { useEffect, useState } from 'react';
+import { MIN_PAYEE_SEARCH_LENGTH } from '@/features/miningTax/payeeEntitySearch';
 import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import type { StartLinkFields } from './startLink';
 import {
@@ -44,9 +45,6 @@ function useLookup<K extends string | number, T>(
   return answer?.key === key ? answer.result : 'loading';
 }
 
-/** ESI's name search needs a few letters; a shorter name is not worth a request. */
-const MIN_PAYEE_NAME_LOOKUP = 3;
-
 export function useStartLinkNames(fields: StartLinkFields): {
   place: NameStatus;
   /** The payee as ESI names it: by its ID when the form has one, else by the name typed. */
@@ -60,7 +58,7 @@ export function useStartLinkNames(fields: StartLinkFields): {
   const typed = fields.payee?.name.trim() ?? '';
   const byId = useLookup(payeeId, resolvePayeeId);
   const byName = useLookup(
-    payeeId === null && typed.length >= MIN_PAYEE_NAME_LOOKUP ? typed : null,
+    payeeId === null && typed.length >= MIN_PAYEE_SEARCH_LENGTH ? typed : null,
     resolveTypedPayee
   );
   return {

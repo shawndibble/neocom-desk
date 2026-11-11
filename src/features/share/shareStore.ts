@@ -78,9 +78,14 @@ export type LoadShareResult =
     }
   | { ok: false; reason: 'not-found' | 'unsupported' | 'failed' };
 
-export function shareUrl(id: string): string {
+/** An in-app path as a full link on this origin, under the app's base path. */
+export function appUrl(path: string): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-  return `${window.location.origin}${base}/s/${id}`;
+  return `${window.location.origin}${base}${path}`;
+}
+
+export function shareUrl(id: string): string {
+  return appUrl(`/s/${id}`);
 }
 
 export async function saveShare(input: {

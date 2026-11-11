@@ -89,8 +89,7 @@ export async function searchPayeeEntitiesPublic(
     resolvePayeeName(trimmed, signal).catch((): PayeeEntityMatch[] => []),
     searchZkillEntities(trimmed),
   ]);
-  const seen = new Set<number>();
-  return [...exact, ...partial]
-    .filter((m) => !seen.has(m.id) && seen.add(m.id))
-    .slice(0, MAX_RESULTS);
+  const byId = new Map<number, PayeeEntityMatch>();
+  for (const match of [...exact, ...partial]) if (!byId.has(match.id)) byId.set(match.id, match);
+  return [...byId.values()].slice(0, MAX_RESULTS);
 }

@@ -299,7 +299,8 @@ service cloud.firestore {
         && (request.resource.data.type != 'survey'
           || (request.resource.data.payload.keys().hasOnly(['v', 'owner', 'prefill'])
             && (!('owner' in request.resource.data.payload)
-              || (request.resource.data.payload.owner is string
+              || (request.auth != null
+                && request.resource.data.payload.owner is string
                 && request.resource.data.payload.owner.size() <= 400))
             && (!('prefill' in request.resource.data.payload)
               || (request.resource.data.payload.prefill is map
@@ -314,7 +315,9 @@ service cloud.firestore {
                 && request.resource.data.payload.prefill.get('tax', {}).keys().hasOnly(['name', 'pct'])
                 && request.resource.data.payload.prefill.get('tax', {}).get('name', '') is string
                 && request.resource.data.payload.prefill.get('tax', {}).get('name', '').size() <= 400
-                && request.resource.data.payload.prefill.get('tax', {}).get('pct', 0) is number))))
+                && request.resource.data.payload.prefill.get('tax', {}).get('pct', 0) is number
+                && request.resource.data.payload.prefill.get('tax', {}).get('pct', 0) >= 0
+                && request.resource.data.payload.prefill.get('tax', {}).get('pct', 0) <= 100))))
         && (request.resource.data.type != 'fitting'
           || (request.resource.data.payload.code is string
             && request.resource.data.payload.code.size() <= 20100))

@@ -5,11 +5,13 @@
  * synced, and best-effort like `submitted.ts`: cleared storage just means the
  * page reads as any visitor's. A Survey lasts a week, so an entry does too.
  */
+import { isRecord } from '@/engine/guards';
+import { DAY_MS } from '@/lib/age';
 import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
 
 const KEY = 'miningSurveysStarted';
 /** A Survey's own lifetime, with a day of slack. */
-const KEEP_MS = 8 * 24 * 60 * 60 * 1000;
+const KEEP_MS = 8 * DAY_MS;
 const MAX_KEPT = 30;
 
 interface Entry {
@@ -23,11 +25,7 @@ function read(now: number): Entry[] {
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (e): e is Entry =>
-        typeof e === 'object' &&
-        e !== null &&
-        typeof (e as Entry).id === 'string' &&
-        typeof (e as Entry).at === 'number' &&
-        now - (e as Entry).at < KEEP_MS
+        isRecord(e) && typeof e.id === 'string' && typeof e.at === 'number' && now - e.at < KEEP_MS
     );
   } catch {
     return [];

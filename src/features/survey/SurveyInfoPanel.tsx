@@ -35,6 +35,8 @@ import { saveSurveyTemplate, useSurveyTemplates } from './surveyTemplates';
 import { SurveyLocationPicker } from './SurveyLocationPicker';
 import { fromInfoFields, startLinkPath } from './startLink';
 import { writeToClipboard } from '@/lib/clipboard';
+import { appUrl } from '@/features/share/shareStore';
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { SurveyWaypointButton } from './SurveyWaypointButton';
 import {
   MAX_SURVEY_NOTES,
@@ -79,7 +81,7 @@ export function SurveyInfoEditor({
   // remembered between visits, since each survey starts from what it stored.
   const [appliedId, setAppliedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<'save' | 'manage' | null>(null);
-  const [linkCopied, setLinkCopied] = useState<'copied' | 'failed' | null>(null);
+  const { copied: linkCopied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   // What was last stored, so a blur with nothing new (or a retry after a failed
   // write) doesn't add a doc.
   const sent = useRef(JSON.stringify([survey?.info?.location ?? null, survey?.info?.notes ?? '']));
@@ -141,10 +143,9 @@ export function SurveyInfoEditor({
             size="sm"
             disabled={fields.location === null && fields.tax === null && notes.trim() === ''}
             onClick={() => {
-              const base = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}`;
-              void writeToClipboard(`${base}${startLinkPath(fromInfoFields(fields))}`).then(
-                () => setLinkCopied('copied'),
-                () => setLinkCopied('failed')
+              void writeToClipboard(appUrl(startLinkPath(fromInfoFields(fields)))).then(
+                () => flash('copied'),
+                () => flash('failed')
               );
             }}
           >

@@ -32,6 +32,8 @@ import { db } from '@/db';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { ShareShell } from '@/features/share/ShareShell';
 import { loadPayees } from '@/features/miningTax/payees';
+import { appUrl } from '@/features/share/shareStore';
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { writeToClipboard } from '@/lib/clipboard';
 import { isTypingTarget } from '@/lib/shortcuts';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -84,7 +86,7 @@ export function SurveyStartScreen() {
 
   const [fields, setFields] = useState<StartLinkFields>(() => parseStartLink(search));
   const [rateText, setRateText] = useState(() => parseStartLink(search).rate?.toString() ?? '');
-  const [copied, setCopied] = useState<'copied' | 'failed' | null>(null);
+  const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   const [howTo, setHowTo] = useState(false);
   // IDs are for link writers: open when the link already carries one.
   const [ids, setIds] = useState(() => {
@@ -187,11 +189,7 @@ export function SurveyStartScreen() {
         : { ...fields, payee: { ...fields.payee, id: verifiedPayeeId } },
     [fields, verifiedPayeeId]
   );
-  const link = useMemo(
-    () =>
-      `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}${startLinkPath(linkFields)}`,
-    [linkFields]
-  );
+  const link = useMemo(() => appUrl(startLinkPath(linkFields)), [linkFields]);
   const placeId = fields.place?.id ?? null;
   const payeeId = fields.payee?.id ?? null;
 
@@ -332,7 +330,7 @@ export function SurveyStartScreen() {
             </button>
           </div>
           <Collapse open={howTo}>
-            <SurveyHowTo />
+            <SurveyHowTo heading={false} />
           </Collapse>
         </div>
       </Panel>
@@ -354,8 +352,8 @@ export function SurveyStartScreen() {
                 size="sm"
                 onClick={() =>
                   void writeToClipboard(link).then(
-                    () => setCopied('copied'),
-                    () => setCopied('failed')
+                    () => flash('copied'),
+                    () => flash('failed')
                   )
                 }
               >

@@ -7,8 +7,9 @@
  */
 import { postUniverseNames } from '@/esi/endpoints';
 import { resolvePayeeName } from '@/features/miningTax/payeeEntitySearch';
+import type { PayeeEntityKind } from '@/features/miningTax/payees';
 
-export type PayeeKind = 'corporation' | 'alliance' | 'character';
+export type PayeeKind = PayeeEntityKind;
 
 export type Resolved<Extra = object> = ({ ok: true; name: string } & Extra) | { ok: false };
 
