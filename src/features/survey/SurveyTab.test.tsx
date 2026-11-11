@@ -31,6 +31,7 @@ vi.mock('./surveyStore', () => ({
 }));
 vi.mock('@/features/share/shareStore', () => ({
   shareUrl: (id: string) => `https://neocomdesk.test/s/${id}`,
+  appUrl: (path: string) => `https://neocomdesk.test${path}`,
 }));
 // The info panel has its own test; here only who sees it editable matters.
 vi.mock('./useHasMoonOre', () => ({ useHasMoonOre: () => true }));
