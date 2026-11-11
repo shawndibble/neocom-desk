@@ -8,6 +8,8 @@
 import { postUniverseNames } from '@/esi/endpoints';
 import { resolvePayeeName } from '@/features/miningTax/payeeEntitySearch';
 import type { PayeeEntityKind } from '@/features/miningTax/payees';
+import type { InfoFields } from '@/engine/survey/infoTemplate';
+import type { StartLinkFields } from './startLink';
 
 export type PayeeKind = PayeeEntityKind;
 
@@ -53,4 +55,24 @@ export async function resolveTypedPayee(
   } catch {
     return { ok: false };
   }
+}
+
+/**
+ * The details a start link would store, with any ID the live lookup hasn't named
+ * yet named now, so a scan pasted straight after the link opened keeps its
+ * location and moon tax. An ID ESI can't name stays unnamed, as before.
+ */
+export async function nameIds(fields: StartLinkFields, info: InfoFields): Promise<InfoFields> {
+  let { location, tax } = info;
+  const placeId = fields.place?.id ?? null;
+  if (location === null && placeId !== null) {
+    const found = await resolvePlaceId(placeId).catch(() => null);
+    if (found?.ok) location = { id: placeId, name: found.name };
+  }
+  const payeeId = fields.payee?.id ?? null;
+  if (tax === null && payeeId !== null && fields.rate !== null) {
+    const found = await resolvePayeeId(payeeId).catch(() => null);
+    if (found?.ok) tax = { name: found.name, pct: fields.rate };
+  }
+  return { ...info, location, tax };
 }

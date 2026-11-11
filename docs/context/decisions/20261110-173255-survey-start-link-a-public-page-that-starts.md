@@ -20,7 +20,9 @@ _Recorded 2026-11-10._
   Survey; the Survey's `/s/<id>` link is what the fleet then shares. Joining a
   fixed Survey from one link would need client-chosen ids and a first-scan race.
 - **The link's details ride in the share's own payload (`prefill`).** The location,
-  tax and notes docs stay sign-in only. A prefill shows until a signed-in owner
+  tax and notes docs (`surveyTax`, `surveyInfo`) can also be created with no sign-in,
+  so the device that started a survey can edit it; the rules cannot tell who started
+  it, so that guard is the UI's. A prefill shows until a signed-in owner
   stores a newer tax or info doc, which wins as before.
 - **Query parameters:** `place`, `placeId`, `payee`, `payeeId`, `rate` (0-100, needs
   a payee), `notes`. Every value is re-validated and capped on read.

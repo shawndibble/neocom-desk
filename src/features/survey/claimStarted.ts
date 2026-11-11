@@ -34,7 +34,11 @@ export async function claimStartedSurveys(
       if (found.owner === null) {
         await setSurveyOwner({ id, owner: ownerName, characterId });
         claimed = true;
-      } else if (!ownsSurvey(found.owner, accountNames)) continue;
+      } else if (!ownsSurvey(found.owner, accountNames)) {
+        // Another pilot's, or this account's Characters haven't loaded yet: ask again next time.
+        checked.delete(id);
+        continue;
+      }
       await noteSurvey(id);
     } catch {
       // Best effort: the next visit tries again.

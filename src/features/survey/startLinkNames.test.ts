@@ -10,7 +10,7 @@ vi.mock('@/esi/endpoints', () => ({
   getCharacterSearch: vi.fn(),
 }));
 
-import { resolvePayeeId, resolveTypedPayee, resolvePlaceId } from './startLinkNames';
+import { nameIds, resolvePayeeId, resolveTypedPayee, resolvePlaceId } from './startLinkNames';
 
 beforeEach(() => {
   postUniverseNames.mockReset();
@@ -77,5 +77,37 @@ describe('resolveTypedPayee', () => {
     expect(await resolveTypedPayee('Nobody')).toEqual({ ok: false });
     postUniverseIds.mockImplementation(() => Promise.reject(new Error('down')));
     expect(await resolveTypedPayee('Nobody')).toEqual({ ok: false });
+  });
+});
+
+describe('nameIds', () => {
+  const noInfo = { location: null, tax: null, notes: '' };
+  const link = (rate: number | null) => ({
+    place: { id: 30003889, name: '' },
+    payee: { id: 98834802, name: '' },
+    rate,
+    notes: '',
+  });
+
+  it('names the IDs the live lookup had not reached yet', async () => {
+    postUniverseNames.mockImplementation((ids: number[]) =>
+      Promise.resolve([
+        ids[0] === 30003889
+          ? { id: 30003889, name: 'Talidal', category: 'solar_system' }
+          : { id: 98834802, name: 'Star Tail Industries', category: 'corporation' },
+      ])
+    );
+    expect(await nameIds(link(5), noInfo)).toEqual({
+      location: { id: 30003889, name: 'Talidal' },
+      tax: { name: 'Star Tail Industries', pct: 5 },
+      notes: '',
+    });
+  });
+
+  it('leaves what is already named, and an ID ESI cannot name, alone', async () => {
+    postUniverseNames.mockImplementation(() => Promise.reject(new Error('404')));
+    const named = { location: { id: 1, name: 'Efa' }, tax: null, notes: 'x' };
+    expect(await nameIds(link(null), named)).toEqual(named);
+    expect(await nameIds(link(5), noInfo)).toEqual(noInfo);
   });
 });

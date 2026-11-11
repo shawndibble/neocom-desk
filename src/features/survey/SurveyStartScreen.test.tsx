@@ -18,7 +18,12 @@ vi.mock('./surveyStore', async () => ({
   addSurveyScan,
   startSurvey,
 }));
-vi.mock('./startLinkNames', () => ({ resolvePayeeId, resolveTypedPayee, resolvePlaceId }));
+vi.mock('./startLinkNames', () => ({
+  resolvePayeeId,
+  resolveTypedPayee,
+  resolvePlaceId,
+  nameIds: async (_fields: unknown, info: unknown) => info,
+}));
 vi.mock('./submitterName', () => ({ submitterName: async () => null }));
 // The real picker searches the whole SDE; its own tests cover that.
 vi.mock('./SurveyLocationPicker', () => ({

@@ -4,6 +4,7 @@
  * link" button on the Survey tab builds the same link from a filled-in panel.
  */
 import { useTranslation } from 'react-i18next';
+import { appUrl } from '@/features/share/shareStore';
 
 const PARAMS = ['place', 'placeId', 'payee', 'payeeId', 'rate', 'notes'] as const;
 
@@ -28,7 +29,7 @@ export function StartLinkHelp() {
         </dl>
         <p className="text-text-dim">{t('survey.start.help.example')}</p>
         <code className="block overflow-x-auto rounded-xs bg-bg p-2 text-xs whitespace-nowrap">
-          {`${window.location.origin}/survey?place=Efa&payee=Bob%20Corp&rate=10&notes=Fleet%20at%2019%3A00`}
+          {appUrl('/survey?place=Efa&payee=Bob%20Corp&rate=10&notes=Fleet%20at%2019%3A00')}
         </code>
         <p className="text-text-dim">{t('survey.start.help.encode')}</p>
         <h3 className="font-medium">{t('survey.start.help.findTitle')}</h3>
