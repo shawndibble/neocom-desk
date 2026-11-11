@@ -195,4 +195,30 @@ describe('SharedLink', () => {
       expect(screen.getByText('Expires')).toBeInTheDocument();
     });
   });
+
+  describe('a short start link', () => {
+    it('opens the Survey start page with the stored details', async () => {
+      vi.mocked(loadShare).mockResolvedValue({
+        ok: true,
+        share: {
+          type: 'survey-start',
+          payload: { v: 1, search: 'placeId=30003889&rate=5' },
+          expiresAt: Date.now() + 1000,
+        },
+      });
+      renderAt('/s/xk3p9q');
+      expect(await screen.findByTestId('landed')).toHaveTextContent(
+        '/survey?placeId=30003889&rate=5'
+      );
+    });
+
+    it('says the link is not valid when the stored query is missing', async () => {
+      vi.mocked(loadShare).mockResolvedValue({
+        ok: true,
+        share: { type: 'survey-start', payload: { v: 1 }, expiresAt: Date.now() + 1000 },
+      });
+      renderAt('/s/xk3p9q');
+      expect(await screen.findByText(/couldn.t open|isn.t valid|try again/i)).toBeInTheDocument();
+    });
+  });
 });

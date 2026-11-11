@@ -7466,6 +7466,12 @@
       "help": {
         "title": "How to make a start link",
         "yourLink": "Your link, built from the details above:",
+        "makeShort": "Make short link",
+        "shortNote": "A short link: it opens the same start page with these details, and works for 30 days.",
+        "shortFailed": "Couldn't make a short link. Try again in a moment.",
+        "shortTitle": "Make a short link from a script",
+        "shortIntro": "Send the same details to this address with POST (a JSON or form body) or GET (a query string). Only the ones you send are used; send at least one. No login needed.",
+        "shortAnswer": "The answer holds the short link. It lasts 30 days, and asking again for the same details gives the same link and renews it:",
         "intro": "A start link opens the Start a mining survey page with the details already filled in. Whoever opens it pastes a scan and gets their own survey with those details. Add these to the end of the address after a ?, joined with &:",
         "place": "The place to mine: a solar system, station or structure name.",
         "placeId": "Optional. The place's ID number, which gives viewers a Set waypoint button. A system or NPC station ID alone is enough; its name is looked up.",
