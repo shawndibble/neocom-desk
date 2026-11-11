@@ -8,7 +8,40 @@ export type ClipboardReader = () => Promise<string>;
 
 type LaterWriter = (text: Promise<string>) => Promise<void>;
 
-let writer: ClipboardWriter = (text) => navigator.clipboard.writeText(text);
+/**
+ * The old way, for a page the Clipboard API is not offered to: it only exists on
+ * https and localhost, so a dev server opened by its network address has none.
+ * Throws when the browser refuses, so a caller still hears of a copy that did not happen.
+ */
+function legacyCopy(text: string): void {
+  const box = document.createElement('textarea');
+  box.value = text;
+  box.setAttribute('readonly', '');
+  box.style.position = 'fixed';
+  box.style.opacity = '0';
+  document.body.appendChild(box);
+  box.select();
+  try {
+    if (!document.execCommand('copy')) throw new Error('The browser refused the copy');
+  } finally {
+    box.remove();
+  }
+}
+
+/** Always a promise: with no Clipboard API this used to throw before it returned one. */
+async function defaultWrite(text: string): Promise<void> {
+  if (typeof navigator.clipboard?.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Refused (no permission, or the click's activation is spent): the old way may still work.
+    }
+  }
+  legacyCopy(text);
+}
+
+let writer: ClipboardWriter = defaultWrite;
 let reader: ClipboardReader = () => navigator.clipboard.readText();
 
 const defaultLaterWriter: LaterWriter = (text) => {
@@ -22,7 +55,7 @@ let laterWriter: LaterWriter = defaultLaterWriter;
 
 /** Override (or, passing null, restore) the clipboard writer. */
 export function configureClipboard(customWriter: ClipboardWriter | null): void {
-  writer = customWriter ?? ((text) => navigator.clipboard.writeText(text));
+  writer = customWriter ?? defaultWrite;
   laterWriter = customWriter ? (text) => text.then(customWriter) : defaultLaterWriter;
 }
 

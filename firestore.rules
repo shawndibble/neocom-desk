@@ -280,7 +280,9 @@ service cloud.firestore {
     match /shares/{shareId} {
       allow get: if resource.data.expiresAt > request.time;
       allow list: if false;
-      allow create: if request.auth != null
+      // A `survey` may be started with no sign-in (a Survey start link opened by
+      // someone with no account); every other type still needs one.
+      allow create: if (request.auth != null || request.resource.data.type == 'survey')
         && // New keys: engine/share/shareId.ts's alphabet; the 9-char form is legacy.
         shareId.matches('^([0-9A-Za-z]{9}|[2-9a-hj-kmnp-z]{6})$')
         && request.resource.data.keys().hasOnly(['type', 'payload', 'createdAt', 'expiresAt'])
@@ -294,6 +296,25 @@ service cloud.firestore {
         && (request.resource.data.type != 'appraisal'
           || (request.resource.data.payload.items is list
             && request.resource.data.payload.items.size() <= 1000))
+        && (request.resource.data.type != 'survey'
+          || (request.resource.data.payload.keys().hasOnly(['v', 'owner', 'prefill'])
+            && (!('owner' in request.resource.data.payload)
+              || (request.resource.data.payload.owner is string
+                && request.resource.data.payload.owner.size() <= 400))
+            && (!('prefill' in request.resource.data.payload)
+              || (request.resource.data.payload.prefill is map
+                && request.resource.data.payload.prefill.keys().hasOnly(['location', 'tax', 'notes'])
+                && request.resource.data.payload.prefill.get('notes', '') is string
+                && request.resource.data.payload.prefill.get('notes', '').size() <= 4000
+                && request.resource.data.payload.prefill.get('location', {}) is map
+                && request.resource.data.payload.prefill.get('location', {}).keys().hasOnly(['id', 'name'])
+                && request.resource.data.payload.prefill.get('location', {}).get('name', '') is string
+                && request.resource.data.payload.prefill.get('location', {}).get('name', '').size() <= 480
+                && request.resource.data.payload.prefill.get('tax', {}) is map
+                && request.resource.data.payload.prefill.get('tax', {}).keys().hasOnly(['name', 'pct'])
+                && request.resource.data.payload.prefill.get('tax', {}).get('name', '') is string
+                && request.resource.data.payload.prefill.get('tax', {}).get('name', '').size() <= 400
+                && request.resource.data.payload.prefill.get('tax', {}).get('pct', 0) is number))))
         && (request.resource.data.type != 'fitting'
           || (request.resource.data.payload.code is string
             && request.resource.data.payload.code.size() <= 20100))
@@ -351,10 +372,12 @@ service cloud.firestore {
       // name, which rules can't check against a sign-in, so the app only writes
       // for the owner. Anyone with the link reads them. Same expiry rule
       // as a scan, so the TTL policy on `surveyTax` removes it with the survey.
+      // Signed in or not, like a scan: the visitor who started the survey with no
+      // account sets its details afterwards (the app offers that to the device
+      // that started it, src/features/survey/startedHere.ts).
       match /surveyTax/{taxId} {
         allow get, list: if get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time;
-        allow create: if request.auth != null
-          && get(/databases/$(database)/documents/shares/$(shareId)).data.type == 'survey'
+        allow create: if get(/databases/$(database)/documents/shares/$(shareId)).data.type == 'survey'
           && get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time
           && request.resource.data.keys().hasOnly(['name', 'pct', 'createdAt', 'expiresAt'])
           && request.resource.data.keys().hasAll(['name', 'pct', 'createdAt', 'expiresAt'])
@@ -378,8 +401,7 @@ service cloud.firestore {
       // rules as the moon tax. The client caps by characters (MAX_LOCATION_NAME, MAX_SURVEY_NOTES); these allow 4x that so multibyte text is never refused.
       match /surveyInfo/{infoId} {
         allow get, list: if get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time;
-        allow create: if request.auth != null
-          && get(/databases/$(database)/documents/shares/$(shareId)).data.type == 'survey'
+        allow create: if get(/databases/$(database)/documents/shares/$(shareId)).data.type == 'survey'
           && get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time
           && request.resource.data.keys().hasOnly(['locationId', 'locationName', 'notes', 'createdAt', 'expiresAt'])
           && request.resource.data.keys().hasAll(['createdAt', 'expiresAt'])

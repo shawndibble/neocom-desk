@@ -15,7 +15,7 @@
  */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel, TextArea } from '@/components/ui';
+import { Button, Fields, Panel, TextArea } from '@/components/ui';
 import { InfoRow } from './InfoRow';
 import { SurveyNotes } from './SurveyNotes';
 import {
@@ -33,6 +33,8 @@ import { ManageTemplatesDialog, SaveTemplateDialog } from './SurveyTemplateDialo
 import { SurveyTemplateMenu } from './SurveyTemplateMenu';
 import { saveSurveyTemplate, useSurveyTemplates } from './surveyTemplates';
 import { SurveyLocationPicker } from './SurveyLocationPicker';
+import { fromInfoFields, startLinkPath } from './startLink';
+import { writeToClipboard } from '@/lib/clipboard';
 import { SurveyWaypointButton } from './SurveyWaypointButton';
 import {
   MAX_SURVEY_NOTES,
@@ -77,6 +79,7 @@ export function SurveyInfoEditor({
   // remembered between visits, since each survey starts from what it stored.
   const [appliedId, setAppliedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<'save' | 'manage' | null>(null);
+  const [linkCopied, setLinkCopied] = useState<'copied' | 'failed' | null>(null);
   // What was last stored, so a blur with nothing new (or a retry after a failed
   // write) doesn't add a doc.
   const sent = useRef(JSON.stringify([survey?.info?.location ?? null, survey?.info?.notes ?? '']));
@@ -133,34 +136,51 @@ export function SurveyInfoEditor({
     <Panel
       title={t('survey.info.title')}
       actions={
-        <SurveyTemplateMenu
-          templates={templates}
-          appliedId={applied?.id ?? null}
-          onApply={apply}
-          onSave={() => setDialog('save')}
-          onManage={() => setDialog('manage')}
-        />
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            disabled={fields.location === null && fields.tax === null && notes.trim() === ''}
+            onClick={() => {
+              const base = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}`;
+              void writeToClipboard(`${base}${startLinkPath(fromInfoFields(fields))}`).then(
+                () => setLinkCopied('copied'),
+                () => setLinkCopied('failed')
+              );
+            }}
+          >
+            {linkCopied === null
+              ? t('survey.start.copy')
+              : t(linkCopied === 'copied' ? 'survey.start.copied' : 'survey.start.copyFailed')}
+          </Button>
+          <SurveyTemplateMenu
+            templates={templates}
+            appliedId={applied?.id ?? null}
+            onApply={apply}
+            onSave={() => setDialog('save')}
+            onManage={() => setDialog('manage')}
+          />
+        </div>
       }
     >
-      <div className="flex flex-col gap-4">
-        {applied !== undefined && (
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <span>{t('survey.templates.applied', { name: applied.name })}</span>
-            {edited && (
-              <>
-                <span className="text-text-dim">{t('survey.templates.edited')}</span>
-                <Button size="sm" onClick={() => updateApplied(applied)}>
-                  {t('survey.templates.update')}
-                </Button>
-                <Button size="sm" onClick={() => setDialog('save')}>
-                  {t('survey.templates.saveAsNew')}
-                </Button>
-              </>
-            )}
-          </p>
-        )}
+      {applied !== undefined && (
+        <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <span>{t('survey.templates.applied', { name: applied.name })}</span>
+          {edited && (
+            <>
+              <span className="text-text-dim">{t('survey.templates.edited')}</span>
+              <Button size="sm" onClick={() => updateApplied(applied)}>
+                {t('survey.templates.update')}
+              </Button>
+              <Button size="sm" onClick={() => setDialog('save')}>
+                {t('survey.templates.saveAsNew')}
+              </Button>
+            </>
+          )}
+        </p>
+      )}
+      <Fields variant="form">
         <InfoRow label={t('survey.info.location')}>
-          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+          <div className="flex min-w-0 flex-1 basis-64">
             <SurveyLocationPicker
               value={location}
               characterId={characterId}
@@ -170,10 +190,10 @@ export function SurveyInfoEditor({
                 store(next, notes);
               }}
             />
-            {location?.id != null && (
-              <SurveyWaypointButton location={{ id: location.id, name: location.name }} />
-            )}
           </div>
+          {location?.id != null && (
+            <SurveyWaypointButton location={{ id: location.id, name: location.name }} />
+          )}
         </InfoRow>
         {moon && (
           <MoonTaxRow
@@ -201,7 +221,7 @@ export function SurveyInfoEditor({
             onBlur={() => store(location, notes)}
           />
         </InfoRow>
-      </div>
+      </Fields>
       {dialog === 'save' && (
         <SaveTemplateDialog
           fields={fields}
@@ -239,17 +259,13 @@ export function SurveyInfoReadout({
   if (location === null && notes === '' && tax === null) return null;
   return (
     <Panel title={t('survey.info.title')}>
-      <div className="flex flex-col gap-4">
+      <Fields variant="form">
         {location !== null && (
           <InfoRow label={t('survey.info.location')}>
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
-              <p className="min-w-0 text-xl font-semibold [overflow-wrap:anywhere]">
-                {location.name}
-              </p>
-              {location.id !== null && (
-                <SurveyWaypointButton location={{ id: location.id, name: location.name }} />
-              )}
-            </div>
+            <p className="min-w-0 text-sm [overflow-wrap:anywhere]">{location.name}</p>
+            {location.id !== null && (
+              <SurveyWaypointButton location={{ id: location.id, name: location.name }} />
+            )}
           </InfoRow>
         )}
         {tax !== null && (
@@ -269,7 +285,7 @@ export function SurveyInfoReadout({
             <SurveyNotes notes={notes} />
           </InfoRow>
         )}
-      </div>
+      </Fields>
     </Panel>
   );
 }

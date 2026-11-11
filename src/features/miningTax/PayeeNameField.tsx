@@ -8,8 +8,8 @@ import { cx } from '@/lib/cx';
 import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import {
   MIN_PAYEE_SEARCH_LENGTH,
-  resolvePayeeName,
   searchPayeeEntities,
+  searchPayeeEntitiesPublic,
   type PayeeEntityMatch,
 } from './payeeEntitySearch';
 
@@ -27,17 +27,29 @@ export function PayeeNameField({
   value,
   onChange,
   onPick,
+  placeholder,
+  ariaLabel,
+  className,
+  size,
 }: {
   id: string;
-  /** Whose token the search runs under. */
-  characterId: number;
+  /** Whose token the search runs under; null with nobody logged in, which leaves the public exact-name matches. */
+  characterId: number | null;
   value: string;
   onChange: (name: string) => void;
   onPick: (match: PayeeEntityMatch) => void;
+  /** Overrides the Payee form's placeholder. */
+  placeholder?: string;
+  /** Names the box when no `<label htmlFor>` does. */
+  ariaLabel?: string;
+  /** On the wrapper, e.g. to size it in a row. */
+  className?: string;
+  /** The box's size; `sm` beside other `sm` controls in a row. */
+  size?: 'sm' | 'md';
 }) {
   const { t } = useTranslation();
   const listboxId = useId();
-  const canSearch = useEndpointsGranted(SEARCH_ENDPOINTS) === true;
+  const canSearch = useEndpointsGranted(SEARCH_ENDPOINTS) === true && characterId !== null;
   const [suggestions, setSuggestions] = useState<PayeeEntityMatch[]>([]);
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState<number | null>(null);
@@ -53,9 +65,10 @@ export function PayeeNameField({
     const ticket = ++latest.current;
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      const lookup = canSearch
-        ? searchPayeeEntities(characterId, trimmed, controller.signal)
-        : resolvePayeeName(trimmed, controller.signal);
+      const lookup =
+        canSearch && characterId !== null
+          ? searchPayeeEntities(characterId, trimmed, controller.signal)
+          : searchPayeeEntitiesPublic(trimmed, controller.signal);
       void lookup
         .then((hits) => {
           if (ticket === latest.current) setSuggestions(hits);
@@ -106,9 +119,11 @@ export function PayeeNameField({
   const listOpen = open && shown.length > 0;
 
   return (
-    <div className="relative">
+    <div className={cx('relative', className)}>
       <TextInput
         id={id}
+        size={size}
+        aria-label={ariaLabel}
         className="w-full"
         role="combobox"
         aria-autocomplete="list"
@@ -119,7 +134,7 @@ export function PayeeNameField({
         }
         autoComplete="off"
         value={value}
-        placeholder={t('miningTax.payeeNamePlaceholder')}
+        placeholder={placeholder ?? t('miningTax.payeeNamePlaceholder')}
         onChange={(e) => {
           typing.current = true;
           latest.current++;

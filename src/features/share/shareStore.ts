@@ -87,12 +87,15 @@ export async function saveShare(input: {
   id: string;
   type: ShareType;
   payload: unknown;
-  /** Signs in as this Character if no Firebase session exists yet. */
-  characterId: number;
+  /**
+   * Signs in as this Character if no Firebase session exists yet. Omitted, the
+   * write goes out with no session, which the rules allow for a `survey` only.
+   */
+  characterId?: number;
 }): Promise<number> {
-  await ensureAnySession(input.characterId);
+  if (input.characterId !== undefined) await ensureAnySession(input.characterId);
   const expiresAt = Date.now() + SHARE_TTL_MS;
-  await setDoc(doc(getSyncFirestore(input.characterId), SHARES_COLLECTION, input.id), {
+  await setDoc(doc(shareFirestore(input.characterId), SHARES_COLLECTION, input.id), {
     type: input.type,
     payload: input.payload,
     createdAt: serverTimestamp(),

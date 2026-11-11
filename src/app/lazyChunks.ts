@@ -57,6 +57,7 @@ export const SHELL_MODULE_SUFFIXES = ['/src/app/Layout.tsx', '/src/routes/Overvi
 export const PUBLIC_ROUTE_SUFFIXES = [
   '/src/routes/FittingShared.tsx',
   '/src/routes/SharedLink.tsx',
+  '/src/routes/SurveyStart.tsx',
   '/src/routes/CommunityJoin.tsx',
   '/src/routes/CorpTaxBookVerify.tsx',
   '/src/routes/CorpTaxBookRemoveNow.tsx',

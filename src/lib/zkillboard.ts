@@ -802,6 +802,37 @@ export async function fetchRegionRecentKills(
   return { ok: false, reason: 'parse' };
 }
 
+export interface ZkillEntityHit {
+  id: number;
+  name: string;
+  kind: 'character' | 'corporation' | 'alliance';
+}
+
+/** The corporations, alliances and characters in a zKillboard autocomplete answer; anything else (ships, systems) is dropped. */
+export function parseEntityAutocomplete(body: unknown): ZkillEntityHit[] {
+  if (!Array.isArray(body)) return [];
+  return body.flatMap((entry): ZkillEntityHit[] => {
+    if (!isRecord(entry)) return [];
+    const { id, name, type } = entry;
+    const known = type === 'character' || type === 'corporation' || type === 'alliance';
+    return known && typeof id === 'number' && typeof name === 'string' && name !== ''
+      ? [{ id, name, kind: type }]
+      : [];
+  });
+}
+
+/**
+ * Partial-name search for corporations, alliances and characters, which ESI only
+ * offers to a signed-in pilot with the search scope. Public and read-only; fails
+ * to an empty list, since a suggestion that doesn't arrive is just no suggestion.
+ */
+export async function searchZkillEntities(query: string): Promise<ZkillEntityHit[]> {
+  const answer = await zkillJson(
+    `https://zkillboard.com/autocomplete/${encodeURIComponent(query)}/`
+  );
+  return answer.ok ? parseEntityAutocomplete(answer.body) : [];
+}
+
 export function systemZkillUrl(systemId: number): string {
   return `https://zkillboard.com/system/${systemId}/`;
 }

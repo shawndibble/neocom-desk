@@ -7,6 +7,7 @@
  */
 import { getCharacterSearch, postUniverseIds } from '@/esi/endpoints';
 import { resolveNames } from '@/features/character/names';
+import { searchZkillEntities } from '@/lib/zkillboard';
 import type { PayeeEntityKind } from './payees';
 
 /** ESI's own floor. Below it the endpoint 400s, so it is never called. */
@@ -71,4 +72,25 @@ export async function resolvePayeeName(
     alliance: ids.alliances,
   };
   return KIND_ORDER.flatMap((kind) => (buckets[kind] ?? []).map((e) => ({ ...e, kind })));
+}
+
+/**
+ * Suggestions with no search scope: ESI offers a partial-name search only to a
+ * signed-in Character, so a visitor (or a pilot without the scope) gets zKillboard's
+ * public autocomplete, with any exact-name ESI match first. Either half may fail alone.
+ */
+export async function searchPayeeEntitiesPublic(
+  query: string,
+  signal?: AbortSignal
+): Promise<PayeeEntityMatch[]> {
+  const trimmed = query.trim();
+  if (trimmed.length < MIN_PAYEE_SEARCH_LENGTH) return [];
+  const [exact, partial] = await Promise.all([
+    resolvePayeeName(trimmed, signal).catch((): PayeeEntityMatch[] => []),
+    searchZkillEntities(trimmed),
+  ]);
+  const seen = new Set<number>();
+  return [...exact, ...partial]
+    .filter((m) => !seen.has(m.id) && seen.add(m.id))
+    .slice(0, MAX_RESULTS);
 }

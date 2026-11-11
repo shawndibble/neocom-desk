@@ -34,6 +34,9 @@ import { SurveyPicker } from './SurveyPicker';
 import { SurveyOwnerChange } from './SurveyOwnerChange';
 import { SurveyInfoEditor, SurveyInfoReadout, type InfoSurvey } from './SurveyInfoPanel';
 import { SurveyStartTemplates } from './SurveyStartTemplates';
+import { StartLinkHelp } from './StartLinkHelp';
+import { noteStartedHere } from './startedHere';
+import { claimStartedSurveys } from './claimStarted';
 import { useSurveyTemplates } from './surveyTemplates';
 import { writeTemplateToSurvey } from './surveyTemplateWrite';
 import { stashPendingScan, takePendingScan } from './pendingScan';
@@ -90,6 +93,18 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
   const [startTemplateId, setStartTemplateId] = useState<string | null>(null);
   const startTemplate = templates.find((template) => template.id === startTemplateId);
 
+  // A survey started on this device with no account becomes this pilot's once they are signed in.
+  const accountNames = useCharacters().map((c) => c.name);
+  const accountKey = accountNames.join('|');
+  useEffect(() => {
+    if (characterId === null) return;
+    void (async () => {
+      const ownerName = (await db.characters.get(characterId))?.name;
+      if (ownerName === undefined) return;
+      if (await claimStartedSurveys(characterId, ownerName, accountKey.split('|'))) await refresh();
+    })().catch(() => undefined);
+  }, [characterId, accountKey, refresh]);
+
   // A survey in view is one the pilot has now created or opened.
   useEffect(() => {
     if (currentId !== null && state.status === 'ready') void noteSurvey(currentId);
@@ -112,7 +127,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
       if (characterId === null) return 'failed';
       const ownerName = (await db.characters.get(characterId))?.name;
       if (ownerName === undefined) return 'failed';
-      const started = await startSurvey({ characterId, ownerName });
+      const started = await startSurvey({ owner: { characterId, ownerName } });
       // Scan first, so the new survey's first load already has it.
       await addSurveyScan({ id: started.id, text, expiresAt: started.expiresAt, by: ownerName });
       // Best effort: a template that fails to write leaves the panel blank, as without one.
@@ -120,6 +135,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
         await writeTemplateToSurvey(started, startTemplate, characterId).catch(() => undefined);
       setStartTemplateId(null);
       noteSubmittedScan();
+      noteStartedHere(started.id);
       await setCurrentId(started.id);
       return 'ok';
     },
@@ -386,6 +402,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
                     ]
               }
             />
+            <StartLinkHelp />
           </>
         )}
       </TabPanel>
