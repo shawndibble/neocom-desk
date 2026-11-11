@@ -165,6 +165,8 @@ describe('JournalTable', () => {
     render(<Harness rows={rows} partyView={partyView(rows)} onFilterChange={onFilterChange} />);
     await user.click(await screen.findByRole('button', { name: 'By party' }));
     const list = await screen.findByRole('table', { name: 'By party' });
+    expect(within(list).getAllByText(/5K/).length).toBeGreaterThan(0);
+    expect(within(list).queryByText('5,000')).not.toBeInTheDocument();
     await user.click(within(list).getByText('CONCORD'));
     expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ party: '77' }));
   });
