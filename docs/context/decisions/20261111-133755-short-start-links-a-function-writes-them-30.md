@@ -1,4 +1,4 @@
-# Scope decisions — Short start links: a function writes them, 30 days
+# Scope decisions — Short start links: a function writes them, 60 days
 
 _Recorded 2026-11-11._
 
@@ -12,11 +12,11 @@ _Recorded 2026-11-11._
   session for a callable. The `shares` rules refuse `survey-start` from any client, so the
   function (Admin SDK) is the only writer and there is no anonymous write to abuse. No
   `firestore.rules` change. Functions are deployed by hand.
-- **Stored as a `shares` doc of type `survey-start`, 30 days.** The existing
-  `shares.expiresAt` TTL policy removes it, so no new collection or policy. 30 days, not
+- **Stored as a `shares` doc of type `survey-start`, 60 days.** The existing
+  `shares.expiresAt` TTL policy removes it, so no new collection or policy. 60 days, not
   the 7 of a Survey share: an event can be set a few weeks ahead, but short links cycle.
 - **The id comes from the canonical query (a hash).** The same details always give the
-  same id and renew the 30 days, so a script repeating a request adds no rows. A
+  same id and renew the 60 days, so a script repeating a request adds no rows. A
   collision with a different live link takes the next hash attempt.
 - **The page re-validates.** `/s/<id>` of this type navigates to `/survey?<query>`; the
   start page caps and checks every value as for a hand-written link.

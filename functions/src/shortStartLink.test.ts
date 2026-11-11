@@ -135,7 +135,7 @@ describe('makeShortStartLink', () => {
   const NOW = 1_800_000_000_000;
   const A = 'caller-a';
 
-  it('answers with the short path, url and 30-day expiry', async () => {
+  it('answers with the short path, url and 60-day expiry', async () => {
     const { rows, store } = memoryStore();
     const res = await makeShortStartLink(
       { place: 'Efa' },
