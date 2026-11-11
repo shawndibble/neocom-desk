@@ -7465,7 +7465,7 @@
       "copyFailed": "Couldn't copy",
       "help": {
         "title": "How to make a start link",
-        "yourLink": "Your link, built from the Additional information above:",
+        "yourLink": "Your link, built from the details above:",
         "intro": "A start link opens the Start a mining survey page with the details already filled in. Whoever opens it pastes a scan and gets their own survey with those details. Add these to the end of the address after a ?, joined with &:",
         "place": "The place to mine: a solar system, station or structure name.",
         "placeId": "Optional. The place's ID number, which gives viewers a Set waypoint button. A system or NPC station ID alone is enough; its name is looked up.",
