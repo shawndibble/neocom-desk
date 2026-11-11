@@ -68,9 +68,9 @@ describe('PlanMap: the detail drawer', () => {
   });
 
   // Felsic Magma is a Lava product; the pilot has no Lava colony. It shows on
-  // the map once Lava is a what-if, and tracing it keeps that tick. Split into
-  // short tests: each map click re-renders the whole map, so one long chain of
-  // them outran its time budget on a loaded CI runner.
+  // the map once Lava is a what-if, and tracing it keeps that tick. Kept as
+  // short tests: each map click re-renders the whole map (~0.5s), so one chain
+  // of a dozen was slow enough to fail its focus wait on a loaded CI runner.
   async function traceFelsicMagmaWithLavaWhatIf() {
     const user = userEvent.setup({ delay: null });
     renderMap();
