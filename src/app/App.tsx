@@ -147,6 +147,7 @@ const Settings = lazy(routeChunks.loadSettings);
 const Help = lazy(routeChunks.loadHelp);
 const FittingShared = lazy(routeChunks.loadFittingShared);
 const SharedLink = lazy(routeChunks.loadSharedLink);
+const SurveyStart = lazy(routeChunks.loadSurveyStart);
 const CorpTaxBookVerify = lazy(routeChunks.loadCorpTaxBookVerify);
 const CorpTaxBookRemoveNow = lazy(routeChunks.loadCorpTaxBookRemoveNow);
 const ErrorProbe = lazy(routeChunks.loadErrorProbe);
@@ -468,6 +469,8 @@ export function App() {
               (ids minted before the short key), kept so links already sent
               still open; the literal `/share/fitting` above outranks it. */}
               <Route path="/s/:shareId" element={<SharedLink />} />
+              {/* A Survey start link and the page that builds one: no login either. */}
+              <Route path="/survey" element={<SurveyStart />} />
               {/* The invite link: a signed-out visitor sees what it is for before logging in. */}
               <Route path="/communities/join/:code" element={<CommunityJoin />} />
               <Route path="/share/:shareId" element={<SharedLink />} />

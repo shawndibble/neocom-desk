@@ -9,7 +9,9 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { EmptyState, Spinner } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { countedScans, type SurveySummary } from '@/engine/survey/series';
 import { classifyScan, lastSeenField, missingOres } from '@/engine/survey/scanUpdate';
@@ -20,6 +22,8 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ScanFeedback } from './ScanFeedback';
 import { useScanFeedback } from './useScanFeedback';
 import { SurveyInfoReadout, type SurveyToConnect } from './SurveyInfoPanel';
+import { SurveyStarterDetails } from './SurveyStarterDetails';
+import { startedHere } from './startedHere';
 import { SurveyBoard } from './SurveyBoard';
 import { ExpandedCheck } from './ExpandedCheck';
 import { stashPendingScan } from './pendingScan';
@@ -38,6 +42,11 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
   // the app), where it starts their own survey: starting one needs a session.
   const [diverted, setDiverted] = useState(false);
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
+  const hydrated = useActiveCharacter((state) => state.hydrated);
+  // Who is signed in decides whether the starter edits here or in the app.
+  useEffect(() => {
+    if (!hydrated) void useActiveCharacter.getState().hydrate();
+  }, [hydrated]);
   // A first scan lacking an ore the survey shows, waiting for the pilot to
   // confirm every section was expanded.
   const [checking, setChecking] = useState<{ text: string; ores: string[] } | null>(null);
@@ -165,16 +174,32 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
             url={shareUrl(shareId)}
             location={state.info?.location?.name ?? null}
             expiresAt={state.expiresAt}
-            afterPanel={(summary) => (
-              <SurveyInfoIfAny
-                info={state.info}
-                tax={state.tax}
-                summary={summary}
-                connect={{ id: shareId, expiresAt: state.expiresAt, summary }}
-              />
-            )}
+            afterPanel={(summary) =>
+              startedHere(shareId) && hydrated && characterId === null ? (
+                <SurveyStarterDetails
+                  key={shareId}
+                  id={shareId}
+                  expiresAt={state.expiresAt}
+                  info={state.info}
+                  tax={state.tax}
+                  onStored={() => void refresh()}
+                />
+              ) : (
+                <SurveyInfoIfAny
+                  info={state.info}
+                  tax={state.tax}
+                  summary={summary}
+                  connect={{ id: shareId, expiresAt: state.expiresAt, summary }}
+                />
+              )
+            }
             panelTitle={t('survey.sharePanelTitle')}
           />
+          <p className="text-xs">
+            <Link to="/survey" className={inlineLinkClassName}>
+              {t('survey.start.newFromShare')}
+            </Link>
+          </p>
         </>
       )}
     </ShareShell>

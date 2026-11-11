@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
+import { Field } from '@/components/ui';
 
-/** One labelled row of the Survey's Additional information panel. */
+/**
+ * One labelled row of the Survey's Additional information panel: the label in
+ * the left column, its value or control in the right, as in `Fields variant="form"`.
+ * The editable panel, the read-only one and the start page's form all share this look.
+ */
 export function InfoRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <span className="text-xs text-text-dim">{label}</span>
-      {children}
-    </div>
-  );
+  return <Field label={label}>{children}</Field>;
 }

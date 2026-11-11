@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolvePayeeName, searchPayeeEntities } from './payeeEntitySearch';
+import {
+  resolvePayeeName,
+  searchPayeeEntities,
+  searchPayeeEntitiesPublic,
+} from './payeeEntitySearch';
 
 const mocks = vi.hoisted(() => ({
+  searchZkillEntities: vi.fn(),
   getCharacterSearch: vi.fn(),
   postUniverseIds: vi.fn(),
   resolveNames: vi.fn(),
@@ -10,6 +15,7 @@ vi.mock('@/esi/endpoints', () => ({
   getCharacterSearch: mocks.getCharacterSearch,
   postUniverseIds: mocks.postUniverseIds,
 }));
+vi.mock('@/lib/zkillboard', () => ({ searchZkillEntities: mocks.searchZkillEntities }));
 vi.mock('@/features/character/names', () => ({ resolveNames: mocks.resolveNames }));
 
 beforeEach(() => vi.clearAllMocks());
@@ -85,5 +91,30 @@ describe('resolvePayeeName', () => {
     expect(await resolvePayeeName('Moon 1 Planet 2')).toEqual([]);
     expect(await resolvePayeeName('  ')).toEqual([]);
     expect(mocks.postUniverseIds).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('searchPayeeEntitiesPublic', () => {
+  it('does not ask under three characters', async () => {
+    expect(await searchPayeeEntitiesPublic('st')).toEqual([]);
+    expect(mocks.searchZkillEntities).not.toHaveBeenCalled();
+  });
+
+  it('lists the exact-name match first, then zKillboard’s partial matches, each once', async () => {
+    mocks.postUniverseIds.mockResolvedValue({ corporations: [{ id: 2, name: 'Star Tail' }] });
+    mocks.searchZkillEntities.mockResolvedValue([
+      { id: 9, name: 'Star Tail Industuries', kind: 'corporation' },
+      { id: 2, name: 'Star Tail', kind: 'corporation' },
+    ]);
+    const hits = await searchPayeeEntitiesPublic('Star Tail');
+    expect(hits.map((h) => h.id)).toEqual([2, 9]);
+  });
+
+  it('still gives the other half when one fails', async () => {
+    mocks.postUniverseIds.mockRejectedValue(new Error('down'));
+    mocks.searchZkillEntities.mockResolvedValue([
+      { id: 9, name: 'Star Tail Industuries', kind: 'corporation' },
+    ]);
+    expect(await searchPayeeEntitiesPublic('Star Tail In')).toHaveLength(1);
   });
 });

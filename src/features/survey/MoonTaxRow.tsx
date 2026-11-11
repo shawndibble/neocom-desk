@@ -61,7 +61,7 @@ export interface TaxSurvey {
 function ConnectedNote({ connection, nowMs }: { connection: SurveyConnection; nowMs: number }) {
   const { t } = useTranslation();
   return (
-    <span role="status" className="-mt-1 flex w-full items-center gap-1.5 text-sm text-text-dim">
+    <span role="status" className="flex items-center gap-1.5 self-center text-sm text-text-dim">
       <Icon.Pending size={Icon.ICON_SIZE.sm} aria-hidden="true" />
       {connection.systemId === null
         ? t('survey.moonTax.connectedNoLocation')
@@ -134,7 +134,7 @@ function MoonConnectionSlot({
   const { t } = useTranslation();
   return (
     <>
-      <div className="flex items-start gap-x-3 sm:ml-auto">
+      <div className="flex w-full flex-wrap items-start gap-x-3 gap-y-2">
         {moon.connection ? (
           <Button id={moon.stopId} size="sm" variant="ghost" onClick={moon.stop}>
             {t('survey.moonTax.stop')}
@@ -147,8 +147,8 @@ function MoonConnectionSlot({
             {t('survey.moonTax.openTax')}
           </Link>
         )}
+        {moon.connection && <ConnectedNote connection={moon.connection} nowMs={moon.now} />}
       </div>
-      {moon.connection && <ConnectedNote connection={moon.connection} nowMs={moon.now} />}
       <ConnectionToastView toast={moon.toast} onClose={moon.closeToast} />
     </>
   );
@@ -254,58 +254,55 @@ export function MoonTaxRow({
 
   return (
     <InfoRow label={t('survey.moonTax.label')}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div data-tax-fields className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="flex items-center gap-1">
-            <TextInput
-              size="sm"
-              inputMode="decimal"
-              aria-label={t('survey.moonTax.rate')}
-              className="w-16 tabular-nums"
-              value={saved.pct}
-              placeholder="0"
-              aria-invalid={saved.pct !== '' && pct === null}
-              onChange={(event) => setSaved({ ...saved, pct: event.target.value })}
-              onFocus={() => setFocused(true)}
-              onBlur={leave}
-            />
-            <span className="text-text-dim">%</span>
-          </span>
-          <span className="text-text-dim">{t('survey.moonTax.to')}</span>
+      <div data-tax-fields className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-2">
+        <TextInput
+          size="sm"
+          list={listId}
+          aria-label={t('survey.moonTax.payee')}
+          className="min-w-0 flex-1 basis-56"
+          value={saved.name}
+          placeholder={t('survey.moonTax.payeePlaceholder')}
+          onChange={(event) => changeName(event.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={leave}
+        />
+        <datalist id={listId}>
+          {payees.map((p) => (
+            <option key={p.id} value={p.name} />
+          ))}
+        </datalist>
+        <span className="flex items-center gap-1">
           <TextInput
             size="sm"
-            list={listId}
-            aria-label={t('survey.moonTax.payee')}
-            className="w-56 max-w-full"
-            value={saved.name}
-            placeholder={t('survey.moonTax.payeePlaceholder')}
-            onChange={(event) => changeName(event.target.value)}
+            inputMode="decimal"
+            aria-label={t('survey.moonTax.rate')}
+            className="w-20 tabular-nums"
+            value={saved.pct}
+            placeholder="0"
+            aria-invalid={saved.pct !== '' && pct === null}
+            onChange={(event) => setSaved({ ...saved, pct: event.target.value })}
             onFocus={() => setFocused(true)}
             onBlur={leave}
           />
-          <datalist id={listId}>
-            {payees.map((p) => (
-              <option key={p.id} value={p.name} />
-            ))}
-          </datalist>
-        </div>
-        <MoonConnectionSlot moon={moon}>
-          <Button
-            id={moon.manageId}
-            size="sm"
-            disabled={!ready}
-            loading={busy}
-            onClick={() => void openTax()}
-          >
-            {t('survey.moonTax.open')}
-          </Button>
-        </MoonConnectionSlot>
-        {failed && (
-          <span role="alert" className="w-full text-xs text-danger">
-            {t('survey.moonTax.failed')}
-          </span>
-        )}
+          <span className="text-text-dim">%</span>
+        </span>
       </div>
+      <MoonConnectionSlot moon={moon}>
+        <Button
+          id={moon.manageId}
+          size="sm"
+          disabled={!ready}
+          loading={busy}
+          onClick={() => void openTax()}
+        >
+          {t('survey.moonTax.open')}
+        </Button>
+      </MoonConnectionSlot>
+      {failed && (
+        <span role="alert" className="w-full text-xs text-danger">
+          {t('survey.moonTax.failed')}
+        </span>
+      )}
     </InfoRow>
   );
 }
@@ -363,39 +360,36 @@ export function MoonTaxReadout({
 
   return (
     <InfoRow label={t('survey.moonTax.label')}>
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
-        <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xl font-semibold">
-          <span className="tabular-nums">{tax.pct}%</span>
-          <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
-          <span className="min-w-0 [overflow-wrap:anywhere]">{tax.name}</span>
-        </p>
-        <MoonConnectionSlot moon={moon} taxLink={!loggedOut}>
-          <div className={blockedButtonClassName}>
-            <Button
-              id={moon.manageId}
-              size="sm"
-
-              // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
-              aria-disabled={loggedOut || undefined}
-              aria-describedby={loggedOut ? hintId : undefined}
-              loading={busy}
-              onClick={() => void open()}
-            >
-              {t('survey.moonTax.manage')}
-            </Button>
-            {loggedOut && (
-              <span id={hintId} className={blockedReasonClassName}>
-                {t('survey.moonTax.needLogin')}
-              </span>
-            )}
-          </div>
-        </MoonConnectionSlot>
-        {failed && (
-          <span role="alert" className="w-full text-xs text-danger">
-            {t('survey.moonTax.failed')}
-          </span>
-        )}
-      </div>
+      <p className="flex min-w-0 flex-1 basis-full flex-wrap items-baseline gap-x-2 text-sm">
+        <span className="tabular-nums">{tax.pct}%</span>
+        <span className="text-text-dim">{t('survey.moonTax.to')}</span>
+        <span className="min-w-0 [overflow-wrap:anywhere]">{tax.name}</span>
+      </p>
+      <MoonConnectionSlot moon={moon} taxLink={!loggedOut}>
+        <div className={blockedButtonClassName}>
+          <Button
+            id={moon.manageId}
+            size="sm"
+            // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
+            aria-disabled={loggedOut || undefined}
+            aria-describedby={loggedOut ? hintId : undefined}
+            loading={busy}
+            onClick={() => void open()}
+          >
+            {t('survey.moonTax.manage')}
+          </Button>
+          {loggedOut && (
+            <span id={hintId} className={blockedReasonClassName}>
+              {t('survey.moonTax.needLogin')}
+            </span>
+          )}
+        </div>
+      </MoonConnectionSlot>
+      {failed && (
+        <span role="alert" className="w-full text-xs text-danger">
+          {t('survey.moonTax.failed')}
+        </span>
+      )}
     </InfoRow>
   );
 }

@@ -33,6 +33,7 @@ import {
   where,
 } from 'firebase/firestore/lite';
 import { generateShareId } from '@/engine/share/shareId';
+import type { InfoFields } from '@/engine/survey/infoTemplate';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import type { SurveyRock, SurveyScan } from '@/engine/survey/series';
 import { loadShare, saveShare, shareFirestore, shareUrl } from '@/features/share/shareStore';
@@ -76,17 +77,41 @@ export const MAX_SURVEY_NOTES = 1000;
 /** Mirrored by the size check in `firestore.rules`. */
 export const MAX_SCAN_BY = 100;
 
+/**
+ * Starts a survey. With an `owner` it is that Character's, written under their
+ * session; without one it is an anonymous visitor's (a start link opened with
+ * no login), which has no owner and no session. `prefill` is the Additional
+ * information a start link carried: it is kept in the share's own payload,
+ * because the info and tax docs need a sign-in, and it shows until a signed-in
+ * owner stores something newer. Mirrored by the payload checks in `firestore.rules`.
+ */
 export async function startSurvey(input: {
-  characterId: number;
-  /** The starting pilot's Character name, kept on the survey so they can be recognised as its owner. */
-  ownerName: string;
+  owner?: {
+    characterId: number;
+    /** The starting pilot's Character name, kept on the survey so they can be recognised as its owner. */
+    ownerName: string;
+  };
+  prefill?: InfoFields;
 }): Promise<{ id: string; url: string; expiresAt: number }> {
   const id = generateShareId();
+  const { location, tax, notes } = input.prefill ?? { location: null, tax: null, notes: '' };
   const expiresAt = await saveShare({
     id,
     type: 'survey',
-    payload: { v: 1, owner: input.ownerName },
-    characterId: input.characterId,
+    payload: {
+      v: 1,
+      ...(input.owner ? { owner: input.owner.ownerName } : {}),
+      ...(location || tax || notes.trim() !== ''
+        ? {
+            prefill: {
+              ...(location ? { location } : {}),
+              ...(tax ? { tax } : {}),
+              ...(notes.trim() !== '' ? { notes: notes.trim() } : {}),
+            },
+          }
+        : {}),
+    },
+    characterId: input.owner?.characterId,
   });
   return { id, url: shareUrl(id), expiresAt };
 }
@@ -150,12 +175,12 @@ export async function setSurveyTax(input: {
   expiresAt: number;
   name: string;
   pct: number;
-  /** The signed-in Character writing it. */
-  characterId: number;
+  /** The Character writing it; omitted for the visitor who started the survey with no account (the rules allow it). */
+  characterId?: number;
 }): Promise<void> {
-  await ensureAnySession(input.characterId);
+  if (input.characterId !== undefined) await ensureAnySession(input.characterId);
   await addDoc(
-    collection(getSyncFirestore(input.characterId), 'shares', input.id, SURVEY_TAX_COLLECTION),
+    collection(shareFirestore(input.characterId), 'shares', input.id, SURVEY_TAX_COLLECTION),
     {
       name: input.name.slice(0, MAX_TAX_NAME),
       pct: input.pct,
@@ -172,13 +197,13 @@ export async function setSurveyInfo(input: {
   expiresAt: number;
   location: { id: number | null; name: string } | null;
   notes: string;
-  /** The signed-in Character writing it. */
-  characterId: number;
+  /** The Character writing it; omitted for the visitor who started the survey with no account (the rules allow it). */
+  characterId?: number;
 }): Promise<void> {
   const notes = input.notes.trim().slice(0, MAX_SURVEY_NOTES);
-  await ensureAnySession(input.characterId);
+  if (input.characterId !== undefined) await ensureAnySession(input.characterId);
   await addDoc(
-    collection(getSyncFirestore(input.characterId), 'shares', input.id, SURVEY_INFO_COLLECTION),
+    collection(shareFirestore(input.characterId), 'shares', input.id, SURVEY_INFO_COLLECTION),
     {
       ...(input.location === null
         ? {}
@@ -271,6 +296,8 @@ interface SurveyCache {
   owner: string | null;
   tax: SurveyTaxShare | null;
   info: SurveyInfoShare | null;
+  /** What the start link set, shown until a stored tax or info is newer. */
+  prefill: ReturnType<typeof prefillOf>;
   /** When the share doc, tax and info were last read; 0 when they are due. */
   detailsReadAt: number;
   /**
@@ -385,6 +412,37 @@ function ownerOf(payload: unknown): string | null {
   return typeof owner === 'string' && owner !== '' ? owner : null;
 }
 
+/** What a start link stored in the share's payload; blank for a survey that has none. */
+function prefillOf(payload: unknown): { tax: SurveyTaxShare | null; info: SurveyInfoShare | null } {
+  const none = { tax: null, info: null };
+  if (typeof payload !== 'object' || payload === null) return none;
+  const raw = (payload as { prefill?: unknown }).prefill;
+  if (typeof raw !== 'object' || raw === null) return none;
+  const { location, tax, notes } = raw as { location?: unknown; tax?: unknown; notes?: unknown };
+  const place = (location ?? {}) as { id?: unknown; name?: unknown };
+  const name = typeof place.name === 'string' ? place.name.trim().slice(0, MAX_LOCATION_NAME) : '';
+  const rate = (tax ?? {}) as { name?: unknown; pct?: unknown };
+  const payee = typeof rate.name === 'string' ? rate.name.trim().slice(0, MAX_TAX_NAME) : '';
+  const text = typeof notes === 'string' ? notes.slice(0, MAX_SURVEY_NOTES) : '';
+  const taxOk = payee !== '' && typeof rate.pct === 'number' && rate.pct >= 0 && rate.pct <= 100;
+  const infoOk = name !== '' || text !== '';
+  return {
+    tax: taxOk ? { name: payee, pct: rate.pct as number } : null,
+    info: infoOk
+      ? {
+          location:
+            name === ''
+              ? null
+              : {
+                  id: typeof place.id === 'number' && Number.isInteger(place.id) ? place.id : null,
+                  name,
+                },
+          notes: text,
+        }
+      : null,
+  };
+}
+
 function resultOf(cache: SurveyCache): LoadSurveyResult {
   return {
     ok: true,
@@ -440,7 +498,11 @@ async function readSurvey(id: string): Promise<LoadSurveyResult> {
       return { ok: false, reason: 'not-found' };
     }
     if (!found.ok) return { ok: false, reason: 'failed' };
-    const details = { expiresAt: found.share.expiresAt, owner: ownerOf(found.share.payload) };
+    const details = {
+      expiresAt: found.share.expiresAt,
+      owner: ownerOf(found.share.payload),
+      prefill: prefillOf(found.share.payload),
+    };
     entry = cache ?? {
       ...details,
       tax: null,
@@ -516,7 +578,7 @@ async function pullTax(id: string, cache: SurveyCache): Promise<void> {
         newest = { at, tax: { name: data.name.trim().slice(0, MAX_TAX_NAME), pct: data.pct } };
       }
     }
-    cache.tax = newest?.tax ?? null;
+    cache.tax = newest?.tax ?? cache.prefill.tax;
   } catch {
     // Keep the last tax read.
   }
@@ -550,7 +612,7 @@ async function pullInfo(id: string, cache: SurveyCache): Promise<void> {
       const notes = typeof data.notes === 'string' ? data.notes.slice(0, MAX_SURVEY_NOTES) : '';
       newest = { at, info: { location, notes } };
     }
-    cache.info = newest?.info ?? null;
+    cache.info = newest?.info ?? cache.prefill.info;
   } catch {
     // Keep the last info read.
   }

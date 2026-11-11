@@ -78,7 +78,7 @@ beforeEach(() => {
 describe('startSurvey', () => {
   it('stores a survey Share Link and returns its id and URL', async () => {
     saveShare.mockResolvedValue(EXPIRES);
-    const started = await startSurvey({ characterId: 7, ownerName: 'Shawn Dibble' });
+    const started = await startSurvey({ owner: { characterId: 7, ownerName: 'Shawn Dibble' } });
     expect(saveShare).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'survey',
@@ -89,6 +89,49 @@ describe('startSurvey', () => {
     expect(started.id).toMatch(/^[2-9a-hj-kmnp-z]{6}$/);
     expect(started.url).toBe(`https://neocomdesk.test/s/${started.id}`);
     expect(started.expiresAt).toBe(EXPIRES);
+  });
+
+  it('starts with no session and no owner, keeping what a start link set in the payload', async () => {
+    saveShare.mockResolvedValue(EXPIRES);
+    await startSurvey({
+      prefill: {
+        location: { id: 7, name: 'Efa' },
+        tax: { name: 'Bob', pct: 10 },
+        notes: ' hi ',
+      },
+    });
+    const call = saveShare.mock.calls[0]![0] as { payload: unknown; characterId?: number };
+    expect(call.characterId).toBeUndefined();
+    expect(call.payload).toEqual({
+      v: 1,
+      prefill: { location: { id: 7, name: 'Efa' }, tax: { name: 'Bob', pct: 10 }, notes: 'hi' },
+    });
+  });
+
+  it('loads a survey with the start link details until a stored tax or info is newer', async () => {
+    loadShare.mockResolvedValue({
+      ok: true,
+      share: {
+        type: 'survey',
+        expiresAt: EXPIRES,
+        payload: {
+          v: 1,
+          prefill: {
+            location: { id: null, name: 'Efa' },
+            tax: { name: 'Bob', pct: 10 },
+            notes: 'n',
+          },
+        },
+      },
+    });
+    getDocs.mockResolvedValue({ docs: [] });
+    const loaded = await loadSurvey('abc123');
+    expect(loaded).toMatchObject({
+      ok: true,
+      owner: null,
+      tax: { name: 'Bob', pct: 10 },
+      info: { location: { id: null, name: 'Efa' }, notes: 'n' },
+    });
   });
 });
 
