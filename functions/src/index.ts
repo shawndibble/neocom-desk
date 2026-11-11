@@ -15,7 +15,9 @@ import {
   type CallerState,
   SURVEY_START_SHARE_TYPE,
   callerKey,
-  clientIp,
+  PROXY_CLIENT_HEADER,
+  PROXY_SECRET_HEADER,
+  callerAddress,
   makeShortStartLink,
   type ShortLinkStore,
 } from './shortStartLink.js';
@@ -1479,7 +1481,8 @@ export const mutamarketEstimate = onCall<unknown>(
  * action because a script has no Firebase session to call a callable with. It is the only
  * writer of `survey-start` shares: the rules refuse that type from any client. `maxInstances`
  * is the hobby-scale abuse cap; the same details always give the same id, so repeating a
- * request adds nothing.
+ * request adds nothing. Called through `api.neocomdesk.com/short` (workers/short-link-proxy), which
+ * names the caller in a header signed with `SHORT_LINK_PROXY_SECRET` (`callerAddress`).
  */
 const shortLinkStore: ShortLinkStore = {
   claim: (id, search, caller, now, expiresAt) => {
@@ -1533,7 +1536,15 @@ export const shortStartLink = onRequest(
       const result = await makeShortStartLink(
         input,
         shortLinkStore,
-        callerKey(clientIp(request.headers['x-forwarded-for'], request.ip)),
+        callerKey(
+          callerAddress({
+            proxyClient: request.get(PROXY_CLIENT_HEADER),
+            proxySecret: request.get(PROXY_SECRET_HEADER),
+            forwardedFor: request.headers['x-forwarded-for'],
+            ip: request.ip,
+            expectedSecret: process.env.SHORT_LINK_PROXY_SECRET,
+          })
+        ),
         Date.now(),
         process.env.APP_URL ?? 'https://neocomdesk.com'
       );

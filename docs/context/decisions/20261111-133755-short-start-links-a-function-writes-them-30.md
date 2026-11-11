@@ -27,3 +27,12 @@ _Recorded 2026-11-11._
   (`firestore.indexes.json`, deployed by hand) removes it after the window. Asking again for
   a link that is still live is free and uncounted. A refused call answers `429` with a
   `Retry-After` header; `maxInstances: 5` stays as the concurrency cap.
+- **The address is `https://api.neocomdesk.com/short`, a Worker in front of the function**
+  (`workers/short-link-proxy`, like `janice.neocomdesk.com`), so the `cloudfunctions.net`
+  address is never shown. Production is static GitHub Pages and can't proxy; the Worker
+  passes `GET`/`POST`/preflight through. Behind it the function would see Cloudflare's
+  address for everyone and share one limit, so the Worker sends the caller's address in
+  `x-short-link-client`, signed with a shared secret (`PROXY_SECRET` on the Worker,
+  `SHORT_LINK_PROXY_SECRET` in `functions/.env`); the function trusts the header only with
+  the right secret and otherwise identifies the caller itself. Deploy order: function, then
+  Worker, then the site.
