@@ -705,6 +705,18 @@
       "indexes": []
     },
     {
+      "collectionGroup": "shortLinkLimits",
+      "fieldPath": "*",
+      "ttl": false,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "shortLinkLimits",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
       "collectionGroup": "surveyScans",
       "fieldPath": "*",
       "ttl": false,

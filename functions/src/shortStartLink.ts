@@ -11,12 +11,50 @@
  * (`/s/<id>`) re-validates the query as it does for a hand-written start link. The
  * id comes from the query itself, so asking again for the same link returns the
  * same short link and renews its 30 days, and a script can't fill the collection
- * by repeating a request. Pure apart from the injected store.
+ * by repeating a request. A caller (an IP, hashed) may make one *new* link every 30
+ * seconds (`NEW_LINK_GAP_MS`) and 30 an hour (`NEW_LINKS_PER_WINDOW`); repeating an existing link
+ * isn't counted. Pure apart from
+ * the injected store.
  */
 import { createHash } from 'node:crypto';
 
 export const SURVEY_START_SHARE_TYPE = 'survey-start';
 export const START_LINK_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** One new short link per caller (IP) in this long; asking again for an existing link is free. */
+export const NEW_LINK_GAP_MS = 30_000;
+/** Where each caller's last new link is noted (a hashed IP and a time), and for how long. */
+export const SHORT_LINK_LIMITS = 'shortLinkLimits';
+/** At most this many new links per caller in one window of `NEW_LINK_WINDOW_MS`. */
+export const NEW_LINKS_PER_WINDOW = 30;
+export const NEW_LINK_WINDOW_MS = 60 * 60 * 1000;
+
+/** What is kept for a caller: its last new link, and the count in the current window. */
+export interface CallerState {
+  lastAt: number;
+  windowStart: number;
+  count: number;
+}
+
+export type LimitCheck =
+  { ok: true; next: CallerState } | { ok: false; limitedFor: number; reason: 'gap' | 'hour' };
+
+/**
+ * May this caller make a new link now? One every `NEW_LINK_GAP_MS`, and at most
+ * `NEW_LINKS_PER_WINDOW` per hour (a fixed window starting at the first link of it).
+ * Pure: the store keeps the `next` state.
+ */
+export function checkNewLink(state: CallerState | null, now: number): LimitCheck {
+  const fresh = state === null || now - state.windowStart >= NEW_LINK_WINDOW_MS;
+  const windowStart = fresh ? now : state.windowStart;
+  const count = fresh ? 0 : state.count;
+  if (state !== null && now - state.lastAt < NEW_LINK_GAP_MS) {
+    return { ok: false, limitedFor: NEW_LINK_GAP_MS - (now - state.lastAt), reason: 'gap' };
+  }
+  if (count >= NEW_LINKS_PER_WINDOW) {
+    return { ok: false, limitedFor: windowStart + NEW_LINK_WINDOW_MS - now, reason: 'hour' };
+  }
+  return { ok: true, next: { lastAt: now, windowStart, count: count + 1 } };
+}
 
 /** The caps a stored Survey has (`MAX_LOCATION_NAME`, `MAX_TAX_NAME`, `MAX_SURVEY_NOTES`). */
 const MAX_PLACE = 120;
@@ -101,22 +139,55 @@ export function shortIdFor(search: string, attempt = 0): string {
   return shortIdFor(search, attempt + 1000);
 }
 
+export type ClaimResult = 'ok' | 'taken' | { limitedFor: number; reason: 'gap' | 'hour' };
+
 export interface ShortLinkStore {
   /**
    * Stores `search` under `id` for the TTL, unless that id already holds a live, different
-   * link. Same link again renews its expiry. Atomic: two requests can't both take one id.
+   * link ('taken'). The same link again renews its expiry and is never limited. A new link
+   * is refused (`limitedFor`, in ms) when `caller` is over the gap or hourly limit
+   * (`checkNewLink`); otherwise it is stored and counted against the caller. Atomic: two requests can't
+   * both take one id or both pass the limit.
    */
-  claim(id: string, search: string, now: number, expiresAt: number): Promise<'ok' | 'taken'>;
+  claim(
+    id: string,
+    search: string,
+    caller: string,
+    now: number,
+    expiresAt: number
+  ): Promise<ClaimResult>;
 }
 
 export interface ShortLinkResponse {
   status: number;
   body: Record<string, unknown>;
+  headers?: Record<string, string>;
+}
+
+/**
+ * The caller's address. Behind Google's front end `request.ip` may be the proxy's, shared by
+ * everyone, so take the entry the front end itself appended to `X-Forwarded-For` (the last
+ * one): a caller can add entries before it, never after. Falls back to the socket address.
+ */
+export function clientIp(forwardedFor: string | string[] | undefined, fallback?: string): string {
+  const header = Array.isArray(forwardedFor) ? forwardedFor.join(',') : (forwardedFor ?? '');
+  const last = header
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part !== '')
+    .pop();
+  return last ?? fallback ?? 'unknown';
+}
+
+/** What identifies a caller in the store: the IP, hashed, so the raw address is never kept. */
+export function callerKey(ip: string): string {
+  return createHash('sha256').update(ip).digest('hex').slice(0, 32);
 }
 
 export async function makeShortStartLink(
   input: unknown,
   store: ShortLinkStore,
+  caller: string,
   now: number,
   appUrl: string
 ): Promise<ShortLinkResponse> {
@@ -125,7 +196,22 @@ export async function makeShortStartLink(
   const expiresAt = now + START_LINK_TTL_MS;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const id = shortIdFor(canonical.search, attempt);
-    if ((await store.claim(id, canonical.search, now, expiresAt)) === 'ok') {
+    const claimed = await store.claim(id, canonical.search, caller, now, expiresAt);
+    if (typeof claimed === 'object') {
+      const retryAfterSeconds = Math.ceil(claimed.limitedFor / 1000);
+      return {
+        status: 429,
+        headers: { 'Retry-After': String(retryAfterSeconds) },
+        body: {
+          error:
+            claimed.reason === 'gap'
+              ? 'one new short link every 30 seconds'
+              : `at most ${NEW_LINKS_PER_WINDOW} new short links an hour`,
+          retryAfterSeconds,
+        },
+      };
+    }
+    if (claimed === 'ok') {
       return {
         status: 200,
         body: {

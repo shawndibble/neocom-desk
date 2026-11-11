@@ -9,7 +9,13 @@ import { createActionGroup, type CallableHandler } from './callableRouter.js';
 import type { CallableAction } from './callableManifest.js';
 import { runDailyHousekeeping } from './dailyHousekeeping.js';
 import {
+  NEW_LINK_WINDOW_MS,
+  SHORT_LINK_LIMITS,
+  checkNewLink,
+  type CallerState,
   SURVEY_START_SHARE_TYPE,
+  callerKey,
+  clientIp,
   makeShortStartLink,
   type ShortLinkStore,
 } from './shortStartLink.js';
@@ -1476,14 +1482,34 @@ export const mutamarketEstimate = onCall<unknown>(
  * request adds nothing.
  */
 const shortLinkStore: ShortLinkStore = {
-  claim: (id, search, now, expiresAt) => {
+  claim: (id, search, caller, now, expiresAt) => {
     const ref = firestore().collection('shares').doc(id);
+    const limitRef = firestore().collection(SHORT_LINK_LIMITS).doc(caller);
     return firestore().runTransaction(async (tx) => {
-      const held = await tx.get(ref);
+      const [held, limit] = await Promise.all([tx.get(ref), tx.get(limitRef)]);
       const data = held.data() as
         { payload?: { search?: unknown }; expiresAt?: { toMillis(): number } } | undefined;
       const live = data?.expiresAt !== undefined && data.expiresAt.toMillis() > now;
       if (held.exists && live && data?.payload?.search !== search) return 'taken' as const;
+      // Renewing a link that is already live is free; only a new one counts against the caller.
+      if (!(held.exists && live)) {
+        const stored = limit.data() as Partial<CallerState> | undefined;
+        const state: CallerState | null =
+          stored?.lastAt === undefined
+            ? null
+            : {
+                lastAt: stored.lastAt,
+                windowStart: stored.windowStart ?? stored.lastAt,
+                count: stored.count ?? 1,
+              };
+        const check = checkNewLink(state, now);
+        if (!check.ok) return { limitedFor: check.limitedFor, reason: check.reason };
+        tx.set(limitRef, {
+          ...check.next,
+          // Removed by the TTL policy on this field (firestore.indexes.json).
+          expiresAt: Timestamp.fromMillis(check.next.windowStart + NEW_LINK_WINDOW_MS),
+        });
+      }
       tx.set(ref, {
         type: SURVEY_START_SHARE_TYPE,
         payload: { v: 1, search },
@@ -1507,9 +1533,11 @@ export const shortStartLink = onRequest(
       const result = await makeShortStartLink(
         input,
         shortLinkStore,
+        callerKey(clientIp(request.headers['x-forwarded-for'], request.ip)),
         Date.now(),
         process.env.APP_URL ?? 'https://neocomdesk.com'
       );
+      if (result.headers) response.set(result.headers);
       response.status(result.status).json(result.body);
     } catch (err) {
       logError('shortStartLink failed', err);

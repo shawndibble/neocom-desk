@@ -10,7 +10,7 @@ import { appUrl } from '@/features/share/shareStore';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { START_LINK_PATH } from './startLink';
-import { makeShortLink, shortStartLinkEndpoint } from './shortStartLink';
+import { ShortLinkLimited, makeShortLink, shortStartLinkEndpoint } from './shortStartLink';
 
 const PARAMS = ['place', 'placeId', 'payee', 'payeeId', 'rate', 'notes'] as const;
 
@@ -29,16 +29,20 @@ export function StartLinkHelp({ path = START_LINK_PATH }: { path?: string }) {
   // The short link made for one path; any change to the details drops it.
   const [short, setShort] = useState<{ path: string; url: string } | null>(null);
   const [shortState, setShortState] = useState<'idle' | 'busy' | 'failed'>('idle');
+  // Seconds to wait when the service said to slow down.
+  const [wait, setWait] = useState<number | null>(null);
   const shortUrl = made && short?.path === path ? short.url : null;
   const url = shortUrl ?? appUrl(made ? path : EXAMPLE_PATH);
   const endpoint = shortStartLinkEndpoint();
 
   async function makeShort() {
     setShortState('busy');
+    setWait(null);
     try {
       setShort({ path, url: await makeShortLink(path) });
       setShortState('idle');
-    } catch {
+    } catch (error) {
+      if (error instanceof ShortLinkLimited) setWait(error.retryAfterSeconds);
       setShortState('failed');
     }
   }
@@ -79,7 +83,11 @@ export function StartLinkHelp({ path = START_LINK_PATH }: { path?: string }) {
         )}
         {shortState === 'failed' && shortUrl === null && (
           <p role="alert" className="text-xs text-danger">
-            {t('survey.start.help.shortFailed')}
+            {wait === null
+              ? t('survey.start.help.shortFailed')
+              : wait > 90
+                ? t('survey.start.help.shortWaitMinutes', { count: Math.ceil(wait / 60) })
+                : t('survey.start.help.shortWaitSeconds', { count: wait })}
           </p>
         )}
         <p>{t('survey.start.help.intro')}</p>
