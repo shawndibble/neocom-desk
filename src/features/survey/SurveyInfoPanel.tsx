@@ -15,7 +15,7 @@
  */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Fields, Panel, TextArea, Tooltip } from '@/components/ui';
+import { Button, Fields, Panel, TextArea } from '@/components/ui';
 import { InfoRow } from './InfoRow';
 import { SurveyNotes } from './SurveyNotes';
 import {
@@ -33,10 +33,6 @@ import { ManageTemplatesDialog, SaveTemplateDialog } from './SurveyTemplateDialo
 import { SurveyTemplateMenu } from './SurveyTemplateMenu';
 import { saveSurveyTemplate, useSurveyTemplates } from './surveyTemplates';
 import { SurveyLocationPicker } from './SurveyLocationPicker';
-import { fromInfoFields, startLinkPath } from './startLink';
-import { writeToClipboard } from '@/lib/clipboard';
-import { appUrl } from '@/features/share/shareStore';
-import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { SurveyWaypointButton } from './SurveyWaypointButton';
 import {
   MAX_SURVEY_NOTES,
@@ -81,7 +77,6 @@ export function SurveyInfoEditor({
   // remembered between visits, since each survey starts from what it stored.
   const [appliedId, setAppliedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<'save' | 'manage' | null>(null);
-  const { copied: linkCopied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   // What was last stored, so a blur with nothing new (or a retry after a failed
   // write) doesn't add a doc.
   const sent = useRef(JSON.stringify([survey?.info?.location ?? null, survey?.info?.notes ?? '']));
@@ -138,31 +133,13 @@ export function SurveyInfoEditor({
     <Panel
       title={t('survey.info.title')}
       actions={
-        <div className="flex items-center gap-2">
-          <Tooltip content={t('survey.start.copyHint')} side="bottom">
-            <Button
-              size="sm"
-              disabled={fields.location === null && fields.tax === null && notes.trim() === ''}
-              onClick={() => {
-                void writeToClipboard(appUrl(startLinkPath(fromInfoFields(fields)))).then(
-                  () => flash('copied'),
-                  () => flash('failed')
-                );
-              }}
-            >
-              {linkCopied === null
-                ? t('survey.start.copy')
-                : t(linkCopied === 'copied' ? 'survey.start.copied' : 'survey.start.copyFailed')}
-            </Button>
-          </Tooltip>
-          <SurveyTemplateMenu
-            templates={templates}
-            appliedId={applied?.id ?? null}
-            onApply={apply}
-            onSave={() => setDialog('save')}
-            onManage={() => setDialog('manage')}
-          />
-        </div>
+        <SurveyTemplateMenu
+          templates={templates}
+          appliedId={applied?.id ?? null}
+          onApply={apply}
+          onSave={() => setDialog('save')}
+          onManage={() => setDialog('manage')}
+        />
       }
     >
       {applied !== undefined && (
