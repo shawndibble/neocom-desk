@@ -23,7 +23,11 @@ const MAX_PLACE = 120;
 const MAX_PAYEE = 100;
 const MAX_NOTES = 1000;
 
-/** `shares` ids: the app's alphabet and length (`src/engine/share/shareId.ts`). */
+/**
+ * `shares` ids: the app's alphabet and length. A copy of `src/engine/share/shareId.ts` (the
+ * `functions` package compiles only its own `src`, so it can't import it); the `shares` rule
+ * accepts `[2-9a-hj-kmnp-z]{6}`, so change the two together.
+ */
 const ALPHABET = '23456789abcdefghjkmnpqrstuvwxyz';
 const ID_LENGTH = 6;
 const UNBIASED_LIMIT = 256 - (256 % ALPHABET.length);
