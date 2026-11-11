@@ -35,6 +35,8 @@ import { SurveyOwnerChange } from './SurveyOwnerChange';
 import { SurveyInfoEditor, SurveyInfoReadout, type InfoSurvey } from './SurveyInfoPanel';
 import { SurveyStartTemplates } from './SurveyStartTemplates';
 import { StartLinkHelp } from './StartLinkHelp';
+import { fromInfoFields, startLinkPath } from './startLink';
+import type { InfoFields } from '@/engine/survey/infoTemplate';
 import { noteStartedHere } from './startedHere';
 import { claimStartedSurveys } from './claimStarted';
 import { useSurveyTemplates } from './surveyTemplates';
@@ -251,6 +253,15 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
   const characterNames = useCharacters().map((c) => c.name);
   const scans = useMemo(() => (state.status === 'ready' ? state.scans : []), [state]);
   const owned = state.status === 'ready' && ownsSurvey(state.owner, characterNames);
+  // What the start link shown in the help is built from: the Additional information as it stands.
+  const helpFields: InfoFields =
+    currentId !== null && state.status === 'ready'
+      ? {
+          location: state.info?.location ?? null,
+          tax: state.tax ? { name: state.tax.name, pct: state.tax.pct } : null,
+          notes: state.info?.notes ?? '',
+        }
+      : draftToInfo(startDraft);
   // Only the owner sets a scan aside; the rules can't tell who that is, so this is the guard.
   const [ignoreFailed, setIgnoreFailed] = useState(false);
   const setIgnored = useCallback(
@@ -417,7 +428,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
                     ]
               }
             />
-            <StartLinkHelp />
+            <StartLinkHelp path={startLinkPath(fromInfoFields(helpFields))} />
           </>
         )}
       </TabPanel>

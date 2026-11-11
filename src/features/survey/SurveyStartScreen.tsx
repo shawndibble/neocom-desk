@@ -219,7 +219,10 @@ export function SurveyStartScreen() {
     );
 
   return (
-    <ShareShell title={t('survey.start.title')} footer={<StartLinkHelp />}>
+    <ShareShell
+      title={t('survey.start.title')}
+      footer={<StartLinkHelp path={startLinkPath(linkFields)} />}
+    >
       <p className="text-sm text-text-dim">{t('survey.start.hint')}</p>
 
       <Panel title={t('survey.start.detailsTitle')}>

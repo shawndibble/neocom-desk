@@ -7457,9 +7457,7 @@
       "placeNotFound": "No system or NPC station has that ID. Structure IDs need a typed name.",
       "payeeNotFound": "No corporation, alliance or character has that ID. The typed name is used.",
       "payeeNameNotFound": "No corporation, alliance or pilot has exactly that name. It is used as typed.",
-      "copy": "Copy start link",
       "inAppNote": "Search systems, stations and your structures. Everyone with the link sees these.",
-      "copyHint": "Copies a link to the Survey start page with this location, moon tax and notes filled in. Post it on a site, in chat or on a calendar invite; whoever opens it pastes a scan and starts their own survey. See How to make a start link, below.",
       "copyLink": "Copy",
       "newFromShare": "Start a new survey",
       "starterNote": "You started this survey, so you can set these. Everyone with the link sees them.",
@@ -7467,6 +7465,7 @@
       "copyFailed": "Couldn't copy",
       "help": {
         "title": "How to make a start link",
+        "yourLink": "Your link, built from the Additional information above:",
         "intro": "A start link opens the Start a mining survey page with the details already filled in. Whoever opens it pastes a scan and gets their own survey with those details. Add these to the end of the address after a ?, joined with &:",
         "place": "The place to mine: a solar system, station or structure name.",
         "placeId": "Optional. The place's ID number, which gives viewers a Set waypoint button. A system or NPC station ID alone is enough; its name is looked up.",
@@ -7480,7 +7479,7 @@
         "findPlace": "Systems and NPC stations: search for the name in the Location box on the Start a mining survey page. It fills the ID in, with no login. A system's ID is also the number in its zKillboard address.",
         "findStructure": "Structures: their names can only be searched when logged in. Without a login, type the structure's exact name as the place and leave the ID out; there is then no waypoint button.",
         "findPayee": "Corporations, alliances and characters: the ID is the number in their zKillboard address (zkillboard.com/corporation/98000001/ has the ID 98000001). Paste it into the Payee ID box, or add payeeId to the link.",
-        "findLoggedIn": "Logged in, the Copy start link button on the Survey tab's Additional information builds the link from the location you picked and the payee you typed."
+        "findLoggedIn": "Logged in, the link at the top of this section is built from the Additional information on this tab, with the location you picked and the payee you typed."
       }
     },
     "differentOnShare": "That scan is a different field than this survey, so it wasn't added. Continue in Neocom Desk to start a new survey with it.",
