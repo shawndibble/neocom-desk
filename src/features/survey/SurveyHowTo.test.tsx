@@ -9,7 +9,7 @@ describe('SurveyHowTo', () => {
     expect(screen.getAllByRole('list')).toHaveLength(1);
     const steps = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(steps).toEqual([
-      'Older overlayNewer overlay1Right-click the Mining Surveyor icon. On the newer overlay, click Open Scan Results Window (1) and go to step 3.',
+      'Older overlayNewer overlay1Right-click the Mining Surveyor icon.',
       '2Choose Open Scan Results Window.',
       '3Click Scan in the new window.',
       '4Expand every ore, so all its rocks are listed.',
