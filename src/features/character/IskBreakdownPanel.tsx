@@ -8,6 +8,7 @@ import { useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
+  IskAmount,
   ProgressBar,
   SegmentedControl,
   SlideOver,
@@ -27,7 +28,7 @@ import {
   type RefTypeBreakdownRow,
 } from '@/features/character/walletJournalFilter';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { signedIsk } from '@/lib/signedIsk';
+import { iskGains, signedIsk } from '@/lib/signedIsk';
 import { formatIsk } from '@/lib/isk';
 
 interface IskBreakdownPanelProps {
@@ -159,7 +160,7 @@ export function IskBreakdownPanel({
         header: t('wallet.journalBreakdownIn'),
         align: 'right',
         className: 'tabular-nums text-isk-pos',
-        render: (row) => formatIsk(row.income),
+        render: (row) => <IskAmount value={row.income} decimals={0} />,
         sortValue: (row) => row.income,
       },
       {
@@ -167,7 +168,7 @@ export function IskBreakdownPanel({
         header: t('wallet.journalBreakdownOut'),
         align: 'right',
         className: 'tabular-nums text-isk-neg',
-        render: (row) => formatIsk(row.expense),
+        render: (row) => <IskAmount value={row.expense} decimals={0} />,
         sortValue: (row) => row.expense,
       },
       {
@@ -176,7 +177,12 @@ export function IskBreakdownPanel({
         align: 'right',
         className: 'tabular-nums',
         cellClassName: (row) => netToneClass(row.net),
-        render: (row) => signedIsk(row.net, 0),
+        render: (row) => (
+          <>
+            {iskGains(row.net, 0) && '+'}
+            <IskAmount value={row.net} decimals={0} />
+          </>
+        ),
         sortValue: (row) => row.net,
       },
     ],
