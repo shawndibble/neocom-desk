@@ -194,7 +194,14 @@ export function SurveyBoard({
       <div className="space-y-4">
         <EmptyState title={t('survey.emptyTitle')} hint={t('survey.emptyHint')} className="py-10" />
         {emptyExtra}
-        <SurveyHowTo />
+        <details className="group rounded-xs border border-line bg-panel/60">
+          <summary className="cursor-pointer select-none px-3 py-2 text-sm text-text-dim touch:py-3">
+            {t('survey.start.howToCopy')}
+          </summary>
+          <div className="border-t border-line py-3">
+            <SurveyHowTo heading={false} />
+          </div>
+        </details>
         {footerActions}
         {scanList}
       </div>

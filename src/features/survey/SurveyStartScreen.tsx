@@ -56,6 +56,7 @@ import { addSurveyScan, startSurvey } from './surveyStore';
 import { noteSubmittedScan } from './submitted';
 import { submitterName } from './submitterName';
 import { useScanFeedback } from './useScanFeedback';
+import { nameIds } from './startLinkNames';
 import { useStartLinkNames, type NameStatus } from './useStartLinkNames';
 
 /** An ID typed into a box: digits only, else nothing. */
@@ -88,11 +89,8 @@ export function SurveyStartScreen() {
   const [rateText, setRateText] = useState(() => parseStartLink(search).rate?.toString() ?? '');
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   const [howTo, setHowTo] = useState(false);
-  // IDs are for link writers: open when the link already carries one.
-  const [ids, setIds] = useState(() => {
-    const start = parseStartLink(search);
-    return start.payee?.id != null || (start.place?.id != null && start.place.name === '');
-  });
+  // IDs are for link writers: shown only when asked for, even if the link carries one.
+  const [ids, setIds] = useState(false);
   const names = useStartLinkNames(fields);
   const savedPayees = useLiveQuery(
     () => (characterId === null ? [] : loadPayees(characterId)),
@@ -115,7 +113,8 @@ export function SurveyStartScreen() {
   function setPayeeName(name: string) {
     setFields((prev) => ({
       ...prev,
-      payee: name === '' && prev.payee?.id == null ? null : { id: prev.payee?.id ?? null, name },
+      // A typed name is its own answer: the ID that came with the old one no longer applies.
+      payee: name === '' ? null : { id: null, name },
     }));
     fillSavedRate(name);
   }
@@ -136,12 +135,14 @@ export function SurveyStartScreen() {
       try {
         const ownerName =
           characterId === null ? undefined : (await db.characters.get(characterId))?.name;
+        // An ID the lookup hasn't named yet (a scan pasted straight after the link opened) is named now.
+        const prefill = await nameIds(fields, info);
         const started = await startSurvey({
           owner:
             characterId !== null && ownerName !== undefined
               ? { characterId, ownerName }
               : undefined,
-          prefill: info,
+          prefill,
         });
         // Scan first, so the new survey's first load already has it.
         await addSurveyScan({
@@ -163,7 +164,7 @@ export function SurveyStartScreen() {
         return scanFailure(error);
       }
     },
-    [characterId, navigate, info]
+    [characterId, navigate, info, fields]
   );
   const { trackedAdd, busy, error } = useScanFeedback(add);
 
@@ -225,8 +226,13 @@ export function SurveyStartScreen() {
         <div className="flex flex-col gap-4">
           <p className="text-xs text-text-dim">{t('survey.start.detailsHint')}</p>
           <SurveyDetailsFields
-            place={fields.place}
-            payeeName={fields.payee?.name ?? ''}
+            // A link with only IDs shows the names ESI gave them; the IDs stay in the link.
+            place={
+              fields.place && fields.place.name === '' && resolvedPlace !== undefined
+                ? { ...fields.place, name: resolvedPlace }
+                : fields.place
+            }
+            payeeName={fields.payee?.name || resolvedPayee || ''}
             rateText={rateText}
             notes={fields.notes}
             characterId={characterId}
@@ -272,9 +278,8 @@ export function SurveyStartScreen() {
                     setFields((prev) => ({
                       ...prev,
                       place:
-                        id === null && (prev.place?.name ?? '') === ''
-                          ? null
-                          : { id, name: prev.place?.name ?? '' },
+                        // The name that went with the old ID is dropped; the lookup names the new one.
+                        id === null ? null : { id, name: '' },
                     }));
                   }}
                   className="w-44"
@@ -291,10 +296,7 @@ export function SurveyStartScreen() {
                     const id = idOf(event.target.value);
                     setFields((prev) => ({
                       ...prev,
-                      payee:
-                        id === null && (prev.payee?.name ?? '') === ''
-                          ? null
-                          : { id, name: prev.payee?.name ?? '' },
+                      payee: id === null ? null : { id, name: '' },
                     }));
                   }}
                   className="w-44"

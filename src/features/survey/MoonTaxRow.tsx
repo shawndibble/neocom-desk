@@ -134,7 +134,7 @@ function MoonConnectionSlot({
   const { t } = useTranslation();
   return (
     <>
-      <div className="flex w-full flex-wrap items-start gap-x-3 gap-y-2">
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
         {moon.connection ? (
           <Button id={moon.stopId} size="sm" variant="ghost" onClick={moon.stop}>
             {t('survey.moonTax.stop')}
@@ -254,7 +254,7 @@ export function MoonTaxRow({
 
   return (
     <InfoRow label={t('survey.moonTax.label')}>
-      <div data-tax-fields className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-2">
+      <div data-tax-fields className="flex min-w-0 flex-1 basis-72 items-center gap-2">
         <TextInput
           size="sm"
           list={listId}
@@ -360,7 +360,7 @@ export function MoonTaxReadout({
 
   return (
     <InfoRow label={t('survey.moonTax.label')}>
-      <p className="flex min-w-0 flex-1 basis-full flex-wrap items-baseline gap-x-2 text-sm">
+      <p className="flex min-w-0 flex-1 basis-48 flex-wrap items-baseline gap-x-2 text-sm">
         <span className="tabular-nums">{tax.pct}%</span>
         <span className="text-text-dim">{t('survey.moonTax.to')}</span>
         <span className="min-w-0 [overflow-wrap:anywhere]">{tax.name}</span>

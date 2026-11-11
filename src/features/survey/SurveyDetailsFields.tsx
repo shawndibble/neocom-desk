@@ -46,7 +46,7 @@ export function SurveyDetailsFields({
   onPayeePick: (match: PayeeEntityMatch) => void;
   onRate: (text: string) => void;
   onNotes: (text: string) => void;
-  /** Focus left the form, or a place or payee was picked: the moment to store what changed. */
+  /** Focus left the form: the moment to store what changed. A pick stores through its own callback. */
   onCommit?: () => void;
 }) {
   const { t } = useTranslation();
@@ -62,14 +62,7 @@ export function SurveyDetailsFields({
           note={placeNote ?? (characterId === null ? t('survey.start.structureNote') : undefined)}
         >
           <div className="flex w-full min-w-0">
-            <SurveyLocationPicker
-              value={place}
-              characterId={characterId}
-              onPick={(picked) => {
-                onPlace(picked);
-                onCommit?.();
-              }}
-            />
+            <SurveyLocationPicker value={place} characterId={characterId} onPick={onPlace} />
           </div>
         </Field>
         <Field label={t('survey.start.moonTax')} note={payeeNote}>
@@ -81,10 +74,7 @@ export function SurveyDetailsFields({
             characterId={characterId}
             value={payeeName}
             onChange={onPayeeName}
-            onPick={(match) => {
-              onPayeePick(match);
-              onCommit?.();
-            }}
+            onPick={onPayeePick}
             className="min-w-0 flex-1 basis-56"
           />
           <TextInput

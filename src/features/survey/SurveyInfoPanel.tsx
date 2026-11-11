@@ -15,7 +15,7 @@
  */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Fields, Panel, TextArea } from '@/components/ui';
+import { Button, Fields, Panel, TextArea, Tooltip } from '@/components/ui';
 import { InfoRow } from './InfoRow';
 import { SurveyNotes } from './SurveyNotes';
 import {
@@ -139,20 +139,22 @@ export function SurveyInfoEditor({
       title={t('survey.info.title')}
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            disabled={fields.location === null && fields.tax === null && notes.trim() === ''}
-            onClick={() => {
-              void writeToClipboard(appUrl(startLinkPath(fromInfoFields(fields)))).then(
-                () => flash('copied'),
-                () => flash('failed')
-              );
-            }}
-          >
-            {linkCopied === null
-              ? t('survey.start.copy')
-              : t(linkCopied === 'copied' ? 'survey.start.copied' : 'survey.start.copyFailed')}
-          </Button>
+          <Tooltip content={t('survey.start.copyHint')} side="bottom">
+            <Button
+              size="sm"
+              disabled={fields.location === null && fields.tax === null && notes.trim() === ''}
+              onClick={() => {
+                void writeToClipboard(appUrl(startLinkPath(fromInfoFields(fields)))).then(
+                  () => flash('copied'),
+                  () => flash('failed')
+                );
+              }}
+            >
+              {linkCopied === null
+                ? t('survey.start.copy')
+                : t(linkCopied === 'copied' ? 'survey.start.copied' : 'survey.start.copyFailed')}
+            </Button>
+          </Tooltip>
           <SurveyTemplateMenu
             templates={templates}
             appliedId={applied?.id ?? null}

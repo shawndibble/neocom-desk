@@ -45,6 +45,13 @@ export function SurveyStarterDetails({
   const sentInfo = useRef(JSON.stringify([info?.location ?? null, info?.notes ?? '']));
   const sentTax = useRef(JSON.stringify(tax ? [tax.name, tax.pct] : null));
   const characterId = activeId ?? undefined;
+  // Writes go one after another, so the latest draft is always the last one stored.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const enqueue = (write: () => Promise<void>) => {
+    const next = queue.current.then(write);
+    queue.current = next.catch(() => undefined);
+    return next;
+  };
 
   function commit(next: { place?: Place | null; payeeName?: string } = {}) {
     const location = next.place === undefined ? place : next.place;
@@ -53,7 +60,9 @@ export function SurveyStarterDetails({
     if (infoKey !== sentInfo.current) {
       const before = sentInfo.current;
       sentInfo.current = infoKey;
-      void setSurveyInfo({ id, expiresAt, location, notes: trimmedNotes, characterId })
+      void enqueue(() =>
+        setSurveyInfo({ id, expiresAt, location, notes: trimmedNotes, characterId })
+      )
         .then(onStored)
         .catch(() => {
           if (sentInfo.current === infoKey) sentInfo.current = before;
@@ -66,7 +75,7 @@ export function SurveyStarterDetails({
     if (taxKey === sentTax.current) return;
     const before = sentTax.current;
     sentTax.current = taxKey;
-    void setSurveyTax({ id, expiresAt, name, pct, characterId })
+    void enqueue(() => setSurveyTax({ id, expiresAt, name, pct, characterId }))
       .then(onStored)
       .catch(() => {
         if (sentTax.current === taxKey) sentTax.current = before;

@@ -7458,6 +7458,8 @@
       "payeeNotFound": "No corporation, alliance or character has that ID. The typed name is used.",
       "payeeNameNotFound": "No corporation, alliance or pilot has exactly that name. It is used as typed.",
       "copy": "Copy start link",
+      "inAppNote": "Search systems, stations and your structures. Everyone with the link sees these.",
+      "copyHint": "Copies a link to the Survey start page with this location, moon tax and notes filled in. Post it on a site, in chat or on a calendar invite; whoever opens it pastes a scan and starts their own survey. See How to make a start link, below.",
       "copyLink": "Copy",
       "newFromShare": "Start a new survey",
       "starterNote": "You started this survey, so you can set these. Everyone with the link sees them.",
