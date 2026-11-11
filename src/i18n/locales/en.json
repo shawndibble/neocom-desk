@@ -7509,11 +7509,11 @@
     "howTo": {
       "title": "How to copy a scan",
       "menuAlt": "The older Mining Surveyor overlay: its icon (1) and its right-click menu with Open Scan Results Window (2) highlighted.",
-      "menuNewAlt": "The newer Mining Surveyor overlay: its menu with Open Scan Results Window (1) highlighted.",
+      "menuNewAlt": "The newer Mining Surveyor overlay: its icon (1) and its right-click menu with Open Scan Results Window (2) highlighted.",
       "olderOverlay": "Older overlay",
       "newerOverlay": "Newer overlay",
       "resultsAlt": "The Mining Survey Results window: the Scan button below a list of ores, each expanded.",
-      "openMenu": "Right-click the Mining Surveyor icon. On the newer overlay, click Open Scan Results Window (1) and go to step 3.",
+      "openMenu": "Right-click the Mining Surveyor icon.",
       "openResults": "Choose Open Scan Results Window.",
       "scan": "Click Scan in the new window.",
       "expand": "Expand every ore, so all its rocks are listed.",
