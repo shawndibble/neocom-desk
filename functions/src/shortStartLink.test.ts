@@ -7,6 +7,7 @@ import {
   type CallerState,
   START_LINK_TTL_MS,
   callerKey,
+  clientIp,
   canonicalSearch,
   makeShortStartLink,
   shortIdFor,
@@ -82,6 +83,19 @@ function memoryStore() {
   };
   return { rows, store };
 }
+
+describe('clientIp', () => {
+  it('takes the address the front end appended, which a caller cannot forge', () => {
+    expect(clientIp('6.6.6.6, 203.0.113.9')).toBe('203.0.113.9');
+    expect(clientIp(['6.6.6.6', ' 203.0.113.9 '])).toBe('203.0.113.9');
+    expect(clientIp('203.0.113.9')).toBe('203.0.113.9');
+  });
+
+  it('falls back to the socket address, then to a shared bucket', () => {
+    expect(clientIp(undefined, '10.0.0.1')).toBe('10.0.0.1');
+    expect(clientIp('', undefined)).toBe('unknown');
+  });
+});
 
 describe('callerKey', () => {
   it('is a stable hash, not the address', () => {

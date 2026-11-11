@@ -15,6 +15,7 @@ import {
   type CallerState,
   SURVEY_START_SHARE_TYPE,
   callerKey,
+  clientIp,
   makeShortStartLink,
   type ShortLinkStore,
 } from './shortStartLink.js';
@@ -1532,7 +1533,7 @@ export const shortStartLink = onRequest(
       const result = await makeShortStartLink(
         input,
         shortLinkStore,
-        callerKey(request.ip || 'unknown'),
+        callerKey(clientIp(request.headers['x-forwarded-for'], request.ip)),
         Date.now(),
         process.env.APP_URL ?? 'https://neocomdesk.com'
       );

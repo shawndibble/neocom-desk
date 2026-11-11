@@ -164,6 +164,21 @@ export interface ShortLinkResponse {
   headers?: Record<string, string>;
 }
 
+/**
+ * The caller's address. Behind Google's front end `request.ip` may be the proxy's, shared by
+ * everyone, so take the entry the front end itself appended to `X-Forwarded-For` (the last
+ * one): a caller can add entries before it, never after. Falls back to the socket address.
+ */
+export function clientIp(forwardedFor: string | string[] | undefined, fallback?: string): string {
+  const header = Array.isArray(forwardedFor) ? forwardedFor.join(',') : (forwardedFor ?? '');
+  const last = header
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part !== '')
+    .pop();
+  return last ?? fallback ?? 'unknown';
+}
+
 /** What identifies a caller in the store: the IP, hashed, so the raw address is never kept. */
 export function callerKey(ip: string): string {
   return createHash('sha256').update(ip).digest('hex').slice(0, 32);
