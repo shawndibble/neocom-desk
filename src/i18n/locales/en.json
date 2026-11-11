@@ -196,18 +196,20 @@
     "info": {
       "tabsLabel": "Ship info",
       "tabs": {
-        "description": "Description",
+        "attributes": "Attributes",
         "fitting": "Fitting",
         "skills": "Skills & Mastery",
         "blueprint": "Blueprint"
       },
       "tabsShort": {
-        "description": "Info",
+        "attributes": "Info",
         "fitting": "Fitting",
         "skills": "Skills",
         "blueprint": "Blueprint"
       },
       "subtitle": "{{faction}} · {{class}} · {{tech}}",
+      "flavorText": "Description",
+      "attributesError": "Couldn't load this hull's attributes.",
       "tech": "Tech {{level}}",
       "mastery": "Mastery {{level}}",
       "masteryNone": "No Mastery yet",
