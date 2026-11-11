@@ -160,7 +160,7 @@ describe('ReloadPrompt', () => {
       await act(() => vi.advanceTimersByTimeAsync(0));
       expect(registerSWOptions.current).toBeUndefined();
 
-      navigateTo('/survey');
+      navigateTo('/skills');
       expect(registerSWOptions.current).toBeDefined();
 
       registerSWOptions.current = undefined;

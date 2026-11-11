@@ -59,7 +59,8 @@ export function SurveyLocationPicker({
   onPick,
 }: {
   value: { id: number | null; name: string } | null;
-  characterId: number;
+  /** Null when nobody is logged in: systems and NPC stations still search, structures need a Character. */
+  characterId: number | null;
   /** A place, or `null` when the pilot emptied the box. */
   onPick: (place: SurveyPlace | null) => void;
 }) {
@@ -108,12 +109,12 @@ export function SurveyLocationPicker({
   }, [open]);
 
   const typed = query?.trim() ?? '';
-  const canSearch = granted !== undefined && granted.includes(SEARCH_SCOPE);
+  const canSearch = characterId !== null && granted !== undefined && granted.includes(SEARCH_SCOPE);
   const searchText = canSearch && typed.length >= MIN_STRUCTURE_SEARCH_LENGTH ? typed : '';
   // Hits belong to the Character that searched, so another one's never pass for current.
   const searchKey = searchText === '' ? '' : `${characterId}:${searchText}`;
   useEffect(() => {
-    if (searchKey === '') return;
+    if (searchKey === '' || characterId === null) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
       void searchStructures(characterId, searchText, controller.signal)
@@ -218,6 +219,7 @@ export function SurveyLocationPicker({
       <LiveStatus>{open && systemsFailed ? t('jumpRange.systemsFailed') : ''}</LiveStatus>
       <TextInput
         size="sm"
+        className="w-full"
         role="combobox"
         aria-label={t('survey.info.location')}
         aria-expanded={showList}

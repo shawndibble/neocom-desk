@@ -31,8 +31,11 @@ vi.mock('./surveyStore', () => ({
 }));
 vi.mock('@/features/share/shareStore', () => ({
   shareUrl: (id: string) => `https://neocomdesk.test/s/${id}`,
+  appUrl: (path: string) => `https://neocomdesk.test${path}`,
 }));
 // The info panel has its own test; here only who sees it editable matters.
+// The start boxes have their own test (startDraft.test.ts); here only the survey the scan starts matters.
+vi.mock('./SurveyStartDetails', () => ({ SurveyStartDetails: () => null }));
 vi.mock('./useHasMoonOre', () => ({ useHasMoonOre: () => true }));
 vi.mock('./SurveyInfoPanel', () => ({
   SurveyInfoEditor: () => <div data-testid="tax-edit" />,
@@ -131,7 +134,10 @@ describe('SurveyTab', () => {
     await screen.findByText('0% mined');
     // The survey renders from `loadSurvey` before the paste's add settles; wait for it so it can't leak into the next test.
     await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
-    expect(startSurvey).toHaveBeenCalledWith({ characterId: 7, ownerName: 'Shawn Dibble' });
+    expect(startSurvey).toHaveBeenCalledWith({
+      owner: { characterId: 7, ownerName: 'Shawn Dibble' },
+      prefill: { location: null, tax: null, notes: '' },
+    });
     expect(addSurveyScan).toHaveBeenCalledWith({
       id: ID,
       text: SCAN,
@@ -450,9 +456,9 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
     it("offers no removal on another pilot's survey", async () => {
       loadSurvey.mockResolvedValue(twoScans('Someone Else'));
       await useCurrentSurveyId.getState().setValue(ID);
-      const { container } = renderTab();
+      renderTab();
       await screen.findByText(/mined/);
-      expect(container.querySelector('details')).toBeNull();
+      expect(screen.queryByText(/^2 scans$/)).toBeNull();
     });
   });
 

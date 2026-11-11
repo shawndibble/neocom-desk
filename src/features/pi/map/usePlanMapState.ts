@@ -26,7 +26,6 @@ import {
   PI_PRODUCT_PARAM,
   piProductHref,
   productNavigation,
-  wasProductPushedHere,
 } from '../piPlanLink';
 import { usePlanPreference } from '../planTicksPref';
 import {
@@ -208,22 +207,10 @@ export function usePlanMapState({
     setPlanetOpen(false);
     restore();
   }, [restore]);
-  const goingBack = useRef(false);
-  useEffect(() => {
-    goingBack.current = false;
-  }, [linked]);
-  /** Takes `product` off the URL: Back when this page pushed the entry, else a replace. */
+  /** Takes `product` off the URL by replacing the entry, never going Back. */
   const dropProduct = useCallback(() => {
-    // A second Close before Back lands would go Back twice, maybe off the page.
-    if (parsePiProduct(location.search) === null || goingBack.current) return;
-    if (wasProductPushedHere(location.state)) {
-      goingBack.current = true;
-      navigate(-1);
-    } else {
-      navigate(hrefWithoutPiProduct(location), {
-        replace: true,
-      });
-    }
+    if (parsePiProduct(location.search) === null) return;
+    navigate(hrefWithoutPiProduct(location), { replace: true });
   }, [location, navigate]);
   // A drawer a link on Plan or Colonies opened has no opener left on this
   // tab: focus goes to that product on the map (a tile, or a phone row), else
@@ -452,8 +439,7 @@ export function usePlanMapState({
     setDetailKind('product');
     const href = piProductHref(typeId, location.search);
     if (planetShown) {
-      // The planet drawer's own Back entry becomes the product's. No marker:
-      // what is under it may not be this page's, so Close replaces, never goes Back.
+      // The planet drawer's own Back entry becomes the product's.
       setPlanetOpen(false);
       navigate(href, { replace: true });
       return;

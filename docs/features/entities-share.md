@@ -42,9 +42,9 @@ Two cross-cutting surfaces: (1) the `?info=` entity layer — clickable names th
 
 **History model** (`EntityInfoRoute.tsx`, mounted once in `src/app/App.tsx`):
 
-- Opening pushes a history entry stamped `{entityInfo: true}` (`entityInfoState.ts:5`). Close = `navigate(-1)` when the entry was pushed here, so Back and the Close button agree.
+- Opening pushes a history entry, so browser Back closes the modal. Close replaces the entry with the same URL minus `info`; it never goes Back, so the page under the modal stays as it is (`docs/context/decisions/` "close never goes back").
 - Opening while a modal is already open (character -> its corporation, drill-down) _replaces_ instead of pushing (`EntityInfoRoute.tsx:41`, `EntityLink.tsx:45`), so a single Close/Back returns to the page.
-- URL opened cold in a new tab (no marker): Close replaces the URL with the same location minus `info`, never leaving the app (`:55`).
+- URL opened cold in a new tab: Close is the same replace, so it never leaves the app (`:55`).
 - Changing pathname strips `info` (a tab switch keeps the search; the modals close on page change) (`EntityInfoRoute.tsx` effect on `location.pathname`; `PublicInfoModal.tsx` also clears on pathname change).
 - The modals use `closeOnBack={false}` (`PublicInfoModal.tsx:168`, SkillDetailModal) because the route layer owns Back.
 - `kind` switch: `type` -> `ItemInfoModal`, `skill` -> `SkillDetailModal`, other kinds -> `PublicInfoModal`; the other two stores are cleared each time so only one modal shows.
@@ -116,7 +116,7 @@ Corporation pages that open Show Info links (`CorpRoster`, `CorpTransactionsPane
 ## Interview Q&A
 
 1. **Why is a click on a corp name a URL change, not component state?** So middle-click/new-tab/copy-link work and Back closes the modal with no extra code (`src/features/entities/EntityInfoRoute.tsx:28` header; DESIGN.md §6c "Real links").
-2. **How does Close avoid leaving the app on a cold link?** Entries pushed by the app carry `{entityInfo:true}`; absent marker -> replace with the same URL minus `info` (`EntityInfoRoute.tsx:55`, `entityInfoState.ts:5`).
+2. **How does Close avoid leaving the app on a cold link?** Close always replaces with the same URL minus `info`; it never calls Back (`EntityInfoRoute.tsx`).
 3. **Why drill-down replaces history?** One Back/Close must return to the page, not walk back through character -> corp -> alliance (`EntityInfoRoute.tsx:41`, `EntityLink.tsx:45`).
 4. **What does a pilot see for an NPC agent?** A slim card, no killboard/employment (`PublicInfoModal.tsx:154,327`).
 5. **Why is the corporation tab driven by live affiliation, not the cached record?** The cached public character info is static; affiliation moves (`src/features/travel/pilotLookup.ts:79`).

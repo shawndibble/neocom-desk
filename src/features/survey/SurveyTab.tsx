@@ -34,8 +34,14 @@ import { SurveyPicker } from './SurveyPicker';
 import { SurveyOwnerChange } from './SurveyOwnerChange';
 import { SurveyInfoEditor, SurveyInfoReadout, type InfoSurvey } from './SurveyInfoPanel';
 import { SurveyStartTemplates } from './SurveyStartTemplates';
+import { StartLinkHelp } from './StartLinkHelp';
+import { fromInfoFields, startLinkPath } from './startLink';
+import type { InfoFields } from '@/engine/survey/infoTemplate';
+import { noteStartedHere } from './startedHere';
+import { claimStartedSurveys } from './claimStarted';
 import { useSurveyTemplates } from './surveyTemplates';
-import { writeTemplateToSurvey } from './surveyTemplateWrite';
+import { SurveyStartDetails } from './SurveyStartDetails';
+import { EMPTY_START_DRAFT, draftFromTemplate, draftToInfo, type StartDraft } from './startDraft';
 import { stashPendingScan, takePendingScan } from './pendingScan';
 import { hasSubmittedScan, noteSubmittedScan } from './submitted';
 import { submitterName } from './submitterName';
@@ -89,6 +95,20 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
   useHydratedStore(useSurveyTemplates);
   const [startTemplateId, setStartTemplateId] = useState<string | null>(null);
   const startTemplate = templates.find((template) => template.id === startTemplateId);
+  // The Additional information typed (or taken from a template) before the first scan.
+  const [startDraft, setStartDraft] = useState<StartDraft>(EMPTY_START_DRAFT);
+
+  // A survey started on this device with no account becomes this pilot's once they are signed in.
+  const accountNames = useCharacters().map((c) => c.name);
+  const accountKey = accountNames.join('|');
+  useEffect(() => {
+    if (characterId === null) return;
+    void (async () => {
+      const ownerName = (await db.characters.get(characterId))?.name;
+      if (ownerName === undefined) return;
+      if (await claimStartedSurveys(characterId, ownerName, accountKey.split('|'))) await refresh();
+    })().catch(() => undefined);
+  }, [characterId, accountKey, refresh]);
 
   // A survey in view is one the pilot has now created or opened.
   useEffect(() => {
@@ -112,18 +132,20 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
       if (characterId === null) return 'failed';
       const ownerName = (await db.characters.get(characterId))?.name;
       if (ownerName === undefined) return 'failed';
-      const started = await startSurvey({ characterId, ownerName });
+      const started = await startSurvey({
+        owner: { characterId, ownerName },
+        prefill: draftToInfo(startDraft),
+      });
       // Scan first, so the new survey's first load already has it.
       await addSurveyScan({ id: started.id, text, expiresAt: started.expiresAt, by: ownerName });
-      // Best effort: a template that fails to write leaves the panel blank, as without one.
-      if (startTemplate)
-        await writeTemplateToSurvey(started, startTemplate, characterId).catch(() => undefined);
       setStartTemplateId(null);
+      setStartDraft(EMPTY_START_DRAFT);
       noteSubmittedScan();
+      noteStartedHere(started.id);
       await setCurrentId(started.id);
       return 'ok';
     },
-    [characterId, setCurrentId, startTemplate]
+    [characterId, setCurrentId, startDraft]
   );
 
   const add = useCallback(
@@ -231,6 +253,15 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
   const characterNames = useCharacters().map((c) => c.name);
   const scans = useMemo(() => (state.status === 'ready' ? state.scans : []), [state]);
   const owned = state.status === 'ready' && ownsSurvey(state.owner, characterNames);
+  // What the start link shown in the help is built from: the Additional information as it stands.
+  const helpFields: InfoFields =
+    currentId !== null && state.status === 'ready'
+      ? {
+          location: state.info?.location ?? null,
+          tax: state.tax ? { name: state.tax.name, pct: state.tax.pct } : null,
+          notes: state.info?.notes ?? '',
+        }
+      : draftToInfo(startDraft);
   // Only the owner sets a scan aside; the rules can't tell who that is, so this is the guard.
   const [ignoreFailed, setIgnoreFailed] = useState(false);
   const setIgnored = useCallback(
@@ -354,11 +385,22 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
               expiresAt={expiresAt}
               emptyExtra={
                 currentId === null && characterId !== null ? (
-                  <SurveyStartTemplates
-                    templates={templates}
-                    selectedId={startTemplate?.id ?? null}
-                    onSelect={setStartTemplateId}
-                  />
+                  <>
+                    <SurveyStartTemplates
+                      templates={templates}
+                      selectedId={startTemplate?.id ?? null}
+                      onSelect={(id) => {
+                        setStartTemplateId(id);
+                        const picked = templates.find((template) => template.id === id);
+                        setStartDraft(picked ? draftFromTemplate(picked) : EMPTY_START_DRAFT);
+                      }}
+                    />
+                    <SurveyStartDetails
+                      characterId={characterId}
+                      draft={startDraft}
+                      onChange={setStartDraft}
+                    />
+                  </>
                 ) : undefined
               }
               footerActions={
@@ -386,6 +428,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
                     ]
               }
             />
+            <StartLinkHelp path={startLinkPath(fromInfoFields(helpFields))} />
           </>
         )}
       </TabPanel>

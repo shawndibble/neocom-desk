@@ -427,3 +427,18 @@ describe('fetchKillmailHash', () => {
     expect(await losses).toEqual({ ok: false, losses: [], reason: 'offline' });
   });
 });
+
+describe('parseEntityAutocomplete', () => {
+  it('keeps corporations, alliances and characters and drops everything else', async () => {
+    const { parseEntityAutocomplete } = await import('./zkillboard');
+    expect(
+      parseEntityAutocomplete([
+        { id: 1, name: 'Star Tail Industuries', type: 'corporation' },
+        { id: 2, name: 'Jita', type: 'solarSystem' },
+        { id: 3, name: 'Bob', type: 'character' },
+        { id: 'x', name: 'Bad', type: 'alliance' },
+      ]).map((h) => h.id)
+    ).toEqual([1, 3]);
+    expect(parseEntityAutocomplete('nope')).toEqual([]);
+  });
+});

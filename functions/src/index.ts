@@ -4,10 +4,23 @@
 // against EVE's published JWKS before any Firebase credential is minted.
 
 import { callerFromAuth, signedInCharacter, verifyAccessToken, type Caller } from './actorAuth.js';
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { createActionGroup, type CallableHandler } from './callableRouter.js';
 import type { CallableAction } from './callableManifest.js';
 import { runDailyHousekeeping } from './dailyHousekeeping.js';
+import {
+  NEW_LINK_WINDOW_MS,
+  SHORT_LINK_LIMITS,
+  checkNewLink,
+  type CallerState,
+  SURVEY_START_SHARE_TYPE,
+  callerKey,
+  PROXY_CLIENT_HEADER,
+  PROXY_SECRET_HEADER,
+  callerAddress,
+  makeShortStartLink,
+  type ShortLinkStore,
+} from './shortStartLink.js';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
@@ -16,6 +29,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getMessaging } from 'firebase-admin/messaging';
 import { firestore } from './firestore.js';
+import { Timestamp } from 'firebase-admin/firestore';
 import {
   installBookWriteTracking,
   stampBook,
@@ -1456,6 +1470,89 @@ export const mutamarketEstimate = onCall<unknown>(
         throw new HttpsError('unavailable', 'MutaMarket is unavailable');
       }
       throw err;
+    }
+  }
+);
+
+/**
+ * shortStartLink (shortStartLink.ts): an HTTP endpoint, `POST` (JSON or form body) or `GET`
+ * (query string), that turns a Survey start link's fields into a short `/s/<id>` link, for a
+ * script that puts one in an EVE calendar event. It is an HTTP trigger and not a callable
+ * action because a script has no Firebase session to call a callable with. It is the only
+ * writer of `survey-start` shares: the rules refuse that type from any client. `maxInstances`
+ * is the hobby-scale abuse cap; the same details always give the same id, so repeating a
+ * request adds nothing. Called through `api.neocomdesk.com/short` (workers/short-link-proxy), which
+ * names the caller in a header signed with `SHORT_LINK_PROXY_SECRET` (`callerAddress`).
+ */
+const shortLinkStore: ShortLinkStore = {
+  claim: (id, search, caller, now, expiresAt) => {
+    const ref = firestore().collection('shares').doc(id);
+    const limitRef = firestore().collection(SHORT_LINK_LIMITS).doc(caller);
+    return firestore().runTransaction(async (tx) => {
+      const [held, limit] = await Promise.all([tx.get(ref), tx.get(limitRef)]);
+      const data = held.data() as
+        { payload?: { search?: unknown }; expiresAt?: { toMillis(): number } } | undefined;
+      const live = data?.expiresAt !== undefined && data.expiresAt.toMillis() > now;
+      if (held.exists && live && data?.payload?.search !== search) return 'taken' as const;
+      // Renewing a link that is already live is free; only a new one counts against the caller.
+      if (!(held.exists && live)) {
+        const stored = limit.data() as Partial<CallerState> | undefined;
+        const state: CallerState | null =
+          stored?.lastAt === undefined
+            ? null
+            : {
+                lastAt: stored.lastAt,
+                windowStart: stored.windowStart ?? stored.lastAt,
+                count: stored.count ?? 1,
+              };
+        const check = checkNewLink(state, now);
+        if (!check.ok) return { limitedFor: check.limitedFor, reason: check.reason };
+        tx.set(limitRef, {
+          ...check.next,
+          // Removed by the TTL policy on this field (firestore.indexes.json).
+          expiresAt: Timestamp.fromMillis(check.next.windowStart + NEW_LINK_WINDOW_MS),
+        });
+      }
+      tx.set(ref, {
+        type: SURVEY_START_SHARE_TYPE,
+        payload: { v: 1, search },
+        createdAt: Timestamp.fromMillis(now),
+        expiresAt: Timestamp.fromMillis(expiresAt),
+      });
+      return 'ok' as const;
+    });
+  },
+};
+
+export const shortStartLink = onRequest(
+  { cors: true, maxInstances: 5 },
+  async (request, response) => {
+    if (request.method !== 'GET' && request.method !== 'POST') {
+      response.set('Allow', 'GET, POST').status(405).json({ error: 'use GET or POST' });
+      return;
+    }
+    const input = request.method === 'POST' ? request.body : request.query;
+    try {
+      const result = await makeShortStartLink(
+        input,
+        shortLinkStore,
+        callerKey(
+          callerAddress({
+            proxyClient: request.get(PROXY_CLIENT_HEADER),
+            proxySecret: request.get(PROXY_SECRET_HEADER),
+            forwardedFor: request.headers['x-forwarded-for'],
+            ip: request.ip,
+            expectedSecret: process.env.SHORT_LINK_PROXY_SECRET,
+          })
+        ),
+        Date.now(),
+        process.env.APP_URL ?? 'https://neocomdesk.com'
+      );
+      if (result.headers) response.set(result.headers);
+      response.status(result.status).json(result.body);
+    } catch (err) {
+      logError('shortStartLink failed', err);
+      response.status(500).json({ error: 'could not make a short link' });
     }
   }
 );

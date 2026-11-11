@@ -67,24 +67,41 @@ describe('PlanMap: the detail drawer', () => {
     expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
   });
 
-  it('keeps a traced product on screen when you untick, hover or click a planet it needs', async () => {
+  // Felsic Magma is a Lava product; the pilot has no Lava colony. It shows on
+  // the map once Lava is a what-if, and tracing it keeps that tick. Kept as
+  // short tests: each map click re-renders the whole map (~0.5s), so one chain
+  // of a dozen was slow enough to fail its focus wait on a loaded CI runner.
+  async function traceFelsicMagmaWithLavaWhatIf() {
     const user = userEvent.setup({ delay: null });
     renderMap();
-    // Felsic Magma is a Lava product; the pilot has no Lava colony. It shows
-    // on the map once Lava is a what-if, and tracing it keeps that tick.
     await user.click(planet('Lava'));
     await user.keyboard('{Escape}');
     await user.click(product('Felsic Magma'));
+    return user;
+  }
+
+  it('keeps the what-if ticked while its product is traced, and focuses the drawer', async () => {
+    await traceFelsicMagmaWithLavaWhatIf();
     const dialog = screen.getByRole('dialog', { name: /^(How to make|Where to get) / });
     expect(planet('Lava')).toHaveAttribute('aria-pressed', 'true');
     await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+  });
+
+  it('unticks the what-if on a click even though the trace needs it, keeping the trace', async () => {
+    const user = await traceFelsicMagmaWithLavaWhatIf();
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    // A click on the ticked what-if unticks it, even though the trace needs it.
     await user.click(planet('Lava'));
     expect(planet('Lava')).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(product('Felsic Magma')).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('previews no what-if on a needed planet while tracing, and a click opens the trace', async () => {
+    const user = await traceFelsicMagmaWithLavaWhatIf();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await user.click(planet('Lava'));
     await user.hover(planet('Lava'));
     // No what-if preview: the trace already shows the chain, pink wires would bury it.
     expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();

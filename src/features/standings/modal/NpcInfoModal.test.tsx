@@ -107,7 +107,7 @@ describe('an NPC corporation in the info modal', () => {
     expect(await screen.findByRole('link', { name: '1 jump' })).toBeInTheDocument();
   });
 
-  it('Close goes back when the app pushed the entry, leaving the page behind it intact', async () => {
+  it('Close replaces the entry the app pushed, leaving the page behind it intact', async () => {
     renderAt(['/start', '/contacts?tab=standings'], 1);
     act(() => openPublicInfoModal('corporation', CALDARI_NAVY));
     await screen.findByRole('dialog');
@@ -116,10 +116,6 @@ describe('an NPC corporation in the info modal', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(probe.pathname).toBe('/contacts');
     expect(probe.search).toBe('?tab=standings');
-
-    // It was a Back, not a replace: one more Back leaves the page, with no stray entry between.
-    act(() => void probe.navigate(-1));
-    await waitFor(() => expect(probe.pathname).toBe('/start'));
   });
 
   it('Close replaces a cold-opened URL with the plain page and never leaves the app', async () => {

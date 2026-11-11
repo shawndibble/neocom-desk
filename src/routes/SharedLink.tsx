@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useMarkPublicRouteRendered } from '@/app/routeFocus';
-import { useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, CachedNotice, EmptyState, Spinner } from '@/components/ui';
 import { guarded } from '@/app/routeChunks';
@@ -43,6 +43,22 @@ function ShareLoading() {
   );
 }
 
+/**
+ * A short start link (`survey-start`): opens the Survey start page with the stored
+ * query. The start page re-validates every value, as for a hand-written link, so
+ * this only checks the payload is a plain query string of a sane size.
+ */
+function StartLinkRedirect({ payload }: { payload: unknown }) {
+  const { t } = useTranslation();
+  const search = (payload as { search?: unknown } | null)?.search;
+  if (typeof search !== 'string' || search === '' || search.length > 4000) {
+    return (
+      <EmptyState title={t('share.failedTitle')} hint={t('share.failedHint')} className="py-10" />
+    );
+  }
+  return <Navigate to={`/survey?${search}`} replace />;
+}
+
 /** The page a stored share's `type` names. */
 function SharedScreen({ share, shareId }: { share: StoredShare; shareId: string }) {
   switch (share.type) {
@@ -54,6 +70,8 @@ function SharedScreen({ share, shareId }: { share: StoredShare; shareId: string 
       return <SurveyShareScreen shareId={shareId} />;
     case 'fitting':
       return <FittingSharedView share={share} />;
+    case 'survey-start':
+      return <StartLinkRedirect payload={share.payload} />;
   }
 }
 

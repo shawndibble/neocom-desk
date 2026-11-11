@@ -144,7 +144,7 @@ describe('EntityInfoRoute', () => {
     expect(probe.search).toBe('');
   });
 
-  it('closing a modal this app opened goes back, returning to the URL without info', async () => {
+  it('closing a modal this app opened replaces the URL with the one without info', async () => {
     renderAt('/contacts?tab=a');
     fireEvent.click(screen.getByRole('link', { name: 'Pilot One' }));
     await screen.findByRole('dialog');
@@ -152,6 +152,24 @@ describe('EntityInfoRoute', () => {
     usePublicInfoModalStore.getState().close();
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(probe.search).toBe('?tab=a');
+  });
+
+  it('closing keeps a param changed while the modal was open, rather than going Back past it', async () => {
+    renderAt('/contacts?tab=a');
+    fireEvent.click(screen.getByRole('link', { name: 'Pilot One' }));
+    await screen.findByRole('dialog');
+    // A page's own URL write keeps the entry's state, as `useUrlParams` does.
+    act(
+      () =>
+        void probe.navigate('/contacts?tab=b&info=character-1', {
+          replace: true,
+          state: { entityInfo: true },
+        })
+    );
+
+    usePublicInfoModalStore.getState().close();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(probe.search).toBe('?tab=b');
   });
 
   it('closing a cold-opened modal replaces the URL without info and keeps other params', async () => {

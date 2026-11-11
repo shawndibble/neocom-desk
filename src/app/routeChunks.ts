@@ -178,6 +178,7 @@ export const loadSettings = named(() => import('@/routes/Settings'), 'Settings')
 export const loadHelp = named(() => import('@/routes/Help'), 'Help');
 export const loadFittingShared = named(() => import('@/routes/FittingShared'), 'FittingShared');
 export const loadCommunityJoin = named(() => import('@/routes/CommunityJoin'), 'CommunityJoin');
+export const loadSurveyStart = named(() => import('@/routes/SurveyStart'), 'SurveyStart');
 export const loadSharedLink = named(() => import('@/routes/SharedLink'), 'SharedLink');
 export const loadCorpTaxBookVerify = named(
   () => import('@/routes/CorpTaxBookVerify'),

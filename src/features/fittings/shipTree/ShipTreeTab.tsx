@@ -6,11 +6,9 @@
  * opens its Ship Info window. The page header and tab bar are the Ships
  * route's.
  */
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, SegmentedControl, Spinner } from '@/components/ui';
-import { ENTITY_INFO_PUSHED_STATE, wasPushedHere } from '@/features/entities/entityInfoState';
 import { enumParam, enumSetParam, intParam, optionalIdParam } from '@/lib/urlState';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -119,8 +117,6 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
     [setParams, masteriesLoaded]
   );
   const tree = useFactionTree(source, factionID);
-  const navigate = useNavigate();
-  const location = useLocation();
   const selected = useMemo<ShipTreeShip | null>(
     () =>
       params.ship === null
@@ -128,6 +124,9 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
         : (source.data.ships.find((ship) => ship.typeID === params.ship) ?? null),
     [params.ship, source.data.ships]
   );
+  // The hull the map marks once the window closes: the last one opened.
+  const [lastOpened, setLastOpened] = useState<number | null>(null);
+  if (selected && selected.typeID !== lastOpened) setLastOpened(selected.typeID);
   // Arrival with `?ship=`: show the faction behind the window; an unknown id
   // is dropped without a word.
   // Once per hull: the window is non-modal on a desktop, so a later faction pick stands.
@@ -148,15 +147,12 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
     (ship: ShipTreeShip) =>
       setParams(
         { ship: ship.typeID, faction: ship.factionID },
-        params.ship === null ? { push: true, state: ENTITY_INFO_PUSHED_STATE } : undefined
+        params.ship === null ? { push: true } : undefined
       ),
     [setParams, params.ship]
   );
-  // ADR 0015's entity-modal rule: Back when the app pushed the entry, else replace.
-  const closeShip = useCallback(() => {
-    if (wasPushedHere(location.state)) void navigate(-1);
-    else setParams({ ship: null });
-  }, [location.state, navigate, setParams]);
+  // Close never goes Back: the tree under the window stays as the pilot left it.
+  const closeShip = useCallback(() => setParams({ ship: null }), [setParams]);
 
   const isPhone = useIsPhone();
   const storedView = useShipTreeViewPreference((state) => state.value);
@@ -216,7 +212,8 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
         <ShipTreeMap
           source={source}
           tree={tree}
-          selectedTypeID={selected?.typeID ?? null}
+          selectedTypeID={selected?.typeID ?? lastOpened}
+          windowOpen={selected !== null}
           onFaction={onFaction}
           onOpenShip={openShip}
           viewSwitch={viewSwitch}

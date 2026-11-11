@@ -53,8 +53,12 @@ export function shareFirestore(characterId?: number): Firestore {
 export const SHARES_COLLECTION = 'shares';
 export const SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Every page a Share Link can open. Mirrored by the `type in [...]` check in `firestore.rules`. */
-export const SHARE_TYPES = ['appraisal', 'fitting', 'dscan', 'survey'] as const;
+/**
+ * Every page a Share Link can open. Mirrored by the `type in [...]` check in `firestore.rules`,
+ * except `survey-start`: the `shortStartLink` function writes those (a short link to the
+ * Survey start page) and the rules refuse it from any client.
+ */
+export const SHARE_TYPES = ['appraisal', 'fitting', 'dscan', 'survey', 'survey-start'] as const;
 export type ShareType = (typeof SHARE_TYPES)[number];
 
 export interface StoredShare {
@@ -78,21 +82,29 @@ export type LoadShareResult =
     }
   | { ok: false; reason: 'not-found' | 'unsupported' | 'failed' };
 
-export function shareUrl(id: string): string {
+/** An in-app path as a full link on this origin, under the app's base path. */
+export function appUrl(path: string): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-  return `${window.location.origin}${base}/s/${id}`;
+  return `${window.location.origin}${base}${path}`;
+}
+
+export function shareUrl(id: string): string {
+  return appUrl(`/s/${id}`);
 }
 
 export async function saveShare(input: {
   id: string;
   type: ShareType;
   payload: unknown;
-  /** Signs in as this Character if no Firebase session exists yet. */
-  characterId: number;
+  /**
+   * Signs in as this Character if no Firebase session exists yet. Omitted, the
+   * write goes out with no session, which the rules allow for a `survey` only.
+   */
+  characterId?: number;
 }): Promise<number> {
-  await ensureAnySession(input.characterId);
+  if (input.characterId !== undefined) await ensureAnySession(input.characterId);
   const expiresAt = Date.now() + SHARE_TTL_MS;
-  await setDoc(doc(getSyncFirestore(input.characterId), SHARES_COLLECTION, input.id), {
+  await setDoc(doc(shareFirestore(input.characterId), SHARES_COLLECTION, input.id), {
     type: input.type,
     payload: input.payload,
     createdAt: serverTimestamp(),

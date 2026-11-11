@@ -38,7 +38,7 @@ test.describe('Ship Tree — desktop', () => {
     // The ~40rem slide-over, not SlideOver's default 25rem.
     expect(box.width).toBeGreaterThan(600);
 
-    for (const tab of ['Description', 'Fitting', 'Skills & Mastery', 'Blueprint']) {
+    for (const tab of ['Attributes', 'Fitting', 'Skills & Mastery', 'Blueprint']) {
       await info.getByRole('tab', { name: tab }).click();
       await expect(info.getByRole('tabpanel', { name: tab })).toBeVisible();
     }

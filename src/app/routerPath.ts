@@ -50,6 +50,7 @@ export function currentRouterPath(): string {
 const PUBLIC_ROUTES = [
   '/s',
   '/share',
+  '/survey',
   '/communities/join',
   '/corp-tax-book/verify',
   '/corp-tax-book/remove-now',

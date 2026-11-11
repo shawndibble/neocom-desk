@@ -15,7 +15,7 @@
  */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel, TextArea } from '@/components/ui';
+import { Button, Fields, Panel, TextArea } from '@/components/ui';
 import { InfoRow } from './InfoRow';
 import { SurveyNotes } from './SurveyNotes';
 import {
@@ -142,25 +142,25 @@ export function SurveyInfoEditor({
         />
       }
     >
-      <div className="flex flex-col gap-4">
-        {applied !== undefined && (
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <span>{t('survey.templates.applied', { name: applied.name })}</span>
-            {edited && (
-              <>
-                <span className="text-text-dim">{t('survey.templates.edited')}</span>
-                <Button size="sm" onClick={() => updateApplied(applied)}>
-                  {t('survey.templates.update')}
-                </Button>
-                <Button size="sm" onClick={() => setDialog('save')}>
-                  {t('survey.templates.saveAsNew')}
-                </Button>
-              </>
-            )}
-          </p>
-        )}
+      {applied !== undefined && (
+        <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <span>{t('survey.templates.applied', { name: applied.name })}</span>
+          {edited && (
+            <>
+              <span className="text-text-dim">{t('survey.templates.edited')}</span>
+              <Button size="sm" onClick={() => updateApplied(applied)}>
+                {t('survey.templates.update')}
+              </Button>
+              <Button size="sm" onClick={() => setDialog('save')}>
+                {t('survey.templates.saveAsNew')}
+              </Button>
+            </>
+          )}
+        </p>
+      )}
+      <Fields variant="form">
         <InfoRow label={t('survey.info.location')}>
-          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+          <div className="flex min-w-0 flex-1 basis-64">
             <SurveyLocationPicker
               value={location}
               characterId={characterId}
@@ -170,10 +170,10 @@ export function SurveyInfoEditor({
                 store(next, notes);
               }}
             />
-            {location?.id != null && (
-              <SurveyWaypointButton location={{ id: location.id, name: location.name }} />
-            )}
           </div>
+          {location?.id != null && (
+            <SurveyWaypointButton location={{ id: location.id, name: location.name }} />
+          )}
         </InfoRow>
         {moon && (
           <MoonTaxRow
@@ -201,7 +201,7 @@ export function SurveyInfoEditor({
             onBlur={() => store(location, notes)}
           />
         </InfoRow>
-      </div>
+      </Fields>
       {dialog === 'save' && (
         <SaveTemplateDialog
           fields={fields}
@@ -239,17 +239,13 @@ export function SurveyInfoReadout({
   if (location === null && notes === '' && tax === null) return null;
   return (
     <Panel title={t('survey.info.title')}>
-      <div className="flex flex-col gap-4">
+      <Fields variant="form">
         {location !== null && (
           <InfoRow label={t('survey.info.location')}>
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
-              <p className="min-w-0 text-xl font-semibold [overflow-wrap:anywhere]">
-                {location.name}
-              </p>
-              {location.id !== null && (
-                <SurveyWaypointButton location={{ id: location.id, name: location.name }} />
-              )}
-            </div>
+            <p className="min-w-0 text-sm [overflow-wrap:anywhere]">{location.name}</p>
+            {location.id !== null && (
+              <SurveyWaypointButton location={{ id: location.id, name: location.name }} />
+            )}
           </InfoRow>
         )}
         {tax !== null && (
@@ -269,7 +265,7 @@ export function SurveyInfoReadout({
             <SurveyNotes notes={notes} />
           </InfoRow>
         )}
-      </div>
+      </Fields>
     </Panel>
   );
 }

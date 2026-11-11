@@ -4,12 +4,21 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { takePendingScan } from './pendingScan';
+import { noteStartedHere } from './startedHere';
 
-const { addSurveyScan, loadSurvey } = vi.hoisted(() => ({
+const { addSurveyScan, loadSurvey, setSurveyInfo, setSurveyTax } = vi.hoisted(() => ({
   addSurveyScan: vi.fn(),
   loadSurvey: vi.fn(),
+  setSurveyInfo: vi.fn(),
+  setSurveyTax: vi.fn(),
 }));
-vi.mock('./surveyStore', () => ({ addSurveyScan, loadSurvey }));
+vi.mock('./surveyStore', async () => ({
+  ...(await vi.importActual<object>('./surveyStore')),
+  addSurveyScan,
+  loadSurvey,
+  setSurveyInfo,
+  setSurveyTax,
+}));
 vi.mock('./submitterName', () => ({ submitterName: async () => null }));
 vi.mock('./SurveyCharts', () => ({ SurveyCharts: () => <div data-testid="charts" /> }));
 
@@ -33,6 +42,8 @@ function renderScreen() {
 
 beforeEach(() => {
   localStorage.clear();
+  setSurveyInfo.mockReset().mockResolvedValue(undefined);
+  setSurveyTax.mockReset().mockResolvedValue(undefined);
   addSurveyScan.mockReset();
   loadSurvey.mockReset();
   addSurveyScan.mockResolvedValue(undefined);
@@ -45,6 +56,52 @@ beforeEach(() => {
 });
 
 afterEach(cleanup);
+
+describe('SurveyShareScreen details', () => {
+  it('lets the device that started the survey set its details, with no account', async () => {
+    noteStartedHere(ID);
+    renderScreen();
+    const notes = await screen.findByLabelText('Notes (markdown supported)');
+    fireEvent.change(notes, { target: { value: 'Dock at the Athanor' } });
+    fireEvent.blur(notes);
+    await waitFor(() =>
+      expect(setSurveyInfo).toHaveBeenCalledWith({
+        id: ID,
+        expiresAt: EXPIRES,
+        location: null,
+        notes: 'Dock at the Athanor',
+        characterId: undefined,
+      })
+    );
+  });
+
+  it('stores the moon tax once it has a name and a rate', async () => {
+    noteStartedHere(ID);
+    renderScreen();
+    fireEvent.change(await screen.findByLabelText('Moon tax payee'), {
+      target: { value: 'Bob Corp' },
+    });
+    const rate = screen.getByLabelText('Moon tax rate (%)');
+    fireEvent.change(rate, { target: { value: '10' } });
+    fireEvent.blur(rate);
+    await waitFor(() =>
+      expect(setSurveyTax).toHaveBeenCalledWith({
+        id: ID,
+        expiresAt: EXPIRES,
+        name: 'Bob Corp',
+        pct: 10,
+        characterId: undefined,
+      })
+    );
+    expect(setSurveyInfo).not.toHaveBeenCalled();
+  });
+
+  it('offers no editor to anyone else', async () => {
+    renderScreen();
+    await screen.findByText('0% mined');
+    expect(screen.queryByLabelText('Moon tax payee')).toBeNull();
+  });
+});
 
 describe('SurveyShareScreen', () => {
   it('shows the survey to a visitor with no session', async () => {

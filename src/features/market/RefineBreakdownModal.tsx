@@ -389,6 +389,10 @@ export function RefineBreakdownModal({
     Math.abs(breakdown.efficiencyMax - breakdown.efficiencyMin) < 1e-9
       ? breakdown.efficiencyMin / setup.yieldRate
       : null;
+  const hasRange =
+    breakdown.efficiencyMin !== null &&
+    breakdown.efficiencyMax !== null &&
+    Math.abs(breakdown.efficiencyMax - breakdown.efficiencyMin) >= 1e-9;
   const usingMine = shared?.source === 'mine';
   const assumingDefault = setup.yieldRate === 0.5;
   const yours = efficiencyText(breakdown.efficiencyMin, breakdown.efficiencyMax);
@@ -501,6 +505,11 @@ export function RefineBreakdownModal({
               )}
             </SetupBox>
           </div>
+          {hasRange && (
+            <p className="text-xs text-text-dim">
+              {t('market.appraisal.breakdown.skillsRangeNote')}
+            </p>
+          )}
           {assumingDefault && (
             <p className="flex items-start gap-1.5 text-xs text-warning">
               <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} className="mt-px shrink-0" />

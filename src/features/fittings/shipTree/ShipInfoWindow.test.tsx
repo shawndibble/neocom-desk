@@ -174,14 +174,16 @@ describe('Ship Info window', () => {
       within(dialog)
         .getAllByRole('tab')
         .map((tab) => tab.textContent)
-    ).toEqual(['Description', 'Fitting', 'Skills & Mastery', 'Blueprint']);
+    ).toEqual(['Attributes', 'Fitting', 'Skills & Mastery', 'Blueprint']);
   });
 
-  it('Description: class and faction, the grouped bonuses, then the description', async () => {
-    const { dialog } = await openShip(/^Merlin/);
+  it('Attributes: class and faction, the grouped bonuses, then the description, collapsed', async () => {
+    const { user, dialog } = await openShip(/^Merlin/);
     expect(within(dialog).getByText('Caldari Frigate bonuses (per skill level):')).toBeVisible();
     expect(within(dialog).getByText('Role bonus:')).toBeVisible();
     expect(within(dialog).getByText('bonus to shield resistances')).toBeVisible();
+    expect(within(dialog).queryByText(/most powerful combat frigate/)).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: 'Description' }));
     expect(within(dialog).getByText(/most powerful combat frigate/)).toBeVisible();
     expect(within(dialog).getByText('Frigate')).toBeVisible();
   });
