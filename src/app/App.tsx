@@ -55,7 +55,7 @@ import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale } from '@/lib/fontScale';
-import { decimalMarkFor, useNumberFormat } from '@/lib/numberFormat';
+import { useNumberFormat } from '@/lib/numberFormat';
 import { useTimeFormat } from '@/lib/timeFormat';
 import { useMobileTabs } from '@/lib/mobileTabs';
 import { requestPersistenceWhenInstalled } from '@/lib/persistStorage';
@@ -411,9 +411,9 @@ function AppEffects() {
 export function App() {
   // Formatters read the number format when they run rather than subscribing,
   // so a change would leave what is on screen in the old format. Keying the
-  // routes on the resolved mark remounts them once, when the mark changes
-  // (switching `auto` to the format it already resolves to does nothing).
-  const numberMark = decimalMarkFor(useNumberFormat((state) => state.value));
+  // routes on the resolved format remounts them once, when the format changes
+  // (picking the format already in use does nothing).
+  const numberStyle = useNumberFormat((state) => state.value);
 
   return (
     <ErrorBoundary>
@@ -425,7 +425,7 @@ export function App() {
           <LandingShellOffLandingRelease />
           <DocumentTitleTracker />
           <StaleStoresReloader />
-          <Suspense key={numberMark} fallback={<RouteFallback />}>
+          <Suspense key={numberStyle} fallback={<RouteFallback />}>
             <SentryRoutes>
               <Route path="/" element={<Root />} />
               <Route path="/login" element={<Login />} />

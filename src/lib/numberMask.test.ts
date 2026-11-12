@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect } from 'vitest';
-import { setDecimalMark } from './numberLocale';
+import { setDecimalMark, setNumberStyle } from './numberLocale';
 import { maskNumber, unmaskCount, unmaskNumber } from './numberMask';
 
 describe('maskNumber', () => {
@@ -68,6 +68,12 @@ describe('unmaskCount', () => {
 
 describe('number format', () => {
   afterEach(() => setDecimalMark('.'));
+
+  it('masks and unmasks with the Swiss apostrophe grouping', () => {
+    setNumberStyle('apostrophe');
+    expect(unmaskNumber(maskNumber(6622.35))).toBe(6622.35);
+    expect(unmaskNumber('1\u2019234')).toBe(1234);
+  });
 
   it('masks and unmasks with a comma decimal', () => {
     setDecimalMark(',');
