@@ -56,6 +56,7 @@ import {
 import { isNpcCorporationId } from '@/esi/entityIds';
 import { DAY_MS } from '@/lib/age';
 import {
+  accountCorpReaders,
   corpReadersFor,
   loadAccountCorpAccess,
   type CorpCapability,
@@ -64,11 +65,16 @@ import { loadCorpLabels } from '@/features/corp/corpTicker';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import {
+  activeReader,
+  oldest,
+  settleCorps,
   startFeederChunks,
   type FeederChunks,
   loadMoonChunksBoardData,
   loadStructuresBoardData,
 } from '../../data/corpBoard';
+import { mergeCorpRows, mergeLookups } from '@/engine/corp/corpMerge';
+import type { CorpFeedBody } from './corpFeedRead';
 import { fetchCorporationStatsRead } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
 import type {
@@ -92,6 +98,7 @@ import type {
   CorpWalletFeed,
 } from './corpFeeds';
 import type { CorpDeadlineSource } from './corpDeadlineSources';
+import type { CorpFeedBase } from './corpFeeds';
 
 export function loadCorpWallet(characterId: number): Promise<CorpWalletFeed> {
   return readCorpFeed<CorpWalletFeed>(characterId, {
@@ -695,4 +702,173 @@ export async function loadCorpDeadlinesAll(
     corporations,
     labels: await loadCorpLabels(corporations.map((slice) => slice.corporationId)),
   };
+}
+
+// --- One widget across every corporation (All scope) --------------------------------
+
+/** One corporation's read, tagged with its corporation. */
+type CorpTagged<F> = F & { corporationId: number };
+
+interface CorpAllSpec<F extends CorpFeedBase> {
+  capability: CorpCapability;
+  what: string;
+  /** The widget's one-corporation read. */
+  load: (characterId: number) => Promise<F>;
+  /** The readable reads' bodies as one; with no read, the empty body. */
+  merge: (reads: readonly CorpTagged<F>[]) => {
+    body: CorpFeedBody<F>;
+    corporationOf: ReadonlyMap<string, number>;
+  };
+  /** Corporations read at once (default the ESI fan-out limit). */
+  concurrency?: number;
+}
+
+/**
+ * A widget's read over every corporation some Character can read it for (`corpReadersFor`,
+ * the active Character preferred), so no read is made that can only 403. A corporation that
+ * fails is left out and the feed flagged; only when every one fails does the widget get its
+ * Retry. Data Age is the stalest corporation.
+ */
+async function readAllCorps<F extends CorpFeedBase>(spec: CorpAllSpec<F>): Promise<F> {
+  const readers = await accountCorpReaders(spec.capability, activeReader());
+  const { reads, partlyFailed } = await settleCorps(
+    readers,
+    spec.what,
+    spec.load,
+    spec.concurrency
+  );
+  const readable = reads.filter((read) => read.readable);
+  const { body, corporationOf } = spec.merge(readable);
+  if (readable.length === 0) {
+    return { ...UNREADABLE, needsReauth: reads.some((read) => read.needsReauth), ...body } as F;
+  }
+  const merged: CorpFeedBase = {
+    readable: true,
+    needsReauth: readable.some((read) => read.needsReauth),
+    fetchedAt: oldest(readable.map((read) => read.fetchedAt)),
+    fromCache: readable.some((read) => read.fromCache),
+    ...body,
+    corporations: await loadCorpLabels(readable.map((read) => read.corporationId)),
+    corporationOf,
+    partlyFailed,
+  };
+  return merged as F;
+}
+
+/** Each read's rows under its corporation, for `mergeCorpRows`. */
+const rowsOf = <F, T>(reads: readonly CorpTagged<F>[], pick: (read: F) => readonly T[]) =>
+  reads.map((read) => ({ corporationId: read.corporationId, rows: pick(read) }));
+
+export function loadCorpCustomsAll(): Promise<CorpCustomsFeed> {
+  return readAllCorps<CorpCustomsFeed>({
+    capability: 'canReadCustomsOffices',
+    what: 'customs offices',
+    load: loadCorpCustoms,
+    merge: (reads) => {
+      const { rows, corporationOf } = mergeCorpRows(
+        rowsOf(reads, (read) => read.offices),
+        (office) => String(office.office_id)
+      );
+      return {
+        corporationOf,
+        body: {
+          offices: rows,
+          typeNames: mergeLookups(reads.map((read) => read.typeNames)),
+          systemNames: mergeLookups(reads.map((read) => read.systemNames)),
+        },
+      };
+    },
+  });
+}
+
+export function loadCorpStarbasesAll(): Promise<CorpStarbasesFeed> {
+  return readAllCorps<CorpStarbasesFeed>({
+    capability: 'canReadStarbases',
+    what: 'starbases',
+    load: loadCorpStarbases,
+    merge: (reads) => {
+      const { rows, corporationOf } = mergeCorpRows(
+        rowsOf(reads, (read) => read.starbases),
+        (row) => String(row.starbaseId)
+      );
+      return {
+        corporationOf,
+        body: {
+          starbases: rows,
+          typeNames: mergeLookups(reads.map((read) => read.typeNames)),
+          systemNames: mergeLookups(reads.map((read) => read.systemNames)),
+        },
+      };
+    },
+    // One corporation at a time: each reads its towers' details under the fan-out limit,
+    // so the limit holds across corporations too.
+    concurrency: 1,
+  });
+}
+
+export function loadCorpSovereigntyAll(): Promise<CorpSovereigntyFeed> {
+  return readAllCorps<CorpSovereigntyFeed>({
+    capability: 'canReadSkyhooks',
+    what: 'sovereignty',
+    load: loadCorpSovereignty,
+    merge: (reads) => {
+      const { rows, corporationOf } = mergeCorpRows(
+        rowsOf(reads, (read) => read.rows),
+        (row) => row.key
+      );
+      return {
+        corporationOf,
+        body: {
+          rows,
+          systemNames: mergeLookups(reads.map((read) => read.systemNames)),
+          typeNames: mergeLookups(reads.map((read) => read.typeNames)),
+          prices: mergeLookups(reads.map((read) => read.prices)),
+          jumps: mergeLookups(reads.map((read) => read.jumps)),
+        },
+      };
+    },
+  });
+}
+
+export function loadCorpContractsAll(): Promise<CorpContractsFeed> {
+  return readAllCorps<CorpContractsFeed>({
+    capability: 'canReadContracts',
+    what: 'contracts',
+    load: loadCorpContracts,
+    merge: (reads) => {
+      // A contract between two of the pilot's corporations is in both reads: kept once.
+      const { rows, corporationOf } = mergeCorpRows(
+        rowsOf(reads, (read) => read.contracts),
+        (contract) => String(contract.contract_id)
+      );
+      return {
+        corporationOf,
+        body: { contracts: rows, names: mergeLookups(reads.map((read) => read.names)) },
+      };
+    },
+  });
+}
+
+export function loadCorpOrdersAll(): Promise<CorpOrdersFeed> {
+  return readAllCorps<CorpOrdersFeed>({
+    capability: 'canReadOrders',
+    what: 'market orders',
+    load: loadCorpOrders,
+    merge: (reads) => {
+      const { rows, corporationOf } = mergeCorpRows(
+        rowsOf(reads, (read) => read.orders),
+        (order) => String(order.order_id)
+      );
+      return {
+        corporationOf,
+        body: {
+          orders: rows,
+          typeNames: mergeLookups(reads.map((read) => read.typeNames)),
+          stationNames: mergeLookups(reads.map((read) => read.stationNames)),
+          stationPrices: mergeLookups(reads.map((read) => read.stationPrices)),
+          issuerNames: mergeLookups(reads.map((read) => read.issuerNames)),
+        },
+      };
+    },
+  });
 }

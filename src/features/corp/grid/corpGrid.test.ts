@@ -128,7 +128,17 @@ describe('the Corp Board board', () => {
     expect(asked).toEqual([['canReadStructures']]);
     // Not yet known: the header scope is read, so one corporation never fans out.
     expect(corpWidgetBoard(ALL).allScopeOffered('structures')).toBe(false);
-    expect(corpWidgetBoard(ALL).opensOnAll).toEqual(new Set(['corpDeadlines', 'structures']));
+    expect(corpWidgetBoard(ALL).opensOnAll).toEqual(
+      new Set([
+        'corpDeadlines',
+        'structures',
+        'corpCustomsOffices',
+        'corpStarbases',
+        'corpSovereignty',
+        'corpContracts',
+        'corpOrders',
+      ])
+    );
   });
 
   it('resets to the full default', () => {

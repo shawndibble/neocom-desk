@@ -43,6 +43,12 @@ export interface CorpFeedBase {
   /** The oldest read behind the feed; null when none was made. */
   fetchedAt: Date | null;
   fromCache: boolean;
+  /** Read across several corporations (All scope): each one's ticker and name. */
+  corporations?: ReadonlyMap<number, CorpLabel>;
+  /** Read across several corporations: each row's corporation, by the widget's row key. */
+  corporationOf?: ReadonlyMap<string, number>;
+  /** Read across several corporations, and one of them failed: the rest draws, flagged. */
+  partlyFailed?: boolean;
 }
 
 /** One master-wallet journal line, reduced to what the money builders read. */
@@ -325,4 +331,32 @@ export async function loadCorpRoleAuditFeed(characterId: number): Promise<CorpRo
 export async function loadCorpSovereigntyFeed(characterId: number): Promise<CorpSovereigntyFeed> {
   const { loadCorpSovereignty } = await import('./corpFeedLoaders');
   return loadCorpSovereignty(characterId);
+}
+
+// --- Every corporation the pilot's Characters can read (All scope) ------------------
+// The same shapes, merged (`corporations`, `corporationOf` and `partlyFailed` set).
+
+export async function loadCorpCustomsAllFeed(): Promise<CorpCustomsFeed> {
+  const { loadCorpCustomsAll } = await import('./corpFeedLoaders');
+  return loadCorpCustomsAll();
+}
+
+export async function loadCorpStarbasesAllFeed(): Promise<CorpStarbasesFeed> {
+  const { loadCorpStarbasesAll } = await import('./corpFeedLoaders');
+  return loadCorpStarbasesAll();
+}
+
+export async function loadCorpSovereigntyAllFeed(): Promise<CorpSovereigntyFeed> {
+  const { loadCorpSovereigntyAll } = await import('./corpFeedLoaders');
+  return loadCorpSovereigntyAll();
+}
+
+export async function loadCorpContractsAllFeed(): Promise<CorpContractsFeed> {
+  const { loadCorpContractsAll } = await import('./corpFeedLoaders');
+  return loadCorpContractsAll();
+}
+
+export async function loadCorpOrdersAllFeed(): Promise<CorpOrdersFeed> {
+  const { loadCorpOrdersAll } = await import('./corpFeedLoaders');
+  return loadCorpOrdersAll();
 }

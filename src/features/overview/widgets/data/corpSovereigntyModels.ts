@@ -27,7 +27,15 @@ import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { formatNumber } from '@/lib/numberLocale';
 import { CORP_CACHE_WINDOW_MS } from '../../data/corpCards';
 import type { BoardDeadline } from '../nextDeadline';
-import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from './builderKit';
+import {
+  acrossCorporations,
+  blank,
+  corpUnreadable,
+  count,
+  statusOf,
+  UNKNOWN,
+  type Builder,
+} from './builderKit';
 import { hbarsFromRows } from './chartBuilders';
 import type { CorpSovereigntyFeed, CorpSovereigntyRow } from './corpFeeds';
 import type { ChartModel } from '../charts/types';
@@ -153,8 +161,8 @@ function reagentLine(
     .join(', ');
 }
 
-export const corpSovereignty: Builder = (feeds, { t, now }) => {
-  const feed = feeds.corpSovereignty;
+export const corpSovereignty: Builder = (feeds, { t, now, scopeAll }) => {
+  const feed = scopeAll ? feeds.corpSovereigntyAll : feeds.corpSovereignty;
   const data = feed?.data ?? null;
   if (!data) return blank(null, statusOf(feed));
   if (!data.readable) return corpUnreadable(null, feed, data.needsReauth, t);
@@ -270,39 +278,43 @@ export const corpSovereignty: Builder = (feeds, { t, now }) => {
     });
   }
 
-  return {
-    ...blank(null, statusOf(feed, { isEmpty: skyhooks.length === 0 })),
-    fetchedAt: data.fetchedAt,
-    fromCache: data.fromCache,
-    number: {
-      value: count(headline.count),
-      unit: t(`${W}.unit`, { count: headline.count }),
-      secondary,
-      tone: worstSeverity(skyhooks.map((row) => tone(row, now))),
-    },
-    rows: skyhooks.map((row) => ({
-      key: row.key,
-      title: nameOf(data, row),
-      value: windowText(row),
-      tone: tone(row, now),
-    })),
-    table: {
-      columns: [
-        { key: 'skyhook', label: t(`${W}.col.skyhook`), priority: 0, nameFloor: true },
-        { key: 'window', label: t(`${W}.col.window`), align: 'end', priority: 2 },
-        { key: 'unsecured', label: t(`${W}.col.unsecured`), align: 'end', priority: 1 },
-      ],
-      rows: skyhooks.map((row): TableRowModel => ({
+  return acrossCorporations(
+    {
+      ...blank(null, statusOf(feed, { isEmpty: skyhooks.length === 0 })),
+      fetchedAt: data.fetchedAt,
+      fromCache: data.fromCache,
+      number: {
+        value: count(headline.count),
+        unit: t(`${W}.unit`, { count: headline.count }),
+        secondary,
+        tone: worstSeverity(skyhooks.map((row) => tone(row, now))),
+      },
+      rows: skyhooks.map((row) => ({
         key: row.key,
-        cells: [nameOf(data, row), windowText(row), riskCell(row)],
+        title: nameOf(data, row),
+        value: windowText(row),
         tone: tone(row, now),
-        detail: detailOf(row),
       })),
+      table: {
+        columns: [
+          { key: 'skyhook', label: t(`${W}.col.skyhook`), priority: 0, nameFloor: true },
+          { key: 'window', label: t(`${W}.col.window`), align: 'end', priority: 2 },
+          { key: 'unsecured', label: t(`${W}.col.unsecured`), align: 'end', priority: 1 },
+        ],
+        rows: skyhooks.map((row): TableRowModel => ({
+          key: row.key,
+          cells: [nameOf(data, row), windowText(row), riskCell(row)],
+          tone: tone(row, now),
+          detail: detailOf(row),
+        })),
+      },
+      chart: raidChart(t, data, skyhooks, now, windowText),
+      deadlines,
+      summary: t(`${W}.summary`, { count: headline.count, total: skyhooks.length }),
     },
-    chart: raidChart(t, data, skyhooks, now, windowText),
-    deadlines,
-    summary: t(`${W}.summary`, { count: headline.count, total: skyhooks.length }),
-  };
+    data,
+    t
+  );
 };
 
 /** Theft windows that open or are open in the next 48 hours; undefined with none. */

@@ -19,6 +19,8 @@ import type {
   NumberModel,
 } from './types';
 import type { Translate } from '@/lib/translate';
+import { corpCell } from './cellKit';
+import type { CorpFeedBase } from './corpFeeds';
 
 /** The Stock page, where the market-stock rows and their per-market summary lead. */
 export const STOCK_PATH = '/market/stock';
@@ -153,4 +155,63 @@ export interface KindDef {
 export function detailToneOf(severity: DeadlineSeverity): DetailTone {
   if (severity === 'critical') return 'danger';
   return severity === 'warning' || severity === 'watch' ? 'warning' : 'neutral';
+}
+
+/**
+ * A corp widget read across several corporations (All scope), so each row names its own: a
+ * Corporation column after the first (the ticker, its full name in the tooltip and first in
+ * the row's detail), and each list row's detail ending with the ticker. When one
+ * corporation's read failed, the rest still draws and the widget is flagged. A read of one
+ * corporation is returned unchanged.
+ */
+export function acrossCorporations(view: KindView, data: CorpFeedBase, t: Translate): KindView {
+  const flagged = data.partlyFailed ? { ...view, status: { ...view.status, error: true } } : view;
+  const labels = data.corporations;
+  const corporationOf = data.corporationOf;
+  if (!labels || labels.size < 2 || !corporationOf) return flagged;
+  const corpOf = (key: string) => {
+    const id = corporationOf.get(key);
+    return id === undefined ? undefined : labels.get(id);
+  };
+  const label = t('overview.board.corporation');
+  const { table } = flagged;
+  return {
+    ...flagged,
+    rows: flagged.rows.map((row) => {
+      const corp = corpOf(row.key);
+      if (!corp) return row;
+      return { ...row, detail: row.detail ? `${row.detail} · ${corp.ticker}` : corp.ticker };
+    }),
+    ...(table && {
+      table: {
+        ...table,
+        columns: [
+          ...table.columns.slice(0, 1),
+          { key: 'corp', label, priority: 4, sortable: table.columns[0]?.sortable },
+          ...table.columns.slice(1),
+        ],
+        rows: table.rows.map((row) => {
+          const corp = corpOf(row.key);
+          return {
+            ...row,
+            cells: [
+              ...row.cells.slice(0, 1),
+              corp ? corpCell(corp) : UNKNOWN,
+              ...row.cells.slice(1),
+            ],
+            ...(row.sort && {
+              sort: [...row.sort.slice(0, 1), corp?.ticker, ...row.sort.slice(1)],
+            }),
+            ...(row.detail &&
+              corp && {
+                detail: {
+                  ...row.detail,
+                  facts: [{ label, value: corp.name }, ...row.detail.facts],
+                },
+              }),
+          };
+        }),
+      },
+    }),
+  };
 }

@@ -9,15 +9,22 @@
 import { openOrderProblemCounts, notCheckedCount } from '@/features/market/openOrdersModel';
 import { corpOrderRows } from '@/features/market/corpOpenOrders';
 import { formatIskCompact } from '@/lib/isk';
-import { blank, corpUnreadable, count, statusOf, type Builder } from './builderKit';
+import {
+  acrossCorporations,
+  blank,
+  corpUnreadable,
+  count,
+  statusOf,
+  type Builder,
+} from './builderKit';
 import { ordersListed, ordersTable } from './ordersModels';
 
 const C = 'overview.widgets.corpOrders';
 /** The Market orders page's Corp view. */
 const TO = '/market/orders?scope=corp';
 
-export const corpOrders: Builder = (feeds, { t, now }) => {
-  const feed = feeds.corpOrders;
+export const corpOrders: Builder = (feeds, { t, now, scopeAll }) => {
+  const feed = scopeAll ? feeds.corpOrdersAll : feeds.corpOrders;
   const data = feed?.data ?? null;
   if (!data) return blank(TO, statusOf(feed));
   if (!data.readable) return corpUnreadable(TO, feed, data.needsReauth, t);
@@ -33,25 +40,31 @@ export const corpOrders: Builder = (feeds, { t, now }) => {
   );
   for (const [id, name] of issuedBy) if (name === '') issuedBy.delete(id);
 
-  return {
-    ...blank(TO, statusOf(feed, { isEmpty: rows.length === 0 })),
-    fetchedAt: data.fetchedAt,
-    fromCache: data.fromCache,
-    number: {
-      value: count(rows.length),
-      unit: t(`${C}.unit`, { count: rows.length }),
-      secondary:
-        escrow > 0
-          ? { text: t(`${C}.escrow`, { isk: formatIskCompact(escrow) }) }
-          : listed > 0
-            ? { text: t(`${C}.listed`, { isk: formatIskCompact(listed) }) }
+  return acrossCorporations(
+    {
+      ...blank(TO, statusOf(feed, { isEmpty: rows.length === 0 })),
+      fetchedAt: data.fetchedAt,
+      fromCache: data.fromCache,
+      number: {
+        value: count(rows.length),
+        unit: t(`${C}.unit`, { count: rows.length }),
+        secondary:
+          escrow > 0
+            ? { text: t(`${C}.escrow`, { isk: formatIskCompact(escrow) }) }
+            : listed > 0
+              ? { text: t(`${C}.listed`, { isk: formatIskCompact(listed) }) }
+              : undefined,
+        notes:
+          unchecked > 0
+            ? [t('overview.widgets.orders.notChecked', { count: unchecked })]
             : undefined,
-      notes:
-        unchecked > 0 ? [t('overview.widgets.orders.notChecked', { count: unchecked })] : undefined,
-      tone: undercut > 0 ? 'warning' : 'clear',
+        tone: undercut > 0 ? 'warning' : 'clear',
+      },
+      rows: [],
+      table: ordersTable(t, rows, now, null, issuedBy, TO),
+      summary: t(`${C}.summary`, { count: rows.length, undercut }),
     },
-    rows: [],
-    table: ordersTable(t, rows, now, null, issuedBy, TO),
-    summary: t(`${C}.summary`, { count: rows.length, undercut }),
-  };
+    data,
+    t
+  );
 };

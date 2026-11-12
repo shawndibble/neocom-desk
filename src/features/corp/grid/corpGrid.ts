@@ -66,12 +66,20 @@ export function corpDefaultLayout(makeId: MakeId = seqId('c')): OverviewLayout {
 
 const CORP_KINDS = boardKinds('corp');
 
-/** Kinds a widget added to the Corp Board opens on All, as the default layout's do. */
-const CORP_OPENS_ON_ALL: ReadonlySet<string> = new Set(
-  CORP_DEFAULT_SEEDS.flatMap((seed) =>
+/**
+ * Kinds a widget added to the Corp Board opens on All: the default layout's, and the Gallery
+ * kinds that read every corporation (#6101).
+ */
+const CORP_OPENS_ON_ALL: ReadonlySet<string> = new Set([
+  ...CORP_DEFAULT_SEEDS.flatMap((seed) =>
     typeof seed !== 'string' && seed.scope === 'all' ? [seed.kind] : []
-  )
-);
+  ),
+  'corpCustomsOffices',
+  'corpStarbases',
+  'corpSovereignty',
+  'corpContracts',
+  'corpOrders',
+]);
 
 /**
  * `corporationsReading` says how many corporations the pilot's Characters can read for any

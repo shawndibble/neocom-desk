@@ -358,6 +358,12 @@ export interface FeedMap {
   corpSovereignty: CorpSovereigntyFeed;
   corpContracts: CorpContractsFeed;
   corpOrders: CorpOrdersFeed;
+  /** The five above across every corporation the pilot's Characters can read (All scope). */
+  corpCustomsAll: CorpCustomsFeed;
+  corpStarbasesAll: CorpStarbasesFeed;
+  corpSovereigntyAll: CorpSovereigntyFeed;
+  corpContractsAll: CorpContractsFeed;
+  corpOrdersAll: CorpOrdersFeed;
   corpKills: CorpKillsFeed;
   corpSrp: CorpSrpFeed;
 }

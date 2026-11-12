@@ -5066,6 +5066,7 @@
       "structuresFine_one": "{{count}} structure, nothing due",
       "structuresFine_other": "{{count}} structures, nothing due",
       "corpUnreadable": "Your corp roles don't cover this.",
+      "corporation": "Corporation",
       "reinforced": "Timers",
       "structureDry": "Out of fuel",
       "structureOffline": "Offline",
