@@ -151,7 +151,13 @@ export function ExtractionsTab() {
       />
       <Panel title={t('corpTaxBook.moons.tabs.extractions')} padded={false}>
         {listed.length === 0 ? (
-          <EmptyState title={t('corpTaxBook.moons.extractionsNoneShown')} />
+          <EmptyState
+            title={t(
+              rows.length === 0
+                ? 'corpTaxBook.moons.extractionsNone'
+                : 'corpTaxBook.moons.extractionsNoneShown'
+            )}
+          />
         ) : (
           <div className="overflow-x-auto">
             <DataTable

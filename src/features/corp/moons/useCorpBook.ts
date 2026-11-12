@@ -64,7 +64,7 @@ import {
   type BookPart,
   type BookPartSet,
 } from '../taxBook/bookParts';
-import { moonOwnersNeedRows, ownRefineriesFromStored } from '@/engine/corpTaxBook/moonOwners';
+import { moonOwnersNeedRows } from '@/engine/corpTaxBook/moonOwners';
 import { forgetObservedCopy } from '../taxBook/observedStore';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 import { isRefineryPlaceholder, refineryPlaceholder, refineryUnreadable } from './moonsFormat';
@@ -548,7 +548,7 @@ export function useCorpBook(
 
 /**
  * Whether the Moon owners tab, read without ledger rows, must read them after all: a moon owner
- * its summary cannot stand in for, or a shell fact only the rows can tell (#5717).
+ * its summary cannot stand in for (#5717).
  */
 export function needsRowsFallback(
   wanted: BookPartSet,
@@ -559,17 +559,14 @@ export function needsRowsFallback(
   if (wanted.has('observed') || !wanted.has('owners') || corporationId === null) return false;
   if (!data.parts?.has('core') || !data.parts.has('owners')) return false;
   const feeders = data.feeders ?? [];
-  return (
-    ownRefineriesFromStored(data.state.extractions.length, feeders.length) === undefined ||
-    moonOwnersNeedRows({
-      now,
-      graceHours: data.settings.graceHours,
-      bookCorporationId: corporationId,
-      rates: data.settings.rates,
-      feeders,
-      ...(data.feederSummaries ? { summaries: data.feederSummaries } : {}),
-    })
-  );
+  return moonOwnersNeedRows({
+    now,
+    graceHours: data.settings.graceHours,
+    bookCorporationId: corporationId,
+    rates: data.settings.rates,
+    feeders,
+    ...(data.feederSummaries ? { summaries: data.feederSummaries } : {}),
+  });
 }
 
 /** The unit prices every loaded row and Extraction needs, as the view's two lookups. */

@@ -52,7 +52,7 @@ describe('ExtractionTimeline', () => {
     expect(within(label).getByText('Ready').className).not.toContain('truncate');
   });
 
-  it('hides Expired by default and shows it when its state is in the set', () => {
+  it('shows Expired by default and hides it when its state is off', () => {
     const expired = {
       ...row('x', 9),
       state: 'expired' as const,
@@ -63,13 +63,13 @@ describe('ExtractionTimeline', () => {
         <ExtractionTimeline rows={[row('a', 1), expired]} states={DEFAULT_STATES} />
       </MemoryRouter>
     );
-    expect(screen.queryByText('Refinery 9')).not.toBeInTheDocument();
+    expect(screen.getByText('Refinery 9')).toBeInTheDocument();
     rerender(
       <MemoryRouter>
-        <ExtractionTimeline rows={[row('a', 1), expired]} states={new Set(['ready', 'expired'])} />
+        <ExtractionTimeline rows={[row('a', 1), expired]} states={new Set(['ready'])} />
       </MemoryRouter>
     );
-    expect(screen.getByText('Refinery 9')).toBeInTheDocument();
+    expect(screen.queryByText('Refinery 9')).not.toBeInTheDocument();
   });
 
   it('says when the states shown hide every chunk', () => {
@@ -105,10 +105,7 @@ describe('ExtractionStateFilter', () => {
     );
     const chips = screen.getAllByRole('button').map((b) => b.textContent);
     expect(chips).toEqual(['Fractured0', 'Ready2', 'Extracting0', 'Expired1']);
-    expect(screen.getByRole('button', { name: /Expired/ })).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    );
+    expect(screen.getByRole('button', { name: /Expired/ })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('offers Cancelled only when the book has one', () => {

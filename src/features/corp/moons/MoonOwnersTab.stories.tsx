@@ -10,9 +10,9 @@ import { NAMES, NOW, ROWS, TOTALS } from './moonOwnerRowFixtures';
  * The page the Moon owners tab sits on: header with Invite a moon owner, the tab bar
  * and the table with its chips. Composed from the same parts as the route.
  */
-function MoonsPage({ showExtractions }: { showExtractions: boolean }) {
+function MoonsPage() {
   const { t } = useTranslation();
-  const tabs = tabBarTabs(MOONS_TABS).filter((x) => showExtractions || x.id !== 'extractions');
+  const tabs = tabBarTabs(MOONS_TABS);
   return (
     <div className="mx-auto max-w-page space-y-4">
       <PageHeader
@@ -44,14 +44,10 @@ const meta = {
   title: 'corp/MoonOwnersTab',
   component: MoonsPage,
   parameters: { layout: 'padded' },
-  args: { showExtractions: true },
 } satisfies Meta<typeof MoonsPage>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary An accounting corporation that also owns moons: four tabs. */
+/** @summary An accounting corporation that also reads moon owners: all five tabs. */
 export const Default: Story = {};
-
-/** @summary An accounting corporation with no moons of its own: no Extractions tab. */
-export const NoMoons: Story = { args: { showExtractions: false } };
