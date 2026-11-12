@@ -82,8 +82,8 @@ describe('the required scope set', () => {
     expect(new Set(scopes).size).toBe(scopes.length);
     // Not one per capability: a capability may need more than one scope, and a
     // scope may serve more than one capability (corpScopes.ts). SRP's two and
-    // Vetting's two are role checks on the roles scope, which adds none.
-    expect(scopes.length).toBeGreaterThanOrEqual(CORP_CAPABILITIES.length - 4);
+    // Vetting's two and the Tax Book's one are role checks on the roles scope, which adds none.
+    expect(scopes.length).toBeGreaterThanOrEqual(CORP_CAPABILITIES.length - 5);
   });
 });
 
@@ -104,7 +104,11 @@ describe('missingCorpScopes', () => {
       missingForRoles(corpCapabilities(['Junior_Accountant']), [
         'esi-wallet.read_corporation_wallets.v1',
       ])
-    ).toEqual(['esi-corporations.read_divisions.v1']);
+    ).toEqual([
+      'esi-corporations.read_divisions.v1',
+      // The Tax Book officer gate (#6116) is a roles check, additive: named, never blocking.
+      'esi-characters.read_corporation_roles.v1',
+    ]);
   });
 
   it('reports nothing once every needed scope is granted', () => {

@@ -63,7 +63,12 @@ import {
 import { loadCorpLabels } from '@/features/corp/corpTicker';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { loadMoonChunksBoardData, loadStructuresBoardData } from '../../data/corpBoard';
+import {
+  startFeederChunks,
+  type FeederChunks,
+  loadMoonChunksBoardData,
+  loadStructuresBoardData,
+} from '../../data/corpBoard';
 import { fetchCorporationStatsRead } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
 import type {
@@ -620,6 +625,17 @@ const DEADLINE_READS: readonly {
   { source: 'sovereignty', capability: 'canReadSkyhooks', load: loadCorpSovereignty },
 ];
 
+/** A corporation's Due soon slice before any read lands. */
+const emptySlice = (corporationId: number): CorpDeadlinesSlice => ({
+  corporationId,
+  structures: null,
+  moonChunks: null,
+  jobs: null,
+  starbases: null,
+  sovereignty: null,
+  failed: false,
+});
+
 /**
  * Every corporation's Due soon sources, each read through a Character whose roles and grant
  * cover that source there (`corpReadersFor`), so no read is made that can only 403. A read
@@ -637,20 +653,14 @@ export async function loadCorpDeadlinesAll(
     ({ source }) => only === undefined || only.includes(source)
   ).flatMap(({ source, capability, load }) =>
     [...corpReadersFor(accounts, capability, preferred)].map(([corporationId, characterId]) => {
-      if (!slices.has(corporationId)) {
-        slices.set(corporationId, {
-          corporationId,
-          structures: null,
-          moonChunks: null,
-          jobs: null,
-          starbases: null,
-          sovereignty: null,
-          failed: false,
-        });
-      }
+      if (!slices.has(corporationId)) slices.set(corporationId, emptySlice(corporationId));
       return { slice: slices.get(corporationId)!, source, load, characterId };
     })
   );
+  const feederChunks =
+    only === undefined || only.includes('moonChunks')
+      ? startFeederChunks(accounts, preferred)
+      : Promise.resolve<FeederChunks>(() => new Map());
   let failures = 0;
   await mapWithConcurrencyLimit(tasks, ESI_FANOUT_CONCURRENCY, async (task) => {
     try {
@@ -663,7 +673,23 @@ export async function loadCorpDeadlinesAll(
       failures += 1;
     }
   });
-  if (tasks.length > 0 && failures === tasks.length) throw new CorpReadFailed('deadlines');
+  // Feeder pops from the Corp Tax Books these Characters view (#6116), for every corporation
+  // no Character read from ESI. Started beside the ESI reads.
+  let fromBooks = 0;
+  const feeders = await feederChunks;
+  const esi = new Set(
+    [...slices.values()]
+      .filter((slice) => slice.moonChunks?.chunks != null)
+      .map((slice) => slice.corporationId)
+  );
+  for (const [corporationId, moonChunks] of feeders(esi)) {
+    const slice = slices.get(corporationId) ?? emptySlice(corporationId);
+    slices.set(corporationId, { ...slice, moonChunks });
+    fromBooks += 1;
+  }
+  if (tasks.length > 0 && failures === tasks.length && fromBooks === 0) {
+    throw new CorpReadFailed('deadlines');
+  }
   const corporations = [...slices.values()];
   return {
     corporations,

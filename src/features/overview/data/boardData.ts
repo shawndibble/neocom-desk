@@ -586,11 +586,14 @@ export interface MoonChunksBoardData {
   needsReauth: boolean;
   fetchedAt: Date | null;
   loadedAt: number;
+  /** Read from a Corp Tax Book (a moon owner's pops, #6116), not from ESI. */
+  fromBook?: true;
 }
 
+/** One Character's moon drills, with its Corp Tax Book's moon owners' pops (#6116). */
 export async function loadMoonChunksBoard(characterId: number): Promise<MoonChunksBoardData> {
-  const { loadMoonChunksBoardData } = await import('./corpBoard');
-  return loadMoonChunksBoardData(characterId);
+  const { loadMoonChunksWithBook } = await import('./corpBoard');
+  return loadMoonChunksWithBook(characterId);
 }
 
 /** Every readable corporation's moon drills, merged: a widget scoped to All characters reads this. */

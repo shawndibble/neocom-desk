@@ -134,6 +134,11 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
   canVet: ['esi-characters.read_corporation_roles.v1'],
   /** Vetting settings, Director alone. Additive (below), like `canVet`. */
   canConfigureVetting: ['esi-characters.read_corporation_roles.v1'],
+  /**
+   * Corp Tax Book officer gate (#6116). Not an ESI read; the book's rules re-check live.
+   * Additive (below): the roles scope is already in the corp group.
+   */
+  canViewTaxBook: ['esi-characters.read_corporation_roles.v1'],
 };
 
 /**
@@ -165,6 +170,7 @@ const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set([
   'canConfigureSrp',
   'canVet',
   'canConfigureVetting',
+  'canViewTaxBook',
 ]);
 
 /**

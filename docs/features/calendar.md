@@ -77,6 +77,8 @@ Fourteen kinds, sorted by deadline then kind rank then id (`buildCharacterBoard`
 
 Overdue rows show a kind-specific past label ("overdue" / "Started" / "ready to deliver") instead of a countdown. Countdown reads "due in <duration>".
 
+**Feeder chunks from a Corp Tax Book (#6116).** A Character whose roles open its corporation's Corp Tax Book (Director, Accountant, Junior Accountant: the Moons page's rule, the `canViewTaxBook` corp capability, which also opens the Moon extractions widget and Due soon to them) also gets the live chunks of that book's moon owners (Feeders). They are read from the book's Overview read model (`readFeederChunkParts`, falling back to live `extractions` when the read model is not built), not from ESI, and each sits under its moon owner's corporation. A corporation some Character reads from ESI keeps its ESI rows and the book's copy is dropped, so no pop shows twice. Cancelled and decayed chunks are left out, and refineries are named by the book's officer label, then the structure name the grant read, then `Moon <id>`. The Data Age is the book's last read of that moon owner. The book read starts beside the ESI reads and is capped at 15 s. A read or refusal is reused for 5 minutes and "no book" for an hour, and a book that fails adds nothing. The same rows reach Due soon and the Moon extractions widget (one Character and All characters), where a moon owner's row reads `Refinery [TICKER]`.
+
 ## Calendar Map and Day Ticker
 
 - Each day cell is a button (`aria-pressed`, label like "<date> - N due: <kinds>" or "nothing due"); shows day number, count, and a dot per kind present. Today ring, selected tint, out-of-month tint, hatched past days with no load.
