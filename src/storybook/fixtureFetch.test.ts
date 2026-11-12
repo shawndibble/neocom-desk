@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { installFixtureFetch, unexpectedRequests } from './fixtureFetch';
+import { SAMPLE_CHARACTERS } from './sampleData';
 
 let uninstall: (() => void) | undefined;
 afterEach(() => {
@@ -60,5 +61,32 @@ describe('installFixtureFetch', () => {
     expect(await response.json()).toBe('b');
     second();
     expect(globalThis.fetch).toBe(before);
+  });
+
+  it("answers a sample Character's public sheet whatever table is installed (#6114)", async () => {
+    uninstall = installFixtureFetch([]);
+    const pilot = SAMPLE_CHARACTERS[1]!;
+    const response = await fetch(`https://esi.evetech.net/characters/${pilot.characterId}`);
+    expect(await response.json()).toMatchObject({
+      name: pilot.name,
+      corporation_id: pilot.corporationId,
+    });
+    expect(unexpectedRequests()).toEqual([]);
+  });
+
+  it("lets a story's own fixture answer a sample sheet first", async () => {
+    const pilot = SAMPLE_CHARACTERS[0]!;
+    uninstall = installFixtureFetch([
+      { path: /^\/characters\/\d+$/, respond: () => ({ body: { name: 'Story pilot' } }) },
+    ]);
+    const response = await fetch(`https://esi.evetech.net/characters/${pilot.characterId}`);
+    expect(await response.json()).toEqual({ name: 'Story pilot' });
+  });
+
+  it("still records any other Character's sheet", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    uninstall = installFixtureFetch([]);
+    await expect(fetch('https://esi.evetech.net/characters/1')).rejects.toThrow();
+    expect(unexpectedRequests()).toEqual(['GET https://esi.evetech.net/characters/1']);
   });
 });
