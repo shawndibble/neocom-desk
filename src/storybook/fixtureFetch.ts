@@ -8,7 +8,12 @@
  *
  * Same-origin requests (the SDE bake, fonts) pass through to the real fetch.
  */
-import { SAMPLE_CHARACTERS, sampleCharacterPublicInfo } from './sampleData';
+import {
+  SAMPLE_CHARACTERS,
+  SAMPLE_STATION_ID,
+  SAMPLE_SYSTEM_ID,
+  sampleCharacterPublicInfo,
+} from './sampleData';
 
 export interface FixtureRequest {
   method: string;
@@ -42,14 +47,27 @@ export function unexpectedRequests(): readonly string[] {
  * unexpected (#6114), so the router answers these itself, after every installed
  * table so a story's own fixture still wins. Any other Character's sheet is still
  * recorded.
+ *
+ * A page's load also outlives its story: one story's `/location` or `/skillqueue`
+ * read can land after the next story installed a table without it (#6126:
+ * the Requests stories' location read under the next Communities story, the
+ * Hauling skill queue under Market Stock). Those two get the same fallback: docked
+ * at the sample station, nothing training.
  */
-const SAMPLE_SHEETS: readonly FixtureRoute[] = [
+const SAMPLE_IDS = SAMPLE_CHARACTERS.map((c) => c.characterId).join('|');
+const sampleRead = (tail: string) => new RegExp(`^/characters/(${SAMPLE_IDS})${tail}$`);
+const SAMPLE_CHARACTER_READS: readonly FixtureRoute[] = [
   {
-    path: new RegExp(`^/characters/(${SAMPLE_CHARACTERS.map((c) => c.characterId).join('|')})$`),
+    path: sampleRead(''),
     respond: ({ url }) => ({
       body: sampleCharacterPublicInfo(Number(url.pathname.split('/').pop())),
     }),
   },
+  {
+    path: sampleRead('/location'),
+    respond: () => ({ body: { solar_system_id: SAMPLE_SYSTEM_ID, station_id: SAMPLE_STATION_ID } }),
+  },
+  { path: sampleRead('/skillqueue'), respond: () => ({ body: [] }) },
 ];
 
 function matches(route: FixtureRoute, method: string, path: string): boolean {
@@ -88,7 +106,7 @@ async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit): Promi
     return original!(input, init);
   }
   const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
-  const route = [...[...installed].flat(), ...SAMPLE_SHEETS].find((candidate) =>
+  const route = [...[...installed].flat(), ...SAMPLE_CHARACTER_READS].find((candidate) =>
     matches(candidate, method, url.pathname)
   );
   if (!route) {
