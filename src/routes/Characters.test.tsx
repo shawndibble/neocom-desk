@@ -41,6 +41,7 @@ import {
   DEFAULT_NOTIFICATION_PREFERENCES,
 } from '@/features/notifications/preferences';
 import { CORP_STANDING_SCOPES } from '@/features/corp/corpStanding';
+import { seedGrant } from '@/test/seed';
 import { Characters } from './Characters';
 
 vi.mock('@/app/loginFlow', () => ({
@@ -1841,22 +1842,8 @@ describe('Characters table view', () => {
     await db.tokens.clear();
     const now = Date.now();
     // Pilot One: a Director with the whole corp grant. Pilot Two: no roles scope.
-    await db.tokens.bulkPut([
-      {
-        characterId: 91,
-        accessToken: 'at',
-        refreshToken: 'rt',
-        expiresAt: now + 6e5,
-        scopes: [...CORP_STANDING_SCOPES],
-      },
-      {
-        characterId: 92,
-        accessToken: 'at',
-        refreshToken: 'rt',
-        expiresAt: now + 6e5,
-        scopes: [],
-      },
-    ]);
+    await seedGrant(91, CORP_STANDING_SCOPES, { expiresAt: now + 6e5 });
+    await seedGrant(92, [], { expiresAt: now + 6e5 });
     await writeCached(91, 'corpRoles', { roles: ['Director'] }, now);
     await db.settings.put({
       key: 'alertsGrants',
@@ -1889,23 +1876,24 @@ describe('Characters table view', () => {
       'href',
       '/settings/notifications'
     );
-    expect(within(pilotTwo).getByRole('button', { name: 'Not granted' })).toBeInTheDocument();
-    expect(
-      within(pilotTwo).getByRole('button', { name: 'Missing permissions' })
-    ).toBeInTheDocument();
+    expect(within(pilotTwo).getByText('Not granted')).toBeInTheDocument();
+    expect(within(pilotTwo).getByRole('link', { name: 'Missing access' })).toHaveAttribute(
+      'href',
+      '/settings/permissions?grant=corp'
+    );
     expect(
       within(pilotTwo).getByRole('link', { name: 'Needs re-authorizing' })
     ).toBeInTheDocument();
 
     const firstRowName = () =>
       within(screen.getByRole('table')).getAllByRole('row')[1]?.textContent ?? '';
-    for (const name of ['Corporation access', 'Alerts when closed']) {
+    for (const name of ['Corporation roles', 'Corporation access', 'Alerts when closed']) {
       const header = within(screen.getByRole('table')).getByRole('columnheader', { name });
       await user.click(within(header).getByRole('button'));
       await waitFor(() => expect(firstRowName()).toContain('Pilot Two'));
     }
 
-    await user.click(within(pilotTwo).getByRole('button', { name: 'Missing permissions' }));
+    await user.click(within(pilotTwo).getByRole('link', { name: 'Missing access' }));
     await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(92));
   });
 });

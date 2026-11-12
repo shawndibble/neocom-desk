@@ -87,7 +87,6 @@ import { returnPathAfterSwitch } from '@/features/character/characterSwitchRetur
 import { useCharacterCorpStanding } from '@/features/corp/useCharacterCorpStanding';
 import { useAlertsGrants } from '@/features/notifications/alertsGrant';
 import { isSyncConfigured } from '@/app/syncStatus';
-import { grantMissingPath } from '@/app/grantMissingPath';
 
 const NO_CHARACTER_IDS: readonly number[] = [];
 
@@ -265,8 +264,7 @@ export function Characters() {
     timeZone,
     groupsValue.groups,
     (id, groupId) => void handleMoveToGroup(id, groupId),
-    achievements,
-    (id) => void openCorpPermissions(id)
+    achievements
   );
 
   useCharactersHousekeeping({
@@ -293,11 +291,6 @@ export function Characters() {
     const from = (location.state as { from?: string } | null)?.from;
     const returnTo = returnPathAfterSwitch(from);
     if (returnTo !== null) navigate(returnTo);
-  }
-
-  async function openCorpPermissions(characterId: number) {
-    await setActiveCharacter(characterId);
-    navigate(grantMissingPath(['corp']));
   }
 
   function handleToggleColumn(id: CharacterColumnId) {

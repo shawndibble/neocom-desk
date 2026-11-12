@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { HintText } from '@/components/ui/HintText';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { SETTINGS_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import {
@@ -173,18 +174,13 @@ export function buildColumns(
   timeZone: 'UTC' | undefined,
   groups: readonly CharacterGroup[],
   onMoveToGroup: (characterId: number, groupId: string | null) => void,
-  achievements: AchievementLookup,
-  /** Makes the Character active, then opens Settings › Permissions at the Corporation Grant. */
-  onOpenCorpPermissions: (characterId: number) => void
+  achievements: AchievementLookup
 ): Record<CharacterColumnId, DataTableColumn<CharacterRow>> {
+  // The row's one corp action: switch to that Character, then its Corporation Permission.
   const corpPermissionsLink = (row: CharacterRow, label: string) => (
-    <button
-      type="button"
-      onClick={() => onOpenCorpPermissions(row.character.characterId)}
-      className={`${inlineLinkClassName} p-0 ${STAT_CHIP_TONE_TEXT_CLASS.warning}`}
-    >
+    <GrantMissingLink groups={['corp']} asCharacter={row.character.characterId}>
       {label}
-    </button>
+    </GrantMissingLink>
   );
   return {
     name: {
@@ -484,8 +480,9 @@ export function buildColumns(
       render: (row) => {
         const standing = row.corpStanding;
         if (!standing) return '—';
+        // Plain text: the access cell beside it carries the fix (DESIGN.md §6c Restraint).
         if (standing.kind === 'notGranted') {
-          return corpPermissionsLink(row, t('characters.corpRolesNotGranted'));
+          return <span className="text-text-dim">{t('characters.corpRolesNotGranted')}</span>;
         }
         return standing.kind === 'roles' ? rolesText(standing.roles) : '';
       },
@@ -520,18 +517,16 @@ export function buildColumns(
       header: t('characters.column.alertsWhenClosed'),
       sortFirst: 'asc',
       sortValue: (row) => alertsWhenClosedRank(row.alertsWhenClosed),
-      render: (row) => (
-        <Link
-          to={NOTIFICATION_SETTINGS_PATH}
-          className={
-            row.alertsWhenClosed === 'needs-reauth'
-              ? `${inlineLinkClassName} ${STAT_CHIP_TONE_TEXT_CLASS.warning}`
-              : inlineLinkClassName
-          }
-        >
-          {t(`settings.notifications.alertsWhenClosed.state.${row.alertsWhenClosed}`)}
-        </Link>
-      ),
+      render: (row) => {
+        const label = t(`settings.notifications.alertsWhenClosed.state.${row.alertsWhenClosed}`);
+        // Only a gap links: "On" needs nothing done (DESIGN.md §6c Restraint).
+        if (row.alertsWhenClosed === 'on') return label;
+        return (
+          <Link to={NOTIFICATION_SETTINGS_PATH} className={inlineLinkClassName}>
+            {label}
+          </Link>
+        );
+      },
     },
     starred: {
       id: 'starred',

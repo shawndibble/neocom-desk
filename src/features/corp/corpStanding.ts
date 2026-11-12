@@ -11,6 +11,7 @@ import type { AlertsRowState } from '@/features/notifications/alertsGrant';
 import { corpGrantCoverage, CORP_SCOPES_FOR_CAPABILITY } from './corpScopes';
 import { corpRoleLabel } from './roles';
 
+/** Read off the registry rather than hand-copied, like every other derived scope constant in this codebase. */
 export const CORP_ROLES_SCOPE: Scope = ESI_REGISTRY.getCharacterRoles.scope;
 
 /** Every scope the standing reads: the roles read plus each capability's scopes. */

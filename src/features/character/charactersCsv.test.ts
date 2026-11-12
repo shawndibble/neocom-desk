@@ -238,6 +238,12 @@ describe('charactersCsvColumns', () => {
       'characters.column.corpRoles': 'characters.corpRolesNotGranted',
       'characters.column.corpAccess': 'characters.corpAccessMissingUnknown',
     });
+    expect(
+      valuesOf(
+        row({ corpStanding: { kind: 'roles', roles: ['Factory_Manager'], missingScopes: 1 } }),
+        options
+      )
+    ).toMatchObject({ 'characters.column.corpAccess': 'characters.corpAccessMissing' });
     expect(valuesOf(row({ corpStanding: { kind: 'none' } }), options)).toMatchObject({
       'characters.column.corpRoles': undefined,
       'characters.column.corpAccess': undefined,

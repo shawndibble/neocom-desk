@@ -4983,8 +4983,8 @@
     },
     "corpRolesNotGranted": "Not granted",
     "corpAccessReady": "Ready",
-    "corpAccessMissing": "Missing permissions ({{count}})",
-    "corpAccessMissingUnknown": "Missing permissions",
+    "corpAccessMissing": "Missing access ({{count}})",
+    "corpAccessMissingUnknown": "Missing access",
     "jobSlotCategory": {
       "manufacturing": "Mfg",
       "science": "Sci",
