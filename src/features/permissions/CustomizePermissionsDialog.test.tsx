@@ -20,7 +20,10 @@ beforeEach(async () => {
   // The store is module-scoped and `hydrate()` is a no-op once `hydrated` is
   // true, so without this reset a later test would start from whatever an
   // earlier test last applied in memory rather than from the cleared table.
-  useCustomizePermissionsSelection.setState({ value: DEFAULT_ON_GROUPS, hydrated: false });
+  useCustomizePermissionsSelection.setState({
+    value: { groups: DEFAULT_ON_GROUPS },
+    hydrated: false,
+  });
 });
 
 describe('CustomizePermissionsDialog', () => {
@@ -33,11 +36,19 @@ describe('CustomizePermissionsDialog', () => {
     }
   });
 
-  it('starts every default-on Permission checked and the opt-in ones unchecked', async () => {
+  it('starts every read Permission checked, the six formerly opt-in ones included (#6102)', async () => {
     render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
     expect(await screen.findByRole('checkbox', { name: 'Wallet' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Corporation' })).not.toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Structure markets' })).not.toBeChecked();
+    for (const name of [
+      'Corporation',
+      'Structure markets',
+      'Jump fatigue',
+      'Corporation projects',
+      'Killmails',
+      'Mercenary dens',
+    ]) {
+      expect(screen.getByRole('checkbox', { name }), name).toBeChecked();
+    }
     expect(screen.getByText(`Optional · ${DEFAULT_ON_GROUPS.length} of 25`)).toBeInTheDocument();
   });
 
@@ -65,19 +76,32 @@ describe('CustomizePermissionsDialog', () => {
     expect(screen.getAllByText('Required')).toHaveLength(2);
   });
 
-  it('tags the six read opt-ins and the six Write to EVE Permissions as opt-in', async () => {
+  it('tags only the six Write to EVE Permissions as opt-in', async () => {
     render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
     await screen.findByRole('checkbox', { name: 'Wallet' });
-    expect(screen.getAllByText('Opt-in')).toHaveLength(12);
+    expect(screen.getAllByText('Opt-in')).toHaveLength(6);
   });
 
-  it('reads the Opt-in tag in an opt-in checkbox’s description', async () => {
+  it('reads the Opt-in tag in an opt-in checkbox’s description, and no read Permission has one', async () => {
     render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
     const corp = await screen.findByRole('checkbox', { name: 'Corporation' });
-    expect(corp).toHaveAccessibleDescription(/Opt-in/);
-    expect(screen.getByRole('checkbox', { name: 'Wallet' })).not.toHaveAccessibleDescription(
+    expect(corp).not.toHaveAccessibleDescription(/Opt-in/);
+    expect(screen.getByRole('checkbox', { name: 'Send mail' })).toHaveAccessibleDescription(
       /Opt-in/
     );
+  });
+
+  it('unticking a formerly opt-in Permission persists for the next open', async () => {
+    const user = userEvent.setup();
+    render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
+    const corp = await screen.findByRole('checkbox', { name: 'Corporation' });
+    await waitFor(() => expect(corp).toBeEnabled());
+    await user.click(corp);
+    await user.click(screen.getByRole('button', { name: /log in with selected permissions/i }));
+    await waitFor(() => expect(mockedLogin).toHaveBeenCalledTimes(1));
+
+    const stored = await db.settings.get(CUSTOMIZE_SELECTION_KEY);
+    expect((stored?.value as { groups: string[] }).groups).not.toContain('corp');
   });
 
   it('unchecking a Permission updates the count and the submitted request', async () => {
@@ -121,7 +145,7 @@ describe('CustomizePermissionsDialog', () => {
   });
 
   it('starts from a selection stored on a previous visit (AC: survives a reload)', async () => {
-    await db.settings.put({ key: CUSTOMIZE_SELECTION_KEY, value: ['mail'] });
+    await db.settings.put({ key: CUSTOMIZE_SELECTION_KEY, value: { groups: ['mail'] } });
 
     render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
 
@@ -135,6 +159,18 @@ describe('CustomizePermissionsDialog', () => {
     expect(screen.getByText('Optional · 1 of 25')).toBeInTheDocument();
   });
 
+  it('opens a choice stored before #6102 with the formerly opt-in Permissions ticked', async () => {
+    await db.settings.put({ key: CUSTOMIZE_SELECTION_KEY, value: ['mail'] });
+
+    render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
+
+    const wallet = await screen.findByRole('checkbox', { name: 'Wallet' });
+    await waitFor(() => expect(wallet).toBeEnabled());
+    expect(wallet).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Killmails' })).toBeChecked();
+    expect(screen.getByText('Optional · 7 of 25')).toBeInTheDocument();
+  });
+
   it('disables every Permission checkbox and Submit until hydration resolves, so a fast click can’t fork from the pre-hydration default', async () => {
     const realHydrate = useCustomizePermissionsSelection.getState().hydrate;
     // Stored selection is Mail only, but `hydrate` never resolves during the
@@ -142,7 +178,7 @@ describe('CustomizePermissionsDialog', () => {
     // purpose, to prove the UI stays locked rather than racing ahead on the
     // pre-hydration `DEFAULT_ON_GROUPS`.
     useCustomizePermissionsSelection.setState({
-      value: ['mail'],
+      value: { groups: ['mail'] },
       hydrated: false,
       hydrate: () => new Promise<void>(() => {}),
     });
@@ -183,6 +219,6 @@ describe('CustomizePermissionsDialog', () => {
     await waitFor(() => expect(mockedLogin).toHaveBeenCalledTimes(1));
 
     const stored = await db.settings.get(CUSTOMIZE_SELECTION_KEY);
-    expect(stored?.value).not.toContain('wallet');
+    expect((stored?.value as { groups: string[] }).groups).not.toContain('wallet');
   });
 });

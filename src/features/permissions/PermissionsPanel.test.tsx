@@ -13,6 +13,7 @@ import { ESI_REGISTRY, PERMISSIONS, SCOPE_GROUPS, WRITE_GROUPS } from '@/esi/reg
 import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import { loadCharacterRoles } from '@/features/corp/roles';
 import { AUTHORIZED_APPS_URL } from '@/lib/links';
+import { FORMERLY_OPT_IN_GROUPS } from './customizeSelection';
 import { PermissionsPanel } from './PermissionsPanel';
 
 vi.mock('@/features/corp/roles', async (importOriginal) => ({
@@ -28,6 +29,10 @@ const mockedGrant = vi.mocked(beginEveLogin);
 
 const CHARACTER_ID = 42;
 const ALL_CORP_SCOPES = [...scopesForGroup('corp')];
+/** What a Character signed in before #6102 holds: the Base Grant without the six formerly opt-in Permissions. */
+const PRE_6102_BASE = SCOPES.filter(
+  (scope) => !FORMERLY_OPT_IN_GROUPS.some((group) => scopesForGroup(group).includes(scope))
+);
 const ROLES_SCOPE = ESI_REGISTRY.getCharacterRoles.scope;
 
 function rolesResolvingTo(roles: readonly string[]): StatusResult<CharacterCorporationRoles> {
@@ -85,7 +90,7 @@ describe('PermissionsPanel — arriving from Grant missing Permissions', () => {
   });
 
   it('flashes nothing without the parameter, or for a Permission already granted', () => {
-    mockedGrantedScopes.mockReturnValue([...SCOPES]);
+    mockedGrantedScopes.mockReturnValue([...PRE_6102_BASE]);
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
     renderPanel('/settings/permissions?grant=wallet,nonsense');
     expect(document.querySelector('.grant-flash')).toBeNull();
@@ -101,7 +106,7 @@ describe('PermissionsPanel — every Permission', () => {
   });
 
   it('marks what the Base Grant holds as granted and the opt-ins as missing', () => {
-    mockedGrantedScopes.mockReturnValue([...SCOPES]);
+    mockedGrantedScopes.mockReturnValue([...PRE_6102_BASE]);
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
     renderPanel();
     expect(within(row('Wallet')).getByText('Granted')).toBeInTheDocument();
@@ -113,7 +118,7 @@ describe('PermissionsPanel — every Permission', () => {
   });
 
   it('lists Not granted rows before Granted ones, each half in catalogue order', () => {
-    mockedGrantedScopes.mockReturnValue([...SCOPES]);
+    mockedGrantedScopes.mockReturnValue([...PRE_6102_BASE]);
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
     renderPanel();
     // The Write to EVE section is its own list below the reads; ordering is per list.
@@ -145,7 +150,7 @@ describe('PermissionsPanel — every Permission', () => {
   });
 
   it('lists the six write features under a Write to EVE heading', () => {
-    mockedGrantedScopes.mockReturnValue([...SCOPES]);
+    mockedGrantedScopes.mockReturnValue([...PRE_6102_BASE]);
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
     renderPanel();
     expect(screen.getByRole('heading', { name: 'Write to EVE' })).toBeInTheDocument();
@@ -212,7 +217,7 @@ describe('PermissionsPanel — granting several at once', () => {
   beforeEach(() => mockedGrantedScopes.mockReturnValue([...CORE_GRANT]));
 
   it('offers a checkbox only on rows that are missing', () => {
-    mockedGrantedScopes.mockReturnValue([...SCOPES]);
+    mockedGrantedScopes.mockReturnValue([...PRE_6102_BASE]);
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
     renderPanel();
     expect(within(row('Wallet')).queryByRole('checkbox')).not.toBeInTheDocument();
@@ -315,7 +320,7 @@ describe('PermissionsPanel — the Corporation row', () => {
   });
 
   it('not-granted: offers Grant, since roles are unknowable until then', () => {
-    mockedGrantedScopes.mockReturnValue([...SCOPES]);
+    mockedGrantedScopes.mockReturnValue([...PRE_6102_BASE]);
     renderPanel();
     expect(within(row('Corporation')).getByText(/roles show once granted/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Grant Corporation' })).toBeInTheDocument();
@@ -354,7 +359,7 @@ describe('PermissionsPanel — an NPC corporation', () => {
       addedAt: 0,
       corporationId: 1000125,
     });
-    mockedGrantedScopes.mockReturnValue([...SCOPES]);
+    mockedGrantedScopes.mockReturnValue([...PRE_6102_BASE]);
     renderPanel();
     await waitFor(() =>
       expect(screen.getAllByRole('listitem')).toHaveLength(SCOPE_GROUPS.length - 2)

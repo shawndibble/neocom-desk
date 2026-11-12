@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SCOPE_GROUPS } from '@/esi/registry';
-import { SCOPES, scopesForGroup } from '@/esi/scopes';
+import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
+import { FORMERLY_OPT_IN_GROUPS } from './customizeSelection';
 import {
   COUNTED_PERMISSIONS,
   countGrantedPermissions,
@@ -45,8 +46,26 @@ describe('countGrantedPermissions', () => {
   });
 
   it('ignores Core Grant scopes, which belong to no Permission', () => {
+    expect(countGrantedPermissions([...CORE_GRANT]).granted).toBe(0);
+  });
+
+  it('counts the whole Base Grant complete', () => {
     const base = countGrantedPermissions([...SCOPES]);
-    expect(base.granted).toBeLessThan(base.total);
+    expect(base.granted).toBe(base.total);
+  });
+
+  /**
+   * #6102 made six read Permissions default-on without nagging the Characters
+   * signed in before it: the count is the same "n of N" it always was, never a
+   * new gap, because it counts Permissions held, not the default.
+   */
+  it('counts a pre-#6102 Base Grant exactly as before the default changed', () => {
+    const formerlyOptIn = new Set(FORMERLY_OPT_IN_GROUPS.flatMap((g) => [...scopesForGroup(g)]));
+    const legacy = SCOPES.filter((scope) => !formerlyOptIn.has(scope));
+    expect(countGrantedPermissions(legacy)).toEqual({
+      granted: COUNTED_PERMISSIONS.length - 5,
+      total: COUNTED_PERMISSIONS.length,
+    });
   });
 });
 

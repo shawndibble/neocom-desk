@@ -32,28 +32,23 @@ export type ScopeRequirement = EsiScopeName | PublicAccess;
 
 /**
  * Every named Scope Group (user-facing: **Permission**) a scope outside the
- * **Core Grant** can belong to. Thirteen are default-on — granted at sign-in
- * along with the Core Grant, together forming the **Base Grant** — and the rest
- * are opt-in: a Character is asked for them only when they ask for the
- * feature, never at sign-in with everyone else. Six of those are the **Write to
- * EVE** section (`mailSend`, `mailOrganize`, `calendarRespond`, `fittingsWrite`,
- * `autopilot`, `openWindow`, marked `section: 'write'`): one Permission per
- * write feature, asked for the first time a Character tries it. The other six
- * are `corp`, `structureMarkets`, `jumpFatigue`, `corpProjects`, `killmails`
- * and `mercenaryDens`.
+ * **Core Grant** can belong to. Every read Permission is default-on — granted
+ * at sign-in along with the Core Grant, together forming the **Base Grant** —
+ * and a player who wants less unticks it in Customize permissions. Only the
+ * six **Write to EVE** Permissions (`mailSend`, `mailOrganize`,
+ * `calendarRespond`, `fittingsWrite`, `autopilot`, `openWindow`, marked
+ * `section: 'write'`) are opt-in: one per write feature, asked for the first
+ * time a Character tries it.
  *
- * `corp` exists because the corp section needs ten scopes that ~95% of users
- * can never use — CCP role-gates the endpoints server-side, so a line member
- * granting them gains nothing but a longer consent screen (GLOSSARY.md round
- * 35). `structureMarkets` (issue #538) exists because most Characters never
- * list an order inside a player structure, so `esi-markets.structure_markets.v1`
- * would cost everyone a consent-screen line for a check almost nobody's
- * orders need. No settings surface requests that group yet — until one does,
- * it stays grantable in principle but ungranted in practice, which degrades
- * to the same "unavailable" row every ungranted Character already sees.
+ * `corp`, `structureMarkets`, `jumpFatigue`, `corpProjects`, `killmails` and
+ * `mercenaryDens` were opt-in until #6102: each cost a separate trip to EVE's
+ * login, and a player with many Characters on many accounts paid that trip
+ * over and over. Holding a scope never makes a call on its own — role and
+ * capability gates (`features/corp/corpScopes.ts`, `useCorpAccess`) still
+ * decide every corp read, so a line member's token never draws a 403.
  *
  * See `docs/context/decisions/20260924-143410-customize-permissions-at-sign-in-core-grant-plus.md`
- * for why the split lands exactly here.
+ * for the Core/Permission split, and the #6102 decision for the default.
  */
 export const SCOPE_GROUPS = [
   'wallet',
@@ -210,32 +205,32 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
   corp: {
     labelKey: 'permissions.corp.label',
     captionKey: 'permissions.corp.caption',
-    defaultOn: false,
+    defaultOn: true,
   },
   structureMarkets: {
     labelKey: 'permissions.structureMarkets.label',
     captionKey: 'permissions.structureMarkets.caption',
-    defaultOn: false,
+    defaultOn: true,
   },
   jumpFatigue: {
     labelKey: 'permissions.jumpFatigue.label',
     captionKey: 'permissions.jumpFatigue.caption',
-    defaultOn: false,
+    defaultOn: true,
   },
   corpProjects: {
     labelKey: 'permissions.corpProjects.label',
     captionKey: 'permissions.corpProjects.caption',
-    defaultOn: false,
+    defaultOn: true,
   },
   killmails: {
     labelKey: 'permissions.killmails.label',
     captionKey: 'permissions.killmails.caption',
-    defaultOn: false,
+    defaultOn: true,
   },
   mercenaryDens: {
     labelKey: 'permissions.mercenaryDens.label',
     captionKey: 'permissions.mercenaryDens.caption',
-    defaultOn: false,
+    defaultOn: true,
   },
 };
 
@@ -250,9 +245,9 @@ export interface EsiEndpointSpec {
    * structure lookup and search) — so leaving it off is the rare case,
    * reserved for those.
    *
-   * Every other endpoint declares one of the 25 `SCOPE_GROUPS`: the thirteen
-   * default-on ones together with the Core Grant make up the **Base Grant**
-   * (`SCOPES` in `scopes.ts`), and the other twelve stay opt-in.
+   * Every other endpoint declares one of the 25 `SCOPE_GROUPS`: the nineteen
+   * default-on (read) ones together with the Core Grant make up the **Base
+   * Grant** (`SCOPES` in `scopes.ts`), and the six Write to EVE ones stay opt-in.
    *
    * Declared per endpoint rather than per scope, which is why
    * `scopes.test.ts` asserts a scope repeated across endpoints always
@@ -485,9 +480,9 @@ export const ESI_REGISTRY = {
     scope: PUBLIC,
   },
   /**
-   * In the `corp` group, not the Base Grant: reading this needs its own scope
-   * regardless of the other nine, so a Character cannot know their corp role
-   * until they opt in. That costs the "you just made Director, grant now"
+   * In the `corp` group (default-on since #6102): reading this needs its own
+   * scope regardless of the others, so a Character who unticked Corporation in
+   * Customize, or signed in before #6102, cannot know their corp role. That costs the "you just made Director, grant now"
    * proactive nudge (`CorpGrantPrompt`) for anyone who never granted the group
    * before — `useCorpAccess` answers `not-granted` instead, and Settings'
    * Corporation Permission row is the only way in. A Character who already held this
@@ -520,9 +515,8 @@ export const ESI_REGISTRY = {
   },
   /**
    * Mercenary Dens (issue #4791). Character routes only: ESI has no corp den
-   * list and no role. Their own opt-in `mercenaryDens` Permission (issue #5153),
-   * not the default-on `planets` one: a niche feature should not cost everyone a
-   * consent-screen line.
+   * list and no role. Their own `mercenaryDens` Permission (issue #5153), not
+   * the `planets` one, so a player can untick it alone; default-on since #6102.
    */
   getCharacterMercenaryDens: {
     route: '/characters/{character_id}/structures/mercenary-dens',
@@ -659,8 +653,8 @@ export const ESI_REGISTRY = {
     scope: PUBLIC,
   },
   /**
-   * The SRP page's lost-ships list. Opt-in and a Permission of its own: only a
-   * pilot filing a claim by pick needs it, and pasting a link works without it
+   * The SRP page's lost-ships list. A Permission of its own (default-on since
+   * #6102): only a pilot filing a claim by pick needs it, and pasting a link works without it
    * (docs/context/decisions/20261023-125348-srp-pilots-file-officers-approve-corp-set-rules.md).
    */
   getCharacterKillmailsRecent: {
@@ -726,7 +720,7 @@ export const ESI_REGISTRY = {
     scope: PUBLIC,
   },
 
-  // Opt-in (issue #538): the region order book above never includes a player
+  // Its own Permission (issue #538; default-on since #6102): the region order book above never includes a player
   // structure's own orders, so this is the only way to check one. ACL-gated
   // per structure, same as `getUniverseStructure` — a 403 is a normal "not on
   // this structure's ACL" outcome, never a reauth trigger.
@@ -980,7 +974,7 @@ export const ESI_REGISTRY = {
     group: 'corp',
   },
   /**
-   * Corporation Projects (issue #4786). Opt-in, and a Permission of their own
+   * Corporation Projects (issue #4786). A Permission of their own
    * rather than part of `corp`: the reads need no corp role, and widening `corp`
    * would move every already-granted corp Character to `roles-without-grant`
    * (docs/features/corp.md). All three share the `corp-project` rate group.

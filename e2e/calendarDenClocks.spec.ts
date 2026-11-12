@@ -5,9 +5,8 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
-import { CHARACTER_ID } from './support/fixtureData';
+import { CHARACTER_ID, PRE_6102_BASE_SCOPES } from './support/fixtureData';
 import { signInAndGoto } from './support/authSeed';
-import { SCOPES as BASE_GRANT } from '../src/esi/scopes';
 
 const HOUR = 3_600_000;
 const iso = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
@@ -96,7 +95,7 @@ test('den clocks show on the phone rail too', async ({ page }) => {
   }
 });
 
-test('a Base Grant pilot sees no den clocks and no "new login" notice (issue #5997)', async ({
+test('a pilot without the Mercenary dens grant sees no den clocks and no "new login" notice (issue #5997)', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -117,7 +116,7 @@ test('a Base Grant pilot sees no den clocks and no "new login" notice (issue #59
       ]),
     })
   );
-  await signInAndGoto(page, './calendar', BASE_GRANT);
+  await signInAndGoto(page, './calendar', PRE_6102_BASE_SCOPES);
 
   // The board reads every source together, so a shown event means the den read landed too.
   await expect(page.getByText('Base grant fleet op').first()).toBeVisible();
