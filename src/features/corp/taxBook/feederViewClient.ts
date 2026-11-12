@@ -49,6 +49,8 @@ export interface FeederViewSummary {
   balanceIsk: number;
   lastPayout: { date: string; amount: number } | null;
   refineryCount: number;
+  /** The refineries counted; absent on a view built before #6097. */
+  refineryIds?: number[];
   unpricedDays: number;
   dismissedAt: number | null;
   /** A pending removal (#4520): when it started and, once its notice is out, when it takes effect. */

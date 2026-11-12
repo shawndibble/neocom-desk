@@ -1,5 +1,9 @@
 import { useMemo } from 'react';
-import { buildMoonOwners, type MoonOwnersInput } from '@/engine/corpTaxBook/moonOwners';
+import {
+  buildMoonOwners,
+  extractionRefineriesOf,
+  type MoonOwnersInput,
+} from '@/engine/corpTaxBook/moonOwners';
 import { useBook } from './useBook';
 
 /** What the moon owners are built from; cheap, for a page or dialog that reads one owner. */
@@ -15,6 +19,8 @@ export function useMoonOwnersInput(): MoonOwnersInput {
       feeders: data.feeders ?? [],
       // Read with the Moon owners tab's `owners` part; absent elsewhere, then priced from entries.
       ...(data.feederSummaries ? { summaries: data.feederSummaries } : {}),
+      // A refinery with an Extraction counts before anyone mines there (#6097).
+      extractionRefineries: extractionRefineriesOf(view.input.extractions),
       // The moon owner's page's prices (#4621), so the tab, Pay and that page owe one figure.
       pricesOn: view.input.moonOwnerPricesOn ?? ((date) => view.input.pricesOn(date).prices),
     }),
