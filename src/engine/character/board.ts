@@ -161,7 +161,7 @@ const KIND_RANK = new Map<CharacterBoardItemKind, number>(
  *
  * A calendar event's deadline is a *start*, not an end, so being past it means
  * the event is happening, not that it is late (the calendar layer keeps a
- * started event on the board until local midnight,
+ * started event on the board for two weeks,
  * `engine/character/calendarRetention.ts`).
  *
  * An industry job's deadline is its finish time, and ESI carries no separate
