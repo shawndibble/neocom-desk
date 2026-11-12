@@ -18084,7 +18084,7 @@
           "state": {
             "ready": "Ready",
             "connected": "Connected",
-            "needs-login": "Needs login",
+            "needs-sign-in": "Needs login",
             "needs-role": "Needs a role",
             "own-book": "Has its own book",
             "gone-quiet": "Gone quiet",
@@ -18094,7 +18094,7 @@
         "needs": {
           "title": "Needs you ({{count}})",
           "meta": "{{connected}} of {{total}} connected",
-          "needs-login": {
+          "needs-sign-in": {
             "text": "The EVE login did not finish.",
             "action": "Log in again"
           },
