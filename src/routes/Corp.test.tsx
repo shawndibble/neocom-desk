@@ -38,7 +38,12 @@ vi.mock('@/app/syncStatus', async (importOriginal) => ({
 }));
 // The widget loaders gate on this before they fetch; the test sets it to the
 // same capabilities `useCorpAccess` reports, as the real two always agree.
-vi.mock('@/features/corp/corpReadAccess', () => ({ resolveCorpReadAccess: vi.fn() }));
+vi.mock('@/features/corp/corpReadAccess', () => ({
+  resolveCorpReadAccess: vi.fn(),
+  // One corporation: no corp widget offers All.
+  loadAccountCorpAccess: vi.fn(async () => []),
+  corporationsReading: vi.fn(() => 1),
+}));
 vi.mock('@/features/corp/boardData', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/boardData')>()),
   loadCorporationId: vi.fn(),
