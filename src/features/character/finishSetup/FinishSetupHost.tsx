@@ -28,7 +28,6 @@ type View = FinishSetupView | null;
 export function FinishSetupHost() {
   const location = useLocation();
   const [view, setView] = useState<View>(null);
-
   useEffect(() => {
     let cancelled = false;
     void finishSetupViewOnArrival(location.state as ArrivalState).then((next) => {
@@ -58,18 +57,28 @@ export function FinishSetupHost() {
         coverageFrom: utcDay(),
       });
     }
-    if (cur?.kind === 'alerts') return beginAlertsLogin(chain.characterId);
+    if (cur?.kind === 'alerts') {
+      return beginAlertsLogin(chain.characterId, {
+        nearby: cur.nearby ?? false,
+        mail: cur.mail ?? false,
+      });
+    }
   };
   return (
     <FinishSetupDialog
-      key={`${view.offering}:${view.chain.characterId}`}
+      key={view.chain.characterId}
       chain={view.chain}
       offering={view.offering}
       onContinue={(items) => {
         const chain = startFinishSetup({ ...view.chain, items });
+        // An approval left unticked is a Not now for it.
+        const unticked = view.chain.items.filter((i) => !items.includes(i)).map((i) => i.kind);
+        if (unticked.length > 0) {
+          void rememberNotNow(chain.characterId, unticked).catch(() => undefined);
+        }
         saveFinishSetupChain(chain);
         setView({ offering: false, chain });
-        void go(chain).catch(() => setView({ offering: false, chain }));
+        return go(chain);
       }}
       onApprove={() => go(view.chain)}
       onNotNow={() => {

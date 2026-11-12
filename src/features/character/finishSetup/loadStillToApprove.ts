@@ -11,6 +11,7 @@ import { useEditedBookStore } from '@/features/corp/moons/editedBook';
 import { useMoonsHiddenCorpsStore } from '@/features/corp/moons/moonsHiddenCorps';
 import { findOwnCeoCorps } from '@/features/corp/moons/useOwnCeoCorps';
 import { readAlertsGrants } from '@/features/notifications/alertsGrant';
+import { planAlertsStepFor } from '@/features/notifications/alertsStepFor';
 import { readNotNow } from './finishSetupStore';
 
 export async function loadStillToApprove(
@@ -37,16 +38,23 @@ export async function loadStillToApprove(
     await useMoonsHiddenCorpsStore.getState().hydrate();
     hidden = useMoonsHiddenCorpsStore.getState().value.hidden;
   }
-  return {
-    name: character.name,
-    items: stillToApprove({
-      characterId,
-      ...(ceoOf ? { ceoOf } : {}),
-      ...(book ? { book } : {}),
-      hiddenCorporationIds: hidden,
-      alertsOnElsewhere,
-      alertsHeld: grants[characterId]?.status === 'active',
-      notNow: await readNotNow(characterId),
-    }),
-  };
+  const items = stillToApprove({
+    characterId,
+    ...(ceoOf ? { ceoOf } : {}),
+    ...(book ? { book } : {}),
+    hiddenCorporationIds: hidden,
+    alertsOnElsewhere,
+    alertsHeld: grants[characterId]?.status === 'active',
+    notNow: await readNotNow(characterId),
+  });
+  // Plan the alerts sign-in as Settings' walk would, so the grant needs no second one; the
+  // step lists what it reads before Continue, which is the consent (ADR 0030).
+  const planned = await Promise.all(
+    items.map(async (item) => {
+      if (item.kind !== 'alerts') return item;
+      const step = await planAlertsStepFor(characterId, { location: true, mail: true });
+      return { ...item, nearby: step.nearby, mail: step.mail };
+    })
+  );
+  return { name: character.name, items: planned };
 }

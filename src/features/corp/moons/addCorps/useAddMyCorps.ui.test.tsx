@@ -294,7 +294,10 @@ describe('closed-app alerts chained into the run', () => {
       await screen.findByRole('heading', { name: 'Corp 1 of 1: one more approval for alerts' })
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Approve alerts as Mira Soltane' }));
-    expect(beginAlertsLogin).toHaveBeenCalledWith(mira.ceoCharacterId);
+    expect(beginAlertsLogin).toHaveBeenCalledWith(mira.ceoCharacterId, {
+      nearby: false,
+      mail: false,
+    });
 
     cleanup();
     render(
@@ -304,7 +307,7 @@ describe('closed-app alerts chained into the run', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('the confirm-screen switch skips alerts for the whole run', async () => {
+  it('the confirm-screen checkbox skips alerts for the whole run', async () => {
     await alertsOnElsewhere();
     render(at());
     await userEvent.click(await screen.findByRole('button', { name: 'Add my other corps' }));
@@ -318,7 +321,7 @@ describe('closed-app alerts chained into the run', () => {
     expect(useAddCorpsRunStore.getState().value?.alertsFor).toBeUndefined();
   });
 
-  it('never offers the switch when closed-app alerts are off for the account', async () => {
+  it('never offers the checkbox when closed-app alerts are off for the account', async () => {
     render(at());
     await userEvent.click(await screen.findByRole('button', { name: 'Add my other corps' }));
     await userEvent.click(screen.getByRole('checkbox', { name: 'Connect Ashen Harbor Mining' }));

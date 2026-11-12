@@ -47,7 +47,7 @@ const land = (state?: unknown) => {
 beforeEach(async () => {
   cleanup();
   sessionStorage.clear();
-  items = [MOON, { kind: 'alerts' }];
+  items = [MOON, { kind: 'alerts', nearby: true, mail: false }];
   for (const fn of [beginOwnCorpGrantLogin, beginAlertsLogin, beginAddCharacterLogin]) {
     fn.mockReset().mockResolvedValue(undefined);
   }
@@ -73,6 +73,7 @@ describe('Finish setting up after a sign-in', () => {
       screen.getByRole('checkbox', { name: /Add Ironvale Reach to the moon book/ })
     ).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /Alerts when the app is closed/ })).toBeChecked();
+    expect(screen.getByText(/It reads EVE notifications and nearby alerts\./)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
     expect(beginOwnCorpGrantLogin).toHaveBeenCalledWith({
@@ -88,7 +89,7 @@ describe('Finish setting up after a sign-in', () => {
       await screen.findByText('Done: Add Ironvale Reach to the moon book.')
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Approve alerts at EVE' }));
-    expect(beginAlertsLogin).toHaveBeenCalledWith(CHAR);
+    expect(beginAlertsLogin).toHaveBeenCalledWith(CHAR, { nearby: true, mail: false });
 
     land({ alertsGrant: { status: 'on', characterId: CHAR, name: 'Kestrel Vane' } });
     expect(
@@ -127,5 +128,24 @@ describe('Finish setting up after a sign-in', () => {
     await waitFor(async () => expect(await readNotNow(CHAR)).toEqual(['moon', 'alerts']));
     expect(readFinishSetup()).toBeNull();
     expect(beginOwnCorpGrantLogin).not.toHaveBeenCalled();
+  });
+
+  it('an approval left unticked at Continue is a Not now for it', async () => {
+    offerFinishSetup(CHAR);
+    land();
+    await userEvent.click(
+      await screen.findByRole('checkbox', { name: /Alerts when the app is closed/ })
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(beginOwnCorpGrantLogin).toHaveBeenCalled();
+    await waitFor(async () => expect(await readNotNow(CHAR)).toEqual(['alerts']));
+  });
+
+  it('a failed Continue says EVE could not be opened', async () => {
+    beginOwnCorpGrantLogin.mockRejectedValue(new Error('no'));
+    offerFinishSetup(CHAR);
+    land();
+    await userEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText("Could not open EVE's login. Try again.")).toBeInTheDocument();
   });
 });

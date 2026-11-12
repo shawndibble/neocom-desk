@@ -24,7 +24,7 @@ const meta = {
   args: {
     chain: fresh(),
     offering: true,
-    onContinue: () => {},
+    onContinue: () => Promise.resolve(),
     onApprove: () => Promise.resolve(),
     onNotNow: () => {},
     onClose: () => {},

@@ -48,11 +48,14 @@ export function arrivalResult(chain: FinishSetupChain, state: ArrivalState): App
 
 export type FinishSetupView = { offering: boolean; chain: FinishSetupChain };
 
+let lastOffer: { offeredAt: number | undefined; view: FinishSetupView } | null = null;
+
 /** The step to show here, or null for none (an empty offer is cleared). */
 export async function finishSetupViewOnArrival(
   state: ArrivalState
 ): Promise<FinishSetupView | null> {
   const saved = readFinishSetup();
+  if (saved?.stage !== 'offer') lastOffer = null;
   if (!saved) return null;
   if (saved.stage === 'running') {
     const result = arrivalResult(saved.chain, state);
@@ -61,10 +64,14 @@ export async function finishSetupViewOnArrival(
     return { offering: false, chain };
   }
   const { characterId } = saved;
+  // Worked out once per offer, not on every navigation while it is on screen (an ESI read).
+  if (lastOffer && lastOffer.offeredAt === saved.offeredAt) return lastOffer.view;
   const found = await loadStillToApprove(characterId).catch(() => null);
   if (!found || found.items.length === 0) {
     clearFinishSetup();
     return null;
   }
-  return { offering: true, chain: startFinishSetup({ characterId, ...found }) };
+  const view = { offering: true, chain: startFinishSetup({ characterId, ...found }) };
+  lastOffer = { offeredAt: saved.offeredAt, view };
+  return view;
 }

@@ -5,6 +5,7 @@
  * book (a verified, priced Firestore read) or prompting for anything. Device-local
  * and advisory: the server re-checks the editor and the corporation on connect.
  */
+import { isId, isRecord } from '@/engine/guards';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const EDITED_BOOK_KEY = 'moonsEditedBook';
@@ -16,11 +17,9 @@ export interface EditedBook {
   onBook: number[];
 }
 
-const isId = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n > 0;
-
 export function parseEditedBook(raw: unknown): EditedBook | null {
-  if (typeof raw !== 'object' || raw === null) return null;
-  const r = raw as Record<string, unknown>;
+  if (!isRecord(raw)) return null;
+  const r = raw;
   if (!isId(r.collectorCorporationId) || !isId(r.editorCharacterId)) return null;
   return {
     collectorCorporationId: r.collectorCorporationId,

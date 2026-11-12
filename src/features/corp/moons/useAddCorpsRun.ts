@@ -5,6 +5,7 @@
  * Needs a role and Has its own book leave no server record.
  */
 import { useCallback } from 'react';
+import { isId } from '@/engine/guards';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import {
   recordAlertsOutcome as recordRunAlertsOutcome,
@@ -36,8 +37,6 @@ function isOutcome(raw: unknown): raw is AddCorpsOutcome {
       return false;
   }
 }
-
-const isId = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n > 0;
 
 const ALERTS_KINDS = new Set(['on', 'failed', 'cancelled', 'skipped']);
 

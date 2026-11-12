@@ -6,6 +6,7 @@
  * a device-local setting, per Character and per approval.
  */
 import type { ApprovalKind, FinishSetupChain } from '@/engine/character/finishSetup';
+import { isId, isRecord } from '@/engine/guards';
 import { MINUTE_MS } from '@/lib/age';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
@@ -15,7 +16,9 @@ const TTL_MS = 15 * MINUTE_MS;
 
 /** `offer`: a sign-in just landed, the step is still to be worked out. `running`: Continue was pressed. */
 export type FinishSetupSaved =
-  { stage: 'offer'; characterId: number } | { stage: 'running'; chain: FinishSetupChain };
+  /** `offeredAt`: when the sign-in landed, telling one offer from the next. */
+  | { stage: 'offer'; characterId: number; offeredAt?: number }
+  | { stage: 'running'; chain: FinishSetupChain };
 
 function write(saved: FinishSetupSaved): void {
   try {
@@ -25,8 +28,12 @@ function write(saved: FinishSetupSaved): void {
   }
 }
 
-/** A sign-in for this Character landed: offer its remaining approvals on the next page. */
+/**
+ * A sign-in for this Character landed: offer its remaining approvals on the next
+ * page. A chain the player is part way through is kept, not replaced.
+ */
 export function offerFinishSetup(characterId: number): void {
+  if (readFinishSetup()?.stage === 'running') return;
   write({ stage: 'offer', characterId });
 }
 
@@ -34,20 +41,15 @@ export function saveFinishSetupChain(chain: FinishSetupChain): void {
   write({ stage: 'running', chain });
 }
 
-const isId = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n > 0;
-
 function isChain(raw: unknown): raw is FinishSetupChain {
-  const c = raw as Partial<FinishSetupChain> | null;
+  if (!isRecord(raw)) return false;
   return (
-    typeof c === 'object' &&
-    c !== null &&
-    isId(c.characterId) &&
-    typeof c.name === 'string' &&
-    Array.isArray(c.items) &&
-    c.items.every((i: { kind?: unknown }) => i?.kind === 'moon' || i?.kind === 'alerts') &&
-    typeof c.index === 'number' &&
-    typeof c.results === 'object' &&
-    c.results !== null
+    isId(raw.characterId) &&
+    typeof raw.name === 'string' &&
+    Array.isArray(raw.items) &&
+    raw.items.every((i) => isRecord(i) && (i.kind === 'moon' || i.kind === 'alerts')) &&
+    typeof raw.index === 'number' &&
+    isRecord(raw.results)
   );
 }
 
@@ -64,7 +66,11 @@ export function readFinishSetup(): FinishSetupSaved | null {
     };
     const fresh = typeof saved.createdAt === 'number' && Date.now() - saved.createdAt <= TTL_MS;
     if (fresh && saved.stage === 'offer' && isId(saved.characterId)) {
-      return { stage: 'offer', characterId: saved.characterId };
+      return {
+        stage: 'offer',
+        characterId: saved.characterId,
+        offeredAt: saved.createdAt as number,
+      };
     }
     if (fresh && saved.stage === 'running' && isChain(saved.chain)) {
       return { stage: 'running', chain: saved.chain };
@@ -88,7 +94,7 @@ export function clearFinishSetup(): void {
 export type FinishSetupNotNow = Record<string, ApprovalKind[]>;
 
 export function parseNotNow(raw: unknown): FinishSetupNotNow | null {
-  if (typeof raw !== 'object' || raw === null) return null;
+  if (!isRecord(raw)) return null;
   const out: FinishSetupNotNow = {};
   for (const [id, kinds] of Object.entries(raw)) {
     if (!isId(Number(id)) || !Array.isArray(kinds)) continue;

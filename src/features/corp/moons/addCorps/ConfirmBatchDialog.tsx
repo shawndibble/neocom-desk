@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Checkbox, Disclosure, Modal, NativeSelect, Panel } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { Pill } from '@/components/ui/Pill';
 import type { AddCorpsCandidate, CoverageChoice } from '@/engine/corpTaxBook/addCorpsRun';
 
@@ -12,7 +13,7 @@ const toChoice = (v: string): CoverageChoice =>
 
 /**
  * Step 2: one confirm for the whole batch: what the book sees, and how far back to count.
- * With closed-app alerts on for the account, one switch chains each CEO's alerts approval
+ * With closed-app alerts on for the account, one checkbox chains each CEO's alerts approval
  * straight after its corp's sign-in (issue #6103); off skips it for the whole run.
  */
 export function ConfirmBatchDialog({
@@ -87,7 +88,7 @@ export function ConfirmBatchDialog({
           <span className="block text-xs text-text-dim">{t(k('backHint'), { count })}</span>
         </label>
         {offerAlerts && (
-          <label className="flex items-start gap-2">
+          <label className={`flex items-start gap-2 ${tappableRowClassName}`}>
             <Checkbox
               className="mt-0.5"
               checked={alerts}

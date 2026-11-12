@@ -45,7 +45,7 @@ describe('ConfirmBatchDialog', () => {
     expect(onConnect).toHaveBeenCalledWith('today', false);
   });
 
-  it('chains closed-app alerts by default when offered, and one switch skips them for the run', async () => {
+  it('chains closed-app alerts by default when offered, and one checkbox skips them for the run', async () => {
     const onConnect = vi.fn();
     const { rerender } = render(
       <ConfirmBatchDialog corps={CORPS} onBack={noop} onConnect={onConnect} onClose={noop} />

@@ -32,14 +32,27 @@ function Note({ tone, children }: { tone: keyof typeof NOTE_TONE; children: Reac
 
 /** One approval as the player reads it: what it is, and what it is for. */
 function useApprovalText() {
-  const { t } = useTranslation();
-  return (item: Approval, name: string) =>
-    item.kind === 'moon'
-      ? {
-          label: t(k('moon.label'), { corp: item.corporationName }),
-          why: t(k('moon.why'), { corp: item.corporationName }),
-        }
-      : { label: t(k('alerts.label')), why: t(k('alerts.why'), { name }) };
+  const { t, i18n } = useTranslation();
+  const need = (key: string) => t(`settings.notifications.alertsWhenClosed.need.${key}`);
+  return (item: Approval, name: string) => {
+    if (item.kind === 'moon') {
+      return {
+        label: t(k('moon.label'), { corp: item.corporationName }),
+        why: t(k('moon.why'), { corp: item.corporationName }),
+      };
+    }
+    // What the grant reads, listed before Continue: that listing is the consent (ADR 0030).
+    const reads = [
+      need('notifications'),
+      ...(item.nearby ? [need('location')] : []),
+      ...(item.mail ? [need('mail')] : []),
+    ];
+    const list = new Intl.ListFormat(i18n.language, { type: 'conjunction' }).format(reads);
+    return {
+      label: t(k('alerts.label')),
+      why: `${t(k('alerts.why'), { name })} ${t(k('alerts.reads'), { list })}`,
+    };
+  };
 }
 
 /**
@@ -60,7 +73,8 @@ export function FinishSetupDialog({
   chain: FinishSetupChain;
   /** Before Continue: the list is ticked choices. After: the chain is running. */
   offering: boolean;
-  onContinue: (items: Approval[]) => void;
+  /** Starts the chain and leaves for EVE for the first item. A rejection reads as an error line. */
+  onContinue: (items: Approval[]) => Promise<void>;
   /** Leaves for EVE for the current item. A rejection reads as an error line. */
   onApprove: () => Promise<void>;
   onNotNow: () => void;
@@ -74,6 +88,14 @@ export function FinishSetupDialog({
   );
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const leaveForEve = (action: () => Promise<void>) => {
+    setBusy(true);
+    setFailed(false);
+    // A login that works leaves the page, so a settled promise means we are still here.
+    action()
+      .catch(() => setFailed(true))
+      .finally(() => setBusy(false));
+  };
   const name = chain.name;
   const title = t(k('title'), { name });
   const avatar = (
@@ -96,7 +118,8 @@ export function FinishSetupDialog({
             <Button
               variant="primary"
               disabled={chosen.length === 0}
-              onClick={() => onContinue(chosen)}
+              loading={busy}
+              onClick={() => leaveForEve(() => onContinue(chosen))}
             >
               {t(k('continue'))}
             </Button>
@@ -143,14 +166,7 @@ export function FinishSetupDialog({
   const last = chain.last;
   const lastItem = last && chain.items.find((i) => i.kind === last.kind);
   const lastLabel = lastItem ? text(lastItem, name).label : '';
-  const approve = () => {
-    setBusy(true);
-    setFailed(false);
-    // A login that works leaves the page, so a settled promise means we are still here.
-    onApprove()
-      .catch(() => setFailed(true))
-      .finally(() => setBusy(false));
-  };
+  const approve = () => leaveForEve(onApprove);
   return (
     <Modal
       open

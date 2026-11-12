@@ -19,7 +19,8 @@ export type Approval =
       collectorCorporationId: number;
       editorCharacterId: number;
     }
-  | { kind: 'alerts' };
+  /** `nearby` / `mail`: the optional scopes the sign-in asks for beside notifications (listed first). */
+  | { kind: 'alerts'; nearby?: boolean; mail?: boolean };
 
 export interface FinishSetupInput {
   characterId: number;

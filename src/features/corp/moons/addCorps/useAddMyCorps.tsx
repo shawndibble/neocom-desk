@@ -26,6 +26,7 @@ import {
   useAlertsGrants,
   type AlertsCallbackState,
 } from '@/features/notifications/alertsGrant';
+import { planAlertsStepFor } from '@/features/notifications/alertsStepFor';
 import { rememberEditedBook } from '../editedBook';
 import { useBook } from '../useBook';
 import { useAddCorpsRun, useAddCorpsRunStore } from '../useAddCorpsRun';
@@ -261,7 +262,12 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
           showOutcome={showOutcome}
           onClose={() => setStage({ kind: 'closed' })}
           onStop={() => void stop().then(() => setStage({ kind: 'closed' }))}
-          onApproveAlerts={() => beginAlertsLogin(currentAlerts(run)!.ceoCharacterId)}
+          onApproveAlerts={async () => {
+            const { ceoCharacterId } = currentAlerts(run)!;
+            // As Settings' walk would plan it; mail only after its own listing (ADR 0030).
+            const step = await planAlertsStepFor(ceoCharacterId, { location: true, mail: false });
+            return beginAlertsLogin(ceoCharacterId, { nearby: step.nearby, mail: step.mail });
+          }}
           onSkipAlerts={() =>
             void recordAlertsOutcome({ kind: 'skipped' }).then(() => {
               const next = useAddCorpsRunStore.getState().value;

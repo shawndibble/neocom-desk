@@ -4884,7 +4884,8 @@
       "alerts": {
         "label": "Alerts when the app is closed",
         "why": "Sends {{name}}'s EVE alerts to your devices while Neocom Desk is closed, like your other characters.",
-        "action": "Approve alerts at EVE"
+        "action": "Approve alerts at EVE",
+        "reads": "It reads {{list}}."
       },
       "result": {
         "done": "Done: {{label}}.",
