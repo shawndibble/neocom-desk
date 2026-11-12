@@ -122,7 +122,7 @@ async function withStartedEventsRetained(
 }
 
 /**
- * Upcoming events, plus today's already-running ones. ESI or cache, with the
+ * Upcoming events, plus those that started in the last two weeks. ESI or cache, with the
  * auth-failure state exposed so the view can offer a re-login instead of a
  * silent empty state when the calendar scope was revoked (issue #14).
  */

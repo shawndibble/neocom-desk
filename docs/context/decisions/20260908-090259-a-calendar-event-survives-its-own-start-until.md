@@ -2,6 +2,10 @@
 
 _Recorded 2026-09-08._
 
+> **Superseded in part by `20261111-175951-calendar-keeps-started-events-for-two-weeks.md`:**
+> retention is now 14 days after start, not end of day / six hours, and the
+> "run-out, never a look-back" bullet no longer holds. The rest stands.
+
 - **A started calendar event stays on the board until its local day is over.**
   `GET /characters/{id}/calendar` returns the next 50 events _from now_, so an
   event leaves the response the moment it begins, and the cache replaces its row

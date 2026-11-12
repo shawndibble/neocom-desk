@@ -27,8 +27,10 @@
  * this module never learns what an `event_date` string looks like.
  */
 
+import { DAY_MS } from '@/lib/age';
+
 /** How long after it starts a seen event stays on the board. */
-export const RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+export const RETENTION_MS = 14 * DAY_MS;
 
 /** The instant an event stops being worth showing. */
 export function retentionEndsAt(startMs: number): number {
