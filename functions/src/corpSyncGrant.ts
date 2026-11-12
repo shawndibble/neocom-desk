@@ -44,6 +44,7 @@ import {
   outcomeOf,
   readFeederLedger,
   recordFeederRead,
+  refreshFeederExtractions,
   refreshRefineryStructures,
   type FeederReadRecord,
 } from './corpTaxBookFeederSync.js';
@@ -705,6 +706,22 @@ export async function syncOneFeeder(
     !READABLE_FEEDER_STATUSES.includes(feederNow.status)
   ) {
     return finish({ outcome: 'none', reason: 'esi-unavailable' }, false, live);
+  }
+  // Extractions first (#6097), so the rows merged next are placed by them. Best effort, never
+  // part of the feeder's health.
+  try {
+    await refreshFeederExtractions(
+      bookDeps(deps),
+      esi,
+      collectorCorporationId,
+      feederNow,
+      refreshed.accessToken
+    );
+  } catch (err) {
+    deps.log('Moon owner extractions read failed', {
+      feederCorporationId,
+      error: err instanceof Error ? err.name : 'unknown',
+    });
   }
   await mergeObservedInto(bookDeps(deps), collectorCorporationId, read.rows);
   // Refinery names and systems (#4654): best effort, never part of the feeder's health.

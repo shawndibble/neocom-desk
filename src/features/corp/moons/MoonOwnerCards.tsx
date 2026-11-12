@@ -4,10 +4,10 @@ import { Button, Panel } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { canPayMoonOwner, type MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
 import { focusRingClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { MoonOwnerStatusPill } from './MoonOwnerStatusPill';
-import { isk, shortDate } from './moonsFormat';
+import { moonOwnerNote } from './moonOwnerNote';
+import { isk } from './moonsFormat';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.${key}`;
 
@@ -33,14 +33,6 @@ export function MoonOwnerCards({
   onPay?: (row: MoonOwnerRow) => void;
 }) {
   const { t } = useTranslation();
-  const note = (r: MoonOwnerRow) =>
-    r.status === 'cant-read' && r.staleSince !== undefined
-      ? t(k('cantReadSince'), { date: shortDate(new Date(r.staleSince).toISOString()) })
-      : r.sameOwner
-        ? t(k('yoursNote'))
-        : r.lastReadWellAt !== undefined
-          ? t(k('synced'), { age: formatAge(now - Date.parse(r.lastReadWellAt), t) })
-          : '';
   return (
     <Panel padded={false} title={t(k('label'))} meta={t(k('summary'), { shown: rows.length })}>
       <ul className="divide-y divide-line">
@@ -71,10 +63,7 @@ export function MoonOwnerCards({
                 {r.sameOwner && <Pill tone="accent">{t(k('yours'))}</Pill>}
                 {r.status !== 'active' && <MoonOwnerStatusPill status={r.status} />}
               </p>
-              <p className="text-xs text-text-dim">
-                {t(k('refineries'), { count: r.refineryCount })}
-                {note(r) ? ` · ${note(r)}` : ''}
-              </p>
+              <p className="text-xs text-text-dim">{moonOwnerNote(r, now, t)}</p>
               <OwedLine r={r} name={name} onPay={onPay} />
             </div>
             <Icon.GoTo

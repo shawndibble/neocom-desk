@@ -1,13 +1,13 @@
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { ExtractionsTab } from './ExtractionsTab';
 
 const tableProps = vi.hoisted(() => ({ calls: [] as Record<string, unknown>[] }));
-const book = vi.hoisted(() => ({ canEdit: true }));
+const book = vi.hoisted(() => ({ canEdit: true, rows: null as unknown[] | null }));
 
 const real = vi.hoisted(() => ({ table: false }));
 
@@ -46,8 +46,9 @@ const ex = (id: string, oreSource: string, tax: number) => ({
 });
 vi.mock('./useBook', () => ({
   useBook: () => ({
+    corporationId: 98000001,
     view: {
-      extractions: [
+      extractions: book.rows ?? [
         ex('a', 'survey', 100),
         ex('b', 'unknown', 0),
         ex('c', 'survey', 0),
@@ -57,7 +58,12 @@ vi.mock('./useBook', () => ({
     },
     canEdit: book.canEdit,
     edit: vi.fn(),
-    names: { refinery: () => 'R', moon: () => 'M', ore: () => 'Ore' },
+    names: {
+      refinery: () => 'R',
+      moon: () => 'M',
+      ore: () => 'Ore',
+      corporation: (id: number) => `Corp ${id}`,
+    },
   }),
 }));
 
@@ -124,6 +130,37 @@ describe('ExtractionsTab on a phone', () => {
     const rows = props.rows as unknown[];
     expect(go.render(rows[0])).toBeNull();
     expect(go.render(rows[1])).not.toBeNull();
+  });
+});
+
+describe('ExtractionsTab with moon owners (#6097)', () => {
+  const shown = (rows: unknown[]) => {
+    real.table = true;
+    book.rows = rows;
+    try {
+      render(
+        <MemoryRouter>
+          <ExtractionsTab />
+        </MemoryRouter>
+      );
+    } finally {
+      real.table = false;
+      book.rows = null;
+    }
+  };
+
+  it('lists a moon owner’s coming chunk with its corporation named, in a book with no refinery of its own', () => {
+    shown([{ ...ex('m', 'unknown', 0), state: 'extracting', sourceCorporationId: 98000002 }]);
+    expect(screen.getByText('Corp 98000002').closest('tr')).toHaveTextContent('Extracting');
+  });
+
+  it('names the book’s own corporation beside a moon owner’s, and none when every chunk is its own', () => {
+    shown([{ ...ex('m', 'unknown', 0), sourceCorporationId: 98000002 }, ex('o', 'unknown', 0)]);
+    expect(screen.getByText('Corp 98000002')).toBeInTheDocument();
+    expect(screen.getByText('Corp 98000001')).toBeInTheDocument();
+    cleanup();
+    shown([ex('o', 'unknown', 0)]);
+    expect(screen.queryByText(/^Corp /)).not.toBeInTheDocument();
   });
 });
 

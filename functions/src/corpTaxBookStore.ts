@@ -556,6 +556,60 @@ export async function writeBilledByPointers(
 }
 
 /**
+ * Merge Extractions into a book (an officer's Survey link or Fully Mined flag stays) and re-stamp
+ * the rows their windows now cover. Adds each new or changed one to `touched`; one that says what
+ * the book already holds is not written again.
+ */
+async function writeExtractions(
+  deps: BookDeps,
+  corporationId: number,
+  incoming: readonly MirrorExtraction[],
+  touched: Set<string>
+): Promise<void> {
+  const extractions = sub(deps.db, corporationId, EXTRACTIONS);
+  const corrected = new Set<number>();
+  for (const x of incoming) {
+    const id = `${x.structureId}_${Date.parse(x.extractionStartTime)}`;
+    const fields: Data = { ...x, id };
+    for (const key of Object.keys(fields)) if (fields[key] === undefined) delete fields[key];
+    const held = (await extractions.doc(id).get()).data();
+    if (!held || WINDOW_FIELDS.some((f) => fields[f] !== undefined && fields[f] !== held[f]))
+      corrected.add(x.structureId);
+    // A new Extraction, or one whose make-up or dates moved, changes its moon doc (ADR 0032).
+    if (
+      held &&
+      Object.keys(fields).every((k) => JSON.stringify(fields[k]) === JSON.stringify(held[k]))
+    )
+      continue;
+    touched.add(id);
+    await extractions.doc(id).set(fields, { merge: true });
+  }
+  // A new or corrected Extraction moves which rows its window covers (ADR 0032). Best effort.
+  await restampStructures(deps.db, corporationId, [...corrected]).catch((e) =>
+    console.error('extraction restamp failed', e instanceof Error ? e.message : e)
+  );
+}
+
+/**
+ * A moon owner's Extractions into the Collector's book (#6097), each tagged with the moon
+ * owner's corporation id. Like a feeder's rows, they never touch the book's `lastSync`, gaps or
+ * audit. Returns how many were new or changed.
+ */
+export async function storeFeederExtractions(
+  deps: BookDeps,
+  collectorCorporationId: number,
+  extractions: readonly (MirrorExtraction & { sourceCorporationId: number })[]
+): Promise<number> {
+  const touched = new Set<string>();
+  await writeExtractions(deps, collectorCorporationId, extractions, touched);
+  if (touched.size === 0) return 0;
+  await refreshMoonDocs(deps.db, collectorCorporationId, touched);
+  // The Overview and Extractions tabs read Extractions from the tab docs (ADR 0032).
+  await refreshReadModels(deps.db, collectorCorporationId, deps.now());
+  return touched.size;
+}
+
+/**
  * The sync once the caller is established. The scheduled sync (ADR 0025) calls
  * this with the role check it just made with the grant holder's token, and
  * `scheduled` makes the audit entry and `lastSync` say so.
@@ -590,27 +644,7 @@ export async function syncBookAs(
     console.error('observed backfill failed', e instanceof Error ? e.message : e)
   );
 
-  const extractions = sub(deps.db, input.corporationId, EXTRACTIONS);
-  const corrected = new Set<number>();
-  for (const x of input.extractions) {
-    const id = `${x.structureId}_${Date.parse(x.extractionStartTime)}`;
-    const fields: Data = { ...x, id };
-    for (const key of Object.keys(fields)) if (fields[key] === undefined) delete fields[key];
-    const held = (await extractions.doc(id).get()).data();
-    if (!held || WINDOW_FIELDS.some((f) => fields[f] !== undefined && fields[f] !== held[f]))
-      corrected.add(x.structureId);
-    // A new Extraction, or one whose make-up or dates moved, changes its moon doc (ADR 0032).
-    if (
-      !held ||
-      Object.keys(fields).some((k) => JSON.stringify(fields[k]) !== JSON.stringify(held[k]))
-    )
-      touchedPulls.add(id);
-    await extractions.doc(id).set(fields, { merge: true });
-  }
-  // A new or corrected Extraction moves which rows its window covers (ADR 0032). Best effort, like the pass below.
-  await restampStructures(deps.db, input.corporationId, [...corrected]).catch((e) =>
-    console.error('extraction restamp failed', e instanceof Error ? e.message : e)
-  );
+  await writeExtractions(deps, input.corporationId, input.extractions, touchedPulls);
   await stampBook(deps.db, input.corporationId, deps.now).catch((e) =>
     console.error('extraction stamp backfill failed', e instanceof Error ? e.message : e)
   );

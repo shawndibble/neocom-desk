@@ -119,6 +119,8 @@ export interface FeederViewSummary {
   balanceIsk: number;
   lastPayout: { date: string; amount: number } | null;
   refineryCount: number;
+  /** The refineries counted (#6097): the Moon owners tab unions them with the Extractions'. */
+  refineryIds: number[];
   unpricedDays: number;
   dismissedAt: number | null;
   /** A pending removal's start and, once its notice is out, when it takes effect (#4520). */
@@ -446,6 +448,7 @@ export function buildFeederView(input: FeederViewInput): FeederView {
     balanceIsk: display.isk,
     lastPayout: last ? { date: last.date, amount: last.amount } : null,
     refineryCount: refineries.size,
+    refineryIds: [...refineries.keys()].sort((a, b) => a - b),
     unpricedDays,
     dismissedAt: record.viewDismissedAt ?? null,
     removalStartedAt:

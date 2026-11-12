@@ -3,7 +3,10 @@
 // from #4654 on, `esi-universe.read_structures.v1`. The ledger read is two things — the observer
 // list and each refinery's ledger; a grant with the structure scope then looks up the names and
 // systems of refineries not read this week. Nothing calls an endpoint the grant cannot reach
-// (each 403 would burn the shared ESI error budget). Rows go into the Collector's `observed` collection tagged with the feeder's
+// (each 403 would burn the shared ESI error budget). After a good ledger read the same grant also
+// reads the corporation's Extractions (#6097), so its refineries and coming chunks show before
+// anyone mines; a refusal there (no Station_Manager) is remembered for a week and never moves the
+// feeder's health. Rows go into the Collector's `observed` collection tagged with the feeder's
 // corporation id; the Collector book's own `lastSync` and gaps are not touched.
 //
 // What the read means for the feeder (the pure rules are corpTaxBookEngine.ts's
@@ -28,9 +31,14 @@ import {
   appendAudit,
   bookRef,
   feederRef,
+  storeFeederExtractions,
   type BookDeps,
 } from './corpTaxBookStore.js';
-import { observedRowsFromLedger } from './corpTaxBookSyncEngine.js';
+import {
+  observedRowsFromLedger,
+  reconcileExtractions,
+  type SyncExtraction,
+} from './corpTaxBookSyncEngine.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 
 /** A refinery's name is re-read, or a refused lookup retried, after this long (#4654). */
@@ -156,6 +164,77 @@ export async function refreshRefineryStructures(
     const pairs: unknown[] = [];
     for (const [id, doc] of fields) pairs.push(new FieldPath('refineryStructures', id), doc);
     tx.update(ref, 'readsStructureNames', readsStructures, ...pairs);
+  });
+}
+
+/** Refused Extractions are asked for again after this long (#6097). */
+export const EXTRACTIONS_RECHECK_MS = STRUCTURE_RECHECK_MS;
+
+/** Whether this run asks ESI for the moon owner's Extractions: not within a week of a refusal. */
+export const extractionsDue = (
+  record: Pick<FeederRecord, 'extractionsRefusedAt'>,
+  now: number
+): boolean =>
+  record.extractionsRefusedAt === undefined ||
+  now - record.extractionsRefusedAt >= EXTRACTIONS_RECHECK_MS;
+
+export type FeederExtractionsRead =
+  | { kind: 'ok'; extractions: (SyncExtraction & { sourceCorporationId: number })[] }
+  /** ESI said 403: the grant holder lacks Station_Manager. */
+  | { kind: 'refused' }
+  /** Unanswered, rate limited, or the shared budget is low: the next run asks again. */
+  | { kind: 'none' };
+
+/**
+ * A moon owner's current Extractions, tagged with its corporation id. The grant's mining scope
+ * is the one the endpoint needs; the Extraction started notification is out of its reach, so the
+ * ore comes from a linked Survey or stays unknown.
+ */
+export async function readFeederExtractions(
+  esi: SyncEsi,
+  feederCorporationId: number,
+  accessToken: string
+): Promise<FeederExtractionsRead> {
+  if (esi.budgetLow()) return { kind: 'none' };
+  const read = await esi.extractions(feederCorporationId, accessToken);
+  if (read.kind === 'forbidden') return { kind: 'refused' };
+  if (read.kind !== 'ok') return { kind: 'none' };
+  return {
+    kind: 'ok',
+    extractions: reconcileExtractions(read.data, [], []).map((x) => ({
+      ...x,
+      sourceCorporationId: feederCorporationId,
+    })),
+  };
+}
+
+/**
+ * After a good ledger read: read the moon owner's Extractions and keep them in the Collector's
+ * book, or remember a refusal on the record. Best effort: a failure here is logged by the caller
+ * and never fails the read or moves the feeder's health.
+ */
+export async function refreshFeederExtractions(
+  deps: BookDeps,
+  esi: SyncEsi,
+  collectorCorporationId: number,
+  record: Pick<FeederRecord, 'corporationId' | 'extractionsRefusedAt'>,
+  accessToken: string
+): Promise<void> {
+  const now = deps.now();
+  if (!extractionsDue(record, now)) return;
+  const read = await readFeederExtractions(esi, record.corporationId, accessToken);
+  if (read.kind === 'none') return;
+  if (read.kind === 'ok') {
+    await storeFeederExtractions(deps, collectorCorporationId, read.extractions);
+    if (record.extractionsRefusedAt === undefined) return;
+  }
+  const ref = feederRef(deps.db, collectorCorporationId, record.corporationId);
+  await deps.db.runTransaction(async (tx) => {
+    const latest = (await tx.get(ref)).data() as FeederRecord | undefined;
+    if (!latest || !READABLE_FEEDER_STATUSES.includes(latest.status)) return;
+    tx.update(ref, {
+      extractionsRefusedAt: read.kind === 'refused' ? now : FieldValue.delete(),
+    });
   });
 }
 

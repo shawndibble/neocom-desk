@@ -18638,6 +18638,7 @@
         },
         "refineries_one": "{{count}} refinery",
         "refineries_other": "{{count}} refineries",
+        "nothingSeen": "No mining or extraction seen yet",
         "synced": "Synced {{age}}",
         "cantReadSince": "Can't read their ledger since {{date}}",
         "since": "since {{date}}",

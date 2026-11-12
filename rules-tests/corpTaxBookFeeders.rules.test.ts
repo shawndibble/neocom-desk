@@ -27,7 +27,8 @@ beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
-    await setDoc(doc(db, RECORD), { status: 'active' });
+    // `extractionsRefusedAt` (#6097) is server-written like the rest of the record.
+    await setDoc(doc(db, RECORD), { status: 'active', extractionsRefusedAt: 1 });
     await setDoc(doc(db, PAYOUT), { amount: 1 });
     await setDoc(doc(db, INVITE), { collectorCorporationId: 98000001 });
     await setDoc(doc(db, POINTER), { collectorCorporationId: 98000001 });

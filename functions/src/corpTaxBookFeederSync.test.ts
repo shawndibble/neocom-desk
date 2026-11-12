@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  EXTRACTIONS_RECHECK_MS,
   FEEDER_FORBIDDEN_STORM,
   FeederStorm,
   MAX_STRUCTURE_LOOKUPS,
   STRUCTURE_RECHECK_MS,
+  extractionsDue,
   lookUpRefineryStructures,
   outcomeOf,
+  readFeederExtractions,
   readFeederLedger,
   structuresToLookUp,
   type FeederLedgerRead,
@@ -37,7 +40,7 @@ function fakeEsi(over: Partial<Record<keyof SyncEsi, unknown>> = {}) {
           },
         ])
     ),
-    extractions: async () => (calls.push('extractions'), ok([])),
+    extractions: async () => (calls.push('extractions'), over.extractions ?? ok([])),
     notifications: async () => (calls.push('notifications'), ok([])),
     journal: async () => (calls.push('journal'), ok([])),
     structureSystem: async () => (calls.push('system'), ok(1)),
@@ -104,6 +107,54 @@ describe('readFeederLedger', () => {
   it('a feeder with no refineries reads fine (and clears stale)', async () => {
     const { esi } = fakeEsi({ observers: ok([]) });
     expect(await readFeederLedger(esi, FEEDER, 'tok')).toMatchObject({ kind: 'ok', rows: [] });
+  });
+});
+
+describe('readFeederExtractions (#6097)', () => {
+  const listed = {
+    structure_id: 5001,
+    moon_id: 40000001,
+    extraction_start_time: '2026-10-10T00:00:00Z',
+    chunk_arrival_time: '2026-10-24T00:00:00Z',
+    natural_decay_time: '2026-10-24T03:00:00Z',
+  };
+
+  it('tags each Extraction with the moon owner and reads no notification', async () => {
+    const { esi, calls } = fakeEsi({ extractions: ok([listed]) });
+    expect(await readFeederExtractions(esi, FEEDER, 'tok')).toEqual({
+      kind: 'ok',
+      extractions: [
+        {
+          structureId: 5001,
+          moonId: 40000001,
+          extractionStartTime: '2026-10-10T00:00:00.000Z',
+          chunkArrivalTime: '2026-10-24T00:00:00.000Z',
+          naturalDecayTime: '2026-10-24T03:00:00.000Z',
+          sourceCorporationId: FEEDER,
+        },
+      ],
+    });
+    expect(calls).toEqual(['extractions']);
+  });
+
+  it('a 403 is a refusal; ESI trouble or a low budget is nothing to remember', async () => {
+    const read = (over: Parameters<typeof fakeEsi>[0]) =>
+      readFeederExtractions(fakeEsi(over).esi, FEEDER, 'tok');
+    expect(await read({ extractions: { kind: 'forbidden' } })).toEqual({ kind: 'refused' });
+    expect(await read({ extractions: { kind: 'backoff' } })).toEqual({ kind: 'none' });
+    expect(await read({ extractions: { kind: 'unavailable' } })).toEqual({ kind: 'none' });
+    const low = fakeEsi({ budgetLow: true });
+    expect(await readFeederExtractions(low.esi, FEEDER, 'tok')).toEqual({ kind: 'none' });
+    expect(low.calls).toEqual([]);
+  });
+
+  it('asks again only once a week has passed since a refusal', () => {
+    const now = Date.parse('2026-10-18T12:00:00Z');
+    expect(extractionsDue({}, now)).toBe(true);
+    expect(extractionsDue({ extractionsRefusedAt: now - EXTRACTIONS_RECHECK_MS + 1 }, now)).toBe(
+      false
+    );
+    expect(extractionsDue({ extractionsRefusedAt: now - EXTRACTIONS_RECHECK_MS }, now)).toBe(true);
   });
 });
 
