@@ -15160,7 +15160,7 @@
     "structures": {
       "title": "Structures",
       "refresh": "Refresh structures",
-      "searchPlaceholder": "Search structure, system or corporation",
+      "searchPlaceholder": "Search structure, system or corporation…",
       "corpFilterLabel": "Corporation",
       "corpFilterAll": "All corporations",
       "problemsOnly": "Problems only",
