@@ -119,6 +119,7 @@ import {
   parseRemoveOwnFeederInput,
   removeOwnFeeder,
 } from './corpTaxBookOwnFeeder.js';
+import { parseSyncMoonOwnersNowInput, syncMoonOwnersNow } from './corpTaxBookMoonOwnersSyncNow.js';
 import {
   dropBookGrants,
   getFeederStatus,
@@ -991,6 +992,15 @@ corpTaxBookAction('addOwnCorpTaxBookFeederCallable', (request) =>
 
 corpTaxBookAction('removeOwnCorpTaxBookFeederCallable', (request) =>
   removeOwnFeeder(corpSyncDeps(), callerOf(request), parseRemoveOwnFeederInput(request.data))
+);
+
+// Sync now for moon owners (issue #6117): an editor reads every moon owner at once, rested per book.
+corpTaxBookAction('syncCorpTaxBookMoonOwnersNowCallable', (request) =>
+  syncMoonOwnersNow(
+    { ...corpSyncDeps(), esi: esiSyncReader() },
+    callerOf(request),
+    parseSyncMoonOwnersNowInput(request.data)
+  )
 );
 
 corpTaxBookAction('leaveCorpTaxBookFeederCallable', (request) =>

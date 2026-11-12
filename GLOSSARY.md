@@ -90,8 +90,9 @@ here — they go one per file in `docs/context/decisions/`.
   never enforced afterward — running it again overwrites whatever craft/buy
   choices, hand-picked ones included, were there before.
 - **Base Grant**: What the plain "Log in" button asks a Character for: the
-  **Core Grant** plus every **Permission** that is on by default. Distinct
-  from the Core Grant, which is only the part that cannot be unchecked.
+  **Core Grant** plus every **Permission** that is on by default — every read
+  one; only **Write to EVE** is left out. Distinct from the Core Grant, which
+  is only the part that cannot be unchecked.
 - **Core Grant**: The scopes every Character must grant, shown checked and
   locked when customizing permissions: skills, the skill queue, and structure
   lookup (names and search). Leaving them out makes other numbers silently
@@ -177,7 +178,7 @@ here — they go one per file in `docs/context/decisions/`.
   **Build Opportunities** it is a buyer: the **Corp projects** view lists each
   open one the chosen Characters can still contribute to, with the reward,
   the build cost, where the blueprint comes from and the profit at the cap.
-  Read with the opt-in **Permission** "Corporation projects"; the view is
+  Read with the **Permission** "Corporation projects"; the view is
   absent without it.
 - **Build Plan**: An industry plan for one blueprint or reaction formula:
   materials needed, costs, fees/taxes, time, and two independent verdicts — an

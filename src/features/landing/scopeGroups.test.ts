@@ -30,16 +30,10 @@ describe('LANDING_SCOPE_GROUPS', () => {
     expect(PLACED_GROUPS.filter((g) => !PERMISSIONS[g].defaultOn).sort()).toEqual([
       'autopilot',
       'calendarRespond',
-      'corp',
-      'corpProjects',
       'fittingsWrite',
-      'jumpFatigue',
-      'killmails',
       'mailOrganize',
       'mailSend',
-      'mercenaryDens',
       'openWindow',
-      'structureMarkets',
     ]);
   });
 

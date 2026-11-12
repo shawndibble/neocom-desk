@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { addCharacter } from '@/features/character/addCharacter';
+import { offerFinishSetup } from '@/features/character/finishSetup/finishSetupStore';
 import {
   LoginError,
   completeVettingLogin,
@@ -227,6 +228,8 @@ export function Callback() {
       })
       .then(async ({ character, firstEver }) => {
         clearLoginRecovery();
+        // The Character's other approvals at EVE, offered on the page this lands on (#6103).
+        offerFinishSetup(character.characterId);
         // Past this point the Character and its token are in Dexie, so the
         // login has happened; a throw from anything below must not put an
         // error panel over it (`features/character/addCharacter` makes the

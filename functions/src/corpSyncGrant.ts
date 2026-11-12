@@ -18,6 +18,7 @@ import { SsoRefreshError, type RefreshedTokens } from './alertGrant.js';
 import { decryptRefreshToken, encryptRefreshToken, rotateStoredToken } from './alertGrantCrypto.js';
 import { boundedString, record } from './communities.js';
 import { CORP_SYNC_SCOPES } from './corpSyncScopes.js';
+import { BOOK_SYNC_CRON } from './corpTaxBookSchedule.js';
 import {
   FEEDER_OF_COLLECTION,
   META,
@@ -509,7 +510,7 @@ export async function runScheduledCorpSyncs(
  * (`lastReadWellAt >= dayClosesAt`). Changing a schedule is not a new export.
  */
 export const SYNC_CORP_TAX_BOOKS_SCHEDULE = {
-  schedule: '35 0,6,12,18 * * *',
+  schedule: BOOK_SYNC_CRON,
   timeZone: 'UTC',
 } as const;
 

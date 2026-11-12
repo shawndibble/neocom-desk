@@ -99,7 +99,7 @@ export function getAllianceCorporations(
 // ---------------------------------------------------------------------------
 // The `corp` scope group (issue #295).
 //
-// Corp-owned reads, all behind an opt-in grant and a server-side role gate.
+// Corp-owned reads, all behind the `corp` Permission and a server-side role gate.
 // Each takes the *Character* making the call as well as the corporation id:
 // ESI authorises these against that Character's own in-game roles, and
 // `characterId` is what selects the access token (and the cache/activity-log

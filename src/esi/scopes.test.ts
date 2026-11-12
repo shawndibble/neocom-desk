@@ -58,8 +58,9 @@ describe('CORE_GRANT', () => {
 describe('SCOPES (Base Grant)', () => {
   // Hand-written, not derived: SCOPES is computed from registry.ts, so a
   // derived expectation would assert nothing. This is the spelling backstop.
-  // Every scope here is a read: the six write scopes are the opt-in
-  // "Write to EVE" section, asked for when a Character first tries the feature.
+  // Every scope here is a read, and every read is here (#6102): the six write
+  // scopes are the opt-in "Write to EVE" section, asked for when a Character
+  // first tries the feature.
   it('lists exactly the v1 Base Grant scopes', () => {
     expect([...SCOPES].sort()).toEqual(
       [
@@ -86,6 +87,30 @@ describe('SCOPES (Base Grant)', () => {
         'esi-search.search_structures.v1',
         'esi-industry.read_character_mining.v1',
         'esi-fittings.read_fittings.v1',
+        // corp
+        'esi-corporations.read_structures.v1',
+        'esi-wallet.read_corporation_wallets.v1',
+        'esi-corporations.read_divisions.v1',
+        'esi-corporations.read_corporation_membership.v1',
+        'esi-corporations.track_members.v1',
+        'esi-industry.read_corporation_mining.v1',
+        'esi-industry.read_corporation_jobs.v1',
+        'esi-assets.read_corporation_assets.v1',
+        'esi-characters.read_corporation_roles.v1',
+        'esi-corporations.read_blueprints.v1',
+        'esi-corporations.read_starbases.v1',
+        'esi-planets.read_customs_offices.v1',
+        'esi-structures.read_corporation.v1',
+        'esi-corporations.read_titles.v1',
+        'esi-contracts.read_corporation_contracts.v1',
+        'esi-markets.read_corporation_orders.v1',
+        // structureMarkets, jumpFatigue, corpProjects, killmails, mercenaryDens
+        'esi-markets.structure_markets.v1',
+        'esi-characters.read_fatigue.v1',
+        'esi-corporations.read_projects.v1',
+        'esi-killmails.read_killmails.v1',
+        'esi-activities.read_character.v1',
+        'esi-structures.read_character.v1',
       ].sort()
     );
   });
@@ -139,35 +164,34 @@ describe('scopesForGroup', () => {
     expect([...scopesForGroup('mercenaryDens')].sort()).toEqual(
       ['esi-activities.read_character.v1', 'esi-structures.read_character.v1'].sort()
     );
-    expect(SCOPES).not.toContain('esi-structures.read_character.v1');
-    expect(SCOPES).not.toContain('esi-activities.read_character.v1');
+    expect(SCOPES).toContain('esi-structures.read_character.v1');
+    expect(SCOPES).toContain('esi-activities.read_character.v1');
   });
 
   it("lists exactly the jumpFatigue group's scopes (issue #3581)", () => {
     expect([...scopesForGroup('jumpFatigue')]).toEqual(['esi-characters.read_fatigue.v1']);
-    expect(SCOPES).not.toContain('esi-characters.read_fatigue.v1');
+    expect(SCOPES).toContain('esi-characters.read_fatigue.v1');
   });
 
   it("lists exactly the killmails group's scopes", () => {
     expect([...scopesForGroup('killmails')]).toEqual(['esi-killmails.read_killmails.v1']);
-    expect(SCOPES).not.toContain('esi-killmails.read_killmails.v1');
+    expect(SCOPES).toContain('esi-killmails.read_killmails.v1');
   });
 
   it("lists exactly the corpProjects group's scopes (issue #4786)", () => {
     expect([...scopesForGroup('corpProjects')]).toEqual(['esi-corporations.read_projects.v1']);
-    expect(SCOPES).not.toContain('esi-corporations.read_projects.v1');
+    expect(SCOPES).toContain('esi-corporations.read_projects.v1');
   });
 
   /**
-   * Issue #327's first acceptance criterion, stated as its own case rather than
-   * left implicit in the hand-written `SCOPES` list above: registering the corp
-   * assets endpoint must widen the *group* and leave the base grant alone. The
-   * character assets scope is the one it would be easiest to confuse it with,
-   * and they must end up on opposite sides of the split.
+   * Issue #327's first acceptance criterion: registering the corp assets
+   * endpoint must widen the *corp group*, not Assets. The character assets
+   * scope is the one it would be easiest to confuse it with, and they must end
+   * up in different Permissions, so unticking one in Customize leaves the other.
    */
-  it('keeps the corp assets scope out of the base grant, beside the character one', () => {
+  it('keeps the corp assets scope in the corp group, apart from the character one', () => {
     expect(scopesForGroup('corp')).toContain('esi-assets.read_corporation_assets.v1');
-    expect(SCOPES).not.toContain('esi-assets.read_corporation_assets.v1');
+    expect(scopesForGroup('assets')).not.toContain('esi-assets.read_corporation_assets.v1');
     expect(SCOPES).toContain('esi-assets.read_assets.v1');
     expect(scopesForGroup('corp')).not.toContain('esi-assets.read_assets.v1');
   });
@@ -287,16 +311,10 @@ describe('PERMISSIONS', () => {
   // Hand-written, not derived from DEFAULT_ON_GROUPS/OPT_IN_GROUPS above: those
   // are filtered by `defaultOn` itself, so a derived expectation here would
   // pass no matter which way a group's flag flipped.
-  it('marks corp, structureMarkets, jumpFatigue, corpProjects, killmails, mercenaryDens and the six Write to EVE groups opt-in and every other group default-on', () => {
+  it('marks only the six Write to EVE groups opt-in and every read group default-on (#6102)', () => {
     const optIn = SCOPE_GROUPS.filter((group) => !PERMISSIONS[group].defaultOn);
     expect([...optIn].sort()).toEqual(
       [
-        'corp',
-        'structureMarkets',
-        'jumpFatigue',
-        'corpProjects',
-        'killmails',
-        'mercenaryDens',
         'mailSend',
         'mailOrganize',
         'calendarRespond',
@@ -403,6 +421,6 @@ describe('isPermissionGranted', () => {
 
   it('ignores scopes of other Permissions', () => {
     expect(isPermissionGranted('wallet', [...SCOPES])).toBe(true);
-    expect(isPermissionGranted('corp', [...SCOPES])).toBe(false);
+    expect(isPermissionGranted('mailSend', [...SCOPES])).toBe(false);
   });
 });

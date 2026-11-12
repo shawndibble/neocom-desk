@@ -4685,7 +4685,7 @@
         "board": "The Corp Board is a board of widgets you pick and size: deadlines, structure fuel, moon chunks, jobs, wallet, members and more.",
         "pages": "Members, Corp Wallet and Corp Assets each have their own page, with role audits and Stock Targets.",
         "moons": "Moons keeps the Corp Tax Book: what each corp member mined at your refineries, their Statements, and what is paid.",
-        "access": "SRP lets a pilot file a claim from their own killmail. Officer pages appear only with a Corp Role, and corporation data is a separate grant."
+        "access": "SRP lets a pilot file a claim from their own killmail. Officer pages appear only with a Corp Role, and corporation data is read only for the roles you hold."
       },
       "comms": {
         "tab": "Mail",
@@ -4797,7 +4797,7 @@
         "write": "Write to EVE"
       },
       "planetsNote": "EVE's consent screen lists the planetary scope as \"manage your planetary installations\". Neocom Desk only reads that data and never writes to it.",
-      "separateNote": "Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them.",
+      "oneLoginNote": "Logging in asks for every read above at once, so no page sends you back to EVE's login later. Corporation data is read only as far as your in-game corporation roles allow. Want less? Log in with custom permissions and untick it.",
       "revoke": "You can take access back at any time:",
       "revokeLink": "EVE's authorized apps page"
     },
@@ -4869,6 +4869,42 @@
     }
   },
   "characters": {
+    "finishSetup": {
+      "title": "Finish setting up {{name}}",
+      "signedIn": "EVE still has you logged in as {{name}}, so each of these is one Authorize press at EVE.",
+      "hint": "EVE sends you back here after each one. Picking a different character at EVE approves nothing.",
+      "continue": "Continue",
+      "notNow": "Not now",
+      "stop": "Stop here",
+      "failed": "Could not open EVE's login. Try again.",
+      "moon": {
+        "label": "Add {{corp}} to the moon book",
+        "why": "Lets the book read {{corp}}'s mining ledger, counted from today.",
+        "action": "Approve the moon book at EVE"
+      },
+      "alerts": {
+        "label": "Alerts when the app is closed",
+        "why": "Sends {{name}}'s EVE alerts to your devices while Neocom Desk is closed, like your other characters.",
+        "action": "Approve alerts at EVE",
+        "reads": "It reads {{list}}."
+      },
+      "result": {
+        "done": "Done: {{label}}.",
+        "notDone": "Not approved: {{label}}. You can do it later where it lives.",
+        "refused": "Not approved: {{label}}. {{reason}}",
+        "wrong": "You approved as {{signedInAs}}, so nothing was approved. Pick {{name}} on EVE's login page and try again."
+      },
+      "state": {
+        "done": "Done",
+        "notDone": "Not done",
+        "now": "Now",
+        "next": "Next"
+      },
+      "doneTitle": "{{name}} is set up",
+      "doneBody": "Anything not done here is still offered later: the moon book from the Moons page, alerts from Settings › Notifications.",
+      "addAnother": "Add another character",
+      "done": "Done"
+    },
     "csvPiExpires": "PI expires",
     "csvTrainingFinishes": "Training finishes",
     "csvAchievementTitle": "Title",
@@ -14165,7 +14201,7 @@
     "customize": {
       "linkLabel": "Log in with custom permissions",
       "title": "Log in with custom permissions",
-      "intro": "Pick what to share. You can add more later in Settings › Permissions.",
+      "intro": "Every read is ticked; untick what you'd rather not share. You can add more later in Settings › Permissions.",
       "optInTag": "Opt-in",
       "requiredTag": "Required",
       "selectAll": "Select all",
@@ -14469,7 +14505,7 @@
         "install": "<link>Settings › App & backup › Install this app</link> shows the steps for your browser, or an Install button if it has one. On iPhone and iPad, installing is also what makes notifications work.",
         "update": "The app updates itself in the background. For a new version now: Settings › App & backup › Update now: it checks and reloads.",
         "pushKinds": "Alerts with a known time: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract or market order about to expire, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, nearby Incursions and raidable skyhooks, and, if you add mail, new mail, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Quiet time (a daily no-push window, set per device) silences every closed-app push; the alerts still appear in your Alerts list. Turn them on in Settings › Notifications.",
-        "permissions": "EVE grants permissions only at login, so plain login asks for everything the pages read. You can pick instead: <custom>Log in with custom permissions</custom> on the login page. Only skills, the skill queue and structure lookup are required. Add more later in Settings › Permissions; revoke on <ccp>EVE's authorized apps page</ccp>. Corporation data, structure markets and jump fatigue are never in the plain login; each is a separate opt-in. So is Alerts when closed, a grant per Character for notifications and, if you add them, location (nearby alerts) and mail headers (new-mail alerts) only.",
+        "permissions": "EVE grants permissions only at login, so plain login asks for everything the pages read, corporation data, structure markets and jump fatigue included. Corporation data is read only as far as a Character's corporation roles allow. Want less? <custom>Log in with custom permissions</custom> on the login page and untick what you'd rather not share; only skills, the skill queue and structure lookup are required. Logging in again later for a Character asks for anything it is missing in one go, except what you unticked. Add more in Settings › Permissions; revoke on <ccp>EVE's authorized apps page</ccp>. Write to EVE permissions are asked for the first time you use one. Alerts when closed is a separate grant per Character, for notifications and, if you add them, location (nearby alerts) and mail headers (new-mail alerts) only.",
         "dataLag": "Neocom Desk reads EVE's ESI, which is not live. A Character's own data is reused for 10 minutes (a day for game constants such as item names), or until EVE says it may change, if later, so moving between pages doesn't ask again. EVE also caches some data for minutes and corporation data for about an hour, so a short timer may already have happened. The age badge by a page's title shows data age: amber after an hour, red after a day. It's hidden on narrow screens; <data>Settings › Cached data</data> lists every source. A Refresh button asks EVE again right away.",
         "alerts": "Alerts are the bell panel (press A). With the app open, it checks each Character and raises Alerts for the events you enabled in Settings › Notifications. With it closed, known-time alerts such as a skill finishing are scheduled up to 72 hours ahead and pushed to devices with notifications on. Alerts when closed is off until you enable it per Character: you authorize that Character a second time, for the permissions listed before you log in (notifications, and location and mail if you include them), and our server checks EVE's notifications and the Character's solar system about every 15 minutes and pushes the types you chose, with their text, and any Incursion or raidable skyhook within your jump limit, via Google's push service. Before any login, Neocom Desk lists the permissions it will ask for and why, including mail, and you can leave mail or location out. If you include mail, our server then reads only your mail headers, never a message, and pushes each new mail's sender and subject to your device through Google's push service. The sender and subject pass through that service and are shown in the pop-up, so they can appear on a lock screen. Our server keeps only the number of the latest mail it handled, and keeps none of them. Turning Alerts when closed off deletes that token. Quiet time, set per device, pauses pushes for a daily window (you can let attacks through); its times and time zone are stored with the device registration. On iPhone and iPad, install the app first.",
         "characters": "Yes. Each Character logs in on its own: Characters › Add character (press C). Switch between them in the switcher; sort or group them on the Characters page. Alerts, Alerts when closed and Community membership are per Character. Some pages, such as Contacts, can show all Characters together.",
@@ -18131,7 +18167,9 @@
           "batch": "Corps in this batch ({{count}})",
           "back_button": "Back",
           "go_one": "Connect {{count}} corp",
-          "go_other": "Connect {{count}} corps"
+          "go_other": "Connect {{count}} corps",
+          "alerts": "Also approve closed-app alerts for each CEO",
+          "alertsHint": "Straight after each corp, while EVE still has you logged in as its CEO: one more Authorize press. Turn off to skip alerts for this whole run."
         },
         "signIn": {
           "title": "Logging in: corp {{n}} of {{total}}",
@@ -18145,6 +18183,14 @@
           "wrong": "You logged in as {{signedInAs}}. {{corp}} needs {{ceo}}. Nothing was connected; try again with the character below.",
           "notConnected": "{{name}} was not connected. {{reason}} It is listed under Needs you.",
           "cancelled": "The EVE login did not finish.",
+          "alertsTitle": "Corp {{n}} of {{total}}: one more approval for alerts",
+          "alertsWhy": "This turns on alerts when the app is closed for {{ceo}}, like your other characters.",
+          "alertsHint": "EVE still has you logged in as {{ceo}}, so this is one Authorize press. Picking someone else approves nothing.",
+          "alertsAction": "Approve alerts as {{ceo}}",
+          "alertsSkip": "Skip alerts",
+          "alertsWrong": "You approved as {{signedInAs}}, so alerts were not turned on. Pick {{ceo}} and try again.",
+          "alertsOn": "Alerts are on for {{ceo}}.",
+          "alertsNotOn": "Alerts were not turned on for {{ceo}}. You can do it later in Settings › Notifications.",
           "stop": "Stop here",
           "action": "Log in as {{ceo}} with EVE",
           "failed": "Could not open EVE's login. Try again.",
@@ -18718,6 +18764,11 @@
         "refineries_other": "{{count}} refineries",
         "nothingSeen": "No mining or extraction seen yet",
         "synced": "Synced {{age}}",
+        "nextRead": "next read {{time}}",
+        "syncNow": {
+          "tooSoon": "Moon owners were just read. Sync now reads them again from {{time}}.",
+          "failed": "Couldn't read the moon owners now. The scheduled sync will try again."
+        },
         "cantReadSince": "Can't read their ledger since {{date}}",
         "since": "since {{date}}",
         "until": "until {{date}}",

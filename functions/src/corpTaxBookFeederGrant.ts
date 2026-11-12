@@ -249,7 +249,12 @@ async function reconnectCore(
     if (!rec || !RECONNECTABLE.includes(rec.status)) {
       fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
     }
-    const patch: Record<string, unknown> = { grantHolder: holder, grantedBy };
+    // A new holder may have the Station_Manager the old one lacked: read Extractions now (#6117).
+    const patch: Record<string, unknown> = {
+      grantHolder: holder,
+      grantedBy,
+      extractionsRefusedAt: FieldValue.delete(),
+    };
     const reopened = rec.status === 'disconnected';
     let coveragePeriods: FeederRecord['coveragePeriods'] | undefined;
     if (reopened) {
@@ -277,7 +282,12 @@ async function reconnectCore(
 }
 
 /** The fields a reconnect's first pull writes (`recordFeederRead`). */
-const FIRST_PULL_FIELDS = ['staleSince', 'lastSyncResult', 'lastReadWellAt'] as const;
+const FIRST_PULL_FIELDS = [
+  'staleSince',
+  'lastSyncResult',
+  'lastReadWellAt',
+  'extractionsRefusedAt',
+] as const;
 
 /**
  * A refused Reconnect puts back only what it (and its first pull) wrote, in a transaction, and

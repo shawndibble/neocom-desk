@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { CORP_CAPABILITIES, corpCapabilities } from '@/engine/corpRoles';
-import { SCOPES, scopesForGroup } from '@/esi/scopes';
+import { scopesForGroup } from '@/esi/scopes';
 import { CORP_SCOPES_FOR_CAPABILITY, corpGrantCoverage, missingCorpScopes } from './corpScopes';
 
 const CONTRACTS = 'esi-contracts.read_corporation_contracts.v1';
@@ -54,15 +54,6 @@ describe('CORP_SCOPES_FOR_CAPABILITY', () => {
     for (const capability of CORP_CAPABILITIES) {
       for (const scope of CORP_SCOPES_FOR_CAPABILITY[capability]) {
         expect(group.has(scope), `${capability}: ${scope}`).toBe(true);
-      }
-    }
-  });
-
-  it('names no scope already in the base grant — those need no gate', () => {
-    const base = new Set<string>(SCOPES);
-    for (const capability of CORP_CAPABILITIES) {
-      for (const scope of CORP_SCOPES_FOR_CAPABILITY[capability]) {
-        expect(base.has(scope), `${capability}: ${scope}`).toBe(false);
       }
     }
   });

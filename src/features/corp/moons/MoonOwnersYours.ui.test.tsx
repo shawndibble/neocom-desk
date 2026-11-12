@@ -79,7 +79,7 @@ describe('MoonOwnersTable: his own corps', () => {
       />
     );
     expect(
-      screen.getByText('No mining or extraction seen yet · Synced 2h ago')
+      screen.getByText(/^No mining or extraction seen yet · Synced 2h ago · next read 12:35\sUTC$/)
     ).toBeInTheDocument();
     expect(screen.queryByText(/0 refineries/)).not.toBeInTheDocument();
   });

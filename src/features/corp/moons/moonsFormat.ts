@@ -41,6 +41,11 @@ export function dateTimeUtc(value: string, now: Date = new Date()): string {
   return `${dateWithYear(value, now)} ${value.slice(11, 16)}\u00a0UTC`;
 }
 
+/** "12:35 UTC" (EVE time) from an instant: a time later today or tomorrow, where the date adds nothing. */
+export function utcTime(ms: number): string {
+  return `${new Date(ms).toISOString().slice(11, 16)}\u00a0UTC`;
+}
+
 /** An amount with its direction in the sign, U+2212 for a minus (the book's sums use it too). */
 export function signedIsk(value: number): string {
   return `${value < 0 ? '\u2212' : '+'}${isk(Math.abs(value))}`;

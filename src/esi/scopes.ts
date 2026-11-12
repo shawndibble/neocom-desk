@@ -4,10 +4,7 @@
  * autopilot waypoints, Open in EVE — each its own opt-in Permission in the
  * **Write to EVE** section, so the Base Grant requests none of them. Every
  * other scope below is a read — `esi-planets.manage_planets.v1` included,
- * whatever its name says.
- * `esi-markets.structure_markets.v1` (issue #538) is opt-in only — behind the
- * `structureMarkets` group, never the Base Grant — since checking a player
- * structure's own market is a need almost nobody's orders have.
+ * whatever its name says — and every read is in the Base Grant (#6102).
  *
  * Derived from `registry.ts`, never hand-maintained, so a scope is here only
  * because some endpoint asks for it. `e2e/support/fixtureData.ts` re-exports.
@@ -54,16 +51,14 @@ export const DEFAULT_ON_GROUPS: readonly ScopeGroup[] = SCOPE_GROUPS.filter(
 
 /**
  * What **every** character is asked for at sign-in: the Core Grant plus every
- * default-on Permission. The plain login and Add Character request exactly
- * this set.
+ * default-on Permission — every read the app makes (#6102). The plain login
+ * and Add Character request exactly this set; Customize permissions asks for
+ * less.
  *
- * Opt-in Permissions (`corp`, `structureMarkets`, `jumpFatigue`, `corpProjects`, `killmails`, `mercenaryDens`) are excluded by design
- * (issue #295, issue #538). Registering a corp endpoint the ordinary way
- * would put "read your corporation's wallets, assets and members" on the
- * consent screen of the ~95% of users who hold no corp role and can never
- * exercise it — a conversion cost paid by everyone for a feature almost
- * nobody uses. `scopesForGroup` supplies the rest, per character, when they
- * ask for it.
+ * The corp scopes are in it although most Characters hold no Corp Role: a
+ * scope the roles cannot use is harmless, since role gates, not held scopes,
+ * decide every corp read. Asking later cost a player with many Characters on
+ * many accounts one more trip to EVE's login per Permission.
  *
  * Order is cosmetic — the SSO authorize URL's `scope` parameter is
  * order-insensitive.

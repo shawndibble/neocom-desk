@@ -269,7 +269,9 @@ emulatorSuite('add my other corps', () => {
   it('refuses a corporation that already feeds a book', async () => {
     await save(await newInvite());
     expect(await reason(add())).toBe('already-feeder');
-    expect(await feederRecord()).toMatchObject({ sameOwner: undefined, mode: 'normal' });
+    const rec = await feederRecord();
+    expect(rec).toMatchObject({ mode: 'normal' });
+    expect(rec?.sameOwner).toBeUndefined();
     expect(await grant()).toMatchObject({ kind: 'feeder' });
   });
 

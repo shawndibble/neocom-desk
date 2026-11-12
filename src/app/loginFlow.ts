@@ -10,10 +10,11 @@ import {
   takeRetryBudget,
 } from '@/auth/session';
 import { clearLoginReturnTo, setLoginReturnTo, takeLoginReturnTo } from '@/auth/loginReturnTo';
-import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
+import { CORE_GRANT, DEFAULT_ON_GROUPS, SCOPES, scopesForGroup } from '@/esi/scopes';
 import type { ScopeGroup } from '@/esi/registry';
 import { db } from '@/db';
 import type { AlertsExtraState } from '@/features/notifications/alertsGrant';
+import { readCustomizeSelection } from '@/features/permissions/customizeSelection';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { assignLocation } from './navigation';
 import { currentRouterPath, isOnRoute } from './routerPath';
@@ -28,7 +29,7 @@ export interface EveLoginOptions {
    * not the active one.
    */
   characterId?: number;
-  /** Opt-in scope groups to add to the request, e.g. `['corp']`. */
+  /** Permissions to ask for even if unticked in Customize, e.g. the one a banner names. */
   groups?: readonly ScopeGroup[];
 }
 
@@ -41,35 +42,52 @@ export interface EveLoginOptions {
  * "plain login still asks for the whole Base Grant" rule.
  *
  * With a known Character, this is a re-login for someone already looking at
- * their own data — a `ReauthBanner`, a `ScopeGate`, a Grant button — so
- * re-asking for the whole Base Grant would silently re-request every
- * Permission the Character declined at sign-in (issue #1520). It asks for
- * just the `CORE_GRANT`, plus any named `groups` (the one Permission a
- * banner's endpoints resolved to, or an opt-in group like `corp`), plus
- * `characterId`'s own stored grant.
+ * their own data — a `ReauthBanner`, a `ScopeGate`, a Grant button. One trip
+ * fills every gap (#6102): the `CORE_GRANT`, any named `groups`, the
+ * Character's own stored grant, and every default-on Permission it lacks —
+ * except one the player unticked in Customize permissions, so a re-login never
+ * re-requests what they declined (#1520). A player with many Characters on
+ * many EVE accounts otherwise paid a sign-out-and-in per missing Permission.
+ * A named group is asked for even if unticked there: they just pressed for it.
  *
- * Unioning *stored* scopes rather than naming new ones is what keeps the union
- * safe: every scope in it was granted to this client id already, so SSO cannot
- * reject the request as asking for something the application is not registered
- * for.
+ * Unioning *stored* scopes is what keeps a re-login from narrowing: EVE issues
+ * a token carrying exactly what was requested. Every added scope is one the
+ * app is registered for, so SSO cannot reject the request.
  */
 async function requestedScopes(
   characterId: number | null,
   groups: readonly ScopeGroup[]
 ): Promise<string[]> {
   if (characterId === null) return [...new Set(SCOPES)];
-  const base = [...CORE_GRANT, ...groups.flatMap((group) => [...scopesForGroup(group)])];
+  const named = [...CORE_GRANT, ...groups.flatMap((group) => [...scopesForGroup(group)])];
+  const fill = await defaultOnFill();
   try {
     const token = await db.tokens.get(characterId);
     // `?? []` as everywhere else that reads a stored grant (app/prefetch.ts,
     // app/useGrantedScopes.ts): `scopes` post-dates the table, so a record
     // written before it exists has no such field however the type reads.
-    return [...new Set([...base, ...(token?.scopes ?? [])])];
+    return [...new Set([...named, ...fill, ...(token?.scopes ?? [])])];
   } catch {
     // A broken Dexie may cost the user their cache; it must never cost them
     // their way back in — nor turn a Grant press into a plain re-auth, which
-    // is why the requested group is already in `base`.
-    return [...new Set(base)];
+    // is why the requested group is already in `named`.
+    return [...new Set([...named, ...fill])];
+  }
+}
+
+/**
+ * The scopes of every default-on Permission the player left ticked in
+ * Customize permissions. Empty when that choice cannot be read: without it a
+ * fill could re-request a Permission the player declined.
+ */
+async function defaultOnFill(): Promise<string[]> {
+  try {
+    const chosen = new Set(await readCustomizeSelection());
+    return DEFAULT_ON_GROUPS.filter((group) => chosen.has(group)).flatMap((group) => [
+      ...scopesForGroup(group),
+    ]);
+  } catch {
+    return [];
   }
 }
 
@@ -231,8 +249,7 @@ function forgetStrayLanding(): void {
  *
  * #293 unioned across every stored Character instead, because it could not
  * under-ask without tripping the cache purge. That is safe but over-asks: an
- * alt would be shown corp scopes only a main ever granted, the exact consent
- * bloat incremental auth exists to avoid. What makes asking for less safe now
+ * alt would be shown a write scope only a main ever granted. What makes asking for less safe now
  * is that `auth/session` judges revocation as **requested vs granted** — a
  * scope the app did not ask for going missing from the JWT is not evidence the
  * Character revoked it, so it purges nothing.
@@ -251,8 +268,8 @@ export async function beginAddCharacterLogin(): Promise<void> {
  * permissions dialog's own submit (issue #1522). Same "nobody to union with"
  * reasoning as `beginAddCharacterLogin`: the returning identity is unknowable
  * until EVE sends them back. Unlike that base request, `groups` here may omit
- * a default-on Permission (an unchecked box) or include an opt-in one
- * (Corporation, Structure markets) — Customize offers all 15 either way.
+ * a default-on Permission (an unchecked box) or include a Write to EVE one —
+ * Customize offers every Permission either way.
  */
 export async function beginCustomizedAddCharacterLogin(
   groups: readonly ScopeGroup[]
