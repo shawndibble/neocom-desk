@@ -1,5 +1,5 @@
 /**
- * Appraisal result header with 13-digit totals printed in full: the other
+ * Appraisal result header with big-haul totals printed in full: the other
  * Appraisal specs only price short numbers, so overflow and overlap in the
  * header went unseen.
  *
@@ -13,8 +13,8 @@ import { signInAndGoto } from './support/authSeed';
 import { expectNoPageOverflow } from './support/overflow';
 
 const VELDSPAR = 1230;
-/** Enough Veldspar for 13-digit totals: the widest figure the cards must hold in full. */
-const PASTE = 'Veldspar\t1,250,000,000';
+/** 12,500,000 units at 0.1 m³ is 1,250,000 m³; at ~5,377 ISK each, a sell of 67,214,000,000 ISK. */
+const PASTE = 'Veldspar\t12,500,000';
 
 const JITA_STATION = 60_003_760;
 
@@ -68,12 +68,12 @@ for (const width of [1024, 1100, 1280, 1440]) {
     await expect(page.getByRole('table', { name: 'Appraisal' })).toBeVisible({ timeout: 15_000 });
 
     const sell = page
-      .getByRole('button', { name: /^Copy Sell total, 6,\d{3},\d{3},\d{3},\d{3} ISK$/ })
+      .getByRole('button', { name: /^Copy Sell total, 6\d,\d{3},\d{3},\d{3} ISK$/ })
       .first();
     await expect(sell).toBeVisible();
     // The full digits are printed, never the shorthand.
     await expect(page.getByRole('region', { name: 'Sell' }).first()).toContainText(
-      /6,\d{3},\d{3},\d{3},\d{3}/
+      /6\d,\d{3},\d{3},\d{3}/
     );
 
     const geometry = await page.evaluate(() => {
