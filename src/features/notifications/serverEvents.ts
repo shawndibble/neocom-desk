@@ -28,6 +28,8 @@ export const SERVER_PUSHED_EVENT_IDS = [
   'communityMemberJoined',
   'communityRequestPledged',
   'priceAlertTriggered',
+  // Pushed when a pilot shares a vetting report, to reviewers who opened Vetting lately.
+  'vettingShared',
   // Needs an Alerts Grant that carries the mail scope (issue #5143, ADR 0029).
   'newMail',
   // Need an Alerts Grant that carries the location (issue #5122, ADR 0028).

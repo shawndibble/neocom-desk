@@ -8,11 +8,12 @@
  * is not held is never shown, never fetched and never offered in the Gallery
  * (corp UI hides rather than locks).
  */
-import type { CorpCapabilities } from '@/engine/corpRoles';
+import type { CorpCapabilities, CorpCapability } from '@/engine/corpRoles';
 import type { WidgetBoard } from '@/features/overview/widgets/board';
 import {
   boardKinds,
   CORP_KIND_CATEGORIES,
+  getKind,
   isAddable,
   kindOpenTo,
   type WidgetKindDef,
@@ -38,12 +39,33 @@ import { seqId } from '@/features/overview/widgets/roles';
  * roles would, once edited and saved, drop the Director main's widgets on
  * every device.
  */
-export const CORP_DEFAULT_SEEDS: readonly WidgetSeed[] = [
+/**
+ * Kinds that read every corporation the pilot's Characters can read, once there are two
+ * (`allScopeOffered`): they open on All, in the default layout and when added from the Gallery.
+ */
+const OPENS_ON_ALL = [
   'corpDeadlines',
   'structures',
   'moonChunks',
   'corpJobs',
   'corpWallet',
+  'corpKills',
+  // #6101's Gallery kinds, not in the default layout.
+  'corpCustomsOffices',
+  'corpStarbases',
+  'corpSovereignty',
+  'corpContracts',
+  'corpOrders',
+] as const;
+
+const onAll = (kind: (typeof OPENS_ON_ALL)[number]): WidgetSeed => ({ kind, scope: 'all' });
+
+export const CORP_DEFAULT_SEEDS: readonly WidgetSeed[] = [
+  onAll('corpDeadlines'),
+  onAll('structures'),
+  onAll('moonChunks'),
+  onAll('corpJobs'),
+  onAll('corpWallet'),
   // The corp wallet on its Flow and its Sources, opened as Cash flow and Income by source were.
   presetSeed('corpCashFlow'),
   'corpMembers',
@@ -64,13 +86,28 @@ export function corpDefaultLayout(makeId: MakeId = seqId('c')): OverviewLayout {
 
 const CORP_KINDS = boardKinds('corp');
 
-export function corpWidgetBoard(capabilities: CorpCapabilities): WidgetBoard {
+const CORP_OPENS_ON_ALL: ReadonlySet<string> = new Set(OPENS_ON_ALL);
+
+/**
+ * `corporationsReading` says how many corporations the pilot's Characters can read for any
+ * of some capabilities; until it is known (left out), every widget reads its header scope.
+ */
+export function corpWidgetBoard(
+  capabilities: CorpCapabilities,
+  corporationsReading?: (capabilities: readonly CorpCapability[]) => number
+): WidgetBoard {
   return {
     id: 'corp',
     kinds: CORP_KINDS,
     categories: CORP_KIND_CATEGORIES,
     canDraw: (kind: WidgetKindDef) => kindOpenTo(kind, capabilities),
     characterScope: 'summable',
+    // One corporation to read: All would be the same rows, so the choice is not offered. Until
+    // the count lands the header scope is read, so a one-corporation pilot never fans out.
+    allScopeOffered: (kind) =>
+      corporationsReading !== undefined &&
+      corporationsReading(getKind(kind)?.capabilities ?? []) > 1,
+    opensOnAll: CORP_OPENS_ON_ALL,
     defaultLayout: corpDefaultLayout,
   };
 }

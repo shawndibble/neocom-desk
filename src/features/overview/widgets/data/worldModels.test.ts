@@ -3,7 +3,8 @@ import type { BoardStructureSource } from '@/engine/corp/board';
 import { visibleColumns } from '../tableModel';
 import { buildView, feedsFor, feedsOf, kindHasAllFeeds } from './models';
 import { elapsedShare } from './industryModels';
-import { FUEL_BAR_HORIZON_MS, shortStructureName } from './structureModels';
+import { FUEL_BAR_HORIZON_MS } from './structureModels';
+import { shortStructureName } from '@/features/corp/structures/structureRows';
 import type { BuildContext, FeedState, Feeds, KindView, TableCell } from './types';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
@@ -302,6 +303,52 @@ describe('structures', () => {
     expect(feedsFor([{ kind: 'training', scope: 'all' }]).sort()).toEqual(
       [...feedsOf('training')!].sort()
     );
+  });
+
+  it("names each structure's corporation when the All read spans several, and not for one", () => {
+    const [a, b] = fleet();
+    const read = (corporations: Map<number, { ticker: string; name: string }>) =>
+      buildView(
+        'structures',
+        {
+          structuresAll: ok({
+            structures: [
+              { ...a!, corporationId: 500 },
+              { ...b!, corporationId: 600 },
+            ],
+            structureCount: 2,
+            needsReauth: false,
+            fetchedAt: new Date(NOW),
+            corporations,
+          }),
+        },
+        ctx({ scopeAll: true })
+      ).table!;
+    const two = read(
+      new Map([
+        [500, { ticker: 'MAIN', name: 'Main Corporation' }],
+        [600, { ticker: 'HOLD', name: 'Holding Corporation' }],
+      ])
+    );
+    expect(two.columns.map((column) => column.key)).toContain('corp');
+    expect(two.rows.map((row) => row.cells[1])).toEqual(
+      expect.arrayContaining([
+        { text: 'MAIN', hint: 'Main Corporation' },
+        { text: 'HOLD', hint: 'Holding Corporation' },
+      ])
+    );
+    const one = read(new Map([[500, { ticker: 'MAIN', name: 'Main Corporation' }]]));
+    expect(one.columns.map((column) => column.key)).not.toContain('corp');
+  });
+
+  it('links its header and each row to the Structures page', () => {
+    const view = buildView('structures', feeds(fleet()), ctx());
+    expect(view.to).toBe('/corp/structures');
+    expect(view.table!.rows.map((row) => row.to).sort()).toEqual([
+      '/corp/structures?structure=1',
+      '/corp/structures?structure=2',
+      '/corp/structures?structure=3',
+    ]);
   });
 
   it('shortens a structure name by the system prefix', () => {

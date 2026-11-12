@@ -111,7 +111,7 @@ const ISK_SHORTHAND_MULTIPLIERS: Readonly<Record<string, number>> = {
 };
 
 /** `10.5m`, `10,500,000`, `10.500.000` and `10500000` all parse to 10,500,000. Suffixes: b = billion, m = million, k or t = thousand. */
-const ISK_AMOUNT_PATTERN = /^([\d.,'\s\u00a0\u2009\u202f]*\d)\s*([bmtk])?$/i;
+const ISK_AMOUNT_PATTERN = /^([\d.,'\u2019\s\u00a0\u2009\u202f]*\d)\s*([bmtk])?$/i;
 
 /**
  * Parses a threshold-style ISK amount from free text (issue #wallet-balance-threshold):
@@ -140,7 +140,7 @@ export function parseIskAmount(input: string): number | null {
  * untouched so the field's error can name it.
  */
 export function maskIskTyping(text: string): string {
-  const match = /^([\d.,'\s\u00a0\u2009\u202f]*)\s*([bmtk])?$/i.exec(text.trim());
+  const match = /^([\d.,'\u2019\s\u00a0\u2009\u202f]*)\s*([bmtk])?$/i.exec(text.trim());
   if (!match) return text;
   const decimal = getDecimalMark();
   const body = match[1];

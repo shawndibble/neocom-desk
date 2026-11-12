@@ -47,6 +47,7 @@ import type {
 } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
 import type { CalendarEventSummary } from '@/esi/endpoints';
+import type { CorpLabel } from '@/features/corp/corpTicker';
 import { DAY_MS } from '@/lib/age';
 
 /*
@@ -552,6 +553,10 @@ export interface StructuresBoardData {
   structureCount: number;
   needsReauth: boolean;
   fetchedAt: Date | null;
+  /** Read across several corporations (All scope): each one's ticker and name, for its rows. */
+  corporations?: ReadonlyMap<number, CorpLabel>;
+  /** Read across several corporations, and one of them failed: the rest draws, flagged. */
+  partlyFailed?: boolean;
 }
 
 /** `StructuresBoardData` with its items built against the current instant. */
@@ -581,11 +586,16 @@ export interface MoonChunksBoardData {
   needsReauth: boolean;
   fetchedAt: Date | null;
   loadedAt: number;
+  /** Read from a Corp Tax Book (a moon owner's pops, #6116), not from ESI. */
+  fromBook?: true;
+  /** Read across several corporations, and one of them failed: the rest draws, flagged. */
+  partlyFailed?: boolean;
 }
 
+/** One Character's moon drills, with its Corp Tax Book's moon owners' pops (#6116). */
 export async function loadMoonChunksBoard(characterId: number): Promise<MoonChunksBoardData> {
-  const { loadMoonChunksBoardData } = await import('./corpBoard');
-  return loadMoonChunksBoardData(characterId);
+  const { loadMoonChunksWithBook } = await import('./corpBoard');
+  return loadMoonChunksWithBook(characterId);
 }
 
 /** Every readable corporation's moon drills, merged: a widget scoped to All characters reads this. */

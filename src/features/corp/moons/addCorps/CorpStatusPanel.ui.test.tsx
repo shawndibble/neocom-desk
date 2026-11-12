@@ -15,7 +15,12 @@ const ITEMS: NeedsYouItem[] = [
 describe('CorpStatusPanel', () => {
   it('renders nothing when nothing needs the player', () => {
     const { container } = render(
-      <CorpStatusPanel items={[]} onSignInAgain={() => {}} onRemove={() => Promise.resolve(true)} />
+      <CorpStatusPanel
+        items={[]}
+        onSignInAgain={() => {}}
+        onGrantAgain={() => {}}
+        onRemove={() => Promise.resolve(true)}
+      />
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -28,6 +33,7 @@ describe('CorpStatusPanel', () => {
         connected={8}
         total={12}
         onSignInAgain={onSignInAgain}
+        onGrantAgain={() => {}}
         onRemove={() => Promise.resolve(true)}
       />
     );
@@ -54,7 +60,14 @@ describe('CorpStatusPanel', () => {
 
   it('removes a corp that went quiet and says when that is refused', async () => {
     const onRemove = vi.fn(() => Promise.resolve(false));
-    render(<CorpStatusPanel items={ITEMS} onSignInAgain={() => {}} onRemove={onRemove} />);
+    render(
+      <CorpStatusPanel
+        items={ITEMS}
+        onSignInAgain={() => {}}
+        onGrantAgain={() => {}}
+        onRemove={onRemove}
+      />
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Remove Wren Hollow Corp' }));
     expect(onRemove).toHaveBeenCalledWith(4);
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not remove this corp');
@@ -65,6 +78,7 @@ describe('CorpStatusPanel', () => {
       <CorpStatusPanel
         items={[{ corporationId: 9, name: 'Dunmoor Freight', state: 'failed', reason: 'unknown' }]}
         onSignInAgain={onSignInAgain}
+        onGrantAgain={() => {}}
         onRemove={() => Promise.resolve(true)}
       />
     );
@@ -73,5 +87,45 @@ describe('CorpStatusPanel', () => {
     expect(screen.queryByText('Needs login')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: /Dunmoor Freight/ }));
     expect(onSignInAgain).toHaveBeenCalledWith(9);
+  });
+
+  it('offers Grant again for an own corp without names and only informs about another', async () => {
+    const onGrantAgain = vi.fn();
+    render(
+      <CorpStatusPanel
+        items={[
+          { corporationId: 30, name: 'Sable Ridge Extraction', state: 'needs-names' },
+          { corporationId: 31, name: 'Brightwater Holdings', state: 'names-not-shared' },
+        ]}
+        onSignInAgain={() => {}}
+        onGrantAgain={onGrantAgain}
+        onRemove={() => Promise.resolve(true)}
+      />
+    );
+    // Only the own corp counts as needing the player.
+    expect(screen.getByText('Needs you (1)')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Refinery names aren't shared. Brightwater Holdings's CEO or an officer can grant again from that corp's Moons page."
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Brightwater Holdings/ })).toBeNull();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Grant again for Sable Ridge Extraction' })
+    );
+    expect(onGrantAgain).toHaveBeenCalledWith(30);
+  });
+
+  it("titles a list of only other officers' corps without a count", () => {
+    render(
+      <CorpStatusPanel
+        items={[{ corporationId: 31, name: 'Brightwater Holdings', state: 'names-not-shared' }]}
+        onSignInAgain={() => {}}
+        onGrantAgain={() => {}}
+        onRemove={() => Promise.resolve(true)}
+      />
+    );
+    expect(screen.getByText('Refinery names')).toBeInTheDocument();
+    expect(screen.queryByText(/Needs you/)).toBeNull();
   });
 });

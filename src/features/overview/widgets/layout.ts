@@ -166,6 +166,8 @@ export interface WidgetInit {
   view?: WidgetView;
   size?: WidgetSize;
   show?: WidgetShow;
+  /** Opens on All (a board's `opensOnAll`, or a default layout's seed). */
+  scope?: WidgetScope;
 }
 
 /** A new widget with `init` applied over its kind's defaults; whatever the kind does not offer is left out. */
@@ -177,6 +179,7 @@ function withInit(kind: WidgetKindId, id: string, init?: WidgetInit): Widget | n
   if (init?.title) widget.title = init.title;
   if (init?.view && def.views.includes(init.view)) widget.view = init.view;
   if (init?.size) widget.size = init.size;
+  if (init?.scope) widget.scope = init.scope;
   if (init?.trendItems?.length && def.hasTrendSources) {
     widget.trendItems = [...init.trendItems];
   }

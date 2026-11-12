@@ -12,7 +12,7 @@ import {
   type KindCategory,
   type WidgetKindDef,
 } from './kinds';
-import type { MakeId, OverviewLayout } from './layout';
+import type { MakeId, OverviewLayout, Widget, WidgetScope } from './layout';
 import { defaultLayout } from './roles';
 
 export interface WidgetBoard {
@@ -27,7 +27,20 @@ export interface WidgetBoard {
    * data has one owner and a choice that cannot be honoured is not worth a row.
    */
   characterScope: 'always' | 'summable';
+  /**
+   * Whether a widget of `kind` may read All right now; when it may not, a widget saved on
+   * All reads its header scope and keeps the saved choice. The Overview always may; the Corp
+   * Board only while the pilot's Characters can read two or more corporations for the kind.
+   */
+  allScopeOffered: (kind: string) => boolean;
+  /** Kinds a widget added on this board opens on All (Due soon and Structures on the Corp Board). */
+  opensOnAll: ReadonlySet<string>;
   defaultLayout: (makeId: MakeId) => OverviewLayout;
+}
+
+/** The scope a widget is read with on `board`: its saved one, unless All is not offered there now. */
+export function readScope(board: WidgetBoard, widget: Pick<Widget, 'kind' | 'scope'>): WidgetScope {
+  return widget.scope === 'all' && board.allScopeOffered(widget.kind) ? 'all' : 'header';
 }
 
 const always = () => true;
@@ -38,6 +51,8 @@ export const OVERVIEW_BOARD: WidgetBoard = {
   categories: KIND_CATEGORIES,
   canDraw: always,
   characterScope: 'always',
+  allScopeOffered: always,
+  opensOnAll: new Set(),
   defaultLayout,
 };
 

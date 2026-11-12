@@ -27,6 +27,8 @@ import type { WalletDivision } from '@/features/corp/divisions';
 import type { CorpAssetsSummary } from './corpAssetsSummary';
 import type { PilotStats, ZkillFailureReason } from '@/lib/zkillboard';
 import type { SrpClaim } from '@/features/corp/srpClaimTypes';
+import type { CorpLabel } from '@/features/corp/corpTicker';
+import type { MoonChunksBoardData, StructuresBoardData } from '../../data/boardData';
 
 /** The fields of a claim the Corp SRP widget reads. */
 export type SrpClaimRow = Pick<
@@ -41,6 +43,12 @@ export interface CorpFeedBase {
   /** The oldest read behind the feed; null when none was made. */
   fetchedAt: Date | null;
   fromCache: boolean;
+  /** Read across several corporations (All scope): each one's ticker and name. */
+  corporations?: ReadonlyMap<number, CorpLabel>;
+  /** Read across several corporations: each row's corporation, by the widget's row key. */
+  corporationOf?: ReadonlyMap<string, number>;
+  /** Read across several corporations, and one of them failed: the rest draws, flagged. */
+  partlyFailed?: boolean;
 }
 
 /** One master-wallet journal line, reduced to what the money builders read. */
@@ -234,6 +242,58 @@ export interface CorpSovereigntyFeed extends CorpFeedBase {
   jumps: ReadonlyMap<number, number>;
 }
 
+/**
+ * One corporation's Due soon reads, each through a Character that can read it there.
+ * A source is null when no Character can (or its read failed): left out, never an error.
+ */
+export interface CorpDeadlinesSlice {
+  corporationId: number;
+  structures: StructuresBoardData | null;
+  moonChunks: MoonChunksBoardData | null;
+  jobs: CorpJobsFeed | null;
+  starbases: CorpStarbasesFeed | null;
+  sovereignty: CorpSovereigntyFeed | null;
+  /** One of this corporation's reads failed: the rest still draws, flagged. */
+  failed: boolean;
+}
+
+/** Due soon across every corporation the pilot's Characters can read (All scope). */
+export interface CorpDeadlinesAllFeed {
+  corporations: CorpDeadlinesSlice[];
+  labels: ReadonlyMap<number, CorpLabel>;
+}
+
+/**
+ * One widget's read across every corporation the pilot's Characters can read it for (All
+ * scope): each corporation's own read, the same feed its header scope reads. A corporation
+ * whose read failed is absent and sets `partlyFailed`; when every read fails the load throws.
+ */
+export interface CorpAllFeed<F extends CorpFeedBase> {
+  corporations: { corporationId: number; feed: F }[];
+  labels: ReadonlyMap<number, CorpLabel>;
+  partlyFailed: boolean;
+}
+
+export async function loadCorpWalletAllFeed(): Promise<CorpAllFeed<CorpWalletFeed>> {
+  const { loadCorpWalletAll } = await import('./corpFeedLoaders');
+  return loadCorpWalletAll();
+}
+
+export async function loadCorpJobsAllFeed(): Promise<CorpAllFeed<CorpJobsFeed>> {
+  const { loadCorpJobsAll } = await import('./corpFeedLoaders');
+  return loadCorpJobsAll();
+}
+
+export async function loadCorpKillsAllFeed(): Promise<CorpAllFeed<CorpKillsFeed>> {
+  const { loadCorpKillsAll } = await import('./corpFeedLoaders');
+  return loadCorpKillsAll();
+}
+
+export async function loadCorpDeadlinesAllFeed(): Promise<CorpDeadlinesAllFeed> {
+  const { loadCorpDeadlinesAll } = await import('./corpFeedLoaders');
+  return loadCorpDeadlinesAll();
+}
+
 export async function loadCorpWalletFeed(characterId: number): Promise<CorpWalletFeed> {
   const { loadCorpWallet } = await import('./corpFeedLoaders');
   return loadCorpWallet(characterId);
@@ -297,4 +357,32 @@ export async function loadCorpRoleAuditFeed(characterId: number): Promise<CorpRo
 export async function loadCorpSovereigntyFeed(characterId: number): Promise<CorpSovereigntyFeed> {
   const { loadCorpSovereignty } = await import('./corpFeedLoaders');
   return loadCorpSovereignty(characterId);
+}
+
+// --- Every corporation the pilot's Characters can read (All scope) ------------------
+// The same shapes, merged (`corporations`, `corporationOf` and `partlyFailed` set).
+
+export async function loadCorpCustomsAllFeed(): Promise<CorpCustomsFeed> {
+  const { loadCorpCustomsAll } = await import('./corpFeedLoaders');
+  return loadCorpCustomsAll();
+}
+
+export async function loadCorpStarbasesAllFeed(): Promise<CorpStarbasesFeed> {
+  const { loadCorpStarbasesAll } = await import('./corpFeedLoaders');
+  return loadCorpStarbasesAll();
+}
+
+export async function loadCorpSovereigntyAllFeed(): Promise<CorpSovereigntyFeed> {
+  const { loadCorpSovereigntyAll } = await import('./corpFeedLoaders');
+  return loadCorpSovereigntyAll();
+}
+
+export async function loadCorpContractsAllFeed(): Promise<CorpContractsFeed> {
+  const { loadCorpContractsAll } = await import('./corpFeedLoaders');
+  return loadCorpContractsAll();
+}
+
+export async function loadCorpOrdersAllFeed(): Promise<CorpOrdersFeed> {
+  const { loadCorpOrdersAll } = await import('./corpFeedLoaders');
+  return loadCorpOrdersAll();
 }

@@ -428,6 +428,12 @@ export function useCorpBook(
       for (const a of fetched.data.groupingAnswers ?? []) characterIds.add(a.characterId);
       // Moon owners are corporations; the universe names lookup resolves both kinds.
       // A payee the moon owner named is a player or another corporation.
+      // The book's own corporation is named beside a moon owner's on Extractions (#6097).
+      if (
+        corporationId !== null &&
+        view.input.extractions.some((x) => x.sourceCorporationId !== undefined)
+      )
+        characterIds.add(corporationId);
       for (const f of fetched.data.feeders ?? []) {
         characterIds.add(f.corporationId);
         if (f.payee) characterIds.add(f.payee.id);
@@ -482,7 +488,7 @@ export function useCorpBook(
     return () => {
       cancelled = true;
     };
-  }, [view, characterId, fetched]);
+  }, [view, characterId, fetched, corporationId]);
 
   const refineries = useMemo(
     () =>

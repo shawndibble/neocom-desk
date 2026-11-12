@@ -11,6 +11,8 @@ const STATE_TONE: Record<CorpState, PillTone> = {
   'own-book': 'warning',
   'gone-quiet': 'danger',
   failed: 'danger',
+  'needs-names': 'warning',
+  'names-not-shared': 'neutral',
 };
 
 /** One corporation's state as a word on a tint. */

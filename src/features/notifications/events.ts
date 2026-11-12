@@ -341,6 +341,13 @@ const CATALOG = [
     labelKey: 'settings.notifications.event.shipLost',
     defaultChannels: 'both',
   },
+  // A Character whose login EVE refused (issue #6091): read from this device's
+  // needs-sign-in mark, so it needs no scope — the grant is what is gone.
+  {
+    id: 'characterNeedsLogin',
+    labelKey: 'settings.notifications.event.characterNeedsLogin',
+    defaultChannels: 'both',
+  },
   // A Character asking to join a Community the pilot administers. Read from the
   // sync backend, so it needs no ESI scope. In the bell and as a notification:
   // someone is waiting on the admin.
@@ -363,6 +370,15 @@ const CATALOG = [
     id: 'communityRequestPledged',
     labelKey: 'settings.notifications.event.communityRequestPledged',
     defaultChannels: 'feedOnly',
+  },
+  // A pilot shared a vetting report with the corp this Character reviews for. The backend raises
+  // it when it writes the report (ADR 0027), so it needs no ESI scope. No `corpCapability`: that
+  // gate belongs to the Corporation Topic's open-app events and their Permission. Every
+  // Character is offered the row, whose hint says it only reaches reviewers; the server decides.
+  {
+    id: 'vettingShared',
+    labelKey: 'settings.notifications.event.vettingShared',
+    defaultChannels: 'both',
   },
 ] as const satisfies readonly CatalogRow[];
 

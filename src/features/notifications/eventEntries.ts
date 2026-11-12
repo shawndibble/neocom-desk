@@ -136,6 +136,9 @@ import {
   type CorpRosterSnapshot,
   type CorpWalletSnapshot,
   type PriceAlertSnapshot,
+  diffCharacterNeedsLogin,
+  type CharacterNeedsLoginFire,
+  type SignInSnapshot,
 } from '@/engine/notificationDiffs';
 import type { NotificationCopy } from '@/engine/notificationWording';
 import type { ProjectableEventId, PushCopy } from '@/engine/projection';
@@ -169,9 +172,11 @@ import {
   type SkyhookNames,
   shipLostCopy,
   type ShipLostNames,
+  characterNeedsLoginCopy,
   communityJoinRequestCopy,
   communityMemberJoinedCopy,
   communityRequestPledgedCopy,
+  vettingSharedCopy,
   type IncursionNames,
   type DomainCopy,
   type NoNames,
@@ -181,6 +186,11 @@ import {
   type CalendarNames,
   type MemberNames,
 } from './domainCopy';
+import {
+  diffVettingShared,
+  type VettingAlertSnapshot,
+  type VettingSharedFire,
+} from '@/engine/vettingAlert';
 import type { EveNotificationNames } from './eveNotificationText';
 import type { NotificationEventId } from './events';
 import { THRESHOLD_FIELDS, type ThresholdField } from './eventThresholdFields';
@@ -214,12 +224,14 @@ export type AnyNotificationFire =
   | CorpWalletThresholdFire
   | PriceAlertTriggeredFire
   | ShipLostFire
+  | CharacterNeedsLoginFire
   | StockBelowTargetFire
   | IncursionNearbyFire
   | SkyhookRaidableNearbyFire
   | CommunityJoinRequestFire
   | CommunityMemberJoinedFire
-  | CommunityRequestPledgedFire;
+  | CommunityRequestPledgedFire
+  | VettingSharedFire;
 
 /* -------------------------------------------------------------------------- */
 /* Snapshot sources                                                            */
@@ -269,6 +281,8 @@ export const SNAPSHOT_SOURCES = {
   incursions: source<IncursionAlertSnapshot, IncursionNames>('incursions'),
   skyhooksNearby: source<SkyhookAlertSnapshot, SkyhookNames>('skyhooksNearby'),
   communities: source<CommunityAlertSnapshot>('communities'),
+  signIn: source<SignInSnapshot>('signIn'),
+  vetting: source<VettingAlertSnapshot>('vetting'),
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -717,6 +731,15 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     },
     rowHintKey: null,
   }),
+  characterNeedsLogin: defineEvent({
+    source: SNAPSHOT_SOURCES.signIn,
+    diff: diffCharacterNeedsLogin,
+    copy: characterNeedsLoginCopy,
+    // The mark is device-local; the backend never sees a failed refresh.
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
   communityJoinRequest: defineEvent({
     source: SNAPSHOT_SOURCES.communities,
     diff: diffCommunityJoinRequest,
@@ -740,6 +763,15 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     projection: null,
     thresholds: null,
     rowHintKey: null,
+  }),
+  // Raised by the backend alone (`pollDomains/vetting.ts`): the diff never fires.
+  vettingShared: defineEvent({
+    source: SNAPSHOT_SOURCES.vetting,
+    diff: diffVettingShared,
+    copy: vettingSharedCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: 'settings.notifications.vettingSharedHint',
   }),
 } satisfies { readonly [K in NotificationEventId]: ErasedEntryFor<K> };
 

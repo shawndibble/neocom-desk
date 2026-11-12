@@ -23,7 +23,7 @@
       "backup": "Settings › App & backup exports a password-protected backup of every character on this device.",
       "timeFormat": "Settings › Display switches timers between your local time and EVE time.",
       "textSize": "Settings › Display changes the text size on this device.",
-      "numberFormat": "Settings › Display switches numbers between 1,234.56 and 1.234,56.",
+      "numberFormat": "Settings › Display switches numbers between 1,234.56, 1.234,56 and 1'234.56.",
       "selfUpdate": "Neocom Desk updates itself when you open it or reload the page."
     }
   },
@@ -36,8 +36,10 @@
     "corpMembers": "Members",
     "corpWallet": "Corp Wallet",
     "corpAssets": "Corp Assets",
+    "corpStructures": "Structures",
     "corpMoons": "Moons",
     "corpSrp": "SRP",
+    "corpVetting": "Vetting",
     "skills": "Skills",
     "industry": "Industry",
     "ships": "Ships",
@@ -4683,7 +4685,7 @@
         "board": "The Corp Board is a board of widgets you pick and size: deadlines, structure fuel, moon chunks, jobs, wallet, members and more.",
         "pages": "Members, Corp Wallet and Corp Assets each have their own page, with role audits and Stock Targets.",
         "moons": "Moons keeps the Corp Tax Book: what each corp member mined at your refineries, their Statements, and what is paid.",
-        "access": "SRP lets a pilot file a claim from their own killmail. Officer pages appear only with a Corp Role, and corporation data is a separate grant."
+        "access": "SRP lets a pilot file a claim from their own killmail. Officer pages appear only with a Corp Role, and corporation data is read only for the roles you hold."
       },
       "comms": {
         "tab": "Mail",
@@ -4795,7 +4797,7 @@
         "write": "Write to EVE"
       },
       "planetsNote": "EVE's consent screen lists the planetary scope as \"manage your planetary installations\". Neocom Desk only reads that data and never writes to it.",
-      "separateNote": "Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them.",
+      "oneLoginNote": "Logging in asks for every read above at once, so no page sends you back to EVE's login later. Corporation data is read only as far as your in-game corporation roles allow. Want less? Log in with custom permissions and untick it.",
       "revoke": "You can take access back at any time:",
       "revokeLink": "EVE's authorized apps page"
     },
@@ -4867,6 +4869,42 @@
     }
   },
   "characters": {
+    "finishSetup": {
+      "title": "Finish setting up {{name}}",
+      "signedIn": "EVE still has you logged in as {{name}}, so each of these is one Authorize press at EVE.",
+      "hint": "EVE sends you back here after each one. Picking a different character at EVE approves nothing.",
+      "continue": "Continue",
+      "notNow": "Not now",
+      "stop": "Stop here",
+      "failed": "Could not open EVE's login. Try again.",
+      "moon": {
+        "label": "Add {{corp}} to the moon book",
+        "why": "Lets the book read {{corp}}'s mining ledger, counted from today.",
+        "action": "Approve the moon book at EVE"
+      },
+      "alerts": {
+        "label": "Alerts when the app is closed",
+        "why": "Sends {{name}}'s EVE alerts to your devices while Neocom Desk is closed, like your other characters.",
+        "action": "Approve alerts at EVE",
+        "reads": "It reads {{list}}."
+      },
+      "result": {
+        "done": "Done: {{label}}.",
+        "notDone": "Not approved: {{label}}. You can do it later where it lives.",
+        "refused": "Not approved: {{label}}. {{reason}}",
+        "wrong": "You approved as {{signedInAs}}, so nothing was approved. Pick {{name}} on EVE's login page and try again."
+      },
+      "state": {
+        "done": "Done",
+        "notDone": "Not done",
+        "now": "Now",
+        "next": "Next"
+      },
+      "doneTitle": "{{name}} is set up",
+      "doneBody": "Anything not done here is still offered later: the moon book from the Moons page, alerts from Settings › Notifications.",
+      "addAnother": "Add another character",
+      "done": "Done"
+    },
     "csvPiExpires": "PI expires",
     "csvTrainingFinishes": "Training finishes",
     "csvAchievementTitle": "Title",
@@ -4900,6 +4938,8 @@
       "alerts": "Alerts"
     },
     "activeLabel": "Active",
+    "logInAgain": "Log in again",
+    "logInAgainFor": "Log in again as {{name}}",
     "spLabel": "SP",
     "walletLabel": "ISK",
     "acceleratorManual": "+{{bonus}} · {{left}}",
@@ -4975,8 +5015,15 @@
       "spReady": "SP ready",
       "alerts": "Alerts",
       "starred": "Starred",
-      "achievement": "Title / Score"
+      "achievement": "Title / Score",
+      "corpRoles": "Corporation roles",
+      "corpAccess": "Corporation access",
+      "alertsWhenClosed": "Alerts when closed"
     },
+    "corpRolesNotGranted": "Not granted",
+    "corpAccessReady": "Ready",
+    "corpAccessMissing": "Missing access ({{count}})",
+    "corpAccessMissingUnknown": "Missing access",
     "jobSlotCategory": {
       "manufacturing": "Mfg",
       "science": "Sci",
@@ -5019,6 +5066,8 @@
       "structuresFine_one": "{{count}} structure, nothing due",
       "structuresFine_other": "{{count}} structures, nothing due",
       "corpUnreadable": "Your corp roles don't cover this.",
+      "corporation": "Corporation",
+      "corporationsMissing": "One of your corporations could not be read, so its rows are missing.",
       "reinforced": "Timers",
       "structureDry": "Out of fuel",
       "structureOffline": "Offline",
@@ -5842,18 +5891,10 @@
         "noProblems": "No structure needs attention.",
         "col": {
           "structure": "Structure",
+          "corp": "Corporation",
           "fuel": "Fuel left",
           "state": "State",
           "timer": "Timer"
-        },
-        "detail": {
-          "unanchors": "Unanchors in",
-          "services": "Services",
-          "serviceState": {
-            "online": "Online",
-            "offline": "Offline",
-            "cleanup": "Going offline"
-          }
         }
       },
       "moonChunks": {
@@ -5869,6 +5910,7 @@
         },
         "col": {
           "drill": "Drill",
+          "corp": "Corporation",
           "in": "In",
           "event": "Event"
         }
@@ -6056,6 +6098,7 @@
         "empty": "Nothing is due.",
         "col": {
           "subject": "Subject",
+          "corp": "Corporation",
           "what": "What",
           "when": "When"
         },
@@ -6187,6 +6230,9 @@
         },
         "col": {
           "division": "Division",
+          "corp": "Corporation",
+          "master": "Master wallet",
+          "total": "Total",
           "balance": "Balance",
           "share": "Share"
         },
@@ -6194,6 +6240,12 @@
         "summary_other": "{{isk}} ISK across {{count}} wallet divisions.",
         "biggest": "{{name}} holds {{share}}% of it",
         "chartNote": "Share of the corporation's ISK by division",
+        "chartNoteAcross": "Share of the ISK by corporation",
+        "acrossCorps_one": "Balances across {{count}} corporation",
+        "acrossCorps_other": "Balances across {{count}} corporations",
+        "summaryAcross_one": "{{isk}} ISK in {{count}} corporation.",
+        "summaryAcross_other": "{{isk}} ISK across {{count}} corporations.",
+        "balancesOnly": "{{isk}} ISK in all. Balances only: cash flow and income read one corporation.",
         "unused_one": "{{count}} unused division",
         "unused_other": "{{count}} unused divisions"
       },
@@ -6337,6 +6389,7 @@
           "product": "Product",
           "ends": "Ends in",
           "installer": "Installer",
+          "corp": "Corporation",
           "activity": "Activity"
         },
         "unit": "running",
@@ -6379,6 +6432,14 @@
         "unit_other": "kills",
         "secondary": "{{losses}} lost · {{efficiency}} ISK efficiency",
         "allTime": "All time, from zKillboard",
+        "acrossCorps_one": "Across {{count}} corporation",
+        "acrossCorps_other": "Across {{count}} corporations",
+        "col": {
+          "corp": "Corporation",
+          "kills": "Kills",
+          "losses": "Losses",
+          "efficiency": "ISK efficiency"
+        },
         "summary": "{{kills}} kills, {{losses}} losses, {{efficiency}} ISK efficiency, all time."
       },
       "corpContracts": {
@@ -6956,6 +7017,8 @@
       "title": "At war with {{name}}",
       "titleMore_one": "At war with {{name}} and {{count}} more",
       "titleMore_other": "At war with {{name}} and {{count}} more",
+      "corporations_one": "{{count}} of your corporations is at war",
+      "corporations_other": "{{count}} of your corporations are at war",
       "declared": "Declared {{age}}",
       "startsIn": "Starts in {{time}}",
       "notStarted": "Not started yet"
@@ -6963,6 +7026,7 @@
     "modal": {
       "title_one": "War declared",
       "title_other": "{{count}} wars declared",
+      "against": "Against {{name}}",
       "active": "Active",
       "startsIn": "Starts in {{time}}",
       "pendingUnknown": "Not started",
@@ -9165,6 +9229,12 @@
     "csvImportant": "Important",
     "csvProjected": "Projected",
     "csvId": "ID",
+    "csvCorporation": "Corporation",
+    "corpFilter": {
+      "title": "Corporation events",
+      "all": "All corporations",
+      "none": "Hide corporation events"
+    },
     "downloadIcs": "Download .ics",
     "addToGoogleCalendar": "Add to Google Calendar",
     "rsvpGrantTitle": "Permission to respond to events",
@@ -9201,7 +9271,10 @@
       "industryJob": "Industry jobs",
       "planetExtraction": "Planets",
       "mercenaryDen": "Mercenary dens",
+      "structureTimer": "Structure timers",
+      "structureFuel": "Structure fuel",
       "moonChunk": "Moon chunks",
+      "corpJob": "Corp industry jobs",
       "skyhookRaid": "Skyhook raids",
       "contractExpiry": "Contracts",
       "orderExpiry": "Market orders",
@@ -9211,6 +9284,24 @@
       "moonChunk": {
         "arrival": "arrives",
         "decay": "decays if not fractured"
+      },
+      "structureTimer": {
+        "anchor_vulnerable": "anchor vulnerability ends",
+        "anchoring": "anchoring ends",
+        "armor_reinforce": "armor reinforcement ends",
+        "armor_vulnerable": "armor vulnerability ends",
+        "deploy_vulnerable": "deployment vulnerability ends",
+        "fitting_invulnerable": "fitting invulnerability ends",
+        "hull_reinforce": "hull reinforcement ends",
+        "hull_vulnerable": "hull vulnerability ends",
+        "onlining_vulnerable": "onlining vulnerability ends",
+        "shield_vulnerable": "shield vulnerability ends",
+        "unanchoring": "unanchors",
+        "unknown": "timer ends"
+      },
+      "corpJob": {
+        "active": "in progress",
+        "ready": "ready to deliver"
       },
       "skyhookRaid": {
         "upcoming": "raid window opens",
@@ -12384,6 +12475,11 @@
         "title": "Join request for {{community}}",
         "body": "{{name}} asked to join {{community}} and is waiting for you to let them in."
       },
+      "vettingShared": {
+        "title": "New vetting report",
+        "application": "A pilot shared a report for review.",
+        "promotion": "A member shared the review they were asked for."
+      },
       "communityMemberJoined": {
         "title": "New member in {{community}}",
         "body": "{{name}} joined {{community}}."
@@ -12400,6 +12496,10 @@
         "body": "{{list}}: {{listed}} of {{target}} listed.",
         "bodyHangar_one": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} is in your hangar there.",
         "bodyHangar_other": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} are in your hangar there."
+      },
+      "characterNeedsLogin": {
+        "title": "Log in again",
+        "body": "{{character}} needs to log in again. Its alerts have stopped."
       },
       "shipLost": {
         "title": "Ship lost",
@@ -13283,7 +13383,8 @@
       "compareHubsTitle": "Compare hubs",
       "appraiseAtHub": "Appraise at {{hub}}",
       "copyTotal": "Copy {{amount}}",
-      "copyCardTotal": "{{title}}: copy {{short}} ISK ({{full}})",
+      "copyCardTotal": "Copy {{title}} total, {{amount}}",
+      "copyCardSecond": "Copy {{title}}: {{label}}, {{amount}}",
       "copiedAmount": "Copied {{amount}}",
       "totalFull": "{{full}} ISK ({{short}})",
       "copiedToClipboard": "Copied to clipboard",
@@ -14121,7 +14222,7 @@
     "customize": {
       "linkLabel": "Log in with custom permissions",
       "title": "Log in with custom permissions",
-      "intro": "Pick what to share. You can add more later in Settings › Permissions.",
+      "intro": "Every read is ticked; untick what you'd rather not share. You can add more later in Settings › Permissions.",
       "optInTag": "Opt-in",
       "requiredTag": "Required",
       "selectAll": "Select all",
@@ -14425,7 +14526,7 @@
         "install": "<link>Settings › App & backup › Install this app</link> shows the steps for your browser, or an Install button if it has one. On iPhone and iPad, installing is also what makes notifications work.",
         "update": "The app updates itself in the background. For a new version now: Settings › App & backup › Update now: it checks and reloads.",
         "pushKinds": "Alerts with a known time: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract or market order about to expire, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, nearby Incursions and raidable skyhooks, and, if you add mail, new mail, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Quiet time (a daily no-push window, set per device) silences every closed-app push; the alerts still appear in your Alerts list. Turn them on in Settings › Notifications.",
-        "permissions": "EVE grants permissions only at login, so plain login asks for everything the pages read. You can pick instead: <custom>Log in with custom permissions</custom> on the login page. Only skills, the skill queue and structure lookup are required. Add more later in Settings › Permissions; revoke on <ccp>EVE's authorized apps page</ccp>. Corporation data, structure markets and jump fatigue are never in the plain login; each is a separate opt-in. So is Alerts when closed, a grant per Character for notifications and, if you add them, location (nearby alerts) and mail headers (new-mail alerts) only.",
+        "permissions": "EVE grants permissions only at login, so plain login asks for everything the pages read, corporation data, structure markets and jump fatigue included. Corporation data is read only as far as a Character's corporation roles allow. Want less? <custom>Log in with custom permissions</custom> on the login page and untick what you'd rather not share; only skills, the skill queue and structure lookup are required. Logging in again later for a Character asks for anything it is missing in one go, except what you unticked. Add more in Settings › Permissions; revoke on <ccp>EVE's authorized apps page</ccp>. Write to EVE permissions are asked for the first time you use one. Alerts when closed is a separate grant per Character, for notifications and, if you add them, location (nearby alerts) and mail headers (new-mail alerts) only.",
         "dataLag": "Neocom Desk reads EVE's ESI, which is not live. A Character's own data is reused for 10 minutes (a day for game constants such as item names), or until EVE says it may change, if later, so moving between pages doesn't ask again. EVE also caches some data for minutes and corporation data for about an hour, so a short timer may already have happened. The age badge by a page's title shows data age: amber after an hour, red after a day. It's hidden on narrow screens; <data>Settings › Cached data</data> lists every source. A Refresh button asks EVE again right away.",
         "alerts": "Alerts are the bell panel (press A). With the app open, it checks each Character and raises Alerts for the events you enabled in Settings › Notifications. With it closed, known-time alerts such as a skill finishing are scheduled up to 72 hours ahead and pushed to devices with notifications on. Alerts when closed is off until you enable it per Character: you authorize that Character a second time, for the permissions listed before you log in (notifications, and location and mail if you include them), and our server checks EVE's notifications and the Character's solar system about every 15 minutes and pushes the types you chose, with their text, and any Incursion or raidable skyhook within your jump limit, via Google's push service. Before any login, Neocom Desk lists the permissions it will ask for and why, including mail, and you can leave mail or location out. If you include mail, our server then reads only your mail headers, never a message, and pushes each new mail's sender and subject to your device through Google's push service. The sender and subject pass through that service and are shown in the pop-up, so they can appear on a lock screen. Our server keeps only the number of the latest mail it handled, and keeps none of them. Turning Alerts when closed off deletes that token. Quiet time, set per device, pauses pushes for a daily window (you can let attacks through); its times and time zone are stored with the device registration. On iPhone and iPad, install the app first.",
         "characters": "Yes. Each Character logs in on its own: Characters › Add character (press C). Switch between them in the switcher; sort or group them on the Characters page. Alerts, Alerts when closed and Community membership are per Character. Some pages, such as Contacts, can show all Characters together.",
@@ -14499,9 +14600,10 @@
         },
         "corp": {
           "title": "Kept for your corporation",
-          "description": "Only if your corporation uses SRP or a Corp Tax Book. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it.",
+          "description": "Only if your corporation uses SRP or a Corp Tax Book, or you shared a Vetting report with a corporation. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it. A Vetting report is the exception: the pilot can delete their own from its status page.",
           "srp": "SRP Claims: the killmail, the Character's name and ID, the hull, system and loss value, the fleet or FC and note you gave, the Reimbursement and the claim's state. Also the corporation's SRP settings, its Doctrine Fits and its SRP log: each filing (with the pilot's name, killmail, hull and amount) and each officer action. The CEO, Directors and Accountants read all of it; a pilot reads only their own claims.",
-          "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a log of who did each, and which books bill each Character (kept under that Character's ID). The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link."
+          "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a log of who did each, and which books bill each Character (kept under that Character's ID). The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link.",
+          "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), the pilot's note and their answers to the corporation's questions, the invite link it started from, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist, questions, invite links and settings, and which of its reviewers opened the vetting page in the last 30 days, used only to send the alert for a new report."
         },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
@@ -14562,7 +14664,9 @@
           "srp": "SRP Claims:",
           "srpKept": "a Paid or Rejected claim is deleted 365 days after it closes (checked daily), and its lines in the SRP log (the filing and each officer action on it) go with it. A Pending or Approved claim, the SRP settings and the log's other lines have no expiry; Doctrine Fits stay until a Director or the CEO deletes them.",
           "corpTaxBook": "Corp Tax Book:",
-          "corpTaxBookKept": "no expiry. Its lines, Statements, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it, including its place in the record of which books bill each Character."
+          "corpTaxBookKept": "no expiry. Its lines, Statements, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it, including its place in the record of which books bill each Character.",
+          "vetting": "Vetting reports:",
+          "vettingKept": "deleted 30 days after the corporation decides, or 90 days after it was shared if nobody decides (checked daily), or at once when the pilot deletes it. While a pilot is still adding Characters, the rows read are kept for 24 hours and removed by the daily clean-up; they are deleted at once when the report is sent."
         }
       },
       "helpPointer": "Bug, question or idea? See <help>Support</help>."
@@ -14742,9 +14846,12 @@
         "communityJoinRequest": "Community join request",
         "communityMemberJoined": "Community member joined",
         "communityRequestPledged": "Pledge on your Request",
+        "vettingShared": "New vetting report",
         "priceAlertTriggered": "Quickbar price alert",
-        "shipLost": "Ship lost"
+        "shipLost": "Ship lost",
+        "characterNeedsLogin": "Character needs to log in again"
       },
+      "vettingSharedHint": "Sent when a pilot shares a report with your corporation. Reaches reviewers who opened Vetting in the last 30 days.",
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Planetary Industry always shows the real expiry.",
       "mercenaryDenReinforcedHint": "Scheduled up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. A den that leaves reinforcement early can still send it.",
       "skyhookRaidableHint": "Scheduled up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Needs the Station Manager role.",
@@ -14927,7 +15034,8 @@
     "numberFormatHint": "How numbers are written. Starts on your browser's format. Pasted numbers read in either format.",
     "numberFormat": {
       "period": "English ({{example}})",
-      "comma": "European ({{example}})"
+      "comma": "European ({{example}})",
+      "apostrophe": "Swiss ({{example}})"
     },
     "weekStartLabel": "Week starts on",
     "weekStartHint": "First day of the week in the Calendar's Month and Fortnight grids.",
@@ -15162,6 +15270,71 @@
     "emptyHint": "Data ages appear here once the app fetches something from EVE's servers."
   },
   "corp": {
+    "structures": {
+      "title": "Structures",
+      "refresh": "Refresh structures",
+      "searchPlaceholder": "Search structure, system or corporation…",
+      "corpFilterLabel": "Corporation",
+      "corpFilterAll": "All corporations",
+      "problemsOnly": "Problems only",
+      "problemsOnlyHint": "Structures with a timer running, low fuel or a service offline",
+      "noFilterMatches": "No structure matches these filters",
+      "noFilterMatchesHint": "Clear the search or a filter to see more.",
+      "empty": "No structures",
+      "emptyHint": "The corporations you can read have no structures anchored.",
+      "noAccessTitle": "No corporation's structures to show",
+      "noAccessHint": "None of your Characters can read a corporation's structures. EVE opens them to a Director or Station Manager.",
+      "loadFailedHint": "EVE did not send the structure list. Try again in a moment.",
+      "partlyFailed": "One or more corporations could not be read; their structures are missing.",
+      "col": {
+        "corp": "Corporation",
+        "structure": "Structure",
+        "type": "Type",
+        "system": "System",
+        "fuel": "Fuel",
+        "state": "State",
+        "timer": "Timer",
+        "services": "Services",
+        "unanchoring": "Unanchoring",
+        "blocks": "Fuel blocks",
+        "needed": "Needed"
+      },
+      "fuelPlan": {
+        "until": "Fuel until",
+        "blocksHint": "Fuel blocks in the structure's fuel bay, and how many it burns a day",
+        "neededHint": "Fuel blocks to add so the structure stays fuelled to the end of the Fuel until date (EVE time)",
+        "perDay": "{{rate}}/day",
+        "noBayAccess": "Not readable",
+        "noBayAccessHint": "Fuel blocks come from the corporation's assets. EVE opens them only to a Director, and a failed read leaves them out too. Structures marked Not readable show time left only.",
+        "total_one": "Total {{blocks}} block · {{volume}} m³",
+        "total_other": "Total {{blocks}} blocks · {{volume}} m³",
+        "unknown_one": "{{count}} structure unknown",
+        "unknown_other": "{{count}} structures unknown",
+        "copy": "Copy list",
+        "copied": "Copied",
+        "copyFailed": "Copy failed",
+        "copyLine_one": "{{structure}} ({{system}}): {{blocks}} fuel block",
+        "copyLine_other": "{{structure}} ({{system}}): {{blocks}} fuel blocks",
+        "copyTotal_one": "Total to {{date}}: {{blocks}} fuel block, {{volume}} m³",
+        "copyTotal_other": "Total to {{date}}: {{blocks}} fuel blocks, {{volume}} m³"
+      },
+      "servicesOnline_one": "{{count}} online",
+      "servicesOnline_other": "{{count}} online",
+      "servicesNone": "None",
+      "detail": {
+        "eveTime": "{{time}} EVE",
+        "localTime": "{{time}} local",
+        "services": "Services",
+        "moonExtraction": "Moon extraction",
+        "chunkArrives": "Chunk arrives",
+        "naturalDecay": "Natural decay",
+        "serviceState": {
+          "online": "Online",
+          "offline": "Offline",
+          "cleanup": "Going offline"
+        }
+      }
+    },
     "rolesUnavailable": "Can't check your corporation roles right now",
     "rolesUnavailableHint": "Neocom Desk reads your roles from EVE, and none are saved on this device yet. Try again, or connect if you're offline. It will retry when you're back online.",
     "title": "Corporation",
@@ -15496,8 +15669,9 @@
       "menu": {
         "remove": "Remove from Corp Board",
         "character": "Corporations",
-        "header": "Header Character's corporation",
-        "all": "All characters' corporations"
+        "header": "This corporation",
+        "all": "All my corporations",
+        "showsOnOne": "Flow and Sources read one corporation: pick This corporation for them."
       },
       "header": {
         "breakdownCaption": "When each widget on the Corp Board last read its data"
@@ -17390,6 +17564,7 @@
         "rate-change": "Rate change",
         "payee-change": "Who gets paid changed",
         "srp-result": "SRP result",
+        "vetting-result": "Vetting decision",
         "removal": "Moon owner removal",
         "removalCancelled": "Removal cancelled"
       },
@@ -18014,7 +18189,9 @@
           "batch": "Corps in this batch ({{count}})",
           "back_button": "Back",
           "go_one": "Connect {{count}} corp",
-          "go_other": "Connect {{count}} corps"
+          "go_other": "Connect {{count}} corps",
+          "alerts": "Also approve closed-app alerts for each CEO",
+          "alertsHint": "Straight after each corp, while EVE still has you logged in as its CEO: one more Authorize press. Turn off to skip alerts for this whole run."
         },
         "signIn": {
           "title": "Logging in: corp {{n}} of {{total}}",
@@ -18028,6 +18205,14 @@
           "wrong": "You logged in as {{signedInAs}}. {{corp}} needs {{ceo}}. Nothing was connected; try again with the character below.",
           "notConnected": "{{name}} was not connected. {{reason}} It is listed under Needs you.",
           "cancelled": "The EVE login did not finish.",
+          "alertsTitle": "Corp {{n}} of {{total}}: one more approval for alerts",
+          "alertsWhy": "This turns on alerts when the app is closed for {{ceo}}, like your other characters.",
+          "alertsHint": "EVE still has you logged in as {{ceo}}, so this is one Authorize press. Picking someone else approves nothing.",
+          "alertsAction": "Approve alerts as {{ceo}}",
+          "alertsSkip": "Skip alerts",
+          "alertsWrong": "You approved as {{signedInAs}}, so alerts were not turned on. Pick {{ceo}} and try again.",
+          "alertsOn": "Alerts are on for {{ceo}}.",
+          "alertsNotOn": "Alerts were not turned on for {{ceo}}. You can do it later in Settings › Notifications.",
           "stop": "Stop here",
           "action": "Log in as {{ceo}} with EVE",
           "failed": "Could not open EVE's login. Try again.",
@@ -18039,11 +18224,14 @@
             "needs-role": "Needs a role",
             "own-book": "Has its own book",
             "gone-quiet": "Gone quiet",
-            "failed": "Could not connect"
+            "failed": "Could not connect",
+            "needs-names": "No refinery names",
+            "names-not-shared": "No refinery names"
           }
         },
         "needs": {
           "title": "Needs you ({{count}})",
+          "titleInfo": "Refinery names",
           "meta": "{{connected}} of {{total}} connected",
           "needs-sign-in": {
             "text": "The EVE login did not finish.",
@@ -18066,6 +18254,14 @@
             "keeps": "Removing keeps its past mining and billing records.",
             "action": "Remove"
           },
+          "needs-names": {
+            "text": "Refinery names aren't shared: this corp's login is from before names were read. Grant again as its CEO; coverage and billing stay as they are.",
+            "action": "Grant again"
+          },
+          "names-not-shared": {
+            "text": "Refinery names aren't shared. {{name}}'s CEO or an officer can grant again from that corp's Moons page."
+          },
+          "grantNamed": "Grant again for {{name}}",
           "removeNamed": "Remove {{name}}",
           "signInNamed": "Log in again for {{name}}",
           "removeFailed": "Could not remove this corp. Try again."
@@ -18599,7 +18795,13 @@
         },
         "refineries_one": "{{count}} refinery",
         "refineries_other": "{{count}} refineries",
+        "nothingSeen": "No mining or extraction seen yet",
         "synced": "Synced {{age}}",
+        "nextRead": "next read {{time}}",
+        "syncNow": {
+          "tooSoon": "Moon owners were just read. Sync now reads them again from {{time}}.",
+          "failed": "Couldn't read the moon owners now. The scheduled sync will try again."
+        },
         "cantReadSince": "Can't read their ledger since {{date}}",
         "since": "since {{date}}",
         "until": "until {{date}}",
@@ -19194,6 +19396,7 @@
       "hintText": "Dotted underline: has a tooltip (HintText)",
       "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
       "missingGrantMark": "Red slashed broadcast icon: this row needs a grant the Character lacks",
+      "needsLogin": "Small warning \"Log in again\" button on a Character: its login is dead; press to log in again",
       "channelOff": "Greyed checkbox that keeps its tick: its channel is off",
       "figureHistory": "Small dim glyph after a figure: click or tap for its history in a popover",
       "figureBreakdown": "Dashed underline on a figure: click or tap opens how it is worked out",
@@ -19807,6 +20010,701 @@
         "not-covered": "Not covered",
         "officer-decides": "An officer decides"
       }
+    }
+  },
+  "vetting": {
+    "title": "Vetting",
+    "tabsLabel": "Vetting reviews",
+    "tabWithCount": "{{label}} {{count}}",
+    "tabs": {
+      "open": "Open",
+      "decided": "Decided",
+      "settings": "Settings"
+    },
+    "deniedTitle": "Vetting is for recruiters",
+    "deniedHint": "Reading reports needs CEO, Director or Personnel Manager.",
+    "roleLine": "Vetting needs CEO, Director or Personnel Manager.",
+    "summary": {
+      "open_one": "{{count}} open",
+      "open_other": "{{count}} open",
+      "yours_one": "needs your sign-off",
+      "yours_other": "need your sign-off"
+    },
+    "copyLink": "Copy apply link",
+    "newInvite": "New invite link",
+    "copied": "Copied",
+    "counter": "{{count}} / {{max}}",
+    "rejection": {
+      "rejected": "Rejected",
+      "notNow": "Not at this time"
+    },
+    "asks": {
+      "ageDays_one": "A character at least {{amount}} day old",
+      "ageDays_other": "A character at least {{amount}} days old",
+      "skillPoints": "{{amount}} skill points",
+      "characters_one": "At least {{amount}} character",
+      "characters_other": "At least {{amount}} characters"
+    },
+    "invites": {
+      "open": "Invites",
+      "title": "Invite links",
+      "label": "Who it is for",
+      "labelHint": "The report it starts shows this.",
+      "create": "Create link",
+      "createdFor": "Link for {{label}}",
+      "copy": "Copy link",
+      "copyNamed": "Copy link for {{label}}",
+      "revoke": "Revoke",
+      "columns": {
+        "label": "For",
+        "by": "Made by",
+        "when": "Made",
+        "uses": "Started"
+      },
+      "emptyTitle": "No invite links",
+      "emptyHint": "Make one for each pilot or post.",
+      "full": "{{count}} invite links is the most. Revoke one to make another.",
+      "publicNote": "Invite-only is off, so the apply link works without one. A report still shows the invite it started from.",
+      "close": "Close",
+      "revokeConfirm": {
+        "title": "Revoke this invite link?",
+        "body": "The link for {{label}} stops working. Applications already started stay."
+      }
+    },
+    "copyOff": "Vetting is off. Applicants cannot use the link.",
+    "reviewMember": "Review a member",
+    "offNote": {
+      "director": "Vetting is off. Turn it on in Settings to take applications.",
+      "reviewer": "Vetting is off. The CEO or a Director turns it on."
+    },
+    "kind": {
+      "application": "Application",
+      "promotionTo": "Promotion to {{role}}"
+    },
+    "result": {
+      "flags_one": "{{count}} flag",
+      "flags_other": "{{count}} flags",
+      "nothing": "Nothing found",
+      "incomplete": "Incomplete",
+      "waiting": "Waiting for pilot",
+      "declined": "Declined",
+      "withdrawn": "Withdrawn"
+    },
+    "queue": {
+      "title": {
+        "open": "Open reviews",
+        "decided": "Decided reviews"
+      },
+      "label": {
+        "open": "Open vetting reviews",
+        "decided": "Decided vetting reviews"
+      },
+      "columns": {
+        "pilot": "Pilot",
+        "for": "For",
+        "characters": "Characters",
+        "result": "Result",
+        "signOffs": "Sign-offs",
+        "read": "Read",
+        "outcome": "Outcome",
+        "decided": "Decided"
+      },
+      "signed": "{{signed}} of {{needed}}",
+      "signedPhone": "{{signed}} of {{needed}} sign-offs",
+      "yoursNeeded": "Yours needed",
+      "asked": "Asked {{age}}",
+      "invite": "Invite: {{label}}",
+      "empty": {
+        "open": {
+          "title": "Nobody to review",
+          "hint": "Send applicants the apply link, or use Review a member before a promotion."
+        },
+        "decided": {
+          "title": "Nothing decided",
+          "hint": "A decided review stays here for 30 days, then is deleted."
+        }
+      }
+    },
+    "requestDialog": {
+      "title": "Review a member",
+      "name": "Character name, exactly as in game",
+      "role": "Role they are up for",
+      "note": "They are asked to share. You cannot sign off a review you asked for.",
+      "confirm": "Ask for a review"
+    },
+    "settings": {
+      "sectionsLabel": "Vetting settings",
+      "sections": {
+        "general": "General",
+        "applicants": "Applicants",
+        "decisions": "Decisions",
+        "watchlist": "Watchlist"
+      },
+      "unsaved": "Unsaved changes",
+      "problems_one": "{{count}} problem to fix before saving",
+      "problems_other": "{{count}} problems to fix before saving",
+      "discard": "Discard",
+      "save": "Save",
+      "saved": "Settings saved",
+      "text": {
+        "title": "What applicants read",
+        "welcome": "Welcome message",
+        "welcomeNote": "Shown at the top of the apply page.",
+        "contact": "Contact line",
+        "contactNote": "Who to talk to. Shown once the report is sent."
+      },
+      "minimums": {
+        "title": "Minimums",
+        "hint": "Checked on Send, applications only. Any one declared character can meet age and skill points.",
+        "ageDays": "Character age",
+        "ageDaysUnit": "days",
+        "skillPoints": "Skill points",
+        "characters": "Characters declared",
+        "upTo": "Up to {{max}}.",
+        "invalid": "Enter a whole number."
+      },
+      "questions": {
+        "title": "Questions",
+        "meta": "{{count}} of {{max}}",
+        "hint": "Asked before Send, applications only. A report keeps each answer with the question as it read then.",
+        "emptyTitle": "No questions",
+        "emptyHint": "Applicants send only their note.",
+        "add": "Add a question",
+        "question": "Question {{n}}",
+        "required": "Required",
+        "requiredNamed": "Question {{n}} is required",
+        "moveUp": "Move question {{n}} up",
+        "moveDown": "Move question {{n}} down",
+        "remove": "Remove question {{n}}",
+        "blank": "Write the question, or remove it.",
+        "full": "{{count}} questions is the most."
+      },
+      "invites": {
+        "title": "Invite-only",
+        "label": "Invite-only",
+        "note": "The apply link works only with an invite. Any reviewer can make invite links.",
+        "manage": "Invite links",
+        "open_one": "Invites ({{count}})",
+        "open_other": "Invites ({{count}})"
+      },
+      "rejection": {
+        "title": "Telling the pilot",
+        "wording": "A no reads as",
+        "wordingNote": "On the pilot's status page and in the mail.",
+        "showReason": "Show the pilot the reason",
+        "showReasonNote": "The pilot sees the note of each reviewer who said no.",
+        "mail": "Offer a mail to the pilot when decided",
+        "mailNote": "In game, from the deciding reviewer's own character."
+      },
+      "notify": {
+        "title": "Telling reviewers",
+        "label": "Tell reviewers about a new report",
+        "note": "A notification on the devices that chose it in Settings › Alerts."
+      },
+      "state": {
+        "title": "Vetting",
+        "on": "On",
+        "off": "Off",
+        "onHint": "Applicants can use the apply link.",
+        "offHint": "The apply link says the corp is not taking applications here.",
+        "turnOn": "Turn on",
+        "turnOff": "Turn off"
+      },
+      "signOffs": {
+        "title": "Sign-offs needed",
+        "application": "Applications",
+        "promotion": "Promotions",
+        "hint": "Whoever asks for a promotion review cannot sign it off."
+      },
+      "watchlist": {
+        "title": "Watchlist",
+        "count_one": "{{count}} entry",
+        "count_other": "{{count}} entries",
+        "name": "Name",
+        "kind": "Kind",
+        "category": {
+          "character": "Character",
+          "corporation": "Corporation",
+          "alliance": "Alliance"
+        },
+        "remove": "Remove",
+        "removeNamed": "Remove {{name}}",
+        "emptyTitle": "Nobody on the watchlist",
+        "emptyHint": "Add the corporations, alliances and characters the checks should look for.",
+        "addLabel": "Exact name of a character, corporation or alliance",
+        "add": "Add",
+        "full": "The watchlist holds {{count}} entries. Remove one to add another."
+      }
+    },
+    "sources": {
+      "wallet": "Wallet journal",
+      "contact": "Contacts",
+      "mail": "Mail",
+      "contract": "Contracts",
+      "skills": "Skills",
+      "history": "Corporation history",
+      "walletRecent": "Wallet journal, about the last 30 days",
+      "walletContracts": "Wallet journal (about the last 30 days), contracts"
+    },
+    "checks": {
+      "watchlistIsk": {
+        "title": "ISK with the watchlist",
+        "finding_one": "{{total}} ISK in {{count}} wallet row with {{party}} (watchlist). Received {{received}}, sent {{sent}}.",
+        "finding_other": "{{total}} ISK in {{count}} wallet rows with the watchlist, most with {{party}}. Received {{received}}, sent {{sent}}.",
+        "looksAt": "Wallet journal, about the last 30 days: rows with anyone on the watchlist"
+      },
+      "watchlistHistory": {
+        "title": "Time in a watchlist corporation",
+        "finding_one": "Was a member of {{party}} (watchlist).",
+        "finding_other": "{{count}} stays in watchlist corporations, the latest in {{party}}.",
+        "looksAt": "Corporation history against the watchlist"
+      },
+      "watchlistContacts": {
+        "title": "Watchlist contacts",
+        "finding_one": "{{party}} (watchlist) is a contact with positive standing.",
+        "finding_other": "{{count}} watchlist contacts with positive standing, {{party}} among them.",
+        "looksAt": "Contacts with positive standing"
+      },
+      "watchlistMail": {
+        "title": "Mail with the watchlist",
+        "finding_one": "{{count}} mail with {{party}} (watchlist).",
+        "finding_other": "{{count}} mails with the watchlist, most with {{party}}.",
+        "looksAt": "Who mail is to and from, never the message"
+      },
+      "watchlistContracts": {
+        "title": "Contracts with the watchlist",
+        "finding_one": "{{count}} contract with {{party}} (watchlist).",
+        "finding_other": "{{count}} contracts with the watchlist, most with {{party}}.",
+        "looksAt": "Contracts with anyone on the watchlist"
+      },
+      "undeclaredCharacter": {
+        "title": "Likely undeclared character",
+        "finding_one": "{{party}}: {{count}} trade or contract with these characters. Not declared.",
+        "finding_other": "{{party}}: {{count}} trades and contracts with these characters. Not declared.",
+        "looksAt": "Repeat trades and contracts with one character outside the declared ones"
+      },
+      "corpHopping": {
+        "title": "Many corporations in a year",
+        "finding_one": "Joined {{count}} player corporation in the last year.",
+        "finding_other": "Joined {{count}} player corporations in the last year.",
+        "looksAt": "Player corporations joined in the last year"
+      },
+      "cynoNoCapital": {
+        "title": "Cyno skills, no capital pilot declared",
+        "finding": "Cynosural Field Theory {{level}}, but no declared character flies a capital or black ops ship.",
+        "looksAt": "Cyno skills against the declared characters' capital skills"
+      },
+      "thinCharacter": {
+        "title": "Old character, few skill points",
+        "finding_one": "{{skillPoints}} skill points after {{count}} year.",
+        "finding_other": "{{skillPoints}} skill points after {{count}} years.",
+        "looksAt": "Character age against skill points"
+      }
+    },
+    "what": {
+      "player_donation": "Player donation",
+      "player_trading": "Direct trade",
+      "mail": "Mail",
+      "contact": "Contact",
+      "member": "Member",
+      "joined": "Joined",
+      "item_exchange": "Item exchange contract",
+      "courier": "Courier contract",
+      "auction": "Auction contract",
+      "other": "Other"
+    },
+    "report": {
+      "title": "Vetting report",
+      "failedTitle": "Could not open the report",
+      "theirNote": "Their note",
+      "theirAnswers": "Their answers",
+      "invite": "Invite: {{label}}",
+      "flags": "Flags",
+      "flagsFound_one": "{{count}} flag in {{checks}} checks",
+      "flagsFound_other": "{{count}} flags in {{checks}} checks",
+      "nothingFound_one": "Nothing found in {{count}} check",
+      "nothingFound_other": "Nothing found in {{count}} checks",
+      "couldNotRun_one": "{{count}} check could not run.",
+      "couldNotRun_other": "{{count}} checks could not run.",
+      "notAVerdict": "Not a verdict. An undeclared character cannot be checked.",
+      "reasonToAsk": "Each flag is a reason to ask.",
+      "serious": "Serious",
+      "ask": "Ask about",
+      "onFrom": "On {{characters}} · from {{source}}",
+      "rowsBehind_one": "{{count}} row behind this",
+      "rowsBehind_other": "{{count}} rows behind this",
+      "evidenceCapped_one": "Showing the latest {{shown}} of {{count}} row.",
+      "evidenceCapped_other": "Showing the latest {{shown}} of {{count}} rows.",
+      "isk": "{{amount}} ISK",
+      "noDate": "No date",
+      "unknownParty": "Unknown ({{id}})",
+      "couldNotCheck": "Could not check",
+      "didNotShare_one": "{{names}} did not share {{source}}.",
+      "didNotShare_other": "{{names}} did not share {{source}}.",
+      "freshRead": "A fresh read needs the pilot to share again.",
+      "showChecks": "Show the checks",
+      "hideChecks": "Hide the checks",
+      "more_one": "{{count}} more",
+      "more_other": "{{count}} more",
+      "ownReviewHint": "The other reviewers decide it.",
+      "noReport": {
+        "waiting": "No report yet",
+        "declined": "The pilot declined",
+        "hint": "There is nothing to read until the pilot shares."
+      },
+      "characters": {
+        "title": "Declared characters",
+        "character": "Character",
+        "born": "Born",
+        "skillPoints": "Skill points",
+        "corporations": "Corporations",
+        "shared": "Shared",
+        "everything": "Everything",
+        "no": "No {{sources}}"
+      },
+      "about": {
+        "title": "About this report",
+        "read": "Read",
+        "keptUntil": "Kept until",
+        "orAfterDecision_one": "or {{count}} day after a decision",
+        "orAfterDecision_other": "or {{count}} days after a decision",
+        "signInKept": "Login kept",
+        "none": "None",
+        "log": "Record"
+      }
+    },
+    "log": {
+      "started": "opened the apply link",
+      "shared": "shared their characters",
+      "opened": "opened the report",
+      "requested": "asked for the review",
+      "decided": "recorded a sign-off",
+      "declined": "declined",
+      "withdrew": "withdrew"
+    },
+    "decision": {
+      "title": "Decision",
+      "needed_one": "{{signed}} of {{count}} sign-off",
+      "needed_other": "{{signed}} of {{count}} sign-offs",
+      "none": "No sign-offs were recorded.",
+      "you": "You",
+      "notDecided": "Not decided",
+      "hidden": "Decided {{when}}. Hidden until you decide",
+      "asked": "Asked for this review",
+      "decidedOn": "Decided {{when}}",
+      "word": {
+        "yours": "Yours",
+        "hidden": "Decided",
+        "barred": "Cannot sign"
+      },
+      "outcome": {
+        "application": {
+          "yes": "Accepted",
+          "no": "Rejected"
+        },
+        "promotion": {
+          "yes": "Approved",
+          "no": "Objected"
+        }
+      },
+      "verb": {
+        "application": {
+          "yes": "Accept",
+          "no": "Reject"
+        },
+        "promotion": {
+          "yes": "Approve",
+          "no": "Object"
+        }
+      },
+      "note": "Note, kept with your decision",
+      "optional": "Optional",
+      "barredAsked": "You asked for this review, so you cannot sign it off.",
+      "barredHint": "You cannot sign off this review.",
+      "decidedWhen": "Decided once {{needed}} sign-offs are in. Any no rejects it.",
+      "refuse": {
+        "application": "Reject {{pilot}}",
+        "promotion": "Object to {{pilot}}'s promotion"
+      },
+      "reason": "Reason, kept with your decision",
+      "refuseHint": "The other reviewers see this note. The pilot will not.",
+      "refuseHintShown": "The pilot will see this note. So do the other reviewers.",
+      "mail": {
+        "offer": "Mail {{pilot}} the decision",
+        "hint": "In game, from your character.",
+        "already": "Already queued from this device.",
+        "grantTitle": "Can't mail the pilot",
+        "grantHint": "The mail goes out from your Character. Grant the mail permission to send it.",
+        "grantAction": "Grant mail permission"
+      }
+    },
+    "mail": {
+      "greeting": "Hi {{pilot}},",
+      "reason": "Reason: {{reason}}",
+      "application": {
+        "acceptedSubject": "Application accepted: {{corp}}",
+        "accepted": "Your application to {{corp}} was accepted.",
+        "acceptedNext": "In EVE, open {{corp}}'s corporation window and press Apply to join. A recruiter accepts it in game.",
+        "rejectedSubject": "Application rejected: {{corp}}",
+        "rejected": "Your application to {{corp}} was rejected.",
+        "notNowSubject": "Application to {{corp}}: not at this time",
+        "notNow": "Your application to {{corp}} was not accepted at this time."
+      },
+      "promotion": {
+        "acceptedSubject": "Review approved: {{role}}",
+        "accepted": "Your review for {{role}} in {{corp}} was approved.",
+        "acceptedNext": "An officer changes your role in game.",
+        "rejectedSubject": "Review not approved: {{role}}",
+        "rejected": "Your review for {{role}} in {{corp}} was not approved.",
+        "notNowSubject": "Review for {{role}}: not at this time",
+        "notNow": "Your review for {{role}} in {{corp}} was not approved at this time."
+      }
+    },
+    "consent": {
+      "title": "What you share",
+      "willSee": {
+        "recruiters": "The recruiters will see",
+        "officers": "The officers reviewing you will see"
+      },
+      "reads": {
+        "history": "Corporation history",
+        "wallet": "Wallet journal",
+        "contact": "Contacts and standings",
+        "mail": "Mail",
+        "contract": "Contracts",
+        "skills": "Skills"
+      },
+      "readNotes": {
+        "wallet": "Last 30 days",
+        "mail": "Who you wrote with. No subject or text is kept"
+      },
+      "notRead": "Not read, not kept",
+      "mailText": "The text of your mail",
+      "signIn": "Your EVE login",
+      "signInNote": "No key is kept. Nothing is read again",
+      "control": "You stay in control",
+      "onlyReviewers": "Only the reviewers can open it",
+      "seeOpened": "You see who opened it",
+      "deleted_one": "Deleted {{count}} day after the decision ({{open}} days if nobody decides), or when you withdraw",
+      "deleted_other": "Deleted {{count}} days after the decision ({{open}} days if nobody decides), or when you withdraw"
+    },
+    "characters": {
+      "title": "Your characters",
+      "added_one": "{{count}} added",
+      "added_other": "{{count}} added",
+      "addAnother": "Add another character",
+      "full": "{{count}} characters is the most one report holds.",
+      "share": "Share {{name}}",
+      "remove": "Remove",
+      "removeNamed": "Remove {{name}}",
+      "signIn": "Log in",
+      "signInAgain": "Log in again",
+      "signInAgainNamed": "Log in again as {{name}}",
+      "partMissingHint": "{{missing}} not shared. That check will not run.",
+      "needsSignInHint": "Its login here does not cover {{missing}}.",
+      "readingNamed": "Reading {{name}}",
+      "readNamed": "{{name}} read",
+      "state": {
+        "read": "Read",
+        "reading": "Reading",
+        "partMissing": "Part missing",
+        "ready": "Logged in",
+        "needsSignIn": "Needs login"
+      }
+    },
+    "apply": {
+      "title": "Apply",
+      "heading": "Apply to {{corp}}",
+      "sub": {
+        "start": "A one-time read of your characters. About two minutes, no account needed.",
+        "characters": "Add every character you own, on every account, then send.",
+        "sent": "Sent {{when}}.",
+        "sentNoTime": "Sent.",
+        "decided": "Decided {{when}}.",
+        "withdrawn": "Withdrawn.",
+        "off": "Not taking applications here.",
+        "inviteOnly": "By invite only."
+      },
+      "welcome": "From {{corp}}",
+      "asks": {
+        "title": "What this corp asks",
+        "unmet": "Not met yet, of what {{corp}} asks:"
+      },
+      "inviteOnly": {
+        "title": "{{corp}} takes applications by invite",
+        "hint": "Ask a recruiter for a link."
+      },
+      "how": {
+        "title": "How it works",
+        "signIn": "Log in with EVE, once per character.",
+        "read": "Each character is read once.",
+        "report": "Recruiters get a report and reply in game."
+      },
+      "signIn": {
+        "first": "Log in with EVE Online",
+        "firstHint": "Start with your main. Add the rest next.",
+        "another": "Add another character with EVE Online",
+        "cancelled": "Login cancelled. Nothing was read.",
+        "failed": "The login did not finish. Nothing was read. Try again."
+      },
+      "before": {
+        "title": "Before you send",
+        "allMine": "These are all my characters.",
+        "allMineHint": "A character left out usually shows up in the others' trades.",
+        "note": "Note to the recruiters (optional)",
+        "required": "{{label}} (required)"
+      },
+      "send": "Send to {{corp}}",
+      "sendHint": "Nothing is sent until you press this.",
+      "sendNeedsTick": "Tick \"These are all my characters\" to send.",
+      "sendNeedsAnswers": "Answer the required questions to send.",
+      "sendNeedsMinimums": "This application does not meet what {{corp}} asks yet.",
+      "startOver": {
+        "action": "Start over",
+        "title": "Start over?",
+        "body": "The characters read so far are deleted. Nothing is sent to {{corp}}."
+      },
+      "missing": {
+        "title": "No such apply link",
+        "hint": "Ask the recruiter for the link again."
+      },
+      "off": {
+        "title": "Not taking applications here",
+        "hint": "This corporation has vetting turned off. Ask a recruiter in game."
+      },
+      "withdrawn": {
+        "title": "Withdrawn",
+        "hint": "The report is deleted. Nothing is kept.",
+        "again": "Start a new application"
+      }
+    },
+    "status": {
+      "title": {
+        "application": "Your application",
+        "promotion": "Your review"
+      },
+      "state": {
+        "draft": "Not sent",
+        "requested": "Requested",
+        "open": "Waiting",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "withdrawn": "Withdrawn",
+        "declined": "Declined"
+      },
+      "line": {
+        "open": {
+          "application_one": "{{count}} character read. The report is with the recruiters.",
+          "application_other": "{{count}} characters read. The report is with the recruiters.",
+          "promotion_one": "{{count}} character read. The report is with the officers.",
+          "promotion_other": "{{count}} characters read. The report is with the officers."
+        },
+        "accepted": "Accepted {{when}}.",
+        "rejected": "Rejected. Decided {{when}}.",
+        "notNow": "Not at this time. Decided {{when}}.",
+        "withdrawn": "You withdrew. The report is deleted.",
+        "declined": "You declined. Nothing was read.",
+        "draft": "Not sent yet.",
+        "requested": "Waiting for you to share."
+      },
+      "nextTitle": "What happens next",
+      "next": {
+        "open": {
+          "application": "A recruiter reads the report.",
+          "promotion": "The officers read the report."
+        },
+        "contact": "They contact you in game.",
+        "outcome": {
+          "application": "If accepted, this page says how to join.",
+          "promotion": "This page shows the decision."
+        },
+        "join": "In EVE, open {{corp}}'s corporation window and press Apply to join.",
+        "joinAccept": "A recruiter accepts it in game.",
+        "role": "An officer changes your role in game."
+      },
+      "reasons_one": "Reason",
+      "reasons_other": "Reasons",
+      "contact": "Contact",
+      "answersTitle": "Your answers",
+      "showAnswers": "Show your answers",
+      "hideAnswers": "Hide your answers",
+      "reportTitle": "Your report",
+      "openedBy": "Opened by",
+      "nobodyYet": "Nobody yet",
+      "deleted": "Deleted",
+      "deletedAfter_one": "{{count}} day after the decision",
+      "deletedAfter_other": "{{count}} days after the decision",
+      "deletedAfterOr_one": "{{count}} day after the decision, or {{date}} if nobody decides",
+      "deletedAfterOr_other": "{{count}} days after the decision, or {{date}} if nobody decides",
+      "nothingKept": "No login was kept. Nothing more is read.",
+      "withdraw": "Withdraw and delete the report",
+      "deleteNow": "Delete the report now",
+      "withdrawConfirm": {
+        "title": "Withdraw and delete the report?",
+        "titleDecided": "Delete the report now?",
+        "body": "{{corp}} can no longer open it. This can't be undone.",
+        "action": "Delete the report"
+      },
+      "useApp": {
+        "title": "Use Neocom Desk",
+        "body": "Use Neocom Desk with these characters. Free.",
+        "note": "It asks you to log in again. That login stays in this browser, never on our servers.",
+        "action": "Open Neocom Desk with these characters",
+        "or": "Or come back to this page in this browser."
+      }
+    },
+    "request": {
+      "title": "Review requested",
+      "none": {
+        "title": "No review requested",
+        "hint": "When an officer asks for a review before a promotion, it shows here."
+      },
+      "anOfficer": "An officer",
+      "promotion": "Promotion to {{role}}",
+      "asked": "<b>{{name}}</b> asked for a review before you are made <b>{{role}}</b>. Other officers decide.",
+      "oneTime": "A one-time read of the characters you share.",
+      "charactersTitle": "Characters to share",
+      "onDevice_one": "{{count}} of {{total}} can be shared without another login",
+      "onDevice_other": "{{count}} of {{total}} can be shared without another login",
+      "share_one": "Share {{count}} character",
+      "share_other": "Share {{count}} characters",
+      "decline": "Decline",
+      "declineHint": "The reviewers are told if you decline.",
+      "declineConfirm": {
+        "title": "Decline the review?",
+        "body": "{{name}} and the reviewers are told. Nothing is read.",
+        "action": "Decline"
+      }
+    },
+    "errors": {
+      "generic": "That did not work. Try again.",
+      "not-found": "This review no longer exists.",
+      "bad-key": "This review no longer exists.",
+      "unknown-corp": "No such corporation.",
+      "vetting-off": "This corporation has vetting turned off.",
+      "wrong-state": "The report is already sent.",
+      "rate-limited": "Too many reads today. Try again tomorrow.",
+      "too-many-characters": "This report holds no more characters.",
+      "no-characters": "Add a character first.",
+      "pilot-missing": "Share the character the review was asked of.",
+      "changed": "The report changed while it was checked. Try again.",
+      "not-a-reviewer": "This needs CEO, Director or Personnel Manager.",
+      "role-required": "This needs CEO or Director.",
+      "unknown-name": "No character, corporation or alliance has exactly that name.",
+      "not-a-member": "That character is not in this corporation.",
+      "already-requested": "That member already has a review waiting.",
+      "watchlist-full": "The watchlist is full.",
+      "invite-required": "This corporation takes applications by invite. Ask a recruiter for a link.",
+      "invites-full": "No more invite links fit. Revoke one first.",
+      "answers-required": "Answer the required questions first.",
+      "below-minimum": "This application does not meet what the corporation asks.",
+      "not-open": "This review is already decided.",
+      "barred": "You cannot sign off this review.",
+      "own-review": "This review is about you, so you cannot open it.",
+      "already-signed": "You already signed this review off.",
+      "esi-backoff": "EVE's servers are busy. Try again in a few minutes.",
+      "esi-error": "EVE's servers did not answer. Try again in a few minutes.",
+      "esi-forbidden": "EVE refused that login. Log in again."
     }
   }
 }

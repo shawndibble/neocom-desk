@@ -32,7 +32,7 @@ import {
   useOpenAfterMenu,
 } from '@/components/ui';
 import { kindSumsAcrossCharacters } from './data/models';
-import { boardKey, useWidgetBoard } from './board';
+import { boardKey, readScope, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { getKind, rangeAppliesTo, showOf, widgetKeys } from './kinds';
 import { LAYER_IDS, toggleHidden } from '@/engine/netWorth/series';
@@ -215,8 +215,14 @@ export function WidgetMenu({
   const title = widget.title ?? fallbackTitle;
   const hasRange = rangeAppliesTo(kind, widget.show);
   const canSum = kindSumsAcrossCharacters(widget.kind, widget);
-  const offersScope = board.characterScope === 'always' || canSum;
+  const offersScope =
+    board.characterScope === 'always' || (canSum && board.allScopeOffered(widget.kind));
   const scopeKey = board.id === 'corp' ? 'corp.grid.menu' : 'overview.menu';
+  // Read across every corporation, a Show that cannot sum is disabled with its reason (DESIGN §6c).
+  const onAll = offersScope && canSum && readScope(board, widget) === 'all';
+  const showSums = (show: WidgetShow) =>
+    !onAll || kindSumsAcrossCharacters(widget.kind, { ...widget, show });
+  const someShowsOff = kind.shows.some((show) => !showSums(show));
   const index = edit.layout.widgets.findIndex((w) => w.id === widget.id);
   const last = edit.layout.widgets.length - 1;
 
@@ -241,11 +247,14 @@ export function WidgetMenu({
             onValueChange={(next) => edit.setShow(widget.id, next as WidgetShow)}
           >
             {kind.shows.map((show) => (
-              <MenuRadioItem key={show} value={show}>
+              <MenuRadioItem key={show} value={show} disabled={!showSums(show)}>
                 {t(`overview.menu.showChoice.${show}`)}
               </MenuRadioItem>
             ))}
           </MenuRadioGroup>
+          {someShowsOff && (
+            <p className="px-2 pb-1 text-xs text-text-dim">{t(`${scopeKey}.showsOnOne`)}</p>
+          )}
           <MenuSeparator />
         </>
       )}

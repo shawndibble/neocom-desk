@@ -55,13 +55,37 @@ import {
 } from '@/features/corp/wallet';
 import { isNpcCorporationId } from '@/esi/entityIds';
 import { DAY_MS } from '@/lib/age';
+import {
+  accountCorpReaders,
+  corpReadersFor,
+  loadAccountCorpAccess,
+  type CorpCapability,
+} from '@/features/corp/corpReadAccess';
+import { loadCorpLabels } from '@/features/corp/corpTicker';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import {
+  activeReader,
+  oldest,
+  settleCorps,
+  startFeederChunks,
+  type FeederChunks,
+  loadMoonChunksBoardData,
+  loadStructuresBoardData,
+} from '../../data/corpBoard';
+import { mergeCorpRows, mergeLookups } from '@/engine/corp/corpMerge';
+import type { CorpFeedBody } from './corpFeedRead';
 import { fetchCorporationStatsRead } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
 import type {
+  CorpAllFeed,
   CorpAssetsFeed,
   CorpCustomsFeed,
   CorpRoleAuditFeed,
   CorpContractsFeed,
+  CorpDeadlinesAllFeed,
+  CorpDeadlinesSlice,
+  CorpFeedBase,
   CorpJobsFeed,
   CorpJournalLine,
   CorpKillsFeed,
@@ -75,8 +99,13 @@ import type {
   CorpOrdersFeed,
   CorpWalletFeed,
 } from './corpFeeds';
+import type { CorpDeadlineSource } from './corpDeadlineSources';
 
-export function loadCorpWallet(characterId: number): Promise<CorpWalletFeed> {
+/**
+ * `withJournal: false` reads the balances only (the All scope's Divisions view): no journal
+ * request, and `journal` is null, so nothing reads net or runway from it.
+ */
+export function loadCorpWallet(characterId: number, withJournal = true): Promise<CorpWalletFeed> {
   return readCorpFeed<CorpWalletFeed>(characterId, {
     capability: 'canReadWallet',
     empty: { divisions: [], journalDivision: MASTER_WALLET_DIVISION, journal: null },
@@ -84,12 +113,14 @@ export function loadCorpWallet(characterId: number): Promise<CorpWalletFeed> {
       const [wallets, divisions, journal] = await Promise.all([
         loadCorporationWallets(characterId, corporationId),
         loadCorporationDivisions(characterId, corporationId, can('canReadDivisions')),
-        loadCorporationWalletJournal(characterId, corporationId, MASTER_WALLET_DIVISION),
+        withJournal
+          ? loadCorporationWalletJournal(characterId, corporationId, MASTER_WALLET_DIVISION)
+          : null,
       ]);
       // Balances are the data: without them a "0 ISK" would read as a broke corporation.
       if (wallets.cached === null) return unlanded('wallet', wallets);
       const lines: CorpJournalLine[] | null =
-        journal.cached === null
+        journal === null || journal.cached === null
           ? null
           : journal.cached.data.flatMap((entry) => {
               const atMs = parseInstant(entry.date);
@@ -588,6 +619,303 @@ export function loadCorpSovereignty(characterId: number): Promise<CorpSovereignt
       return {
         reads: [skyhooks, hubs, ...skyhookDetails.values(), ...hubDetails.values()],
         body: { rows, systemNames, typeNames, prices, jumps },
+      };
+    },
+  });
+}
+
+// --- Due soon across every corporation (All scope) ----------------------------------
+
+/** Each Due soon source, the capability that opens it, and its one-corporation read. */
+const DEADLINE_READS: readonly {
+  source: CorpDeadlineSource;
+  capability: CorpCapability;
+  load: (characterId: number) => Promise<NonNullable<CorpDeadlinesSlice[CorpDeadlineSource]>>;
+}[] = [
+  { source: 'structures', capability: 'canReadStructures', load: loadStructuresBoardData },
+  { source: 'moonChunks', capability: 'canReadMoonExtractions', load: loadMoonChunksBoardData },
+  { source: 'jobs', capability: 'canReadIndustry', load: loadCorpJobs },
+  { source: 'starbases', capability: 'canReadStarbases', load: loadCorpStarbases },
+  { source: 'sovereignty', capability: 'canReadSkyhooks', load: loadCorpSovereignty },
+];
+
+/** A corporation's Due soon slice before any read lands. */
+const emptySlice = (corporationId: number): CorpDeadlinesSlice => ({
+  corporationId,
+  structures: null,
+  moonChunks: null,
+  jobs: null,
+  starbases: null,
+  sovereignty: null,
+  failed: false,
+});
+
+/**
+ * Every corporation's Due soon sources, each read through a Character whose roles and grant
+ * cover that source there (`corpReadersFor`), so no read is made that can only 403. A read
+ * that fails leaves its corporation without that source, flagged; only when every read
+ * fails does the widget get its Retry. `only` narrows the read to those sources.
+ */
+export async function loadCorpDeadlinesAll(
+  only?: readonly CorpDeadlineSource[]
+): Promise<CorpDeadlinesAllFeed> {
+  const accounts = await loadAccountCorpAccess();
+  // The active Character reads its own corporation, sharing the cache rows `/corp` warmed.
+  const preferred = useActiveCharacter.getState().activeCharacterId ?? undefined;
+  const slices = new Map<number, CorpDeadlinesSlice>();
+  const tasks = DEADLINE_READS.filter(
+    ({ source }) => only === undefined || only.includes(source)
+  ).flatMap(({ source, capability, load }) =>
+    [...corpReadersFor(accounts, capability, preferred)].map(([corporationId, characterId]) => {
+      if (!slices.has(corporationId)) slices.set(corporationId, emptySlice(corporationId));
+      return { slice: slices.get(corporationId)!, source, load, characterId };
+    })
+  );
+  const feederChunks =
+    only === undefined || only.includes('moonChunks')
+      ? startFeederChunks(accounts, preferred)
+      : Promise.resolve<FeederChunks>(() => new Map());
+  let failures = 0;
+  await mapWithConcurrencyLimit(tasks, ESI_FANOUT_CONCURRENCY, async (task) => {
+    try {
+      // Each source's slot takes its own read's shape.
+      (task.slice as Record<CorpDeadlineSource, unknown>)[task.source] = await task.load(
+        task.characterId
+      );
+    } catch {
+      task.slice.failed = true;
+      failures += 1;
+    }
+  });
+  // Feeder pops from the Corp Tax Books these Characters view (#6116), for every corporation
+  // no Character read from ESI. Started beside the ESI reads.
+  let fromBooks = 0;
+  const feeders = await feederChunks;
+  const esi = new Set(
+    [...slices.values()]
+      .filter((slice) => slice.moonChunks?.chunks != null)
+      .map((slice) => slice.corporationId)
+  );
+  for (const [corporationId, moonChunks] of feeders(esi)) {
+    const slice = slices.get(corporationId) ?? emptySlice(corporationId);
+    slices.set(corporationId, { ...slice, moonChunks });
+    fromBooks += 1;
+  }
+  if (tasks.length > 0 && failures === tasks.length && fromBooks === 0) {
+    throw new CorpReadFailed('deadlines');
+  }
+  const corporations = [...slices.values()];
+  return {
+    corporations,
+    labels: await loadCorpLabels(corporations.map((slice) => slice.corporationId)),
+  };
+}
+
+// --- One widget across every corporation (All scope) --------------------------------
+
+/**
+ * `load` once per corporation some Character can read `capability` for (`corpReadersFor`;
+ * null for an ungated read), the active Character reading its own corporation so it shares
+ * the cache rows `/corp` warmed. A failed corporation is left out, flagged; only when every
+ * one fails does the widget get its Retry.
+ */
+async function loadEveryCorp<F extends CorpFeedBase>(
+  capability: CorpCapability | null,
+  what: string,
+  load: (characterId: number) => Promise<F>
+): Promise<CorpAllFeed<F>> {
+  const accounts = await loadAccountCorpAccess();
+  const { reads, partlyFailed } = await settleCorps(
+    corpReadersFor(accounts, capability, activeReader()),
+    what,
+    load
+  );
+  return {
+    corporations: reads.map((read) => ({ corporationId: read.corporationId, feed: read })),
+    labels: await loadCorpLabels(reads.map((read) => read.corporationId)),
+    partlyFailed,
+  };
+}
+
+/** Balances only: Cash flow, Income and runway stay on one corporation. */
+export const loadCorpWalletAll = () =>
+  loadEveryCorp('canReadWallet', 'wallet', (characterId) => loadCorpWallet(characterId, false));
+
+export const loadCorpJobsAll = () =>
+  loadEveryCorp('canReadIndustry', 'industry jobs', loadCorpJobs);
+
+/** Public zKillboard totals: every corporation a Character belongs to, no role asked. */
+export const loadCorpKillsAll = () => loadEveryCorp(null, 'kills', loadCorpKills);
+
+/** One corporation's read, tagged with its corporation. */
+type CorpTagged<F> = F & { corporationId: number };
+
+interface CorpAllSpec<F extends CorpFeedBase> {
+  capability: CorpCapability;
+  what: string;
+  /** The widget's one-corporation read. */
+  load: (characterId: number) => Promise<F>;
+  /** The readable reads' bodies as one; with no read, the empty body. */
+  merge: (reads: readonly CorpTagged<F>[]) => {
+    body: CorpFeedBody<F>;
+    corporationOf: ReadonlyMap<string, number>;
+  };
+  /** Corporations read at once (default the ESI fan-out limit). */
+  concurrency?: number;
+}
+
+/**
+ * A widget's read over every corporation some Character can read it for (`corpReadersFor`,
+ * the active Character preferred), so no read is made that can only 403. A corporation that
+ * fails is left out and the feed flagged; only when every one fails does the widget get its
+ * Retry. Data Age is the stalest corporation.
+ */
+async function readAllCorps<F extends CorpFeedBase>(spec: CorpAllSpec<F>): Promise<F> {
+  const readers = await accountCorpReaders(spec.capability, activeReader());
+  const { reads, partlyFailed } = await settleCorps(
+    readers,
+    spec.what,
+    spec.load,
+    spec.concurrency
+  );
+  const readable = reads.filter((read) => read.readable);
+  const { body, corporationOf } = spec.merge(readable);
+  if (readable.length === 0) {
+    return { ...UNREADABLE, needsReauth: reads.some((read) => read.needsReauth), ...body } as F;
+  }
+  const merged: CorpFeedBase = {
+    readable: true,
+    needsReauth: readable.some((read) => read.needsReauth),
+    fetchedAt: oldest(readable.map((read) => read.fetchedAt)),
+    fromCache: readable.some((read) => read.fromCache),
+    ...body,
+    corporations: await loadCorpLabels(readable.map((read) => read.corporationId)),
+    corporationOf,
+    partlyFailed,
+  };
+  return merged as F;
+}
+
+/** Each read's rows under its corporation, for `mergeCorpRows`. */
+const rowsOf = <F, T>(reads: readonly CorpTagged<F>[], pick: (read: F) => readonly T[]) =>
+  reads.map((read) => ({ corporationId: read.corporationId, rows: pick(read) }));
+
+export function loadCorpCustomsAll(): Promise<CorpCustomsFeed> {
+  return readAllCorps<CorpCustomsFeed>({
+    capability: 'canReadCustomsOffices',
+    what: 'customs offices',
+    load: loadCorpCustoms,
+    merge: (reads) => {
+      const { rows, corporationOf } = mergeCorpRows(
+        rowsOf(reads, (read) => read.offices),
+        (office) => String(office.office_id)
+      );
+      return {
+        corporationOf,
+        body: {
+          offices: rows,
+          typeNames: mergeLookups(reads.map((read) => read.typeNames)),
+          systemNames: mergeLookups(reads.map((read) => read.systemNames)),
+        },
+      };
+    },
+  });
+}
+
+export function loadCorpStarbasesAll(): Promise<CorpStarbasesFeed> {
+  return readAllCorps<CorpStarbasesFeed>({
+    capability: 'canReadStarbases',
+    what: 'starbases',
+    load: loadCorpStarbases,
+    merge: (reads) => {
+      const { rows, corporationOf } = mergeCorpRows(
+        rowsOf(reads, (read) => read.starbases),
+        (row) => String(row.starbaseId)
+      );
+      return {
+        corporationOf,
+        body: {
+          starbases: rows,
+          typeNames: mergeLookups(reads.map((read) => read.typeNames)),
+          systemNames: mergeLookups(reads.map((read) => read.systemNames)),
+        },
+      };
+    },
+    // One corporation at a time: each reads its towers' details under the fan-out limit,
+    // so the limit holds across corporations too.
+    concurrency: 1,
+  });
+}
+
+export function loadCorpSovereigntyAll(): Promise<CorpSovereigntyFeed> {
+  return readAllCorps<CorpSovereigntyFeed>({
+    capability: 'canReadSkyhooks',
+    what: 'sovereignty',
+    load: loadCorpSovereignty,
+    merge: (reads) => {
+      const { rows, corporationOf } = mergeCorpRows(
+        rowsOf(reads, (read) => read.rows),
+        (row) => row.key
+      );
+      return {
+        corporationOf,
+        body: {
+          rows,
+          systemNames: mergeLookups(reads.map((read) => read.systemNames)),
+          typeNames: mergeLookups(reads.map((read) => read.typeNames)),
+          prices: mergeLookups(reads.map((read) => read.prices)),
+          jumps: mergeLookups(reads.map((read) => read.jumps)),
+        },
+      };
+    },
+  });
+}
+
+export function loadCorpContractsAll(): Promise<CorpContractsFeed> {
+  return readAllCorps<CorpContractsFeed>({
+    capability: 'canReadContracts',
+    what: 'contracts',
+    load: loadCorpContracts,
+    merge: (reads) => {
+      // A contract between two of the pilot's corporations is in both reads: kept once,
+      // under the corporation that issued it.
+      const { rows, corporationOf } = mergeCorpRows(
+        rowsOf(reads, (read) => read.contracts),
+        (contract) => String(contract.contract_id)
+      );
+      const read = new Set(reads.map((r) => r.corporationId));
+      for (const contract of rows) {
+        if (read.has(contract.issuer_corporation_id)) {
+          corporationOf.set(String(contract.contract_id), contract.issuer_corporation_id);
+        }
+      }
+      return {
+        corporationOf,
+        body: { contracts: rows, names: mergeLookups(reads.map((read) => read.names)) },
+      };
+    },
+  });
+}
+
+export function loadCorpOrdersAll(): Promise<CorpOrdersFeed> {
+  return readAllCorps<CorpOrdersFeed>({
+    capability: 'canReadOrders',
+    what: 'market orders',
+    load: loadCorpOrders,
+    merge: (reads) => {
+      const { rows, corporationOf } = mergeCorpRows(
+        rowsOf(reads, (read) => read.orders),
+        (order) => String(order.order_id)
+      );
+      return {
+        corporationOf,
+        body: {
+          orders: rows,
+          typeNames: mergeLookups(reads.map((read) => read.typeNames)),
+          stationNames: mergeLookups(reads.map((read) => read.stationNames)),
+          stationPrices: mergeLookups(reads.map((read) => read.stationPrices)),
+          issuerNames: mergeLookups(reads.map((read) => read.issuerNames)),
+        },
       };
     },
   });

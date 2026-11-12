@@ -6,22 +6,24 @@ const access = vi.hoisted(
 );
 const structuresByCorp = vi.hoisted(() => new Map<number, unknown>());
 
-vi.mock('@/features/character/allCharactersFanOut', () => ({
-  fanOutAllCharacters: async ({
-    load,
-  }: {
-    load: (c: { characterId: number; name: string }) => Promise<unknown>;
-  }) => {
-    const entries: unknown[] = [];
-    for (const character of characters) {
-      const entry = await load(character);
-      if (entry !== null) entries.push(entry);
-    }
-    return { entries, skipped: [] };
-  },
-}));
-vi.mock('@/features/corp/corpReadAccess', () => ({
-  resolveCorpReadAccess: async (characterId: number) => access.get(characterId) ?? null,
+vi.mock('@/features/corp/corpReadAccess', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/corp/corpReadAccess')>();
+  const accounts = () =>
+    characters.flatMap(({ characterId }) => {
+      const gate = access.get(characterId);
+      return gate ? [{ characterId, access: gate }] : [];
+    });
+  return {
+    ...actual,
+    resolveCorpReadAccess: async (characterId: number) => access.get(characterId) ?? null,
+    loadAccountCorpAccess: async () => accounts(),
+    accountCorpReaders: async (capability: Parameters<typeof actual.corpReadersFor>[1]) =>
+      actual.corpReadersFor(accounts(), capability),
+  };
+});
+vi.mock('@/features/corp/corpTicker', () => ({
+  loadCorpLabels: async (ids: number[]) =>
+    new Map(ids.map((id) => [id, { ticker: `T${id}`, name: `Corp ${id}` }])),
 }));
 vi.mock('@/features/corp/boardData', () => ({
   loadCorporationStructures: async (_characterId: number, corporationId: number) =>
@@ -33,7 +35,8 @@ vi.mock('@/features/corp/boardSources', () => ({
 }));
 vi.mock('@/features/character/calendarMoonChunks', () => ({ loadMoonChunks: vi.fn() }));
 
-import { loadAllStructuresBoardData } from './corpBoard';
+import { loadMoonChunks } from '@/features/character/calendarMoonChunks';
+import { loadAllMoonChunksBoardData, loadAllStructuresBoardData } from './corpBoard';
 
 const canAll = () => true;
 const read = (ids: number[], at: string) => ({
@@ -64,7 +67,12 @@ describe('loadAllStructuresBoardData', () => {
 
     const merged = await loadAllStructuresBoardData();
 
-    expect(merged.structures?.map((s) => s.structureId)).toEqual([1, 2, 3]);
+    expect(merged.structures?.map((s) => [s.structureId, s.corporationId])).toEqual([
+      [1, 10],
+      [2, 10],
+      [3, 20],
+    ]);
+    expect([...(merged.corporations?.keys() ?? [])]).toEqual([10, 20]);
     expect(merged.structureCount).toBe(3);
     expect(merged.fetchedAt).toEqual(new Date('2026-11-01T09:00:00Z'));
   });
@@ -75,7 +83,9 @@ describe('loadAllStructuresBoardData', () => {
     access.set(3, { corporationId: 20, can: canAll });
     structuresByCorp.set(10, read([1], '2026-11-01T10:00:00Z'));
     structuresByCorp.set(20, { cached: null, needsReauth: false });
-    expect((await loadAllStructuresBoardData()).structures).toHaveLength(1);
+    const partial = await loadAllStructuresBoardData();
+    expect(partial.structures).toHaveLength(1);
+    expect(partial.partlyFailed).toBe(true);
 
     structuresByCorp.set(10, { cached: null, needsReauth: false });
     await expect(loadAllStructuresBoardData()).rejects.toThrow();
@@ -87,5 +97,42 @@ describe('loadAllStructuresBoardData', () => {
     const merged = await loadAllStructuresBoardData();
     expect(merged.structures).toBeNull();
     expect(merged.needsReauth).toBe(false);
+  });
+});
+
+describe('loadAllMoonChunksBoardData', () => {
+  beforeEach(() => {
+    characters.length = 0;
+    access.clear();
+  });
+
+  it('names each drill’s corporation, and flags a corporation whose read failed', async () => {
+    // No Corp Tax Book: no Feeder read is started.
+    const canMoons = (capability: string) => capability === 'canReadMoonExtractions';
+    for (const [characterId, corporationId] of [
+      [1, 10],
+      [3, 20],
+      [5, 30],
+    ] as const) {
+      characters.push({ characterId, name: `P${characterId}` });
+      access.set(characterId, { corporationId, can: canMoons });
+    }
+    vi.mocked(loadMoonChunks).mockImplementation((async (characterId: number) =>
+      characterId === 5
+        ? { result: { needsReauth: false, cached: null }, failed: true }
+        : {
+            result: { needsReauth: false, cached: { fetchedAt: new Date('2026-11-01T10:00:00Z') } },
+            sources: [{ id: `d${characterId}`, subject: 'Efa', detail: 'arrival', deadlineMs: 1 }],
+            extractions: [],
+            failed: false,
+          }) as never);
+
+    const merged = await loadAllMoonChunksBoardData();
+
+    expect(merged.chunks?.map((chunk) => [chunk.id, chunk.corporation])).toEqual([
+      ['d1', { id: 10, name: 'Corp 10', ticker: 'T10' }],
+      ['d3', { id: 20, name: 'Corp 20', ticker: 'T20' }],
+    ]);
+    expect(merged.partlyFailed).toBe(true);
   });
 });

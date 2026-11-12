@@ -35,6 +35,8 @@ import type {
   CorpMembersFeed,
   CorpMiningFeed,
   CorpSovereigntyFeed,
+  CorpDeadlinesAllFeed,
+  CorpAllFeed,
   CorpStarbasesFeed,
   CorpWalletFeed,
 } from './corpFeeds';
@@ -134,6 +136,8 @@ export interface ListRow {
 export type TableCell =
   | string
   | { text: string; iskAmount: number }
+  /** Short text with more behind it (a ticker, the corporation's full name in a tooltip). */
+  | { text: string; hint: string }
   | { text: string; tone?: 'good' | 'caution' | 'bad'; bar?: number };
 
 export interface TableColumn {
@@ -319,6 +323,10 @@ export interface FeedMap {
   /** Every readable corporation's, merged: what a widget scoped to All characters reads. */
   structuresAll: StructuresBoardData;
   moonChunksAll: MoonChunksBoardData;
+  corpDeadlinesAll: CorpDeadlinesAllFeed;
+  corpWalletAll: CorpAllFeed<CorpWalletFeed>;
+  corpJobsAll: CorpAllFeed<CorpJobsFeed>;
+  corpKillsAll: CorpAllFeed<CorpKillsFeed>;
   incursions: IncursionsBoardData;
   sovRaids: SovRaidsWidgetData;
   spExtras: SpExtras;
@@ -354,6 +362,12 @@ export interface FeedMap {
   corpSovereignty: CorpSovereigntyFeed;
   corpContracts: CorpContractsFeed;
   corpOrders: CorpOrdersFeed;
+  /** The five above across every corporation the pilot's Characters can read (All scope). */
+  corpCustomsAll: CorpCustomsFeed;
+  corpStarbasesAll: CorpStarbasesFeed;
+  corpSovereigntyAll: CorpSovereigntyFeed;
+  corpContractsAll: CorpContractsFeed;
+  corpOrdersAll: CorpOrdersFeed;
   corpKills: CorpKillsFeed;
   corpSrp: CorpSrpFeed;
 }

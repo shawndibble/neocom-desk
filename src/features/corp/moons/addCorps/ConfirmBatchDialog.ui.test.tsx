@@ -22,7 +22,7 @@ describe('ConfirmBatchDialog', () => {
     render(<ConfirmBatchDialog corps={CORPS} onBack={noop} onConnect={onConnect} onClose={noop} />);
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'How far back' }), '14');
     await userEvent.click(screen.getByRole('button', { name: 'Connect 12 corps' }));
-    expect(onConnect).toHaveBeenCalledWith(14);
+    expect(onConnect).toHaveBeenCalledWith(14, false);
   });
 
   it('connects from today by default, goes back and lists the batch on demand', async () => {
@@ -42,6 +42,30 @@ describe('ConfirmBatchDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(onBack).toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Connect 1 corp' }));
-    expect(onConnect).toHaveBeenCalledWith('today');
+    expect(onConnect).toHaveBeenCalledWith('today', false);
+  });
+
+  it('chains closed-app alerts by default when offered, and one checkbox skips them for the run', async () => {
+    const onConnect = vi.fn();
+    const { rerender } = render(
+      <ConfirmBatchDialog corps={CORPS} onBack={noop} onConnect={onConnect} onClose={noop} />
+    );
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    rerender(
+      <ConfirmBatchDialog
+        corps={CORPS}
+        offerAlerts
+        onBack={noop}
+        onConnect={onConnect}
+        onClose={noop}
+      />
+    );
+    const alerts = screen.getByRole('checkbox', { name: /closed-app alerts for each CEO/ });
+    expect(alerts).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Connect 12 corps' }));
+    expect(onConnect).toHaveBeenLastCalledWith('today', true);
+    await userEvent.click(alerts);
+    await userEvent.click(screen.getByRole('button', { name: 'Connect 12 corps' }));
+    expect(onConnect).toHaveBeenLastCalledWith('today', false);
   });
 });

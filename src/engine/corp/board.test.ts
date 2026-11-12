@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   CORP_BOARD_ITEM_KINDS,
   buildCorpBoard,
+  mergeCorpBoards,
   severityForRemaining,
   type BoardExtractionSource,
   type BoardJobSource,
@@ -640,5 +641,32 @@ describe('sov hub reagents', () => {
   it('stays on the board once the bay is empty, overdue', () => {
     const [item] = hubBoard([{ id: 'hub:9', name: 'Efa', runsOutMs: at(-HOUR) }]);
     expect(item!.severity).toBe('critical');
+  });
+});
+
+describe('mergeCorpBoards', () => {
+  it("ranks two corporations' deadlines together, each row carrying its corporation", () => {
+    const a = fuelBoard([structure({ structureId: 1, fuelExpiresMs: at(5 * DAY) })]);
+    const b = fuelBoard([
+      structure({ structureId: 1, fuelExpiresMs: at(2 * DAY) }),
+      structure({ structureId: 2, fuelExpiresMs: at(9 * DAY) }),
+    ]);
+    const merged = mergeCorpBoards([
+      { corporationId: 500, items: a },
+      { corporationId: 600, items: b },
+    ]);
+    expect(merged.map((item) => [item.corporationId, item.deadlineMs])).toEqual([
+      [600, at(2 * DAY)],
+      [500, at(5 * DAY)],
+      [600, at(9 * DAY)],
+    ]);
+    // The same structure id in two corporations stays two rows with distinct keys.
+    expect(new Set(merged.map((item) => item.id)).size).toBe(3);
+  });
+
+  it('changes nothing about a row but its corporation and key', () => {
+    const items = fuelBoard([structure()]);
+    const [merged] = mergeCorpBoards([{ corporationId: 500, items }]);
+    expect({ ...merged, id: items[0]!.id }).toEqual({ ...items[0], corporationId: 500 });
   });
 });

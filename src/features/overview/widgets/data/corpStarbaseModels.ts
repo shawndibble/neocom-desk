@@ -15,6 +15,7 @@ import { formatCountdown } from '@/lib/duration';
 import { formatNumber } from '@/lib/numberLocale';
 import { CORP_CACHE_WINDOW_MS } from '../../data/corpCards';
 import {
+  acrossCorporations,
   blank,
   corpUnreadable,
   count,
@@ -80,8 +81,8 @@ function fuelTone(remainingMs: number | null): DeadlineSeverity {
   return remainingMs < STARBASE_FUEL_WARNING_HOURS * HOUR_MS ? 'warning' : 'clear';
 }
 
-export const corpStarbases: Builder = (feeds, { t, now }) => {
-  const feed = feeds.corpStarbases;
+export const corpStarbases: Builder = (feeds, { t, now, scopeAll }) => {
+  const feed = scopeAll ? feeds.corpStarbasesAll : feeds.corpStarbases;
   const data = feed?.data ?? null;
   if (!data) return blank(null, statusOf(feed));
   if (!data.readable) return corpUnreadable(null, feed, data.needsReauth, t);
@@ -161,62 +162,66 @@ export const corpStarbases: Builder = (feeds, { t, now }) => {
     (tower) => tower.expiresMs !== null && fuelTone(tower.expiresMs - now) !== 'clear'
   ).length;
 
-  return {
-    ...blank(null, statusOf(feed, { isEmpty: towers.length === 0 })),
-    fetchedAt: data.fetchedAt,
-    fromCache: data.fromCache,
-    number: {
-      value: count(towers.length),
-      unit: t(`${W}.unit`),
-      secondary,
-      notes:
-        lowFuel > 0
-          ? [t(`${W}.lowFuel`, { count: lowFuel, hours: STARBASE_FUEL_WARNING_HOURS })]
-          : undefined,
-      tone: worstSeverity(towers.map((tower) => tower.tone)),
-    },
-    rows: towers.map((tower) => ({
-      key: String(tower.row.starbaseId),
-      title: tower.system,
-      detail: `${tower.type} · ${stateText(tower.row.state)}`,
-      value: fuelText(tower),
-      tone: tower.tone,
-    })),
-    table: {
-      columns: [
-        { key: 'tower', label: t(`${W}.col.tower`), priority: 0 },
-        { key: 'system', label: t(`${W}.col.system`), priority: 1 },
-        { key: 'state', label: t(`${W}.col.state`), priority: 2, hideNarrow: true },
-        { key: 'fuel', label: t(`${W}.col.fuel`), align: 'end', priority: 1 },
-        {
-          key: 'strontium',
-          label: t(`${W}.col.strontium`),
-          align: 'end',
-          priority: 3,
-          hideNarrow: true,
-        },
-        {
-          key: 'reinforced',
-          label: t(`${W}.col.reinforced`),
-          align: 'end',
-          priority: 2,
-          hideNarrow: true,
-        },
-      ],
-      rows: towers.map((tower): TableRowModel => ({
+  return acrossCorporations(
+    {
+      ...blank(null, statusOf(feed, { isEmpty: towers.length === 0 })),
+      fetchedAt: data.fetchedAt,
+      fromCache: data.fromCache,
+      number: {
+        value: count(towers.length),
+        unit: t(`${W}.unit`),
+        secondary,
+        notes:
+          lowFuel > 0
+            ? [t(`${W}.lowFuel`, { count: lowFuel, hours: STARBASE_FUEL_WARNING_HOURS })]
+            : undefined,
+        tone: worstSeverity(towers.map((tower) => tower.tone)),
+      },
+      rows: towers.map((tower) => ({
         key: String(tower.row.starbaseId),
-        cells: [
-          tower.type,
-          tower.system,
-          stateText(tower.row.state),
-          fuelText(tower),
-          strontiumText(tower),
-          reinforceText(tower),
-        ],
+        title: tower.system,
+        detail: `${tower.type} · ${stateText(tower.row.state)}`,
+        value: fuelText(tower),
         tone: tower.tone,
-        detail: detailOf(tower),
       })),
+      table: {
+        columns: [
+          { key: 'tower', label: t(`${W}.col.tower`), priority: 0 },
+          { key: 'system', label: t(`${W}.col.system`), priority: 1 },
+          { key: 'state', label: t(`${W}.col.state`), priority: 2, hideNarrow: true },
+          { key: 'fuel', label: t(`${W}.col.fuel`), align: 'end', priority: 1 },
+          {
+            key: 'strontium',
+            label: t(`${W}.col.strontium`),
+            align: 'end',
+            priority: 3,
+            hideNarrow: true,
+          },
+          {
+            key: 'reinforced',
+            label: t(`${W}.col.reinforced`),
+            align: 'end',
+            priority: 2,
+            hideNarrow: true,
+          },
+        ],
+        rows: towers.map((tower): TableRowModel => ({
+          key: String(tower.row.starbaseId),
+          cells: [
+            tower.type,
+            tower.system,
+            stateText(tower.row.state),
+            fuelText(tower),
+            strontiumText(tower),
+            reinforceText(tower),
+          ],
+          tone: tower.tone,
+          detail: detailOf(tower),
+        })),
+      },
+      summary: t(`${W}.summary`, { count: towers.length, low: lowFuel }),
     },
-    summary: t(`${W}.summary`, { count: towers.length, low: lowFuel }),
-  };
+    data,
+    t
+  );
 };

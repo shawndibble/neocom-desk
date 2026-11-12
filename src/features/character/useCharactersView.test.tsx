@@ -40,6 +40,8 @@ function view(
         netWorthById,
         acceleratorById: new Map(),
         detectedAcceleratorById: new Map(),
+        corpStandingById: new Map(),
+        alertsGrants: {},
       }),
     { wrapper }
   ).result.current;

@@ -31,10 +31,13 @@ const ALL_CORP_VIEWS = {
   canReadMembers: true,
   canReadWallet: true,
   canReadAssets: true,
+  canReadStructures: true,
   canReadMiningLedger: true,
   canReadRoleAudit: true,
   canManageSrp: true,
   canConfigureSrp: true,
+  canVet: true,
+  canConfigureVetting: true,
 };
 
 const TILE_GRID = 'grid grid-cols-4 gap-1.5';

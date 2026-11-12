@@ -6,7 +6,17 @@
 import type { AddCorpsOutcome, AddCorpsRun } from '@/engine/corpTaxBook/addCorpsRun';
 
 export type CorpState =
-  'ready' | 'connected' | 'needs-sign-in' | 'needs-role' | 'own-book' | 'gone-quiet' | 'failed';
+  | 'ready'
+  | 'connected'
+  | 'needs-sign-in'
+  | 'needs-role'
+  | 'own-book'
+  | 'gone-quiet'
+  | 'failed'
+  // Read without refinery names (a grant from before the structure scope, decision 20261021-084219):
+  // one the player can sign in for again, and one only its own officer can.
+  | 'needs-names'
+  | 'names-not-shared';
 
 export type NeedsYouState = Exclude<CorpState, 'ready' | 'connected'>;
 
@@ -36,6 +46,8 @@ export interface OwnerRowLike {
   corporationId: number;
   status: string;
   sameOwner?: boolean;
+  /** Whether its grant reads refinery names; absent until its first read since #4654. */
+  readsStructureNames?: boolean;
 }
 
 export interface NeedsYouItem {
@@ -50,15 +62,28 @@ export interface NeedsYouItem {
 export const isGoneQuiet = (row: OwnerRowLike): boolean =>
   row.sameOwner === true && (row.status === 'cant-read' || row.status === 'disconnected');
 
+/** Moon owner statuses the sync still reads (a removal or a disconnect asks for nothing else). */
+const READ = new Set(['active', 'no-rate', 'settled-otherwise']);
+
+/** Whether a moon owner the book reads came without refinery names. */
+const lacksNames = (row: OwnerRowLike): boolean =>
+  row.readsStructureNames === false && READ.has(row.status);
+
+/** Whether an item is the player's to fix (counted), rather than information about another officer's. */
+export const needsThePlayer = (item: NeedsYouItem): boolean => item.state !== 'names-not-shared';
+
 /**
  * Corporations that need the player: run outcomes that did not connect, and the
- * player's own moon owners that stopped answering. A corporation the book now
- * reads well is never listed, whatever the run once said about it.
+ * player's own moon owners that stopped answering, and moon owners read without
+ * refinery names: `needs-names` for one of the player's own that they can sign in
+ * as the CEO of (`grantable`), `names-not-shared` for the rest. A corporation the
+ * book now reads well is never listed, whatever the run once said about it.
  */
 export function needsYou(
   run: AddCorpsRun | null,
   rows: readonly OwnerRowLike[],
-  name: (corporationId: number) => string
+  name: (corporationId: number) => string,
+  grantable: ReadonlySet<number> = new Set()
 ): NeedsYouItem[] {
   const items = new Map<number, NeedsYouItem>();
   const reading = new Set(
@@ -85,6 +110,15 @@ export function needsYou(
         corporationId: r.corporationId,
         name: name(r.corporationId),
         state: 'gone-quiet',
+      });
+    } else if (lacksNames(r) && !items.has(r.corporationId)) {
+      items.set(r.corporationId, {
+        corporationId: r.corporationId,
+        name: name(r.corporationId),
+        state:
+          r.sameOwner === true && grantable.has(r.corporationId)
+            ? 'needs-names'
+            : 'names-not-shared',
       });
     }
   }

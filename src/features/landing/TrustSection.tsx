@@ -60,7 +60,7 @@ export function TrustSection() {
         </div>
         <div className="space-y-3 text-sm text-text-dim lg:border-l lg:border-line lg:pl-10">
           <p>{t('login.scopes.planetsNote')}</p>
-          <p>{t('login.scopes.separateNote')}</p>
+          <p>{t('login.scopes.oneLoginNote')}</p>
           <p>
             {t('login.permissionsPrivacy')}{' '}
             <a href="/privacy.html" className={inlineLinkClassName}>

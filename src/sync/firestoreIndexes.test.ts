@@ -10,6 +10,8 @@ const SWEEP_GROUP_FIELDS: [group: string, field: string][] = [
   ['itemRequests', 'closedAt'],
   ['fleetPayouts', 'expiresAt'],
   ['srpClaims', 'closedAt'],
+  ['vettingReviews', 'expiresAt'],
+  ['vettingThrottle', 'windowStart'],
 ];
 
 /**

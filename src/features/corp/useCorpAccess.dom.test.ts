@@ -5,7 +5,7 @@ import type { CharacterCorporationRoles } from '@/esi/endpoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { ESI_REGISTRY } from '@/esi/registry';
-import { scopesForGroup } from '@/esi/scopes';
+import { scopesForGroup, SCOPES } from '@/esi/scopes';
 import { CORP_SCOPES_FOR_CAPABILITY } from './corpScopes';
 import { loadCharacterRoles } from './roles';
 import { useCorpAccess } from './useCorpAccess';
@@ -127,8 +127,10 @@ describe('useCorpAccess — not-granted', () => {
 });
 
 describe('useCorpAccess — none', () => {
-  it('is none for a character holding no corp role, and renders nothing', async () => {
-    mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
+  // #6102: the whole Base Grant carries every corp scope now, so a line
+  // member holds them all; the roles answer alone keeps every corp read off.
+  it('is none for a character holding the whole Base Grant but no corp role, and renders nothing', async () => {
+    mockedGrantedScopes.mockReturnValue([...SCOPES]);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo([]));
     const { result } = renderHook(() => useCorpAccess());
     await waitFor(() => expect(result.current.state).toBe('none'));
@@ -269,6 +271,9 @@ describe('useCorpAccess — ready', () => {
       canReadSkyhooks: true,
       canManageSrp: true,
       canConfigureSrp: true,
+      canVet: true,
+      canConfigureVetting: true,
+      canViewTaxBook: true,
     });
   });
 

@@ -39,8 +39,10 @@ describe('canHide', () => {
       '/corp/members',
       '/corp/wallet',
       '/corp/assets',
+      '/corp/structures',
       '/corp/moons',
       '/corp/srp',
+      '/corp/vetting',
     ]) {
       expect(canHide(path)).toBe(true);
     }

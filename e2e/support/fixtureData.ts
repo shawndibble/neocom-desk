@@ -30,13 +30,37 @@ import { SCOPES as BASE_SCOPES, scopesForGroup } from '../../src/esi/scopes';
 import { WRITE_GROUPS } from '../../src/esi/registry';
 
 /**
- * The Base Grant plus the opt-in mercenaryDens Permission, so den specs see
- * their data, and every Write to EVE Permission, so the write buttons (Open in
- * EVE, Set waypoints, Save to EVE) render enabled.
+ * What a Character signed in before #6102 holds: the Base Grant without the
+ * six read Permissions that were opt-in until then. Specs seed this rather
+ * than today's Base Grant so a page that reads corp, killmails or jump fatigue
+ * data only does so in the specs that mock it (and add that group themselves).
+ * Hand-listed: `features/permissions/customizeSelection.ts` names the same six,
+ * but importing it would drag Dexie in here.
+ */
+export const PRE_6102_BASE_SCOPES: readonly string[] = (() => {
+  const formerlyOptIn = new Set(
+    (
+      [
+        'corp',
+        'structureMarkets',
+        'jumpFatigue',
+        'corpProjects',
+        'killmails',
+        'mercenaryDens',
+      ] as const
+    ).flatMap((group) => scopesForGroup(group))
+  );
+  return BASE_SCOPES.filter((scope) => !formerlyOptIn.has(scope));
+})();
+
+/**
+ * A pre-#6102 grant plus the mercenaryDens Permission, so den specs see their
+ * data, and every Write to EVE Permission, so the write buttons (Open in EVE,
+ * Set waypoints, Save to EVE) render enabled.
  */
 export const SCOPES: readonly string[] = [
   ...new Set([
-    ...BASE_SCOPES,
+    ...PRE_6102_BASE_SCOPES,
     ...scopesForGroup('mercenaryDens'),
     ...WRITE_GROUPS.flatMap((group) => scopesForGroup(group)),
   ]),

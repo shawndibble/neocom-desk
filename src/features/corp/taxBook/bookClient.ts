@@ -143,7 +143,19 @@ export async function readFeederRemovalState(
     'feeders',
     String(feederCorporationId)
   );
-  const read = async () => (await getDoc(ref)).data() as RemovalNoticeRecord | undefined;
+  return asOfficer(
+    characterId,
+    corporationId,
+    async () => (await getDoc(ref)).data() as RemovalNoticeRecord | undefined
+  );
+}
+
+/** Runs an officer-rules read, renewing a lapsed officer record once on a refusal. */
+async function asOfficer<T>(
+  characterId: number,
+  corporationId: number,
+  read: () => Promise<T>
+): Promise<T> {
   try {
     return await read();
   } catch (error) {
@@ -152,6 +164,61 @@ export async function readFeederRemovalState(
     await verifyOfficer(characterId, corporationId);
     return read();
   }
+}
+
+/** A Collector book's Feeder Extractions and records, for their pops off the Moons page. */
+export interface FeederChunkParts {
+  extractions: SyncExtraction[];
+  feeders: (Pick<BookFeeder, 'corporationId' | 'refineryLabels' | 'refineryStructures'> & {
+    /** The Feeder's last good read (ms): its pops' Data Age. */
+    lastReadWellAt?: number;
+  })[];
+}
+
+/**
+ * The Feeder Extractions a book holds and the records that name their refineries (#6116),
+ * under the officer rules. Null when the corporation has no book. The Extractions come from the
+ * Overview read model (ADR 0032: one doc, already windowed and without cancelled ones); a book
+ * whose read model is not built yet reads its live chunks instead. Only Feeder rows are kept:
+ * the book's own chunks come from ESI.
+ */
+export async function readFeederChunkParts(
+  characterId: number,
+  corporationId: number
+): Promise<FeederChunkParts | null> {
+  await ensureSignedIn(characterId);
+  const db = getSyncFirestore(characterId);
+  const book = doc(db, 'corps', String(corporationId));
+  if (!(await getDoc(book)).exists()) return null;
+  return asOfficer(characterId, corporationId, async () => {
+    const [overview, feeders] = await Promise.all([
+      getDoc(doc(book, 'readModels', 'overview')),
+      getDocs(collection(book, 'feeders')),
+    ]);
+    const windowed = overview.data()?.extractions as SyncExtraction[] | undefined;
+    const extractions =
+      windowed ??
+      (
+        await getDocs(
+          query(
+            collection(book, 'extractions'),
+            where('naturalDecayTime', '>', new Date().toISOString())
+          )
+        )
+      ).docs.map((d) => d.data() as SyncExtraction);
+    return {
+      extractions: extractions.filter((x) => x.sourceCorporationId !== undefined),
+      feeders: feeders.docs.map((d) => {
+        const { refineryLabels, refineryStructures, lastReadWellAt } = d.data() as FeederDoc;
+        return {
+          corporationId: Number(d.id),
+          ...(typeof lastReadWellAt === 'number' ? { lastReadWellAt } : {}),
+          ...(refineryLabels ? { refineryLabels } : {}),
+          ...(refineryStructures ? { refineryStructures } : {}),
+        };
+      }),
+    };
+  });
 }
 
 /** Checks the Character's corporation and roles with ESI and records officer access for 24 hours (D7). */

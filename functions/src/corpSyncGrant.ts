@@ -18,6 +18,7 @@ import { SsoRefreshError, type RefreshedTokens } from './alertGrant.js';
 import { decryptRefreshToken, encryptRefreshToken, rotateStoredToken } from './alertGrantCrypto.js';
 import { boundedString, record } from './communities.js';
 import { CORP_SYNC_SCOPES } from './corpSyncScopes.js';
+import { BOOK_SYNC_CRON } from './corpTaxBookSchedule.js';
 import {
   FEEDER_OF_COLLECTION,
   META,
@@ -44,6 +45,7 @@ import {
   outcomeOf,
   readFeederLedger,
   recordFeederRead,
+  refreshFeederExtractions,
   refreshRefineryStructures,
   type FeederReadRecord,
 } from './corpTaxBookFeederSync.js';
@@ -508,7 +510,7 @@ export async function runScheduledCorpSyncs(
  * (`lastReadWellAt >= dayClosesAt`). Changing a schedule is not a new export.
  */
 export const SYNC_CORP_TAX_BOOKS_SCHEDULE = {
-  schedule: '35 0,6,12,18 * * *',
+  schedule: BOOK_SYNC_CRON,
   timeZone: 'UTC',
 } as const;
 
@@ -706,6 +708,23 @@ export async function syncOneFeeder(
   ) {
     return finish({ outcome: 'none', reason: 'esi-unavailable' }, false, live);
   }
+  // Extractions first (#6097), so the rows merged next are placed by them. Best effort, never
+  // part of the feeder's health.
+  let extractionRefineries: number[] = [];
+  try {
+    extractionRefineries = await refreshFeederExtractions(
+      bookDeps(deps),
+      esi,
+      collectorCorporationId,
+      feederNow,
+      refreshed.accessToken
+    );
+  } catch (err) {
+    deps.log('Moon owner extractions read failed', {
+      feederCorporationId,
+      error: err instanceof Error ? err.name : 'unknown',
+    });
+  }
   await mergeObservedInto(bookDeps(deps), collectorCorporationId, read.rows);
   // Refinery names and systems (#4654): best effort, never part of the feeder's health.
   try {
@@ -714,7 +733,7 @@ export async function syncOneFeeder(
       esi,
       collectorCorporationId,
       feederCorporationId,
-      read.rows.map((r) => r.structureId),
+      [...read.rows.map((r) => r.structureId), ...extractionRefineries],
       refreshed.accessToken,
       live.readsStructures === true
     );

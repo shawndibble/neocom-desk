@@ -58,6 +58,8 @@ export function toBoardStructures(
     state: structure.state ?? null,
     stateTimerEndMs: parseInstant(structure.state_timer_end),
     unanchorsAtMs: parseInstant(structure.unanchors_at),
+    systemId: structure.system_id,
+    typeId: structure.type_id,
     services: (structure.services ?? []).map((service) => ({
       name: service.name,
       state: service.state,

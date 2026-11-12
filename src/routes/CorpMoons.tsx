@@ -65,6 +65,7 @@ import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
 import { useAddMyCorps } from '@/features/corp/moons/addCorps/useAddMyCorps';
 import { useMoonOwners } from '@/features/corp/moons/useMoonOwners';
+import { useMoonOwnersSyncNow } from '@/features/corp/moons/useMoonOwnersSyncNow';
 import { setMoonsTabsHidden } from '@/features/corp/moons/moonsTabsHidden';
 
 function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -90,6 +91,8 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { rows: moonOwnerRows } = useMoonOwners();
   const hasMoonOwners = moonOwnerRows.length > 0;
   const addCorps = useAddMyCorps(moonOwnerRows);
+  const moonOwnersSync = useMoonOwnersSyncNow(moonOwnerRows);
+  const syncing = sync.run.phase === 'syncing' || moonOwnersSync.busy;
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
   // Back from EVE's page after the Automatic sync opt-in: show the settings it was pressed in.
@@ -147,10 +150,11 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
                 )}
                 {sync.ledger.state === 'ready' && (
                   <IconButton
-                    icon={sync.run.phase === 'syncing' ? <Spinner /> : <Icon.Refresh />}
+                    icon={syncing ? <Spinner /> : <Icon.Refresh />}
                     label={t('corpTaxBook.moons.syncNow')}
-                    onClick={() => void sync.sync()}
-                    busy={sync.run.phase === 'syncing'}
+                    // The book's own ledger and every moon owner's, side by side (#6117).
+                    onClick={() => void Promise.all([sync.sync(), moonOwnersSync.run()])}
+                    busy={syncing}
                   />
                 )}
                 <IconButton
@@ -214,6 +218,13 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
         />
       )}
       {deleteOpen && <DeleteBookDialog onClose={() => setDeleteOpen(false)} />}
+      {moonOwnersSync.notice && (
+        <Toast
+          message={moonOwnersSync.notice.message}
+          instance={moonOwnersSync.notice.instance}
+          onClose={moonOwnersSync.clearNotice}
+        />
+      )}
       {saved && (
         <Toast message={t('corpTaxBook.moons.settings.saved')} onClose={() => setSaved(false)} />
       )}

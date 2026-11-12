@@ -31,6 +31,9 @@ export const CHARACTER_COLUMN_IDS = [
   'spFarm',
   'spReady',
   'alerts',
+  'corpRoles',
+  'corpAccess',
+  'alertsWhenClosed',
   // Last, always — GLOSSARY.md's glossary reserves "pinned" for a planetary
   // structure, so this is `starred` internally (same feature the card view's
   // star toggle already drives), header text says "Starred".
@@ -112,15 +115,19 @@ export const useCharacterViewMode = createLocalSetting<CharacterViewMode>({
  * every row as unknown, which is worse than not offering it. `group`
  * likewise only when at least one Group exists — with none, the column's
  * Select would offer only "Ungrouped" for every row, same reasoning as the
- * card view's own `groups.length > 0` gate on its Select.
+ * card view's own `groups.length > 0` gate on its Select. `alertsWhenClosed`
+ * only when the sync backend is configured: without one there is no Alerts
+ * Grant to arm, as Settings › Notifications hides its own section.
  */
 export function availableCharacterColumns(
   spExtractionEnabled: boolean,
-  hasGroups: boolean
+  hasGroups: boolean,
+  syncConfigured = true
 ): readonly CharacterColumnId[] {
   return CHARACTER_COLUMN_IDS.filter((id) => {
     if (id === 'spReady' || id === 'spFarm') return spExtractionEnabled;
     if (id === 'group') return hasGroups;
+    if (id === 'alertsWhenClosed') return syncConfigured;
     return true;
   });
 }
@@ -135,8 +142,11 @@ export function availableCharacterColumns(
 export function visibleAvailableColumns(
   visible: readonly CharacterColumnId[],
   spExtractionEnabled: boolean,
-  hasGroups: boolean
+  hasGroups: boolean,
+  syncConfigured = true
 ): readonly CharacterColumnId[] {
-  const available = new Set(availableCharacterColumns(spExtractionEnabled, hasGroups));
+  const available = new Set(
+    availableCharacterColumns(spExtractionEnabled, hasGroups, syncConfigured)
+  );
   return visible.filter((id) => available.has(id));
 }

@@ -16,19 +16,25 @@ const ALL_CORP_VIEWS = {
   canReadMembers: true,
   canReadWallet: true,
   canReadAssets: true,
+  canReadStructures: true,
   canReadMiningLedger: true,
   canReadRoleAudit: true,
   canManageSrp: true,
   canConfigureSrp: true,
+  canVet: true,
+  canConfigureVetting: true,
 };
 const NO_CORP_VIEWS = {
   canReadMembers: false,
   canReadWallet: false,
   canReadAssets: false,
+  canReadStructures: false,
   canReadMiningLedger: false,
   canReadRoleAudit: false,
   canManageSrp: false,
   canConfigureSrp: false,
+  canVet: false,
+  canConfigureVetting: false,
 };
 
 const MOONS_TAB_PATHS = [
@@ -71,8 +77,10 @@ describe('railGroups', () => {
           '/corp/members',
           '/corp/wallet',
           '/corp/assets',
+          '/corp/structures',
           '/corp/moons',
           '/corp/srp',
+          '/corp/vetting',
         ],
       },
       {

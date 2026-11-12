@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { BookViewInput } from '@/engine/corpTaxBook/bookView';
@@ -12,6 +13,8 @@ import { CorpMoons } from './CorpMoons';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 vi.mock('@/features/corp/taxBook/useCorpTaxBook', () => ({ useCorpTaxBook: vi.fn() }));
+const syncMoonOwnersNowRemote = vi.hoisted(() => vi.fn());
+vi.mock('@/sync/corpSyncGrantApi', () => ({ syncMoonOwnersNowRemote }));
 const book = vi.hoisted(() => ({
   entries: [] as ObservedMiningEntry[],
   feeders: [] as unknown[],
@@ -131,6 +134,20 @@ describe('CorpMoons moon owners', () => {
     book.feeders = [];
     mount('/corp/moons/extractions');
     expect(screen.getByRole('tab', { name: 'Extractions', selected: true })).toBeInTheDocument();
+  });
+
+  it('Sync now reads the moon owners too (#6117)', async () => {
+    book.entries = [];
+    book.feeders = [ONE_FEEDER];
+    syncMoonOwnersNowRemote.mockResolvedValue({ kind: 'synced', read: 1, stale: 0, skipped: 0 });
+    mount('/corp/moons/moon-owners');
+    await userEvent.click(screen.getByRole('button', { name: 'Sync now' }));
+    await waitFor(() =>
+      expect(syncMoonOwnersNowRemote).toHaveBeenCalledWith({
+        editorCharacterId: 7,
+        collectorCorporationId: 98000000,
+      })
+    );
   });
 
   it('keeps the invite button off the other tabs', () => {

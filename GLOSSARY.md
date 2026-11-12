@@ -90,8 +90,9 @@ here — they go one per file in `docs/context/decisions/`.
   never enforced afterward — running it again overwrites whatever craft/buy
   choices, hand-picked ones included, were there before.
 - **Base Grant**: What the plain "Log in" button asks a Character for: the
-  **Core Grant** plus every **Permission** that is on by default. Distinct
-  from the Core Grant, which is only the part that cannot be unchecked.
+  **Core Grant** plus every **Permission** that is on by default — every read
+  one; only **Write to EVE** is left out. Distinct from the Core Grant, which
+  is only the part that cannot be unchecked.
 - **Core Grant**: The scopes every Character must grant, shown checked and
   locked when customizing permissions: skills, the skill queue, and structure
   lookup (names and search). Leaving them out makes other numbers silently
@@ -177,7 +178,7 @@ here — they go one per file in `docs/context/decisions/`.
   **Build Opportunities** it is a buyer: the **Corp projects** view lists each
   open one the chosen Characters can still contribute to, with the reward,
   the build cost, where the blueprint comes from and the profit at the cap.
-  Read with the opt-in **Permission** "Corporation projects"; the view is
+  Read with the **Permission** "Corporation projects"; the view is
   absent without it.
 - **Build Plan**: An industry plan for one blueprint or reaction formula:
   materials needed, costs, fees/taxes, time, and two independent verdicts — an
@@ -386,8 +387,10 @@ here — they go one per file in `docs/context/decisions/`.
   kick). Acknowledging it dismisses the whole danger type. Nothing else raises
   it.
 - **War banner**: The red strip under the Overview's and the Corp Board's
-  header while the pilot's corporation, or its alliance, has a war declared on
-  it that is running or not yet started. Pressing it opens the war in a modal.
+  header while any corporation the account's Characters are in, or its
+  alliance, has a war declared on it that is running or not yet started. With
+  several of them at war it counts the corporations, and the modal groups the
+  wars by the corporation each is on. Pressing it opens the war in a modal.
   Unlike the **Danger banner** it is not an **Alert** and is not acknowledged: it
   ends when the war does. A war the corporation declared itself never shows.
 - **Dark**: A member with no login for the corp's inactivity span or more —
@@ -810,6 +813,12 @@ here — they go one per file in `docs/context/decisions/`.
   accelerator or Skills only.
 - **Widget State**: Which of five things a **Widget** is showing: loading,
   needs permission, failed, empty or ok.
+- **Vetting**: A corporation's check of a pilot before it accepts an application or promotes a member: one read of the pilot's declared Characters, a **Vetting Report**, and **Sign-off**s. The server reads once with a short-lived access token and keeps no sign-in (ADR 0033). Player-facing: "Vetting".
+- **Vetting Report**: What a **Vetting** read produced: **Vetting Flag**s, the checks that found nothing, and the checks that could not run because a source was not shared. Never a verdict; "Nothing found" is not "safe". Deleted 30 days after the decision, or 90 days after it was shared if nobody decides.
+- **Vetting Flag**: One finding in a **Vetting Report** with the rows behind it, "Serious" or "Ask about". A reason to ask the pilot, not a conclusion. Player-facing: "flag".
+- **Watchlist**: The corporations, alliances and characters a corporation's **Vetting** checks dealings against. Set by its CEO and Directors. Distinct from contacts and standings.
+- **Sign-off**: One reviewer's recorded decision on a **Vetting Report**. Counted per EVE account; whoever asked for the review, or is its subject, cannot give one, and another reviewer's is hidden until you record your own. A review closes once the sign-offs needed are in: rejected if any said no.
+- **Apply link**: The public page (`/apply/<corporationId>`) where a pilot starts a **Vetting** application with no Neocom Desk account. Distinct from a **Survey** start link.
 - **Yours**: The pill on a **Feeder** whose corporation is one of the viewer's own, joined through "Add my other
   corps" (the CEO is a Character on the viewer's account) rather than an invite. It owes no owner rate and takes no
   payouts: the row is always settled otherwise.

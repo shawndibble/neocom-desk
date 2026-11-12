@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
 import { db, type TokenRecord } from '@/db';
-import { CORE_GRANT, SCOPES, revokedScopes, scopesForGroup } from '@/esi/scopes';
+import { CORE_GRANT, DEFAULT_ON_GROUPS, SCOPES, revokedScopes, scopesForGroup } from '@/esi/scopes';
+import { CUSTOMIZE_SELECTION_KEY } from '@/features/permissions/customizeSelection';
 import { completeLogin } from '@/auth/session';
 import { setLoginReturnTo, takeLoginReturnTo } from '@/auth/loginReturnTo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -21,11 +22,11 @@ import {
 const CHAR_ID = 2112625428;
 const OTHER_CHAR_ID = 90000001;
 /**
- * A scope no *ungrouped* registry endpoint declares — an incrementally granted
- * one. It is a real corp-group scope, which is the case that matters: the base
- * consent screen must not carry it.
+ * A scope outside the Base Grant — an incrementally granted one. Since #6102
+ * every read is in the Base Grant, so it is a Write to EVE scope: the base
+ * consent screen must not carry it, and no re-login fills it in.
  */
-const EXTRA_SCOPE = 'esi-corporations.read_structures.v1';
+const EXTRA_SCOPE = 'esi-ui.open_window.v1';
 
 /** The `scope` parameter of the authorize URL the flow navigated to. */
 function requestedScopes(): string[] {
@@ -98,11 +99,16 @@ describe('beginAddCharacterLogin', () => {
     expect(requestedScopes().sort()).toEqual([...SCOPES].sort());
   });
 
-  it('puts NO corp scope on the consent screen (AC 1)', async () => {
+  it('asks for every read Permission, the corp one included, and no write one (#6102)', async () => {
     await beginAddCharacterLogin();
 
     const requested = new Set(requestedScopes());
-    for (const scope of scopesForGroup('corp')) expect(requested.has(scope), scope).toBe(false);
+    for (const group of ['corp', 'structureMarkets', 'killmails', 'mercenaryDens'] as const) {
+      for (const scope of scopesForGroup(group)) expect(requested.has(scope), scope).toBe(true);
+    }
+    for (const group of ['mailSend', 'openWindow'] as const) {
+      for (const scope of scopesForGroup(group)) expect(requested.has(scope), scope).toBe(false);
+    }
   });
 
   it('does NOT inherit another character’s wider grant', async () => {
@@ -190,13 +196,37 @@ describe('beginEveLogin: re-auth for a known character', () => {
     expect(requestedScopes()).not.toContain(EXTRA_SCOPE);
   });
 
-  it('sends only the Core Grant for a character with no stored grant and no named Permission (AC 3)', async () => {
-    // #1520: a bare re-auth with no identifiable Permission must never re-ask
-    // for the whole Base Grant, or it would re-request every Permission the
-    // Character declined at sign-in.
+  it('fills every default-on gap in one trip for a character with no stored grant (#6102)', async () => {
     await beginEveLogin({ characterId: CHAR_ID });
 
-    expect(requestedScopes().sort()).toEqual([...CORE_GRANT].sort());
+    expect(requestedScopes().sort()).toEqual([...SCOPES].sort());
+  });
+
+  it('leaves out a Permission the player unticked in Customize', async () => {
+    // #1520's concern, kept: a re-login must not re-request what the player
+    // declined. Customize is where they declined it.
+    await db.settings.put({
+      key: CUSTOMIZE_SELECTION_KEY,
+      value: { groups: DEFAULT_ON_GROUPS.filter((group) => group !== 'killmails') },
+    });
+
+    await beginEveLogin({ characterId: CHAR_ID });
+
+    const requested = new Set(requestedScopes());
+    for (const scope of scopesForGroup('killmails'))
+      expect(requested.has(scope), scope).toBe(false);
+    for (const scope of scopesForGroup('corp')) expect(requested.has(scope), scope).toBe(true);
+  });
+
+  it('never fills a Write to EVE Permission, even one ticked in Customize', async () => {
+    await db.settings.put({
+      key: CUSTOMIZE_SELECTION_KEY,
+      value: { groups: [...DEFAULT_ON_GROUPS, 'openWindow'] },
+    });
+
+    await beginEveLogin({ characterId: CHAR_ID });
+
+    expect(requestedScopes()).not.toContain(EXTRA_SCOPE);
   });
 
   /**
@@ -362,7 +392,7 @@ describe('beginCustomizedAddCharacterLogin', () => {
     for (const scope of scopesForGroup('mail')) expect(requested.has(scope), scope).toBe(false);
   });
 
-  it('can ask for an opt-in group too (e.g. corp), since Customize offers all 13', async () => {
+  it('can ask for an opt-in group too (e.g. corp), since Customize offers every Permission', async () => {
     await beginCustomizedAddCharacterLogin(['corp']);
 
     const requested = new Set(requestedScopes());
@@ -398,20 +428,52 @@ describe('beginCustomizedAddCharacterLogin', () => {
 // ---------------------------------------------------------------------------
 
 describe('beginEveLogin: requesting a scope group', () => {
-  it('asks for the Core Grant plus the named group, never the whole Base Grant (AC 1)', async () => {
+  it('asks for the named group and every other default-on gap, minus what Customize unticked (#6102)', async () => {
     // A Character holding only the Core Grant plus Wallet presses the Mail
-    // banner: SSO must be asked for Core + Wallet (stored) + Mail (named) and
-    // nothing else — not every other default-on Permission.
+    // banner: one trip asks for Core + Wallet (stored) + Mail (named) + every
+    // other default-on Permission it lacks, except Contracts, which the player
+    // unticked in Customize.
     await seedGrant(CHAR_ID, [...CORE_GRANT, ...scopesForGroup('wallet')]);
+    await db.settings.put({
+      key: CUSTOMIZE_SELECTION_KEY,
+      value: { groups: DEFAULT_ON_GROUPS.filter((group) => group !== 'contracts') },
+    });
 
     await beginEveLogin({ characterId: CHAR_ID, groups: ['mail'] });
 
     const requested = new Set(requestedScopes());
+    for (const group of ['wallet', 'mail', 'assets', 'corp', 'killmails'] as const) {
+      for (const scope of scopesForGroup(group)) expect(requested.has(scope), scope).toBe(true);
+    }
     for (const scope of CORE_GRANT) expect(requested.has(scope), scope).toBe(true);
-    for (const scope of scopesForGroup('wallet')) expect(requested.has(scope), scope).toBe(true);
-    for (const scope of scopesForGroup('mail')) expect(requested.has(scope), scope).toBe(true);
     for (const scope of scopesForGroup('contracts'))
       expect(requested.has(scope), scope).toBe(false);
+  });
+
+  it('still asks for a named group the player unticked in Customize, since they just pressed for it', async () => {
+    await db.settings.put({ key: CUSTOMIZE_SELECTION_KEY, value: { groups: [] } });
+
+    await beginEveLogin({ characterId: CHAR_ID, groups: ['corp'] });
+
+    const requested = new Set(requestedScopes());
+    for (const scope of scopesForGroup('corp')) expect(requested.has(scope), scope).toBe(true);
+    for (const scope of scopesForGroup('wallet')) expect(requested.has(scope), scope).toBe(false);
+  });
+
+  it('honours a choice stored before #6102: the formerly opt-in Permissions are filled, an unticked one is not', async () => {
+    await db.settings.put({
+      key: CUSTOMIZE_SELECTION_KEY,
+      value: DEFAULT_ON_GROUPS.filter(
+        (group) => group !== 'wallet' && group !== 'corp' && group !== 'killmails'
+      ),
+    });
+
+    await beginEveLogin({ characterId: CHAR_ID });
+
+    const requested = new Set(requestedScopes());
+    for (const scope of scopesForGroup('wallet')) expect(requested.has(scope), scope).toBe(false);
+    for (const scope of scopesForGroup('corp')) expect(requested.has(scope), scope).toBe(true);
+    for (const scope of scopesForGroup('killmails')) expect(requested.has(scope), scope).toBe(true);
   });
 
   it('adds every scope in the group to the Core Grant', async () => {
@@ -461,14 +523,26 @@ describe('beginEveLogin: requesting a scope group', () => {
 });
 
 describe('beginEveLogin: a broken Dexie', () => {
-  it('falls back to the Core Grant when the stored grant cannot be read', async () => {
-    // A broken Dexie must cost the user their cache, never their way back in
-    // — but it must not turn an unreadable grant into a full Base Grant ask.
+  it('still fills the default-on gaps when the stored grant cannot be read', async () => {
+    // A broken Dexie must cost the user their cache, never their way back in.
     const get = vi.spyOn(db.tokens, 'get').mockRejectedValue(new Error('store closed'));
 
     await beginEveLogin({ characterId: CHAR_ID });
 
     get.mockRestore();
+    expect(requestedScopes().sort()).toEqual([...SCOPES].sort());
+  });
+
+  it('falls back to the Core Grant when the Customize choice cannot be read either', async () => {
+    // Without the choice, a fill could re-request a Permission the player
+    // declined, so it asks for nothing beyond Core.
+    const tokens = vi.spyOn(db.tokens, 'get').mockRejectedValue(new Error('store closed'));
+    const settings = vi.spyOn(db.settings, 'get').mockRejectedValue(new Error('store closed'));
+
+    await beginEveLogin({ characterId: CHAR_ID });
+
+    tokens.mockRestore();
+    settings.mockRestore();
     expect(requestedScopes().sort()).toEqual([...CORE_GRANT].sort());
   });
 

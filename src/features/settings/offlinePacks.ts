@@ -3,7 +3,7 @@
  * pilot recognises, and how a byte count reads. Pure: the Cache Storage reads
  * live in `offlineStatus.ts`.
  */
-import { getDecimalMark } from '@/lib/numberLocale';
+import { getDecimalMark, getGroupMark } from '@/lib/numberLocale';
 
 /** The packs, in display order: the lazy SDE files, then the build's route chunks (the fitting engine is a pack of its own, outside this list). */
 export const OFFLINE_PACK_IDS = [
@@ -78,5 +78,5 @@ export function formatBytes(bytes: number): string {
     maximumFractionDigits: 1,
   }).format(value);
   // Unit names stay English; the group and decimal marks follow the Number format.
-  return getDecimalMark() === ',' ? text.replace(/[.,]/g, (c) => (c === '.' ? ',' : '.')) : text;
+  return text.replace(/[.,]/g, (c) => (c === '.' ? getDecimalMark() : getGroupMark()));
 }

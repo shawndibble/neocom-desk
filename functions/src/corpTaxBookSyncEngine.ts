@@ -377,7 +377,12 @@ export const MOON_ORE_M3_PER_UNIT = 10;
 export interface SyncExtraction extends MirrorExtraction {
   oreLines?: { typeId: number; quantity: number }[];
   surveyId?: string;
+  /** The moon owner whose grant read it (#6097); absent means the book's own corporation. */
+  sourceCorporationId?: number;
 }
+
+/** A moon owner's Extraction, as its grant read it (#6097). */
+export type FeederExtraction = SyncExtraction & { sourceCorporationId: number };
 
 export interface EsiExtractionLike {
   structure_id: number;

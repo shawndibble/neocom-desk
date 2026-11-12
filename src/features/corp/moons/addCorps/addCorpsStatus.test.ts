@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { recordOutcome } from '@/engine/corpTaxBook/addCorpsRun';
-import { connectedInRun, needsYou, stateOfOutcome } from './addCorpsStatus';
+import { connectedInRun, needsThePlayer, needsYou, stateOfOutcome } from './addCorpsStatus';
 import { corpName, CORPS, freshRun } from './addCorpsFixtures';
 
 describe('stateOfOutcome', () => {
@@ -47,5 +47,43 @@ describe('needsYou', () => {
     expect(
       needsYou(null, [{ corporationId: 1, status: 'active', sameOwner: true }], corpName)
     ).toEqual([]);
+  });
+
+  it('asks for Grant again where names are not read: own corps act, others only inform', () => {
+    const rows = [
+      {
+        corporationId: 10,
+        status: 'settled-otherwise',
+        sameOwner: true,
+        readsStructureNames: false,
+      },
+      { corporationId: 11, status: 'active', readsStructureNames: false },
+      // Not yet synced, or already granted: nothing to ask.
+      { corporationId: 12, status: 'settled-otherwise', sameOwner: true },
+      {
+        corporationId: 13,
+        status: 'settled-otherwise',
+        sameOwner: true,
+        readsStructureNames: true,
+      },
+      // Own corp the player cannot sign in for (no CEO character): only its officer can.
+      {
+        corporationId: 14,
+        status: 'settled-otherwise',
+        sameOwner: true,
+        readsStructureNames: false,
+      },
+      // Gone quiet wins over names; a removal in progress is not asked about.
+      { corporationId: 15, status: 'cant-read', sameOwner: true, readsStructureNames: false },
+      { corporationId: 16, status: 'removal-pending', readsStructureNames: false },
+    ];
+    const items = needsYou(null, rows, corpName, new Set([10, 12, 13, 15]));
+    expect(items.map((i) => [i.corporationId, i.state])).toEqual([
+      [10, 'needs-names'],
+      [11, 'names-not-shared'],
+      [14, 'names-not-shared'],
+      [15, 'gone-quiet'],
+    ]);
+    expect(items.filter(needsThePlayer).map((i) => i.corporationId)).toEqual([10, 15]);
   });
 });

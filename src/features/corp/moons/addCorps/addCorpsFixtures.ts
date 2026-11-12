@@ -34,12 +34,13 @@ export const CORPS: AddCorpsCandidate[] = NAMES.map(([name, ceoName], i) => ({
 export const corpName = (id: number): string =>
   CORPS.find((c) => c.corporationId === id)?.name ?? `Corp ${id}`;
 
-export const freshRun = (): AddCorpsRun =>
+export const freshRun = (extra: { alertsFor?: number[] } = {}): AddCorpsRun =>
   startRun({
     collectorCorporationId: BOOK_CORPORATION_ID,
     editorCharacterId: EDITOR_ID,
     queue: CORPS,
     coverageFrom: '2026-11-01',
+    ...extra,
   });
 
 /** Three connected and the second skipped: the dialog is on corp 5 (index 4). */

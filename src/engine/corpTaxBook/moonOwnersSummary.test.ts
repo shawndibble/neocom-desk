@@ -345,3 +345,35 @@ describe('moonOwnersNeedRows (#5717)', () => {
     expect(moonOwnersNeedRows(bare(withSummaries(input([feeder(A)], { rates }))))).toBe(true);
   });
 });
+
+describe('refineries seen, from a summary (#6097)', () => {
+  // A's ledger rows are at refineries 10 and 11.
+  const i = withSummaries(input([feeder(A)]));
+  const rowWith = (summary: Partial<MoonOwnerSummary>, extraction: number[]) =>
+    buildMoonOwners({
+      ...i,
+      entries: [],
+      summaries: new Map([[A, { ...i.summaries!.get(A)!, ...summary }]]),
+      extractionRefineries: new Map([[A, new Set(extraction)]]),
+    }).rows[0]!;
+
+  it('unions the summary refineries with the Extraction refineries', () => {
+    expect(rowWith({ refineryIds: [10, 11] }, [11, 12]).refineryCount).toBe(3);
+  });
+
+  it('a summary from before it kept the ids shows the larger count', () => {
+    expect(rowWith({}, [12]).refineryCount).toBe(2);
+    expect(rowWith({}, [12, 13, 14]).refineryCount).toBe(3);
+  });
+
+  it('an Extraction alone is not "nothing seen", and still prices a moon owner with no ore as Guests', () => {
+    const empty = withSummaries(input([feeder(A)], {}, []));
+    const row = buildMoonOwners({
+      ...empty,
+      extractionRefineries: new Map([[A, new Set([12])]]),
+    }).rows[0]!;
+    expect(row).toMatchObject({ refineryCount: 1, mined: 0 });
+    expect(row.nothingSeen).toBeUndefined();
+    expect(buildMoonOwners(empty).rows[0]!.nothingSeen).toBe(true);
+  });
+});

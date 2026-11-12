@@ -31,7 +31,25 @@ export interface AddCorpsRun {
   outcomes: Record<number, AddCorpsOutcome>;
   /** The latest outcome, for the banner on the next screen. */
   lastOutcome?: { corporationId: number; outcome: AddCorpsOutcome };
+  /**
+   * CEO Characters whose closed-app alerts approval follows their corporation's
+   * moon sign-in, while the player is still signed in to that EVE account
+   * (issue #6103). Absent or empty: the run asks for no alerts.
+   */
+  alertsFor?: number[];
+  /** The corporation whose CEO's alerts approval is the step now, after it connected. */
+  alertsStep?: { corporationId: number; signedInAs?: string };
+  /** How the latest alerts approval ended, for the note on the next screen. */
+  lastAlerts?: { corporationId: number; kind: AlertsStepOutcome['kind'] };
 }
+
+/** How a chained alerts approval came back. A wrong character keeps the step. */
+export type AlertsStepOutcome =
+  | { kind: 'on' }
+  | { kind: 'failed' }
+  | { kind: 'cancelled' }
+  | { kind: 'skipped' }
+  | { kind: 'wrong-character'; signedInAs: string };
 
 /** The player's pick for "How far back?". */
 export type CoverageChoice = 'today' | 7 | 14 | 30;
@@ -41,12 +59,14 @@ export function startRun(args: {
   editorCharacterId: number;
   queue: AddCorpsCandidate[];
   coverageFrom?: string;
+  alertsFor?: number[];
 }): AddCorpsRun {
   return {
     collectorCorporationId: args.collectorCorporationId,
     editorCharacterId: args.editorCharacterId,
     ...(args.coverageFrom === undefined ? {} : { coverageFrom: args.coverageFrom }),
     queue: args.queue,
+    ...(args.alertsFor?.length ? { alertsFor: args.alertsFor } : {}),
     index: 0,
     outcomes: {},
   };
@@ -69,8 +89,14 @@ export function current(run: AddCorpsRun): AddCorpsCandidate | undefined {
   return run.queue[run.index];
 }
 
+/** The corporation whose CEO's alerts approval is pending, if that is the step now. */
+export function currentAlerts(run: AddCorpsRun): AddCorpsCandidate | undefined {
+  const step = run.alertsStep;
+  return step && run.queue.find((c) => c.corporationId === step.corporationId);
+}
+
 export function isDone(run: AddCorpsRun): boolean {
-  return run.index >= run.queue.length;
+  return run.index >= run.queue.length && run.alertsStep === undefined;
 }
 
 export function progress(run: AddCorpsRun): { done: number; total: number } {
@@ -91,7 +117,35 @@ export function recordOutcome(run: AddCorpsRun, outcome: AddCorpsOutcome): AddCo
     outcomes: { ...run.outcomes, [corp.corporationId]: outcome },
     lastOutcome: { corporationId: corp.corporationId, outcome },
   };
+  // Only a connected corp chains: the player has just signed in as its CEO at EVE.
+  if (outcome.kind === 'connected' && run.alertsFor?.includes(corp.ceoCharacterId)) {
+    next.alertsStep = { corporationId: corp.corporationId };
+  }
   return advance(next);
+}
+
+/**
+ * Record how the chained alerts approval went. A wrong character keeps the step
+ * (nothing was approved); anything else ends it, and that CEO is not asked again.
+ */
+export function recordAlertsOutcome(run: AddCorpsRun, outcome: AlertsStepOutcome): AddCorpsRun {
+  const corp = currentAlerts(run);
+  if (!corp) return run;
+  if (outcome.kind === 'wrong-character') {
+    return {
+      ...run,
+      alertsStep: { corporationId: corp.corporationId, signedInAs: outcome.signedInAs },
+    };
+  }
+  const alertsFor = (run.alertsFor ?? []).filter((id) => id !== corp.ceoCharacterId);
+  const next: AddCorpsRun = {
+    ...run,
+    alertsFor,
+    lastAlerts: { corporationId: corp.corporationId, kind: outcome.kind },
+  };
+  delete next.alertsStep;
+  if (alertsFor.length === 0) delete next.alertsFor;
+  return next;
 }
 
 export function skip(run: AddCorpsRun): AddCorpsRun {
@@ -100,7 +154,9 @@ export function skip(run: AddCorpsRun): AddCorpsRun {
 
 /** End the run now; outcomes so far stay for the result screen. */
 export function stop(run: AddCorpsRun): AddCorpsRun {
-  return { ...run, index: run.queue.length };
+  const next: AddCorpsRun = { ...run, index: run.queue.length };
+  delete next.alertsStep;
+  return next;
 }
 
 /** The UTC day a "How far back?" choice counts from, fixed once for the whole batch. */

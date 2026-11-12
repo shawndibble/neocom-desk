@@ -44,6 +44,7 @@ describe('corpCapabilities', () => {
       'canReadMiningLedger',
       'canReadOrders',
       'canManageSrp',
+      'canViewTaxBook',
     ]);
   });
 
@@ -54,7 +55,7 @@ describe('corpCapabilities', () => {
   });
 
   it('grants wallet access to a Junior_Accountant', () => {
-    expect(held(['Junior_Accountant'])).toEqual(['canReadWallet']);
+    expect(held(['Junior_Accountant'])).toEqual(['canReadWallet', 'canViewTaxBook']);
   });
 
   /**
@@ -142,10 +143,30 @@ describe('corpCapabilities', () => {
     expect(corpCapabilities(['Station_Manager']).canManageSrp).toBe(false);
   });
 
+  it('opens the Corp Tax Book (and its moon pops) to a Director, Accountant or Junior_Accountant (#6116)', () => {
+    expect(corpCapabilities(['Director']).canViewTaxBook).toBe(true);
+    expect(corpCapabilities(['Accountant']).canViewTaxBook).toBe(true);
+    expect(corpCapabilities(['Junior_Accountant']).canViewTaxBook).toBe(true);
+    expect(corpCapabilities(['Station_Manager']).canViewTaxBook).toBe(false);
+    expect(corpCapabilities([]).canViewTaxBook).toBe(false);
+  });
+
   it('opens SRP settings to a Director alone, never an Accountant', () => {
     expect(corpCapabilities(['Director']).canConfigureSrp).toBe(true);
     expect(corpCapabilities(['Accountant']).canConfigureSrp).toBe(false);
     expect(corpCapabilities(['Junior_Accountant']).canConfigureSrp).toBe(false);
+  });
+
+  it('opens Vetting reviews to a Personnel_Manager or a Director, and no other role', () => {
+    expect(corpCapabilities(['Personnel_Manager']).canVet).toBe(true);
+    expect(corpCapabilities(['Director']).canVet).toBe(true);
+    expect(corpCapabilities(['Accountant']).canVet).toBe(false);
+    expect(corpCapabilities([]).canVet).toBe(false);
+  });
+
+  it('opens Vetting settings to a Director alone, never a Personnel_Manager', () => {
+    expect(corpCapabilities(['Director']).canConfigureVetting).toBe(true);
+    expect(corpCapabilities(['Personnel_Manager']).canConfigureVetting).toBe(false);
   });
 
   it('opens the starbase reads to a Director alone', () => {
@@ -180,6 +201,7 @@ describe('corpCapabilities', () => {
       'canReadIndustry',
       'canReadOrders',
       'canManageSrp',
+      'canViewTaxBook',
     ]);
   });
 

@@ -28,6 +28,9 @@ import {
 } from '@/lib/urlState';
 import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 import type { WhereaboutsLookup } from '@/features/character/useCharacterWhereabouts';
+import type { CorpStanding } from '@/features/corp/corpStanding';
+import { alertsRowState, type AlertsGrantRecord } from '@/features/notifications/alertsGrant';
+import { isSyncConfigured } from '@/app/syncStatus';
 import type { LatestNetWorth } from '@/engine/netWorth/latest';
 import type { CharacterRow } from '@/features/character/charactersTableColumns';
 import type { ActiveFilter } from '@/components/ui';
@@ -166,6 +169,10 @@ interface CharactersViewInput {
   acceleratorById: ReadonlyMap<number, CharacterAcceleratorRecord>;
   /** The accelerator bonus each Character's cached attribute sheet implies. */
   detectedAcceleratorById: ReadonlyMap<number, number | null>;
+  /** Each Character's corporation standing; absent until read. */
+  corpStandingById: ReadonlyMap<number, CorpStanding>;
+  /** This device's Alerts Grants, keyed by Character id. */
+  alertsGrants: Readonly<Record<number, AlertsGrantRecord>>;
 }
 
 /**
@@ -192,6 +199,8 @@ export function useCharactersView(input: CharactersViewInput) {
     netWorthById,
     acceleratorById,
     detectedAcceleratorById,
+    corpStandingById,
+    alertsGrants,
   } = input;
   const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
   const { q: search, sort: sortKey, dir: sortDirection } = filterParams;
@@ -210,7 +219,11 @@ export function useCharactersView(input: CharactersViewInput) {
     [characters]
   );
 
-  const availableColumnIds = availableCharacterColumns(spExtractionEnabled, groups.length > 0);
+  const availableColumnIds = availableCharacterColumns(
+    spExtractionEnabled,
+    groups.length > 0,
+    isSyncConfigured()
+  );
   // `id` is already known available here, so this is just "is it checked" —
   // `visibleAvailableColumns` (below, `handleToggleColumn`'s own zero-columns
   // guard) is for narrowing the *raw stored* list, which can hold ids that
@@ -331,6 +344,8 @@ export function useCharactersView(input: CharactersViewInput) {
         netWorth: netWorthById.get(character.characterId),
         acceleratorRecord: acceleratorById.get(character.characterId),
         detectedAccelerator: detectedAcceleratorById.get(character.characterId) ?? null,
+        corpStanding: corpStandingById.get(character.characterId),
+        alertsWhenClosed: alertsRowState(alertsGrants[character.characterId]),
       };
     });
   const allIds = (characters ?? []).map((character) => character.characterId);

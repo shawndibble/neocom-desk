@@ -1,8 +1,7 @@
 /**
- * Appraisal result header with realistic big-haul figures (regression for
- * the #3009/#3010 header: `67,214,000,000 ISK (67.2B)` overflowed its group
- * and ran under the Cargo label at 1280, and all three groups overlapped at
- * 1024, because the other Appraisal specs only price short numbers).
+ * Appraisal result header with big-haul totals printed in full: the other
+ * Appraisal specs only price short numbers, so overflow and overlap in the
+ * header went unseen.
  *
  * Asserts invariants, not pixels (CI fonts differ): the three groups don't
  * overlap, no group's content overflows its box, the page doesn't scroll
@@ -14,7 +13,7 @@ import { signInAndGoto } from './support/authSeed';
 import { expectNoPageOverflow } from './support/overflow';
 
 const VELDSPAR = 1230;
-/** 12,500,000 units at 0.1 m³ is 1,250,000 m³; at ~5,377 ISK each, a 67.2B sell. */
+/** 12,500,000 units at 0.1 m³ is 1,250,000 m³; at ~5,377 ISK each, a sell of 67,214,000,000 ISK. */
 const PASTE = 'Veldspar\t12,500,000';
 
 const JITA_STATION = 60_003_760;
@@ -69,15 +68,17 @@ for (const width of [1024, 1100, 1280, 1440]) {
     await expect(page.getByRole('table', { name: 'Appraisal' })).toBeVisible({ timeout: 15_000 });
 
     const sell = page
-      .getByRole('button', { name: /^Sell: copy 6\d\.\dB ISK \(6\d,\d{3},\d{3},\d{3}\)$/ })
+      .getByRole('button', { name: /^Copy Sell total, 6\d,\d{3},\d{3},\d{3} ISK$/ })
       .first();
     await expect(sell).toBeVisible();
-    // The shorthand alone is printed; the full digits live in the accessible name and the copy.
-    await expect(page.getByRole('region', { name: 'Sell' }).first()).toContainText(/6\d\.\dB/);
+    // The full digits are printed, never the shorthand.
+    await expect(page.getByRole('region', { name: 'Sell' }).first()).toContainText(
+      /6\d,\d{3},\d{3},\d{3}/
+    );
 
     const geometry = await page.evaluate(() => {
       const groups = [...document.querySelectorAll('section[aria-label]')].filter((s) =>
-        s.querySelector(':scope > h3')
+        s.querySelector('h3')
       ) as HTMLElement[];
       const boxes = groups.map((g) => {
         const r = g.getBoundingClientRect();

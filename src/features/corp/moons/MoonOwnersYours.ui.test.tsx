@@ -45,6 +45,45 @@ describe('MoonOwnersTable: his own corps', () => {
     expect(screen.getByText(/2 refineries · no owner rate · no payouts/)).toBeInTheDocument();
   });
 
+  it('shows the last read’s age on his own corps too (#6097)', () => {
+    render(
+      <MoonOwnersTable
+        rows={[{ ...rows[0]!, lastReadWellAt: '2026-10-20T10:00:00Z' }]}
+        totals={{ owed: 0, paidThisMonth: 0, count: 1, needALook: 0 }}
+        name={(id) => `Corp ${id}`}
+        now={Date.parse('2026-10-20T12:00:00Z')}
+        onOpen={() => {}}
+      />
+    );
+    expect(
+      screen.getByText(/2 refineries · no owner rate · no payouts · Synced 2h ago/)
+    ).toBeInTheDocument();
+  });
+
+  it('says so in words when no mining or extraction was seen yet, with the read age (#6097)', () => {
+    render(
+      <MoonOwnersTable
+        rows={[
+          row({
+            id: '3',
+            corporationId: 3,
+            refineryCount: 0,
+            nothingSeen: true,
+            lastReadWellAt: '2026-10-20T10:00:00Z',
+          }),
+        ]}
+        totals={{ owed: 0, paidThisMonth: 0, count: 1, needALook: 0 }}
+        name={(id) => `Corp ${id}`}
+        now={Date.parse('2026-10-20T12:00:00Z')}
+        onOpen={() => {}}
+      />
+    );
+    expect(
+      screen.getByText(/^No mining or extraction seen yet · Synced 2h ago · next read 12:35\sUTC$/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/0 refineries/)).not.toBeInTheDocument();
+  });
+
   it('never offers Pay on one', () => {
     view();
     expect(screen.getAllByRole('button', { name: /^Pay/ })).toHaveLength(1);

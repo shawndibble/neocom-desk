@@ -141,6 +141,12 @@ export const ROUTE_REQUIREMENTS = {
    */
   '/corp/members': UNGATED,
   /**
+   * UNGATED for the same reasons as `/corp/members`: `canReadStructures` is an
+   * in-game role, and the page reads every corporation any stored Character can
+   * read (issue #6089), not only the active one's.
+   */
+  '/corp/structures': UNGATED,
+  /**
    * UNGATED for the same reasons as `/corp/members`: `canReadWallet` is an
    * in-game role, so a scope declaration here would offer a re-login for a
    * permission no login can grant.
@@ -161,6 +167,10 @@ export const ROUTE_REQUIREMENTS = {
   '/corp/moons': UNGATED,
   // Hidden for non-officers, never locked (see `NavSubView.visible`); the views check `canManageSrp`.
   '/corp/srp': UNGATED,
+  // Hidden for anyone but a reviewer, never locked; `CorpVetting` checks `canVet`.
+  '/corp/vetting': UNGATED,
+  // A member's own review request: no scope to hold, the page signs each character in itself.
+  '/vetting': UNGATED,
   // The drill-down's deeper levels (issue #779): every level renders the same
   // component off the same gate, so it gates identically.
   '/corp/assets/*': UNGATED,

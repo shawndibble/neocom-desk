@@ -6,7 +6,7 @@
  * `esi/registry.ts`; capability -> scope is an ESI concern and lives here.
  *
  * The mapping below is a *selection* from the registry, not a second copy of
- * it. #295 registered all seven corp scopes under the opt-in `corp` group, and
+ * it. #295 registered all seven corp scopes under the `corp` group, and
  * typing these as `Scope` — the union `esi/registry.ts` derives — makes an
  * unregistered or misspelled string a compile error; `corpScopes.test.ts` adds
  * that every one of them is in `scopesForGroup('corp')`. What cannot be
@@ -127,6 +127,18 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
   canManageSrp: ['esi-characters.read_corporation_roles.v1'],
   /** SRP Settings, Director alone. Additive (below), for the same reason as `canManageSrp`. */
   canConfigureSrp: ['esi-characters.read_corporation_roles.v1'],
+  /**
+   * Reviewer gate for Vetting (Director or Personnel_Manager). Not an ESI read; the callables
+   * re-check live. Additive (below): the roles scope is already in the corp group.
+   */
+  canVet: ['esi-characters.read_corporation_roles.v1'],
+  /** Vetting settings, Director alone. Additive (below), like `canVet`. */
+  canConfigureVetting: ['esi-characters.read_corporation_roles.v1'],
+  /**
+   * Corp Tax Book officer gate (#6116). Not an ESI read; the book's rules re-check live.
+   * Additive (below): the roles scope is already in the corp group.
+   */
+  canViewTaxBook: ['esi-characters.read_corporation_roles.v1'],
 };
 
 /**
@@ -156,6 +168,9 @@ const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set([
   'canReadSkyhooks',
   'canManageSrp',
   'canConfigureSrp',
+  'canVet',
+  'canConfigureVetting',
+  'canViewTaxBook',
 ]);
 
 /**

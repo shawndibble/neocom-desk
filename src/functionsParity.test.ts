@@ -55,6 +55,7 @@ import {
 import {
   COMMUNITY_EVENT_IDS,
   POLLED_EVENT_IDS,
+  VETTING_EVENT_IDS,
   diffPriceAlerts,
   serverEventOccurrenceKey,
   type ServerEventFire as FunctionsServerEventFire,
@@ -232,7 +233,13 @@ describe('standing buyback Requests', () => {
 describe('server-pushed events (issue #5121)', () => {
   it('the server handles exactly the events the client registers for', () => {
     expect(
-      [...COMMUNITY_EVENT_IDS, ...POLLED_EVENT_IDS, ...NEARBY_EVENT_IDS, 'newMail'].sort()
+      [
+        ...COMMUNITY_EVENT_IDS,
+        ...POLLED_EVENT_IDS,
+        ...NEARBY_EVENT_IDS,
+        ...VETTING_EVENT_IDS,
+        'newMail',
+      ].sort()
     ).toEqual([...SERVER_PUSHED_EVENT_IDS].sort());
   });
 
@@ -282,6 +289,13 @@ describe('server-pushed events (issue #5121)', () => {
       price: 4.5,
       targetPrice: 5.25,
       direction: 'below',
+    },
+    {
+      eventId: 'vettingShared',
+      characterId: 7,
+      corporationId: 98000001,
+      reviewId: 'v-0042',
+      kind: 'application',
     },
   ];
 

@@ -104,9 +104,7 @@ import {
   type CorpSyncDeps,
 } from './corpSyncGrant.js';
 import {
-  acceptFeederInvite,
   createFeederInvite,
-  parseAcceptFeederInviteInput,
   parseCreateFeederInviteInput,
   parsePreviewFeederInviteInput,
   parseRevokeFeederInviteInput,
@@ -119,6 +117,7 @@ import {
   parseRemoveOwnFeederInput,
   removeOwnFeeder,
 } from './corpTaxBookOwnFeeder.js';
+import { parseSyncMoonOwnersNowInput, syncMoonOwnersNow } from './corpTaxBookMoonOwnersSyncNow.js';
 import {
   dropBookGrants,
   getFeederStatus,
@@ -264,6 +263,42 @@ import {
 } from './communityFleetPayoutsStore.js';
 import { sweepFleetPayouts } from './communityFleetPayoutsCleanup.js';
 import { sweepSrpClaims } from './srpCleanup.js';
+import { sweepVetting } from './vettingCleanup.js';
+import { esiVettingReader } from './vettingEsi.js';
+import {
+  parseVettingAddCharacter,
+  parseVettingCorp,
+  parseVettingDecide,
+  parseVettingHandle,
+  parseVettingInviteCode,
+  parseVettingInviteLabel,
+  parseVettingMember,
+  parseVettingRemoveCharacter,
+  parseVettingRequest,
+  parseVettingReviewId,
+  parseVettingSettingsPatch,
+  parseVettingStart,
+  parseVettingSubmit,
+} from './vettingParse.js';
+import {
+  addVettingCharacter,
+  createVettingInvite,
+  declineVetting,
+  decideVettingReview,
+  getVettingCorp,
+  getVettingOverview,
+  getVettingStatus,
+  listMyVettingRequests,
+  openVettingReview,
+  removeVettingCharacter,
+  requestVettingReview,
+  revokeVettingInvite,
+  saveVettingSettings,
+  startVetting,
+  submitVetting,
+  withdrawVetting,
+  type VettingDeps,
+} from './vettingStore.js';
 import {
   parseApproveBatch,
   parseApproveItem,
@@ -894,14 +929,6 @@ corpTaxBookAction('previewCorpTaxBookFeederInviteCallable', (request) =>
   )
 );
 
-corpTaxBookAction('acceptCorpTaxBookFeederInviteCallable', (request) =>
-  acceptFeederInvite(
-    corpTaxBookDeps(),
-    callerOf(request),
-    parseAcceptFeederInviteInput(request.data)
-  )
-);
-
 // Scheduled Corp Tax Book sync (issue #4068, ADR 0025). The second server-held EVE
 // token: an opt-in, narrow-scope grant per corporation, encrypted under the same
 // `ALERTS_TOKEN_KEY` secret (bound to its own purpose, so blobs do not cross
@@ -955,6 +982,15 @@ corpTaxBookAction('addOwnCorpTaxBookFeederCallable', (request) =>
 
 corpTaxBookAction('removeOwnCorpTaxBookFeederCallable', (request) =>
   removeOwnFeeder(corpSyncDeps(), callerOf(request), parseRemoveOwnFeederInput(request.data))
+);
+
+// Sync now for moon owners (issue #6117): an editor reads every moon owner at once, rested per book.
+corpTaxBookAction('syncCorpTaxBookMoonOwnersNowCallable', (request) =>
+  syncMoonOwnersNow(
+    { ...corpSyncDeps(), esi: esiSyncReader() },
+    callerOf(request),
+    parseSyncMoonOwnersNowInput(request.data)
+  )
 );
 
 corpTaxBookAction('leaveCorpTaxBookFeederCallable', (request) =>
@@ -1334,6 +1370,106 @@ export const corpTaxBookCall = onCall<unknown>(
   (request) => bookVersioned(() => corpTaxBookActions.route(request))
 );
 
+// Vetting: a router of its own. Its public actions (an applicant has no Neocom Desk session)
+// prove the caller by the EVE access token or the review key in `data`, never by `callerOf`.
+// Not `bookVersioned`: nothing a client caches is written here (every read is a callable), and
+// the vetting collections are in UNVERSIONED_COLLECTIONS. Logic: vettingStore.ts.
+// `push` tells reviewers' devices of a shared report (`vettingShared`, ADR 0027) from inside the
+// submit action: FCM through the Admin SDK, so the router needs no secret for it.
+const vettingDeps = (): VettingDeps => ({
+  ...srpDeps(),
+  esi: esiVettingReader(),
+  push: getMessaging(),
+  logWarn,
+});
+
+const vettingActions = createActionGroup();
+const vettingAction = (name: CallableAction<'vetting'>, handler: CallableHandler): void => {
+  vettingActions.register(name, handler);
+};
+export const vettingCall = onCall<unknown>({ maxInstances: 10, timeoutSeconds: 120 }, (request) =>
+  vettingActions.route(request)
+);
+
+vettingAction('getVettingCorpCallable', (request) =>
+  getVettingCorp(vettingDeps(), parseVettingCorp(request.data))
+);
+vettingAction('startVettingCallable', (request) =>
+  startVetting(vettingDeps(), parseVettingStart(request.data))
+);
+vettingAction('addVettingCharacterCallable', (request) =>
+  addVettingCharacter(vettingDeps(), parseVettingAddCharacter(request.data))
+);
+vettingAction('removeVettingCharacterCallable', (request) =>
+  removeVettingCharacter(vettingDeps(), parseVettingRemoveCharacter(request.data))
+);
+vettingAction('submitVettingCallable', (request) =>
+  submitVetting(vettingDeps(), parseVettingSubmit(request.data))
+);
+vettingAction('getVettingStatusCallable', (request) =>
+  getVettingStatus(vettingDeps(), parseVettingHandle(request.data))
+);
+vettingAction('withdrawVettingCallable', (request) =>
+  withdrawVetting(vettingDeps(), parseVettingHandle(request.data))
+);
+vettingAction('declineVettingCallable', (request) =>
+  declineVetting(vettingDeps(), parseVettingHandle(request.data))
+);
+vettingAction('listMyVettingRequestsCallable', (request) =>
+  listMyVettingRequests(vettingDeps(), callerOf(request), parseVettingMember(request.data))
+);
+vettingAction('getVettingOverviewCallable', (request) =>
+  getVettingOverview(vettingDeps(), callerOf(request), parseBookCall(request.data))
+);
+vettingAction('openVettingReviewCallable', (request) =>
+  openVettingReview(
+    vettingDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseVettingReviewId(request.data)
+  )
+);
+vettingAction('decideVettingReviewCallable', (request) =>
+  decideVettingReview(
+    vettingDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseVettingDecide(request.data)
+  )
+);
+vettingAction('requestVettingReviewCallable', (request) =>
+  requestVettingReview(
+    vettingDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseVettingRequest(request.data)
+  )
+);
+vettingAction('createVettingInviteCallable', (request) =>
+  createVettingInvite(
+    vettingDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseVettingInviteLabel(request.data)
+  )
+);
+vettingAction('revokeVettingInviteCallable', (request) =>
+  revokeVettingInvite(
+    vettingDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseVettingInviteCode(request.data)
+  )
+);
+vettingAction('saveVettingSettingsCallable', (request) =>
+  saveVettingSettings(
+    vettingDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseVettingSettingsPatch(request.data)
+  )
+);
+
 /**
  * dailyHousekeeping (was three scheduled functions, to stay under the deploy quota and the
  * Cloud Scheduler free tier):
@@ -1350,6 +1486,8 @@ export const corpTaxBookCall = onCall<unknown>(
  *   their Shares. Bounded to 500 deletes a run.
  * - sweepSrpClaims (ADR 0026): deletes Paid and Rejected SRP Claims a year after
  *   they close, with their SRP log entries. Bounded to 500 deletes a run.
+ * - sweepVetting: deletes vetting drafts never shared (a day), requests never answered (30 days)
+ *   and decided reviews 30 days after the decision, each with what was read into it.
  * - purgeFiredProjections: deletes Scheduled Push rows fired more than 30 days ago (was every
  *   `dispatchProjections` tick, an empty billed query 96 times a day).
  * The three sweeps and the stale-account purge read with one query each (collection-group for
@@ -1439,6 +1577,17 @@ export const dailyHousekeeping = onSchedule(
               });
             } else {
               logInfo('SRP claim sweep done', { deleted, failed, truncated });
+            }
+          },
+        },
+        {
+          name: 'sweepVetting',
+          run: async () => {
+            const done = await sweepVetting(firestore(), Date.now());
+            if (done.failed > 0 || done.truncated) {
+              logWarn('Vetting sweep incomplete, continues next run', { ...done });
+            } else {
+              logInfo('Vetting sweep done', { ...done });
             }
           },
         },

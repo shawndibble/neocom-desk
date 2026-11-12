@@ -120,6 +120,11 @@ export interface FeederRecord {
   refineryStructures?: Record<string, RefineryStructureDoc>;
   /** The current grant carries the structure scope (#4654); absent on grants from before. */
   readsStructureNames?: boolean;
+  /**
+   * ESI refused the moon owner's Extractions (#6097): the grant holder lacks Station_Manager.
+   * Not asked again until a week has passed. Absent while they read fine or were never refused.
+   */
+  extractionsRefusedAt?: number;
 }
 
 /** One refinery's structure lookup on a moon owner's record. */
@@ -205,14 +210,6 @@ export function parseRevokeFeederInviteInput(data: unknown): RevokeFeederInviteI
 export interface AcceptFeederInviteInput {
   code: string;
   accessToken: string;
-}
-
-export function parseAcceptFeederInviteInput(data: unknown): AcceptFeederInviteInput {
-  const d = record(data);
-  return {
-    code: boundedString(d.code, 'code', 64),
-    accessToken: boundedString(d.accessToken, 'accessToken', 8192),
-  };
 }
 
 // --- Create and revoke -----------------------------------------------------
@@ -402,6 +399,8 @@ const FEED_STATE: readonly (keyof FeederRecord)[] = [
   'staleSince',
   'disconnectedAt',
   'lastSyncResult',
+  // A rejoin's holder may read Extractions the old one could not (#6117).
+  'extractionsRefusedAt',
   'viewDismissedAt',
   // The offered rate belongs to the link, not to the record's history.
   'offeredOwnerRatePct',

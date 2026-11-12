@@ -211,11 +211,13 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       incursions: ['incursionNearby'],
       skyhooksNearby: ['skyhookRaidableNearby'],
       kills: ['shipLost'],
+      signIn: ['characterNeedsLogin'],
       accelerator: ['acceleratorExpiring'],
       acceleratorPresence: ['acceleratorEnded'],
       mercenaryDens: ['mercenaryDenReinforced', 'mercenaryDenAnarchy'],
       skyhooks: ['skyhookRaidable'],
       communities: ['communityJoinRequest', 'communityMemberJoined', 'communityRequestPledged'],
+      vetting: ['vettingShared'],
     });
   });
 

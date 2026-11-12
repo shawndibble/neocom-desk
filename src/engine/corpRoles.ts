@@ -115,6 +115,19 @@ export interface CorpCapabilities {
    * `canReadRoleAudit` needs) still sees Settings.
    */
   canConfigureSrp: boolean;
+  /**
+   * Reviewer gate for Vetting (Director or Personnel_Manager): read reports and sign them off.
+   * Not an ESI read; the callables re-check live.
+   */
+  canVet: boolean;
+  /** Vetting settings (on/off, sign-offs needed, watchlist): Director alone. */
+  canConfigureVetting: boolean;
+  /**
+   * Officer gate for the Corp Tax Book (D8): Director, Accountant or Junior_Accountant, like
+   * `canViewCorpTaxBook`. Not an ESI read; the book's officer rules re-check live. Opens the
+   * book's moon owners' pops on the Calendar and the Moon extractions widget (#6116).
+   */
+  canViewTaxBook: boolean;
 }
 
 export type CorpCapability = keyof CorpCapabilities;
@@ -144,6 +157,9 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadSkyhooks',
   'canManageSrp',
   'canConfigureSrp',
+  'canVet',
+  'canConfigureVetting',
+  'canViewTaxBook',
 ];
 
 /** The answer for a Character with no roles — and the shape of "not loaded yet". */
@@ -165,6 +181,9 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadSkyhooks: false,
   canManageSrp: false,
   canConfigureSrp: false,
+  canVet: false,
+  canConfigureVetting: false,
+  canViewTaxBook: false,
 };
 
 /**
@@ -215,6 +234,12 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   canManageSrp: ['Accountant'],
   // Director alone, via the Director clause.
   canConfigureSrp: [],
+  // Director (via the Director clause) or Personnel_Manager, the role that accepts applications in game.
+  canVet: ['Personnel_Manager'],
+  // Director alone, via the Director clause.
+  canConfigureVetting: [],
+  // Director (via the Director clause), Accountant or Junior_Accountant: who opens the Moons page.
+  canViewTaxBook: ['Accountant', 'Junior_Accountant'],
 };
 
 /** Capabilities every corp member holds: ESI names no role for them, so they say nothing about roles. */

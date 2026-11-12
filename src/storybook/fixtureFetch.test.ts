@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { installFixtureFetch, unexpectedRequests } from './fixtureFetch';
+import { installFixtureFetch, unexpectedRequests, whenFixturesRetired } from './fixtureFetch';
+import { SAMPLE_CHARACTERS, SAMPLE_STATION_ID, SAMPLE_SYSTEM_ID } from './sampleData';
 
 let uninstall: (() => void) | undefined;
-afterEach(() => {
+afterEach(async () => {
   uninstall?.();
   uninstall = undefined;
+  await whenFixturesRetired();
   vi.restoreAllMocks();
 });
 
@@ -45,10 +47,47 @@ describe('installFixtureFetch', () => {
     await expect(fetch('https://esi.evetech.net/universe/names')).rejects.toThrow();
   });
 
-  it('restores the previous fetch on uninstall', () => {
+  it('restores the previous fetch once the uninstalled table retires', async () => {
     const before = globalThis.fetch;
     installFixtureFetch([])();
+    await whenFixturesRetired();
     expect(globalThis.fetch).toBe(before);
+  });
+
+  it("answers an unmounted story's late request instead of blaming the next story (#6113)", async () => {
+    const first = installFixtureFetch([
+      { path: '/universe/stations/1', respond: () => ({ body: 'a' }) },
+    ]);
+    first();
+    uninstall = installFixtureFetch([{ path: '/b', respond: () => ({ body: 'b' }) }]);
+    const late = await fetch('https://esi.evetech.net/universe/stations/1');
+    expect(await late.json()).toBe('a');
+    expect(unexpectedRequests()).toEqual([]);
+  });
+
+  it("records an unmounted story's late miss instead of sending it to the network", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    installFixtureFetch([])();
+    await expect(fetch('https://esi.evetech.net/characters/1/assets')).rejects.toThrow();
+    expect(unexpectedRequests()).toEqual(['GET https://esi.evetech.net/characters/1/assets']);
+  });
+
+  it('names the request that keeps an unmounted story busy past the deadline', async () => {
+    installFixtureFetch([{ path: '/poll', respond: () => ({ body: 1 }) }])();
+    const poll = setInterval(() => void fetch('https://esi.evetech.net/poll'), 100);
+    try {
+      await expect(whenFixturesRetired(400)).rejects.toThrow(
+        /last request: GET https:\/\/esi\.evetech\.net\/poll/
+      );
+    } finally {
+      clearInterval(poll);
+    }
+  });
+
+  it("puts a mounted story's fixture ahead of an unmounted one's", async () => {
+    installFixtureFetch([{ path: '/a', respond: () => ({ body: 'old' }) }])();
+    uninstall = installFixtureFetch([{ path: '/a', respond: () => ({ body: 'new' }) }]);
+    expect(await (await fetch('https://esi.evetech.net/a')).json()).toBe('new');
   });
 
   it('keeps routing for a story still mounted when another unmounts, in any order', async () => {
@@ -59,6 +98,54 @@ describe('installFixtureFetch', () => {
     const response = await fetch('https://esi.evetech.net/b');
     expect(await response.json()).toBe('b');
     second();
+    await whenFixturesRetired();
     expect(globalThis.fetch).toBe(before);
+  });
+
+  it("answers a sample Character's public sheet whatever table is installed (#6114)", async () => {
+    uninstall = installFixtureFetch([]);
+    const pilot = SAMPLE_CHARACTERS[1]!;
+    const response = await fetch(`https://esi.evetech.net/characters/${pilot.characterId}`);
+    expect(await response.json()).toMatchObject({
+      name: pilot.name,
+      corporation_id: pilot.corporationId,
+    });
+    expect(unexpectedRequests()).toEqual([]);
+  });
+
+  it("lets a story's own fixture answer a sample sheet first", async () => {
+    const pilot = SAMPLE_CHARACTERS[0]!;
+    uninstall = installFixtureFetch([
+      { path: /^\/characters\/\d+$/, respond: () => ({ body: { name: 'Story pilot' } }) },
+    ]);
+    const response = await fetch(`https://esi.evetech.net/characters/${pilot.characterId}`);
+    expect(await response.json()).toEqual({ name: 'Story pilot' });
+  });
+
+  it("answers a sample Character's location and skill queue whatever table is installed (#6126)", async () => {
+    uninstall = installFixtureFetch([]);
+    const id = SAMPLE_CHARACTERS[0]!.characterId;
+    const location = await fetch(`https://esi.evetech.net/characters/${id}/location`);
+    expect(await location.json()).toEqual({
+      solar_system_id: SAMPLE_SYSTEM_ID,
+      station_id: SAMPLE_STATION_ID,
+    });
+    const queue = await fetch(`https://esi.evetech.net/characters/${id}/skillqueue`);
+    expect(await queue.json()).toEqual([]);
+    expect(unexpectedRequests()).toEqual([]);
+  });
+
+  it("still records any other Character's location", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    uninstall = installFixtureFetch([]);
+    await expect(fetch('https://esi.evetech.net/characters/1/location')).rejects.toThrow();
+    expect(unexpectedRequests()).toEqual(['GET https://esi.evetech.net/characters/1/location']);
+  });
+
+  it("still records any other Character's sheet", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    uninstall = installFixtureFetch([]);
+    await expect(fetch('https://esi.evetech.net/characters/1')).rejects.toThrow();
+    expect(unexpectedRequests()).toEqual(['GET https://esi.evetech.net/characters/1']);
   });
 });

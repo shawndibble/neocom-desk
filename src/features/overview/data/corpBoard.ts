@@ -10,8 +10,16 @@
 import { loadCorporationStructures } from '@/features/corp/boardData';
 import { toBoardStructures } from '@/features/corp/boardSources';
 import { CorpReadFailed } from '@/features/corp/corpRead';
-import { resolveCorpReadAccess, type CorpCapability } from '@/features/corp/corpReadAccess';
-import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
+import {
+  accountCorpReaders,
+  corpReadersFor,
+  loadAccountCorpAccess,
+  resolveCorpReadAccess,
+  type AccountCorpAccess,
+} from '@/features/corp/corpReadAccess';
+import { loadCorpLabels, type CorpLabel } from '@/features/corp/corpTicker';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadMoonChunks } from '@/features/character/calendarMoonChunks';
 import type { MoonChunksBoardData, StructuresBoardData } from './boardData';
 
@@ -56,53 +64,49 @@ export async function loadMoonChunksBoardData(characterId: number): Promise<Moon
 
 // --- All characters: every corporation the pilot's Characters can read -----------------
 
-/**
- * One Character per corporation that can read `capability`: the first of them
- * in Character order. A corporation two Characters share is read once, and one
- * no Character's roles and grant cover is absent (no request is made for it).
- */
-async function corpReaders(capability: CorpCapability): Promise<number[]> {
-  const { entries } = await fanOutAllCharacters({
-    load: async ({ characterId }) => {
-      const access = await resolveCorpReadAccess(characterId);
-      return access?.can(capability) ? { characterId, corporationId: access.corporationId } : null;
-    },
-  });
-  const readers = new Map<number, number>();
-  for (const { characterId, corporationId } of entries) {
-    if (!readers.has(corporationId)) readers.set(corporationId, characterId);
-  }
-  return [...readers.values()];
-}
-
 /** The oldest of the reads' timestamps: the merged list is only as fresh as its stalest corporation. */
-function oldest(dates: readonly (Date | null)[]): Date | null {
+export function oldest(dates: readonly (Date | null)[]): Date | null {
   const known = dates.filter((date): date is Date => date !== null);
   return known.length === 0 ? null : new Date(Math.min(...known.map((date) => date.getTime())));
 }
 
 /**
- * Settles one read per corporation. A corporation that failed is left out while
- * another answered ("nothing from this corporation", the others still list); only
- * when every one failed does the widget get its Retry.
+ * Settles one read per corporation, at most `concurrency` corporations at once. A
+ * corporation that failed is left out while another answered ("nothing from this
+ * corporation", the others still list); only when every one failed does the widget
+ * get its Retry. Reads come back in reader order, never completion order.
  */
-async function settleCorps<T>(
-  readers: readonly number[],
+export async function settleCorps<T>(
+  readers: ReadonlyMap<number, number>,
   what: string,
-  load: (characterId: number) => Promise<T>
-): Promise<T[]> {
-  const settled = await Promise.allSettled(readers.map(load));
-  const reads = settled.flatMap((outcome) =>
-    outcome.status === 'fulfilled' ? [outcome.value] : []
+  load: (characterId: number) => Promise<T>,
+  concurrency = ESI_FANOUT_CONCURRENCY
+): Promise<{ reads: (T & { corporationId: number })[]; partlyFailed: boolean }> {
+  const entries = [...readers];
+  const settled: ((T & { corporationId: number }) | null)[] = entries.map(() => null);
+  await mapWithConcurrencyLimit(
+    entries.map((entry, index) => ({ entry, index })),
+    concurrency,
+    async ({ entry: [corporationId, characterId], index }) => {
+      try {
+        settled[index] = { ...(await load(characterId)), corporationId };
+      } catch {
+        // Left out: the others still list.
+      }
+    }
   );
-  if (reads.length === 0 && readers.length > 0) throw new CorpReadFailed(what);
-  return reads;
+  const reads = settled.filter((read) => read !== null);
+  if (reads.length === 0 && readers.size > 0) throw new CorpReadFailed(what);
+  return { reads, partlyFailed: reads.length < readers.size };
 }
+
+/** The active Character reads its own corporation, sharing the cache rows `/corp` warmed. */
+export const activeReader = () => useActiveCharacter.getState().activeCharacterId ?? undefined;
 
 /** Every readable corporation's structures as one list, for a widget scoped to All characters. */
 export async function loadAllStructuresBoardData(): Promise<StructuresBoardData> {
-  const reads = await settleCorps(
-    await corpReaders('canReadStructures'),
+  const { reads, partlyFailed } = await settleCorps(
+    await accountCorpReaders('canReadStructures', activeReader()),
     'structures',
     loadStructuresBoardData
   );
@@ -111,30 +115,26 @@ export async function loadAllStructuresBoardData(): Promise<StructuresBoardData>
     return { ...UNREADABLE_STRUCTURES, needsReauth: reads.some((read) => read.needsReauth) };
   }
   return {
-    structures: readable.flatMap((read) => read.structures ?? []),
+    // Each structure keeps its corporation, so a row read across several can name it.
+    structures: readable.flatMap(({ structures, corporationId }) =>
+      (structures ?? []).map((structure) => ({ ...structure, corporationId }))
+    ),
     structureCount: readable.reduce((sum, read) => sum + read.structureCount, 0),
     needsReauth: readable.some((read) => read.needsReauth),
     fetchedAt: oldest(readable.map((read) => read.fetchedAt)),
+    corporations: await loadCorpLabels(readable.map((read) => read.corporationId)),
+    partlyFailed,
   };
 }
 
-/** Every readable corporation's moon drills as one list, for a widget scoped to All characters. */
-export async function loadAllMoonChunksBoardData(): Promise<MoonChunksBoardData> {
-  const reads = await settleCorps(
-    await corpReaders('canReadMoonExtractions'),
-    'moon extractions',
-    loadMoonChunksBoardData
-  );
+/** Several corporations' moon reads as one list; null chunks when none was readable. */
+function mergeMoonChunks(
+  reads: readonly MoonChunksBoardData[],
+  needsReauth: boolean,
+  loadedAt: number
+): MoonChunksBoardData {
   const readable = reads.filter((read) => read.chunks !== null);
-  const loadedAt = Date.now();
-  if (readable.length === 0) {
-    return {
-      chunks: null,
-      needsReauth: reads.some((read) => read.needsReauth),
-      fetchedAt: null,
-      loadedAt,
-    };
-  }
+  if (readable.length === 0) return { chunks: null, needsReauth, fetchedAt: null, loadedAt };
   return {
     chunks: readable.flatMap((read) => read.chunks ?? []),
     extractions: readable.flatMap((read) => read.extractions ?? []),
@@ -142,4 +142,147 @@ export async function loadAllMoonChunksBoardData(): Promise<MoonChunksBoardData>
     fetchedAt: oldest(readable.map((read) => read.fetchedAt)),
     loadedAt,
   };
+}
+
+/** A book read that has not answered by then is left out, so it never holds a widget back. */
+const BOOK_READ_LIMIT_MS = 15_000;
+
+/** Feeder pops by corporation, once the caller knows which corporations ESI answered for. */
+export type FeederChunks = (
+  esiCorporations: ReadonlySet<number>
+) => Map<number, MoonChunksBoardData>;
+
+const NO_FEEDER_CHUNKS: FeederChunks = () => new Map();
+
+/**
+ * Starts reading the Corp Tax Books these Characters view (#6116), beside the caller's ESI
+ * reads. Best effort and bounded: a book that fails, or is slower than the limit, adds nothing.
+ * A pilot whose Characters view no book makes no request at all.
+ */
+export async function startFeederChunks(
+  accounts: readonly AccountCorpAccess[],
+  preferred?: number
+): Promise<FeederChunks> {
+  if (!accounts.some(({ access }) => access.can('canViewTaxBook'))) return NO_FEEDER_CHUNKS;
+  try {
+    // Lazy: the book client is Firebase, and most pilots run no book.
+    const { readFeederBooks, feederChunkReads } =
+      await import('@/features/corp/taxBook/feederBookChunks');
+    const books = await Promise.race([
+      readFeederBooks(accounts, preferred),
+      new Promise<[]>((resolve) => setTimeout(() => resolve([]), BOOK_READ_LIMIT_MS)),
+    ]);
+    if (books.length === 0) return NO_FEEDER_CHUNKS;
+    return (esi) => feederChunkReads(books, esi);
+  } catch {
+    return NO_FEEDER_CHUNKS;
+  }
+}
+
+/** A Feeder's rows say whose they are in the widget: "Efa - Tatara [TICK]". */
+async function namedByCorporation(
+  reads: ReadonlyMap<number, MoonChunksBoardData>
+): Promise<MoonChunksBoardData[]> {
+  if (reads.size === 0) return [];
+  const labels = await loadCorpLabels([...reads.keys()]).catch(
+    () => new Map<number, { ticker: string }>()
+  );
+  return [...reads].map(([corporationId, read]) => {
+    const ticker = labels.get(corporationId)?.ticker;
+    if (!ticker) return read;
+    const named = (subject: string) => `${subject} [${ticker}]`;
+    return {
+      ...read,
+      chunks: read.chunks?.map((c) => ({ ...c, subject: named(c.subject) })) ?? null,
+      ...(read.extractions
+        ? { extractions: read.extractions.map((x) => ({ ...x, subject: named(x.subject) })) }
+        : {}),
+    };
+  });
+}
+
+/**
+ * A book officer may see moon pops even with no extraction read of their own (#6116): with no
+ * pops to list the widget says "none coming", never "your roles don't cover this".
+ */
+function openToOfficer(read: MoonChunksBoardData): MoonChunksBoardData {
+  return read.chunks === null && !read.needsReauth
+    ? { ...read, chunks: [], extractions: [] }
+    : read;
+}
+
+/** One Character's moon read, plus its book's Feeder pops when it views a Corp Tax Book. */
+export async function loadMoonChunksWithBook(characterId: number): Promise<MoonChunksBoardData> {
+  const access = await resolveCorpReadAccess(characterId);
+  if (!access?.can('canViewTaxBook')) return loadMoonChunksBoardData(characterId);
+  const [own, feeders] = await Promise.all([
+    loadMoonChunksBoardData(characterId).then(
+      (read) => ({ read }),
+      (error: unknown) => ({ error })
+    ),
+    startFeederChunks([{ characterId, access }], characterId),
+  ]);
+  const book = await namedByCorporation(feeders(new Set([access.corporationId])));
+  // The own read failed and no book answered: the widget's Retry.
+  if ('error' in own) {
+    if (book.length === 0) throw own.error;
+    return mergeMoonChunks(book, false, Date.now());
+  }
+  if (book.length === 0) return openToOfficer(own.read);
+  return mergeMoonChunks([own.read, ...book], own.read.needsReauth, own.read.loadedAt);
+}
+
+/** A read's drills stamped with their corporation, so a list across several can name it. */
+function withCorporation(
+  read: MoonChunksBoardData,
+  id: number,
+  label: CorpLabel | undefined
+): MoonChunksBoardData {
+  const corporation = { id, name: label?.name ?? String(id), ticker: label?.ticker ?? String(id) };
+  return {
+    ...read,
+    chunks: read.chunks?.map((chunk) => ({ ...chunk, corporation })) ?? null,
+  };
+}
+
+/** Every readable corporation's moon drills as one list, for a widget scoped to All characters. */
+export async function loadAllMoonChunksBoardData(): Promise<MoonChunksBoardData> {
+  const accounts = await loadAccountCorpAccess();
+  const preferred = activeReader();
+  const readers = corpReadersFor(accounts, 'canReadMoonExtractions', preferred);
+  const [esiRead, feeders] = await Promise.all([
+    settleCorps(readers, 'moon extractions', loadMoonChunksBoardData).then(
+      ({ reads, partlyFailed }) => ({ reads, partlyFailed, failed: null as unknown }),
+      (error: unknown) => ({
+        reads: [] as (MoonChunksBoardData & { corporationId: number })[],
+        partlyFailed: true,
+        failed: error,
+      })
+    ),
+    startFeederChunks(accounts, preferred),
+  ]);
+  const { reads, partlyFailed, failed } = esiRead;
+  const esi = new Set(reads.filter((r) => r.chunks !== null).map((r) => r.corporationId));
+  const bookReads = feeders(esi);
+  const book = await namedByCorporation(bookReads);
+  // Every ESI read failed and no book answered: the widget's Retry.
+  if (failed !== null && book.length === 0) throw failed;
+  const sources: [number, MoonChunksBoardData][] = [
+    ...reads.map((read): [number, MoonChunksBoardData] => [read.corporationId, read]),
+    // `namedByCorporation` keeps the map's order.
+    ...[...bookReads.keys()].map((id, i): [number, MoonChunksBoardData] => [id, book[i]!]),
+  ];
+  const labels = await loadCorpLabels([
+    ...new Set(sources.filter(([, read]) => read.chunks !== null).map(([id]) => id)),
+  ]);
+  const merged = mergeMoonChunks(
+    sources.map(([id, read]) => withCorporation(read, id, labels.get(id))),
+    reads.some((read) => read.needsReauth),
+    Date.now()
+  );
+  const view = accounts.some(({ access }) => access.can('canViewTaxBook'))
+    ? openToOfficer(merged)
+    : merged;
+  // One corporation of several failed: the rest draws, flagged.
+  return partlyFailed ? { ...view, partlyFailed: true } : view;
 }

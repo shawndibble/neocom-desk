@@ -5,22 +5,25 @@
  * cargo facts. Nothing dropped.
  */
 import { fixed2 } from '@/lib/fixedFormat';
-import type { ReactNode } from 'react';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
-import { rowInteractiveClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  hintCueClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
 import { writeToClipboard } from '@/lib/clipboard';
-import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { formatIsk } from '@/lib/isk';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
-import { IskAmount, StatChip, StatChips } from '@/components/ui';
-import { HintText } from '@/components/ui/HintText';
+import { IskAmount, LiveStatus, StatChip, StatChips, Tooltip } from '@/components/ui';
 import type { AppraisalNetTotals, AppraisalTotals, RefineBasis } from '@/engine/market/appraisal';
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
 import { RefineChipValue } from './RefineChipValue';
 
-/** How long the "copied" bubble stays on the card. */
+/** How long the "copied" bubble stays by the area that copied. */
 const COPIED_FEEDBACK_MS = 2000;
 
 interface AppraisalHeaderStatsProps {
@@ -45,28 +48,27 @@ interface AppraisalHeaderStatsProps {
 }
 
 /**
- * One of the three headline numbers: label, figure, what it is, and the figure
- * it nets to. The whole card is one copy control: the title is the button and
- * its `::after` stretches over the card, so a press anywhere copies the full
- * digits and the bubble says so on the card.
+ * Sized by the header's width so a 13-digit total (about 8.5em wide) stays whole in a third of it,
+ * never below body size (`text-sm`). Each step leaves slack for a wider system font.
  */
-function PriceCell({
-  title,
-  hint,
-  value,
-  emphasis = false,
-  below,
-}: {
-  title: string;
-  hint: string;
+const HEADLINE_SIZE_CLASS =
+  'text-xl @[29rem]:text-sm @[32rem]:text-base @[36rem]:text-lg @[40rem]:text-xl';
+
+/** The figure a card nets to, under its divider. */
+interface SecondFigure {
+  label: string;
   value: number;
-  emphasis?: boolean;
-  below?: ReactNode;
-}) {
+  /** What the label means; a tooltip on the area. */
+  help?: string;
+}
+
+/** Per-area copy state. */
+function useCopyFigure(value: number) {
   const { t } = useTranslation();
   const { copied, flash } = useCopyFeedback(COPIED_FEEDBACK_MS);
+  const [copies, setCopies] = useState(0);
   const full = formatIsk(value, 0);
-  const short = formatIskCompact(value);
+  const exact = t('common.iskExact', { amount: full });
 
   async function copy() {
     try {
@@ -74,45 +76,129 @@ function PriceCell({
     } catch {
       return;
     }
+    setCopies((n) => n + 1);
     flash();
   }
+
+  return {
+    full,
+    exact,
+    copy,
+    copiedMessage: copied === null ? null : t('market.appraisal.copiedAmount', { amount: exact }),
+    copies,
+  };
+}
+
+type CopyFigure = ReturnType<typeof useCopyFigure>;
+
+/** The live region stays mounted and the bubble is not one: a status node mounted with its text is not reliably read out. */
+function CopiedFeedback({ figure, className }: { figure: CopyFigure; className: string }) {
+  return (
+    <>
+      <LiveStatus announceKey={figure.copies}>{figure.copiedMessage}</LiveStatus>
+      {figure.copiedMessage !== null && (
+        <span
+          aria-hidden="true"
+          className={cx(
+            'pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap text-text normal-case shadow-md',
+            className
+          )}
+        >
+          {figure.copiedMessage}
+        </span>
+      )}
+    </>
+  );
+}
+
+/** Under the divider: one button copies the figure. The tooltip sits on the button, so a tap copies and a hold reveals (DESIGN.md §6c). */
+function SecondFigureArea({ title, second }: { title: string; second: SecondFigure }) {
+  const { t } = useTranslation();
+  const figure = useCopyFigure(second.value);
+  return (
+    <div className="relative border-t border-line">
+      {/* Below, so the bubble does not cover the card's own total. */}
+      <Tooltip content={second.help} side="bottom">
+        <button
+          type="button"
+          onClick={() => void figure.copy()}
+          aria-label={t('market.appraisal.copyCardSecond', {
+            title,
+            label: second.label,
+            amount: figure.exact,
+          })}
+          className={cx(
+            'flex w-full cursor-copy flex-wrap items-baseline justify-between gap-x-2 rounded-b-xs px-2.5 pt-1 pb-2 text-left text-xs text-text-dim',
+            focusRingInsetClassName,
+            rowInteractiveClassName
+          )}
+        >
+          <span className={second.help ? hintCueClassName : undefined}>{second.label}</span>
+          <b className={cx('whitespace-nowrap tabular-nums', iskToneClass(second.value))}>
+            {figure.full}
+          </b>
+        </button>
+      </Tooltip>
+      <CopiedFeedback figure={figure} className="top-full mt-1" />
+    </div>
+  );
+}
+
+/**
+ * One headline card, two copy areas split at the divider: above, the title
+ * button's `::after` covers the area; below, `SecondFigureArea`.
+ */
+function PriceCell({
+  title,
+  hint,
+  value,
+  emphasis = false,
+  second,
+}: {
+  title: string;
+  hint: string;
+  value: number;
+  emphasis?: boolean;
+  second?: SecondFigure | null;
+}) {
+  const { t } = useTranslation();
+  const total = useCopyFigure(value);
 
   return (
     <section
       aria-label={title}
-      className={cx(
-        'relative flex min-w-0 flex-col gap-0.5 rounded-xs border border-line bg-panel px-2.5 py-2 has-[button:focus-visible]:outline-2 has-[button:focus-visible]:-outline-offset-2 has-[button:focus-visible]:outline-accent',
-        rowInteractiveClassName
-      )}
+      className="flex min-w-0 flex-col rounded-xs border border-line bg-panel"
     >
-      <h3 className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
-        <button
-          type="button"
-          onClick={() => void copy()}
-          aria-label={t('market.appraisal.copyCardTotal', { title, short, full })}
-          className="cursor-copy rounded-xs uppercase tracking-widest after:absolute after:inset-0 focus-visible:outline-none"
-        >
-          {title}
-        </button>
-      </h3>
-      <span
-        className={`text-xl font-semibold tabular-nums ${emphasis ? 'text-accent' : 'text-text'}`}
+      <div
+        className={cx(
+          'relative flex flex-1 flex-col gap-0.5 px-2.5 pt-2 has-[button:focus-visible]:outline-2 has-[button:focus-visible]:-outline-offset-2 has-[button:focus-visible]:outline-accent',
+          second ? 'rounded-t-xs' : 'rounded-xs pb-1',
+          rowInteractiveClassName
+        )}
       >
-        {short}
-      </span>
-      <span className="mb-1 text-[0.6875rem] text-text-dim">{hint}</span>
-      {below && (
-        <div className="mt-auto border-t border-line pt-1 text-xs text-text-dim">{below}</div>
-      )}
-      {/* Mounted only while showing, so three cards aren't three empty live regions. */}
-      {copied && (
+        <h3 className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+          <button
+            type="button"
+            onClick={() => void total.copy()}
+            aria-label={t('market.appraisal.copyCardTotal', { title, amount: total.exact })}
+            className="cursor-copy rounded-xs uppercase tracking-widest after:absolute after:inset-0 focus-visible:outline-none"
+          >
+            {title}
+          </button>
+        </h3>
         <span
-          role="status"
-          className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap text-text normal-case shadow-md"
+          className={cx(
+            HEADLINE_SIZE_CLASS,
+            'font-semibold whitespace-nowrap tabular-nums',
+            emphasis ? 'text-accent' : 'text-text'
+          )}
         >
-          {t('market.appraisal.copiedAmount', { amount: t('common.iskExact', { amount: full }) })}
+          {total.full}
         </span>
-      )}
+        <span className="mb-1 text-[0.6875rem] text-text-dim">{hint}</span>
+        <CopiedFeedback figure={total} className="bottom-full mb-1" />
+      </div>
+      {second && <SecondFigureArea title={title} second={second} />}
     </section>
   );
 }
@@ -173,28 +259,19 @@ export function AppraisalHeaderStats({
     );
   }
   return (
-    <div className="flex w-full flex-col gap-2">
-      <div className="grid grid-cols-3 gap-2">
+    <div className="@container flex w-full flex-col gap-2">
+      {/* One per row below the width `HEADLINE_SIZE_CLASS` can fit three across. */}
+      <div className="grid grid-cols-1 gap-2 @[29rem]:grid-cols-3">
         <PriceCell
           title={t('market.appraisal.summaryBuy')}
           hint={t('market.appraisal.summaryBuyHint')}
           value={totals.buy}
-          below={
-            net && (
-              <>
-                <HintText
-                  className="relative"
-                  content={t('market.appraisal.instantNetHelp', {
-                    tax: fixed2(net.salesTaxPct),
-                  })}
-                >
-                  {t('market.appraisal.summaryBuyNet')}
-                </HintText>{' '}
-                <b className={iskToneClass(net.instantNet)}>
-                  <IskAmount value={net.instantNet} decimals={0} />
-                </b>
-              </>
-            )
+          second={
+            net && {
+              label: t('market.appraisal.summaryBuyNet'),
+              value: net.instantNet,
+              help: t('market.appraisal.instantNetHelp', { tax: fixed2(net.salesTaxPct) }),
+            }
           }
         />
         <PriceCell
@@ -202,36 +279,21 @@ export function AppraisalHeaderStats({
           hint={t('market.appraisal.summarySplitHint')}
           value={(totals.buy + totals.sell) / 2}
           emphasis
-          below={
-            <>
-              {t('market.appraisal.spread')}{' '}
-              <b className={iskToneClass(totals.spread)}>
-                <IskAmount value={totals.spread} decimals={0} />
-              </b>
-            </>
-          }
+          second={{ label: t('market.appraisal.spread'), value: totals.spread }}
         />
         <PriceCell
           title={t('market.appraisal.summarySell')}
           hint={t('market.appraisal.summarySellHint')}
           value={totals.sell}
-          below={
-            net && (
-              <>
-                <HintText
-                  className="relative"
-                  content={t('market.appraisal.listNetHelp', {
-                    tax: fixed2(net.salesTaxPct),
-                    broker: fixed2(net.brokerFeePct),
-                  })}
-                >
-                  {t('market.appraisal.summarySellNet')}
-                </HintText>{' '}
-                <b className={iskToneClass(net.listNet)}>
-                  <IskAmount value={net.listNet} decimals={0} />
-                </b>
-              </>
-            )
+          second={
+            net && {
+              label: t('market.appraisal.summarySellNet'),
+              value: net.listNet,
+              help: t('market.appraisal.listNetHelp', {
+                tax: fixed2(net.salesTaxPct),
+                broker: fixed2(net.brokerFeePct),
+              }),
+            }
           }
         />
       </div>

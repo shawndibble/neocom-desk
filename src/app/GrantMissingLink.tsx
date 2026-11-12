@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MenuItem } from '@/components/ui';
@@ -15,6 +16,7 @@ import { grantMissingPath } from './grantMissingPath';
 export function GrantMissingLink({
   groups,
   asCharacter,
+  children,
 }: {
   groups: readonly ScopeGroup[];
   /**
@@ -22,6 +24,8 @@ export function GrantMissingLink({
    * shows the active Character, so the link switches to it first.
    */
   asCharacter?: number;
+  /** A label naming the gap where the link stands alone (a table cell); "Grant missing" by default. */
+  children?: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
@@ -34,7 +38,7 @@ export function GrantMissingLink({
           : () => void useActiveCharacter.getState().setActiveCharacter(asCharacter)
       }
     >
-      {t('permissions.grantMissing')}
+      {children ?? t('permissions.grantMissing')}
     </Link>
   );
 }

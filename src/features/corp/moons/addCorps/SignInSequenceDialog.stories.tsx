@@ -37,3 +37,10 @@ export const WrongCharacter: Story = {
 export const Refused: Story = {
   args: { run: recordOutcome(midRun(), { kind: 'refused', reason: 'not-an-accountant' }) },
 };
+
+/** @summary Closed-app alerts chained: right after a corp connects, one more approval as its CEO. */
+export const AlertsStep: Story = {
+  args: {
+    run: recordOutcome(freshRun({ alertsFor: [90000001] }), { kind: 'connected' }),
+  },
+};

@@ -55,7 +55,7 @@ import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale } from '@/lib/fontScale';
-import { decimalMarkFor, useNumberFormat } from '@/lib/numberFormat';
+import { useNumberFormat } from '@/lib/numberFormat';
 import { useTimeFormat } from '@/lib/timeFormat';
 import { useMobileTabs } from '@/lib/mobileTabs';
 import { requestPersistenceWhenInstalled } from '@/lib/persistStorage';
@@ -124,9 +124,13 @@ const FittingCompare = lazy(routeChunks.loadFittingCompare);
 const Corp = lazy(routeChunks.loadCorp);
 const CorpMembers = lazy(routeChunks.loadCorpMembers);
 const CorpAssets = lazy(routeChunks.loadCorpAssets);
+const CorpStructures = lazy(routeChunks.loadCorpStructures);
 const CorpMoons = lazy(routeChunks.loadCorpMoons);
 const CorpSrp = lazy(routeChunks.loadCorpSrp);
 const Srp = lazy(routeChunks.loadSrp);
+const CorpVetting = lazy(routeChunks.loadCorpVetting);
+const VettingRequest = lazy(routeChunks.loadVettingRequest);
+const Apply = lazy(routeChunks.loadApply);
 const CorpWallet = lazy(routeChunks.loadCorpWallet);
 const Market = lazy(routeChunks.loadMarket);
 const Wallet = lazy(routeChunks.loadWallet);
@@ -242,9 +246,12 @@ const ROUTE_ELEMENTS = {
   '/corp/members': <CorpMembers />,
   '/corp/wallet': <CorpWallet />,
   '/corp/assets': <CorpAssets />,
+  '/corp/structures': <CorpStructures />,
   '/corp/moons': <CorpMoons />,
   '/corp/srp': <CorpSrp />,
   '/srp': <Srp />,
+  '/corp/vetting': <CorpVetting />,
+  '/vetting': <VettingRequest />,
   '/corp/assets/*': <CorpAssets />,
   '/assets': <Assets />,
   '/mail': <Mail />,
@@ -411,9 +418,9 @@ function AppEffects() {
 export function App() {
   // Formatters read the number format when they run rather than subscribing,
   // so a change would leave what is on screen in the old format. Keying the
-  // routes on the resolved mark remounts them once, when the mark changes
-  // (switching `auto` to the format it already resolves to does nothing).
-  const numberMark = decimalMarkFor(useNumberFormat((state) => state.value));
+  // routes on the resolved format remounts them once, when the format changes
+  // (picking the format already in use does nothing).
+  const numberStyle = useNumberFormat((state) => state.value);
 
   return (
     <ErrorBoundary>
@@ -425,7 +432,7 @@ export function App() {
           <LandingShellOffLandingRelease />
           <DocumentTitleTracker />
           <StaleStoresReloader />
-          <Suspense key={numberMark} fallback={<RouteFallback />}>
+          <Suspense key={numberStyle} fallback={<RouteFallback />}>
             <SentryRoutes>
               <Route path="/" element={<Root />} />
               <Route path="/login" element={<Login />} />
@@ -471,6 +478,8 @@ export function App() {
               <Route path="/s/:shareId" element={<SharedLink />} />
               {/* A Survey start link and the page that builds one: no login either. */}
               <Route path="/survey" element={<SurveyStart />} />
+              {/* A corp's apply link: an applicant has no account, and signs each character in on the page. */}
+              <Route path="/apply/:corpId" element={<Apply />} />
               {/* The invite link: a signed-out visitor sees what it is for before logging in. */}
               <Route path="/communities/join/:code" element={<CommunityJoin />} />
               <Route path="/share/:shareId" element={<SharedLink />} />

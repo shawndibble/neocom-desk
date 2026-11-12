@@ -1,6 +1,6 @@
 /**
- * The Calendar's one corporation read: the moon drills the corp ops board
- * already shows, as a clock kind of the Character's own.
+ * One Character's moon-drill read for its corporation, for the corp board
+ * and Due soon.
  *
  * **Gated before it fetches, not after.** CCP role-gates the extraction
  * endpoint server-side, so a Character without `Station_Manager` would get a

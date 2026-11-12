@@ -8,6 +8,7 @@
  * never undo that change if queueing fails".
  */
 import { db } from '@/db';
+import type { Translate } from '@/lib/translate';
 import { requiredScopesForEndpoints, SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 
 const SEND_MAIL_SCOPES = requiredScopesForEndpoints(SEND_MAIL_ENDPOINTS);
@@ -82,5 +83,36 @@ export async function queueOfficerMail(input: OfficerMailInput): Promise<Officer
     return { status: 'queued', queued };
   } catch {
     return { status: 'failed' };
+  }
+}
+
+/** What became of a batch of Officer mails, for the line that reports it. */
+export interface MailRun {
+  /** Pilots whose mail is on the paced send queue (it goes out about 5 a minute). */
+  queued: string[];
+  /** Pilots whose mail could not be queued; the change it follows stands. */
+  failed: string[];
+  /** The officer's Character cannot send mail, so none was tried. */
+  missingScope: boolean;
+}
+
+/** A `MailRun` as one line; empty when there was nothing to mail. */
+export function mailSummary(t: Translate, run: MailRun): string {
+  if (run.missingScope) return t('srp.officer.mail.noScope');
+  return [
+    run.queued.length > 0 ? t('srp.officer.mail.queuedFor', { count: run.queued.length }) : '',
+    run.failed.length > 0 ? t('srp.officer.mail.failedFor', { names: run.failed.join(', ') }) : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** The corporation's name for an Officer mail, or null when it cannot be read (the caller has a fallback). */
+export async function officerCorporationName(corporationId: number): Promise<string | null> {
+  try {
+    const { loadPublicCorporationRecord } = await import('@/features/character/publicInfoData');
+    return (await loadPublicCorporationRecord(corporationId))?.name ?? null;
+  } catch {
+    return null;
   }
 }

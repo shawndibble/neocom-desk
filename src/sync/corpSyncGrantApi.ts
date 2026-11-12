@@ -121,3 +121,31 @@ export async function removeOwnCorpFeederRemote(args: {
     return refusal(error);
   }
 }
+
+/**
+ * What Sync now did for the book's moon owners; `retryAt` (epoch ms) when it pressed too soon.
+ * Mirrors `SyncMoonOwnersNowResult` (functions/src/corpTaxBookMoonOwnersSyncNow.ts), which the
+ * client cannot import: that module pulls in firebase-admin.
+ */
+export type MoonOwnersSyncNowResult =
+  | { kind: 'synced'; read: number; stale: number; skipped: number }
+  | { kind: 'rate-limited'; retryAt: number }
+  | { kind: 'refused'; reason: string };
+
+/** Read every moon owner of the book now (#6117): an editor's live roles-scope token, rested per book. */
+export async function syncMoonOwnersNowRemote(args: {
+  editorCharacterId: number;
+  collectorCorporationId: number;
+}): Promise<MoonOwnersSyncNowResult> {
+  await ensureSignedIn(args.editorCharacterId);
+  const accessToken = await getValidAccessToken(args.editorCharacterId);
+  try {
+    return await callRouted<Record<string, unknown>, MoonOwnersSyncNowResult>(
+      'syncCorpTaxBookMoonOwnersNowCallable',
+      { corporationId: args.collectorCorporationId, accessToken },
+      args.editorCharacterId
+    );
+  } catch (error) {
+    return { kind: 'refused', reason: callableErrorReason(error) ?? 'unknown' };
+  }
+}

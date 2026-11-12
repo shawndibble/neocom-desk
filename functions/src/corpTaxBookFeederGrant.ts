@@ -236,20 +236,31 @@ async function reconnectCore(
   deps: BookDeps,
   feederCorp: number,
   holder: number,
-  grantedBy: number
+  grantedBy: number,
+  /** Grant again from the Collector's side: only an own corp of this book, checked in the transaction. */
+  ownOf?: number
 ): Promise<AcceptFeederInviteResult & { reconnect: ReconnectUndo }> {
   const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp));
   return deps.db.runTransaction(async (tx) => {
     const collector: unknown = (await tx.get(pointerRef)).data()?.collectorCorporationId;
-    if (typeof collector !== 'number') {
+    if (typeof collector !== 'number' || (ownOf !== undefined && collector !== ownOf)) {
       fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
     }
     const ref = feederRef(deps.db, collector, feederCorp);
     const rec = (await tx.get(ref)).data() as FeederRecord | undefined;
-    if (!rec || !RECONNECTABLE.includes(rec.status)) {
+    if (
+      !rec ||
+      !RECONNECTABLE.includes(rec.status) ||
+      (ownOf !== undefined && (rec.sameOwner !== true || rec.status !== 'active'))
+    ) {
       fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
     }
-    const patch: Record<string, unknown> = { grantHolder: holder, grantedBy };
+    // A new holder may have the Station_Manager the old one lacked: read Extractions now (#6117).
+    const patch: Record<string, unknown> = {
+      grantHolder: holder,
+      grantedBy,
+      extractionsRefusedAt: FieldValue.delete(),
+    };
     const reopened = rec.status === 'disconnected';
     let coveragePeriods: FeederRecord['coveragePeriods'] | undefined;
     if (reopened) {
@@ -277,7 +288,12 @@ async function reconnectCore(
 }
 
 /** The fields a reconnect's first pull writes (`recordFeederRead`). */
-const FIRST_PULL_FIELDS = ['staleSince', 'lastSyncResult', 'lastReadWellAt'] as const;
+const FIRST_PULL_FIELDS = [
+  'staleSince',
+  'lastSyncResult',
+  'lastReadWellAt',
+  'extractionsRefusedAt',
+] as const;
 
 /**
  * A refused Reconnect puts back only what it (and its first pull) wrote, in a transaction, and
@@ -316,8 +332,11 @@ export async function saveFeederGrant(
   deps: FeederGrantDeps,
   caller: Caller,
   input: SaveFeederGrantInput,
-  /** The add-my-corp path names the corporation the alt must be in: `wrong-corp` otherwise. */
-  options: { expectedFeederCorp?: number } = {}
+  /**
+   * The add-my-corp path names the corporation the alt must be in (`wrong-corp` otherwise) and,
+   * for Grant again, the book whose own active moon owner a Reconnect may replace.
+   */
+  options: { expectedFeederCorp?: number; reconnectOwnOf?: number } = {}
 ): Promise<SaveFeederGrantResult> {
   const callerId = signedInCharacter(caller);
   // The alt need not be on the caller's account, so the token's Character is not
@@ -362,7 +381,13 @@ export async function saveFeederGrant(
 
     accepted =
       input.code === RECONNECT_CODE
-        ? await reconnectCore(bookDeps(deps), feederCorp, claims.characterId, callerId)
+        ? await reconnectCore(
+            bookDeps(deps),
+            feederCorp,
+            claims.characterId,
+            callerId,
+            options.reconnectOwnOf
+          )
         : await acceptInviteCore(bookDeps(deps), {
             code: input.code,
             characterId: claims.characterId,

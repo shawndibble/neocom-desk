@@ -203,7 +203,26 @@ describe('structures and moon extractions', () => {
   });
 });
 
-describe('structures row detail', () => {
+describe('moon extractions widget with a Feeder from a Corp Tax Book (#6116)', () => {
+  it("names the Feeder's corporation on its row, after the short refinery name", () => {
+    const feeds: Feeds = {
+      moonChunks: ok({
+        chunks: [
+          { id: '7001', subject: 'Efa - Tatara [ABCD]', detail: 'arrival', deadlineMs: NOW + HOUR },
+        ],
+        needsReauth: false,
+        fetchedAt: new Date(NOW - HOUR),
+        loadedAt: NOW,
+        fromBook: true,
+      }),
+    };
+    const view = buildView('moonChunks', feeds, ctx());
+    expect(view.table?.rows[0]?.cells[0]).toBe('Tatara [ABCD]');
+    expect(view.rows?.[0]?.title).toBe('Tatara [ABCD]');
+  });
+});
+
+describe('structures row link', () => {
   const feeds = (): Feeds => ({
     structures: ok({
       structures: [
@@ -226,20 +245,11 @@ describe('structures row detail', () => {
     }),
   });
 
-  it('opens the structure with fuel, timer and its services on both boards', () => {
+  it('links each row to its structure on the Structures page, on both boards', () => {
     for (const show of ['all', 'problems'] as const) {
       const row = buildView('structures', feeds(), ctx({ show })).table!.rows[0]!;
-      const S = 'overview.widgets.structures';
-      expect(row.detail!.title).toBe('Helios Prime');
-      expect(row.detail!.facts.map((f) => f.label)).toEqual([`${S}.col.fuel`, `${S}.col.timer`]);
-      expect(row.detail!.list!.items).toEqual([
-        expect.objectContaining({ text: 'Market', badge: `${S}.detail.serviceState.online` }),
-        expect.objectContaining({
-          text: 'Reprocessing',
-          badge: `${S}.detail.serviceState.offline`,
-          tone: 'danger',
-        }),
-      ]);
+      expect(row.to).toBe('/corp/structures?structure=1');
+      expect(row.detail).toBeUndefined();
     }
   });
 });

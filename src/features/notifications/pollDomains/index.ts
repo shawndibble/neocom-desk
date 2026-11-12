@@ -52,10 +52,12 @@ import { stockTargetDomain } from './stockTargets';
 import { incursionDomain } from './incursions';
 import { skyhookNearbyDomain } from './skyhooksNearby';
 import { communitiesDomain } from './communities';
+import { vettingDomain } from './vetting';
 import { killsDomain } from './kills';
 import { mercenaryDensDomain } from './mercenaryDens';
 import { acceleratorDomain } from './accelerator';
 import { acceleratorEndedDomain } from './acceleratorEnded';
+import { signInDomain } from './signIn';
 
 export type { AnyNotificationFire } from '../eventEntries';
 export type { PollDomain } from './defineDomain';
@@ -89,10 +91,13 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   incursionDomain,
   skyhookNearbyDomain,
   communitiesDomain,
+  vettingDomain,
   killsDomain,
   mercenaryDensDomain,
   acceleratorDomain,
   acceleratorEndedDomain,
+  // Last: it reads the needs-sign-in mark the fetches above may just have set.
+  signInDomain,
 ];
 
 const DOMAIN_BY_EVENT: ReadonlyMap<NotificationEventId, PollDomain> = new Map(

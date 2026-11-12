@@ -334,7 +334,8 @@ const SPECS = {
   moonChunks: {
     category: 'planets',
     corp: 'corpClocks',
-    capabilities: ['canReadMoonExtractions'],
+    // An officer of a Corp Tax Book sees its moon owners' pops here too (#6116).
+    capabilities: ['canReadMoonExtractions', 'canViewTaxBook'],
     views: NT,
     view: 'table',
     size: 'M',
@@ -410,6 +411,8 @@ const SPECS = {
       'canReadMoonExtractions',
       'canReadIndustry',
       'canReadSkyhooks',
+      // A Corp Tax Book officer's moon owners' pops are deadlines too (#6116).
+      'canViewTaxBook',
     ],
     views: NCT,
     view: 'chart',
@@ -515,7 +518,8 @@ const SPECS = {
     endpoints: ['getCorporationMiningObservers', 'getCorporationMiningObserver'],
   },
   // zKillboard's all-time totals, not corp ESI: no capability, so any Character on the board sees it.
-  corpKills: { corp: 'corpOps', views: N, view: 'number', size: 'S', endpoints: [] },
+  // The table is one row per corporation: the header's, or every one on All.
+  corpKills: { corp: 'corpOps', views: NT, view: 'number', size: 'S', endpoints: [] },
   corpContracts: {
     corp: 'corpOps',
     capabilities: ['canReadContracts'],

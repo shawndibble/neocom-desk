@@ -7,6 +7,8 @@ import type { SrpMemberBackend } from '@/features/corp/srp/srpMemberBackend';
 import type { LostLoss, MemberClaim } from '@/features/corp/srp/srpMemberModel';
 import type { SrpStatus } from '@/features/corp/srpTypes';
 import { DAY_MS } from '@/lib/age';
+import type { FixtureRoute } from './fixtureFetch';
+import { sampleCharacterPublicInfo } from './sampleData';
 
 const HASH = 'c'.repeat(40);
 
@@ -37,6 +39,32 @@ const PREVIEW_FACTS = {
 } as const;
 
 export const SRP_FIXTURE_CORPORATION_ID = 98765432;
+
+/**
+ * The public reads an SRP page makes for the pilot (their sheet, then their corporation).
+ * Without them a story that paints before its seed lands reaches the network, and the
+ * smoke test's `unexpectedRequests()` check fails on a timing race.
+ * `corporationOf` names the corporation a pilot's sheet reports, so it matches the story's seed.
+ */
+export function srpPublicInfoRoutes(
+  corporationOf: (characterId: number) => number = () => SRP_FIXTURE_CORPORATION_ID
+): FixtureRoute[] {
+  return [
+    {
+      path: /^\/corporations\/\d+\/?$/,
+      respond: () => ({
+        body: { name: 'Sample Corp', ceo_id: 1, member_count: 40, tax_rate: 0.1 },
+      }),
+    },
+    {
+      path: /^\/characters\/\d+$/,
+      respond: ({ url }) => {
+        const id = Number(url.pathname.split('/').pop());
+        return { body: sampleCharacterPublicInfo(id, corporationOf(id)) };
+      },
+    },
+  ];
+}
 
 export interface SrpFixtureOptions {
   enabled?: boolean;

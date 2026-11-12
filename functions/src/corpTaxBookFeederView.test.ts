@@ -358,6 +358,7 @@ describe('buildFeederView', () => {
       { structureId: 78, label: null, labelSetAt: null, solarSystemId: null, structureName: null },
     ]);
     expect(v.summary.refineryCount).toBe(2);
+    expect(v.summary.refineryIds).toHaveLength(2);
   });
 
   it("carries the label either side's officers set, kept on the record (#4640)", () => {

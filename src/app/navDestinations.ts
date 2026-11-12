@@ -98,10 +98,13 @@ export type CorpViewCapability =
   | 'canReadMembers'
   | 'canReadWallet'
   | 'canReadAssets'
+  | 'canReadStructures'
   | 'canReadMiningLedger'
   | 'canReadRoleAudit'
   | 'canManageSrp'
-  | 'canConfigureSrp';
+  | 'canConfigureSrp'
+  | 'canVet'
+  | 'canConfigureVetting';
 
 export interface NavSubView {
   readonly path: AppRoutePath;
@@ -192,6 +195,16 @@ export const NAV_PAGES = [
     corpCapability: 'canReadAssets',
   },
   {
+    // Any corporation the account can read counts, not only the active Character's
+    // (`useCorpViewCapabilities`): a holding corporation's director is often not the main.
+    path: '/corp/structures',
+    labelKey: 'nav.corpStructures',
+    group: 'corp',
+    gating: 'corp',
+    mobileTab: false,
+    corpCapability: 'canReadStructures',
+  },
+  {
     path: '/corp/moons',
     labelKey: 'nav.corpMoons',
     group: 'corp',
@@ -210,6 +223,16 @@ export const NAV_PAGES = [
     conditionalTabs: { queue: 'srp' },
     // Settings is for Directors (`srpViews.ts`).
     corpTabCapabilities: { settings: 'canConfigureSrp' },
+  },
+  {
+    path: '/corp/vetting',
+    labelKey: 'nav.corpVetting',
+    group: 'corp',
+    gating: 'corp',
+    mobileTab: false,
+    corpCapability: 'canVet',
+    // Settings is for Directors (`VettingPage`).
+    corpTabCapabilities: { settings: 'canConfigureVetting' },
   },
   {
     path: '/skills',

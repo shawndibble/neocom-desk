@@ -238,12 +238,14 @@ describe('server-pushed events upload (issue #5121)', () => {
     });
     await rebuildProjection(d);
     expect(uploadProjection.mock.calls[0][2]?.get(CHAR.characterId)).toEqual({
-      serverEvents: ['communityJoinRequest', 'priceAlertTriggered'],
+      // vettingShared rides along for every Character: the server decides who reviews.
+      serverEvents: ['communityJoinRequest', 'priceAlertTriggered', 'vettingShared'],
       serverInputs: { priceStationId: 60003760 },
     });
     expect(serverInputsFor).toHaveBeenCalledWith(CHAR.characterId, [
       'communityJoinRequest',
       'priceAlertTriggered',
+      'vettingShared',
     ]);
   });
 

@@ -71,6 +71,8 @@ beforeEach(async () => {
     await setDoc(doc(db, `${CORP}/miners/m1`), { uids: ['char:2'], characterIds: [2] });
     await setDoc(doc(db, `${CORP}/audit/e1`), { action: 'sync' });
     await setDoc(doc(db, `${CORP}/extractions/x1`), { moonId: 1 });
+    // A moon owner's Extraction (#6097) is tagged with its corporation; same officer-only read.
+    await setDoc(doc(db, `${CORP}/extractions/x2`), { moonId: 2, sourceCorporationId: 98000002 });
     await setDoc(doc(db, `${CORP}/minerTotals/m1`), { minerId: 'm1', billed: 1 });
     await setDoc(doc(db, `${CORP}/moonDocs/x1`), { extractionId: 'x1', minerCount: 1 });
     await setDoc(doc(db, `${CORP}/readModels/minerList`), { schema: 1, miners: [] });
@@ -83,6 +85,7 @@ beforeEach(async () => {
 const OFFICER_ONLY = [
   'audit/e1',
   'extractions/x1',
+  'extractions/x2',
   'minerTotals/m1',
   'moonDocs/x1',
   'readModels/minerList',

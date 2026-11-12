@@ -73,6 +73,15 @@ import {
   loadCorpRoleAuditFeed,
   loadCorpMiningFeed,
   loadCorpSovereigntyFeed,
+  loadCorpDeadlinesAllFeed,
+  loadCorpWalletAllFeed,
+  loadCorpJobsAllFeed,
+  loadCorpKillsAllFeed,
+  loadCorpCustomsAllFeed,
+  loadCorpStarbasesAllFeed,
+  loadCorpSovereigntyAllFeed,
+  loadCorpContractsAllFeed,
+  loadCorpOrdersAllFeed,
   loadCorpStarbasesFeed,
   loadCorpContractsFeed,
   loadCorpSrpFeed,
@@ -261,9 +270,26 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   corpMining: snapshot(loadCorpMiningFeed, 'corp:mining'),
   corpStarbases: snapshot(loadCorpStarbasesFeed, 'corp:starbases'),
   corpSovereignty: snapshot(loadCorpSovereigntyFeed, 'corp:sovereignty'),
+  corpDeadlinesAll: snapshot(loadCorpDeadlinesAllFeed, 'corp:deadlines-all', {
+    accountWide: true,
+  }),
   corpContracts: snapshot(loadCorpContractsFeed, 'corp:contracts'),
   corpOrders: snapshot(loadCorpOrdersFeed, 'corp:orders'),
+  corpCustomsAll: snapshot(loadCorpCustomsAllFeed, 'corp:customs-all', { accountWide: true }),
+  corpStarbasesAll: snapshot(loadCorpStarbasesAllFeed, 'corp:starbases-all', {
+    accountWide: true,
+  }),
+  corpSovereigntyAll: snapshot(loadCorpSovereigntyAllFeed, 'corp:sovereignty-all', {
+    accountWide: true,
+  }),
+  corpContractsAll: snapshot(loadCorpContractsAllFeed, 'corp:contracts-all', {
+    accountWide: true,
+  }),
+  corpOrdersAll: snapshot(loadCorpOrdersAllFeed, 'corp:orders-all', { accountWide: true }),
   corpKills: snapshot(loadCorpKillsFeed, 'corp:kills'),
+  corpWalletAll: snapshot(loadCorpWalletAllFeed, 'corp:wallet-all', { accountWide: true }),
+  corpJobsAll: snapshot(loadCorpJobsAllFeed, 'corp:jobs-all', { accountWide: true }),
+  corpKillsAll: snapshot(loadCorpKillsAllFeed, 'corp:kills-all', { accountWide: true }),
   corpSrp: snapshot(loadCorpSrpFeed, 'corp:srp'),
 };
 
