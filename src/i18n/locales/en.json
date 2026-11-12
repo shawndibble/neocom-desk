@@ -4870,7 +4870,7 @@
   "characters": {
     "finishSetup": {
       "title": "Finish setting up {{name}}",
-      "signedIn": "Your EVE account is still signed in as {{name}}, so each of these is one Authorize press at EVE.",
+      "signedIn": "EVE still has you logged in as {{name}}, so each of these is one Authorize press at EVE.",
       "hint": "EVE sends you back here after each one. Picking a different character at EVE approves nothing.",
       "continue": "Continue",
       "notNow": "Not now",
@@ -18157,7 +18157,7 @@
           "go_one": "Connect {{count}} corp",
           "go_other": "Connect {{count}} corps",
           "alerts": "Also approve closed-app alerts for each CEO",
-          "alertsHint": "Straight after each corp, while EVE is still signed in as its CEO: one more Authorize press. Turn off to skip alerts for this whole run."
+          "alertsHint": "Straight after each corp, while EVE still has you logged in as its CEO: one more Authorize press. Turn off to skip alerts for this whole run."
         },
         "signIn": {
           "title": "Logging in: corp {{n}} of {{total}}",
@@ -18173,7 +18173,7 @@
           "cancelled": "The EVE login did not finish.",
           "alertsTitle": "Corp {{n}} of {{total}}: one more approval for alerts",
           "alertsWhy": "This turns on alerts when the app is closed for {{ceo}}, like your other characters.",
-          "alertsHint": "EVE is still signed in as {{ceo}}, so this is one Authorize press. Picking someone else approves nothing.",
+          "alertsHint": "EVE still has you logged in as {{ceo}}, so this is one Authorize press. Picking someone else approves nothing.",
           "alertsAction": "Approve alerts as {{ceo}}",
           "alertsSkip": "Skip alerts",
           "alertsWrong": "You approved as {{signedInAs}}, so alerts were not turned on. Pick {{ceo}} and try again.",
