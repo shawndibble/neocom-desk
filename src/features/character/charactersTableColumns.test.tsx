@@ -30,13 +30,13 @@ beforeEach(() => {
 });
 
 describe('Characters table name cell', () => {
-  it('shows Sign in again on the row of a character whose login is dead', () => {
+  it('shows Log in again on the row of a character whose login is dead', () => {
     render(<>{nameCell(2, 'Ada Vance')}</>);
-    expect(screen.getByRole('button', { name: 'Sign in again as Ada Vance' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Log in again as Ada Vance' })).toBeInTheDocument();
   });
 
   it('shows nothing extra on a character whose login works', () => {
     render(<>{nameCell(3, 'Bo Rask')}</>);
-    expect(screen.queryByRole('button', { name: /sign in again/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /log in again/i })).not.toBeInTheDocument();
   });
 });

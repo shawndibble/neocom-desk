@@ -6,8 +6,8 @@
 // `failure` is deliberately NOT persisted (mirrors `publicInfo.ts`). A reload
 // clears it, as do `dismiss()` and a character switch — which is what keeps a
 // re-auth prompt from pinning on forever for a failure re-authing cannot fix.
-// The needs-sign-in mark below is the exception, and persists: a dead grant
-// stays dead across a reload until that Character signs in again.
+// The needs-login mark below is the exception, and persists: a dead grant
+// stays dead across a reload until that Character logs in again.
 import { create } from 'zustand';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { onDeadGrant } from '@/auth/deadGrantSignal';
@@ -101,7 +101,7 @@ interface AuthFailureState {
    * `kind` narrows what counts as stale: a fresh access token proves the
    * refresh grant is alive but says nothing about a scope a previous read was
    * refused for, so it must not clear a `'request'` failure. A `'token'`
-   * clear also drops the needs-sign-in mark: the grant works again.
+   * clear also drops the needs-login mark: the grant works again.
    */
   clearFor: (characterId: number, kind?: AuthFailureKind) => void;
 }

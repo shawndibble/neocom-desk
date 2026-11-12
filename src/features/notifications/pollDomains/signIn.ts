@@ -8,14 +8,14 @@ import { SNAPSHOT_SOURCES } from '../eventEntries';
 import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 
-/* Character needs to sign in again ------------------------------------------ */
+/* Character needs to log in again ------------------------------------------ */
 
 const isSignInEntrySnapshot = shapeGuard<SignInEntrySnapshot>({
   needsLogin: is.oneOf([true] as const),
 });
 
 /**
- * Reads the device's needs-sign-in mark (issue #6091), not ESI: the mark is
+ * Reads the device's needs-login mark (issue #6091), not ESI: the mark is
  * set by the token failures every other domain's fetches already run into.
  * Listed last in `POLL_DOMAINS`, so a failure earlier in the same poll is
  * reported by that poll.

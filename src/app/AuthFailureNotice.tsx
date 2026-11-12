@@ -31,7 +31,7 @@ export function AuthFailureRedirect() {
 
   useEffect(() => {
     if (failure?.kind !== 'token' || failure.characterId !== activeCharacterId) return;
-    // `reportTokenFailure` already left the needs-sign-in mark, which
+    // `reportTokenFailure` already left the needs-login mark, which
     // outlives this consumed failure, so Characters can say why the player
     // landed there.
     dismiss();
@@ -50,7 +50,7 @@ export function AuthFailureRedirect() {
  * other marked Character carries the state on its own row instead
  * (`NeedsLoginAction`), so a dozen dead alts never stack a dozen banners.
  * Dismissing hides it for this visit only: the mark itself stays until the
- * Character signs in again.
+ * Character logs in again.
  */
 export function NeedsLoginNotice() {
   const { t } = useTranslation();

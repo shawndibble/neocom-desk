@@ -7,7 +7,7 @@ beforeEach(() => {
 });
 
 describe('signInDomain', () => {
-  it('reads the needs-sign-in mark for the character polled', async () => {
+  it('reads the needs-login mark for the character polled', async () => {
     expect(await signInDomain.load(7)).toEqual([{ needsLogin: true }]);
     expect(await signInDomain.load(8)).toEqual([]);
   });
@@ -26,8 +26,8 @@ describe('signInDomain', () => {
       'Ada Vance'
     );
     expect(copy).toEqual({
-      title: 'Sign in again',
-      body: 'Ada Vance needs to sign in again. Its alerts have stopped.',
+      title: 'Log in again',
+      body: 'Ada Vance needs to log in again. Its alerts have stopped.',
     });
   });
 });

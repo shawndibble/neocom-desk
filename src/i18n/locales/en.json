@@ -4901,8 +4901,8 @@
       "alerts": "Alerts"
     },
     "activeLabel": "Active",
-    "signInAgain": "Sign in again",
-    "signInAgainFor": "Sign in again as {{name}}",
+    "logInAgain": "Log in again",
+    "logInAgainFor": "Log in again as {{name}}",
     "spLabel": "SP",
     "walletLabel": "ISK",
     "acceleratorManual": "+{{bonus}} · {{left}}",
@@ -12401,8 +12401,8 @@
         "bodyHangar_other": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} are in your hangar there."
       },
       "characterNeedsLogin": {
-        "title": "Sign in again",
-        "body": "{{character}} needs to sign in again. Its alerts have stopped."
+        "title": "Log in again",
+        "body": "{{character}} needs to log in again. Its alerts have stopped."
       },
       "shipLost": {
         "title": "Ship lost",
@@ -14747,7 +14747,7 @@
         "communityRequestPledged": "Pledge on your Request",
         "priceAlertTriggered": "Quickbar price alert",
         "shipLost": "Ship lost",
-        "characterNeedsLogin": "Character needs to sign in again"
+        "characterNeedsLogin": "Character needs to log in again"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Planetary Industry always shows the real expiry.",
       "mercenaryDenReinforcedHint": "Scheduled up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. A den that leaves reinforcement early can still send it.",
@@ -18084,7 +18084,7 @@
           "state": {
             "ready": "Ready",
             "connected": "Connected",
-            "needs-sign-in": "Needs login",
+            "needs-login": "Needs login",
             "needs-role": "Needs a role",
             "own-book": "Has its own book",
             "gone-quiet": "Gone quiet",
@@ -18094,7 +18094,7 @@
         "needs": {
           "title": "Needs you ({{count}})",
           "meta": "{{connected}} of {{total}} connected",
-          "needs-sign-in": {
+          "needs-login": {
             "text": "The EVE login did not finish.",
             "action": "Log in again"
           },
@@ -19243,7 +19243,7 @@
       "hintText": "Dotted underline: has a tooltip (HintText)",
       "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
       "missingGrantMark": "Red slashed broadcast icon: this row needs a grant the Character lacks",
-      "needsLogin": "Small warning \"Sign in again\" button on a Character: its login is dead; press to sign in again",
+      "needsLogin": "Small warning \"Log in again\" button on a Character: its login is dead; press to log in again",
       "channelOff": "Greyed checkbox that keeps its tick: its channel is off",
       "figureHistory": "Small dim glyph after a figure: click or tap for its history in a popover",
       "figureBreakdown": "Dashed underline on a figure: click or tap opens how it is worked out",

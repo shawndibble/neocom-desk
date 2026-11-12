@@ -23,8 +23,8 @@ describe('NeedsLoginAction', () => {
   it('offers a re-login for that character when its login is dead', async () => {
     useNeedsLogin.setState({ value: [7], hydrated: true });
     render(<NeedsLoginAction characterId={7} name="Ada Vance" />);
-    const button = screen.getByRole('button', { name: 'Sign in again as Ada Vance' });
-    expect(button).toHaveTextContent('Sign in again');
+    const button = screen.getByRole('button', { name: 'Log in again as Ada Vance' });
+    expect(button).toHaveTextContent('Log in again');
     await userEvent.click(button);
     expect(beginEveLogin).toHaveBeenCalledWith({ characterId: 7 });
   });

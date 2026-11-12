@@ -7,8 +7,8 @@ import { cx } from '@/lib/cx';
 import { useNeedsLogin } from '@/stores/authFailure';
 
 /**
- * "Sign in again" on a Character whose login EVE refused (issue #6091): the
- * needs-sign-in mark, shown where the Character is listed (Characters table
+ * "Log in again" on a Character whose login EVE refused (issue #6091): the
+ * needs-login mark, shown where the Character is listed (Characters table
  * and cards, the Character switcher), with the same re-login the banner runs.
  * Renders nothing for a Character whose login works.
  */
@@ -30,12 +30,12 @@ export function NeedsLoginAction({
       <Button
         size="sm"
         variant="warning"
-        aria-label={t('characters.signInAgainFor', { name })}
+        aria-label={t('characters.logInAgainFor', { name })}
         onClick={() => void beginEveLogin({ characterId })}
         className={cx('shrink-0', className)}
       >
         <Icon.Warn />
-        {t('characters.signInAgain')}
+        {t('characters.logInAgain')}
       </Button>
     </NeedsConnection>
   );
