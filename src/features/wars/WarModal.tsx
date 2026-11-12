@@ -7,7 +7,7 @@
  * corporation each is against.
  */
 import { useTranslation } from 'react-i18next';
-import { Modal, IskAmount } from '@/components/ui';
+import { Eyebrow, Modal, IskAmount } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Pill } from '@/components/ui/Pill';
 import type { StoredWar, WarAgainstMe } from '@/engine/wars';
@@ -19,18 +19,20 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { warZkillUrl } from '@/lib/zkillboard';
 import { usePartyName } from './usePartyName';
 import { WarParty } from './WarParty';
-import { corporationsAtWar, type WarGroup } from './warGroups';
+import { groupWarsByCorporation, type WarGroup } from './warGroups';
 
 interface WarModalProps {
   open: boolean;
   onClose: () => void;
   wars: readonly WarAgainstMe[];
+  /** The account has several corporations: head each group with the one its wars are on. */
+  nameCorporation?: boolean;
 }
 
-export function WarModal({ open, onClose, wars }: WarModalProps) {
+export function WarModal({ open, onClose, wars, nameCorporation = false }: WarModalProps) {
   const { t } = useTranslation();
   const phone = useIsPhone();
-  const groups = corporationsAtWar(wars);
+  const groups = groupWarsByCorporation(wars);
   return (
     <Modal
       open={open}
@@ -38,7 +40,7 @@ export function WarModal({ open, onClose, wars }: WarModalProps) {
       placement={phone ? 'sheet' : 'center'}
       title={t('wars.modal.title', { count: wars.length })}
     >
-      {groups.length > 1 ? (
+      {nameCorporation || groups.length > 1 ? (
         <div className="space-y-6">
           {groups.map((group) => (
             <Group key={group.against.corporationId ?? 0} group={group} />
@@ -66,9 +68,7 @@ function Group({ group }: { group: WarGroup }) {
   const name = usePartyName({ corporationId: group.against.corporationId });
   return (
     <section className="space-y-2">
-      <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {t('wars.modal.against', { name })}
-      </h3>
+      <Eyebrow as="h3">{t('wars.modal.against', { name })}</Eyebrow>
       <Cards wars={group.wars} />
     </section>
   );

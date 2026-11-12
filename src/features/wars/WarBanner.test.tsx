@@ -147,7 +147,13 @@ describe('WarBanner', () => {
     it('shows a war on another account corporation while the active one is at peace', async () => {
       loadActiveWars.mockResolvedValue([onHolding()]);
       renderBanner();
-      expect(await screen.findByText('At war with Hostile Corp')).toBeInTheDocument();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /At war with Hostile Corp/ })
+      );
+      const dialog = await screen.findByRole('dialog', { name: 'War declared' });
+      expect(
+        within(dialog).getByRole('heading', { name: 'Against Holding Corp' })
+      ).toBeInTheDocument();
     });
 
     it('counts the corporations at war and groups the modal by the one each war is on', async () => {

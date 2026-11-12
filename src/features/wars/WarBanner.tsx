@@ -24,20 +24,20 @@ import { formatAge } from '@/lib/age';
 import { useNow } from '@/lib/useNow';
 import { usePartyName } from './usePartyName';
 import { useWarsAgainstMe } from './useWarsAgainstMe';
-import { corporationsAtWar } from './warGroups';
+import { groupWarsByCorporation } from './warGroups';
 import { WarModal } from './WarModal';
 
 export function WarBanner({ characterId }: { characterId: number }) {
   const { t } = useTranslation();
   const now = useNow();
-  const wars = useWarsAgainstMe(characterId);
+  const { wars, corporations: accountCorporations } = useWarsAgainstMe(characterId);
   const [open, setOpen] = useState(false);
   const first = wars[0];
   // Hooks above run for every render; the name hook needs a party even with no war.
   const name = usePartyName(first?.war.aggressor ?? {});
   if (first === undefined) return null;
 
-  const corporations = corporationsAtWar(wars).length;
+  const corporations = groupWarsByCorporation(wars).length;
   const more = wars.length - 1;
   const when =
     corporations > 1
@@ -77,7 +77,12 @@ export function WarBanner({ characterId }: { characterId: number }) {
           <Icon.GoTo aria-hidden="true" className="ml-auto shrink-0 text-text-dim" />
         </button>
       </div>
-      <WarModal open={open} onClose={() => setOpen(false)} wars={wars} />
+      <WarModal
+        open={open}
+        onClose={() => setOpen(false)}
+        wars={wars}
+        nameCorporation={accountCorporations > 1}
+      />
     </>
   );
 }

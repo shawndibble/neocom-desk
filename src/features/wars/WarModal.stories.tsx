@@ -75,6 +75,7 @@ export const SeveralWars: Story = {
 /** @summary Wars on two of the account's corporations: the cards grouped under the corporation each is against, the active Character's first. */
 export const SeveralCorporations: Story = {
   args: {
+    nameCorporation: true,
     wars: [
       active(),
       {
