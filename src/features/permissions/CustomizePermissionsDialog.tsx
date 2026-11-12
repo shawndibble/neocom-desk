@@ -9,9 +9,9 @@
  * `CORE_GRANT`'s four raw scope names, which this dialog never shows
  * (docs/context/decisions/20260924-143410-customize-permissions-at-sign-in-core-grant-plus.md).
  * Below it, every Permission in a two-column checklist that collapses to one
- * at phone width, the opt-in ones tagged and unchecked by default. The
- * "Write to EVE" Permissions sit under their own heading, derived from the
- * registry's `section`.
+ * at phone width, every read one ticked by default (#6102). The "Write to
+ * EVE" Permissions sit under their own heading, derived from the registry's
+ * `section`, tagged opt-in and unticked by default.
  *
  * The selection persists device-locally only on submit — Cancel discards a
  * half-made change rather than remembering it (`customizeSelection.ts`).
@@ -64,7 +64,7 @@ export function CustomizePermissionsDialog({
   // must survive.
   const [pending, setPending] = useState<ReadonlySet<ScopeGroup> | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const selected = pending ?? new Set(stored);
+  const selected = pending ?? new Set(stored.groups);
   const locked = !hydrated || submitting;
 
   function toggle(group: ScopeGroup) {
@@ -86,7 +86,7 @@ export function CustomizePermissionsDialog({
       // Best-effort: a device-local preference-save failure (quota, private
       // browsing) must never block the login it is attached to.
       try {
-        await persist(groups);
+        await persist({ groups });
       } catch {
         // Intentionally swallowed — see comment above.
       }

@@ -46,6 +46,30 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-location.read_location.v1': 'current location',
   'esi-location.read_ship_type.v1': 'the ship you are flying',
   'esi-fittings.read_fittings.v1': 'in-game fittings',
+  // In the Base Grant since #6102; a Character's Corp Roles decide which of
+  // the corporation reads ever run.
+  'esi-characters.read_corporation_roles.v1': 'your corporation roles',
+  'esi-wallet.read_corporation_wallets.v1': 'corporation wallets',
+  'esi-corporations.read_divisions.v1': 'corporation divisions',
+  'esi-corporations.read_corporation_membership.v1': 'corporation members',
+  'esi-corporations.track_members.v1': 'corporation members',
+  'esi-corporations.read_titles.v1': 'corporation titles',
+  'esi-corporations.read_structures.v1': 'corporation structures',
+  'esi-structures.read_corporation.v1': 'corporation structures',
+  'esi-corporations.read_starbases.v1': 'corporation starbases',
+  'esi-planets.read_customs_offices.v1': 'corporation customs offices',
+  'esi-industry.read_corporation_mining.v1': 'corporation mining',
+  'esi-industry.read_corporation_jobs.v1': 'corporation industry jobs',
+  'esi-corporations.read_blueprints.v1': 'corporation blueprints',
+  'esi-assets.read_corporation_assets.v1': 'corporation assets',
+  'esi-contracts.read_corporation_contracts.v1': 'corporation contracts',
+  'esi-markets.read_corporation_orders.v1': 'corporation market orders',
+  'esi-corporations.read_projects.v1': 'corporation projects',
+  'esi-markets.structure_markets.v1': 'player structure markets',
+  'esi-characters.read_fatigue.v1': 'jump fatigue',
+  'esi-killmails.read_killmails.v1': 'killmails',
+  'esi-structures.read_character.v1': 'mercenary dens',
+  'esi-activities.read_character.v1': 'mercenary dens',
 };
 
 /** The write scopes (opt-in, not in the Base Grant) — their disclosure goes in the "Six writes" trust card, not the read sentence, which it would otherwise contradict. */
@@ -388,7 +412,7 @@ describe('Login', () => {
     expect(screen.getByText('Your planetary colonies.')).toBeInTheDocument();
   });
 
-  it('keeps the planetary-scope note, the separate-grants note and the revoke link', async () => {
+  it('keeps the planetary-scope note, the one-login note and the revoke link', async () => {
     renderLogin();
     const trust = within(
       await screen.findByRole('region', { name: /it writes only when you act/i })
@@ -396,7 +420,9 @@ describe('Login', () => {
     expect(trust.getByText(/manage your planetary installations/i)).toHaveTextContent(
       /only reads that data and never writes/i
     );
-    expect(trust.getByText(/player-structure markets are separate grants/i)).toBeInTheDocument();
+    expect(trust.getByText(/asks for every read above at once/i)).toHaveTextContent(
+      /log in with custom permissions/i
+    );
     expect(trust.getByRole('link', { name: /authorized apps page/i })).toHaveAttribute(
       'href',
       AUTHORIZED_APPS_URL

@@ -32,28 +32,23 @@ export type ScopeRequirement = EsiScopeName | PublicAccess;
 
 /**
  * Every named Scope Group (user-facing: **Permission**) a scope outside the
- * **Core Grant** can belong to. Thirteen are default-on — granted at sign-in
- * along with the Core Grant, together forming the **Base Grant** — and the rest
- * are opt-in: a Character is asked for them only when they ask for the
- * feature, never at sign-in with everyone else. Six of those are the **Write to
- * EVE** section (`mailSend`, `mailOrganize`, `calendarRespond`, `fittingsWrite`,
- * `autopilot`, `openWindow`, marked `section: 'write'`): one Permission per
- * write feature, asked for the first time a Character tries it. The other six
- * are `corp`, `structureMarkets`, `jumpFatigue`, `corpProjects`, `killmails`
- * and `mercenaryDens`.
+ * **Core Grant** can belong to. Every read Permission is default-on — granted
+ * at sign-in along with the Core Grant, together forming the **Base Grant** —
+ * and a player who wants less unticks it in Customize permissions. Only the
+ * six **Write to EVE** Permissions (`mailSend`, `mailOrganize`,
+ * `calendarRespond`, `fittingsWrite`, `autopilot`, `openWindow`, marked
+ * `section: 'write'`) are opt-in: one per write feature, asked for the first
+ * time a Character tries it.
  *
- * `corp` exists because the corp section needs ten scopes that ~95% of users
- * can never use — CCP role-gates the endpoints server-side, so a line member
- * granting them gains nothing but a longer consent screen (GLOSSARY.md round
- * 35). `structureMarkets` (issue #538) exists because most Characters never
- * list an order inside a player structure, so `esi-markets.structure_markets.v1`
- * would cost everyone a consent-screen line for a check almost nobody's
- * orders need. No settings surface requests that group yet — until one does,
- * it stays grantable in principle but ungranted in practice, which degrades
- * to the same "unavailable" row every ungranted Character already sees.
+ * `corp`, `structureMarkets`, `jumpFatigue`, `corpProjects`, `killmails` and
+ * `mercenaryDens` were opt-in until #6102: each cost a separate trip to EVE's
+ * login, and a player with many Characters on many accounts paid that trip
+ * over and over. Holding a scope never makes a call on its own — role and
+ * capability gates (`features/corp/corpScopes.ts`, `useCorpAccess`) still
+ * decide every corp read, so a line member's token never draws a 403.
  *
  * See `docs/context/decisions/20260924-143410-customize-permissions-at-sign-in-core-grant-plus.md`
- * for why the split lands exactly here.
+ * for the Core/Permission split, and the #6102 decision for the default.
  */
 export const SCOPE_GROUPS = [
   'wallet',
@@ -210,32 +205,32 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
   corp: {
     labelKey: 'permissions.corp.label',
     captionKey: 'permissions.corp.caption',
-    defaultOn: false,
+    defaultOn: true,
   },
   structureMarkets: {
     labelKey: 'permissions.structureMarkets.label',
     captionKey: 'permissions.structureMarkets.caption',
-    defaultOn: false,
+    defaultOn: true,
   },
   jumpFatigue: {
     labelKey: 'permissions.jumpFatigue.label',
     captionKey: 'permissions.jumpFatigue.caption',
-    defaultOn: false,
+    defaultOn: true,
   },
   corpProjects: {
     labelKey: 'permissions.corpProjects.label',
     captionKey: 'permissions.corpProjects.caption',
-    defaultOn: false,
+    defaultOn: true,
   },
   killmails: {
     labelKey: 'permissions.killmails.label',
     captionKey: 'permissions.killmails.caption',
-    defaultOn: false,
+    defaultOn: true,
   },
   mercenaryDens: {
     labelKey: 'permissions.mercenaryDens.label',
     captionKey: 'permissions.mercenaryDens.caption',
-    defaultOn: false,
+    defaultOn: true,
   },
 };
 
@@ -250,9 +245,9 @@ export interface EsiEndpointSpec {
    * structure lookup and search) — so leaving it off is the rare case,
    * reserved for those.
    *
-   * Every other endpoint declares one of the 25 `SCOPE_GROUPS`: the thirteen
-   * default-on ones together with the Core Grant make up the **Base Grant**
-   * (`SCOPES` in `scopes.ts`), and the other twelve stay opt-in.
+   * Every other endpoint declares one of the 25 `SCOPE_GROUPS`: the nineteen
+   * default-on (read) ones together with the Core Grant make up the **Base
+   * Grant** (`SCOPES` in `scopes.ts`), and the six Write to EVE ones stay opt-in.
    *
    * Declared per endpoint rather than per scope, which is why
    * `scopes.test.ts` asserts a scope repeated across endpoints always
