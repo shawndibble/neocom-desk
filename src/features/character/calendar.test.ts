@@ -155,7 +155,7 @@ describe('loadCalendarEvents retention', () => {
     };
   }
 
-  it('keeps an event ESI dropped after it started, until its local day is over', async () => {
+  it('keeps an event ESI dropped after it started, for two weeks', async () => {
     const now = new Date(2026, 8, 8, 14, 0, 0);
     vi.setSystemTime(now);
     const running = summary(1, new Date(2026, 8, 8, 12, 0, 0), 'Fleet Op');
@@ -179,8 +179,13 @@ describe('loadCalendarEvents retention', () => {
     );
     expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([running, upcoming]);
 
-    // Next day: the op is done being today's news.
-    vi.setSystemTime(new Date(2026, 8, 9, 9, 0, 0));
+    // Ten days on it is still history the pilot can look back at.
+    vi.setSystemTime(new Date(2026, 8, 18, 9, 0, 0));
+    await db.esiCache.delete([CHAR_ID, 'calendar']);
+    expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([running, upcoming]);
+
+    // Past two weeks it ages out.
+    vi.setSystemTime(new Date(2026, 8, 23, 9, 0, 0));
     await db.esiCache.delete([CHAR_ID, 'calendar']);
     expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([upcoming]);
   });
@@ -220,31 +225,6 @@ describe('loadCalendarEvents retention', () => {
     expect((await db.esiCache.get([CHAR_ID, 'calendar:seen']))?.fetchedAt).toEqual(
       first?.fetchedAt
     );
-  });
-
-  it('carries a late-evening op past midnight, then drops it once its run is over', async () => {
-    const lastNight = summary(1, new Date(2026, 8, 7, 22, 0, 0), 'Late Op');
-    vi.setSystemTime(new Date(2026, 8, 7, 21, 30, 0));
-    server.use(
-      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () =>
-        HttpResponse.json([lastNight])
-      )
-    );
-    await loadCalendarEvents(CHAR_ID);
-
-    // 01:00, an hour past midnight: ESI has dropped it, the op is still going.
-    vi.setSystemTime(new Date(2026, 8, 8, 1, 0, 0));
-    await db.esiCache.delete([CHAR_ID, 'calendar']);
-    server.resetHandlers();
-    server.use(
-      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () => HttpResponse.json([]))
-    );
-    expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([lastNight]);
-
-    // 05:00: past the assumed run, so the morning is not showing last night.
-    vi.setSystemTime(new Date(2026, 8, 8, 5, 0, 0));
-    await db.esiCache.delete([CHAR_ID, 'calendar']);
-    expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([]);
   });
 
   it('drops an event that vanished before it started — a cancellation, not ESI trimming', async () => {

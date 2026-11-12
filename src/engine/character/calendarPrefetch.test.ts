@@ -31,8 +31,8 @@ describe('selectCalendarEventsToPrefetch', () => {
 
   it('keeps one that started hours ago while the calendar still shows it, but not an old one', () => {
     const HOUR = 60 * 60_000;
-    // The window is `calendarRetention`'s own (end of its day, or 6 h from the start).
-    expect(pick([event(1, NOW - 5 * HOUR), event(2, NOW - 2 * DAY)])).toEqual([1]);
+    // The window is `calendarRetention`'s own (two weeks from the start).
+    expect(pick([event(1, NOW - 5 * HOUR), event(2, NOW - 15 * DAY)])).toEqual([1]);
   });
 
   it('never asks again for details already cached', () => {

@@ -92,8 +92,9 @@ function parseAnchorKey(key: string): Date {
  * Not three tab-switched views any more. `GET /characters/{id}/calendar`
  * returns up to 50 events *from now only* and the cache replaces its row
  * wholesale, so a month grid spent most of its cells on days that structurally
- * cannot hold anything — and paging backwards always said "No events this
- * month" however busy that month had really been. The grid is now a map and
+ * cannot hold anything — and paging backwards said "No events this
+ * month" however busy that month had really been (only the last two weeks
+ * of started events are kept). The grid is now a map and
  * the list is always beside it (see the scope decision).
  *
  * It also merges in every other clock the Character can read: skill-queue

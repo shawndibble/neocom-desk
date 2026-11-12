@@ -21,7 +21,7 @@ GLOSSARY.md entries were cut to plain definitions. The scope decisions and ratio
 - **Build Group**: Membership lives only on the plan (`buildGroupId`); group name, order and existence live in the `sync.industryBuildGroups` setting, so an emptied group survives and no merge can give one plan to two groups. Deleting a group deletes its member plans (20260923 decision). A dangling `buildGroupId` renders as an ordinary ungrouped plan. The Industry list UI says "group" since no collision there.
 - **Build Location**: Plan remembers which place was picked so the box can name it after reload; setting it updates the **Remembered Location** new plans start at; any edit that moves the job elsewhere drops the name.
 - **Build Plan**: Invention and research/copying out of scope (`.out-of-scope/`).
-- **Calendar Map**: Hatch reflects "incapable of holding anything", not the date: a past day that holds a retained event (ESI drops events at end of day or six hours after start, whichever is later) draws as an ordinary day. Two densities: month or fortnight around today.
+- **Calendar Map**: Hatch reflects "incapable of holding anything", not the date: a past day that holds a retained event (this device keeps started events for two weeks; see `20261111-175951`) draws as an ordinary day. Two densities: month or fortnight around today.
 - **Certificate**: Only the nine combat groups are baked; industry, science and trade certificates excluded.
 - **Certified Plan**: Baked from CCP's JSONL export since Fuzzwork CSVs lack it; milestones become Plan Milestones; fully trained plans hidden from the picker.
 - **Character Modifiers**: Industry uses effective levels (min of trained and active); market/refining/mining use queue-corrected trained levels.

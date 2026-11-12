@@ -201,9 +201,9 @@ here — they go one per file in `docs/context/decisions/`.
   the short per-row tooltips.
 - **Calendar Map**: The calendar page's grid — each day cell carries its date,
   a count, and one dot per **Clock Kind** landing on it, and nothing else. The
-  detail lives in the **Coming Up Rail** beside it. Days before today are
-  hatched because ESI returns calendar events from now only, so a past cell is
-  normally incapable of holding anything, which differs from "nothing on".
+  detail lives in the **Coming Up Rail** beside it. Past days with
+  nothing seen are hatched because ESI returns calendar events from now only
+  (this device keeps what it saw for two weeks), which differs from "nothing on".
 - **Certificate**: One of CCP's combat certificates (Armor Tanking, Navigation,
   Medium Missiles, …) — a five-grade ladder of skill levels, Basic, Standard,
   Improved, Advanced, Elite. The same ladders CCP assembles ship **Masteries**

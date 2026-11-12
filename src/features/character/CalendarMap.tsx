@@ -15,8 +15,8 @@
  * wraps at worst and the glyphs line up in the same order in every cell.
  *
  * **Past days are drawn, hatched and captioned.** ESI's `/calendar` returns
- * events from now only and the cache replaces its row wholesale, so no past
- * day can hold a calendar *event*. The old grid let a pilot page back into a
+ * events from now only, so a past day holds a calendar *event* only if this
+ * device saw it before it started (kept two weeks). The old grid let a pilot page back into a
  * month of empty cells and draw the obvious wrong conclusion; saying so once
  * under the grid is cheaper than an empty state they have to trigger.
  *
