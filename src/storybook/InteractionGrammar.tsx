@@ -3,7 +3,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { AddPreviewReadout } from '@/features/fittings/AddPreviewReadout';
 import { NeedsLoginAction } from '@/features/character/NeedsLoginAction';
 import { useNeedsLogin } from '@/stores/authFailure';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Chart } from '@/features/overview/widgets/charts/Chart';
 import { useTranslation } from 'react-i18next';
 import {
@@ -78,9 +78,9 @@ function Cue({ rule, note, children }: { rule: string; note?: string; children: 
 
 /** A Character's dead login, as its row shows it (`NeedsLoginAction`). */
 function NeedsLoginSample() {
-  useEffect(() => {
-    useNeedsLogin.setState({ value: [SAMPLE_CHARACTER_ID], hydrated: true });
-  }, []);
+  // Seeded before the action mounts: marked as hydrated, its own read never
+  // starts, so the stored (empty) list cannot replace the sample.
+  useState(() => useNeedsLogin.setState({ value: [SAMPLE_CHARACTER_ID], hydrated: true }));
   return <NeedsLoginAction characterId={SAMPLE_CHARACTER_ID} name="Ada Vance" />;
 }
 

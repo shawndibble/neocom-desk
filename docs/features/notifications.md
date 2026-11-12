@@ -77,6 +77,7 @@ Code: `src/routes/Alerts.tsx`; `src/features/notifications/*` (see below); `src/
 - `mergeFeedRecord`: earliest `firedAt` wins, latest `dismissedAt` wins (a dismissal sticks whichever order two writers land), other defined fields from incoming.
 - Toast suppression (`rowSuppressesToast`): skipped only if this device already notified (`notifiedHereAt`, local, never synced), or dismissed anywhere, or the row is older than `TOAST_STALE_AFTER_MS` = 24 h (decision `20260925-112832-device-notification-dedup-is-per-device`).
 - Feed sync: rows synced via `notificationFeed` collection (`sync/syncedCollections.ts:668`, `feedSync.syncFeed`), per Character; `feed.ts` itself does not call sync (service worker imports it) - page callers use `feedSync.ts` (decision `20260912-125743-alert-dismissals-push-on-dismiss-a-visible-tab`). A Service-Worker-written row syncs on the next page-context sync.
+- Device-local events: `characterNeedsLogin` rows are never pushed (`isDeviceLocalFeedRow`, `feed.ts`), so a dead login stays on the device that saw it (issue #6091).
 - Removing a Character deletes its rows (`deleteFeedForCharacter`).
 
 ## Badges

@@ -44,22 +44,37 @@ export const useNeedsLogin = createLocalSetting<readonly number[]>({
     Array.isArray(raw) && raw.every((id) => Number.isInteger(id)) ? (raw as number[]) : null,
 });
 
-/** The mark as stored, once hydrated. */
-export async function needsLoginIds(): Promise<readonly number[]> {
-  await useNeedsLogin.getState().hydrate();
-  return useNeedsLogin.getState().value;
+/**
+ * Every mark and clear, one after another. Each hydrates first (a write before
+ * the stored list is read would replace it: `settingStore.ts` drops a read
+ * that lands after a set), and two running side by side would each change the
+ * list they read and the later write would drop the earlier one's change.
+ */
+let pendingUpdates = 0;
+let updates: Promise<void> = Promise.resolve();
+
+function updateNeedsLogin(change: (ids: readonly number[]) => readonly number[]): Promise<void> {
+  pendingUpdates += 1;
+  const run = updates.then(async () => {
+    try {
+      await useNeedsLogin.getState().hydrate();
+      const ids = useNeedsLogin.getState().value;
+      const next = change(ids);
+      if (next !== ids) await useNeedsLogin.getState().setValue(next);
+    } finally {
+      pendingUpdates -= 1;
+    }
+  });
+  // A failed write must not wedge every later update behind it.
+  updates = run.catch(() => undefined);
+  return run;
 }
 
-/**
- * Each change hydrates first: a write before the stored list is read would
- * replace it (`settingStore.ts` drops a read that lands after a set).
- */
-async function updateNeedsLogin(
-  change: (ids: readonly number[]) => readonly number[]
-): Promise<void> {
-  const ids = await needsLoginIds();
-  const next = change(ids);
-  if (next !== ids) await useNeedsLogin.getState().setValue(next);
+/** The mark as stored, once hydrated and once every update already asked for has landed. */
+export async function needsLoginIds(): Promise<readonly number[]> {
+  await updates;
+  await useNeedsLogin.getState().hydrate();
+  return useNeedsLogin.getState().value;
 }
 
 export function markNeedsLogin(characterId: number): Promise<void> {
@@ -67,10 +82,10 @@ export function markNeedsLogin(characterId: number): Promise<void> {
 }
 
 export function clearNeedsLogin(characterId: number): Promise<void> {
-  // Every successful token fetch lands here: skip the async hop when the
-  // hydrated list already lacks the id.
+  // Every successful token fetch lands here: skip the queue when the hydrated
+  // list lacks the id and no mark that could add it is still on its way.
   const { hydrated, value } = useNeedsLogin.getState();
-  if (hydrated && !value.includes(characterId)) return Promise.resolve();
+  if (hydrated && pendingUpdates === 0 && !value.includes(characterId)) return Promise.resolve();
   return updateNeedsLogin((ids) =>
     ids.includes(characterId) ? ids.filter((id) => id !== characterId) : ids
   );
