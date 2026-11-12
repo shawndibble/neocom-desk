@@ -101,6 +101,20 @@ const WIRE_NAMES = [
   'corpTaxBook:readCorpTaxBookStatementCallable',
   'corpTaxBook:declineCorpTaxBookGroupingByTokenCallable',
   'corpTaxBook:stopCorpTaxBookRemindersCallable',
+  'vetting:getVettingCorpCallable',
+  'vetting:startVettingCallable',
+  'vetting:addVettingCharacterCallable',
+  'vetting:removeVettingCharacterCallable',
+  'vetting:submitVettingCallable',
+  'vetting:getVettingStatusCallable',
+  'vetting:withdrawVettingCallable',
+  'vetting:declineVettingCallable',
+  'vetting:listMyVettingRequestsCallable',
+  'vetting:getVettingOverviewCallable',
+  'vetting:openVettingReviewCallable',
+  'vetting:decideVettingReviewCallable',
+  'vetting:requestVettingReviewCallable',
+  'vetting:saveVettingSettingsCallable',
 ];
 
 const index = readFileSync(join(__dirname, 'index.ts'), 'utf8');
@@ -108,9 +122,12 @@ const HELPER_GROUP: Record<string, CallableGroup> = {
   alertsAction: 'alerts',
   communityAction: 'community',
   corpTaxBookAction: 'corpTaxBook',
+  vettingAction: 'vetting',
 };
 const registered = [
-  ...index.matchAll(/^(communityAction|corpTaxBookAction|alertsAction)\(\s*'(\w+)'/gm),
+  ...index.matchAll(
+    /^(communityAction|corpTaxBookAction|alertsAction|vettingAction)\(\s*'(\w+)'/gm
+  ),
 ].map((m) => `${HELPER_GROUP[m[1]]}:${m[2]}`);
 
 describe('callable manifest', () => {
@@ -136,10 +153,10 @@ describe('callable manifest', () => {
     expect([...registered].sort()).toEqual([...declared].sort());
   });
 
-  it('deploys no per-name community, Corp Tax Book, SRP or alerts callable', () => {
+  it('deploys no per-name community, Corp Tax Book, SRP, vetting or alerts callable', () => {
     const loose = [
       ...index.matchAll(
-        /^export const (\w*(?:Communit|CorpTaxBook|CorpOfficer|Srp)\w*Callable|registerDevice|saveAlertGrant|deleteAlertGrant) =/gm
+        /^export const (\w*(?:Communit|CorpTaxBook|CorpOfficer|Srp|Vetting)\w*Callable|registerDevice|saveAlertGrant|deleteAlertGrant) =/gm
       ),
     ];
     expect(loose.map((m) => m[1])).toEqual([]);

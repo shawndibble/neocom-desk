@@ -663,6 +663,26 @@ service cloud.firestore {
           && resource.data.ownerHash == request.auth.token.ownerHash;
         allow list, write: if false;
       }
+
+      // Vetting: a corp's settings, its reviews, what a read of a character returned while a
+      // report is being put together, and a per-character draft counter. Closed to every
+      // client: a pilot and an officer both read and write through the `vettingCall` actions
+      // (functions/src/vettingStore.ts), which use the Admin SDK.
+      match /vetting/{docId} {
+        allow read, write: if false;
+      }
+
+      match /vettingReviews/{reviewId} {
+        allow read, write: if false;
+
+        match /inputs/{characterId} {
+          allow read, write: if false;
+        }
+      }
+
+      match /vettingThrottle/{characterId} {
+        allow read, write: if false;
+      }
     }
 
     match /corpTaxBookTokens/{token} {

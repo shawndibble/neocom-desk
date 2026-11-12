@@ -100,6 +100,22 @@ export const CALLABLE_ACTIONS = {
     'declineCorpTaxBookGroupingByTokenCallable',
     'stopCorpTaxBookRemindersCallable',
   ],
+  vetting: [
+    'getVettingCorpCallable',
+    'startVettingCallable',
+    'addVettingCharacterCallable',
+    'removeVettingCharacterCallable',
+    'submitVettingCallable',
+    'getVettingStatusCallable',
+    'withdrawVettingCallable',
+    'declineVettingCallable',
+    'listMyVettingRequestsCallable',
+    'getVettingOverviewCallable',
+    'openVettingReviewCallable',
+    'decideVettingReviewCallable',
+    'requestVettingReviewCallable',
+    'saveVettingSettingsCallable',
+  ],
 } as const;
 
 export type CallableGroup = keyof typeof CALLABLE_ACTIONS;
@@ -111,6 +127,7 @@ export const ROUTER_FUNCTIONS = {
   alerts: 'alertsCall',
   community: 'communityCall',
   corpTaxBook: 'corpTaxBookCall',
+  vetting: 'vettingCall',
 } as const satisfies Record<CallableGroup, string>;
 
 const GROUP_OF = new Map<string, CallableGroup>(
