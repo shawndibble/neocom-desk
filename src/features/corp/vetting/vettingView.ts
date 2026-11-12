@@ -3,16 +3,17 @@
  * React, no i18n calls; wording keys and their figures come back for the component to translate.
  */
 import { VETTING_SCOPES, type VettingScope } from '@/auth/vettingScopes';
-import type {
-  VettingAssessment,
-  VettingCheckId,
-  VettingFlag,
-  VettingParty,
-  VettingReview,
-  VettingReviewSummary,
-  VettingSeverity,
-  VettingSource,
-  VettingState,
+import {
+  VETTING_CHECK_SOURCES,
+  type VettingAssessment,
+  type VettingCheckId,
+  type VettingFlag,
+  type VettingParty,
+  type VettingReview,
+  type VettingReviewSummary,
+  type VettingSeverity,
+  type VettingSource,
+  type VettingState,
 } from '@/engine/vetting';
 
 export type VettingResult =
@@ -132,11 +133,14 @@ export function flagFindingParams(
   }
 }
 
-/** Where each check's rows come from, as the report names it (`vetting.sources.<id>`). */
-export type VettingSourceLabel = VettingSource | 'history' | 'walletContracts';
+/**
+ * Where each check's rows come from, as the report names it (`vetting.sources.<id>`). A label
+ * only: which sources a check needs is the engine's `VETTING_CHECK_SOURCES`.
+ */
+export type VettingSourceLabel = VettingSource | 'history' | 'walletRecent' | 'walletContracts';
 
 export const CHECK_SOURCE_LABEL: Record<VettingCheckId, VettingSourceLabel> = {
-  watchlistIsk: 'wallet',
+  watchlistIsk: 'walletRecent',
   watchlistHistory: 'history',
   watchlistContacts: 'contact',
   watchlistMail: 'mail',
@@ -147,20 +151,7 @@ export const CHECK_SOURCE_LABEL: Record<VettingCheckId, VettingSourceLabel> = {
   thinCharacter: 'skills',
 };
 
-/** The source a check cannot run without; null for the two that read public history. */
-const CHECK_NEEDS: Record<VettingCheckId, VettingSource | null> = {
-  watchlistIsk: 'wallet',
-  watchlistHistory: null,
-  watchlistContacts: 'contact',
-  watchlistMail: 'mail',
-  watchlistContracts: 'contract',
-  undeclaredCharacter: 'wallet',
-  corpHopping: null,
-  cynoNoCapital: 'skills',
-  thinCharacter: 'skills',
-};
-
-/** Evidence rows whose `what` has its own wording; anything else is shown as the source spells it. */
+/** Evidence rows whose `what` has its own wording; anything else reads as "Other". */
 const KNOWN_WHAT: ReadonlySet<string> = new Set([
   'player_donation',
   'player_trading',
@@ -173,30 +164,44 @@ const KNOWN_WHAT: ReadonlySet<string> = new Set([
   'auction',
 ]);
 
-export function evidenceWhatKey(what: string): string | null {
-  return KNOWN_WHAT.has(what) ? `vetting.what.${what}` : null;
+export function evidenceWhatKey(what: string): string {
+  return KNOWN_WHAT.has(what) ? `vetting.what.${what}` : 'vetting.what.other';
 }
 
 export interface MissingCheck {
   check: VettingCheckId;
-  source: VettingSource;
-  /** Declared characters that did not share the source. */
+  /** What the check reads that was not shared, in the engine's order. */
+  sources: VettingSource[];
+  /** Declared characters that did not share it. */
   names: string[];
 }
 
-/** Checks that could not run, with who did not share what. A check that still flagged is not one. */
+/**
+ * Checks that could not run, with who did not share what. A check that still flagged is not one.
+ * The sources come from the engine's `VETTING_CHECK_SOURCES`, narrowed to the ones those
+ * characters actually left out when the report says which.
+ */
 export function missingChecks(
   assessment: VettingAssessment,
-  characters: readonly { characterId: number; name: string }[]
+  characters: readonly { characterId: number; name: string; missing?: readonly VettingSource[] }[]
 ): MissingCheck[] {
   return assessment.checks.flatMap((check) => {
-    const source = CHECK_NEEDS[check.check];
-    if (check.state !== 'missing' || source === null) return [];
-    const names = check.missingFor.flatMap((id) => {
+    const needs = VETTING_CHECK_SOURCES[check.check];
+    if (check.state !== 'missing' || needs.length === 0) return [];
+    const who = check.missingFor.flatMap((id) => {
       const character = characters.find((candidate) => candidate.characterId === id);
-      return character ? [character.name] : [];
+      return character ? [character] : [];
     });
-    return [{ check: check.check, source, names }];
+    const leftOut = needs.filter((source) =>
+      who.some((character) => character.missing?.includes(source))
+    );
+    return [
+      {
+        check: check.check,
+        sources: leftOut.length > 0 ? leftOut : [...needs],
+        names: who.map((character) => character.name),
+      },
+    ];
   });
 }
 
@@ -213,7 +218,7 @@ export type SignOffRow =
       decision: 'yes' | 'no';
       note: string;
     }
-  /** Asked for the review, so cannot sign it off. */
+  /** Asked for the review, so cannot sign it off. `you` when that is the caller. */
   | { kind: 'barred'; name: string; you: boolean };
 
 /**
@@ -221,7 +226,8 @@ export type SignOffRow =
  * (hidden ones without their decision), then the caller's own open row, then whoever is barred.
  */
 export function signOffRows(
-  review: Pick<VettingReview, 'state' | 'yours' | 'barred' | 'requestedBy' | 'signOffs'>
+  review: Pick<VettingReview, 'state' | 'yours' | 'requestedBy' | 'signOffs'>,
+  reviewerId: number
 ): SignOffRow[] {
   const rows: SignOffRow[] = review.signOffs.map((signOff) =>
     signOff.decision === undefined
@@ -238,9 +244,21 @@ export function signOffRows(
   if (review.state !== 'open') return rows;
   if (review.yours) rows.push({ kind: 'yours' });
   if (review.requestedBy) {
-    rows.push({ kind: 'barred', name: review.requestedBy.name, you: review.barred });
+    rows.push({
+      kind: 'barred',
+      name: review.requestedBy.name,
+      you: askedByReviewer(review, reviewerId),
+    });
   }
   return rows;
+}
+
+/** The caller is whoever asked for this review (and so cannot sign it off). */
+export function askedByReviewer(
+  review: Pick<VettingReview, 'requestedBy'>,
+  reviewerId: number
+): boolean {
+  return review.requestedBy?.characterId === reviewerId;
 }
 
 const SCOPE_SOURCE: Record<VettingScope, VettingSource> = {
@@ -293,6 +311,7 @@ const KNOWN_REASONS: ReadonlySet<string> = new Set([
   'watchlist-full',
   'not-open',
   'barred',
+  'own-review',
   'already-signed',
   'esi-backoff',
   'esi-error',

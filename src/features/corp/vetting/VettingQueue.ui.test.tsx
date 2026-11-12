@@ -80,6 +80,8 @@ describe('VettingPage queue', () => {
     expect(screen.getByText('ISK with the watchlist')).toBeInTheDocument();
     expect(screen.getByText('Serious')).toBeInTheDocument();
     expect(screen.getByText(/1,200,000,000 ISK in 3 wallet rows/)).toBeInTheDocument();
+    // The ISK flag says how far back the wallet goes.
+    expect(screen.getByText(/from Wallet journal, about the last 30 days$/)).toBeInTheDocument();
     // The first flag's rows are open, each party an entity link.
     expect(screen.getAllByRole('link', { name: 'Corvin Hale' }).length).toBeGreaterThan(0);
     expect(screen.getByText('Could not check')).toBeInTheDocument();
@@ -88,6 +90,31 @@ describe('VettingPage queue', () => {
     expect(fixture.calls.find((call) => call.method === 'open')?.args[2]).toBe(
       VETTING_FIXTURE_REVIEWS.flagged
     );
+  });
+
+  it('says so, with no retry, when the review is about the reviewer', async () => {
+    fixture = createVettingFixture();
+    fixture.open = async () => {
+      throw Object.assign(new Error('x'), { details: { reason: 'own-review' } });
+    };
+    setVettingBackendOverride(fixture);
+    await seedCharacter(CHARACTER);
+    await db.characters.update(CHARACTER, {
+      corporationId: VETTING_FIXTURE_CORPORATION.corporationId,
+    });
+    useActiveCharacter.setState({ activeCharacterId: CHARACTER, hydrated: true });
+    render(
+      <MemoryRouter initialEntries={[`/corp/vetting/open/${VETTING_FIXTURE_REVIEWS.flagged}`]}>
+        <Routes>
+          <Route path="/corp/vetting/*" element={<VettingPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(
+      await screen.findByText('This review is about you, so you cannot open it.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Try again|Retry/ })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Vetting' })).toBeInTheDocument();
   });
 
   it('does not open a request the pilot has not answered', async () => {
@@ -122,7 +149,9 @@ describe('VettingPage queue', () => {
     await setup('/corp/vetting/settings', { on: false, canConfigure: false });
     const copy = await screen.findByRole('button', { name: 'Copy apply link' });
     expect(copy).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByText('Vetting is off. A Director turns it on.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Vetting is off. The CEO or a Director turns it on.')
+    ).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Settings' })).toBeNull();
     expect(screen.getByText('Open reviews')).toBeInTheDocument();
   });

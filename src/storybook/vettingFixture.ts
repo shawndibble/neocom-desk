@@ -11,6 +11,7 @@ import {
   assessVetting,
   VETTING_DEFAULT_SETTINGS,
   VETTING_KEEP_DAYS,
+  VETTING_OPEN_KEEP_DAYS,
   type VettingCharacterInput,
   type VettingDealing,
   type VettingKind,
@@ -303,7 +304,13 @@ function buildReview(seed: ReviewSeed, now: number, watchlist: number[]): Vettin
         ? [{ at, characterId: pilot.characterId, name: pilot.name, action: 'shared' as const }]
         : []),
     ],
-    deleteAt: decidedAt === null ? null : decidedAt + VETTING_KEEP_DAYS * DAY_MS,
+    // From the moment it is shared: an undecided review goes after `VETTING_OPEN_KEEP_DAYS`.
+    deleteAt:
+      decidedAt !== null
+        ? decidedAt + VETTING_KEEP_DAYS * DAY_MS
+        : read
+          ? at + VETTING_OPEN_KEEP_DAYS * DAY_MS
+          : null,
   };
 }
 
@@ -514,6 +521,7 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
     if (application !== 'draft') {
       status.state = application === 'accepted' ? 'accepted' : 'open';
       status.readAt = now - 2 * HOUR_MS;
+      status.deleteAt = status.readAt + VETTING_OPEN_KEEP_DAYS * DAY_MS;
       if (application !== 'sent') {
         status.openedBy = [{ name: reviewer.name, at: now - 4 * 60_000 }];
       }
@@ -534,6 +542,7 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
         ? {
             characters: (pools.get(requestHandle.reviewId) ?? []).map(asCharacter),
             readAt: now - 3 * HOUR_MS,
+            deleteAt: now - 3 * HOUR_MS + VETTING_OPEN_KEEP_DAYS * DAY_MS,
           }
         : {}),
     });
@@ -611,7 +620,13 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
     submit: async (handle, note) => {
       const status = statusOf(handle);
       if (status.characters.length === 0) throw refusal('no-characters');
-      return put({ ...status, state: 'open', note, readAt: now });
+      return put({
+        ...status,
+        state: 'open',
+        note,
+        readAt: now,
+        deleteAt: now + VETTING_OPEN_KEEP_DAYS * DAY_MS,
+      });
     },
     status: async (handle) => structuredClone(statusOf(handle)),
     withdraw: async (handle) => {
@@ -658,8 +673,9 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
       ];
       review.signed = review.signOffs.length;
       review.yours = false;
-      const refused = review.signOffs.some((signOff) => signOff.decision === 'no');
-      if (refused || review.signed >= review.needed) {
+      // Open until every sign-off needed is in; then any "no" rejects it.
+      if (review.signed >= review.needed) {
+        const refused = review.signOffs.some((signOff) => signOff.decision === 'no');
         review.state = refused ? 'rejected' : 'accepted';
         review.decidedAt = now;
         review.deleteAt = now + VETTING_KEEP_DAYS * DAY_MS;

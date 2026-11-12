@@ -31,9 +31,12 @@ const review = (over: Partial<VettingReview> = {}): VettingReview => ({
   ...over,
 });
 
+/** The signed-in reviewer: Kestrel Vane in the rows below. */
+const REVIEWER = 6;
+
 function setup(over: Partial<VettingReview> = {}) {
   const onDecide = vi.fn(async () => {});
-  render(<VettingDecision review={review(over)} onDecide={onDecide} />);
+  render(<VettingDecision review={review(over)} reviewerId={REVIEWER} onDecide={onDecide} />);
   return onDecide;
 }
 
@@ -75,6 +78,14 @@ describe('VettingDecision', () => {
     expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Object' })).toBeInTheDocument();
     expect(screen.getByText('1 of 2 sign-offs')).toBeInTheDocument();
+    expect(
+      screen.getByText('Decided once 2 sign-offs are in. Any no rejects it.')
+    ).toBeInTheDocument();
+  });
+
+  it('does not explain the count when one sign-off decides it', () => {
+    setup();
+    expect(screen.queryByText(/Decided once/)).toBeNull();
   });
 
   it('shows every decision and its note once the caller has decided, with nothing left to press', () => {
@@ -119,11 +130,27 @@ describe('VettingDecision', () => {
     expect(screen.queryByRole('textbox')).toBeNull();
   });
 
+  it('does not say the caller asked when someone else did and they are barred all the same', () => {
+    setup({
+      kind: 'promotion',
+      barred: true,
+      yours: false,
+      needed: 2,
+      requestedBy: { characterId: 9, name: 'Bram Soto' },
+    });
+    expect(screen.getByText('You cannot sign off this review.')).toBeInTheDocument();
+    expect(screen.queryByText(/You asked for this review/)).toBeNull();
+    // The asker's row is theirs, not the caller's.
+    const row = within(screen.getByText('Bram Soto').closest('li')!);
+    expect(row.getByText('Asked for this review')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  });
+
   it('keeps the reason and says why when the server refuses', async () => {
     const onDecide = vi.fn(async () => {
       throw Object.assign(new Error('x'), { details: { reason: 'already-signed' } });
     });
-    render(<VettingDecision review={review()} onDecide={onDecide} />);
+    render(<VettingDecision review={review()} reviewerId={REVIEWER} onDecide={onDecide} />);
     await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
     const dialog = within(await screen.findByRole('dialog'));
     await userEvent.type(dialog.getByLabelText('Reason, kept with your decision'), 'No');

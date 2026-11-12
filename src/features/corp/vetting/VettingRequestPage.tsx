@@ -6,7 +6,7 @@
  *
  * Only access tokens are sent, one per character, straight to the server's read.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -36,6 +36,8 @@ import type { VettingLoginOutcome } from './vettingLoginState';
 import { requestRows } from './vettingRows';
 import { isReviewGone, vettingErrorKey } from './vettingView';
 
+const NO_SCOPES: ReadonlyMap<number, readonly string[]> = new Map();
+
 type Load =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; handle: VettingHandle | null };
 
@@ -50,11 +52,15 @@ export function VettingRequestPage({ login, onSignIn }: VettingRequestPageProps)
   const { t } = useTranslation();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const characters = useCharacters();
-  const tokens = useLiveQuery(() => db.tokens.toArray(), []);
-  const scopesById = useMemo(
-    () => new Map((tokens ?? []).map((token) => [token.characterId, token.scopes ?? []])),
-    [tokens]
-  );
+  // Only each Character's granted scopes leave the token read, never a token (ADR 0001).
+  const scopesById =
+    useLiveQuery(
+      async () =>
+        new Map(
+          (await db.tokens.toArray()).map((token) => [token.characterId, token.scopes ?? []])
+        ),
+      []
+    ) ?? NO_SCOPES;
   const [load, setLoad] = useState<Load>({ status: 'loading' });
   const [status, setStatus] = useState<VettingStatus | null>(null);
   const [unticked, setUnticked] = useState<ReadonlySet<number>>(new Set());

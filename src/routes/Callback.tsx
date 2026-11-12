@@ -33,9 +33,9 @@ import {
   type CorpSyncCallbackState,
   type CorpSyncGrantOutcome,
 } from '@/features/corp/taxBook/syncGrant';
-import type {
-  VettingCallbackState,
-  VettingLoginOutcome,
+import {
+  holdVettingLogin,
+  type VettingLoginOutcome,
 } from '@/features/corp/vetting/vettingLoginState';
 import { beginAddCharacterLogin, retryLastLogin, retryLastLoginOnce } from '@/app/loginFlow';
 import { Button, NeedsConnection, Panel, Spinner } from '@/components/ui';
@@ -102,8 +102,8 @@ export function Callback() {
     // added, no token is stored on this device, and every outcome — including
     // a cancel or a failure — goes back to the Settings row that was pressed
     // rather than to an error panel that would offer to restart it as one.
-    const alertsIntent = state ? loginIntentFor(state) : undefined;
-    if (alertsIntent?.kind === 'alerts') {
+    const intent = state ? loginIntentFor(state) : undefined;
+    if (intent?.kind === 'alerts') {
       const land = (alertsGrant: AlertsCallbackState['alertsGrant']) => {
         if (alertsGrant.status !== 'on') clearAlertsQueue();
         navigate(takeLoginReturnTo() ?? '/settings/notifications', {
@@ -118,7 +118,7 @@ export function Callback() {
       void completeAlertsGrant({ code, state })
         .catch((): AlertsGrantOutcome => ({
           status: 'failed',
-          characterId: alertsIntent.characterId,
+          characterId: intent.characterId,
         }))
         .then(land);
       return;
@@ -126,7 +126,7 @@ export function Callback() {
 
     // The Corp Tax Book's Automatic sync grant (ADR 0025) is the same kind of
     // round trip: nothing is stored here, and every outcome goes back to the book.
-    if (alertsIntent?.kind === 'corpSync') {
+    if (intent?.kind === 'corpSync') {
       const land = (corpSyncGrant: CorpSyncCallbackState['corpSyncGrant']) => {
         navigate(takeLoginReturnTo() ?? '/corp/moons', {
           replace: true,
@@ -140,14 +140,14 @@ export function Callback() {
       void completeCorpSyncGrant({ code, state })
         .catch((): CorpSyncGrantOutcome => ({
           status: 'failed',
-          characterId: alertsIntent.characterId,
+          characterId: intent.characterId,
         }))
         .then(land);
       return;
     }
 
     // A moon owner's grant is the same kind of round trip, and lands back on the Moons page.
-    if (alertsIntent?.kind === 'feederGrant') {
+    if (intent?.kind === 'feederGrant') {
       const land = (feederGrant: FeederGrantCallbackState['feederGrant']) => {
         navigate(takeLoginReturnTo() ?? '/corp/moons', {
           replace: true,
@@ -165,8 +165,8 @@ export function Callback() {
     }
 
     // Connecting one of the player's own CEO corporations: the same kind of round trip.
-    if (alertsIntent?.kind === 'ownCorpGrant') {
-      const corporationId = alertsIntent.feederCorporationId;
+    if (intent?.kind === 'ownCorpGrant') {
+      const corporationId = intent.feederCorporationId;
       const land = (ownCorpGrant: OwnCorpGrantOutcome) => {
         navigate(takeLoginReturnTo() ?? '/corp/moons', {
           replace: true,
@@ -193,14 +193,13 @@ export function Callback() {
     }
 
     // A Vetting sign-in reads one character for a corp's report: no Character is added and
-    // nothing is stored. The access token goes back to the page in router state (memory only);
-    // `completeVettingLogin` has already dropped the refresh token.
-    if (alertsIntent?.kind === 'vetting') {
+    // nothing is stored. The access token is held in module memory for the page to take once
+    // (`vettingLoginState.ts`), never in router or history state, which outlives the page and is
+    // copied with the tab; `completeVettingLogin` has already dropped the refresh token.
+    if (intent?.kind === 'vetting') {
       const land = (vettingLogin: VettingLoginOutcome) => {
-        navigate(takeLoginReturnTo() ?? `/apply/${alertsIntent.corporationId}`, {
-          replace: true,
-          state: { vettingLogin } satisfies VettingCallbackState,
-        });
+        holdVettingLogin(vettingLogin);
+        navigate(takeLoginReturnTo() ?? `/apply/${intent.corporationId}`, { replace: true });
       };
       if (ssoError || !code || !state) {
         land({ status: 'cancelled' });

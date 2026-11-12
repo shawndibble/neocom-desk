@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Checkbox, Spinner, textActionClassName } from '@/components/ui';
+import { Button, Checkbox, Spinner, textActionClassName } from '@/components/ui';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { Pill, type PillTone } from '@/components/ui/Pill';
@@ -104,9 +104,9 @@ export function VettingCharacterList({
                     : t('vetting.characters.partMissingHint', { missing })}
                 </span>
                 {onSignIn && (
-                  <button
-                    type="button"
-                    className={textActionClassName()}
+                  // Goes to EVE's login page, so a Button (DESIGN.md §6c); Remove acts in place.
+                  <Button
+                    size="sm"
                     aria-label={t('vetting.characters.signInAgainNamed', { name: row.name })}
                     onClick={busy ? undefined : () => onSignIn(row)}
                     aria-disabled={busy || undefined}
@@ -116,7 +116,7 @@ export function VettingCharacterList({
                         ? 'vetting.characters.signIn'
                         : 'vetting.characters.signInAgain'
                     )}
-                  </button>
+                  </Button>
                 )}
                 {canRemove && (
                   <button

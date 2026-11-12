@@ -20,6 +20,7 @@ import {
   Spinner,
   TextArea,
 } from '@/components/ui';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { InlineError } from '@/components/ui/InlineError';
 import {
   VETTING_MAX_CHARACTERS,
@@ -62,7 +63,7 @@ interface ApplyPageProps {
 export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPageProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  const [loaded, setBoot] = useState<Boot>({ status: 'loading' });
+  const [loadedBoot, setLoadedBoot] = useState<Boot>({ status: 'loading' });
   const [handle, setHandle] = useState<VettingHandle | null>(null);
   const [status, setStatus] = useState<VettingStatus | null>(null);
   const [reading, setReading] = useState<{ characterId: number; name: string } | null>(null);
@@ -73,6 +74,7 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
   const [busy, setBusy] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [withdrawn, setWithdrawn] = useState(false);
+  const [startingOver, setStartingOver] = useState(false);
   const [attempt, setAttempt] = useState(0);
   // The sign-in is spent on the first run: a retry of the page load must not read it again.
   const loginSpent = useRef(false);
@@ -108,14 +110,14 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
         }
       } catch (err) {
         const reason = callableErrorReason(err);
-        setBoot({
+        setLoadedBoot({
           status: reason === 'unknown-corp' || reason === 'not-found' ? 'missing' : 'failed',
         });
         return;
       }
       setHandle(held);
       setStatus(found);
-      setBoot({ status: 'ready', corp });
+      setLoadedBoot({ status: 'ready', corp });
 
       if (loginSpent.current || login === null) return;
       loginSpent.current = true;
@@ -157,13 +159,31 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
     }
   };
 
+  /** Deletes the report on the server (a draft's rows included) and forgets its handle here. */
+  const discard = async () => {
+    if (handle === null || corporationId === null) return;
+    try {
+      await vettingBackend().withdraw(handle);
+    } catch (err) {
+      // Already gone (an unsent draft is deleted after a day): nothing left to delete.
+      if (!isReviewGone(callableErrorReason(err))) throw err;
+    }
+    clearVettingHandle(`apply:${corporationId}`);
+    setHandle(null);
+    setStatus(null);
+    setAllMine(false);
+    setNote('');
+    setError(null);
+    setAnnounce('');
+  };
+
   const signIn = (reviewId?: string) => {
     setSigningIn(true);
     onSignIn(reviewId);
   };
 
   // A link whose id is not a number names no corporation: nothing to load.
-  const boot: Boot = corporationId === null ? { status: 'missing' } : loaded;
+  const boot: Boot = corporationId === null ? { status: 'missing' } : loadedBoot;
   if (boot.status === 'loading') return <Spinner block="page" label={t('common.loading')} />;
   if (boot.status === 'failed') {
     return <LoadFailedState onRetry={() => setAttempt((n) => n + 1)} />;
@@ -220,13 +240,7 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
         <VettingStatusView
           status={status}
           onWithdraw={async () => {
-            if (handle === null) return;
-            await vettingBackend().withdraw(handle);
-            clearVettingHandle(`apply:${corp.corporationId}`);
-            setHandle(null);
-            setStatus(null);
-            setAllMine(false);
-            setNote('');
+            await discard();
             setWithdrawn(true);
           }}
           onOpenApp={onOpenApp}
@@ -363,7 +377,22 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
         <span className="text-xs text-text-dim">
           {t(sendable || read === 0 ? 'vetting.apply.sendHint' : 'vetting.apply.sendNeedsTick')}
         </span>
+        {handle !== null && (
+          <Button className="sm:ml-auto" onClick={() => setStartingOver(true)}>
+            {t('vetting.apply.startOver.action')}
+          </Button>
+        )}
       </div>
+      <ConfirmDialog
+        open={startingOver}
+        title={t('vetting.apply.startOver.title')}
+        body={t('vetting.apply.startOver.body', { corp: corp.name })}
+        actionLabel={t('vetting.apply.startOver.action')}
+        cancelLabel={t('common.cancel')}
+        failedLabel={t('vetting.errors.generic')}
+        onConfirm={discard}
+        onClose={() => setStartingOver(false)}
+      />
     </>
   );
 }

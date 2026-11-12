@@ -1,23 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { vettingLoginFrom, type VettingLoginOutcome } from './vettingLoginState';
+import { dropVettingLogin, heldVettingLogin, type VettingLoginOutcome } from './vettingLoginState';
 
 /**
- * The Vetting sign-in the callback handed this page in router state, read once. The state is
- * cleared at once, so the access token lives in this component's memory alone: a reload, Back
- * or a copied tab finds no token in the history entry.
+ * The Vetting sign-in the callback left for this page, read once. It is read during the first
+ * render and dropped from the holder as soon as the page commits, so from then on the access
+ * token lives in this component's memory alone. Reading and dropping are two steps because a
+ * render may run twice (StrictMode) or be thrown away before it commits; one step would lose
+ * the login to the discarded render.
  */
 export function useConsumedVettingLogin(): VettingLoginOutcome | null {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [login] = useState(() => vettingLoginFrom(location.state));
-  const carried = vettingLoginFrom(location.state) !== null;
+  const [login] = useState(heldVettingLogin);
   useEffect(() => {
-    if (!carried) return;
-    navigate(
-      { pathname: location.pathname, search: location.search, hash: location.hash },
-      { replace: true, state: null }
-    );
-  }, [carried, navigate, location.pathname, location.search, location.hash]);
+    if (login !== null) dropVettingLogin(login);
+  }, [login]);
   return login;
 }

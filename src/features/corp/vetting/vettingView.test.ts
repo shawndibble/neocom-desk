@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type {
-  VettingAssessment,
-  VettingFlag,
-  VettingParty,
-  VettingReview,
-  VettingReviewSummary,
+import {
+  VETTING_CHECK_SOURCES,
+  type VettingAssessment,
+  type VettingFlag,
+  type VettingParty,
+  type VettingReview,
+  type VettingReviewSummary,
 } from '@/engine/vetting';
 import {
+  askedByReviewer,
   canSend,
   evidenceWhatKey,
   flagFindingParams,
@@ -200,7 +202,8 @@ describe('evidenceWhatKey', () => {
   it('knows the rows the checks produce and nothing else', () => {
     expect(evidenceWhatKey('player_donation')).toBe('vetting.what.player_donation');
     expect(evidenceWhatKey('member')).toBe('vetting.what.member');
-    expect(evidenceWhatKey('some_new_ref_type')).toBeNull();
+    // A word ESI adds later is never shown raw.
+    expect(evidenceWhatKey('some_new_ref_type')).toBe('vetting.what.other');
   });
 });
 
@@ -220,7 +223,34 @@ describe('missingChecks', () => {
           { characterId: 2, name: 'Mira Vell' },
         ]
       )
-    ).toEqual([{ check: 'watchlistMail', source: 'mail', names: ['Mira Vell'] }]);
+    ).toEqual([{ check: 'watchlistMail', sources: ['mail'], names: ['Mira Vell'] }]);
+  });
+
+  it('takes what a check needs from the engine, narrowed to what was left out', () => {
+    const checks = assessment({
+      checks: [{ check: 'undeclaredCharacter', state: 'missing', missingFor: [2] }],
+    });
+    // Nothing says which of the check's sources is missing: every one the engine lists.
+    expect(missingChecks(checks, [{ characterId: 2, name: 'Mira Vell' }])).toEqual([
+      {
+        check: 'undeclaredCharacter',
+        sources: [...VETTING_CHECK_SOURCES.undeclaredCharacter],
+        names: ['Mira Vell'],
+      },
+    ]);
+    expect(
+      missingChecks(checks, [{ characterId: 2, name: 'Mira Vell', missing: ['contract', 'mail'] }])
+    ).toEqual([{ check: 'undeclaredCharacter', sources: ['contract'], names: ['Mira Vell'] }]);
+  });
+
+  it('never lists a check the engine says reads nothing private', () => {
+    expect(VETTING_CHECK_SOURCES.corpHopping).toEqual([]);
+    expect(
+      missingChecks(
+        assessment({ checks: [{ check: 'corpHopping', state: 'missing', missingFor: [2] }] }),
+        [{ characterId: 2, name: 'Mira Vell' }]
+      )
+    ).toEqual([]);
   });
 });
 
@@ -240,12 +270,12 @@ const review = (over: Partial<VettingReview>): VettingReview => ({
 
 describe('signOffRows', () => {
   it('lists the caller as still to decide on an open review', () => {
-    expect(signOffRows(review({}))).toEqual([{ kind: 'yours' }]);
+    expect(signOffRows(review({}), 6)).toEqual([{ kind: 'yours' }]);
   });
 
   it('hides another reviewer’s decision until the caller has decided', () => {
     const other = { characterId: 5, name: 'Ilse Marrow', you: false, at: 100 };
-    expect(signOffRows(review({ needed: 2, signed: 1, signOffs: [other] }))).toEqual([
+    expect(signOffRows(review({ needed: 2, signed: 1, signOffs: [other] }), 6)).toEqual([
       { kind: 'hidden', name: 'Ilse Marrow', at: 100 },
       { kind: 'yours' },
     ]);
@@ -261,7 +291,8 @@ describe('signOffRows', () => {
           { characterId: 5, name: 'Ilse Marrow', you: false, at: 100, decision: 'no', note: 'No.' },
           { characterId: 6, name: 'Kestrel Vane', you: true, at: 200, decision: 'yes', note: '' },
         ],
-      })
+      }),
+      6
     );
     expect(rows).toEqual([
       { kind: 'decided', name: 'Ilse Marrow', you: false, at: 100, decision: 'no', note: 'No.' },
@@ -271,17 +302,26 @@ describe('signOffRows', () => {
 
   it('bars whoever asked for the review, the caller or someone else', () => {
     const requestedBy = { characterId: 9, name: 'Bram Soto' };
-    expect(signOffRows(review({ kind: 'promotion', requestedBy, barred: false }))).toEqual([
+    expect(signOffRows(review({ kind: 'promotion', requestedBy }), 6)).toEqual([
       { kind: 'yours' },
       { kind: 'barred', name: 'Bram Soto', you: false },
     ]);
     expect(
-      signOffRows(review({ kind: 'promotion', requestedBy, barred: true, yours: false }))
+      signOffRows(review({ kind: 'promotion', requestedBy, barred: true, yours: false }), 9)
     ).toEqual([{ kind: 'barred', name: 'Bram Soto', you: true }]);
   });
 
+  it('does not call the caller the asker when they are barred for another reason', () => {
+    const requestedBy = { characterId: 9, name: 'Bram Soto' };
+    const about = review({ kind: 'promotion', requestedBy, barred: true, yours: false });
+    expect(signOffRows(about, 6)).toEqual([{ kind: 'barred', name: 'Bram Soto', you: false }]);
+    expect(askedByReviewer(about, 6)).toBe(false);
+    expect(askedByReviewer(about, 9)).toBe(true);
+    expect(askedByReviewer(review({}), 9)).toBe(false);
+  });
+
   it('adds no row for the caller once the review is decided', () => {
-    expect(signOffRows(review({ state: 'accepted', yours: false }))).toEqual([]);
+    expect(signOffRows(review({ state: 'accepted', yours: false }), 6)).toEqual([]);
   });
 });
 
@@ -310,6 +350,7 @@ describe('canSend', () => {
 describe('vettingErrorKey', () => {
   it('maps a known refusal to its wording and anything else to the generic line', () => {
     expect(vettingErrorKey('vetting-off')).toBe('vetting.errors.vetting-off');
+    expect(vettingErrorKey('own-review')).toBe('vetting.errors.own-review');
     expect(vettingErrorKey('who-knows')).toBe('vetting.errors.generic');
     expect(vettingErrorKey(null)).toBe('vetting.errors.generic');
   });

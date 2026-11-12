@@ -31,8 +31,9 @@ token.
 - **Sign-in.** A `vetting` login intent runs PKCE with exactly `VETTING_SCOPES`
   (`esi-wallet.read_character_wallet.v1`, `esi-characters.read_contacts.v1`,
   `esi-mail.read_mail.v1`, `esi-contracts.read_character_contracts.v1`,
-  `esi-skills.read_skills.v1`). The callback keeps the access token in memory,
-  hands it to the callable and discards the refresh token: it is never stored in
+  `esi-skills.read_skills.v1`). The callback keeps the access token in memory
+  (a one-shot holder, not router state), hands it to the callable and discards
+  the refresh token: it is never stored in
   Dexie and never sent anywhere. The scope list has a server copy pinned by a
   test, like `corpSyncScopes`.
 - **Verification.** `verifyEveAccessToken` checks the signature against CCP's
@@ -44,7 +45,8 @@ token.
   recipients only; no subject, no body), contracts and skills.
 - **What is stored.** While a pilot adds characters, each character's
   normalised rows sit in `corps/{id}/vettingReviews/{review}/inputs/{character}`,
-  for at most 24 hours. On Send the pure checks (`src/engine/vetting.ts`,
+  for 24 hours: after that they are refused, and the daily sweep removes them.
+  On Send the pure checks (`src/engine/vetting.ts`,
   mirrored in `functions/src/vettingEngine.ts`) run once, the inputs are
   deleted, and the review keeps the assessment: flags with up to 10 evidence
   rows each, the names those rows mention, and per-character facts. No token at
@@ -55,7 +57,8 @@ token.
   status with a secret key returned once at the start, since an applicant has no
   session; the server stores only its hash.
 - **Retention.** A decided review is deleted 30 days after the decision; a
-  draft after 24 hours; the pilot can delete theirs at any time.
+  shared one nobody decides after 90 days; a draft after 24 hours (by the daily
+  sweep); the pilot can delete theirs at any time.
 - **A new router.** The actions are a `vetting` group behind `vettingCall`, not
   part of `corpTaxBookCall`: several are public (no session), none touch the
   book's version stamps, and a read of many pages should not share the book
@@ -73,7 +76,8 @@ token.
 - It cannot catch a character the pilot never declared, only make one likely to
   show up in the declared characters' dealings. The report says so.
 - The ESI error budget is shared per client id. Reads go one request at a time,
-  stop when the budget runs low, and public starts are limited per character.
+  honour `Retry-After`, stop when the budget runs low, and public starts are
+  limited per character per corporation.
 - The EVE app registrations (dev and production) must allow the five scopes.
   `functions/`, rules and indexes deploy by hand, after merge.
 

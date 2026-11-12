@@ -8,7 +8,8 @@ import '@/i18n';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import { VETTING_SCOPES } from '@/auth/vettingScopes';
 import { db } from '@/db';
-import { vettingLoginFrom } from '@/features/corp/vetting/vettingLoginState';
+import { useConsumedVettingLogin } from '@/features/corp/vetting/useConsumedVettingLogin';
+import { heldVettingLogin } from '@/features/corp/vetting/vettingLoginState';
 import { Callback } from './Callback';
 
 const CHAR_ID = 2112625428;
@@ -60,15 +61,15 @@ function stashVettingLogin(state: string, reviewId?: string): void {
   );
 }
 
-/** Stands in for the page the login was pressed on: shows the router state the callback hands it. */
+/** Stands in for the page the login was pressed on: takes the login the callback left for it. */
 function Landing({ name }: { name: string }) {
   const location = useLocation();
-  const login = vettingLoginFrom(location.state);
+  const login = useConsumedVettingLogin();
   return (
     <div role="status">
       {name} at {location.pathname}: {login?.status ?? 'none'}
       {login?.status === 'ok' && ` ${login.name} ${login.characterId} ${login.accessToken}`}
-      <pre>{JSON.stringify(Object.keys((location.state as object | null) ?? {}))}</pre>
+      <pre>state {JSON.stringify(location.state)}</pre>
     </div>
   );
 }
@@ -89,13 +90,18 @@ function renderCallback(search: string) {
 }
 
 describe('Callback, Vetting round trip', () => {
-  it('hands the access token to the apply page in router state and stores nothing', async () => {
+  it('hands the access token to the apply page in memory only and stores nothing', async () => {
     stashVettingLogin('state-v');
     renderCallback('?code=good-code&state=state-v');
     expect(
       await screen.findByText(new RegExp(`apply at /apply/98000001: ok CCP Alpha ${CHAR_ID}`))
     ).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent(ACCESS);
+    // Not in the history entry, which a reload, Back or a copied tab would hand out again.
+    expect(screen.getByRole('status')).toHaveTextContent('state null');
+    expect(JSON.stringify(window.history.state)).not.toContain(ACCESS);
+    expect(JSON.stringify({ ...sessionStorage })).not.toContain(ACCESS);
+    expect(JSON.stringify({ ...localStorage })).not.toContain(ACCESS);
     // StrictMode ran the effect twice; the one-time code was exchanged once.
     expect(tokenRequests).toBe(1);
     expect(await db.characters.count()).toBe(0);
@@ -118,5 +124,22 @@ describe('Callback, Vetting round trip', () => {
     renderCallback('?error=access_denied&state=state-v');
     expect(await screen.findByText(/apply at \/apply\/98000001: cancelled/)).toBeInTheDocument();
     expect(tokenRequests).toBe(0);
+  });
+
+  it('gives the login to one page, once: a reload of that page finds nothing', async () => {
+    stashVettingLogin('state-v');
+    const first = renderCallback('?code=good-code&state=state-v');
+    await screen.findByText(/apply at \/apply\/98000001: ok/);
+    expect(heldVettingLogin()).toBeNull();
+    first.unmount();
+    render(
+      <MemoryRouter initialEntries={['/apply/98000001']}>
+        <Routes>
+          <Route path="/apply/:corpId" element={<Landing name="apply" />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('apply at /apply/98000001: none');
+    expect(document.body.textContent).not.toContain(ACCESS);
   });
 });

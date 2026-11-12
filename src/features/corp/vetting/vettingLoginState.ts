@@ -1,7 +1,9 @@
 /**
- * What a Vetting sign-in hands back, as router state, to the page it was pressed on
- * (`routes/Callback.tsx`). The access token rides here and in the page's memory only: the page
- * reads it once, hands it to the server and clears the state. Types and one guard, no imports,
+ * What a Vetting sign-in hands back to the page it was pressed on (`routes/Callback.tsx`), held
+ * in this module's memory and nowhere else: never in router or `history.state`, `sessionStorage`
+ * or `localStorage`, since the outcome carries an EVE access token. The callback puts it here,
+ * the page takes it once and hands the token to the server. A reload after the redirect finds
+ * nothing, and the pilot logs in again for that character. Types and one slot, no imports,
  * because the eager callback route loads this.
  */
 export type VettingLoginOutcome =
@@ -9,22 +11,19 @@ export type VettingLoginOutcome =
   | { status: 'cancelled' }
   | { status: 'failed' };
 
-export interface VettingCallbackState {
-  vettingLogin: VettingLoginOutcome;
+let held: VettingLoginOutcome | null = null;
+
+/** The callback's side: keep the outcome for the page the redirect lands on. */
+export function holdVettingLogin(outcome: VettingLoginOutcome): void {
+  held = outcome;
 }
 
-/** The outcome in a location's `state`, or null when it carries none (or something else). */
-export function vettingLoginFrom(state: unknown): VettingLoginOutcome | null {
-  const login = (state as Partial<VettingCallbackState> | null)?.vettingLogin;
-  if (!login || typeof login !== 'object') return null;
-  if (login.status === 'cancelled' || login.status === 'failed') return { status: login.status };
-  if (
-    login.status === 'ok' &&
-    typeof login.accessToken === 'string' &&
-    typeof login.characterId === 'number' &&
-    typeof login.name === 'string'
-  ) {
-    return login;
-  }
-  return null;
+/** The outcome waiting for a page, left in place; `dropVettingLogin` is what spends it. */
+export function heldVettingLogin(): VettingLoginOutcome | null {
+  return held;
+}
+
+/** Forgets `outcome` if it is still the one held, so a newer login is never dropped by an old page. */
+export function dropVettingLogin(outcome: VettingLoginOutcome): void {
+  if (held === outcome) held = null;
 }

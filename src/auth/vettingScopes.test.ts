@@ -1,15 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { VETTING_SCOPES } from './vettingScopes';
-
-// Read as text, not imported: the server's copy lands in its own change, and a missing module
-// would fail this whole file at import rather than say what is missing.
-const serverCopies = import.meta.glob<string>('../../functions/src/vettingScopes.ts', {
-  query: '?raw',
-  import: 'default',
-  eager: true,
-});
-const serverSource = Object.values(serverCopies)[0];
 
 describe('VETTING_SCOPES', () => {
   it('is the five scopes a report reads', () => {
@@ -27,16 +19,12 @@ describe('VETTING_SCOPES', () => {
     for (const scope of VETTING_SCOPES) expect(registered).toContain(scope);
   });
 
-  if (serverSource === undefined) {
-    it.todo(
-      'matches functions/src/vettingScopes.ts (that file does not exist yet; this runs once it does)'
+  it('is exactly what the server demands of a vetting token', () => {
+    // Read as text: the functions package is not part of this module graph.
+    const serverSource = readFileSync('functions/src/vettingScopes.ts', 'utf8');
+    const serverScopes = [...serverSource.matchAll(/['"](esi-[a-z_.-]+\.v\d+)['"]/g)].map(
+      (match) => match[1]
     );
-  } else {
-    it('is exactly what the server demands of a vetting token', () => {
-      const serverScopes = [...serverSource.matchAll(/['"](esi-[a-z_.-]+\.v\d+)['"]/g)].map(
-        (match) => match[1]
-      );
-      expect([...new Set(serverScopes)].sort()).toEqual([...VETTING_SCOPES].sort());
-    });
-  }
+    expect([...new Set(serverScopes)].sort()).toEqual([...VETTING_SCOPES].sort());
+  });
 });

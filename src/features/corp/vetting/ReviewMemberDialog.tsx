@@ -2,12 +2,10 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
+import { VETTING_ROLE_MAX } from '@/engine/vetting';
 import { callableErrorReason } from '@/lib/callableError';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { vettingErrorKey } from './vettingView';
-
-/** Longest role name the server keeps (`VETTING_ROLE_MAX` in functions/src/vettingTypes.ts). */
-const ROLE_MAX = 40;
 
 interface ReviewMemberDialogProps {
   onClose: () => void;
@@ -93,7 +91,7 @@ export function ReviewMemberDialog({ onClose, onRequest }: ReviewMemberDialogPro
           <span className="text-xs text-text-dim">{t('vetting.requestDialog.role')}</span>
           <TextInput
             value={role}
-            maxLength={ROLE_MAX}
+            maxLength={VETTING_ROLE_MAX}
             onChange={(event) => setRole(event.target.value)}
             autoComplete="off"
           />

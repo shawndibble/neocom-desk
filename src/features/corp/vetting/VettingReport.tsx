@@ -27,12 +27,12 @@ import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import * as Icon from '@/components/ui/icons';
 import { Pill } from '@/components/ui/Pill';
 import {
-  VETTING_KEEP_DAYS,
   type VettingAssessment,
   type VettingReportCharacter,
   type VettingReview,
 } from '@/engine/vetting';
 import { formatAge } from '@/lib/age';
+import { callableErrorReason } from '@/lib/callableError';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { cx } from '@/lib/cx';
 import { formatList } from '@/lib/listFormat';
@@ -42,7 +42,7 @@ import { useNow } from '@/lib/useNow';
 import { VettingDecision } from './VettingDecision';
 import { VettingEntity } from './VettingEntity';
 import { VettingFlagList } from './VettingFlagList';
-import { reviewKindLabel } from './vettingText';
+import { deletionLine, reviewKindLabel } from './vettingText';
 import { vettingBackend } from './vettingClient';
 import { VETTING_TABS } from './vettingTabs';
 import { missingChecks, resultLine } from './vettingView';
@@ -94,7 +94,7 @@ function MissingChecksPanel({
               {t('vetting.report.didNotShare', {
                 count: row.names.length,
                 names: formatList(row.names),
-                source: t(`vetting.sources.${row.source}`),
+                source: formatList(row.sources.map((id) => t(`vetting.sources.${id}`))),
               })}
             </span>
           </li>
@@ -124,10 +124,10 @@ function ClearChecksPanel({ assessment, open }: { assessment: VettingAssessment;
       collapsedSummary={
         <span className="block px-3 py-2 text-xs text-text-dim">
           {names.length > 3
-            ? t('vetting.report.andMore', {
-                names: names.slice(0, 3).join(', '),
-                count: names.length - 3,
-              })
+            ? formatList([
+                ...names.slice(0, 3),
+                t('vetting.report.more', { count: names.length - 3 }),
+              ])
             : formatList(names)}
         </span>
       }
@@ -237,11 +237,7 @@ function AboutReport({ review }: { review: VettingReview }) {
           />
           <ValueRow
             label={t('vetting.report.about.keptUntil')}
-            value={
-              review.deleteAt !== null
-                ? formatDateOnly(new Date(review.deleteAt), timeZone)
-                : t('vetting.status.deletedAfter', { count: VETTING_KEEP_DAYS })
-            }
+            value={deletionLine(review, (at) => formatDateOnly(new Date(at), timeZone), t)}
           />
           <ValueRow
             label={t('vetting.report.about.signInKept')}
@@ -270,7 +266,11 @@ function AboutReport({ review }: { review: VettingReview }) {
 }
 
 type Load =
-  { status: 'loading' } | { status: 'failed' } | { status: 'ready'; review: VettingReview };
+  | { status: 'loading' }
+  | { status: 'failed' }
+  /** The review is about the caller: the server will not open it for them. */
+  | { status: 'ownReview' }
+  | { status: 'ready'; review: VettingReview };
 
 interface VettingReportProps {
   characterId: number;
@@ -306,7 +306,13 @@ export function VettingReport({
       .open(characterId, corporationId, reviewId)
       .then(
         (review) => setLoaded({ key, load: { status: 'ready', review } }),
-        () => setLoaded({ key, load: { status: 'failed' } })
+        (error: unknown) =>
+          setLoaded({
+            key,
+            load: {
+              status: callableErrorReason(error) === 'own-review' ? 'ownReview' : 'failed',
+            },
+          })
       );
   }, [key, attempt, characterId, corporationId, reviewId]);
 
@@ -327,6 +333,19 @@ export function VettingReport({
   );
 
   if (load.status === 'loading') return frame(<Spinner block="page" label={t('common.loading')} />);
+  if (load.status === 'ownReview') {
+    return frame(
+      <>
+        <h1 className="text-xl font-semibold">{t('vetting.report.title')}</h1>
+        <Panel>
+          <EmptyState
+            title={t('vetting.errors.own-review')}
+            hint={t('vetting.report.ownReviewHint')}
+          />
+        </Panel>
+      </>
+    );
+  }
   if (load.status === 'failed') {
     return frame(
       <>
@@ -394,6 +413,7 @@ export function VettingReport({
         <div className="space-y-4 lg:sticky lg:top-4">
           <VettingDecision
             review={review}
+            reviewerId={characterId}
             onDecide={async (decision, note) => {
               const next = await vettingBackend().decide(
                 characterId,

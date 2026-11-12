@@ -264,6 +264,15 @@ describe('assessVetting', () => {
     expect(result.checks.find((c) => c.check === 'thinCharacter')?.state).toBe('missing');
   });
 
+  it('marks the undeclared-character check missing when contracts were not shared', () => {
+    const result = assessVetting(input([character({ missing: ['contract'] })]));
+    expect(result.checks.find((c) => c.check === 'undeclaredCharacter')).toMatchObject({
+      state: 'missing',
+      missingFor: [1],
+    });
+    expect(result.checks.find((c) => c.check === 'watchlistIsk')?.state).toBe('clear');
+  });
+
   it('caps evidence rows and keeps the true total, newest first', () => {
     const dealings = Array.from({ length: 30 }, (_, i) =>
       donation(9001, 1_000, `2026-10-${String(i + 1).padStart(2, '0')}T00:00:00Z`)

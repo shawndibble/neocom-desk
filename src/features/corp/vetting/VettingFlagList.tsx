@@ -33,7 +33,6 @@ function EvidenceRows({ flag, names }: { flag: VettingFlag; names: Names }) {
       party?.category === 'character' && party.corporationId !== undefined
         ? names.parties.find((candidate) => candidate.id === party.corporationId)
         : undefined;
-    const whatKey = evidenceWhatKey(evidence.what);
     const on = names.characters.find((candidate) => candidate.characterId === evidence.characterId);
     return (
       <li
@@ -55,7 +54,7 @@ function EvidenceRows({ flag, names }: { flag: VettingFlag; names: Names }) {
           )}
           {corporation && <span className="text-text-dim"> · {corporation.name}</span>}
           <span className="block text-xs text-text-dim">
-            {whatKey ? t(whatKey) : evidence.what.replace(/_/g, ' ')}
+            {t(evidenceWhatKey(evidence.what))}
             {several && on && ` · ${on.name}`}
           </span>
         </span>

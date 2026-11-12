@@ -811,10 +811,10 @@ here — they go one per file in `docs/context/decisions/`.
 - **Widget State**: Which of five things a **Widget** is showing: loading,
   needs permission, failed, empty or ok.
 - **Vetting**: A corporation's check of a pilot before it accepts an application or promotes a member: one read of the pilot's declared Characters, a **Vetting Report**, and **Sign-off**s. The server reads once with a short-lived access token and keeps no sign-in (ADR 0033). Player-facing: "Vetting".
-- **Vetting Report**: What a **Vetting** read produced: **Vetting Flag**s, the checks that found nothing, and the checks that could not run because a source was not shared. Never a verdict; "Nothing found" is not "safe". Deleted 30 days after the decision.
+- **Vetting Report**: What a **Vetting** read produced: **Vetting Flag**s, the checks that found nothing, and the checks that could not run because a source was not shared. Never a verdict; "Nothing found" is not "safe". Deleted 30 days after the decision, or 90 days after it was shared if nobody decides.
 - **Vetting Flag**: One finding in a **Vetting Report** with the rows behind it, "Serious" or "Ask about". A reason to ask the pilot, not a conclusion. Player-facing: "flag".
 - **Watchlist**: The corporations, alliances and characters a corporation's **Vetting** checks dealings against. Set by its CEO and Directors. Distinct from contacts and standings.
-- **Sign-off**: One reviewer's recorded decision on a **Vetting Report**. Counted per EVE account; whoever asked for the review cannot give one, and another reviewer's is hidden until you record your own.
+- **Sign-off**: One reviewer's recorded decision on a **Vetting Report**. Counted per EVE account; whoever asked for the review, or is its subject, cannot give one, and another reviewer's is hidden until you record your own. A review closes once the sign-offs needed are in: rejected if any said no.
 - **Apply link**: The public page (`/apply/<corporationId>`) where a pilot starts a **Vetting** application with no Neocom Desk account. Distinct from a **Survey** start link.
 - **Yours**: The pill on a **Feeder** whose corporation is one of the viewer's own, joined through "Add my other
   corps" (the CEO is a Character on the viewer's account) rather than an invite. It owes no owner rate and takes no

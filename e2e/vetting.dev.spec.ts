@@ -102,7 +102,7 @@ test('the apply link shows its start page with nobody logged in', async ({ page 
     page.getByRole('heading', { level: 1, name: /Apply to Brass Meridian Logistics/ })
   ).toBeVisible();
   await expect(page.getByText('How it works')).toBeVisible();
-  await expect(page.getByText('Who you wrote with. Never the subject or text')).toBeVisible();
+  await expect(page.getByText('Who you wrote with. No subject or text is kept')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Log in with EVE Online' })).toBeVisible();
   // No account: the app's rail is not drawn around a public page.
   await expect(page.getByRole('navigation')).toHaveCount(0);

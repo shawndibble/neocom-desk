@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Eyebrow } from '@/components/ui';
-import { VETTING_KEEP_DAYS } from '@/engine/vetting';
+import { VETTING_KEEP_DAYS, VETTING_OPEN_KEEP_DAYS } from '@/engine/vetting';
 
 /** What one read covers, in the pilot's words. A `note` narrows a line that would otherwise worry. */
 const READS: readonly { id: string; note?: boolean }[] = [
@@ -52,7 +52,12 @@ export function VettingConsentTerms({ readers }: { readers: 'recruiters' | 'offi
           <ul className="space-y-1.5">
             <li>{t('vetting.consent.onlyReviewers')}</li>
             <li>{t('vetting.consent.seeOpened')}</li>
-            <li>{t('vetting.consent.deleted', { count: VETTING_KEEP_DAYS })}</li>
+            <li>
+              {t('vetting.consent.deleted', {
+                count: VETTING_KEEP_DAYS,
+                open: VETTING_OPEN_KEEP_DAYS,
+              })}
+            </li>
           </ul>
         </div>
       </div>

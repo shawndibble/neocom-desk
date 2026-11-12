@@ -14502,9 +14502,10 @@
         },
         "corp": {
           "title": "Kept for your corporation",
-          "description": "Only if your corporation uses SRP or a Corp Tax Book. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it.",
+          "description": "Only if your corporation uses SRP or a Corp Tax Book, or you shared a Vetting report with a corporation. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it. A Vetting report is the exception: the pilot can delete their own from its status page.",
           "srp": "SRP Claims: the killmail, the Character's name and ID, the hull, system and loss value, the fleet or FC and note you gave, the Reimbursement and the claim's state. Also the corporation's SRP settings, its Doctrine Fits and its SRP log: each filing (with the pilot's name, killmail, hull and amount) and each officer action. The CEO, Directors and Accountants read all of it; a pilot reads only their own claims.",
-          "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a log of who did each, and which books bill each Character (kept under that Character's ID). The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link."
+          "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a log of who did each, and which books bill each Character (kept under that Character's ID). The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link.",
+          "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), the pilot's note, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist and settings."
         },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
@@ -14565,7 +14566,9 @@
           "srp": "SRP Claims:",
           "srpKept": "a Paid or Rejected claim is deleted 365 days after it closes (checked daily), and its lines in the SRP log (the filing and each officer action on it) go with it. A Pending or Approved claim, the SRP settings and the log's other lines have no expiry; Doctrine Fits stay until a Director or the CEO deletes them.",
           "corpTaxBook": "Corp Tax Book:",
-          "corpTaxBookKept": "no expiry. Its lines, Statements, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it, including its place in the record of which books bill each Character."
+          "corpTaxBookKept": "no expiry. Its lines, Statements, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it, including its place in the record of which books bill each Character.",
+          "vetting": "Vetting reports:",
+          "vettingKept": "deleted 30 days after the corporation decides, or 90 days after it was shared if nobody decides (checked daily), or at once when the pilot deletes it. While a pilot is still adding Characters, the rows read are kept for 24 hours and removed by the daily clean-up; they are deleted at once when the report is sent."
         }
       },
       "helpPointer": "Bug, question or idea? See <help>Support</help>."
@@ -19823,8 +19826,8 @@
       "settings": "Settings"
     },
     "deniedTitle": "Vetting is for recruiters",
-    "deniedHint": "Reading reports needs Director or Personnel Manager.",
-    "roleLine": "Vetting needs Director or Personnel Manager.",
+    "deniedHint": "Reading reports needs CEO, Director or Personnel Manager.",
+    "roleLine": "Vetting needs CEO, Director or Personnel Manager.",
     "summary": {
       "open_one": "{{count}} open",
       "open_other": "{{count}} open",
@@ -19837,7 +19840,7 @@
     "reviewMember": "Review a member",
     "offNote": {
       "director": "Vetting is off. Turn it on in Settings to take applications.",
-      "reviewer": "Vetting is off. A Director turns it on."
+      "reviewer": "Vetting is off. The CEO or a Director turns it on."
     },
     "kind": {
       "application": "Application",
@@ -19936,14 +19939,15 @@
       "contract": "Contracts",
       "skills": "Skills",
       "history": "Corporation history",
-      "walletContracts": "Wallet journal, contracts"
+      "walletRecent": "Wallet journal, about the last 30 days",
+      "walletContracts": "Wallet journal (about the last 30 days), contracts"
     },
     "checks": {
       "watchlistIsk": {
         "title": "ISK with the watchlist",
         "finding_one": "{{total}} ISK in {{count}} wallet row with {{party}} (watchlist). Received {{received}}, sent {{sent}}.",
         "finding_other": "{{total}} ISK in {{count}} wallet rows with the watchlist, most with {{party}}. Received {{received}}, sent {{sent}}.",
-        "looksAt": "Wallet journal rows with anyone on the watchlist"
+        "looksAt": "Wallet journal, about the last 30 days: rows with anyone on the watchlist"
       },
       "watchlistHistory": {
         "title": "Time in a watchlist corporation",
@@ -20002,7 +20006,8 @@
       "joined": "Joined",
       "item_exchange": "Item exchange contract",
       "courier": "Courier contract",
-      "auction": "Auction contract"
+      "auction": "Auction contract",
+      "other": "Other"
     },
     "report": {
       "title": "Vetting report",
@@ -20033,8 +20038,9 @@
       "freshRead": "A fresh read needs the pilot to share again.",
       "showChecks": "Show the checks",
       "hideChecks": "Hide the checks",
-      "andMore_one": "{{names}} and {{count}} more",
-      "andMore_other": "{{names}} and {{count}} more",
+      "more_one": "{{count}} more",
+      "more_other": "{{count}} more",
+      "ownReviewHint": "The other reviewers decide it.",
       "noReport": {
         "waiting": "No report yet",
         "declined": "The pilot declined",
@@ -20105,7 +20111,9 @@
       },
       "note": "Note, kept with your decision",
       "optional": "Optional",
-      "barredHint": "You asked for this review, so you cannot sign it off.",
+      "barredAsked": "You asked for this review, so you cannot sign it off.",
+      "barredHint": "You cannot sign off this review.",
+      "decidedWhen": "Decided once {{needed}} sign-offs are in. Any no rejects it.",
       "refuse": {
         "application": "Reject {{pilot}}",
         "promotion": "Object to {{pilot}}'s promotion"
@@ -20129,7 +20137,7 @@
       },
       "readNotes": {
         "wallet": "Last 30 days",
-        "mail": "Who you wrote with. Never the subject or text"
+        "mail": "Who you wrote with. No subject or text is kept"
       },
       "notRead": "Not read, not kept",
       "mailText": "The text of your mail",
@@ -20138,8 +20146,8 @@
       "control": "You stay in control",
       "onlyReviewers": "Only the reviewers can open it",
       "seeOpened": "You see who opened it",
-      "deleted_one": "Deleted {{count}} day after the decision, or when you withdraw",
-      "deleted_other": "Deleted {{count}} days after the decision, or when you withdraw"
+      "deleted_one": "Deleted {{count}} day after the decision ({{open}} days if nobody decides), or when you withdraw",
+      "deleted_other": "Deleted {{count}} days after the decision ({{open}} days if nobody decides), or when you withdraw"
     },
     "characters": {
       "title": "Your characters",
@@ -20199,6 +20207,11 @@
       "send": "Send to {{corp}}",
       "sendHint": "Nothing is sent until you press this.",
       "sendNeedsTick": "Tick \"These are all my characters\" to send.",
+      "startOver": {
+        "action": "Start over",
+        "title": "Start over?",
+        "body": "The characters read so far are deleted. Nothing is sent to {{corp}}."
+      },
       "missing": {
         "title": "No such apply link",
         "hint": "Ask the recruiter for the link again."
@@ -20262,6 +20275,8 @@
       "deleted": "Deleted",
       "deletedAfter_one": "{{count}} day after the decision",
       "deletedAfter_other": "{{count}} days after the decision",
+      "deletedAfterOr_one": "{{count}} day after the decision, or {{date}} if nobody decides",
+      "deletedAfterOr_other": "{{count}} days after the decision, or {{date}} if nobody decides",
       "nothingKept": "No login was kept. Nothing more is read.",
       "withdraw": "Withdraw and delete the report",
       "deleteNow": "Delete the report now",
@@ -20276,7 +20291,7 @@
         "body": "Use Neocom Desk with these characters. Free.",
         "note": "It asks you to log in again. That login stays in this browser, never on our servers.",
         "action": "Open Neocom Desk with these characters",
-        "or": "Or keep this page's link."
+        "or": "Or come back to this page in this browser."
       }
     },
     "request": {
@@ -20314,14 +20329,15 @@
       "no-characters": "Add a character first.",
       "pilot-missing": "Share the character the review was asked of.",
       "changed": "The report changed while it was checked. Try again.",
-      "not-a-reviewer": "This needs Director or Personnel Manager.",
-      "role-required": "This needs Director.",
+      "not-a-reviewer": "This needs CEO, Director or Personnel Manager.",
+      "role-required": "This needs CEO or Director.",
       "unknown-name": "No character, corporation or alliance has exactly that name.",
       "not-a-member": "That character is not in this corporation.",
       "already-requested": "That member already has a review waiting.",
       "watchlist-full": "The watchlist is full.",
       "not-open": "This review is already decided.",
-      "barred": "You asked for this review, so you cannot sign it off.",
+      "barred": "You cannot sign off this review.",
+      "own-review": "This review is about you, so you cannot open it.",
       "already-signed": "You already signed this review off.",
       "esi-backoff": "EVE's servers are busy. Try again in a few minutes.",
       "esi-error": "EVE's servers did not answer. Try again in a few minutes.",

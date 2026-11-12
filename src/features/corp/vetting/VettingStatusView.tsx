@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Eyebrow, Panel, textActionClassName } from '@/components/ui';
+import { Button, Eyebrow, Panel } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Pill, type PillTone } from '@/components/ui/Pill';
-import { VETTING_KEEP_DAYS, type VettingState, type VettingStatus } from '@/engine/vetting';
+import type { VettingState, VettingStatus } from '@/engine/vetting';
 import { formatList } from '@/lib/listFormat';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { VettingSteps } from './VettingPublicFrame';
+import { deletionLine } from './vettingText';
 
 const STATE_TONE: Partial<Record<VettingState, PillTone>> = { accepted: 'success' };
 
@@ -42,11 +43,7 @@ function VettingOpenedBy({ status }: { status: VettingStatus }) {
       </div>
       <div className="grid grid-cols-[7rem_1fr] gap-2">
         <dt className="text-text-dim">{t('vetting.status.deleted')}</dt>
-        <dd>
-          {status.deleteAt !== null
-            ? formatDateOnly(new Date(status.deleteAt), timeZone)
-            : t('vetting.status.deletedAfter', { count: VETTING_KEEP_DAYS })}
-        </dd>
+        <dd>{deletionLine(status, (at) => formatDateOnly(new Date(at), timeZone), t)}</dd>
       </div>
     </dl>
   );
@@ -114,15 +111,11 @@ export function VettingStatusView({ status, onWithdraw, onOpenApp }: VettingStat
             <VettingOpenedBy status={status} />
             <p className="text-text-dim">{t('vetting.status.nothingKept')}</p>
             {onWithdraw && (
-              <button
-                type="button"
-                className={textActionClassName()}
-                onClick={() => setConfirming(true)}
-              >
+              <Button size="sm" onClick={() => setConfirming(true)}>
                 {t(
                   status.state === 'open' ? 'vetting.status.withdraw' : 'vetting.status.deleteNow'
                 )}
-              </button>
+              </Button>
             )}
           </div>
         </Panel>

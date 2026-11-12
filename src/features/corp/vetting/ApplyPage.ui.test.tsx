@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { textActionClassName } from '@/components/ui';
 import {
   createVettingFixture,
   VETTING_FIXTURE_APPLICANT,
@@ -58,7 +59,7 @@ describe('ApplyPage', () => {
       await screen.findByRole('heading', { level: 1, name: /Apply to Brass Meridian Logistics/ })
     ).toBeInTheDocument();
     expect(screen.getByText('How it works')).toBeInTheDocument();
-    expect(screen.getByText('Who you wrote with. Never the subject or text')).toBeInTheDocument();
+    expect(screen.getByText('Who you wrote with. No subject or text is kept')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Log in with EVE Online' }));
     expect(onSignIn).toHaveBeenCalledWith(undefined);
     expect(fixture.calls.map((call) => call.method)).toEqual(['corpInfo']);
@@ -98,7 +99,14 @@ describe('ApplyPage', () => {
     const { onSignIn } = setup({ application: 'draft' });
     expect(await screen.findByText('Part missing')).toBeInTheDocument();
     expect(screen.getByText('Mail not shared. That check will not run.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Log in again as Mira Vell' }));
+    // Goes to EVE's login, so a Button; Remove beside it acts in place and stays a text action.
+    const again = screen.getByRole('button', { name: 'Log in again as Mira Vell' });
+    const remove = screen.getByRole('button', { name: 'Remove Mira Vell' });
+    const textAction = textActionClassName().split(' ');
+    expect(again).toHaveTextContent('Log in again');
+    expect(again).not.toHaveClass(...textAction);
+    expect(remove).toHaveClass(...textAction);
+    await userEvent.click(again);
     expect(onSignIn).toHaveBeenCalledWith(fixture.applicationHandle.reviewId);
   });
 
@@ -130,11 +138,55 @@ describe('ApplyPage', () => {
   it('shows who opened a sent report, and withdraws only after a confirm', async () => {
     setup({ application: 'opened' });
     expect(await screen.findByText('Kestrel Vane')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Withdraw and delete the report' }));
+    // Opens a confirm, so a Button, not a text action.
+    const withdraw = screen.getByRole('button', { name: 'Withdraw and delete the report' });
+    expect(withdraw).not.toHaveClass(...textActionClassName().split(' '));
+    await userEvent.click(withdraw);
     expect(fixture.calls.some((call) => call.method === 'withdraw')).toBe(false);
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Delete the report' }));
     expect(await screen.findByText('The report is deleted. Nothing is kept.')).toBeInTheDocument();
+    expect(readVettingHandle(SLOT)).toBeNull();
+  });
+
+  it('says when a waiting report is deleted either way', async () => {
+    setup({ application: 'sent' });
+    expect(
+      await screen.findByText(/^30 days after the decision, or .+ if nobody decides$/)
+    ).toBeInTheDocument();
+  });
+
+  it('starts over from the draft only after a confirm, deleting it and forgetting the handle', async () => {
+    setup({ application: 'draft' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Start over' }));
+    expect(fixture.calls.some((call) => call.method === 'withdraw')).toBe(false);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Start over?' }));
+    expect(
+      dialog.getByText(
+        'The characters read so far are deleted. Nothing is sent to Brass Meridian Logistics.'
+      )
+    ).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('button', { name: 'Start over' }));
+    expect(await screen.findByRole('button', { name: 'Log in with EVE Online' })).toBeVisible();
+    expect(fixture.calls.find((call) => call.method === 'withdraw')?.args).toEqual([
+      fixture.applicationHandle,
+    ]);
+    expect(readVettingHandle(SLOT)).toBeNull();
+    expect(screen.queryByText('Tamsin Vell')).not.toBeInTheDocument();
+  });
+
+  it('starts over even when the draft has already expired on the server', async () => {
+    setup({ application: 'draft' });
+    await screen.findByText('Part missing');
+    fixture.withdraw = async () => {
+      throw Object.assign(new Error('x'), { details: { reason: 'bad-key' } });
+    };
+    setVettingBackendOverride(fixture);
+    await userEvent.click(screen.getByRole('button', { name: 'Start over' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Start over' })
+    );
+    expect(await screen.findByRole('button', { name: 'Log in with EVE Online' })).toBeVisible();
     expect(readVettingHandle(SLOT)).toBeNull();
   });
 

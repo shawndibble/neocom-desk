@@ -8,7 +8,7 @@ import { callableErrorReason } from '@/lib/callableError';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { signOffRows, vettingErrorKey, type SignOffRow } from './vettingView';
+import { askedByReviewer, signOffRows, vettingErrorKey, type SignOffRow } from './vettingView';
 
 const ROW_TONE: Record<SignOffRow['kind'], PillTone> = {
   yours: 'warning',
@@ -21,10 +21,10 @@ const ROW_TONE: Record<SignOffRow['kind'], PillTone> = {
  * Who has to decide and where each stands. Another reviewer's decision stays hidden until the
  * caller records their own; whoever asked for the review cannot sign it off.
  */
-function VettingSignOffs({ review }: { review: VettingReview }) {
+function VettingSignOffs({ review, reviewerId }: { review: VettingReview; reviewerId: number }) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  const rows = signOffRows(review);
+  const rows = signOffRows(review, reviewerId);
   const day = (at: number) => formatDateOnly(new Date(at), timeZone);
   if (rows.length === 0) {
     return <p className="text-sm text-text-dim">{t('vetting.decision.none')}</p>;
@@ -67,6 +67,8 @@ function VettingSignOffs({ review }: { review: VettingReview }) {
 
 interface VettingDecisionProps {
   review: VettingReview;
+  /** The signed-in reviewer, to tell "you asked for this" from being barred for another reason. */
+  reviewerId: number;
   /** Records the caller's sign-off; rejects with the server's refusal. */
   onDecide: (decision: 'yes' | 'no', note: string) => Promise<void>;
 }
@@ -76,7 +78,7 @@ interface VettingDecisionProps {
  * buttons. Yes acts at once; No opens a confirm that needs the note, since the pilot's officers
  * read it as the reason.
  */
-export function VettingDecision({ review, onDecide }: VettingDecisionProps) {
+export function VettingDecision({ review, reviewerId, onDecide }: VettingDecisionProps) {
   const { t } = useTranslation();
   const phone = useIsPhone();
   const [note, setNote] = useState('');
@@ -130,7 +132,12 @@ export function VettingDecision({ review, onDecide }: VettingDecisionProps) {
       metaOwnRow
     >
       <div className="space-y-3">
-        <VettingSignOffs review={review} />
+        <VettingSignOffs review={review} reviewerId={reviewerId} />
+        {review.state === 'open' && review.needed > 1 && (
+          <p className="text-xs text-text-dim">
+            {t('vetting.decision.decidedWhen', { needed: review.needed })}
+          </p>
+        )}
         {canDecide && (
           <>
             <label className="block space-y-1">
@@ -152,7 +159,13 @@ export function VettingDecision({ review, onDecide }: VettingDecisionProps) {
           </>
         )}
         {review.state === 'open' && review.barred && (
-          <p className="text-xs text-text-dim">{t('vetting.decision.barredHint')}</p>
+          <p className="text-xs text-text-dim">
+            {t(
+              askedByReviewer(review, reviewerId)
+                ? 'vetting.decision.barredAsked'
+                : 'vetting.decision.barredHint'
+            )}
+          </p>
         )}
         {error && !refusing && <InlineError>{error}</InlineError>}
       </div>

@@ -256,7 +256,7 @@
           short-lived access token, and keeps no login. It stores a report: each character's name,
           corporation, age and skill points, the flags raised with up to 10 rows behind each (who
           the row was with, when, and the ISK), your note, and who opened or decided it. No mail
-          subject or text is read. The corporation's CEO, Directors and Personnel Managers can read
+          subject or text is kept. The corporation's CEO, Directors and Personnel Managers can read
           it; you can see who opened it. Also the corporation's watchlist and vetting settings.
         </li>
       </ul>
@@ -385,9 +385,10 @@
           character.
         </li>
         <li>
-          Vetting reports: deleted 30 days after the corporation decides (the clean-up runs daily),
-          or at once when the pilot deletes theirs. While a pilot is still adding characters, the
-          rows read are kept for at most 24 hours and are deleted when the report is sent.
+          Vetting reports: deleted 30 days after the corporation decides, or 90 days after it was
+          shared if nobody decides (checked daily), or at once when the pilot deletes it. While a
+          pilot is still adding characters, the rows read are kept for 24 hours and removed by the
+          daily clean-up; they are deleted at once when the report is sent.
         </li>
         <li>
           Alerts when closed token: until you turn it off, remove the character, log out or delete
