@@ -20060,6 +20060,8 @@
         "title": "About this report",
         "read": "Read",
         "keptUntil": "Kept until",
+        "orAfterDecision_one": "or {{count}} day after a decision",
+        "orAfterDecision_other": "or {{count}} days after a decision",
         "signInKept": "Login kept",
         "none": "None",
         "log": "Record"

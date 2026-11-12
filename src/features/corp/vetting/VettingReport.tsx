@@ -27,6 +27,7 @@ import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import * as Icon from '@/components/ui/icons';
 import { Pill } from '@/components/ui/Pill';
 import {
+  VETTING_KEEP_DAYS,
   type VettingAssessment,
   type VettingReportCharacter,
   type VettingReview,
@@ -235,10 +236,18 @@ function AboutReport({ review }: { review: VettingReview }) {
               review.readAt === null ? undefined : formatAge(Math.max(0, now - review.readAt), t)
             }
           />
-          <ValueRow
-            label={t('vetting.report.about.keptUntil')}
-            value={deletionLine(review, (at) => formatDateOnly(new Date(at), timeZone), t)}
-          />
+          {review.state === 'open' && review.deleteAt !== null ? (
+            <ValueRow
+              label={t('vetting.report.about.keptUntil')}
+              value={formatDateOnly(new Date(review.deleteAt), timeZone)}
+              note={t('vetting.report.about.orAfterDecision', { count: VETTING_KEEP_DAYS })}
+            />
+          ) : (
+            <ValueRow
+              label={t('vetting.report.about.keptUntil')}
+              value={deletionLine(review, (at) => formatDateOnly(new Date(at), timeZone), t)}
+            />
+          )}
           <ValueRow
             label={t('vetting.report.about.signInKept')}
             value={t('vetting.report.about.none')}
