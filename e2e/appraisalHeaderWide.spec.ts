@@ -15,7 +15,8 @@ import { expectNoPageOverflow } from './support/overflow';
 
 const VELDSPAR = 1230;
 /** 12,500,000 units at 0.1 m³ is 1,250,000 m³; at ~5,377 ISK each, a 67.2B sell. */
-const PASTE = 'Veldspar\t12,500,000';
+/** Enough Veldspar for 13-digit totals: the widest figure the cards must hold in full. */
+const PASTE = 'Veldspar\t1,250,000,000';
 
 const JITA_STATION = 60_003_760;
 
@@ -69,15 +70,17 @@ for (const width of [1024, 1100, 1280, 1440]) {
     await expect(page.getByRole('table', { name: 'Appraisal' })).toBeVisible({ timeout: 15_000 });
 
     const sell = page
-      .getByRole('button', { name: /^Sell: copy 6\d\.\dB ISK \(6\d,\d{3},\d{3},\d{3}\)$/ })
+      .getByRole('button', { name: /^Copy Sell total, 6,\d{3},\d{3},\d{3},\d{3} ISK$/ })
       .first();
     await expect(sell).toBeVisible();
-    // The shorthand alone is printed; the full digits live in the accessible name and the copy.
-    await expect(page.getByRole('region', { name: 'Sell' }).first()).toContainText(/6\d\.\dB/);
+    // The full digits are printed, never the shorthand.
+    await expect(page.getByRole('region', { name: 'Sell' }).first()).toContainText(
+      /6,\d{3},\d{3},\d{3},\d{3}/
+    );
 
     const geometry = await page.evaluate(() => {
       const groups = [...document.querySelectorAll('section[aria-label]')].filter((s) =>
-        s.querySelector(':scope > h3')
+        s.querySelector('h3')
       ) as HTMLElement[];
       const boxes = groups.map((g) => {
         const r = g.getBoundingClientRect();

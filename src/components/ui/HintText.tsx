@@ -59,6 +59,14 @@ function useParentClips(enabled: boolean) {
 }
 
 /**
+ * The dotted "has a tooltip" underline on its own, for a label inside a
+ * pressable area whose tooltip sits on the area (DESIGN.md §6c): the label is
+ * not a trigger there, so it takes the cue without `HintText`'s focus stop.
+ */
+export const hintCueClassName =
+  'underline decoration-dotted decoration-current/70 underline-offset-2';
+
+/**
  * Text that carries a tooltip (DESIGN.md §6c): a dotted underline, dimmed to
  * about 70% so it reads as a cue and not as emphasis, visible at rest. A
  * focusable `<span>` so a keyboard reveals the bubble, and `openOnTap` so a
@@ -91,7 +99,7 @@ export function HintText({
         className={cx(
           desktopOnly
             ? 'sm:cursor-help sm:underline sm:decoration-dotted sm:decoration-current/70 sm:underline-offset-2'
-            : 'cursor-help underline decoration-dotted decoration-current/70 underline-offset-2',
+            : cx('cursor-help', hintCueClassName),
           'rounded-xs',
           focusRingClassName,
           className

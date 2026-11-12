@@ -372,7 +372,9 @@ describe('AppraisalPanel', () => {
       // Only row 1 has a buy price: 10,000 raw total, scaled by the default
       // 90% Price % to 9,000, less 7.5% sales tax (Accounting 0) — 8,325.
       // Row 2 contributes nothing.
-      expect(screen.getByText('8,325 ISK', { selector: '.sr-only' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Copy Buy: Sell now, after tax, 8,325 ISK' })
+      ).toBeInTheDocument();
     });
 
     it('never shows the net chips while the active Character’s skills are still loading', () => {
@@ -1463,55 +1465,121 @@ describe('AppraisalPanel — the row as an item', () => {
   describe('Sell and Buy totals', () => {
     afterEach(() => configureClipboard(null));
 
-    it('read as shorthand only, and the whole card copies the full figure', async () => {
+    function captureClipboard(): string[] {
       const written: string[] = [];
       configureClipboard(async (text) => {
         written.push(text);
       });
-      renderPanel({ controller: controller({ result: outcome() }) });
+      return written;
+    }
+    const withSkills = () => outcome({ accountingLevel: 0, brokerRelationsLevel: 0 });
+    /** The digits in a copy area's accessible name ("Copy Sell total, 1,386,400 ISK"). */
+    const digitsOf = (button: HTMLElement) =>
+      /(-?[\d,]+) ISK$/.exec(button.getAttribute('aria-label') ?? '')![1];
+
+    it('print every figure in full, and each side of the divider copies its own figure', async () => {
+      const written = captureClipboard();
+      renderPanel({ controller: controller({ result: withSkills() }) });
 
       const card = screen.getByRole('region', { name: 'Sell' });
-      expect(card).toHaveTextContent('1.4M');
-      expect(card).toHaveClass('relative');
-      const sell = within(card).getByRole('button', { name: 'Sell: copy 1.4M ISK (1,386,400)' });
-      expect(sell).toHaveClass('after:absolute', 'after:inset-0');
-      expect(within(card).getAllByRole('button')).toHaveLength(1);
-      await userEvent.click(sell);
+      expect(card).toHaveTextContent('1,386,400');
+      expect(card).not.toHaveTextContent('1.4M');
+      const [total, second] = within(card).getAllByRole('button');
+      expect(total).toHaveAccessibleName('Copy Sell total, 1,386,400 ISK');
+      expect(second).toHaveAccessibleName(/^Copy Sell: List it, after fees, [\d,]+ ISK$/);
+      const net = digitsOf(second);
+      expect(net).not.toBe('1,386,400');
+      // No shorthand under the divider either.
+      expect(second).toHaveTextContent(`List it, after fees${net}`);
 
+      await userEvent.click(total);
       expect(written).toEqual(['1,386,400']);
-      expect(await screen.findAllByText('Copied 1,386,400 ISK')).not.toHaveLength(0);
+      expect(await within(card).findByRole('status')).toHaveTextContent('Copied 1,386,400 ISK');
+      expect(within(card).getAllByRole('status')).toHaveLength(1);
+
+      await userEvent.click(second);
+      expect(written).toEqual(['1,386,400', net]);
+      expect(
+        within(card)
+          .getAllByRole('status')
+          .map((bubble) => bubble.textContent)
+      ).toEqual(['Copied 1,386,400 ISK', `Copied ${net} ISK`]);
     });
 
-    it('the Split card copies the midpoint, by keyboard, and its net hint does not copy', async () => {
-      const written: string[] = [];
-      configureClipboard(async (text) => {
-        written.push(text);
-      });
-      renderPanel({
-        controller: controller({
-          result: outcome({ accountingLevel: 0, brokerRelationsLevel: 0 }),
-        }),
-      });
+    it('a press on the label under the divider copies the second figure', async () => {
+      const written = captureClipboard();
+      renderPanel({ controller: controller({ result: withSkills() }) });
+
+      const sell = screen.getByRole('region', { name: 'Sell' });
+      await userEvent.click(within(sell).getByText('List it, after fees'));
+      expect(written).toEqual([digitsOf(within(sell).getAllByRole('button')[1])]);
+    });
+
+    it('the keyboard reaches both areas of a card in order, and Enter and Space copy', async () => {
+      const written = captureClipboard();
+      renderPanel({ controller: controller({ result: withSkills() }) });
 
       const split = screen.getByRole('region', { name: 'Split' });
       const sell = screen.getByRole('region', { name: 'Sell' });
       const buy = screen.getByRole('region', { name: 'Buy' });
-      const digits = (card: HTMLElement) =>
-        Number(
-          /\(([\d,]+)\)/
-            .exec(within(card).getByRole('button').getAttribute('aria-label') ?? '')![1]
-            .replaceAll(',', '')
-        );
-      const midpoint = (digits(buy) + digits(sell)) / 2;
+      const number = (button: HTMLElement) => Number(digitsOf(button).replaceAll(',', ''));
+      const [total, spread] = within(split).getAllByRole('button');
+      const midpoint =
+        (number(within(buy).getAllByRole('button')[0]) +
+          number(within(sell).getAllByRole('button')[0])) /
+        2;
 
-      await userEvent.click(within(sell).getByText('List it, after fees'));
-      expect(written).toEqual([]);
-
-      within(split).getByRole('button').focus();
+      total.focus();
       await userEvent.keyboard('{Enter}');
+      await userEvent.tab();
+      expect(spread).toHaveFocus();
       await userEvent.keyboard(' ');
-      expect(written).toHaveLength(2);
-      expect(Number(written[0].replaceAll(',', ''))).toBe(midpoint);
+      expect(written).toEqual([digitsOf(total), digitsOf(spread)]);
+      expect(number(total)).toBe(midpoint);
+      expect(spread).toHaveAccessibleName(/^Copy Split: Spread, /);
+    });
+
+    it('the Buy and Sell labels keep their tooltip on hover and on focus', async () => {
+      renderPanel({ controller: controller({ result: withSkills() }) });
+
+      const buyNet = within(screen.getByRole('region', { name: 'Buy' })).getAllByRole('button')[1];
+      await userEvent.hover(within(buyNet).getByText('Sell now, after tax'));
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/tax/i);
+      await userEvent.unhover(buyNet);
+
+      const sellNet = within(screen.getByRole('region', { name: 'Sell' })).getAllByRole(
+        'button'
+      )[1];
+      sellNet.focus();
+      await waitFor(() => expect(sellNet).toHaveAccessibleDescription(/broker/i));
+    });
+
+    it('a negative second figure copies with its minus sign', async () => {
+      const written = captureClipboard();
+      renderPanel({
+        controller: controller({
+          result: outcome({
+            appraisal: { ...APPRAISAL, totals: { ...APPRAISAL.totals, spread: -40_450 } },
+          }),
+        }),
+      });
+
+      const spread = within(screen.getByRole('region', { name: 'Split' })).getAllByRole(
+        'button'
+      )[1];
+      await userEvent.click(spread);
+      expect(written).toEqual(['-40,450']);
+      expect(spread).toHaveAccessibleName('Copy Split: Spread, -40,450 ISK');
+    });
+
+    it('a card with no second figure has one copy area', () => {
+      renderPanel({ controller: controller({ result: outcome() }) });
+      expect(
+        within(screen.getByRole('region', { name: 'Sell' })).getAllByRole('button')
+      ).toHaveLength(1);
+      expect(
+        within(screen.getByRole('region', { name: 'Split' })).getAllByRole('button')
+      ).toHaveLength(2);
     });
   });
 });
