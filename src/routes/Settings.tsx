@@ -34,7 +34,7 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Field, Fields, FilterChip, PageHeader, Panel } from '@/components/ui';
 import { useFontScale, FONT_SCALE_STEPS } from '@/lib/fontScale';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
-import { decimalMarkFor, NUMBER_FORMATS, useNumberFormat } from '@/lib/numberFormat';
+import { NUMBER_FORMATS, useNumberFormat } from '@/lib/numberFormat';
 import { numberFormatExample } from '@/lib/numberLocale';
 import { useTimeFormat, TIME_FORMATS } from '@/lib/timeFormat';
 import {
@@ -174,7 +174,7 @@ export function Settings() {
                       onSelect={(format) => void setNumberFormat(format)}
                       labelFor={(format) =>
                         t(`settings.numberFormat.${format}`, {
-                          example: numberFormatExample(decimalMarkFor(format)),
+                          example: numberFormatExample(format),
                         })
                       }
                     />

@@ -23,7 +23,7 @@
       "backup": "Settings › App & backup exports a password-protected backup of every character on this device.",
       "timeFormat": "Settings › Display switches timers between your local time and EVE time.",
       "textSize": "Settings › Display changes the text size on this device.",
-      "numberFormat": "Settings › Display switches numbers between 1,234.56 and 1.234,56.",
+      "numberFormat": "Settings › Display switches numbers between 1,234.56, 1.234,56 and 1'234.56.",
       "selfUpdate": "Neocom Desk updates itself when you open it or reload the page."
     }
   },
@@ -14927,7 +14927,8 @@
     "numberFormatHint": "How numbers are written. Starts on your browser's format. Pasted numbers read in either format.",
     "numberFormat": {
       "period": "English ({{example}})",
-      "comma": "European ({{example}})"
+      "comma": "European ({{example}})",
+      "apostrophe": "Swiss ({{example}})"
     },
     "weekStartLabel": "Week starts on",
     "weekStartHint": "First day of the week in the Calendar's Month and Fortnight grids.",

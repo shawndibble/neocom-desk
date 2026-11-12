@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { parseLocalizedNumber } from './parseLocalizedNumber';
 
 describe('parseLocalizedNumber', () => {
+  it('reads a Swiss figure, with a straight or typographic apostrophe', () => {
+    expect(parseLocalizedNumber("1'234'567.89")).toBe(1234567.89);
+    expect(parseLocalizedNumber('1\u2019234\u2019567.89')).toBe(1234567.89);
+    expect(parseLocalizedNumber('5\u2019100\u2019000', '.')).toBe(5100000);
+  });
+
   it.each([
     ['964', 964],
     ['0', 0],

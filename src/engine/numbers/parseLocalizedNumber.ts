@@ -7,7 +7,7 @@
  * setting. EVE prints at most two decimals, so three digits after the last
  * separator can only be a thousands group.
  *
- * - A space (any kind) or apostrophe is always a thousands mark.
+ * - A space (any kind) or apostrophe (straight or typographic) is always a thousands mark.
  * - `.` and `,` together: the later one is the decimal, the other groups.
  * - One kind, repeated: it groups (`1.178.000`).
  * - One kind, once: three digits after it (and 1-3 before it, not `0`) make it
@@ -24,7 +24,7 @@
 
 export type DecimalMark = '.' | ',';
 
-const SPACE_AND_APOSTROPHE = /[\s']/g; // \s covers no-break, thin and narrow no-break spaces
+const SPACE_AND_APOSTROPHE = /[\s'\u2019]/g; // \s covers no-break, thin and narrow no-break spaces
 const SHAPE = /^-?[.,]?\d[\d.,]*$/;
 const FIRST_GROUP = /^\d{1,3}$/;
 const LATER_GROUP = /^\d{3}$/;
