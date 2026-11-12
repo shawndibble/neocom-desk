@@ -49,7 +49,7 @@ describe("Calendar: moon owners' pops from a Corp Tax Book (#6116)", () => {
     // The accounting corporation's CEO: views the book, reads no corp source from ESI.
     accounts.push({
       characterId: 2,
-      access: { corporationId: 20, can: () => false, viewsTaxBook: true },
+      access: { corporationId: 20, can: (c: string) => c === 'canViewTaxBook' },
     });
     feederChunks.mockReturnValue(new Map([[30, bookRead]]));
 

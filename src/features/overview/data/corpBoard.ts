@@ -155,7 +155,7 @@ export async function startFeederChunks(
   accounts: readonly AccountCorpAccess[],
   preferred?: number
 ): Promise<FeederChunks> {
-  if (!accounts.some(({ access }) => access.viewsTaxBook)) return NO_FEEDER_CHUNKS;
+  if (!accounts.some(({ access }) => access.can('canViewTaxBook'))) return NO_FEEDER_CHUNKS;
   try {
     // Lazy: the book client is Firebase, and most pilots run no book.
     const { readFeederBooks, feederChunkReads } =
@@ -193,10 +193,20 @@ async function namedByCorporation(
   });
 }
 
+/**
+ * A book officer may see moon pops even with no extraction read of their own (#6116): with no
+ * pops to list the widget says "none coming", never "your roles don't cover this".
+ */
+function openToOfficer(read: MoonChunksBoardData): MoonChunksBoardData {
+  return read.chunks === null && !read.needsReauth
+    ? { ...read, chunks: [], extractions: [] }
+    : read;
+}
+
 /** One Character's moon read, plus its book's Feeder pops when it views a Corp Tax Book. */
 export async function loadMoonChunksWithBook(characterId: number): Promise<MoonChunksBoardData> {
   const access = await resolveCorpReadAccess(characterId);
-  if (!access?.viewsTaxBook) return loadMoonChunksBoardData(characterId);
+  if (!access?.can('canViewTaxBook')) return loadMoonChunksBoardData(characterId);
   const [own, feeders] = await Promise.all([
     loadMoonChunksBoardData(characterId).then(
       (read) => ({ read }),
@@ -210,7 +220,7 @@ export async function loadMoonChunksWithBook(characterId: number): Promise<MoonC
     if (book.length === 0) throw own.error;
     return mergeMoonChunks(book, false, Date.now());
   }
-  if (book.length === 0) return own.read;
+  if (book.length === 0) return openToOfficer(own.read);
   return mergeMoonChunks([own.read, ...book], own.read.needsReauth, own.read.loadedAt);
 }
 
@@ -234,9 +244,12 @@ export async function loadAllMoonChunksBoardData(): Promise<MoonChunksBoardData>
   const book = await namedByCorporation(feeders(esi));
   // Every ESI read failed and no book answered: the widget's Retry.
   if (failed !== null && book.length === 0) throw failed;
-  return mergeMoonChunks(
+  const merged = mergeMoonChunks(
     [...reads, ...book],
     reads.some((read) => read.needsReauth),
     Date.now()
   );
+  return accounts.some(({ access }) => access.can('canViewTaxBook'))
+    ? openToOfficer(merged)
+    : merged;
 }

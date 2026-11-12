@@ -17,7 +17,7 @@ const chunk = (structureId: number, owner: number): SyncExtraction => ({
 });
 const viewer = (characterId: number, corporationId: number, viewsTaxBook = true) => ({
   characterId,
-  access: { corporationId, can: () => false, viewsTaxBook },
+  access: { corporationId, can: (c: string) => viewsTaxBook && c === 'canViewTaxBook' },
 });
 
 beforeEach(() => {

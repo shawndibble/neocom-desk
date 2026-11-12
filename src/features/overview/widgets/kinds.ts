@@ -334,7 +334,8 @@ const SPECS = {
   moonChunks: {
     category: 'planets',
     corp: 'corpClocks',
-    capabilities: ['canReadMoonExtractions'],
+    // An officer of a Corp Tax Book sees its moon owners' pops here too (#6116).
+    capabilities: ['canReadMoonExtractions', 'canViewTaxBook'],
     views: NT,
     view: 'table',
     size: 'M',
@@ -410,6 +411,8 @@ const SPECS = {
       'canReadMoonExtractions',
       'canReadIndustry',
       'canReadSkyhooks',
+      // A Corp Tax Book officer's moon owners' pops are deadlines too (#6116).
+      'canViewTaxBook',
     ],
     views: NCT,
     view: 'chart',

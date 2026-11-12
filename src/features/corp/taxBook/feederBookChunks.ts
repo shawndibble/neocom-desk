@@ -49,7 +49,7 @@ function readBook(characterId: number, corporationId: number, now: number) {
 function bookReaders(accounts: readonly AccountCorpAccess[], preferred?: number) {
   const readers = new Map<number, number>();
   for (const { characterId, access } of accounts) {
-    if (!access.viewsTaxBook) continue;
+    if (!access.can('canViewTaxBook')) continue;
     if (!readers.has(access.corporationId) || characterId === preferred) {
       readers.set(access.corporationId, characterId);
     }

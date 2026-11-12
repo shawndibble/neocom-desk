@@ -27,6 +27,7 @@ const ALL: CorpCapabilities = {
   canConfigureSrp: true,
   canVet: true,
   canConfigureVetting: true,
+  canViewTaxBook: true,
 };
 
 /** What a Character with `caps` sees of the default layout. */
@@ -63,7 +64,14 @@ describe('the Corp Board default layout', () => {
     ).toEqual(['corpDeadlines', 'structures', 'moonChunks']);
   });
 
-  it('draws an Accountant the money widgets and no clocks', () => {
+  it('draws a Corp Tax Book officer the moon pops, without Station_Manager (#6116)', () => {
+    expect(drawnFor({ ...NO_CORP_CAPABILITIES, canViewTaxBook: true })).toEqual([
+      'corpDeadlines',
+      'moonChunks',
+    ]);
+  });
+
+  it('draws a wallet reader the money widgets and no clocks', () => {
     expect(drawnFor({ ...NO_CORP_CAPABILITIES, canReadWallet: true })).toEqual([
       'corpWallet',
       'corpWallet',

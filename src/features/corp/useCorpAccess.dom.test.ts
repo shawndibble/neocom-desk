@@ -273,6 +273,7 @@ describe('useCorpAccess — ready', () => {
       canConfigureSrp: true,
       canVet: true,
       canConfigureVetting: true,
+      canViewTaxBook: true,
     });
   });
 
