@@ -116,6 +116,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   skyhookRaidableNearby: '/overview',
   // The Overview, whose Kills widget lists the loss (issue #4772).
   shipLost: '/overview',
+  characterNeedsLogin: '/characters',
   // The Communities page, where the admin lets the request in or sees the Member.
   communityJoinRequest: '/communities',
   communityMemberJoined: '/communities',

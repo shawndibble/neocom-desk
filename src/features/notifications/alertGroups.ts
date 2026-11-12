@@ -128,6 +128,7 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   stockBelowTarget: 'warning',
   // A hull already gone (issue #4772): nothing left to act on, but worth a look.
   shipLost: 'warning',
+  characterNeedsLogin: 'warning',
   // Something to fly to, not a fault.
   incursionNearby: 'watch',
   // A window to fly to, not a fault.

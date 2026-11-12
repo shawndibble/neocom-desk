@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { Button, LiveStatus, ReauthBanner } from '@/components/ui';
-import { useAuthFailure, type AuthFailure } from '@/stores/authFailure';
+import { useAuthFailure, useNeedsLogin, type AuthFailure } from '@/stores/authFailure';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { beginEveLogin } from './loginFlow';
@@ -24,74 +25,66 @@ import { pageOwnsReauth } from './pageOwnsReauth';
 export function AuthFailureRedirect() {
   const failure = useAuthFailure((state) => state.failure);
   const dismiss = useAuthFailure((state) => state.dismiss);
-  const markNeedsLogin = useAuthFailure((state) => state.markNeedsLogin);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     if (failure?.kind !== 'token' || failure.characterId !== activeCharacterId) return;
-    // Leaves a record that outlives the consumed failure, so Characters can
-    // say why the player landed there.
-    markNeedsLogin(failure.characterId);
+    // `reportTokenFailure` already left the needs-sign-in mark, which
+    // outlives this consumed failure, so Characters can say why the player
+    // landed there.
     dismiss();
     // Straight to Characters, skipping the /login hop that bounced there
     // anyway. The old `state.from` is dropped: re-login lands on Characters.
     if (location.pathname === '/characters' || location.pathname === '/login') return;
     navigate('/characters', { replace: true });
-  }, [failure, activeCharacterId, dismiss, markNeedsLogin, navigate, location]);
+  }, [failure, activeCharacterId, dismiss, navigate, location]);
 
   return null;
 }
 
 /**
- * Notice on Characters for each Character whose dead grant redirected the
- * player here. Stays until dismissed, login completes (the next token refresh
- * clears the mark), or the Character is removed.
+ * Notice on Characters for the active Character when its login is dead — the
+ * redirect above is what brought the player here, and this says why. Every
+ * other marked Character carries the state on its own row instead
+ * (`NeedsLoginAction`), so a dozen dead alts never stack a dozen banners.
+ * Dismissing hides it for this visit only: the mark itself stays until the
+ * Character signs in again.
  */
 export function NeedsLoginNotice() {
   const { t } = useTranslation();
-  const needsLogin = useAuthFailure((state) => state.needsLogin);
-  const dismissNeedsLogin = useAuthFailure((state) => state.dismissNeedsLogin);
-  const characters = useLiveQuery(
-    () => (needsLogin.length ? db.characters.bulkGet(needsLogin) : []),
-    [needsLogin]
+  const needsLogin = useNeedsLogin((state) => state.value);
+  useHydratedStore(useNeedsLogin);
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const [dismissedId, setDismissedId] = useState<number | null>(null);
+  const shownId =
+    activeCharacterId !== null &&
+    activeCharacterId !== dismissedId &&
+    needsLogin.includes(activeCharacterId)
+      ? activeCharacterId
+      : null;
+  const character = useLiveQuery(
+    () => (shownId === null ? undefined : db.characters.get(shownId)),
+    [shownId]
   );
 
-  // A Character removed by any path (sync, another tab) must not leave its mark
-  // behind to resurface if the same id is added again this session.
-  useEffect(() => {
-    if (!characters) return;
-    needsLogin.forEach((id, i) => {
-      if (characters[i] === undefined) dismissNeedsLogin(id);
-    });
-  }, [characters, needsLogin, dismissNeedsLogin]);
-
-  const named = (characters ?? []).filter((c) => c !== undefined);
-  if (named.length === 0) return null;
+  if (shownId === null || character === undefined) return null;
 
   return (
-    <>
-      {named.map((character) => (
-        <div
-          key={character.characterId}
-          role="status"
-          className="rounded-xs border border-warning/40 bg-panel px-3 py-1"
-        >
-          <ReauthBanner
-            title={t('reauth.needsLoginTitle', { character: character.name })}
-            hint={t('reauth.needsLoginHint', { character: character.name })}
-            actionLabel={t('reauth.staleGrantAction')}
-            onLogin={() => void beginEveLogin({ characterId: character.characterId })}
-          />
-          <div className="pb-2">
-            <Button size="sm" onClick={() => dismissNeedsLogin(character.characterId)}>
-              {t('reauth.dismiss')}
-            </Button>
-          </div>
-        </div>
-      ))}
-    </>
+    <div role="status" className="rounded-xs border border-warning/40 bg-panel px-3 py-1">
+      <ReauthBanner
+        title={t('reauth.needsLoginTitle', { character: character.name })}
+        hint={t('reauth.needsLoginHint', { character: character.name })}
+        actionLabel={t('reauth.staleGrantAction')}
+        onLogin={() => void beginEveLogin({ characterId: character.characterId })}
+      />
+      <div className="pb-2">
+        <Button size="sm" onClick={() => setDismissedId(character.characterId)}>
+          {t('reauth.dismiss')}
+        </Button>
+      </div>
+    </div>
   );
 }
 
