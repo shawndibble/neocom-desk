@@ -7,9 +7,10 @@
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { beginOwnCorpGrantLogin } from '@/app/loginFlow';
+import { beginAlertsLogin, beginOwnCorpGrantLogin } from '@/app/loginFlow';
 import {
   current,
+  currentAlerts,
   isDone,
   progress,
   type AddCorpsCandidate,
@@ -20,6 +21,13 @@ import {
 import type { MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
 import { utcDay } from '@/engine/localDay';
 import type { OwnCorpGrantCallbackState, OwnCorpGrantOutcome } from '../../taxBook/ownCorpGrant';
+import {
+  alertsReturnFor,
+  useAlertsGrants,
+  type AlertsCallbackState,
+} from '@/features/notifications/alertsGrant';
+import { planAlertsStepFor } from '@/features/notifications/alertsStepFor';
+import { rememberEditedBook } from '../editedBook';
 import { useBook } from '../useBook';
 import { useAddCorpsRun, useAddCorpsRunStore } from '../useAddCorpsRun';
 import { newCorps, useMoonsHiddenCorps, useMoonsHiddenCorpsStore } from '../moonsHiddenCorps';
@@ -77,7 +85,8 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
   const { characterId, corporationId, canEdit, reload, names } = useBook();
   const own = useOwnCeoCorps(corporationId, canEdit);
   const hidden = useMoonsHiddenCorps();
-  const { run, start, recordOutcome, stop, retry } = useAddCorpsRun();
+  const { run, start, recordOutcome, recordAlertsOutcome, stop, retry } = useAddCorpsRun();
+  const alertsGrants = useAlertsGrants();
   const location = useLocation();
   const navigate = useNavigate();
   const [stage, setStage] = useState<Stage>({ kind: 'closed' });
@@ -85,22 +94,33 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
   const [showOutcome, setShowOutcome] = useState(false);
 
   // EVE's return carries its result as router state: read it once, record it, clear it.
-  const arrival = useRef(
-    (location.state as Partial<OwnCorpGrantCallbackState> | null)?.ownCorpGrant
-  );
+  const arrivalState = location.state as Partial<
+    OwnCorpGrantCallbackState & AlertsCallbackState
+  > | null;
+  const arrival = useRef(arrivalState?.ownCorpGrant);
+  const alertsArrival = useRef(arrivalState?.alertsGrant);
   const handled = useRef(false);
   useEffect(() => {
     void useMoonsHiddenCorpsStore.getState().hydrate();
     void (async () => {
       await useAddCorpsRunStore.getState().hydrate();
       const grant = arrival.current;
-      if (!grant || handled.current) return;
+      const alerts = alertsArrival.current;
+      if ((!grant && !alerts) || handled.current) return;
       handled.current = true;
       navigate(location.pathname, { replace: true, state: null });
       const saved = useAddCorpsRunStore.getState().value;
-      if (!saved || current(saved)?.corporationId !== grant.corporationId) return;
-      await recordOutcome(outcomeOfGrant(grant));
-      if (grant.status === 'connected') reload();
+      if (!saved) return;
+      if (grant) {
+        if (current(saved)?.corporationId !== grant.corporationId) return;
+        await recordOutcome(outcomeOfGrant(grant));
+        if (grant.status === 'connected') reload();
+      } else if (alerts) {
+        const step = currentAlerts(saved);
+        const outcome = step && alertsReturnFor(alerts, step.ceoCharacterId);
+        if (!outcome) return;
+        await recordAlertsOutcome(outcome);
+      }
       setShowOutcome(true);
       const next = useAddCorpsRunStore.getState().value;
       setStage(next && !isDone(next) ? { kind: 'sign-in' } : { kind: 'closed' });
@@ -114,6 +134,24 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
     [rows]
   );
   const hiddenIds = useMemo(() => new Set(hidden.hidden), [hidden.hidden]);
+  // Remembered for "Finish setting up" after a sign-in (#6103), so it can offer a CEO's corp here.
+  const onBookKey = [...onBook].sort((a, b) => a - b).join(',');
+  useEffect(() => {
+    if (!canEdit) return;
+    void rememberEditedBook({
+      collectorCorporationId: corporationId,
+      editorCharacterId: characterId,
+      onBook: [...onBook],
+    }).catch(() => undefined);
+    // `onBookKey` stands for `onBook`, a new Set on every rows change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit, corporationId, characterId, onBookKey]);
+  // Closed-app alerts are on for the account when any Character's grant is active.
+  const alertsOn = Object.values(alertsGrants).some((g) => g.status === 'active');
+  const lacksAlerts = (corps: readonly AddCorpsCandidate[]) =>
+    alertsOn
+      ? corps.map((c) => c.ceoCharacterId).filter((id) => alertsGrants[id]?.status !== 'active')
+      : [];
   const offered = own.corps.filter(
     (c) => !hiddenIds.has(c.corporationId) && !onBook.has(c.corporationId)
   );
@@ -198,6 +236,7 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
       {stage.kind === 'confirm' && (
         <ConfirmBatchDialog
           corps={stage.corps}
+          offerAlerts={lacksAlerts(stage.corps).length > 0}
           onBack={() =>
             setStage({
               kind: 'pick',
@@ -206,12 +245,13 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
             })
           }
           onClose={() => setStage({ kind: 'closed' })}
-          onConnect={(choice: CoverageChoice) =>
+          onConnect={(choice: CoverageChoice, alerts: boolean) =>
             void start({
               collectorCorporationId: corporationId,
               editorCharacterId: characterId,
               queue: stage.corps,
               coverageFrom: coverageFromForChoice(choice, utcDay()),
+              ...(alerts ? { alertsFor: lacksAlerts(stage.corps) } : {}),
             }).then(openSignIn)
           }
         />
@@ -222,6 +262,19 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
           showOutcome={showOutcome}
           onClose={() => setStage({ kind: 'closed' })}
           onStop={() => void stop().then(() => setStage({ kind: 'closed' }))}
+          onApproveAlerts={async () => {
+            const { ceoCharacterId } = currentAlerts(run)!;
+            // As Settings' walk would plan it; mail only after its own listing (ADR 0030).
+            const step = await planAlertsStepFor(ceoCharacterId, { location: true, mail: false });
+            return beginAlertsLogin(ceoCharacterId, { nearby: step.nearby, mail: step.mail });
+          }}
+          onSkipAlerts={() =>
+            void recordAlertsOutcome({ kind: 'skipped' }).then(() => {
+              const next = useAddCorpsRunStore.getState().value;
+              setShowOutcome(true);
+              if (!next || isDone(next)) setStage({ kind: 'closed' });
+            })
+          }
           onSignIn={async () => {
             const cur = current(run)!;
             // Read live right before leaving for EVE: a corporation or CEO that changed since

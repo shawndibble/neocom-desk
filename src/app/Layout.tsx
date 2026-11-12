@@ -42,6 +42,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { GlobalPasteRouter } from './GlobalPasteRouter';
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
+import { FinishSetupHost } from '@/features/character/finishSetup/FinishSetupHost';
 import { NetWorthSnapshotRecorder } from '@/features/netWorth/NetWorthSnapshotRecorder';
 import { AlertsPanelProvider } from '@/features/notifications/AlertsPanelContext';
 import { useRequestBadgePoll } from '@/features/communities/requestBadge';
@@ -463,6 +464,7 @@ export const Layout = memo(function Layout() {
           <CorpGrantPrompt />
           <InstallPrompt />
           <ForegroundNotificationPoller />
+          <FinishSetupHost />
           <NetWorthSnapshotRecorder />
 
           <RecentNavRecorder />

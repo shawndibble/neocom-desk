@@ -6,11 +6,14 @@ import '@/i18n';
 import type { MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
 import { useAddCorpsRunStore } from '../useAddCorpsRun';
 import { useMoonsHiddenCorpsStore } from '../moonsHiddenCorps';
-import { BOOK_CORPORATION_ID, CORPS, corpName, freshRun } from './addCorpsFixtures';
+import { db } from '@/db';
+import { startRun } from '@/engine/corpTaxBook/addCorpsRun';
+import { BOOK_CORPORATION_ID, CORPS, EDITOR_ID, corpName, freshRun } from './addCorpsFixtures';
 import { useAddMyCorps } from './useAddMyCorps';
 
 const reload = vi.fn();
 const beginOwnCorpGrantLogin = vi.fn();
+const beginAlertsLogin = vi.fn();
 const removeOwnCorpFeederRemote = vi.fn();
 let candidates = CORPS.slice(0, 3);
 
@@ -30,6 +33,7 @@ vi.mock('../useOwnCeoCorps', () => ({
 }));
 vi.mock('@/app/loginFlow', () => ({
   beginOwnCorpGrantLogin: (...a: unknown[]) => beginOwnCorpGrantLogin(...a),
+  beginAlertsLogin: (...a: unknown[]) => beginAlertsLogin(...a),
 }));
 vi.mock('@/sync/corpSyncGrantApi', () => ({
   removeOwnCorpFeederRemote: (...a: unknown[]) => removeOwnCorpFeederRemote(...a),
@@ -57,6 +61,8 @@ beforeEach(async () => {
   cleanup();
   reload.mockReset();
   beginOwnCorpGrantLogin.mockReset().mockResolvedValue(undefined);
+  beginAlertsLogin.mockReset().mockResolvedValue(undefined);
+  await db.settings.delete('alertsGrants');
   removeOwnCorpFeederRemote.mockReset().mockResolvedValue({ ok: true });
   candidates = CORPS.slice(0, 3);
   await useAddCorpsRunStore.getState().setValue(null);
@@ -260,5 +266,102 @@ describe('Add my other corps on the page', () => {
     expect(beginOwnCorpGrantLogin).not.toHaveBeenCalled();
     expect(useAddCorpsRunStore.getState().value!.outcomes).toEqual({});
     expect(screen.getByRole('button', { name: 'Log in as Mira Soltane with EVE' })).toBeEnabled();
+  });
+});
+
+describe('closed-app alerts chained into the run', () => {
+  const alertsOnElsewhere = () =>
+    db.settings.put({ key: 'alertsGrants', value: { 5: { status: 'active', enabledAt: 1 } } });
+  const mira = CORPS[1]!;
+
+  it('chains each CEO alerts approval after its corp by default, straight after the moon sign-in', async () => {
+    await alertsOnElsewhere();
+    render(at());
+    await userEvent.click(await screen.findByRole('button', { name: 'Add my other corps' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Connect Ashen Harbor Mining' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Continue with 1 corp' }));
+    expect(
+      await screen.findByRole('checkbox', { name: /closed-app alerts for each CEO/ })
+    ).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Connect 1 corp' }));
+    await waitFor(() =>
+      expect(useAddCorpsRunStore.getState().value?.alertsFor).toEqual([mira.ceoCharacterId])
+    );
+
+    cleanup();
+    render(at({ ownCorpGrant: { status: 'connected', corporationId: mira.corporationId } }));
+    expect(
+      await screen.findByRole('heading', { name: 'Corp 1 of 1: one more approval for alerts' })
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Approve alerts as Mira Soltane' }));
+    expect(beginAlertsLogin).toHaveBeenCalledWith(mira.ceoCharacterId, {
+      nearby: false,
+      mail: false,
+    });
+
+    cleanup();
+    render(
+      at({ alertsGrant: { status: 'on', characterId: mira.ceoCharacterId, name: 'Mira Soltane' } })
+    );
+    await waitFor(() => expect(useAddCorpsRunStore.getState().value?.alertsStep).toBeUndefined());
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('the confirm-screen checkbox skips alerts for the whole run', async () => {
+    await alertsOnElsewhere();
+    render(at());
+    await userEvent.click(await screen.findByRole('button', { name: 'Add my other corps' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Connect Ashen Harbor Mining' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Continue with 1 corp' }));
+    await userEvent.click(
+      await screen.findByRole('checkbox', { name: /closed-app alerts for each CEO/ })
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Connect 1 corp' }));
+    await screen.findByRole('heading', { name: 'Logging in: corp 1 of 1' });
+    expect(useAddCorpsRunStore.getState().value?.alertsFor).toBeUndefined();
+  });
+
+  it('never offers the checkbox when closed-app alerts are off for the account', async () => {
+    render(at());
+    await userEvent.click(await screen.findByRole('button', { name: 'Add my other corps' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Connect Ashen Harbor Mining' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Continue with 1 corp' }));
+    await screen.findByRole('button', { name: 'Connect 1 corp' });
+    expect(screen.queryByRole('checkbox', { name: /closed-app alerts/ })).toBeNull();
+  });
+
+  it('a wrong character at the alerts step approves nothing and keeps the step', async () => {
+    const run = startRun({
+      collectorCorporationId: BOOK_CORPORATION_ID,
+      editorCharacterId: EDITOR_ID,
+      queue: [mira],
+      alertsFor: [mira.ceoCharacterId],
+    });
+    await useAddCorpsRunStore.getState().setValue({
+      ...run,
+      index: 1,
+      outcomes: { [mira.corporationId]: { kind: 'connected' } },
+      alertsStep: { corporationId: mira.corporationId },
+    });
+    render(
+      at({
+        alertsGrant: {
+          status: 'mismatch',
+          expectedCharacterId: mira.ceoCharacterId,
+          authorizedCharacterId: 1,
+          authorizedName: 'Dax Orlen',
+        },
+      })
+    );
+    expect(
+      await screen.findByText(
+        'You approved as Dax Orlen, so alerts were not turned on. Pick Mira Soltane and try again.'
+      )
+    ).toBeInTheDocument();
+    expect(useAddCorpsRunStore.getState().value?.alertsStep?.corporationId).toBe(
+      mira.corporationId
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Skip alerts' }));
+    await waitFor(() => expect(useAddCorpsRunStore.getState().value?.alertsStep).toBeUndefined());
   });
 });
