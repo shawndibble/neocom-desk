@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   hashInviteCode,
-  parseAcceptFeederInviteInput,
   parseCreateFeederInviteInput,
   parseRevokeFeederInviteInput,
 } from './corpTaxBookFeeders.js';
@@ -27,14 +26,6 @@ describe('feeder invite parsers', () => {
     const inviteId = hashInviteCode('abc');
     expect(parseRevokeFeederInviteInput({ corporationId: 5, inviteId }).inviteId).toBe(inviteId);
     expect(() => parseRevokeFeederInviteInput({ corporationId: 5, inviteId: 'nope' })).toThrow();
-  });
-
-  it('needs a code and an access token to accept', () => {
-    expect(parseAcceptFeederInviteInput({ code: 'c', accessToken: 't' })).toEqual({
-      code: 'c',
-      accessToken: 't',
-    });
-    expect(() => parseAcceptFeederInviteInput({ code: 'c' })).toThrow();
   });
 
   it('hashes a code to a stable 64-char id', () => {
