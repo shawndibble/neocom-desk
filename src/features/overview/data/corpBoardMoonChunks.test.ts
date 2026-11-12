@@ -9,7 +9,8 @@ interface Gate {
 const characters = vi.hoisted(() => [] as number[]);
 const access = vi.hoisted(() => new Map<number, Gate>());
 const esiChunks = vi.hoisted(() => new Map<number, unknown>());
-const loadBookMoonChunks = vi.hoisted(() => vi.fn());
+const readFeederBooks = vi.hoisted(() => vi.fn());
+const feederChunkReads = vi.hoisted(() => vi.fn());
 
 vi.mock('@/features/corp/corpReadAccess', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/features/corp/corpReadAccess')>();
@@ -24,7 +25,9 @@ vi.mock('@/features/corp/corpReadAccess', async (importOriginal) => {
     loadAccountCorpAccess: async () => accounts(),
   };
 });
-vi.mock('@/features/corp/corpTicker', () => ({ loadCorpLabels: async () => new Map() }));
+vi.mock('@/features/corp/corpTicker', () => ({
+  loadCorpLabels: async (ids: number[]) => new Map(ids.map((id) => [id, { ticker: `T${id}` }])),
+}));
 vi.mock('@/features/corp/boardData', () => ({ loadCorporationStructures: vi.fn() }));
 vi.mock('@/features/corp/boardSources', () => ({ toBoardStructures: vi.fn() }));
 vi.mock('@/features/character/calendarMoonChunks', () => ({
@@ -35,7 +38,7 @@ vi.mock('@/features/character/calendarMoonChunks', () => ({
     return read ?? { result: { cached: null, needsReauth: false }, sources: undefined };
   },
 }));
-vi.mock('@/features/corp/taxBook/bookMoonChunks', () => ({ loadBookMoonChunks }));
+vi.mock('@/features/corp/taxBook/feederBookChunks', () => ({ readFeederBooks, feederChunkReads }));
 
 import { loadAllMoonChunksBoardData, loadMoonChunksWithBook } from './corpBoard';
 
@@ -59,7 +62,8 @@ beforeEach(() => {
   characters.length = 0;
   access.clear();
   esiChunks.clear();
-  loadBookMoonChunks.mockReset().mockResolvedValue(new Map());
+  readFeederBooks.mockReset().mockResolvedValue([{}]);
+  feederChunkReads.mockReset().mockReturnValue(new Map());
 });
 
 describe("moon owners' pops from a Corp Tax Book (#6116)", () => {
@@ -69,21 +73,23 @@ describe("moon owners' pops from a Corp Tax Book (#6116)", () => {
     // The CEO of the accounting corporation: views its book, no refinery of its own.
     access.set(2, { corporationId: 20, can: () => false, viewsTaxBook: true });
     esiChunks.set(10, esiRead('own'));
-    loadBookMoonChunks.mockResolvedValue(new Map([[30, bookRead('moon-owner')]]));
+    feederChunkReads.mockReturnValue(new Map([[30, bookRead('moon-owner')]]));
 
     const merged = await loadAllMoonChunksBoardData();
 
-    expect(merged.chunks?.map((c) => c.id)).toEqual(['own', 'moon-owner']);
-    const [accounts, esi] = loadBookMoonChunks.mock.calls[0];
-    expect(accounts).toHaveLength(2);
-    expect([...esi]).toEqual([10]);
+    expect(merged.chunks?.map((c) => c.subject)).toEqual([
+      'Refinery own',
+      'Refinery moon-owner [T30]',
+    ]);
+    expect(readFeederBooks.mock.calls[0]?.[0]).toHaveLength(2);
+    expect([...(feederChunkReads.mock.calls[0]?.[1] as Set<number>)]).toEqual([10]);
   });
 
   it('All characters: a book still answers when every ESI read failed', async () => {
     characters.push(1);
     access.set(1, { corporationId: 10, can: only('canReadMoonExtractions'), viewsTaxBook: true });
     esiChunks.set(10, 'fail');
-    loadBookMoonChunks.mockResolvedValue(new Map([[30, bookRead('moon-owner')]]));
+    feederChunkReads.mockReturnValue(new Map([[30, bookRead('moon-owner')]]));
     expect((await loadAllMoonChunksBoardData()).chunks?.map((c) => c.id)).toEqual(['moon-owner']);
   });
 
@@ -92,23 +98,46 @@ describe("moon owners' pops from a Corp Tax Book (#6116)", () => {
     access.set(1, { corporationId: 10, can: only('canReadMoonExtractions') });
     esiChunks.set(10, esiRead('own'));
     await loadAllMoonChunksBoardData();
-    expect(loadBookMoonChunks).not.toHaveBeenCalled();
+    expect(readFeederBooks).not.toHaveBeenCalled();
   });
 
   it("one Character: its book's moon owners join its own corporation's drills", async () => {
     characters.push(2);
     access.set(2, { corporationId: 20, can: () => false, viewsTaxBook: true });
-    loadBookMoonChunks.mockResolvedValue(new Map([[30, bookRead('moon-owner')]]));
+    feederChunkReads.mockReturnValue(new Map([[30, bookRead('moon-owner')]]));
     const read = await loadMoonChunksWithBook(2);
-    expect(read.chunks?.map((c) => c.id)).toEqual(['moon-owner']);
-    expect([...loadBookMoonChunks.mock.calls[0][1]]).toEqual([20]);
+    expect(read.chunks?.map((c) => c.subject)).toEqual(['Refinery moon-owner [T30]']);
+    expect([...(feederChunkReads.mock.calls[0]?.[1] as Set<number>)]).toEqual([20]);
+  });
+
+  it('one Character: a book still answers when its own ESI read failed', async () => {
+    characters.push(1);
+    access.set(1, { corporationId: 10, can: only('canReadMoonExtractions'), viewsTaxBook: true });
+    esiChunks.set(10, 'fail');
+    feederChunkReads.mockReturnValue(new Map([[30, bookRead('moon-owner')]]));
+    expect((await loadMoonChunksWithBook(1)).chunks?.map((c) => c.id)).toEqual(['moon-owner']);
+  });
+
+  it('one Character: Retry when its own read failed and no book answered', async () => {
+    characters.push(1);
+    access.set(1, { corporationId: 10, can: only('canReadMoonExtractions'), viewsTaxBook: true });
+    esiChunks.set(10, 'fail');
+    await expect(loadMoonChunksWithBook(1)).rejects.toThrow();
+  });
+
+  it('one Character: a Character that views no book reads nothing from Firebase', async () => {
+    characters.push(1);
+    access.set(1, { corporationId: 10, can: only('canReadMoonExtractions') });
+    esiChunks.set(10, esiRead('own'));
+    expect((await loadMoonChunksWithBook(1)).chunks?.map((c) => c.id)).toEqual(['own']);
+    expect(readFeederBooks).not.toHaveBeenCalled();
   });
 
   it('one Character: a book that fails to load leaves its own read as it was', async () => {
     characters.push(1);
     access.set(1, { corporationId: 10, can: only('canReadMoonExtractions'), viewsTaxBook: true });
     esiChunks.set(10, esiRead('own'));
-    loadBookMoonChunks.mockRejectedValue(new Error('offline'));
+    readFeederBooks.mockRejectedValue(new Error('offline'));
     expect((await loadMoonChunksWithBook(1)).chunks?.map((c) => c.id)).toEqual(['own']);
   });
 });

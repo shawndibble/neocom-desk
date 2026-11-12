@@ -586,6 +586,8 @@ export interface MoonChunksBoardData {
   needsReauth: boolean;
   fetchedAt: Date | null;
   loadedAt: number;
+  /** Read from a Corp Tax Book (a moon owner's pops, #6116), not from ESI. */
+  fromBook?: true;
 }
 
 /** One Character's moon drills, with its Corp Tax Book's moon owners' pops (#6116). */

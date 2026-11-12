@@ -277,8 +277,10 @@ function allCorpDeadlines(feeds: Feeds, ctx: BuildContext): KindView {
       fromCache: readable.some(({ read }) => read.fromCache),
     },
     ctx,
-    // One corporation's rows need no column naming it.
-    readable.length > 1 ? data.labels : undefined
+    // One corporation's rows need no column naming it, unless they are a Feeder's from a book (#6116).
+    readable.length > 1 || data.corporations.some((slice) => slice.moonChunks?.fromBook)
+      ? data.labels
+      : undefined
   );
 }
 

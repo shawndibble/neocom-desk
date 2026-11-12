@@ -64,7 +64,8 @@ import { loadCorpLabels } from '@/features/corp/corpTicker';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import {
-  bookMoonChunks,
+  startFeederChunks,
+  type FeederChunks,
   loadMoonChunksBoardData,
   loadStructuresBoardData,
 } from '../../data/corpBoard';
@@ -656,6 +657,10 @@ export async function loadCorpDeadlinesAll(
       return { slice: slices.get(corporationId)!, source, load, characterId };
     })
   );
+  const feederChunks =
+    only === undefined || only.includes('moonChunks')
+      ? startFeederChunks(accounts, preferred)
+      : Promise.resolve<FeederChunks>(() => new Map());
   let failures = 0;
   await mapWithConcurrencyLimit(tasks, ESI_FANOUT_CONCURRENCY, async (task) => {
     try {
@@ -668,20 +673,19 @@ export async function loadCorpDeadlinesAll(
       failures += 1;
     }
   });
-  // Moon owners' pops from the Corp Tax Books these Characters view (#6116), for every
-  // corporation no Character read from ESI.
+  // Feeder pops from the Corp Tax Books these Characters view (#6116), for every corporation
+  // no Character read from ESI. Started beside the ESI reads.
   let fromBooks = 0;
-  if (only === undefined || only.includes('moonChunks')) {
-    const esi = new Set(
-      [...slices.values()]
-        .filter((slice) => slice.moonChunks?.chunks != null)
-        .map((slice) => slice.corporationId)
-    );
-    for (const [corporationId, moonChunks] of await bookMoonChunks(accounts, esi, preferred)) {
-      const slice = slices.get(corporationId) ?? emptySlice(corporationId);
-      slices.set(corporationId, { ...slice, moonChunks });
-      fromBooks += 1;
-    }
+  const feeders = await feederChunks;
+  const esi = new Set(
+    [...slices.values()]
+      .filter((slice) => slice.moonChunks?.chunks != null)
+      .map((slice) => slice.corporationId)
+  );
+  for (const [corporationId, moonChunks] of feeders(esi)) {
+    const slice = slices.get(corporationId) ?? emptySlice(corporationId);
+    slices.set(corporationId, { ...slice, moonChunks });
+    fromBooks += 1;
   }
   if (tasks.length > 0 && failures === tasks.length && fromBooks === 0) {
     throw new CorpReadFailed('deadlines');

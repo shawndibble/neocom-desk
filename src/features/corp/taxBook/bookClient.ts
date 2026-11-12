@@ -166,35 +166,53 @@ async function asOfficer<T>(
   }
 }
 
-/** A Collector book's moon owners' Extractions and records, for their pops off the Moons page. */
-export interface MoonOwnerChunkParts {
+/** A Collector book's Feeder Extractions and records, for their pops off the Moons page. */
+export interface FeederChunkParts {
   extractions: SyncExtraction[];
-  feeders: Pick<BookFeeder, 'refineryLabels' | 'refineryStructures'>[];
+  feeders: (Pick<BookFeeder, 'corporationId' | 'refineryLabels' | 'refineryStructures'> & {
+    /** The Feeder's last good read (ms): its pops' Data Age. */
+    lastReadWellAt?: number;
+  })[];
 }
 
 /**
- * The moon owners' Extractions a book holds and the records that name their refineries (#6116),
- * read under the officer rules. Null when the corporation has no book. Only rows tagged with a
- * moon owner are read: the book's own chunks come from ESI.
+ * The Feeder Extractions a book holds and the records that name their refineries (#6116),
+ * under the officer rules. Null when the corporation has no book. The Extractions come from the
+ * Overview read model (ADR 0032: one doc, already windowed and without cancelled ones); a book
+ * whose read model is not built yet reads its live chunks instead. Only Feeder rows are kept:
+ * the book's own chunks come from ESI.
  */
-export async function readMoonOwnerChunkParts(
+export async function readFeederChunkParts(
   characterId: number,
   corporationId: number
-): Promise<MoonOwnerChunkParts | null> {
+): Promise<FeederChunkParts | null> {
   await ensureSignedIn(characterId);
   const db = getSyncFirestore(characterId);
   const book = doc(db, 'corps', String(corporationId));
   if (!(await getDoc(book)).exists()) return null;
   return asOfficer(characterId, corporationId, async () => {
-    const [extractions, feeders] = await Promise.all([
-      getDocs(query(collection(book, 'extractions'), where('sourceCorporationId', '>', 0))),
+    const [overview, feeders] = await Promise.all([
+      getDoc(doc(book, 'readModels', 'overview')),
       getDocs(collection(book, 'feeders')),
     ]);
+    const windowed = overview.data()?.extractions as SyncExtraction[] | undefined;
+    const extractions =
+      windowed ??
+      (
+        await getDocs(
+          query(
+            collection(book, 'extractions'),
+            where('naturalDecayTime', '>', new Date().toISOString())
+          )
+        )
+      ).docs.map((d) => d.data() as SyncExtraction);
     return {
-      extractions: extractions.docs.map((d) => d.data() as SyncExtraction),
+      extractions: extractions.filter((x) => x.sourceCorporationId !== undefined),
       feeders: feeders.docs.map((d) => {
-        const { refineryLabels, refineryStructures } = d.data() as BookFeeder;
+        const { refineryLabels, refineryStructures, lastReadWellAt } = d.data() as FeederDoc;
         return {
+          corporationId: Number(d.id),
+          ...(typeof lastReadWellAt === 'number' ? { lastReadWellAt } : {}),
           ...(refineryLabels ? { refineryLabels } : {}),
           ...(refineryStructures ? { refineryStructures } : {}),
         };

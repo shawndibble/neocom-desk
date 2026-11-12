@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MoonChunksBoardData } from '@/features/overview/data/boardData';
 
 const accounts = vi.hoisted(() => [] as unknown[]);
-const bookMoonChunks = vi.hoisted(() => vi.fn());
+const feederChunks = vi.hoisted(() => vi.fn());
 const loadMoonChunksBoardData = vi.hoisted(() => vi.fn());
 
 vi.mock('@/features/corp/corpReadAccess', async (importOriginal) => ({
@@ -10,7 +10,7 @@ vi.mock('@/features/corp/corpReadAccess', async (importOriginal) => ({
   loadAccountCorpAccess: async () => accounts,
 }));
 vi.mock('@/features/overview/data/corpBoard', () => ({
-  bookMoonChunks,
+  startFeederChunks: async () => feederChunks,
   loadMoonChunksBoardData,
   loadStructuresBoardData: vi.fn(),
 }));
@@ -40,7 +40,7 @@ const bookRead: MoonChunksBoardData = {
 
 beforeEach(() => {
   accounts.length = 0;
-  bookMoonChunks.mockReset().mockResolvedValue(new Map());
+  feederChunks.mockReset().mockReturnValue(new Map());
   loadMoonChunksBoardData.mockReset();
 });
 
@@ -51,12 +51,15 @@ describe("Calendar: moon owners' pops from a Corp Tax Book (#6116)", () => {
       characterId: 2,
       access: { corporationId: 20, can: () => false, viewsTaxBook: true },
     });
-    bookMoonChunks.mockResolvedValue(new Map([[30, bookRead]]));
+    feederChunks.mockReturnValue(new Map([[30, bookRead]]));
 
     const read = await loadCorpCalendar(NOW);
 
     expect(read.moonChunks).toHaveLength(1);
-    expect(read.moonChunks?.[0]).toMatchObject({ deadlineMs: ARRIVES });
+    expect(read.moonChunks?.[0]).toMatchObject({
+      deadlineMs: ARRIVES,
+      corporation: { id: 30, name: 'Corp 30' },
+    });
     expect(read.corporations.map((c) => c.name)).toEqual(['Corp 30']);
   });
 

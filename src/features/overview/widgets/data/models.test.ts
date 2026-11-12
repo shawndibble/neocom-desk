@@ -203,6 +203,25 @@ describe('structures and moon extractions', () => {
   });
 });
 
+describe('moon extractions widget with a Feeder from a Corp Tax Book (#6116)', () => {
+  it("names the Feeder's corporation on its row, after the short refinery name", () => {
+    const feeds: Feeds = {
+      moonChunks: ok({
+        chunks: [
+          { id: '7001', subject: 'Efa - Tatara [ABCD]', detail: 'arrival', deadlineMs: NOW + HOUR },
+        ],
+        needsReauth: false,
+        fetchedAt: new Date(NOW - HOUR),
+        loadedAt: NOW,
+        fromBook: true,
+      }),
+    };
+    const view = buildView('moonChunks', feeds, ctx());
+    expect(view.table?.rows[0]?.cells[0]).toBe('Tatara [ABCD]');
+    expect(view.rows?.[0]?.title).toBe('Tatara [ABCD]');
+  });
+});
+
 describe('structures row link', () => {
   const feeds = (): Feeds => ({
     structures: ok({
