@@ -6,6 +6,7 @@ import '@/i18n';
 import { db } from '@/db';
 import type { StoredWar } from '@/engine/wars';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { seedCharacter } from '@/test/seed';
 import { WarBanner } from './WarBanner';
 
 const loadActiveWars = vi.fn<() => Promise<readonly StoredWar[]>>();
@@ -19,7 +20,8 @@ vi.mock('./recentWars', () => ({
   loadRecentWars: () => loadRecentWars(),
 }));
 vi.mock('@/features/character/useEntityName', () => ({
-  useEntityName: (id: number | undefined) => (id === 100 ? 'Hostile Corp' : null),
+  useEntityName: (id: number | undefined) =>
+    id === 100 ? 'Hostile Corp' : id === 200 ? 'Main Corp' : id === 201 ? 'Holding Corp' : null,
 }));
 
 const HOUR = 3_600_000;
@@ -49,14 +51,19 @@ function renderBanner() {
 
 beforeEach(async () => {
   await db.notificationFeed.clear();
+  await db.characters.clear();
   loadRecentWars.mockReset();
   loadRecentWars.mockResolvedValue([]);
   loadActiveWars.mockReset();
   usePublicInfo.setState({
     byCharacterId: { 91: { corporationName: 'Mine', allianceName: null, corporationId: 200 } },
     load: vi.fn(async () => {}),
+    loadMany: vi.fn(async () => {}),
   });
 });
+
+const onHolding = (over: Partial<StoredWar> = {}) =>
+  war({ id: 900, defender: { corporationId: 201, iskDestroyed: 0, shipsKilled: 0 }, ...over });
 
 describe('WarBanner', () => {
   it('draws nothing when no war is open', async () => {
@@ -129,5 +136,38 @@ describe('WarBanner', () => {
     loadRecentWars.mockResolvedValue([war()]);
     renderBanner();
     expect(await screen.findByText('At war with Hostile Corp')).toBeInTheDocument();
+  });
+
+  describe('several account corporations', () => {
+    beforeEach(async () => {
+      await seedCharacter(91, 'Main', { corporationId: 200 });
+      await seedCharacter(92, 'Holding Director', { corporationId: 201 });
+    });
+
+    it('shows a war on another account corporation while the active one is at peace', async () => {
+      loadActiveWars.mockResolvedValue([onHolding()]);
+      renderBanner();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /At war with Hostile Corp/ })
+      );
+      const dialog = await screen.findByRole('dialog', { name: 'War declared' });
+      expect(
+        within(dialog).getByRole('heading', { name: 'Against Holding Corp' })
+      ).toBeInTheDocument();
+    });
+
+    it('counts the corporations at war and groups the modal by the one each war is on', async () => {
+      loadActiveWars.mockResolvedValue([onHolding(), war()]);
+      renderBanner();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /2 of your corporations are at war/ })
+      );
+      const dialog = await screen.findByRole('dialog', { name: '2 wars declared' });
+      const headings = within(dialog).getAllByRole('heading', { level: 3 });
+      expect(headings.map((h) => h.textContent)).toEqual([
+        'Against Main Corp',
+        'Against Holding Corp',
+      ]);
+    });
   });
 });
