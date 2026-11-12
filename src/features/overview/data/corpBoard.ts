@@ -126,7 +126,7 @@ export async function loadAllMoonChunksBoardData(): Promise<MoonChunksBoardData>
     loadMoonChunksBoardData
   );
   const readable = reads.filter((read) => read.chunks !== null);
-  const loadedAt = Math.max(Date.now(), ...reads.map((read) => read.loadedAt));
+  const loadedAt = Date.now();
   if (readable.length === 0) {
     return {
       chunks: null,

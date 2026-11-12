@@ -77,6 +77,9 @@ export function feedsOf(
   return reads?.feeds;
 }
 
+/** Whether the kind has an All characters read of its own, apart from the header Character's. */
+export const kindHasAllFeeds = (kind: string): boolean => KINDS[kind]?.allFeeds !== undefined;
+
 /** What wants a feed: a kind, or one widget of it with its settings (`ViewSettings`). */
 export type FeedReader = string | ({ kind: string; scope?: WidgetScope } & ViewSettings);
 

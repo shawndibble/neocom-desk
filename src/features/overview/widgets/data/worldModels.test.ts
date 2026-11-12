@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BoardStructureSource } from '@/engine/corp/board';
 import { visibleColumns } from '../tableModel';
-import { buildView, feedsFor, feedsOf } from './models';
+import { buildView, feedsFor, feedsOf, kindHasAllFeeds } from './models';
 import { elapsedShare } from './industryModels';
 import { FUEL_BAR_HORIZON_MS, shortStructureName } from './structureModels';
 import type { BuildContext, FeedState, Feeds, KindView, TableCell } from './types';
@@ -292,6 +292,8 @@ describe('structures', () => {
     expect(buildView('structures', merged, ctx({ scopeAll: true })).table!.rows).toHaveLength(3);
     // A header-scoped widget never reads the merged feed: it has not loaded it.
     expect(buildView('structures', merged, ctx()).table).toBeUndefined();
+    expect(kindHasAllFeeds('structures')).toBe(true);
+    expect(kindHasAllFeeds('training')).toBe(false);
     expect(feedsOf('structures')).toEqual(['structures']);
     expect(feedsOf('structures', undefined, true)).toEqual(['structuresAll']);
     expect(feedsFor([{ kind: 'structures', scope: 'all' }])).toEqual(['structuresAll']);
