@@ -1,0 +1,9 @@
+# Scope decisions — Sync now reads moon owners, rested 10 minutes per book (issue #6117)
+
+_Recorded 2026-11-12 · issue #6117._
+
+- **Adding a corporation needs no new sync step.** The join's first pull is already `syncOneFeeder`, the scheduled pass's own read, so everything officers read about the new moon owner (rows, Extractions, moon docs, read models, names, the view summary) lands before the call returns. It rules out a second "sync after join" call.
+- **Sync now also reads every moon owner, for an editor only, once per book per 10 minutes.** A player who just connected corporations, or whose grants predate #6097, should not wait up to six hours. Each read is `syncOneFeeder`, so health and the views move exactly as on the schedule. The rest is per book, not per caller, because every editor shares the moon owners' ESI error budget. A press inside the rest is a result (`rate-limited`, `retryAt`), not an error, and the toast says when it runs again. The slot lives in a server-only collection (`corpTaxBookMoonOwnersSyncNow`), with no rule opening it. A router action, never a new export.
+- **The call starts no new pull after 90 seconds** (the router allows 120). The rest are counted as skipped and the next scheduled run reads them. It rules out a fan-out or a queued background job for a manual press.
+- **Sync now shows for an editor of a book with a moon owner still read, even without the mining scope on their own Character.** The book's own ledger sync still needs that scope and simply does nothing without it.
+- **A moon owner row still read on the schedule says when it is read next** ("next read 12:35 UTC"), from the same constant that builds the cron, so a corporation added a minute ago never looks broken. Disconnected, left and removed rows say nothing about a next read.

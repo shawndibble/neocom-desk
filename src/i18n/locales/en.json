@@ -18706,6 +18706,11 @@
         "refineries_other": "{{count}} refineries",
         "nothingSeen": "No mining or extraction seen yet",
         "synced": "Synced {{age}}",
+        "nextRead": "next read {{time}}",
+        "syncNow": {
+          "tooSoon": "Moon owners were just read. Sync now reads them again from {{time}}.",
+          "failed": "Couldn't read the moon owners now. The scheduled sync will try again."
+        },
         "cantReadSince": "Can't read their ledger since {{date}}",
         "since": "since {{date}}",
         "until": "until {{date}}",

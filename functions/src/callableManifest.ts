@@ -47,6 +47,7 @@ export const CALLABLE_ACTIONS = {
     'saveCorpTaxBookFeederGrantCallable',
     'addOwnCorpTaxBookFeederCallable',
     'removeOwnCorpTaxBookFeederCallable',
+    'syncCorpTaxBookMoonOwnersNowCallable',
     'leaveCorpTaxBookFeederCallable',
     'getCorpTaxBookFeederStatusCallable',
     'getCorpTaxBookFeederViewAccessCallable',
