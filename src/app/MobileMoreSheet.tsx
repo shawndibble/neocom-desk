@@ -31,6 +31,7 @@ const ALL_CORP_VIEWS = {
   canReadMembers: true,
   canReadWallet: true,
   canReadAssets: true,
+  canReadStructures: true,
   canReadMiningLedger: true,
   canReadRoleAudit: true,
   canManageSrp: true,

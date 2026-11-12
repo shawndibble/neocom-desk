@@ -31,7 +31,7 @@ import type { CorpDeadlinesSlice, CorpJobsFeed } from './corpFeeds';
 import { toBoardHubFuel, toBoardSovereignty } from './corpSovereigntyModels';
 import { toBoardStarbases } from './corpStarbaseModels';
 import { elapsedShare } from './industryModels';
-import { shortStructureName } from './structureModels';
+import { shortStructureName } from '@/features/corp/structures/structureRows';
 import type {
   BuildContext,
   Feeds,

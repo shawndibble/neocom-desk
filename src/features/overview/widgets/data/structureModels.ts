@@ -6,6 +6,11 @@ import { DAY_MS } from '@/lib/age';
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import type { CorpBoardItem } from '@/engine/corp/board';
 import { structureStateLabel } from '@/features/corp/boardSources';
+import {
+  shortStructureName,
+  structureRows,
+  structureWhen,
+} from '@/features/corp/structures/structureRows';
 import { formatCountdown } from '@/lib/duration';
 import { moonChunksSummary, structuresSummary } from '../../data/boardSummary';
 import {
@@ -17,26 +22,16 @@ import {
   structuresSeverity,
   structuresView,
 } from '../../data/corpCards';
-import { blank, count, detailToneOf, statusOf, UNKNOWN, type Builder } from './builderKit';
+import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { corpCell, fractionBar } from './cellKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
-import type { DetailTone, NumberModel, RowDetailModel, TableCell, TableModel } from './types';
+import type { NumberModel, TableCell, TableModel } from './types';
 import type { Translate } from '@/lib/translate';
 
 const C = 'overview.widgets.chart';
-const SERVICE_STATE = {
-  online: 'overview.widgets.structures.detail.serviceState.online',
-  offline: 'overview.widgets.structures.detail.serviceState.offline',
-  cleanup: 'overview.widgets.structures.detail.serviceState.cleanup',
-} as const;
+const STRUCTURES_PAGE = '/corp/structures';
 
 // --- Structures -------------------------------------------------------------------
-
-/** "Efa - Helios Prime" is long on a tile; the name after the system prefix is the one a pilot knows it by. */
-export function shortStructureName(name: string): string {
-  const cut = name.indexOf(' - ');
-  return cut > 0 && cut + 3 < name.length ? name.slice(cut + 3) : name;
-}
 
 /**
  * A full tank is not in the data (ESI gives only when the fuel runs out), so the
@@ -50,14 +45,6 @@ function fuelCell(item: CorpBoardItem, t: Translate): TableCell {
   if (item.timing !== 'timed' || item.withinStaleWindow) return text;
   const bar = fractionBar(item.remainingMs ?? 0, FUEL_BAR_HORIZON_MS);
   return bar === undefined ? text : { text, bar };
-}
-
-function structureWhen(item: CorpBoardItem, t: Translate): string {
-  if (item.timing === 'passed') return t('overview.board.structureDry');
-  if (item.timing === 'untimed') return t('overview.board.structureOffline');
-  // A clock shorter than CCP's hour-long cache may already be over, so it is not ticked down.
-  if (item.withinStaleWindow) return t('overview.board.structureSoon');
-  return formatCountdown(Math.max(0, item.remainingMs ?? 0) / 1000);
 }
 
 /**
@@ -113,8 +100,7 @@ function problemsNumber(
 export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
   const feed = scopeAll ? feeds.structuresAll : feeds.structures;
   const raw = feed?.data ?? null;
-  // No structures page exists: a plain title, not a link back to /corp.
-  const to = null;
+  const to = STRUCTURES_PAGE;
   if (!raw) return blank(to, statusOf(feed));
   const view = structuresView(raw, now);
   const items = view.items;
@@ -133,20 +119,10 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
   // Read across several corporations: each row names its own.
   const labels = raw.corporations && raw.corporations.size > 1 ? raw.corporations : undefined;
   // One row per structure, healthy ones too: the pilot asks "is everything fuelled", not only "what is wrong".
-  const all = (raw.structures ?? []).map((source) => {
-    const id = source.structureId;
+  const all = structureRows(raw.structures ?? [], items).map((row) => {
+    const { source, fuel, timer, offline, lowFuel } = row;
     const corp =
       labels && source.corporationId !== undefined ? labels.get(source.corporationId) : undefined;
-    const fuel = items.find((item) => item.id === `fuel:${id}`);
-    const timer = items.find((item) => item.id === `state:${id}`);
-    const offline = items.filter((item) => item.id.startsWith(`service:${id}:`));
-    const unanchor = items.find((item) => item.id === `unanchor:${id}`);
-    const own = [fuel, timer, ...offline].filter(
-      (item): item is CorpBoardItem => item !== undefined
-    );
-    const tone = worstSeverity(own.map((item) => item.severity));
-    const lowFuel =
-      fuel !== undefined && (fuel.severity === 'warning' || fuel.severity === 'critical');
     const state = timer
       ? structureStateLabel(timer.detail)
       : offline.length > 0
@@ -154,54 +130,10 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
         : lowFuel
           ? t('overview.widgets.structures.state.lowFuel')
           : t('overview.widgets.structures.state.ok');
-    const S = 'overview.widgets.structures';
-    const detail: RowDetailModel = {
-      title: shortStructureName(source.name),
-      status: { badge: state, tone: detailToneOf(tone) },
-      facts: [
-        ...(corp ? [{ label: t(`${S}.col.corp`), value: corp.name }] : []),
-        { label: t(`${S}.col.fuel`), value: fuel ? structureWhen(fuel, t) : UNKNOWN },
-        {
-          label: t(`${S}.col.timer`),
-          value: timer && timer.timing === 'timed' ? structureWhen(timer, t) : UNKNOWN,
-        },
-        ...(unanchor && unanchor.timing === 'timed'
-          ? [
-              {
-                label: t('overview.widgets.structures.detail.unanchors'),
-                value: structureWhen(unanchor, t),
-              },
-            ]
-          : []),
-      ],
-      list:
-        source.services.length === 0
-          ? undefined
-          : {
-              title: t('overview.widgets.structures.detail.services'),
-              items: source.services.map((service) => ({
-                key: service.name,
-                badge: t(SERVICE_STATE[service.state]),
-                tone: (service.state === 'online'
-                  ? 'neutral'
-                  : service.state === 'offline'
-                    ? 'danger'
-                    : 'warning') as DetailTone,
-                text: service.name,
-                value: '',
-              })),
-            },
-    };
     return {
-      id,
-      detail,
-      // Every board item of this structure, so Problems only can keep exactly these.
-      items: unanchor ? [...own, unanchor] : own,
+      ...row,
+      id: source.structureId,
       name: shortStructureName(source.name),
-      // What the Problems only setting keeps: the same three things the State column names.
-      problem: timer !== undefined || offline.length > 0 || lowFuel,
-      remaining: fuel?.timing === 'timed' ? (fuel.remainingMs ?? 0) : Number.NEGATIVE_INFINITY,
-      tone,
       cells: [
         shortStructureName(source.name),
         ...(labels ? [corp ? corpCell(corp) : UNKNOWN] : []),
@@ -250,7 +182,8 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
       key: String(row.id),
       cells: row.cells,
       tone: row.tone,
-      detail: row.detail,
+      // The page holds the full detail: every service, both clocks, the system.
+      to: `${to}?structure=${row.id}`,
     })),
   };
 

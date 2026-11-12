@@ -137,6 +137,10 @@ export interface BoardStructureSource {
   services: readonly BoardStructureService[];
   /** The owning corporation, set on a list read across several corporations; absent otherwise. */
   corporationId?: number;
+  /** The solar system it is anchored in, for a view that places it; the board ranks without it. */
+  systemId?: number;
+  /** The structure's type (Astrahus, Athanor…), for a view that names it. */
+  typeId?: number;
 }
 
 export interface BoardStructureService {

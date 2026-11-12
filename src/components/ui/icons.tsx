@@ -28,6 +28,7 @@
  * `no-restricted-imports` rule keeps the barrel from creeping back.
  */
 import { AddressBook } from '@phosphor-icons/react/dist/csr/AddressBook';
+import { Anchor } from '@phosphor-icons/react/dist/csr/Anchor';
 import { ArrowBendUpLeft } from '@phosphor-icons/react/dist/csr/ArrowBendUpLeft';
 import { ArrowBendUpRight } from '@phosphor-icons/react/dist/csr/ArrowBendUpRight';
 import { ArrowClockwise } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
@@ -490,6 +491,8 @@ export const NavCorp = withWeight(Buildings);
 export const NavCorpMembers = withWeight(UserList);
 export const NavCorpWallet = withWeight(Vault);
 export const NavCorpAssets = withWeight(Warehouse);
+// Upwell structures are anchored in space: an anchor (Mercenary Den already has the turret).
+export const NavCorpStructures = withWeight(Anchor);
 export const NavCorpMoons = withWeight(Moon);
 // SRP repays lost ships: a lifebuoy (`ReadOnly`'s shield would read as a lock).
 export const NavCorpSrp = withWeight(Lifebuoy);

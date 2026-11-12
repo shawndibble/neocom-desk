@@ -15,6 +15,11 @@ export interface CorpLabel {
   name: string;
 }
 
+/** A corporation written out in full: "Main Corp [MAIN]". */
+export function corpLabelText(corp: CorpLabel): string {
+  return `${corp.name} [${corp.ticker}]`;
+}
+
 /** Each corporation's label; one whose public record cannot be read is named by its id. */
 export async function loadCorpLabels(
   corporationIds: readonly number[]
