@@ -16,6 +16,7 @@ const meta = {
       { corporationId: 21, name: 'Wren Hollow Corp', state: 'gone-quiet' },
     ],
     onSignInAgain: () => {},
+    onGrantAgain: () => {},
     onRemove: () => Promise.resolve(true),
   },
 } satisfies Meta<typeof CorpStatusPanel>;
@@ -37,6 +38,16 @@ export const Failed: Story = {
         state: 'failed',
         reason: 'ledger-unavailable',
       },
+    ],
+  },
+};
+
+/** @summary Read without refinery names: Grant again for an own corp, words only for another's. */
+export const RefineryNames: Story = {
+  args: {
+    items: [
+      { corporationId: 24, name: 'Sable Ridge Extraction', state: 'needs-names' },
+      { corporationId: 25, name: 'Brightwater Holdings', state: 'names-not-shared' },
     ],
   },
 };

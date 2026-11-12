@@ -173,7 +173,22 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
   };
 
   const pending = run !== null && !isDone(run);
-  const items = canEdit ? needsYou(run, rows, names.corporation) : [];
+  // Own corps the player is CEO of: the ones Grant again can sign in for.
+  const grantable = useMemo(() => new Set(own.corps.map((c) => c.corporationId)), [own.corps]);
+  const items = canEdit ? needsYou(run, rows, names.corporation, grantable) : [];
+  // Grant again is one guided pass over every own corp without names, the clicked one first.
+  const grantAgain = (id: number) => {
+    const wanted = items.filter((i) => i.state === 'needs-names').map((i) => i.corporationId);
+    const queue = [id, ...wanted.filter((w) => w !== id)].flatMap((w) =>
+      own.corps.filter((c) => c.corporationId === w)
+    );
+    if (queue.length === 0) return;
+    void start({
+      collectorCorporationId: corporationId,
+      editorCharacterId: characterId,
+      queue,
+    }).then(openSignIn);
+  };
 
   const notices = canEdit ? (
     <>
@@ -198,6 +213,7 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
         items={items}
         {...(run ? { connected: connectedInRun(run), total: run.queue.length } : {})}
         onSignInAgain={(id) => void retry(id).then(openSignIn)}
+        onGrantAgain={grantAgain}
         onRemove={async (id) => {
           const { removeOwnCorpFeederRemote } = await import('@/sync/corpSyncGrantApi');
           const out = await removeOwnCorpFeederRemote({

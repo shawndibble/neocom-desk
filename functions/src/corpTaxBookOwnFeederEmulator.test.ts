@@ -275,6 +275,42 @@ emulatorSuite('add my other corps', () => {
     expect(await grant()).toMatchObject({ kind: 'feeder' });
   });
 
+  it('Grant again on a connected own corp reconnects: names read, coverage and mode kept', async () => {
+    // A grant from before the structure scope: its reads carry no refinery names.
+    mineScopes = FEEDER_SYNC_SCOPES.filter((s) => !s.includes('structures'));
+    await add();
+    const before = await feederRecord();
+    expect(before?.readsStructureNames).toBe(false);
+    mineScopes = [...FEEDER_SYNC_SCOPES];
+    now = T0 + 86_400_000;
+    expect(
+      await add({
+        coverageFrom: '2026-10-15',
+        grantRefreshToken: 'rt-17',
+        grantAccessToken: 'mine-17',
+      })
+    ).toEqual({
+      collectorCorporationId: COLLECTOR,
+      feederCorporationId: FEEDER,
+      rejoined: false,
+    });
+    const rec = await feederRecord();
+    expect(rec).toMatchObject({
+      status: 'active',
+      sameOwner: true,
+      mode: before?.mode,
+      modeChanges: before?.modeChanges,
+      coveragePeriods: before?.coveragePeriods,
+      joinedAt: before?.joinedAt,
+      grantHolder: 17,
+      readsStructureNames: true,
+    });
+    expect(await grant()).toMatchObject({ characterId: 17, readsStructures: true });
+    expect(await invites()).toBe(0);
+    // The old grant's token is revoked once the new one works.
+    expect(revoked).toContain(`rt-${ALT}`);
+  });
+
   it('unwinds everything when the ledger is refused', async () => {
     ledger = 'forbidden';
     expect(await reason(add())).toBe('not-an-accountant');

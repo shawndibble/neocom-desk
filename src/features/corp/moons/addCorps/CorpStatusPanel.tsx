@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { InlineError } from '@/components/ui/InlineError';
 import { Button, Panel } from '@/components/ui';
 import { addCorpsErrorText } from '../addCorpsErrorText';
-import type { NeedsYouItem } from './addCorpsStatus';
+import { needsThePlayer, type NeedsYouItem } from './addCorpsStatus';
 import { CorpStatePill } from './CorpRow';
 
 const k = (key: string) => `corpTaxBook.moons.addCorps.needs.${key}`;
@@ -12,7 +12,9 @@ const k = (key: string) => `corpTaxBook.moons.addCorps.needs.${key}`;
  * "Needs you (N)": every corp of the player's that did not end up connected,
  * with the one-line reason and the fix that applies. Gone quiet is removed from
  * here; sign-in problems start that corp's sign-in again; a corp with its own
- * book has only the instruction, because moving a book is not built yet.
+ * book has only the instruction, because moving a book is not built yet. A moon
+ * owner read without refinery names offers Grant again when it is the player's
+ * own, and otherwise only says whose officer can; that one is not counted.
  * Renders nothing when the list is empty.
  */
 export function CorpStatusPanel({
@@ -20,6 +22,7 @@ export function CorpStatusPanel({
   connected,
   total,
   onSignInAgain,
+  onGrantAgain,
   onRemove,
 }: {
   items: readonly NeedsYouItem[];
@@ -27,6 +30,8 @@ export function CorpStatusPanel({
   connected?: number;
   total?: number;
   onSignInAgain: (corporationId: number) => void;
+  /** Sign in again as the CEO so the grant reads refinery names. */
+  onGrantAgain: (corporationId: number) => void;
   /** Resolves `false` when the removal was refused. */
   onRemove: (corporationId: number) => Promise<boolean>;
 }) {
@@ -34,6 +39,7 @@ export function CorpStatusPanel({
   const [removing, setRemoving] = useState<number | null>(null);
   const [failedId, setFailedId] = useState<number | null>(null);
   if (items.length === 0) return null;
+  const count = items.filter(needsThePlayer).length;
   const remove = (id: number) => {
     setRemoving(id);
     setFailedId(null);
@@ -44,7 +50,7 @@ export function CorpStatusPanel({
   };
   return (
     <Panel
-      title={t(k('title'), { count: items.length })}
+      title={count > 0 ? t(k('title'), { count }) : t(k('titleInfo'))}
       {...(connected !== undefined && total !== undefined
         ? { meta: t(k('meta'), { connected, total }) }
         : {})}
@@ -67,7 +73,16 @@ export function CorpStatusPanel({
                 >
                   {t(k('gone-quiet.action'))}
                 </Button>
-              ) : item.state === 'own-book' ? null : (
+              ) : item.state === 'needs-names' ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t(k('grantNamed'), { name: item.name })}
+                  onClick={() => onGrantAgain(item.corporationId)}
+                >
+                  {t(k('needs-names.action'))}
+                </Button>
+              ) : item.state === 'own-book' || item.state === 'names-not-shared' ? null : (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -79,7 +94,9 @@ export function CorpStatusPanel({
               )}
             </div>
             <p className="text-xs text-text-dim">
-              {item.reason ? addCorpsErrorText(t, item.reason) : t(k(`${item.state}.text`))}
+              {item.reason
+                ? addCorpsErrorText(t, item.reason)
+                : t(k(`${item.state}.text`), { name: item.name })}
             </p>
             {item.state === 'failed' && item.reason && (
               <p className="text-xs text-text-dim">
