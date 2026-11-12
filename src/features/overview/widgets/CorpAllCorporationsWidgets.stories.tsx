@@ -270,7 +270,7 @@ export const MarketOrders: Story = {
   ),
 };
 
-/** @summary One corporation's read failed: the other's rows still draw, flagged. */
+/** @summary One corporation's read failed: the others' rows still draw, with a note under them. */
 export const PartlyFailed: Story = {
   render: () => (
     <Board

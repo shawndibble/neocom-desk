@@ -84,6 +84,7 @@ import type {
   CorpContractsFeed,
   CorpDeadlinesAllFeed,
   CorpDeadlinesSlice,
+  CorpFeedBase,
   CorpJobsFeed,
   CorpJournalLine,
   CorpKillsFeed,
@@ -98,7 +99,6 @@ import type {
   CorpWalletFeed,
 } from './corpFeeds';
 import type { CorpDeadlineSource } from './corpDeadlineSources';
-import type { CorpFeedBase } from './corpFeeds';
 
 export function loadCorpWallet(characterId: number): Promise<CorpWalletFeed> {
   return readCorpFeed<CorpWalletFeed>(characterId, {
@@ -836,11 +836,18 @@ export function loadCorpContractsAll(): Promise<CorpContractsFeed> {
     what: 'contracts',
     load: loadCorpContracts,
     merge: (reads) => {
-      // A contract between two of the pilot's corporations is in both reads: kept once.
+      // A contract between two of the pilot's corporations is in both reads: kept once,
+      // under the corporation that issued it.
       const { rows, corporationOf } = mergeCorpRows(
         rowsOf(reads, (read) => read.contracts),
         (contract) => String(contract.contract_id)
       );
+      const read = new Set(reads.map((r) => r.corporationId));
+      for (const contract of rows) {
+        if (read.has(contract.issuer_corporation_id)) {
+          corporationOf.set(String(contract.contract_id), contract.issuer_corporation_id);
+        }
+      }
       return {
         corporationOf,
         body: { contracts: rows, names: mergeLookups(reads.map((read) => read.names)) },

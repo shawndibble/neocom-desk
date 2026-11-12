@@ -128,7 +128,10 @@ describe('Customs offices across corporations', () => {
   it('keeps the others’ rows when one corporation’s read failed, flagged', () => {
     const view = corpCustomsOffices({ corpCustomsAll: ok(customs({ partlyFailed: true })) }, ctx);
     expect(view.table!.rows).toHaveLength(3);
-    expect(view.status.error).toBe(true);
+    // A note, not the Failed state: that would hide the rows that did land.
+    expect(view.status.error).toBe(false);
+    expect(view.table!.footer).toBe('overview.board.corporationsMissing');
+    expect(view.number.notes).toContain('overview.board.corporationsMissing');
   });
 });
 
@@ -178,13 +181,23 @@ const skyhook = (id: number, opensInHours: number): CorpSovereigntyRow => ({
 });
 
 describe('Sovereignty across corporations', () => {
-  it('puts every corporation’s skyhooks on one timeline, each naming its corporation', () => {
+  it('puts every corporation’s skyhooks and hubs on one timeline, each naming its corporation', () => {
+    const hub: CorpSovereigntyRow = {
+      ...skyhook(9, 0),
+      key: 'hub:9',
+      kind: 'hub',
+      planetName: null,
+      windowStartMs: null,
+      windowEndMs: null,
+      hubBay: { amount: 100, burningPerHour: 10, updatedMs: NOW },
+    };
     const feed: CorpSovereigntyFeed = {
       ...across([
         ['skyhook:1', A],
         ['skyhook:2', B],
+        ['hub:9', B],
       ]),
-      rows: [skyhook(1, 9), skyhook(2, 3)],
+      rows: [skyhook(1, 9), skyhook(2, 3), hub],
       systemNames: new Map([[30, 'Tama']]),
       typeNames: new Map(),
       prices: new Map(),
@@ -193,18 +206,24 @@ describe('Sovereignty across corporations', () => {
     const view = corpSovereignty({ corpSovereigntyAll: ok(feed) }, ctx);
     expect(view.table!.rows.map((row) => row.key)).toEqual(['skyhook:2', 'skyhook:1']);
     expect(column(view, 'corp')).toEqual(['HOLD2', 'HOLD1']);
+    // The next window (corporation B's skyhook) and B's hub running dry in 10 h, together.
+    expect(view.deadlines.map((deadline) => deadline.at)).toEqual([
+      NOW + 3 * HOUR,
+      NOW + 10 * HOUR,
+    ]);
   });
 });
 
 // --- Contracts -----------------------------------------------------------------------
 
-const contract = (id: number, expiresInHours: number): Contract => ({
+const contract = (id: number, expiresInHours: number, collateral?: number): Contract => ({
   contract_id: id,
   issuer_id: 1,
   issuer_corporation_id: A,
   assignee_id: 0,
   acceptor_id: 0,
-  type: 'item_exchange',
+  type: collateral === undefined ? 'item_exchange' : 'courier',
+  collateral,
   status: 'outstanding',
   for_corporation: true,
   availability: 'public',
@@ -220,11 +239,13 @@ describe('Corp contracts across corporations', () => {
         ['2', A],
         ['3', B],
       ]),
-      contracts: [contract(1, 72), contract(2, 96), contract(3, 48)],
+      contracts: [contract(1, 72, 200_000_000), contract(2, 96), contract(3, 48, 100_000_000)],
       names: new Map([[1, 'Issuer']]),
     };
     const view = corpContracts({ corpContractsAll: ok(feed) }, ctx);
     expect(view.number.value).toBe('3');
+    // Collateral at stake: both corporations' couriers.
+    expect(view.number.notes?.[0]).toContain('300');
     expect(view.table!.rows.map((row) => row.key)).toEqual(['3', '1', '2']);
     expect(column(view, 'corp')).toEqual(['HOLD2', 'HOLD1', 'HOLD1']);
   });

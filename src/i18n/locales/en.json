@@ -5067,6 +5067,7 @@
       "structuresFine_other": "{{count}} structures, nothing due",
       "corpUnreadable": "Your corp roles don't cover this.",
       "corporation": "Corporation",
+      "corporationsMissing": "One of your corporations could not be read, so its rows are missing.",
       "reinforced": "Timers",
       "structureDry": "Out of fuel",
       "structureOffline": "Offline",

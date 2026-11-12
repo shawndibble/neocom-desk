@@ -85,10 +85,11 @@ describe('loadCorpCustomsAll', () => {
 });
 
 describe('loadCorpContractsAll', () => {
-  it('keeps a contract between two of the corporations once', async () => {
+  it('keeps a contract between two of the corporations once, under its issuer', async () => {
     const shared = {
       contract_id: 5,
       issuer_id: 1,
+      issuer_corporation_id: B,
       assignee_id: B,
       status: 'outstanding',
       type: 'item_exchange',
@@ -98,6 +99,7 @@ describe('loadCorpContractsAll', () => {
     );
     const feed = await loadCorpContractsAll();
     expect(feed.contracts.map((c) => c.contract_id)).toEqual([5, 6]);
-    expect(feed.corporationOf!.get('5')).toBe(A);
+    // Read first through corporation A, but B issued it.
+    expect(feed.corporationOf!.get('5')).toBe(B);
   });
 });

@@ -161,11 +161,19 @@ export function detailToneOf(severity: DeadlineSeverity): DetailTone {
  * A corp widget read across several corporations (All scope), so each row names its own: a
  * Corporation column after the first (the ticker, its full name in the tooltip and first in
  * the row's detail), and each list row's detail ending with the ticker. When one
- * corporation's read failed, the rest still draws and the widget is flagged. A read of one
- * corporation is returned unchanged.
+ * corporation's read failed, the rest still draws, with a note under the figure and the
+ * rows (not the Failed state, which would hide them). A read of one corporation is
+ * returned unchanged.
  */
 export function acrossCorporations(view: KindView, data: CorpFeedBase, t: Translate): KindView {
-  const flagged = data.partlyFailed ? { ...view, status: { ...view.status, error: true } } : view;
+  const missing = t('overview.board.corporationsMissing');
+  const flagged: KindView = data.partlyFailed
+    ? {
+        ...view,
+        number: { ...view.number, notes: [...(view.number.notes ?? []), missing] },
+        ...(view.table && { table: { ...view.table, footer: missing } }),
+      }
+    : view;
   const labels = data.corporations;
   const corporationOf = data.corporationOf;
   if (!labels || labels.size < 2 || !corporationOf) return flagged;
