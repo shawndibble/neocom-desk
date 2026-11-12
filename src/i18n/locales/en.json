@@ -17463,6 +17463,7 @@
       "startedOn": "started {{date}}",
       "windowDays_one": "{{count}} day",
       "windowDays_other": "{{count}} days",
+      "extractionsNone": "No Extractions yet",
       "extractionsNoneShown": "No Extraction matches the states shown",
       "extractionsSummary_one": "{{count}} Extraction",
       "extractionsSummary_other": "{{count}} Extractions",

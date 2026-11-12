@@ -548,7 +548,7 @@ export function useCorpBook(
 
 /**
  * Whether the Moon owners tab, read without ledger rows, must read them after all: a moon owner
- * its summary cannot stand in for, or a shell fact only the rows can tell (#5717).
+ * its summary cannot stand in for (#5717).
  */
 export function needsRowsFallback(
   wanted: BookPartSet,
