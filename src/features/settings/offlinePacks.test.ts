@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LAZY_SDE_FILES } from '@/sde/lazySdeFiles';
 import { TYPE_INFO_SHARD_COUNT } from '@/sde/typeInfoShard';
-import { setDecimalMark } from '@/lib/numberLocale';
+import { setDecimalMark, setNumberStyle } from '@/lib/numberLocale';
 import { OFFLINE_PACK_IDS, formatBytes, packFor, summarizePacks } from './offlinePacks';
 
 describe('packFor app pages', () => {
@@ -68,6 +68,16 @@ describe('formatBytes', () => {
     try {
       expect(formatBytes(3.5 * 1024 ** 3)).toBe('3,5 GB');
       expect(formatBytes(1023 * 1024)).toBe('1.023 kB');
+    } finally {
+      setDecimalMark('.');
+    }
+  });
+
+  it('groups with the Swiss apostrophe', () => {
+    setNumberStyle('apostrophe');
+    try {
+      expect(formatBytes(3.5 * 1024 ** 3)).toBe('3.5 GB');
+      expect(formatBytes(1023 * 1024)).toMatch(/^1['\u2019]023 kB$/);
     } finally {
       setDecimalMark('.');
     }

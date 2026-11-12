@@ -412,8 +412,8 @@ export function App() {
   // Formatters read the number format when they run rather than subscribing,
   // so a change would leave what is on screen in the old format. Keying the
   // routes on the resolved format remounts them once, when the format changes
-  // (switching `auto` to the format it already resolves to does nothing).
-  const numberMark = useNumberFormat((state) => state.value);
+  // (picking the format already in use does nothing).
+  const numberStyle = useNumberFormat((state) => state.value);
 
   return (
     <ErrorBoundary>
@@ -425,7 +425,7 @@ export function App() {
           <LandingShellOffLandingRelease />
           <DocumentTitleTracker />
           <StaleStoresReloader />
-          <Suspense key={numberMark} fallback={<RouteFallback />}>
+          <Suspense key={numberStyle} fallback={<RouteFallback />}>
             <SentryRoutes>
               <Route path="/" element={<Root />} />
               <Route path="/login" element={<Login />} />

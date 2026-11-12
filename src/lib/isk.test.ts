@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
+import { setDecimalMark, setNumberStyle } from './numberLocale';
 import {
   CONTRACT_ISK_CENTS_BELOW,
   formatIsk,
@@ -8,6 +9,7 @@ import {
   formatIskCompactSigned,
   formatMarketIsk,
   marketIskDecimals,
+  maskIskTyping,
   parseIskAmount,
   parseNumeric,
 } from './isk';
@@ -192,5 +194,17 @@ describe('formatContractIsk', () => {
   it('keeps the cents under the contract threshold, as every contract screen does', () => {
     expect(formatContractIsk(600)).toBe('600.00 ISK');
     expect(formatContractIsk(CONTRACT_ISK_CENTS_BELOW + 1)).toBe('1,001 ISK');
+  });
+});
+
+describe('Swiss apostrophe style', () => {
+  afterEach(() => setDecimalMark('.'));
+
+  it('masks typing with the apostrophe group and reads either apostrophe back', () => {
+    setNumberStyle('apostrophe');
+    expect(maskIskTyping('1234567')).toMatch(/^1['\u2019]234['\u2019]567$/);
+    expect(maskIskTyping('1234.5')).toMatch(/^1['\u2019]234\.5$/);
+    expect(parseIskAmount("1'234")).toBe(1234);
+    expect(parseIskAmount('1\u2019234.5m')).toBe(1_234_500_000);
   });
 });

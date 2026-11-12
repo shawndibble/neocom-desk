@@ -45,7 +45,10 @@ export const BROWSER_DECIMAL_MARK: DecimalMark = detectDecimalMark(
   typeof navigator === 'undefined' ? undefined : navigator.language
 );
 
-let active: NumberStyle = BROWSER_DECIMAL_MARK === ',' ? 'comma' : 'period';
+/** The style the browser's language starts on (a Swiss browser starts on English: Swiss is picked, not detected). */
+export const BROWSER_NUMBER_STYLE: NumberStyle = BROWSER_DECIMAL_MARK === ',' ? 'comma' : 'period';
+
+let active: NumberStyle = BROWSER_NUMBER_STYLE;
 
 export const getDecimalMark = (): DecimalMark => decimalMarkOf(active);
 
