@@ -281,6 +281,7 @@ emulatorSuite('add my other corps', () => {
     await add();
     const before = await feederRecord();
     expect(before?.readsStructureNames).toBe(false);
+    const invitesBefore = await invites();
     mineScopes = [...FEEDER_SYNC_SCOPES];
     now = T0 + 86_400_000;
     expect(
@@ -306,7 +307,8 @@ emulatorSuite('add my other corps', () => {
       readsStructureNames: true,
     });
     expect(await grant()).toMatchObject({ characterId: 17, readsStructures: true });
-    expect(await invites()).toBe(0);
+    // Reconnect mints no self-invite.
+    expect(await invites()).toBe(invitesBefore);
     // The old grant's token is revoked once the new one works.
     expect(revoked).toContain(`rt-${ALT}`);
   });
