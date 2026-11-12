@@ -6950,6 +6950,8 @@
       "title": "At war with {{name}}",
       "titleMore_one": "At war with {{name}} and {{count}} more",
       "titleMore_other": "At war with {{name}} and {{count}} more",
+      "corporations_one": "{{count}} of your corporations is at war",
+      "corporations_other": "{{count}} of your corporations are at war",
       "declared": "Declared {{age}}",
       "startsIn": "Starts in {{time}}",
       "notStarted": "Not started yet"
@@ -6957,6 +6959,7 @@
     "modal": {
       "title_one": "War declared",
       "title_other": "{{count}} wars declared",
+      "against": "Against {{name}}",
       "active": "Active",
       "startsIn": "Starts in {{time}}",
       "pendingUnknown": "Not started",

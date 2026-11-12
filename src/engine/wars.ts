@@ -65,6 +65,8 @@ export interface WarAgainstMe {
   war: StoredWar;
   side: WarSide;
   status: Exclude<WarStatus, { kind: 'over' }>;
+  /** The account's corporation (and alliance) the war is on. */
+  against: WarEntityIds;
 }
 
 function matches(
@@ -77,34 +79,45 @@ function matches(
   );
 }
 
+function sideFor(war: StoredWar, me: WarEntityIds): WarSide | null {
+  // A war `me` declared is not "against" me.
+  if (matches(war.aggressor, me)) return null;
+  if (matches(war.defender, me)) return 'defender';
+  return war.allies.some((ally) => matches(ally, me)) ? 'ally' : null;
+}
+
 /**
- * The wars still running (or about to) with `me` on the receiving end, an
- * active war ahead of a pending one, then newest declared first. A war `me`
- * declared is not "against" me and is left out.
+ * The wars still running (or about to) with one of the account's
+ * corporations on the receiving end. `parties` is every corporation the
+ * account's Characters are in, the active Character's first. Each war is
+ * listed once, tied to the first party it is against, so a war on an alliance
+ * two of them share is not counted twice. Ordered by party, then an active war
+ * ahead of a pending one, then newest declared first.
  */
 export function warsAgainst(
   wars: readonly StoredWar[],
-  me: WarEntityIds,
+  parties: readonly WarEntityIds[],
   now: number
 ): WarAgainstMe[] {
-  const hits: WarAgainstMe[] = [];
+  const hits: { hit: WarAgainstMe; rank: number }[] = [];
   for (const war of wars) {
-    if (matches(war.aggressor, me)) continue;
-    const side: WarSide | null = matches(war.defender, me)
-      ? 'defender'
-      : war.allies.some((ally) => matches(ally, me))
-        ? 'ally'
-        : null;
-    if (side === null) continue;
     const status = warStatus(war, now);
     if (status.kind === 'over') continue;
-    hits.push({ war, side, status });
+    for (const [rank, against] of parties.entries()) {
+      const side = sideFor(war, against);
+      if (side === null) continue;
+      hits.push({ hit: { war, side, status, against }, rank });
+      break;
+    }
   }
-  return hits.sort(
-    (a, b) =>
-      Number(b.status.kind === 'active') - Number(a.status.kind === 'active') ||
-      b.war.declared - a.war.declared
-  );
+  return hits
+    .sort(
+      (a, b) =>
+        a.rank - b.rank ||
+        Number(b.hit.status.kind === 'active') - Number(a.hit.status.kind === 'active') ||
+        b.hit.war.declared - a.hit.war.declared
+    )
+    .map(({ hit }) => hit);
 }
 
 const isNum = (value: unknown): value is number =>
