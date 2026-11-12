@@ -297,6 +297,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     acceleratorPresence: async () => [],
     skyhooks: async () => [],
     communities: async () => [],
+    vetting: async () => [],
     orderExpiry: async () => [],
     marketOrderUndercut: loadMarketOrderUndercut,
   };
@@ -327,6 +328,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     acceleratorPresence: domainState(undefined, undefined),
     skyhooks: domainState(undefined, undefined),
     communities: domainState(undefined, undefined),
+    vetting: domainState(undefined, undefined),
     marketOrderUndercut: domainState(undefined, undefined),
     orderExpiry: domainState(undefined, undefined),
   };

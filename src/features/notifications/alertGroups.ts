@@ -137,6 +137,8 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   communityJoinRequest: 'watch',
   communityMemberJoined: 'watch',
   communityRequestPledged: 'watch',
+  // A report waits on the reviewers; nothing is burning.
+  vettingShared: 'watch',
   // Waiting on you, but nothing is burning.
   spExtractionReady: 'watch',
   industryJobComplete: 'watch',

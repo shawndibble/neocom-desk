@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import i18n from '@/i18n';
+import { mailSummary } from '@/features/corpTaxBook/officerMail';
 import {
   buildSrpResultMail,
   groupByPilot,
-  mailSummary,
   queueSrpResultMails,
   withMailSummary,
   type SrpMailPilot,

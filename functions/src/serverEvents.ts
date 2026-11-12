@@ -19,6 +19,9 @@ export const COMMUNITY_EVENT_IDS = [
   'communityRequestPledged',
 ] as const;
 
+/** The events a `vettingCall` action pushes when it writes them (vettingStore.ts). */
+export const VETTING_EVENT_IDS = ['vettingShared'] as const;
+
 /** The events the 15-minute dispatch tick polls for (public market data). */
 export const POLLED_EVENT_IDS = ['priceAlertTriggered'] as const;
 export type PolledEventId = (typeof POLLED_EVENT_IDS)[number];
@@ -189,11 +192,25 @@ export interface PriceAlertTriggeredFire {
   direction: 'above' | 'below';
 }
 
+/**
+ * A vetting report was shared with a corp: told to each reviewer (`characterId`) the overview
+ * saw in the last 30 days. It names no pilot: a fire is kept in the reviewer's notification
+ * feed, which outlives the pilot deleting their report.
+ */
+export interface VettingSharedFire {
+  eventId: 'vettingShared';
+  characterId: number;
+  corporationId: number;
+  reviewId: string;
+  kind: 'application' | 'promotion';
+}
+
 export type ServerEventFire =
   | CommunityJoinRequestFire
   | CommunityMemberJoinedFire
   | CommunityRequestPledgedFire
-  | PriceAlertTriggeredFire;
+  | PriceAlertTriggeredFire
+  | VettingSharedFire;
 
 /* Price alerts: mirrors `diffPriceAlertTriggered` (src/engine/notificationDiffs/market.ts) */
 
@@ -264,6 +281,9 @@ export function serverEventOccurrenceKey(fire: ServerEventFire): string {
       return [fire.characterId, fire.eventId, fire.typeId, fire.targetPrice, fire.direction].join(
         ':'
       );
+    case 'vettingShared':
+      // A review is shared once, so its id is the occurrence.
+      return [fire.characterId, fire.eventId, fire.corporationId, fire.reviewId].join(':');
   }
 }
 
@@ -300,6 +320,14 @@ function floorCopy(fire: ServerEventFire): { title: string; body: string } {
       return {
         title: 'Price alert',
         body: `${fire.name} reached ${iskFormat.format(fire.price)} ISK (target ${iskFormat.format(fire.targetPrice)} ISK).`,
+      };
+    case 'vettingShared':
+      return {
+        title: 'New vetting report',
+        body:
+          fire.kind === 'promotion'
+            ? 'A member shared the review they were asked for.'
+            : 'A pilot shared a report for review.',
       };
   }
 }

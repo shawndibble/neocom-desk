@@ -53,6 +53,8 @@ const ROUTE_TITLE_KEYS = {
   '/corp/structures': ['nav.corpStructures'],
   '/corp/moons': ['corp.moons.title'],
   '/corp/srp': ['nav.corpSrp'],
+  '/corp/vetting': ['nav.corpVetting'],
+  '/vetting': ['vetting.request.title'],
   // A sub-view of the Overview, like Clones: the title names the page it sits in.
   '/srp': ['nav.overview', 'nav.srp'],
   '/corp/assets/*': ['nav.corpAssets'],
@@ -84,6 +86,7 @@ const OTHER_ROUTE_TITLE_KEYS: Record<string, readonly string[]> = {
   '/communities/join/:code': ['communities.join.title'],
   '/corp-tax-book/verify/:token': ['corpTaxBook.verify.title'],
   '/corp-tax-book/remove-now/:code': ['corpTaxBook.removeNow.title'],
+  '/apply/:corpId': ['vetting.apply.title'],
 };
 
 const ROUTE_PATTERNS = Object.entries({ ...OTHER_ROUTE_TITLE_KEYS, ...ROUTE_TITLE_KEYS });

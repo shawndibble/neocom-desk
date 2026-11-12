@@ -51,6 +51,7 @@ const PUBLIC_ROUTES = [
   '/s',
   '/share',
   '/survey',
+  '/apply',
   '/communities/join',
   '/corp-tax-book/verify',
   '/corp-tax-book/remove-now',

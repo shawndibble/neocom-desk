@@ -19,6 +19,7 @@ import type { NewMailPushFire } from './serverEventCopy';
 import type { IncursionNearbyFire } from '@/engine/incursions/incursionAlert';
 import { INCURSION_STATES } from '@/engine/incursions/incursionRows';
 import type { SkyhookRaidableNearbyFire } from '@/engine/skyhooks/skyhookAlert';
+import type { VettingSharedFire } from '@/engine/vettingAlert';
 import { is, shapeGuard } from './snapshotShape';
 import type { ServerPushedEventId } from './serverEvents';
 
@@ -29,7 +30,8 @@ export type ServerEventFire =
   | PriceAlertTriggeredFire
   | NewMailPushFire
   | IncursionNearbyFire
-  | SkyhookRaidableNearbyFire;
+  | SkyhookRaidableNearbyFire
+  | VettingSharedFire;
 
 const community = {
   characterId: is.number,
@@ -64,6 +66,13 @@ const GUARDS: Record<ServerPushedEventId, (raw: unknown) => boolean> = {
     price: is.number,
     targetPrice: is.number,
     direction: is.oneOf(['above', 'below'] as const),
+  }),
+  vettingShared: shapeGuard<VettingSharedFire>({
+    eventId: is.oneOf(['vettingShared'] as const),
+    characterId: is.number,
+    corporationId: is.number,
+    reviewId: is.string,
+    kind: is.oneOf(['application', 'promotion'] as const),
   }),
   // Lenient on the optional parts: a push without a sender or subject still reads as a new mail.
   newMail: shapeGuard<NewMailPushFire>({

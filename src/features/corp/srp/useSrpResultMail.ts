@@ -6,10 +6,10 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
+import { officerCorporationName, type MailRun } from '@/features/corpTaxBook/officerMail';
 import {
   groupByPilot,
   queueSrpResultMails,
-  type MailRun,
   type SrpMailClaim,
   type SrpMailKind,
 } from './srpResultMail';
@@ -18,15 +18,6 @@ export interface DecidedClaim {
   characterId: number | null;
   characterName: string | null;
   claim: SrpMailClaim;
-}
-
-async function corporationName(corporationId: number): Promise<string | null> {
-  try {
-    const { loadPublicCorporationRecord } = await import('@/features/character/publicInfoData');
-    return (await loadPublicCorporationRecord(corporationId))?.name ?? null;
-  } catch {
-    return null;
-  }
 }
 
 export function useSrpResultMail(): (
@@ -42,7 +33,7 @@ export function useSrpResultMail(): (
       if (officerId === null) return { queued: [], failed: [], missingScope: pilots.length > 0 };
       try {
         const corpName =
-          (corporationId === null ? null : await corporationName(corporationId)) ??
+          (corporationId === null ? null : await officerCorporationName(corporationId)) ??
           t('srp.officer.mail.corpFallback');
         return await queueSrpResultMails(t, {
           kind,

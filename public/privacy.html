@@ -249,6 +249,19 @@
           amount due and payouts, never what each miner owes. A Statement's verify link, sent by
           in-game mail, shows that Statement to whoever has the link, without logging in.
         </li>
+        <li>
+          <strong>Vetting reports:</strong> if you apply to a corporation through its apply link, or
+          share a review an officer asked for, our server reads the characters you log in with once
+          (wallet journal, contacts, who your mail was with, contracts and skills) using a
+          short-lived access token, and keeps no login. It stores a report: each character's name,
+          corporation, age and skill points, the flags raised with up to 10 rows behind each (who
+          the row was with, when, and the ISK), your note and your answers to the corporation's
+          questions, the invite link you came from, and who opened or decided it. No mail subject or
+          text is kept. The corporation's CEO, Directors and Personnel Managers can read it; you can
+          see who opened it. Also the corporation's watchlist, questions, invite links and vetting
+          settings, and which of its reviewers opened the vetting page in the last 30 days, used
+          only to decide who is sent the alert for a new report.
+        </li>
       </ul>
       <p>How long each is kept is under <a href="#retention">How long it is kept</a>.</p>
 
@@ -373,6 +386,12 @@
           the officer who turned the book on, or the corporation's CEO, deletes the book, which
           deletes everything in it, and removes the book from the record of which books bill each
           character.
+        </li>
+        <li>
+          Vetting reports: deleted 30 days after the corporation decides, or 90 days after it was
+          shared if nobody decides (checked daily), or at once when the pilot deletes it. While a
+          pilot is still adding characters, the rows read are kept for 24 hours and removed by the
+          daily clean-up; they are deleted at once when the report is sent.
         </li>
         <li>
           Alerts when closed token: until you turn it off, remove the character, log out or delete

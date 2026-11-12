@@ -26,6 +26,9 @@ const DEPLOYED = [
   // session to call a callable with, and the function is the only writer of `survey-start` shares.
   'shortStartLink',
   'syncCorpTaxBooks',
+  // A router: every vetting callable is one of its actions. Its own function because its public
+  // actions take no Firebase session and it must not run under the Corp Tax Book's secrets.
+  'vettingCall',
 ];
 
 describe('deployed functions', () => {

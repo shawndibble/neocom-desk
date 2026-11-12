@@ -122,6 +122,8 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   communityMemberJoined: '/communities',
   // The Communities page: the requester opens the Community and its Requests tab.
   communityRequestPledged: '/communities',
+  // The queue, where the new report is listed. The pop-up itself opens the report (`path`).
+  vettingShared: '/corp/vetting/open',
 };
 
 export const NOTIFICATION_FALLBACK_ROUTE = '/alerts';
@@ -146,6 +148,12 @@ export interface NotificationTarget {
    * produced the bubble it is closing.
    */
   subjectId?: number;
+  /**
+   * A destination of the fire's own, in place of the event's route: a vetting report is named
+   * by a string id, which a numeric `subjectId` cannot carry. Only the pop-up has it; the feed
+   * row keeps the event's route.
+   */
+  path?: string;
 }
 
 /**
@@ -261,7 +269,10 @@ export function notificationOptionsFor(
     tag: notificationTagFor(target),
     renotify: true,
     data: {
-      url: notificationUrlForSubject(target.eventId, target.subjectId, target.characterId),
+      url:
+        target.path === undefined
+          ? notificationUrlForSubject(target.eventId, target.subjectId, target.characterId)
+          : withParam(target.path, ALERT_CHARACTER_PARAM, String(target.characterId)),
     },
   };
 }

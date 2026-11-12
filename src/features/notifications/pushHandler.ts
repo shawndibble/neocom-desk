@@ -63,6 +63,7 @@ import { parseServerEventFire, type ServerEventFire } from './serverEventPayload
 import {
   communityJoinRequestText,
   communityMemberJoinedText,
+  vettingSharedText,
   communityRequestPledgedText,
   newMailText,
   priceAlertText,
@@ -72,6 +73,7 @@ import {
   incursionNearbyWording,
   skyhookRaidableNearbyWording,
 } from './pollDomains/copy/nearbyWording';
+import { vettingSharedPath } from '@/engine/vettingAlert';
 
 /**
  * The service worker's own i18next instance, not `@/i18n`: that module loads
@@ -226,6 +228,8 @@ interface Presented {
   feedKey: string | null;
   /** The row the fire was about, for the click target (a price alert's item). */
   subjectId?: number;
+  /** A destination of the fire's own for the pop-up (`NotificationTarget.path`). */
+  path?: string;
   /**
    * The body the feed row keeps when it must differ from the pop-up's. The
    * Notification Feed syncs to Firestore, so a new mail's sender and subject
@@ -252,6 +256,8 @@ async function presentServerFire(
       return { ...communityRequestPledgedText(t, fire), feedKey };
     case 'priceAlertTriggered':
       return { ...priceAlertText(t, fire), feedKey, subjectId: fire.typeId };
+    case 'vettingShared':
+      return { ...vettingSharedText(t, fire), feedKey, path: vettingSharedPath(fire) };
     // New mail (issue #5143): the pop-up names the sender and subject; the feed row never does.
     case 'newMail': {
       const character =
@@ -397,7 +403,7 @@ export async function handlePush(env: PushEnv, rawText: string | null, now: numb
 
   // Bounded like the name lookups: a stuck store read must not hold the
   // notification back, because WebKit revokes the subscription on a silent push.
-  const { title, body, feedBody, feedKey, subjectId } = await withinBudget(
+  const { title, body, feedBody, feedKey, subjectId, path } = await withinBudget(
     present(env, payload, now),
     genericPresented(payload),
     PRESENT_BUDGET_MS
@@ -413,7 +419,12 @@ export async function handlePush(env: PushEnv, rawText: string | null, now: numb
         )
       : false;
   const options = notificationOptionsFor(
-    { eventId: payload.eventId, characterId: payload.characterId, subjectId },
+    {
+      eventId: payload.eventId,
+      characterId: payload.characterId,
+      subjectId,
+      ...(path === undefined ? {} : { path }),
+    },
     body
   );
   const notify = env.showNotification(
