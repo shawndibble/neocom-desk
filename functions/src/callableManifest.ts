@@ -42,7 +42,6 @@ export const CALLABLE_ACTIONS = {
     'createCorpTaxBookFeederInviteCallable',
     'revokeCorpTaxBookFeederInviteCallable',
     'previewCorpTaxBookFeederInviteCallable',
-    'acceptCorpTaxBookFeederInviteCallable',
     'saveCorpTaxBookSyncGrantCallable',
     'saveCorpTaxBookFeederGrantCallable',
     'addOwnCorpTaxBookFeederCallable',

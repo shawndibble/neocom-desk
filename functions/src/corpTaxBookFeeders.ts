@@ -212,14 +212,6 @@ export interface AcceptFeederInviteInput {
   accessToken: string;
 }
 
-export function parseAcceptFeederInviteInput(data: unknown): AcceptFeederInviteInput {
-  const d = record(data);
-  return {
-    code: boundedString(d.code, 'code', 64),
-    accessToken: boundedString(d.accessToken, 'accessToken', 8192),
-  };
-}
-
 // --- Create and revoke -----------------------------------------------------
 
 export async function requireActiveBook(deps: BookDeps, corporationId: number): Promise<void> {

@@ -104,9 +104,7 @@ import {
   type CorpSyncDeps,
 } from './corpSyncGrant.js';
 import {
-  acceptFeederInvite,
   createFeederInvite,
-  parseAcceptFeederInviteInput,
   parseCreateFeederInviteInput,
   parsePreviewFeederInviteInput,
   parseRevokeFeederInviteInput,
@@ -928,14 +926,6 @@ corpTaxBookAction('previewCorpTaxBookFeederInviteCallable', (request) =>
     corpTaxBookDeps(),
     callerOf(request),
     parsePreviewFeederInviteInput(request.data)
-  )
-);
-
-corpTaxBookAction('acceptCorpTaxBookFeederInviteCallable', (request) =>
-  acceptFeederInvite(
-    corpTaxBookDeps(),
-    callerOf(request),
-    parseAcceptFeederInviteInput(request.data)
   )
 );
 
