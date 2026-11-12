@@ -1,12 +1,23 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { reportEsiAuthFailure, subscribeToEsiAuthFailures, useAuthFailure } from './authFailure';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { db } from '@/db';
+import {
+  clearNeedsLogin,
+  markNeedsLogin,
+  needsLoginIds,
+  reportEsiAuthFailure,
+  subscribeToEsiAuthFailures,
+  useAuthFailure,
+  useNeedsLogin,
+} from './authFailure';
 import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
 import { emitDeadGrant } from '@/auth/deadGrantSignal';
 
 const CHARACTER_ID = 5;
 
-beforeEach(() => {
-  useAuthFailure.setState({ failure: null, needsLogin: [] });
+beforeEach(async () => {
+  useAuthFailure.setState({ failure: null });
+  await db.settings.delete('auth.needsLogin');
+  useNeedsLogin.setState({ value: [], hydrated: true });
 });
 
 describe('useAuthFailure', () => {
@@ -85,37 +96,53 @@ describe('subscribeToEsiAuthFailures', () => {
     expect(useAuthFailure.getState().failure).toBeNull();
   });
 
-  describe('needsLogin', () => {
-    it('survives dismissing the failure that triggered the redirect', () => {
+  describe('needs-sign-in mark', () => {
+    const marks = () => useNeedsLogin.getState().value;
+
+    it('is set by a token failure for any character, not only the active one', async () => {
+      useAuthFailure.getState().reportTokenFailure(CHARACTER_ID + 1);
+      await vi.waitFor(() => expect(marks()).toEqual([CHARACTER_ID + 1]));
+    });
+
+    it('survives dismissing the failure that triggered the redirect', async () => {
       useAuthFailure.getState().reportTokenFailure(CHARACTER_ID);
-      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID);
       useAuthFailure.getState().dismiss();
-      expect(useAuthFailure.getState().needsLogin).toEqual([CHARACTER_ID]);
+      await vi.waitFor(() => expect(marks()).toEqual([CHARACTER_ID]));
     });
 
-    it('does not record the same character twice', () => {
-      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID);
-      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID);
-      expect(useAuthFailure.getState().needsLogin).toEqual([CHARACTER_ID]);
+    it('survives a reload: the store rehydrates it from this device', async () => {
+      await markNeedsLogin(CHARACTER_ID);
+      useNeedsLogin.setState({ value: [], hydrated: false });
+      expect(await needsLoginIds()).toEqual([CHARACTER_ID]);
     });
 
-    it('clears on a successful token refresh, for that character only', () => {
-      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID);
-      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID + 1);
+    it('keeps the stored marks when a new one lands before hydration', async () => {
+      await db.settings.put({ key: 'auth.needsLogin', value: [CHARACTER_ID] });
+      useNeedsLogin.setState({ value: [], hydrated: false });
+      await markNeedsLogin(CHARACTER_ID + 1);
+      expect(marks()).toEqual([CHARACTER_ID, CHARACTER_ID + 1]);
+    });
+
+    it('does not record the same character twice', async () => {
+      await markNeedsLogin(CHARACTER_ID);
+      await markNeedsLogin(CHARACTER_ID);
+      expect(marks()).toEqual([CHARACTER_ID]);
+    });
+
+    it('clears when the grant works again (sign-in), for that character only', async () => {
+      await markNeedsLogin(CHARACTER_ID);
+      await markNeedsLogin(CHARACTER_ID + 1);
       useAuthFailure.getState().clearFor(CHARACTER_ID, 'token');
-      expect(useAuthFailure.getState().needsLogin).toEqual([CHARACTER_ID + 1]);
+      await vi.waitFor(() => expect(marks()).toEqual([CHARACTER_ID + 1]));
+      useNeedsLogin.setState({ value: [], hydrated: false });
+      expect(await needsLoginIds()).toEqual([CHARACTER_ID + 1]);
     });
 
-    it('survives a request-kind clear, which says nothing about the grant', () => {
-      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID);
+    it('survives a request-kind clear, which says nothing about the grant', async () => {
+      await markNeedsLogin(CHARACTER_ID);
       useAuthFailure.getState().clearFor(CHARACTER_ID, 'request');
-      expect(useAuthFailure.getState().needsLogin).toEqual([CHARACTER_ID]);
-    });
-
-    it('clears on explicit dismiss', () => {
-      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID);
-      useAuthFailure.getState().dismissNeedsLogin(CHARACTER_ID);
-      expect(useAuthFailure.getState().needsLogin).toEqual([]);
+      await clearNeedsLogin(CHARACTER_ID + 1);
+      expect(marks()).toEqual([CHARACTER_ID]);
     });
   });
 });

@@ -60,6 +60,17 @@ export const FEED_SYNC_WINDOW_MAX_ROWS = 100;
 // note at each declaration — change one and change the other.
 export const FEED_SYNC_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * Events whose Feed rows never leave this device. A dead login
+ * (`characterNeedsLogin`, issue #6091) is about this device's own tokens, and
+ * nothing about a failed refresh is sent to the server.
+ */
+const DEVICE_LOCAL_EVENT_IDS: ReadonlySet<string> = new Set(['characterNeedsLogin']);
+
+export function isDeviceLocalFeedRow(row: { eventId: string }): boolean {
+  return DEVICE_LOCAL_EVENT_IDS.has(row.eventId);
+}
+
 export function rowsWithinSyncWindow<T extends { firedAt: number }>(
   newestFirst: readonly T[],
   now: number,

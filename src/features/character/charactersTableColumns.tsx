@@ -47,6 +47,7 @@ import {
 import { type CharacterGroup, type CharacterSortStats } from '@/features/character/groups';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { AffiliationName } from '@/features/character/CharacterCard';
+import { NeedsLoginAction } from '@/features/character/NeedsLoginAction';
 import { achievementColumn } from '@/features/character/achievementColumn';
 import type { AchievementLookup } from '@/features/character/useCharacterAchievements';
 import {
@@ -198,6 +199,7 @@ export function buildColumns(
             alt={t('characters.portraitAlt', { name: row.character.name })}
           />
           <span className="truncate font-medium">{row.character.name}</span>
+          <NeedsLoginAction characterId={row.character.characterId} name={row.character.name} />
         </span>
       ),
     },

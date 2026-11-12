@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/controlStyles';
 import { useCharacterPermissionCounts } from '@/features/permissions/useCharacterPermissionCounts';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { NeedsLoginAction } from '@/features/character/NeedsLoginAction';
 import { grantMissingPath } from './grantMissingPath';
 
 export function CharacterSwitcher({
@@ -97,6 +98,12 @@ export function CharacterSwitcher({
                     {t('nav.permissionsCount', { granted: row.granted, total: row.total })}
                   </button>
                 </span>
+                {/* Above the row's full-size switch button, like the Permissions link. */}
+                <NeedsLoginAction
+                  characterId={row.characterId}
+                  name={row.name}
+                  className="relative"
+                />
                 {active && (
                   <Pill className="pointer-events-none relative">{t('nav.characterActive')}</Pill>
                 )}
