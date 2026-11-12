@@ -51,6 +51,8 @@ export interface MoonOwnerFeeder {
   coveragePeriods: CoveragePeriod[];
   /** A pending removal (#4520); `effectiveAt` is set once its notice is out. */
   removal?: { startedAt: number; startedByName: string; effectiveAt?: number };
+  /** Whether its grant reads refinery names (#4654); absent until a read since then. */
+  readsStructureNames?: boolean;
   payouts: readonly MoonOwnerPayout[];
 }
 
@@ -137,6 +139,8 @@ export interface MoonOwnerRow {
   mode: FeederMode;
   /** One of the viewer's own corporations: no owner rate, no payouts. */
   sameOwner?: boolean;
+  /** False when its grant predates the structure scope: rows fall back to systems and ids. */
+  readsStructureNames?: boolean;
 }
 
 /** Whether a row is on the pay list: whole ISK owed, on a normal (not settled otherwise) moon owner. */
@@ -339,6 +343,7 @@ function workFromSummary(
     ...(f.staleSince !== undefined ? { staleSince: f.staleSince } : {}),
     mode: settledNow ? 'settled-otherwise' : 'normal',
     ...(f.sameOwner ? { sameOwner: true } : {}),
+    ...(f.readsStructureNames !== undefined ? { readsStructureNames: f.readsStructureNames } : {}),
   };
 }
 
@@ -429,6 +434,9 @@ function work(
       ...(f.staleSince !== undefined ? { staleSince: f.staleSince } : {}),
       mode: settledNow ? 'settled-otherwise' : 'normal',
       ...(f.sameOwner ? { sameOwner: true } : {}),
+      ...(f.readsStructureNames !== undefined
+        ? { readsStructureNames: f.readsStructureNames }
+        : {}),
     },
   };
 }

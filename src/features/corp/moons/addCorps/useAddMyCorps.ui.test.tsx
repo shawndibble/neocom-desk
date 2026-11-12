@@ -219,6 +219,43 @@ describe('Add my other corps on the page', () => {
     });
   });
 
+  it('Grant again signs every own corp without names in one pass, the clicked one first', async () => {
+    const noNames = (c: (typeof CORPS)[number]) =>
+      ({
+        id: String(c.corporationId),
+        corporationId: c.corporationId,
+        status: 'settled-otherwise',
+        sameOwner: true,
+        readsStructureNames: false,
+      }) as MoonOwnerRow;
+    render(
+      <MemoryRouter>
+        <Harness rows={[noNames(CORPS[0]!), noNames(CORPS[2]!)]} />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText('Needs you (2)')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Grant again for Cobalt Drift Syndicate' })
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Logging in: corp 1 of 2' })
+    ).toBeInTheDocument();
+    const run = useAddCorpsRunStore.getState().value!;
+    expect(run.queue.map((c) => c.corporationId)).toEqual([
+      CORPS[2]!.corporationId,
+      CORPS[0]!.corporationId,
+    ]);
+    // A grant again changes no coverage: the run asks for none.
+    expect(run.coverageFrom).toBeUndefined();
+    await userEvent.click(screen.getByRole('button', { name: 'Log in as Dax Orlen with EVE' }));
+    expect(beginOwnCorpGrantLogin).toHaveBeenCalledWith({
+      characterId: 7,
+      expectedCeoCharacterId: CORPS[2]!.ceoCharacterId,
+      collectorCorporationId: BOOK_CORPORATION_ID,
+      feederCorporationId: CORPS[2]!.corporationId,
+    });
+  });
+
   it('does not send a stale corporation to EVE: it is recorded as not connected', async () => {
     verifyOwnCeoCorp.mockResolvedValueOnce('stale');
     render(at());
