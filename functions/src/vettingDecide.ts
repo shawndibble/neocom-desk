@@ -7,6 +7,7 @@ import {
   VETTING_DEFAULT_SETTINGS,
   VETTING_DRAFT_HOURS,
   VETTING_KEEP_DAYS,
+  VETTING_OPEN_KEEP_DAYS,
   VETTING_WATCHLIST_MAX,
   type VettingAssessment,
   type VettingCharacterInput,
@@ -136,9 +137,29 @@ export function shouldLogOpen(
 const DECIDED = ['accepted', 'rejected'];
 
 /**
+ * Whether the review is about this person: its pilot, a character read into it or on its
+ * report, or another character of the EVE account one of those was read from. The subject may
+ * neither read the report nor sign it off (`own-review`).
+ */
+export function isSubject(
+  review: StoredVettingReview,
+  person: Pick<VettingActor, 'characterId' | 'ownerHash'>
+): boolean {
+  return (
+    review.pilot.characterId === person.characterId ||
+    review.reportCharacters.some((character) => character.characterId === person.characterId) ||
+    review.characters.some(
+      (character) =>
+        character.characterId === person.characterId ||
+        (character.ownerHash !== undefined && character.ownerHash === person.ownerHash)
+    )
+  );
+}
+
+/**
  * Whether this reviewer is shut out of the decision: they asked for the review, or it is about
- * them (the pilot, or one of the characters read). The same person on another character of the
- * same EVE account counts as the requester.
+ * them (`isSubject`). The same person on another character of the same EVE account counts as
+ * the requester.
  */
 export function isBarred(review: StoredVettingReview, reviewer: VettingActor): boolean {
   const asked = review.requestedBy;
@@ -148,10 +169,7 @@ export function isBarred(review: StoredVettingReview, reviewer: VettingActor): b
   ) {
     return true;
   }
-  return (
-    review.pilot.characterId === reviewer.characterId ||
-    review.characters.some((character) => character.characterId === reviewer.characterId)
-  );
+  return isSubject(review, reviewer);
 }
 
 /** One sign-off per person: a second character of the same account has already signed. */
@@ -165,9 +183,11 @@ function hasSigned(review: StoredVettingReview, reviewer: VettingActor): boolean
 export type SignOffRefusal = 'not-open' | 'barred' | 'already-signed';
 
 /**
- * A reviewer's decision applied to an open review. A `no` rejects it at once; the review is
- * accepted when the `yes` count reaches `signOffsNeeded`. A decided review is kept
- * `VETTING_KEEP_DAYS` and then swept.
+ * A reviewer's sign-off recorded on an open review. Nothing is decided until `signOffsNeeded`
+ * people have signed, whichever way: then the review is rejected if any of them said `no`, and
+ * accepted otherwise. A `no` therefore closes nothing early, so that a review still open says
+ * nothing about the sign-offs already on it (the blind second review). A decided review is kept
+ * `VETTING_KEEP_DAYS` and then swept; an undecided one keeps the expiry its submit gave it.
  */
 export function decideSignOff(
   review: StoredVettingReview,
@@ -181,8 +201,12 @@ export function decideSignOff(
   if (hasSigned(review, reviewer)) return { ok: false, reason: 'already-signed' };
 
   const signOffs: StoredSignOff[] = [...review.signOffs, { ...reviewer, at: now, decision, note }];
-  const yes = signOffs.filter((signOff) => signOff.decision === 'yes').length;
-  const state = decision === 'no' ? 'rejected' : yes >= review.signOffsNeeded ? 'accepted' : 'open';
+  const state =
+    signOffs.length < review.signOffsNeeded
+      ? 'open'
+      : signOffs.some((signOff) => signOff.decision === 'no')
+        ? 'rejected'
+        : 'accepted';
   const next: StoredVettingReview = {
     ...review,
     signOffs,
@@ -230,7 +254,8 @@ export function reviewSummary(
     flags: review.assessment?.flags.length ?? 0,
     ...(worst ? { worst } : {}),
     missing: review.assessment?.checks.filter((check) => check.state === 'missing').length ?? 0,
-    signed: review.signOffs.filter((signOff) => signOff.decision === 'yes').length,
+    // Every sign-off, not the yes count: that would give an open review's decisions away.
+    signed: review.signOffs.length,
     needed: review.signOffsNeeded,
     yours: review.state === 'open' && !isBarred(review, viewer) && !hasSigned(review, viewer),
     readAt: review.readAt,
@@ -241,7 +266,8 @@ export function reviewSummary(
 
 /**
  * The report as this officer may see it. Blind second review: another reviewer's decision and
- * note are left out until the viewer has recorded their own, or the review is decided.
+ * note are left out (their name and the time stay) until the viewer has recorded their own, or
+ * the review is decided. An open review's state gives nothing away either: see `decideSignOff`.
  */
 export function reviewView(
   id: string,
@@ -375,22 +401,50 @@ export function withoutCharacter(
 export const draftExpiry = (now: number): number => now + VETTING_DRAFT_HOURS * HOUR_MS;
 export const requestExpiry = (createdAt: number): number =>
   createdAt + VETTING_REQUEST_KEEP_DAYS * DAY_MS;
+/** When a shared review nobody decides is deleted, counted from its submit. */
+export const openExpiry = (now: number): number => now + VETTING_OPEN_KEEP_DAYS * DAY_MS;
+
+const expired = (review: Partial<StoredVettingReview>, now: number): boolean =>
+  isFiniteNumber(review.expiresAt) && review.expiresAt <= now;
+
+/**
+ * A draft past its `VETTING_DRAFT_HOURS`. The sweep runs once a day, so until it does the
+ * store treats such a draft as gone: what was read into it is never used again.
+ */
+export function isExpiredDraft(review: Partial<StoredVettingReview>, now: number): boolean {
+  return review.state === 'draft' && expired(review, now);
+}
+
+/**
+ * A request still holding what a member read into it more than `VETTING_DRAFT_HOURS` ago. The
+ * request itself lives on; the store drops the reads (`withoutInputs`) before using it.
+ */
+export function hasExpiredInputs(review: Partial<StoredVettingReview>, now: number): boolean {
+  return (
+    review.state === 'requested' && (review.characters?.length ?? 0) > 0 && expired(review, now)
+  );
+}
+
+/** A request with what was read into it dropped: the sweep's `clear-inputs`. */
+export function withoutInputs(review: StoredVettingReview): StoredVettingReview {
+  return { ...review, characters: [], expiresAt: requestExpiry(review.createdAt) };
+}
 
 /**
  * What the daily sweep does with a review whose `expiresAt` has passed. A draft goes after
  * `VETTING_DRAFT_HOURS`; a requested or declined review 30 days after it was asked for; a
- * decided one at `deleteAt`. A requested review still holding what a member read into it loses
- * only that after `VETTING_DRAFT_HOURS`, so raw rows never outlive a draft.
+ * shared one nobody decided `VETTING_OPEN_KEEP_DAYS` after its submit; a decided one at
+ * `deleteAt`. A requested review still holding what a member read into it loses only that
+ * after `VETTING_DRAFT_HOURS`, so raw rows never outlive a draft.
  */
 export function decideVettingSweep(
   review: Partial<StoredVettingReview>,
   now: number
 ): 'delete' | 'clear-inputs' | 'keep' {
-  if (!isFiniteNumber(review.expiresAt) || review.expiresAt > now) return 'keep';
-  if (review.state === 'open') return 'keep';
+  if (!expired(review, now)) return 'keep';
   if (review.state === 'requested') {
     if (isFiniteNumber(review.createdAt) && now < requestExpiry(review.createdAt)) {
-      return (review.characters?.length ?? 0) > 0 ? 'clear-inputs' : 'keep';
+      return hasExpiredInputs(review, now) ? 'clear-inputs' : 'keep';
     }
   }
   return 'delete';
@@ -416,4 +470,38 @@ export function nextDraftSlot(
 /** The sign-offs a review of this kind needs under these settings. */
 export function signOffsNeeded(settings: VettingSettings, kind: VettingKind): number {
   return settings.signOffs[kind];
+}
+
+// --- The public corp lookup --------------------------------------------------
+
+export interface TimedEntry<T> {
+  at: number;
+  value: T;
+}
+
+/** What `rememberTimed` kept under `key`, while it is younger than `ttlMs`. */
+export function recallTimed<K, T>(
+  cache: Map<K, TimedEntry<T>>,
+  key: K,
+  now: number,
+  ttlMs: number
+): TimedEntry<T> | undefined {
+  const held = cache.get(key);
+  return held && now >= held.at && now - held.at < ttlMs ? held : undefined;
+}
+
+/** Keeps `value` under `key`, dropping the oldest entries so the map holds at most `max`. */
+export function rememberTimed<K, T>(
+  cache: Map<K, TimedEntry<T>>,
+  key: K,
+  value: T,
+  now: number,
+  max: number
+): void {
+  cache.delete(key);
+  for (const oldest of cache.keys()) {
+    if (cache.size < max) break;
+    cache.delete(oldest);
+  }
+  cache.set(key, { at: now, value });
 }

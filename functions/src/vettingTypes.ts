@@ -45,7 +45,6 @@ export const VETTING_LOG_MAX = 100;
 export const VETTING_MAX_READS = 30;
 /** Drafts one verified character may start per corporation per day. */
 export const VETTING_DAILY_DRAFTS = 10;
-export const VETTING_ROLE_MAX = 40;
 /** Dealings kept per character, newest first, so an input document stays under 1 MiB. */
 export const VETTING_MAX_DEALINGS = 5000;
 /** Names one settings save may add to the watchlist. */
@@ -82,6 +81,11 @@ export interface StoredVettingCharacter {
   corporationName: string;
   missing: VettingSource[];
   readAt: number;
+  /**
+   * The EVE account the read's token belonged to, so another character of the same account
+   * cannot open the report as a reviewer. Absent on a review stored before it was kept.
+   */
+  ownerHash?: string;
 }
 
 export interface StoredVettingReview {
@@ -108,7 +112,14 @@ export interface StoredVettingReview {
   createdAt: number;
   readAt: number | null;
   decidedAt: number | null;
+  /**
+   * When the pilot is told the review goes: `expiresAt` once shared (90 days undecided, 30 days
+   * after a decision); null before that.
+   */
   deleteAt: number | null;
-  /** When the daily sweep next acts on it (vettingDecide.ts `decideVettingSweep`); null while open. */
+  /**
+   * When the daily sweep next acts on it (vettingDecide.ts `decideVettingSweep`), and when a
+   * draft, or what a member read into a request, stops being usable.
+   */
   expiresAt: number | null;
 }

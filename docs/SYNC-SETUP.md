@@ -102,7 +102,9 @@ firebase deploy --only functions:vettingCall,functions:dailyHousekeeping,firesto
 deploy them before or with the function, never after. The sweep's collection-group index on
 `vettingReviews.expiresAt` is in `firestore.indexes.json`
 (`firebase deploy --only firestore:indexes`); until it is deployed the sweep falls back to a
-per-corporation scan.
+per-corporation scan. The same sweep deletes stale `vettingThrottle` counters with a
+collection-group query on `windowStart`, which needs its own `COLLECTION_GROUP` field override
+there and falls back the same way without it.
 
 ### Index exemptions are a one-way-ish deploy
 

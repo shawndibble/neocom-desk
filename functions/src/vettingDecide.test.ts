@@ -4,18 +4,29 @@ import {
   applyVettingSettingsPatch,
   decideSignOff,
   decideVettingSweep,
+  hasExpiredInputs,
+  isExpiredDraft,
+  isSubject,
   nextDraftSlot,
+  openExpiry,
   pilotStatus,
   readVettingSettings,
+  recallTimed,
   referencedPartyIds,
+  rememberTimed,
   reportCharacter,
   reviewSummary,
   reviewView,
   shouldLogOpen,
   unknownWatchName,
   withoutCharacter,
+  withoutInputs,
 } from './vettingDecide.js';
-import { VETTING_KEEP_DAYS, type VettingAssessment } from './vettingEngine.js';
+import {
+  VETTING_KEEP_DAYS,
+  VETTING_OPEN_KEEP_DAYS,
+  type VettingAssessment,
+} from './vettingEngine.js';
 import { DAY_MS, HOUR_MS, type StoredVettingReview, type VettingActor } from './vettingTypes.js';
 
 const T0 = Date.parse('2026-11-01T12:00:00Z');
@@ -94,7 +105,7 @@ describe('decideSignOff', () => {
     });
   });
 
-  it('accepts when the yes count reaches what the review needs', () => {
+  it('accepts when everyone the review needs has signed yes', () => {
     const twice = decided(decided(review(), actor(2), 'yes'), actor(3), 'yes', T0 + 5);
     expect(twice).toMatchObject({
       state: 'accepted',
@@ -105,12 +116,72 @@ describe('decideSignOff', () => {
     expect(twice.log.map((entry) => entry.action)).toEqual(['decided', 'decided']);
   });
 
-  it('rejects at once on a no', () => {
-    expect(decided(review(), actor(2), 'no')).toMatchObject({
+  it('stays open after a no until everyone needed has signed, then rejects', () => {
+    const open = review({ deleteAt: T0 + 9, expiresAt: T0 + 9 });
+    const once = decided(open, actor(2), 'no');
+    // Indistinguishable from a yes: still open, nothing decided, the submit's expiry kept.
+    expect(once).toMatchObject({
+      state: 'open',
+      decidedAt: null,
+      deleteAt: T0 + 9,
+      expiresAt: T0 + 9,
+    });
+    expect({ ...once, signOffs: [] }).toEqual({
+      ...decided(open, actor(2), 'yes'),
+      signOffs: [],
+    });
+
+    expect(decided(once, actor(3), 'yes', T0 + 5)).toMatchObject({
+      state: 'rejected',
+      decidedAt: T0 + 5,
+      deleteAt: T0 + 5 + VETTING_KEEP_DAYS * DAY_MS,
+      expiresAt: T0 + 5 + VETTING_KEEP_DAYS * DAY_MS,
+    });
+    expect(decided(decided(open, actor(2), 'yes'), actor(3), 'no').state).toBe('rejected');
+  });
+
+  it('rejects on a single no when one sign-off is all the review needs', () => {
+    expect(decided(review({ signOffsNeeded: 1 }), actor(2), 'no')).toMatchObject({
       state: 'rejected',
       decidedAt: T0,
       deleteAt: T0 + VETTING_KEEP_DAYS * DAY_MS,
     });
+  });
+});
+
+describe('isSubject', () => {
+  const read = { ...review().characters[0], characterId: 51, ownerHash: 'h51' };
+  const about = review({
+    characters: [read],
+    reportCharacters: [
+      {
+        characterId: 52,
+        name: 'Pilot 52',
+        corporationId: 98000001,
+        corporationName: 'Test Corp',
+        birthday: '2015-01-01T00:00:00Z',
+        skillPoints: null,
+        corporations: 1,
+        missing: [],
+      },
+    ],
+  });
+
+  it('is the pilot, a character read into the review or on its report', () => {
+    expect(isSubject(about, actor(50))).toBe(true);
+    expect(isSubject(about, actor(51))).toBe(true);
+    expect(isSubject(about, actor(52))).toBe(true);
+  });
+
+  it('is another character of the account a read came from', () => {
+    expect(isSubject(about, actor(60, 'h51'))).toBe(true);
+  });
+
+  it('is not the requester or anyone else', () => {
+    expect(isSubject(about, actor(1))).toBe(false);
+    expect(isSubject(about, actor(2))).toBe(false);
+    // A read stored without its account matches by character only.
+    expect(isSubject(review(), actor(60, 'h50'))).toBe(false);
   });
 });
 
@@ -132,11 +203,26 @@ describe('reviewView', () => {
     ]);
   });
 
+  it('gives a no away no more than a yes while the review is open', () => {
+    const open = review({ signOffsNeeded: 3 });
+    const seen = (decision: 'yes' | 'no') => {
+      const view = reviewView('r1', decided(open, actor(2), decision), actor(3));
+      expect(view).toMatchObject({ state: 'open', signed: 1, needed: 3, yours: true });
+      return JSON.stringify(view);
+    };
+    expect(seen('no')).toBe(seen('yes'));
+    expect(seen('no')).not.toContain('note 2');
+  });
+
   it('shows every decision once the review is decided', () => {
-    const rejected = decided(review(), actor(2), 'no');
-    expect(reviewView('r1', rejected, actor(4)).signOffs[0]).toMatchObject({
-      decision: 'no',
-      note: 'note 2',
+    const rejected = decided(decided(review(), actor(2), 'no'), actor(3), 'yes');
+    expect(reviewView('r1', rejected, actor(4))).toMatchObject({
+      state: 'rejected',
+      signed: 2,
+      signOffs: [
+        { decision: 'no', note: 'note 2' },
+        { decision: 'yes', note: 'note 3' },
+      ],
     });
   });
 
@@ -401,14 +487,16 @@ describe('decideVettingSweep', () => {
   const at = (state: StoredVettingReview['state'], over: Partial<StoredVettingReview> = {}) =>
     review({ state, expiresAt: T0, ...over });
 
-  it('keeps a review that has not expired, has no expiry, or is open', () => {
+  it('keeps a review that has not expired or has no expiry', () => {
     expect(decideVettingSweep(at('draft'), T0 - 1)).toBe('keep');
     expect(decideVettingSweep(at('draft', { expiresAt: null }), T0)).toBe('keep');
-    expect(decideVettingSweep(at('open'), T0)).toBe('keep');
+    expect(decideVettingSweep(at('open'), T0 - 1)).toBe('keep');
+    expect(decideVettingSweep(at('open', { expiresAt: null }), T0)).toBe('keep');
     expect(decideVettingSweep({}, T0)).toBe('keep');
   });
 
-  it('deletes an expired draft, declined request and decided review', () => {
+  it('deletes an expired draft, declined request, decided review and undecided open one', () => {
+    expect(decideVettingSweep(at('open'), T0)).toBe('delete');
     expect(decideVettingSweep(at('draft'), T0)).toBe('delete');
     expect(decideVettingSweep(at('declined'), T0)).toBe('delete');
     expect(decideVettingSweep(at('accepted'), T0)).toBe('delete');
@@ -423,6 +511,37 @@ describe('decideVettingSweep', () => {
   });
 });
 
+describe('expiry on use', () => {
+  it('counts a draft as gone once its time has passed, and no other state', () => {
+    const draft = review({ state: 'draft', expiresAt: T0 });
+    expect(isExpiredDraft(draft, T0 - 1)).toBe(false);
+    expect(isExpiredDraft(draft, T0)).toBe(true);
+    expect(isExpiredDraft(review({ state: 'draft', expiresAt: null }), T0)).toBe(false);
+    expect(isExpiredDraft(review({ state: 'open', expiresAt: T0 }), T0)).toBe(false);
+    expect(isExpiredDraft(review({ state: 'requested', expiresAt: T0 }), T0)).toBe(false);
+  });
+
+  it('finds what a member read into a request and left past its time, and drops it', () => {
+    const requested = review({ state: 'requested', expiresAt: T0 });
+    expect(hasExpiredInputs(requested, T0 - 1)).toBe(false);
+    expect(hasExpiredInputs(requested, T0)).toBe(true);
+    expect(hasExpiredInputs({ ...requested, characters: [] }, T0)).toBe(false);
+    expect(hasExpiredInputs(review({ state: 'draft', expiresAt: T0 }), T0)).toBe(false);
+
+    const dropped = withoutInputs(requested);
+    expect(dropped).toMatchObject({
+      state: 'requested',
+      characters: [],
+      expiresAt: T0 + 30 * DAY_MS,
+    });
+    expect(hasExpiredInputs(dropped, T0)).toBe(false);
+  });
+
+  it('gives an undecided shared review its own keep time', () => {
+    expect(openExpiry(T0)).toBe(T0 + VETTING_OPEN_KEEP_DAYS * DAY_MS);
+  });
+});
+
 describe('nextDraftSlot', () => {
   it('allows ten drafts a day, then refuses without extending the window', () => {
     let state = nextDraftSlot(undefined, T0);
@@ -433,5 +552,27 @@ describe('nextDraftSlot', () => {
       allowed: true,
       state: { windowStart: T0 + DAY_MS, count: 1 },
     });
+  });
+});
+
+describe('the timed cache', () => {
+  it('recalls a value, null included, until it is an hour old', () => {
+    const cache = new Map<number, { at: number; value: string | null }>();
+    rememberTimed(cache, 1, 'a', T0, 500);
+    rememberTimed(cache, 2, null, T0, 500);
+    expect(recallTimed(cache, 1, T0 + HOUR_MS - 1, HOUR_MS)).toEqual({ at: T0, value: 'a' });
+    expect(recallTimed(cache, 2, T0, HOUR_MS)).toEqual({ at: T0, value: null });
+    expect(recallTimed(cache, 1, T0 + HOUR_MS, HOUR_MS)).toBeUndefined();
+    expect(recallTimed(cache, 3, T0, HOUR_MS)).toBeUndefined();
+  });
+
+  it('holds at most its cap, dropping the oldest', () => {
+    const cache = new Map<number, { at: number; value: number }>();
+    for (let i = 0; i < 5; i++) rememberTimed(cache, i, i, T0 + i, 3);
+    expect([...cache.keys()]).toEqual([2, 3, 4]);
+    // Remembering a key again moves it to the newest place and adds no entry.
+    rememberTimed(cache, 2, 9, T0 + 9, 3);
+    expect([...cache.keys()]).toEqual([3, 4, 2]);
+    expect(recallTimed(cache, 2, T0 + 9, HOUR_MS)?.value).toBe(9);
   });
 });

@@ -125,17 +125,17 @@ const CAPITAL_SKILLS = [
 /** Journal rows that are one player choosing to deal with another. */
 const PERSONAL_REF_TYPES = ['player_donation', 'player_trading'];
 
-/** What each check reads; a character missing it cannot be checked. */
-const CHECK_SOURCE: Record<VettingCheckId, VettingSource | null> = {
-  watchlistIsk: 'wallet',
-  watchlistHistory: null,
-  watchlistContacts: 'contact',
-  watchlistMail: 'mail',
-  watchlistContracts: 'contract',
-  undeclaredCharacter: 'wallet',
-  corpHopping: null,
-  cynoNoCapital: 'skills',
-  thinCharacter: 'skills',
+/** What each check reads; a character missing any of them cannot be fully checked. */
+export const VETTING_CHECK_SOURCES: Record<VettingCheckId, readonly VettingSource[]> = {
+  watchlistIsk: ['wallet'],
+  watchlistHistory: [],
+  watchlistContacts: ['contact'],
+  watchlistMail: ['mail'],
+  watchlistContracts: ['contract'],
+  undeclaredCharacter: ['wallet', 'contract'],
+  corpHopping: [],
+  cynoNoCapital: ['skills'],
+  thinCharacter: ['skills'],
 };
 
 function isNpcCorporation(id: number): boolean {
@@ -350,12 +350,10 @@ export function assessVetting(input: VettingInput): VettingAssessment {
   );
 
   const checks = VETTING_CHECKS.map((check): VettingCheckResult => {
-    const source = CHECK_SOURCE[check];
-    const missingFor = source
-      ? input.characters
-          .filter((character) => character.missing.includes(source))
-          .map((character) => character.characterId)
-      : [];
+    const sources = VETTING_CHECK_SOURCES[check];
+    const missingFor = input.characters
+      .filter((character) => sources.some((source) => character.missing.includes(source)))
+      .map((character) => character.characterId);
     const flagged = flags.some((found) => found.check === check);
     return {
       check,
@@ -403,6 +401,10 @@ export const VETTING_DEFAULT_SETTINGS: VettingSettings = {
 
 /** Days a decided review is kept before the daily sweep deletes it. */
 export const VETTING_KEEP_DAYS = 30;
+/** Days a shared review nobody decides is kept. */
+export const VETTING_OPEN_KEEP_DAYS = 90;
+/** Longest role name a promotion review carries. */
+export const VETTING_ROLE_MAX = 40;
 /** Hours an unsent draft is kept. */
 export const VETTING_DRAFT_HOURS = 24;
 export const VETTING_MAX_CHARACTERS = 30;
@@ -453,6 +455,7 @@ export interface VettingReviewSummary {
   worst?: VettingSeverity;
   /** Checks that could not run. */
   missing: number;
+  /** Sign-offs recorded so far, whichever way they went. */
   signed: number;
   needed: number;
   /** The caller has not decided and is allowed to. */
@@ -467,7 +470,7 @@ export interface VettingReview extends VettingReviewSummary {
   corporationId: number;
   note: string;
   requestedBy?: { characterId: number; name: string };
-  /** True when the caller asked for this review and so cannot sign it off. */
+  /** True when the caller asked for this review, or it is about them, so they cannot sign it off. */
   barred: boolean;
   reportCharacters: VettingReportCharacter[];
   parties: VettingParty[];

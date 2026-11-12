@@ -3,8 +3,8 @@
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
 import { int } from './corpTaxBook.js';
-import { VETTING_NOTE_MAX, type VettingKind } from './vettingEngine.js';
-import { VETTING_ROLE_MAX, VETTING_WATCH_ADD_MAX } from './vettingTypes.js';
+import { VETTING_NOTE_MAX, VETTING_ROLE_MAX, type VettingKind } from './vettingEngine.js';
+import { VETTING_WATCH_ADD_MAX } from './vettingTypes.js';
 
 const ID_MAX = 2_147_483_647;
 const TOKEN_MAX = 8192;

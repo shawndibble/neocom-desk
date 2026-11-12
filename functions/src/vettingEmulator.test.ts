@@ -10,6 +10,7 @@ import { sweepVetting } from './vettingCleanup.js';
 import {
   VETTING_DRAFT_HOURS,
   VETTING_KEEP_DAYS,
+  VETTING_OPEN_KEEP_DAYS,
   type VettingCharacterInput,
   type VettingDealing,
   type VettingParty,
@@ -19,6 +20,7 @@ import { parseVettingSettingsPatch, type VettingHandle } from './vettingParse.js
 import { VETTING_SCOPES } from './vettingScopes.js';
 import {
   addVettingCharacter,
+  clearVettingCorpCache,
   declineVetting,
   decideVettingReview,
   getVettingCorp,
@@ -178,6 +180,7 @@ emulatorSuite('vetting (emulator)', () => {
   beforeEach(async () => {
     await clearEmulator();
     now = T0;
+    clearVettingCorpCache();
     esiCalls.length = 0;
     for (const map of [identities, owners, sheets, names, homes, scopes]) map.clear();
     identities.set(CEO, { corporationId: CORP, ceoId: CEO, roles: [] });
@@ -216,6 +219,19 @@ emulatorSuite('vetting (emulator)', () => {
     expect(await reason(getVettingCorp(deps(), { corporationId: 98000404 }))).toBe('unknown-corp');
     expect(await reason(start())).toBe('vetting-off');
     expect(esiCalls.filter((c) => c.startsWith('read:'))).toEqual([]);
+
+    // A corp with no settings is named from ESI once an hour, known or not.
+    now = T0 + HOUR_MS - 1;
+    expect(await getVettingCorp(deps(), { corporationId: CORP })).toMatchObject({
+      name: 'Test Corp',
+      on: false,
+    });
+    expect(await reason(getVettingCorp(deps(), { corporationId: 98000404 }))).toBe('unknown-corp');
+    expect(esiCalls).toEqual([`corporation:${CORP}`, 'corporation:98000404']);
+    now = T0 + HOUR_MS;
+    await getVettingCorp(deps(), { corporationId: CORP });
+    expect(esiCalls).toHaveLength(3);
+    now = T0;
 
     await turnOn();
     esiCalls.length = 0;
@@ -332,7 +348,9 @@ emulatorSuite('vetting (emulator)', () => {
       state: 'open',
       note: 'x'.repeat(10),
       readAt: T0,
-      expiresAt: null,
+      // Kept 90 days for a decision, and the pilot is told so.
+      deleteAt: T0 + VETTING_OPEN_KEEP_DAYS * DAY_MS,
+      expiresAt: T0 + VETTING_OPEN_KEEP_DAYS * DAY_MS,
       signOffsNeeded: 1,
     });
     expect(review?.assessment.flags).toMatchObject([
@@ -368,7 +386,61 @@ emulatorSuite('vetting (emulator)', () => {
     expect(
       await reason(addVettingCharacter(deps(), { ...handle, accessToken: tok(APPLICANT_ALT) }))
     ).toBe('wrong-state');
-    expect(await getVettingStatus(deps(), handle)).toMatchObject({ state: 'open', readAt: T0 });
+    expect(await getVettingStatus(deps(), handle)).toMatchObject({
+      state: 'open',
+      readAt: T0,
+      deleteAt: T0 + VETTING_OPEN_KEEP_DAYS * DAY_MS,
+    });
+  });
+
+  it('treats a draft past its day as gone, before the sweep has run', async () => {
+    await turnOn();
+    const { handle } = await start();
+    const reads = esiCalls.length;
+    now = T0 + VETTING_DRAFT_HOURS * HOUR_MS - 1;
+    expect((await getVettingStatus(deps(), handle)).state).toBe('draft');
+
+    now = T0 + VETTING_DRAFT_HOURS * HOUR_MS;
+    expect(await reason(getVettingStatus(deps(), handle))).toBe('bad-key');
+    expect(
+      await reason(addVettingCharacter(deps(), { ...handle, accessToken: tok(APPLICANT_ALT) }))
+    ).toBe('bad-key');
+    expect(
+      await reason(removeVettingCharacter(deps(), { ...handle, characterId: APPLICANT }))
+    ).toBe('bad-key');
+    expect(await reason(submit(handle))).toBe('bad-key');
+    // Nothing was read, used or changed.
+    expect(esiCalls.length).toBe(reads);
+    expect(await stored(handle.reviewId)).toMatchObject({ state: 'draft', reads: 1 });
+    // The pilot can still delete it.
+    expect(await withdrawVetting(deps(), handle)).toEqual({});
+    expect((await reviewDoc(handle.reviewId).get()).exists).toBe(false);
+    expect(await inputIds(handle.reviewId)).toEqual([]);
+  });
+
+  it('drops what a member read into a request a day ago instead of using it', async () => {
+    await turnOn();
+    await request('Pilot 5');
+    const [{ handle }] = await myRequests(MEMBER);
+    await addVettingCharacter(deps(), { ...handle, accessToken: tok(APPLICANT_ALT) });
+
+    // A day on, a new read replaces the stale one rather than joining it.
+    now = T0 + VETTING_DRAFT_HOURS * HOUR_MS;
+    const added = await addVettingCharacter(deps(), { ...handle, accessToken: tok(MEMBER) });
+    expect(added.characters.map((c) => c.characterId)).toEqual([MEMBER]);
+    expect(await inputIds(handle.reviewId)).toEqual([String(MEMBER)]);
+    expect((await stored(handle.reviewId))?.expiresAt).toBe(now + VETTING_DRAFT_HOURS * HOUR_MS);
+
+    // Another day on, a submit has nothing left to send.
+    now = T0 + 2 * VETTING_DRAFT_HOURS * HOUR_MS;
+    expect(await reason(submit(handle))).toBe('no-characters');
+    expect(await stored(handle.reviewId)).toMatchObject({
+      state: 'requested',
+      characters: [],
+      expiresAt: T0 + 30 * DAY_MS,
+    });
+    expect(await inputIds(handle.reviewId)).toEqual([]);
+    expect((await getVettingStatus(deps(), handle)).characters).toEqual([]);
   });
 
   it('will not share a report with no characters', async () => {
@@ -394,11 +466,10 @@ emulatorSuite('vetting (emulator)', () => {
 
   it('limits drafts per character per day and reads per report', async () => {
     await turnOn();
-    let last = await start();
-    for (let i = 1; i < 10; i++) last = await start();
+    for (let i = 0; i < 10; i++) await start();
     expect(await reason(start())).toBe('rate-limited');
     now = T0 + DAY_MS;
-    await start();
+    const last = await start();
 
     await reviewDoc(last.handle.reviewId).update({ reads: 30 });
     const reads = esiCalls.length;
@@ -406,6 +477,18 @@ emulatorSuite('vetting (emulator)', () => {
       await reason(addVettingCharacter(deps(), { ...last.handle, accessToken: tok(APPLICANT_ALT) }))
     ).toBe('rate-limited');
     expect(esiCalls.length).toBe(reads);
+
+    // The slot is taken before the read: two adds side by side cannot both have the last one.
+    await reviewDoc(last.handle.reviewId).update({ reads: 29 });
+    const both = await Promise.allSettled(
+      [APPLICANT_ALT, STRANGER].map((id) =>
+        addVettingCharacter(deps(), { ...last.handle, accessToken: tok(id) })
+      )
+    );
+    expect(both.map((out) => out.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(esiCalls.length).toBe(reads + 1);
+    expect(await stored(last.handle.reviewId)).toMatchObject({ reads: 30 });
+    expect((await stored(last.handle.reviewId))?.characters).toHaveLength(2);
   });
 
   it('shows the overview to a Director, the CEO and a Personnel_Manager only', async () => {
@@ -548,6 +631,86 @@ emulatorSuite('vetting (emulator)', () => {
     });
   });
 
+  it('keeps a review open after a no, so an open review says nothing of its sign-offs', async () => {
+    await turnOn();
+    await request('Pilot 5');
+    const [{ handle }] = await myRequests(MEMBER);
+    await addVettingCharacter(deps(), { ...handle, accessToken: tok(MEMBER) });
+    await submit(handle);
+    const id = handle.reviewId;
+
+    now = T0 + 5;
+    expect(await decide(id, RECRUITER, 'no', 'not this one')).toMatchObject({
+      state: 'open',
+      signed: 1,
+      needed: 2,
+      decidedAt: null,
+      deleteAt: T0 + VETTING_OPEN_KEEP_DAYS * DAY_MS,
+    });
+    const blind = await open(id, RECRUITER_2);
+    expect(blind).toMatchObject({ state: 'open', signed: 1, yours: true });
+    expect(blind.signOffs).toEqual([
+      { characterId: RECRUITER, name: `Pilot ${RECRUITER}`, you: false, at: T0 + 5 },
+    ]);
+    expect(JSON.stringify(blind)).not.toContain('not this one');
+    // The requester, who cannot sign, is told no more.
+    expect((await open(id, DIRECTOR)).signOffs[0]).not.toHaveProperty('decision');
+    expect(await getVettingStatus(deps(), handle)).toMatchObject({
+      state: 'open',
+      decidedAt: null,
+    });
+
+    now = T0 + 9;
+    expect(await decide(id, RECRUITER_2, 'yes')).toMatchObject({
+      state: 'rejected',
+      signed: 2,
+      decidedAt: T0 + 9,
+      deleteAt: T0 + 9 + VETTING_KEEP_DAYS * DAY_MS,
+      signOffs: [
+        { characterId: RECRUITER, decision: 'no', note: 'not this one' },
+        { characterId: RECRUITER_2, you: true, decision: 'yes' },
+      ],
+    });
+    expect((await stored(id))?.expiresAt).toBe(T0 + 9 + VETTING_KEEP_DAYS * DAY_MS);
+  });
+
+  it('never shows a reviewer the report about themselves', async () => {
+    await turnOn();
+    names.set(RECRUITER, { id: RECRUITER, name: 'Pilot 3', category: 'character' });
+    await request('Pilot 3');
+    const [{ handle }] = await myRequests(RECRUITER);
+    await addVettingCharacter(deps(), { ...handle, accessToken: tok(RECRUITER) });
+    await addVettingCharacter(deps(), { ...handle, accessToken: tok(APPLICANT_ALT) });
+    await submit(handle);
+    const id = handle.reviewId;
+
+    expect(await reason(open(id, RECRUITER))).toBe('own-review');
+    expect(await reason(decide(id, RECRUITER, 'yes'))).toBe('own-review');
+    // A character on the report, and another character of the account one was read from.
+    identities.set(APPLICANT_ALT, { corporationId: CORP, ceoId: CEO, roles: ['Director'] });
+    expect(await reason(open(id, APPLICANT_ALT))).toBe('own-review');
+    owners.set(RECRUITER_2, ownerOf(APPLICANT_ALT));
+    expect(await reason(open(id, RECRUITER_2))).toBe('own-review');
+    expect(await reason(decide(id, RECRUITER_2, 'yes'))).toBe('own-review');
+    owners.delete(RECRUITER_2);
+
+    // Nothing was opened or signed, and the queue still lists the row as not theirs.
+    expect(await stored(id)).toMatchObject({ state: 'open', signOffs: [] });
+    expect((await getVettingStatus(deps(), handle)).openedBy).toEqual([]);
+    const queue = await getVettingOverview(deps(), who(RECRUITER), call(RECRUITER));
+    expect(queue.reviews).toMatchObject([{ id, state: 'open', yours: false }]);
+
+    // The requester reads it but cannot sign; anyone else does both.
+    expect((await open(id, DIRECTOR)).barred).toBe(true);
+    expect(await reason(decide(id, DIRECTOR, 'yes'))).toBe('barred');
+    expect(await decide(id, RECRUITER_2, 'yes')).toMatchObject({ state: 'open', signed: 1 });
+    // The stored account never reaches a caller.
+    expect(JSON.stringify(await open(id, CEO))).not.toContain(ownerOf(APPLICANT_ALT));
+    expect(JSON.stringify(await getVettingStatus(deps(), handle))).not.toContain(
+      ownerOf(APPLICANT_ALT)
+    );
+  });
+
   it('asks a member for a review, which they find, answer or decline', async () => {
     await turnOn();
     expect(await reason(request('Nobody At All'))).toBe('unknown-name');
@@ -665,7 +828,7 @@ emulatorSuite('vetting (emulator)', () => {
     });
   });
 
-  it('sweeps stale drafts, unanswered requests and decided reviews, and nothing else', async () => {
+  it('sweeps stale drafts, requests, decided and undecided reviews and throttle counters', async () => {
     await turnOn();
     const draft = await start(APPLICANT_ALT);
     const open_ = await shared();
@@ -687,6 +850,7 @@ emulatorSuite('vetting (emulator)', () => {
     expect(await sweepVetting(db, T0 + VETTING_DRAFT_HOURS * HOUR_MS)).toEqual({
       deleted: 1,
       cleared: 1,
+      throttles: 0,
       failed: 0,
       truncated: false,
     });
@@ -699,10 +863,22 @@ emulatorSuite('vetting (emulator)', () => {
     });
     expect(await inputIds(asked.reviewId)).toEqual([]);
 
-    // 30 days on: the request and the decided review go; the open one is never swept.
+    // The draft throttle's counters go a day after their one-day window ended.
+    const throttles = async () =>
+      (await corp().collection('vettingThrottle').get()).docs.map((d) => d.id).sort();
+    expect(await throttles()).toEqual([APPLICANT, APPLICANT_ALT, STRANGER].map(String).sort());
+    expect(await sweepVetting(db, T0 + 2 * DAY_MS - 1)).toMatchObject({ deleted: 0, throttles: 0 });
+    expect(await sweepVetting(db, T0 + 2 * DAY_MS)).toMatchObject({ deleted: 0, throttles: 3 });
+    expect(await throttles()).toEqual([]);
+
+    // 30 days on: the request and the decided review go; the open one waits for a decision.
     expect(await sweepVetting(db, T0 + 30 * DAY_MS)).toMatchObject({ deleted: 2, cleared: 0 });
     expect(await ids()).toEqual([open_.reviewId]);
-    expect(await sweepVetting(db, T0 + 400 * DAY_MS)).toMatchObject({ deleted: 0 });
+    const openGoes = T0 + VETTING_OPEN_KEEP_DAYS * DAY_MS;
+    expect(await sweepVetting(db, openGoes - 1)).toMatchObject({ deleted: 0 });
     expect(await ids()).toEqual([open_.reviewId]);
+    // 90 days after it was shared, undecided: it goes too.
+    expect(await sweepVetting(db, openGoes)).toMatchObject({ deleted: 1, failed: 0 });
+    expect(await ids()).toEqual([]);
   });
 });

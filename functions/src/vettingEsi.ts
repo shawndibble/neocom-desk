@@ -1,13 +1,15 @@
 // Vetting: the ESI reads. One read of a character with the pilot's own short-lived access
 // token (public sheet and history, then each source the token's scopes cover), and the public
 // lookups that name what the read found. Same identification headers as every server ESI call
-// (esiClient.ts); 420/429 or a low error budget stop the read, since the budget is shared by
-// every user of the client id. The token is used for these calls and dropped: nothing here
-// stores, logs or returns it. Mail is read as headers only, and only who and when is kept.
+// (esiClient.ts). Requests go one at a time; 420/429 or a low error budget stop the read, since
+// the budget is shared by every user of the client id, and after a 420/429 no reader in this
+// instance calls ESI again until its `Retry-After` has passed. The token is used for these calls
+// and dropped: nothing here stores, logs or returns it. Mail is read as headers only, and only
+// who and when is kept.
 
 import { fail } from './actorAuth.js';
 import { chunk } from './chunk.js';
-import { ESI_BASE, esiHeaders, isBudgetLow } from './esiClient.js';
+import { ESI_BASE, esiHeaders, isBudgetLow, retryAfterMs } from './esiClient.js';
 import { isFiniteNumber, isPlainRecord } from './guards.js';
 import type {
   VettingCharacterInput,
@@ -36,6 +38,26 @@ const TIMEOUT_MS = 20_000;
 /** `POST /universe/names/` and `/characters/affiliation/` take at most this many ids. */
 const BULK_IDS = 1000;
 const BULK_NAMES = 500;
+/**
+ * 404s one bulk lookup may spend finding the ids ESI will not take. Each one counts against
+ * the error budget every user shares, so past this the ids still in doubt are dropped.
+ */
+export const VETTING_BULK_MAX_MISSES = 6;
+/** How long a 420/429 without a usable `Retry-After` holds requests back: ESI's error window. */
+export const VETTING_BACKOFF_MS = 60_000;
+/** A `Retry-After` is honoured up to this, so one bad header cannot stop vetting for a day. */
+export const VETTING_BACKOFF_MAX_MS = 15 * 60_000;
+
+/**
+ * No request before this time (ms): ESI answered 420/429. Module-level, because the limit is on
+ * the client id and a reader is made per call; it lasts as long as the function instance.
+ */
+let notBefore = 0;
+
+/** Test seam: forgets the backoff a 420/429 left behind. */
+export function resetVettingEsiBackoff(): void {
+  notBefore = 0;
+}
 
 export const SOURCE_SCOPE: Record<VettingSource, VettingScope> = {
   wallet: 'esi-wallet.read_character_wallet.v1',
@@ -84,11 +106,14 @@ const backoff = (): never =>
 const unavailable = (): never =>
   fail('unavailable', 'ESI did not answer; try again shortly', 'esi-error');
 
-export function esiVettingReader(fetchImpl: typeof fetch = fetch): VettingEsi {
+export function esiVettingReader(
+  fetchImpl: typeof fetch = fetch,
+  now: () => number = Date.now
+): VettingEsi {
   let low = false;
 
   async function request(path: string, accessToken: string | null, body?: unknown): Promise<Got> {
-    if (low) return { kind: 'backoff' };
+    if (low || now() < notBefore) return { kind: 'backoff' };
     let res: Response;
     try {
       res = await fetchImpl(`${ESI_BASE}${path}`, {
@@ -107,6 +132,8 @@ export function esiVettingReader(fetchImpl: typeof fetch = fetch): VettingEsi {
     if (isBudgetLow(res.headers)) low = true;
     if (res.status === 420 || res.status === 429) {
       low = true;
+      const wait = retryAfterMs(res.headers) ?? VETTING_BACKOFF_MS;
+      notBefore = Math.max(notBefore, now() + Math.min(wait, VETTING_BACKOFF_MAX_MS));
       return { kind: 'backoff' };
     }
     // 403: this token may not read the source. 401: the token itself is dead, which must not
@@ -170,35 +197,65 @@ export function esiVettingReader(fetchImpl: typeof fetch = fetch): VettingEsi {
     return rows;
   }
 
-  /**
-   * A bulk POST that answers 404 for the whole batch when one id is bad: split the batch and
-   * try each half, dropping the single ids ESI will not take.
-   */
-  async function bulk(path: string, ids: readonly number[]): Promise<unknown[]> {
-    if (ids.length === 0) return [];
-    const got = await request(path, null, ids);
-    if (got.kind === 'ok') return Array.isArray(got.body) ? (got.body as unknown[]) : [];
-    if (got.kind === 'backoff') return backoff();
-    if (got.kind !== 'not-found') return unavailable();
-    if (ids.length === 1) return [];
-    const half = Math.ceil(ids.length / 2);
-    return [...(await bulk(path, ids.slice(0, half))), ...(await bulk(path, ids.slice(half)))];
+  interface Batch {
+    ids: number[];
+    /** Known to hold an id ESI will not take, so it is split without being asked. */
+    bad: boolean;
+    /** The other half of the batch this one was split from. */
+    twin?: Batch;
   }
 
+  /**
+   * A bulk POST, `BULK_IDS` at a time. ESI answers 404 for a whole batch when one id is bad, so
+   * a refused batch is halved and each half tried, dropping the single ids ESI will not take.
+   * At most `VETTING_BULK_MAX_MISSES` requests may fail that way: the largest batch is always
+   * asked next, so when the allowance is spent only the small pieces still in doubt are dropped.
+   */
   async function bulkAll(path: string, ids: readonly number[]): Promise<unknown[]> {
     const out: unknown[] = [];
-    for (const batch of chunk([...new Set(ids)], BULK_IDS)) out.push(...(await bulk(path, batch)));
+    const queue: Batch[] = chunk([...new Set(ids)], BULK_IDS).map((batch) => ({
+      ids: batch,
+      bad: false,
+    }));
+    let misses = 0;
+    const split = (batch: Batch) => {
+      if (batch.ids.length === 1) return;
+      const half = Math.ceil(batch.ids.length / 2);
+      const first: Batch = { ids: batch.ids.slice(0, half), bad: false };
+      const second: Batch = { ids: batch.ids.slice(half), bad: false, twin: first };
+      first.twin = second;
+      queue.push(first, second);
+    };
+    for (;;) {
+      queue.sort((a, b) => b.ids.length - a.ids.length);
+      const batch = queue.shift();
+      if (!batch) break;
+      if (batch.bad) {
+        split(batch);
+        continue;
+      }
+      if (misses >= VETTING_BULK_MAX_MISSES) break;
+      const got = await request(path, null, batch.ids);
+      if (got.kind === 'ok') {
+        if (Array.isArray(got.body)) out.push(...(got.body as unknown[]));
+        // This half was fine, so the bad id is in the other: no request needed to learn that.
+        if (batch.twin && queue.includes(batch.twin)) batch.twin.bad = true;
+      } else if (got.kind === 'not-found') {
+        misses += 1;
+        split(batch);
+      } else {
+        return got.kind === 'backoff' ? backoff() : unavailable();
+      }
+    }
     return out;
   }
 
   return {
     async readCharacter(characterId, accessToken, scopes) {
-      const [sheetGot, historyGot] = await Promise.all([
-        request(`/characters/${characterId}/`, null),
-        request(`/characters/${characterId}/corporationhistory/`, null),
-      ]);
-      const sheet = settle(sheetGot);
-      const history = settle(historyGot);
+      // One request at a time: `settle` throws on a 420/429 or a low budget, so nothing after
+      // the request that met it is sent.
+      const sheet = settle(await request(`/characters/${characterId}/`, null));
+      const history = settle(await request(`/characters/${characterId}/corporationhistory/`, null));
       if (sheet.kind !== 'ok' || history.kind !== 'ok') return unavailable();
       const body = sheet.body;
       if (
@@ -219,17 +276,15 @@ export function esiVettingReader(fetchImpl: typeof fetch = fetch): VettingEsi {
         return got;
       }
       const at = `/characters/${characterId}`;
-      const [wallet, contacts, mail, contracts, skills] = await Promise.all([
-        shared('wallet', () => paged(`${at}/wallet/journal/`, accessToken)),
-        shared('contact', () => paged(`${at}/contacts/`, accessToken)),
-        shared('mail', () => mailHeaders(characterId, accessToken)),
-        shared('contract', () => paged(`${at}/contracts/`, accessToken)),
-        shared('skills', async () => {
-          const got = settle(await request(`${at}/skills/`, accessToken));
-          if (got.kind === 'forbidden') return null;
-          return skillsOf(got.body) ?? unavailable();
-        }),
-      ]);
+      const wallet = await shared('wallet', () => paged(`${at}/wallet/journal/`, accessToken));
+      const contacts = await shared('contact', () => paged(`${at}/contacts/`, accessToken));
+      const mail = await shared('mail', () => mailHeaders(characterId, accessToken));
+      const contracts = await shared('contract', () => paged(`${at}/contracts/`, accessToken));
+      const skills = await shared('skills', async () => {
+        const got = settle(await request(`${at}/skills/`, accessToken));
+        if (got.kind === 'forbidden') return null;
+        return skillsOf(got.body) ?? unavailable();
+      });
 
       const dealings: VettingDealing[] = [
         ...walletDealings(characterId, wallet ?? []),
