@@ -30,6 +30,8 @@ import {
   loadMailBoard,
   loadMiningTaxBoard,
   loadMoonChunksBoard,
+  loadAllMoonChunksBoard,
+  loadAllStructuresBoard,
   loadPlanetaryBoard,
   loadPriceAlertsBoard,
   loadStructuresBoard,
@@ -219,6 +221,12 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   stock: snapshot(loadStockBoardFor, 'overview:stock'),
   structures: snapshot(loadStructuresBoard, 'overview:structures'),
   moonChunks: snapshot(loadMoonChunksBoard, 'overview:moon-chunks'),
+  structuresAll: snapshot(loadAllStructuresBoard, 'overview:structures-all', {
+    accountWide: true,
+  }),
+  moonChunksAll: snapshot(loadAllMoonChunksBoard, 'overview:moon-chunks-all', {
+    accountWide: true,
+  }),
   incursions: { type: 'hook', Component: IncursionsSource },
   sovRaids: snapshot(loadSovRaidsWidget, 'overview:sov-raids'),
   spExtras: { type: 'hook', Component: SpExtrasSource },

@@ -316,6 +316,9 @@ export interface FeedMap {
   stock: { board: StockBoardData | null };
   structures: StructuresBoardData;
   moonChunks: MoonChunksBoardData;
+  /** Every readable corporation's, merged: what a widget scoped to All characters reads. */
+  structuresAll: StructuresBoardData;
+  moonChunksAll: MoonChunksBoardData;
   incursions: IncursionsBoardData;
   sovRaids: SovRaidsWidgetData;
   spExtras: SpExtras;

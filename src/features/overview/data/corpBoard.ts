@@ -10,7 +10,8 @@
 import { loadCorporationStructures } from '@/features/corp/boardData';
 import { toBoardStructures } from '@/features/corp/boardSources';
 import { CorpReadFailed } from '@/features/corp/corpRead';
-import { resolveCorpReadAccess } from '@/features/corp/corpReadAccess';
+import { resolveCorpReadAccess, type CorpCapability } from '@/features/corp/corpReadAccess';
+import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
 import { loadMoonChunks } from '@/features/character/calendarMoonChunks';
 import type { MoonChunksBoardData, StructuresBoardData } from './boardData';
 
@@ -49,6 +50,96 @@ export async function loadMoonChunksBoardData(characterId: number): Promise<Moon
     extractions,
     needsReauth: result.needsReauth,
     fetchedAt: result.cached?.fetchedAt ?? null,
+    loadedAt,
+  };
+}
+
+// --- All characters: every corporation the pilot's Characters can read -----------------
+
+/**
+ * One Character per corporation that can read `capability`: the first of them
+ * in Character order. A corporation two Characters share is read once, and one
+ * no Character's roles and grant cover is absent (no request is made for it).
+ */
+async function corpReaders(capability: CorpCapability): Promise<number[]> {
+  const { entries } = await fanOutAllCharacters({
+    load: async ({ characterId }) => {
+      const access = await resolveCorpReadAccess(characterId);
+      return access?.can(capability) ? { characterId, corporationId: access.corporationId } : null;
+    },
+  });
+  const readers = new Map<number, number>();
+  for (const { characterId, corporationId } of entries) {
+    if (!readers.has(corporationId)) readers.set(corporationId, characterId);
+  }
+  return [...readers.values()];
+}
+
+/** The oldest of the reads' timestamps: the merged list is only as fresh as its stalest corporation. */
+function oldest(dates: readonly (Date | null)[]): Date | null {
+  const known = dates.filter((date): date is Date => date !== null);
+  return known.length === 0 ? null : new Date(Math.min(...known.map((date) => date.getTime())));
+}
+
+/**
+ * Settles one read per corporation. A corporation that failed is left out while
+ * another answered ("nothing from this corporation", the others still list); only
+ * when every one failed does the widget get its Retry.
+ */
+async function settleCorps<T>(
+  readers: readonly number[],
+  what: string,
+  load: (characterId: number) => Promise<T>
+): Promise<T[]> {
+  const settled = await Promise.allSettled(readers.map(load));
+  const reads = settled.flatMap((outcome) =>
+    outcome.status === 'fulfilled' ? [outcome.value] : []
+  );
+  if (reads.length === 0 && readers.length > 0) throw new CorpReadFailed(what);
+  return reads;
+}
+
+/** Every readable corporation's structures as one list, for a widget scoped to All characters. */
+export async function loadAllStructuresBoardData(): Promise<StructuresBoardData> {
+  const reads = await settleCorps(
+    await corpReaders('canReadStructures'),
+    'structures',
+    loadStructuresBoardData
+  );
+  const readable = reads.filter((read) => read.structures !== null);
+  if (readable.length === 0) {
+    return { ...UNREADABLE_STRUCTURES, needsReauth: reads.some((read) => read.needsReauth) };
+  }
+  return {
+    structures: readable.flatMap((read) => read.structures ?? []),
+    structureCount: readable.reduce((sum, read) => sum + read.structureCount, 0),
+    needsReauth: readable.some((read) => read.needsReauth),
+    fetchedAt: oldest(readable.map((read) => read.fetchedAt)),
+  };
+}
+
+/** Every readable corporation's moon drills as one list, for a widget scoped to All characters. */
+export async function loadAllMoonChunksBoardData(): Promise<MoonChunksBoardData> {
+  const reads = await settleCorps(
+    await corpReaders('canReadMoonExtractions'),
+    'moon extractions',
+    loadMoonChunksBoardData
+  );
+  const readable = reads.filter((read) => read.chunks !== null);
+  const loadedAt = Date.now();
+  if (readable.length === 0) {
+    return {
+      chunks: null,
+      needsReauth: reads.some((read) => read.needsReauth),
+      fetchedAt: null,
+      loadedAt,
+    };
+  }
+  return {
+    chunks: readable.flatMap((read) => read.chunks ?? []),
+    extractions: readable.flatMap((read) => read.extractions ?? []),
+    needsReauth: readable.some((read) => read.needsReauth),
+    fetchedAt: oldest(readable.map((read) => read.fetchedAt)),
     loadedAt,
   };
 }

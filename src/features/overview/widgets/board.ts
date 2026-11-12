@@ -21,8 +21,12 @@ export interface WidgetBoard {
   categories: readonly KindCategory[];
   /** The Corp Board hides a kind whose capability is not held: hide, never lock. */
   canDraw: (kind: WidgetKindDef) => boolean;
-  /** Whether a widget's menu offers Header / All characters; corp data has one owner. */
-  characterScope: boolean;
+  /**
+   * Whether a widget's menu offers Header / All characters. The Overview always does (a kind
+   * that cannot sum says so); the Corp Board only for a kind that can, since a corporation's
+   * data has one owner and a choice that cannot be honoured is not worth a row.
+   */
+  characterScope: 'always' | 'summable';
   defaultLayout: (makeId: MakeId) => OverviewLayout;
 }
 
@@ -33,7 +37,7 @@ export const OVERVIEW_BOARD: WidgetBoard = {
   kinds: boardKinds('overview'),
   categories: KIND_CATEGORIES,
   canDraw: always,
-  characterScope: true,
+  characterScope: 'always',
   defaultLayout,
 };
 

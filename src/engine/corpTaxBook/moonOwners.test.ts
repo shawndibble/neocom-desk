@@ -4,7 +4,6 @@ import {
   canPayMoonOwner,
   deriveModeChanges,
   deriveOwnerRateHistory,
-  hasOwnRefineries,
   moonOwnerDetail,
   type MoonOwnerFeeder,
   type MoonOwnerPayout,
@@ -349,19 +348,6 @@ describe('moonOwnerDetail', () => {
 
   it('is undefined for a corporation that is not a moon owner', () => {
     expect(moonOwnerDetail(input(), 5)).toBeUndefined();
-  });
-});
-
-describe('hasOwnRefineries', () => {
-  it('is false for a book that only reads moon owners', () => {
-    expect(hasOwnRefineries([entry(A, '2026-10-05', 1)], 0, BOOK)).toBe(false);
-    expect(hasOwnRefineries([], 0, BOOK)).toBe(false);
-  });
-
-  it('is true with an extraction notice or a row of its own', () => {
-    expect(hasOwnRefineries([], 1, BOOK)).toBe(true);
-    expect(hasOwnRefineries([entry(undefined, '2026-10-05', 1)], 0, BOOK)).toBe(true);
-    expect(hasOwnRefineries([entry(BOOK, '2026-10-05', 1)], 0, BOOK)).toBe(true);
   });
 });
 

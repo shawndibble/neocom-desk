@@ -7,9 +7,7 @@ import { describe, expect, it } from 'vitest';
 import * as server from '../../../functions/src/corpTaxBookEngine';
 import {
   buildMoonOwners,
-  hasOwnRefineries,
   moonOwnersNeedRows,
-  ownRefineriesFromStored,
   summaryFor,
   type MoonOwnerFeeder,
   type MoonOwnerPayout,
@@ -345,28 +343,5 @@ describe('moonOwnersNeedRows (#5717)', () => {
       { scope: 'guest', pct: 20, effectiveFrom: '2026-01-01' },
     ];
     expect(moonOwnersNeedRows(bare(withSummaries(input([feeder(A)], { rates }))))).toBe(true);
-  });
-});
-
-describe('ownRefineriesFromStored (#5717)', () => {
-  const rows = (...sources: (number | undefined)[]) =>
-    sources.map((sourceCorporationId) => ({ sourceCorporationId }));
-
-  it('settles the answer the rows give whenever an Extraction exists or there is no moon owner', () => {
-    for (const entries of [rows(), rows(A), rows(undefined), rows(BOOK)]) {
-      for (const [extractions, feeders] of [
-        [1, 1],
-        [3, 0],
-        [0, 0],
-      ] as const) {
-        expect(ownRefineriesFromStored(extractions, feeders)).toBe(true);
-        // The tab's own rule: own refineries, or no moon owner yet.
-        expect(hasOwnRefineries(entries, extractions, BOOK) || feeders === 0).toBe(true);
-      }
-    }
-  });
-
-  it('is undecided when only the rows can tell', () => {
-    expect(ownRefineriesFromStored(0, 2)).toBeUndefined();
   });
 });

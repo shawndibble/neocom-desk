@@ -156,10 +156,12 @@ function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
     [setLayout]
   );
   const layout = stored ?? pending ?? fallback;
-  const kinds = useMemo(
-    () => distinctKinds(visibleWidgets(layout.widgets, isPhone, board.canDraw)),
+  // The drawn widgets, not just their kinds: one scoped to All characters reads other feeds.
+  const shown = useMemo(
+    () => visibleWidgets(layout.widgets, isPhone, board.canDraw),
     [layout.widgets, isPhone, board]
   );
+  const kinds = useMemo(() => distinctKinds(shown), [shown]);
 
   if (!hydrated) {
     return <Spinner block="page" label={t('common.loading')} />;
@@ -169,7 +171,7 @@ function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
     <WidgetBoardContext.Provider value={board}>
       <OverviewRefreshProvider>
         <OverviewEditProvider layout={layout} onLayoutChange={onLayoutChange}>
-          <WidgetDataProvider kinds={kinds}>
+          <WidgetDataProvider kinds={kinds} widgets={shown}>
             <CorpGrid layout={layout} />
           </WidgetDataProvider>
         </OverviewEditProvider>

@@ -16,7 +16,7 @@ Route `/overview` (`src/routes/Overview.tsx`). Landing page for a signed-in Char
 
 "Is there anything I must do before I log off." Numbers where items are interchangeable (orders, mining tax), rows only where each item is its own thing (industry jobs, one row per colony reset run). Every card links to the page that fixes it. Decisions: `20260907-153621-the-overview-becomes-a-triage-board-and-the.md`, `20260929-114130-overview-cards-can-be-hidden-by-the-pilot.md`, `20260929-145533-overview-cards-can-be-reordered.md`, `20261010-235829-overview-cards-can-start-switched-off.md`, `20260929-140431-six-more-overview-cards.md`, `20260925-203743-overview-contracts-row-feeds-next-deadline.md`. `docs/UX-REVIEW.md` (2026-08-29) predates the board; its Overview remarks are superseded.
 
-Scope: active Character, except Alerts (device-wide feed), Structures and Moon extractions (the Character's corp via roles), Mining tax (all Characters, see gaps) and Industry (sums across Characters when All characters is picked).
+Scope: active Character, except Alerts (device-wide feed), Structures and Moon extractions (the Character's corp via roles; widget scope All characters merges every corporation any Character can read), Mining tax (all Characters, see gaps) and Industry (sums across Characters when All characters is picked).
 
 A quick glance between sessions; during a session the pilot sits on the page they need, not here (owner, 2026-10-11).
 

@@ -15494,7 +15494,10 @@
         "onBoard": "On your Corp Board ×{{count}}"
       },
       "menu": {
-        "remove": "Remove from Corp Board"
+        "remove": "Remove from Corp Board",
+        "character": "Corporations",
+        "header": "Header Character's corporation",
+        "all": "All characters' corporations"
       },
       "header": {
         "breakdownCaption": "When each widget on the Corp Board last read its data"
@@ -17463,6 +17466,7 @@
       "startedOn": "started {{date}}",
       "windowDays_one": "{{count}} day",
       "windowDays_other": "{{count}} days",
+      "extractionsNone": "No Extractions yet",
       "extractionsNoneShown": "No Extraction matches the states shown",
       "extractionsSummary_one": "{{count}} Extraction",
       "extractionsSummary_other": "{{count}} Extractions",

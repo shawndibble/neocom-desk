@@ -128,6 +128,12 @@ export interface KindDef {
   feeds: readonly FeedId[];
   scope: KindScope;
   /**
+   * The feeds read *instead of* `feeds` by a widget scoped to All characters, for an
+   * `account` kind whose All read is a fan-out of its own (the corp widgets: every
+   * corporation the pilot's Characters can read). Left out, the same feeds serve both.
+   */
+  allFeeds?: readonly FeedId[];
+  /**
    * The builder. With `loadBuild` it is the stand-in drawn until the real one lands
    * (loading, so no copy it would need is loaded yet).
    */

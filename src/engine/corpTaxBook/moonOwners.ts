@@ -534,33 +534,3 @@ export function moonOwnerDetail(input: MoonOwnersInput, id: number): MoonOwnerDe
     ...(period ? { period } : {}),
   };
 }
-
-/**
- * What `hasOwnRefineries` says without any ledger row, when the held records settle it: an
- * Extraction exists, or there are no moon owners (the tab is kept). `undefined`: only the rows
- * can tell (#5717).
- */
-export function ownRefineriesFromStored(
-  extractionCount: number,
-  feederCount: number
-): boolean | undefined {
-  return extractionCount > 0 || feederCount === 0 ? true : undefined;
-}
-
-/**
- * Whether the book reads any refinery of its own: an extraction notice, or a
- * ledger row no moon owner recorded. A moon owner's grant is ledger-only, so a
- * book with neither has nothing for the Extractions tab to show.
- */
-export function hasOwnRefineries(
-  entries: readonly Pick<ObservedMiningEntry, 'sourceCorporationId'>[],
-  extractionCount: number,
-  bookCorporationId: number
-): boolean {
-  return (
-    extractionCount > 0 ||
-    entries.some(
-      (e) => e.sourceCorporationId === undefined || e.sourceCorporationId === bookCorporationId
-    )
-  );
-}

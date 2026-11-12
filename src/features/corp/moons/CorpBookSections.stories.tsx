@@ -63,7 +63,7 @@ const openFirstRow: Story['play'] = async ({ canvasElement }) => {
 export const Overview: Story = {
   render: () => (
     <Page tab="overview">
-      <OverviewTab showMoons />
+      <OverviewTab />
     </Page>
   ),
 };

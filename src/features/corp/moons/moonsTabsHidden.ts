@@ -9,7 +9,8 @@ export const MOONS_TAB_PATHS: readonly string[] = MOONS_TABS.tabs.map((tab) =>
 
 /**
  * Whether Moons' tabs are left out of the rail and the page title: true while the
- * corporation has no book mode chosen yet (each tab would open the same setup screen).
+ * corporation has no book mode chosen yet (each tab would open the same setup screen) or the
+ * Character may not read the book (each tab would open the same no-access screen).
  * The Moons page sets it once it has read the book; until then the tabs show as before.
  */
 let hidden = false;

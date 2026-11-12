@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BoardStructureSource } from '@/engine/corp/board';
 import { visibleColumns } from '../tableModel';
-import { buildView } from './models';
+import { buildView, feedsFor, feedsOf, kindHasAllFeeds } from './models';
 import { elapsedShare } from './industryModels';
 import { FUEL_BAR_HORIZON_MS, shortStructureName } from './structureModels';
 import type { BuildContext, FeedState, Feeds, KindView, TableCell } from './types';
@@ -279,6 +279,30 @@ describe('structures', () => {
     source(2, 'Efa - Lowfuel Keepstar', { fuelExpiresMs: NOW + 2 * DAY }),
     source(3, 'Efa - Offline Athanor', { services: [{ name: 'Reprocessing', state: 'offline' }] }),
   ];
+
+  it('reads the merged all-corporations feed when scoped to All characters, and only then', () => {
+    const merged: Feeds = {
+      structuresAll: ok({
+        structures: fleet(),
+        structureCount: 3,
+        needsReauth: false,
+        fetchedAt: new Date(NOW),
+      }),
+    };
+    expect(buildView('structures', merged, ctx({ scopeAll: true })).table!.rows).toHaveLength(3);
+    // A header-scoped widget never reads the merged feed: it has not loaded it.
+    expect(buildView('structures', merged, ctx()).table).toBeUndefined();
+    expect(kindHasAllFeeds('structures')).toBe(true);
+    expect(kindHasAllFeeds('training')).toBe(false);
+    expect(feedsOf('structures')).toEqual(['structures']);
+    expect(feedsOf('structures', undefined, true)).toEqual(['structuresAll']);
+    expect(feedsFor([{ kind: 'structures', scope: 'all' }])).toEqual(['structuresAll']);
+    expect(feedsFor([{ kind: 'structures', scope: 'header' }])).toEqual(['structures']);
+    // A kind that cannot sum keeps its feeds whatever its widget asks for.
+    expect(feedsFor([{ kind: 'training', scope: 'all' }]).sort()).toEqual(
+      [...feedsOf('training')!].sort()
+    );
+  });
 
   it('shortens a structure name by the system prefix', () => {
     expect(shortStructureName('Efa - Helios Prime')).toBe('Helios Prime');
