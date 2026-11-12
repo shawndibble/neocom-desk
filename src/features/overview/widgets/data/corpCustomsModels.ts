@@ -5,7 +5,15 @@
  */
 import type { CorporationCustomsOffice } from '@/esi/endpoints';
 import { formatNumber } from '@/lib/numberLocale';
-import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from './builderKit';
+import {
+  acrossCorporations,
+  blank,
+  corpUnreadable,
+  count,
+  statusOf,
+  UNKNOWN,
+  type Builder,
+} from './builderKit';
 import type { RowDetailModel } from './types';
 import type { Translate } from '@/lib/translate';
 
@@ -40,8 +48,8 @@ function ratesOf(office: CorporationCustomsOffice, t: Translate): string {
 
 const hour = (value: number) => String(value).padStart(2, '0');
 
-export const corpCustomsOffices: Builder = (feeds, { t }) => {
-  const feed = feeds.corpCustoms;
+export const corpCustomsOffices: Builder = (feeds, { t, scopeAll }) => {
+  const feed = scopeAll ? feeds.corpCustomsAll : feeds.corpCustoms;
   const data = feed?.data ?? null;
   if (!data) return blank(null, statusOf(feed));
   if (!data.readable) return corpUnreadable(null, feed, data.needsReauth, t);
@@ -77,36 +85,40 @@ export const corpCustomsOffices: Builder = (feeds, { t }) => {
   );
   const systems = new Set(offices.map((office) => office.system_id)).size;
 
-  return {
-    ...blank(null, statusOf(feed, { isEmpty: offices.length === 0 })),
-    fetchedAt: data.fetchedAt,
-    fromCache: data.fromCache,
-    number: {
-      value: count(offices.length),
-      unit: t(`${K}.unit`, { count: offices.length }),
-      secondary: offices.length > 0 ? { text: t(`${K}.systems`, { count: systems }) } : undefined,
-      tone: 'clear',
-    },
-    rows: offices.map((office) => ({
-      key: String(office.office_id),
-      title: nameOf(office),
-      detail: systemOf(office),
-      value: windowOf(office),
-      tone: 'clear' as const,
-    })),
-    table: {
-      columns: [
-        { key: 'office', label: t(`${K}.col.office`), priority: 0 },
-        { key: 'system', label: t(`${K}.col.system`), priority: 1 },
-        { key: 'rates', label: t(`${K}.col.rates`), priority: 2, hideNarrow: true },
-        { key: 'window', label: t(`${K}.col.window`), align: 'end', priority: 3 },
-      ],
+  return acrossCorporations(
+    {
+      ...blank(null, statusOf(feed, { isEmpty: offices.length === 0 })),
+      fetchedAt: data.fetchedAt,
+      fromCache: data.fromCache,
+      number: {
+        value: count(offices.length),
+        unit: t(`${K}.unit`, { count: offices.length }),
+        secondary: offices.length > 0 ? { text: t(`${K}.systems`, { count: systems }) } : undefined,
+        tone: 'clear',
+      },
       rows: offices.map((office) => ({
         key: String(office.office_id),
-        cells: [nameOf(office), systemOf(office), ratesOf(office, t), windowOf(office)],
-        detail: detailOf(office),
+        title: nameOf(office),
+        detail: systemOf(office),
+        value: windowOf(office),
+        tone: 'clear' as const,
       })),
+      table: {
+        columns: [
+          { key: 'office', label: t(`${K}.col.office`), priority: 0 },
+          { key: 'system', label: t(`${K}.col.system`), priority: 1 },
+          { key: 'rates', label: t(`${K}.col.rates`), priority: 2, hideNarrow: true },
+          { key: 'window', label: t(`${K}.col.window`), align: 'end', priority: 3 },
+        ],
+        rows: offices.map((office) => ({
+          key: String(office.office_id),
+          cells: [nameOf(office), systemOf(office), ratesOf(office, t), windowOf(office)],
+          detail: detailOf(office),
+        })),
+      },
+      summary: t(`${K}.summary`, { count: offices.length, systems }),
     },
-    summary: t(`${K}.summary`, { count: offices.length, systems }),
-  };
+    data,
+    t
+  );
 };

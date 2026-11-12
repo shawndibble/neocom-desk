@@ -18,7 +18,17 @@ registerKindDefs(CORP_DEFS);
 
 const CAPS = new Proxy({} as CorpCapabilities, { get: () => true });
 
-function setup(kind: 'corpDeadlines' | 'structures', corporations: number) {
+const KINDS = [
+  'corpDeadlines',
+  'structures',
+  'corpCustomsOffices',
+  'corpStarbases',
+  'corpSovereignty',
+  'corpContracts',
+  'corpOrders',
+] as const;
+
+function setup(kind: (typeof KINDS)[number], corporations: number) {
   const widget: WidgetModel = {
     id: 'w1',
     kind,
@@ -49,24 +59,18 @@ function setup(kind: 'corpDeadlines' | 'structures', corporations: number) {
 const ALL = 'All my corporations';
 
 describe('Corp Board scope choice', () => {
-  it.each(['corpDeadlines', 'structures'] as const)(
-    'offers %s every corporation, chosen, when two can be read',
-    async (kind) => {
-      setup(kind, 2);
-      await userEvent.click(screen.getByRole('button', { name: /^Settings for / }));
-      expect(screen.getByRole('menuitemradio', { name: ALL })).toHaveAttribute(
-        'aria-checked',
-        'true'
-      );
-    }
-  );
+  it.each(KINDS)('offers %s every corporation, chosen, when two can be read', async (kind) => {
+    setup(kind, 2);
+    await userEvent.click(screen.getByRole('button', { name: /^Settings for / }));
+    expect(screen.getByRole('menuitemradio', { name: ALL })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
+  });
 
-  it.each(['corpDeadlines', 'structures'] as const)(
-    'offers %s no choice with one corporation',
-    async (kind) => {
-      setup(kind, 1);
-      await userEvent.click(screen.getByRole('button', { name: /^Settings for / }));
-      expect(screen.queryByRole('menuitemradio', { name: ALL })).toBeNull();
-    }
-  );
+  it.each(KINDS)('offers %s no choice with one corporation', async (kind) => {
+    setup(kind, 1);
+    await userEvent.click(screen.getByRole('button', { name: /^Settings for / }));
+    expect(screen.queryByRole('menuitemradio', { name: ALL })).toBeNull();
+  });
 });
