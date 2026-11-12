@@ -10,6 +10,7 @@
  * Working it out from the fitted service modules is out of scope (#6093).
  */
 import { DAY_MS, HOUR_MS } from '@/lib/age';
+import { shiftUtcDate } from '../localDay';
 import { FUEL_BLOCK_TYPE_IDS } from './starbases';
 
 /** Every fuel block type is 5 m³ (SDE group 1136). */
@@ -54,8 +55,8 @@ export function fuelBays(assets: readonly FuelBayAsset[]): Map<number, number> {
  * (UTC) day, so the structure stays fuelled through all of it.
  */
 export function fuelUntilMs(date: string): number {
-  const [y, m, d] = date.split('-').map(Number);
-  return Date.UTC(y!, m! - 1, d! + 1);
+  // A bare `YYYY-MM-DD` parses as UTC midnight.
+  return Date.parse(shiftUtcDate(date, 1));
 }
 
 export interface FuelPlanInput {

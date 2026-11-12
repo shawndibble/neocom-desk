@@ -237,15 +237,15 @@ describe('CorpStructures', () => {
       );
       renderPage();
       const tableEl = await table();
-      await waitFor(() => expect(column(tableEl, 'Fuel blocks')).toContain('No access'));
+      await waitFor(() => expect(column(tableEl, 'Fuel blocks')).toContain('Not readable'));
       const rows = column(tableEl, 'Structure');
       const gamma = rows.indexOf('Gamma');
       const alpha = rows.indexOf('Alpha');
-      expect(column(tableEl, 'Fuel blocks')[gamma]).toBe('No access');
+      expect(column(tableEl, 'Fuel blocks')[gamma]).toBe('Not readable');
       expect(column(tableEl, 'Needed')[gamma]).toBe('—');
       expect(column(tableEl, 'Fuel')[gamma]).toMatch(/\d/);
       expect(column(tableEl, 'Fuel blocks')[alpha]).toBe('40020/day');
-      expect(screen.getByText(/which EVE opens only to a Director/)).toBeInTheDocument();
+      expect(screen.getByText(/EVE opens them only to a Director/)).toBeInTheDocument();
     });
 
     it('totals the visible rows and copies the same list', async () => {
@@ -283,7 +283,7 @@ describe('CorpStructures', () => {
       );
       renderPage();
       const tableEl = await table();
-      await waitFor(() => expect(column(tableEl, 'Fuel blocks')).not.toContain('No access'));
+      await waitFor(() => expect(column(tableEl, 'Fuel blocks')).not.toContain('Not readable'));
       const needed = column(tableEl, 'Needed').map(count);
       expect(needed[column(tableEl, 'Structure').indexOf('Done')]).toBe(0);
       const sum = needed.reduce((a, b) => a + b, 0);

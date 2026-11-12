@@ -68,6 +68,7 @@ import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatEveDateTime } from '@/lib/eveTime';
 import { formatCount } from '@/lib/formatCount';
+import { createNumberFormat } from '@/lib/numberLocale';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
@@ -88,6 +89,8 @@ const OPEN_PARAM = optionalIdParam();
 const ANY = '__any';
 const DASH = '—';
 const NO_CORPORATIONS: ReadonlyMap<number, CorpLabel> = new Map();
+/** A slow burn (under a block a day) keeps its tenth rather than rounding to 0. */
+const formatTenths = createNumberFormat({ maximumFractionDigits: 1 });
 /** The "Fuel until" date an untouched page plans toward, in days from today. */
 const DEFAULT_FUEL_DAYS = 30;
 
@@ -150,7 +153,11 @@ export function CorpStructures() {
   const setFuelUntil = useFuelUntil((s) => s.setValue);
   useHydratedStore(useFuelUntil);
   const today = utcDay(now);
-  const fuelUntil = storedFuelUntil ?? shiftUtcDate(today, DEFAULT_FUEL_DAYS);
+  // A saved date that has passed would zero every row: plan the default month instead.
+  const fuelUntil =
+    storedFuelUntil !== null && storedFuelUntil >= today
+      ? storedFuelUntil
+      : shiftUtcDate(today, DEFAULT_FUEL_DAYS);
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
 
   const view = useMemo(() => (data ? structuresView(data, now) : null), [data, now]);
@@ -324,7 +331,10 @@ export function CorpStructures() {
               {fuel.plan.perDay !== null && (
                 <span className="text-xs text-text-dim">
                   {t('corp.structures.fuelPlan.perDay', {
-                    count: formatCount(fuel.plan.perDay),
+                    rate:
+                      fuel.plan.perDay < 1
+                        ? formatTenths(fuel.plan.perDay)
+                        : formatCount(fuel.plan.perDay),
                   })}
                 </span>
               )}
@@ -417,16 +427,20 @@ export function CorpStructures() {
       t('corp.structures.fuelPlan.copyLine', {
         structure: shortStructureName(row.source.name),
         system: systemName(row),
-        count: formatCount(needed),
+        count: needed,
+        blocks: formatCount(needed),
       })
     );
     lines.push(
       t('corp.structures.fuelPlan.copyTotal', {
         date: fuelUntil,
-        count: formatCount(totalNeeded),
+        count: totalNeeded,
+        blocks: formatCount(totalNeeded),
         volume: formatCount(totalNeeded * FUEL_BLOCK_VOLUME_M3),
       })
     );
+    if (unknownNeeded > 0)
+      lines.push(t('corp.structures.fuelPlan.unknown', { count: unknownNeeded }));
     try {
       await writeToClipboard(lines.join('\n'));
       flash('copied');
@@ -620,18 +634,19 @@ export function CorpStructures() {
                         </span>
                       )}
                     </span>
-                    <button
-                      type="button"
-                      className={textActionClassName('ml-auto')}
-                      onClick={() => void copyList()}
-                      disabled={shoppingList.length === 0}
-                    >
-                      {copied === 'copied'
-                        ? t('corp.structures.fuelPlan.copied')
-                        : copied === 'failed'
-                          ? t('corp.structures.fuelPlan.copyFailed')
-                          : t('corp.structures.fuelPlan.copy')}
-                    </button>
+                    {shoppingList.length > 0 && (
+                      <button
+                        type="button"
+                        className={textActionClassName('ml-auto')}
+                        onClick={() => void copyList()}
+                      >
+                        {copied === 'copied'
+                          ? t('corp.structures.fuelPlan.copied')
+                          : copied === 'failed'
+                            ? t('corp.structures.fuelPlan.copyFailed')
+                            : t('corp.structures.fuelPlan.copy')}
+                      </button>
+                    )}
                   </div>
                   {noBayAccess && (
                     <p className="text-xs text-text-dim">
