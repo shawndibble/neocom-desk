@@ -20129,7 +20129,7 @@
       },
       "readNotes": {
         "wallet": "Last 30 days",
-        "mail": "Who and subject, never the message"
+        "mail": "Who you wrote with. Never the subject or text"
       },
       "notRead": "Not read, not kept",
       "mailText": "The text of your mail",
