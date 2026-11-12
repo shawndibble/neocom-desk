@@ -50,6 +50,7 @@ const ROUTE_TITLE_KEYS = {
   '/corp/members': ['corp.members.title'],
   '/corp/wallet': ['corp.wallet.title'],
   '/corp/assets': ['nav.corpAssets'],
+  '/corp/structures': ['nav.corpStructures'],
   '/corp/moons': ['corp.moons.title'],
   '/corp/srp': ['nav.corpSrp'],
   // A sub-view of the Overview, like Clones: the title names the page it sits in.

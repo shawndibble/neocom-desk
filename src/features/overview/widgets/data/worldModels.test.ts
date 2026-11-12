@@ -340,6 +340,16 @@ describe('structures', () => {
     expect(one.columns.map((column) => column.key)).not.toContain('corp');
   });
 
+  it('links its header and each row to the Structures page', () => {
+    const view = buildView('structures', feeds(fleet()), ctx());
+    expect(view.to).toBe('/corp/structures');
+    expect(view.table!.rows.map((row) => row.to).sort()).toEqual([
+      '/corp/structures?structure=1',
+      '/corp/structures?structure=2',
+      '/corp/structures?structure=3',
+    ]);
+  });
+
   it('shortens a structure name by the system prefix', () => {
     expect(shortStructureName('Efa - Helios Prime')).toBe('Helios Prime');
     expect(shortStructureName('Helios')).toBe('Helios');

@@ -36,6 +36,7 @@
     "corpMembers": "Members",
     "corpWallet": "Corp Wallet",
     "corpAssets": "Corp Assets",
+    "corpStructures": "Structures",
     "corpMoons": "Moons",
     "corpSrp": "SRP",
     "skills": "Skills",
@@ -15165,6 +15166,45 @@
     "emptyHint": "Data ages appear here once the app fetches something from EVE's servers."
   },
   "corp": {
+    "structures": {
+      "title": "Structures",
+      "refresh": "Refresh structures",
+      "searchPlaceholder": "Search structure, system or corporation",
+      "corpFilterLabel": "Corporation",
+      "corpFilterAll": "All corporations",
+      "problemsOnly": "Problems only",
+      "problemsOnlyHint": "Structures with a timer running, low fuel or a service offline",
+      "noFilterMatches": "No structure matches these filters",
+      "noFilterMatchesHint": "Clear the search or a filter to see more.",
+      "empty": "No structures",
+      "emptyHint": "The corporations you can read have no structures anchored.",
+      "noAccessTitle": "No corporation's structures to show",
+      "noAccessHint": "None of your Characters can read a corporation's structures. EVE opens them to a Director or Station Manager.",
+      "loadFailedHint": "EVE did not send the structure list. Try again in a moment.",
+      "partlyFailed": "One or more corporations could not be read; their structures are missing.",
+      "col": {
+        "corp": "Corporation",
+        "structure": "Structure",
+        "type": "Type",
+        "system": "System",
+        "fuel": "Fuel",
+        "state": "State",
+        "timer": "Timer",
+        "services": "Services",
+        "unanchoring": "Unanchoring"
+      },
+      "servicesOnline_one": "{{count}} online",
+      "servicesOnline_other": "{{count}} online",
+      "servicesNone": "None",
+      "detail": {
+        "eveTime": "{{time}} EVE",
+        "localTime": "{{time}} local",
+        "services": "Services",
+        "moonExtraction": "Moon extraction",
+        "chunkArrives": "Chunk arrives",
+        "naturalDecay": "Natural decay"
+      }
+    },
     "rolesUnavailable": "Can't check your corporation roles right now",
     "rolesUnavailableHint": "Neocom Desk reads your roles from EVE, and none are saved on this device yet. Try again, or connect if you're offline. It will retry when you're back online.",
     "title": "Corporation",

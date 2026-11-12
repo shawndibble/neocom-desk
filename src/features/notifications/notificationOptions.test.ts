@@ -29,6 +29,10 @@ describe('notificationUrlFor', () => {
   it('routes wallet alerts to the wallet journal tab', () => {
     expect(notificationUrlFor('walletBalanceChanged')).toBe('/wallet/journal');
   });
+
+  it('opens the Structures page when a structure runs low on fuel', () => {
+    expect(notificationUrlFor('structureFuelLow')).toBe('/corp/structures');
+  });
 });
 
 describe('notificationTagFor', () => {
