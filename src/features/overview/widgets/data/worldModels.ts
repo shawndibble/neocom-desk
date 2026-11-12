@@ -456,8 +456,18 @@ export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {
   industry: { feeds: ['industry'], scope: 'account', build: industry },
   planetary: { feeds: ['planetary'], scope: 'character', build: planetary },
   mercenaryDens: { feeds: ['mercenaryDens'], scope: 'account', build: mercenaryDens },
-  structures: { feeds: ['structures'], scope: 'character', build: structures },
-  moonChunks: { feeds: ['moonChunks'], scope: 'character', build: moonChunks },
+  structures: {
+    feeds: ['structures'],
+    allFeeds: ['structuresAll'],
+    scope: 'account',
+    build: structures,
+  },
+  moonChunks: {
+    feeds: ['moonChunks'],
+    allFeeds: ['moonChunksAll'],
+    scope: 'account',
+    build: moonChunks,
+  },
   incursions: { feeds: ['incursions'], scope: 'account', build: incursions },
   sovRaids: {
     feeds: ['sovRaids'],

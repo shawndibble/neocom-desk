@@ -70,7 +70,7 @@ export function corpWidgetBoard(capabilities: CorpCapabilities): WidgetBoard {
     kinds: CORP_KINDS,
     categories: CORP_KIND_CATEGORIES,
     canDraw: (kind: WidgetKindDef) => kindOpenTo(kind, capabilities),
-    characterScope: false,
+    characterScope: 'summable',
     defaultLayout: corpDefaultLayout,
   };
 }

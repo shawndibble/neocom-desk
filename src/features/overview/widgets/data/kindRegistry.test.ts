@@ -30,7 +30,10 @@ const FEED_IDS = Object.keys(FEED_SOURCES) as FeedId[];
 describe('feeds and sources', () => {
   it('gives every feed a source, and every source is read by some kind', () => {
     const read = new Set<FeedId>();
-    for (const kind of allKindIds()) for (const feed of feedsOf(kind) ?? []) read.add(feed);
+    for (const kind of allKindIds()) {
+      for (const feed of feedsOf(kind) ?? []) read.add(feed);
+      for (const feed of feedsOf(kind, undefined, true) ?? []) read.add(feed);
+    }
     for (const feed of read) expect(FEED_IDS, feed).toContain(feed);
     for (const feed of FEED_IDS) expect(read, `${feed} is never read`).toContain(feed);
   });

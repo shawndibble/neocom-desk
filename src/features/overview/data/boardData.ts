@@ -564,6 +564,12 @@ export async function loadStructuresBoard(characterId: number): Promise<Structur
   return loadStructuresBoardData(characterId);
 }
 
+/** Every readable corporation's structures, merged: a widget scoped to All characters reads this. */
+export async function loadAllStructuresBoard(): Promise<StructuresBoardData> {
+  const { loadAllStructuresBoardData } = await import('./corpBoard');
+  return loadAllStructuresBoardData();
+}
+
 export interface MoonChunksBoardData {
   /** One clock per drill (arrival, or decay once landed), or null when unreadable. */
   chunks: BoardClockSource[] | null;
@@ -580,4 +586,10 @@ export interface MoonChunksBoardData {
 export async function loadMoonChunksBoard(characterId: number): Promise<MoonChunksBoardData> {
   const { loadMoonChunksBoardData } = await import('./corpBoard');
   return loadMoonChunksBoardData(characterId);
+}
+
+/** Every readable corporation's moon drills, merged: a widget scoped to All characters reads this. */
+export async function loadAllMoonChunksBoard(): Promise<MoonChunksBoardData> {
+  const { loadAllMoonChunksBoardData } = await import('./corpBoard');
+  return loadAllMoonChunksBoardData();
 }

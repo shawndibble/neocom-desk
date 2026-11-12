@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTicker } from '@/lib/ticker';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { kindHasAllFeeds } from './widgets/data/models';
 import { OVERVIEW_TICK_MS } from './widgets/data/tick';
 import { useKindViews, viewKey } from './widgets/data/useWidgetView';
 import {
@@ -17,10 +18,14 @@ import { visibleWidgets } from './widgets/visibility';
 /** A kind whose view has not been built yet: no read to date. */
 const EMPTY_READ = { fetchedAt: null, fromCache: false };
 
-/** Profit's reads follow its Source, so its request carries it; every other kind's key ignores the field. */
+/**
+ * Profit's reads follow its Source, so its request carries it; every other kind's key ignores the field.
+ * A kind with an All read of its own (the corp widgets) follows its widget's scope: its header feed
+ * is not mounted when every widget of the kind is on All, so asking for it would never settle.
+ */
 const requestOf = (widget: Widget) => ({
   kind: widget.kind,
-  scopeAll: false,
+  scopeAll: widget.scope === 'all' && kindHasAllFeeds(widget.kind),
   profitSource: widget.profitSource,
 });
 

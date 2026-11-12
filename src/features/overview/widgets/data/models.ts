@@ -19,6 +19,7 @@ import type { BuildContext, FeedId, Feeds, KindView } from './types';
 import { settingsContext, type ViewSettings } from './viewSettings';
 import type { EsiEndpointId } from '@/esi/registry';
 import { getKind } from '../kinds';
+import type { WidgetScope } from '../layout';
 
 // --- The kind registry --------------------------------------------------------
 //
@@ -63,17 +64,33 @@ function resolved(kind: string, settings?: ViewSettings) {
  * Kind -> the feeds it reads, or with a widget's settings the feeds that widget reads.
  * Undefined for a kind with no declaration (coming soon, or from a newer build).
  */
-export const feedsOf = (kind: string, settings?: ViewSettings): readonly FeedId[] | undefined =>
-  resolved(kind, settings)?.feeds;
+export function feedsOf(
+  kind: string,
+  settings?: ViewSettings,
+  scopeAll = false
+): readonly FeedId[] | undefined {
+  const reads = resolved(kind, settings);
+  if (scopeAll) {
+    const def = KINDS[kind];
+    if (def?.allFeeds) return def.allFeeds;
+  }
+  return reads?.feeds;
+}
+
+/** Whether the kind has an All characters read of its own, apart from the header Character's. */
+export const kindHasAllFeeds = (kind: string): boolean => KINDS[kind]?.allFeeds !== undefined;
 
 /** What wants a feed: a kind, or one widget of it with its settings (`ViewSettings`). */
-export type FeedReader = string | ({ kind: string } & ViewSettings);
+export type FeedReader = string | ({ kind: string; scope?: WidgetScope } & ViewSettings);
 
 /** The distinct feeds needed by `readers`; only these are ever fetched. */
 export function feedsFor(readers: readonly FeedReader[]): FeedId[] {
   const out = new Set<FeedId>();
   for (const reader of readers) {
-    const feeds = typeof reader === 'string' ? feedsOf(reader) : feedsOf(reader.kind, reader);
+    const feeds =
+      typeof reader === 'string'
+        ? feedsOf(reader)
+        : feedsOf(reader.kind, reader, reader.scope === 'all');
     for (const feed of feeds ?? []) out.add(feed);
   }
   return [...out];
