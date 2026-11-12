@@ -87,12 +87,41 @@ async function readBody(init: RequestInit | undefined): Promise<unknown> {
 let original: typeof globalThis.fetch | undefined;
 /** Route tables of every installed story; stories on one docs page overlap. */
 const installed = new Set<readonly FixtureRoute[]>();
+/**
+ * Tables of unmounted stories, still answering until fetch goes quiet. A page's
+ * work can outlive its story; without these, its late requests reached the real
+ * network, or were recorded against the next story's table (#6113). In the
+ * Storybook UI, which never drains between stories, a retiring table can also
+ * answer the next story for a path that story has no fixture for; the smoke
+ * drains each story first, so its record is unaffected.
+ */
+const retiring = new Set<readonly FixtureRoute[]>();
 let lastActivity = 0;
+let lastRequest = '';
+
+async function pollUntil(done: () => boolean): Promise<void> {
+  while (!done()) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
 
 /** Resolves once no request has gone through the fixture fetch for `quietMs`. */
 export async function whenFetchQuiet(quietMs = 300): Promise<void> {
-  while (Date.now() - lastActivity < quietMs) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
+  await pollUntil(() => Date.now() - lastActivity >= quietMs);
+}
+
+/**
+ * Resolves once every uninstalled table has stopped answering and the real fetch
+ * is back. Rejects after `timeoutMs`, naming the last request, if something keeps
+ * fetching after its story unmounted (a poll nobody stopped).
+ */
+export async function whenFixturesRetired(timeoutMs = 3000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  await pollUntil(() => retiring.size === 0 || Date.now() >= deadline);
+  if (retiring.size > 0) {
+    throw new Error(
+      `Fixture fetch still busy ${timeoutMs}ms after its story unmounted; last request: ${lastRequest}`
+    );
   }
 }
 
@@ -106,14 +135,14 @@ async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit): Promi
     return original!(input, init);
   }
   const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
-  const route = [...[...installed].flat(), ...SAMPLE_CHARACTER_READS].find((candidate) =>
-    matches(candidate, method, url.pathname)
+  lastRequest = `${method} ${url.origin}${url.pathname}`;
+  const route = [...[...installed, ...retiring].flat(), ...SAMPLE_CHARACTER_READS].find(
+    (candidate) => matches(candidate, method, url.pathname)
   );
   if (!route) {
-    const label = `${method} ${url.origin}${url.pathname}`;
-    unexpected.push(label);
-    console.error(`Story reached the network with no fixture: ${label}`);
-    throw new TypeError(`Story reached the network with no fixture: ${label}`);
+    unexpected.push(lastRequest);
+    console.error(`Story reached the network with no fixture: ${lastRequest}`);
+    throw new TypeError(`Story reached the network with no fixture: ${lastRequest}`);
   }
   const { body, headers } = route.respond({ method, url, body: await readBody(init) });
   return new Response(JSON.stringify(body), {
@@ -122,9 +151,19 @@ async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit): Promi
   });
 }
 
-/** Returns an uninstall function; the real `fetch` returns when the last story uninstalls. */
+function restoreIfIdle() {
+  if (installed.size === 0 && retiring.size === 0 && original) {
+    globalThis.fetch = original;
+    original = undefined;
+  }
+}
+
+/**
+ * Returns an uninstall function. An uninstalled table keeps answering, behind every
+ * installed one, until fetch goes quiet; the real `fetch` returns once none is left.
+ */
 export function installFixtureFetch(routes: readonly FixtureRoute[]): () => void {
-  if (installed.size === 0) {
+  if (!original) {
     original = globalThis.fetch;
     globalThis.fetch = fixtureFetch;
   }
@@ -132,10 +171,11 @@ export function installFixtureFetch(routes: readonly FixtureRoute[]): () => void
   const mine = [...routes];
   installed.add(mine);
   return () => {
-    installed.delete(mine);
-    if (installed.size === 0 && original) {
-      globalThis.fetch = original;
-      original = undefined;
-    }
+    if (!installed.delete(mine)) return;
+    retiring.add(mine);
+    void whenFetchQuiet().then(() => {
+      retiring.delete(mine);
+      restoreIfIdle();
+    });
   };
 }
