@@ -18202,11 +18202,14 @@
             "needs-role": "Needs a role",
             "own-book": "Has its own book",
             "gone-quiet": "Gone quiet",
-            "failed": "Could not connect"
+            "failed": "Could not connect",
+            "needs-names": "No refinery names",
+            "names-not-shared": "No refinery names"
           }
         },
         "needs": {
           "title": "Needs you ({{count}})",
+          "titleInfo": "Refinery names",
           "meta": "{{connected}} of {{total}} connected",
           "needs-sign-in": {
             "text": "The EVE login did not finish.",
@@ -18229,6 +18232,14 @@
             "keeps": "Removing keeps its past mining and billing records.",
             "action": "Remove"
           },
+          "needs-names": {
+            "text": "Refinery names aren't shared: this corp's login is from before names were read. Grant again as its CEO; coverage and billing stay as they are.",
+            "action": "Grant again"
+          },
+          "names-not-shared": {
+            "text": "Refinery names aren't shared. {{name}}'s CEO or an officer can grant again from that corp's Moons page."
+          },
+          "grantNamed": "Grant again for {{name}}",
           "removeNamed": "Remove {{name}}",
           "signInNamed": "Log in again for {{name}}",
           "removeFailed": "Could not remove this corp. Try again."
