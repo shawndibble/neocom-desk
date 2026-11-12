@@ -1,4 +1,16 @@
+import { Link } from 'react-router-dom';
 import { HintText } from '@/components/ui/HintText';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { SETTINGS_TABS } from '@/app/pageTabs';
+import { tabPath } from '@/lib/pageTabs';
+import {
+  alertsWhenClosedRank,
+  corpAccessRank,
+  corpRolesRank,
+  type CorpStanding,
+} from '@/features/corp/corpStanding';
+import { rolesText } from '@/features/corp/roles';
+import type { AlertsRowState } from '@/features/notifications/alertsGrant';
 import { type CharacterRecord } from '@/db';
 import {
   CharacterAvatar,
@@ -73,7 +85,12 @@ export interface CharacterRow {
   acceleratorRecord: CharacterAcceleratorRecord | undefined;
   /** The bonus the attribute sheet implies; null when not cached or legal. */
   detectedAccelerator: number | null;
+  /** Capability roles and grant coverage; undefined until read (and never read while neither corp column shows). */
+  corpStanding: CorpStanding | undefined;
+  alertsWhenClosed: AlertsRowState;
 }
+
+const NOTIFICATION_SETTINGS_PATH = tabPath(SETTINGS_TABS, 'notifications');
 
 /**
  * One `manufacturing`/`science`/`reaction` job-slot column — three of these,
@@ -156,8 +173,19 @@ export function buildColumns(
   timeZone: 'UTC' | undefined,
   groups: readonly CharacterGroup[],
   onMoveToGroup: (characterId: number, groupId: string | null) => void,
-  achievements: AchievementLookup
+  achievements: AchievementLookup,
+  /** Makes the Character active, then opens Settings › Permissions at the Corporation Grant. */
+  onOpenCorpPermissions: (characterId: number) => void
 ): Record<CharacterColumnId, DataTableColumn<CharacterRow>> {
+  const corpPermissionsLink = (row: CharacterRow, label: string) => (
+    <button
+      type="button"
+      onClick={() => onOpenCorpPermissions(row.character.characterId)}
+      className={`${inlineLinkClassName} p-0 ${STAT_CHIP_TONE_TEXT_CLASS.warning}`}
+    >
+      {label}
+    </button>
+  );
   return {
     name: {
       id: 'name',
@@ -446,6 +474,64 @@ export function buildColumns(
         ) : (
           '—'
         ),
+    },
+    // Gaps sort first (ascending), so a 13-director roster reads its holes at the top.
+    corpRoles: {
+      id: 'corpRoles',
+      header: t('characters.column.corpRoles'),
+      sortFirst: 'asc',
+      sortValue: (row) => corpRolesRank(row.corpStanding),
+      render: (row) => {
+        const standing = row.corpStanding;
+        if (!standing) return '—';
+        if (standing.kind === 'notGranted') {
+          return corpPermissionsLink(row, t('characters.corpRolesNotGranted'));
+        }
+        return standing.kind === 'roles' ? rolesText(standing.roles) : '';
+      },
+    },
+    corpAccess: {
+      id: 'corpAccess',
+      header: t('characters.column.corpAccess'),
+      sortFirst: 'asc',
+      sortValue: (row) => corpAccessRank(row.corpStanding),
+      render: (row) => {
+        const standing = row.corpStanding;
+        if (!standing) return '—';
+        if (standing.kind === 'none') return '';
+        if (standing.kind === 'notGranted') {
+          return corpPermissionsLink(row, t('characters.corpAccessMissingUnknown'));
+        }
+        if (standing.missingScopes === 0) {
+          return (
+            <span className={STAT_CHIP_TONE_TEXT_CLASS.success}>
+              {t('characters.corpAccessReady')}
+            </span>
+          );
+        }
+        return corpPermissionsLink(
+          row,
+          t('characters.corpAccessMissing', { count: standing.missingScopes })
+        );
+      },
+    },
+    alertsWhenClosed: {
+      id: 'alertsWhenClosed',
+      header: t('characters.column.alertsWhenClosed'),
+      sortFirst: 'asc',
+      sortValue: (row) => alertsWhenClosedRank(row.alertsWhenClosed),
+      render: (row) => (
+        <Link
+          to={NOTIFICATION_SETTINGS_PATH}
+          className={
+            row.alertsWhenClosed === 'needs-reauth'
+              ? `${inlineLinkClassName} ${STAT_CHIP_TONE_TEXT_CLASS.warning}`
+              : inlineLinkClassName
+          }
+        >
+          {t(`settings.notifications.alertsWhenClosed.state.${row.alertsWhenClosed}`)}
+        </Link>
+      ),
     },
     starred: {
       id: 'starred',

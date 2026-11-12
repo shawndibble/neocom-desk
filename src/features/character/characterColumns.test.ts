@@ -158,3 +158,24 @@ describe('useCharacterViewMode', () => {
     expect(row?.value).toBe('table');
   });
 });
+
+describe('corporation and Alerts when closed columns (#6092)', () => {
+  const ids = ['corpRoles', 'corpAccess', 'alertsWhenClosed'] as const;
+
+  it('are in the picker but off by default, ahead of Starred', () => {
+    for (const id of ids) {
+      expect(CHARACTER_COLUMN_IDS).toContain(id);
+      expect(DEFAULT_VISIBLE_CHARACTER_COLUMNS).not.toContain(id);
+    }
+    expect(CHARACTER_COLUMN_IDS.at(-1)).toBe('starred');
+  });
+
+  it('offers Alerts when closed only with a sync backend', () => {
+    expect(availableCharacterColumns(true, true, false)).not.toContain('alertsWhenClosed');
+    expect(availableCharacterColumns(true, true, false)).toContain('corpAccess');
+    expect(availableCharacterColumns(true, true, true)).toContain('alertsWhenClosed');
+    expect(visibleAvailableColumns(['name', 'alertsWhenClosed'], true, true, false)).toEqual([
+      'name',
+    ]);
+  });
+});

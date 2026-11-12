@@ -40,6 +40,7 @@ import {
   useNotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
 } from '@/features/notifications/preferences';
+import { CORP_STANDING_SCOPES } from '@/features/corp/corpStanding';
 import { Characters } from './Characters';
 
 vi.mock('@/app/loginFlow', () => ({
@@ -1829,5 +1830,82 @@ describe('Characters table view', () => {
     // The countdown sits beside the attention word now (#1490), not alone.
     const value = await within(cell).findByText(/\d+h \d+m/);
     expect(value).toHaveAttribute('tabIndex', '0');
+  });
+
+  it('the corporation and Alerts when closed columns are off by default, can be turned on, and sort gaps first (#6092)', async () => {
+    syncConfigured.value = true;
+    onTestFinished(() => {
+      syncConfigured.value = false;
+    });
+    await db.esiCache.clear();
+    await db.tokens.clear();
+    const now = Date.now();
+    // Pilot One: a Director with the whole corp grant. Pilot Two: no roles scope.
+    await db.tokens.bulkPut([
+      {
+        characterId: 91,
+        accessToken: 'at',
+        refreshToken: 'rt',
+        expiresAt: now + 6e5,
+        scopes: [...CORP_STANDING_SCOPES],
+      },
+      {
+        characterId: 92,
+        accessToken: 'at',
+        refreshToken: 'rt',
+        expiresAt: now + 6e5,
+        scopes: [],
+      },
+    ]);
+    await writeCached(91, 'corpRoles', { roles: ['Director'] }, now);
+    await db.settings.put({
+      key: 'alertsGrants',
+      value: { 92: { status: 'needs-reauth', enabledAt: now } },
+    });
+
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+    const headerNames = ['Corporation roles', 'Corporation access', 'Alerts when closed'];
+    for (const name of headerNames) {
+      expect(
+        within(screen.getByRole('table')).queryByRole('columnheader', { name })
+      ).not.toBeInTheDocument();
+    }
+
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    for (const name of headerNames) {
+      await user.click(await screen.findByRole('menuitemcheckbox', { name }));
+    }
+    await user.keyboard('{Escape}');
+
+    const table = screen.getByRole('table');
+    const pilotOne = within(table).getByText('Pilot One').closest('tr');
+    const pilotTwo = within(table).getByText('Pilot Two').closest('tr');
+    if (!pilotOne || !pilotTwo) throw new Error('expected both rows');
+    expect(await within(pilotOne).findByText('Ready')).toBeInTheDocument();
+    expect(within(pilotOne).getByText('Director')).toBeInTheDocument();
+    expect(within(pilotOne).getByRole('link', { name: 'Off' })).toHaveAttribute(
+      'href',
+      '/settings/notifications'
+    );
+    expect(within(pilotTwo).getByRole('button', { name: 'Not granted' })).toBeInTheDocument();
+    expect(
+      within(pilotTwo).getByRole('button', { name: 'Missing permissions' })
+    ).toBeInTheDocument();
+    expect(
+      within(pilotTwo).getByRole('link', { name: 'Needs re-authorizing' })
+    ).toBeInTheDocument();
+
+    const firstRowName = () =>
+      within(screen.getByRole('table')).getAllByRole('row')[1]?.textContent ?? '';
+    for (const name of ['Corporation access', 'Alerts when closed']) {
+      const header = within(screen.getByRole('table')).getByRole('columnheader', { name });
+      await user.click(within(header).getByRole('button'));
+      await waitFor(() => expect(firstRowName()).toContain('Pilot Two'));
+    }
+
+    await user.click(within(pilotTwo).getByRole('button', { name: 'Missing permissions' }));
+    await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(92));
   });
 });

@@ -212,4 +212,35 @@ describe('charactersCsvColumns', () => {
     expect(valuesOf(row())['characters.column.spReady']).toBe('characters.spReadyYes');
     expect(valuesOf(row({ totalSp: 1_000_000 }))['characters.column.spReady']).toBeUndefined();
   });
+
+  it('carries the corporation and Alerts when closed columns only when asked, as the table offers them', () => {
+    const headers = build().map((c) => c.header);
+    expect(headers).not.toContain('characters.column.corpRoles');
+    expect(headers).not.toContain('characters.column.alertsWhenClosed');
+
+    const options = { corpColumns: true, alertsWhenClosedColumn: true };
+    expect(
+      valuesOf(
+        row({
+          corpStanding: { kind: 'roles', roles: ['Director'], missingScopes: 0 },
+          alertsWhenClosed: 'on',
+        }),
+        options
+      )
+    ).toMatchObject({
+      'characters.column.corpRoles': 'Director',
+      'characters.column.corpAccess': 'characters.corpAccessReady',
+      'characters.column.alertsWhenClosed': 'settings.notifications.alertsWhenClosed.state.on',
+    });
+    expect(
+      valuesOf(row({ corpStanding: { kind: 'notGranted' }, alertsWhenClosed: 'off' }), options)
+    ).toMatchObject({
+      'characters.column.corpRoles': 'characters.corpRolesNotGranted',
+      'characters.column.corpAccess': 'characters.corpAccessMissingUnknown',
+    });
+    expect(valuesOf(row({ corpStanding: { kind: 'none' } }), options)).toMatchObject({
+      'characters.column.corpRoles': undefined,
+      'characters.column.corpAccess': undefined,
+    });
+  });
 });

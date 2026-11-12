@@ -84,6 +84,10 @@ import { buildColumns } from '@/features/character/charactersTableColumns';
 import { useCharacterWhereabouts } from '@/features/character/useCharacterWhereabouts';
 import { useCharacterAchievements } from '@/features/character/useCharacterAchievements';
 import { returnPathAfterSwitch } from '@/features/character/characterSwitchReturn';
+import { useCharacterCorpStanding } from '@/features/corp/useCharacterCorpStanding';
+import { useAlertsGrants } from '@/features/notifications/alertsGrant';
+import { isSyncConfigured } from '@/app/syncStatus';
+import { grantMissingPath } from '@/app/grantMissingPath';
 
 const NO_CHARACTER_IDS: readonly number[] = [];
 
@@ -193,6 +197,15 @@ export function Characters() {
       ? (characters ?? []).map((character) => character.characterId)
       : NO_CHARACTER_IDS
   );
+  // Roles are a read per Character, so only while a corp column shows.
+  const corpColumnsShown =
+    visibleColumns.includes('corpRoles') || visibleColumns.includes('corpAccess');
+  const corpStandingById = useCharacterCorpStanding(
+    corpColumnsShown
+      ? (characters ?? []).map((character) => character.characterId)
+      : NO_CHARACTER_IDS
+  );
+  const alertsGrants = useAlertsGrants();
 
   const {
     search,
@@ -229,6 +242,8 @@ export function Characters() {
     netWorthById,
     acceleratorById,
     detectedAcceleratorById,
+    corpStandingById,
+    alertsGrants,
   });
 
   // One batched read for the roster (public records): the cards' line, the table's column and
@@ -250,7 +265,8 @@ export function Characters() {
     timeZone,
     groupsValue.groups,
     (id, groupId) => void handleMoveToGroup(id, groupId),
-    achievements
+    achievements,
+    (id) => void openCorpPermissions(id)
   );
 
   useCharactersHousekeeping({
@@ -279,6 +295,11 @@ export function Characters() {
     if (returnTo !== null) navigate(returnTo);
   }
 
+  async function openCorpPermissions(characterId: number) {
+    await setActiveCharacter(characterId);
+    navigate(grantMissingPath(['corp']));
+  }
+
   function handleToggleColumn(id: CharacterColumnId) {
     const next = visibleColumns.includes(id)
       ? visibleColumns.filter((existing) => existing !== id)
@@ -290,7 +311,12 @@ export function Characters() {
     // `next.length` check can stay non-zero while every id left actually
     // renders nothing.
     if (
-      visibleAvailableColumns(next, spExtractionEnabled, groupsValue.groups.length > 0).length === 0
+      visibleAvailableColumns(
+        next,
+        spExtractionEnabled,
+        groupsValue.groups.length > 0,
+        isSyncConfigured()
+      ).length === 0
     )
       return;
     void setVisibleColumns(next);
@@ -318,8 +344,18 @@ export function Characters() {
         extractionNet: extractionPrices.net,
         achievements,
         lastSynced: (row) => characterLastSynced(row.stats, row.queue),
+        corpColumns: corpColumnsShown,
+        alertsWhenClosedColumn: isSyncConfigured(),
       }),
-    [t, groupList, spExtractionEnabled, spExtractionThreshold, extractionPrices.net, achievements]
+    [
+      t,
+      groupList,
+      spExtractionEnabled,
+      spExtractionThreshold,
+      extractionPrices.net,
+      achievements,
+      corpColumnsShown,
+    ]
   );
   const charactersExport = useTableExport({
     surface: 'characters',
