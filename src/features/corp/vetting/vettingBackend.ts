@@ -30,21 +30,36 @@ export interface VettingSettingsPatch {
   removeWatch?: number[];
   /** Exact in-game names to add; the server resolves them. */
   addWatchNames?: string[];
+  welcome?: string;
+  contact?: string;
+  /** The whole list, in order. A question with no `id` is new; the server gives it one. */
+  questions?: { id?: string; label: string; required: boolean }[];
+  minimums?: VettingSettings['minimums'];
+  rejection?: VettingSettings['rejection'];
+  inviteOnly?: boolean;
+  notifyReviewers?: boolean;
+  mailDecision?: boolean;
 }
 
 export interface VettingBackend {
   // Public: no session.
-  corpInfo(corporationId: number): Promise<VettingCorpInfo>;
+  /** `invite` is the code from the apply link, when it carries one. */
+  corpInfo(corporationId: number, invite?: string): Promise<VettingCorpInfo>;
   /** Reads the first character and opens a draft. */
   start(
     corporationId: number,
-    accessToken: string
+    accessToken: string,
+    invite?: string
   ): Promise<{ handle: VettingHandle; status: VettingStatus }>;
   /** Reads one more character into the draft (or re-reads one already there). */
   addCharacter(handle: VettingHandle, accessToken: string): Promise<VettingStatus>;
   removeCharacter(handle: VettingHandle, characterId: number): Promise<VettingStatus>;
   /** Runs the checks and hands the report to the corp. */
-  submit(handle: VettingHandle, note: string): Promise<VettingStatus>;
+  submit(
+    handle: VettingHandle,
+    note: string,
+    answers: { questionId: string; answer: string }[]
+  ): Promise<VettingStatus>;
   status(handle: VettingHandle): Promise<VettingStatus>;
   /** Withdraws and deletes the report. */
   withdraw(handle: VettingHandle): Promise<void>;
@@ -72,6 +87,9 @@ export interface VettingBackend {
     memberName: string,
     role: string
   ): Promise<VettingOverview>;
+  /** Any reviewer may hand out an invite link. */
+  createInvite(characterId: number, corporationId: number, label: string): Promise<VettingOverview>;
+  revokeInvite(characterId: number, corporationId: number, code: string): Promise<VettingOverview>;
   saveSettings(
     characterId: number,
     corporationId: number,

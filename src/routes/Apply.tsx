@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { beginAddCharacterLogin, beginVettingLogin } from '@/app/loginFlow';
 import { useMarkPublicRouteRendered } from '@/app/routeFocus';
 import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
@@ -11,10 +11,14 @@ import { useConsumedVettingLogin } from '@/features/corp/vetting/useConsumedVett
  * deliberately, since an applicant has no account (`routeScopes.test.ts` asserts the exemption).
  * Each character signs in with EVE for exactly what the report reads; that sign-in is never kept
  * as a device session. A pilot with no Character here is offered the app once the report is sent.
+ *
+ * An invite link carries its code as `?invite=<code>`. `beginVettingLogin` stashes the page it
+ * was pressed on with its query, so the code is still on the link when EVE's login returns.
  */
 export function Apply() {
   useMarkPublicRouteRendered();
   const { corpId = '' } = useParams();
+  const [search] = useSearchParams();
   const corporationId = /^\d{1,12}$/.test(corpId) ? Number(corpId) : null;
   const login = useConsumedVettingLogin();
   const characters = useCharacterCountOrLoading();
@@ -22,6 +26,7 @@ export function Apply() {
     <VettingPublicFrame>
       <ApplyPage
         corporationId={corporationId}
+        invite={search.get('invite')}
         login={login}
         onSignIn={(reviewId) => {
           if (corporationId !== null) void beginVettingLogin(corporationId, reviewId);

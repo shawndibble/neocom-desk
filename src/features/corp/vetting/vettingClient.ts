@@ -31,6 +31,8 @@ const ACTION = {
   open: 'openVettingReviewCallable',
   decide: 'decideVettingReviewCallable',
   request: 'requestVettingReviewCallable',
+  createInvite: 'createVettingInviteCallable',
+  revokeInvite: 'revokeVettingInviteCallable',
   saveSettings: 'saveVettingSettingsCallable',
 } as const satisfies Record<string, CallableAction>;
 
@@ -69,14 +71,21 @@ const withHandle = (handle: VettingHandle): Record<string, unknown> => ({
   key: handle.key,
 });
 
+/** The invite code, only when the link carried one: an absent field, never an empty string. */
+const withInvite = (invite: string | undefined): Record<string, unknown> =>
+  invite ? { invite } : {};
+
 const client: VettingBackend = {
-  corpInfo: (corporationId) => open<VettingCorpInfo>(ACTION.corpInfo, { corporationId }),
-  start: (corporationId, accessToken) => open(ACTION.start, { corporationId, accessToken }),
+  corpInfo: (corporationId, invite) =>
+    open<VettingCorpInfo>(ACTION.corpInfo, { corporationId, ...withInvite(invite) }),
+  start: (corporationId, accessToken, invite) =>
+    open(ACTION.start, { corporationId, accessToken, ...withInvite(invite) }),
   addCharacter: (handle, accessToken) =>
     open<VettingStatus>(ACTION.addCharacter, { ...withHandle(handle), accessToken }),
   removeCharacter: (handle, characterId) =>
     open<VettingStatus>(ACTION.removeCharacter, { ...withHandle(handle), characterId }),
-  submit: (handle, note) => open<VettingStatus>(ACTION.submit, { ...withHandle(handle), note }),
+  submit: (handle, note, answers) =>
+    open<VettingStatus>(ACTION.submit, { ...withHandle(handle), note, answers }),
   status: (handle) => open<VettingStatus>(ACTION.status, withHandle(handle)),
   withdraw: async (handle) => {
     await open<unknown>(ACTION.withdraw, withHandle(handle));
@@ -98,6 +107,10 @@ const client: VettingBackend = {
     }),
   request: (characterId, corporationId, memberName, role) =>
     signedIn<VettingOverview>(characterId, ACTION.request, { corporationId, memberName, role }),
+  createInvite: (characterId, corporationId, label) =>
+    signedIn<VettingOverview>(characterId, ACTION.createInvite, { corporationId, label }),
+  revokeInvite: (characterId, corporationId, code) =>
+    signedIn<VettingOverview>(characterId, ACTION.revokeInvite, { corporationId, code }),
   saveSettings: (characterId, corporationId, patch) =>
     signedIn<VettingOverview>(characterId, ACTION.saveSettings, { corporationId, patch }),
 };

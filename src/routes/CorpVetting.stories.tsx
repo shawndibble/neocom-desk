@@ -6,7 +6,7 @@ import {
   vettingShellRoutes,
 } from '@/storybook/vettingShell';
 import { withSampleVetting } from '@/storybook/withSampleVetting';
-import { VETTING_FIXTURE_REVIEWS } from '@/storybook/vettingFixture';
+import { VETTING_FIXTURE_CONFIGURED, VETTING_FIXTURE_REVIEWS } from '@/storybook/vettingFixture';
 import { CorpVetting } from './CorpVetting';
 
 const directorRoutes = vettingShellRoutes(['Director']);
@@ -77,10 +77,71 @@ export const RejectDialog: Story = {
 /** @summary Decided: reviews that are over, kept 30 days. */
 export const Decided: Story = { parameters: { shell: shell('/corp/vetting/decided') } };
 
-/** @summary Settings (Director): on or off, sign-offs needed per kind, the watchlist. */
+const configured = { settings: VETTING_FIXTURE_CONFIGURED };
+const inviteOnly = { settings: { ...VETTING_FIXTURE_CONFIGURED, inviteOnly: true } };
+const settings = (section: string) => ({
+  vetting: configured,
+  shell: shell(`/corp/vetting/settings/${section}`),
+});
+
+/** @summary Settings (Director), General: on or off, the welcome message and the contact line. */
 export const Settings: Story = { parameters: { shell: shell('/corp/vetting/settings') } };
-/** @summary Phone: settings. */
-export const SettingsPhone: Story = { ...Settings, globals: phone };
+/** @summary Settings, General, for a corp that wrote its welcome and contact line. */
+export const SettingsGeneral: Story = { parameters: settings('general') };
+/** @summary Settings, Applicants: minimums, the ordered questions, invite-only and the way to the invite links. */
+export const SettingsApplicants: Story = { parameters: settings('applicants') };
+/** @summary Settings, Decisions: sign-offs, how a no reads, the reason, the mail, the reviewers' notification. */
+export const SettingsDecisions: Story = { parameters: settings('decisions') };
+/** @summary Settings, Watchlist: who the checks look for. */
+export const SettingsWatchlist: Story = { parameters: settings('watchlist') };
+/** @summary Settings with an edit not yet saved: the section is marked and the bar pins Discard and Save. */
+export const SettingsUnsaved: Story = {
+  ...SettingsGeneral,
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.type(await body.findByLabelText('Contact line'), ' Or mail us.');
+    await body.findByText('Unsaved changes');
+  },
+};
+/** @summary Phone: every settings section in one page, each under its heading. */
+export const SettingsPhone: Story = { ...SettingsApplicants, globals: phone };
+
+/** @summary Invite-only corp: the header makes an invite link, and the queue shows where an application came from. */
+export const QueueInviteOnly: Story = { parameters: { vetting: inviteOnly } };
+
+/** @summary "New invite link": who it is for, then the link with Copy. */
+export const InviteDialog: Story = {
+  ...QueueInviteOnly,
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(await body.findByRole('button', { name: 'New invite link' }));
+    const dialog = within(await body.findByRole('dialog', { name: 'New invite link' }));
+    await userEvent.type(dialog.getByLabelText('Who it is for'), 'Sio Tane');
+    await userEvent.click(dialog.getByRole('button', { name: 'Create link' }));
+    await dialog.findByRole('button', { name: 'Copy link for Sio Tane' });
+  },
+};
+
+const openInvites: Story['play'] = async ({ canvasElement }) => {
+  const body = within(canvasElement.ownerDocument.body);
+  await userEvent.click(await body.findByRole('button', { name: 'Invites' }));
+  await body.findByRole('dialog', { name: 'Invite links' });
+};
+
+/** @summary Invite links: who each is for, who made it, when, how many applications it started, Copy link and Revoke. */
+export const InvitesList: Story = { ...QueueInviteOnly, play: openInvites };
+/** @summary Phone: the invite links as a sheet. */
+export const InvitesListPhone: Story = { ...InvitesList, globals: phone };
+
+/** @summary Report of a corp that asks questions: "Their answers" beside "Their note". */
+export const ReportAnswers: Story = {
+  parameters: { vetting: configured, ...report(VETTING_FIXTURE_REVIEWS.flagged) },
+};
+/** @summary Phone: the note, then the answers, in one column. */
+export const ReportAnswersPhone: Story = { ...ReportAnswers, globals: phone };
+
+/** @summary Reject where the corp shows the reason: the confirm says the pilot will see it. */
+export const RejectDialogReasonShown: Story = { ...ReportAnswers, play: RejectDialog.play };
 
 /** @summary A Personnel Manager reviews but has no Settings tab. */
 export const Recruiter: Story = {

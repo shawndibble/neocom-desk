@@ -8,7 +8,9 @@ import { parseBookCall } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import { sweepVetting } from './vettingCleanup.js';
 import {
+  VETTING_DEFAULT_SETTINGS,
   VETTING_DRAFT_HOURS,
+  VETTING_INVITES_MAX,
   VETTING_KEEP_DAYS,
   VETTING_OPEN_KEEP_DAYS,
   type VettingCharacterInput,
@@ -21,6 +23,7 @@ import { VETTING_SCOPES } from './vettingScopes.js';
 import {
   addVettingCharacter,
   clearVettingCorpCache,
+  createVettingInvite,
   declineVetting,
   decideVettingReview,
   getVettingCorp,
@@ -30,6 +33,7 @@ import {
   openVettingReview,
   removeVettingCharacter,
   requestVettingReview,
+  revokeVettingInvite,
   saveVettingSettings,
   startVetting,
   submitVetting,
@@ -65,6 +69,9 @@ const homes = new Map<number, { corporationId: number; allianceId?: number }>();
 /** Scopes each token carries beside the roles scope; all five unless a test narrows them. */
 const scopes = new Map<number, string[]>();
 const esiCalls: string[] = [];
+/** What the fake FCM sender was asked to send; `pushFails` makes every send throw. */
+const pushed: { token: string; data: Record<string, string> }[] = [];
+let pushFails = false;
 
 const ownerOf = (id: number) => owners.get(id) ?? `h${id}`;
 
@@ -132,6 +139,13 @@ const deps = (): VettingDeps => ({
   },
   lookupCorporation: async (characterId) => homes.get(characterId)?.corporationId ?? CORP,
   esi,
+  push: {
+    send: async (message) => {
+      if (pushFails) throw new Error('fcm down');
+      pushed.push(message);
+      return 'id';
+    },
+  },
 });
 
 const who = (id: number): Caller => ({ uid: `char:${id}`, ownerHash: ownerOf(id) });
@@ -157,9 +171,33 @@ const inputIds = async (id: string) =>
 const save = (patch: Record<string, unknown>, by = DIRECTOR) =>
   saveVettingSettings(deps(), who(by), call(by), parseVettingSettingsPatch({ patch }));
 const turnOn = (patch: Record<string, unknown> = {}) => save({ on: true, ...patch });
-const start = (id = APPLICANT) =>
-  startVetting(deps(), { corporationId: CORP, accessToken: tok(id) });
-const submit = (handle: VettingHandle, note = '') => submitVetting(deps(), { ...handle, note });
+const start = (id = APPLICANT, invite?: string) =>
+  startVetting(deps(), {
+    corporationId: CORP,
+    accessToken: tok(id),
+    ...(invite !== undefined ? { invite } : {}),
+  });
+const submit = (
+  handle: VettingHandle,
+  note = '',
+  answers: { questionId: string; answer: string }[] = []
+) => submitVetting(deps(), { ...handle, note, answers });
+const overviewAs = (by: number) => getVettingOverview(deps(), who(by), call(by));
+const invite = (label: string, by = RECRUITER) =>
+  createVettingInvite(deps(), who(by), call(by), { label });
+const revoke = (code: string, by = RECRUITER) =>
+  revokeVettingInvite(deps(), who(by), call(by), { code });
+const settingsDoc = () => corp().collection('vetting').doc('settings');
+/** A device registered for `characterId` with the given server events on. */
+const device = (id: string, characterId: number, events: string[]) =>
+  db
+    .collection('deviceRegistrations')
+    .doc(id)
+    .set({
+      fcmToken: `fcm-${id}`,
+      characterIds: [characterId],
+      serverEventsByCharacter: { [String(characterId)]: events },
+    });
 const open = (reviewId: string, by: number) =>
   openVettingReview(deps(), who(by), call(by), { reviewId });
 const decide = (reviewId: string, by: number, decision: 'yes' | 'no', note = '') =>
@@ -182,6 +220,8 @@ emulatorSuite('vetting (emulator)', () => {
     now = T0;
     clearVettingCorpCache();
     esiCalls.length = 0;
+    pushed.length = 0;
+    pushFails = false;
     for (const map of [identities, owners, sheets, names, homes, scopes]) map.clear();
     identities.set(CEO, { corporationId: CORP, ceoId: CEO, roles: [] });
     identities.set(DIRECTOR, { corporationId: CORP, ceoId: CEO, roles: ['Director'] });
@@ -215,6 +255,10 @@ emulatorSuite('vetting (emulator)', () => {
       name: 'Test Corp',
       ticker: 'TEST',
       on: false,
+      welcome: '',
+      minimums: { ageDays: 0, skillPoints: 0, characters: 1 },
+      inviteOnly: false,
+      inviteOk: true,
     });
     expect(await reason(getVettingCorp(deps(), { corporationId: 98000404 }))).toBe('unknown-corp');
     expect(await reason(start())).toBe('vetting-off');
@@ -499,6 +543,7 @@ emulatorSuite('vetting (emulator)', () => {
     const asDirector = await getVettingOverview(deps(), who(DIRECTOR), call(DIRECTOR));
     expect(asDirector.canConfigure).toBe(true);
     expect(asDirector.settings).toEqual({
+      ...VETTING_DEFAULT_SETTINGS,
       on: true,
       watchlist: [],
       signOffs: { application: 1, promotion: 2 },
@@ -787,6 +832,7 @@ emulatorSuite('vetting (emulator)', () => {
       CEO
     );
     expect(first.settings).toEqual({
+      ...VETTING_DEFAULT_SETTINGS,
       on: true,
       signOffs: { application: 1, promotion: 3 },
       watchlist: [
@@ -880,5 +926,357 @@ emulatorSuite('vetting (emulator)', () => {
     // 90 days after it was shared, undecided: it goes too.
     expect(await sweepVetting(db, openGoes)).toMatchObject({ deleted: 1, failed: 0 });
     expect(await ids()).toEqual([]);
+  });
+
+  it('reads a settings document written before the newer settings as their defaults', async () => {
+    await settingsDoc().set({
+      on: true,
+      watchlist: [],
+      signOffs: { application: 1, promotion: 2 },
+      corporationName: 'Test Corp',
+      corporationTicker: 'TEST',
+    });
+    const seen = await overviewAs(DIRECTOR);
+    expect(seen.settings).toEqual({ ...VETTING_DEFAULT_SETTINGS, on: true });
+    expect(seen.invites).toEqual([]);
+    expect(await getVettingCorp(deps(), { corporationId: CORP })).toMatchObject({
+      on: true,
+      welcome: '',
+      inviteOnly: false,
+      inviteOk: true,
+    });
+    // An application under it is asked nothing more than before.
+    const { handle, status } = await start();
+    expect(status).toMatchObject({ contact: '', questions: [], answers: [], unmet: [] });
+    expect(await submit(handle)).toMatchObject({ state: 'open', answers: [] });
+  });
+
+  it('saves the newer settings, keeps question ids, and gives a new question one', async () => {
+    const first = await save({
+      on: true,
+      welcome: ' Welcome aboard ',
+      contact: 'Ask Bob',
+      questions: [
+        { label: 'Why us?', required: true },
+        { id: 'forged', label: 'Timezone?', required: false },
+      ],
+      minimums: { ageDays: 30, skillPoints: 9e12, characters: 0 },
+      rejection: { wording: 'notNow', showReason: true },
+      inviteOnly: true,
+      notifyReviewers: false,
+      mailDecision: false,
+    });
+    const [why, zone] = first.settings.questions;
+    expect(first.settings).toMatchObject({
+      welcome: 'Welcome aboard',
+      contact: 'Ask Bob',
+      questions: [
+        { label: 'Why us?', required: true },
+        { label: 'Timezone?', required: false },
+      ],
+      minimums: { ageDays: 30, skillPoints: 500_000_000, characters: 1 },
+      rejection: { wording: 'notNow', showReason: true },
+      inviteOnly: true,
+      notifyReviewers: false,
+      mailDecision: false,
+    });
+    expect(why.id).toMatch(/^[A-Za-z0-9_-]{8}$/);
+    expect(zone.id).not.toBe('forged');
+    expect(zone.id).not.toBe(why.id);
+
+    // The whole list again, reordered and reworded: known ids stay, the rest of the settings too.
+    const second = await save({
+      questions: [
+        { id: zone.id, label: 'Your timezone?', required: true },
+        { id: why.id, label: 'Why us?', required: true },
+        { label: 'Anything else?', required: false },
+      ],
+    });
+    expect(second.settings.questions.slice(0, 2)).toEqual([
+      { id: zone.id, label: 'Your timezone?', required: true },
+      { id: why.id, label: 'Why us?', required: true },
+    ]);
+    expect(second.settings).toMatchObject({ welcome: 'Welcome aboard', inviteOnly: true });
+    expect(await reason(save({ welcome: 'x' }, RECRUITER))).toBe('role-required');
+    expect(() => parseVettingSettingsPatch({ patch: { welcome: 'x'.repeat(601) } })).toThrow(
+      HttpsError
+    );
+  });
+
+  it('lets any reviewer hand out and revoke invites, up to the cap', async () => {
+    await turnOn();
+    expect(await reason(invite('Reddit', MEMBER))).toBe('not-a-reviewer');
+    expect(await reason(invite('Reddit', OUTSIDER))).toBe('wrong-corp');
+    const made = await invite('Reddit', RECRUITER);
+    expect(made.invites).toEqual([
+      {
+        code: expect.stringMatching(/^[A-Za-z0-9_-]{12}$/),
+        label: 'Reddit',
+        createdBy: { characterId: RECRUITER, name: `Pilot ${RECRUITER}` },
+        createdAt: T0,
+        uses: 0,
+      },
+    ]);
+    const two = await invite('Discord', CEO);
+    expect(two.invites.map((held) => held.label)).toEqual(['Reddit', 'Discord']);
+    expect(new Set(two.invites.map((held) => held.code)).size).toBe(2);
+    // Saving settings leaves the invites as they are.
+    expect((await save({ welcome: 'Hi' })).invites).toHaveLength(2);
+
+    expect(await reason(revoke(made.invites[0].code, MEMBER))).toBe('not-a-reviewer');
+    const left = await revoke(made.invites[0].code, DIRECTOR);
+    expect(left.invites.map((held) => held.label)).toEqual(['Discord']);
+    // Revoking a code that is already gone changes nothing.
+    expect((await revoke(made.invites[0].code)).invites).toHaveLength(1);
+
+    const full = Array.from({ length: VETTING_INVITES_MAX }, (_, i) => ({
+      code: `code${String(i).padStart(8, '0')}`,
+      label: `L${i}`,
+      createdBy: { characterId: RECRUITER, name: 'Pilot 3' },
+      createdAt: T0,
+      uses: 0,
+    }));
+    await settingsDoc().update({ invites: full });
+    expect(await reason(invite('One more'))).toBe('invites-full');
+  });
+
+  it('hands out an invite for a corp that has saved no settings yet', async () => {
+    const made = await invite('Early');
+    expect(made.invites).toHaveLength(1);
+    expect(made.settings).toEqual(VETTING_DEFAULT_SETTINGS);
+    // The corp is still named from ESI, and the cached name carries no answer about an invite.
+    const info = (code?: string) =>
+      getVettingCorp(deps(), { corporationId: CORP, ...(code ? { invite: code } : {}) });
+    expect(await info()).toMatchObject({ name: 'Test Corp', inviteOnly: false, inviteOk: true });
+    await settingsDoc().update({ inviteOnly: true });
+    expect(await info()).toMatchObject({ inviteOnly: true, inviteOk: false });
+    expect(await info('wrongwrong12')).toMatchObject({ inviteOk: false });
+    expect(await info(made.invites[0].code)).toMatchObject({ inviteOk: true });
+    expect(await info()).toMatchObject({ inviteOk: false });
+    expect(esiCalls).toEqual([`corporation:${CORP}`]);
+  });
+
+  it('starts an invite-only application only with a live code, counts it, and shows its label', async () => {
+    await turnOn({ inviteOnly: true });
+    const { invites } = await invite('Reddit');
+    const code = invites[0].code;
+    const info = await getVettingCorp(deps(), { corporationId: CORP, invite: code });
+    expect(info).toMatchObject({ inviteOnly: true, inviteOk: true });
+    // Nothing about the invite itself leaves through the public page.
+    expect(JSON.stringify(info)).not.toContain('Reddit');
+    expect(await getVettingCorp(deps(), { corporationId: CORP })).toMatchObject({
+      inviteOk: false,
+    });
+
+    expect(await reason(start())).toBe('invite-required');
+    expect(await reason(start(APPLICANT, 'wrongwrong12'))).toBe('invite-required');
+    // Refused before the token is used for anything.
+    expect(esiCalls.filter((c) => c.startsWith('read:'))).toEqual([]);
+
+    const { handle, status } = await start(APPLICANT, code);
+    expect(JSON.stringify(status)).not.toContain(code);
+    expect(await stored(handle.reviewId)).toMatchObject({ invite: { code, label: 'Reddit' } });
+    await start(APPLICANT_ALT, code);
+    expect((await overviewAs(RECRUITER)).invites).toMatchObject([{ code, uses: 2 }]);
+
+    await submit(handle);
+    const seen = await overviewAs(RECRUITER);
+    const row = seen.reviews.find((r) => r.id === handle.reviewId);
+    expect(row?.invite).toBe('Reddit');
+    const opened = await open(handle.reviewId, RECRUITER);
+    expect(opened.invite).toBe('Reddit');
+    expect(JSON.stringify(opened)).not.toContain(code);
+
+    // Revoked: the link stops working, the application started with it keeps its label.
+    await revoke(code);
+    expect(await reason(start(STRANGER, code))).toBe('invite-required');
+    expect((await open(handle.reviewId, RECRUITER)).invite).toBe('Reddit');
+
+    // A corp that is not invite-only still records a live code, and ignores a dead one.
+    await save({ inviteOnly: false });
+    const again = (await invite('Discord')).invites[0].code;
+    const viaLink = await start(STRANGER, again);
+    expect(await stored(viaLink.handle.reviewId)).toMatchObject({ invite: { label: 'Discord' } });
+    const dead = await start(SPY, code);
+    expect(await stored(dead.handle.reviewId)).not.toHaveProperty('invite');
+    expect((await overviewAs(RECRUITER)).invites).toMatchObject([{ code: again, uses: 1 }]);
+  });
+
+  it('needs the required answers before a share, and keeps the settled ones', async () => {
+    const { settings } = await turnOn({
+      questions: [
+        { label: 'Why us?', required: true },
+        { label: 'Timezone?', required: false },
+      ],
+    });
+    const [why, zone] = settings.questions;
+    const { handle, status } = await start();
+    expect(status.questions).toEqual(settings.questions);
+
+    expect(await reason(submit(handle))).toBe('answers-required');
+    expect(await reason(submit(handle, '', [{ questionId: zone.id, answer: 'EU' }]))).toBe(
+      'answers-required'
+    );
+    expect(await reason(submit(handle, '', [{ questionId: why.id, answer: '   ' }]))).toBe(
+      'answers-required'
+    );
+    // Refused before the checks spent anything, and still a draft with its reads.
+    expect(await stored(handle.reviewId)).toMatchObject({ state: 'draft' });
+    expect(await inputIds(handle.reviewId)).toEqual([String(APPLICANT)]);
+
+    const answers = [{ questionId: why.id, label: 'Why us?', answer: 'Friends fly here' }];
+    const shared_ = await submit(handle, '', [
+      { questionId: why.id, answer: ' Friends fly here ' },
+      { questionId: 'not-a-question', answer: 'dropped' },
+    ]);
+    expect(shared_).toMatchObject({ state: 'open', answers });
+    expect((await stored(handle.reviewId))?.answers).toEqual(answers);
+    expect((await open(handle.reviewId, RECRUITER)).answers).toEqual(answers);
+
+    // A reworded question does not rewrite what was answered.
+    await save({ questions: [{ id: why.id, label: 'Why join?', required: true }] });
+    expect(await getVettingStatus(deps(), handle)).toMatchObject({
+      questions: [{ id: why.id, label: 'Why join?', required: true }],
+      answers,
+    });
+
+    // Withdraw deletes the answers with everything else.
+    await withdrawVetting(deps(), handle);
+    expect(await stored(handle.reviewId)).toBeUndefined();
+  });
+
+  it('holds an application to the minimums, and a promotion to neither questions nor minimums', async () => {
+    await turnOn({
+      questions: [{ label: 'Why us?', required: true }],
+      minimums: { ageDays: 365, skillPoints: 50_000_000, characters: 2 },
+    });
+    const { settings } = await overviewAs(DIRECTOR);
+    const answer = [{ questionId: settings.questions[0].id, answer: 'Friends' }];
+    sheets.set(APPLICANT, {
+      ...sheet(APPLICANT),
+      birthday: new Date(T0 - 30 * DAY_MS).toISOString(),
+      skillPoints: 5_000_000,
+    });
+    const { handle, status } = await start();
+    expect(status.unmet).toEqual(['ageDays', 'skillPoints', 'characters']);
+    const refused = await submit(handle, '', answer).catch((e) => e);
+    expect(refused).toBeInstanceOf(HttpsError);
+    expect((refused as HttpsError).code).toBe('failed-precondition');
+    expect((refused as HttpsError).details).toEqual({ reason: 'below-minimum' });
+    expect((refused as HttpsError).message).toBe('ageDays,skillPoints,characters');
+
+    // An older, trained alt meets age and skill points; two characters meet the count.
+    const added = await addVettingCharacter(deps(), { ...handle, accessToken: tok(APPLICANT_ALT) });
+    expect(added.unmet).toEqual([]);
+    expect(await submit(handle, '', answer)).toMatchObject({ state: 'open', unmet: [] });
+
+    // The minimums as they stand when the status is read: lowered, nothing is unmet.
+    const second = await start(STRANGER);
+    expect(second.status.unmet).toEqual(['characters']);
+    await save({ minimums: { ageDays: 0, skillPoints: 0, characters: 1 } });
+    expect((await getVettingStatus(deps(), second.handle)).unmet).toEqual([]);
+    await save({ minimums: { ageDays: 0, skillPoints: 0, characters: 5 } });
+
+    await request('Pilot 5');
+    const [{ handle: asked, status: askedStatus }] = await myRequests(MEMBER);
+    expect(askedStatus).toMatchObject({ questions: [], unmet: [] });
+    await addVettingCharacter(deps(), { ...asked, accessToken: tok(MEMBER) });
+    expect(await submit(asked)).toMatchObject({ state: 'open', questions: [], answers: [] });
+  });
+
+  it('tells the pilot the contact once shared, and why it was rejected only when the corp shows it', async () => {
+    await turnOn({ contact: 'Ask Bob in Discord', signOffs: { application: 2, promotion: 2 } });
+    const { handle, status } = await start();
+    expect(status.contact).toBe('');
+    expect((await submit(handle)).contact).toBe('Ask Bob in Discord');
+    expect(await getVettingStatus(deps(), handle)).not.toHaveProperty('rejection');
+
+    await decide(handle.reviewId, RECRUITER, 'no', 'Too new to the game');
+    await decide(handle.reviewId, RECRUITER_2, 'yes', 'Seems fine to me');
+    expect(await getVettingStatus(deps(), handle)).toMatchObject({
+      state: 'rejected',
+      contact: 'Ask Bob in Discord',
+      rejection: { wording: 'rejected', reasons: [] },
+    });
+    await save({ rejection: { wording: 'notNow', showReason: true } });
+    const told = await getVettingStatus(deps(), handle);
+    expect(told.rejection).toEqual({ wording: 'notNow', reasons: ['Too new to the game'] });
+    expect(JSON.stringify(told)).not.toContain('Seems fine');
+    await save({ rejection: { wording: 'notNow', showReason: false } });
+    expect((await getVettingStatus(deps(), handle)).rejection).toEqual({
+      wording: 'notNow',
+      reasons: [],
+    });
+  });
+
+  it('records who the overview saw as a reviewer, and nobody it refused', async () => {
+    const reviewers = async () =>
+      (await corp().collection('vetting').doc('reviewers').get()).data()?.reviewers;
+    expect(await reason(overviewAs(MEMBER))).toBe('not-a-reviewer');
+    expect(await reviewers()).toBeUndefined();
+    await overviewAs(RECRUITER);
+    await overviewAs(DIRECTOR);
+    expect(await reviewers()).toEqual({
+      [`char:${RECRUITER}`]: { characterId: RECRUITER, lastSeenAt: T0 },
+      [`char:${DIRECTOR}`]: { characterId: DIRECTOR, lastSeenAt: T0 },
+    });
+    // Seen again within the day: not rewritten. 30 days on, the one not seen since is dropped.
+    now = T0 + HOUR_MS;
+    await overviewAs(RECRUITER);
+    expect((await reviewers())[`char:${RECRUITER}`].lastSeenAt).toBe(T0);
+    now = T0 + 30 * DAY_MS;
+    await overviewAs(RECRUITER);
+    expect(await reviewers()).toEqual({
+      [`char:${RECRUITER}`]: { characterId: RECRUITER, lastSeenAt: now },
+    });
+  });
+
+  it('pushes a shared report once to each known reviewer device that chose it', async () => {
+    await turnOn();
+    await overviewAs(RECRUITER);
+    await overviewAs(DIRECTOR);
+    await device('recruiter', RECRUITER, ['vettingShared']);
+    await device('director', DIRECTOR, ['newMail']);
+    // Chose the event, but was never seen as a reviewer of this corp.
+    await device('member', MEMBER, ['vettingShared']);
+
+    const { handle } = await start();
+    expect(pushed).toEqual([]);
+    await submit(handle);
+    expect(pushed).toHaveLength(1);
+    expect(pushed[0].token).toBe('fcm-recruiter');
+    expect(pushed[0].data).toMatchObject({
+      characterId: String(RECRUITER),
+      eventId: 'vettingShared',
+      occurrenceKey: `${RECRUITER}:vettingShared:${CORP}:${handle.reviewId}`,
+    });
+    expect(JSON.parse(pushed[0].data.fire)).toEqual({
+      eventId: 'vettingShared',
+      characterId: RECRUITER,
+      corporationId: CORP,
+      reviewId: handle.reviewId,
+      pilotName: `Pilot ${APPLICANT}`,
+      kind: 'application',
+    });
+
+    // A reviewer not seen for 30 days is no longer told.
+    now = T0 + 30 * DAY_MS;
+    pushed.length = 0;
+    await submit((await start(STRANGER)).handle);
+    expect(pushed).toEqual([]);
+  });
+
+  it('pushes nothing when the corp turned it off, and a failed push never fails the share', async () => {
+    await turnOn({ notifyReviewers: false });
+    await overviewAs(RECRUITER);
+    await device('recruiter', RECRUITER, ['vettingShared']);
+    await shared();
+    expect(pushed).toEqual([]);
+
+    await save({ notifyReviewers: true });
+    pushFails = true;
+    const { handle } = await start(STRANGER);
+    expect(await submit(handle)).toMatchObject({ state: 'open' });
+    expect(pushed).toEqual([]);
   });
 });

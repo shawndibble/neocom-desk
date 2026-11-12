@@ -1,8 +1,14 @@
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import type { VettingReview } from '@/engine/vetting';
+import {
+  VETTING_DEFAULT_SETTINGS,
+  type VettingReview,
+  type VettingSettings,
+} from '@/engine/vetting';
+import type { MailRun } from '../srp/srpResultMail';
 import { VettingDecision } from './VettingDecision';
 
 const review = (over: Partial<VettingReview> = {}): VettingReview => ({
@@ -21,6 +27,7 @@ const review = (over: Partial<VettingReview> = {}): VettingReview => ({
   decidedAt: null,
   corporationId: 98000001,
   note: '',
+  answers: [],
   barred: false,
   reportCharacters: [],
   parties: [],
@@ -34,9 +41,19 @@ const review = (over: Partial<VettingReview> = {}): VettingReview => ({
 /** The signed-in reviewer: Kestrel Vane in the rows below. */
 const REVIEWER = 6;
 
-function setup(over: Partial<VettingReview> = {}) {
+function setup(
+  over: Partial<VettingReview> = {},
+  settings: VettingSettings | null = VETTING_DEFAULT_SETTINGS
+) {
   const onDecide = vi.fn(async () => {});
-  render(<VettingDecision review={review(over)} reviewerId={REVIEWER} onDecide={onDecide} />);
+  render(
+    <VettingDecision
+      review={review(over)}
+      reviewerId={REVIEWER}
+      settings={settings}
+      onDecide={onDecide}
+    />
+  );
   return onDecide;
 }
 
@@ -150,7 +167,14 @@ describe('VettingDecision', () => {
     const onDecide = vi.fn(async () => {
       throw Object.assign(new Error('x'), { details: { reason: 'already-signed' } });
     });
-    render(<VettingDecision review={review()} reviewerId={REVIEWER} onDecide={onDecide} />);
+    render(
+      <VettingDecision
+        review={review()}
+        reviewerId={REVIEWER}
+        settings={VETTING_DEFAULT_SETTINGS}
+        onDecide={onDecide}
+      />
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
     const dialog = within(await screen.findByRole('dialog'));
     await userEvent.type(dialog.getByLabelText('Reason, kept with your decision'), 'No');
@@ -159,5 +183,108 @@ describe('VettingDecision', () => {
       'You already signed this review off.'
     );
     expect(dialog.getByLabelText('Reason, kept with your decision')).toHaveValue('No');
+  });
+
+  it('says who reads the reason: the pilot too, where the corp shows it or it is not known', async () => {
+    setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
+    expect(
+      await screen.findByText('The other reviewers see it. The pilot does not.')
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ['the corp shows the reason', shown],
+    ['the settings could not be read', null],
+  ])('tells the reviewer the pilot sees the reason when %s', async (_, settings) => {
+    setup({}, settings);
+    await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
+    expect(
+      await screen.findByText('The other reviewers see it. So does the pilot.')
+    ).toBeInTheDocument();
+  });
+});
+
+const shown: VettingSettings = {
+  ...VETTING_DEFAULT_SETTINGS,
+  rejection: { wording: 'notNow', showReason: true },
+};
+
+/** The report page's part: the review the decision answers with replaces the one on screen. */
+function Deciding({
+  settings,
+  onMail,
+  closes = true,
+}: {
+  settings: VettingSettings;
+  onMail?: () => Promise<MailRun>;
+  closes?: boolean;
+}) {
+  const [current, setCurrent] = useState(review());
+  return (
+    <VettingDecision
+      review={current}
+      reviewerId={REVIEWER}
+      settings={settings}
+      onMail={onMail}
+      onDecide={async () =>
+        setCurrent(
+          review(closes ? { state: 'accepted', yours: false, signed: 1 } : { yours: false })
+        )
+      }
+    />
+  );
+}
+
+describe('VettingDecision mail offer', () => {
+  const run = (over: Partial<MailRun>): MailRun => ({
+    queued: [],
+    failed: [],
+    missingScope: false,
+    ...over,
+  });
+
+  it('offers the mail once the caller’s sign-off closes the review, and says it was queued', async () => {
+    const onMail = vi.fn(async () => run({ queued: ['Tamsin Vell'] }));
+    render(<Deciding settings={VETTING_DEFAULT_SETTINGS} onMail={onMail} />);
+    expect(screen.queryByRole('button', { name: /Mail Tamsin Vell/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Mail Tamsin Vell the decision' })
+    );
+    expect(onMail).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('Mail queued for 1 pilot.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Mail Tamsin Vell/ })).toBeNull();
+  });
+
+  it('says a failed mail left the decision saved, and keeps the offer', async () => {
+    render(
+      <Deciding
+        settings={VETTING_DEFAULT_SETTINGS}
+        onMail={async () => run({ failed: ['Tamsin Vell'] })}
+      />
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Mail Tamsin Vell/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Mail failed for Tamsin Vell, status still saved.'
+    );
+    expect(screen.getByRole('button', { name: /Mail Tamsin Vell/ })).toBeInTheDocument();
+  });
+
+  it('offers none when the corp turned it off, or while the review is still open', async () => {
+    const onMail = vi.fn(async () => run({}));
+    const { unmount } = render(
+      <Deciding settings={{ ...VETTING_DEFAULT_SETTINGS, mailDecision: false }} onMail={onMail} />
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull());
+    expect(screen.queryByRole('button', { name: /Mail Tamsin Vell/ })).toBeNull();
+    unmount();
+
+    render(<Deciding settings={VETTING_DEFAULT_SETTINGS} onMail={onMail} closes={false} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull());
+    expect(screen.queryByRole('button', { name: /Mail Tamsin Vell/ })).toBeNull();
   });
 });

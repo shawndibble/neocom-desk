@@ -8,6 +8,8 @@ import {
   type VettingAssessment,
   type VettingCheckId,
   type VettingFlag,
+  type VettingMinimumId,
+  type VettingMinimums,
   type VettingParty,
   type VettingReview,
   type VettingReviewSummary,
@@ -279,13 +281,54 @@ export function missingSourcesFor(scopes: readonly string[]): VettingSource[] {
   );
 }
 
-/** Whether the applicant's Send is live. */
-export function canSend(input: {
+/** The minimums a corp set above "none", in the order the apply page lists them. */
+export function askedMinimums(
+  minimums: VettingMinimums
+): { id: VettingMinimumId; value: number }[] {
+  return [
+    ...(minimums.ageDays > 0 ? [{ id: 'ageDays' as const, value: minimums.ageDays }] : []),
+    ...(minimums.skillPoints > 0
+      ? [{ id: 'skillPoints' as const, value: minimums.skillPoints }]
+      : []),
+    ...(minimums.characters > 1 ? [{ id: 'characters' as const, value: minimums.characters }] : []),
+  ];
+}
+
+const MINIMUM_IDS: readonly VettingMinimumId[] = ['ageDays', 'skillPoints', 'characters'];
+
+/**
+ * The minimums a `below-minimum` refusal names: the server lists the unmet ids in its message,
+ * comma separated. Anything else in there is ignored.
+ */
+export function unmetFromRefusal(error: unknown): VettingMinimumId[] {
+  const message = (error as { message?: unknown } | null)?.message;
+  if (typeof message !== 'string') return [];
+  const named = message.split(/[^A-Za-z]+/);
+  return MINIMUM_IDS.filter((id) => named.includes(id));
+}
+
+/** What stands between the applicant and Send, first thing first; null when Send is live. */
+export type SendBlock = 'characters' | 'reading' | 'minimums' | 'answers' | 'tick';
+
+export function sendBlock(input: {
   characters: number;
   allMine: boolean;
   reading: boolean;
-}): boolean {
-  return input.characters > 0 && input.allMine && !input.reading;
+  /** Minimums the corp set that the draft does not meet. */
+  unmet?: number;
+  /** Required questions left blank. */
+  unanswered?: number;
+}): SendBlock | null {
+  if (input.characters === 0) return 'characters';
+  if (input.reading) return 'reading';
+  if ((input.unmet ?? 0) > 0) return 'minimums';
+  if ((input.unanswered ?? 0) > 0) return 'answers';
+  return input.allMine ? null : 'tick';
+}
+
+/** Whether the applicant's Send is live. */
+export function canSend(input: Parameters<typeof sendBlock>[0]): boolean {
+  return sendBlock(input) === null;
 }
 
 /**
@@ -309,6 +352,10 @@ const KNOWN_REASONS: ReadonlySet<string> = new Set([
   'not-a-member',
   'already-requested',
   'watchlist-full',
+  'invite-required',
+  'invites-full',
+  'answers-required',
+  'below-minimum',
   'not-open',
   'barred',
   'own-review',

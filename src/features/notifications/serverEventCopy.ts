@@ -18,6 +18,7 @@ import type {
   PriceAlertTriggeredFire,
   ShipLostFire,
 } from '@/engine/notificationDiffs';
+import type { VettingSharedFire } from '@/engine/vettingAlert';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import type { Translate } from '@/lib/translate';
 
@@ -54,6 +55,13 @@ export function communityJoinRequestText(
       name: fire.characterName,
       community: fire.communityName,
     }),
+  };
+}
+
+export function vettingSharedText(t: Translate, fire: VettingSharedFire): NotificationCopy {
+  return {
+    title: fired(t, 'vettingShared', 'title', { pilot: fire.pilotName }),
+    body: fired(t, 'vettingShared', fire.kind, { pilot: fire.pilotName }),
   };
 }
 

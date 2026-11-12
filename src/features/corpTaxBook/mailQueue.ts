@@ -328,6 +328,33 @@ export function enqueuePayeeChangeMail(input: {
 }
 
 /**
+ * Queues the mail that tells a pilot how their vetting review was decided. Written by the caller
+ * (it needs the reviewer's i18n); one review is mailed once, whoever presses.
+ */
+export function enqueueVettingDecisionMail(input: {
+  corporationId: number;
+  senderCharacterId: number;
+  reviewId: string;
+  recipient: { id: number; name: string };
+  mail: { subject: string; body: string };
+}): Promise<{ queued: number }> {
+  return queueNotices(
+    {
+      corporationId: input.corporationId,
+      senderCharacterId: input.senderCharacterId,
+      kind: 'vetting-result',
+    },
+    [
+      {
+        recipient: input.recipient,
+        statementId: `vetting:${input.reviewId}:${input.recipient.id}`,
+        mail: input.mail,
+      },
+    ]
+  );
+}
+
+/**
  * Queues the mail that tells each pilot how their SRP claims were decided. The mails are
  * written by the caller (they need the officer's i18n); the queue only paces and persists them.
  * A decision is its kind plus the claims it covers, so a double submit mails once per pilot.

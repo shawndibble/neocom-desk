@@ -12387,6 +12387,11 @@
         "title": "Join request for {{community}}",
         "body": "{{name}} asked to join {{community}} and is waiting for you to let them in."
       },
+      "vettingShared": {
+        "title": "New vetting report: {{pilot}}",
+        "application": "{{pilot}} applied and shared a vetting report.",
+        "promotion": "{{pilot}} shared the review they were asked for."
+      },
       "communityMemberJoined": {
         "title": "New member in {{community}}",
         "body": "{{name}} joined {{community}}."
@@ -14505,7 +14510,7 @@
           "description": "Only if your corporation uses SRP or a Corp Tax Book, or you shared a Vetting report with a corporation. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it. A Vetting report is the exception: the pilot can delete their own from its status page.",
           "srp": "SRP Claims: the killmail, the Character's name and ID, the hull, system and loss value, the fleet or FC and note you gave, the Reimbursement and the claim's state. Also the corporation's SRP settings, its Doctrine Fits and its SRP log: each filing (with the pilot's name, killmail, hull and amount) and each officer action. The CEO, Directors and Accountants read all of it; a pilot reads only their own claims.",
           "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a log of who did each, and which books bill each Character (kept under that Character's ID). The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link.",
-          "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), the pilot's note, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist and settings."
+          "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), the pilot's note and their answers to the corporation's questions, the invite link it started from, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist, questions, invite links and settings."
         },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
@@ -14748,9 +14753,11 @@
         "communityJoinRequest": "Community join request",
         "communityMemberJoined": "Community member joined",
         "communityRequestPledged": "Pledge on your Request",
+        "vettingShared": "New vetting report",
         "priceAlertTriggered": "Quickbar price alert",
         "shipLost": "Ship lost"
       },
+      "vettingSharedHint": "Sent when a pilot shares a report with your corporation. Reaches reviewers who opened Vetting in the last 30 days.",
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Planetary Industry always shows the real expiry.",
       "mercenaryDenReinforcedHint": "Scheduled up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. A den that leaves reinforcement early can still send it.",
       "skyhookRaidableHint": "Scheduled up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Needs the Station Manager role.",
@@ -17397,6 +17404,7 @@
         "rate-change": "Rate change",
         "payee-change": "Who gets paid changed",
         "srp-result": "SRP result",
+        "vetting-result": "Vetting decision",
         "removal": "Moon owner removal",
         "removalCancelled": "Removal cancelled"
       },
@@ -19835,7 +19843,49 @@
       "yours_other": "need your sign-off"
     },
     "copyLink": "Copy apply link",
+    "newInvite": "New invite link",
     "copied": "Copied",
+    "counter": "{{count}} / {{max}}",
+    "rejection": {
+      "rejected": "Rejected",
+      "notNow": "Not at this time"
+    },
+    "asks": {
+      "ageDays_one": "A character at least {{amount}} day old",
+      "ageDays_other": "A character at least {{amount}} days old",
+      "skillPoints": "{{amount}} skill points",
+      "characters_one": "At least {{amount}} character",
+      "characters_other": "At least {{amount}} characters"
+    },
+    "invites": {
+      "open": "Invites",
+      "title": "Invite links",
+      "label": "Who it is for",
+      "labelHint": "The report it starts shows this.",
+      "create": "Create link",
+      "createdFor": "Link for {{label}}",
+      "copy": "Copy link",
+      "copyNamed": "Copy link for {{label}}",
+      "revoke": "Revoke",
+      "revokeNamed": "Revoke link for {{label}}",
+      "columns": {
+        "label": "For",
+        "by": "Made by",
+        "when": "Made",
+        "uses": "Started"
+      },
+      "phoneLine_one": "{{by}} · {{when}} · {{count}} started",
+      "phoneLine_other": "{{by}} · {{when}} · {{count}} started",
+      "emptyTitle": "No invite links",
+      "emptyHint": "Make one for each pilot or post.",
+      "full": "{{count}} invite links is the most. Revoke one to make another.",
+      "publicNote": "Invite-only is off, so the apply link works without one. A report still shows the invite it started from.",
+      "close": "Close",
+      "revokeConfirm": {
+        "title": "Revoke this invite link?",
+        "body": "The link for {{label}} stops working. Applications already started stay."
+      }
+    },
     "copyOff": "Vetting is off. Applicants cannot use the link.",
     "reviewMember": "Review a member",
     "offNote": {
@@ -19878,6 +19928,7 @@
       "signedPhone": "{{signed}} of {{needed}} sign-offs",
       "yoursNeeded": "Yours needed",
       "asked": "Asked {{age}}",
+      "invite": "Invite: {{label}}",
       "empty": {
         "open": {
           "title": "Nobody to review",
@@ -19897,6 +19948,74 @@
       "confirm": "Ask for a review"
     },
     "settings": {
+      "sectionsLabel": "Vetting settings",
+      "sections": {
+        "general": "General",
+        "applicants": "Applicants",
+        "decisions": "Decisions",
+        "watchlist": "Watchlist"
+      },
+      "unsaved": "Unsaved changes",
+      "problems_one": "{{count}} problem to fix before saving",
+      "problems_other": "{{count}} problems to fix before saving",
+      "discard": "Discard",
+      "save": "Save",
+      "saved": "Settings saved",
+      "text": {
+        "title": "What applicants read",
+        "welcome": "Welcome message",
+        "welcomeNote": "Shown at the top of the apply page.",
+        "contact": "Contact line",
+        "contactNote": "Who to talk to. Shown once the report is sent."
+      },
+      "minimums": {
+        "title": "Minimums",
+        "hint": "Checked on Send, applications only. Any one declared character can meet age and skill points.",
+        "ageDays": "Character age",
+        "ageDaysUnit": "days",
+        "skillPoints": "Skill points",
+        "characters": "Characters declared",
+        "upTo": "Up to {{max}}.",
+        "invalid": "Enter a whole number."
+      },
+      "questions": {
+        "title": "Questions",
+        "meta": "{{count}} of {{max}}",
+        "hint": "Asked before Send, applications only. A report keeps each answer with the question as it read then.",
+        "emptyTitle": "No questions",
+        "emptyHint": "Applicants send only their note.",
+        "add": "Add a question",
+        "question": "Question {{n}}",
+        "required": "Required",
+        "requiredNamed": "Question {{n}} is required",
+        "moveUp": "Move question {{n}} up",
+        "moveDown": "Move question {{n}} down",
+        "remove": "Remove question {{n}}",
+        "blank": "Write the question, or remove it.",
+        "full": "{{count}} questions is the most."
+      },
+      "invites": {
+        "title": "Invite-only",
+        "label": "Invite-only",
+        "note": "The apply link works only with an invite. Any reviewer can make invite links.",
+        "manage": "Invite links",
+        "open_one": "Invites ({{count}})",
+        "open_other": "Invites ({{count}})"
+      },
+      "rejection": {
+        "title": "Telling the pilot",
+        "wording": "A no reads as",
+        "wordingNote": "On the pilot's status page and in the mail.",
+        "showReason": "Show the pilot the reason",
+        "showReasonNote": "The pilot sees the note of each reviewer who said no.",
+        "mail": "Offer a mail to the pilot when decided",
+        "mailNote": "In game, from the deciding reviewer's own character."
+      },
+      "notify": {
+        "title": "Telling reviewers",
+        "label": "Tell reviewers about a new report",
+        "note": "A notification on the devices that chose it in Settings › Alerts."
+      },
       "state": {
         "title": "Vetting",
         "on": "On",
@@ -20013,6 +20132,8 @@
       "title": "Vetting report",
       "failedTitle": "Could not open the report",
       "theirNote": "Their note",
+      "theirAnswers": "Their answers",
+      "invite": "Invite: {{label}}",
       "flags": "Flags",
       "flagsFound_one": "{{count}} flag in {{checks}} checks",
       "flagsFound_other": "{{count}} flags in {{checks}} checks",
@@ -20121,7 +20242,37 @@
         "promotion": "Object to {{pilot}}'s promotion"
       },
       "reason": "Reason, kept with your decision",
-      "refuseHint": "The other reviewers see it. The pilot does not."
+      "refuseHint": "The other reviewers see it. The pilot does not.",
+      "refuseHintShown": "The other reviewers see it. So does the pilot.",
+      "mail": {
+        "offer": "Mail {{pilot}} the decision",
+        "hint": "In game, from your character.",
+        "grantTitle": "Can't mail the pilot",
+        "grantHint": "The mail goes out from your Character. Grant the mail permission to send it.",
+        "grantAction": "Grant mail permission"
+      }
+    },
+    "mail": {
+      "greeting": "Hi {{pilot}},",
+      "reason": "Reason: {{reason}}",
+      "application": {
+        "acceptedSubject": "Application accepted: {{corp}}",
+        "accepted": "Your application to {{corp}} was accepted.",
+        "acceptedNext": "In EVE, open {{corp}}'s corporation window and press Apply to join. A recruiter accepts it in game.",
+        "rejectedSubject": "Application rejected: {{corp}}",
+        "rejected": "Your application to {{corp}} was rejected.",
+        "notNowSubject": "Application to {{corp}}: not at this time",
+        "notNow": "Your application to {{corp}} was not accepted at this time."
+      },
+      "promotion": {
+        "acceptedSubject": "Review approved: {{role}}",
+        "accepted": "Your review for {{role}} in {{corp}} was approved.",
+        "acceptedNext": "An officer changes your role in game.",
+        "rejectedSubject": "Review not approved: {{role}}",
+        "rejected": "Your review for {{role}} in {{corp}} was not approved.",
+        "notNowSubject": "Review for {{role}}: not at this time",
+        "notNow": "Your review for {{role}} in {{corp}} was not approved at this time."
+      }
     },
     "consent": {
       "title": "What you share",
@@ -20185,7 +20336,17 @@
         "sentNoTime": "Sent.",
         "decided": "Decided {{when}}.",
         "withdrawn": "Withdrawn.",
-        "off": "Not taking applications here."
+        "off": "Not taking applications here.",
+        "inviteOnly": "By invite only."
+      },
+      "welcome": "From {{corp}}",
+      "asks": {
+        "title": "What this corp asks",
+        "unmet": "Not met yet, of what {{corp}} asks:"
+      },
+      "inviteOnly": {
+        "title": "{{corp}} takes applications by invite",
+        "hint": "Ask a recruiter for a link."
       },
       "how": {
         "title": "How it works",
@@ -20204,11 +20365,14 @@
         "title": "Before you send",
         "allMine": "These are all my characters.",
         "allMineHint": "A character left out usually shows up in the others' trades.",
-        "note": "Note to the recruiters (optional)"
+        "note": "Note to the recruiters (optional)",
+        "required": "{{label}} (required)"
       },
       "send": "Send to {{corp}}",
       "sendHint": "Nothing is sent until you press this.",
       "sendNeedsTick": "Tick \"These are all my characters\" to send.",
+      "sendNeedsAnswers": "Answer the required questions to send.",
+      "sendNeedsMinimums": "This application does not meet what {{corp}} asks yet.",
       "startOver": {
         "action": "Start over",
         "title": "Start over?",
@@ -20251,6 +20415,7 @@
         },
         "accepted": "Accepted {{when}}.",
         "rejected": "Not accepted. Decided {{when}}.",
+        "notNow": "Not at this time. Decided {{when}}.",
         "withdrawn": "You withdrew. The report is deleted.",
         "declined": "You declined. Nothing was read.",
         "draft": "Not sent yet.",
@@ -20271,6 +20436,12 @@
         "joinAccept": "A recruiter accepts it in game.",
         "role": "An officer changes your role in game."
       },
+      "reasons_one": "Reason",
+      "reasons_other": "Reasons",
+      "contact": "Contact",
+      "answersTitle": "Your answers",
+      "showAnswers": "Show your answers",
+      "hideAnswers": "Hide your answers",
       "reportTitle": "Your report",
       "openedBy": "Opened by",
       "nobodyYet": "Nobody yet",
@@ -20337,6 +20508,10 @@
       "not-a-member": "That character is not in this corporation.",
       "already-requested": "That member already has a review waiting.",
       "watchlist-full": "The watchlist is full.",
+      "invite-required": "This corporation takes applications by invite. Ask a recruiter for a link.",
+      "invites-full": "No more invite links fit. Revoke one first.",
+      "answers-required": "Answer the required questions first.",
+      "below-minimum": "This application does not meet what the corporation asks.",
       "not-open": "This review is already decided.",
       "barred": "You cannot sign off this review.",
       "own-review": "This review is about you, so you cannot open it.",

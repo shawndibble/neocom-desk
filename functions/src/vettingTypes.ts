@@ -3,14 +3,19 @@
 //
 // Firestore layout (firestore.rules closes all of it to clients; every read and write is a
 // `vettingCall` action through the Admin SDK):
-//   corps/{corporationId}/vetting/settings                    the corp's VettingSettings
+//   corps/{corporationId}/vetting/settings                    the corp's VettingSettings, with its
+//                                                             watchlist and invites
+//   corps/{corporationId}/vetting/reviewers                   who was last seen holding a reviewer
+//                                                             role (StoredVettingReviewers)
 //   corps/{corporationId}/vettingReviews/{reviewId}           one review (StoredVettingReview)
 //   corps/{corporationId}/vettingReviews/{reviewId}/inputs/{characterId}
 //                                                             what one read of a character returned,
 //                                                             held only until submit or withdraw
 //   corps/{corporationId}/vettingThrottle/{characterId}       per-character daily draft counter
 import type {
+  VettingAnswer,
   VettingAssessment,
+  VettingInvite,
   VettingKind,
   VettingLogEntry,
   VettingParty,
@@ -22,6 +27,8 @@ import type {
 
 export const VETTING_SETTINGS_COLLECTION = 'vetting';
 export const VETTING_SETTINGS_DOC = 'settings';
+/** Beside the settings, in the same closed collection. */
+export const VETTING_REVIEWERS_DOC = 'reviewers';
 export const VETTING_REVIEWS = 'vettingReviews';
 export const VETTING_INPUTS = 'inputs';
 export const VETTING_THROTTLE = 'vettingThrottle';
@@ -50,13 +57,28 @@ export const VETTING_MAX_DEALINGS = 5000;
 /** Names one settings save may add to the watchlist. */
 export const VETTING_WATCH_ADD_MAX = 50;
 
+/** A reviewer not seen holding the role for this long is no longer told of a shared report. */
+export const VETTING_REVIEWER_DAYS = 30;
+
 export const HOUR_MS = 3_600_000;
 export const DAY_MS = 86_400_000;
 
 /** The settings document: the settings, plus the corp's name so the public page needs no ESI. */
 export interface StoredVettingSettings extends VettingSettings {
+  /** Server-owned, like the watchlist: changed only by the invite actions and a start. */
+  invites: VettingInvite[];
   corporationName?: string;
   corporationTicker?: string;
+}
+
+/**
+ * Who the overview last saw holding a reviewer role, by Firebase uid. There is no role list to
+ * read without a token, so this is how a shared report finds the reviewers to tell
+ * (`vettingShared`). Written when an overview succeeds; entries older than
+ * `VETTING_REVIEWER_DAYS` are dropped on the next write and never used.
+ */
+export interface StoredVettingReviewers {
+  reviewers: Record<string, { characterId: number; lastSeenAt: number }>;
 }
 
 /** A person, as the server knows them: the Character and the EVE account behind it. */
@@ -82,6 +104,12 @@ export interface StoredVettingCharacter {
   missing: VettingSource[];
   readAt: number;
   /**
+   * Kept so a draft's status can say which minimums are not met yet. Absent on a character read
+   * before they were kept, which then meets neither minimum until it is read again.
+   */
+  birthday?: string;
+  skillPoints?: number | null;
+  /**
    * The EVE account the read's token belonged to, so another character of the same account
    * cannot open the report as a reviewer. Absent on a review stored before it was kept.
    */
@@ -99,7 +127,11 @@ export interface StoredVettingReview {
   requestedBy?: VettingActor;
   /** SHA-256 of the pilot's secret, hex; null until a requested member is handed one. */
   keyHash: string | null;
+  /** The invite an application started from. Officers are shown the label, nobody the code. */
+  invite?: { code: string; label: string };
   note: string;
+  /** What an application answered, settled at submit. Absent on a review stored before it. */
+  answers?: VettingAnswer[];
   characters: StoredVettingCharacter[];
   /** Character reads made so far; also the version a submit checks nothing changed under it. */
   reads: number;

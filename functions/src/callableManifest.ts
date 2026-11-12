@@ -115,6 +115,8 @@ export const CALLABLE_ACTIONS = {
     'decideVettingReviewCallable',
     'requestVettingReviewCallable',
     'saveVettingSettingsCallable',
+    'createVettingInviteCallable',
+    'revokeVettingInviteCallable',
   ],
 } as const;
 

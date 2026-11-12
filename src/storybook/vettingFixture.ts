@@ -9,11 +9,16 @@
  */
 import {
   assessVetting,
+  settleVettingAnswers,
+  unmetVettingMinimums,
   VETTING_DEFAULT_SETTINGS,
+  VETTING_INVITES_MAX,
   VETTING_KEEP_DAYS,
   VETTING_OPEN_KEEP_DAYS,
+  type VettingAnswer,
   type VettingCharacterInput,
   type VettingDealing,
+  type VettingInvite,
   type VettingKind,
   type VettingParty,
   type VettingReview,
@@ -47,6 +52,30 @@ export const VETTING_FIXTURE_REVIEWS = {
 const BLACK_KITE = 98111001;
 const CORVIN = 2118000010;
 const ORRIN = 2118000011;
+
+/**
+ * A corp that set everything up: a welcome and contact line, three questions (two required),
+ * minimums the sample applicant meets, and a softer no that shows its reason. Pass it as
+ * `settings` to see the options at work; the default fixture is a corp that never opened Settings.
+ */
+export const VETTING_FIXTURE_CONFIGURED: Partial<VettingSettings> = {
+  welcome:
+    'We fly out of Hollow Reach, EU and early US evenings. Mining, hauling and home defence.\nRead the pinned mail before you apply.',
+  contact: 'Ilse Marrow or Bram Soto, in the "Brass Public" channel.',
+  questions: [
+    { id: 'q-timezone', label: 'What timezone do you play in?', required: true },
+    { id: 'q-referral', label: 'Who told you about us?', required: false },
+    { id: 'q-ships', label: 'What do you fly most?', required: true },
+  ],
+  minimums: { ageDays: 365, skillPoints: 20_000_000, characters: 2 },
+  rejection: { wording: 'notNow', showReason: true },
+};
+
+const SAMPLE_ANSWERS: Record<string, string> = {
+  'q-timezone': 'EU, most evenings from 19:00 EVE time.',
+  'q-referral': 'Hesper Lune, from the Hollow Reach fleet.',
+  'q-ships': 'Orca and Hulk in the belt, a Stabber Fleet Issue for home defence.',
+};
 
 const PARTIES: VettingParty[] = [
   { id: CORVIN, name: 'Corvin Hale', category: 'character', corporationId: BLACK_KITE },
@@ -220,14 +249,14 @@ function inputFor(sample: Sample, now: number): VettingCharacterInput {
 }
 
 /** A refusal as the callables word one: a code, and the reason in `details` (vettingStore.ts). */
-function refusal(reason: string): Error {
+function refusal(reason: string, message = reason): Error {
   const code =
     reason === 'not-found' || reason === 'unknown-corp' || reason === 'unknown-name'
       ? 'not-found'
       : reason === 'bad-key'
         ? 'permission-denied'
         : 'failed-precondition';
-  return Object.assign(new Error(reason), { code: `functions/${code}`, details: { reason } });
+  return Object.assign(new Error(message), { code: `functions/${code}`, details: { reason } });
 }
 
 interface ReviewSeed {
@@ -238,13 +267,20 @@ interface ReviewSeed {
   samples: Sample[];
   pilot?: { characterId: number; name: string; corporationName: string };
   note?: string;
+  /** The label of the invite link the application started from. */
+  invite?: string;
   needed: number;
   ageMs: number;
   signOffs?: VettingReview['signOffs'];
   requestedBy?: { characterId: number; name: string };
 }
 
-function buildReview(seed: ReviewSeed, now: number, watchlist: number[]): VettingReview {
+function buildReview(
+  seed: ReviewSeed,
+  now: number,
+  watchlist: number[],
+  answers: VettingAnswer[] = []
+): VettingReview {
   const [main] = seed.samples;
   const read = seed.samples.length > 0;
   const assessment = read
@@ -279,8 +315,10 @@ function buildReview(seed: ReviewSeed, now: number, watchlist: number[]): Vettin
     readAt: read ? at : null,
     createdAt: at - (read ? 20 * 60_000 : 0),
     decidedAt,
+    ...(seed.invite ? { invite: seed.invite } : {}),
     corporationId: VETTING_FIXTURE_CORPORATION.corporationId,
     note: seed.note ?? '',
+    answers: read && seed.kind === 'application' ? answers : [],
     ...(seed.requestedBy ? { requestedBy: seed.requestedBy } : {}),
     barred: false,
     reportCharacters: seed.samples.map((sample) => ({
@@ -331,6 +369,7 @@ function summaryOf(review: VettingReview): VettingReviewSummary {
     readAt,
     createdAt,
     decidedAt,
+    invite,
   } = review;
   return {
     id,
@@ -348,6 +387,7 @@ function summaryOf(review: VettingReview): VettingReviewSummary {
     readAt,
     createdAt,
     decidedAt,
+    ...(invite ? { invite } : {}),
   };
 }
 
@@ -366,7 +406,9 @@ export interface VettingFixtureOptions {
    */
   request?: boolean | 'shared';
   /** Where the applicant's own application stands when the page opens. */
-  application?: 'none' | 'draft' | 'sent' | 'opened' | 'accepted';
+  application?: 'none' | 'draft' | 'sent' | 'opened' | 'accepted' | 'rejected';
+  /** What the corp set, over the defaults (`VETTING_FIXTURE_CONFIGURED` is one that set it all). */
+  settings?: Partial<VettingSettings>;
   /** Every call waits this long first, so a "Reading" row can be seen. */
   delayMs?: number;
 }
@@ -388,7 +430,33 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
     ...VETTING_DEFAULT_SETTINGS,
     on: options.on ?? true,
     watchlist: [...WATCHLIST],
+    ...options.settings,
   };
+  const answersNow = (): VettingAnswer[] =>
+    settings.questions.flatMap((question) =>
+      SAMPLE_ANSWERS[question.id]
+        ? [{ questionId: question.id, label: question.label, answer: SAMPLE_ANSWERS[question.id] }]
+        : []
+    );
+  let invites: VettingInvite[] = options.empty
+    ? []
+    : [
+        {
+          code: 'inv-forum',
+          label: 'Forum post',
+          createdBy: ILSE,
+          createdAt: now - 3 * DAY_MS,
+          uses: 4,
+        },
+        {
+          code: 'inv-pell',
+          label: 'Pell Okonru',
+          createdBy: { characterId: reviewer.characterId, name: reviewer.name },
+          createdAt: now - 2 * DAY_MS,
+          uses: 1,
+        },
+      ];
+  const liveInvite = (code: string | undefined) => invites.find((invite) => invite.code === code);
   const watchIds = () => settings.watchlist.map((entry) => entry.id);
 
   const seeds: ReviewSeed[] = options.empty
@@ -420,6 +488,7 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
           kind: 'application',
           state: 'open',
           samples: [PELL, PELL_ALT],
+          invite: 'Pell Okonru',
           needed: 1,
           ageMs: DAY_MS + 3 * HOUR_MS,
         },
@@ -461,7 +530,9 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
           ],
         },
       ];
-  const reviews = new Map(seeds.map((seed) => [seed.id, buildReview(seed, now, watchIds())]));
+  const reviews = new Map(
+    seeds.map((seed) => [seed.id, buildReview(seed, now, watchIds(), answersNow())])
+  );
   const waiting = reviews.get(VETTING_FIXTURE_REVIEWS.waiting);
   if (waiting) waiting.barred = true;
 
@@ -506,7 +577,35 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
     decidedAt: null,
     deleteAt: null,
     openedBy: [],
+    contact: '',
+    questions: kind === 'application' ? structuredClone(settings.questions) : [],
+    answers: [],
+    unmet: [],
   });
+  /** An application draft's unmet minimums, worked out as the server does on every read. */
+  const withUnmet = (status: VettingStatus): VettingStatus =>
+    status.kind !== 'application' || status.state !== 'draft'
+      ? status
+      : {
+          ...status,
+          unmet: unmetVettingMinimums(
+            settings.minimums,
+            status.characters.flatMap((character) => {
+              const sample = (pools.get(status.id) ?? []).find(
+                (candidate) => candidate.characterId === character.characterId
+              );
+              return sample
+                ? [
+                    {
+                      birthday: iso(now, sample.years * 365 * DAY_MS),
+                      skillPoints: sample.missing?.includes('skills') ? null : sample.skillPoints,
+                    },
+                  ]
+                : [];
+            }),
+            now
+          ),
+        };
   const asCharacter = (sample: Sample): VettingStatus['characters'][number] => ({
     characterId: sample.characterId,
     name: sample.name,
@@ -519,18 +618,29 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
     const status = blankStatus(applicationHandle, 'application', 'draft');
     status.characters = [TAMSIN, MIRA, VELL_HAULING].map(asCharacter);
     if (application !== 'draft') {
-      status.state = application === 'accepted' ? 'accepted' : 'open';
+      status.state =
+        application === 'accepted' || application === 'rejected' ? application : 'open';
+      status.contact = settings.contact;
+      status.answers = answersNow();
       status.readAt = now - 2 * HOUR_MS;
       status.deleteAt = status.readAt + VETTING_OPEN_KEEP_DAYS * DAY_MS;
       if (application !== 'sent') {
         status.openedBy = [{ name: reviewer.name, at: now - 4 * 60_000 }];
       }
-      if (application === 'accepted') {
+      if (application === 'accepted' || application === 'rejected') {
         status.decidedAt = now - 60_000;
         status.deleteAt = status.decidedAt + VETTING_KEEP_DAYS * DAY_MS;
       }
+      if (application === 'rejected') {
+        status.rejection = {
+          wording: settings.rejection.wording,
+          reasons: settings.rejection.showReason
+            ? ['We are full on haulers this month. Ask again after the next deployment.']
+            : [],
+        };
+      }
     }
-    statuses.set(applicationHandle.reviewId, status);
+    statuses.set(applicationHandle.reviewId, withUnmet(status));
   }
   if (options.request) {
     const shared = options.request === 'shared';
@@ -555,7 +665,8 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
     }
     return status;
   };
-  const put = (status: VettingStatus): VettingStatus => {
+  const put = (next: VettingStatus): VettingStatus => {
+    const status = withUnmet(next);
     statuses.set(status.id, status);
     return structuredClone(status);
   };
@@ -591,6 +702,7 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
     settings: structuredClone(settings),
     canConfigure: options.canConfigure ?? true,
     reviews: [...reviews.values()].map(summaryOf),
+    invites: structuredClone(invites),
   });
   const reviewOf = (reviewId: string): VettingReview => {
     const review = reviews.get(reviewId);
@@ -599,13 +711,23 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
   };
 
   const backend: VettingBackend = {
-    corpInfo: async (corporationId) => {
+    corpInfo: async (corporationId, invite) => {
       if (corporationId !== corp.corporationId) throw refusal('unknown-corp');
-      return { ...corp, on: settings.on };
+      return {
+        ...corp,
+        on: settings.on,
+        welcome: settings.welcome,
+        minimums: { ...settings.minimums },
+        inviteOnly: settings.inviteOnly,
+        inviteOk: !settings.inviteOnly || liveInvite(invite) !== undefined,
+      };
     },
-    start: async (corporationId, accessToken) => {
+    start: async (corporationId, accessToken, invite) => {
       if (corporationId !== corp.corporationId) throw refusal('unknown-corp');
       if (!settings.on) throw refusal('vetting-off');
+      const used = liveInvite(invite);
+      if (settings.inviteOnly && !used) throw refusal('invite-required');
+      if (used) used.uses += 1;
       const status = read(blankStatus(applicationHandle, 'application', 'draft'), accessToken);
       return { handle: { ...applicationHandle }, status };
     },
@@ -617,13 +739,19 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
         characters: status.characters.filter((character) => character.characterId !== characterId),
       });
     },
-    submit: async (handle, note) => {
-      const status = statusOf(handle);
+    submit: async (handle, note, given) => {
+      const status = withUnmet(statusOf(handle));
       if (status.characters.length === 0) throw refusal('no-characters');
+      if (status.unmet.length > 0) throw refusal('below-minimum', status.unmet.join(','));
+      const { answers, unanswered } = settleVettingAnswers(status.questions, given);
+      if (unanswered.length > 0) throw refusal('answers-required');
       return put({
         ...status,
         state: 'open',
         note,
+        answers,
+        unmet: [],
+        contact: settings.contact,
         readAt: now,
         deleteAt: now + VETTING_OPEN_KEEP_DAYS * DAY_MS,
       });
@@ -712,12 +840,47 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
       reviews.set(id, review);
       return overview();
     },
+    createInvite: async (_characterId, _corporationId, label) => {
+      if (invites.length >= VETTING_INVITES_MAX) throw refusal('invites-full');
+      invites = [
+        ...invites,
+        {
+          code: `inv-${invites.length + 1}-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+          label,
+          createdBy: { characterId: reviewer.characterId, name: reviewer.name },
+          createdAt: now,
+          uses: 0,
+        },
+      ];
+      return overview();
+    },
+    revokeInvite: async (_characterId, _corporationId, code) => {
+      invites = invites.filter((invite) => invite.code !== code);
+      return overview();
+    },
     saveSettings: async (_characterId, _corporationId, patch) => {
       const added = (patch.addWatchNames ?? []).map((name, index): VettingWatchEntry => {
         if (/^nobody/i.test(name)) throw refusal('unknown-name');
         return { id: 98333000 + settings.watchlist.length + index, name, category: 'corporation' };
       });
       settings = {
+        ...settings,
+        ...(patch.welcome === undefined ? {} : { welcome: patch.welcome }),
+        ...(patch.contact === undefined ? {} : { contact: patch.contact }),
+        ...(patch.minimums ? { minimums: patch.minimums } : {}),
+        ...(patch.rejection ? { rejection: patch.rejection } : {}),
+        ...(patch.inviteOnly === undefined ? {} : { inviteOnly: patch.inviteOnly }),
+        ...(patch.notifyReviewers === undefined ? {} : { notifyReviewers: patch.notifyReviewers }),
+        ...(patch.mailDecision === undefined ? {} : { mailDecision: patch.mailDecision }),
+        ...(patch.questions
+          ? {
+              questions: patch.questions.map((question, index) => ({
+                id: question.id ?? `q-new-${index + 1}`,
+                label: question.label,
+                required: question.required,
+              })),
+            }
+          : {}),
         on: patch.on ?? settings.on,
         signOffs: patch.signOffs ?? settings.signOffs,
         watchlist: [

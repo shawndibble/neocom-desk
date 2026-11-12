@@ -6,6 +6,7 @@ import { textActionClassName } from '@/components/ui';
 import {
   createVettingFixture,
   VETTING_FIXTURE_APPLICANT,
+  VETTING_FIXTURE_CONFIGURED,
   VETTING_FIXTURE_CORPORATION,
   type VettingFixture,
   type VettingFixtureOptions,
@@ -30,7 +31,11 @@ let fixture: VettingFixture;
 
 function setup(
   options: VettingFixtureOptions = {},
-  props: { login?: VettingLoginOutcome | null; corporationId?: number | null } = {}
+  props: {
+    login?: VettingLoginOutcome | null;
+    corporationId?: number | null;
+    invite?: string | null;
+  } = {}
 ) {
   fixture = createVettingFixture(options);
   setVettingBackendOverride(fixture);
@@ -41,6 +46,7 @@ function setup(
   const view = render(
     <ApplyPage
       corporationId={props.corporationId === undefined ? CORP : props.corporationId}
+      invite={props.invite}
       login={props.login ?? null}
       onSignIn={onSignIn}
       onOpenApp={vi.fn()}
@@ -232,5 +238,174 @@ describe('ApplyPage', () => {
     };
     await userEvent.click(screen.getByRole('button', { name: 'Remove Vell Hauling' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('That did not work. Try again.');
+  });
+});
+
+describe('ApplyPage with what the corp set', () => {
+  const draft = { application: 'draft', settings: VETTING_FIXTURE_CONFIGURED } as const;
+  const sendButton = () =>
+    screen.findByRole('button', { name: 'Send to Brass Meridian Logistics' });
+  const tick = () =>
+    userEvent.click(screen.getByRole('checkbox', { name: /These are all my characters/ }));
+
+  it('opens with the welcome and what the corp asks, above how it works', async () => {
+    setup({ settings: VETTING_FIXTURE_CONFIGURED });
+    expect(await screen.findByText(/We fly out of Hollow Reach/)).toBeInTheDocument();
+    expect(screen.getByText('What this corp asks')).toBeInTheDocument();
+    expect(screen.getByText('A character at least 365 days old')).toBeInTheDocument();
+    expect(screen.getByText('20,000,000 skill points')).toBeInTheDocument();
+    expect(screen.getByText('At least 2 characters')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Log in with EVE Online' })).toBeInTheDocument();
+  });
+
+  it('shows neither block for a corp that set nothing', async () => {
+    setup();
+    await screen.findByText('How it works');
+    expect(screen.queryByText('What this corp asks')).toBeNull();
+    expect(screen.queryByText(/^From /)).toBeNull();
+  });
+
+  it('says to ask a recruiter, with no login, when the corp is invite-only and the link has no live code', async () => {
+    const bare = setup({ settings: { inviteOnly: true } });
+    expect(
+      await screen.findByText('Brass Meridian Logistics takes applications by invite')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Ask a recruiter for a link.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Log in with EVE Online' })).toBeNull();
+    bare.unmount();
+
+    setup({ settings: { inviteOnly: true } }, { invite: 'revoked-code' });
+    expect(
+      await screen.findByText('Brass Meridian Logistics takes applications by invite')
+    ).toBeInTheDocument();
+    expect(fixture.calls.find((call) => call.method === 'corpInfo')?.args).toEqual([
+      CORP,
+      'revoked-code',
+    ]);
+  });
+
+  it('takes a live invite: the login is offered, and the code goes with the first read', async () => {
+    const start = setup({ settings: { inviteOnly: true } }, { invite: 'inv-forum' });
+    expect(await screen.findByRole('button', { name: 'Log in with EVE Online' })).toBeVisible();
+    start.unmount();
+
+    setup({ settings: { inviteOnly: true } }, { invite: 'inv-forum', login: loginAs(tamsin) });
+    const list = await screen.findByRole('list');
+    expect(await within(list).findByText('Read')).toBeInTheDocument();
+    expect(fixture.calls.find((call) => call.method === 'start')?.args).toEqual([
+      CORP,
+      `fixture:${tamsin.characterId}`,
+      'inv-forum',
+    ]);
+  });
+
+  it('asks the corp’s questions above the note and keeps Send inert until the required ones are answered', async () => {
+    setup(draft);
+    const send = await sendButton();
+    await tick();
+    expect(send).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Answer the required questions to send.')).toBeInTheDocument();
+    await userEvent.click(send);
+    expect(fixture.calls.some((call) => call.method === 'submit')).toBe(false);
+
+    const timezone = screen.getByRole('textbox', {
+      name: 'What timezone do you play in? (required)',
+    });
+    expect(timezone).toHaveAttribute('aria-required', 'true');
+    expect(timezone).toHaveAttribute('maxlength', '500');
+    expect(screen.getByRole('textbox', { name: 'Who told you about us?' })).not.toHaveAttribute(
+      'aria-required'
+    );
+    await userEvent.type(timezone, 'EU');
+    expect(send).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'What do you fly most? (required)' }),
+      ' Orca '
+    );
+    expect(send).not.toHaveAttribute('aria-disabled');
+    await userEvent.click(send);
+
+    expect(await screen.findByText('Waiting')).toBeInTheDocument();
+    expect(fixture.calls.find((call) => call.method === 'submit')?.args.slice(1)).toEqual([
+      '',
+      [
+        { questionId: 'q-timezone', answer: 'EU' },
+        { questionId: 'q-referral', answer: '' },
+        { questionId: 'q-ships', answer: ' Orca ' },
+      ],
+    ]);
+  });
+
+  it('lists the minimums not met and keeps Send inert while any is', async () => {
+    setup({
+      application: 'draft',
+      settings: { minimums: { ageDays: 4000, skillPoints: 20_000_000, characters: 5 } },
+    });
+    const send = await sendButton();
+    await tick();
+    const unmet = within(screen.getByText(/^Not met yet/).parentElement!);
+    expect(unmet.getByText('A character at least 4,000 days old')).toBeInTheDocument();
+    expect(unmet.getByText('At least 5 characters')).toBeInTheDocument();
+    expect(unmet.queryByText(/skill points/)).toBeNull();
+    expect(send).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      screen.getByText('This application does not meet what Brass Meridian Logistics asks yet.')
+    ).toBeInTheDocument();
+    await userEvent.click(send);
+    expect(fixture.calls.some((call) => call.method === 'submit')).toBe(false);
+  });
+
+  it('lists what the server says is unmet when Send is refused for it', async () => {
+    setup({ application: 'draft' });
+    const send = await sendButton();
+    await tick();
+    fixture.submit = async () => {
+      throw Object.assign(new Error('skillPoints'), { details: { reason: 'below-minimum' } });
+    };
+    setVettingBackendOverride(fixture);
+    await userEvent.click(send);
+    expect(await screen.findByText(/^Not met yet/)).toBeInTheDocument();
+    expect(screen.getByText('0 skill points')).toBeInTheDocument();
+    expect(send).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('words an answers-required refusal', async () => {
+    setup({ application: 'draft' });
+    const send = await sendButton();
+    await tick();
+    fixture.submit = async () => {
+      throw Object.assign(new Error('x'), { details: { reason: 'answers-required' } });
+    };
+    setVettingBackendOverride(fixture);
+    await userEvent.click(send);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Answer the required questions first.'
+    );
+  });
+
+  it('shows the contact line and the pilot’s own answers once sent', async () => {
+    setup({ application: 'sent', settings: VETTING_FIXTURE_CONFIGURED });
+    expect(await screen.findByText('Contact')).toBeInTheDocument();
+    expect(screen.getByText(/Ilse Marrow or Bram Soto/)).toBeInTheDocument();
+    expect(screen.queryByText('EU, most evenings from 19:00 EVE time.')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Show your answers' }));
+    expect(screen.getByText('What timezone do you play in?')).toBeInTheDocument();
+    expect(screen.getByText('EU, most evenings from 19:00 EVE time.')).toBeInTheDocument();
+  });
+
+  it('says a no in the corp’s wording, with its reasons when the corp shows them', async () => {
+    const soft = setup({ application: 'rejected', settings: VETTING_FIXTURE_CONFIGURED });
+    expect(await screen.findByText('Not at this time')).toBeInTheDocument();
+    expect(screen.getByText(/^Not at this time\. Decided /)).toBeInTheDocument();
+    expect(screen.getByText('Reason')).toBeInTheDocument();
+    expect(screen.getByText(/We are full on haulers this month/)).toBeInTheDocument();
+    expect(screen.queryByText('Rejected')).toBeNull();
+    soft.unmount();
+
+    setup({ application: 'rejected' });
+    expect(await screen.findByText('Rejected')).toBeInTheDocument();
+    expect(screen.getByText(/^Not accepted\. Decided /)).toBeInTheDocument();
+    expect(screen.queryByText('Reason')).toBeNull();
+    expect(screen.queryByText(/full on haulers/)).toBeNull();
   });
 });

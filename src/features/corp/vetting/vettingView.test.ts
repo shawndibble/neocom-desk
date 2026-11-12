@@ -9,7 +9,10 @@ import {
 } from '@/engine/vetting';
 import {
   askedByReviewer,
+  askedMinimums,
   canSend,
+  sendBlock,
+  unmetFromRefusal,
   evidenceWhatKey,
   flagFindingParams,
   isReviewGone,
@@ -258,6 +261,7 @@ const review = (over: Partial<VettingReview>): VettingReview => ({
   ...summary({}),
   corporationId: 98000001,
   note: '',
+  answers: [],
   barred: false,
   reportCharacters: [],
   parties: [],
@@ -347,7 +351,50 @@ describe('canSend', () => {
   });
 });
 
+describe('sendBlock', () => {
+  const ready = { characters: 2, allMine: true, reading: false };
+
+  it('names what stands in the way, the corp’s own asks before the statement', () => {
+    expect(sendBlock(ready)).toBeNull();
+    expect(sendBlock({ ...ready, unmet: 1, unanswered: 2, allMine: false })).toBe('minimums');
+    expect(sendBlock({ ...ready, unanswered: 1, allMine: false })).toBe('answers');
+    expect(sendBlock({ ...ready, allMine: false })).toBe('tick');
+    expect(sendBlock({ ...ready, characters: 0, unmet: 1 })).toBe('characters');
+    expect(sendBlock({ ...ready, reading: true })).toBe('reading');
+    expect(canSend({ ...ready, unanswered: 1 })).toBe(false);
+  });
+});
+
+describe('askedMinimums', () => {
+  it('lists only what a corp set above none, in the page’s order', () => {
+    expect(askedMinimums({ ageDays: 0, skillPoints: 0, characters: 1 })).toEqual([]);
+    expect(askedMinimums({ ageDays: 365, skillPoints: 50_000_000, characters: 2 })).toEqual([
+      { id: 'ageDays', value: 365 },
+      { id: 'skillPoints', value: 50_000_000 },
+      { id: 'characters', value: 2 },
+    ]);
+    expect(askedMinimums({ ageDays: 0, skillPoints: 0, characters: 3 })).toEqual([
+      { id: 'characters', value: 3 },
+    ]);
+  });
+});
+
+describe('unmetFromRefusal', () => {
+  it('reads the unmet ids a below-minimum refusal lists, and nothing else', () => {
+    expect(unmetFromRefusal(new Error('skillPoints,ageDays'))).toEqual(['ageDays', 'skillPoints']);
+    expect(unmetFromRefusal(new Error('characters, bogus'))).toEqual(['characters']);
+    expect(unmetFromRefusal(new Error('below-minimum'))).toEqual([]);
+    expect(unmetFromRefusal(null)).toEqual([]);
+  });
+});
+
 describe('vettingErrorKey', () => {
+  it('words the refusals the corp’s settings add', () => {
+    for (const reason of ['invite-required', 'invites-full', 'answers-required', 'below-minimum']) {
+      expect(vettingErrorKey(reason)).toBe(`vetting.errors.${reason}`);
+    }
+  });
+
   it('maps a known refusal to its wording and anything else to the generic line', () => {
     expect(vettingErrorKey('vetting-off')).toBe('vetting.errors.vetting-off');
     expect(vettingErrorKey('own-review')).toBe('vetting.errors.own-review');

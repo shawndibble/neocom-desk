@@ -4,15 +4,19 @@
 
 import { isFiniteNumber, isPlainRecord } from './guards.js';
 import {
-  VETTING_DEFAULT_SETTINGS,
   VETTING_DRAFT_HOURS,
+  VETTING_INVITES_MAX,
   VETTING_KEEP_DAYS,
   VETTING_OPEN_KEEP_DAYS,
   VETTING_WATCHLIST_MAX,
+  normalizeVettingSettings,
+  unmetVettingMinimums,
   type VettingAssessment,
   type VettingCharacterInput,
+  type VettingInvite,
   type VettingKind,
   type VettingLogEntry,
+  type VettingQuestion,
   type VettingReportCharacter,
   type VettingReview,
   type VettingReviewSummary,
@@ -29,8 +33,10 @@ import {
   VETTING_DAILY_DRAFTS,
   VETTING_LOG_MAX,
   VETTING_REQUEST_KEEP_DAYS,
+  VETTING_REVIEWER_DAYS,
   type StoredSignOff,
   type StoredVettingReview,
+  type StoredVettingReviewers,
   type StoredVettingSettings,
   type VettingActor,
 } from './vettingTypes.js';
@@ -39,13 +45,32 @@ import {
 
 const WATCH_CATEGORIES = ['character', 'corporation', 'alliance'];
 
-const clampSignOffs = (value: unknown, fallback: number): number =>
-  isFiniteNumber(value) ? Math.min(3, Math.max(1, Math.round(value))) : fallback;
+function readInvites(raw: unknown): VettingInvite[] {
+  return (Array.isArray(raw) ? (raw as unknown[]) : []).flatMap((entry): VettingInvite[] => {
+    if (!isPlainRecord(entry) || !isPlainRecord(entry.createdBy)) return [];
+    const { code, label, createdBy, createdAt, uses } = entry;
+    if (typeof code !== 'string' || !code || typeof label !== 'string') return [];
+    if (!isFiniteNumber(createdBy.characterId) || typeof createdBy.name !== 'string') return [];
+    if (!isFiniteNumber(createdAt) || !isFiniteNumber(uses)) return [];
+    return [
+      {
+        code,
+        label,
+        createdBy: { characterId: createdBy.characterId, name: createdBy.name },
+        createdAt,
+        uses,
+      },
+    ];
+  });
+}
 
-/** The settings document as stored, or the defaults (off) for a corp that has none. */
+/**
+ * The settings document as stored, or the defaults (off) for a corp that has none. Every read
+ * goes through `normalizeVettingSettings`, so a document written before a setting existed reads
+ * as that setting's default. The watchlist and the invites are the server's own, checked here.
+ */
 export function readVettingSettings(data: unknown): StoredVettingSettings {
   const d = isPlainRecord(data) ? data : {};
-  const counts = isPlainRecord(d.signOffs) ? d.signOffs : {};
   const watchlist = (Array.isArray(d.watchlist) ? (d.watchlist as unknown[]) : []).flatMap(
     (entry): VettingWatchEntry[] =>
       isPlainRecord(entry) &&
@@ -62,12 +87,9 @@ export function readVettingSettings(data: unknown): StoredVettingSettings {
         : []
   );
   return {
-    on: d.on === true,
+    ...normalizeVettingSettings(d),
     watchlist,
-    signOffs: {
-      application: clampSignOffs(counts.application, VETTING_DEFAULT_SETTINGS.signOffs.application),
-      promotion: clampSignOffs(counts.promotion, VETTING_DEFAULT_SETTINGS.signOffs.promotion),
-    },
+    invites: readInvites(d.invites),
     ...(typeof d.corporationName === 'string' ? { corporationName: d.corporationName } : {}),
     ...(typeof d.corporationTicker === 'string' ? { corporationTicker: d.corporationTicker } : {}),
   };
@@ -75,7 +97,8 @@ export function readVettingSettings(data: unknown): StoredVettingSettings {
 
 /** What a caller is sent: the settings without the server's own fields. */
 export function wireSettings(settings: StoredVettingSettings): VettingSettings {
-  return { on: settings.on, watchlist: settings.watchlist, signOffs: settings.signOffs };
+  // The normalizer returns the wire settings and nothing else: no invites, no corp name.
+  return { ...normalizeVettingSettings(settings), watchlist: settings.watchlist };
 }
 
 /** The first of `names` that ESI resolved to nothing, compared as ESI does (case-blind). */
@@ -87,11 +110,34 @@ export function unknownWatchName(
   return names.find((name) => !known.has(name.toLowerCase()));
 }
 
-/** `settings` with the patch applied; `watchlist-full` when the list would pass its cap. */
+/**
+ * The questions a patch leaves: its whole list, in its order. A question keeps its id only when
+ * the corp already had one by that id (once per list); any other entry is new and gets one.
+ */
+function patchedQuestions(
+  held: readonly VettingQuestion[],
+  sent: NonNullable<VettingSettingsPatch['questions']>,
+  newId: () => string
+): VettingQuestion[] {
+  const known = new Set(held.map((question) => question.id));
+  const used = new Set<string>();
+  return sent.map((entry) => {
+    let id = entry.id !== undefined && known.has(entry.id) && !used.has(entry.id) ? entry.id : '';
+    while (!id || used.has(id)) id = newId();
+    used.add(id);
+    return { id, label: entry.label, required: entry.required };
+  });
+}
+
+/**
+ * `settings` with the patch applied, its numbers clamped by `normalizeVettingSettings`;
+ * `watchlist-full` when the list would pass its cap. The invites are not a patch's to change.
+ */
 export function applyVettingSettingsPatch(
   settings: StoredVettingSettings,
   patch: VettingSettingsPatch,
-  added: readonly VettingWatchEntry[]
+  added: readonly VettingWatchEntry[],
+  newId: () => string
 ): { ok: true; settings: StoredVettingSettings } | { ok: false; reason: 'watchlist-full' } {
   const removed = new Set(patch.removeWatch);
   const watchlist = settings.watchlist.filter((entry) => !removed.has(entry.id));
@@ -99,15 +145,129 @@ export function applyVettingSettingsPatch(
     if (!watchlist.some((held) => held.id === entry.id)) watchlist.push(entry);
   }
   if (watchlist.length > VETTING_WATCHLIST_MAX) return { ok: false, reason: 'watchlist-full' };
+  const next = normalizeVettingSettings({
+    on: patch.on ?? settings.on,
+    signOffs: patch.signOffs ?? settings.signOffs,
+    welcome: patch.welcome ?? settings.welcome,
+    contact: patch.contact ?? settings.contact,
+    questions: patch.questions
+      ? patchedQuestions(settings.questions, patch.questions, newId)
+      : settings.questions,
+    minimums: patch.minimums ?? settings.minimums,
+    rejection: patch.rejection ?? settings.rejection,
+    inviteOnly: patch.inviteOnly ?? settings.inviteOnly,
+    notifyReviewers: patch.notifyReviewers ?? settings.notifyReviewers,
+    mailDecision: patch.mailDecision ?? settings.mailDecision,
+  });
+  return { ok: true, settings: { ...settings, ...next, watchlist } };
+}
+
+// --- Invites ----------------------------------------------------------------
+
+/** The invite `code` names, while it has not been revoked. */
+export function liveVettingInvite(
+  settings: StoredVettingSettings,
+  code: string | undefined
+): VettingInvite | undefined {
+  return code === undefined ? undefined : settings.invites.find((held) => held.code === code);
+}
+
+/** Whether an apply link carrying `code` may start an application. */
+export function vettingInviteOk(
+  settings: StoredVettingSettings,
+  code: string | undefined
+): boolean {
+  return !settings.inviteOnly || liveVettingInvite(settings, code) !== undefined;
+}
+
+export function addVettingInvite(
+  settings: StoredVettingSettings,
+  invite: VettingInvite
+): { ok: true; settings: StoredVettingSettings } | { ok: false; reason: 'invites-full' } {
+  if (settings.invites.length >= VETTING_INVITES_MAX) return { ok: false, reason: 'invites-full' };
+  return { ok: true, settings: { ...settings, invites: [...settings.invites, invite] } };
+}
+
+/** Revoked: the code stops working; applications started with it keep the label they recorded. */
+export function withoutVettingInvite(
+  settings: StoredVettingSettings,
+  code: string
+): StoredVettingSettings {
+  return { ...settings, invites: settings.invites.filter((held) => held.code !== code) };
+}
+
+/** `settings` with one more application counted against the invite `code`. */
+export function withVettingInviteUsed(
+  settings: StoredVettingSettings,
+  code: string
+): StoredVettingSettings {
   return {
-    ok: true,
-    settings: {
-      ...settings,
-      on: patch.on ?? settings.on,
-      signOffs: patch.signOffs ?? settings.signOffs,
-      watchlist,
-    },
+    ...settings,
+    invites: settings.invites.map((held) =>
+      held.code === code ? { ...held, uses: held.uses + 1 } : held
+    ),
   };
+}
+
+// --- Known reviewers --------------------------------------------------------
+
+function readReviewers(data: unknown): StoredVettingReviewers['reviewers'] {
+  const raw = isPlainRecord(data) && isPlainRecord(data.reviewers) ? data.reviewers : {};
+  const out: StoredVettingReviewers['reviewers'] = {};
+  for (const [uid, entry] of Object.entries(raw)) {
+    if (
+      isPlainRecord(entry) &&
+      isFiniteNumber(entry.characterId) &&
+      isFiniteNumber(entry.lastSeenAt)
+    ) {
+      out[uid] = { characterId: entry.characterId, lastSeenAt: entry.lastSeenAt };
+    }
+  }
+  return out;
+}
+
+const reviewerSeenRecently = (lastSeenAt: number, now: number): boolean =>
+  now - lastSeenAt < VETTING_REVIEWER_DAYS * DAY_MS;
+
+/**
+ * The reviewers document after `uid` was seen holding a reviewer role now, without anyone not
+ * seen in `VETTING_REVIEWER_DAYS`; null when it need not be written (seen within the day).
+ */
+export function seenVettingReviewer(
+  data: unknown,
+  uid: string,
+  characterId: number,
+  now: number
+): StoredVettingReviewers | null {
+  const held = readReviewers(data);
+  const mine = held[uid];
+  if (mine && mine.characterId === characterId && now >= mine.lastSeenAt) {
+    if (now - mine.lastSeenAt < DAY_MS) return null;
+  }
+  const reviewers: StoredVettingReviewers['reviewers'] = {};
+  for (const [id, entry] of Object.entries(held)) {
+    if (reviewerSeenRecently(entry.lastSeenAt, now)) reviewers[id] = entry;
+  }
+  reviewers[uid] = { characterId, lastSeenAt: now };
+  return { reviewers };
+}
+
+/**
+ * The Characters to tell that a report was shared: reviewers seen in the last
+ * `VETTING_REVIEWER_DAYS`, never one the report is about.
+ */
+export function vettingSharedRecipients(
+  data: unknown,
+  review: StoredVettingReview,
+  now: number
+): number[] {
+  const ids = new Set<number>();
+  for (const entry of Object.values(readReviewers(data))) {
+    if (!reviewerSeenRecently(entry.lastSeenAt, now)) continue;
+    if (isSubject(review, { characterId: entry.characterId, ownerHash: '' })) continue;
+    ids.add(entry.characterId);
+  }
+  return [...ids].sort((a, b) => a - b);
 }
 
 // --- Log --------------------------------------------------------------------
@@ -261,6 +421,8 @@ export function reviewSummary(
     readAt: review.readAt,
     createdAt: review.createdAt,
     decidedAt: review.decidedAt,
+    // The label only: the code is the corp's to hand out, not a row's to show.
+    ...(review.invite ? { invite: review.invite.label } : {}),
   };
 }
 
@@ -290,6 +452,7 @@ export function reviewView(
     ...reviewSummary(id, review, viewer),
     corporationId: review.corporationId,
     note: review.note,
+    answers: review.answers ?? [],
     ...(review.requestedBy
       ? {
           requestedBy: {
@@ -308,8 +471,22 @@ export function reviewView(
   };
 }
 
-/** What the pilot sees of their own review: no flags, no sign-offs, only who opened it. */
-export function pilotStatus(id: string, review: StoredVettingReview): VettingStatus {
+const SHARED = ['open', ...DECIDED];
+
+/**
+ * What the pilot sees of their own review: no flags, no sign-offs, only who opened it. What the
+ * corp asks is read from its settings as they are now: the questions and unmet minimums of an
+ * application (a promotion is asked neither), the contact once the report is shared, and for a
+ * rejected review the corp's wording, with the notes of the reviewers who said no only when the
+ * corp shows them.
+ */
+export function pilotStatus(
+  id: string,
+  review: StoredVettingReview,
+  settings: VettingSettings,
+  now: number
+): VettingStatus {
+  const application = review.kind === 'application';
   return {
     id,
     corporationId: review.corporationId,
@@ -340,6 +517,32 @@ export function pilotStatus(id: string, review: StoredVettingReview): VettingSta
       .filter((entry) => entry.action === 'opened')
       .map((entry) => ({ name: entry.name, at: entry.at }))
       .sort((a, b) => b.at - a.at),
+    contact: SHARED.includes(review.state) ? settings.contact : '',
+    questions: application ? settings.questions : [],
+    answers: review.answers ?? [],
+    unmet:
+      application && review.state === 'draft'
+        ? unmetVettingMinimums(
+            settings.minimums,
+            review.characters.map((character) => ({
+              birthday: character.birthday ?? '',
+              skillPoints: character.skillPoints ?? null,
+            })),
+            now
+          )
+        : [],
+    ...(review.state === 'rejected'
+      ? {
+          rejection: {
+            wording: settings.rejection.wording,
+            reasons: settings.rejection.showReason
+              ? review.signOffs
+                  .filter((signOff) => signOff.decision === 'no' && signOff.note.trim() !== '')
+                  .map((signOff) => signOff.note.trim())
+              : [],
+          },
+        }
+      : {}),
   };
 }
 

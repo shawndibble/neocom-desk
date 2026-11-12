@@ -27,9 +27,16 @@ import { usePageTab } from '@/lib/usePageTab';
 import { ReviewMemberDialog } from './ReviewMemberDialog';
 import { VettingQueue } from './VettingQueue';
 import { VettingReport } from './VettingReport';
+import { VettingInvitesDialog } from './VettingInvitesDialog';
 import { VettingSettingsView } from './VettingSettingsView';
 import { vettingBackend } from './vettingClient';
-import { VETTING_TABS, reviewIdFromPathname, reviewPath, type VettingTabId } from './vettingTabs';
+import {
+  VETTING_TABS,
+  reviewIdFromPathname,
+  reviewPath,
+  settingsSectionFromPathname,
+  type VettingTabId,
+} from './vettingTabs';
 import { applyLink } from './vettingText';
 import { isDecided, needsYours } from './vettingView';
 import { useVettingOverview } from './useVettingOverview';
@@ -44,6 +51,7 @@ export function VettingPage() {
   const { state, characterId, corporationId, reload, replace } = useVettingOverview();
   const { copied, flash } = useCopyFeedback(2000);
   const [requesting, setRequesting] = useState(false);
+  const [invitesOpen, setInvitesOpen] = useState<'new' | 'list' | null>(null);
   const reviewId = reviewIdFromPathname(pathname);
   const canConfigure = state.status === 'ready' && state.overview.canConfigure;
   const shown: VettingTabId = tab === 'settings' && !canConfigure ? 'open' : tab;
@@ -56,6 +64,13 @@ export function VettingPage() {
         corporationId={corporationId}
         reviewId={reviewId}
         tab={tab}
+        settings={
+          state.status === 'ready'
+            ? state.overview.settings
+            : state.status === 'loading'
+              ? undefined
+              : null
+        }
         onDecided={reload}
       />
     );
@@ -109,11 +124,18 @@ export function VettingPage() {
       // The clipboard was refused; nothing was copied and nothing claims it was.
     }
   };
-  const copyButton = (
+  // By invite, the bare apply link takes nobody anywhere: the header makes an invite link instead.
+  const { inviteOnly } = overview.settings;
+  const copyButton = inviteOnly ? (
+    <Button aria-disabled={!on || undefined} onClick={on ? () => setInvitesOpen('new') : undefined}>
+      {t('vetting.newInvite')}
+    </Button>
+  ) : (
     <Button aria-disabled={!on || undefined} onClick={on ? () => void copy() : undefined}>
       {t(copied ? 'vetting.copied' : 'vetting.copyLink')}
     </Button>
   );
+  const showInvites = inviteOnly || overview.invites.length > 0;
 
   return page(
     <>
@@ -126,6 +148,9 @@ export function VettingPage() {
         </p>
         <span className="flex flex-wrap gap-2">
           {on ? copyButton : <Tooltip content={t('vetting.copyOff')}>{copyButton}</Tooltip>}
+          {showInvites && (
+            <Button onClick={() => setInvitesOpen('list')}>{t('vetting.invites.open')}</Button>
+          )}
           <Button onClick={() => setRequesting(true)}>{t('vetting.reviewMember')}</Button>
         </span>
         <LiveStatus>{copied ? t('vetting.copied') : ''}</LiveStatus>
@@ -163,6 +188,9 @@ export function VettingPage() {
         {shown === 'settings' ? (
           <VettingSettingsView
             settings={overview.settings}
+            section={settingsSectionFromPathname(pathname)}
+            invites={overview.invites.length}
+            onManageInvites={() => setInvitesOpen('list')}
             onSave={async (patch) => {
               replace(await vettingBackend().saveSettings(characterId, corporationId, patch));
             }}
@@ -175,6 +203,23 @@ export function VettingPage() {
           />
         )}
       </div>
+      {invitesOpen !== null && (
+        <VettingInvitesDialog
+          mode={invitesOpen}
+          corporationId={corporationId}
+          invites={overview.invites}
+          inviteOnly={inviteOnly}
+          onCreate={async (label) => {
+            const next = await vettingBackend().createInvite(characterId, corporationId, label);
+            replace(next);
+            return next.invites;
+          }}
+          onRevoke={async (code) => {
+            replace(await vettingBackend().revokeInvite(characterId, corporationId, code));
+          }}
+          onClose={() => setInvitesOpen(null)}
+        />
+      )}
       {requesting && (
         <ReviewMemberDialog
           onClose={() => setRequesting(false)}

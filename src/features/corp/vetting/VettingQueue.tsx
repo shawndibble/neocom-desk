@@ -71,7 +71,20 @@ export function VettingQueue({ tab, rows, onOpen }: VettingQueueProps) {
       {
         id: 'kind',
         header: t('vetting.queue.columns.for'),
-        render: (row) => reviewKindLabel(row, t),
+        // Where an application came from, under what it is for. A phone's dense card runs its
+        // cells into one line, so nothing here may be a block there.
+        render: (row) =>
+          row.invite === undefined ? (
+            reviewKindLabel(row, t)
+          ) : (
+            <span className={phone ? undefined : 'block'}>
+              {reviewKindLabel(row, t)}
+              <span className={phone ? 'text-text-dim' : 'block text-xs text-text-dim'}>
+                {phone && ' · '}
+                {t('vetting.queue.invite', { label: row.invite })}
+              </span>
+            </span>
+          ),
       },
       {
         id: 'characters',

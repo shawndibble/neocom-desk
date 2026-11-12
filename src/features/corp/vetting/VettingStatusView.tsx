@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Eyebrow, Panel } from '@/components/ui';
+import { Button, CollapsiblePanel, Eyebrow, Panel } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Pill, type PillTone } from '@/components/ui/Pill';
 import type { VettingState, VettingStatus } from '@/engine/vetting';
@@ -8,7 +8,8 @@ import { formatList } from '@/lib/listFormat';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { VettingSteps } from './VettingPublicFrame';
-import { deletionLine } from './vettingText';
+import { VettingAnswerList } from './VettingAnswerList';
+import { deletionLine, statusStateLabel } from './vettingText';
 
 const STATE_TONE: Partial<Record<VettingState, PillTone>> = { accepted: 'success' };
 
@@ -58,13 +59,16 @@ interface VettingStatusViewProps {
 }
 
 /**
- * A pilot's review after it is sent: where Send lands and what they come back to. Status, what
- * happens next, who opened the report, when it is deleted, Withdraw.
+ * A pilot's review after it is sent: where Send lands and what they come back to. Status (a no
+ * in the corp's own wording, with its reasons when the corp shows them), what happens next and
+ * who to talk to, the pilot's own answers, who opened the report, when it is deleted, Withdraw.
  */
 export function VettingStatusView({ status, onWithdraw, onOpenApp }: VettingStatusViewProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const [confirming, setConfirming] = useState(false);
+  const [answersOpen, setAnswersOpen] = useState(false);
+  const reasons = status.state === 'rejected' ? (status.rejection?.reasons ?? []) : [];
   const decidedAt =
     status.decidedAt !== null ? formatTimestamp(new Date(status.decidedAt), timeZone) : '';
   const corp = status.corporationName;
@@ -86,25 +90,63 @@ export function VettingStatusView({ status, onWithdraw, onOpenApp }: VettingStat
       <Panel
         title={t(`vetting.status.title.${status.kind}`)}
         meta={
-          <Pill tone={STATE_TONE[status.state] ?? 'neutral'}>
-            {t(`vetting.status.state.${status.state}`)}
-          </Pill>
+          <Pill tone={STATE_TONE[status.state] ?? 'neutral'}>{statusStateLabel(status, t)}</Pill>
         }
       >
         <div className="space-y-3 text-sm">
           <p>
             {status.state === 'open'
               ? t(`vetting.status.line.open.${status.kind}`, { count: status.characters.length })
-              : t(`vetting.status.line.${status.state}`, { when: decidedAt, corp })}
+              : t(
+                  status.state === 'rejected' && status.rejection?.wording === 'notNow'
+                    ? 'vetting.status.line.notNow'
+                    : `vetting.status.line.${status.state}`,
+                  { when: decidedAt, corp }
+                )}
           </p>
+          {reasons.length > 0 && (
+            <div className="space-y-2">
+              <Eyebrow>{t('vetting.status.reasons', { count: reasons.length })}</Eyebrow>
+              <ul className="space-y-1.5">
+                {reasons.map((reason, index) => (
+                  <li key={index} className="break-words whitespace-pre-wrap">
+                    {reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {steps.length > 0 && (
             <div className="space-y-2">
               <Eyebrow>{t('vetting.status.nextTitle')}</Eyebrow>
               <VettingSteps steps={steps} />
             </div>
           )}
+          {!gone && status.contact !== '' && (
+            <dl className="grid grid-cols-[7rem_1fr] gap-2">
+              <dt className="text-text-dim">{t('vetting.status.contact')}</dt>
+              <dd className="break-words whitespace-pre-wrap">{status.contact}</dd>
+            </dl>
+          )}
         </div>
       </Panel>
+      {!gone && status.answers.length > 0 && (
+        <CollapsiblePanel
+          title={t('vetting.status.answersTitle')}
+          meta={status.answers.length}
+          padded={false}
+          expanded={answersOpen}
+          onToggle={() => setAnswersOpen((value) => !value)}
+          labels={{
+            show: t('vetting.status.showAnswers'),
+            hide: t('vetting.status.hideAnswers'),
+          }}
+        >
+          <div className="p-3">
+            <VettingAnswerList answers={status.answers} />
+          </div>
+        </CollapsiblePanel>
+      )}
       {!gone && (
         <Panel title={t('vetting.status.reportTitle')}>
           <div className="space-y-3 text-sm">

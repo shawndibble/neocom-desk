@@ -115,6 +115,8 @@ const WIRE_NAMES = [
   'vetting:decideVettingReviewCallable',
   'vetting:requestVettingReviewCallable',
   'vetting:saveVettingSettingsCallable',
+  'vetting:createVettingInviteCallable',
+  'vetting:revokeVettingInviteCallable',
 ];
 
 const index = readFileSync(join(__dirname, 'index.ts'), 'utf8');

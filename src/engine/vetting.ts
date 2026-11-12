@@ -384,19 +384,204 @@ export interface VettingWatchEntry {
   category: 'character' | 'corporation' | 'alliance';
 }
 
+/** A question the corp asks every applicant before Send. */
+export interface VettingQuestion {
+  id: string;
+  label: string;
+  required: boolean;
+}
+
+export interface VettingAnswer {
+  questionId: string;
+  /** The question as it read when answered, so a later edit does not rewrite history. */
+  label: string;
+  answer: string;
+}
+
+/** What an application must meet before it can be sent. Zero means no minimum. */
+export interface VettingMinimums {
+  /** At least one declared character is this many days old. */
+  ageDays: number;
+  /** At least one declared character has this many skill points. */
+  skillPoints: number;
+  /** At least this many characters are declared. */
+  characters: number;
+}
+
+/** What a rejected pilot is told. */
+export interface VettingRejection {
+  wording: 'rejected' | 'notNow';
+  /** Show the pilot the note of each reviewer who said no. */
+  showReason: boolean;
+}
+
+/** An apply link a reviewer hands out, for a corp that takes applications by invite only. */
+export interface VettingInvite {
+  code: string;
+  /** Who it is for or where it was posted, in the reviewer's words. */
+  label: string;
+  createdBy: { characterId: number; name: string };
+  createdAt: number;
+  /** Applications started with it. */
+  uses: number;
+}
+
 export interface VettingSettings {
   /** Off until a Director turns it on; an apply link to a corp with it off says so. */
   on: boolean;
   watchlist: VettingWatchEntry[];
   /** Sign-offs each kind needs, 1 to 3. */
   signOffs: Record<VettingKind, number>;
+  /** Shown at the top of the apply page. */
+  welcome: string;
+  /** Who to talk to, shown on the status page after Send. */
+  contact: string;
+  questions: VettingQuestion[];
+  minimums: VettingMinimums;
+  rejection: VettingRejection;
+  /** The apply link only works with a live invite code. */
+  inviteOnly: boolean;
+  /** Push "new report to review" to reviewers' devices that chose it. */
+  notifyReviewers: boolean;
+  /** Offer the deciding reviewer an in-game mail to the pilot. */
+  mailDecision: boolean;
 }
 
 export const VETTING_DEFAULT_SETTINGS: VettingSettings = {
   on: false,
   watchlist: [],
   signOffs: { application: 1, promotion: 2 },
+  welcome: '',
+  contact: '',
+  questions: [],
+  minimums: { ageDays: 0, skillPoints: 0, characters: 1 },
+  rejection: { wording: 'rejected', showReason: false },
+  inviteOnly: false,
+  notifyReviewers: true,
+  mailDecision: true,
 };
+
+export const VETTING_WELCOME_MAX = 600;
+export const VETTING_CONTACT_MAX = 200;
+export const VETTING_QUESTIONS_MAX = 8;
+export const VETTING_QUESTION_MAX = 120;
+export const VETTING_ANSWER_MAX = 500;
+export const VETTING_INVITES_MAX = 50;
+export const VETTING_INVITE_LABEL_MAX = 40;
+/** Upper bounds a corp's minimums are clamped to. */
+export const VETTING_MINIMUM_LIMITS: VettingMinimums = {
+  ageDays: 3650,
+  skillPoints: 500_000_000,
+  characters: 30,
+};
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function text(value: unknown, max: number): string {
+  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+/**
+ * Settings as stored, made whole: a document written before a setting existed,
+ * or holding a value out of range, reads as the default or the nearest bound.
+ * The watchlist and invites are not this function's: the server owns those.
+ */
+export function normalizeVettingSettings(raw: unknown): VettingSettings {
+  const d = isObject(raw) ? raw : {};
+  const base = VETTING_DEFAULT_SETTINGS;
+  const signOffs = isObject(d.signOffs) ? d.signOffs : {};
+  const minimums = isObject(d.minimums) ? d.minimums : {};
+  const rejection = isObject(d.rejection) ? d.rejection : {};
+  const seen = new Set<string>();
+  const questions: VettingQuestion[] = [];
+  for (const entry of Array.isArray(d.questions) ? d.questions : []) {
+    if (!isObject(entry) || typeof entry.id !== 'string') continue;
+    const label = text(entry.label, VETTING_QUESTION_MAX);
+    if (!entry.id || !label || seen.has(entry.id)) continue;
+    if (questions.length === VETTING_QUESTIONS_MAX) break;
+    seen.add(entry.id);
+    questions.push({ id: entry.id, label, required: entry.required === true });
+  }
+  return {
+    on: d.on === true,
+    watchlist: Array.isArray(d.watchlist) ? (d.watchlist as VettingWatchEntry[]) : [],
+    signOffs: {
+      application: clampInt(signOffs.application, 1, 3, base.signOffs.application),
+      promotion: clampInt(signOffs.promotion, 1, 3, base.signOffs.promotion),
+    },
+    welcome: text(d.welcome, VETTING_WELCOME_MAX),
+    contact: text(d.contact, VETTING_CONTACT_MAX),
+    questions,
+    minimums: {
+      ageDays: clampInt(minimums.ageDays, 0, VETTING_MINIMUM_LIMITS.ageDays, 0),
+      skillPoints: clampInt(minimums.skillPoints, 0, VETTING_MINIMUM_LIMITS.skillPoints, 0),
+      characters: clampInt(minimums.characters, 1, VETTING_MINIMUM_LIMITS.characters, 1),
+    },
+    rejection: {
+      wording: rejection.wording === 'notNow' ? 'notNow' : 'rejected',
+      showReason: rejection.showReason === true,
+    },
+    inviteOnly: d.inviteOnly === true,
+    notifyReviewers: d.notifyReviewers !== false,
+    mailDecision: d.mailDecision !== false,
+  };
+}
+
+export type VettingMinimumId = keyof VettingMinimums;
+
+/**
+ * The minimums an application does not meet yet. Age and skill points are met
+ * by any one declared character (the main); a character that did not share
+ * Skills cannot meet the skill-point minimum.
+ */
+export function unmetVettingMinimums(
+  minimums: VettingMinimums,
+  characters: { birthday: string; skillPoints: number | null }[],
+  now: number
+): VettingMinimumId[] {
+  const unmet: VettingMinimumId[] = [];
+  const day = 86_400_000;
+  if (
+    minimums.ageDays > 0 &&
+    !characters.some((c) => now - Date.parse(c.birthday) >= minimums.ageDays * day)
+  ) {
+    unmet.push('ageDays');
+  }
+  if (
+    minimums.skillPoints > 0 &&
+    !characters.some((c) => c.skillPoints !== null && c.skillPoints >= minimums.skillPoints)
+  ) {
+    unmet.push('skillPoints');
+  }
+  if (characters.length < minimums.characters) unmet.push('characters');
+  return unmet;
+}
+
+/**
+ * The answers to keep for a set of questions: one per question still asked,
+ * trimmed and capped, with the ids of required questions left blank.
+ */
+export function settleVettingAnswers(
+  questions: VettingQuestion[],
+  given: { questionId: string; answer: string }[]
+): { answers: VettingAnswer[]; unanswered: string[] } {
+  const answers: VettingAnswer[] = [];
+  const unanswered: string[] = [];
+  for (const question of questions) {
+    const found = given.find((entry) => entry.questionId === question.id);
+    const answer = text(found?.answer, VETTING_ANSWER_MAX);
+    if (answer) answers.push({ questionId: question.id, label: question.label, answer });
+    else if (question.required) unanswered.push(question.id);
+  }
+  return { answers, unanswered };
+}
 
 /** Days a decided review is kept before the daily sweep deletes it. */
 export const VETTING_KEEP_DAYS = 30;
@@ -462,12 +647,15 @@ export interface VettingReviewSummary {
   readAt: number | null;
   createdAt: number;
   decidedAt: number | null;
+  /** The invite the application started from, when there was one. */
+  invite?: string;
 }
 
 /** The full report an officer opens. */
 export interface VettingReview extends VettingReviewSummary {
   corporationId: number;
   note: string;
+  answers: VettingAnswer[];
   requestedBy?: { characterId: number; name: string };
   /** True when the caller asked for this review, or it is about them, so they cannot sign it off. */
   barred: boolean;
@@ -501,6 +689,14 @@ export interface VettingStatus {
   deleteAt: number | null;
   /** Reviewers who opened the report, newest first. */
   openedBy: { name: string; at: number }[];
+  /** The corp's contact line, once the report is shared. */
+  contact: string;
+  /** What the corp asks before Send: its questions and minimums, and what is not met yet. */
+  questions: VettingQuestion[];
+  answers: VettingAnswer[];
+  unmet: VettingMinimumId[];
+  /** Set on a rejected review: the corp's wording, and its reasons when it shows them. */
+  rejection?: { wording: VettingRejection['wording']; reasons: string[] };
 }
 
 /** What the public apply page needs before any sign-in. */
@@ -509,6 +705,12 @@ export interface VettingCorpInfo {
   name: string;
   ticker: string;
   on: boolean;
+  welcome: string;
+  minimums: VettingMinimums;
+  /** True when the corp takes applications by invite only. */
+  inviteOnly: boolean;
+  /** Whether the invite code sent with the request is live. Always true when not invite-only. */
+  inviteOk: boolean;
 }
 
 export interface VettingOverview {
@@ -516,4 +718,5 @@ export interface VettingOverview {
   /** The caller may change settings (Director or CEO). */
   canConfigure: boolean;
   reviews: VettingReviewSummary[];
+  invites: VettingInvite[];
 }

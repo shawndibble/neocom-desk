@@ -31,6 +31,7 @@ import {
   type VettingAssessment,
   type VettingReportCharacter,
   type VettingReview,
+  type VettingSettings,
 } from '@/engine/vetting';
 import { formatAge } from '@/lib/age';
 import { callableErrorReason } from '@/lib/callableError';
@@ -40,10 +41,12 @@ import { formatList } from '@/lib/listFormat';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { useNow } from '@/lib/useNow';
+import { VettingAnswerList } from './VettingAnswerList';
 import { VettingDecision } from './VettingDecision';
 import { VettingEntity } from './VettingEntity';
 import { VettingFlagList } from './VettingFlagList';
 import { deletionLine, reviewKindLabel } from './vettingText';
+import { useVettingDecisionMail } from './useVettingDecisionMail';
 import { vettingBackend } from './vettingClient';
 import { VETTING_TABS } from './vettingTabs';
 import { missingChecks, resultLine } from './vettingView';
@@ -287,6 +290,11 @@ interface VettingReportProps {
   reviewId: string;
   /** The tab the report was opened from, where the crumb leads back. */
   tab: 'open' | 'decided';
+  /**
+   * The corp's settings, from the queue's overview: what a no tells the pilot and whether a mail
+   * is offered. `undefined` while that is still loading, null when it could not be read.
+   */
+  settings: VettingSettings | null | undefined;
   /** A sign-off was recorded: the queue behind this page is stale. */
   onDecided: () => void;
 }
@@ -296,9 +304,15 @@ export function VettingReport({
   corporationId,
   reviewId,
   tab,
+  settings,
   onDecided,
 }: VettingReportProps) {
   const { t } = useTranslation();
+  const mailDecision = useVettingDecisionMail(characterId);
+  // A sign-off reloads the queue behind this page: keep the settings last read meanwhile, so the
+  // decision rail (and its mail offer) is not torn down by its own decision.
+  const [known, setKnown] = useState(settings);
+  if (settings !== undefined && settings !== known) setKnown(settings);
   const key = `${characterId}:${corporationId}:${reviewId}`;
   const [loaded, setLoaded] = useState<{ key: string; load: Load } | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -341,7 +355,9 @@ export function VettingReport({
     </div>
   );
 
-  if (load.status === 'loading') return frame(<Spinner block="page" label={t('common.loading')} />);
+  if (load.status === 'loading' || known === undefined) {
+    return frame(<Spinner block="page" label={t('common.loading')} />);
+  }
   if (load.status === 'ownReview') {
     return frame(
       <>
@@ -382,13 +398,29 @@ export function VettingReport({
           <h1 className="truncate text-xl font-semibold">{review.pilot.name}</h1>
           <p className="text-sm text-text-dim">
             {reviewKindLabel(review, t)} · {review.pilot.corporationName}
+            {review.invite && <> · {t('vetting.report.invite', { label: review.invite })}</>}
           </p>
         </div>
       </div>
-      {review.note !== '' && (
-        <Panel title={t('vetting.report.theirNote')}>
-          <p className="text-sm break-words whitespace-pre-wrap">{review.note}</p>
-        </Panel>
+      {(review.note !== '' || review.answers.length > 0) && (
+        <div className="grid items-start gap-4 md:grid-cols-2">
+          {review.note !== '' && (
+            <Panel
+              title={t('vetting.report.theirNote')}
+              className={review.answers.length === 0 ? 'md:col-span-2' : undefined}
+            >
+              <p className="text-sm break-words whitespace-pre-wrap">{review.note}</p>
+            </Panel>
+          )}
+          {review.answers.length > 0 && (
+            <Panel
+              title={t('vetting.report.theirAnswers')}
+              className={review.note === '' ? 'md:col-span-2' : undefined}
+            >
+              <VettingAnswerList answers={review.answers} />
+            </Panel>
+          )}
+        </div>
       )}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-4">
@@ -423,6 +455,8 @@ export function VettingReport({
           <VettingDecision
             review={review}
             reviewerId={characterId}
+            settings={known}
+            onMail={known === null ? undefined : () => mailDecision(review, known.rejection)}
             onDecide={async (decision, note) => {
               const next = await vettingBackend().decide(
                 characterId,

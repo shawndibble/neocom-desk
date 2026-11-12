@@ -20,7 +20,8 @@ export interface DecidedClaim {
   claim: SrpMailClaim;
 }
 
-async function corporationName(corporationId: number): Promise<string | null> {
+/** The corporation's name for an Officer mail, or null when it cannot be read (the caller has a fallback). */
+export async function officerCorporationName(corporationId: number): Promise<string | null> {
   try {
     const { loadPublicCorporationRecord } = await import('@/features/character/publicInfoData');
     return (await loadPublicCorporationRecord(corporationId))?.name ?? null;
@@ -42,7 +43,7 @@ export function useSrpResultMail(): (
       if (officerId === null) return { queued: [], failed: [], missingScope: pilots.length > 0 };
       try {
         const corpName =
-          (corporationId === null ? null : await corporationName(corporationId)) ??
+          (corporationId === null ? null : await officerCorporationName(corporationId)) ??
           t('srp.officer.mail.corpFallback');
         return await queueSrpResultMails(t, {
           kind,

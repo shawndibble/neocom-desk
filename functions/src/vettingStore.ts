@@ -26,9 +26,12 @@ import {
 } from './actorAuth.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
 import type { BookCall } from './corpTaxBook.js';
+import type { PushSender } from './projectionStore.js';
+import { deliverServerEvent } from './serverEventStore.js';
 import type { SrpDeps } from './srpStore.js';
 import { CORPS_COLLECTION } from './srpTypes.js';
 import {
+  addVettingInvite,
   appendVettingLog,
   applyVettingSettingsPatch,
   decideSignOff,
@@ -36,6 +39,7 @@ import {
   hasExpiredInputs,
   isExpiredDraft,
   isSubject,
+  liveVettingInvite,
   nextDraftSlot,
   openExpiry,
   pilotStatus,
@@ -47,18 +51,26 @@ import {
   requestExpiry,
   reviewSummary,
   reviewView,
+  seenVettingReviewer,
   shouldLogOpen,
   signOffsNeeded,
   unknownWatchName,
+  vettingInviteOk,
+  vettingSharedRecipients,
   wireSettings,
+  withVettingInviteUsed,
   withoutCharacter,
   withoutInputs,
+  withoutVettingInvite,
   type DraftThrottle,
   type TimedEntry,
 } from './vettingDecide.js';
 import {
   VETTING_MAX_CHARACTERS,
   assessVetting,
+  settleVettingAnswers,
+  unmetVettingMinimums,
+  type VettingAnswer,
   type VettingCharacterInput,
   type VettingCorpInfo,
   type VettingOverview,
@@ -68,16 +80,19 @@ import {
   type VettingWatchEntry,
 } from './vettingEngine.js';
 import type { VettingEsi } from './vettingEsi.js';
-import type {
-  VettingDecideInput,
-  VettingHandle,
-  VettingSettingsPatch,
-  VettingStartInput,
+import {
+  VETTING_INVITE_CODE_LENGTH,
+  type VettingDecideInput,
+  type VettingHandle,
+  type VettingSettingsPatch,
+  type VettingStartInput,
+  type VettingSubmitInput,
 } from './vettingParse.js';
 import {
   HOUR_MS,
   VETTING_INPUTS,
   VETTING_MAX_READS,
+  VETTING_REVIEWERS_DOC,
   VETTING_REVIEWS,
   VETTING_SETTINGS_COLLECTION,
   VETTING_SETTINGS_DOC,
@@ -90,6 +105,10 @@ import {
 
 export interface VettingDeps extends SrpDeps {
   esi: VettingEsi;
+  /** Sends `vettingShared` to reviewers' devices (FCM in production). */
+  push: PushSender;
+  /** Where a push that could not be sent is noted; never the caller's problem. */
+  logWarn?: (message: string, meta?: Record<string, unknown>) => void;
 }
 
 /** The in-game role that may read and sign off reviews, beside Director and the CEO. */
@@ -101,6 +120,8 @@ const corpRef = (db: Firestore, corporationId: number) =>
   db.collection(CORPS_COLLECTION).doc(String(corporationId));
 const settingsRef = (db: Firestore, corporationId: number) =>
   corpRef(db, corporationId).collection(VETTING_SETTINGS_COLLECTION).doc(VETTING_SETTINGS_DOC);
+const reviewersRef = (db: Firestore, corporationId: number) =>
+  corpRef(db, corporationId).collection(VETTING_SETTINGS_COLLECTION).doc(VETTING_REVIEWERS_DOC);
 const reviewsOf = (db: Firestore, corporationId: number) =>
   corpRef(db, corporationId).collection(VETTING_REVIEWS);
 const reviewRef = (db: Firestore, corporationId: number, reviewId: string) =>
@@ -112,6 +133,10 @@ const inputRef = (review: DocumentReference, characterId: number) =>
 
 const newReviewId = () => randomBytes(16).toString('base64url');
 const newKey = () => randomBytes(32).toString('base64url');
+/** 9 random bytes are 12 url-safe characters. */
+const newInviteCode = () =>
+  randomBytes(9).toString('base64url').slice(0, VETTING_INVITE_CODE_LENGTH);
+const newQuestionId = () => randomBytes(6).toString('base64url');
 const hashKey = (key: string) => createHash('sha256').update(key).digest('hex');
 
 function keyMatches(keyHash: unknown, key: string): boolean {
@@ -232,16 +257,29 @@ export function clearVettingCorpCache(): void {
   corpCache.clear();
 }
 
-/** Public: what the apply page shows before any sign-in. */
+/**
+ * Public: what the apply page shows before any sign-in. `inviteOk` says only whether the code
+ * sent is live; nothing else about a corp's invites leaves through here.
+ */
 export async function getVettingCorp(
   deps: VettingDeps,
-  input: { corporationId: number }
+  input: { corporationId: number; invite?: string }
 ): Promise<VettingCorpInfo> {
   const { corporationId } = input;
+  // Read on every call: only the ESI name below is cached, never an answer about an invite.
   const settings = await loadSettings(deps, corporationId);
+  const info = (corp: { name: string; ticker: string }): VettingCorpInfo => ({
+    corporationId,
+    name: corp.name,
+    ticker: corp.ticker,
+    on: settings.on,
+    welcome: settings.welcome,
+    minimums: settings.minimums,
+    inviteOnly: settings.inviteOnly,
+    inviteOk: vettingInviteOk(settings, input.invite),
+  });
   if (settings.corporationName !== undefined && settings.corporationTicker !== undefined) {
-    const { name, ticker } = await corpName(deps, corporationId, settings);
-    return { corporationId, name, ticker, on: settings.on };
+    return info(await corpName(deps, corporationId, settings));
   }
   const now = deps.now();
   let found = recallTimed(corpCache, corporationId, now, CORP_CACHE_MS)?.value;
@@ -251,7 +289,7 @@ export async function getVettingCorp(
     rememberTimed(corpCache, corporationId, found, now, CORP_CACHE_MAX);
   }
   if (!found) fail('not-found', 'No such corporation', 'unknown-corp');
-  return { corporationId, name: found.name, ticker: found.ticker, on: settings.on };
+  return info(found);
 }
 
 // --- Reading a character ----------------------------------------------------
@@ -278,6 +316,8 @@ async function readVerified(
       corporationName: corporation?.name ?? '',
       missing: input.missing,
       readAt: deps.now(),
+      birthday: input.birthday,
+      skillPoints: input.skillPoints,
       ownerHash: claims.ownerHash,
     },
   };
@@ -319,13 +359,28 @@ async function takeDraftSlot(
 
 // --- The pilot --------------------------------------------------------------
 
-/** Public: reads the token's character and opens a draft application. */
+function requireInvite(settings: StoredVettingSettings, code: string | undefined): void {
+  if (!vettingInviteOk(settings, code)) {
+    fail(
+      'permission-denied',
+      'This corporation takes applications by invite only',
+      'invite-required'
+    );
+  }
+}
+
+/**
+ * Public: reads the token's character and opens a draft application. A live invite code is
+ * recorded on it and counted, whether or not the corp is invite-only.
+ */
 export async function startVetting(
   deps: VettingDeps,
   input: VettingStartInput
 ): Promise<{ handle: VettingHandle; status: VettingStatus }> {
   const settings = await loadSettings(deps, input.corporationId);
   requireOn(settings);
+  // Before the token is verified or anything is read: a link without a live invite gets no further.
+  requireInvite(settings, input.invite);
   const claims = await verifyAccessToken(deps.verifyToken, input.accessToken);
   await takeDraftSlot(deps, input.corporationId, claims.characterId);
   const read = await readVerified(deps, claims, input.accessToken);
@@ -343,6 +398,7 @@ export async function startVetting(
     pilot: pilotOf(read.character),
     keyHash: hashKey(key),
     note: '',
+    answers: [],
     characters: [read.character],
     reads: 1,
     reportCharacters: [],
@@ -365,13 +421,26 @@ export async function startVetting(
     expiresAt: draftExpiry(now),
   };
   const ref = reviewRef(deps.db, input.corporationId, reviewId);
-  const batch = deps.db.batch();
-  batch.create(ref, review);
-  batch.set(inputRef(ref, read.character.characterId), inputDoc(read));
-  await batch.commit();
+  const settingsDoc = settingsRef(deps.db, input.corporationId);
+  // One transaction: the invite is checked again as it is now (it may have been revoked while
+  // the character was read) and its use is counted with the review it started.
+  const made = await deps.db.runTransaction(async (tx) => {
+    const current = readVettingSettings((await tx.get(settingsDoc)).data());
+    requireInvite(current, input.invite);
+    const invite = liveVettingInvite(current, input.invite);
+    const next: StoredVettingReview = invite
+      ? { ...review, invite: { code: invite.code, label: invite.label } }
+      : review;
+    if (invite) {
+      tx.update(settingsDoc, { invites: withVettingInviteUsed(current, invite.code).invites });
+    }
+    tx.create(ref, next);
+    tx.set(inputRef(ref, read.character.characterId), inputDoc(read));
+    return { review: next, settings: current };
+  });
   return {
     handle: { corporationId: input.corporationId, reviewId, key },
-    status: pilotStatus(reviewId, review),
+    status: pilotStatus(reviewId, made.review, made.settings, now),
   };
 }
 
@@ -422,6 +491,7 @@ export async function addVettingCharacter(
   const claims = await verifyAccessToken(deps.verifyToken, input.accessToken);
   await reserveRead(deps, ref, input, claims.characterId);
   const read = await readVerified(deps, claims, input.accessToken);
+  const settings = await loadSettings(deps, input.corporationId);
 
   return deps.db.runTransaction(async (tx) => {
     const now = deps.now();
@@ -455,7 +525,7 @@ export async function addVettingCharacter(
     }
     tx.set(ref, next);
     tx.set(inputRef(ref, read.character.characterId), inputDoc(read));
-    return pilotStatus(input.reviewId, next);
+    return pilotStatus(input.reviewId, next, settings, now);
   });
 }
 
@@ -464,6 +534,7 @@ export async function removeVettingCharacter(
   input: VettingHandle & { characterId: number }
 ): Promise<VettingStatus> {
   const ref = reviewRef(deps.db, input.corporationId, input.reviewId);
+  const settings = await loadSettings(deps, input.corporationId);
   return deps.db.runTransaction(async (tx) => {
     const now = deps.now();
     const loaded = pilotReview(await tx.get(ref), input, now);
@@ -473,7 +544,7 @@ export async function removeVettingCharacter(
     tx.set(ref, next);
     // Expired reads are all gone already, this character's among them.
     if (review === loaded) tx.delete(inputRef(ref, input.characterId));
-    return pilotStatus(input.reviewId, next);
+    return pilotStatus(input.reviewId, next, settings, now);
   });
 }
 
@@ -548,12 +619,69 @@ const readsVersion = (review: StoredVettingReview): string =>
   ].join(',');
 
 /**
+ * What an application must bring before it is shared: an answer to each required question and
+ * the corp's minimums, both as the settings stand now. Returns the answers to keep.
+ */
+function requireApplicationMet(
+  settings: StoredVettingSettings,
+  given: VettingSubmitInput['answers'],
+  characters: VettingCharacterInput[],
+  now: number
+): VettingAnswer[] {
+  const { answers, unanswered } = settleVettingAnswers(settings.questions, given);
+  if (unanswered.length > 0) {
+    fail('failed-precondition', 'Answer every required question first', 'answers-required');
+  }
+  const unmet = unmetVettingMinimums(settings.minimums, characters, now);
+  // The message is the unmet minimums' ids, comma separated: the client shows which.
+  if (unmet.length > 0) fail('failed-precondition', unmet.join(','), 'below-minimum');
+  return answers;
+}
+
+/**
+ * Tells the reviewers seen lately that a report was shared, on the devices that chose it. After
+ * the submit has committed, and never its problem: a failure here is logged and swallowed.
+ */
+async function notifyShared(
+  deps: VettingDeps,
+  reviewId: string,
+  review: StoredVettingReview
+): Promise<void> {
+  try {
+    const now = deps.now();
+    const known = (await reviewersRef(deps.db, review.corporationId).get()).data();
+    await Promise.all(
+      vettingSharedRecipients(known, review, now).map((characterId) =>
+        deliverServerEvent(
+          deps.db,
+          deps.push,
+          {
+            eventId: 'vettingShared',
+            characterId,
+            corporationId: review.corporationId,
+            reviewId,
+            pilotName: review.pilot.name,
+            kind: review.kind,
+          },
+          now,
+          deps.logWarn
+        )
+      )
+    );
+  } catch (err) {
+    deps.logWarn?.('vettingShared push failed', { error: String(err) });
+  }
+}
+
+/**
  * Runs the checks, hands the report to the corp, and deletes what the reads returned. From here
- * the review waits `VETTING_OPEN_KEEP_DAYS` for a decision, and is deleted if none comes.
+ * the review waits `VETTING_OPEN_KEEP_DAYS` for a decision, and is deleted if none comes. An
+ * application must first answer the corp's required questions and meet its minimums; a
+ * promotion review is asked neither.
  */
 export async function submitVetting(
   deps: VettingDeps,
-  input: VettingHandle & { note: string }
+  input: VettingSubmitInput
 ): Promise<VettingStatus> {
   const { ref, review: before } = await loadForPilot(deps, input);
   requireEditable(before);
@@ -581,10 +709,15 @@ export async function submitVetting(
   }
 
   const settings = await loadSettings(deps, input.corporationId);
+  // Before the checks spend any ESI call on a report that cannot be shared yet.
+  const answers =
+    before.kind === 'application'
+      ? requireApplicationMet(settings, input.answers, characters, deps.now())
+      : [];
   const { assessment, parties, kept } = await assess(deps, characters, settings.watchlist);
   const listed = new Map(before.characters.map((character) => [character.characterId, character]));
 
-  return deps.db.runTransaction(async (tx) => {
+  const shared = await deps.db.runTransaction(async (tx) => {
     const now = deps.now();
     const review = pilotReview(await tx.get(ref), input, now);
     requireEditable(review);
@@ -593,6 +726,7 @@ export async function submitVetting(
       ...review,
       state: 'open',
       note: input.note,
+      answers,
       characters: review.characters.filter((character) => byId.has(character.characterId)),
       reportCharacters: characters.map((character) =>
         reportCharacter(
@@ -618,15 +752,21 @@ export async function submitVetting(
     };
     tx.set(ref, next);
     for (const doc of stored.docs) tx.delete(doc.ref);
-    return pilotStatus(input.reviewId, next);
+    return next;
   });
+  if (settings.notifyReviewers) await notifyShared(deps, input.reviewId, shared);
+  return pilotStatus(input.reviewId, shared, settings, deps.now());
 }
 
 export async function getVettingStatus(
   deps: VettingDeps,
   handle: VettingHandle
 ): Promise<VettingStatus> {
-  return pilotStatus(handle.reviewId, (await loadForPilot(deps, handle)).review);
+  const [{ review }, settings] = await Promise.all([
+    loadForPilot(deps, handle),
+    loadSettings(deps, handle.corporationId),
+  ]);
+  return pilotStatus(handle.reviewId, review, settings, deps.now());
 }
 
 /**
@@ -691,9 +831,10 @@ export async function listMyVettingRequests(
 ): Promise<{ handle: VettingHandle; status: VettingStatus }[]> {
   const actor = await verifyCallerToken(deps, caller, input.accessToken);
   const corporationId = await deps.lookupCorporation(actor.characterId);
-  const found = await reviewsOf(deps.db, corporationId)
-    .where('pilot.characterId', '==', actor.characterId)
-    .get();
+  const [found, settings] = await Promise.all([
+    reviewsOf(deps.db, corporationId).where('pilot.characterId', '==', actor.characterId).get(),
+    loadSettings(deps, corporationId),
+  ]);
   const out: { handle: VettingHandle; status: VettingStatus }[] = [];
   for (const doc of found.docs) {
     if (doc.get('state') !== 'requested') continue;
@@ -708,7 +849,7 @@ export async function listMyVettingRequests(
     if (review) {
       out.push({
         handle: { corporationId, reviewId: doc.id, key },
-        status: pilotStatus(doc.id, review),
+        status: pilotStatus(doc.id, review, settings, deps.now()),
       });
     }
   }
@@ -775,7 +916,36 @@ async function overview(
       .map((doc) => reviewSummary(doc.id, doc.data() as StoredVettingReview, reviewer.actor))
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, OVERVIEW_LIMIT),
+    invites: settings.invites,
   };
+}
+
+/**
+ * Notes that this caller held a reviewer role just now, so a shared report can find them
+ * (`notifyShared`). At most one write a day per reviewer; a failure costs only a push.
+ */
+async function recordReviewer(
+  deps: VettingDeps,
+  corporationId: number,
+  actor: VettingActor
+): Promise<void> {
+  const ref = reviewersRef(deps.db, corporationId);
+  try {
+    if (!seenVettingReviewer((await ref.get()).data(), actor.uid, actor.characterId, deps.now())) {
+      return;
+    }
+    await deps.db.runTransaction(async (tx) => {
+      const next = seenVettingReviewer(
+        (await tx.get(ref)).data(),
+        actor.uid,
+        actor.characterId,
+        deps.now()
+      );
+      if (next) tx.set(ref, next);
+    });
+  } catch (err) {
+    deps.logWarn?.('vetting reviewer not recorded', { error: String(err) });
+  }
 }
 
 export async function getVettingOverview(
@@ -783,7 +953,53 @@ export async function getVettingOverview(
   caller: Caller,
   call: BookCall
 ): Promise<VettingOverview> {
-  return overview(deps, call.corporationId, await authorizeReviewer(deps, caller, call, 'review'));
+  const reviewer = await authorizeReviewer(deps, caller, call, 'review');
+  const out = await overview(deps, call.corporationId, reviewer);
+  await recordReviewer(deps, call.corporationId, reviewer.actor);
+  return out;
+}
+
+/** Any reviewer hands out an apply link: a new invite, live until revoked. */
+export async function createVettingInvite(
+  deps: VettingDeps,
+  caller: Caller,
+  call: BookCall,
+  input: { label: string }
+): Promise<VettingOverview> {
+  const reviewer = await authorizeReviewer(deps, caller, call, 'review');
+  const ref = settingsRef(deps.db, call.corporationId);
+  await deps.db.runTransaction(async (tx) => {
+    const out = addVettingInvite(await loadSettings(deps, call.corporationId, tx), {
+      code: newInviteCode(),
+      label: input.label,
+      createdBy: { characterId: reviewer.actor.characterId, name: reviewer.actor.name },
+      createdAt: deps.now(),
+      uses: 0,
+    });
+    if (!out.ok) {
+      fail('failed-precondition', 'Too many invites; revoke one first', out.reason);
+    }
+    // Merged: a corp that has saved no settings yet keeps none but the invite.
+    tx.set(ref, { invites: out.settings.invites }, { merge: true });
+  });
+  return overview(deps, call.corporationId, reviewer);
+}
+
+/** Any reviewer revokes an invite. A code that is already gone is not an error. */
+export async function revokeVettingInvite(
+  deps: VettingDeps,
+  caller: Caller,
+  call: BookCall,
+  input: { code: string }
+): Promise<VettingOverview> {
+  const reviewer = await authorizeReviewer(deps, caller, call, 'review');
+  const ref = settingsRef(deps.db, call.corporationId);
+  await deps.db.runTransaction(async (tx) => {
+    const settings = await loadSettings(deps, call.corporationId, tx);
+    if (!liveVettingInvite(settings, input.code)) return;
+    tx.set(ref, { invites: withoutVettingInvite(settings, input.code).invites }, { merge: true });
+  });
+  return overview(deps, call.corporationId, reviewer);
 }
 
 /** A review an officer may see: any but a draft, which is not with the corp yet. */
@@ -907,6 +1123,7 @@ export async function requestVettingReview(
       requestedBy: reviewer.actor,
       keyHash: null,
       note: '',
+      answers: [],
       characters: [],
       reads: 0,
       reportCharacters: [],
@@ -960,7 +1177,8 @@ export async function saveVettingSettings(
     const out = applyVettingSettingsPatch(
       await loadSettings(deps, call.corporationId, tx),
       patch,
-      added
+      added,
+      newQuestionId
     );
     if (!out.ok) {
       fail('failed-precondition', 'The watchlist is full; remove an entry first', out.reason);

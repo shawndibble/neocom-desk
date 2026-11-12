@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addVettingInvite,
   appendVettingLog,
   applyVettingSettingsPatch,
   decideSignOff,
@@ -7,6 +8,7 @@ import {
   hasExpiredInputs,
   isExpiredDraft,
   isSubject,
+  liveVettingInvite,
   nextDraftSlot,
   openExpiry,
   pilotStatus,
@@ -17,17 +19,32 @@ import {
   reportCharacter,
   reviewSummary,
   reviewView,
+  seenVettingReviewer,
   shouldLogOpen,
   unknownWatchName,
+  vettingInviteOk,
+  vettingSharedRecipients,
   withoutCharacter,
+  wireSettings,
   withoutInputs,
+  withoutVettingInvite,
 } from './vettingDecide.js';
 import {
+  VETTING_DEFAULT_SETTINGS,
+  VETTING_INVITES_MAX,
   VETTING_KEEP_DAYS,
   VETTING_OPEN_KEEP_DAYS,
   type VettingAssessment,
+  type VettingInvite,
 } from './vettingEngine.js';
-import { DAY_MS, HOUR_MS, type StoredVettingReview, type VettingActor } from './vettingTypes.js';
+import {
+  DAY_MS,
+  HOUR_MS,
+  VETTING_REVIEWER_DAYS,
+  type StoredVettingReview,
+  type StoredVettingSettings,
+  type VettingActor,
+} from './vettingTypes.js';
 
 const T0 = Date.parse('2026-11-01T12:00:00Z');
 const actor = (id: number, owner = `h${id}`): VettingActor => ({
@@ -69,6 +86,20 @@ const review = (over: Partial<StoredVettingReview> = {}): StoredVettingReview =>
   decidedAt: null,
   deleteAt: null,
   expiresAt: null,
+  ...over,
+});
+
+const settingsOf = (over: Partial<StoredVettingSettings> = {}): StoredVettingSettings => ({
+  ...readVettingSettings({}),
+  ...over,
+});
+
+const invite = (code: string, over: Partial<VettingInvite> = {}): VettingInvite => ({
+  code,
+  label: `Label ${code}`,
+  createdBy: { characterId: 2, name: 'Pilot 2' },
+  createdAt: T0,
+  uses: 0,
   ...over,
 });
 
@@ -286,6 +317,21 @@ describe('reviewSummary', () => {
   });
 });
 
+describe('what an officer sees of invites and answers', () => {
+  it("shows the invite's label only, and the stored answers", () => {
+    const answers = [{ questionId: 'q1', label: 'Why us?', answer: 'Friends' }];
+    const held = review({ invite: { code: 'abcDEF123_-x', label: 'Reddit' }, answers });
+    expect(reviewSummary('r1', held, actor(2)).invite).toBe('Reddit');
+    const view = reviewView('r1', held, actor(2));
+    expect(view.invite).toBe('Reddit');
+    expect(view.answers).toEqual(answers);
+    expect(JSON.stringify(view)).not.toContain('abcDEF123_-x');
+    // A review stored before answers and invites existed.
+    expect(reviewSummary('r1', review(), actor(2))).not.toHaveProperty('invite');
+    expect(reviewView('r1', review(), actor(2)).answers).toEqual([]);
+  });
+});
+
 describe('pilotStatus', () => {
   it('lists who opened the report, newest first, and nothing of the decision', () => {
     const log = [
@@ -293,7 +339,7 @@ describe('pilotStatus', () => {
       { at: T0 + 9, characterId: 3, name: 'Pilot 3', action: 'opened' as const },
       { at: T0 + 5, characterId: 2, name: 'Pilot 2', action: 'decided' as const },
     ];
-    const status = pilotStatus('r1', decided(review({ log }), actor(2), 'yes'));
+    const status = pilotStatus('r1', decided(review({ log }), actor(2), 'yes'), settingsOf(), T0);
     expect(status).toMatchObject({
       id: 'r1',
       corporationName: 'Test Corp',
@@ -311,6 +357,89 @@ describe('pilotStatus', () => {
     expect(JSON.stringify(status)).not.toContain('note 2');
     expect(status).not.toHaveProperty('signOffs');
     expect(status).not.toHaveProperty('assessment');
+    expect(status).not.toHaveProperty('rejection');
+  });
+
+  const asking = settingsOf({
+    contact: 'Ask Bob',
+    questions: [{ id: 'q1', label: 'Why us?', required: true }],
+    minimums: { ageDays: 365, skillPoints: 5_000_000, characters: 2 },
+  });
+  const young = {
+    characterId: 50,
+    name: 'Pilot 50',
+    corporationId: 98000001,
+    corporationName: 'Test Corp',
+    missing: [],
+    readAt: T0,
+    birthday: new Date(T0 - 10 * DAY_MS).toISOString(),
+    skillPoints: 6_000_000,
+  };
+
+  it('tells a draft application what the corp asks and what is not met, but not the contact', () => {
+    const draft = review({ kind: 'application', state: 'draft', characters: [young] });
+    delete draft.requestedBy;
+    expect(pilotStatus('r1', draft, asking, T0)).toMatchObject({
+      contact: '',
+      questions: asking.questions,
+      answers: [],
+      unmet: ['ageDays', 'characters'],
+    });
+    // Met a year on, with a second character.
+    const two = { ...draft, characters: [young, { ...young, characterId: 51 }] };
+    expect(pilotStatus('r1', two, asking, T0 + 365 * DAY_MS).unmet).toEqual([]);
+    // A character read before its birthday was kept on the review meets no age or SP minimum.
+    const bare = { ...young, birthday: undefined, skillPoints: undefined };
+    expect(pilotStatus('r1', { ...draft, characters: [bare] }, asking, T0).unmet).toEqual([
+      'ageDays',
+      'skillPoints',
+      'characters',
+    ]);
+  });
+
+  it('shows the contact and the stored answers once shared, and no unmet minimums', () => {
+    const answers = [{ questionId: 'q1', label: 'Why us?', answer: 'Friends' }];
+    const open = review({ kind: 'application', state: 'open', characters: [young], answers });
+    expect(pilotStatus('r1', open, asking, T0)).toMatchObject({
+      contact: 'Ask Bob',
+      questions: asking.questions,
+      answers,
+      unmet: [],
+    });
+    expect(pilotStatus('r1', { ...open, state: 'accepted' }, asking, T0).contact).toBe('Ask Bob');
+  });
+
+  it('asks a promotion nothing: no questions, no minimums', () => {
+    const asked = review({ state: 'requested', characters: [young] });
+    expect(pilotStatus('r1', asked, asking, T0)).toMatchObject({
+      contact: '',
+      questions: [],
+      answers: [],
+      unmet: [],
+    });
+  });
+
+  it("tells a rejected pilot the corp's wording, and its reasons only when it shows them", () => {
+    const open = review({ signOffsNeeded: 3 });
+    const no = (r: StoredVettingReview, by: number, note: string) => {
+      const out = decideSignOff(r, actor(by), by === 3 ? 'yes' : 'no', note, T0);
+      if (!out.ok) throw new Error(out.reason);
+      return out.review;
+    };
+    const rejected = no(no(no(open, 2, 'Too new'), 3, 'Seems fine'), 4, '  ');
+    expect(rejected.state).toBe('rejected');
+    expect(pilotStatus('r1', rejected, settingsOf(), T0).rejection).toEqual({
+      wording: 'rejected',
+      reasons: [],
+    });
+    const shown = settingsOf({ rejection: { wording: 'notNow', showReason: true } });
+    expect(pilotStatus('r1', rejected, shown, T0).rejection).toEqual({
+      wording: 'notNow',
+      reasons: ['Too new'],
+    });
+    expect(pilotStatus('r1', { ...rejected, state: 'accepted' }, shown, T0)).not.toHaveProperty(
+      'rejection'
+    );
   });
 });
 
@@ -335,10 +464,12 @@ describe('the open log', () => {
 
 describe('settings', () => {
   it('defaults to off, and repairs what is stored', () => {
-    expect(readVettingSettings(undefined)).toEqual({
-      on: false,
-      watchlist: [],
-      signOffs: { application: 1, promotion: 2 },
+    // A document written before the newer settings existed reads as their defaults.
+    expect(readVettingSettings(undefined)).toEqual({ ...VETTING_DEFAULT_SETTINGS, invites: [] });
+    expect(readVettingSettings({ on: true, signOffs: { application: 1, promotion: 2 } })).toEqual({
+      ...VETTING_DEFAULT_SETTINGS,
+      on: true,
+      invites: [],
     });
     expect(
       readVettingSettings({
@@ -348,11 +479,88 @@ describe('settings', () => {
         corporationName: 'Test Corp',
       })
     ).toEqual({
+      ...VETTING_DEFAULT_SETTINGS,
       on: true,
       watchlist: [{ id: 1, name: 'A', category: 'corporation' }],
       signOffs: { application: 3, promotion: 2 },
+      invites: [],
       corporationName: 'Test Corp',
     });
+  });
+
+  it('keeps well-formed invites and sends none of the server fields to a caller', () => {
+    const held = readVettingSettings({
+      invites: [invite('aaaaaaaaaaaa', { uses: 2 }), { code: 'bad' }, 'junk'],
+      corporationName: 'Test Corp',
+      corporationTicker: 'TEST',
+    });
+    expect(held.invites).toEqual([invite('aaaaaaaaaaaa', { uses: 2 })]);
+    expect(wireSettings(held)).toEqual(VETTING_DEFAULT_SETTINGS);
+  });
+
+  it('applies the newer settings, clamps numbers, and leaves the invites alone', () => {
+    const settings = settingsOf({
+      invites: [invite('aaaaaaaaaaaa')],
+      corporationName: 'Test Corp',
+      questions: [
+        { id: 'q1', label: 'Why us?', required: true },
+        { id: 'q2', label: 'Timezone?', required: false },
+      ],
+    });
+    let n = 0;
+    const out = applyVettingSettingsPatch(
+      settings,
+      {
+        removeWatch: [],
+        addWatchNames: [],
+        welcome: 'Hello',
+        contact: 'Ask Bob',
+        // Reordered; q1 reworded; one new without an id, one with an id nobody issued, and
+        // q2 sent twice (the second is a new question).
+        questions: [
+          { id: 'q2', label: 'Timezone?', required: true },
+          { label: 'New one', required: false },
+          { id: 'q1', label: 'Why join?', required: true },
+          { id: 'made-up', label: 'Forged id', required: false },
+          { id: 'q2', label: 'Again', required: false },
+        ],
+        minimums: { ageDays: -5, skillPoints: 9e12, characters: 2.4 },
+        rejection: { wording: 'notNow', showReason: true },
+        inviteOnly: true,
+        notifyReviewers: false,
+        mailDecision: false,
+      },
+      [],
+      () => `new${++n}`
+    );
+    expect(out).toEqual({
+      ok: true,
+      settings: {
+        ...settings,
+        welcome: 'Hello',
+        contact: 'Ask Bob',
+        questions: [
+          { id: 'q2', label: 'Timezone?', required: true },
+          { id: 'new1', label: 'New one', required: false },
+          { id: 'q1', label: 'Why join?', required: true },
+          { id: 'new2', label: 'Forged id', required: false },
+          { id: 'new3', label: 'Again', required: false },
+        ],
+        minimums: { ageDays: 0, skillPoints: 500_000_000, characters: 2 },
+        rejection: { wording: 'notNow', showReason: true },
+        inviteOnly: true,
+        notifyReviewers: false,
+        mailDecision: false,
+      },
+    });
+    // A patch that names none of them changes none of them.
+    const same = applyVettingSettingsPatch(
+      settings,
+      { removeWatch: [], addWatchNames: [] },
+      [],
+      () => 'x'
+    );
+    expect(same).toEqual({ ok: true, settings });
   });
 
   it('removes and adds watchlist entries without duplicates', () => {
@@ -368,7 +576,8 @@ describe('settings', () => {
       [
         { id: 2, name: 'B', category: 'alliance' },
         { id: 3, name: 'C', category: 'character' },
-      ]
+      ],
+      () => 'x'
     );
     expect(out).toMatchObject({
       ok: true,
@@ -393,7 +602,8 @@ describe('settings', () => {
       applyVettingSettingsPatch(
         readVettingSettings({}),
         { removeWatch: [], addWatchNames: [] },
-        added
+        added,
+        () => 'x'
       )
     ).toEqual({ ok: false, reason: 'watchlist-full' });
   });
@@ -402,6 +612,62 @@ describe('settings', () => {
     const resolved = [{ id: 1, name: 'Bad Corp', category: 'corporation' as const }];
     expect(unknownWatchName(['bad corp'], resolved)).toBeUndefined();
     expect(unknownWatchName(['bad corp', 'Nobody'], resolved)).toBe('Nobody');
+  });
+});
+
+describe('invites', () => {
+  it('is always ok for an open corp, and needs a live code for an invite-only one', () => {
+    const open = settingsOf({ invites: [invite('aaaaaaaaaaaa')] });
+    expect(vettingInviteOk(open, undefined)).toBe(true);
+    expect(vettingInviteOk(open, 'nope')).toBe(true);
+    const closed = { ...open, inviteOnly: true };
+    expect(vettingInviteOk(closed, undefined)).toBe(false);
+    expect(vettingInviteOk(closed, 'nope')).toBe(false);
+    expect(vettingInviteOk(closed, 'aaaaaaaaaaaa')).toBe(true);
+    expect(liveVettingInvite(open, 'aaaaaaaaaaaa')).toEqual(invite('aaaaaaaaaaaa'));
+    expect(liveVettingInvite(open, undefined)).toBeUndefined();
+  });
+
+  it('adds up to the cap and removes by code', () => {
+    const one = addVettingInvite(settingsOf(), invite('aaaaaaaaaaaa'));
+    expect(one).toMatchObject({ ok: true, settings: { invites: [invite('aaaaaaaaaaaa')] } });
+    const full = settingsOf({
+      invites: Array.from({ length: VETTING_INVITES_MAX }, (_, i) => invite(`code${i}`)),
+    });
+    expect(addVettingInvite(full, invite('bbbbbbbbbbbb'))).toEqual({
+      ok: false,
+      reason: 'invites-full',
+    });
+    expect(withoutVettingInvite(full, 'code3').invites).toHaveLength(VETTING_INVITES_MAX - 1);
+    expect(withoutVettingInvite(full, 'nope')).toEqual(full);
+  });
+});
+
+describe('known reviewers', () => {
+  const day = DAY_MS;
+  it('records a reviewer, rewrites at most once a day, and prunes those not seen in 30 days', () => {
+    const first = seenVettingReviewer(undefined, 'char:2', 2, T0);
+    expect(first).toEqual({ reviewers: { 'char:2': { characterId: 2, lastSeenAt: T0 } } });
+    expect(seenVettingReviewer(first, 'char:2', 2, T0 + day - 1)).toBeNull();
+    const later = seenVettingReviewer(first, 'char:3', 3, T0 + VETTING_REVIEWER_DAYS * day);
+    expect(later).toEqual({
+      reviewers: { 'char:3': { characterId: 3, lastSeenAt: T0 + VETTING_REVIEWER_DAYS * day } },
+    });
+    expect(seenVettingReviewer({ reviewers: 'junk' }, 'char:2', 2, T0)).toEqual(first);
+  });
+
+  it('tells the reviewers seen in 30 days, never one the report is about', () => {
+    const doc = {
+      reviewers: {
+        'char:2': { characterId: 2, lastSeenAt: T0 },
+        'char:3': { characterId: 3, lastSeenAt: T0 - VETTING_REVIEWER_DAYS * day },
+        'char:50': { characterId: 50, lastSeenAt: T0 },
+        'char:4': { characterId: 4, lastSeenAt: T0 - 5 },
+        'char:9': { characterId: 'x', lastSeenAt: T0 },
+      },
+    };
+    expect(vettingSharedRecipients(doc, review(), T0)).toEqual([2, 4]);
+    expect(vettingSharedRecipients(undefined, review(), T0)).toEqual([]);
   });
 });
 

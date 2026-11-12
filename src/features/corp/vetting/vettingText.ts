@@ -1,4 +1,12 @@
-import { VETTING_KEEP_DAYS, type VettingReviewSummary, type VettingState } from '@/engine/vetting';
+import {
+  VETTING_KEEP_DAYS,
+  type VettingMinimumId,
+  type VettingRejection,
+  type VettingReviewSummary,
+  type VettingState,
+  type VettingStatus,
+} from '@/engine/vetting';
+import { formatCount } from '@/lib/formatCount';
 import type { Translate } from '@/lib/translate';
 
 /** "Application", or "Promotion to Director". */
@@ -11,9 +19,35 @@ export function reviewKindLabel(
     : t('vetting.kind.application');
 }
 
-/** The link a corp sends applicants: this app's origin, `/apply/<corporationId>`. */
-export function applyLink(corporationId: number): string {
-  return `${window.location.origin}${import.meta.env.BASE_URL}apply/${corporationId}`;
+/** The apply page's router path: `/apply/<corporationId>`, with the invite code when there is one. */
+export function applyPath(corporationId: number, invite?: string): string {
+  const code = invite?.trim() ?? '';
+  return `/apply/${corporationId}${code === '' ? '' : `?invite=${encodeURIComponent(code)}`}`;
+}
+
+/** The link a corp sends applicants: this app's origin and `applyPath`. */
+export function applyLink(corporationId: number, invite?: string): string {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  return `${window.location.origin}${base}${applyPath(corporationId, invite)}`;
+}
+
+/** One minimum a corp asks, as the applicant reads it: "A character at least 365 days old". */
+export function minimumLine(id: VettingMinimumId, value: number, t: Translate): string {
+  return t(`vetting.asks.${id}`, { count: value, amount: formatCount(value) });
+}
+
+/** "Rejected" or the corp's softer "Not at this time"; every other state reads as itself. */
+export function statusStateLabel(
+  status: Pick<VettingStatus, 'state' | 'rejection'>,
+  t: Translate
+): string {
+  return status.state === 'rejected'
+    ? rejectionLabel(status.rejection?.wording ?? 'rejected', t)
+    : t(`vetting.status.state.${status.state}`);
+}
+
+export function rejectionLabel(wording: VettingRejection['wording'], t: Translate): string {
+  return t(`vetting.rejection.${wording}`);
 }
 
 /**

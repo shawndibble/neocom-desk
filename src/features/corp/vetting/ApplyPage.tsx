@@ -1,7 +1,9 @@
 /**
- * The public apply page's body (`/apply/<corpId>`): one page, four states. Start (how it works,
- * what is shared, the EVE sign-in), characters (each one read by the server as it signs in),
- * status once sent, and "not taking applications" for a corp with vetting off or unknown.
+ * The public apply page's body (`/apply/<corpId>`): one page, five states. Start (the corp's
+ * welcome and what it asks, how it works, what is shared, the EVE sign-in), characters (each one
+ * read by the server as it signs in, then the corp's questions), status once sent, "not taking
+ * applications" for a corp with vetting off or unknown, and "by invite" for a corp that takes
+ * applications only through an invite link when this one carries no live code.
  *
  * An applicant has no account. Each EVE sign-in comes back as `login` with a short-lived access
  * token, which is handed to the server once and kept nowhere; the application itself is found
@@ -23,9 +25,12 @@ import {
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { InlineError } from '@/components/ui/InlineError';
 import {
+  settleVettingAnswers,
+  VETTING_ANSWER_MAX,
   VETTING_MAX_CHARACTERS,
   VETTING_NOTE_MAX,
   type VettingCorpInfo,
+  type VettingMinimumId,
   type VettingStatus,
 } from '@/engine/vetting';
 import { callableErrorReason } from '@/lib/callableError';
@@ -40,7 +45,24 @@ import { vettingBackend } from './vettingClient';
 import { clearVettingHandle, readVettingHandle, writeVettingHandle } from './vettingHandle';
 import type { VettingLoginOutcome } from './vettingLoginState';
 import { applicationRows } from './vettingRows';
-import { canSend, isReviewGone, vettingErrorKey } from './vettingView';
+import { minimumLine } from './vettingText';
+import {
+  askedMinimums,
+  isReviewGone,
+  sendBlock,
+  unmetFromRefusal,
+  vettingErrorKey,
+  type SendBlock,
+} from './vettingView';
+
+/** The line beside Send, by what still blocks it. */
+const SEND_HINT: Record<SendBlock, string> = {
+  characters: 'vetting.apply.sendHint',
+  reading: 'vetting.apply.sendHint',
+  minimums: 'vetting.apply.sendNeedsMinimums',
+  answers: 'vetting.apply.sendNeedsAnswers',
+  tick: 'vetting.apply.sendNeedsTick',
+};
 
 type Boot =
   | { status: 'loading' }
@@ -52,6 +74,8 @@ type Boot =
 interface ApplyPageProps {
   /** Null when the link's id is not a number. */
   corporationId: number | null;
+  /** The invite code the link carries (`?invite=`), if it does. */
+  invite?: string | null;
   /** The EVE sign-in this visit came back from, if it did. */
   login: VettingLoginOutcome | null;
   /** Starts an EVE sign-in for one more character; `reviewId` once there is a draft. */
@@ -60,7 +84,7 @@ interface ApplyPageProps {
   onOpenApp?: () => void;
 }
 
-export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPageProps) {
+export function ApplyPage({ corporationId, invite, login, onSignIn, onOpenApp }: ApplyPageProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const [loadedBoot, setLoadedBoot] = useState<Boot>({ status: 'loading' });
@@ -71,6 +95,9 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
   const [announce, setAnnounce] = useState('');
   const [allMine, setAllMine] = useState(false);
   const [note, setNote] = useState('');
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  // Minimums a Send was refused for, kept until the draft changes.
+  const [refused, setRefused] = useState<readonly VettingMinimumId[]>([]);
   const [busy, setBusy] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [withdrawn, setWithdrawn] = useState(false);
@@ -84,6 +111,8 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
     (err: unknown) => setError(t(vettingErrorKey(callableErrorReason(err)))),
     [t]
   );
+  // An absent code is an absent argument, so a public link's calls read as they always did.
+  const code = invite?.trim() || null;
 
   useEffect(() => {
     // Once per attempt, with no cancel flag: StrictMode's second effect run must not start a
@@ -97,7 +126,9 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
       let held = readVettingHandle(`apply:${corporationId}`);
       let found: VettingStatus | null = null;
       try {
-        corp = await backend.corpInfo(corporationId);
+        corp = await (code === null
+          ? backend.corpInfo(corporationId)
+          : backend.corpInfo(corporationId, code));
         if (held) {
           try {
             found = await backend.status(held);
@@ -130,7 +161,9 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
       setAnnounce(t('vetting.characters.readingNamed', { name: login.name }));
       try {
         if (held === null) {
-          const begun = await backend.start(corporationId, login.accessToken);
+          const begun = await (code === null
+            ? backend.start(corporationId, login.accessToken)
+            : backend.start(corporationId, login.accessToken, code));
           writeVettingHandle(`apply:${corporationId}`, begun.handle);
           setHandle(begun.handle);
           setStatus(begun.status);
@@ -144,12 +177,13 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
         setReading(null);
       }
     })();
-  }, [attempt, corporationId, login, t, fail]);
+  }, [attempt, corporationId, code, login, t, fail]);
 
   const act = async (run: (held: VettingHandle) => Promise<void>) => {
     if (handle === null || busy) return;
     setBusy(true);
     setError(null);
+    setRefused([]);
     try {
       await run(handle);
     } catch (err) {
@@ -173,6 +207,8 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
     setStatus(null);
     setAllMine(false);
     setNote('');
+    setAnswers({});
+    setRefused([]);
     setError(null);
     setAnnounce('');
   };
@@ -261,10 +297,40 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
   }
 
   const rows = applicationRows(status, reading);
+  const line = (id: VettingMinimumId) => minimumLine(id, corp.minimums[id], t);
   if (rows.length === 0 && handle === null) {
+    // By invite, and this link carries no live code: nothing to log in for.
+    if (corp.inviteOnly && !corp.inviteOk) {
+      return (
+        <>
+          {heading(t('vetting.apply.sub.inviteOnly'))}
+          <Panel>
+            <EmptyState
+              title={t('vetting.apply.inviteOnly.title', { corp: corp.name })}
+              hint={t('vetting.apply.inviteOnly.hint')}
+            />
+          </Panel>
+        </>
+      );
+    }
+    const asked = askedMinimums(corp.minimums);
     return (
       <>
         {heading(t('vetting.apply.sub.start'))}
+        {corp.welcome !== '' && (
+          <Panel title={t('vetting.apply.welcome', { corp: corp.name })}>
+            <p className="text-sm break-words whitespace-pre-wrap">{corp.welcome}</p>
+          </Panel>
+        )}
+        {asked.length > 0 && (
+          <Panel title={t('vetting.apply.asks.title')}>
+            <ul className="list-disc space-y-1 pl-5 text-sm">
+              {asked.map(({ id }) => (
+                <li key={id}>{line(id)}</li>
+              ))}
+            </ul>
+          </Panel>
+        )}
         <Panel title={t('vetting.apply.how.title')}>
           <VettingSteps
             steps={[
@@ -293,7 +359,20 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
 
   const read = status?.characters.length ?? 0;
   const full = read >= VETTING_MAX_CHARACTERS;
-  const sendable = canSend({ characters: read, allMine, reading: reading !== null });
+  const questions = status?.questions ?? [];
+  const given = questions.map((question) => ({
+    questionId: question.id,
+    answer: answers[question.id] ?? '',
+  }));
+  const unmet = [...new Set([...(status?.unmet ?? []), ...refused])];
+  const block = sendBlock({
+    characters: read,
+    allMine,
+    reading: reading !== null,
+    unmet: unmet.length,
+    unanswered: settleVettingAnswers(questions, given).unanswered.length,
+  });
+  const sendable = block === null;
   return (
     <>
       {heading(t('vetting.apply.sub.characters'))}
@@ -332,8 +411,36 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
       </Panel>
       <LiveStatus>{announce}</LiveStatus>
       {error && <InlineError>{error}</InlineError>}
+      {unmet.length > 0 && reading === null && (
+        <div className="space-y-1 text-sm text-warning">
+          <p>{t('vetting.apply.asks.unmet', { corp: corp.name })}</p>
+          <ul className="list-disc space-y-0.5 pl-5">
+            {unmet.map((id) => (
+              <li key={id}>{line(id)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <Panel title={t('vetting.apply.before.title')}>
         <div className="space-y-3 text-sm">
+          {questions.map((question) => (
+            <label key={question.id} className="block space-y-1">
+              <span className="text-xs text-text-dim">
+                {question.required
+                  ? t('vetting.apply.before.required', { label: question.label })
+                  : question.label}
+              </span>
+              <TextArea
+                rows={2}
+                maxLength={VETTING_ANSWER_MAX}
+                aria-required={question.required || undefined}
+                value={answers[question.id] ?? ''}
+                onChange={(event) =>
+                  setAnswers((prev) => ({ ...prev, [question.id]: event.target.value }))
+                }
+              />
+            </label>
+          ))}
           <label className="flex items-start gap-2">
             <Checkbox
               className="mt-0.5"
@@ -367,7 +474,16 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
             sendable
               ? () =>
                   void act(async (held) => {
-                    setStatus(await vettingBackend().submit(held, note.trim()));
+                    try {
+                      setStatus(await vettingBackend().submit(held, note.trim(), given));
+                    } catch (err) {
+                      // The server names the minimums not met: list them as the page does.
+                      const named = unmetFromRefusal(err);
+                      if (callableErrorReason(err) !== 'below-minimum' || named.length === 0) {
+                        throw err;
+                      }
+                      setRefused(named);
+                    }
                   })
               : undefined
           }
@@ -375,7 +491,7 @@ export function ApplyPage({ corporationId, login, onSignIn, onOpenApp }: ApplyPa
           {t('vetting.apply.send', { corp: corp.name })}
         </Button>
         <span className="text-xs text-text-dim">
-          {t(sendable || read === 0 ? 'vetting.apply.sendHint' : 'vetting.apply.sendNeedsTick')}
+          {t(block === null ? 'vetting.apply.sendHint' : SEND_HINT[block], { corp: corp.name })}
         </span>
         {handle !== null && (
           <Button className="sm:ml-auto" onClick={() => setStartingOver(true)}>

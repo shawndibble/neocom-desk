@@ -177,6 +177,17 @@ describe('serverEventOccurrenceKey', () => {
         },
         '7:priceAlertTriggered:34:10:above',
       ],
+      [
+        {
+          eventId: 'vettingShared',
+          characterId: 7,
+          corporationId: 98000001,
+          reviewId: 'r1',
+          pilotName: 'Nine',
+          kind: 'application',
+        },
+        '7:vettingShared:98000001:r1',
+      ],
     ];
     for (const [fire, key] of fires) expect(serverEventOccurrenceKey(fire)).toBe(key);
   });

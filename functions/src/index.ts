@@ -271,6 +271,8 @@ import {
   parseVettingCorp,
   parseVettingDecide,
   parseVettingHandle,
+  parseVettingInviteCode,
+  parseVettingInviteLabel,
   parseVettingMember,
   parseVettingRemoveCharacter,
   parseVettingRequest,
@@ -281,6 +283,7 @@ import {
 } from './vettingParse.js';
 import {
   addVettingCharacter,
+  createVettingInvite,
   declineVetting,
   decideVettingReview,
   getVettingCorp,
@@ -290,6 +293,7 @@ import {
   openVettingReview,
   removeVettingCharacter,
   requestVettingReview,
+  revokeVettingInvite,
   saveVettingSettings,
   startVetting,
   submitVetting,
@@ -1370,7 +1374,14 @@ export const corpTaxBookCall = onCall<unknown>(
 // prove the caller by the EVE access token or the review key in `data`, never by `callerOf`.
 // Not `bookVersioned`: nothing a client caches is written here (every read is a callable), and
 // the vetting collections are in UNVERSIONED_COLLECTIONS. Logic: vettingStore.ts.
-const vettingDeps = (): VettingDeps => ({ ...srpDeps(), esi: esiVettingReader() });
+// `push` tells reviewers' devices of a shared report (`vettingShared`, ADR 0027) from inside the
+// submit action: FCM through the Admin SDK, so the router needs no secret for it.
+const vettingDeps = (): VettingDeps => ({
+  ...srpDeps(),
+  esi: esiVettingReader(),
+  push: getMessaging(),
+  logWarn,
+});
 
 const vettingActions = createActionGroup();
 const vettingAction = (name: CallableAction<'vetting'>, handler: CallableHandler): void => {
@@ -1432,6 +1443,22 @@ vettingAction('requestVettingReviewCallable', (request) =>
     callerOf(request),
     parseBookCall(request.data),
     parseVettingRequest(request.data)
+  )
+);
+vettingAction('createVettingInviteCallable', (request) =>
+  createVettingInvite(
+    vettingDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseVettingInviteLabel(request.data)
+  )
+);
+vettingAction('revokeVettingInviteCallable', (request) =>
+  revokeVettingInvite(
+    vettingDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseVettingInviteCode(request.data)
   )
 );
 vettingAction('saveVettingSettingsCallable', (request) =>

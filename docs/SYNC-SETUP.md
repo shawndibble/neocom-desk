@@ -106,6 +106,13 @@ per-corporation scan. The same sweep deletes stale `vettingThrottle` counters wi
 collection-group query on `windowStart`, which needs its own `COLLECTION_GROUP` field override
 there and falls back the same way without it.
 
+`vettingCall` also sends the `vettingShared` push (ADR 0027): when a report is shared and the
+corp's `notifyReviewers` setting is on, the submit action pushes to the devices of that
+corporation's known reviewers that enabled the event. It is sent from inside the action, so
+there is no trigger to deploy and no secret to set (FCM through the Admin SDK). The reviewers
+are those the overview saw holding the role in the last 30 days, kept in
+`corps/{id}/vetting/reviewers`, which the existing `vetting` rule already closes.
+
 ### Index exemptions are a one-way-ish deploy
 
 `firestore.indexes.json`'s `fieldOverrides` exempt every field of every synced

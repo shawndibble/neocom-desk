@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   VETTING_CHECKS,
+  VETTING_DEFAULT_SETTINGS,
   assessVetting,
+  normalizeVettingSettings,
+  settleVettingAnswers,
+  unmetVettingMinimums,
   type VettingCharacterInput,
   type VettingDealing,
   type VettingInput,
@@ -293,5 +297,85 @@ describe('assessVetting', () => {
       ])
     );
     expect(result.flags.map((flag) => flag.severity)).toEqual(['critical', 'warning']);
+  });
+});
+
+describe('normalizeVettingSettings', () => {
+  it('reads a document written before the newer settings existed as the defaults', () => {
+    const old = { on: true, watchlist: [], signOffs: { application: 2, promotion: 3 } };
+    expect(normalizeVettingSettings(old)).toEqual({
+      ...VETTING_DEFAULT_SETTINGS,
+      on: true,
+      signOffs: { application: 2, promotion: 3 },
+    });
+    expect(normalizeVettingSettings(undefined)).toEqual(VETTING_DEFAULT_SETTINGS);
+  });
+
+  it('clamps numbers, trims text and drops broken or surplus questions', () => {
+    const questions = Array.from({ length: 12 }, (_, i) => ({
+      id: `q${i}`,
+      label: ` Question ${i} `,
+      required: i === 0,
+    }));
+    const settings = normalizeVettingSettings({
+      signOffs: { application: 9, promotion: 0 },
+      welcome: `  ${'x'.repeat(700)}  `,
+      minimums: { ageDays: -5, skillPoints: 1e12, characters: 0 },
+      rejection: { wording: 'notNow', showReason: true },
+      questions: [{ id: 'q0', label: '' }, { label: 'no id' }, ...questions, questions[1]],
+      notifyReviewers: false,
+    });
+    expect(settings.signOffs).toEqual({ application: 3, promotion: 1 });
+    expect(settings.welcome).toHaveLength(600);
+    expect(settings.minimums).toEqual({ ageDays: 0, skillPoints: 500_000_000, characters: 1 });
+    expect(settings.rejection).toEqual({ wording: 'notNow', showReason: true });
+    expect(settings.questions).toHaveLength(8);
+    expect(settings.questions[0]).toEqual({ id: 'q0', label: 'Question 0', required: true });
+    expect(settings.notifyReviewers).toBe(false);
+    expect(settings.mailDecision).toBe(true);
+  });
+});
+
+describe('unmetVettingMinimums', () => {
+  const main = { birthday: '2019-03-01T00:00:00Z', skillPoints: 84_000_000 };
+  const alt = { birthday: '2026-10-01T00:00:00Z', skillPoints: null };
+
+  it('is met by any one declared character, and needs none by default', () => {
+    expect(unmetVettingMinimums(VETTING_DEFAULT_SETTINGS.minimums, [alt], NOW)).toEqual([]);
+    const minimums = { ageDays: 365, skillPoints: 50_000_000, characters: 2 };
+    expect(unmetVettingMinimums(minimums, [alt, main], NOW)).toEqual([]);
+  });
+
+  it('names each minimum not met; unshared skills cannot meet skill points', () => {
+    const minimums = { ageDays: 365, skillPoints: 1_000_000, characters: 2 };
+    expect(unmetVettingMinimums(minimums, [alt], NOW)).toEqual([
+      'ageDays',
+      'skillPoints',
+      'characters',
+    ]);
+  });
+});
+
+describe('settleVettingAnswers', () => {
+  const questions = [
+    { id: 'tz', label: 'Timezone', required: true },
+    { id: 'why', label: 'Why us', required: false },
+  ];
+
+  it('keeps answers to questions still asked, with the label as it read', () => {
+    const result = settleVettingAnswers(questions, [
+      { questionId: 'tz', answer: '  EU  ' },
+      { questionId: 'gone', answer: 'old' },
+    ]);
+    expect(result).toEqual({
+      answers: [{ questionId: 'tz', label: 'Timezone', answer: 'EU' }],
+      unanswered: [],
+    });
+  });
+
+  it('lists required questions left blank', () => {
+    expect(
+      settleVettingAnswers(questions, [{ questionId: 'tz', answer: '  ' }]).unanswered
+    ).toEqual(['tz']);
   });
 });

@@ -195,7 +195,7 @@ export function VettingRequestPage({ login, onSignIn }: VettingRequestPageProps)
         setStatus(await backend.addCharacter(handle, await getValidAccessToken(row.characterId)));
       }
       setReadingId(null);
-      const sent = await backend.submit(handle, '');
+      const sent = await backend.submit(handle, '', []);
       writeVettingHandle(`request:${characterId}`, handle);
       setStatus(sent);
     } catch (err) {
