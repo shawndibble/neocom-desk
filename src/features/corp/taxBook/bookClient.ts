@@ -143,7 +143,19 @@ export async function readFeederRemovalState(
     'feeders',
     String(feederCorporationId)
   );
-  const read = async () => (await getDoc(ref)).data() as RemovalNoticeRecord | undefined;
+  return asOfficer(
+    characterId,
+    corporationId,
+    async () => (await getDoc(ref)).data() as RemovalNoticeRecord | undefined
+  );
+}
+
+/** Runs an officer-rules read, renewing a lapsed officer record once on a refusal. */
+async function asOfficer<T>(
+  characterId: number,
+  corporationId: number,
+  read: () => Promise<T>
+): Promise<T> {
   try {
     return await read();
   } catch (error) {
@@ -152,6 +164,43 @@ export async function readFeederRemovalState(
     await verifyOfficer(characterId, corporationId);
     return read();
   }
+}
+
+/** A Collector book's moon owners' Extractions and records, for their pops off the Moons page. */
+export interface MoonOwnerChunkParts {
+  extractions: SyncExtraction[];
+  feeders: Pick<BookFeeder, 'refineryLabels' | 'refineryStructures'>[];
+}
+
+/**
+ * The moon owners' Extractions a book holds and the records that name their refineries (#6116),
+ * read under the officer rules. Null when the corporation has no book. Only rows tagged with a
+ * moon owner are read: the book's own chunks come from ESI.
+ */
+export async function readMoonOwnerChunkParts(
+  characterId: number,
+  corporationId: number
+): Promise<MoonOwnerChunkParts | null> {
+  await ensureSignedIn(characterId);
+  const db = getSyncFirestore(characterId);
+  const book = doc(db, 'corps', String(corporationId));
+  if (!(await getDoc(book)).exists()) return null;
+  return asOfficer(characterId, corporationId, async () => {
+    const [extractions, feeders] = await Promise.all([
+      getDocs(query(collection(book, 'extractions'), where('sourceCorporationId', '>', 0))),
+      getDocs(collection(book, 'feeders')),
+    ]);
+    return {
+      extractions: extractions.docs.map((d) => d.data() as SyncExtraction),
+      feeders: feeders.docs.map((d) => {
+        const { refineryLabels, refineryStructures } = d.data() as BookFeeder;
+        return {
+          ...(refineryLabels ? { refineryLabels } : {}),
+          ...(refineryStructures ? { refineryStructures } : {}),
+        };
+      }),
+    };
+  });
 }
 
 /** Checks the Character's corporation and roles with ESI and records officer access for 24 hours (D7). */

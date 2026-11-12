@@ -145,6 +145,7 @@ Corp kinds follow the same rules as every non-event kind: nothing is retained pa
 - Day-grid is not keyboard-navigable as a grid (each cell is a tab stop; up to 42).
 - Time zone setting (Local/EVE) is deliberately not applied to the Calendar grids (local-day buckets); event detail shows local time.
 - Moon chunk kind needs corp scope + role and is silently hidden from the menu without them.
+- **Moon owners' chunks from a Corp Tax Book (#6116).** A Character whose roles open its corporation's Corp Tax Book (Director, Accountant, Junior Accountant: the Moons page's rule, `viewsTaxBook` on `CorpReadAccess`) also gets the chunks of that book's moon owners, read from the book (`loadBookMoonChunks`, `readMoonOwnerChunkParts`) rather than ESI, each under its moon owner's corporation. A corporation some Character reads from ESI keeps its ESI rows, and the book's copy is dropped, so no pop shows twice. Cancelled chunks are left out, and refineries are named by officer label, then the structure name the grant read, then `Moon <id>`. A book read is reused for 5 minutes, and a book that fails adds nothing. The same rows reach Due soon and the Moon extractions widget (one Character and All characters).
 - Week-start lives in Settings, not on the page; density is hidden on phone.
 - Event detail has no "open in game", no invitee list, and no location (ESI limitation).
 - FAQ/Help panels do not mention Calendar.

@@ -16,6 +16,7 @@ vi.mock('@/features/corp/corpReadAccess', async (importOriginal) => {
   return {
     ...actual,
     resolveCorpReadAccess: async (characterId: number) => access.get(characterId) ?? null,
+    loadAccountCorpAccess: async () => accounts(),
     accountCorpReaders: async (capability: Parameters<typeof actual.corpReadersFor>[1]) =>
       actual.corpReadersFor(accounts(), capability),
   };

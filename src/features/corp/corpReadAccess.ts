@@ -9,7 +9,7 @@
  * then the corporation, then the roles, then the capability's own scopes.
  */
 import { db } from '@/db';
-import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
+import { canViewCorpTaxBook, corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
 import { loadCorporationId } from './boardData';
@@ -22,6 +22,8 @@ export interface CorpReadAccess {
   corporationId: number;
   /** Whether the Character's roles open `capability` and its grant holds that capability's scopes. */
   can: (capability: CorpCapability) => boolean;
+  /** The Character's roles open its corporation's Corp Tax Book (the Moons page's own rule). */
+  viewsTaxBook?: boolean;
 }
 
 /**
@@ -37,9 +39,11 @@ export async function resolveCorpReadAccess(characterId: number): Promise<CorpRe
   if (corporationId === null) return null;
   const roles = await loadCharacterRoles(characterId);
   if (roles.needsReauth || roles.cached === null) return null;
-  const capabilities = corpCapabilities(corpWideRoles(roles.cached.data));
+  const held = corpWideRoles(roles.cached.data);
+  const capabilities = corpCapabilities(held);
   return {
     corporationId,
+    viewsTaxBook: canViewCorpTaxBook(held),
     can: (capability) =>
       capabilities[capability] &&
       CORP_SCOPES_FOR_CAPABILITY[capability].every((scope) => granted.has(scope)),
