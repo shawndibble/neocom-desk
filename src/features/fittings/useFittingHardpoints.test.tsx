@@ -57,10 +57,10 @@ describe('useFittingHardpoints', () => {
 
   it('stays unknown while a high-slot type can’t be fetched, rather than showing its pip free', async () => {
     const { result } = renderHook(() => useFittingHardpoints(WITH_UNKNOWN));
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // What is known still badges its tile. Waited for, not slept on: the lookup is async and a fixed delay raced it on a loaded CI runner.
+    await waitFor(() => expect(result.current.kindOf(2889)).toBe('turret'));
+    // The unfetchable type keeps the counts unknown.
     expect(result.current.used).toBeNull();
-    // What is known still badges its tile.
-    expect(result.current.kindOf(2889)).toBe('turret');
   });
 
   it('is null with nothing open', () => {
