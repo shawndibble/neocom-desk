@@ -30,6 +30,8 @@ const FEEDER_DIRECTOR = 13;
 const FEEDER_NOBODY = 14;
 
 let ledger: 'ok' | 'forbidden' | 'unavailable' = 'ok';
+/** The moon owner's Extractions read: refused (no Station_Manager) or one coming chunk. */
+let extractionsRead: 'ok' | 'forbidden' = 'ok';
 let now = T0;
 /** Runs during the first pull's observer read: a concurrent write landing mid-save. */
 let duringPull: (() => Promise<void>) | undefined;
@@ -66,6 +68,18 @@ const esi = (): SyncEsi =>
           last_updated: '2026-10-18',
         },
       ]),
+    extractions: async () =>
+      extractionsRead === 'forbidden'
+        ? { kind: 'forbidden' }
+        : ok([
+            {
+              structure_id: 4001,
+              moon_id: 40000001,
+              extraction_start_time: '2026-10-15T00:00:00Z',
+              chunk_arrival_time: '2026-10-29T00:00:00Z',
+              natural_decay_time: '2026-10-29T03:00:00Z',
+            },
+          ]),
     budgetLow: () => false,
   }) as unknown as SyncEsi;
 
@@ -145,6 +159,7 @@ emulatorSuite('moon owner onboarding', () => {
   beforeEach(async () => {
     await clearEmulator();
     ledger = 'ok';
+    extractionsRead = 'ok';
     mineScopes = [...FEEDER_SYNC_SCOPES];
     now = T0;
     duringPull = undefined;
@@ -264,6 +279,21 @@ emulatorSuite('moon owner onboarding', () => {
     await save(RECONNECT_CODE, undefined, OTHER_ALT);
     expect(await grant()).toMatchObject({ kind: 'feeder', characterId: OTHER_ALT });
     expect(revoked).toEqual([`rt-${ALT}`]);
+  });
+
+  it('reconnect: a new holder reads Extractions at once, despite the old one being refused (#6117)', async () => {
+    extractionsRead = 'forbidden';
+    await save(await newInvite());
+    expect((await feederRecord())?.extractionsRefusedAt).toBe(T0);
+    extractionsRead = 'ok';
+    await save(RECONNECT_CODE, undefined, OTHER_ALT);
+    expect(await feederRecord()).not.toHaveProperty('extractionsRefusedAt');
+    const chunks = await db
+      .collection('corps')
+      .doc(String(COLLECTOR))
+      .collection('extractions')
+      .get();
+    expect(chunks.docs.map((d) => d.get('structureId'))).toEqual([4001]);
   });
 
   it('reconnect: a refused first pull puts the earlier grant back', async () => {

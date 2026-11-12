@@ -49,7 +49,7 @@ export interface AddOwnFeederInput extends BookCall {
   coverageFrom?: string;
 }
 
-function requireToken(call: BookCall): void {
+export function requireToken(call: BookCall): void {
   if (call.accessToken === undefined) {
     fail('invalid-argument', 'accessToken is required', 'token-required');
   }

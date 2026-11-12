@@ -197,6 +197,11 @@ const paidOf = (payouts: readonly MoonOwnerPayout[]) =>
 
 const LIFECYCLE: readonly MoonOwnerFeeder['status'][] = ['disconnected', 'left', 'removed'];
 
+/** Whether the scheduled sync still reads a moon owner in this status (Sync now, "next read"). */
+export function isStillRead(status: MoonOwnerStatus): boolean {
+  return !(LIFECYCLE as readonly string[]).includes(status);
+}
+
 function statusOf(f: MoonOwnerFeeder, settledNow: boolean, ratePct: number | undefined) {
   if (f.status === 'pending-removal') return 'removal-pending';
   if (LIFECYCLE.includes(f.status)) return f.status as 'disconnected' | 'left' | 'removed';
