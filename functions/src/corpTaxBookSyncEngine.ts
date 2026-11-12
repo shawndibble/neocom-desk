@@ -381,6 +381,9 @@ export interface SyncExtraction extends MirrorExtraction {
   sourceCorporationId?: number;
 }
 
+/** A moon owner's Extraction, as its grant read it (#6097). */
+export type FeederExtraction = SyncExtraction & { sourceCorporationId: number };
+
 export interface EsiExtractionLike {
   structure_id: number;
   moon_id: number;

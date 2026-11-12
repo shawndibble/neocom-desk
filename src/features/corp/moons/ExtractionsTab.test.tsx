@@ -151,7 +151,10 @@ describe('ExtractionsTab with moon owners (#6097)', () => {
 
   it('lists a moon owner’s coming chunk with its corporation named, in a book with no refinery of its own', () => {
     shown([{ ...ex('m', 'unknown', 0), state: 'extracting', sourceCorporationId: 98000002 }]);
-    expect(screen.getByText('Corp 98000002').closest('tr')).toHaveTextContent('Extracting');
+    const row = screen.getByText('Corp 98000002').closest('tr');
+    expect(row).toHaveTextContent('Extracting');
+    // No notification is read for a moon owner: without a linked Survey the ore is unknown.
+    expect(row).toHaveTextContent('Ore unknown');
   });
 
   it('names the book’s own corporation beside a moon owner’s, and none when every chunk is its own', () => {

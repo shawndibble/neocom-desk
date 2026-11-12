@@ -709,8 +709,9 @@ export async function syncOneFeeder(
   }
   // Extractions first (#6097), so the rows merged next are placed by them. Best effort, never
   // part of the feeder's health.
+  let extractionRefineries: number[] = [];
   try {
-    await refreshFeederExtractions(
+    extractionRefineries = await refreshFeederExtractions(
       bookDeps(deps),
       esi,
       collectorCorporationId,
@@ -731,7 +732,7 @@ export async function syncOneFeeder(
       esi,
       collectorCorporationId,
       feederCorporationId,
-      read.rows.map((r) => r.structureId),
+      [...read.rows.map((r) => r.structureId), ...extractionRefineries],
       refreshed.accessToken,
       live.readsStructures === true
     );

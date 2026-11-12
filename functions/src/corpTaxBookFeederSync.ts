@@ -37,7 +37,7 @@ import {
 import {
   observedRowsFromLedger,
   reconcileExtractions,
-  type SyncExtraction,
+  type FeederExtraction,
 } from './corpTaxBookSyncEngine.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 
@@ -179,7 +179,8 @@ export const extractionsDue = (
   now - record.extractionsRefusedAt >= EXTRACTIONS_RECHECK_MS;
 
 export type FeederExtractionsRead =
-  | { kind: 'ok'; extractions: (SyncExtraction & { sourceCorporationId: number })[] }
+  /** `complete`: ESI's list was whole, so a coming chunk missing from it was cancelled. */
+  | { kind: 'ok'; extractions: FeederExtraction[]; complete: boolean }
   /** ESI said 403: the grant holder lacks Station_Manager. */
   | { kind: 'refused' }
   /** Unanswered, rate limited, or the shared budget is low: the next run asks again. */
@@ -205,13 +206,15 @@ export async function readFeederExtractions(
       ...x,
       sourceCorporationId: feederCorporationId,
     })),
+    complete: !read.truncated,
   };
 }
 
 /**
  * After a good ledger read: read the moon owner's Extractions and keep them in the Collector's
- * book, or remember a refusal on the record. Best effort: a failure here is logged by the caller
- * and never fails the read or moves the feeder's health.
+ * book, or remember a refusal on the record. Returns their refineries, so one nobody has mined
+ * at yet gets its name looked up too. Best effort: a failure here is logged by the caller and
+ * never fails the read or moves the feeder's health.
  */
 export async function refreshFeederExtractions(
   deps: BookDeps,
@@ -219,14 +222,21 @@ export async function refreshFeederExtractions(
   collectorCorporationId: number,
   record: Pick<FeederRecord, 'corporationId' | 'extractionsRefusedAt'>,
   accessToken: string
-): Promise<void> {
+): Promise<number[]> {
   const now = deps.now();
-  if (!extractionsDue(record, now)) return;
+  if (!extractionsDue(record, now)) return [];
   const read = await readFeederExtractions(esi, record.corporationId, accessToken);
-  if (read.kind === 'none') return;
+  if (read.kind === 'none') return [];
+  const refineries = read.kind === 'ok' ? read.extractions.map((x) => x.structureId) : [];
   if (read.kind === 'ok') {
-    await storeFeederExtractions(deps, collectorCorporationId, read.extractions);
-    if (record.extractionsRefusedAt === undefined) return;
+    await storeFeederExtractions(
+      deps,
+      collectorCorporationId,
+      record.corporationId,
+      read.extractions,
+      read.complete
+    );
+    if (record.extractionsRefusedAt === undefined) return refineries;
   }
   const ref = feederRef(deps.db, collectorCorporationId, record.corporationId);
   await deps.db.runTransaction(async (tx) => {
@@ -236,6 +246,7 @@ export async function refreshFeederExtractions(
       extractionsRefusedAt: read.kind === 'refused' ? now : FieldValue.delete(),
     });
   });
+  return refineries;
 }
 
 /** The health outcome a ledger read stands for. */

@@ -133,6 +133,7 @@ describe('readFeederExtractions (#6097)', () => {
           sourceCorporationId: FEEDER,
         },
       ],
+      complete: true,
     });
     expect(calls).toEqual(['extractions']);
   });

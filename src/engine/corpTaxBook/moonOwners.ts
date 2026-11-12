@@ -174,8 +174,13 @@ function refineriesSeen(
 ): Pick<MoonOwnerRow, 'refineryCount' | 'nothingSeen'> {
   const all = new Set(ledger);
   for (const id of input.extractionRefineries?.get(feederId) ?? []) all.add(id);
-  return { refineryCount: all.size, ...(all.size === 0 ? { nothingSeen: true as const } : {}) };
+  return seen(all.size);
 }
+
+const seen = (count: number): Pick<MoonOwnerRow, 'refineryCount' | 'nothingSeen'> => ({
+  refineryCount: count,
+  ...(count === 0 ? { nothingSeen: true as const } : {}),
+});
 
 /** The same from a summary; one from before it kept the ids can only say the larger of the two counts. */
 function refineriesSeenInSummary(
@@ -184,9 +189,7 @@ function refineriesSeenInSummary(
   s: MoonOwnerSummary
 ): Pick<MoonOwnerRow, 'refineryCount' | 'nothingSeen'> {
   if (s.refineryIds) return refineriesSeen(input, feederId, s.refineryIds);
-  const withExtraction = input.extractionRefineries?.get(feederId)?.size ?? 0;
-  const count = Math.max(s.refineryCount, withExtraction);
-  return { refineryCount: count, ...(count === 0 ? { nothingSeen: true as const } : {}) };
+  return seen(Math.max(s.refineryCount, input.extractionRefineries?.get(feederId)?.size ?? 0));
 }
 
 const paidOf = (payouts: readonly MoonOwnerPayout[]) =>

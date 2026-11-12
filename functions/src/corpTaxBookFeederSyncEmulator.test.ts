@@ -314,6 +314,52 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
     expect(again.docs.map((d) => d.updateTime.toMillis())).toEqual([written]);
   });
 
+  it('a coming chunk ESI stops listing is cancelled; one that arrived is kept (#6097)', async () => {
+    await addFeeder(98000002);
+    const chunk = (structure: number, arrival: string): EsiExtractionLike => ({
+      structure_id: structure,
+      moon_id: 40000001,
+      extraction_start_time: '2026-10-01T00:00:00Z',
+      chunk_arrival_time: arrival,
+      natural_decay_time: arrival,
+    });
+    esiState.extractions.set(
+      98000002,
+      ok([chunk(7001, '2026-10-10T00:00:00Z'), chunk(7002, '2026-10-24T00:00:00Z')])
+    );
+    await run();
+    // ESI lists neither now: 7001's chunk arrived before T0, 7002's was still coming.
+    esiState.extractions.delete(98000002);
+    now += 6 * 3_600_000;
+    await run();
+    const stored = await collectorBook().collection('extractions').get();
+    const cancelledAt = Object.fromEntries(
+      stored.docs.map((d) => [d.get('structureId'), d.get('cancelledAt')])
+    );
+    expect(cancelledAt).toEqual({ 7001: undefined, 7002: new Date(now).toISOString() });
+  });
+
+  it('looks up the name of a refinery known only from an Extraction (#6097)', async () => {
+    await addFeeder(98000002, {}, true, { readsStructures: true });
+    esiState.noObservers.add(98000002);
+    esiState.extractions.set(
+      98000002,
+      ok([
+        {
+          structure_id: 7001,
+          moon_id: 40000001,
+          extraction_start_time: '2026-10-10T00:00:00Z',
+          chunk_arrival_time: '2026-10-24T00:00:00Z',
+          natural_decay_time: '2026-10-24T03:00:00Z',
+        },
+      ])
+    );
+    await run();
+    expect((await feederRecord(98000002))?.refineryStructures).toEqual({
+      '7001': { name: 'Refinery 7001', solarSystemId: 30004000, checkedAt: T0 },
+    });
+  });
+
   it('a 403 on Extractions alone leaves the moon owner active and is not asked again for a week (#6097)', async () => {
     await addFeeder(98000002);
     esiState.extractions.set(98000002, { kind: 'forbidden' });
