@@ -1,8 +1,7 @@
 /**
- * Appraisal result header with realistic big-haul figures (regression for
- * the #3009/#3010 header: `67,214,000,000 ISK (67.2B)` overflowed its group
- * and ran under the Cargo label at 1280, and all three groups overlapped at
- * 1024, because the other Appraisal specs only price short numbers).
+ * Appraisal result header with 13-digit totals printed in full: the other
+ * Appraisal specs only price short numbers, so overflow and overlap in the
+ * header went unseen.
  *
  * Asserts invariants, not pixels (CI fonts differ): the three groups don't
  * overlap, no group's content overflows its box, the page doesn't scroll
@@ -14,7 +13,6 @@ import { signInAndGoto } from './support/authSeed';
 import { expectNoPageOverflow } from './support/overflow';
 
 const VELDSPAR = 1230;
-/** 12,500,000 units at 0.1 m³ is 1,250,000 m³; at ~5,377 ISK each, a 67.2B sell. */
 /** Enough Veldspar for 13-digit totals: the widest figure the cards must hold in full. */
 const PASTE = 'Veldspar\t1,250,000,000';
 

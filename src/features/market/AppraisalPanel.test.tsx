@@ -1492,18 +1492,22 @@ describe('AppraisalPanel — the row as an item', () => {
       // No shorthand under the divider either.
       expect(second).toHaveTextContent(`List it, after fees${net}`);
 
+      // Each area has its own live region and its own bubble; one does not speak for the other.
+      const said = () =>
+        within(card)
+          .getAllByRole('status')
+          .map((region) => region.textContent);
+      expect(said()).toEqual(['', '']);
+
       await userEvent.click(total);
       expect(written).toEqual(['1,386,400']);
-      expect(await within(card).findByRole('status')).toHaveTextContent('Copied 1,386,400 ISK');
-      expect(within(card).getAllByRole('status')).toHaveLength(1);
+      await waitFor(() => expect(said()).toEqual(['Copied 1,386,400 ISK', '']));
+      expect(within(card).getAllByText('Copied 1,386,400 ISK')).toHaveLength(2);
 
       await userEvent.click(second);
       expect(written).toEqual(['1,386,400', net]);
-      expect(
-        within(card)
-          .getAllByRole('status')
-          .map((bubble) => bubble.textContent)
-      ).toEqual(['Copied 1,386,400 ISK', `Copied ${net} ISK`]);
+      await waitFor(() => expect(said()).toEqual(['Copied 1,386,400 ISK', `Copied ${net} ISK`]));
+      expect(within(card).getAllByText(`Copied ${net} ISK`)).toHaveLength(2);
     });
 
     it('a press on the label under the divider copies the second figure', async () => {

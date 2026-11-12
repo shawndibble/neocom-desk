@@ -6,14 +6,18 @@
  */
 import { fixed2 } from '@/lib/fixedFormat';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
-import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  hintCueClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk } from '@/lib/isk';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
-import { IskAmount, StatChip, StatChips, Tooltip } from '@/components/ui';
-import { hintCueClassName } from '@/components/ui/HintText';
+import { IskAmount, LiveStatus, StatChip, StatChips, Tooltip } from '@/components/ui';
 import type { AppraisalNetTotals, AppraisalTotals, RefineBasis } from '@/engine/market/appraisal';
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
@@ -44,11 +48,8 @@ interface AppraisalHeaderStatsProps {
 }
 
 /**
- * The headline's size by the header's own width, so a 13-digit total
- * ("1,234,567,890,123", about 8.5 times the font size wide) stays whole in a
- * third of it: full size where the cards stack (a phone) and from 40rem, and
- * in between stepped down, never below body size (`text-sm`). Each step leaves
- * a few percent spare for a wider system font.
+ * Sized by the header's width so a 13-digit total (about 8.5em wide) stays whole in a third of it,
+ * never below body size (`text-sm`). Each step leaves slack for a wider system font.
  */
 const HEADLINE_SIZE_CLASS =
   'text-xl @[29rem]:text-sm @[32rem]:text-base @[36rem]:text-lg @[40rem]:text-xl';
@@ -57,14 +58,17 @@ const HEADLINE_SIZE_CLASS =
 interface SecondFigure {
   label: string;
   value: number;
-  /** What the label means; a tooltip on the area (hover, focus, touch-and-hold). */
+  /** What the label means; a tooltip on the area. */
   help?: string;
 }
 
-/** One copy area's state: the full digits, the copy, and whether its bubble shows. */
+/** Per-area copy state. */
 function useCopyFigure(value: number) {
+  const { t } = useTranslation();
   const { copied, flash } = useCopyFeedback(COPIED_FEEDBACK_MS);
+  const [copies, setCopies] = useState(0);
   const full = formatIsk(value, 0);
+  const exact = t('common.iskExact', { amount: full });
 
   async function copy() {
     try {
@@ -72,47 +76,56 @@ function useCopyFigure(value: number) {
     } catch {
       return;
     }
+    setCopies((n) => n + 1);
     flash();
   }
 
-  return { full, copied: copied !== null, copy };
+  return {
+    full,
+    exact,
+    copy,
+    copiedMessage: copied === null ? null : t('market.appraisal.copiedAmount', { amount: exact }),
+    copies,
+  };
 }
 
-/** Mounted only while showing, so six copy areas aren't six empty live regions. */
-function CopiedBubble({ amount, className }: { amount: string; className: string }) {
-  const { t } = useTranslation();
+type CopyFigure = ReturnType<typeof useCopyFigure>;
+
+/** The live region stays mounted and the bubble is not one: a status node mounted with its text is not reliably read out. */
+function CopiedFeedback({ figure, className }: { figure: CopyFigure; className: string }) {
   return (
-    <span
-      role="status"
-      className={cx(
-        'pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap text-text normal-case shadow-md',
-        className
+    <>
+      <LiveStatus announceKey={figure.copies}>{figure.copiedMessage}</LiveStatus>
+      {figure.copiedMessage !== null && (
+        <span
+          aria-hidden="true"
+          className={cx(
+            'pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap text-text normal-case shadow-md',
+            className
+          )}
+        >
+          {figure.copiedMessage}
+        </span>
       )}
-    >
-      {t('market.appraisal.copiedAmount', { amount })}
-    </span>
+    </>
   );
 }
 
-/**
- * The area under a card's divider: one button, label and figure, that copies
- * the figure. The label's tooltip sits on the button, so a hover or focus
- * shows it, a touch-and-hold reveals it, and a tap copies (DESIGN.md §6c).
- */
+/** Under the divider: one button copies the figure. The tooltip sits on the button, so a tap copies and a hold reveals (DESIGN.md §6c). */
 function SecondFigureArea({ title, second }: { title: string; second: SecondFigure }) {
   const { t } = useTranslation();
   const figure = useCopyFigure(second.value);
-  const exact = t('common.iskExact', { amount: figure.full });
   return (
     <div className="relative border-t border-line">
-      <Tooltip content={second.help}>
+      {/* Below, so the bubble does not cover the card's own total. */}
+      <Tooltip content={second.help} side="bottom">
         <button
           type="button"
           onClick={() => void figure.copy()}
           aria-label={t('market.appraisal.copyCardSecond', {
             title,
             label: second.label,
-            amount: exact,
+            amount: figure.exact,
           })}
           className={cx(
             'flex w-full cursor-copy flex-wrap items-baseline justify-between gap-x-2 rounded-b-xs px-2.5 pt-1 pb-2 text-left text-xs text-text-dim',
@@ -126,17 +139,14 @@ function SecondFigureArea({ title, second }: { title: string; second: SecondFigu
           </b>
         </button>
       </Tooltip>
-      {figure.copied && <CopiedBubble amount={exact} className="top-full mt-1" />}
+      <CopiedFeedback figure={figure} className="top-full mt-1" />
     </div>
   );
 }
 
 /**
- * One of the three headline numbers: label, figure, what it is, and the figure
- * it nets to. Two copy areas split at the divider. Above it, the title is the
- * button and its `::after` stretches over that area, so a press there copies
- * the headline. Below it, `SecondFigureArea` copies the second figure. Every
- * figure is printed in full.
+ * One headline card, two copy areas split at the divider: above, the title
+ * button's `::after` covers the area; below, `SecondFigureArea`.
  */
 function PriceCell({
   title,
@@ -153,7 +163,6 @@ function PriceCell({
 }) {
   const { t } = useTranslation();
   const total = useCopyFigure(value);
-  const exact = t('common.iskExact', { amount: total.full });
 
   return (
     <section
@@ -171,7 +180,7 @@ function PriceCell({
           <button
             type="button"
             onClick={() => void total.copy()}
-            aria-label={t('market.appraisal.copyCardTotal', { title, amount: exact })}
+            aria-label={t('market.appraisal.copyCardTotal', { title, amount: total.exact })}
             className="cursor-copy rounded-xs uppercase tracking-widest after:absolute after:inset-0 focus-visible:outline-none"
           >
             {title}
@@ -187,7 +196,7 @@ function PriceCell({
           {total.full}
         </span>
         <span className="mb-1 text-[0.6875rem] text-text-dim">{hint}</span>
-        {total.copied && <CopiedBubble amount={exact} className="bottom-full mb-1" />}
+        <CopiedFeedback figure={total} className="bottom-full mb-1" />
       </div>
       {second && <SecondFigureArea title={title} second={second} />}
     </section>
@@ -251,7 +260,7 @@ export function AppraisalHeaderStats({
   }
   return (
     <div className="@container flex w-full flex-col gap-2">
-      {/* Three across from the width where a 13-digit total fits a card at body size; one per row below it. */}
+      {/* One per row below the width `HEADLINE_SIZE_CLASS` can fit three across. */}
       <div className="grid grid-cols-1 gap-2 @[29rem]:grid-cols-3">
         <PriceCell
           title={t('market.appraisal.summaryBuy')}
