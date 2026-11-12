@@ -94,6 +94,7 @@ import { Hammer } from '@phosphor-icons/react/dist/csr/Hammer';
 import { Handshake } from '@phosphor-icons/react/dist/csr/Handshake';
 import { Hourglass } from '@phosphor-icons/react/dist/csr/Hourglass';
 import { Lightbulb } from '@phosphor-icons/react/dist/csr/Lightbulb';
+import { IdentificationBadge } from '@phosphor-icons/react/dist/csr/IdentificationBadge';
 import { Info as InfoGlyph } from '@phosphor-icons/react/dist/csr/Info';
 import { ListBullets } from '@phosphor-icons/react/dist/csr/ListBullets';
 import { LockKey } from '@phosphor-icons/react/dist/csr/LockKey';
@@ -493,6 +494,8 @@ export const NavCorpAssets = withWeight(Warehouse);
 export const NavCorpMoons = withWeight(Moon);
 // SRP repays lost ships: a lifebuoy (`ReadOnly`'s shield would read as a lock).
 export const NavCorpSrp = withWeight(Lifebuoy);
+// Vetting reads who a pilot is: an identification badge.
+export const NavCorpVetting = withWeight(IdentificationBadge);
 export const NavSkills = withWeight(GraduationCap);
 export const NavIndustry = withWeight(Factory);
 export const NavShips = withWeight(RocketLaunch);

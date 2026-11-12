@@ -38,6 +38,7 @@
     "corpAssets": "Corp Assets",
     "corpMoons": "Moons",
     "corpSrp": "SRP",
+    "corpVetting": "Vetting",
     "skills": "Skills",
     "industry": "Industry",
     "ships": "Ships",
@@ -19810,6 +19811,521 @@
         "not-covered": "Not covered",
         "officer-decides": "An officer decides"
       }
+    }
+  },
+  "vetting": {
+    "title": "Vetting",
+    "tabsLabel": "Vetting reviews",
+    "tabWithCount": "{{label}} {{count}}",
+    "tabs": {
+      "open": "Open",
+      "decided": "Decided",
+      "settings": "Settings"
+    },
+    "deniedTitle": "Vetting is for recruiters",
+    "deniedHint": "Reading reports needs Director or Personnel Manager.",
+    "roleLine": "Vetting needs Director or Personnel Manager.",
+    "summary": {
+      "open_one": "{{count}} open",
+      "open_other": "{{count}} open",
+      "yours_one": "needs your sign-off",
+      "yours_other": "need your sign-off"
+    },
+    "copyLink": "Copy apply link",
+    "copied": "Copied",
+    "copyOff": "Vetting is off. Applicants cannot use the link.",
+    "reviewMember": "Review a member",
+    "offNote": {
+      "director": "Vetting is off. Turn it on in Settings to take applications.",
+      "reviewer": "Vetting is off. A Director turns it on."
+    },
+    "kind": {
+      "application": "Application",
+      "promotionTo": "Promotion to {{role}}"
+    },
+    "result": {
+      "flags_one": "{{count}} flag",
+      "flags_other": "{{count}} flags",
+      "nothing": "Nothing found",
+      "incomplete": "Incomplete",
+      "waiting": "Waiting for pilot",
+      "declined": "Declined",
+      "withdrawn": "Withdrawn"
+    },
+    "queue": {
+      "title": {
+        "open": "Open reviews",
+        "decided": "Decided reviews"
+      },
+      "label": {
+        "open": "Open vetting reviews",
+        "decided": "Decided vetting reviews"
+      },
+      "columns": {
+        "pilot": "Pilot",
+        "for": "For",
+        "characters": "Characters",
+        "result": "Result",
+        "signOffs": "Sign-offs",
+        "read": "Read",
+        "outcome": "Outcome",
+        "decided": "Decided"
+      },
+      "signed": "{{signed}} of {{needed}}",
+      "signedPhone": "{{signed}} of {{needed}} sign-offs",
+      "yoursNeeded": "Yours needed",
+      "asked": "Asked {{age}}",
+      "empty": {
+        "open": {
+          "title": "Nobody to review",
+          "hint": "Send applicants the apply link, or use Review a member before a promotion."
+        },
+        "decided": {
+          "title": "Nothing decided",
+          "hint": "A decided review stays here for 30 days, then is deleted."
+        }
+      }
+    },
+    "requestDialog": {
+      "title": "Review a member",
+      "name": "Character name, exactly as in game",
+      "role": "Role they are up for",
+      "note": "They are asked to share. You cannot sign off a review you asked for.",
+      "confirm": "Ask for a review"
+    },
+    "settings": {
+      "state": {
+        "title": "Vetting",
+        "on": "On",
+        "off": "Off",
+        "onHint": "Applicants can use the apply link.",
+        "offHint": "The apply link says the corp is not taking applications here.",
+        "turnOn": "Turn on",
+        "turnOff": "Turn off"
+      },
+      "signOffs": {
+        "title": "Sign-offs needed",
+        "application": "Applications",
+        "promotion": "Promotions",
+        "hint": "Whoever asks for a promotion review cannot sign it off."
+      },
+      "watchlist": {
+        "title": "Watchlist",
+        "count_one": "{{count}} entry",
+        "count_other": "{{count}} entries",
+        "name": "Name",
+        "kind": "Kind",
+        "category": {
+          "character": "Character",
+          "corporation": "Corporation",
+          "alliance": "Alliance"
+        },
+        "remove": "Remove",
+        "removeNamed": "Remove {{name}}",
+        "emptyTitle": "Nobody on the watchlist",
+        "emptyHint": "Add the corporations, alliances and characters the checks should look for.",
+        "addLabel": "Exact name of a character, corporation or alliance",
+        "add": "Add",
+        "full": "The watchlist holds {{count}} entries. Remove one to add another."
+      }
+    },
+    "sources": {
+      "wallet": "Wallet journal",
+      "contact": "Contacts",
+      "mail": "Mail",
+      "contract": "Contracts",
+      "skills": "Skills",
+      "history": "Corporation history",
+      "walletContracts": "Wallet journal, contracts"
+    },
+    "checks": {
+      "watchlistIsk": {
+        "title": "ISK with the watchlist",
+        "finding_one": "{{total}} ISK in {{count}} wallet row with {{party}} (watchlist). Received {{received}}, sent {{sent}}.",
+        "finding_other": "{{total}} ISK in {{count}} wallet rows with the watchlist, most with {{party}}. Received {{received}}, sent {{sent}}.",
+        "looksAt": "Wallet journal rows with anyone on the watchlist"
+      },
+      "watchlistHistory": {
+        "title": "Time in a watchlist corporation",
+        "finding_one": "Was a member of {{party}} (watchlist).",
+        "finding_other": "{{count}} stays in watchlist corporations, the latest in {{party}}.",
+        "looksAt": "Corporation history against the watchlist"
+      },
+      "watchlistContacts": {
+        "title": "Watchlist contacts",
+        "finding_one": "{{party}} (watchlist) is a contact with positive standing.",
+        "finding_other": "{{count}} watchlist contacts with positive standing, {{party}} among them.",
+        "looksAt": "Contacts with positive standing"
+      },
+      "watchlistMail": {
+        "title": "Mail with the watchlist",
+        "finding_one": "{{count}} mail with {{party}} (watchlist).",
+        "finding_other": "{{count}} mails with the watchlist, most with {{party}}.",
+        "looksAt": "Who mail is to and from, never the message"
+      },
+      "watchlistContracts": {
+        "title": "Contracts with the watchlist",
+        "finding_one": "{{count}} contract with {{party}} (watchlist).",
+        "finding_other": "{{count}} contracts with the watchlist, most with {{party}}.",
+        "looksAt": "Contracts with anyone on the watchlist"
+      },
+      "undeclaredCharacter": {
+        "title": "Likely undeclared character",
+        "finding_one": "{{party}}: {{count}} trade or contract with these characters. Not declared.",
+        "finding_other": "{{party}}: {{count}} trades and contracts with these characters. Not declared.",
+        "looksAt": "Repeat trades and contracts with one character outside the declared ones"
+      },
+      "corpHopping": {
+        "title": "Many corporations in a year",
+        "finding_one": "Joined {{count}} player corporation in the last year.",
+        "finding_other": "Joined {{count}} player corporations in the last year.",
+        "looksAt": "Player corporations joined in the last year"
+      },
+      "cynoNoCapital": {
+        "title": "Cyno skills, no capital pilot declared",
+        "finding": "Cynosural Field Theory {{level}}, but no declared character flies a capital or black ops ship.",
+        "looksAt": "Cyno skills against the declared characters' capital skills"
+      },
+      "thinCharacter": {
+        "title": "Old character, few skill points",
+        "finding_one": "{{skillPoints}} skill points after {{count}} year.",
+        "finding_other": "{{skillPoints}} skill points after {{count}} years.",
+        "looksAt": "Character age against skill points"
+      }
+    },
+    "what": {
+      "player_donation": "Player donation",
+      "player_trading": "Direct trade",
+      "mail": "Mail",
+      "contact": "Contact",
+      "member": "Member",
+      "joined": "Joined",
+      "item_exchange": "Item exchange contract",
+      "courier": "Courier contract",
+      "auction": "Auction contract"
+    },
+    "report": {
+      "title": "Vetting report",
+      "failedTitle": "Could not open the report",
+      "theirNote": "Their note",
+      "flags": "Flags",
+      "flagsFound_one": "{{count}} flag in {{checks}} checks",
+      "flagsFound_other": "{{count}} flags in {{checks}} checks",
+      "nothingFound_one": "Nothing found in {{count}} check",
+      "nothingFound_other": "Nothing found in {{count}} checks",
+      "couldNotRun_one": "{{count}} check could not run.",
+      "couldNotRun_other": "{{count}} checks could not run.",
+      "notAVerdict": "Not a verdict. An undeclared character cannot be checked.",
+      "reasonToAsk": "Each flag is a reason to ask.",
+      "serious": "Serious",
+      "ask": "Ask about",
+      "onFrom": "On {{characters}} · from {{source}}",
+      "rowsBehind_one": "{{count}} row behind this",
+      "rowsBehind_other": "{{count}} rows behind this",
+      "evidenceCapped_one": "Showing the latest {{shown}} of {{count}} row.",
+      "evidenceCapped_other": "Showing the latest {{shown}} of {{count}} rows.",
+      "isk": "{{amount}} ISK",
+      "noDate": "No date",
+      "unknownParty": "Unknown ({{id}})",
+      "couldNotCheck": "Could not check",
+      "didNotShare_one": "{{names}} did not share {{source}}.",
+      "didNotShare_other": "{{names}} did not share {{source}}.",
+      "freshRead": "A fresh read needs the pilot to share again.",
+      "showChecks": "Show the checks",
+      "hideChecks": "Hide the checks",
+      "andMore_one": "{{names}} and {{count}} more",
+      "andMore_other": "{{names}} and {{count}} more",
+      "noReport": {
+        "waiting": "No report yet",
+        "declined": "The pilot declined",
+        "hint": "There is nothing to read until the pilot shares."
+      },
+      "characters": {
+        "title": "Declared characters",
+        "character": "Character",
+        "born": "Born",
+        "skillPoints": "Skill points",
+        "corporations": "Corporations",
+        "shared": "Shared",
+        "everything": "Everything",
+        "no": "No {{sources}}"
+      },
+      "about": {
+        "title": "About this report",
+        "read": "Read",
+        "keptUntil": "Kept until",
+        "signInKept": "Login kept",
+        "none": "None",
+        "log": "Record"
+      }
+    },
+    "log": {
+      "started": "opened the apply link",
+      "shared": "shared their characters",
+      "opened": "opened the report",
+      "requested": "asked for the review",
+      "decided": "recorded a sign-off",
+      "declined": "declined",
+      "withdrew": "withdrew"
+    },
+    "decision": {
+      "title": "Decision",
+      "needed_one": "{{signed}} of {{count}} sign-off",
+      "needed_other": "{{signed}} of {{count}} sign-offs",
+      "none": "No sign-offs were recorded.",
+      "you": "You",
+      "notDecided": "Not decided",
+      "hidden": "Decided {{when}}. Hidden until you decide",
+      "asked": "Asked for this review",
+      "decidedOn": "Decided {{when}}",
+      "word": {
+        "yours": "Yours",
+        "hidden": "Decided",
+        "barred": "Cannot sign"
+      },
+      "outcome": {
+        "application": {
+          "yes": "Accepted",
+          "no": "Rejected"
+        },
+        "promotion": {
+          "yes": "Approved",
+          "no": "Objected"
+        }
+      },
+      "verb": {
+        "application": {
+          "yes": "Accept",
+          "no": "Reject"
+        },
+        "promotion": {
+          "yes": "Approve",
+          "no": "Object"
+        }
+      },
+      "note": "Note, kept with your decision",
+      "optional": "Optional",
+      "barredHint": "You asked for this review, so you cannot sign it off.",
+      "refuse": {
+        "application": "Reject {{pilot}}",
+        "promotion": "Object to {{pilot}}'s promotion"
+      },
+      "reason": "Reason, kept with your decision",
+      "refuseHint": "The other reviewers see it. The pilot does not."
+    },
+    "consent": {
+      "title": "What you share",
+      "willSee": {
+        "recruiters": "The recruiters will see",
+        "officers": "The officers reviewing you will see"
+      },
+      "reads": {
+        "history": "Corporation history",
+        "wallet": "Wallet journal",
+        "contact": "Contacts and standings",
+        "mail": "Mail",
+        "contract": "Contracts",
+        "skills": "Skills"
+      },
+      "readNotes": {
+        "wallet": "Last 30 days",
+        "mail": "Who and subject, never the message"
+      },
+      "notRead": "Not read, not kept",
+      "mailText": "The text of your mail",
+      "signIn": "Your EVE login",
+      "signInNote": "No key is kept. Nothing is read again",
+      "control": "You stay in control",
+      "onlyReviewers": "Only the reviewers can open it",
+      "seeOpened": "You see who opened it",
+      "deleted_one": "Deleted {{count}} day after the decision, or when you withdraw",
+      "deleted_other": "Deleted {{count}} days after the decision, or when you withdraw"
+    },
+    "characters": {
+      "title": "Your characters",
+      "added_one": "{{count}} added",
+      "added_other": "{{count}} added",
+      "addAnother": "Add another character",
+      "full": "{{count}} characters is the most one report holds.",
+      "share": "Share {{name}}",
+      "remove": "Remove",
+      "removeNamed": "Remove {{name}}",
+      "signIn": "Log in",
+      "signInAgain": "Log in again",
+      "signInAgainNamed": "Log in again as {{name}}",
+      "partMissingHint": "{{missing}} not shared. That check will not run.",
+      "needsSignInHint": "Its login here does not cover {{missing}}.",
+      "readingNamed": "Reading {{name}}",
+      "readNamed": "{{name}} read",
+      "state": {
+        "read": "Read",
+        "reading": "Reading",
+        "partMissing": "Part missing",
+        "ready": "Logged in",
+        "needsSignIn": "Needs login"
+      }
+    },
+    "apply": {
+      "title": "Apply",
+      "heading": "Apply to {{corp}}",
+      "sub": {
+        "start": "A one-time read of your characters. About two minutes, no account needed.",
+        "characters": "Add every character you own, on every account, then send.",
+        "sent": "Sent {{when}}.",
+        "sentNoTime": "Sent.",
+        "decided": "Decided {{when}}.",
+        "withdrawn": "Withdrawn.",
+        "off": "Not taking applications here."
+      },
+      "how": {
+        "title": "How it works",
+        "signIn": "Log in with EVE, once per character.",
+        "read": "Each character is read once.",
+        "report": "Recruiters get a report and reply in game."
+      },
+      "signIn": {
+        "first": "Log in with EVE Online",
+        "firstHint": "Start with your main. Add the rest next.",
+        "another": "Add another character with EVE Online",
+        "cancelled": "Login cancelled. Nothing was read.",
+        "failed": "The login did not finish. Nothing was read. Try again."
+      },
+      "before": {
+        "title": "Before you send",
+        "allMine": "These are all my characters.",
+        "allMineHint": "A character left out usually shows up in the others' trades.",
+        "note": "Note to the recruiters (optional)"
+      },
+      "send": "Send to {{corp}}",
+      "sendHint": "Nothing is sent until you press this.",
+      "sendNeedsTick": "Tick \"These are all my characters\" to send.",
+      "missing": {
+        "title": "No such apply link",
+        "hint": "Ask the recruiter for the link again."
+      },
+      "off": {
+        "title": "Not taking applications here",
+        "hint": "This corporation has vetting turned off. Ask a recruiter in game."
+      },
+      "withdrawn": {
+        "title": "Withdrawn",
+        "hint": "The report is deleted. Nothing is kept.",
+        "again": "Start a new application"
+      }
+    },
+    "status": {
+      "title": {
+        "application": "Your application",
+        "promotion": "Your review"
+      },
+      "state": {
+        "draft": "Not sent",
+        "requested": "Requested",
+        "open": "Waiting",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "withdrawn": "Withdrawn",
+        "declined": "Declined"
+      },
+      "line": {
+        "open": {
+          "application_one": "{{count}} character read. The report is with the recruiters.",
+          "application_other": "{{count}} characters read. The report is with the recruiters.",
+          "promotion_one": "{{count}} character read. The report is with the officers.",
+          "promotion_other": "{{count}} characters read. The report is with the officers."
+        },
+        "accepted": "Accepted {{when}}.",
+        "rejected": "Not accepted. Decided {{when}}.",
+        "withdrawn": "You withdrew. The report is deleted.",
+        "declined": "You declined. Nothing was read.",
+        "draft": "Not sent yet.",
+        "requested": "Waiting for you to share."
+      },
+      "nextTitle": "What happens next",
+      "next": {
+        "open": {
+          "application": "A recruiter reads the report.",
+          "promotion": "The officers read the report."
+        },
+        "contact": "They contact you in game.",
+        "outcome": {
+          "application": "If accepted, this page says how to join.",
+          "promotion": "This page shows the decision."
+        },
+        "join": "In EVE, open {{corp}}'s corporation window and press Apply to join.",
+        "joinAccept": "A recruiter accepts it in game.",
+        "role": "An officer changes your role in game."
+      },
+      "reportTitle": "Your report",
+      "openedBy": "Opened by",
+      "nobodyYet": "Nobody yet",
+      "deleted": "Deleted",
+      "deletedAfter_one": "{{count}} day after the decision",
+      "deletedAfter_other": "{{count}} days after the decision",
+      "nothingKept": "No login was kept. Nothing more is read.",
+      "withdraw": "Withdraw and delete the report",
+      "deleteNow": "Delete the report now",
+      "withdrawConfirm": {
+        "title": "Withdraw and delete the report?",
+        "titleDecided": "Delete the report now?",
+        "body": "{{corp}} can no longer open it. This can't be undone.",
+        "action": "Delete the report"
+      },
+      "useApp": {
+        "title": "Use Neocom Desk",
+        "body": "Use Neocom Desk with these characters. Free.",
+        "note": "It asks you to log in again. That login stays in this browser, never on our servers.",
+        "action": "Open Neocom Desk with these characters",
+        "or": "Or keep this page's link."
+      }
+    },
+    "request": {
+      "title": "Review requested",
+      "none": {
+        "title": "No review requested",
+        "hint": "When an officer asks for a review before a promotion, it shows here."
+      },
+      "anOfficer": "An officer",
+      "promotion": "Promotion to {{role}}",
+      "asked": "<b>{{name}}</b> asked for a review before you are made <b>{{role}}</b>. Other officers decide.",
+      "oneTime": "A one-time read of the characters you share.",
+      "charactersTitle": "Characters to share",
+      "onDevice_one": "{{count}} of {{total}} can be shared without another login",
+      "onDevice_other": "{{count}} of {{total}} can be shared without another login",
+      "share_one": "Share {{count}} character",
+      "share_other": "Share {{count}} characters",
+      "decline": "Decline",
+      "declineHint": "The reviewers are told if you decline.",
+      "declineConfirm": {
+        "title": "Decline the review?",
+        "body": "{{name}} and the reviewers are told. Nothing is read.",
+        "action": "Decline"
+      }
+    },
+    "errors": {
+      "generic": "That did not work. Try again.",
+      "not-found": "This review no longer exists.",
+      "bad-key": "This review no longer exists.",
+      "unknown-corp": "No such corporation.",
+      "vetting-off": "This corporation has vetting turned off.",
+      "wrong-state": "The report is already sent.",
+      "rate-limited": "Too many reads today. Try again tomorrow.",
+      "too-many-characters": "This report holds no more characters.",
+      "no-characters": "Add a character first.",
+      "pilot-missing": "Share the character the review was asked of.",
+      "changed": "The report changed while it was checked. Try again.",
+      "not-a-reviewer": "This needs Director or Personnel Manager.",
+      "role-required": "This needs Director.",
+      "unknown-name": "No character, corporation or alliance has exactly that name.",
+      "not-a-member": "That character is not in this corporation.",
+      "already-requested": "That member already has a review waiting.",
+      "watchlist-full": "The watchlist is full.",
+      "not-open": "This review is already decided.",
+      "barred": "You asked for this review, so you cannot sign it off.",
+      "already-signed": "You already signed this review off.",
+      "esi-backoff": "EVE's servers are busy. Try again in a few minutes.",
+      "esi-error": "EVE's servers did not answer. Try again in a few minutes.",
+      "esi-forbidden": "EVE refused that login. Log in again."
     }
   }
 }

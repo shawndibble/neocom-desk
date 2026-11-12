@@ -101,7 +101,7 @@ export const COMMUNITY_COLLECTION_FAQ_ITEM = {
 } as const satisfies Record<string, CommunityFaqItemId>;
 
 /** A line in the corporation records group. */
-export type CorpFaqItemId = 'srp' | 'corpTaxBook';
+export type CorpFaqItemId = 'srp' | 'corpTaxBook' | 'vetting';
 
 /**
  * Every collection under `corps/{id}` in `firestore.rules`, and the line that
@@ -133,6 +133,10 @@ export const CORP_COLLECTION_FAQ_ITEM = {
   srpDoctrines: 'srp',
   srpAudit: 'srp',
   srpOfficers: 'srp',
+  vetting: 'vetting',
+  vettingReviews: 'vetting',
+  inputs: 'vetting',
+  vettingThrottle: 'vetting',
 } as const satisfies Record<string, CorpFaqItemId>;
 
 /** The Community lines, as the panel lists them. */
@@ -231,7 +235,7 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
     id: 'corpRecords',
     titleKey: 'settings.faq.store.corp.title',
     descriptionKey: 'settings.faq.store.corp.description',
-    items: (['srp', 'corpTaxBook'] satisfies CorpFaqItemId[]).map((id) => ({
+    items: (['srp', 'corpTaxBook', 'vetting'] satisfies CorpFaqItemId[]).map((id) => ({
       id,
       labelKey: `settings.faq.store.corp.${id}`,
     })),
@@ -258,7 +262,8 @@ export interface RetentionGroup {
  * `engine/wallet/archiveCoverage.ts`,
  * `esi/cachePrune.ts`, `features/notifications/feed.ts`, `sync/merge.ts`,
  * `functions/src/purgeStaleAccounts.ts`, `functions/src/communityRequests.ts`,
- * `features/share/shareStore.ts`, `functions/src/srpRetention.ts` and `srpCleanup.ts`; the Corp Tax
+ * `features/share/shareStore.ts`, `functions/src/srpRetention.ts` and `srpCleanup.ts`, `VETTING_KEEP_DAYS` and
+ * `VETTING_DRAFT_HOURS` in `engine/vetting.ts`; the Corp Tax
  * Book has no sweep, only `deleteBook` in `functions/src/corpTaxBookStore.ts`),
  * so change one and change the other (`FaqPanel.test.tsx` reads the numbers out
  * of those functions files).
@@ -299,6 +304,7 @@ export const RETENTION_GROUPS: readonly RetentionGroup[] = [
       'shareLinks',
       'srp',
       'corpTaxBook',
+      'vetting',
       'idle',
     ].map((id) => ({
       id,

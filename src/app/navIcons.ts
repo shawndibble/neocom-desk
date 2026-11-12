@@ -16,6 +16,7 @@ export const NAV_ICONS: Record<NavPagePath, ComponentType<Icon.IconProps>> = {
   '/corp/assets': Icon.NavCorpAssets,
   '/corp/moons': Icon.NavCorpMoons,
   '/corp/srp': Icon.NavCorpSrp,
+  '/corp/vetting': Icon.NavCorpVetting,
   '/skills': Icon.NavSkills,
   '/industry': Icon.NavIndustry,
   '/ships': Icon.NavShips,

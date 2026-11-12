@@ -154,6 +154,9 @@ export const loadCorpWallet = named(() => import('@/routes/CorpWallet'), 'CorpWa
 export const loadCorpMoons = named(() => import('@/routes/CorpMoons'), 'CorpMoons');
 export const loadCorpSrp = named(() => import('@/routes/CorpSrp'), 'CorpSrp');
 export const loadSrp = named(() => import('@/routes/Srp'), 'Srp');
+export const loadCorpVetting = named(() => import('@/routes/CorpVetting'), 'CorpVetting');
+export const loadVettingRequest = named(() => import('@/routes/VettingRequest'), 'VettingRequest');
+export const loadApply = named(() => import('@/routes/Apply'), 'Apply');
 export const loadMarket = named(() => import('@/routes/Market'), 'Market');
 export const loadWallet = named(() => import('@/routes/Wallet'), 'Wallet');
 export const loadMoonMiningTax = named(() => import('@/routes/MoonMiningTax'), 'MoonMiningTax');
@@ -228,6 +231,8 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/corp/moons': loadCorpMoons,
   '/corp/srp': loadCorpSrp,
   '/srp': loadSrp,
+  '/corp/vetting': loadCorpVetting,
+  '/vetting': loadVettingRequest,
   '/corp/assets/*': loadCorpAssets,
   '/assets': loadAssets,
   '/mail': loadMail,

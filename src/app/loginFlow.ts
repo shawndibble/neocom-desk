@@ -4,6 +4,7 @@ import {
   startCorpSyncLogin,
   startFeederGrantLogin,
   startOwnCorpGrantLogin,
+  startVettingLogin,
   startLogin,
   scopesForRetry,
   takeRetryBudget,
@@ -142,6 +143,17 @@ export async function beginCorpSyncLogin(
 }
 
 /**
+ * One EVE sign-in for a Vetting report: exactly `VETTING_SCOPES`, for whichever character the
+ * pilot picks on EVE's page, returning to the page it was pressed on (`/apply/<corp>` or
+ * `/vetting`). The callback keeps the access token in memory only and discards the refresh
+ * token; see `auth/session.ts` `completeVettingLogin`.
+ */
+export async function beginVettingLogin(corporationId: number, reviewId?: string): Promise<void> {
+  rememberThisPage();
+  assignLocation(await startVettingLogin(corporationId, reviewId));
+}
+
+/**
  * Grant a moon owner's ledger to an accounting corporation (ADR 0025 amendment):
  * a separate SSO round trip where the player picks the Accountant Character on
  * EVE's login screen, returning to the page it was pressed on.
@@ -191,6 +203,10 @@ function rememberThisPage(): void {
  * `/corp-tax-book/verify`, where a guest signs in as the character they are
  * confirming into a grouping and returns to the Statement (#4210), and
  * `/corp-tax-book/remove-now`, where a payee signs in and returns to the link (#4520).
+ *
+ * `/apply` is deliberately absent: its vetting sign-ins stash the page themselves
+ * (`beginVettingLogin`), and its "Open Neocom Desk" button is an ordinary Add Character that
+ * must not land back on the application after an abandoned sign-in left a stash.
  */
 const LANDING_KEEPING_ROUTES = [
   '/login',

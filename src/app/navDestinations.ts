@@ -101,7 +101,9 @@ export type CorpViewCapability =
   | 'canReadMiningLedger'
   | 'canReadRoleAudit'
   | 'canManageSrp'
-  | 'canConfigureSrp';
+  | 'canConfigureSrp'
+  | 'canVet'
+  | 'canConfigureVetting';
 
 export interface NavSubView {
   readonly path: AppRoutePath;
@@ -210,6 +212,16 @@ export const NAV_PAGES = [
     conditionalTabs: { queue: 'srp' },
     // Settings is for Directors (`srpViews.ts`).
     corpTabCapabilities: { settings: 'canConfigureSrp' },
+  },
+  {
+    path: '/corp/vetting',
+    labelKey: 'nav.corpVetting',
+    group: 'corp',
+    gating: 'corp',
+    mobileTab: false,
+    corpCapability: 'canVet',
+    // Settings is for Directors (`VettingPage`).
+    corpTabCapabilities: { settings: 'canConfigureVetting' },
   },
   {
     path: '/skills',

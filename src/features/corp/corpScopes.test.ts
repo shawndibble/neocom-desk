@@ -90,8 +90,9 @@ describe('the required scope set', () => {
     const scopes = requiredFor(['Director']);
     expect(new Set(scopes).size).toBe(scopes.length);
     // Not one per capability: a capability may need more than one scope, and a
-    // scope may serve more than one capability (corpScopes.ts).
-    expect(scopes.length).toBeGreaterThanOrEqual(CORP_CAPABILITIES.length - 2);
+    // scope may serve more than one capability (corpScopes.ts). SRP's two and
+    // Vetting's two are role checks on the roles scope, which adds none.
+    expect(scopes.length).toBeGreaterThanOrEqual(CORP_CAPABILITIES.length - 4);
   });
 });
 
@@ -302,6 +303,22 @@ describe('corpGrantCoverage', () => {
     expect(coverage.capabilities.canReadRoleAudit).toBe(false);
     expect(coverage.capabilities.canManageSrp).toBe(true);
     expect(coverage.capabilities.canConfigureSrp).toBe(true);
+  });
+
+  it('opens Vetting on the roles scope alone, additively', () => {
+    expect(CORP_SCOPES_FOR_CAPABILITY.canVet).toEqual([ROLES]);
+    expect(CORP_SCOPES_FOR_CAPABILITY.canConfigureVetting).toEqual([ROLES]);
+    const TITLES = 'esi-corporations.read_titles.v1';
+    const coverage = corpGrantCoverage(
+      corpCapabilities(['Director']),
+      scopesForGroup('corp').filter((scope) => scope !== TITLES)
+    );
+    expect(coverage.capabilities.canVet).toBe(true);
+    expect(coverage.capabilities.canConfigureVetting).toBe(true);
+    const recruiter = corpGrantCoverage(corpCapabilities(['Personnel_Manager']), [ROLES]);
+    expect(recruiter.blocking).toBe(false);
+    expect(recruiter.capabilities.canVet).toBe(true);
+    expect(recruiter.capabilities.canConfigureVetting).toBe(false);
   });
 
   it('keeps a Station_Manager’s older grant ready when only the skyhook scope is missing (#4775)', () => {

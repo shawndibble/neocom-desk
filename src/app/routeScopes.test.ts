@@ -132,6 +132,7 @@ describe('every route must declare its scope requirement', () => {
     expect(literalPaths.sort()).toEqual([
       '*',
       '/',
+      '/apply/:corpId',
       '/callback',
       '/communities/join/:code',
       '/corp-tax-book/remove-now/:code',

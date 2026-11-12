@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { addCharacter } from '@/features/character/addCharacter';
 import {
   LoginError,
+  completeVettingLogin,
   loginIntentFor,
   clearLoginIntent,
   clearLoginRecovery,
@@ -32,6 +33,10 @@ import {
   type CorpSyncCallbackState,
   type CorpSyncGrantOutcome,
 } from '@/features/corp/taxBook/syncGrant';
+import type {
+  VettingCallbackState,
+  VettingLoginOutcome,
+} from '@/features/corp/vetting/vettingLoginState';
 import { beginAddCharacterLogin, retryLastLogin, retryLastLoginOnce } from '@/app/loginFlow';
 import { Button, NeedsConnection, Panel, Spinner } from '@/components/ui';
 import { isOfflineFailure } from '@/esi/client';
@@ -183,6 +188,34 @@ export function Callback() {
             reason: callableErrorReason(error) ?? 'unknown',
           };
         })
+        .then(land);
+      return;
+    }
+
+    // A Vetting sign-in reads one character for a corp's report: no Character is added and
+    // nothing is stored. The access token goes back to the page in router state (memory only);
+    // `completeVettingLogin` has already dropped the refresh token.
+    if (alertsIntent?.kind === 'vetting') {
+      const land = (vettingLogin: VettingLoginOutcome) => {
+        navigate(takeLoginReturnTo() ?? `/apply/${alertsIntent.corporationId}`, {
+          replace: true,
+          state: { vettingLogin } satisfies VettingCallbackState,
+        });
+      };
+      if (ssoError || !code || !state) {
+        land({ status: 'cancelled' });
+        return;
+      }
+      void completeVettingLogin({ code, state })
+        .then(
+          ({ accessToken, characterId, name }): VettingLoginOutcome => ({
+            status: 'ok',
+            accessToken,
+            characterId,
+            name,
+          }),
+          (): VettingLoginOutcome => ({ status: 'failed' })
+        )
         .then(land);
       return;
     }
