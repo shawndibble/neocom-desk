@@ -9,6 +9,7 @@ import {
   mergeFeedRecord,
   dismissFeedEntries,
   rowsWithinSyncWindow,
+  isDeviceLocalFeedRow,
   FEED_SYNC_WINDOW_MAX_ROWS,
   FEED_SYNC_WINDOW_MS,
   rowSuppressesToast,
@@ -501,5 +502,12 @@ describe('deleteFeedForCharacter', () => {
     const feed = await readFeed();
     expect(feed).toHaveLength(1);
     expect(feed[0].characterId).toBe(2);
+  });
+});
+
+describe('isDeviceLocalFeedRow', () => {
+  it('keeps a dead-login alert on this device, and nothing else', () => {
+    expect(isDeviceLocalFeedRow({ eventId: 'characterNeedsLogin' })).toBe(true);
+    expect(isDeviceLocalFeedRow({ eventId: 'shipLost' })).toBe(false);
   });
 });

@@ -16,6 +16,7 @@ import {
 import {
   createSrpMemberFixture,
   SRP_FIXTURE_CORPORATION_ID,
+  srpPublicInfoRoutes,
   type SrpFixtureOptions,
 } from '@/storybook/srpMemberFixture';
 import { CorpSrp } from './CorpSrp';
@@ -80,6 +81,7 @@ const ROLES: Record<SrpFixtureRole, string[]> = {
 
 let role: SrpFixtureRole = 'director';
 const routes = (): FixtureRoute[] => [
+  ...srpPublicInfoRoutes(),
   {
     path: /^\/characters\/\d+\/roles$/,
     respond: () => ({ body: { roles: ROLES[role] } }),

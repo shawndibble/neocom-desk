@@ -36,6 +36,7 @@
     "corpMembers": "Members",
     "corpWallet": "Corp Wallet",
     "corpAssets": "Corp Assets",
+    "corpStructures": "Structures",
     "corpMoons": "Moons",
     "corpSrp": "SRP",
     "corpVetting": "Vetting",
@@ -4901,6 +4902,8 @@
       "alerts": "Alerts"
     },
     "activeLabel": "Active",
+    "logInAgain": "Log in again",
+    "logInAgainFor": "Log in again as {{name}}",
     "spLabel": "SP",
     "walletLabel": "ISK",
     "acceleratorManual": "+{{bonus}} · {{left}}",
@@ -4976,8 +4979,15 @@
       "spReady": "SP ready",
       "alerts": "Alerts",
       "starred": "Starred",
-      "achievement": "Title / Score"
+      "achievement": "Title / Score",
+      "corpRoles": "Corporation roles",
+      "corpAccess": "Corporation access",
+      "alertsWhenClosed": "Alerts when closed"
     },
+    "corpRolesNotGranted": "Not granted",
+    "corpAccessReady": "Ready",
+    "corpAccessMissing": "Missing access ({{count}})",
+    "corpAccessMissingUnknown": "Missing access",
     "jobSlotCategory": {
       "manufacturing": "Mfg",
       "science": "Sci",
@@ -5847,15 +5857,6 @@
           "fuel": "Fuel left",
           "state": "State",
           "timer": "Timer"
-        },
-        "detail": {
-          "unanchors": "Unanchors in",
-          "services": "Services",
-          "serviceState": {
-            "online": "Online",
-            "offline": "Offline",
-            "cleanup": "Going offline"
-          }
         }
       },
       "moonChunks": {
@@ -6959,6 +6960,8 @@
       "title": "At war with {{name}}",
       "titleMore_one": "At war with {{name}} and {{count}} more",
       "titleMore_other": "At war with {{name}} and {{count}} more",
+      "corporations_one": "{{count}} of your corporations is at war",
+      "corporations_other": "{{count}} of your corporations are at war",
       "declared": "Declared {{age}}",
       "startsIn": "Starts in {{time}}",
       "notStarted": "Not started yet"
@@ -6966,6 +6969,7 @@
     "modal": {
       "title_one": "War declared",
       "title_other": "{{count}} wars declared",
+      "against": "Against {{name}}",
       "active": "Active",
       "startsIn": "Starts in {{time}}",
       "pendingUnknown": "Not started",
@@ -9168,6 +9172,12 @@
     "csvImportant": "Important",
     "csvProjected": "Projected",
     "csvId": "ID",
+    "csvCorporation": "Corporation",
+    "corpFilter": {
+      "title": "Corporation events",
+      "all": "All corporations",
+      "none": "Hide corporation events"
+    },
     "downloadIcs": "Download .ics",
     "addToGoogleCalendar": "Add to Google Calendar",
     "rsvpGrantTitle": "Permission to respond to events",
@@ -9204,7 +9214,10 @@
       "industryJob": "Industry jobs",
       "planetExtraction": "Planets",
       "mercenaryDen": "Mercenary dens",
+      "structureTimer": "Structure timers",
+      "structureFuel": "Structure fuel",
       "moonChunk": "Moon chunks",
+      "corpJob": "Corp industry jobs",
       "skyhookRaid": "Skyhook raids",
       "contractExpiry": "Contracts",
       "orderExpiry": "Market orders",
@@ -9214,6 +9227,24 @@
       "moonChunk": {
         "arrival": "arrives",
         "decay": "decays if not fractured"
+      },
+      "structureTimer": {
+        "anchor_vulnerable": "anchor vulnerability ends",
+        "anchoring": "anchoring ends",
+        "armor_reinforce": "armor reinforcement ends",
+        "armor_vulnerable": "armor vulnerability ends",
+        "deploy_vulnerable": "deployment vulnerability ends",
+        "fitting_invulnerable": "fitting invulnerability ends",
+        "hull_reinforce": "hull reinforcement ends",
+        "hull_vulnerable": "hull vulnerability ends",
+        "onlining_vulnerable": "onlining vulnerability ends",
+        "shield_vulnerable": "shield vulnerability ends",
+        "unanchoring": "unanchors",
+        "unknown": "timer ends"
+      },
+      "corpJob": {
+        "active": "in progress",
+        "ready": "ready to deliver"
       },
       "skyhookRaid": {
         "upcoming": "raid window opens",
@@ -12409,6 +12440,10 @@
         "bodyHangar_one": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} is in your hangar there.",
         "bodyHangar_other": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} are in your hangar there."
       },
+      "characterNeedsLogin": {
+        "title": "Log in again",
+        "body": "{{character}} needs to log in again. Its alerts have stopped."
+      },
       "shipLost": {
         "title": "Ship lost",
         "lostShip": "Lost your {{ship}}",
@@ -13291,7 +13326,8 @@
       "compareHubsTitle": "Compare hubs",
       "appraiseAtHub": "Appraise at {{hub}}",
       "copyTotal": "Copy {{amount}}",
-      "copyCardTotal": "{{title}}: copy {{short}} ISK ({{full}})",
+      "copyCardTotal": "Copy {{title}} total, {{amount}}",
+      "copyCardSecond": "Copy {{title}}: {{label}}, {{amount}}",
       "copiedAmount": "Copied {{amount}}",
       "totalFull": "{{full}} ISK ({{short}})",
       "copiedToClipboard": "Copied to clipboard",
@@ -14755,7 +14791,8 @@
         "communityRequestPledged": "Pledge on your Request",
         "vettingShared": "New vetting report",
         "priceAlertTriggered": "Quickbar price alert",
-        "shipLost": "Ship lost"
+        "shipLost": "Ship lost",
+        "characterNeedsLogin": "Character needs to log in again"
       },
       "vettingSharedHint": "Sent when a pilot shares a report with your corporation. Reaches reviewers who opened Vetting in the last 30 days.",
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Planetary Industry always shows the real expiry.",
@@ -15176,6 +15213,71 @@
     "emptyHint": "Data ages appear here once the app fetches something from EVE's servers."
   },
   "corp": {
+    "structures": {
+      "title": "Structures",
+      "refresh": "Refresh structures",
+      "searchPlaceholder": "Search structure, system or corporation…",
+      "corpFilterLabel": "Corporation",
+      "corpFilterAll": "All corporations",
+      "problemsOnly": "Problems only",
+      "problemsOnlyHint": "Structures with a timer running, low fuel or a service offline",
+      "noFilterMatches": "No structure matches these filters",
+      "noFilterMatchesHint": "Clear the search or a filter to see more.",
+      "empty": "No structures",
+      "emptyHint": "The corporations you can read have no structures anchored.",
+      "noAccessTitle": "No corporation's structures to show",
+      "noAccessHint": "None of your Characters can read a corporation's structures. EVE opens them to a Director or Station Manager.",
+      "loadFailedHint": "EVE did not send the structure list. Try again in a moment.",
+      "partlyFailed": "One or more corporations could not be read; their structures are missing.",
+      "col": {
+        "corp": "Corporation",
+        "structure": "Structure",
+        "type": "Type",
+        "system": "System",
+        "fuel": "Fuel",
+        "state": "State",
+        "timer": "Timer",
+        "services": "Services",
+        "unanchoring": "Unanchoring",
+        "blocks": "Fuel blocks",
+        "needed": "Needed"
+      },
+      "fuelPlan": {
+        "until": "Fuel until",
+        "blocksHint": "Fuel blocks in the structure's fuel bay, and how many it burns a day",
+        "neededHint": "Fuel blocks to add so the structure stays fuelled to the end of the Fuel until date (EVE time)",
+        "perDay": "{{rate}}/day",
+        "noBayAccess": "Not readable",
+        "noBayAccessHint": "Fuel blocks come from the corporation's assets. EVE opens them only to a Director, and a failed read leaves them out too. Structures marked Not readable show time left only.",
+        "total_one": "Total {{blocks}} block · {{volume}} m³",
+        "total_other": "Total {{blocks}} blocks · {{volume}} m³",
+        "unknown_one": "{{count}} structure unknown",
+        "unknown_other": "{{count}} structures unknown",
+        "copy": "Copy list",
+        "copied": "Copied",
+        "copyFailed": "Copy failed",
+        "copyLine_one": "{{structure}} ({{system}}): {{blocks}} fuel block",
+        "copyLine_other": "{{structure}} ({{system}}): {{blocks}} fuel blocks",
+        "copyTotal_one": "Total to {{date}}: {{blocks}} fuel block, {{volume}} m³",
+        "copyTotal_other": "Total to {{date}}: {{blocks}} fuel blocks, {{volume}} m³"
+      },
+      "servicesOnline_one": "{{count}} online",
+      "servicesOnline_other": "{{count}} online",
+      "servicesNone": "None",
+      "detail": {
+        "eveTime": "{{time}} EVE",
+        "localTime": "{{time}} local",
+        "services": "Services",
+        "moonExtraction": "Moon extraction",
+        "chunkArrives": "Chunk arrives",
+        "naturalDecay": "Natural decay",
+        "serviceState": {
+          "online": "Online",
+          "offline": "Offline",
+          "cleanup": "Going offline"
+        }
+      }
+    },
     "rolesUnavailable": "Can't check your corporation roles right now",
     "rolesUnavailableHint": "Neocom Desk reads your roles from EVE, and none are saved on this device yet. Try again, or connect if you're offline. It will retry when you're back online.",
     "title": "Corporation",
@@ -18614,6 +18716,7 @@
         },
         "refineries_one": "{{count}} refinery",
         "refineries_other": "{{count}} refineries",
+        "nothingSeen": "No mining or extraction seen yet",
         "synced": "Synced {{age}}",
         "cantReadSince": "Can't read their ledger since {{date}}",
         "since": "since {{date}}",
@@ -19209,6 +19312,7 @@
       "hintText": "Dotted underline: has a tooltip (HintText)",
       "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
       "missingGrantMark": "Red slashed broadcast icon: this row needs a grant the Character lacks",
+      "needsLogin": "Small warning \"Log in again\" button on a Character: its login is dead; press to log in again",
       "channelOff": "Greyed checkbox that keeps its tick: its channel is off",
       "figureHistory": "Small dim glyph after a figure: click or tap for its history in a popover",
       "figureBreakdown": "Dashed underline on a figure: click or tap opens how it is worked out",

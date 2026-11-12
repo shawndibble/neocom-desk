@@ -50,6 +50,7 @@ const ROUTE_TITLE_KEYS = {
   '/corp/members': ['corp.members.title'],
   '/corp/wallet': ['corp.wallet.title'],
   '/corp/assets': ['nav.corpAssets'],
+  '/corp/structures': ['nav.corpStructures'],
   '/corp/moons': ['corp.moons.title'],
   '/corp/srp': ['nav.corpSrp'],
   '/corp/vetting': ['nav.corpVetting'],

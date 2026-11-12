@@ -386,8 +386,10 @@ here — they go one per file in `docs/context/decisions/`.
   kick). Acknowledging it dismisses the whole danger type. Nothing else raises
   it.
 - **War banner**: The red strip under the Overview's and the Corp Board's
-  header while the pilot's corporation, or its alliance, has a war declared on
-  it that is running or not yet started. Pressing it opens the war in a modal.
+  header while any corporation the account's Characters are in, or its
+  alliance, has a war declared on it that is running or not yet started. With
+  several of them at war it counts the corporations, and the modal groups the
+  wars by the corporation each is on. Pressing it opens the war in a modal.
   Unlike the **Danger banner** it is not an **Alert** and is not acknowledged: it
   ends when the war does. A war the corporation declared itself never shows.
 - **Dark**: A member with no login for the corp's inactivity span or more —

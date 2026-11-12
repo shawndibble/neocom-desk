@@ -171,6 +171,9 @@ export function stockFixtureRoutes(): FixtureRoute[] {
       respond: () => ({ body: { solar_system_id: 30002659, station_id: DODIXIE } }),
     },
     { path: at('/skills'), respond: () => ({ body: { skills: [], total_sp: 0 } }) },
+    // Read beside the skills on a slow runner (fee standings, clone implants): none of either.
+    { path: at('/standings/'), respond: () => ({ body: [] }) },
+    { path: at('/implants'), respond: () => ({ body: [] }) },
     {
       path: at('/assets'),
       respond: ({ url }) => ({

@@ -265,6 +265,8 @@ export interface SyncExtraction {
   surveyId?: string;
   /** Set by an officer once the chunk is mined out (#5257); absent when not flagged. */
   fullyMined?: { by: number; byName: string; at: string };
+  /** The moon owner whose grant read it (#6097); absent means the book's own corporation. */
+  sourceCorporationId?: number;
 }
 
 export const extractionId = (x: Pick<SyncExtraction, 'structureId' | 'extractionStartTime'>) =>

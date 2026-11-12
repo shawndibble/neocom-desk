@@ -22,6 +22,7 @@ const PINNED = [
   'assetsItemSort',
   'assetsRoutePreference',
   'assetsStationSort',
+  'calendarCorpFilter',
   'calendarHiddenKinds',
   'calendarView',
   'characterFilterPicks',

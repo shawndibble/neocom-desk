@@ -49,6 +49,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'incursionNearby',
       'skyhookRaidableNearby',
       'shipLost',
+      'characterNeedsLogin',
       'communityJoinRequest',
       'communityMemberJoined',
       'communityRequestPledged',

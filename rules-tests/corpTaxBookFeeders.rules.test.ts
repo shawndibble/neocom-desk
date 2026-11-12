@@ -4,7 +4,16 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
+import {
+  collection,
+  deleteDoc,
+  deleteField,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore';
 import { characterAuth, createRulesEnv } from './testEnv';
 
 // Collector books (issue #4507): a client never writes a feeder record, an invite
@@ -27,7 +36,8 @@ beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
-    await setDoc(doc(db, RECORD), { status: 'active' });
+    // `extractionsRefusedAt` (#6097) is server-written like the rest of the record.
+    await setDoc(doc(db, RECORD), { status: 'active', extractionsRefusedAt: 1 });
     await setDoc(doc(db, PAYOUT), { amount: 1 });
     await setDoc(doc(db, INVITE), { collectorCorporationId: 98000001 });
     await setDoc(doc(db, POINTER), { collectorCorporationId: 98000001 });
@@ -79,6 +89,13 @@ describe('feeder paths', () => {
     await assertSucceeds(getDoc(doc(characterAuth(env, OFFICER, 'h').firestore(), RECORD)));
     await assertFails(getDoc(doc(characterAuth(env, 2, 'h').firestore(), RECORD)));
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), RECORD)));
+  });
+
+  // Issue #6097: the remembered Extractions refusal is the server's, like the rest of the record.
+  it.each(clients)('denies %s setting or clearing the Extractions refusal', async (_n, ctx) => {
+    const db = ctx(env);
+    await assertFails(updateDoc(doc(db, RECORD), { extractionsRefusedAt: 2 }));
+    await assertFails(updateDoc(doc(db, RECORD), { extractionsRefusedAt: deleteField() }));
   });
 
   it.each(clients)('denies %s every write to a payout', async (_n, ctx) => {

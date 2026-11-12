@@ -7,6 +7,9 @@ import { isPiExpired, type AttentionEntry } from './rosterAttention';
 import { placeLabel, type CharacterWhereabouts } from './characterWhereabouts';
 import { achievementCsvColumns } from './achievementCsv';
 import type { AchievementLookup } from './useCharacterAchievements';
+import type { CorpStanding } from '@/features/corp/corpStanding';
+import { rolesText } from '@/features/corp/roles';
+import type { AlertsRowState } from '@/features/notifications/alertsGrant';
 
 /** The slice of a Characters-table row the export reads (the route's `CharacterRow` satisfies it). */
 export interface CharacterCsvRow {
@@ -23,6 +26,9 @@ export interface CharacterCsvRow {
   spFarm: boolean;
   /** Docked place and hull; undefined until read (the read only runs while its columns show). */
   whereabouts: CharacterWhereabouts | undefined;
+  /** Undefined until read (the read only runs while a corp column shows). */
+  corpStanding: CorpStanding | undefined;
+  alertsWhenClosed: AlertsRowState;
 }
 
 const JOB_SLOT_CATEGORIES: readonly JobSlotCategory[] = ['manufacturing', 'science', 'reaction'];
@@ -53,6 +59,8 @@ export function charactersCsvColumns(
     extractionNet,
     achievements,
     lastSynced,
+    corpColumns = false,
+    alertsWhenClosedColumn = false,
     now = Date.now,
   }: {
     groupNameById: ReadonlyMap<string, string>;
@@ -64,6 +72,10 @@ export function charactersCsvColumns(
     achievements: AchievementLookup;
     /** The route's one "how stale is this character" rule, shared with its card and table. */
     lastSynced: (row: CharacterCsvRow) => Date | undefined;
+    /** Corporation roles and access: only while one shows, since only then are roles read. */
+    corpColumns?: boolean;
+    /** Alerts when closed: only with a sync backend, as in the table. */
+    alertsWhenClosedColumn?: boolean;
     /** The clock PI expiry is read against, at export time. Injected for tests. */
     now?: () => number;
   }
@@ -164,6 +176,40 @@ export function charactersCsvColumns(
         ]
       : []),
     { header: t('characters.column.alerts'), value: (row) => row.alertCount },
+    ...(corpColumns
+      ? [
+          {
+            header: t('characters.column.corpRoles'),
+            value: (row) => {
+              const standing = row.corpStanding;
+              if (standing?.kind === 'notGranted') return t('characters.corpRolesNotGranted');
+              return standing?.kind === 'roles'
+                ? (rolesText(standing.roles) ?? undefined)
+                : undefined;
+            },
+          } satisfies CsvColumn<CharacterCsvRow>,
+          {
+            header: t('characters.column.corpAccess'),
+            value: (row) => {
+              const standing = row.corpStanding;
+              if (standing?.kind === 'notGranted') return t('characters.corpAccessMissingUnknown');
+              if (standing?.kind !== 'roles') return undefined;
+              return standing.missingScopes === 0
+                ? t('characters.corpAccessReady')
+                : t('characters.corpAccessMissing', { count: standing.missingScopes });
+            },
+          } satisfies CsvColumn<CharacterCsvRow>,
+        ]
+      : []),
+    ...(alertsWhenClosedColumn
+      ? [
+          {
+            header: t('characters.column.alertsWhenClosed'),
+            value: (row) =>
+              t(`settings.notifications.alertsWhenClosed.state.${row.alertsWhenClosed}`),
+          } satisfies CsvColumn<CharacterCsvRow>,
+        ]
+      : []),
     {
       header: t('characters.column.starred'),
       value: (row) => (row.starred ? t('characters.column.starred') : undefined),

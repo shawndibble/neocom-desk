@@ -141,6 +141,12 @@ export const ROUTE_REQUIREMENTS = {
    */
   '/corp/members': UNGATED,
   /**
+   * UNGATED for the same reasons as `/corp/members`: `canReadStructures` is an
+   * in-game role, and the page reads every corporation any stored Character can
+   * read (issue #6089), not only the active one's.
+   */
+  '/corp/structures': UNGATED,
+  /**
    * UNGATED for the same reasons as `/corp/members`: `canReadWallet` is an
    * in-game role, so a scope declaration here would offer a re-login for a
    * permission no login can grant.

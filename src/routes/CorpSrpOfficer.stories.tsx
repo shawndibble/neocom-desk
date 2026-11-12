@@ -8,6 +8,7 @@ import { setSrpOfficerBackendOverride } from '@/features/corp/srpOfficerBackendO
 import type { FixtureRoute } from '@/storybook/fixtureFetch';
 import { SAMPLE_CHARACTERS } from '@/storybook/sampleData';
 import { createSrpFixture, type SrpFixtureRole } from '@/storybook/srpFixture';
+import { srpPublicInfoRoutes } from '@/storybook/srpMemberFixture';
 import { createSrpOfficerFixture, type SrpOfficerScenario } from '@/storybook/srpOfficerFixture';
 import { CorpSrp } from './CorpSrp';
 
@@ -19,6 +20,9 @@ const ROLES: Record<SrpFixtureRole, string[]> = {
 
 let role: SrpFixtureRole = 'director';
 const routes = (): FixtureRoute[] => [
+  ...srpPublicInfoRoutes(
+    (id) => SAMPLE_CHARACTERS.find((c) => c.characterId === id)?.corporationId ?? 1
+  ),
   { path: /^\/characters\/\d+\/roles$/, respond: () => ({ body: { roles: ROLES[role] } }) },
 ];
 

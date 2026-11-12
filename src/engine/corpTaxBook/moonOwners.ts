@@ -84,6 +84,8 @@ export interface MoonOwnerSummary {
   balanceKind: BalanceDisplay['kind'];
   balanceIsk: number;
   refineryCount: number;
+  /** The refineries behind `refineryCount`; absent on a summary built before #6097. */
+  refineryIds?: readonly number[];
   /** Covered, billable days the server could not price; the entry path prices them again. */
   unpricedDays: number;
 }
@@ -102,6 +104,8 @@ export interface MoonOwnersInput {
   feeders: readonly MoonOwnerFeeder[];
   /** Each moon owner's view summary, by corporation id; absent where it was not read. */
   summaries?: ReadonlyMap<number, MoonOwnerSummary>;
+  /** The refineries with an Extraction, by the moon owner that reads them (`extractionRefineriesOf`). */
+  extractionRefineries?: ReadonlyMap<number, ReadonlySet<number>>;
   /** The day's unit prices, by raw type id. */
   pricesOn: (date: string) => ReadonlyMap<number, number>;
 }
@@ -111,7 +115,10 @@ export interface MoonOwnerRow {
   id: string;
   corporationId: number;
   status: MoonOwnerStatus;
+  /** Refineries in its ledger rows or its Extractions. */
   refineryCount: number;
+  /** No ledger row and no Extraction yet: the row says so instead of "0 refineries". */
+  nothingSeen?: true;
   /** Ore value at 100% over their covered days. */
   mined: number;
   /** First covered day. */
@@ -144,6 +151,46 @@ export interface MoonOwnerTotals {
 }
 
 export { deriveModeChanges, deriveOwnerRateHistory };
+
+/** Each moon owner's refineries that have an Extraction, from the book's stored Extractions. */
+export function extractionRefineriesOf(
+  extractions: readonly { structureId: number; sourceCorporationId?: number }[]
+): Map<number, Set<number>> {
+  const out = new Map<number, Set<number>>();
+  for (const x of extractions) {
+    if (x.sourceCorporationId === undefined) continue;
+    const held = out.get(x.sourceCorporationId);
+    if (held) held.add(x.structureId);
+    else out.set(x.sourceCorporationId, new Set([x.structureId]));
+  }
+  return out;
+}
+
+/** A moon owner's refineries: those in its ledger rows and those with an Extraction. */
+function refineriesSeen(
+  input: MoonOwnersInput,
+  feederId: number,
+  ledger: Iterable<number>
+): Pick<MoonOwnerRow, 'refineryCount' | 'nothingSeen'> {
+  const all = new Set(ledger);
+  for (const id of input.extractionRefineries?.get(feederId) ?? []) all.add(id);
+  return seen(all.size);
+}
+
+const seen = (count: number): Pick<MoonOwnerRow, 'refineryCount' | 'nothingSeen'> => ({
+  refineryCount: count,
+  ...(count === 0 ? { nothingSeen: true as const } : {}),
+});
+
+/** The same from a summary; one from before it kept the ids can only say the larger of the two counts. */
+function refineriesSeenInSummary(
+  input: MoonOwnersInput,
+  feederId: number,
+  s: MoonOwnerSummary
+): Pick<MoonOwnerRow, 'refineryCount' | 'nothingSeen'> {
+  if (s.refineryIds) return refineriesSeen(input, feederId, s.refineryIds);
+  return seen(Math.max(s.refineryCount, input.extractionRefineries?.get(feederId)?.size ?? 0));
+}
 
 const paidOf = (payouts: readonly MoonOwnerPayout[]) =>
   payouts.reduce((sum, p) => (p.notAPayout ? sum : sum + p.amount), 0);
@@ -275,7 +322,7 @@ function workFromSummary(
     id: String(f.corporationId),
     corporationId: f.corporationId,
     status: statusOf(f, settledNow, rate?.pct),
-    refineryCount: s.refineryCount,
+    ...refineriesSeenInSummary(input, f.corporationId, s),
     mined: s.minedValueIsk,
     ...(froms[0] !== undefined ? { since: froms[0] } : {}),
     ...(until !== undefined ? { until } : {}),
@@ -361,7 +408,11 @@ function work(
       id: String(f.corporationId),
       corporationId: f.corporationId,
       status: statusOf(f, settledNow, rate?.pct),
-      refineryCount: new Set(own.map((e) => e.structureId)).size,
+      ...refineriesSeen(
+        input,
+        f.corporationId,
+        own.map((e) => e.structureId)
+      ),
       mined,
       ...(froms[0] !== undefined ? { since: froms[0] } : {}),
       ...(until !== undefined ? { until } : {}),

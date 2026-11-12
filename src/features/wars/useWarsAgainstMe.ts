@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { warsAgainst, type StoredWar, type WarAgainstMe } from '@/engine/wars';
+import { useCharacters } from '@/features/character/useCharacters';
+import { warsAgainst, type StoredWar, type WarAgainstMe, type WarEntityIds } from '@/engine/wars';
 import { useNow } from '@/lib/useNow';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { ACTIVE_WARS_POLL_MS, loadActiveWars } from './activeWars';
@@ -9,15 +10,24 @@ import { useWarDeclaredNotice } from './useWarDeclaredNotice';
 const NONE: readonly StoredWar[] = [];
 const NO_HITS: readonly WarAgainstMe[] = [];
 
+export interface WarsAgainstAccount {
+  wars: readonly WarAgainstMe[];
+  /** How many distinct corporations the account's Characters are in. */
+  corporations: number;
+}
+
 /**
- * The wars still running against a Character's corporation or alliance, newest
- * first with the active ones ahead of any not yet started. Empty while
- * loading, offline, or while the Character's corporation is not known yet.
+ * The wars still running against any corporation (or alliance) the account's
+ * Characters are in: the active Character's own first, then the rest, each
+ * newest first with the active ones ahead of any not yet started. Empty while
+ * loading, offline, or while no corporation is known yet.
  */
-export function useWarsAgainstMe(characterId: number): readonly WarAgainstMe[] {
+export function useWarsAgainstMe(characterId: number): WarsAgainstAccount {
   const now = useNow();
-  const info = usePublicInfo((state) => state.byCharacterId[characterId]);
+  const infoById = usePublicInfo((state) => state.byCharacterId);
   const loadPublicInfo = usePublicInfo((state) => state.load);
+  const loadManyPublicInfo = usePublicInfo((state) => state.loadMany);
+  const characters = useCharacters();
   const [listed, setListed] = useState<readonly StoredWar[]>(NONE);
   const [recent, setRecent] = useState<readonly StoredWar[]>(NONE);
   const noticed = useWarDeclaredNotice();
@@ -25,6 +35,15 @@ export function useWarsAgainstMe(characterId: number): readonly WarAgainstMe[] {
   useEffect(() => {
     void loadPublicInfo(characterId);
   }, [characterId, loadPublicInfo]);
+
+  // The alliance comes from public info; one batched read covers every other Character.
+  const otherIds = characters
+    .map((character) => character.characterId)
+    .filter((id) => id !== characterId);
+  const othersKey = otherIds.join(',');
+  useEffect(() => {
+    if (othersKey !== '') void loadManyPublicInfo(othersKey.split(',').map(Number));
+  }, [othersKey, loadManyPublicInfo]);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,10 +85,26 @@ export function useWarsAgainstMe(characterId: number): readonly WarAgainstMe[] {
     return [...byId.values()];
   }, [listed, recent]);
 
-  const corporationId = info?.corporationId;
-  const allianceId = info?.allianceId;
-  return useMemo(
-    () => (wars.length === 0 ? NO_HITS : warsAgainst(wars, { corporationId, allianceId }, now)),
-    [wars, corporationId, allianceId, now]
+  const parties = useMemo(() => {
+    const storedCorp = new Map(characters.map((c) => [c.characterId, c.corporationId]));
+    const byCorp = new Map<number, WarEntityIds>();
+    for (const id of [characterId, ...othersKey.split(',').filter(Boolean).map(Number)]) {
+      const info = infoById[id];
+      // The stored record knows the corporation without a fetch; public info adds the alliance.
+      const corporationId = info?.corporationId ?? storedCorp.get(id);
+      if (corporationId === undefined) continue;
+      const known = byCorp.get(corporationId);
+      if (known === undefined)
+        byCorp.set(corporationId, { corporationId, allianceId: info?.allianceId });
+      else known.allianceId ??= info?.allianceId;
+    }
+    // Map order is insertion order: the active Character's corporation stays first.
+    return [...byCorp.values()];
+  }, [characterId, characters, othersKey, infoById]);
+
+  const hits = useMemo(
+    () => (wars.length === 0 || parties.length === 0 ? NO_HITS : warsAgainst(wars, parties, now)),
+    [wars, parties, now]
   );
+  return { wars: hits, corporations: parties.length };
 }

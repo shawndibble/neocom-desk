@@ -3,6 +3,7 @@ import { db, type NotificationFeedRecord } from '@/db';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
 import {
   FEED_SYNC_WINDOW_MS,
+  isDeviceLocalFeedRow,
   mergeFeedRecord,
   rowsWithinSyncWindow,
   trimFeed,
@@ -139,7 +140,14 @@ export async function syncFeed(ctx: SyncContext): Promise<void> {
     .equals(ctx.characterId)
     .reverse()
     .sortBy('firedAt');
-  const pushEligible = new Set(rowsWithinSyncWindow(local, ctx.now).map((row) => row.id));
+  // A device-local event's rows are never introduced to sync, so no other
+  // device and no server copy ever holds them.
+  const pushEligible = new Set(
+    rowsWithinSyncWindow(
+      local.filter((row) => !isDeviceLocalFeedRow(row)),
+      ctx.now
+    ).map((row) => row.id)
+  );
 
   const plan = mergeFeed<NotificationFeedRecord, RemoteNotificationFeedDoc>(
     local,

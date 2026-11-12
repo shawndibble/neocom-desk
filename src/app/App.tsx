@@ -124,6 +124,7 @@ const FittingCompare = lazy(routeChunks.loadFittingCompare);
 const Corp = lazy(routeChunks.loadCorp);
 const CorpMembers = lazy(routeChunks.loadCorpMembers);
 const CorpAssets = lazy(routeChunks.loadCorpAssets);
+const CorpStructures = lazy(routeChunks.loadCorpStructures);
 const CorpMoons = lazy(routeChunks.loadCorpMoons);
 const CorpSrp = lazy(routeChunks.loadCorpSrp);
 const Srp = lazy(routeChunks.loadSrp);
@@ -245,6 +246,7 @@ const ROUTE_ELEMENTS = {
   '/corp/members': <CorpMembers />,
   '/corp/wallet': <CorpWallet />,
   '/corp/assets': <CorpAssets />,
+  '/corp/structures': <CorpStructures />,
   '/corp/moons': <CorpMoons />,
   '/corp/srp': <CorpSrp />,
   '/srp': <Srp />,

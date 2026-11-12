@@ -95,7 +95,8 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // to a page these types have.
   eveNotification: '/alerts',
   // Corp events (issue #299): each lands on the corp route that shows it.
-  structureFuelLow: '/corp',
+  // The Structures page (issue #6089) lists every fuel clock, soonest first.
+  structureFuelLow: '/corp/structures',
   skyhookRaidable: '/corp',
   // Not the corp board (issue #2302): that shows the job with nothing pointing
   // at it, and not at all once delivered. Active Jobs lists corp jobs and
@@ -115,6 +116,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   skyhookRaidableNearby: '/overview',
   // The Overview, whose Kills widget lists the loss (issue #4772).
   shipLost: '/overview',
+  characterNeedsLogin: '/characters',
   // The Communities page, where the admin lets the request in or sees the Member.
   communityJoinRequest: '/communities',
   communityMemberJoined: '/communities',

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
-import { focusRingClassName } from './controlStyles';
+import { focusRingClassName, hintCueClassName } from './controlStyles';
 import { Tooltip } from './Tooltip';
 
 interface HintTextProps {
@@ -91,7 +91,7 @@ export function HintText({
         className={cx(
           desktopOnly
             ? 'sm:cursor-help sm:underline sm:decoration-dotted sm:decoration-current/70 sm:underline-offset-2'
-            : 'cursor-help underline decoration-dotted decoration-current/70 underline-offset-2',
+            : cx('cursor-help', hintCueClassName),
           'rounded-xs',
           focusRingClassName,
           className

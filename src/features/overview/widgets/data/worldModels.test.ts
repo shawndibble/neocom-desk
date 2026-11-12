@@ -3,7 +3,8 @@ import type { BoardStructureSource } from '@/engine/corp/board';
 import { visibleColumns } from '../tableModel';
 import { buildView, feedsFor, feedsOf, kindHasAllFeeds } from './models';
 import { elapsedShare } from './industryModels';
-import { FUEL_BAR_HORIZON_MS, shortStructureName } from './structureModels';
+import { FUEL_BAR_HORIZON_MS } from './structureModels';
+import { shortStructureName } from '@/features/corp/structures/structureRows';
 import type { BuildContext, FeedState, Feeds, KindView, TableCell } from './types';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
@@ -338,6 +339,16 @@ describe('structures', () => {
     );
     const one = read(new Map([[500, { ticker: 'MAIN', name: 'Main Corporation' }]]));
     expect(one.columns.map((column) => column.key)).not.toContain('corp');
+  });
+
+  it('links its header and each row to the Structures page', () => {
+    const view = buildView('structures', feeds(fleet()), ctx());
+    expect(view.to).toBe('/corp/structures');
+    expect(view.table!.rows.map((row) => row.to).sort()).toEqual([
+      '/corp/structures?structure=1',
+      '/corp/structures?structure=2',
+      '/corp/structures?structure=3',
+    ]);
   });
 
   it('shortens a structure name by the system prefix', () => {

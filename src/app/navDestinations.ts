@@ -98,6 +98,7 @@ export type CorpViewCapability =
   | 'canReadMembers'
   | 'canReadWallet'
   | 'canReadAssets'
+  | 'canReadStructures'
   | 'canReadMiningLedger'
   | 'canReadRoleAudit'
   | 'canManageSrp'
@@ -192,6 +193,16 @@ export const NAV_PAGES = [
     gating: 'corp',
     mobileTab: false,
     corpCapability: 'canReadAssets',
+  },
+  {
+    // Any corporation the account can read counts, not only the active Character's
+    // (`useCorpViewCapabilities`): a holding corporation's director is often not the main.
+    path: '/corp/structures',
+    labelKey: 'nav.corpStructures',
+    group: 'corp',
+    gating: 'corp',
+    mobileTab: false,
+    corpCapability: 'canReadStructures',
   },
   {
     path: '/corp/moons',

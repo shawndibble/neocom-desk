@@ -237,3 +237,11 @@ export function toggleChipStateClassName(
   const off = 'border-line bg-panel-2 text-text-dim';
   return hoverable ? `${off} hover:border-line-bright hover:text-text active:bg-panel` : off;
 }
+
+/**
+ * The dotted "has a tooltip" underline on its own, for a label inside a
+ * pressable area whose tooltip sits on the area (DESIGN.md §6c): the label is
+ * not a trigger there, so it takes the cue without `HintText`'s focus stop.
+ */
+export const hintCueClassName =
+  'underline decoration-dotted decoration-current/70 underline-offset-2';

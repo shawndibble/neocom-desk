@@ -4,6 +4,7 @@ import {
   canPayMoonOwner,
   deriveModeChanges,
   deriveOwnerRateHistory,
+  extractionRefineriesOf,
   moonOwnerDetail,
   type MoonOwnerFeeder,
   type MoonOwnerPayout,
@@ -384,5 +385,37 @@ describe('a same-owner moon owner', () => {
   it('carries the flag into the detail, and a normal owner has none', () => {
     expect(moonOwnerDetail(input({ feeders: [mine] }), A)?.row.sameOwner).toBe(true);
     expect(buildMoonOwners(input()).rows[0]).not.toHaveProperty('sameOwner');
+  });
+});
+
+describe('refineries seen (#6097)', () => {
+  const extractions = extractionRefineriesOf([
+    { structureId: 10, sourceCorporationId: A },
+    { structureId: 11, sourceCorporationId: A },
+    { structureId: 30, sourceCorporationId: B },
+    // The book's own Extraction belongs to no moon owner.
+    { structureId: 99 },
+  ]);
+
+  it('counts the union of the ledger refineries and the Extraction refineries', () => {
+    // The ledger has refinery 10; the Extractions have 10 and 11.
+    const row = rowOf(input({ extractionRefineries: extractions }));
+    expect(row.refineryCount).toBe(2);
+    expect(row.nothingSeen).toBeUndefined();
+  });
+
+  it('counts a refinery nobody has mined at yet, and leaves Mined to the ledger', () => {
+    const row = rowOf(
+      input({ entries: [], feeders: [feeder(B)], extractionRefineries: extractions }),
+      B
+    );
+    expect(row).toMatchObject({ refineryCount: 1, mined: 0 });
+    expect(row.nothingSeen).toBeUndefined();
+  });
+
+  it('says nothing was seen yet for a corporation with no ledger row and no Extraction', () => {
+    const row = rowOf(input({ entries: [], extractionRefineries: new Map() }));
+    expect(row).toMatchObject({ refineryCount: 0, nothingSeen: true });
+    expect(rowOf(input({ entries: [] })).nothingSeen).toBe(true);
   });
 });

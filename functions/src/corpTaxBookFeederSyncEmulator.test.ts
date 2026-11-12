@@ -11,6 +11,7 @@ import {
   type CorpSyncGrantDoc,
 } from './corpSyncGrant.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
+import type { EsiExtractionLike } from './corpTaxBookSyncEngine.js';
 import type { EsiRead, StructureLookup, SyncEsi } from './corpTaxBookSyncEsi.js';
 
 const COLLECTOR = 98000001;
@@ -38,6 +39,10 @@ interface FakeEsi {
   mode: Map<number, 'ok' | 'forbidden' | 'throw' | 'unavailable'>;
   /** Per structure id: how its `/universe/structures` lookup answers. Default a name. */
   structure: Map<number, StructureLookup>;
+  /** Per feeder corporation: how its Extractions answer. Default none listed. */
+  extractions: Map<number, EsiRead<EsiExtractionLike[]>>;
+  /** Feeder corporations ESI lists no observer for: nobody has mined there yet. */
+  noObservers: Set<number>;
   calls: string[];
 }
 let esiState: FakeEsi;
@@ -48,7 +53,8 @@ const fakeEsi = (): SyncEsi => ({
     const mode = esiState.mode.get(corp) ?? 'ok';
     if (mode === 'throw') throw new Error('boom');
     if (mode === 'unavailable') return { kind: 'unavailable' };
-    return mode === 'forbidden' ? { kind: 'forbidden' } : ok([corp * 10]);
+    if (mode === 'forbidden') return { kind: 'forbidden' };
+    return ok(esiState.noObservers.has(corp) ? [] : [corp * 10]);
   },
   ledger: async (corp) => {
     esiState.calls.push(`ledger:${corp}`);
@@ -62,7 +68,10 @@ const fakeEsi = (): SyncEsi => ({
       },
     ]) as never;
   },
-  extractions: async () => (esiState.calls.push('extractions'), ok([])),
+  extractions: async (corp) => {
+    esiState.calls.push(`extractions:${corp}`);
+    return esiState.extractions.get(corp) ?? ok([]);
+  },
   notifications: async () => (esiState.calls.push('notifications'), ok([])),
   journal: async () => (esiState.calls.push('journal'), ok([])),
   structureSystem: async () => (esiState.calls.push('system'), ok(1)),
@@ -156,7 +165,13 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
     rotate = false;
     duringRefresh = undefined;
     revokedAtSso.length = 0;
-    esiState = { mode: new Map(), structure: new Map(), calls: [] };
+    esiState = {
+      mode: new Map(),
+      structure: new Map(),
+      extractions: new Map(),
+      noObservers: new Set(),
+      calls: [],
+    };
     await collectorBook().set({
       active: true,
       startDate: '2026-08-01',
@@ -249,10 +264,128 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
     expect(rec?.staleSince).toBeUndefined();
   });
 
-  it('only reads the observer list and ledgers: nothing the ledger-only grant cannot reach', async () => {
+  it('only reads the observer list, ledgers and Extractions: nothing the mining scope cannot reach', async () => {
     await addFeeder(98000002);
     await run();
-    expect(esiState.calls.filter((c) => !/^(observers|ledger)/.test(c))).toEqual([]);
+    expect(esiState.calls.filter((c) => !/^(observers|ledger|extractions)/.test(c))).toEqual([]);
+  });
+
+  it('a moon owner nobody has mined at keeps its Extraction in the book, tagged, health unchanged (#6097)', async () => {
+    await addFeeder(98000002);
+    esiState.noObservers.add(98000002);
+    esiState.extractions.set(
+      98000002,
+      ok([
+        {
+          structure_id: 7001,
+          moon_id: 40000001,
+          extraction_start_time: '2026-10-10T00:00:00Z',
+          chunk_arrival_time: '2026-10-24T00:00:00Z',
+          natural_decay_time: '2026-10-24T03:00:00Z',
+        },
+      ])
+    );
+    expect((await run()).feeders).toMatchObject({ read: 1, stale: 0 });
+    const stored = await collectorBook().collection('extractions').get();
+    expect(stored.docs.map((d) => d.data())).toEqual([
+      {
+        id: `7001_${Date.parse('2026-10-10T00:00:00Z')}`,
+        structureId: 7001,
+        moonId: 40000001,
+        extractionStartTime: '2026-10-10T00:00:00.000Z',
+        chunkArrivalTime: '2026-10-24T00:00:00.000Z',
+        naturalDecayTime: '2026-10-24T03:00:00.000Z',
+        sourceCorporationId: 98000002,
+      },
+    ]);
+    expect(await observedRows()).toEqual([]);
+    const rec = await feederRecord(98000002);
+    expect(rec).toMatchObject({ status: 'active', lastReadWellAt: T0 });
+    expect(rec?.staleSince).toBeUndefined();
+    expect(rec?.extractionsRefusedAt).toBeUndefined();
+    // Like its rows, a moon owner's Extraction is not the book's own sync.
+    expect((await collectorBook().get()).get('lastSync')).toEqual({ at: T0 - 3_600_000, gaps: [] });
+
+    // The same Extraction on the next run writes nothing again.
+    const written = stored.docs[0]!.updateTime.toMillis();
+    now += 6 * 3_600_000;
+    await run();
+    const again = await collectorBook().collection('extractions').get();
+    expect(again.docs.map((d) => d.updateTime.toMillis())).toEqual([written]);
+  });
+
+  it('a coming chunk ESI stops listing is cancelled; one that arrived is kept (#6097)', async () => {
+    await addFeeder(98000002);
+    const chunk = (structure: number, arrival: string): EsiExtractionLike => ({
+      structure_id: structure,
+      moon_id: 40000001,
+      extraction_start_time: '2026-10-01T00:00:00Z',
+      chunk_arrival_time: arrival,
+      natural_decay_time: arrival,
+    });
+    esiState.extractions.set(
+      98000002,
+      ok([chunk(7001, '2026-10-10T00:00:00Z'), chunk(7002, '2026-10-24T00:00:00Z')])
+    );
+    await run();
+    // ESI lists neither now: 7001's chunk arrived before T0, 7002's was still coming.
+    esiState.extractions.delete(98000002);
+    now += 6 * 3_600_000;
+    await run();
+    const stored = await collectorBook().collection('extractions').get();
+    const cancelledAt = Object.fromEntries(
+      stored.docs.map((d) => [d.get('structureId'), d.get('cancelledAt')])
+    );
+    expect(cancelledAt).toEqual({ 7001: undefined, 7002: new Date(now).toISOString() });
+  });
+
+  it('looks up the name of a refinery known only from an Extraction (#6097)', async () => {
+    await addFeeder(98000002, {}, true, { readsStructures: true });
+    esiState.noObservers.add(98000002);
+    esiState.extractions.set(
+      98000002,
+      ok([
+        {
+          structure_id: 7001,
+          moon_id: 40000001,
+          extraction_start_time: '2026-10-10T00:00:00Z',
+          chunk_arrival_time: '2026-10-24T00:00:00Z',
+          natural_decay_time: '2026-10-24T03:00:00Z',
+        },
+      ])
+    );
+    await run();
+    expect((await feederRecord(98000002))?.refineryStructures).toEqual({
+      '7001': { name: 'Refinery 7001', solarSystemId: 30004000, checkedAt: T0 },
+    });
+  });
+
+  it('a 403 on Extractions alone leaves the moon owner active and is not asked again for a week (#6097)', async () => {
+    await addFeeder(98000002);
+    esiState.extractions.set(98000002, { kind: 'forbidden' });
+    const asked = () => esiState.calls.filter((c) => c.startsWith('extractions')).length;
+
+    expect((await run()).feeders).toMatchObject({ read: 1, stale: 0 });
+    let rec = await feederRecord(98000002);
+    expect(rec).toMatchObject({ status: 'active', lastReadWellAt: T0, extractionsRefusedAt: T0 });
+    expect(rec?.staleSince).toBeUndefined();
+    expect(rec?.lastSyncResult?.outcome).toBe('synced');
+    expect(await observedRows()).toHaveLength(1);
+    expect(asked()).toBe(1);
+
+    // Within the week: the ledger is read, Extractions are not asked for.
+    now += 6 * DAY;
+    expect((await run()).feeders).toMatchObject({ read: 1, stale: 0 });
+    expect(asked()).toBe(1);
+
+    // After it, with the role granted: asked again, and the refusal is forgotten.
+    esiState.extractions.delete(98000002);
+    now += 2 * DAY;
+    await run();
+    expect(asked()).toBe(2);
+    rec = await feederRecord(98000002);
+    expect(rec?.extractionsRefusedAt).toBeUndefined();
+    expect(rec?.staleSince).toBeUndefined();
   });
 
   it('a 403 marks the feeder stale, keeps its token, and the next good read clears it', async () => {

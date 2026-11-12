@@ -341,6 +341,13 @@ const CATALOG = [
     labelKey: 'settings.notifications.event.shipLost',
     defaultChannels: 'both',
   },
+  // A Character whose login EVE refused (issue #6091): read from this device's
+  // needs-sign-in mark, so it needs no scope — the grant is what is gone.
+  {
+    id: 'characterNeedsLogin',
+    labelKey: 'settings.notifications.event.characterNeedsLogin',
+    defaultChannels: 'both',
+  },
   // A Character asking to join a Community the pilot administers. Read from the
   // sync backend, so it needs no ESI scope. In the bell and as a notification:
   // someone is waiting on the admin.

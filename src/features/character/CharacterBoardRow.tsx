@@ -108,6 +108,7 @@ export function CharacterBoardRow({
         <span className="mt-0.5 block truncate text-xs text-text-dim">
           {formatTimeOfDay(new Date(item.deadlineMs), zone)} · {t(KIND_LABEL[item.kind])}
           {item.detail && ` · ${t(`calendar.detail.${item.kind}.${item.detail}`, item.detail)}`}
+          {item.corporation && ` · ${item.corporation.name}`}
         </span>
       </span>
     </>
