@@ -2,7 +2,9 @@
  * What a pilot (and their corporation) wants from a war declaration, in one
  * glance and no more: who, when it bites, and how it is going. Each war is a
  * card: a red summary block with the aggressor and the status, four facts in
- * two columns, then the two kill tallies side by side.
+ * two columns, then the two kill tallies side by side. When wars are on more
+ * than one of the account's corporations, the cards are grouped under the
+ * corporation each is against.
  */
 import { useTranslation } from 'react-i18next';
 import { Modal, IskAmount } from '@/components/ui';
@@ -17,6 +19,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { warZkillUrl } from '@/lib/zkillboard';
 import { usePartyName } from './usePartyName';
 import { WarParty } from './WarParty';
+import { corporationsAtWar, type WarGroup } from './warGroups';
 
 interface WarModalProps {
   open: boolean;
@@ -27,6 +30,7 @@ interface WarModalProps {
 export function WarModal({ open, onClose, wars }: WarModalProps) {
   const { t } = useTranslation();
   const phone = useIsPhone();
+  const groups = corporationsAtWar(wars);
   return (
     <Modal
       open={open}
@@ -34,12 +38,39 @@ export function WarModal({ open, onClose, wars }: WarModalProps) {
       placement={phone ? 'sheet' : 'center'}
       title={t('wars.modal.title', { count: wars.length })}
     >
-      <div className="space-y-4">
-        {wars.map((hit) => (
-          <WarCard key={hit.war.id} hit={hit} />
-        ))}
-      </div>
+      {groups.length > 1 ? (
+        <div className="space-y-6">
+          {groups.map((group) => (
+            <Group key={group.against.corporationId ?? 0} group={group} />
+          ))}
+        </div>
+      ) : (
+        <Cards wars={wars} />
+      )}
     </Modal>
+  );
+}
+
+function Cards({ wars }: { wars: readonly WarAgainstMe[] }) {
+  return (
+    <div className="space-y-4">
+      {wars.map((hit) => (
+        <WarCard key={hit.war.id} hit={hit} />
+      ))}
+    </div>
+  );
+}
+
+function Group({ group }: { group: WarGroup }) {
+  const { t } = useTranslation();
+  const name = usePartyName({ corporationId: group.against.corporationId });
+  return (
+    <section className="space-y-2">
+      <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        {t('wars.modal.against', { name })}
+      </h3>
+      <Cards wars={group.wars} />
+    </section>
   );
 }
 

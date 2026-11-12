@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { warsAgainst, type StoredWar, type WarAgainstMe } from '@/engine/wars';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type CharacterRecord } from '@/db';
+import { warsAgainst, type StoredWar, type WarAgainstMe, type WarEntityIds } from '@/engine/wars';
 import { useNow } from '@/lib/useNow';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { ACTIVE_WARS_POLL_MS, loadActiveWars } from './activeWars';
@@ -8,16 +10,20 @@ import { useWarDeclaredNotice } from './useWarDeclaredNotice';
 
 const NONE: readonly StoredWar[] = [];
 const NO_HITS: readonly WarAgainstMe[] = [];
+const NO_CHARACTERS: readonly CharacterRecord[] = [];
 
 /**
- * The wars still running against a Character's corporation or alliance, newest
- * first with the active ones ahead of any not yet started. Empty while
- * loading, offline, or while the Character's corporation is not known yet.
+ * The wars still running against any corporation (or alliance) the account's
+ * Characters are in: the active Character's own first, then the rest, each
+ * newest first with the active ones ahead of any not yet started. Empty while
+ * loading, offline, or while no corporation is known yet.
  */
 export function useWarsAgainstMe(characterId: number): readonly WarAgainstMe[] {
   const now = useNow();
-  const info = usePublicInfo((state) => state.byCharacterId[characterId]);
+  const infoById = usePublicInfo((state) => state.byCharacterId);
   const loadPublicInfo = usePublicInfo((state) => state.load);
+  const loadManyPublicInfo = usePublicInfo((state) => state.loadMany);
+  const characters = useLiveQuery(() => db.characters.toArray(), [], NO_CHARACTERS);
   const [listed, setListed] = useState<readonly StoredWar[]>(NONE);
   const [recent, setRecent] = useState<readonly StoredWar[]>(NONE);
   const noticed = useWarDeclaredNotice();
@@ -25,6 +31,15 @@ export function useWarsAgainstMe(characterId: number): readonly WarAgainstMe[] {
   useEffect(() => {
     void loadPublicInfo(characterId);
   }, [characterId, loadPublicInfo]);
+
+  // The alliance comes from public info; one batched read covers every other Character.
+  const othersKey = characters
+    .map((character) => character.characterId)
+    .filter((id) => id !== characterId)
+    .join(',');
+  useEffect(() => {
+    if (othersKey !== '') void loadManyPublicInfo(othersKey.split(',').map(Number));
+  }, [othersKey, loadManyPublicInfo]);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,10 +81,27 @@ export function useWarsAgainstMe(characterId: number): readonly WarAgainstMe[] {
     return [...byId.values()];
   }, [listed, recent]);
 
-  const corporationId = info?.corporationId;
-  const allianceId = info?.allianceId;
+  const parties = useMemo(() => {
+    const storedCorp = new Map(characters.map((c) => [c.characterId, c.corporationId]));
+    const ids = [
+      characterId,
+      ...characters.map((c) => c.characterId).filter((id) => id !== characterId),
+    ];
+    const seen = new Set<number>();
+    const out: WarEntityIds[] = [];
+    for (const id of ids) {
+      const info = infoById[id];
+      // The stored record knows the corporation without a fetch; public info adds the alliance.
+      const corporationId = info?.corporationId ?? storedCorp.get(id);
+      if (corporationId === undefined || seen.has(corporationId)) continue;
+      seen.add(corporationId);
+      out.push({ corporationId, allianceId: info?.allianceId });
+    }
+    return out;
+  }, [characterId, characters, infoById]);
+
   return useMemo(
-    () => (wars.length === 0 ? NO_HITS : warsAgainst(wars, { corporationId, allianceId }, now)),
-    [wars, corporationId, allianceId, now]
+    () => (wars.length === 0 || parties.length === 0 ? NO_HITS : warsAgainst(wars, parties, now)),
+    [wars, parties, now]
   );
 }

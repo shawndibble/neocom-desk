@@ -1,7 +1,8 @@
 /**
- * The red strip under a page header while the Character's corporation (or its
- * alliance) has a war declared on it, still running or about to start. It
- * draws nothing otherwise. The Overview and the Corp Board mount it;
+ * The red strip under a page header while any of the account's corporations
+ * (or their alliances) has a war declared on it, still running or about to
+ * start. With one corporation at war it names the aggressor; with several it
+ * counts the corporations. It draws nothing otherwise. The Overview and the Corp Board mount it;
  * pressing the strip opens the war's card in a modal.
  *
  * Not the Danger banner: that one is driven by Alerts and acknowledged away,
@@ -23,6 +24,7 @@ import { formatAge } from '@/lib/age';
 import { useNow } from '@/lib/useNow';
 import { usePartyName } from './usePartyName';
 import { useWarsAgainstMe } from './useWarsAgainstMe';
+import { corporationsAtWar } from './warGroups';
 import { WarModal } from './WarModal';
 
 export function WarBanner({ characterId }: { characterId: number }) {
@@ -35,13 +37,16 @@ export function WarBanner({ characterId }: { characterId: number }) {
   const name = usePartyName(first?.war.aggressor ?? {});
   if (first === undefined) return null;
 
+  const corporations = corporationsAtWar(wars).length;
   const more = wars.length - 1;
   const when =
-    first.status.kind === 'pending'
-      ? first.status.startsIn === null
-        ? t('wars.banner.notStarted')
-        : t('wars.banner.startsIn', { time: formatCountdown(first.status.startsIn / 1000) })
-      : t('wars.banner.declared', { age: formatAge(Math.max(0, now - first.war.declared), t) });
+    corporations > 1
+      ? null
+      : first.status.kind === 'pending'
+        ? first.status.startsIn === null
+          ? t('wars.banner.notStarted')
+          : t('wars.banner.startsIn', { time: formatCountdown(first.status.startsIn / 1000) })
+        : t('wars.banner.declared', { age: formatAge(Math.max(0, now - first.war.declared), t) });
 
   return (
     <>
@@ -62,11 +67,13 @@ export function WarBanner({ characterId }: { characterId: number }) {
             {t('wars.banner.label')}
           </span>
           <b className="min-w-0 text-sm">
-            {more > 0
-              ? t('wars.banner.titleMore', { name, count: more })
-              : t('wars.banner.title', { name })}
+            {corporations > 1
+              ? t('wars.banner.corporations', { count: corporations })
+              : more > 0
+                ? t('wars.banner.titleMore', { name, count: more })
+                : t('wars.banner.title', { name })}
           </b>
-          <span className="min-w-0 text-xs text-text-dim">{when}</span>
+          {when !== null && <span className="min-w-0 text-xs text-text-dim">{when}</span>}
           <Icon.GoTo aria-hidden="true" className="ml-auto shrink-0 text-text-dim" />
         </button>
       </div>

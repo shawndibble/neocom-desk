@@ -60,14 +60,14 @@ describe('warStatus', () => {
 
 describe('warsAgainst', () => {
   it('returns a war whose defender is my corporation', () => {
-    const [hit] = warsAgainst([war()], me, NOW);
+    const [hit] = warsAgainst([war()], [me], NOW);
     expect(hit?.war.id).toBe(1);
     expect(hit?.side).toBe('defender');
   });
 
   it('matches my alliance as the defender', () => {
     const wars = [war({ defender: { allianceId: 900, iskDestroyed: 0, shipsKilled: 0 } })];
-    expect(warsAgainst(wars, { corporationId: 200, allianceId: 900 }, NOW)).toHaveLength(1);
+    expect(warsAgainst(wars, [{ corporationId: 200, allianceId: 900 }], NOW)).toHaveLength(1);
   });
 
   it('matches an ally, which is always on the defender side', () => {
@@ -77,31 +77,70 @@ describe('warsAgainst', () => {
         allies: [{ corporationId: 200 }],
       }),
     ];
-    expect(warsAgainst(wars, me, NOW)[0]?.side).toBe('ally');
+    expect(warsAgainst(wars, [me], NOW)[0]?.side).toBe('ally');
   });
 
   it('ignores a war I declared: that is not a dec against me', () => {
     const wars = [war({ aggressor: { corporationId: 200, iskDestroyed: 0, shipsKilled: 0 } })];
-    expect(warsAgainst(wars, me, NOW)).toEqual([]);
+    expect(warsAgainst(wars, [me], NOW)).toEqual([]);
   });
 
   it('ignores wars that are over', () => {
-    expect(warsAgainst([war({ finished: NOW - HOUR })], me, NOW)).toEqual([]);
+    expect(warsAgainst([war({ finished: NOW - HOUR })], [me], NOW)).toEqual([]);
   });
 
   it('ignores wars about someone else', () => {
-    expect(warsAgainst([war()], { corporationId: 999 }, NOW)).toEqual([]);
+    expect(warsAgainst([war()], [{ corporationId: 999 }], NOW)).toEqual([]);
   });
 
   it('does not match when I have no ids yet', () => {
-    expect(warsAgainst([war()], {}, NOW)).toEqual([]);
+    expect(warsAgainst([war()], [{}], NOW)).toEqual([]);
   });
 
   it('puts the war already active before one still pending, then newest declared first', () => {
     const pending = war({ id: 2, started: NOW + HOUR, declared: NOW - HOUR });
     const old = war({ id: 3, declared: NOW - 100 * HOUR });
     const recent = war({ id: 4, declared: NOW - 30 * HOUR });
-    expect(warsAgainst([pending, old, recent], me, NOW).map((w) => w.war.id)).toEqual([4, 3, 2]);
+    expect(warsAgainst([pending, old, recent], [me], NOW).map((w) => w.war.id)).toEqual([4, 3, 2]);
+  });
+
+  it('ties a war to the account corporation it is against, the first party ahead', () => {
+    const onOther = war({
+      id: 5,
+      defender: { corporationId: 201, iskDestroyed: 0, shipsKilled: 0 },
+    });
+    const onMine = war({ id: 6, declared: NOW - 100 * HOUR });
+    const hits = warsAgainst([onOther, onMine], [me, { corporationId: 201 }], NOW);
+    expect(hits.map((h) => [h.war.id, h.against.corporationId])).toEqual([
+      [6, 200],
+      [5, 201],
+    ]);
+  });
+
+  it('lists a war on an alliance two account corporations share once', () => {
+    const wars = [war({ defender: { allianceId: 900, iskDestroyed: 0, shipsKilled: 0 } })];
+    const hits = warsAgainst(
+      wars,
+      [
+        { corporationId: 200, allianceId: 900 },
+        { corporationId: 201, allianceId: 900 },
+      ],
+      NOW
+    );
+    expect(hits).toHaveLength(1);
+    expect(hits[0]?.against.corporationId).toBe(200);
+  });
+
+  it('still finds a war on another account corporation when the first one declared it', () => {
+    const wars = [
+      war({
+        aggressor: { corporationId: 200, iskDestroyed: 0, shipsKilled: 0 },
+        defender: { corporationId: 201, iskDestroyed: 0, shipsKilled: 0 },
+      }),
+    ];
+    expect(warsAgainst(wars, [me, { corporationId: 201 }], NOW)[0]?.against.corporationId).toBe(
+      201
+    );
   });
 });
 

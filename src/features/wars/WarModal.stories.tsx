@@ -21,6 +21,7 @@ const active = (over: Partial<StoredWar> = {}): WarAgainstMe => ({
   war: war(over),
   side: 'defender',
   status: { kind: 'active', endsIn: null },
+  against: { corporationId: 98000001 },
 });
 
 /** @summary The war card a pilot opens from the War banner: who, when, and how it is going. */
@@ -50,6 +51,7 @@ export const NotStartedWithAllies: Story = {
         }),
         side: 'defender',
         status: { kind: 'pending', startsIn: 19 * HOUR_MS },
+        against: { corporationId: 98000001 },
       },
     ],
   },
@@ -66,6 +68,23 @@ export const SeveralWars: Story = {
         mutual: true,
         aggressor: { corporationId: 98000003, iskDestroyed: 12_000_000, shipsKilled: 1 },
       }),
+    ],
+  },
+};
+
+/** @summary Wars on two of the account's corporations: the cards grouped under the corporation each is against, the active Character's first. */
+export const SeveralCorporations: Story = {
+  args: {
+    wars: [
+      active(),
+      {
+        ...active({
+          id: 763600,
+          declared: NOW - 12 * HOUR_MS,
+          defender: { corporationId: 98000004, iskDestroyed: 0, shipsKilled: 0 },
+        }),
+        against: { corporationId: 98000004 },
+      },
     ],
   },
 };
