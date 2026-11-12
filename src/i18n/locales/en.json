@@ -4796,7 +4796,7 @@
         "write": "Write to EVE"
       },
       "planetsNote": "EVE's consent screen lists the planetary scope as \"manage your planetary installations\". Neocom Desk only reads that data and never writes to it.",
-      "separateNote": "Logging in asks for every read above at once, so no page sends you back to EVE's login later. Corporation data is read only as far as your in-game corporation roles allow. Want less? Log in with custom permissions and untick it.",
+      "oneLoginNote": "Logging in asks for every read above at once, so no page sends you back to EVE's login later. Corporation data is read only as far as your in-game corporation roles allow. Want less? Log in with custom permissions and untick it.",
       "revoke": "You can take access back at any time:",
       "revokeLink": "EVE's authorized apps page"
     },

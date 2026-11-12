@@ -6,7 +6,7 @@
  * `esi/registry.ts`; capability -> scope is an ESI concern and lives here.
  *
  * The mapping below is a *selection* from the registry, not a second copy of
- * it. #295 registered all seven corp scopes under the opt-in `corp` group, and
+ * it. #295 registered all seven corp scopes under the `corp` group, and
  * typing these as `Scope` — the union `esi/registry.ts` derives — makes an
  * unregistered or misspelled string a compile error; `corpScopes.test.ts` adds
  * that every one of them is in `scopesForGroup('corp')`. What cannot be
