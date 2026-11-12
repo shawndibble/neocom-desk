@@ -14,10 +14,10 @@ import {
   type MoonOwnerRow,
   type MoonOwnerTotals,
 } from '@/engine/corpTaxBook/moonOwners';
-import { formatAge } from '@/lib/age';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { MoonOwnerStatusPill } from './MoonOwnerStatusPill';
 import { MoonOwnerCards } from './MoonOwnerCards';
+import { moonOwnerNote } from './moonOwnerNote';
 import { caretColumn } from './caretColumn';
 import { isk, shortDate } from './moonsFormat';
 
@@ -61,17 +61,7 @@ export function MoonOwnersTable({
             <span className="truncate text-accent">{name(r.corporationId)}</span>
             {r.sameOwner && <Pill tone="accent">{t(k('yours'))}</Pill>}
           </span>
-          <span className="block text-xs text-text-dim">
-            {t(k('refineries'), { count: r.refineryCount })}
-            {' · '}
-            {r.status === 'cant-read' && r.staleSince !== undefined
-              ? t(k('cantReadSince'), { date: shortDate(new Date(r.staleSince).toISOString()) })
-              : r.sameOwner
-                ? t(k('yoursNote'))
-                : r.lastReadWellAt !== undefined
-                  ? t(k('synced'), { age: formatAge(now - Date.parse(r.lastReadWellAt), t) })
-                  : ''}
-          </span>
+          <span className="block text-xs text-text-dim">{moonOwnerNote(r, now, t)}</span>
         </span>
       ),
       sortValue: (r) => name(r.corporationId),

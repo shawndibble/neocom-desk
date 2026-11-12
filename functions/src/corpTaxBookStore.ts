@@ -71,6 +71,7 @@ import {
   type TurnOnInput,
 } from './corpTaxBook.js';
 import {
+  extractionIdOf,
   allocatePayments,
   dismissalCredits,
   forfeitAllowed,
@@ -87,6 +88,7 @@ import {
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
+import type { FeederExtraction } from './corpTaxBookSyncEngine.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
 import { isMissingIndex } from './indexedSweep.js';
@@ -556,6 +558,93 @@ export async function writeBilledByPointers(
 }
 
 /**
+ * Merge Extractions into a book (an officer's Survey link or Fully Mined flag stays) and re-stamp
+ * the rows their windows now cover. Adds each new or changed one to `touched`; one that says what
+ * the book already holds is not written again.
+ */
+async function writeExtractions(
+  deps: BookDeps,
+  corporationId: number,
+  incoming: readonly MirrorExtraction[],
+  touched: Set<string>
+): Promise<void> {
+  const extractions = sub(deps.db, corporationId, EXTRACTIONS);
+  const corrected = new Set<number>();
+  for (const x of incoming) {
+    const id = extractionIdOf(x);
+    const fields: Data = { ...x, id };
+    for (const key of Object.keys(fields)) if (fields[key] === undefined) delete fields[key];
+    const held = (await extractions.doc(id).get()).data();
+    if (!held || WINDOW_FIELDS.some((f) => fields[f] !== undefined && fields[f] !== held[f]))
+      corrected.add(x.structureId);
+    // A new Extraction, or one whose make-up or dates moved, changes its moon doc (ADR 0032).
+    if (
+      held &&
+      Object.keys(fields).every((k) => JSON.stringify(fields[k]) === JSON.stringify(held[k]))
+    )
+      continue;
+    touched.add(id);
+    await extractions.doc(id).set(fields, { merge: true });
+  }
+  // A new or corrected Extraction moves which rows its window covers (ADR 0032). Best effort.
+  await restampStructures(deps.db, corporationId, [...corrected]).catch((e) =>
+    console.error('extraction restamp failed', e instanceof Error ? e.message : e)
+  );
+}
+
+/**
+ * A moon owner's chunk that has not arrived and that ESI no longer lists was cancelled: its
+ * grant cannot read the notification that says so. Returns the ids marked.
+ */
+async function cancelUnlistedFeederExtractions(
+  deps: BookDeps,
+  collectorCorporationId: number,
+  feederCorporationId: number,
+  listed: readonly MirrorExtraction[]
+): Promise<string[]> {
+  const now = new Date(deps.now()).toISOString();
+  const keep = new Set(listed.map(extractionIdOf));
+  const stored = await sub(deps.db, collectorCorporationId, EXTRACTIONS)
+    .where('sourceCorporationId', '==', feederCorporationId)
+    .get();
+  const gone = stored.docs.filter((d) => {
+    const x = d.data() as MirrorExtraction;
+    return !x.cancelledAt && x.chunkArrivalTime > now && !keep.has(d.id);
+  });
+  for (const d of gone) await d.ref.update({ cancelledAt: now });
+  return gone.map((d) => d.id);
+}
+
+/**
+ * A moon owner's Extractions into the Collector's book (#6097), each tagged with the moon
+ * owner's corporation id. Like a feeder's rows, they never touch the book's `lastSync`, gaps or
+ * audit. `complete` says ESI's list was whole, so a coming chunk missing from it is cancelled.
+ */
+export async function storeFeederExtractions(
+  deps: BookDeps,
+  collectorCorporationId: number,
+  feederCorporationId: number,
+  extractions: readonly FeederExtraction[],
+  complete: boolean
+): Promise<void> {
+  const touched = new Set<string>();
+  await writeExtractions(deps, collectorCorporationId, extractions, touched);
+  if (complete) {
+    const cancelled = await cancelUnlistedFeederExtractions(
+      deps,
+      collectorCorporationId,
+      feederCorporationId,
+      extractions
+    );
+    for (const id of cancelled) touched.add(id);
+  }
+  if (touched.size === 0) return;
+  await refreshMoonDocs(deps.db, collectorCorporationId, touched);
+  // The Overview and Extractions tabs read Extractions from the tab docs (ADR 0032).
+  await refreshReadModels(deps.db, collectorCorporationId, deps.now());
+}
+
+/**
  * The sync once the caller is established. The scheduled sync (ADR 0025) calls
  * this with the role check it just made with the grant holder's token, and
  * `scheduled` makes the audit entry and `lastSync` say so.
@@ -590,27 +679,7 @@ export async function syncBookAs(
     console.error('observed backfill failed', e instanceof Error ? e.message : e)
   );
 
-  const extractions = sub(deps.db, input.corporationId, EXTRACTIONS);
-  const corrected = new Set<number>();
-  for (const x of input.extractions) {
-    const id = `${x.structureId}_${Date.parse(x.extractionStartTime)}`;
-    const fields: Data = { ...x, id };
-    for (const key of Object.keys(fields)) if (fields[key] === undefined) delete fields[key];
-    const held = (await extractions.doc(id).get()).data();
-    if (!held || WINDOW_FIELDS.some((f) => fields[f] !== undefined && fields[f] !== held[f]))
-      corrected.add(x.structureId);
-    // A new Extraction, or one whose make-up or dates moved, changes its moon doc (ADR 0032).
-    if (
-      !held ||
-      Object.keys(fields).some((k) => JSON.stringify(fields[k]) !== JSON.stringify(held[k]))
-    )
-      touchedPulls.add(id);
-    await extractions.doc(id).set(fields, { merge: true });
-  }
-  // A new or corrected Extraction moves which rows its window covers (ADR 0032). Best effort, like the pass below.
-  await restampStructures(deps.db, input.corporationId, [...corrected]).catch((e) =>
-    console.error('extraction restamp failed', e instanceof Error ? e.message : e)
-  );
+  await writeExtractions(deps, input.corporationId, input.extractions, touchedPulls);
   await stampBook(deps.db, input.corporationId, deps.now).catch((e) =>
     console.error('extraction stamp backfill failed', e instanceof Error ? e.message : e)
   );

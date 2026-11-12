@@ -27,6 +27,7 @@ import type { QueueInfo } from '@/features/character/rosterView';
 import type { CharacterGroup, CharacterSortStats } from '@/features/character/groups';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { AchievementLine } from '@/features/character/AchievementLine';
+import { NeedsLoginAction } from '@/features/character/NeedsLoginAction';
 import type { AchievementParts } from '@/features/character/achievement';
 import {
   UNGROUPED_VALUE,
@@ -156,6 +157,7 @@ export function CharacterCard({
                 {lastSynced && (
                   <DataAgeBadge date={lastSynced} dotOnly alwaysVisible className="shrink-0" />
                 )}
+                <NeedsLoginAction characterId={character.characterId} name={character.name} />
               </span>
               <span className="block truncate text-xs text-text-dim">
                 <AffiliationName name={info?.corporationName} />

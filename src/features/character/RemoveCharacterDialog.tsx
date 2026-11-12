@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
-import { useAuthFailure } from '@/stores/authFailure';
+import { clearNeedsLogin } from '@/stores/authFailure';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { removeCharacterAfterSync } from '@/features/character/removeCharacter';
@@ -54,7 +54,7 @@ export function RemoveCharacterDialog({
     setRemoving(true);
     try {
       await removeCharacterAfterSync(id, isSyncConfigured(), removeShared);
-      useAuthFailure.getState().dismissNeedsLogin(id);
+      void clearNeedsLogin(id);
       // Requested in the same batch as the dialog closing (`finally`), so the
       // request outlives the dialog's own focus return, which it retries past.
       focusAfterCommit(

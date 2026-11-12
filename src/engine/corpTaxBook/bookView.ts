@@ -163,6 +163,8 @@ export interface ExtractionRow {
   minerCount: number;
   /** Who flagged the chunk Fully Mined and when (#5257); absent when not flagged. */
   fullyMined?: { by: number; byName: string; at: string };
+  /** The moon owner whose refinery it is (#6097); absent means the book's own corporation. */
+  sourceCorporationId?: number;
 }
 
 export interface NeedsYouDeclaration {
@@ -666,6 +668,9 @@ function buildExtractionRows(
         tax: mine.reduce((s, c) => s + (frozenByKey.get(c.key)?.tax ?? c.taxOwed), 0),
         minerCount: new Set(mine.map((c) => c.minerId)).size,
         ...(x.fullyMined ? { fullyMined: x.fullyMined } : {}),
+        ...(x.sourceCorporationId !== undefined
+          ? { sourceCorporationId: x.sourceCorporationId }
+          : {}),
       };
     })
     .sort((a, b) => a.chunkArrivalAt.localeCompare(b.chunkArrivalAt));

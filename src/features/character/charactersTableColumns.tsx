@@ -1,4 +1,17 @@
+import { Link } from 'react-router-dom';
 import { HintText } from '@/components/ui/HintText';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
+import { SETTINGS_TABS } from '@/app/pageTabs';
+import { tabPath } from '@/lib/pageTabs';
+import {
+  alertsWhenClosedRank,
+  corpAccessRank,
+  corpRolesRank,
+  type CorpStanding,
+} from '@/features/corp/corpStanding';
+import { rolesText } from '@/features/corp/roles';
+import type { AlertsRowState } from '@/features/notifications/alertsGrant';
 import { type CharacterRecord } from '@/db';
 import {
   CharacterAvatar,
@@ -34,6 +47,7 @@ import {
 import { type CharacterGroup, type CharacterSortStats } from '@/features/character/groups';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { AffiliationName } from '@/features/character/CharacterCard';
+import { NeedsLoginAction } from '@/features/character/NeedsLoginAction';
 import { achievementColumn } from '@/features/character/achievementColumn';
 import type { AchievementLookup } from '@/features/character/useCharacterAchievements';
 import {
@@ -73,7 +87,12 @@ export interface CharacterRow {
   acceleratorRecord: CharacterAcceleratorRecord | undefined;
   /** The bonus the attribute sheet implies; null when not cached or legal. */
   detectedAccelerator: number | null;
+  /** Capability roles and grant coverage; undefined until read (and never read while neither corp column shows). */
+  corpStanding: CorpStanding | undefined;
+  alertsWhenClosed: AlertsRowState;
 }
+
+const NOTIFICATION_SETTINGS_PATH = tabPath(SETTINGS_TABS, 'notifications');
 
 /**
  * One `manufacturing`/`science`/`reaction` job-slot column — three of these,
@@ -158,6 +177,12 @@ export function buildColumns(
   onMoveToGroup: (characterId: number, groupId: string | null) => void,
   achievements: AchievementLookup
 ): Record<CharacterColumnId, DataTableColumn<CharacterRow>> {
+  // The row's one corp action: switch to that Character, then its Corporation Permission.
+  const corpPermissionsLink = (row: CharacterRow, label: string) => (
+    <GrantMissingLink groups={['corp']} asCharacter={row.character.characterId}>
+      {label}
+    </GrantMissingLink>
+  );
   return {
     name: {
       id: 'name',
@@ -174,6 +199,7 @@ export function buildColumns(
             alt={t('characters.portraitAlt', { name: row.character.name })}
           />
           <span className="truncate font-medium">{row.character.name}</span>
+          <NeedsLoginAction characterId={row.character.characterId} name={row.character.name} />
         </span>
       ),
     },
@@ -446,6 +472,63 @@ export function buildColumns(
         ) : (
           '—'
         ),
+    },
+    // Gaps sort first (ascending), so a 13-director roster reads its holes at the top.
+    corpRoles: {
+      id: 'corpRoles',
+      header: t('characters.column.corpRoles'),
+      sortFirst: 'asc',
+      sortValue: (row) => corpRolesRank(row.corpStanding),
+      render: (row) => {
+        const standing = row.corpStanding;
+        if (!standing) return '—';
+        // Plain text: the access cell beside it carries the fix (DESIGN.md §6c Restraint).
+        if (standing.kind === 'notGranted') {
+          return <span className="text-text-dim">{t('characters.corpRolesNotGranted')}</span>;
+        }
+        return standing.kind === 'roles' ? rolesText(standing.roles) : '';
+      },
+    },
+    corpAccess: {
+      id: 'corpAccess',
+      header: t('characters.column.corpAccess'),
+      sortFirst: 'asc',
+      sortValue: (row) => corpAccessRank(row.corpStanding),
+      render: (row) => {
+        const standing = row.corpStanding;
+        if (!standing) return '—';
+        if (standing.kind === 'none') return '';
+        if (standing.kind === 'notGranted') {
+          return corpPermissionsLink(row, t('characters.corpAccessMissingUnknown'));
+        }
+        if (standing.missingScopes === 0) {
+          return (
+            <span className={STAT_CHIP_TONE_TEXT_CLASS.success}>
+              {t('characters.corpAccessReady')}
+            </span>
+          );
+        }
+        return corpPermissionsLink(
+          row,
+          t('characters.corpAccessMissing', { count: standing.missingScopes })
+        );
+      },
+    },
+    alertsWhenClosed: {
+      id: 'alertsWhenClosed',
+      header: t('characters.column.alertsWhenClosed'),
+      sortFirst: 'asc',
+      sortValue: (row) => alertsWhenClosedRank(row.alertsWhenClosed),
+      render: (row) => {
+        const label = t(`settings.notifications.alertsWhenClosed.state.${row.alertsWhenClosed}`);
+        // Only a gap links: "On" needs nothing done (DESIGN.md §6c Restraint).
+        if (row.alertsWhenClosed === 'on') return label;
+        return (
+          <Link to={NOTIFICATION_SETTINGS_PATH} className={inlineLinkClassName}>
+            {label}
+          </Link>
+        );
+      },
     },
     starred: {
       id: 'starred',

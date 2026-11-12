@@ -27,7 +27,7 @@ import { MinedBar, OreLine, StateWord } from './moonsParts';
 
 export function ExtractionsTab() {
   const { t } = useTranslation();
-  const { view, names, canEdit, edit } = useBook();
+  const { view, names, canEdit, edit, corporationId } = useBook();
   const [states, setStates] = useState<ReadonlySet<ExtractionState>>(DEFAULT_STATES);
   const toggleState = (state: ExtractionState) =>
     setStates((prev) => {
@@ -69,6 +69,8 @@ export function ExtractionsTab() {
     [canEdit, names, run, onCloseAutoFocus, t]
   );
   const rows = view.extractions;
+  // A book that reads a moon owner's Extractions names each row's corporation (#6097).
+  const namesCorporations = rows.some((r) => r.sourceCorporationId !== undefined);
   const listed = rows.filter((r) => states.has(r.state));
   const inChunks = rows
     .filter((r) => r.state !== 'expired' && r.state !== 'cancelled')
@@ -80,12 +82,19 @@ export function ExtractionsTab() {
       header: t('corpTaxBook.moons.cols.moon'),
       primary: true,
       render: (row) => (
-        <PlaceCell
-          refinery={names.refinery(row.structureId)}
-          undockable={names.undockable?.(row.structureId)}
-          moon={names.moon(row.moonId)}
-          accent
-        />
+        <>
+          <PlaceCell
+            refinery={names.refinery(row.structureId)}
+            undockable={names.undockable?.(row.structureId)}
+            moon={names.moon(row.moonId)}
+            accent
+          />
+          {namesCorporations && (
+            <span className="block text-xs text-text-dim">
+              {names.corporation(row.sourceCorporationId ?? corporationId)}
+            </span>
+          )}
+        </>
       ),
       sortValue: (row) => names.refinery(row.structureId),
     },
