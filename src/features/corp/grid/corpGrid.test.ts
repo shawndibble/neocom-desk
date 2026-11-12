@@ -44,12 +44,17 @@ describe('the Corp Board default layout', () => {
     expect(DEFAULT_KINDS.slice(0, 2)).toEqual(['corpDeadlines', 'structures']);
   });
 
-  it('opens Due soon and Structures on every corporation, the rest on the header Character', () => {
-    const scopes = corpDefaultLayout().widgets.map((w) => [w.kind, w.scope]);
-    expect(scopes.slice(0, 3)).toEqual([
-      ['corpDeadlines', 'all'],
-      ['structures', 'all'],
-      ['moonChunks', 'header'],
+  it('opens every kind that reads across corporations on All, the rest on the header Character', () => {
+    const scopes = corpDefaultLayout().widgets.map((w) => [w.kind, w.show ?? null, w.scope]);
+    expect(scopes.slice(0, 7)).toEqual([
+      ['corpDeadlines', null, 'all'],
+      ['structures', null, 'all'],
+      ['moonChunks', null, 'all'],
+      ['corpJobs', null, 'all'],
+      ['corpWallet', null, 'all'],
+      // Cash flow reads one corporation's journal.
+      ['corpWallet', 'flow', 'header'],
+      ['corpMembers', null, 'header'],
     ]);
   });
 
@@ -128,7 +133,9 @@ describe('the Corp Board board', () => {
     expect(asked).toEqual([['canReadStructures']]);
     // Not yet known: the header scope is read, so one corporation never fans out.
     expect(corpWidgetBoard(ALL).allScopeOffered('structures')).toBe(false);
-    expect(corpWidgetBoard(ALL).opensOnAll).toEqual(new Set(['corpDeadlines', 'structures']));
+    expect(corpWidgetBoard(ALL).opensOnAll).toEqual(
+      new Set(['corpDeadlines', 'structures', 'moonChunks', 'corpJobs', 'corpWallet', 'corpKills'])
+    );
   });
 
   it('resets to the full default', () => {

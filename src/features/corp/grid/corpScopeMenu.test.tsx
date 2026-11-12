@@ -18,13 +18,26 @@ registerKindDefs(CORP_DEFS);
 
 const CAPS = new Proxy({} as CorpCapabilities, { get: () => true });
 
-function setup(kind: 'corpDeadlines' | 'structures', corporations: number) {
+const ACROSS = [
+  'corpDeadlines',
+  'structures',
+  'moonChunks',
+  'corpJobs',
+  'corpWallet',
+  'corpKills',
+] as const;
+
+function setup(
+  kind: (typeof ACROSS)[number],
+  corporations: number,
+  scope: WidgetModel['scope'] = 'all'
+) {
   const widget: WidgetModel = {
     id: 'w1',
     kind,
     size: 'L',
     view: 'table',
-    scope: 'all',
+    scope,
     showOnPhone: true,
   };
   render(
@@ -49,24 +62,33 @@ function setup(kind: 'corpDeadlines' | 'structures', corporations: number) {
 const ALL = 'All my corporations';
 
 describe('Corp Board scope choice', () => {
-  it.each(['corpDeadlines', 'structures'] as const)(
-    'offers %s every corporation, chosen, when two can be read',
-    async (kind) => {
-      setup(kind, 2);
-      await userEvent.click(screen.getByRole('button', { name: /^Settings for / }));
-      expect(screen.getByRole('menuitemradio', { name: ALL })).toHaveAttribute(
-        'aria-checked',
-        'true'
-      );
-    }
-  );
+  it.each(ACROSS)('offers %s every corporation, chosen, when two can be read', async (kind) => {
+    setup(kind, 2);
+    await userEvent.click(screen.getByRole('button', { name: /^Settings for / }));
+    expect(screen.getByRole('menuitemradio', { name: ALL })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
+  });
 
-  it.each(['corpDeadlines', 'structures'] as const)(
-    'offers %s no choice with one corporation',
-    async (kind) => {
-      setup(kind, 1);
-      await userEvent.click(screen.getByRole('button', { name: /^Settings for / }));
-      expect(screen.queryByRole('menuitemradio', { name: ALL })).toBeNull();
-    }
-  );
+  it.each(ACROSS)('offers %s no choice with one corporation', async (kind) => {
+    setup(kind, 1);
+    await userEvent.click(screen.getByRole('button', { name: /^Settings for / }));
+    expect(screen.queryByRole('menuitemradio', { name: ALL })).toBeNull();
+  });
+
+  it('offers the corp wallet Divisions only on All, and says why', async () => {
+    setup('corpWallet', 2);
+    await userEvent.click(screen.getByRole('button', { name: /^Settings for / }));
+    expect(screen.queryByRole('menuitemradio', { name: 'Flow' })).toBeNull();
+    expect(screen.queryByRole('menuitemradio', { name: 'Sources' })).toBeNull();
+    expect(screen.getByText('All my corporations shows balances only.')).toBeInTheDocument();
+  });
+
+  it('offers the corp wallet every Show on its own corporation', async () => {
+    setup('corpWallet', 2, 'header');
+    await userEvent.click(screen.getByRole('button', { name: /^Settings for / }));
+    expect(screen.getByRole('menuitemradio', { name: 'Flow' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitemradio', { name: 'Sources' })).toBeInTheDocument();
+  });
 });

@@ -7,13 +7,23 @@ import { dailyOutgoings, runwayDays, VITALS_WINDOW_DAYS } from '@/engine/corp/vi
 import { humanizeRefType } from '@/features/character/format';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import { blank, corpUnreadable, statusOf, UNKNOWN, type Builder } from './builderKit';
-import { fractionBar, shareCell, signedCell } from './cellKit';
+import { walletBalancesAcross } from '@/engine/corp/acrossCorps';
+import { corpCell, fractionBar, shareCell, signedCell } from './cellKit';
+import { corpReads, flagPartlyFailed, oldestRead } from './corpAcrossKit';
 import { hbarsFromRows } from './chartBuilders';
 import { backwardBucketSums } from './chartSeries';
 import { rollingTitles, signTone } from './chartTips';
 import type { CorpJournalLine, CorpWalletFeed } from './corpFeeds';
 import type { BarsChartModel } from '../charts/types';
-import type { FeedState, KindView, NumberModel, TableCell, TableModel } from './types';
+import type {
+  BuildContext,
+  Feeds,
+  FeedState,
+  KindView,
+  NumberModel,
+  TableCell,
+  TableModel,
+} from './types';
 import type { Translate } from '@/lib/translate';
 
 const TO = '/corp/wallet';
@@ -56,8 +66,9 @@ const inRange = (journal: readonly CorpJournalLine[], now: number, range: number
 
 // --- Corp wallet ------------------------------------------------------------------
 
-export const corpWallet: Builder = (feeds, { t }) => {
-  const ready = notReady(feeds.corpWallet, t);
+/** One corporation's divisions: the header scope, or All with one readable corporation. */
+function divisionsView(feed: FeedState<CorpWalletFeed> | undefined, t: Translate): KindView {
+  const ready = notReady(feed, t);
   if ('view' in ready) return ready.view;
   const { data } = ready;
   const K = `${W}.corpWallet`;
@@ -101,7 +112,7 @@ export const corpWallet: Builder = (feeds, { t }) => {
   };
   return withFeed(
     {
-      ...blank(TO, statusOf(feeds.corpWallet, { isEmpty: named.length === 0 })),
+      ...blank(TO, statusOf(feed, { isEmpty: named.length === 0 })),
       number,
       table,
       summary: t(`${K}.summary`, { isk: formatIskCompact(total), count: all.length }),
@@ -127,7 +138,86 @@ export const corpWallet: Builder = (feeds, { t }) => {
     },
     data
   );
-};
+}
+
+/**
+ * Every readable corporation's balances (All scope): one row per corporation with its master
+ * wallet and its total across the divisions read, then the grand total. Balances only: Cash
+ * flow, Income and runway read one corporation's journal.
+ */
+function walletAcross(feeds: Feeds, { t }: Pick<BuildContext, 't'>): KindView {
+  const K = `${W}.corpWallet`;
+  const across = corpReads(feeds.corpWalletAll, TO, t, (feed) => divisionsView(feed, t));
+  if ('view' in across) return across.view;
+  const { reads, data } = across;
+  const { rows, total } = walletBalancesAcross(
+    reads.map(({ corporationId, feed }) => ({
+      corporationId,
+      masterDivision: feed.journalDivision,
+      divisions: feed.divisions,
+    }))
+  );
+  const labelOf = new Map(reads.map((read) => [read.corporationId, read.label]));
+  const label = (corporationId: number) => labelOf.get(corporationId)!;
+  const table: TableModel = {
+    columns: [
+      { key: 'corp', label: t(`${K}.col.corp`), priority: 0 },
+      { key: 'master', label: t(`${K}.col.master`), align: 'end', priority: 2 },
+      { key: 'total', label: t(`${K}.col.total`), align: 'end', priority: 1 },
+    ],
+    rows: rows.map((row) => ({
+      key: String(row.corporationId),
+      to: TO,
+      cells: [corpCell(label(row.corporationId)), iskCell(row.master), iskCell(row.total)],
+    })),
+    footer: t(`${K}.balancesOnly`),
+  };
+  return flagPartlyFailed(
+    {
+      ...blank(TO, statusOf(feeds.corpWalletAll)),
+      ...oldestRead(reads),
+      number: {
+        value: formatIskCompact(total),
+        iskAmount: total,
+        tone: 'clear',
+        secondary: { text: t(`${K}.acrossCorps`, { count: rows.length }) },
+      },
+      rows: rows.map((row) => ({
+        key: String(row.corporationId),
+        title: label(row.corporationId).ticker,
+        detail: label(row.corporationId).name,
+        value: formatIskCompact(row.total),
+        iskAmount: row.total,
+        tone: 'clear',
+      })),
+      table,
+      summary: t(`${K}.summaryAcross`, { isk: formatIskCompact(total), count: rows.length }),
+      chart:
+        total > 0
+          ? (hbarsFromRows(
+              t,
+              rows
+                .filter((row) => row.total > 0)
+                .map((row) => {
+                  const share = row.total / total;
+                  return {
+                    key: String(row.corporationId),
+                    label: label(row.corporationId).ticker,
+                    value: row.total,
+                    share,
+                    text: `${Math.round(share * 100)}%`,
+                  };
+                }),
+              t(`${K}.chartNoteAcross`)
+            ) ?? undefined)
+          : undefined,
+    },
+    data.partlyFailed
+  );
+}
+
+export const corpWallet: Builder = (feeds, ctx) =>
+  ctx.scopeAll ? walletAcross(feeds, ctx) : divisionsView(feeds.corpWallet, ctx.t);
 
 // --- Cash flow --------------------------------------------------------------------
 

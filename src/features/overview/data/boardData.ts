@@ -588,6 +588,8 @@ export interface MoonChunksBoardData {
   loadedAt: number;
   /** Read from a Corp Tax Book (a moon owner's pops, #6116), not from ESI. */
   fromBook?: true;
+  /** Read across several corporations, and one of them failed: the rest draws, flagged. */
+  partlyFailed?: boolean;
 }
 
 /** One Character's moon drills, with its Corp Tax Book's moon owners' pops (#6116). */

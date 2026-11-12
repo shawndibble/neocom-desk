@@ -35,7 +35,8 @@ vi.mock('@/features/corp/boardSources', () => ({
 }));
 vi.mock('@/features/character/calendarMoonChunks', () => ({ loadMoonChunks: vi.fn() }));
 
-import { loadAllStructuresBoardData } from './corpBoard';
+import { loadMoonChunks } from '@/features/character/calendarMoonChunks';
+import { loadAllMoonChunksBoardData, loadAllStructuresBoardData } from './corpBoard';
 
 const canAll = () => true;
 const read = (ids: number[], at: string) => ({
@@ -96,5 +97,42 @@ describe('loadAllStructuresBoardData', () => {
     const merged = await loadAllStructuresBoardData();
     expect(merged.structures).toBeNull();
     expect(merged.needsReauth).toBe(false);
+  });
+});
+
+describe('loadAllMoonChunksBoardData', () => {
+  beforeEach(() => {
+    characters.length = 0;
+    access.clear();
+  });
+
+  it('names each drill’s corporation, and flags a corporation whose read failed', async () => {
+    // No Corp Tax Book: no Feeder read is started.
+    const canMoons = (capability: string) => capability === 'canReadMoonExtractions';
+    for (const [characterId, corporationId] of [
+      [1, 10],
+      [3, 20],
+      [5, 30],
+    ] as const) {
+      characters.push({ characterId, name: `P${characterId}` });
+      access.set(characterId, { corporationId, can: canMoons });
+    }
+    vi.mocked(loadMoonChunks).mockImplementation((async (characterId: number) =>
+      characterId === 5
+        ? { result: { needsReauth: false, cached: null }, failed: true }
+        : {
+            result: { needsReauth: false, cached: { fetchedAt: new Date('2026-11-01T10:00:00Z') } },
+            sources: [{ id: `d${characterId}`, subject: 'Efa', detail: 'arrival', deadlineMs: 1 }],
+            extractions: [],
+            failed: false,
+          }) as never);
+
+    const merged = await loadAllMoonChunksBoardData();
+
+    expect(merged.chunks?.map((chunk) => [chunk.id, chunk.corporation])).toEqual([
+      ['d1', { id: 10, name: 'Corp 10', ticker: 'T10' }],
+      ['d3', { id: 20, name: 'Corp 20', ticker: 'T20' }],
+    ]);
+    expect(merged.partlyFailed).toBe(true);
   });
 });

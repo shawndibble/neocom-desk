@@ -5908,6 +5908,7 @@
         },
         "col": {
           "drill": "Drill",
+          "corp": "Corporation",
           "in": "In",
           "event": "Event"
         }
@@ -6227,6 +6228,9 @@
         },
         "col": {
           "division": "Division",
+          "corp": "Corporation",
+          "master": "Master wallet",
+          "total": "Total",
           "balance": "Balance",
           "share": "Share"
         },
@@ -6234,6 +6238,13 @@
         "summary_other": "{{isk}} ISK across {{count}} wallet divisions.",
         "biggest": "{{name}} holds {{share}}% of it",
         "chartNote": "Share of the corporation's ISK by division",
+        "chartNoteAcross": "Share of the ISK by corporation",
+        "acrossCorps_one": "Across {{count}} corporation",
+        "acrossCorps_other": "Across {{count}} corporations",
+        "summaryAcross_one": "{{isk}} ISK in {{count}} corporation.",
+        "summaryAcross_other": "{{isk}} ISK across {{count}} corporations.",
+        "balancesOnly": "Balances only: cash flow and income read one corporation.",
+        "allScopeShows": "All my corporations shows balances only.",
         "unused_one": "{{count}} unused division",
         "unused_other": "{{count}} unused divisions"
       },
@@ -6377,6 +6388,7 @@
           "product": "Product",
           "ends": "Ends in",
           "installer": "Installer",
+          "corp": "Corporation",
           "activity": "Activity"
         },
         "unit": "running",
@@ -6419,6 +6431,14 @@
         "unit_other": "kills",
         "secondary": "{{losses}} lost · {{efficiency}} ISK efficiency",
         "allTime": "All time, from zKillboard",
+        "acrossCorps_one": "Across {{count}} corporation",
+        "acrossCorps_other": "Across {{count}} corporations",
+        "col": {
+          "corp": "Corporation",
+          "kills": "Kills",
+          "losses": "Losses",
+          "efficiency": "ISK efficiency"
+        },
         "summary": "{{kills}} kills, {{losses}} losses, {{efficiency}} ISK efficiency, all time."
       },
       "corpContracts": {

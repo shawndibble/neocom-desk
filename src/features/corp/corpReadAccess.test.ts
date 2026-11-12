@@ -68,6 +68,22 @@ describe('corpReadersFor', () => {
     expect(corporationsReading(accounts, ['canReadStructures', 'canReadIndustry'])).toBe(2);
     expect(corporationsReading(accounts, ['canReadMembers'])).toBe(0);
   });
+
+  it('reads every player corporation for an ungated read (no capability)', () => {
+    const accounts = [
+      reader(1, 500, []),
+      reader(2, 600, ['canReadWallet']),
+      reader(3, 600, []),
+      reader(4, 1000125, []),
+    ];
+    expect(corporationsReading(accounts, [])).toBe(2);
+    expect(corpReadersFor(accounts, null, 3)).toEqual(
+      new Map([
+        [500, 1],
+        [600, 3],
+      ])
+    );
+  });
 });
 
 describe('accountCorpReaders', () => {

@@ -32,7 +32,7 @@ import {
   useOpenAfterMenu,
 } from '@/components/ui';
 import { kindSumsAcrossCharacters } from './data/models';
-import { boardKey, useWidgetBoard } from './board';
+import { boardKey, readScope, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { getKind, rangeAppliesTo, showOf, widgetKeys } from './kinds';
 import { LAYER_IDS, toggleHidden } from '@/engine/netWorth/series';
@@ -218,6 +218,11 @@ export function WidgetMenu({
   const offersScope =
     board.characterScope === 'always' || (canSum && board.allScopeOffered(widget.kind));
   const scopeKey = board.id === 'corp' ? 'corp.grid.menu' : 'overview.menu';
+  // Read across every corporation, only the Shows that sum are offered (the corp wallet's balances).
+  const onAll = offersScope && canSum && readScope(board, widget) === 'all';
+  const shows = onAll
+    ? kind.shows.filter((show) => kindSumsAcrossCharacters(widget.kind, { ...widget, show }))
+    : kind.shows;
   const index = edit.layout.widgets.findIndex((w) => w.id === widget.id);
   const last = edit.layout.widgets.length - 1;
 
@@ -234,14 +239,14 @@ export function WidgetMenu({
         </>
       )}
       {/* What the widget draws comes before how; every Show offers the kind's views, so View stays put. */}
-      {kind.shows.length > 1 && (
+      {shows.length > 1 && (
         <>
           <MenuLabel>{t('overview.menu.show')}</MenuLabel>
           <MenuRadioGroup
             value={showOf(kind, widget.show)}
             onValueChange={(next) => edit.setShow(widget.id, next as WidgetShow)}
           >
-            {kind.shows.map((show) => (
+            {shows.map((show) => (
               <MenuRadioItem key={show} value={show}>
                 {t(`overview.menu.showChoice.${show}`)}
               </MenuRadioItem>
@@ -281,6 +286,11 @@ export function WidgetMenu({
           </MenuRadioGroup>
           {!canSum && (
             <p className="px-2 pb-1 text-xs text-text-dim">{t('overview.menu.nameOnly')}</p>
+          )}
+          {shows.length < kind.shows.length && (
+            <p className="px-2 pb-1 text-xs text-text-dim">
+              {t(`overview.widgets.${widget.kind}.allScopeShows`)}
+            </p>
           )}
         </>
       )}

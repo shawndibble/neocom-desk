@@ -48,6 +48,7 @@ import {
   type UndoableResult,
 } from './layout';
 import { useWidgetBoard } from './board';
+import { kindSumsAcrossCharacters } from './data/models';
 import { visibleWidgets } from './visibility';
 
 export const FLASH_MS = 1600;
@@ -168,7 +169,10 @@ export function OverviewEditProvider({
         if (before !== null) commit(restoreLayout(before));
       },
       add: (kind, init) => {
-        const opensOnAll = boardRef.current.opensOnAll.has(kind);
+        // A preset that reads one corporation (the corp wallet on Flow) stays on it.
+        const opensOnAll =
+          boardRef.current.opensOnAll.has(kind) &&
+          kindSumsAcrossCharacters(kind, { show: init?.show });
         const result = addWidgetUndoable(
           layoutRef.current,
           kind,

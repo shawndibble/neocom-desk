@@ -36,6 +36,7 @@ import type {
   CorpMiningFeed,
   CorpSovereigntyFeed,
   CorpDeadlinesAllFeed,
+  CorpAllFeed,
   CorpStarbasesFeed,
   CorpWalletFeed,
 } from './corpFeeds';
@@ -323,6 +324,9 @@ export interface FeedMap {
   structuresAll: StructuresBoardData;
   moonChunksAll: MoonChunksBoardData;
   corpDeadlinesAll: CorpDeadlinesAllFeed;
+  corpWalletAll: CorpAllFeed<CorpWalletFeed>;
+  corpJobsAll: CorpAllFeed<CorpJobsFeed>;
+  corpKillsAll: CorpAllFeed<CorpKillsFeed>;
   incursions: IncursionsBoardData;
   sovRaids: SovRaidsWidgetData;
   spExtras: SpExtras;
