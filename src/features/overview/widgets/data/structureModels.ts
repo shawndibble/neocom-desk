@@ -110,8 +110,8 @@ function problemsNumber(
   };
 }
 
-export const structures: Builder = (feeds, { t, now, show }) => {
-  const feed = feeds.structures;
+export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
+  const feed = scopeAll ? feeds.structuresAll : feeds.structures;
   const raw = feed?.data ?? null;
   // No structures page exists: a plain title, not a link back to /corp.
   const to = null;
@@ -302,8 +302,8 @@ export const structures: Builder = (feeds, { t, now, show }) => {
 
 // --- Moon extractions -------------------------------------------------------------
 
-export const moonChunks: Builder = (feeds, { t, now }) => {
-  const feed = feeds.moonChunks;
+export const moonChunks: Builder = (feeds, { t, now, scopeAll }) => {
+  const feed = scopeAll ? feeds.moonChunksAll : feeds.moonChunks;
   const data = feed?.data ?? null;
   const to = '/corp/moons/extractions';
   if (!data) return blank(to, statusOf(feed));

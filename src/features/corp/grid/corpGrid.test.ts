@@ -88,7 +88,7 @@ describe('the Corp Board board', () => {
   it('offers only corp kinds, hides what the Character cannot read, and has no Character scope', () => {
     const board = corpWidgetBoard({ ...NO_CORP_CAPABILITIES, canReadWallet: true });
     expect(board.id).toBe('corp');
-    expect(board.characterScope).toBe(false);
+    expect(board.characterScope).toBe('summable');
     expect(board.kinds.every((k) => k.boards.corp !== undefined)).toBe(true);
     expect(board.canDraw(getKind('corpWallet')!)).toBe(true);
     expect(board.canDraw(getKind('structures')!)).toBe(false);

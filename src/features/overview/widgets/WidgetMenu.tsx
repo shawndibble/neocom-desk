@@ -215,6 +215,8 @@ export function WidgetMenu({
   const title = widget.title ?? fallbackTitle;
   const hasRange = rangeAppliesTo(kind, widget.show);
   const canSum = kindSumsAcrossCharacters(widget.kind, widget);
+  const offersScope = board.characterScope === 'always' || canSum;
+  const scopeKey = board.id === 'corp' ? 'corp.grid.menu' : 'overview.menu';
   const index = edit.layout.widgets.findIndex((w) => w.id === widget.id);
   const last = edit.layout.widgets.length - 1;
 
@@ -263,17 +265,17 @@ export function WidgetMenu({
           <MenuSeparator />
         </>
       )}
-      {/* Corp data belongs to one corporation: there is no Character to choose. */}
-      {board.characterScope && (
+      {/* On the Corp Board, "Header" is the active Character's corporation and "All" every corporation any of them can read. */}
+      {offersScope && (
         <>
-          <MenuLabel>{t('overview.menu.character')}</MenuLabel>
+          <MenuLabel>{t(`${scopeKey}.character`)}</MenuLabel>
           <MenuRadioGroup
             value={widget.scope}
             onValueChange={(next) => edit.setScope(widget.id, next as WidgetScope)}
           >
-            <MenuRadioItem value="header">{t('overview.menu.header')}</MenuRadioItem>
+            <MenuRadioItem value="header">{t(`${scopeKey}.header`)}</MenuRadioItem>
             <MenuRadioItem value="all" disabled={!canSum}>
-              {t('overview.menu.all')}
+              {t(`${scopeKey}.all`)}
             </MenuRadioItem>
           </MenuRadioGroup>
           {!canSum && (
@@ -283,7 +285,7 @@ export function WidgetMenu({
       )}
       {hasRange && (
         <>
-          {board.characterScope && <MenuSeparator />}
+          {offersScope && <MenuSeparator />}
           <MenuLabel>{t('overview.menu.range')}</MenuLabel>
           <MenuRadioGroup
             value={String(widget.range)}
@@ -410,7 +412,7 @@ export function WidgetMenu({
         </>
       )}
       {/* The View group ends in its own separator; any group after it does not. */}
-      {(board.characterScope ||
+      {(offersScope ||
         hasRange ||
         kind.hasCalendarEvents ||
         kind.hasRaidsWhere ||

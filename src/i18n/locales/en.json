@@ -15494,7 +15494,10 @@
         "onBoard": "On your Corp Board ×{{count}}"
       },
       "menu": {
-        "remove": "Remove from Corp Board"
+        "remove": "Remove from Corp Board",
+        "character": "Corporations",
+        "header": "Header Character's corporation",
+        "all": "All characters' corporations"
       },
       "header": {
         "breakdownCaption": "When each widget on the Corp Board last read its data"
