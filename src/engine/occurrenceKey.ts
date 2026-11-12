@@ -59,6 +59,7 @@ import type {
   StructureReinforcementExitFire,
   PriceAlertTriggeredFire,
   ShipLostFire,
+  CharacterNeedsLoginFire,
 } from './notificationDiffs';
 import type {
   CommunityJoinRequestFire,
@@ -108,6 +109,7 @@ export type OccurrenceFire =
   | StructureReinforcementExitFire
   | PriceAlertTriggeredFire
   | ShipLostFire
+  | CharacterNeedsLoginFire
   | StockBelowTargetFire
   | CommunityJoinRequestFire
   | CommunityMemberJoinedFire
@@ -239,6 +241,9 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // The killmail itself: zKillboard ids a loss once and never changes it.
     case 'shipLost':
       return [characterId, fire.eventId, fire.killmailId].join(':');
+    // The poll that first saw the mark: a later failure, after a sign-in, is its own.
+    case 'characterNeedsLogin':
+      return [characterId, fire.eventId, fire.sinceMs].join(':');
     // The Character at the Community, at the time it asked or joined: someone
     // turned away who asks again, or a Member who leaves and rejoins, is a new
     // occurrence and must not be deduped against the first.
@@ -317,6 +322,8 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     // The killmail's own time, which a poll after days away must not replace.
     case 'shipLost':
       return pastOrNow(fire.timeMs);
+    case 'characterNeedsLogin':
+      return fire.sinceMs;
     // The completed entry's `finish_date`, already in the past by the time
     // the diff fires (`isCompleted`). Null when the queue carried no date.
     case 'skillLevelComplete':

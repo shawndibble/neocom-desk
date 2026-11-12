@@ -4901,6 +4901,8 @@
       "alerts": "Alerts"
     },
     "activeLabel": "Active",
+    "logInAgain": "Log in again",
+    "logInAgainFor": "Log in again as {{name}}",
     "spLabel": "SP",
     "walletLabel": "ISK",
     "acceleratorManual": "+{{bonus}} · {{left}}",
@@ -12405,6 +12407,10 @@
         "bodyHangar_one": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} is in your hangar there.",
         "bodyHangar_other": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} are in your hangar there."
       },
+      "characterNeedsLogin": {
+        "title": "Log in again",
+        "body": "{{character}} needs to log in again. Its alerts have stopped."
+      },
       "shipLost": {
         "title": "Ship lost",
         "lostShip": "Lost your {{ship}}",
@@ -14748,7 +14754,8 @@
         "communityMemberJoined": "Community member joined",
         "communityRequestPledged": "Pledge on your Request",
         "priceAlertTriggered": "Quickbar price alert",
-        "shipLost": "Ship lost"
+        "shipLost": "Ship lost",
+        "characterNeedsLogin": "Character needs to log in again"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Planetary Industry always shows the real expiry.",
       "mercenaryDenReinforcedHint": "Scheduled up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. A den that leaves reinforcement early can still send it.",
@@ -15193,7 +15200,28 @@
         "state": "State",
         "timer": "Timer",
         "services": "Services",
-        "unanchoring": "Unanchoring"
+        "unanchoring": "Unanchoring",
+        "blocks": "Fuel blocks",
+        "needed": "Needed"
+      },
+      "fuelPlan": {
+        "until": "Fuel until",
+        "blocksHint": "Fuel blocks in the structure's fuel bay, and how many it burns a day",
+        "neededHint": "Fuel blocks to add so the structure stays fuelled to the end of the Fuel until date (EVE time)",
+        "perDay": "{{rate}}/day",
+        "noBayAccess": "Not readable",
+        "noBayAccessHint": "Fuel blocks come from the corporation's assets. EVE opens them only to a Director, and a failed read leaves them out too. Structures marked Not readable show time left only.",
+        "total_one": "Total {{blocks}} block · {{volume}} m³",
+        "total_other": "Total {{blocks}} blocks · {{volume}} m³",
+        "unknown_one": "{{count}} structure unknown",
+        "unknown_other": "{{count}} structures unknown",
+        "copy": "Copy list",
+        "copied": "Copied",
+        "copyFailed": "Copy failed",
+        "copyLine_one": "{{structure}} ({{system}}): {{blocks}} fuel block",
+        "copyLine_other": "{{structure}} ({{system}}): {{blocks}} fuel blocks",
+        "copyTotal_one": "Total to {{date}}: {{blocks}} fuel block, {{volume}} m³",
+        "copyTotal_other": "Total to {{date}}: {{blocks}} fuel blocks, {{volume}} m³"
       },
       "servicesOnline_one": "{{count}} online",
       "servicesOnline_other": "{{count}} online",
@@ -19245,6 +19273,7 @@
       "hintText": "Dotted underline: has a tooltip (HintText)",
       "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
       "missingGrantMark": "Red slashed broadcast icon: this row needs a grant the Character lacks",
+      "needsLogin": "Small warning \"Log in again\" button on a Character: its login is dead; press to log in again",
       "channelOff": "Greyed checkbox that keeps its tick: its channel is off",
       "figureHistory": "Small dim glyph after a figure: click or tap for its history in a popover",
       "figureBreakdown": "Dashed underline on a figure: click or tap opens how it is worked out",

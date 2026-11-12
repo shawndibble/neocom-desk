@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useAuthFailure } from '@/stores/authFailure';
+import { useAuthFailure, useNeedsLogin } from '@/stores/authFailure';
 import { AuthFailureNotice, AuthFailureRedirect, NeedsLoginNotice } from './AuthFailureNotice';
 import { beginEveLogin } from './loginFlow';
 
@@ -27,7 +27,9 @@ function renderApp() {
 }
 
 beforeEach(async () => {
-  useAuthFailure.setState({ failure: null, needsLogin: [] });
+  useAuthFailure.setState({ failure: null });
+  await db.settings.delete('auth.needsLogin');
+  useNeedsLogin.setState({ value: [], hydrated: true });
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
   await db.characters.clear();
 });
@@ -64,13 +66,14 @@ describe('AuthFailureRedirect', () => {
     expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHARACTER_ID });
   });
 
-  it('forgets a character that no longer exists', async () => {
+  it('shows no notice for a character that no longer exists', async () => {
     useAuthFailure.getState().reportTokenFailure(CHARACTER_ID);
     renderApp();
-    await waitFor(() => expect(useAuthFailure.getState().needsLogin).toEqual([]));
+    await waitFor(() => expect(useAuthFailure.getState().failure).toBeNull());
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('drops the notice when dismissed', async () => {
+  it('drops the notice when dismissed, keeping the mark until a sign-in', async () => {
     await db.characters.put({
       characterId: CHARACTER_ID,
       name: 'Ada Vance',
@@ -81,6 +84,7 @@ describe('AuthFailureRedirect', () => {
     renderApp();
     await userEvent.click(await screen.findByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByText('Ada Vance needs a new login')).not.toBeInTheDocument();
+    expect(useNeedsLogin.getState().value).toEqual([CHARACTER_ID]);
   });
 
   it('consumes the failure, so the redirect happens once rather than every render', async () => {
@@ -93,7 +97,7 @@ describe('AuthFailureRedirect', () => {
     useAuthFailure.getState().reportTokenFailure(CHARACTER_ID);
     renderApp();
     await waitFor(() => expect(useAuthFailure.getState().failure).toBeNull());
-    expect(useAuthFailure.getState().needsLogin).toEqual([CHARACTER_ID]);
+    expect(useNeedsLogin.getState().value).toEqual([CHARACTER_ID]);
   });
 
   it('does not redirect for a request-level failure — only that view is broken', () => {
@@ -102,11 +106,13 @@ describe('AuthFailureRedirect', () => {
     expect(screen.getByText('mail view')).toBeInTheDocument();
   });
 
-  it('does not throw the active character out over another character’s dead grant', () => {
+  it('does not throw the active character out over another character’s dead grant', async () => {
     useAuthFailure.getState().reportTokenFailure(CHARACTER_ID + 1);
     renderApp();
     expect(screen.getByText('mail view')).toBeInTheDocument();
-    expect(useAuthFailure.getState().needsLogin).toEqual([]);
+    // Marked for its own row and alert, but no redirect and no shell banner.
+    await waitFor(() => expect(useNeedsLogin.getState().value).toEqual([CHARACTER_ID + 1]));
+    expect(screen.queryByText('mail view')).toBeInTheDocument();
   });
 });
 

@@ -54,13 +54,14 @@ Table: one flat `DataTable`, scrolls sideways at every width, sticky name (`resp
 ## Persistence and sync
 
 - URL (ADR 0015): `q, sort, dir, queue, corp, group, starred, alerts, table.sort`.
+- Needs-login mark (`auth.needsLogin`, device-local Dexie setting, never synced; issue #6091): every Character whose refresh grant EVE refused (`invalid_grant`), active or not. Set by any token failure (`reportTokenFailure`), survives a reload, cleared when that Character's grant works again (login, then its next token refresh) or it is removed. Nothing about it goes to the server.
 - Device-local Dexie settings: view mode, visible columns (`charactersVisibleColumns`; empty list rejected to defaults; migration flag `charactersColumnsMigratedGroupRemove` adds `group`, drops retired `remove`), starred ids (`starredCharacters.ts`), groups (own `updatedAt`, no `sync.` prefix, `overviewGroups.ts`). Density = shared synced font scale. None of groups/stars sync.
 - Self-heal effects prune group members and stars whose Character left the device (`Characters.tsx:1117,1133`), including sold Characters.
 - Data: roster core cache-only by default (`roster.ts`, `rosterView.ts`: wallet, skills with queue-corrected SP, queue state, job-slot skills); `live: true` composes per-Character loaders with `ESI_FANOUT_CONCURRENCY`, merging rows as each finishes. Attention (`rosterAttention.ts`): job counts + PI; planets scope checked up front per Character so a 403 never raises an app-wide banner. Public info batched (`usePublicInfo.loadMany`). Alert counts from the feed.
 
 ## States
 
-No Characters: EmptyState "No characters yet". Filters empty everything: "No characters match this search or filter". Unknown stats: "unknown"/dash. Spinner while Dexie loads. Remove failure: `Toast` 5 s, nothing deleted. No ESI error UI on refresh all.
+Dead login: the table's name cell, the card's name line and the Character switcher row show a warning "Log in again" button (`NeedsLoginAction`, accessible name "Log in again as <name>") that starts the re-login for that Character. The active Character's dead login still redirects here and adds the "<name> needs a new login" banner (`NeedsLoginNotice`; Dismiss hides it for this visit, the mark stays); a non-active Character never redirects or raises the shell banner. The `characterNeedsLogin` alert (notifications.md) fires once per failure. No Characters: EmptyState "No characters yet". Filters empty everything: "No characters match this search or filter". Unknown stats: "unknown"/dash. Spinner while Dexie loads. Remove failure: `Toast` 5 s, nothing deleted. No ESI error UI on refresh all.
 
 ## Scopes
 
@@ -113,11 +114,12 @@ Modal copy states local deletion and that the synced copy stays. `removeCharacte
 - Table has no group management; two sort controls (`sort` vs `table.sort`).
 - No manual Character ordering.
 - Row-menu "Alerts" sets active Character then opens a device-wide page without preselecting the alerts Character filter.
-- Refresh all shows one spinner only; no per-Character progress or failure marker (`handleRefreshAll`).
+- Refresh all shows one spinner only; no per-Character progress marker (`handleRefreshAll`). A dead login is the one per-Character failure marked ("Log in again").
+- The needs-login mark comes only from token refreshes that already happen; nothing probes a token proactively.
 - Re-adding an existing Character is a plain re-login with no account-wide backfill by design (`addCharacter.ts`).
 - Cards are the default view (`Characters.tsx:1751`), though the table's attention scan is the main reason to open the page (owner, 2026-10-11).
 
 ## Improvement ideas
 
 - Consider Table as the default view on desktop, or at some roster size (owner, 2026-10-11: the table scan is the main job).
-- Bulk select (group/remove/star), drag ordering, per-Character refresh and failure markers, Alpha/Omega and location on cards, sync groups and stars across devices.
+- Bulk select (group/remove/star), drag ordering, per-Character refresh progress, Alpha/Omega and location on cards, sync groups and stars across devices.

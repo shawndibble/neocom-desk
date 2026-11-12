@@ -136,6 +136,9 @@ import {
   type CorpRosterSnapshot,
   type CorpWalletSnapshot,
   type PriceAlertSnapshot,
+  diffCharacterNeedsLogin,
+  type CharacterNeedsLoginFire,
+  type SignInSnapshot,
 } from '@/engine/notificationDiffs';
 import type { NotificationCopy } from '@/engine/notificationWording';
 import type { ProjectableEventId, PushCopy } from '@/engine/projection';
@@ -169,6 +172,7 @@ import {
   type SkyhookNames,
   shipLostCopy,
   type ShipLostNames,
+  characterNeedsLoginCopy,
   communityJoinRequestCopy,
   communityMemberJoinedCopy,
   communityRequestPledgedCopy,
@@ -214,6 +218,7 @@ export type AnyNotificationFire =
   | CorpWalletThresholdFire
   | PriceAlertTriggeredFire
   | ShipLostFire
+  | CharacterNeedsLoginFire
   | StockBelowTargetFire
   | IncursionNearbyFire
   | SkyhookRaidableNearbyFire
@@ -269,6 +274,7 @@ export const SNAPSHOT_SOURCES = {
   incursions: source<IncursionAlertSnapshot, IncursionNames>('incursions'),
   skyhooksNearby: source<SkyhookAlertSnapshot, SkyhookNames>('skyhooksNearby'),
   communities: source<CommunityAlertSnapshot>('communities'),
+  signIn: source<SignInSnapshot>('signIn'),
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -715,6 +721,15 @@ export const NOTIFICATION_EVENT_ENTRIES = {
       fields: [THRESHOLD_FIELDS.shipLostMinimumIsk],
       hintKey: 'settings.notifications.shipLostMinimumIskHint',
     },
+    rowHintKey: null,
+  }),
+  characterNeedsLogin: defineEvent({
+    source: SNAPSHOT_SOURCES.signIn,
+    diff: diffCharacterNeedsLogin,
+    copy: characterNeedsLoginCopy,
+    // The mark is device-local; the backend never sees a failed refresh.
+    projection: null,
+    thresholds: null,
     rowHintKey: null,
   }),
   communityJoinRequest: defineEvent({
