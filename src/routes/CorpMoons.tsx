@@ -148,7 +148,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
                     {t('corpTaxBook.moons.activity.button')}
                   </Button>
                 )}
-                {(sync.ledger.state === 'ready' || moonOwnersSync.enabled) && (
+                {sync.ledger.state === 'ready' && (
                   <IconButton
                     icon={syncing ? <Spinner /> : <Icon.Refresh />}
                     label={t('corpTaxBook.moons.syncNow')}
@@ -219,7 +219,11 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
       )}
       {deleteOpen && <DeleteBookDialog onClose={() => setDeleteOpen(false)} />}
       {moonOwnersSync.notice && (
-        <Toast message={moonOwnersSync.notice} onClose={moonOwnersSync.clearNotice} />
+        <Toast
+          message={moonOwnersSync.notice.message}
+          instance={moonOwnersSync.notice.instance}
+          onClose={moonOwnersSync.clearNotice}
+        />
       )}
       {saved && (
         <Toast message={t('corpTaxBook.moons.settings.saved')} onClose={() => setSaved(false)} />

@@ -122,7 +122,11 @@ export async function removeOwnCorpFeederRemote(args: {
   }
 }
 
-/** What Sync now did for the book's moon owners; `retryAt` (epoch ms) when it pressed too soon. */
+/**
+ * What Sync now did for the book's moon owners; `retryAt` (epoch ms) when it pressed too soon.
+ * Mirrors `SyncMoonOwnersNowResult` (functions/src/corpTaxBookMoonOwnersSyncNow.ts), which the
+ * client cannot import: that module pulls in firebase-admin.
+ */
 export type MoonOwnersSyncNowResult =
   | { kind: 'synced'; read: number; stale: number; skipped: number }
   | { kind: 'rate-limited'; retryAt: number }

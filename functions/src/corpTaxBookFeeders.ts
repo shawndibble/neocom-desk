@@ -407,6 +407,8 @@ const FEED_STATE: readonly (keyof FeederRecord)[] = [
   'staleSince',
   'disconnectedAt',
   'lastSyncResult',
+  // A rejoin's holder may read Extractions the old one could not (#6117).
+  'extractionsRefusedAt',
   'viewDismissedAt',
   // The offered rate belongs to the link, not to the record's history.
   'offeredOwnerRatePct',

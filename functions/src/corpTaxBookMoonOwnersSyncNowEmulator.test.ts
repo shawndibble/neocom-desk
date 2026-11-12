@@ -177,6 +177,13 @@ emulatorSuite('sync moon owners now', () => {
     expect(await storedExtractions()).toMatchObject([
       { structureId: 7001, sourceCorporationId: FEEDER_A },
     ]);
+    // What officers read without the raw rows: the pull's moon doc and the Overview's window.
+    const id = `7001_${Date.parse(CHUNK.extraction_start_time)}`;
+    expect((await collectorBook().collection('moonDocs').doc(id).get()).exists).toBe(true);
+    const overview = (await collectorBook().collection('readModels').doc('overview').get()).data();
+    expect(overview?.extractions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ structureId: 7001 })])
+    );
   });
 
   it('pulls every moon owner at once, without waiting for the schedule', async () => {
@@ -222,6 +229,17 @@ emulatorSuite('sync moon owners now', () => {
       corporationId: COLLECTOR,
       accessToken: `roles-${COLLECTOR_CEO}`,
       feederCorporationId: FEEDER_B,
+    });
+    calls.length = 0;
+    expect(await syncNow()).toEqual({ kind: 'synced', read: 1, stale: 0, skipped: 0 });
+    expect(calls.some((c) => c.endsWith(`:${FEEDER_B}`))).toBe(false);
+  });
+
+  it('leaves out a moon owner that disconnected', async () => {
+    await add(FEEDER_A);
+    await add(FEEDER_B);
+    await collectorBook().collection('feeders').doc(String(FEEDER_B)).update({
+      status: 'disconnected',
     });
     calls.length = 0;
     expect(await syncNow()).toEqual({ kind: 'synced', read: 1, stale: 0, skipped: 0 });

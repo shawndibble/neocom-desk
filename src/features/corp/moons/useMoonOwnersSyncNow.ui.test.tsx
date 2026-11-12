@@ -53,8 +53,25 @@ describe('Sync now for moon owners', () => {
     });
     const { result } = renderHook(() => useMoonOwnersSyncNow([row('active')]));
     await act(() => result.current.run());
-    await waitFor(() => expect(result.current.notice).toContain('08:40'));
+    await waitFor(() => expect(result.current.notice?.message).toContain('08:40'));
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('is on for a book whose only moon owner has no rate yet (still read on the schedule)', () => {
+    expect(renderHook(() => useMoonOwnersSyncNow([row('no-rate')])).result.current.enabled).toBe(
+      true
+    );
+  });
+
+  it('says so when every read was skipped, and a second press replays the toast', async () => {
+    syncMoonOwnersNowRemote.mockResolvedValue({ kind: 'synced', read: 0, stale: 0, skipped: 2 });
+    const { result } = renderHook(() => useMoonOwnersSyncNow([row('active')]));
+    await act(() => result.current.run());
+    const first = result.current.notice;
+    expect(first?.message).toMatch(/scheduled sync/);
+    await new Promise((r) => setTimeout(r, 2));
+    await act(() => result.current.run());
+    expect(result.current.notice?.instance).not.toBe(first?.instance);
   });
 
   it('is off for a viewer who cannot edit, and with no moon owner still read', async () => {

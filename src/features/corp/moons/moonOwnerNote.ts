@@ -1,13 +1,10 @@
 import type { TFunction } from 'i18next';
-import type { MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
+import { isStillRead, type MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
 import { formatAge } from '@/lib/age';
 import { nextScheduledBookSync } from '../../../../functions/src/corpTaxBookSchedule';
 import { shortDate, utcTime } from './moonsFormat';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.${key}`;
-
-/** Statuses the scheduled sync no longer reads. */
-const NEVER_READ_AGAIN = new Set<MoonOwnerRow['status']>(['disconnected', 'left', 'removed']);
 
 /**
  * The dim line under a moon owner's name, shared by the table and the phone cards: its
@@ -24,7 +21,7 @@ export function moonOwnerNote(r: MoonOwnerRow, now: number, t: TFunction): strin
     r.status === 'cant-read' && r.staleSince !== undefined
       ? [t(k('cantReadSince'), { date: shortDate(new Date(r.staleSince).toISOString()) })]
       : [r.sameOwner ? t(k('yoursNote')) : undefined, synced];
-  const next = NEVER_READ_AGAIN.has(r.status)
+  const next = !isStillRead(r.status)
     ? undefined
     : t(k('nextRead'), {
         time: utcTime(nextScheduledBookSync(now)),
