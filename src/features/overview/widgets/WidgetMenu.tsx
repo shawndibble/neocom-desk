@@ -215,7 +215,8 @@ export function WidgetMenu({
   const title = widget.title ?? fallbackTitle;
   const hasRange = rangeAppliesTo(kind, widget.show);
   const canSum = kindSumsAcrossCharacters(widget.kind, widget);
-  const offersScope = board.characterScope === 'always' || canSum;
+  const offersScope =
+    board.characterScope === 'always' || (canSum && board.allScopeOffered(widget.kind));
   const scopeKey = board.id === 'corp' ? 'corp.grid.menu' : 'overview.menu';
   const index = edit.layout.widgets.findIndex((w) => w.id === widget.id);
   const last = edit.layout.widgets.length - 1;

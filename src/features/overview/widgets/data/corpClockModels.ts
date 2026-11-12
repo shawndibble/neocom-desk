@@ -3,7 +3,12 @@
  * Same contract as `models.ts`: pure, derived at render time.
  */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
-import { buildCorpBoard, type CorpBoardItem } from '@/engine/corp/board';
+import {
+  buildCorpBoard,
+  mergeCorpBoards,
+  type CorpBoardItem,
+  type CorpBoardSources,
+} from '@/engine/corp/board';
 import {
   DEADLINE_STRIP_DAYS,
   DUE_SOON_WINDOW_MS,
@@ -19,14 +24,18 @@ import { formatDateOnly } from '@/lib/timestamp';
 import { CORP_CACHE_WINDOW_MS } from '../../data/corpCards';
 import type { BarsChartModel } from '../charts/types';
 import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from './builderKit';
-import { fractionBar } from './cellKit';
+import { corpCell, fractionBar } from './cellKit';
 import { hbarsFromRows } from './chartBuilders';
-import type { CorpJobsFeed } from './corpFeeds';
+import type { CorpLabel } from '@/features/corp/corpTicker';
+import type { CorpDeadlinesSlice, CorpJobsFeed } from './corpFeeds';
 import { toBoardHubFuel, toBoardSovereignty } from './corpSovereigntyModels';
 import { toBoardStarbases } from './corpStarbaseModels';
 import { elapsedShare } from './industryModels';
 import { shortStructureName } from './structureModels';
 import type {
+  BuildContext,
+  Feeds,
+  KindView,
   NumberSecondary,
   RowDetailModel,
   TableCell,
@@ -116,56 +125,68 @@ function dayChart(
   };
 }
 
-export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
-  const list = [feeds.structures, feeds.moonChunks, feeds.corpJobs] as const;
-  // A feed still on its first load: nothing to say until every read has an answer.
-  const pending = list.find((feed) => !feed || (!feed.data && feed.loading));
-  // Towers only add clocks: a Character may not read them, so they wait for an answer but never block one.
-  const towers = feeds.corpStarbases;
-  const towersPending = towers && !towers.data && towers.loading ? towers : undefined;
-  // Raid windows are the same kind of extra: waited for, never blocking.
-  const raids = feeds.corpSovereignty;
-  const raidsPending = raids && !raids.data && raids.loading ? raids : undefined;
-  const extraPending = towersPending ?? raidsPending;
-  if (list.some((feed) => !feed) || pending !== undefined || extraPending !== undefined) {
-    return blank(null, statusOf(pending ?? extraPending));
-  }
+/** One corporation's Due soon reads, whatever scope fetched them; absent or null means not read. */
+type DeadlineReads = Partial<Omit<CorpDeadlinesSlice, 'corporationId' | 'failed'>>;
 
+/** The readable reads as the board's sources, and when they landed. */
+function readableSources(reads: DeadlineReads, now: number) {
   // A source this Character cannot read contributes undefined, never [].
-  const structures = feeds.structures?.data?.structures ?? undefined;
+  const structures = reads.structures?.structures ?? undefined;
   // `chunks` says whether the read was allowed; `extractions` is what the board ranks.
-  const chunks = feeds.moonChunks?.data?.chunks ?? undefined;
-  const extractions = chunks ? (feeds.moonChunks?.data?.extractions ?? []) : undefined;
-  const jobsData = feeds.corpJobs?.data?.readable ? feeds.corpJobs.data : undefined;
-  const towersData = towers?.data?.readable ? towers.data : undefined;
-  const raidsData = raids?.data?.readable ? raids.data : undefined;
+  const chunks = reads.moonChunks?.chunks ?? undefined;
+  const extractions = chunks ? (reads.moonChunks?.extractions ?? []) : undefined;
+  const jobs = reads.jobs?.readable ? reads.jobs : undefined;
+  const towers = reads.starbases?.readable ? reads.starbases : undefined;
+  const raids = reads.sovereignty?.readable ? reads.sovereignty : undefined;
+  const fetched = [
+    structures ? reads.structures?.fetchedAt : null,
+    chunks ? reads.moonChunks?.fetchedAt : null,
+    jobs?.fetchedAt,
+    towers?.fetchedAt,
+    raids?.fetchedAt,
+  ].filter((at): at is Date => at instanceof Date);
+  return {
+    readable:
+      structures !== undefined ||
+      chunks !== undefined ||
+      jobs !== undefined ||
+      towers !== undefined ||
+      raids !== undefined,
+    sources: {
+      structures,
+      extractions,
+      jobs: jobs ? toBoardJobs(jobs.jobs, jobs.typeNames) : undefined,
+      starbases: towers ? toBoardStarbases(towers, now) : undefined,
+      sovereignty: raids ? toBoardSovereignty(raids) : undefined,
+      hubFuel: raids ? toBoardHubFuel(raids) : undefined,
+    } satisfies Omit<CorpBoardSources, 'nowMs' | 'staleWindowMs'>,
+    fetched,
+    fromCache: Boolean(jobs?.fromCache),
+  };
+}
 
-  if (
-    structures === undefined &&
-    chunks === undefined &&
-    jobsData === undefined &&
-    towersData === undefined &&
-    raidsData === undefined
-  ) {
-    const failed = [...list, towers, raids].find((feed) => feed && !feed.data && feed.error);
-    if (failed) return blank(null, statusOf(failed));
-    const needsReauth =
-      Boolean(feeds.structures?.data?.needsReauth) ||
-      Boolean(feeds.moonChunks?.data?.needsReauth) ||
-      Boolean(feeds.corpJobs?.data?.needsReauth);
-    return corpUnreadable(null, feeds.structures, needsReauth, t);
-  }
+const boardOf = (sources: ReturnType<typeof readableSources>['sources'], now: number) =>
+  buildCorpBoard({ nowMs: now, staleWindowMs: CORP_CACHE_WINDOW_MS, ...sources });
 
-  const board = buildCorpBoard({
-    nowMs: now,
-    staleWindowMs: CORP_CACHE_WINDOW_MS,
-    structures,
-    extractions,
-    jobs: jobsData ? toBoardJobs(jobsData.jobs, jobsData.typeNames) : undefined,
-    starbases: towersData ? toBoardStarbases(towersData, now) : undefined,
-    sovereignty: raidsData ? toBoardSovereignty(raidsData) : undefined,
-    hubFuel: raidsData ? toBoardHubFuel(raidsData) : undefined,
-  });
+/** How the read went, for the view: the feeds' state, and when the oldest read landed. */
+interface DeadlinesRead {
+  loading: boolean;
+  /** A read failed while others answered: the rest draws, flagged. */
+  error: boolean;
+  fetched: readonly Date[];
+  fromCache: boolean;
+}
+
+/**
+ * The widget over a built board. `labels` names each row's corporation, given only when
+ * the rows come from more than one.
+ */
+function deadlinesView(
+  board: readonly CorpBoardItem[],
+  read: DeadlinesRead,
+  { t, now, zone }: Pick<BuildContext, 't' | 'now' | 'zone'>,
+  labels?: ReadonlyMap<number, CorpLabel>
+): KindView {
   // A finished job is "Ready to deliver" on Corp industry jobs, not a deadline.
   const items = board.filter((item) => item.kind !== 'jobDelivery');
   // The board is already soonest-first; an offline service has no clock, so it is no deadline.
@@ -179,6 +200,8 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
       )
       .map((item) => item.severity)
   );
+  const corpOf = (item: CorpBoardItem) =>
+    labels && item.corporationId !== undefined ? labels.get(item.corporationId) : undefined;
 
   // Next is the soonest item still ahead; a dry or overdue one is listed, not "next".
   const next = timed.find((item) => item.timing === 'timed' && (item.deadlineMs ?? 0) > now);
@@ -194,6 +217,9 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
   const table: TableModel = {
     columns: [
       { key: 'subject', label: t('overview.widgets.corpDeadlines.col.subject'), priority: 0 },
+      ...(labels
+        ? [{ key: 'corp', label: t('overview.widgets.corpDeadlines.col.corp'), priority: 3 }]
+        : []),
       { key: 'what', label: t('overview.widgets.corpDeadlines.col.what'), priority: 2 },
       {
         key: 'when',
@@ -202,33 +228,35 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
         priority: 1,
       },
     ],
-    rows: timed.map((item): TableRowModel => ({
-      key: item.id,
-      cells: [subjectOf(item), whatOf(item, t), whenOf(item, t)],
-      tone: item.severity,
-    })),
+    rows: timed.map((item): TableRowModel => {
+      const corp = corpOf(item);
+      return {
+        key: item.id,
+        cells: [
+          subjectOf(item),
+          ...(labels ? [corp ? corpCell(corp) : UNKNOWN] : []),
+          whatOf(item, t),
+          whenOf(item, t),
+        ],
+        tone: item.severity,
+      };
+    }),
   };
-  const fetched = [
-    structures ? feeds.structures?.data?.fetchedAt : null,
-    chunks ? feeds.moonChunks?.data?.fetchedAt : null,
-    jobsData?.fetchedAt,
-    towersData?.fetchedAt,
-    raidsData?.fetchedAt,
-  ].filter((at): at is Date => at instanceof Date);
 
   return {
     ...blank(null, {
       ...statusOf(undefined, {
-        loading: [...list, towers, raids].some((feed) => feed?.loading),
+        loading: read.loading,
         hasData: true,
         isEmpty: timed.length === 0,
       }),
-      // Any failed read still draws what the other feeds gave, flagged as failed.
-      error: [...list, towers, raids].some((feed) => Boolean(feed && !feed.data && feed.error)),
+      error: read.error,
     }),
     fetchedAt:
-      fetched.length > 0 ? fetched.reduce((oldest, at) => (at < oldest ? at : oldest)) : null,
-    fromCache: jobsData?.fromCache ?? false,
+      read.fetched.length > 0
+        ? read.fetched.reduce((oldest, at) => (at < oldest ? at : oldest))
+        : null,
+    fromCache: read.fromCache,
     number: {
       value: count(due.total),
       unit: t('corp.standing.dueSoon'),
@@ -243,13 +271,16 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
             ],
       tone: due.total > 0 ? dueTone : 'clear',
     },
-    rows: timed.map((item) => ({
-      key: item.id,
-      title: subjectOf(item),
-      detail: whatOf(item, t),
-      value: whenOf(item, t),
-      tone: item.severity,
-    })),
+    rows: timed.map((item) => {
+      const corp = corpOf(item);
+      return {
+        key: item.id,
+        title: subjectOf(item),
+        detail: corp ? `${corp.ticker} · ${whatOf(item, t)}` : whatOf(item, t),
+        value: whenOf(item, t),
+        tone: item.severity,
+      };
+    }),
     table,
     summary: t('overview.widgets.corpDeadlines.summary', {
       count: due.total,
@@ -257,6 +288,98 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
     }),
     chart: dayChart(t, items, now, zone),
   };
+}
+
+/** Due soon across every corporation the pilot's Characters can read: one deadline-ranked list. */
+function allCorpDeadlines(feeds: Feeds, ctx: BuildContext): KindView {
+  const feed = feeds.corpDeadlinesAll;
+  const data = feed?.data;
+  if (!feed || !data) return blank(null, statusOf(feed));
+  const reads = data.corporations.map((slice) => ({
+    corporationId: slice.corporationId,
+    read: readableSources(slice, ctx.now),
+  }));
+  const readable = reads.filter(({ read }) => read.readable);
+  if (readable.length === 0) {
+    // A read failed and none answered: Retry, not "your roles don't cover this".
+    if (data.corporations.some((slice) => slice.failed)) {
+      return blank(null, { ...statusOf(feed), error: true });
+    }
+    const needsReauth = data.corporations.some(
+      (slice) =>
+        slice.structures?.needsReauth || slice.moonChunks?.needsReauth || slice.jobs?.needsReauth
+    );
+    return corpUnreadable(null, feed, needsReauth, ctx.t);
+  }
+  const board = mergeCorpBoards(
+    readable.map(({ corporationId, read }) => ({
+      corporationId,
+      items: boardOf(read.sources, ctx.now),
+    }))
+  );
+  return deadlinesView(
+    board,
+    {
+      loading: feed.loading,
+      error: data.corporations.some((slice) => slice.failed),
+      fetched: readable.flatMap(({ read }) => read.fetched),
+      fromCache: readable.some(({ read }) => read.fromCache),
+    },
+    ctx,
+    // One corporation's rows need no column naming it.
+    readable.length > 1 ? data.labels : undefined
+  );
+}
+
+export const corpDeadlines: Builder = (feeds, ctx) => {
+  if (ctx.scopeAll) return allCorpDeadlines(feeds, ctx);
+  const { t, now } = ctx;
+  const list = [feeds.structures, feeds.moonChunks, feeds.corpJobs] as const;
+  // A feed still on its first load: nothing to say until every read has an answer.
+  const pending = list.find((feed) => !feed || (!feed.data && feed.loading));
+  // Towers only add clocks: a Character may not read them, so they wait for an answer but never block one.
+  const towers = feeds.corpStarbases;
+  const towersPending = towers && !towers.data && towers.loading ? towers : undefined;
+  // Raid windows are the same kind of extra: waited for, never blocking.
+  const raids = feeds.corpSovereignty;
+  const raidsPending = raids && !raids.data && raids.loading ? raids : undefined;
+  const extraPending = towersPending ?? raidsPending;
+  if (list.some((feed) => !feed) || pending !== undefined || extraPending !== undefined) {
+    return blank(null, statusOf(pending ?? extraPending));
+  }
+
+  const read = readableSources(
+    {
+      structures: feeds.structures?.data,
+      moonChunks: feeds.moonChunks?.data,
+      jobs: feeds.corpJobs?.data,
+      starbases: towers?.data,
+      sovereignty: raids?.data,
+    },
+    now
+  );
+  const all = [...list, towers, raids];
+  if (!read.readable) {
+    const failed = all.find((feed) => feed && !feed.data && feed.error);
+    if (failed) return blank(null, statusOf(failed));
+    const needsReauth =
+      Boolean(feeds.structures?.data?.needsReauth) ||
+      Boolean(feeds.moonChunks?.data?.needsReauth) ||
+      Boolean(feeds.corpJobs?.data?.needsReauth);
+    return corpUnreadable(null, feeds.structures, needsReauth, t);
+  }
+
+  return deadlinesView(
+    boardOf(read.sources, now),
+    {
+      loading: all.some((feed) => feed?.loading),
+      // Any failed read still draws what the other feeds gave, flagged as failed.
+      error: all.some((feed) => Boolean(feed && !feed.data && feed.error)),
+      fetched: read.fetched,
+      fromCache: read.fromCache,
+    },
+    ctx
+  );
 };
 
 // --- Corp industry jobs -----------------------------------------------------------

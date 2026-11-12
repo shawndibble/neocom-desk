@@ -55,6 +55,15 @@ import {
 } from '@/features/corp/wallet';
 import { isNpcCorporationId } from '@/esi/entityIds';
 import { DAY_MS } from '@/lib/age';
+import {
+  corpReadersFor,
+  loadAccountCorpAccess,
+  type CorpCapability,
+} from '@/features/corp/corpReadAccess';
+import { loadCorpLabels } from '@/features/corp/corpTicker';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { loadMoonChunksBoardData, loadStructuresBoardData } from '../../data/corpBoard';
 import { fetchCorporationStatsRead } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
 import type {
@@ -62,6 +71,8 @@ import type {
   CorpCustomsFeed,
   CorpRoleAuditFeed,
   CorpContractsFeed,
+  CorpDeadlinesAllFeed,
+  CorpDeadlinesSlice,
   CorpJobsFeed,
   CorpJournalLine,
   CorpKillsFeed,
@@ -591,4 +602,68 @@ export function loadCorpSovereignty(characterId: number): Promise<CorpSovereignt
       };
     },
   });
+}
+
+// --- Due soon across every corporation (All scope) ----------------------------------
+
+type DeadlineSource = Exclude<keyof CorpDeadlinesSlice, 'corporationId' | 'failed'>;
+
+/** Each Due soon source, the capability that opens it, and its one-corporation read. */
+const DEADLINE_READS: readonly {
+  source: DeadlineSource;
+  capability: CorpCapability;
+  load: (characterId: number) => Promise<NonNullable<CorpDeadlinesSlice[DeadlineSource]>>;
+}[] = [
+  { source: 'structures', capability: 'canReadStructures', load: loadStructuresBoardData },
+  { source: 'moonChunks', capability: 'canReadMoonExtractions', load: loadMoonChunksBoardData },
+  { source: 'jobs', capability: 'canReadIndustry', load: loadCorpJobs },
+  { source: 'starbases', capability: 'canReadStarbases', load: loadCorpStarbases },
+  { source: 'sovereignty', capability: 'canReadSkyhooks', load: loadCorpSovereignty },
+];
+
+/**
+ * Every corporation's Due soon sources, each read through a Character whose roles and grant
+ * cover that source there (`corpReadersFor`), so no read is made that can only 403. A read
+ * that fails leaves its corporation without that source, flagged; only when every read
+ * fails does the widget get its Retry.
+ */
+export async function loadCorpDeadlinesAll(): Promise<CorpDeadlinesAllFeed> {
+  const accounts = await loadAccountCorpAccess();
+  // The active Character reads its own corporation, sharing the cache rows `/corp` warmed.
+  const preferred = useActiveCharacter.getState().activeCharacterId ?? undefined;
+  const slices = new Map<number, CorpDeadlinesSlice>();
+  const tasks = DEADLINE_READS.flatMap(({ source, capability, load }) =>
+    [...corpReadersFor(accounts, capability, preferred)].map(([corporationId, characterId]) => {
+      if (!slices.has(corporationId)) {
+        slices.set(corporationId, {
+          corporationId,
+          structures: null,
+          moonChunks: null,
+          jobs: null,
+          starbases: null,
+          sovereignty: null,
+          failed: false,
+        });
+      }
+      return { slice: slices.get(corporationId)!, source, load, characterId };
+    })
+  );
+  let failures = 0;
+  await mapWithConcurrencyLimit(tasks, ESI_FANOUT_CONCURRENCY, async (task) => {
+    try {
+      // Each source's slot takes its own read's shape.
+      (task.slice as Record<DeadlineSource, unknown>)[task.source] = await task.load(
+        task.characterId
+      );
+    } catch {
+      task.slice.failed = true;
+      failures += 1;
+    }
+  });
+  if (tasks.length > 0 && failures === tasks.length) throw new CorpReadFailed('deadlines');
+  const corporations = [...slices.values()];
+  return {
+    corporations,
+    labels: await loadCorpLabels(corporations.map((slice) => slice.corporationId)),
+  };
 }

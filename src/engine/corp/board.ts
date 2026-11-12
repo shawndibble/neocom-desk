@@ -111,6 +111,11 @@ export interface CorpBoardItem {
    * amount of cache age can put a past instant back into the future.
    */
   withinStaleWindow: boolean;
+  /**
+   * The corporation the clock belongs to, set only by `mergeCorpBoards` (a board
+   * read across several corporations). Absent on a one-corporation board.
+   */
+  corporationId?: number;
 }
 
 /** A structure, as the board reads it. Names come resolved — see the module note. */
@@ -130,6 +135,8 @@ export interface BoardStructureSource {
   /** Epoch ms the structure finishes unanchoring, or `null`. */
   unanchorsAtMs: number | null;
   services: readonly BoardStructureService[];
+  /** The owning corporation, set on a list read across several corporations; absent otherwise. */
+  corporationId?: number;
 }
 
 export interface BoardStructureService {
@@ -508,12 +515,29 @@ export function buildCorpBoard(sources: CorpBoardSources): CorpBoardItem[] {
     items.push(jobItem(job, clock));
   }
 
-  return items.sort((a, b) => {
-    const byDeadline = sortKey(a) - sortKey(b);
-    // NaN guard: Infinity - Infinity is NaN, and two untimed items are a tie.
-    if (byDeadline !== 0 && !Number.isNaN(byDeadline)) return byDeadline;
-    const byKind = (KIND_RANK.get(a.kind) ?? 0) - (KIND_RANK.get(b.kind) ?? 0);
-    if (byKind !== 0) return byKind;
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-  });
+  return items.sort(byBoardOrder);
+}
+
+function byBoardOrder(a: CorpBoardItem, b: CorpBoardItem): number {
+  const byDeadline = sortKey(a) - sortKey(b);
+  // NaN guard: Infinity - Infinity is NaN, and two untimed items are a tie.
+  if (byDeadline !== 0 && !Number.isNaN(byDeadline)) return byDeadline;
+  const byKind = (KIND_RANK.get(a.kind) ?? 0) - (KIND_RANK.get(b.kind) ?? 0);
+  if (byKind !== 0) return byKind;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * Several corporations' boards as one, ranked by the same rule as each board.
+ * Every item is stamped with its corporation, and its id prefixed with it: two
+ * corporations can hold the same structure id in their own reads.
+ */
+export function mergeCorpBoards(
+  boards: readonly { corporationId: number; items: readonly CorpBoardItem[] }[]
+): CorpBoardItem[] {
+  return boards
+    .flatMap(({ corporationId, items }) =>
+      items.map((item) => ({ ...item, id: `${corporationId}:${item.id}`, corporationId }))
+    )
+    .sort(byBoardOrder);
 }

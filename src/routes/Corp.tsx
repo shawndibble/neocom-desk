@@ -36,7 +36,7 @@ import {
   OverviewDataAge,
 } from '@/features/overview/OverviewHeader';
 import { useOverviewSummary } from '@/features/overview/useOverviewSummary';
-import { WidgetBoardContext } from '@/features/overview/widgets/board';
+import { readScope, WidgetBoardContext } from '@/features/overview/widgets/board';
 import { CORP_DEFS } from '@/features/overview/widgets/data/corpModels';
 import { registerKindDefs } from '@/features/overview/widgets/data/models';
 import { OverviewRefreshProvider } from '@/features/overview/widgets/data/OverviewRefreshProvider';
@@ -55,6 +55,8 @@ import type { CorpCapabilities } from '@/engine/corpRoles';
 import { WarBanner } from '@/features/wars/WarBanner';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
+import { corporationsReading, loadAccountCorpAccess } from '@/features/corp/corpReadAccess';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 // The corp kinds' builders load with this route, not with the Overview's startup graph.
@@ -134,7 +136,16 @@ function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
   const stored = useCorpOverviewLayout((state) => state.value);
   const setLayout = useCorpOverviewLayout((state) => state.setValue);
   const hydrated = useHydratedStore(useCorpOverviewLayout);
-  const board = useMemo(() => corpWidgetBoard(capabilities), [capabilities]);
+  // Which corporations the pilot's Characters can read: All is offered only for two or more.
+  const accounts = useAsyncLoad(loadAccountCorpAccess).data;
+  const board = useMemo(
+    () =>
+      corpWidgetBoard(
+        capabilities,
+        accounts && ((wanted) => corporationsReading(accounts, wanted))
+      ),
+    [capabilities, accounts]
+  );
   const fallback = useMemo(() => corpDefaultLayout(), []);
 
   // The default draws at once, but a first edit over it is only saved once this device's first
@@ -156,9 +167,13 @@ function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
     [setLayout]
   );
   const layout = stored ?? pending ?? fallback;
-  // The drawn widgets, not just their kinds: one scoped to All characters reads other feeds.
+  // The drawn widgets as they are read, not just their kinds: one scoped to All reads other feeds.
   const shown = useMemo(
-    () => visibleWidgets(layout.widgets, isPhone, board.canDraw),
+    () =>
+      visibleWidgets(layout.widgets, isPhone, board.canDraw).map((widget) => ({
+        ...widget,
+        scope: readScope(board, widget),
+      })),
     [layout.widgets, isPhone, board]
   );
   const kinds = useMemo(() => distinctKinds(shown), [shown]);

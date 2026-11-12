@@ -21,7 +21,8 @@ import { corpInactive, corpMembers, corpMining } from './corpPeopleModels';
 export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
   corpDeadlines: {
     feeds: ['structures', 'moonChunks', 'corpJobs', 'corpStarbases', 'corpSovereignty'],
-    scope: 'character',
+    allFeeds: ['corpDeadlinesAll'],
+    scope: 'account',
     build: corpDeadlines,
   },
   corpStarbases: { feeds: ['corpStarbases'], scope: 'character', build: corpStarbases },

@@ -304,6 +304,42 @@ describe('structures', () => {
     );
   });
 
+  it("names each structure's corporation when the All read spans several, and not for one", () => {
+    const [a, b] = fleet();
+    const read = (corporations: Map<number, { ticker: string; name: string }>) =>
+      buildView(
+        'structures',
+        {
+          structuresAll: ok({
+            structures: [
+              { ...a!, corporationId: 500 },
+              { ...b!, corporationId: 600 },
+            ],
+            structureCount: 2,
+            needsReauth: false,
+            fetchedAt: new Date(NOW),
+            corporations,
+          }),
+        },
+        ctx({ scopeAll: true })
+      ).table!;
+    const two = read(
+      new Map([
+        [500, { ticker: 'MAIN', name: 'Main Corporation' }],
+        [600, { ticker: 'HOLD', name: 'Holding Corporation' }],
+      ])
+    );
+    expect(two.columns.map((column) => column.key)).toContain('corp');
+    expect(two.rows.map((row) => row.cells[1])).toEqual(
+      expect.arrayContaining([
+        { text: 'MAIN', hint: 'Main Corporation' },
+        { text: 'HOLD', hint: 'Holding Corporation' },
+      ])
+    );
+    const one = read(new Map([[500, { ticker: 'MAIN', name: 'Main Corporation' }]]));
+    expect(one.columns.map((column) => column.key)).not.toContain('corp');
+  });
+
   it('shortens a structure name by the system prefix', () => {
     expect(shortStructureName('Efa - Helios Prime')).toBe('Helios Prime');
     expect(shortStructureName('Helios')).toBe('Helios');

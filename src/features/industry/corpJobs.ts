@@ -11,45 +11,11 @@
  * installed the job. So every corporation is read once, through any account
  * Character that can, and the panel then picks jobs by `installer_id`.
  */
-import { db } from '@/db';
 import type { CorporationIndustryJob } from '@/esi/endpoints';
-import { ESI_REGISTRY } from '@/esi/registry';
-import { corpCapabilities } from '@/engine/corpRoles';
-import { loadCorporationId } from '@/features/corp/boardData';
-import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
+import { accountCorpReaders } from '@/features/corp/corpReadAccess';
 import { loadCorporationIndustryJobs } from '@/features/corp/jobs';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
-
-const CORP_JOBS_SCOPE = ESI_REGISTRY.getCorporationIndustryJobs.scope;
-
-/** One account Character's standing towards its corporation's jobs. */
-export interface CorpReaderCandidate {
-  characterId: number;
-  corporationId: number;
-  canReadIndustry: boolean;
-}
-
-/**
- * One Character per corporation to read its jobs through — the preferred one
- * (the active Character, so the read shares its cache row with `/corp` and the
- * notification poller) when it can, else the first that can. Corporations no
- * candidate can read are absent.
- */
-export function pickCorpReaders(
-  candidates: readonly CorpReaderCandidate[],
-  preferredCharacterId?: number
-): Map<number, number> {
-  const readers = new Map<number, number>();
-  for (const candidate of candidates) {
-    if (!candidate.canReadIndustry) continue;
-    const isPreferred = candidate.characterId === preferredCharacterId;
-    if (!readers.has(candidate.corporationId) || isPreferred) {
-      readers.set(candidate.corporationId, candidate.characterId);
-    }
-  }
-  return readers;
-}
 
 export interface VisibleCorpJobsOptions {
   /** Every Character on this device — a corpmate's job is never "mine". */
@@ -103,34 +69,14 @@ export const EMPTY_CORP_JOBS: CorpJobsSnapshot = {
  *
  * The scope is checked up front from the stored token — a live 403 would
  * raise the app-wide re-auth banner for a grant the pilot never opted into —
- * and the role gate mirrors the notification poller's `corpContextFor`.
+ * and the roles from the cached roles read (`accountCorpReaders`).
  */
 export async function loadAccountCorpIndustryJobs(
   preferredCharacterId?: number
 ): Promise<CorpJobsSnapshot> {
   try {
-    const characters = await db.characters.toArray();
-    const candidates: CorpReaderCandidate[] = [];
-    await mapWithConcurrencyLimit(characters, ESI_FANOUT_CONCURRENCY, async ({ characterId }) => {
-      try {
-        const token = await db.tokens.get(characterId);
-        if (!(token?.scopes ?? []).includes(CORP_JOBS_SCOPE)) return;
-        const corporationId = await loadCorporationId(characterId);
-        if (corporationId === null) return;
-        const roles = await loadCharacterRoles(characterId);
-        // Roles unknown (offline, no cache): not a candidate.
-        if (roles.needsReauth || roles.cached === null) return;
-        const canReadIndustry = corpCapabilities(corpWideRoles(roles.cached.data)).canReadIndustry;
-        candidates.push({ characterId, corporationId, canReadIndustry });
-      } catch {
-        // Unknown standing reads as "not a candidate" — never as a hint.
-      }
-    });
-    // Completion order is arbitrary; account order keeps reader choice stable.
-    const order = new Map(characters.map((c, index) => [c.characterId, index]));
-    candidates.sort((a, b) => (order.get(a.characterId) ?? 0) - (order.get(b.characterId) ?? 0));
-
-    const readers = pickCorpReaders(candidates, preferredCharacterId);
+    // Roles and grant settled per Character before any corp call (`corpReadAccess.ts`).
+    const readers = await accountCorpReaders('canReadIndustry', preferredCharacterId);
     const jobs: CorporationIndustryJob[] = [];
     const fetchedAts: number[] = [];
     let fromCache = false;

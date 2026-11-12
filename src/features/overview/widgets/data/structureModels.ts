@@ -18,7 +18,7 @@ import {
   structuresView,
 } from '../../data/corpCards';
 import { blank, count, detailToneOf, statusOf, UNKNOWN, type Builder } from './builderKit';
-import { fractionBar } from './cellKit';
+import { corpCell, fractionBar } from './cellKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
 import type { DetailTone, NumberModel, RowDetailModel, TableCell, TableModel } from './types';
 import type { Translate } from '@/lib/translate';
@@ -130,9 +130,13 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
     };
   }
 
+  // Read across several corporations: each row names its own.
+  const labels = raw.corporations && raw.corporations.size > 1 ? raw.corporations : undefined;
   // One row per structure, healthy ones too: the pilot asks "is everything fuelled", not only "what is wrong".
   const all = (raw.structures ?? []).map((source) => {
     const id = source.structureId;
+    const corp =
+      labels && source.corporationId !== undefined ? labels.get(source.corporationId) : undefined;
     const fuel = items.find((item) => item.id === `fuel:${id}`);
     const timer = items.find((item) => item.id === `state:${id}`);
     const offline = items.filter((item) => item.id.startsWith(`service:${id}:`));
@@ -155,6 +159,7 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
       title: shortStructureName(source.name),
       status: { badge: state, tone: detailToneOf(tone) },
       facts: [
+        ...(corp ? [{ label: t(`${S}.col.corp`), value: corp.name }] : []),
         { label: t(`${S}.col.fuel`), value: fuel ? structureWhen(fuel, t) : UNKNOWN },
         {
           label: t(`${S}.col.timer`),
@@ -199,6 +204,7 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
       tone,
       cells: [
         shortStructureName(source.name),
+        ...(labels ? [corp ? corpCell(corp) : UNKNOWN] : []),
         fuel ? fuelCell(fuel, t) : UNKNOWN,
         state,
         timer && timer.timing === 'timed' ? structureWhen(timer, t) : UNKNOWN,
@@ -222,6 +228,9 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
   const table: TableModel = {
     columns: [
       { key: 'structure', label: t('overview.widgets.structures.col.structure'), priority: 0 },
+      ...(labels
+        ? [{ key: 'corp', label: t('overview.widgets.structures.col.corp'), priority: 4 }]
+        : []),
       { key: 'fuel', label: t('overview.widgets.structures.col.fuel'), align: 'end', priority: 1 },
       // The row's severity dot and the fuel and timer cells say the same at phone width.
       {
@@ -246,10 +255,11 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
   };
 
   return {
-    ...blank(
-      to,
-      statusOf(feed, { isEmpty: problemsOnly ? rows.length === 0 : view.structureCount === 0 })
-    ),
+    ...blank(to, {
+      ...statusOf(feed, { isEmpty: problemsOnly ? rows.length === 0 : view.structureCount === 0 }),
+      // One corporation of several failed: what the others gave still draws, flagged.
+      ...(raw.partlyFailed ? { error: true } : {}),
+    }),
     ...(problemsOnly && rows.length === 0 && view.structureCount > 0
       ? { emptyMessage: t('overview.widgets.structures.noProblems'), emptyHealthy: true }
       : {}),

@@ -5842,6 +5842,7 @@
         "noProblems": "No structure needs attention.",
         "col": {
           "structure": "Structure",
+          "corp": "Corporation",
           "fuel": "Fuel left",
           "state": "State",
           "timer": "Timer"
@@ -6056,6 +6057,7 @@
         "empty": "Nothing is due.",
         "col": {
           "subject": "Subject",
+          "corp": "Corporation",
           "what": "What",
           "when": "When"
         },
@@ -15496,8 +15498,8 @@
       "menu": {
         "remove": "Remove from Corp Board",
         "character": "Corporations",
-        "header": "Header Character's corporation",
-        "all": "All characters' corporations"
+        "header": "This corporation",
+        "all": "All my corporations"
       },
       "header": {
         "breakdownCaption": "When each widget on the Corp Board last read its data"

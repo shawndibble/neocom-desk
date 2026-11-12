@@ -47,6 +47,7 @@ import type {
 } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
 import type { CalendarEventSummary } from '@/esi/endpoints';
+import type { CorpLabel } from '@/features/corp/corpTicker';
 import { DAY_MS } from '@/lib/age';
 
 /*
@@ -552,6 +553,10 @@ export interface StructuresBoardData {
   structureCount: number;
   needsReauth: boolean;
   fetchedAt: Date | null;
+  /** Read across several corporations (All scope): each one's ticker and name, for its rows. */
+  corporations?: ReadonlyMap<number, CorpLabel>;
+  /** Read across several corporations, and one of them failed: the rest draws, flagged. */
+  partlyFailed?: boolean;
 }
 
 /** `StructuresBoardData` with its items built against the current instant. */
