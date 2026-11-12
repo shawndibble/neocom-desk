@@ -168,7 +168,13 @@ export function OverviewEditProvider({
         if (before !== null) commit(restoreLayout(before));
       },
       add: (kind, init) => {
-        const result = addWidgetUndoable(layoutRef.current, kind, makeWidgetId, init);
+        const opensOnAll = boardRef.current.opensOnAll.has(kind);
+        const result = addWidgetUndoable(
+          layoutRef.current,
+          kind,
+          makeWidgetId,
+          opensOnAll ? { scope: 'all', ...init } : init
+        );
         if (commitUndoable(result)) {
           const added = result?.layout.widgets.at(-1);
           if (added) flash(added.id);

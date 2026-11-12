@@ -4,7 +4,7 @@ import { mswServer } from '@/test/msw';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import type { CorporationIndustryJob } from '@/esi/endpoints';
-import { loadAccountCorpIndustryJobs, pickCorpReaders, visibleCorpJobs } from './corpJobs';
+import { loadAccountCorpIndustryJobs, visibleCorpJobs } from './corpJobs';
 
 const server = mswServer();
 beforeEach(async () => {
@@ -35,40 +35,6 @@ function corpJob(overrides: Partial<CorporationIndustryJob> = {}): CorporationIn
     ...overrides,
   };
 }
-
-describe('pickCorpReaders', () => {
-  it('names one reader per corporation, only among characters who can read its jobs', () => {
-    const readers = pickCorpReaders([
-      { characterId: 1, corporationId: 500, canReadIndustry: false },
-      { characterId: 2, corporationId: 500, canReadIndustry: true },
-      { characterId: 3, corporationId: 500, canReadIndustry: true },
-      { characterId: 4, corporationId: 600, canReadIndustry: false },
-    ]);
-    expect(readers).toEqual(new Map([[500, 2]]));
-  });
-
-  it('prefers the given character when it can read its corporation', () => {
-    const readers = pickCorpReaders(
-      [
-        { characterId: 2, corporationId: 500, canReadIndustry: true },
-        { characterId: 3, corporationId: 500, canReadIndustry: true },
-      ],
-      3
-    );
-    expect(readers.get(500)).toBe(3);
-  });
-
-  it('ignores a preferred character that cannot read', () => {
-    const readers = pickCorpReaders(
-      [
-        { characterId: 2, corporationId: 500, canReadIndustry: true },
-        { characterId: 3, corporationId: 500, canReadIndustry: false },
-      ],
-      3
-    );
-    expect(readers.get(500)).toBe(2);
-  });
-});
 
 describe('visibleCorpJobs', () => {
   const account = new Set([91, 92]);
@@ -146,7 +112,9 @@ describe('visibleCorpJobs', () => {
 });
 
 describe('loadAccountCorpIndustryJobs', () => {
+  // The roles read needs its own scope; without it no corp read is attempted.
   const CORP_SCOPE = 'esi-industry.read_corporation_jobs.v1';
+  const ROLES_SCOPE = 'esi-characters.read_corporation_roles.v1';
   const CORP_ID = 98000001;
 
   async function seed(characterId: number, scopes: string[]) {
@@ -179,8 +147,8 @@ describe('loadAccountCorpIndustryJobs', () => {
   }
 
   it('reads the corporation through the character holding the role, listing jobs any account character installed', async () => {
-    await seed(1, [CORP_SCOPE]);
-    await seed(2, [CORP_SCOPE]);
+    await seed(1, [ROLES_SCOPE, CORP_SCOPE]);
+    await seed(2, [ROLES_SCOPE, CORP_SCOPE]);
     server.use(
       publicInfo(1),
       publicInfo(2),

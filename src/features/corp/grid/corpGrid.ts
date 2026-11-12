@@ -8,11 +8,12 @@
  * is not held is never shown, never fetched and never offered in the Gallery
  * (corp UI hides rather than locks).
  */
-import type { CorpCapabilities } from '@/engine/corpRoles';
+import type { CorpCapabilities, CorpCapability } from '@/engine/corpRoles';
 import type { WidgetBoard } from '@/features/overview/widgets/board';
 import {
   boardKinds,
   CORP_KIND_CATEGORIES,
+  getKind,
   isAddable,
   kindOpenTo,
   type WidgetKindDef,
@@ -39,8 +40,9 @@ import { seqId } from '@/features/overview/widgets/roles';
  * every device.
  */
 export const CORP_DEFAULT_SEEDS: readonly WidgetSeed[] = [
-  'corpDeadlines',
-  'structures',
+  // Every corporation the pilot's Characters can read, once there are two (`allScopeOffered`).
+  { kind: 'corpDeadlines', scope: 'all' },
+  { kind: 'structures', scope: 'all' },
   'moonChunks',
   'corpJobs',
   'corpWallet',
@@ -64,13 +66,28 @@ export function corpDefaultLayout(makeId: MakeId = seqId('c')): OverviewLayout {
 
 const CORP_KINDS = boardKinds('corp');
 
-export function corpWidgetBoard(capabilities: CorpCapabilities): WidgetBoard {
+/** Kinds a widget added to the Corp Board opens on All, as the default layout's do. */
+const CORP_OPENS_ON_ALL: ReadonlySet<string> = new Set(['corpDeadlines', 'structures']);
+
+/**
+ * `corporationsReading` says how many corporations the pilot's Characters can read for any
+ * of some capabilities; until it is known (left out), a widget's saved scope stands.
+ */
+export function corpWidgetBoard(
+  capabilities: CorpCapabilities,
+  corporationsReading?: (capabilities: readonly CorpCapability[]) => number
+): WidgetBoard {
   return {
     id: 'corp',
     kinds: CORP_KINDS,
     categories: CORP_KIND_CATEGORIES,
     canDraw: (kind: WidgetKindDef) => kindOpenTo(kind, capabilities),
     characterScope: 'summable',
+    // One corporation to read: All would be the same rows, so the choice is not offered.
+    allScopeOffered: (kind) =>
+      corporationsReading === undefined ||
+      corporationsReading(getKind(kind)?.capabilities ?? []) > 1,
+    opensOnAll: CORP_OPENS_ON_ALL,
     defaultLayout: corpDefaultLayout,
   };
 }

@@ -3,7 +3,13 @@ import type { BoardExtractionSource, BoardStructureSource } from '@/engine/corp/
 import type { CorporationIndustryJob } from '@/esi/endpoints';
 import { formatDateOnly } from '@/lib/timestamp';
 import type { MoonChunksBoardData, StructuresBoardData } from '../../data/boardData';
-import type { CorpJobsFeed, CorpSovereigntyFeed, CorpStarbasesFeed } from './corpFeeds';
+import type {
+  CorpDeadlinesAllFeed,
+  CorpDeadlinesSlice,
+  CorpJobsFeed,
+  CorpSovereigntyFeed,
+  CorpStarbasesFeed,
+} from './corpFeeds';
 import { corpDeadlines, corpJobs } from './corpClockModels';
 import type { BuildContext, FeedState, Feeds } from './types';
 
@@ -407,6 +413,111 @@ describe('corpDeadlines', () => {
       corpJobs: jobsFeed([]),
     };
     expect(corpDeadlines(feeds, ctx).status.isEmpty).toBe(true);
+  });
+});
+
+describe('corpDeadlines across corporations (All scope)', () => {
+  const allCtx: BuildContext = { ...ctx, scopeAll: true };
+  const LABELS = new Map([
+    [500, { ticker: 'MAIN', name: 'Main Corporation' }],
+    [600, { ticker: 'HOLD', name: 'Holding Corporation' }],
+  ]);
+
+  function slice(
+    corporationId: number,
+    over: Partial<CorpDeadlinesSlice> = {}
+  ): CorpDeadlinesSlice {
+    return {
+      corporationId,
+      structures: null,
+      moonChunks: null,
+      jobs: null,
+      starbases: null,
+      sovereignty: null,
+      failed: false,
+      ...over,
+    };
+  }
+
+  const allFeed = (corporations: CorpDeadlinesSlice[]): Feeds => ({
+    corpDeadlinesAll: ok<CorpDeadlinesAllFeed>({ corporations, labels: LABELS }),
+  });
+
+  it("ranks both corporations' deadlines together and names each row's corporation", () => {
+    const view = corpDeadlines(
+      allFeed([
+        slice(500, {
+          structures: structuresFeed([structure({ fuelExpiresMs: NOW + 9 * HOUR })]).data,
+        }),
+        slice(600, {
+          structures: structuresFeed([
+            structure({ structureId: 2, name: 'Amarr - Vault', fuelExpiresMs: NOW + 3 * HOUR }),
+          ]).data,
+        }),
+      ]),
+      allCtx
+    );
+    expect(view.number.value).toBe('2');
+    expect(view.table?.columns.map((column) => column.key)).toEqual([
+      'subject',
+      'corp',
+      'what',
+      'when',
+    ]);
+    expect(view.table?.rows.map((row) => row.cells.slice(0, 2))).toEqual([
+      ['Vault', { text: 'HOLD', hint: 'Holding Corporation' }],
+      ['Helios Prime', { text: 'MAIN', hint: 'Main Corporation' }],
+    ]);
+    expect(view.rows[0]?.detail).toContain('HOLD');
+  });
+
+  it('reads each source only where that corporation can: one with jobs only still lists them', () => {
+    const view = corpDeadlines(
+      allFeed([
+        slice(500, { structures: structuresFeed([structure()]).data }),
+        slice(600, {
+          moonChunks: moonFeed([
+            {
+              structureId: 7,
+              subject: 'Amarr - Drill',
+              chunkArrivalMs: NOW + 2 * HOUR,
+              naturalDecayMs: NOW + 5 * HOUR,
+            },
+          ]).data,
+        }),
+      ]),
+      allCtx
+    );
+    expect(view.table?.rows[0]?.cells[1]).toEqual({ text: 'HOLD', hint: 'Holding Corporation' });
+  });
+
+  it("keeps the other corporation's rows when one corporation's read failed, flagged", () => {
+    const view = corpDeadlines(
+      allFeed([
+        slice(500, { structures: structuresFeed([structure()]).data }),
+        slice(600, { failed: true }),
+      ]),
+      allCtx
+    );
+    expect(view.table?.rows).toHaveLength(1);
+    expect(view.status.error).toBe(true);
+    // Only one corporation answered: no column naming it.
+    expect(view.table?.columns.map((column) => column.key)).not.toContain('corp');
+  });
+
+  it('never reads the header feeds when scoped to All, nor the All feed otherwise', () => {
+    const header: Feeds = {
+      structures: structuresFeed([structure()]),
+      moonChunks: moonFeed([]),
+      corpJobs: jobsFeed([]),
+    };
+    expect(corpDeadlines(header, allCtx).table).toBeUndefined();
+    expect(corpDeadlines(allFeed([slice(500)]), ctx).table).toBeUndefined();
+  });
+
+  it('is loading until the All read lands, and unreadable when no corporation can be read', () => {
+    expect(corpDeadlines({ corpDeadlinesAll: loading() }, allCtx).status.loading).toBe(true);
+    expect(corpDeadlines(allFeed([]), allCtx).emptyMessage).toBe('overview.board.corpUnreadable');
   });
 });
 

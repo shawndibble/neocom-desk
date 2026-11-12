@@ -8,3 +8,31 @@ export async function corpTickerOrId(corporationId: number): Promise<string> {
     return String(corporationId);
   }
 }
+
+/** How a row names its corporation: the ticker, with the full name for its tooltip. */
+export interface CorpLabel {
+  ticker: string;
+  name: string;
+}
+
+/** Each corporation's label; one whose public record cannot be read is named by its id. */
+export async function loadCorpLabels(
+  corporationIds: readonly number[]
+): Promise<Map<number, CorpLabel>> {
+  const { loadPublicCorporationRecord } = await import('@/features/character/publicInfoData');
+  const labels = await Promise.all(
+    corporationIds.map(async (corporationId): Promise<[number, CorpLabel]> => {
+      const fallback = { ticker: String(corporationId), name: String(corporationId) };
+      try {
+        const record = await loadPublicCorporationRecord(corporationId);
+        return [
+          corporationId,
+          record ? { ticker: record.ticker || fallback.ticker, name: record.name } : fallback,
+        ];
+      } catch {
+        return [corporationId, fallback];
+      }
+    })
+  );
+  return new Map(labels);
+}

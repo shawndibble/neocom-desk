@@ -6,22 +6,23 @@ const access = vi.hoisted(
 );
 const structuresByCorp = vi.hoisted(() => new Map<number, unknown>());
 
-vi.mock('@/features/character/allCharactersFanOut', () => ({
-  fanOutAllCharacters: async ({
-    load,
-  }: {
-    load: (c: { characterId: number; name: string }) => Promise<unknown>;
-  }) => {
-    const entries: unknown[] = [];
-    for (const character of characters) {
-      const entry = await load(character);
-      if (entry !== null) entries.push(entry);
-    }
-    return { entries, skipped: [] };
-  },
-}));
-vi.mock('@/features/corp/corpReadAccess', () => ({
-  resolveCorpReadAccess: async (characterId: number) => access.get(characterId) ?? null,
+vi.mock('@/features/corp/corpReadAccess', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/corp/corpReadAccess')>();
+  const accounts = () =>
+    characters.flatMap(({ characterId }) => {
+      const gate = access.get(characterId);
+      return gate ? [{ characterId, access: gate }] : [];
+    });
+  return {
+    ...actual,
+    resolveCorpReadAccess: async (characterId: number) => access.get(characterId) ?? null,
+    accountCorpReaders: async (capability: Parameters<typeof actual.corpReadersFor>[1]) =>
+      actual.corpReadersFor(accounts(), capability),
+  };
+});
+vi.mock('@/features/corp/corpTicker', () => ({
+  loadCorpLabels: async (ids: number[]) =>
+    new Map(ids.map((id) => [id, { ticker: `T${id}`, name: `Corp ${id}` }])),
 }));
 vi.mock('@/features/corp/boardData', () => ({
   loadCorporationStructures: async (_characterId: number, corporationId: number) =>
@@ -64,7 +65,12 @@ describe('loadAllStructuresBoardData', () => {
 
     const merged = await loadAllStructuresBoardData();
 
-    expect(merged.structures?.map((s) => s.structureId)).toEqual([1, 2, 3]);
+    expect(merged.structures?.map((s) => [s.structureId, s.corporationId])).toEqual([
+      [1, 10],
+      [2, 10],
+      [3, 20],
+    ]);
+    expect([...(merged.corporations?.keys() ?? [])]).toEqual([10, 20]);
     expect(merged.structureCount).toBe(3);
     expect(merged.fetchedAt).toEqual(new Date('2026-11-01T09:00:00Z'));
   });

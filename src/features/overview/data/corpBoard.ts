@@ -10,8 +10,8 @@
 import { loadCorporationStructures } from '@/features/corp/boardData';
 import { toBoardStructures } from '@/features/corp/boardSources';
 import { CorpReadFailed } from '@/features/corp/corpRead';
-import { resolveCorpReadAccess, type CorpCapability } from '@/features/corp/corpReadAccess';
-import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
+import { accountCorpReaders, resolveCorpReadAccess } from '@/features/corp/corpReadAccess';
+import { loadCorpLabels } from '@/features/corp/corpTicker';
 import { loadMoonChunks } from '@/features/character/calendarMoonChunks';
 import type { MoonChunksBoardData, StructuresBoardData } from './boardData';
 
@@ -56,27 +56,8 @@ export async function loadMoonChunksBoardData(characterId: number): Promise<Moon
 
 // --- All characters: every corporation the pilot's Characters can read -----------------
 
-/**
- * One Character per corporation that can read `capability`: the first of them
- * in Character order. A corporation two Characters share is read once, and one
- * no Character's roles and grant cover is absent (no request is made for it).
- */
-async function corpReaders(capability: CorpCapability): Promise<number[]> {
-  const { entries } = await fanOutAllCharacters({
-    load: async ({ characterId }) => {
-      const access = await resolveCorpReadAccess(characterId);
-      return access?.can(capability) ? { characterId, corporationId: access.corporationId } : null;
-    },
-  });
-  const readers = new Map<number, number>();
-  for (const { characterId, corporationId } of entries) {
-    if (!readers.has(corporationId)) readers.set(corporationId, characterId);
-  }
-  return [...readers.values()];
-}
-
 /** The oldest of the reads' timestamps: the merged list is only as fresh as its stalest corporation. */
-function oldest(dates: readonly (Date | null)[]): Date | null {
+export function oldest(dates: readonly (Date | null)[]): Date | null {
   const known = dates.filter((date): date is Date => date !== null);
   return known.length === 0 ? null : new Date(Math.min(...known.map((date) => date.getTime())));
 }
@@ -87,22 +68,27 @@ function oldest(dates: readonly (Date | null)[]): Date | null {
  * when every one failed does the widget get its Retry.
  */
 async function settleCorps<T>(
-  readers: readonly number[],
+  readers: ReadonlyMap<number, number>,
   what: string,
   load: (characterId: number) => Promise<T>
-): Promise<T[]> {
-  const settled = await Promise.allSettled(readers.map(load));
+): Promise<(T & { corporationId: number })[]> {
+  const settled = await Promise.allSettled(
+    [...readers].map(async ([corporationId, characterId]) => ({
+      ...(await load(characterId)),
+      corporationId,
+    }))
+  );
   const reads = settled.flatMap((outcome) =>
     outcome.status === 'fulfilled' ? [outcome.value] : []
   );
-  if (reads.length === 0 && readers.length > 0) throw new CorpReadFailed(what);
+  if (reads.length === 0 && readers.size > 0) throw new CorpReadFailed(what);
   return reads;
 }
 
 /** Every readable corporation's structures as one list, for a widget scoped to All characters. */
 export async function loadAllStructuresBoardData(): Promise<StructuresBoardData> {
   const reads = await settleCorps(
-    await corpReaders('canReadStructures'),
+    await accountCorpReaders('canReadStructures'),
     'structures',
     loadStructuresBoardData
   );
@@ -111,17 +97,21 @@ export async function loadAllStructuresBoardData(): Promise<StructuresBoardData>
     return { ...UNREADABLE_STRUCTURES, needsReauth: reads.some((read) => read.needsReauth) };
   }
   return {
-    structures: readable.flatMap((read) => read.structures ?? []),
+    // Each structure keeps its corporation, so a row read across several can name it.
+    structures: readable.flatMap(({ structures, corporationId }) =>
+      (structures ?? []).map((structure) => ({ ...structure, corporationId }))
+    ),
     structureCount: readable.reduce((sum, read) => sum + read.structureCount, 0),
     needsReauth: readable.some((read) => read.needsReauth),
     fetchedAt: oldest(readable.map((read) => read.fetchedAt)),
+    corporations: await loadCorpLabels(readable.map((read) => read.corporationId)),
   };
 }
 
 /** Every readable corporation's moon drills as one list, for a widget scoped to All characters. */
 export async function loadAllMoonChunksBoardData(): Promise<MoonChunksBoardData> {
   const reads = await settleCorps(
-    await corpReaders('canReadMoonExtractions'),
+    await accountCorpReaders('canReadMoonExtractions'),
     'moon extractions',
     loadMoonChunksBoardData
   );

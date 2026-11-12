@@ -32,3 +32,8 @@ export function shareCell(part: number, whole: number, none = '0%'): TableCell {
   const share = fractionBar(Math.max(0, part), whole);
   return share === undefined ? none : { text: `${Math.round(share * 100)}%`, bar: share };
 }
+
+/** A row's corporation, read across several: its ticker, the full name in the tooltip. */
+export function corpCell(corp: { ticker: string; name: string }): TableCell {
+  return { text: corp.ticker, hint: corp.name };
+}

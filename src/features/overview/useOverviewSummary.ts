@@ -12,7 +12,7 @@ import {
 } from './widgets/headerSummary';
 import type { Widget } from './widgets/layout';
 import { chipTone, nextDeadline } from './widgets/nextDeadline';
-import { useWidgetBoard } from './widgets/board';
+import { readScope, useWidgetBoard, type WidgetBoard } from './widgets/board';
 import { visibleWidgets } from './widgets/visibility';
 
 /** A kind whose view has not been built yet: no read to date. */
@@ -23,9 +23,9 @@ const EMPTY_READ = { fetchedAt: null, fromCache: false };
  * A kind with an All read of its own (the corp widgets) follows its widget's scope: its header feed
  * is not mounted when every widget of the kind is on All, so asking for it would never settle.
  */
-const requestOf = (widget: Widget) => ({
+const requestOf = (board: WidgetBoard, widget: Widget) => ({
   kind: widget.kind,
-  scopeAll: widget.scope === 'all' && kindHasAllFeeds(widget.kind),
+  scopeAll: readScope(board, widget) === 'all' && kindHasAllFeeds(widget.kind),
   profitSource: widget.profitSource,
 });
 
@@ -35,16 +35,19 @@ export type OverviewSummary = ReturnType<typeof useOverviewSummary>;
 /** Read once by the board and handed to each header part, so the kinds are not resolved three times. */
 export function useOverviewSummary(widgets: readonly Widget[]) {
   const isPhone = useIsPhone();
-  const { canDraw } = useWidgetBoard();
+  const board = useWidgetBoard();
+  const { canDraw } = board;
   const now = useTicker(OVERVIEW_TICK_MS);
   const shown = useMemo(
     () => visibleWidgets(widgets, isPhone, canDraw),
     [widgets, isPhone, canDraw]
   );
   const requests = useMemo(() => {
-    const byKey = new Map(shown.map((widget) => [viewKey(requestOf(widget)), requestOf(widget)]));
+    const byKey = new Map(
+      shown.map((widget) => [viewKey(requestOf(board, widget)), requestOf(board, widget)])
+    );
     return [...byKey.values()];
-  }, [shown]);
+  }, [shown, board]);
   const views = useKindViews(requests);
   const all = [...views.values()];
   const next = nextDeadline(collectDeadlines(all), now);
@@ -52,7 +55,7 @@ export function useOverviewSummary(widgets: readonly Widget[]) {
     shown.map((widget) => ({
       kind: widget.kind,
       show: widget.show,
-      view: views.get(viewKey(requestOf(widget))) ?? EMPTY_READ,
+      view: views.get(viewKey(requestOf(board, widget))) ?? EMPTY_READ,
     }))
   );
   const remaining = next ? next.at - now : 0;

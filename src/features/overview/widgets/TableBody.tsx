@@ -34,6 +34,7 @@ import { firstSortDirection, nextDataTableSort } from '@/components/ui/dataTable
 import * as Icon from '@/components/ui/icons';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
+import { HintText } from '@/components/ui/HintText';
 import { openItemInfo } from '@/stores/itemInfoModal';
 import { cx } from '@/lib/cx';
 import type { TableCell, TableColumn, TableModel, TableRowModel } from './data/types';
@@ -87,6 +88,7 @@ const CELL_TONE = { good: 'text-success', caution: 'text-warning', bad: 'text-da
 function CellValue({ cell, compact }: { cell: TableCell; compact: boolean }) {
   if (typeof cell === 'string') return <>{cell}</>;
   if ('iskAmount' in cell) return <IskAmount value={cell.iskAmount} decimals={0} />;
+  if ('hint' in cell) return <HintText content={cell.hint}>{cell.text}</HintText>;
   if (cell.bar === undefined) return <>{cell.text}</>;
   return (
     <span className="inline-flex items-center gap-2">

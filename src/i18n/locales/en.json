@@ -5842,6 +5842,7 @@
         "noProblems": "No structure needs attention.",
         "col": {
           "structure": "Structure",
+          "corp": "Corporation",
           "fuel": "Fuel left",
           "state": "State",
           "timer": "Timer"
@@ -6056,6 +6057,7 @@
         "empty": "Nothing is due.",
         "col": {
           "subject": "Subject",
+          "corp": "Corporation",
           "what": "What",
           "when": "When"
         },

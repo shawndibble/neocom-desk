@@ -27,6 +27,8 @@ import type { WalletDivision } from '@/features/corp/divisions';
 import type { CorpAssetsSummary } from './corpAssetsSummary';
 import type { PilotStats, ZkillFailureReason } from '@/lib/zkillboard';
 import type { SrpClaim } from '@/features/corp/srpClaimTypes';
+import type { CorpLabel } from '@/features/corp/corpTicker';
+import type { MoonChunksBoardData, StructuresBoardData } from '../../data/boardData';
 
 /** The fields of a claim the Corp SRP widget reads. */
 export type SrpClaimRow = Pick<
@@ -232,6 +234,32 @@ export interface CorpSovereigntyFeed extends CorpFeedBase {
   prices: ReadonlyMap<number, number>;
   /** Stargate jumps from the Current System; absent when it or the route is unknown. */
   jumps: ReadonlyMap<number, number>;
+}
+
+/**
+ * One corporation's Due soon reads, each through a Character that can read it there.
+ * A source is null when no Character can (or its read failed): left out, never an error.
+ */
+export interface CorpDeadlinesSlice {
+  corporationId: number;
+  structures: StructuresBoardData | null;
+  moonChunks: MoonChunksBoardData | null;
+  jobs: CorpJobsFeed | null;
+  starbases: CorpStarbasesFeed | null;
+  sovereignty: CorpSovereigntyFeed | null;
+  /** One of this corporation's reads failed: the rest still draws, flagged. */
+  failed: boolean;
+}
+
+/** Due soon across every corporation the pilot's Characters can read (All scope). */
+export interface CorpDeadlinesAllFeed {
+  corporations: CorpDeadlinesSlice[];
+  labels: ReadonlyMap<number, CorpLabel>;
+}
+
+export async function loadCorpDeadlinesAllFeed(): Promise<CorpDeadlinesAllFeed> {
+  const { loadCorpDeadlinesAll } = await import('./corpFeedLoaders');
+  return loadCorpDeadlinesAll();
 }
 
 export async function loadCorpWalletFeed(characterId: number): Promise<CorpWalletFeed> {

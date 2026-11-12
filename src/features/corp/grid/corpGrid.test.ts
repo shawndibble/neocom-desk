@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NO_CORP_CAPABILITIES, type CorpCapabilities } from '@/engine/corpRoles';
 import { getKind } from '@/features/overview/widgets/kinds';
+import { readScope } from '@/features/overview/widgets/board';
 import { seedKind } from '@/features/overview/widgets/layout';
 import { CORP_DEFAULT_SEEDS, corpDefaultLayout, corpWidgetBoard } from './corpGrid';
 
@@ -37,7 +38,16 @@ const drawnFor = (caps: CorpCapabilities) => {
 describe('the Corp Board default layout', () => {
   it('opens with the clocks first, then money, then people, like the board it replaces', () => {
     expect(corpDefaultLayout().widgets.map((w) => w.kind)).toEqual(DEFAULT_KINDS);
-    expect(CORP_DEFAULT_SEEDS.slice(0, 2)).toEqual(['corpDeadlines', 'structures']);
+    expect(DEFAULT_KINDS.slice(0, 2)).toEqual(['corpDeadlines', 'structures']);
+  });
+
+  it('opens Due soon and Structures on every corporation, the rest on the header Character', () => {
+    const scopes = corpDefaultLayout().widgets.map((w) => [w.kind, w.scope]);
+    expect(scopes.slice(0, 3)).toEqual([
+      ['corpDeadlines', 'all'],
+      ['structures', 'all'],
+      ['moonChunks', 'header'],
+    ]);
   });
 
   it('holds every default kind whatever the Character reads, so a saved edit keeps the rest', () => {
@@ -94,6 +104,21 @@ describe('the Corp Board board', () => {
     expect(board.canDraw(getKind('structures')!)).toBe(false);
     // Coming-soon kinds carry no gate, so the Gallery lists them for everyone.
     expect(board.canDraw(getKind('corpKills')!)).toBe(true);
+  });
+
+  it('offers All only while two or more corporations can be read for the kind', () => {
+    const counted = (n: number) => corpWidgetBoard(ALL, () => n);
+    expect(counted(2).allScopeOffered('corpDeadlines')).toBe(true);
+    expect(counted(1).allScopeOffered('corpDeadlines')).toBe(false);
+    expect(readScope(counted(1), { kind: 'structures', scope: 'all' })).toBe('header');
+    expect(readScope(counted(2), { kind: 'structures', scope: 'all' })).toBe('all');
+    // Counted over the kind's own capabilities.
+    const asked: (readonly string[])[] = [];
+    corpWidgetBoard(ALL, (caps) => (asked.push(caps), 2)).allScopeOffered('structures');
+    expect(asked).toEqual([['canReadStructures']]);
+    // Not yet known: the saved choice stands.
+    expect(corpWidgetBoard(ALL).allScopeOffered('structures')).toBe(true);
+    expect(corpWidgetBoard(ALL).opensOnAll).toEqual(new Set(['corpDeadlines', 'structures']));
   });
 
   it('resets to the full default', () => {

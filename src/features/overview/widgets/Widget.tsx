@@ -46,6 +46,7 @@ import { endpointsOf } from './data/models';
 import { Chart } from './charts/Chart';
 import type { Widget as WidgetModel } from './layout';
 import { scopePresentation } from './scope';
+import { readScope, useWidgetBoard } from './board';
 import { OVERVIEW_TICK_MS } from './data/tick';
 import { resolveWidget } from './state';
 import { TableBody, type TableBodyProps } from './TableBody';
@@ -286,7 +287,8 @@ export function Widget(props: WidgetProps) {
 
 function LiveWidget(props: WidgetProps) {
   const { widget } = props;
-  const scope = scopePresentation(widget.kind, widget.scope, widget);
+  const board = useWidgetBoard();
+  const scope = scopePresentation(widget.kind, readScope(board, widget), widget);
   // The kind's declared settings pick what counts; the rest are ignored (`viewSettings.ts`).
   const view = useWidgetView(widget.kind, scope.scopeAll, widget);
   return <WidgetFrame {...props} view={view} rememberHeight />;

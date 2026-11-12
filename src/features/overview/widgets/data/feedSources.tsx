@@ -73,6 +73,7 @@ import {
   loadCorpRoleAuditFeed,
   loadCorpMiningFeed,
   loadCorpSovereigntyFeed,
+  loadCorpDeadlinesAllFeed,
   loadCorpStarbasesFeed,
   loadCorpContractsFeed,
   loadCorpSrpFeed,
@@ -261,6 +262,9 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   corpMining: snapshot(loadCorpMiningFeed, 'corp:mining'),
   corpStarbases: snapshot(loadCorpStarbasesFeed, 'corp:starbases'),
   corpSovereignty: snapshot(loadCorpSovereigntyFeed, 'corp:sovereignty'),
+  corpDeadlinesAll: snapshot(loadCorpDeadlinesAllFeed, 'corp:deadlines-all', {
+    accountWide: true,
+  }),
   corpContracts: snapshot(loadCorpContractsFeed, 'corp:contracts'),
   corpOrders: snapshot(loadCorpOrdersFeed, 'corp:orders'),
   corpKills: snapshot(loadCorpKillsFeed, 'corp:kills'),
