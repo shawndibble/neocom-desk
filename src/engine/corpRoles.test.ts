@@ -148,6 +148,18 @@ describe('corpCapabilities', () => {
     expect(corpCapabilities(['Junior_Accountant']).canConfigureSrp).toBe(false);
   });
 
+  it('opens Vetting reviews to a Personnel_Manager or a Director, and no other role', () => {
+    expect(corpCapabilities(['Personnel_Manager']).canVet).toBe(true);
+    expect(corpCapabilities(['Director']).canVet).toBe(true);
+    expect(corpCapabilities(['Accountant']).canVet).toBe(false);
+    expect(corpCapabilities([]).canVet).toBe(false);
+  });
+
+  it('opens Vetting settings to a Director alone, never a Personnel_Manager', () => {
+    expect(corpCapabilities(['Director']).canConfigureVetting).toBe(true);
+    expect(corpCapabilities(['Personnel_Manager']).canConfigureVetting).toBe(false);
+  });
+
   it('opens the starbase reads to a Director alone', () => {
     expect(corpCapabilities(['Station_Manager']).canReadStarbases).toBe(false);
     expect(corpCapabilities(['Director']).canReadStarbases).toBe(true);

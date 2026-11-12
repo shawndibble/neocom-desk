@@ -65,6 +65,7 @@ export const LAZY_SECTIONS: readonly string[] = [
   'corpTaxBook',
   'srp',
   'srpMember',
+  'vetting',
 ];
 
 /**

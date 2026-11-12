@@ -72,6 +72,7 @@ import type { SkyhookRaidableNearbyFire } from './skyhooks/skyhookAlert';
 import { parseInstant } from './esiInstant';
 import { utcDay } from './localDay';
 import { DAY_MS } from '@/lib/age';
+import type { VettingSharedFire } from './vettingAlert';
 
 /**
  * Every fire an Occurrence Key can be derived from — the same members as
@@ -115,7 +116,8 @@ export type OccurrenceFire =
   | CommunityMemberJoinedFire
   | CommunityRequestPledgedFire
   | IncursionNearbyFire
-  | SkyhookRaidableNearbyFire;
+  | SkyhookRaidableNearbyFire
+  | VettingSharedFire;
 
 function dayBucket(nowMs: number): number {
   return Math.floor(nowMs / DAY_MS);
@@ -250,6 +252,9 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     case 'communityJoinRequest':
     case 'communityMemberJoined':
       return [characterId, fire.eventId, fire.communityId, fire.uid, fire.at].join(':');
+    // A review is shared once, so its id is the occurrence.
+    case 'vettingShared':
+      return [characterId, fire.eventId, fire.corporationId, fire.reviewId].join(':');
     // The latest new Pledge in the Community, by Request, Pledger and the time
     // it was written. A re-Pledge after a poll that saw the withdrawal writes a
     // later `at` and is its own occurrence; the same Pledge read twice, or an
@@ -397,6 +402,9 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     case 'communityJoinRequest':
     case 'communityMemberJoined':
     case 'communityRequestPledged':
+    // The push carries no time of its own; the moment it is handled is it.
+    // falls through
+    case 'vettingShared':
       return nowMs;
     default: {
       const exhaustive: never = fire;

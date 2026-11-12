@@ -73,18 +73,48 @@ automatically. To deploy rules alone: `firebase deploy --only firestore:rules`.
 
 ### Functions are routers, not one per action
 
-`functions/src/index.ts` deploys 16 functions: three routers (`communityCall`,
-`corpTaxBookCall`, `alertsCall`), `mintFirebaseToken`, `mutamarketEstimate` and the
-scheduled jobs. Every other "callable" (`editCorpTaxBookCallable`, `fileSrpClaimCallable`,
+`functions/src/index.ts` deploys 13 functions: four routers (`communityCall`,
+`corpTaxBookCall`, `alertsCall`, `vettingCall`), `mintFirebaseToken`, `mutamarketEstimate`,
+the scheduled jobs and the triggers. Every other "callable" (`editCorpTaxBookCallable`, `fileSrpClaimCallable`,
 `registerDevice`, and so on) is an **action** registered on a router and called from
 the client with `callRouted` (`src/sync/routedCallable.ts`). A deploy has a per-minute
 mutation quota, so a new callable is a `communityAction` / `corpTaxBookAction` /
-`alertsAction` registration, never a new `export const`.
+`alertsAction` / `vettingAction` registration, never a new `export const`.
 `functions/src/deployedFunctions.test.ts` fails if one is added without review.
 
 When a deploy finds functions on the project that the source no longer exports (the old
 per-name callables), it asks to delete them. Answer yes. If it hits a 429, rerun it, or
 delete in batches: `firebase functions:delete a b c --region us-central1 --force`.
+
+### Vetting has its own router, deployed by hand
+
+`vettingCall` serves every vetting action (`functions/src/vettingStore.ts`). It is a router of
+its own because some of its actions are public: an applicant has no Neocom Desk session, so
+those prove the caller by the EVE access token or the review key in the request, not by
+Firebase auth. Nothing deploys it automatically. A change to vetting goes out with:
+
+```sh
+firebase deploy --only functions:vettingCall,functions:dailyHousekeeping,firestore:rules
+```
+
+`dailyHousekeeping` carries the vetting retention sweep. The rules close `vetting`,
+`vettingReviews` (and its `inputs`) and `vettingThrottle` under `corps/{id}` to every client;
+deploy them before or with the function, never after. The sweep's collection-group index on
+`vettingReviews.expiresAt` is in `firestore.indexes.json`
+(`firebase deploy --only firestore:indexes`); until it is deployed the sweep falls back to a
+per-corporation scan. The same sweep deletes stale `vettingThrottle` counters with a
+collection-group query on `windowStart`, which needs its own `COLLECTION_GROUP` field override
+there and falls back the same way without it.
+
+`vettingCall` also sends the `vettingShared` push (ADR 0027): when a report is shared and the
+corp's `notifyReviewers` setting is on, the submit action pushes to the devices of that
+corporation's known reviewers that enabled the event. It is sent from inside the action, so
+there is no trigger to deploy and no secret to set (FCM through the Admin SDK). The reviewers
+are those the overview saw holding the role in the last 30 days, kept (with the EVE account
+each was on, so a report is never pushed to its own pilot's other character) in
+`corps/{id}/vetting/reviewers`, which the existing `vetting` rule already closes. The push names
+no pilot, goes to at most 50 reviewers (the most recently seen) and holds the submit up for at
+most 3 seconds; one that fails or runs out of time is logged and the report is shared regardless.
 
 ### Index exemptions are a one-way-ish deploy
 

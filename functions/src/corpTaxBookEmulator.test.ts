@@ -8,6 +8,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall, parseEditAction, parseSyncInput, parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import {
+  KEPT_ON_BOOK_DELETE,
   claimPayment,
   deleteBook,
   confirmGrouping,
@@ -24,6 +25,7 @@ import {
   type BookDeps,
 } from './corpTaxBookStore.js';
 import { SRP_CLAIMS, SRP_COLLECTIONS } from './srpTypes.js';
+import { VETTING_COLLECTIONS } from './vettingTypes.js';
 
 const CORP = 98000001;
 const T0 = Date.parse('2026-10-18T12:00:00Z');
@@ -1210,14 +1212,14 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect((await book().collection('statements').get()).empty).toBe(true);
     });
 
-    it("deletes every book collection but leaves the corporation's SRP data untouched", async () => {
+    it("deletes every book collection but leaves the corporation's SRP and vetting data untouched", async () => {
       await turnOn();
       await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
       // A nested book collection, and one the delete has never heard of.
       const payouts = () => book().collection('feeders').doc('98000002').collection('payouts');
       await payouts().doc('p1').set({ a: 1 });
       await book().collection('futureBookThing').doc('x').set({ a: 1 });
-      for (const name of SRP_COLLECTIONS) {
+      for (const name of KEPT_ON_BOOK_DELETE) {
         await book().collection(name).doc('kept').set({ name });
       }
 
@@ -1225,8 +1227,9 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
 
       expect((await book().get()).exists).toBe(false);
       const left = (await book().listCollections()).map((c) => c.id).sort();
-      expect(left).toEqual([...SRP_COLLECTIONS].sort());
-      for (const name of SRP_COLLECTIONS) {
+      expect(left).toEqual([...KEPT_ON_BOOK_DELETE].sort());
+      expect(left).toEqual(expect.arrayContaining([...SRP_COLLECTIONS, ...VETTING_COLLECTIONS]));
+      for (const name of KEPT_ON_BOOK_DELETE) {
         expect((await book().collection(name).doc('kept').get()).data()).toEqual({ name });
       }
       expect((await payouts().get()).empty).toBe(true);

@@ -73,6 +73,7 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
       'mercenaryDenAnarchy',
       'marketOrderUndercut',
       'skyhookRaidable',
+      'vettingShared',
     ]);
   });
 });

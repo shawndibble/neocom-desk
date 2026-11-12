@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { Button, LiveStatus } from '@/components/ui';
+import { AttentionDot, sectionRailClassName, SectionRailLink } from './sectionRail';
 import { ActionResult } from './settingsFields';
 import { useApplyUpdate, useUpdateStatusLine } from './useUpdateState';
 import { useStorageAtRisk } from './storageAtRisk';
@@ -36,10 +37,7 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
   const storageAtRisk = useStorageAtRisk((s) => s.atRisk);
 
   return (
-    <nav
-      aria-label={t('settings.navLabel')}
-      className="hidden md:sticky md:top-4 md:block md:self-start"
-    >
+    <nav aria-label={t('settings.navLabel')} className={sectionRailClassName}>
       {groups.map((group) => (
         <div key={group.id} className="mb-3">
           <p
@@ -49,48 +47,23 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
             {t(group.labelKey)}
           </p>
           <ul aria-labelledby={`settings-nav-${group.id}`} className="space-y-px">
-            {group.sections.map((id) => {
-              const active = id === value;
-              return (
-                <li key={id}>
-                  <Link
-                    to={tabPath(SETTINGS_TABS, id)}
-                    aria-current={active ? 'page' : undefined}
-                    className={cx(
-                      'block border-l-2 px-2 py-1.5 text-xs',
-                      interactiveClassName,
-                      focusRingInsetClassName,
-                      active
-                        ? 'border-accent bg-panel text-text'
-                        : 'border-transparent text-text-dim hover:bg-panel-2 hover:text-text active:bg-panel'
-                    )}
-                  >
-                    {t(LABEL_KEYS.get(id) ?? id)}
-                    {id === 'app' && updateAvailable && (
-                      <AttentionDot label={t('settings.update.available')} />
-                    )}
-                    {id === 'offline' && storageAtRisk && (
-                      <AttentionDot label={t('settings.offline.atRisk')} />
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
+            {group.sections.map((id) => (
+              <li key={id}>
+                <SectionRailLink to={tabPath(SETTINGS_TABS, id)} active={id === value}>
+                  {t(LABEL_KEYS.get(id) ?? id)}
+                  {id === 'app' && updateAvailable && (
+                    <AttentionDot label={t('settings.update.available')} />
+                  )}
+                  {id === 'offline' && storageAtRisk && (
+                    <AttentionDot label={t('settings.offline.atRisk')} />
+                  )}
+                </SectionRailLink>
+              </li>
+            ))}
           </ul>
         </div>
       ))}
     </nav>
-  );
-}
-
-/** §6c: something inside this section needs attention now; clears when handled. */
-function AttentionDot({ label }: { label: string }) {
-  return (
-    <span
-      role="img"
-      aria-label={label}
-      className="ml-1.5 inline-block size-1.5 rounded-full bg-accent align-middle"
-    />
   );
 }
 

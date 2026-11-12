@@ -21,6 +21,7 @@ import {
 import { revokedScopes } from '@/esi/scopes';
 import { ALERTS_LOCATION_SCOPE, ALERTS_MAIL_SCOPE, ALERTS_SCOPE } from './alertsScope';
 import { CORP_SYNC_SCOPES, FEEDER_SYNC_SCOPES } from './corpSyncScopes';
+import { VETTING_SCOPES } from './vettingScopes';
 
 export interface SsoConfig {
   clientId?: string;
@@ -127,7 +128,13 @@ export type LoginIntent =
       feederCorporationId: number;
       /** UTC day (YYYY-MM-DD) the moon owner's ledger counts from. */
       coverageFrom?: string;
-    };
+    }
+  /**
+   * A Vetting read: one character signs in so the server can read it once for a corp's report.
+   * No `characterId`: an applicant has no Character on this device, and picks one on EVE's page.
+   * `reviewId` is the draft or request the character is added to; absent for the first one.
+   */
+  | { kind: 'vetting'; corporationId: number; reviewId?: string };
 
 /**
  * Which way a login failed. The callback route recovers from these rather
@@ -235,6 +242,22 @@ export function startOwnCorpGrantLogin(
   config?: SsoConfig
 ): Promise<string> {
   return beginLogin([...FEEDER_SYNC_SCOPES], config, { kind: 'ownCorpGrant', ...intent });
+}
+
+/**
+ * A Vetting round trip: exactly `VETTING_SCOPES`, marked so the callback never persists it as a
+ * login. Like the grants above, it leaves `INTENT_KEY` alone.
+ */
+export function startVettingLogin(
+  corporationId: number,
+  reviewId?: string,
+  config?: SsoConfig
+): Promise<string> {
+  return beginLogin([...VETTING_SCOPES], config, {
+    kind: 'vetting',
+    corporationId,
+    ...(reviewId === undefined ? {} : { reviewId }),
+  });
 }
 
 async function beginLogin(
@@ -571,7 +594,15 @@ function readPendingLogin(key: string, allowExpired = false): PendingLogin | und
                     : {}),
                 } satisfies LoginIntent,
               }
-            : {}),
+            : intent?.kind === 'vetting' && typeof intent.corporationId === 'number'
+              ? {
+                  intent: {
+                    kind: 'vetting',
+                    corporationId: intent.corporationId,
+                    ...(typeof intent.reviewId === 'string' ? { reviewId: intent.reviewId } : {}),
+                  } satisfies LoginIntent,
+                }
+              : {}),
   };
 }
 
@@ -805,23 +836,65 @@ export async function completeOwnCorpGrantLogin(
   };
 }
 
-async function completeIntentLogin(
+/** What a Vetting round trip came back with. Nothing here has been stored. */
+export interface VettingLoginResult {
+  corporationId: number;
+  reviewId?: string;
+  /** The character the pilot picked on EVE's page. */
+  characterId: number;
+  name: string;
+  /** Short-lived; the caller keeps it in memory and hands it to the server once. */
+  accessToken: string;
+}
+
+/**
+ * Handle the callback of a Vetting round trip: exchange the code, keep the **access token**
+ * only and store nothing. The refresh token in SSO's answer is dropped here, unread: it is
+ * never returned, stored, sent or logged, so the corp's one-time read cannot become a standing
+ * one. A sibling of `completeIntentLogin` because that one requires a pressed Character and a
+ * refresh token to hand on, and this has neither.
+ */
+export async function completeVettingLogin(
   params: { code: string; state: string },
-  kind: LoginIntent['kind'],
   config?: SsoConfig
-): Promise<AlertsLoginResult & { intent: LoginIntent }> {
+): Promise<VettingLoginResult> {
   const { clientId } = resolveConfig(config);
   const { key, pending } = pendingForCallback(params.state);
   removeStorage(key);
-  if (pending.intent?.kind !== kind)
+  const intent = pending.intent;
+  if (intent?.kind !== 'vetting') throw new LoginError('state-mismatch', 'Not this kind of login');
+
+  const tokens = await exchangeCode({ clientId, code: params.code, verifier: pending.verifier });
+  const decoded = decodeAccessToken(tokens.access_token);
+  return {
+    corporationId: intent.corporationId,
+    ...(intent.reviewId === undefined ? {} : { reviewId: intent.reviewId }),
+    characterId: decoded.characterId,
+    name: decoded.name,
+    accessToken: tokens.access_token,
+  };
+}
+
+type CharacterIntent = Exclude<LoginIntent, { kind: 'vetting' }>;
+
+async function completeIntentLogin(
+  params: { code: string; state: string },
+  kind: CharacterIntent['kind'],
+  config?: SsoConfig
+): Promise<AlertsLoginResult & { intent: CharacterIntent }> {
+  const { clientId } = resolveConfig(config);
+  const { key, pending } = pendingForCallback(params.state);
+  removeStorage(key);
+  const intent = pending.intent;
+  if (!intent || intent.kind === 'vetting' || intent.kind !== kind)
     throw new LoginError('state-mismatch', 'Not this kind of login');
 
   const tokens = await exchangeCode({ clientId, code: params.code, verifier: pending.verifier });
   if (!tokens.refresh_token) throw new Error('Token response omitted refresh_token');
   const decoded = decodeAccessToken(tokens.access_token);
   return {
-    intent: pending.intent,
-    expectedCharacterId: pending.intent.characterId,
+    intent,
+    expectedCharacterId: intent.characterId,
     characterId: decoded.characterId,
     name: decoded.name,
     accessToken: tokens.access_token,

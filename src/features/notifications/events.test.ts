@@ -53,6 +53,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'communityJoinRequest',
       'communityMemberJoined',
       'communityRequestPledged',
+      'vettingShared',
     ]);
   });
 

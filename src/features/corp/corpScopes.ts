@@ -127,6 +127,13 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
   canManageSrp: ['esi-characters.read_corporation_roles.v1'],
   /** SRP Settings, Director alone. Additive (below), for the same reason as `canManageSrp`. */
   canConfigureSrp: ['esi-characters.read_corporation_roles.v1'],
+  /**
+   * Reviewer gate for Vetting (Director or Personnel_Manager). Not an ESI read; the callables
+   * re-check live. Additive (below): the roles scope is already in the corp group.
+   */
+  canVet: ['esi-characters.read_corporation_roles.v1'],
+  /** Vetting settings, Director alone. Additive (below), like `canVet`. */
+  canConfigureVetting: ['esi-characters.read_corporation_roles.v1'],
 };
 
 /**
@@ -156,6 +163,8 @@ const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set([
   'canReadSkyhooks',
   'canManageSrp',
   'canConfigureSrp',
+  'canVet',
+  'canConfigureVetting',
 ]);
 
 /**

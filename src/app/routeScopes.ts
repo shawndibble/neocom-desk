@@ -167,6 +167,10 @@ export const ROUTE_REQUIREMENTS = {
   '/corp/moons': UNGATED,
   // Hidden for non-officers, never locked (see `NavSubView.visible`); the views check `canManageSrp`.
   '/corp/srp': UNGATED,
+  // Hidden for anyone but a reviewer, never locked; `CorpVetting` checks `canVet`.
+  '/corp/vetting': UNGATED,
+  // A member's own review request: no scope to hold, the page signs each character in itself.
+  '/vetting': UNGATED,
   // The drill-down's deeper levels (issue #779): every level renders the same
   // component off the same gate, so it gates identically.
   '/corp/assets/*': UNGATED,

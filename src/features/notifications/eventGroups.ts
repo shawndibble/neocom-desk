@@ -58,6 +58,10 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
   communityJoinRequest: 'world',
   communityMemberJoined: 'world',
   communityRequestPledged: 'world',
+  // Beside the community events, not under Corporation: that Topic is the events riding the
+  // Corporation Permission and only firing while the app is open. This one is pushed by the
+  // backend and needs no Permission.
+  vettingShared: 'world',
   structureFuelLow: 'corp',
   skyhookRaidable: 'corp',
   corpIndustryJobReady: 'corp',

@@ -91,6 +91,7 @@ import {
 import type { FeederExtraction } from './corpTaxBookSyncEngine.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
+import { VETTING_COLLECTIONS } from './vettingTypes.js';
 import { isMissingIndex } from './indexedSweep.js';
 import { FEEDER_OBSERVED, rollupChanges, writeRollupChanges } from './corpTaxBookFeederRollup.js';
 import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
@@ -355,15 +356,18 @@ export async function ownBookFloor(
   return utcDate(leftAt);
 }
 
+/** The `corps/{id}` subcollections that are not the book's: deleting the book leaves them. */
+export const KEPT_ON_BOOK_DELETE: readonly string[] = [...SRP_COLLECTIONS, ...VETTING_COLLECTIONS];
+
 /**
- * The book's half of `corps/{id}`: the document and every subcollection except SRP's,
- * which shares the document (#4939). Found at run time, so a book collection added
- * later still goes. SRP never reads the parent document, and Firestore keeps a deleted
+ * The book's half of `corps/{id}`: the document and every subcollection except SRP's and
+ * vetting's, which share the document (#4939). Found at run time, so a book collection added
+ * later still goes. Neither reads the parent document, and Firestore keeps a deleted
  * document's other subcollections.
  */
 async function deleteBookContents(ref: DocumentReference): Promise<void> {
   for (const sub of await ref.listCollections()) {
-    if (!SRP_COLLECTIONS.includes(sub.id)) await ref.firestore.recursiveDelete(sub);
+    if (!KEPT_ON_BOOK_DELETE.includes(sub.id)) await ref.firestore.recursiveDelete(sub);
   }
   await ref.delete();
 }

@@ -371,6 +371,15 @@ const CATALOG = [
     labelKey: 'settings.notifications.event.communityRequestPledged',
     defaultChannels: 'feedOnly',
   },
+  // A pilot shared a vetting report with the corp this Character reviews for. The backend raises
+  // it when it writes the report (ADR 0027), so it needs no ESI scope. No `corpCapability`: that
+  // gate belongs to the Corporation Topic's open-app events and their Permission. Every
+  // Character is offered the row, whose hint says it only reaches reviewers; the server decides.
+  {
+    id: 'vettingShared',
+    labelKey: 'settings.notifications.event.vettingShared',
+    defaultChannels: 'both',
+  },
 ] as const satisfies readonly CatalogRow[];
 
 export type NotificationEventId = (typeof CATALOG)[number]['id'];

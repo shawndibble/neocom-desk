@@ -271,6 +271,8 @@ describe('useCorpAccess — ready', () => {
       canReadSkyhooks: true,
       canManageSrp: true,
       canConfigureSrp: true,
+      canVet: true,
+      canConfigureVetting: true,
     });
   });
 

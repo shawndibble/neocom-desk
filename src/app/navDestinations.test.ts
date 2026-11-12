@@ -21,6 +21,8 @@ const ALL_CORP_VIEWS = {
   canReadRoleAudit: true,
   canManageSrp: true,
   canConfigureSrp: true,
+  canVet: true,
+  canConfigureVetting: true,
 };
 const NO_CORP_VIEWS = {
   canReadMembers: false,
@@ -31,6 +33,8 @@ const NO_CORP_VIEWS = {
   canReadRoleAudit: false,
   canManageSrp: false,
   canConfigureSrp: false,
+  canVet: false,
+  canConfigureVetting: false,
 };
 
 const MOONS_TAB_PATHS = [
@@ -76,6 +80,7 @@ describe('railGroups', () => {
           '/corp/structures',
           '/corp/moons',
           '/corp/srp',
+          '/corp/vetting',
         ],
       },
       {

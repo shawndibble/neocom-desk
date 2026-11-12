@@ -17,8 +17,8 @@ export const COLLECTION_VERSIONS_FIELD = 'collectionVersions';
  * Subcollections whose writes never change what a client caches, so they move
  * no stamp: officer access records (rewritten on every officer check, which
  * the officer page makes on each open), the audit log (written beside the
- * edit it records), and the SRP collections that share the `corps/{id}`
- * umbrella. Leaving a name out only costs a re-read; adding one that a client
+ * edit it records), and the SRP and vetting collections that share the
+ * `corps/{id}` umbrella. Leaving a name out only costs a re-read; adding one that a client
  * caches would serve it stale.
  */
 export const UNVERSIONED_COLLECTIONS: ReadonlySet<string> = new Set([
@@ -30,6 +30,10 @@ export const UNVERSIONED_COLLECTIONS: ReadonlySet<string> = new Set([
   'srpOfficers',
   'srpDoctrines',
   'srpThrottle',
+  // Vetting shares the umbrella too; no client reads any of it (every read is a callable).
+  'vetting',
+  'vettingReviews',
+  'vettingThrottle',
   // A server-side mirror of `observed` (corpTaxBookFeederRollup.ts); no client reads it.
   'feederObserved',
 ]);

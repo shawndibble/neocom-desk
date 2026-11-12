@@ -36,6 +36,8 @@ const ALL_CORP_VIEWS = {
   canReadRoleAudit: true,
   canManageSrp: true,
   canConfigureSrp: true,
+  canVet: true,
+  canConfigureVetting: true,
 };
 
 const TILE_GRID = 'grid grid-cols-4 gap-1.5';

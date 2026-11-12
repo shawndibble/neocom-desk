@@ -569,6 +569,30 @@ describe('server-pushed events (issue #5121)', () => {
     );
   });
 
+  it('renders a new vetting report without naming the pilot and opens that report', async () => {
+    const fire = {
+      eventId: 'vettingShared',
+      characterId: 7,
+      corporationId: 98000001,
+      reviewId: 'v-0042',
+      kind: 'application',
+    } as const;
+    const e = env();
+    await handlePush(e, serverPush(fire), 5000);
+    const [title, options] = vi.mocked(e.showNotification).mock.calls[0];
+    expect(title).toBe('New vetting report');
+    expect(options.body).toBe('A pilot shared a report for review.');
+    expect(String(options.data?.url)).toMatch(/^\/corp\/vetting\/open\/v-0042\?/);
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: '7:vettingShared:98000001:v-0042',
+        eventId: 'vettingShared',
+        title: 'New vetting report',
+        body: 'A pilot shared a report for review.',
+      })
+    );
+  });
+
   it('falls back to the sender’s copy and key for a fire that is not the push’s own', async () => {
     const e = env();
     await handlePush(e, serverPush({ ...priceFire, characterId: 8 }, { characterId: '7' }), 5000);

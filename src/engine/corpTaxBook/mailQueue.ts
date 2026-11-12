@@ -21,7 +21,8 @@ const MAX_RATE_LIMIT_WAIT_MS = 10 * MINUTE_MS;
 /**
  * `rate-change` (#4515), `removal`/`removalCancelled` (#4520) and `payee-change` (#4653) are moon
  * owner mails, not Statements. `srp-result` (an officer telling a pilot an SRP claim was decided)
- * belongs to no Corp Tax Book at all: it only rides the same paced queue.
+ * and `vetting-result` (a reviewer telling a pilot how their vetting review was decided) belong to
+ * no Corp Tax Book at all: they only ride the same paced queue.
  */
 export type MailKind =
   | 'statement'
@@ -30,7 +31,8 @@ export type MailKind =
   | 'payee-change'
   | 'removal'
   | 'removalCancelled'
-  | 'srp-result';
+  | 'srp-result'
+  | 'vetting-result';
 
 /** Only Statement mail is logged on a Statement; other kinds have none to log on. */
 export const isStatementMail = (kind: MailKind): kind is 'statement' | 'reminder' =>
