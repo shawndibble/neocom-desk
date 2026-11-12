@@ -555,6 +555,8 @@ export interface StructuresBoardData {
   fetchedAt: Date | null;
   /** Read across several corporations (All scope): each one's ticker and name, for its rows. */
   corporations?: ReadonlyMap<number, CorpLabel>;
+  /** Read across several corporations, and one of them failed: the rest draws, flagged. */
+  partlyFailed?: boolean;
 }
 
 /** `StructuresBoardData` with its items built against the current instant. */

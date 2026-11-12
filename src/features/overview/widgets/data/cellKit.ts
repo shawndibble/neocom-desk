@@ -2,6 +2,7 @@
  * Pure helpers for the table cell variant `{ text, tone?, bar? }` (see
  * `TableCell` in `types.ts` for the one shared rule). No fetch, DOM or Dexie.
  */
+import type { CorpLabel } from '@/features/corp/corpTicker';
 import type { TableCell } from './types';
 
 export type CellTone = 'good' | 'caution' | 'bad';
@@ -34,6 +35,6 @@ export function shareCell(part: number, whole: number, none = '0%'): TableCell {
 }
 
 /** A row's corporation, read across several: its ticker, the full name in the tooltip. */
-export function corpCell(corp: { ticker: string; name: string }): TableCell {
+export function corpCell(corp: CorpLabel): TableCell {
   return { text: corp.ticker, hint: corp.name };
 }

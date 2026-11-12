@@ -46,7 +46,7 @@ function setup(kind: 'corpDeadlines' | 'structures', corporations: number) {
   );
 }
 
-const ALL = "All characters' corporations";
+const ALL = 'All my corporations';
 
 describe('Corp Board scope choice', () => {
   it.each(['corpDeadlines', 'structures'] as const)(

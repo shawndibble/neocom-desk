@@ -515,6 +515,12 @@ describe('corpDeadlines across corporations (All scope)', () => {
     expect(corpDeadlines(allFeed([slice(500)]), ctx).table).toBeUndefined();
   });
 
+  it('offers Retry, not "unreadable", when the only reads that could answer failed', () => {
+    const view = corpDeadlines(allFeed([slice(500, { failed: true })]), allCtx);
+    expect(view.status.error).toBe(true);
+    expect(view.emptyMessage).toBeUndefined();
+  });
+
   it('is loading until the All read lands, and unreadable when no corporation can be read', () => {
     expect(corpDeadlines({ corpDeadlinesAll: loading() }, allCtx).status.loading).toBe(true);
     expect(corpDeadlines(allFeed([]), allCtx).emptyMessage).toBe('overview.board.corpUnreadable');

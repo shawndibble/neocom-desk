@@ -12,6 +12,7 @@ import { toBoardStructures } from '@/features/corp/boardSources';
 import { CorpReadFailed } from '@/features/corp/corpRead';
 import { accountCorpReaders, resolveCorpReadAccess } from '@/features/corp/corpReadAccess';
 import { loadCorpLabels } from '@/features/corp/corpTicker';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadMoonChunks } from '@/features/character/calendarMoonChunks';
 import type { MoonChunksBoardData, StructuresBoardData } from './boardData';
 
@@ -57,7 +58,7 @@ export async function loadMoonChunksBoardData(characterId: number): Promise<Moon
 // --- All characters: every corporation the pilot's Characters can read -----------------
 
 /** The oldest of the reads' timestamps: the merged list is only as fresh as its stalest corporation. */
-export function oldest(dates: readonly (Date | null)[]): Date | null {
+function oldest(dates: readonly (Date | null)[]): Date | null {
   const known = dates.filter((date): date is Date => date !== null);
   return known.length === 0 ? null : new Date(Math.min(...known.map((date) => date.getTime())));
 }
@@ -71,7 +72,7 @@ async function settleCorps<T>(
   readers: ReadonlyMap<number, number>,
   what: string,
   load: (characterId: number) => Promise<T>
-): Promise<(T & { corporationId: number })[]> {
+): Promise<{ reads: (T & { corporationId: number })[]; partlyFailed: boolean }> {
   const settled = await Promise.allSettled(
     [...readers].map(async ([corporationId, characterId]) => ({
       ...(await load(characterId)),
@@ -82,13 +83,16 @@ async function settleCorps<T>(
     outcome.status === 'fulfilled' ? [outcome.value] : []
   );
   if (reads.length === 0 && readers.size > 0) throw new CorpReadFailed(what);
-  return reads;
+  return { reads, partlyFailed: reads.length < readers.size };
 }
+
+/** The active Character reads its own corporation, sharing the cache rows `/corp` warmed. */
+const activeReader = () => useActiveCharacter.getState().activeCharacterId ?? undefined;
 
 /** Every readable corporation's structures as one list, for a widget scoped to All characters. */
 export async function loadAllStructuresBoardData(): Promise<StructuresBoardData> {
-  const reads = await settleCorps(
-    await accountCorpReaders('canReadStructures'),
+  const { reads, partlyFailed } = await settleCorps(
+    await accountCorpReaders('canReadStructures', activeReader()),
     'structures',
     loadStructuresBoardData
   );
@@ -105,13 +109,14 @@ export async function loadAllStructuresBoardData(): Promise<StructuresBoardData>
     needsReauth: readable.some((read) => read.needsReauth),
     fetchedAt: oldest(readable.map((read) => read.fetchedAt)),
     corporations: await loadCorpLabels(readable.map((read) => read.corporationId)),
+    partlyFailed,
   };
 }
 
 /** Every readable corporation's moon drills as one list, for a widget scoped to All characters. */
 export async function loadAllMoonChunksBoardData(): Promise<MoonChunksBoardData> {
-  const reads = await settleCorps(
-    await accountCorpReaders('canReadMoonExtractions'),
+  const { reads } = await settleCorps(
+    await accountCorpReaders('canReadMoonExtractions', activeReader()),
     'moon extractions',
     loadMoonChunksBoardData
   );

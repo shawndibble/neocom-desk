@@ -255,10 +255,11 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
   };
 
   return {
-    ...blank(
-      to,
-      statusOf(feed, { isEmpty: problemsOnly ? rows.length === 0 : view.structureCount === 0 })
-    ),
+    ...blank(to, {
+      ...statusOf(feed, { isEmpty: problemsOnly ? rows.length === 0 : view.structureCount === 0 }),
+      // One corporation of several failed: what the others gave still draws, flagged.
+      ...(raw.partlyFailed ? { error: true } : {}),
+    }),
     ...(problemsOnly && rows.length === 0 && view.structureCount > 0
       ? { emptyMessage: t('overview.widgets.structures.noProblems'), emptyHealthy: true }
       : {}),

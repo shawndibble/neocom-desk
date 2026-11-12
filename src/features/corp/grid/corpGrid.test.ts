@@ -116,8 +116,8 @@ describe('the Corp Board board', () => {
     const asked: (readonly string[])[] = [];
     corpWidgetBoard(ALL, (caps) => (asked.push(caps), 2)).allScopeOffered('structures');
     expect(asked).toEqual([['canReadStructures']]);
-    // Not yet known: the saved choice stands.
-    expect(corpWidgetBoard(ALL).allScopeOffered('structures')).toBe(true);
+    // Not yet known: the header scope is read, so one corporation never fans out.
+    expect(corpWidgetBoard(ALL).allScopeOffered('structures')).toBe(false);
     expect(corpWidgetBoard(ALL).opensOnAll).toEqual(new Set(['corpDeadlines', 'structures']));
   });
 

@@ -61,6 +61,7 @@ import {
   type CorpCapability,
 } from '@/features/corp/corpReadAccess';
 import { loadCorpLabels } from '@/features/corp/corpTicker';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadMoonChunksBoardData, loadStructuresBoardData } from '../../data/corpBoard';
 import { fetchCorporationStatsRead } from '@/lib/zkillboard';
@@ -628,9 +629,11 @@ const DEADLINE_READS: readonly {
  */
 export async function loadCorpDeadlinesAll(): Promise<CorpDeadlinesAllFeed> {
   const accounts = await loadAccountCorpAccess();
+  // The active Character reads its own corporation, sharing the cache rows `/corp` warmed.
+  const preferred = useActiveCharacter.getState().activeCharacterId ?? undefined;
   const slices = new Map<number, CorpDeadlinesSlice>();
   const tasks = DEADLINE_READS.flatMap(({ source, capability, load }) =>
-    [...corpReadersFor(accounts, capability)].map(([corporationId, characterId]) => {
+    [...corpReadersFor(accounts, capability, preferred)].map(([corporationId, characterId]) => {
       if (!slices.has(corporationId)) {
         slices.set(corporationId, {
           corporationId,

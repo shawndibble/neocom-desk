@@ -81,7 +81,9 @@ describe('loadAllStructuresBoardData', () => {
     access.set(3, { corporationId: 20, can: canAll });
     structuresByCorp.set(10, read([1], '2026-11-01T10:00:00Z'));
     structuresByCorp.set(20, { cached: null, needsReauth: false });
-    expect((await loadAllStructuresBoardData()).structures).toHaveLength(1);
+    const partial = await loadAllStructuresBoardData();
+    expect(partial.structures).toHaveLength(1);
+    expect(partial.partlyFailed).toBe(true);
 
     structuresByCorp.set(10, { cached: null, needsReauth: false });
     await expect(loadAllStructuresBoardData()).rejects.toThrow();

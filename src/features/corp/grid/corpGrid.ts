@@ -67,11 +67,15 @@ export function corpDefaultLayout(makeId: MakeId = seqId('c')): OverviewLayout {
 const CORP_KINDS = boardKinds('corp');
 
 /** Kinds a widget added to the Corp Board opens on All, as the default layout's do. */
-const CORP_OPENS_ON_ALL: ReadonlySet<string> = new Set(['corpDeadlines', 'structures']);
+const CORP_OPENS_ON_ALL: ReadonlySet<string> = new Set(
+  CORP_DEFAULT_SEEDS.flatMap((seed) =>
+    typeof seed !== 'string' && seed.scope === 'all' ? [seed.kind] : []
+  )
+);
 
 /**
  * `corporationsReading` says how many corporations the pilot's Characters can read for any
- * of some capabilities; until it is known (left out), a widget's saved scope stands.
+ * of some capabilities; until it is known (left out), every widget reads its header scope.
  */
 export function corpWidgetBoard(
   capabilities: CorpCapabilities,
@@ -83,9 +87,10 @@ export function corpWidgetBoard(
     categories: CORP_KIND_CATEGORIES,
     canDraw: (kind: WidgetKindDef) => kindOpenTo(kind, capabilities),
     characterScope: 'summable',
-    // One corporation to read: All would be the same rows, so the choice is not offered.
+    // One corporation to read: All would be the same rows, so the choice is not offered. Until
+    // the count lands the header scope is read, so a one-corporation pilot never fans out.
     allScopeOffered: (kind) =>
-      corporationsReading === undefined ||
+      corporationsReading !== undefined &&
       corporationsReading(getKind(kind)?.capabilities ?? []) > 1,
     opensOnAll: CORP_OPENS_ON_ALL,
     defaultLayout: corpDefaultLayout,

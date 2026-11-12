@@ -27,8 +27,7 @@ import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from '.
 import { corpCell, fractionBar } from './cellKit';
 import { hbarsFromRows } from './chartBuilders';
 import type { CorpLabel } from '@/features/corp/corpTicker';
-import type { MoonChunksBoardData, StructuresBoardData } from '../../data/boardData';
-import type { CorpJobsFeed, CorpSovereigntyFeed, CorpStarbasesFeed } from './corpFeeds';
+import type { CorpDeadlinesSlice, CorpJobsFeed } from './corpFeeds';
 import { toBoardHubFuel, toBoardSovereignty } from './corpSovereigntyModels';
 import { toBoardStarbases } from './corpStarbaseModels';
 import { elapsedShare } from './industryModels';
@@ -127,13 +126,7 @@ function dayChart(
 }
 
 /** One corporation's Due soon reads, whatever scope fetched them; absent or null means not read. */
-interface DeadlineReads {
-  structures?: StructuresBoardData | null;
-  moonChunks?: MoonChunksBoardData | null;
-  jobs?: CorpJobsFeed | null;
-  starbases?: CorpStarbasesFeed | null;
-  sovereignty?: CorpSovereigntyFeed | null;
-}
+type DeadlineReads = Partial<Omit<CorpDeadlinesSlice, 'corporationId' | 'failed'>>;
 
 /** The readable reads as the board's sources, and when they landed. */
 function readableSources(reads: DeadlineReads, now: number) {
@@ -308,6 +301,10 @@ function allCorpDeadlines(feeds: Feeds, ctx: BuildContext): KindView {
   }));
   const readable = reads.filter(({ read }) => read.readable);
   if (readable.length === 0) {
+    // A read failed and none answered: Retry, not "your roles don't cover this".
+    if (data.corporations.some((slice) => slice.failed)) {
+      return blank(null, { ...statusOf(feed), error: true });
+    }
     const needsReauth = data.corporations.some(
       (slice) =>
         slice.structures?.needsReauth || slice.moonChunks?.needsReauth || slice.jobs?.needsReauth
