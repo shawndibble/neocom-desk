@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
   ApplyCharacters,
   ApplySent,
+  ApplyStatusInApp,
   ApplyStart,
   PHONE,
   PromotionRequest,
@@ -22,8 +23,14 @@ import { APPLICANT_CHARACTERS, MEMBER_CHARACTERS } from './vettingFixtures';
  *   report then says that check could not run.
  * - "These are all my characters" is a statement the applicant makes, with the
  *   reason it matters said plainly.
- * - Send is the one primary action. After it: what was kept, who has opened
- *   the report, and Withdraw.
+ * - Send is the one primary action. It lands on the application's status
+ *   page, not the Overview with a toast: status, what happens next, who has
+ *   opened the report, Withdraw. The page is what the pilot comes back to, and
+ *   after a decision it names the in-game step (the app cannot accept a corp
+ *   application).
+ * - Staying signed in is opt-in: "Open Neocom Desk with these characters"
+ *   keeps the sign-in in this browser only. A pilot who already uses the app
+ *   sees the same status page inside the shell, with no offer.
  * - **Promotion request** (inside the app): who asked and for which role,
  *   characters already signed in on this device are ticked with no second
  *   sign-in, and Decline is a real choice the reviewers are told about.
@@ -61,11 +68,19 @@ export const Characters390: Story = {
   globals: { viewport: PHONE.viewport },
 };
 
-/** @summary Sent: what was kept, who has opened the report, Withdraw. */
+/** @summary Status page Send lands on: waiting, what happens next, who opened the report, Withdraw, optional "Open Neocom Desk". */
 export const Sent1440: Story = { render: () => <ApplySent /> };
-/** @summary Phone: sent. */
+/** @summary Phone: the status page. */
 export const Sent390: Story = {
   render: () => <ApplySent />,
+  globals: { viewport: PHONE.viewport },
+};
+
+/** @summary Status page after the corp accepts: the in-game step, who opened the report, deletion date. */
+export const Accepted1440: Story = { render: () => <ApplySent accepted /> };
+/** @summary Phone: accepted. */
+export const Accepted390: Story = {
+  render: () => <ApplySent accepted />,
   globals: { viewport: PHONE.viewport },
 };
 
@@ -80,5 +95,14 @@ export const Promotion1440: Story = {
 export const Promotion390: Story = {
   parameters: SHELL,
   render: () => <PromotionRequest characters={MEMBER_CHARACTERS} />,
+  globals: { viewport: PHONE.viewport },
+};
+
+/** @summary The status page for a pilot who already uses the app: in the shell, no sign-in offer. */
+export const StatusInApp1440: Story = { parameters: SHELL, render: () => <ApplyStatusInApp /> };
+/** @summary Phone: status page in the app. */
+export const StatusInApp390: Story = {
+  parameters: SHELL,
+  render: () => <ApplyStatusInApp />,
   globals: { viewport: PHONE.viewport },
 };

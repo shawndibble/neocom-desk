@@ -282,39 +282,134 @@ export function ApplyCharacters({ characters }: { characters: VettingCharacter[]
   );
 }
 
-/** Step three: sent. Says what was kept, what was not, and how to take it back. */
-export function ApplySent() {
+const NEXT_SENT = [
+  'A recruiter reads the report. You can see below when someone opens it.',
+  'They contact you in game, usually with a few questions.',
+  'If they accept, this page tells you how to join in game.',
+];
+
+const NEXT_ACCEPTED = [
+  `In EVE, open ${CORP.name}'s corporation window and press Apply to join.`,
+  'A recruiter accepts the application in game. Neocom Desk cannot do that step for you.',
+];
+
+/**
+ * The application's status page: where Send lands and what the pilot comes
+ * back to. Status, what happens next, who opened the report, Withdraw, and one
+ * optional offer to keep the characters signed in on this device.
+ */
+function StatusBody({ accepted, inApp }: { accepted?: boolean; inApp?: boolean }) {
   return (
-    <PublicPage>
-      <ApplyHeading sub="Sent 12 Nov 2026 14:02 EVE." />
-      <Panel title={`Sent to ${CORP.name}`}>
+    <>
+      <Panel
+        title="Your application"
+        meta={
+          <Pill tone={accepted ? 'success' : 'neutral'}>{accepted ? 'Accepted' : 'Waiting'}</Pill>
+        }
+      >
         <div className="space-y-3 text-sm">
           <p>
-            3 characters were read and the report is with the recruiters. They will contact you in
-            game.
+            {accepted
+              ? `Kestrel Vane accepted your application to ${CORP.name} on 13 Nov 2026 19:20 EVE.`
+              : `3 characters were read on 12 Nov 2026 14:02 EVE and the report is with ${CORP.name}'s recruiters.`}
           </p>
-          <p className="text-text-dim">
-            Neocom Desk kept no sign-in for your characters. Nothing more is read unless you share
-            again. Keep this page&apos;s link to see who opened the report or to withdraw.
-          </p>
+          <div className="space-y-2">
+            <Eyebrow>What happens next</Eyebrow>
+            <ol className="space-y-1.5">
+              {(accepted ? NEXT_ACCEPTED : NEXT_SENT).map((step, index) => (
+                <li key={step} className="grid grid-cols-[1.5rem_1fr] gap-2">
+                  <span className="font-semibold text-text-dim tabular-nums">{index + 1}</span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      </Panel>
+      <Panel title="Your report">
+        <div className="space-y-3 text-sm">
           <NewComponent name="VettingOpenedBy">
             <dl className="space-y-1.5">
               <div className="grid grid-cols-[7rem_1fr] gap-2">
                 <dt className="text-text-dim">Opened by</dt>
-                <dd>Nobody yet</dd>
+                <dd>
+                  {accepted ? (
+                    <>
+                      Kestrel Vane
+                      <span className="block text-xs text-text-dim">
+                        12 Nov 15:58 and 13 Nov 19:12
+                      </span>
+                    </>
+                  ) : (
+                    'Nobody yet'
+                  )}
+                </dd>
               </div>
               <div className="grid grid-cols-[7rem_1fr] gap-2">
                 <dt className="text-text-dim">Deleted</dt>
-                <dd>30 days after the decision</dd>
+                <dd>{accepted ? '13 Dec 2026' : '30 days after the decision'}</dd>
               </div>
             </dl>
           </NewComponent>
+          <p className="text-text-dim">
+            Neocom Desk&apos;s servers kept no sign-in for your characters. Nothing more is read
+            unless you share again.
+          </p>
           <button type="button" className={textActionClassName()}>
-            Withdraw and delete the report…
+            {accepted ? 'Delete the report now…' : 'Withdraw and delete the report…'}
           </button>
         </div>
       </Panel>
+      {!inApp && (
+        <Panel title="Use Neocom Desk">
+          <div className="space-y-3 text-sm">
+            <p>
+              Keep these 3 characters signed in on this device to use Neocom Desk: skills, wallet,
+              industry and the rest. It is free.
+            </p>
+            <p className="text-text-dim">
+              The sign-in stays in this browser only, never on our servers. You can also come back
+              to this page without the link, and a later read for {CORP.name} is one press.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button>Open Neocom Desk with these characters</Button>
+              <span className="text-xs text-text-dim">
+                Otherwise keep this page&apos;s link to come back.
+              </span>
+            </div>
+          </div>
+        </Panel>
+      )}
+    </>
+  );
+}
+
+/** Step three on the public page: Send lands here, not on a dashboard. */
+export function ApplySent({ accepted }: { accepted?: boolean }) {
+  return (
+    <PublicPage>
+      <ApplyHeading
+        sub={accepted ? 'Decided 13 Nov 2026 19:20 EVE.' : 'Sent 12 Nov 2026 14:02 EVE.'}
+      />
+      <StatusBody accepted={accepted} />
     </PublicPage>
+  );
+}
+
+/** The same status page for a pilot who already uses the app: inside the shell, no sign-in offer. */
+export function ApplyStatusInApp() {
+  return (
+    <div className="mx-auto max-w-2xl space-y-4 px-4 py-4">
+      <PageHeader
+        title="Application"
+        meta={
+          <span className="text-xs text-text-dim">
+            {CORP.name} [{CORP.ticker}]
+          </span>
+        }
+      />
+      <StatusBody inApp />
+    </div>
   );
 }
 
