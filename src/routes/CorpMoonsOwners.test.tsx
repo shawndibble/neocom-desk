@@ -111,13 +111,11 @@ function mount(path: string) {
 beforeEach(() => vi.clearAllMocks());
 
 describe('CorpMoons moon owners', () => {
-  it('has no Extractions tab when the book reads no refinery of its own, and lands on Moon owners', () => {
+  it('keeps Extractions for a book that only reads moon owners', () => {
     book.entries = [entry(98000001)];
     book.feeders = [ONE_FEEDER];
     mount('/corp/moons/extractions');
-    expect(screen.queryByRole('tab', { name: 'Extractions' })).toBeNull();
-    expect(screen.getByRole('tab', { name: 'Moon owners', selected: true })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Invite a moon owner' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Extractions', selected: true })).toBeInTheDocument();
   });
 
   it('keeps Extractions, and the invite button, for a book with refineries of its own', () => {

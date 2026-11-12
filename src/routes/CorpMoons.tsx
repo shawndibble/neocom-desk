@@ -15,7 +15,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { canViewCorpTaxBook } from '@/engine/corpRoles';
-import { Navigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -34,7 +34,7 @@ import {
   useTabsId,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { tabBarTabs, tabPath } from '@/lib/pageTabs';
+import { tabBarTabs } from '@/lib/pageTabs';
 import { cx } from '@/lib/cx';
 import { usePageTab } from '@/lib/usePageTab';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -64,7 +64,7 @@ import { StatementsTab } from '@/features/corp/moons/StatementsTab';
 import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
 import { useAddMyCorps } from '@/features/corp/moons/addCorps/useAddMyCorps';
-import { useMoonOwners, useShowExtractions } from '@/features/corp/moons/useMoonOwners';
+import { useMoonOwners } from '@/features/corp/moons/useMoonOwners';
 import { setMoonsTabsHidden } from '@/features/corp/moons/moonsTabsHidden';
 
 function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -86,7 +86,6 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const { view, canEdit, characterId, corporationId, names } = useBook();
-  const showExtractions = useShowExtractions();
   // With no moon owners the empty state carries the invite button itself.
   const { rows: moonOwnerRows } = useMoonOwners();
   const hasMoonOwners = moonOwnerRows.length > 0;
@@ -104,10 +103,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const isPhone = useIsPhone();
   const detail = moonsDetail(pathname);
-  // A corporation with no refineries of its own has nothing for Extractions to show.
-  if (!showExtractions && (tab === 'extractions' || detail?.kind === 'extraction'))
-    return <Navigate to={tabPath(MOONS_TABS, 'moon-owners')} replace />;
-  const tabs = tabBarTabs(MOONS_TABS).filter((x) => showExtractions || x.id !== 'extractions');
+  const tabs = tabBarTabs(MOONS_TABS);
   return (
     <div className="mx-auto max-w-page space-y-4 px-4 py-4">
       {detail === null && (
@@ -191,7 +187,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           )}
           <BookHealthStrip sync={sync} />
           <TabPanel tabsId={tabsId} tabId={tab}>
-            {tab === 'overview' && <OverviewTab showMoons={showExtractions} />}
+            {tab === 'overview' && <OverviewTab />}
             {tab === 'extractions' && <ExtractionsTab />}
             {tab === 'miners' && <MinersTab />}
             {tab === 'statements' && <StatementsTab />}
@@ -274,13 +270,14 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
     extractionId: open?.kind === 'extraction' ? open.id : undefined,
   });
   const { state } = book;
-  // The rail and the page title list Moons' tabs only once a book mode is chosen.
-  const unchosen = state.status === 'off';
-  const decided = state.status === 'off' || state.status === 'ready';
+  // The rail and the page title list Moons' tabs only when the page will show them: a book
+  // mode is chosen and this Character may read the book (a moon owner's own corp is denied).
+  const unavailable = state.status === 'off' || state.status === 'denied';
+  const decided = unavailable || state.status === 'ready';
   useEffect(() => {
-    if (decided) setMoonsTabsHidden(unchosen);
+    if (decided) setMoonsTabsHidden(unavailable);
     return () => setMoonsTabsHidden(false);
-  }, [decided, unchosen]);
+  }, [decided, unavailable]);
 
   if (state.status === 'loading') return <MoonsLoading />;
   if (state.status === 'failed') {
@@ -374,6 +371,17 @@ export function CorpMoons() {
   const { t } = useTranslation();
   const access = useCorpAccess();
   const { ledger } = useCorpTaxBook({ autoSync: false });
+  const viewer = access.state === 'ready' && canViewCorpTaxBook(access.roles);
+  // The page below renders no tab bar for these, so the rail lists none either.
+  const noAccess =
+    access.state !== 'unknown' &&
+    (access.state !== 'ready' ||
+      (!viewer && (ledger.state === 'unavailable' || ledger.state === 'unknown')));
+  useEffect(() => {
+    if (!noAccess) return;
+    setMoonsTabsHidden(true);
+    return () => setMoonsTabsHidden(false);
+  }, [noAccess]);
   if (access.state === 'unknown') return <MoonsLoading />;
   if (access.state !== 'ready') {
     return (
@@ -388,7 +396,6 @@ export function CorpMoons() {
       </div>
     );
   }
-  const viewer = canViewCorpTaxBook(access.roles);
   if (!viewer && (ledger.state === 'unavailable' || ledger.state === 'unknown')) {
     return (
       <div className="mx-auto max-w-page space-y-4 p-4">

@@ -67,18 +67,18 @@ describe('the Overview and Miners tab read models', () => {
   });
 
   it('prints the Overview from the docs', () => {
-    renderTab(<OverviewTab showMoons />);
+    renderTab(<OverviewTab />);
     expect(headings()).toEqual(['Fractured · 0', 'Ready · 0', 'Pops in the next 7 days · 0']);
     expect(screen.getByText(/Before the book: 7 donations/)).toBeInTheDocument();
   });
 
   it('falls back to the whole-book view while the docs are missing', () => {
-    renderTab(<OverviewTab showMoons />, null);
+    renderTab(<OverviewTab />, null);
     expect(headings()).toEqual(['Fractured · 1', 'Ready · 1', 'Pops in the next 7 days · 1']);
   });
 
   it('falls back when the docs are from another schema', () => {
-    renderTab(<OverviewTab showMoons />, {
+    renderTab(<OverviewTab />, {
       ...DOCS,
       minerList: { ...DOCS.minerList, schema: READ_MODELS_SCHEMA + 1 },
     });

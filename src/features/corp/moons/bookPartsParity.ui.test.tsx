@@ -321,7 +321,7 @@ interface Route {
   ui: ReactElement;
 }
 const ROUTES: Route[] = [
-  { name: 'overview', tab: 'overview', detail: null, ui: <OverviewTab showMoons /> },
+  { name: 'overview', tab: 'overview', detail: null, ui: <OverviewTab /> },
   { name: 'extractions', tab: 'extractions', detail: null, ui: <ExtractionsTab /> },
   { name: 'miners', tab: 'miners', detail: null, ui: <MinersTab /> },
   { name: 'statements', tab: 'statements', detail: null, ui: <StatementsTab /> },
@@ -377,8 +377,8 @@ describe('book parts parity', () => {
   });
 
   it('the harness sees a missing slice: the Overview on core alone differs from the whole book', () => {
-    const whole = screenText(<OverviewTab showMoons />, undefined);
-    expect(screenText(<OverviewTab showMoons />, new Set(['core']))).not.toBe(whole);
+    const whole = screenText(<OverviewTab />, undefined);
+    expect(screenText(<OverviewTab />, new Set(['core']))).not.toBe(whole);
   });
 
   it('the Extractions detail needs the ledger for its dismissed days', () => {

@@ -8,9 +8,5 @@ export const FILTER_STATES: readonly ExtractionState[] = [
   'expired',
   'cancelled',
 ];
-/** Expired is history: off until asked for, so the live chunks lead. */
-export const DEFAULT_STATES: ReadonlySet<ExtractionState> = new Set([
-  'fractured',
-  'ready',
-  'extracting',
-]);
+/** Every state shows from the start, Expired history beside the live chunks; a chip narrows it. */
+export const DEFAULT_STATES: ReadonlySet<ExtractionState> = new Set(FILTER_STATES);

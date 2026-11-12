@@ -71,20 +71,20 @@ describe('ExtractionsTab on a phone', () => {
     const props = tableProps.calls[0];
     expect(props.mobileSort).toBe(true);
     expect(props.stackColumns).toBe(2);
-    expect(props.stackSummary).toBe('4 Extractions');
+    expect(props.stackSummary).toBe('5 Extractions');
   });
 
-  it('lists only the states the chips have on, Expired off by default, and counts what each adds', async () => {
+  it('lists the states the chips have on, Expired included by default, and counts what each adds', async () => {
     render(
       <MemoryRouter>
         <ExtractionsTab />
       </MemoryRouter>
     );
-    expect(tableProps.calls.at(-1)!.stackSummary).toBe('4 Extractions');
+    expect(tableProps.calls.at(-1)!.stackSummary).toBe('5 Extractions');
     const expired = screen.getByRole('button', { name: /Expired/ });
     expect(expired).toHaveTextContent('1');
     await userEvent.click(expired);
-    expect(tableProps.calls.at(-1)!.stackSummary).toBe('5 Extractions');
+    expect(tableProps.calls.at(-1)!.stackSummary).toBe('4 Extractions');
   });
 
   it('right-click menu: both items on a surveyed row with tax; no menu otherwise', () => {
