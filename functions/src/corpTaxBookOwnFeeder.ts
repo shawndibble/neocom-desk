@@ -102,7 +102,7 @@ export async function addOwnFeeder(
         accessToken: input.grantAccessToken,
         refreshToken: input.grantRefreshToken,
       },
-      { expectedFeederCorp: input.feederCorporationId }
+      { expectedFeederCorp: input.feederCorporationId, reconnectOwnOf: input.corporationId }
     );
   }
   // The code never leaves this function: the invite exists only for the save below.
@@ -135,7 +135,11 @@ export async function addOwnFeeder(
   }
 }
 
-/** Whether the moon owner is one of the caller's own corps that this book already reads. */
+/**
+ * Whether the moon owner is one of the caller's own corps that this book already reads. Only
+ * routes the call: `reconnectCore` checks the same again inside its transaction. The Moons page
+ * offers Grant again on readable rows (`addCorpsStatus.ts`), all of which are `active` here.
+ */
 async function isActiveOwnFeeder(
   deps: FeederGrantDeps,
   collector: number,

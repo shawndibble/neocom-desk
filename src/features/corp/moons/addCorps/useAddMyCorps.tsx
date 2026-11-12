@@ -182,7 +182,8 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
     const queue = [id, ...wanted.filter((w) => w !== id)].flatMap((w) =>
       own.corps.filter((c) => c.corporationId === w)
     );
-    if (queue.length === 0) return;
+    // A run still in progress is never replaced: Continue finishes it first.
+    if (queue.length === 0 || pending) return;
     void start({
       collectorCorporationId: corporationId,
       editorCharacterId: characterId,

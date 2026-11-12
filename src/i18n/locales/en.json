@@ -18237,7 +18237,7 @@
             "action": "Grant again"
           },
           "names-not-shared": {
-            "text": "Refinery names aren't shared. {{name}}'s officer can grant again from their Moons page."
+            "text": "Refinery names aren't shared. {{name}}'s CEO or an officer can grant again from that corp's Moons page."
           },
           "grantNamed": "Grant again for {{name}}",
           "removeNamed": "Remove {{name}}",

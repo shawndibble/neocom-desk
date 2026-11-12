@@ -106,7 +106,7 @@ describe('CorpStatusPanel', () => {
     expect(screen.getByText('Needs you (1)')).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Refinery names aren't shared. Brightwater Holdings's officer can grant again from their Moons page."
+        "Refinery names aren't shared. Brightwater Holdings's CEO or an officer can grant again from that corp's Moons page."
       )
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Brightwater Holdings/ })).toBeNull();
