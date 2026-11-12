@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useTicker } from '@/lib/ticker';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { kindHasAllFeeds } from './widgets/data/models';
+import { kindHasAllFeeds, kindSumsAcrossCharacters } from './widgets/data/models';
 import { OVERVIEW_TICK_MS } from './widgets/data/tick';
 import { useKindViews, viewKey } from './widgets/data/useWidgetView';
 import {
@@ -25,7 +25,10 @@ const EMPTY_READ = { fetchedAt: null, fromCache: false };
  */
 const requestOf = (board: WidgetBoard, widget: Widget) => ({
   kind: widget.kind,
-  scopeAll: readScope(board, widget) === 'all' && kindHasAllFeeds(widget.kind),
+  scopeAll:
+    readScope(board, widget) === 'all' &&
+    kindHasAllFeeds(widget.kind) &&
+    kindSumsAcrossCharacters(widget.kind, widget),
   profitSource: widget.profitSource,
 });
 

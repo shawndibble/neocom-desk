@@ -3,6 +3,7 @@
  * Same contract as `models.ts`: pure, derived at render time.
  */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
+import { mergeByCorporation } from '@/engine/corp/acrossCorps';
 import { mergeCorpBoards, type CorpBoardItem } from '@/engine/corp/board';
 import {
   DEADLINE_STRIP_DAYS,
@@ -24,11 +25,13 @@ import { hbarsFromRows } from './chartBuilders';
 import type { CorpLabel } from '@/features/corp/corpTicker';
 import { boardOf, readableSources } from './corpDeadlineSources';
 import type { CorpJobsFeed } from './corpFeeds';
+import { corpReads, flagPartlyFailed, oldestRead } from './corpAcrossKit';
 import { elapsedShare } from './industryModels';
 import { shortStructureName } from '@/features/corp/structures/structureRows';
 import type {
   BuildContext,
   Feeds,
+  FeedState,
   KindView,
   NumberSecondary,
   RowDetailModel,
@@ -342,11 +345,18 @@ interface JobFacts {
   done: boolean;
   endMs: number;
   label: string;
+  installer: string;
   tone: DeadlineSeverity;
+  /** Read across several corporations: whose job it is. */
+  corp?: CorpLabel;
 }
 
-/** Active and ready jobs: finished ones first (oldest waiting first), then running ones by soonest end. */
-function jobFacts(data: CorpJobsFeed, t: Translate, now: number): JobFacts[] {
+/** Finished jobs first (oldest waiting first), then running ones by soonest end. */
+const byFinishedThenEnd = (a: JobFacts, b: JobFacts) =>
+  Number(b.done) - Number(a.done) || a.endMs - b.endMs;
+
+/** Active and ready jobs, in `byFinishedThenEnd` order. */
+function jobFacts(data: CorpJobsFeed, t: Translate, now: number, corp?: CorpLabel): JobFacts[] {
   const facts = data.jobs
     .filter((job) => job.status === 'active' || job.status === 'ready')
     .map((job): JobFacts => {
@@ -362,20 +372,51 @@ function jobFacts(data: CorpJobsFeed, t: Translate, now: number): JobFacts[] {
         done,
         endMs,
         label: t('overview.board.jobSubject', { name, count: job.runs }),
+        installer: data.installerNames.get(job.installer_id) ?? UNKNOWN,
         tone: done ? 'warning' : isCompletingSoon(job, now) ? 'watch' : 'clear',
+        ...(corp ? { corp } : {}),
       };
     });
-  const byEnd = (a: JobFacts, b: JobFacts) => a.endMs - b.endMs;
-  return [...facts.filter((f) => f.done).sort(byEnd), ...facts.filter((f) => !f.done).sort(byEnd)];
+  return facts.sort(byFinishedThenEnd);
 }
 
-export const corpJobs: Builder = (feeds, { t, now }) => {
-  const feed = feeds.corpJobs;
+/** One corporation's jobs: the header scope, or All with one readable corporation. */
+function jobsOne(feed: FeedState<CorpJobsFeed> | undefined, ctx: BuildContext): KindView {
   const data = feed?.data ?? null;
   if (!data) return blank(null, statusOf(feed));
-  if (!data.readable) return corpUnreadable(null, feed, data.needsReauth, t);
+  if (!data.readable) return corpUnreadable(null, feed, data.needsReauth, ctx.t);
+  return jobsView(jobFacts(data, ctx.t, ctx.now), feed, data, ctx);
+}
 
-  const facts = jobFacts(data, t, now);
+/** Every readable corporation's jobs in one list (All scope), each row naming its corporation. */
+function jobsAcross(feeds: Feeds, ctx: BuildContext): KindView {
+  const feed = feeds.corpJobsAll;
+  const across = corpReads(feed, null, ctx.t, (one) => jobsOne(one, ctx));
+  if ('view' in across) return across.view;
+  const facts = mergeByCorporation(
+    across.reads.map(({ corporationId, feed: read, label }) => ({
+      corporationId,
+      items: jobFacts(read, ctx.t, ctx.now, label),
+    })),
+    byFinishedThenEnd
+  );
+  return flagPartlyFailed(
+    jobsView(facts, feed, oldestRead(across.reads), ctx),
+    across.data.partlyFailed
+  );
+}
+
+export const corpJobs: Builder = (feeds, ctx) =>
+  ctx.scopeAll ? jobsAcross(feeds, ctx) : jobsOne(feeds.corpJobs, ctx);
+
+/** The widget over jobs already in order; a Corporation column when any names its corporation. */
+function jobsView(
+  facts: readonly JobFacts[],
+  feed: FeedState<unknown> | undefined,
+  age: { fetchedAt: Date | null; fromCache: boolean },
+  { t, now }: Pick<BuildContext, 't' | 'now'>
+): KindView {
+  const named = facts.some((f) => f.corp !== undefined);
   const ready = facts.filter((f) => f.done);
   const running = facts.filter((f) => !f.done);
   const next = running[0];
@@ -413,10 +454,8 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
     title: f.label,
     facts: [
       { label: t('overview.widgets.corpJobs.col.activity'), value: activityOf(f.job) },
-      {
-        label: t('overview.widgets.corpJobs.col.installer'),
-        value: data.installerNames.get(f.job.installer_id) ?? UNKNOWN,
-      },
+      ...(f.corp ? [{ label: t('overview.widgets.corpJobs.col.corp'), value: f.corp.name }] : []),
+      { label: t('overview.widgets.corpJobs.col.installer'), value: f.installer },
       {
         label: t('overview.widgets.corpJobs.col.ends'),
         value: f.done ? t('overview.board.ready') : left(f),
@@ -426,8 +465,8 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
 
   return {
     ...blank(null, statusOf(feed, { isEmpty: facts.length === 0 })),
-    fetchedAt: data.fetchedAt,
-    fromCache: data.fromCache,
+    fetchedAt: age.fetchedAt,
+    fromCache: age.fromCache,
     number: {
       value: count(running.length),
       unit: t('overview.widgets.corpJobs.unit'),
@@ -437,13 +476,16 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
     rows: facts.map((f) => ({
       key: String(f.job.job_id),
       title: f.label,
-      detail: activityOf(f.job),
+      detail: f.corp ? `${f.corp.ticker} · ${activityOf(f.job)}` : activityOf(f.job),
       value: f.done ? t('overview.board.ready') : left(f),
       tone: f.tone,
     })),
     table: {
       columns: [
         { key: 'product', label: t('overview.widgets.corpJobs.col.product'), priority: 0 },
+        ...(named
+          ? [{ key: 'corp', label: t('overview.widgets.corpJobs.col.corp'), priority: 4 }]
+          : []),
         { key: 'ends', label: t('overview.widgets.corpJobs.col.ends'), align: 'end', priority: 1 },
         // Product and time left are the row; who installed it and how read fine without at phone width.
         {
@@ -463,8 +505,9 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
         key: String(f.job.job_id),
         cells: [
           f.label,
+          ...(named ? [f.corp ? corpCell(f.corp) : UNKNOWN] : []),
           endsCell(f),
-          data.installerNames.get(f.job.installer_id) ?? UNKNOWN,
+          f.installer,
           activityOf(f.job),
         ],
         tone: f.tone,
@@ -491,4 +534,4 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
         t('overview.widgets.corpJobs.chartNote')
       ) ?? undefined,
   };
-};
+}

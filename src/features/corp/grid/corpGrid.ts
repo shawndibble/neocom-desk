@@ -39,13 +39,33 @@ import { seqId } from '@/features/overview/widgets/roles';
  * roles would, once edited and saved, drop the Director main's widgets on
  * every device.
  */
-export const CORP_DEFAULT_SEEDS: readonly WidgetSeed[] = [
-  // Every corporation the pilot's Characters can read, once there are two (`allScopeOffered`).
-  { kind: 'corpDeadlines', scope: 'all' },
-  { kind: 'structures', scope: 'all' },
+/**
+ * Kinds that read every corporation the pilot's Characters can read, once there are two
+ * (`allScopeOffered`): they open on All, in the default layout and when added from the Gallery.
+ */
+const OPENS_ON_ALL = [
+  'corpDeadlines',
+  'structures',
   'moonChunks',
   'corpJobs',
   'corpWallet',
+  'corpKills',
+  // #6101's Gallery kinds, not in the default layout.
+  'corpCustomsOffices',
+  'corpStarbases',
+  'corpSovereignty',
+  'corpContracts',
+  'corpOrders',
+] as const;
+
+const onAll = (kind: (typeof OPENS_ON_ALL)[number]): WidgetSeed => ({ kind, scope: 'all' });
+
+export const CORP_DEFAULT_SEEDS: readonly WidgetSeed[] = [
+  onAll('corpDeadlines'),
+  onAll('structures'),
+  onAll('moonChunks'),
+  onAll('corpJobs'),
+  onAll('corpWallet'),
   // The corp wallet on its Flow and its Sources, opened as Cash flow and Income by source were.
   presetSeed('corpCashFlow'),
   'corpMembers',
@@ -66,20 +86,7 @@ export function corpDefaultLayout(makeId: MakeId = seqId('c')): OverviewLayout {
 
 const CORP_KINDS = boardKinds('corp');
 
-/**
- * Kinds a widget added to the Corp Board opens on All: the default layout's, and the Gallery
- * kinds that read every corporation (#6101).
- */
-const CORP_OPENS_ON_ALL: ReadonlySet<string> = new Set([
-  ...CORP_DEFAULT_SEEDS.flatMap((seed) =>
-    typeof seed !== 'string' && seed.scope === 'all' ? [seed.kind] : []
-  ),
-  'corpCustomsOffices',
-  'corpStarbases',
-  'corpSovereignty',
-  'corpContracts',
-  'corpOrders',
-]);
+const CORP_OPENS_ON_ALL: ReadonlySet<string> = new Set(OPENS_ON_ALL);
 
 /**
  * `corporationsReading` says how many corporations the pilot's Characters can read for any

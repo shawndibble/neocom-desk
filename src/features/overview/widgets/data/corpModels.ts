@@ -4,6 +4,7 @@
  * registry (`models.ts`) through `registerKindDefs` when the Corp route loads.
  * Structures and Moon extractions are the Overview's own kinds, reused as they are.
  */
+import type { EsiEndpointId } from '@/esi/registry';
 import { byShow, type KindDef } from './builderKit';
 import { corpAssets } from './corpAssetsModels';
 import { corpContracts } from './corpContractsModels';
@@ -17,6 +18,12 @@ import { corpCashFlow, corpIncome, corpWallet } from './corpMoneyModels';
 import { corpKills } from './corpOpsModels';
 import { corpSrp } from './corpSrpModels';
 import { corpInactive, corpMembers, corpMining } from './corpPeopleModels';
+
+const CORP_WALLET_ENDPOINTS: readonly EsiEndpointId[] = [
+  'getCorporationWallets',
+  'getCorporationDivisions',
+  'getCorporationWalletJournal',
+];
 
 export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
   corpDeadlines: {
@@ -37,7 +44,7 @@ export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
     scope: 'account',
     build: corpSovereignty,
   },
-  corpJobs: { feeds: ['corpJobs'], scope: 'character', build: corpJobs },
+  corpJobs: { feeds: ['corpJobs'], allFeeds: ['corpJobsAll'], scope: 'account', build: corpJobs },
   corpCustomsOffices: {
     feeds: ['corpCustoms'],
     allFeeds: ['corpCustomsAll'],
@@ -47,8 +54,15 @@ export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
   corpRoleAudit: { feeds: ['corpRoleAudit'], scope: 'character', build: corpRoleAudit },
   corpWallet: {
     feeds: ['corpWallet'],
-    scope: 'character',
+    allFeeds: ['corpWalletAll'],
+    scope: 'account',
     build: byShow({ divisions: corpWallet, flow: corpCashFlow, sources: corpIncome }, corpWallet),
+    // Only the balances sum across corporations: Flow and Sources read one corporation's journal.
+    bySettings: ({ show }) => ({
+      feeds: ['corpWallet'],
+      scope: show === 'flow' || show === 'sources' ? 'character' : 'account',
+      endpoints: CORP_WALLET_ENDPOINTS,
+    }),
   },
   corpMembers: { feeds: ['corpMembers'], scope: 'character', build: corpMembers },
   corpInactive: { feeds: ['corpMembers'], scope: 'character', build: corpInactive },
@@ -66,6 +80,11 @@ export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
     build: corpContracts,
   },
   corpAssets: { feeds: ['corpAssets', 'corpStockTargets'], scope: 'character', build: corpAssets },
-  corpKills: { feeds: ['corpKills'], scope: 'character', build: corpKills },
+  corpKills: {
+    feeds: ['corpKills'],
+    allFeeds: ['corpKillsAll'],
+    scope: 'account',
+    build: corpKills,
+  },
   corpSrp: { feeds: ['corpSrp'], scope: 'character', build: corpSrp },
 };

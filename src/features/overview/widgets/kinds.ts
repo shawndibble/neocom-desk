@@ -518,7 +518,8 @@ const SPECS = {
     endpoints: ['getCorporationMiningObservers', 'getCorporationMiningObserver'],
   },
   // zKillboard's all-time totals, not corp ESI: no capability, so any Character on the board sees it.
-  corpKills: { corp: 'corpOps', views: N, view: 'number', size: 'S', endpoints: [] },
+  // The table is one row per corporation: the header's, or every one on All.
+  corpKills: { corp: 'corpOps', views: NT, view: 'number', size: 'S', endpoints: [] },
   corpContracts: {
     corp: 'corpOps',
     capabilities: ['canReadContracts'],

@@ -74,6 +74,9 @@ import {
   loadCorpMiningFeed,
   loadCorpSovereigntyFeed,
   loadCorpDeadlinesAllFeed,
+  loadCorpWalletAllFeed,
+  loadCorpJobsAllFeed,
+  loadCorpKillsAllFeed,
   loadCorpCustomsAllFeed,
   loadCorpStarbasesAllFeed,
   loadCorpSovereigntyAllFeed,
@@ -284,6 +287,9 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   }),
   corpOrdersAll: snapshot(loadCorpOrdersAllFeed, 'corp:orders-all', { accountWide: true }),
   corpKills: snapshot(loadCorpKillsFeed, 'corp:kills'),
+  corpWalletAll: snapshot(loadCorpWalletAllFeed, 'corp:wallet-all', { accountWide: true }),
+  corpJobsAll: snapshot(loadCorpJobsAllFeed, 'corp:jobs-all', { accountWide: true }),
+  corpKillsAll: snapshot(loadCorpKillsAllFeed, 'corp:kills-all', { accountWide: true }),
   corpSrp: snapshot(loadCorpSrpFeed, 'corp:srp'),
 };
 

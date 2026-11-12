@@ -5,6 +5,7 @@
 import { DAY_MS } from '@/lib/age';
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import type { CorpBoardItem } from '@/engine/corp/board';
+import type { BoardClockSource } from '@/engine/character/board';
 import { structureStateLabel } from '@/features/corp/boardSources';
 import {
   shortStructureName,
@@ -24,6 +25,7 @@ import {
 } from '../../data/corpCards';
 import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { corpCell, fractionBar } from './cellKit';
+import { flagPartlyFailed } from './corpAcrossKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
 import type { NumberModel, TableCell, TableModel } from './types';
 import type { Translate } from '@/lib/translate';
@@ -271,21 +273,40 @@ export const moonChunks: Builder = (feeds, { t, now, scopeAll }) => {
   const untilOf = (deadlineMs: number) => formatCountdown(Math.max(0, deadlineMs - now) / 1000);
   const tone = moonChunksSeverity({ ...data, chunks }, now) ?? 'clear';
 
+  // Read across several corporations: each row names its own.
+  const named =
+    scopeAll && new Set(chunks.map((chunk) => chunk.corporation?.id).filter(Boolean)).size > 1;
+  const corpOf = (chunk: BoardClockSource) => (named ? chunk.corporation : undefined);
+
   const table: TableModel = {
     columns: [
       { key: 'drill', label: t('overview.widgets.moonChunks.col.drill'), priority: 0 },
+      ...(named
+        ? [{ key: 'corp', label: t('overview.widgets.moonChunks.col.corp'), priority: 3 }]
+        : []),
       { key: 'in', label: t('overview.widgets.moonChunks.col.in'), align: 'end', priority: 1 },
       { key: 'event', label: t('overview.widgets.moonChunks.col.event'), priority: 2 },
     ],
-    rows: chunks.map((chunk, i) => ({
-      key: `${chunk.id}:${i}`,
-      cells: [shortStructureName(chunk.subject), untilOf(chunk.deadlineMs), eventOf(chunk.detail)],
-      tone: moonChunkSeverity(chunk, now),
-    })),
+    rows: chunks.map((chunk, i) => {
+      const corp = corpOf(chunk);
+      return {
+        key: `${chunk.corporation?.id ?? ''}:${chunk.id}:${i}`,
+        cells: [
+          shortStructureName(chunk.subject),
+          ...(named ? [corp ? corpCell(corp) : UNKNOWN] : []),
+          untilOf(chunk.deadlineMs),
+          eventOf(chunk.detail),
+        ],
+        tone: moonChunkSeverity(chunk, now),
+      };
+    }),
   };
 
   return {
-    ...blank(to, statusOf(feed, { isEmpty: chunks.length === 0 })),
+    ...flagPartlyFailed(
+      blank(to, statusOf(feed, { isEmpty: chunks.length === 0 })),
+      scopeAll && data.partlyFailed === true
+    ),
     fetchedAt: data.fetchedAt,
     number:
       ready > 0 || !nextChunk
@@ -304,13 +325,16 @@ export const moonChunks: Builder = (feeds, { t, now, scopeAll }) => {
             },
             tone,
           },
-    rows: chunks.map((chunk, i) => ({
-      key: `${chunk.id}:${i}`,
-      title: shortStructureName(chunk.subject),
-      detail: eventOf(chunk.detail),
-      value: untilOf(chunk.deadlineMs),
-      tone: moonChunkSeverity(chunk, now),
-    })),
+    rows: chunks.map((chunk, i) => {
+      const corp = corpOf(chunk);
+      return {
+        key: `${chunk.corporation?.id ?? ''}:${chunk.id}:${i}`,
+        title: shortStructureName(chunk.subject),
+        detail: corp ? `${corp.ticker} · ${eventOf(chunk.detail)}` : eventOf(chunk.detail),
+        value: untilOf(chunk.deadlineMs),
+        tone: moonChunkSeverity(chunk, now),
+      };
+    }),
     table,
     deadlines: nextChunk
       ? [

@@ -10,6 +10,7 @@
  */
 import { db } from '@/db';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
+import { isNpcCorporationId } from '@/esi/entityIds';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
 import { loadCorporationId } from './boardData';
@@ -74,16 +75,19 @@ export async function loadAccountCorpAccess(): Promise<AccountCorpAccess[]> {
  * One reader per corporation that can read `capability`: the preferred
  * Character (the active one, whose reads share their cache rows with `/corp`)
  * when it can, else the first that can. A corporation no Character can read
- * for it is absent, so no request is ever made for it.
+ * for it is absent, so no request is ever made for it. `null` is an ungated
+ * read (Corp kills, public): every player corporation a Character's corp gate settled for.
  */
 export function corpReadersFor(
   accounts: readonly AccountCorpAccess[],
-  capability: CorpCapability,
+  capability: CorpCapability | null,
   preferredCharacterId?: number
 ): Map<number, number> {
   const readers = new Map<number, number>();
   for (const { characterId, access } of accounts) {
-    if (!access.can(capability)) continue;
+    if (capability === null ? isNpcCorporationId(access.corporationId) : !access.can(capability)) {
+      continue;
+    }
     if (!readers.has(access.corporationId) || characterId === preferredCharacterId) {
       readers.set(access.corporationId, characterId);
     }
@@ -91,14 +95,21 @@ export function corpReadersFor(
   return readers;
 }
 
-/** How many corporations some Character can read for any of `capabilities`. */
+/**
+ * How many corporations some Character can read for any of `capabilities`; with none
+ * (an ungated kind, Corp kills), every player corporation a Character's corp gate settled for.
+ */
 export function corporationsReading(
   accounts: readonly AccountCorpAccess[],
   capabilities: readonly CorpCapability[]
 ): number {
   const corporations = new Set<number>();
   for (const { access } of accounts) {
-    if (capabilities.some((capability) => access.can(capability))) {
+    const reads =
+      capabilities.length === 0
+        ? !isNpcCorporationId(access.corporationId)
+        : capabilities.some((capability) => access.can(capability));
+    if (reads) {
       corporations.add(access.corporationId);
     }
   }

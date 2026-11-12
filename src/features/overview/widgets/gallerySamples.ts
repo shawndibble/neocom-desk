@@ -880,7 +880,18 @@ function buildSamples(t: TFunction): Record<string, Sample> {
       value: '1,284',
       unit: t('overview.widgets.corpKills.unit', { count: 1284 }),
       note: t('overview.widgets.corpKills.secondary', { losses: '312', efficiency: '81%' }),
-      rows: [],
+      rows: [
+        [
+          'HOLD',
+          t('overview.widgets.corpKills.secondary', { losses: '204', efficiency: '84%' }),
+          '1,102',
+        ],
+        [
+          'MOON',
+          t('overview.widgets.corpKills.secondary', { losses: '108', efficiency: '61%' }),
+          '182',
+        ],
+      ],
     },
     corpSrp: {
       value: '7',

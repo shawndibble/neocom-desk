@@ -193,8 +193,9 @@ describe('widget kind catalogue', () => {
     // No per-payee breakdown exists, so there is nothing honest to chart.
     expect(v('miningTax')).toEqual(['number', 'table']);
     expect(v('wallet')).toEqual(['number', 'chart', 'table']);
-    // zKillboard sends all-time totals only: no series to chart, no range to pick.
-    expect(v('corpKills')).toEqual(['number']);
+    // zKillboard sends all-time totals only: no series to chart, no range to pick. The table
+    // is one row per corporation.
+    expect(v('corpKills')).toEqual(['number', 'table']);
     expect(v('netWorth')).toEqual(['number', 'chart', 'table']);
   });
 

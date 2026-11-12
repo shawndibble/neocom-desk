@@ -78,6 +78,7 @@ import type { CorpFeedBody } from './corpFeedRead';
 import { fetchCorporationStatsRead } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
 import type {
+  CorpAllFeed,
   CorpAssetsFeed,
   CorpCustomsFeed,
   CorpRoleAuditFeed,
@@ -100,7 +101,11 @@ import type {
 } from './corpFeeds';
 import type { CorpDeadlineSource } from './corpDeadlineSources';
 
-export function loadCorpWallet(characterId: number): Promise<CorpWalletFeed> {
+/**
+ * `withJournal: false` reads the balances only (the All scope's Divisions view): no journal
+ * request, and `journal` is null, so nothing reads net or runway from it.
+ */
+export function loadCorpWallet(characterId: number, withJournal = true): Promise<CorpWalletFeed> {
   return readCorpFeed<CorpWalletFeed>(characterId, {
     capability: 'canReadWallet',
     empty: { divisions: [], journalDivision: MASTER_WALLET_DIVISION, journal: null },
@@ -108,12 +113,14 @@ export function loadCorpWallet(characterId: number): Promise<CorpWalletFeed> {
       const [wallets, divisions, journal] = await Promise.all([
         loadCorporationWallets(characterId, corporationId),
         loadCorporationDivisions(characterId, corporationId, can('canReadDivisions')),
-        loadCorporationWalletJournal(characterId, corporationId, MASTER_WALLET_DIVISION),
+        withJournal
+          ? loadCorporationWalletJournal(characterId, corporationId, MASTER_WALLET_DIVISION)
+          : null,
       ]);
       // Balances are the data: without them a "0 ISK" would read as a broke corporation.
       if (wallets.cached === null) return unlanded('wallet', wallets);
       const lines: CorpJournalLine[] | null =
-        journal.cached === null
+        journal === null || journal.cached === null
           ? null
           : journal.cached.data.flatMap((entry) => {
               const atMs = parseInstant(entry.date);
@@ -705,6 +712,40 @@ export async function loadCorpDeadlinesAll(
 }
 
 // --- One widget across every corporation (All scope) --------------------------------
+
+/**
+ * `load` once per corporation some Character can read `capability` for (`corpReadersFor`;
+ * null for an ungated read), the active Character reading its own corporation so it shares
+ * the cache rows `/corp` warmed. A failed corporation is left out, flagged; only when every
+ * one fails does the widget get its Retry.
+ */
+async function loadEveryCorp<F extends CorpFeedBase>(
+  capability: CorpCapability | null,
+  what: string,
+  load: (characterId: number) => Promise<F>
+): Promise<CorpAllFeed<F>> {
+  const accounts = await loadAccountCorpAccess();
+  const { reads, partlyFailed } = await settleCorps(
+    corpReadersFor(accounts, capability, activeReader()),
+    what,
+    load
+  );
+  return {
+    corporations: reads.map((read) => ({ corporationId: read.corporationId, feed: read })),
+    labels: await loadCorpLabels(reads.map((read) => read.corporationId)),
+    partlyFailed,
+  };
+}
+
+/** Balances only: Cash flow, Income and runway stay on one corporation. */
+export const loadCorpWalletAll = () =>
+  loadEveryCorp('canReadWallet', 'wallet', (characterId) => loadCorpWallet(characterId, false));
+
+export const loadCorpJobsAll = () =>
+  loadEveryCorp('canReadIndustry', 'industry jobs', loadCorpJobs);
+
+/** Public zKillboard totals: every corporation a Character belongs to, no role asked. */
+export const loadCorpKillsAll = () => loadEveryCorp(null, 'kills', loadCorpKills);
 
 /** One corporation's read, tagged with its corporation. */
 type CorpTagged<F> = F & { corporationId: number };

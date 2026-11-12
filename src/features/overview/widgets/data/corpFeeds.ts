@@ -263,6 +263,32 @@ export interface CorpDeadlinesAllFeed {
   labels: ReadonlyMap<number, CorpLabel>;
 }
 
+/**
+ * One widget's read across every corporation the pilot's Characters can read it for (All
+ * scope): each corporation's own read, the same feed its header scope reads. A corporation
+ * whose read failed is absent and sets `partlyFailed`; when every read fails the load throws.
+ */
+export interface CorpAllFeed<F extends CorpFeedBase> {
+  corporations: { corporationId: number; feed: F }[];
+  labels: ReadonlyMap<number, CorpLabel>;
+  partlyFailed: boolean;
+}
+
+export async function loadCorpWalletAllFeed(): Promise<CorpAllFeed<CorpWalletFeed>> {
+  const { loadCorpWalletAll } = await import('./corpFeedLoaders');
+  return loadCorpWalletAll();
+}
+
+export async function loadCorpJobsAllFeed(): Promise<CorpAllFeed<CorpJobsFeed>> {
+  const { loadCorpJobsAll } = await import('./corpFeedLoaders');
+  return loadCorpJobsAll();
+}
+
+export async function loadCorpKillsAllFeed(): Promise<CorpAllFeed<CorpKillsFeed>> {
+  const { loadCorpKillsAll } = await import('./corpFeedLoaders');
+  return loadCorpKillsAll();
+}
+
 export async function loadCorpDeadlinesAllFeed(): Promise<CorpDeadlinesAllFeed> {
   const { loadCorpDeadlinesAll } = await import('./corpFeedLoaders');
   return loadCorpDeadlinesAll();

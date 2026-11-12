@@ -70,7 +70,8 @@ export function feedsOf(
   scopeAll = false
 ): readonly FeedId[] | undefined {
   const reads = resolved(kind, settings);
-  if (scopeAll) {
+  // Only a widget whose settings sum across reads the All feed (the corp wallet's Flow does not).
+  if (scopeAll && reads?.scope === 'account') {
     const def = KINDS[kind];
     if (def?.allFeeds) return def.allFeeds;
   }
