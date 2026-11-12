@@ -65,6 +65,25 @@ describe('installFixtureFetch', () => {
     expect(unexpectedRequests()).toEqual([]);
   });
 
+  it("records an unmounted story's late miss instead of sending it to the network", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    installFixtureFetch([])();
+    await expect(fetch('https://esi.evetech.net/characters/1/assets')).rejects.toThrow();
+    expect(unexpectedRequests()).toEqual(['GET https://esi.evetech.net/characters/1/assets']);
+  });
+
+  it('names the request that keeps an unmounted story busy past the deadline', async () => {
+    installFixtureFetch([{ path: '/poll', respond: () => ({ body: 1 }) }])();
+    const poll = setInterval(() => void fetch('https://esi.evetech.net/poll'), 100);
+    try {
+      await expect(whenFixturesRetired(400)).rejects.toThrow(
+        /last request: GET https:\/\/esi\.evetech\.net\/poll/
+      );
+    } finally {
+      clearInterval(poll);
+    }
+  });
+
   it("puts a mounted story's fixture ahead of an unmounted one's", async () => {
     installFixtureFetch([{ path: '/a', respond: () => ({ body: 'old' }) }])();
     uninstall = installFixtureFetch([{ path: '/a', respond: () => ({ body: 'new' }) }]);
