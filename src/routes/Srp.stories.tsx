@@ -7,34 +7,16 @@ import { SAMPLE_CHARACTERS } from '@/storybook/sampleData';
 import {
   createSrpMemberFixture,
   SRP_FIXTURE_CORPORATION_ID,
+  srpPublicInfoRoutes,
   type SrpFixtureOptions,
 } from '@/storybook/srpMemberFixture';
 import type { FixtureRoute } from '@/storybook/fixtureFetch';
 import { Srp } from './Srp';
 
-/** The Overview header reads the pilot's public sheet and corporation (portrait, name, corp). */
+/** The member page also probes each pilot's corp roles, to tell if they can officiate. A plain member holds none. */
 const routes = (): FixtureRoute[] => [
-  {
-    path: /^\/corporations\/\d+\/?$/,
-    respond: () => ({
-      body: { name: 'Sample Corp', ceo_id: 1, member_count: 40, tax_rate: 0.1 },
-    }),
-  },
-  {
-    path: /^\/characters\/\d+$/,
-    respond: ({ url }) => ({
-      body: {
-        name:
-          SAMPLE_CHARACTERS.find((c) => url.pathname.endsWith(`/${c.characterId}`))?.name ??
-          'Pilot',
-        corporation_id: SRP_FIXTURE_CORPORATION_ID,
-        birthday: '2016-03-01T00:00:00Z',
-        bloodline_id: 1,
-        gender: 'male',
-        race_id: 1,
-      },
-    }),
-  },
+  ...srpPublicInfoRoutes(),
+  { path: /^\/characters\/\d+\/roles$/, respond: () => ({ body: { roles: [] } }) },
 ];
 
 /** Seeds the sample Characters into one SRP-fixture corporation, so the page has a corporation to read. */
