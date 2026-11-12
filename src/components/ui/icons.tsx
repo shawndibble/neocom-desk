@@ -81,6 +81,7 @@ import { Export as ExportIcon } from '@phosphor-icons/react/dist/csr/Export';
 import { Eye } from '@phosphor-icons/react/dist/csr/Eye';
 import { EyeSlash } from '@phosphor-icons/react/dist/csr/EyeSlash';
 import { Factory } from '@phosphor-icons/react/dist/csr/Factory';
+import { GasPump } from '@phosphor-icons/react/dist/csr/GasPump';
 import { FileText } from '@phosphor-icons/react/dist/csr/FileText';
 import { Flag } from '@phosphor-icons/react/dist/csr/Flag';
 import { Note } from '@phosphor-icons/react/dist/csr/Note';
@@ -94,6 +95,7 @@ import { GraduationCap } from '@phosphor-icons/react/dist/csr/GraduationCap';
 import { Hammer } from '@phosphor-icons/react/dist/csr/Hammer';
 import { Handshake } from '@phosphor-icons/react/dist/csr/Handshake';
 import { Hourglass } from '@phosphor-icons/react/dist/csr/Hourglass';
+import { Timer } from '@phosphor-icons/react/dist/csr/Timer';
 import { Lightbulb } from '@phosphor-icons/react/dist/csr/Lightbulb';
 import { Info as InfoGlyph } from '@phosphor-icons/react/dist/csr/Info';
 import { ListBullets } from '@phosphor-icons/react/dist/csr/ListBullets';
@@ -493,6 +495,9 @@ export const NavCorpWallet = withWeight(Vault);
 export const NavCorpAssets = withWeight(Warehouse);
 // Upwell structures are anchored in space: an anchor (Mercenary Den already has the turret).
 export const NavCorpStructures = withWeight(Anchor);
+/** Calendar kinds: a structure running out of fuel, and a structure timer ending. */
+export const StructureFuel = withWeight(GasPump);
+export const StructureTimer = withWeight(Timer);
 export const NavCorpMoons = withWeight(Moon);
 // SRP repays lost ships: a lifebuoy (`ReadOnly`'s shield would read as a lock).
 export const NavCorpSrp = withWeight(Lifebuoy);

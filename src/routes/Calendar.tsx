@@ -34,8 +34,14 @@ import {
   shownKinds,
   toggleHiddenKind,
 } from '@/features/character/calendarKindFilter';
+import { activeCorpFilter, useCalendarCorpFilter } from '@/features/character/calendarCorpFilter';
 import { buildCharacterBoard, type CharacterBoardItemKind } from '@/engine/character/board';
-import { countsByDay, countsByKind, filterByKinds } from '@/engine/character/deadlines';
+import {
+  countsByDay,
+  countsByKind,
+  filterByCorporation,
+  filterByKinds,
+} from '@/engine/character/deadlines';
 import {
   addDays,
   addMonths,
@@ -139,9 +145,12 @@ export function Calendar() {
   const skillPlanChoices = useCalendarSkillPlans((state) => state.value);
   const setSkillPlanChoices = useCalendarSkillPlans((state) => state.setValue);
   const weekStart = useCalendarWeekStart((state) => state.value);
+  const savedCorpFilter = useCalendarCorpFilter((state) => state.value);
+  const setCorpFilter = useCalendarCorpFilter((state) => state.setValue);
   useHydratedStore(
     useCalendarDensity,
     useCalendarHiddenKinds,
+    useCalendarCorpFilter,
     useCalendarSkillPlans,
     useCalendarWeekStart
   );
@@ -274,7 +283,11 @@ export function Calendar() {
   );
 
   const selected = useMemo(() => shownKinds(hiddenKinds), [hiddenKinds]);
-  const visible = useMemo(() => filterByKinds(board, selected), [board, selected]);
+  const corpFilter = activeCorpFilter(savedCorpFilter, data?.corporations ?? []);
+  const visible = useMemo(
+    () => filterByKinds(filterByCorporation(board, corpFilter), selected),
+    [board, corpFilter, selected]
+  );
   const loads = useMemo(() => countsByDay(visible, zone), [visible, zone]);
   // Counted off the unfiltered board: a kind's own count must not drop to zero
   // just because the pilot has it switched off in the menu showing that count.
@@ -403,6 +416,9 @@ export function Calendar() {
               chosenSkillPlanId={data?.chosenSkillPlanId ?? null}
               skillPlanError={data?.skillPlanError ?? null}
               onChooseSkillPlan={(planId) => void chooseSkillPlan(planId)}
+              corporations={data?.corporations}
+              corpFilter={corpFilter}
+              onCorpFilter={(filter) => void setCorpFilter(filter)}
             />
             <TableActionsMenu name={t('calendar.title')} tableExport={eventsExport} size="md" />
             <IconButton

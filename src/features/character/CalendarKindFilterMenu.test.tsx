@@ -89,3 +89,51 @@ describe('CalendarKindFilterMenu empty kinds', () => {
     expect(screen.getByRole('menuitemcheckbox', { name: /mercenary dens/i })).toBeTruthy();
   });
 });
+
+describe('CalendarKindFilterMenu corporation filter', () => {
+  const corporations = [
+    { id: 1, name: 'Main Corp', ticker: 'MAIN' },
+    { id: 2, name: 'Holding Two', ticker: 'HOLD2' },
+  ];
+
+  async function openCorpMenu(list: typeof corporations) {
+    const user = userEvent.setup();
+    const onCorpFilter = vi.fn();
+    render(
+      <CalendarKindFilterMenu
+        hidden={[]}
+        onToggle={() => {}}
+        onShowAll={() => {}}
+        counts={new Map()}
+        readableKinds={[]}
+        reauthKinds={[]}
+        skillPlanChoices={[]}
+        chosenSkillPlanId={null}
+        skillPlanError={null}
+        onChooseSkillPlan={() => {}}
+        corporations={list}
+        corpFilter="all"
+        onCorpFilter={onCorpFilter}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /filter event types/i }));
+    // By keyboard: a pointer leaving the submenu trigger closes it under jsdom.
+    (await screen.findByRole('menuitem', { name: /corporation events/i })).focus();
+    await user.keyboard('{Enter}');
+    return { user, onCorpFilter };
+  }
+
+  it('picks one corporation out of several', async () => {
+    const { user, onCorpFilter } = await openCorpMenu(corporations);
+    (await screen.findByRole('menuitemradio', { name: 'Holding Two [HOLD2]' })).focus();
+    await user.keyboard('{Enter}');
+    expect(onCorpFilter).toHaveBeenCalledWith(2);
+  });
+
+  it('offers only All and Hide for a single corporation', async () => {
+    await openCorpMenu(corporations.slice(0, 1));
+    expect(await screen.findAllByRole('menuitemradio')).toHaveLength(2);
+    expect(screen.getByRole('menuitemradio', { name: 'All corporations' })).toBeChecked();
+    expect(screen.getByRole('menuitemradio', { name: 'Hide corporation events' })).toBeVisible();
+  });
+});

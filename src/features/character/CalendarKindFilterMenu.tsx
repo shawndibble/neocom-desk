@@ -44,7 +44,13 @@ import {
 import { DropdownMenuTrigger } from '@/components/ui';
 import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItemKind } from '@/engine/character/board';
+import {
+  CHARACTER_BOARD_ITEM_KINDS,
+  type BoardCorporation,
+  type CharacterBoardItemKind,
+} from '@/engine/character/board';
+import type { CorpEventFilter } from '@/engine/character/deadlines';
+import { corpLabelText } from '@/features/corp/corpTicker';
 import { KIND_LABEL } from './calendarKindLabels';
 import { KIND_TEXT } from '@/components/ui/kindTone';
 import { KIND_ICON } from './calendarKindIcons';
@@ -71,7 +77,13 @@ export interface CalendarKindFilterMenuProps {
   skillPlanError: string | null;
   /** Picks a plan, or null to stop projecting one. */
   onChooseSkillPlan: (planId: string | null) => void;
+  /** The corporations with corp events. Empty hides the corporation filter. */
+  corporations?: readonly BoardCorporation[];
+  corpFilter?: CorpEventFilter;
+  onCorpFilter?: (filter: CorpEventFilter) => void;
 }
+
+const NO_CORPORATIONS: readonly BoardCorporation[] = [];
 
 function KindGlyph({ kind }: { kind: CharacterBoardItemKind }) {
   const Glyph = KIND_ICON[kind];
@@ -80,6 +92,9 @@ function KindGlyph({ kind }: { kind: CharacterBoardItemKind }) {
 
 /** Kinds read through an opt-in Permission: no row while unreadable. */
 const OPT_IN_KINDS: ReadonlySet<CharacterBoardItemKind> = new Set([
+  'structureTimer',
+  'structureFuel',
+  'corpJob',
   'moonChunk',
   'skyhookRaid',
   'mercenaryDen',
@@ -96,6 +111,9 @@ export function CalendarKindFilterMenu({
   chosenSkillPlanId,
   skillPlanError,
   onChooseSkillPlan,
+  corporations = NO_CORPORATIONS,
+  corpFilter = 'all',
+  onCorpFilter,
 }: CalendarKindFilterMenuProps) {
   const { t } = useTranslation();
   const hiddenSet = new Set(hidden);
@@ -145,7 +163,7 @@ export function CalendarKindFilterMenu({
               ? t('calendar.filter.open')
               : t('calendar.filter.openWithCount', { count: hidden.length })
           }
-          pressed={hidden.length > 0}
+          pressed={hidden.length > 0 || (corporations.length > 0 && corpFilter !== 'all')}
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">
@@ -178,6 +196,38 @@ export function CalendarKindFilterMenu({
           </DropdownMenuCheckboxItem>
         ))}
         <DropdownMenuSeparator />
+        {/* Only with a corp event source: a pilot who reads no corporation sees no hint of one. */}
+        {corporations.length > 0 && (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>{t('calendar.corpFilter.title')}</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuRadioGroup
+                value={String(corpFilter)}
+                onValueChange={(value) =>
+                  onCorpFilter?.(value === 'all' || value === 'none' ? value : Number(value))
+                }
+              >
+                <DropdownMenuRadioItem value="all" onSelect={(event) => event.preventDefault()}>
+                  {t('calendar.corpFilter.all')}
+                </DropdownMenuRadioItem>
+                {/* One corporation alone would repeat All. */}
+                {corporations.length > 1 &&
+                  corporations.map((corporation) => (
+                    <DropdownMenuRadioItem
+                      key={corporation.id}
+                      value={String(corporation.id)}
+                      onSelect={(event) => event.preventDefault()}
+                    >
+                      <span className="flex-1 truncate">{corpLabelText(corporation)}</span>
+                    </DropdownMenuRadioItem>
+                  ))}
+                <DropdownMenuRadioItem value="none" onSelect={(event) => event.preventDefault()}>
+                  {t('calendar.corpFilter.none')}
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        )}
         {/* One plan per Character, so a radio group in a submenu rather than a
             section of its own in the kinds list. Picking the chosen plan again
             stops projecting it (see `onValueChange`'s empty-string case). */}

@@ -86,6 +86,7 @@ import type {
   CorpOrdersFeed,
   CorpWalletFeed,
 } from './corpFeeds';
+import type { CorpDeadlineSource } from './corpDeadlineSources';
 
 export function loadCorpWallet(characterId: number): Promise<CorpWalletFeed> {
   return readCorpFeed<CorpWalletFeed>(characterId, {
@@ -606,13 +607,11 @@ export function loadCorpSovereignty(characterId: number): Promise<CorpSovereignt
 
 // --- Due soon across every corporation (All scope) ----------------------------------
 
-type DeadlineSource = Exclude<keyof CorpDeadlinesSlice, 'corporationId' | 'failed'>;
-
 /** Each Due soon source, the capability that opens it, and its one-corporation read. */
 const DEADLINE_READS: readonly {
-  source: DeadlineSource;
+  source: CorpDeadlineSource;
   capability: CorpCapability;
-  load: (characterId: number) => Promise<NonNullable<CorpDeadlinesSlice[DeadlineSource]>>;
+  load: (characterId: number) => Promise<NonNullable<CorpDeadlinesSlice[CorpDeadlineSource]>>;
 }[] = [
   { source: 'structures', capability: 'canReadStructures', load: loadStructuresBoardData },
   { source: 'moonChunks', capability: 'canReadMoonExtractions', load: loadMoonChunksBoardData },
@@ -625,14 +624,19 @@ const DEADLINE_READS: readonly {
  * Every corporation's Due soon sources, each read through a Character whose roles and grant
  * cover that source there (`corpReadersFor`), so no read is made that can only 403. A read
  * that fails leaves its corporation without that source, flagged; only when every read
- * fails does the widget get its Retry.
+ * fails does the widget get its Retry. `only` narrows the read to some sources (the
+ * Calendar reads no starbases or sovereignty).
  */
-export async function loadCorpDeadlinesAll(): Promise<CorpDeadlinesAllFeed> {
+export async function loadCorpDeadlinesAll(
+  only?: readonly CorpDeadlineSource[]
+): Promise<CorpDeadlinesAllFeed> {
   const accounts = await loadAccountCorpAccess();
   // The active Character reads its own corporation, sharing the cache rows `/corp` warmed.
   const preferred = useActiveCharacter.getState().activeCharacterId ?? undefined;
   const slices = new Map<number, CorpDeadlinesSlice>();
-  const tasks = DEADLINE_READS.flatMap(({ source, capability, load }) =>
+  const tasks = DEADLINE_READS.filter(
+    ({ source }) => only === undefined || only.includes(source)
+  ).flatMap(({ source, capability, load }) =>
     [...corpReadersFor(accounts, capability, preferred)].map(([corporationId, characterId]) => {
       if (!slices.has(corporationId)) {
         slices.set(corporationId, {
@@ -652,7 +656,7 @@ export async function loadCorpDeadlinesAll(): Promise<CorpDeadlinesAllFeed> {
   await mapWithConcurrencyLimit(tasks, ESI_FANOUT_CONCURRENCY, async (task) => {
     try {
       // Each source's slot takes its own read's shape.
-      (task.slice as Record<DeadlineSource, unknown>)[task.source] = await task.load(
+      (task.slice as Record<CorpDeadlineSource, unknown>)[task.source] = await task.load(
         task.characterId
       );
     } catch {

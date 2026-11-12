@@ -1,5 +1,5 @@
 /**
- * The Calendar page's seven ESI reads, its two gated corp reads and its one Skill Plan projection, and the one snapshot they collapse into.
+ * The Calendar page's seven ESI reads, its gated corp reads (every readable corporation's deadlines, the active Character's skyhooks) and its one Skill Plan projection, and the one snapshot they collapse into.
  *
  * Fetch + cache only — the ESI-shape-to-board-source conversion lives next
  * door in `calendarBoardSources.ts`, and the ranking lives in
@@ -27,6 +27,7 @@ import type { CalendarEventSummary, Contract } from '@/esi/endpoints';
 import type {
   BoardCalendarEventSource,
   BoardClockSource,
+  BoardCorporation,
   CharacterBoardItemKind,
 } from '@/engine/character/board';
 import type { CachedResult, StatusResult } from '@/esi/cache';
@@ -44,7 +45,7 @@ import { readCachedPlanetNames } from '@/features/pi/names';
 import { db } from '@/db';
 import { acceleratorId } from '@/features/accelerator/characterAccelerators';
 import { loadSkillPlanBoard, type SkillPlanChoice } from './calendarSkillPlan';
-import { loadMoonChunks } from './calendarMoonChunks';
+import { loadCorpCalendar } from './calendarCorpDeadlines';
 import { loadSkyhookRaids } from './calendarSkyhooks';
 import { loadCharacterDenRows } from './mercenaryDens';
 import type { SkyhookRaid } from './calendarBoardSources';
@@ -67,8 +68,16 @@ export interface CalendarBoardData {
   industryJobs?: BoardClockSource[];
   planetExtractions?: BoardClockSource[];
   mercenaryDens?: BoardClockSource[];
-  /** Corp moon drills. Left `undefined` unless the Character holds the corp role and scope to read them. */
+  /** Moon drills of every readable corporation. Left `undefined` when no corporation can be read for them. */
   moonChunks?: BoardClockSource[];
+  /** Structures running out of fuel, every readable corporation. */
+  structureFuel?: BoardClockSource[];
+  /** Structure timers ending, every readable corporation. */
+  structureTimers?: BoardClockSource[];
+  /** Corp industry jobs finishing, every readable corporation. */
+  corpJobs?: BoardClockSource[];
+  /** The corporations behind the corp events: the corporation filter's choices. Empty when none is readable. */
+  corporations: BoardCorporation[];
   /** Corp skyhook raid windows. Left `undefined` unless the Character holds the corp role and scope to read them. */
   skyhookRaids?: BoardClockSource[];
   /** The skyhooks behind `skyhookRaids`, for the detail modal (system, stock, window). */
@@ -127,6 +136,9 @@ export interface CalendarBoardData {
   loadedAtMs: number;
 }
 
+/** A source with no ESI cache row of its own: nothing to date, nothing to re-authorise. */
+const NO_CACHE: StatusResult<unknown[]> = { cached: null, needsReauth: false };
+
 /** `undefined` when the source could not be read, so the engine can tell that from empty. */
 function readRows<T>(result: StatusResult<T[]>): readonly T[] | undefined {
   return result.cached?.data;
@@ -172,7 +184,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     contractsResult,
     ordersResult,
     skillPlanBoard,
-    moonChunkRead,
+    corpRead,
     skyhookRead,
     densResult,
     typedAccelerator,
@@ -184,7 +196,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     loadContracts(characterId),
     loadOrders(characterId),
     loadSkillPlanBoard(characterId, loadedAtMs),
-    loadMoonChunks(characterId, loadedAtMs),
+    loadCorpCalendar(loadedAtMs),
     loadSkyhookRaids(characterId, loadedAtMs),
     loadCharacterDenRows(characterId),
     db.characterAccelerators.get(acceleratorId(characterId)),
@@ -276,21 +288,18 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     { kind: 'planetExtraction', result: planetsResult, rows: planets },
     { kind: 'mercenaryDen', result: densResult, rows: dens },
     // The pilot's own answer, from Dexie: no cache metadata, nothing to re-authorise.
-    {
-      kind: 'accelerator',
-      result: { cached: null, needsReauth: false },
-      rows: acceleratorSources,
-    },
-    { kind: 'moonChunk', result: moonChunkRead.result, rows: moonChunkRead.sources },
+    { kind: 'accelerator', result: NO_CACHE, rows: acceleratorSources },
+    // Corp reads carry their own fetch times (`corpRead.fetched`), folded in below. A
+    // corporation whose grant lapsed is left out, never a re-auth notice for another Character.
+    { kind: 'structureTimer', result: NO_CACHE, rows: corpRead.structureTimers },
+    { kind: 'structureFuel', result: NO_CACHE, rows: corpRead.structureFuel },
+    { kind: 'moonChunk', result: NO_CACHE, rows: corpRead.moonChunks },
+    { kind: 'corpJob', result: NO_CACHE, rows: corpRead.corpJobs },
     { kind: 'skyhookRaid', result: skyhookRead.result, rows: skyhookRead.sources },
     { kind: 'contractExpiry', result: contractsResult, rows: contracts },
     { kind: 'orderExpiry', result: ordersResult, rows: orders },
     // Not an ESI read: no cache metadata, and nothing to re-authorise.
-    {
-      kind: 'skillPlan',
-      result: { cached: null, needsReauth: false },
-      rows: planSchedule?.scheduled,
-    },
+    { kind: 'skillPlan', result: NO_CACHE, rows: planSchedule?.scheduled },
   ] satisfies {
     kind: CharacterBoardItemKind;
     result: StatusResult<unknown[]>;
@@ -301,6 +310,10 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
   for (const source of sources) {
     if (source.result.cached) cached.push(source.result.cached);
   }
+  const fetchedAt = [
+    ...cached.map((result) => result.fetchedAt.getTime()),
+    ...corpRead.fetched.map((at) => at.getTime()),
+  ];
 
   return {
     calendarEvents: events && toCalendarEventSources(events),
@@ -308,7 +321,11 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     industryJobs: jobs && toIndustryJobSources(jobs, typeName, loadedAtMs),
     planetExtractions: planets && toPlanetExtractionSources(colonies),
     mercenaryDens: dens && toMercenaryDenSources(dens, loadedAtMs),
-    moonChunks: moonChunkRead.sources,
+    moonChunks: corpRead.moonChunks,
+    structureFuel: corpRead.structureFuel,
+    structureTimers: corpRead.structureTimers,
+    corpJobs: corpRead.corpJobs,
+    corporations: corpRead.corporations,
     skyhookRaids: skyhookRead.sources,
     skyhookRaidDetails: skyhookRead.raids,
     contractExpiries:
@@ -322,11 +339,8 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
       skillPlanBoard.outcome.status === 'error' ? skillPlanBoard.outcome.reason : null,
     readableKinds: sources.filter((s) => s.rows !== undefined).map((s) => s.kind),
     reauthKinds: sources.filter((s) => s.result.needsReauth).map((s) => s.kind),
-    oldestFetchedAt:
-      cached.length > 0
-        ? new Date(Math.min(...cached.map((result) => result.fetchedAt.getTime())))
-        : null,
-    fromCache: cached.some((result) => result.fromCache),
+    oldestFetchedAt: fetchedAt.length > 0 ? new Date(Math.min(...fetchedAt)) : null,
+    fromCache: corpRead.fromCache || cached.some((result) => result.fromCache),
     events: [...(events ?? [])],
     loadedAtMs,
   };

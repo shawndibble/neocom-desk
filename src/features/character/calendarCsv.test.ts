@@ -30,6 +30,7 @@ describe('calendarCsvColumns', () => {
       'calendar.csvDate',
       'calendar.csvTitle',
       'calendar.csvDetail',
+      'calendar.csvCorporation',
       'calendar.csvResponse',
       'calendar.csvImportant',
       'calendar.csvProjected',
@@ -43,6 +44,7 @@ describe('calendarCsvColumns', () => {
       'calendar.csvDate': '2026-08-29T18:00:00.000Z',
       'calendar.csvTitle': 'Fleet op',
       'calendar.csvDetail': undefined,
+      'calendar.csvCorporation': undefined,
       'calendar.csvResponse': 'calendar.responseDeclined',
       'calendar.csvImportant': 'common.exportFlagYes',
       'calendar.csvProjected': 'common.exportFlagNo',
@@ -69,5 +71,12 @@ describe('calendarCsvColumns', () => {
       'calendar.csvImportant': null,
       'calendar.csvId': 42,
     });
+  });
+
+  it('names the corporation of a corp event', () => {
+    const corporation = { id: 2, name: 'Holding Two', ticker: 'HOLD2' };
+    expect(
+      valuesOf(item({ kind: 'structureFuel', response: null, important: false, corporation }))
+    ).toMatchObject({ 'calendar.csvCorporation': 'Holding Two' });
   });
 });

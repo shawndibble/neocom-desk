@@ -1,6 +1,6 @@
 # Calendar
 
-`/calendar` (nav: Social group, phone tab). The Character's "Coming Up" surface: the in-game calendar events plus every other clock the Character can read (skill queue, industry jobs, PI extractors, moon chunks, contracts, market orders, optional projected skill plan), shown as a **Calendar Map** (grid) beside the **Coming Up Rail** (list). Replaced the old Month/Week/Agenda tabs (scope decision `20260907-123312-calendar-becomes-the-characters-coming-up-surface`).
+`/calendar` (nav: Social group, phone tab). The Character's "Coming Up" surface: the in-game calendar events plus every other clock the Character can read (skill queue, industry jobs, PI extractors, contracts, market orders, optional projected skill plan), plus corporation deadlines (structure fuel, structure timers, moon chunks, corp jobs) for every corporation the account can read, shown as a **Calendar Map** (grid) beside the **Coming Up Rail** (list). Replaced the old Month/Week/Agenda tabs (scope decision `20260907-123312-calendar-becomes-the-characters-coming-up-surface`).
 
 Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,calendarBoardSources,calendar,calendarMoonChunks,calendarSkillPlan,calendarKindFilter,calendarKindLabels,calendarViewPref,calendarWeekStart,calendarCsv,calendarResponseTone}.ts`; components `CalendarMap`, `CalendarDayTicker`, `ComingUpRail`, `CharacterBoardRow`, `CalendarKindFilterMenu`, `EventDetailModal`; engine `src/engine/character/{board,deadlines,calendarRetention}.ts`; grid math `src/lib/calendarGrid.ts`; export `src/lib/calendarExport.ts`.
 
@@ -58,19 +58,22 @@ Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,cale
 
 ## Board sources (what lands on the map and rail)
 
-Eight kinds, sorted by deadline then kind rank then id (`buildCharacterBoard`). Hue per kind (`kindTone`), glyph per kind (`CharacterBoardRow`).
+Fourteen kinds, sorted by deadline then kind rank then id (`buildCharacterBoard`). Hue per kind (`kindTone`), glyph per kind (`CharacterBoardRow`).
 
-| Kind (label)                      | Deadline                                                                              | Source / loader                                    | Scope                                                                                                                                |
-| --------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `calendarEvent` Calendar events   | `event_date`; shows response and "Important" (importance > 0); past = "Started"       | `GET /characters/{id}/calendar` (<= 50 from now)   | `esi-calendar.read_calendar_events.v1`                                                                                               |
-| `skillTraining` Skill queue       | each entry's `finish_date`                                                            | skill queue                                        | `esi-skills.read_skillqueue.v1`                                                                                                      |
-| `industryJob` Industry jobs       | `end_date` of active/ready jobs; past = "ready to deliver"                            | industry jobs                                      | `esi-industry.read_character_jobs.v1`                                                                                                |
-| `planetExtraction` Planets        | each extractor pin `expiry_time` (cached colony details only)                         | planets                                            | `esi-planets.manage_planets.v1`                                                                                                      |
-| `moonChunk` Moon chunks           | chunk arrival, then natural decay if not fractured                                    | corp mining extractions (+ structures for names)   | corp scope `esi-industry.read_corporation_mining.v1` and Corp Capability `canReadMoonExtractions`; menu row hidden when not readable |
-| `contractExpiry` Contracts        | active contracts: courier delivery deadline, else `date_expired`; type + route detail | contracts (+ location names for untitled couriers) | `esi-contracts.read_character_contracts.v1`                                                                                          |
-| `orderExpiry` Market orders       | `issued + duration` days; buy/sell detail                                             | orders                                             | `esi-markets.read_character_orders.v1`                                                                                               |
-| `accelerator` Accelerator expires | the pilot's typed-in cerebral accelerator running out (active Character)              | `characterAccelerators` from Dexie                 | none (local)                                                                                                                         |
-| `skillPlan` Skill plan            | projected completion of un-queued plan steps; tagged "Projected"                      | chosen Skill Plan from Dexie + schedule            | none (local)                                                                                                                         |
+| Kind (label)                      | Deadline                                                                              | Source / loader                                                              | Scope                                                                                                                                    |
+| --------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `calendarEvent` Calendar events   | `event_date`; shows response and "Important" (importance > 0); past = "Started"       | `GET /characters/{id}/calendar` (<= 50 from now)                             | `esi-calendar.read_calendar_events.v1`                                                                                                   |
+| `skillTraining` Skill queue       | each entry's `finish_date`                                                            | skill queue                                                                  | `esi-skills.read_skillqueue.v1`                                                                                                          |
+| `industryJob` Industry jobs       | `end_date` of active/ready jobs; past = "ready to deliver"                            | industry jobs                                                                | `esi-industry.read_character_jobs.v1`                                                                                                    |
+| `planetExtraction` Planets        | each extractor pin `expiry_time` (cached colony details only)                         | planets                                                                      | `esi-planets.manage_planets.v1`                                                                                                          |
+| `structureFuel` Structure fuel    | `fuel_expires`; a structure already dry has no date and is left off                   | corp structures, every readable corporation                                  | Corp Capability `canReadStructures` + `esi-corporations.read_structures.v1`, per corporation; menu row hidden when not readable          |
+| `structureTimer` Structure timers | `state_timer_end` (detail = the state ending) and `unanchors_at`                      | corp structures, every readable corporation                                  | as Structure fuel                                                                                                                        |
+| `moonChunk` Moon chunks           | chunk arrival, then natural decay if not fractured                                    | corp mining extractions (+ structures for names), every readable corporation | Corp Capability `canReadMoonExtractions` + `esi-industry.read_corporation_mining.v1`, per corporation; menu row hidden when not readable |
+| `corpJob` Corp industry jobs      | `end_date` of active/ready corp jobs; past = "ready to deliver"                       | corp industry jobs, every readable corporation                               | Corp Capability `canReadIndustry` + `esi-industry.read_corporation_jobs.v1`, per corporation; menu row hidden when not readable          |
+| `contractExpiry` Contracts        | active contracts: courier delivery deadline, else `date_expired`; type + route detail | contracts (+ location names for untitled couriers)                           | `esi-contracts.read_character_contracts.v1`                                                                                              |
+| `orderExpiry` Market orders       | `issued + duration` days; buy/sell detail                                             | orders                                                                       | `esi-markets.read_character_orders.v1`                                                                                                   |
+| `accelerator` Accelerator expires | the pilot's typed-in cerebral accelerator running out (active Character)              | `characterAccelerators` from Dexie                                           | none (local)                                                                                                                             |
+| `skillPlan` Skill plan            | projected completion of un-queued plan steps; tagged "Projected"                      | chosen Skill Plan from Dexie + schedule                                      | none (local)                                                                                                                             |
 
 Overdue rows show a kind-specific past label ("overdue" / "Started" / "ready to deliver") instead of a countdown. Countdown reads "due in <duration>".
 
@@ -88,6 +91,7 @@ Overdue rows show a kind-specific past label ("overdue" / "Started" / "ready to 
 - Day groups: heading "Today · Tue 6 Oct" / "Tomorrow · ..." / short date, with item count; `ul aria-label`.
 - Row (`CharacterBoardRow`): kind glyph, countdown, optional "Projected"/"Important" tags, response label (calendar events: accepted/declined/tentative/not responded, colour-toned), subject, time of day, kind label, detail.
 - Only calendar-event rows are buttons (open detail modal). Contract rows are links to the contract history row. Every other kind is read-only text.
+- **Corporation events** (`calendarCorpDeadlines.ts`): the four corp kinds are Due soon's own deadline rows (`loadCorpDeadlinesAll` → `buildCorpBoard` with running jobs → `mergeCorpBoards` → `engine/character/corpCalendar.ts`), read for every corporation `corpReadersFor` returns, one reader Character per corporation and source, gated before any fetch. Each row names its corporation on the third line. Personal kinds and skyhook raids stay on the active Character. Starbases and sovereignty windows are not read. A corporation that cannot be read (or needs a new login) is left out; corp kinds never raise the re-auth notice. Scope decision `20261112-062106-calendar-shows-corporation-deadlines-for-every-readable-corporation`.
 - No forward window cap: everything each source returns is on the board.
 
 ## Event types filter menu
@@ -95,6 +99,7 @@ Overdue rows show a kind-specific past label ("overdue" / "Started" / "ready to 
 - Filter icon button in header; label shows "(N hidden)" and `pressed` when any are hidden. Menu: heading "Event types", one `DropdownMenuCheckboxItem` per kind (swatch legend + label + count), counts come from the unfiltered board; replaced by "Not granted" / "Unavailable" / "Choose a plan" / "Could not be scheduled" where applicable. Menu stays open on toggle.
 - Hidden kinds are persisted in Dexie `calendarHiddenKinds` (stores what is hidden so new kinds default visible). Device-local.
 - "Skill plan to project" section: one checkbox per Skill Plan of the Character (select again to clear), "No Skill Plans for this character" empty note, error reason if scheduling fails. Choice stored per Character in `calendarSkillPlanByCharacter`; choosing triggers a reload.
+- "Corporation events" submenu, only when at least one corporation is readable: All corporations / one row per corporation (two or more only) / Hide corporation events. Applies to the four corp kinds only; the pilot's own events always show. Stored in `calendarCorpFilter`; a saved corporation that is no longer readable filters nothing. The filter button is `pressed` while it is not on All.
 - "Show all types" button (disabled when none hidden).
 
 ## Event detail modal (calendar events only)
@@ -109,6 +114,8 @@ Overdue rows show a kind-specific past label ("overdue" / "Started" / "ready to 
 
 ESI drops an event the moment it starts. `loadCalendarEvents` keeps previously seen events in a second cache row (`calendar:seen`) and retains an already-started event for 14 days after it started (`engine/character/calendarRetention.ts`); an upcoming event missing from a fresh read is treated as deleted. Summary cache row is 2-minute fresh.
 
+Corp kinds follow the same rules as every non-event kind: nothing is retained past what ESI still reports, and nothing is prefetched (retention and detail prefetch are calendar-event rules).
+
 ## CSV export
 
 `TableActionsMenu` in header (`surface: 'calendar'`). Columns: Date (`event_date` as given), Title, Response (localised). Rows = raw calendar events in ESI order (including started ones kept by retention, with RSVP overrides applied); not the merged board, not filtered by kind or day.
@@ -119,6 +126,7 @@ ESI drops an event the moment it starts. `loadCalendarEvents` keeps previously s
 | ------------------------------------------------------------------------------- | ----------------------------------- |
 | `calendarView` (`month`/`fortnight`; legacy `week`->fortnight, `agenda`->month) | density icon button                 |
 | `calendarHiddenKinds`                                                           | filter menu                         |
+| `calendarCorpFilter` (`all`/`none`/corporation id)                              | filter menu                         |
 | `calendarSkillPlanByCharacter`                                                  | filter menu                         |
 | `calendarWeekStart` (`monday`/`sunday`)                                         | Settings > Display "Week starts on" |
 
@@ -173,7 +181,7 @@ ESI drops an event the moment it starts. `loadCalendarEvents` keeps previously s
 7. **Why does the phone use a 14-day ticker?** A month grid on a phone puts six weeks of scroll before today; the ticker is a rolling 14 days from the anchor (`Calendar.tsx:102`, `buildDaysFrom`); density toggle exists only for the wide grid.
 8. **What is "Projected"?** Un-queued steps of the chosen Skill Plan scheduled from `startDate + cumulativeSeconds`, excluding steps already in the queue (`calendarBoardSources.ts` `toSkillPlanSources`); tagged `Projected` via `isProjectedKind`; plan error surfaces in the menu, not as a page error.
 9. **How are contract deadlines computed?** Active contracts only; courier uses `courierDeliveryDeadlineMs` (accepted + days to complete) else `date_expired`; untitled couriers named "start -> end" via location lookups (`calendarBoardSources.ts`, `calendarBoardData.ts:loadCourierRouteNames`).
-10. **When does a moon chunk show?** Only when `resolveCorpReadAccess` says `canReadMoonExtractions`; before arrival the deadline is chunk arrival with detail "arrives", after it natural decay with "decays if not fractured" (`calendarMoonChunks.ts`, `toMoonChunkSources`).
+10. **When does a moon chunk show?** When some Character of the account can read extractions for that corporation (`corpReadersFor`, `canReadMoonExtractions`); before arrival the deadline is chunk arrival with detail "arrives", after it natural decay with "decays if not fractured" (`calendarCorpDeadlines.ts`, `engine/corp/board.ts` `extractionItem`).
 
 ## Improvement ideas
 

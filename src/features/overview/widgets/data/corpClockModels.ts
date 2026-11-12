@@ -3,12 +3,7 @@
  * Same contract as `models.ts`: pure, derived at render time.
  */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
-import {
-  buildCorpBoard,
-  mergeCorpBoards,
-  type CorpBoardItem,
-  type CorpBoardSources,
-} from '@/engine/corp/board';
+import { mergeCorpBoards, type CorpBoardItem } from '@/engine/corp/board';
 import {
   DEADLINE_STRIP_DAYS,
   DUE_SOON_WINDOW_MS,
@@ -17,7 +12,7 @@ import {
 } from '@/engine/corp/deadlines';
 import type { DayZone } from '@/engine/localDay';
 import type { CorporationIndustryJob } from '@/esi/endpoints';
-import { structureStateLabel, toBoardJobs } from '@/features/corp/boardSources';
+import { structureStateLabel } from '@/features/corp/boardSources';
 import { activityI18nKey, isCompletingSoon } from '@/features/industry/jobs';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatDateOnly } from '@/lib/timestamp';
@@ -27,9 +22,8 @@ import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from '.
 import { corpCell, fractionBar } from './cellKit';
 import { hbarsFromRows } from './chartBuilders';
 import type { CorpLabel } from '@/features/corp/corpTicker';
-import type { CorpDeadlinesSlice, CorpJobsFeed } from './corpFeeds';
-import { toBoardHubFuel, toBoardSovereignty } from './corpSovereigntyModels';
-import { toBoardStarbases } from './corpStarbaseModels';
+import { boardOf, readableSources } from './corpDeadlineSources';
+import type { CorpJobsFeed } from './corpFeeds';
 import { elapsedShare } from './industryModels';
 import { shortStructureName } from '@/features/corp/structures/structureRows';
 import type {
@@ -124,49 +118,6 @@ function dayChart(
     summary: t('corp.standing.strip.describe', { days: days.length, detail }),
   };
 }
-
-/** One corporation's Due soon reads, whatever scope fetched them; absent or null means not read. */
-type DeadlineReads = Partial<Omit<CorpDeadlinesSlice, 'corporationId' | 'failed'>>;
-
-/** The readable reads as the board's sources, and when they landed. */
-function readableSources(reads: DeadlineReads, now: number) {
-  // A source this Character cannot read contributes undefined, never [].
-  const structures = reads.structures?.structures ?? undefined;
-  // `chunks` says whether the read was allowed; `extractions` is what the board ranks.
-  const chunks = reads.moonChunks?.chunks ?? undefined;
-  const extractions = chunks ? (reads.moonChunks?.extractions ?? []) : undefined;
-  const jobs = reads.jobs?.readable ? reads.jobs : undefined;
-  const towers = reads.starbases?.readable ? reads.starbases : undefined;
-  const raids = reads.sovereignty?.readable ? reads.sovereignty : undefined;
-  const fetched = [
-    structures ? reads.structures?.fetchedAt : null,
-    chunks ? reads.moonChunks?.fetchedAt : null,
-    jobs?.fetchedAt,
-    towers?.fetchedAt,
-    raids?.fetchedAt,
-  ].filter((at): at is Date => at instanceof Date);
-  return {
-    readable:
-      structures !== undefined ||
-      chunks !== undefined ||
-      jobs !== undefined ||
-      towers !== undefined ||
-      raids !== undefined,
-    sources: {
-      structures,
-      extractions,
-      jobs: jobs ? toBoardJobs(jobs.jobs, jobs.typeNames) : undefined,
-      starbases: towers ? toBoardStarbases(towers, now) : undefined,
-      sovereignty: raids ? toBoardSovereignty(raids) : undefined,
-      hubFuel: raids ? toBoardHubFuel(raids) : undefined,
-    } satisfies Omit<CorpBoardSources, 'nowMs' | 'staleWindowMs'>,
-    fetched,
-    fromCache: Boolean(jobs?.fromCache),
-  };
-}
-
-const boardOf = (sources: ReturnType<typeof readableSources>['sources'], now: number) =>
-  buildCorpBoard({ nowMs: now, staleWindowMs: CORP_CACHE_WINDOW_MS, ...sources });
 
 /** How the read went, for the view: the feeds' state, and when the oldest read landed. */
 interface DeadlinesRead {

@@ -16,6 +16,11 @@ import {
   DEFAULT_HIDDEN_KINDS,
   CALENDAR_HIDDEN_KINDS_KEY,
 } from '@/features/character/calendarKindFilter';
+import {
+  useCalendarCorpFilter,
+  DEFAULT_CORP_FILTER,
+} from '@/features/character/calendarCorpFilter';
+import { CHARACTER_BOARD_ITEM_KINDS } from '@/engine/character/board';
 import { App } from '@/app/App';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { exportRows } from '@/lib/downloadCsv';
@@ -157,6 +162,7 @@ beforeEach(async () => {
   usePublicInfo.setState({ byCharacterId: {} });
   useCalendarDensity.setState({ value: DEFAULT_CALENDAR_DENSITY, hydrated: false });
   useCalendarHiddenKinds.setState({ value: DEFAULT_HIDDEN_KINDS, hydrated: false });
+  useCalendarCorpFilter.setState({ value: DEFAULT_CORP_FILTER, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -185,6 +191,9 @@ async function grantCorpScopes(roles: string[]) {
   server.use(
     http.get(ESI, () => HttpResponse.json({ corporation_id: CORP_ID })),
     http.get(`${ESI}/roles`, () => HttpResponse.json({ roles })),
+    http.get(`https://esi.evetech.net/corporations/${CORP_ID}`, () =>
+      HttpResponse.json({ name: 'Main Corp', ticker: 'MAIN' })
+    ),
     http.get(`${CORP}/${CORP_ID}/mining/extractions`, () =>
       HttpResponse.json([
         {
@@ -198,6 +207,88 @@ async function grantCorpScopes(roles: string[]) {
     )
   );
 }
+
+const ALT_ID = 92;
+const ALT_CORP_ID = 98000002;
+const ALT_ESI = `https://esi.evetech.net/characters/${ALT_ID}`;
+
+/** A second Character, a director of a holding corporation the active one is not in. */
+async function addHoldingCorpDirector() {
+  await db.characters.put({ characterId: ALT_ID, name: 'Alt Two', ownerHash: 'oh2', addedAt: 2 });
+  await db.tokens.put({
+    characterId: ALT_ID,
+    accessToken: 'access-token-2',
+    refreshToken: 'refresh-2',
+    expiresAt: Date.now() + 3_600_000,
+    scopes: ['esi-characters.read_corporation_roles.v1', 'esi-corporations.read_structures.v1'],
+  });
+  server.use(
+    http.get(ALT_ESI, () => HttpResponse.json({ corporation_id: ALT_CORP_ID })),
+    http.get(`${ALT_ESI}/roles`, () => HttpResponse.json({ roles: ['Station_Manager'] })),
+    http.get(`${ALT_ESI}/corporationhistory`, () => HttpResponse.json([])),
+    http.get(`https://esi.evetech.net/corporations/${ALT_CORP_ID}`, () =>
+      HttpResponse.json({ name: 'Holding Two', ticker: 'HOLD2' })
+    ),
+    http.get(`https://esi.evetech.net/corporations/${ALT_CORP_ID}/structures`, () =>
+      HttpResponse.json([
+        {
+          structure_id: 2001,
+          corporation_id: ALT_CORP_ID,
+          profile_id: 1,
+          system_id: 30000142,
+          type_id: 35832,
+          name: 'Perimeter - Holding Astrahus',
+          state: 'armor_reinforce',
+          fuel_expires: inHours(30).toISOString(),
+          state_timer_end: inHours(50).toISOString(),
+        },
+      ])
+    )
+  );
+}
+
+describe('Calendar corporation events', () => {
+  it('shows fuel-out and timer events of a corporation the active Character is not in', async () => {
+    await addHoldingCorpDirector();
+    render(<App />);
+
+    const rail = await screen.findByRole('list', { name: /coming up/i });
+    const rows = await within(rail).findAllByText('Perimeter - Holding Astrahus');
+    expect(rows).toHaveLength(2);
+    expect(within(rail).getByText(/Structure fuel · Holding Two/)).toBeInTheDocument();
+    expect(
+      within(rail).getByText(/Structure timers · armor reinforcement ends · Holding Two/)
+    ).toBeInTheDocument();
+  });
+
+  it("hides them from the corporation filter, and keeps the pilot's own events", async () => {
+    const user = userEvent.setup();
+    await addHoldingCorpDirector();
+    render(<App />);
+    await screen.findAllByText('Perimeter - Holding Astrahus');
+
+    await user.click(screen.getByRole('button', { name: /filter event types/i }));
+    // By keyboard: a pointer leaving the submenu trigger closes it under jsdom.
+    (await screen.findByRole('menuitem', { name: /corporation events/i })).focus();
+    await user.keyboard('{Enter}');
+    await screen.findByRole('menuitemradio', { name: /hide corporation events/i });
+    await user.keyboard('{End}{Enter}');
+
+    await waitFor(() => expect(screen.queryByText('Perimeter - Holding Astrahus')).toBeNull());
+    expect(screen.getByText('Fleet Op')).toBeInTheDocument();
+  });
+
+  it('offers no corporation filter when no corporation can be read', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /filter event types/i }));
+    expect(await screen.findByRole('menuitemcheckbox', { name: /calendar events/i })).toBeVisible();
+    expect(screen.queryByRole('menuitem', { name: /corporation events/i })).toBeNull();
+    expect(screen.queryByRole('menuitemcheckbox', { name: /structure/i })).toBeNull();
+  });
+});
 
 describe('Calendar', () => {
   it('puts a moon chunk on the board for a Character who can read extractions', async () => {
@@ -451,19 +542,7 @@ describe('Calendar', () => {
   it('says so when every kind has been deselected', async () => {
     await db.settings.put({
       key: CALENDAR_HIDDEN_KINDS_KEY,
-      value: [
-        'calendarEvent',
-        'skillTraining',
-        'accelerator',
-        'industryJob',
-        'planetExtraction',
-        'mercenaryDen',
-        'moonChunk',
-        'skyhookRaid',
-        'contractExpiry',
-        'orderExpiry',
-        'skillPlan',
-      ],
+      value: [...CHARACTER_BOARD_ITEM_KINDS],
     });
     render(<App />);
 

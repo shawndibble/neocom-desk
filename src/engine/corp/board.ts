@@ -230,6 +230,12 @@ export interface CorpBoardSources {
   hubFuel?: readonly BoardHubFuelSource[];
   extractions?: readonly BoardExtractionSource[];
   jobs?: readonly BoardJobSource[];
+  /**
+   * Also list a job still running, dated at its finish. Off for the ops board,
+   * where a job is only something to act on once it can be delivered; on for
+   * the Calendar, which shows when it will finish.
+   */
+  includeRunningJobs?: boolean;
 }
 
 /**
@@ -515,7 +521,9 @@ export function buildCorpBoard(sources: CorpBoardSources): CorpBoardItem[] {
     // delivered, cancelled, paused, or reverted — done with regardless of
     // end time, since there is nothing left to pick up.
     const stillOpen = job.status === 'ready' || job.status === 'active';
-    if (!stillOpen || (job.status !== 'ready' && clock.nowMs < job.endMs)) continue;
+    if (!stillOpen) continue;
+    const running = job.status !== 'ready' && clock.nowMs < job.endMs;
+    if (running && !sources.includeRunningJobs) continue;
     items.push(jobItem(job, clock));
   }
 

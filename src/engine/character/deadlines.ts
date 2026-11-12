@@ -141,3 +141,15 @@ export function countsByKind(
   for (const item of items) counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
   return counts;
 }
+
+/** The Calendar's corporation filter: every corp event, none, or one corporation's. */
+export type CorpEventFilter = 'all' | 'none' | number;
+
+/** The corporation filter, applied. The pilot's own clocks always pass. */
+export function filterByCorporation(
+  items: readonly CharacterBoardItem[],
+  filter: CorpEventFilter
+): CharacterBoardItem[] {
+  if (filter === 'all') return [...items];
+  return items.filter((item) => item.corporation === undefined || item.corporation.id === filter);
+}

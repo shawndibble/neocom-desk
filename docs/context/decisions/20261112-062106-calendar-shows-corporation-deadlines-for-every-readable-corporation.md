@@ -1,0 +1,11 @@
+# Scope decisions — Calendar shows corporation deadlines for every readable corporation (issue #6094)
+
+_Recorded 2026-11-12 · issue #6094._
+
+- **The Calendar reads its corp events from Due soon's own deadline rows** (`loadCorpDeadlinesAll` → `buildCorpBoard` → `mergeCorpBoards`), for every corporation `corpReadersFor` returns, each source gated on that corporation's capability before any fetch. `engine/character/corpCalendar.ts` only sorts those rows into Calendar kinds; there is no second mapper. Personal events stay on the active Character.
+- **Three new Clock Kinds: `structureFuel`, `structureTimer`, `corpJob`.** `moonChunk` moves onto the same path and widens from the active Character's corporation to every readable one, superseding the "Character's own" reading in `20260925-142253-calendar-gains-a-moon-chunk-kind.md`. Skyhook raids stay on the active Character; starbases and sovereignty windows are not read (out of scope, same rows later).
+- **A clock with no instant has no day.** A structure already dry (ESI drops `fuel_expires`) and an offline service are left off the Calendar; Due soon still lists them.
+- **Corp jobs show while they run.** The corp board lists a job only once it can be delivered; the Calendar asks it for running jobs too (`includeRunningJobs`), dated at their finish. A job row names its product and corporation, not a structure: the board's job rows carry none.
+- **A corporation whose grant lapsed is left out, never a re-auth notice.** The Calendar's notice re-authorises the active Character, which may not be the corporation's reader. Moon chunks lose their "Not granted" row for the same reason.
+- **Corporation filter lives in the Event types menu** as a "Corporation events" submenu: All corporations, each corporation (only with two or more), Hide corporation events. Absent when no corporation is readable. Saved device-local in `calendarCorpFilter`; a saved corporation that is no longer readable filters nothing. It never hides the pilot's own events.
+- **Colours:** `--color-kind-structure-timer: #88b078`, `--color-kind-structure-fuel: #b8a858`, `--color-kind-corp-job: #c0e0d8`. Each is ΔE ≥ 23 (CIE76) from every other clock kind and ≥ 27 from the four status tones, AA on bg/panel/panel-2, measured for normal vision only; glyph and written name carry the kind as for the rest.

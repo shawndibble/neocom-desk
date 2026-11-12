@@ -46,7 +46,10 @@ export const CHARACTER_BOARD_ITEM_KINDS = [
   'industryJob',
   'planetExtraction',
   'mercenaryDen',
+  'structureTimer',
+  'structureFuel',
   'moonChunk',
+  'corpJob',
   'skyhookRaid',
   'contractExpiry',
   'orderExpiry',
@@ -57,6 +60,13 @@ export type CharacterBoardItemKind = (typeof CHARACTER_BOARD_ITEM_KINDS)[number]
 
 /** ESI's own RSVP enum, carried through so the rail can flag "you owe an answer". */
 export type CalendarResponse = 'declined' | 'not_responded' | 'accepted' | 'tentative';
+
+/** The corporation a corp clock belongs to, already named by the caller. */
+export interface BoardCorporation {
+  id: number;
+  name: string;
+  ticker: string;
+}
 
 /** What every source hands in: an identity, what to say about it, and when. */
 export interface BoardClockSource {
@@ -75,6 +85,8 @@ export interface BoardClockSource {
   detail: string;
   /** Epoch ms the clock runs out. Already parsed; a NaN must never reach here. */
   deadlineMs: number;
+  /** Set on a corporation's clock (`corpCalendar.ts`); absent on the pilot's own. */
+  corporation?: BoardCorporation;
 }
 
 /** A calendar event, which alone carries an RSVP state and an importance flag. */
@@ -123,8 +135,14 @@ export interface CharacterBoardSources {
   planetExtractions?: readonly BoardClockSource[];
   /** Den reinforcement ends and tactical operation expiries. */
   mercenaryDens?: readonly BoardClockSource[];
-  /** Corp moon drills — absent unless the Character holds `canReadMoonExtractions`. */
+  /** Moon drills of every readable corporation; absent when none can be read. */
   moonChunks?: readonly BoardClockSource[];
+  /** Structures running out of fuel, every readable corporation. */
+  structureFuel?: readonly BoardClockSource[];
+  /** Structure reinforcement, vulnerability and unanchor timers ending. */
+  structureTimers?: readonly BoardClockSource[];
+  /** Corp industry jobs finishing. */
+  corpJobs?: readonly BoardClockSource[];
   /** Corp skyhook theft windows — absent unless the Character holds `canReadSkyhooks`. */
   skyhookRaids?: readonly BoardClockSource[];
   contractExpiries?: readonly BoardClockSource[];
@@ -143,7 +161,10 @@ const SOURCE_KEY = {
   industryJob: 'industryJobs',
   planetExtraction: 'planetExtractions',
   mercenaryDen: 'mercenaryDens',
+  structureTimer: 'structureTimers',
+  structureFuel: 'structureFuel',
   moonChunk: 'moonChunks',
+  corpJob: 'corpJobs',
   skyhookRaid: 'skyhookRaids',
   contractExpiry: 'contractExpiries',
   orderExpiry: 'orderExpiries',
@@ -175,7 +196,7 @@ const KIND_RANK = new Map<CharacterBoardItemKind, number>(
  */
 export function pastDeadlineLabelKey(kind: CharacterBoardItemKind): string {
   if (kind === 'calendarEvent') return 'calendar.started';
-  if (kind === 'industryJob') return 'calendar.detail.industryJob.ready';
+  if (kind === 'industryJob' || kind === 'corpJob') return 'calendar.detail.industryJob.ready';
   return 'calendar.overdue';
 }
 
@@ -209,6 +230,7 @@ function toItem(
     remainingMs,
     response: isCalendarEvent(source) ? source.response : null,
     important: isCalendarEvent(source) ? source.important : false,
+    ...(source.corporation ? { corporation: source.corporation } : {}),
   };
 }
 
