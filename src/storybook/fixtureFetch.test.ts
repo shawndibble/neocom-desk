@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { installFixtureFetch, unexpectedRequests } from './fixtureFetch';
-import { SAMPLE_CHARACTERS } from './sampleData';
+import { SAMPLE_CHARACTERS, SAMPLE_STATION_ID, SAMPLE_SYSTEM_ID } from './sampleData';
 
 let uninstall: (() => void) | undefined;
 afterEach(() => {
@@ -81,6 +81,26 @@ describe('installFixtureFetch', () => {
     ]);
     const response = await fetch(`https://esi.evetech.net/characters/${pilot.characterId}`);
     expect(await response.json()).toEqual({ name: 'Story pilot' });
+  });
+
+  it("answers a sample Character's location and skill queue whatever table is installed (#6126)", async () => {
+    uninstall = installFixtureFetch([]);
+    const id = SAMPLE_CHARACTERS[0]!.characterId;
+    const location = await fetch(`https://esi.evetech.net/characters/${id}/location`);
+    expect(await location.json()).toEqual({
+      solar_system_id: SAMPLE_SYSTEM_ID,
+      station_id: SAMPLE_STATION_ID,
+    });
+    const queue = await fetch(`https://esi.evetech.net/characters/${id}/skillqueue`);
+    expect(await queue.json()).toEqual([]);
+    expect(unexpectedRequests()).toEqual([]);
+  });
+
+  it("still records any other Character's location", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    uninstall = installFixtureFetch([]);
+    await expect(fetch('https://esi.evetech.net/characters/1/location')).rejects.toThrow();
+    expect(unexpectedRequests()).toEqual(['GET https://esi.evetech.net/characters/1/location']);
   });
 
   it("still records any other Character's sheet", async () => {
