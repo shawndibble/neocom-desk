@@ -107,7 +107,7 @@ Overdue rows show a kind-specific past label ("overdue" / "Started" / "ready to 
 
 ## Retention rule for started events
 
-ESI drops an event the moment it starts. `loadCalendarEvents` keeps previously seen events in a second cache row (`calendar:seen`) and retains an already-started event until the end of its local day or 6 hours after start, whichever is later (`engine/character/calendarRetention.ts`); an upcoming event missing from a fresh read is treated as deleted. Summary cache row is 2-minute fresh.
+ESI drops an event the moment it starts. `loadCalendarEvents` keeps previously seen events in a second cache row (`calendar:seen`) and retains an already-started event for 14 days after it started (`engine/character/calendarRetention.ts`); an upcoming event missing from a fresh read is treated as deleted. Summary cache row is 2-minute fresh.
 
 ## CSV export
 
@@ -130,7 +130,7 @@ ESI drops an event the moment it starts. `loadCalendarEvents` keeps previously s
 
 ## Observed gaps
 
-- Past is not browsable: ESI returns only upcoming events and the cache only keeps what this device saw before start; past days with nothing hatch.
+- Past is browsable for two weeks, but partial: ESI returns only upcoming events, so the history is what this device saw before each event started; days the app was never open for stay empty, and past days with nothing hatch.
 - ESI cap of 50 calendar events and 50 queue entries bounds the board; no paging.
 - No search, no sort, no per-item actions on non-calendar rows except the contract link; skill, job, extractor, moon-chunk, order rows are not links.
 - CSV covers calendar events only, ignoring kind/day filters and all other clocks.
@@ -167,7 +167,7 @@ ESI drops an event the moment it starts. `loadCalendarEvents` keeps previously s
 1. **Why a map + rail instead of month/week/agenda tabs?** ESI returns up to 50 events from now only and the cache replaces its row, so month grids spent most cells on days that cannot hold anything and paging back always said "No events"; grid became a map, list always beside it (`Calendar.tsx` header comment, decision `20260907-123312`).
 2. **How are items ordered?** Deadline ascending, then `KIND_RANK` (order of `CHARACTER_BOARD_ITEM_KINDS`: calendarEvent, skillTraining, accelerator, industryJob, planetExtraction, moonChunk, contractExpiry, orderExpiry, skillPlan), then id string compare (`engine/character/board.ts:140,212-226`).
 3. **Why doesn't the page show a page-level re-login banner?** Eight independent sources; one revoked scope must not blank the others. Route is `UNGATED` (`routeScopes.ts:212`); refused sources are listed in an amber line and marked "Not granted" in the filter menu (`calendarBoardData.ts` `reauthKinds`).
-4. **What happens to an event the moment it starts?** ESI drops it; `withStartedEventsRetained` keeps it from the `calendar:seen` row until `max(end of its local day, start + 6h)` (`calendarRetention.ts:52-55`, `calendar.ts` merge); upcoming events missing from a fresh read are treated as deleted. Summary freshness 2 min (`calendar.ts:135`).
+4. **What happens to an event the moment it starts?** ESI drops it; `withStartedEventsRetained` keeps it from the `calendar:seen` row until start + 14 days (`calendarRetention.ts` `RETENTION_MS`, `calendar.ts` merge); upcoming events missing from a fresh read are treated as deleted. Summary freshness 2 min (`calendar.ts:135`).
 5. **How does RSVP avoid flicker or being overwritten by a stale snapshot?** After the PUT it patches caches and records `{response, atMs}`; an override applies while `data.loadedAtMs <= atMs`, i.e. any snapshot that began loading before the RSVP; a later snapshot is trusted (`Calendar.tsx:~190-205`).
 6. **Why store hidden kinds instead of shown ones?** A new kind added later would be absent from existing stored "shown" arrays and arrive switched off; as exclusions it shows on day one; unknown stored kinds are dropped (`calendarKindFilter.ts`).
 7. **Why does the phone use a 14-day ticker?** A month grid on a phone puts six weeks of scroll before today; the ticker is a rolling 14 days from the anchor (`Calendar.tsx:102`, `buildDaysFrom`); density toggle exists only for the wide grid.
