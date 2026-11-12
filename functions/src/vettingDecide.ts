@@ -32,6 +32,7 @@ import {
   HOUR_MS,
   VETTING_DAILY_DRAFTS,
   VETTING_LOG_MAX,
+  VETTING_NOTIFY_MAX,
   VETTING_REQUEST_KEEP_DAYS,
   VETTING_REVIEWER_DAYS,
   type StoredSignOff,
@@ -220,7 +221,13 @@ function readReviewers(data: unknown): StoredVettingReviewers['reviewers'] {
       isFiniteNumber(entry.characterId) &&
       isFiniteNumber(entry.lastSeenAt)
     ) {
-      out[uid] = { characterId: entry.characterId, lastSeenAt: entry.lastSeenAt };
+      out[uid] = {
+        characterId: entry.characterId,
+        ...(typeof entry.ownerHash === 'string' && entry.ownerHash
+          ? { ownerHash: entry.ownerHash }
+          : {}),
+        lastSeenAt: entry.lastSeenAt,
+      };
     }
   }
   return out;
@@ -230,44 +237,48 @@ const reviewerSeenRecently = (lastSeenAt: number, now: number): boolean =>
   now - lastSeenAt < VETTING_REVIEWER_DAYS * DAY_MS;
 
 /**
- * The reviewers document after `uid` was seen holding a reviewer role now, without anyone not
- * seen in `VETTING_REVIEWER_DAYS`; null when it need not be written (seen within the day).
+ * The reviewers document after `seen` held a reviewer role now, without anyone not seen in
+ * `VETTING_REVIEWER_DAYS`; null when it need not be written (the same entry, seen within the day).
  */
 export function seenVettingReviewer(
   data: unknown,
-  uid: string,
-  characterId: number,
+  seen: Pick<VettingActor, 'uid' | 'characterId' | 'ownerHash'>,
   now: number
 ): StoredVettingReviewers | null {
+  const { uid, characterId, ownerHash } = seen;
   const held = readReviewers(data);
   const mine = held[uid];
-  if (mine && mine.characterId === characterId && now >= mine.lastSeenAt) {
+  if (
+    mine &&
+    mine.characterId === characterId &&
+    mine.ownerHash === ownerHash &&
+    now >= mine.lastSeenAt
+  ) {
     if (now - mine.lastSeenAt < DAY_MS) return null;
   }
   const reviewers: StoredVettingReviewers['reviewers'] = {};
   for (const [id, entry] of Object.entries(held)) {
     if (reviewerSeenRecently(entry.lastSeenAt, now)) reviewers[id] = entry;
   }
-  reviewers[uid] = { characterId, lastSeenAt: now };
+  reviewers[uid] = { characterId, ownerHash, lastSeenAt: now };
   return { reviewers };
 }
 
 /**
  * The Characters to tell that a report was shared: reviewers seen in the last
- * `VETTING_REVIEWER_DAYS`, never one the report is about.
+ * `VETTING_REVIEWER_DAYS`, never one the report is about (`isSubject`: an entry stored without
+ * its account is matched by character only). The most recently seen first, at most
+ * `VETTING_NOTIFY_MAX` of them.
  */
 export function vettingSharedRecipients(
   data: unknown,
   review: StoredVettingReview,
   now: number
 ): number[] {
-  const ids = new Set<number>();
-  for (const entry of Object.values(readReviewers(data))) {
-    if (!reviewerSeenRecently(entry.lastSeenAt, now)) continue;
-    if (isSubject(review, { characterId: entry.characterId, ownerHash: '' })) continue;
-    ids.add(entry.characterId);
-  }
-  return [...ids].sort((a, b) => a - b);
+  const told = Object.values(readReviewers(data))
+    .filter((entry) => reviewerSeenRecently(entry.lastSeenAt, now) && !isSubject(review, entry))
+    .sort((a, b) => b.lastSeenAt - a.lastSeenAt || a.characterId - b.characterId);
+  return [...new Set(told.map((entry) => entry.characterId))].slice(0, VETTING_NOTIFY_MAX);
 }
 
 // --- Log --------------------------------------------------------------------
@@ -303,7 +314,7 @@ const DECIDED = ['accepted', 'rejected'];
  */
 export function isSubject(
   review: StoredVettingReview,
-  person: Pick<VettingActor, 'characterId' | 'ownerHash'>
+  person: { characterId: number; ownerHash?: string }
 ): boolean {
   return (
     review.pilot.characterId === person.characterId ||
@@ -311,6 +322,7 @@ export function isSubject(
     review.characters.some(
       (character) =>
         character.characterId === person.characterId ||
+        // Either side stored before its account was kept is matched by character only.
         (character.ownerHash !== undefined && character.ownerHash === person.ownerHash)
     )
   );
@@ -348,19 +360,29 @@ export type SignOffRefusal = 'not-open' | 'barred' | 'already-signed';
  * accepted otherwise. A `no` therefore closes nothing early, so that a review still open says
  * nothing about the sign-offs already on it (the blind second review). A decided review is kept
  * `VETTING_KEEP_DAYS` and then swept; an undecided one keeps the expiry its submit gave it.
+ * `reasonShown` is the corp's `rejection.showReason` as the sign-off is made, stamped on it: a
+ * note written while reasons were kept from pilots stays kept from them (`pilotStatus`).
  */
 export function decideSignOff(
   review: StoredVettingReview,
   reviewer: VettingActor,
-  decision: 'yes' | 'no',
-  note: string,
+  sign: { decision: 'yes' | 'no'; note: string; reasonShown: boolean },
   now: number
 ): { ok: true; review: StoredVettingReview } | { ok: false; reason: SignOffRefusal } {
   if (review.state !== 'open') return { ok: false, reason: 'not-open' };
   if (isBarred(review, reviewer)) return { ok: false, reason: 'barred' };
   if (hasSigned(review, reviewer)) return { ok: false, reason: 'already-signed' };
 
-  const signOffs: StoredSignOff[] = [...review.signOffs, { ...reviewer, at: now, decision, note }];
+  const signOffs: StoredSignOff[] = [
+    ...review.signOffs,
+    {
+      ...reviewer,
+      at: now,
+      decision: sign.decision,
+      note: sign.note,
+      reasonShown: sign.reasonShown,
+    },
+  ];
   const state =
     signOffs.length < review.signOffsNeeded
       ? 'open'
@@ -428,8 +450,8 @@ export function reviewSummary(
 
 /**
  * The report as this officer may see it. Blind second review: another reviewer's decision and
- * note are left out (their name and the time stay) until the viewer has recorded their own, or
- * the review is decided. An open review's state gives nothing away either: see `decideSignOff`.
+ * note (and whether that note was written to be shown to the pilot) are left out (their name and
+ * the time stay) until the viewer has recorded their own, or the review is decided. An open review's state gives nothing away either: see `decideSignOff`.
  */
 export function reviewView(
   id: string,
@@ -445,7 +467,13 @@ export function reviewView(
       name: signOff.name,
       you,
       at: signOff.at,
-      ...(revealed || you ? { decision: signOff.decision, note: signOff.note } : {}),
+      ...(revealed || you
+        ? {
+            decision: signOff.decision,
+            note: signOff.note,
+            reasonShown: signOff.reasonShown === true,
+          }
+        : {}),
     };
   });
   return {
@@ -477,8 +505,10 @@ const SHARED = ['open', ...DECIDED];
  * What the pilot sees of their own review: no flags, no sign-offs, only who opened it. What the
  * corp asks is read from its settings as they are now: the questions and unmet minimums of an
  * application (a promotion is asked neither), the contact once the report is shared, and for a
- * rejected review the corp's wording, with the notes of the reviewers who said no only when the
- * corp shows them.
+ * rejected review the corp's wording. Its reasons are not read from the settings as they are
+ * now: they are the notes of the reviewers who said no while the corp showed reasons
+ * (`reasonShown`, stamped by `decideSignOff`), so turning the setting on later reveals nothing
+ * written before.
  */
 export function pilotStatus(
   id: string,
@@ -535,11 +565,10 @@ export function pilotStatus(
       ? {
           rejection: {
             wording: settings.rejection.wording,
-            reasons: settings.rejection.showReason
-              ? review.signOffs
-                  .filter((signOff) => signOff.decision === 'no' && signOff.note.trim() !== '')
-                  .map((signOff) => signOff.note.trim())
-              : [],
+            reasons: review.signOffs
+              .filter((signOff) => signOff.decision === 'no' && signOff.reasonShown === true)
+              .map((signOff) => signOff.note.trim())
+              .filter((note) => note !== ''),
           },
         }
       : {}),

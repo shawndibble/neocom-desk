@@ -58,10 +58,11 @@ export function communityJoinRequestText(
   };
 }
 
+/** Names no pilot: the row it becomes lands in the synced Notification Feed. */
 export function vettingSharedText(t: Translate, fire: VettingSharedFire): NotificationCopy {
   return {
-    title: fired(t, 'vettingShared', 'title', { pilot: fire.pilotName }),
-    body: fired(t, 'vettingShared', fire.kind, { pilot: fire.pilotName }),
+    title: fired(t, 'vettingShared', 'title'),
+    body: fired(t, 'vettingShared', fire.kind),
   };
 }
 

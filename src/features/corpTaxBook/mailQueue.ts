@@ -329,7 +329,8 @@ export function enqueuePayeeChangeMail(input: {
 
 /**
  * Queues the mail that tells a pilot how their vetting review was decided. Written by the caller
- * (it needs the reviewer's i18n); one review is mailed once, whoever presses.
+ * (it needs the reviewer's i18n). The queue lives on this device, so one review is mailed once
+ * per device: a second reviewer, or the same one on another device, can queue it again.
  */
 export function enqueueVettingDecisionMail(input: {
   corporationId: number;

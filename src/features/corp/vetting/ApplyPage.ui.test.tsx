@@ -13,6 +13,7 @@ import {
 } from '@/storybook/vettingFixture';
 import { ApplyPage } from './ApplyPage';
 import { setVettingBackendOverride } from './vettingBackend';
+import { readVettingDraft, writeVettingDraft } from './vettingDraft';
 import { readVettingHandle, writeVettingHandle } from './vettingHandle';
 import type { VettingLoginOutcome } from './vettingLoginState';
 
@@ -55,7 +56,10 @@ function setup(
   return { onSignIn, ...view };
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  sessionStorage.clear();
+});
 afterEach(() => setVettingBackendOverride(null));
 
 describe('ApplyPage', () => {
@@ -132,6 +136,53 @@ describe('ApplyPage', () => {
     expect(screen.getByText('3 characters read. The report is with the recruiters.')).toBeVisible();
     expect(screen.getByText('Nobody yet')).toBeInTheDocument();
     expect(fixture.calls.find((call) => call.method === 'submit')?.args[1]).toBe('Hi');
+  });
+
+  it('keeps the answers, the note and the tick across the EVE login for another character', async () => {
+    const first = setup({ application: 'draft', settings: VETTING_FIXTURE_CONFIGURED });
+    const timezone = await screen.findByRole('textbox', { name: /What timezone do you play in/ });
+    await userEvent.type(timezone, 'EU evenings');
+    await userEvent.type(screen.getByRole('textbox', { name: /Note to the recruiters/ }), 'Hi');
+    await userEvent.click(screen.getByRole('checkbox', { name: /These are all my characters/ }));
+    // Leaves for EVE: the page is gone until the login comes back.
+    await userEvent.click(screen.getByRole('button', { name: 'Log in again as Mira Vell' }));
+    first.unmount();
+
+    setVettingBackendOverride(fixture);
+    render(<ApplyPage corporationId={CORP} login={loginAs(mira)} onSignIn={vi.fn()} />);
+    expect(
+      await screen.findByRole('textbox', { name: /What timezone do you play in/ })
+    ).toHaveValue('EU evenings');
+    expect(screen.getByRole('textbox', { name: /Note to the recruiters/ })).toHaveValue('Hi');
+    expect(screen.getByRole('checkbox', { name: /These are all my characters/ })).toBeChecked();
+    // In this tab only, and never a token.
+    expect(JSON.stringify({ ...localStorage })).not.toContain('EU evenings');
+    expect(JSON.stringify({ ...sessionStorage })).not.toContain('fixture:');
+  });
+
+  it('forgets what was typed once sent, and on Start over', async () => {
+    const reviewId = () => fixture.applicationHandle.reviewId;
+    const sent = setup({ application: 'draft' });
+    await userEvent.type(
+      await screen.findByRole('textbox', { name: /Note to the recruiters/ }),
+      'Hi'
+    );
+    await userEvent.click(screen.getByRole('checkbox', { name: /These are all my characters/ }));
+    writeVettingDraft(reviewId(), { answers: {}, note: 'Hi', allMine: true });
+    await userEvent.click(screen.getByRole('button', { name: 'Send to Brass Meridian Logistics' }));
+    expect(await screen.findByText('Waiting')).toBeInTheDocument();
+    expect(readVettingDraft(reviewId())).toBeNull();
+    sent.unmount();
+
+    localStorage.clear();
+    setup({ application: 'draft' });
+    writeVettingDraft(reviewId(), { answers: {}, note: 'Hi', allMine: true });
+    await userEvent.click(await screen.findByRole('button', { name: 'Start over' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Start over' })
+    );
+    expect(await screen.findByRole('button', { name: 'Log in with EVE Online' })).toBeVisible();
+    expect(readVettingDraft(reviewId())).toBeNull();
   });
 
   it('removes a character from the draft', async () => {
@@ -404,7 +455,7 @@ describe('ApplyPage with what the corp set', () => {
 
     setup({ application: 'rejected' });
     expect(await screen.findByText('Rejected')).toBeInTheDocument();
-    expect(screen.getByText(/^Not accepted\. Decided /)).toBeInTheDocument();
+    expect(screen.getByText(/^Rejected\. Decided /)).toBeInTheDocument();
     expect(screen.queryByText('Reason')).toBeNull();
     expect(screen.queryByText(/full on haulers/)).toBeNull();
   });

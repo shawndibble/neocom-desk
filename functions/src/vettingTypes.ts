@@ -6,7 +6,8 @@
 //   corps/{corporationId}/vetting/settings                    the corp's VettingSettings, with its
 //                                                             watchlist and invites
 //   corps/{corporationId}/vetting/reviewers                   who was last seen holding a reviewer
-//                                                             role (StoredVettingReviewers)
+//                                                             role, and on which EVE account
+//                                                             (StoredVettingReviewers)
 //   corps/{corporationId}/vettingReviews/{reviewId}           one review (StoredVettingReview)
 //   corps/{corporationId}/vettingReviews/{reviewId}/inputs/{characterId}
 //                                                             what one read of a character returned,
@@ -59,6 +60,10 @@ export const VETTING_WATCH_ADD_MAX = 50;
 
 /** A reviewer not seen holding the role for this long is no longer told of a shared report. */
 export const VETTING_REVIEWER_DAYS = 30;
+/** The most reviewers one shared report is pushed to, the most recently seen first. */
+export const VETTING_NOTIFY_MAX = 50;
+/** How long a submit waits for that push before it answers the pilot without it. */
+export const VETTING_NOTIFY_BUDGET_MS = 3000;
 
 export const HOUR_MS = 3_600_000;
 export const DAY_MS = 86_400_000;
@@ -78,7 +83,17 @@ export interface StoredVettingSettings extends VettingSettings {
  * `VETTING_REVIEWER_DAYS` are dropped on the next write and never used.
  */
 export interface StoredVettingReviewers {
-  reviewers: Record<string, { characterId: number; lastSeenAt: number }>;
+  reviewers: Record<string, StoredVettingReviewer>;
+}
+
+interface StoredVettingReviewer {
+  characterId: number;
+  /**
+   * The reviewer's EVE account, so a report is never pushed to another character of its own
+   * pilot. Absent on an entry stored before it was kept, which is matched by character only.
+   */
+  ownerHash?: string;
+  lastSeenAt: number;
 }
 
 /** A person, as the server knows them: the Character and the EVE account behind it. */
@@ -93,6 +108,12 @@ export interface StoredSignOff extends VettingActor {
   at: number;
   decision: 'yes' | 'no';
   note: string;
+  /**
+   * The corp's `rejection.showReason` when this was signed: only then may a no's note reach the
+   * pilot, whatever the setting becomes later. Absent on a sign-off stored before it was kept,
+   * which reads as false.
+   */
+  reasonShown?: boolean;
 }
 
 /** A character read into a review, as the pilot's status lists it. */

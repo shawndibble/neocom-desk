@@ -12,8 +12,10 @@ import {
   type VettingRejection,
   type VettingSettings,
 } from '@/engine/vetting';
+import { clamp } from '@/engine/math';
 import { maskNumber, unmaskCount } from '@/lib/numberMask';
 import type { VettingSettingsPatch } from './vettingBackend';
+import { VETTING_MINIMUM_IDS } from './vettingView';
 
 export interface VettingQuestionDraft {
   /** Stable while the form is open, so a row keeps its input when the list is reordered. */
@@ -46,12 +48,6 @@ export const VETTING_SETTINGS_SECTIONS = [
   'watchlist',
 ] as const;
 export type VettingSettingsSection = (typeof VETTING_SETTINGS_SECTIONS)[number];
-
-export const VETTING_MINIMUM_IDS: readonly VettingMinimumId[] = [
-  'ageDays',
-  'skillPoints',
-  'characters',
-];
 
 /** The least each minimum can be, which is also "none asked". */
 export const VETTING_MINIMUM_FLOOR: Record<VettingMinimumId, number> = {
@@ -87,7 +83,7 @@ export function parseMinimum(id: VettingMinimumId, raw: string): number | null {
   if (raw.trim() === '') return VETTING_MINIMUM_FLOOR[id];
   const value = unmaskCount(raw);
   if (value === undefined) return null;
-  return Math.min(VETTING_MINIMUM_LIMITS[id], Math.max(VETTING_MINIMUM_FLOOR[id], value));
+  return clamp(value, VETTING_MINIMUM_FLOOR[id], VETTING_MINIMUM_LIMITS[id]);
 }
 
 /** A typed minimum as the field shows it once left: clamped and grouped. Unreadable text is kept. */

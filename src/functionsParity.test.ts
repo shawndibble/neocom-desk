@@ -295,7 +295,6 @@ describe('server-pushed events (issue #5121)', () => {
       characterId: 7,
       corporationId: 98000001,
       reviewId: 'v-0042',
-      pilotName: 'Tamsin Vell',
       kind: 'application',
     },
   ];

@@ -11,7 +11,8 @@ import { callableErrorReason } from '@/lib/callableError';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { mailSummary, type MailRun } from '../srp/srpResultMail';
+import { mailSummary, type MailRun } from '@/features/corpTaxBook/officerMail';
+import { offersDecisionMail } from './vettingDecisionMail';
 import { askedByReviewer, signOffRows, vettingErrorKey, type SignOffRow } from './vettingView';
 
 const ROW_TONE: Record<SignOffRow['kind'], PillTone> = {
@@ -75,7 +76,9 @@ interface VettingDecisionProps {
   reviewerId: number;
   /**
    * What the corp set about telling the pilot. Null when it could not be read: the reason is
-   * then treated as shown to the pilot, and no mail is offered.
+   * then treated as shown to the pilot, and no mail is offered. Whether the pilot reads a note
+   * is settled when it is written (the server stamps the sign-off), so the hint speaks of this
+   * note alone.
    */
   settings: Pick<VettingSettings, 'rejection' | 'mailDecision'> | null;
   /** Records the caller's sign-off; rejects with the server's refusal. */
@@ -87,8 +90,9 @@ interface VettingDecisionProps {
 /**
  * The decision rail: the sign-off list, a note kept with the caller's decision, and the two
  * buttons. Yes acts at once; No opens a confirm that needs the note, since the pilot's officers
- * read it as the reason (and the pilot too, where the corp shows it). Once the caller's sign-off
- * closes the review, it offers the in-game mail that tells the pilot, when the corp wants one.
+ * read it as the reason (and the pilot too, where the corp shows it at that moment). A decided
+ * review offers each reviewer who signed it the in-game mail that tells the pilot, when the corp
+ * wants one: on any visit, since the Officer mail queue only remembers what this device queued.
  */
 export function VettingDecision({
   review,
@@ -103,8 +107,6 @@ export function VettingDecision({
   const [busy, setBusy] = useState<'yes' | 'no' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refusing, setRefusing] = useState(false);
-  // Set by this visit's own sign-off: the mail is the deciding reviewer's to send, once.
-  const [decidedHere, setDecidedHere] = useState(false);
   const [mailing, setMailing] = useState(false);
   const [mail, setMail] = useState<MailRun | null>(null);
   const verb = (decision: 'yes' | 'no') => t(`vetting.decision.verb.${review.kind}.${decision}`);
@@ -116,7 +118,6 @@ export function VettingDecision({
     setError(null);
     try {
       await onDecide(decision, note.trim());
-      setDecidedHere(true);
       return true;
     } catch (err) {
       setError(t(vettingErrorKey(callableErrorReason(err))));
@@ -126,8 +127,7 @@ export function VettingDecision({
     }
   };
 
-  const closed = review.state === 'accepted' || review.state === 'rejected';
-  const offersMail = decidedHere && closed && settings?.mailDecision === true && !!onMail;
+  const offersMail = !!onMail && offersDecisionMail(review, settings);
   const sendMail = async () => {
     if (!onMail || mailing) return;
     setMailing(true);
@@ -137,7 +137,12 @@ export function VettingDecision({
       setMailing(false);
     }
   };
-  const mailLine = mail === null ? '' : mailSummary(t, mail);
+  // Nobody queued, nobody failed: this device had already queued the review's mail.
+  const alreadyQueued =
+    mail !== null && !mail.missingScope && mail.queued.length === 0 && mail.failed.length === 0;
+  const mailLine =
+    mail === null ? '' : alreadyQueued ? t('vetting.decision.mail.already') : mailSummary(t, mail);
+  const mailDone = alreadyQueued || (mail?.queued.length ?? 0) > 0;
 
   const noReady = note.trim().length > 0;
   const refuseButtons = (
@@ -206,7 +211,7 @@ export function VettingDecision({
         {error && !refusing && <InlineError>{error}</InlineError>}
         {offersMail && (
           <div className="space-y-2 border-t border-line pt-3">
-            {(mail === null || mail.queued.length === 0) && (
+            {!mailDone && (
               <>
                 <Button className="w-full" loading={mailing} onClick={() => void sendMail()}>
                   {t('vetting.decision.mail.offer', { pilot: review.pilot.name })}
@@ -215,9 +220,7 @@ export function VettingDecision({
               </>
             )}
             {mailLine !== '' && (
-              <ActionResult kind={mail?.queued.length ? 'success' : 'error'}>
-                {mailLine}
-              </ActionResult>
+              <ActionResult kind={mailDone ? 'success' : 'error'}>{mailLine}</ActionResult>
             )}
             {mail?.missingScope && (
               <GrantNote

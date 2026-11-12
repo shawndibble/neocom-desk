@@ -4,6 +4,7 @@ import type { VettingReview } from '@/engine/vetting';
 import {
   buildVettingDecisionMail,
   decisionMailInput,
+  offersDecisionMail,
   type VettingDecisionMailInput,
 } from './vettingDecisionMail';
 
@@ -14,7 +15,7 @@ const input = (over: Partial<VettingDecisionMailInput>): VettingDecisionMailInpu
   kind: 'application',
   pilot: 'Tamsin Vell',
   corpName: 'Brass Meridian Logistics',
-  rejection: { wording: 'rejected', showReason: false },
+  wording: 'rejected',
   reasons: [],
   ...over,
 });
@@ -41,29 +42,25 @@ describe('buildVettingDecisionMail', () => {
     expect(mail.body).toContain('An officer changes your role in game.');
   });
 
-  it('rejected: the corp’s wording, and no reason unless the corp shows it', () => {
-    const reasons = ['Too many corps this year.'];
-    const plain = buildVettingDecisionMail(t, input({ outcome: 'rejected', reasons }));
+  it('rejected: the corp’s wording, and no reason line when it was handed none', () => {
+    const plain = buildVettingDecisionMail(t, input({ outcome: 'rejected' }));
     expect(plain.subject).toBe('Application rejected: Brass Meridian Logistics');
     expect(plain.body).toContain('Your application to Brass Meridian Logistics was rejected.');
-    expect(plain.body).not.toContain('Too many corps');
+    expect(plain.body).not.toContain('Reason');
     expect(plain.body).not.toContain('Apply to join');
 
-    const soft = buildVettingDecisionMail(
-      t,
-      input({ outcome: 'rejected', reasons, rejection: { wording: 'notNow', showReason: false } })
-    );
+    const soft = buildVettingDecisionMail(t, input({ outcome: 'rejected', wording: 'notNow' }));
     expect(soft.subject).toBe('Application to Brass Meridian Logistics: not at this time');
     expect(soft.body).toContain('was not accepted at this time.');
     expect(soft.body).not.toContain('Reason');
   });
 
-  it('rejected with the reason shown: one line per reviewer who said no', () => {
+  it('rejected with reasons: one line each', () => {
     const mail = buildVettingDecisionMail(
       t,
       input({
         outcome: 'rejected',
-        rejection: { wording: 'notNow', showReason: true },
+        wording: 'notNow',
         reasons: ['Full on haulers.', '  ', 'Ask again in <b>March</b>.'],
       })
     );
@@ -91,34 +88,89 @@ describe('decisionMailInput', () => {
     kind: 'application',
     pilot: { characterId: 1, name: 'Tamsin Vell', corporationName: 'Hollow Reach Mining' },
     signOffs: [
-      { characterId: 6, name: 'Kestrel Vane', you: true, at: 2, decision: 'no', note: 'Too new.' },
-      { characterId: 7, name: 'Ilse Marrow', you: false, at: 1, decision: 'yes', note: 'Fine.' },
-      { characterId: 8, name: 'Bram Soto', you: false, at: 1, decision: 'no', note: '' },
+      {
+        characterId: 6,
+        name: 'Kestrel Vane',
+        you: true,
+        at: 2,
+        decision: 'no',
+        note: 'Too new.',
+        reasonShown: true,
+      },
+      {
+        characterId: 7,
+        name: 'Ilse Marrow',
+        you: false,
+        at: 1,
+        decision: 'yes',
+        note: 'Fine.',
+        reasonShown: true,
+      },
+      {
+        characterId: 8,
+        name: 'Bram Soto',
+        you: false,
+        at: 1,
+        decision: 'no',
+        note: '',
+        reasonShown: true,
+      },
+      // Written while the corp kept reasons to itself: never the pilot's to read.
+      {
+        characterId: 9,
+        name: 'Oda Lind',
+        you: false,
+        at: 1,
+        decision: 'no',
+        note: 'Kept quiet.',
+        reasonShown: false,
+      },
+      // Written before sign-offs were stamped.
+      { characterId: 10, name: 'Per Aske', you: false, at: 1, decision: 'no', note: 'Unstamped.' },
     ],
     ...over,
   });
-  const rejection = { wording: 'rejected', showReason: true } as const;
 
   it('has nothing to say about a review that is not decided', () => {
-    expect(decisionMailInput(review({ state: 'open' }), rejection, 'Corp')).toBeNull();
-    expect(decisionMailInput(review({ state: 'withdrawn' }), rejection, 'Corp')).toBeNull();
+    expect(decisionMailInput(review({ state: 'open' }), 'rejected', 'Corp')).toBeNull();
+    expect(decisionMailInput(review({ state: 'withdrawn' }), 'rejected', 'Corp')).toBeNull();
   });
 
-  it('takes the reasons from the reviewers who said no and wrote one', () => {
-    expect(decisionMailInput(review({}), rejection, 'Corp')).toEqual({
+  it('takes the reasons only from a no stamped as shown to the pilot when it was written', () => {
+    expect(decisionMailInput(review({}), 'notNow', 'Corp')).toEqual({
       outcome: 'rejected',
       kind: 'application',
       pilot: 'Tamsin Vell',
       corpName: 'Corp',
-      rejection,
+      wording: 'notNow',
       reasons: ['Too new.'],
     });
     expect(
       decisionMailInput(
         review({ state: 'accepted', kind: 'promotion', role: 'Director' }),
-        rejection,
+        'rejected',
         'Corp'
       )
     ).toMatchObject({ outcome: 'accepted', kind: 'promotion', role: 'Director' });
+  });
+});
+
+describe('offersDecisionMail', () => {
+  const mine = { characterId: 6, name: 'Kestrel Vane', you: true, at: 2 };
+  const theirs = { ...mine, characterId: 7, you: false };
+  const on = { mailDecision: true };
+
+  it('offers a decided review to a reviewer who signed it, on any visit', () => {
+    expect(offersDecisionMail({ state: 'accepted', signOffs: [theirs, mine] }, on)).toBe(true);
+    expect(offersDecisionMail({ state: 'rejected', signOffs: [mine] }, on)).toBe(true);
+  });
+
+  it('offers none while open, to a reviewer who did not sign, or when the corp wants no mail', () => {
+    expect(offersDecisionMail({ state: 'open', signOffs: [mine] }, on)).toBe(false);
+    expect(offersDecisionMail({ state: 'accepted', signOffs: [theirs] }, on)).toBe(false);
+    expect(
+      offersDecisionMail({ state: 'accepted', signOffs: [mine] }, { mailDecision: false })
+    ).toBe(false);
+    expect(offersDecisionMail({ state: 'accepted', signOffs: [mine] }, null)).toBe(false);
   });
 });

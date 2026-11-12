@@ -183,7 +183,6 @@ describe('serverEventOccurrenceKey', () => {
           characterId: 7,
           corporationId: 98000001,
           reviewId: 'r1',
-          pilotName: 'Nine',
           kind: 'application',
         },
         '7:vettingShared:98000001:r1',
@@ -233,6 +232,29 @@ describe('buildServerEventPush', () => {
     expect(data.title).toBe('Price alert');
     expect(data.body).toBe('Tritanium reached 11.00 ISK (target 10.00 ISK).');
     expect(data.fireAt).toBe('2');
+  });
+
+  it('words a shared vetting report without naming the pilot', () => {
+    const shared = (kind: 'application' | 'promotion') =>
+      buildServerEventPush(
+        { eventId: 'vettingShared', characterId: 7, corporationId: 98000001, reviewId: 'r1', kind },
+        2
+      );
+    expect(shared('application')).toMatchObject({
+      title: 'New vetting report',
+      body: 'A pilot shared a report for review.',
+    });
+    expect(shared('promotion')).toMatchObject({
+      title: 'New vetting report',
+      body: 'A member shared the review they were asked for.',
+    });
+    expect(JSON.parse(shared('application').fire)).toEqual({
+      eventId: 'vettingShared',
+      characterId: 7,
+      corporationId: 98000001,
+      reviewId: 'r1',
+      kind: 'application',
+    });
   });
 });
 

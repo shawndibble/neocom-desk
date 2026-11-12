@@ -1,21 +1,27 @@
 /**
  * Invite links, for any reviewer: `mode="new"` is the small dialog the queue's header opens for
  * an invite-only corp (who the link is for, Create, then the link with Copy); `mode="list"` is
- * every live link with who made it, when, how often it was used, Copy link and Revoke, and the
- * same form under it. A link is `<origin>/apply/<corporationId>?invite=<code>`.
+ * every live link with who made it, when and how often it was used, and the same form under it.
+ * A row's one visible action is Copy link; Revoke, which a confirm guards, sits in the row's
+ * menu (⋮, right-click, touch and hold) with Copy link again, so the menu alone does the lot.
+ * One `DataTable` at every width: cards on a phone. A link is
+ * `<origin>/apply/<corporationId>?invite=<code>`.
  */
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   DataTable,
   EmptyState,
   LiveStatus,
+  MenuItem,
   Modal,
+  RowActionsMenu,
   TextInput,
   type DataTableColumn,
 } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useOpenAfterMenu } from '@/components/ui/useOpenAfterMenu';
 import { InlineError } from '@/components/ui/InlineError';
 import {
   VETTING_INVITE_LABEL_MAX,
@@ -27,6 +33,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
+import { firstConnected, type FocusCandidate } from '@/lib/useFocusAfterCommit';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { applyLink } from './vettingText';
 import { vettingErrorKey } from './vettingView';
@@ -62,6 +69,18 @@ export function VettingInvitesDialog({
   const [made, setMade] = useState<VettingInvite | null>(null);
   const [revoking, setRevoking] = useState<VettingInvite | null>(null);
   const { copied, flash } = useCopyFeedback<string>(2000);
+  const { run, onCloseAutoFocus } = useOpenAfterMenu();
+  // Each row's Copy link, so focus has somewhere to land once a revoked row is gone (§7).
+  const copyButtons = useRef(new Map<string, HTMLButtonElement>());
+  const afterRevoke = useRef<readonly FocusCandidate[]>([]);
+  const askRevoke = (row: VettingInvite) => {
+    const index = invites.findIndex((invite) => invite.code === row.code);
+    const button = (invite: VettingInvite | undefined) => () =>
+      invite === undefined ? null : copyButtons.current.get(invite.code);
+    // The next link, else the one before, else the field that makes a new one.
+    afterRevoke.current = [button(invites[index + 1]), button(invites[index - 1]), labelRef];
+    setRevoking(row);
+  };
 
   const full = invites.length >= VETTING_INVITES_MAX;
   const ready = label.trim() !== '' && !full;
@@ -89,9 +108,17 @@ export function VettingInvitesDialog({
       // The clipboard was refused; nothing was copied and nothing claims it was.
     }
   };
-  const copyButton = (invite: VettingInvite, size?: 'sm') => (
+  const copyButton = (invite: VettingInvite, inRow = false) => (
     <Button
-      size={size}
+      ref={
+        inRow
+          ? (el) => {
+              if (el) copyButtons.current.set(invite.code, el);
+              else copyButtons.current.delete(invite.code);
+            }
+          : undefined
+      }
+      size={inRow ? 'sm' : undefined}
       aria-label={t('vetting.invites.copyNamed', { label: invite.label })}
       onClick={() => void copy(invite)}
     >
@@ -160,17 +187,21 @@ export function VettingInvitesDialog({
     </div>
   );
 
-  const rowActions = (row: VettingInvite) => (
-    <>
-      {copyButton(row, 'sm')}
-      <Button
-        size="sm"
-        aria-label={t('vetting.invites.revokeNamed', { label: row.label })}
-        onClick={() => setRevoking(row)}
-      >
-        {t('vetting.invites.revoke')}
-      </Button>
-    </>
+  const rowMenu = (row: VettingInvite, tr: ReactElement) => (
+    <RowActionsMenu
+      name={row.label}
+      onCloseAutoFocus={onCloseAutoFocus}
+      items={
+        <>
+          <MenuItem onSelect={() => void copy(row)}>{t('vetting.invites.copy')}</MenuItem>
+          <MenuItem onSelect={() => run(() => askRevoke(row))}>
+            {t('vetting.invites.revoke')}
+          </MenuItem>
+        </>
+      }
+    >
+      {tr}
+    </RowActionsMenu>
   );
 
   const columns: DataTableColumn<VettingInvite>[] = [
@@ -199,10 +230,13 @@ export function VettingInvitesDialog({
       render: (row) => row.uses,
     },
     {
-      id: 'actions',
+      id: 'copy',
       header: '',
       align: 'right',
-      render: (row) => <span className="flex justify-end gap-2">{rowActions(row)}</span>,
+      stackEdge: 'end',
+      // On a card: its own row at the foot, the button at its natural width.
+      cellClassName: () => 'dt-action-row',
+      render: (row) => copyButton(row, true),
     },
   ];
 
@@ -234,30 +268,6 @@ export function VettingInvitesDialog({
                   title={t('vetting.invites.emptyTitle')}
                   hint={t('vetting.invites.emptyHint')}
                 />
-              ) : phone ? (
-                // Two text buttons per row do not fit a stacked table card's corner: a plain list.
-                <ul
-                  aria-label={t('vetting.invites.title')}
-                  className="divide-y divide-line border-y border-line"
-                >
-                  {invites.map((row) => (
-                    <li key={row.code} className="space-y-2 py-2">
-                      <div className="min-w-0">
-                        <span className="block font-semibold break-words">{row.label}</span>
-                        <span className="block text-xs text-text-dim tabular-nums">
-                          {t('vetting.invites.phoneLine', {
-                            by: row.createdBy.name,
-                            when: formatDateOnly(new Date(row.createdAt), timeZone),
-                            count: row.uses,
-                          })}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 [&>button]:w-full">
-                        {rowActions(row)}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
               ) : (
                 <div className="-mx-3 border-y border-line">
                   <DataTable
@@ -265,6 +275,8 @@ export function VettingInvitesDialog({
                     columns={columns}
                     rows={invites}
                     rowKey={(row) => row.code}
+                    rowContextMenu={rowMenu}
+                    rowMoreActions
                   />
                 </div>
               )}
@@ -288,6 +300,8 @@ export function VettingInvitesDialog({
           if (made?.code === revoking.code) setMade(null);
         }}
         onClose={() => setRevoking(null)}
+        // The ⋮ that opened it goes with the revoked row.
+        returnFocusFallback={() => firstConnected(afterRevoke.current)}
       />
     </>
   );

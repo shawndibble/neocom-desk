@@ -42,6 +42,7 @@ import { ApplyHeading, VettingSteps } from './VettingPublicFrame';
 import { VettingStatusView } from './VettingStatusView';
 import type { VettingHandle } from './vettingBackend';
 import { vettingBackend } from './vettingClient';
+import { clearVettingDraft, readVettingDraft, writeVettingDraft } from './vettingDraft';
 import { clearVettingHandle, readVettingHandle, writeVettingHandle } from './vettingHandle';
 import type { VettingLoginOutcome } from './vettingLoginState';
 import { applicationRows } from './vettingRows';
@@ -148,6 +149,16 @@ export function ApplyPage({ corporationId, invite, login, onSignIn, onOpenApp }:
       }
       setHandle(held);
       setStatus(found);
+      // What was typed before leaving for EVE's login, while the draft is still unsent.
+      const kept =
+        held !== null && (found === null || found.state === 'draft')
+          ? readVettingDraft(held.reviewId)
+          : null;
+      if (kept !== null) {
+        setAnswers(kept.answers);
+        setNote(kept.note);
+        setAllMine(kept.allMine);
+      }
       setLoadedBoot({ status: 'ready', corp });
 
       if (loginSpent.current || login === null) return;
@@ -203,6 +214,7 @@ export function ApplyPage({ corporationId, invite, login, onSignIn, onOpenApp }:
       if (!isReviewGone(callableErrorReason(err))) throw err;
     }
     clearVettingHandle(`apply:${corporationId}`);
+    clearVettingDraft(handle.reviewId);
     setHandle(null);
     setStatus(null);
     setAllMine(false);
@@ -214,6 +226,8 @@ export function ApplyPage({ corporationId, invite, login, onSignIn, onOpenApp }:
   };
 
   const signIn = (reviewId?: string) => {
+    // EVE's login leaves the page: keep what was typed for the way back.
+    if (reviewId !== undefined) writeVettingDraft(reviewId, { answers, note, allMine });
     setSigningIn(true);
     onSignIn(reviewId);
   };
@@ -476,6 +490,7 @@ export function ApplyPage({ corporationId, invite, login, onSignIn, onOpenApp }:
                   void act(async (held) => {
                     try {
                       setStatus(await vettingBackend().submit(held, note.trim(), given));
+                      clearVettingDraft(held.reviewId);
                     } catch (err) {
                       // The server names the minimums not met: list them as the page does.
                       const named = unmetFromRefusal(err);

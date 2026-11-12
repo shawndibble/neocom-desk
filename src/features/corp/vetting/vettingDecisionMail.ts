@@ -3,15 +3,23 @@
  * effort, from the reviewer's own Character with their own token, after the decision was saved:
  * a failed mail never undoes it. It rides the paced Officer mail queue, like an SRP result mail
  * (`srp/srpResultMail.ts`), and reports through the same `MailRun`. The builder is pure.
+ *
+ * A reason reaches the pilot only from a no stamped `reasonShown` when it was written, the same
+ * rule the server uses for the pilot's own status page: a later change to the corp's setting
+ * neither reveals an old note nor hides one the pilot already reads.
  */
 import type { TFunction } from 'i18next';
 import { clipToCodePoints, MAX_MAIL_SUBJECT } from '@/engine/communities/requestMail';
-import type { VettingKind, VettingRejection, VettingReview } from '@/engine/vetting';
+import type {
+  VettingKind,
+  VettingRejection,
+  VettingReview,
+  VettingSettings,
+} from '@/engine/vetting';
 import { enqueueVettingDecisionMail } from '@/features/corpTaxBook/mailQueue';
-import { queueOfficerMail } from '@/features/corpTaxBook/officerMail';
+import { queueOfficerMail, type MailRun } from '@/features/corpTaxBook/officerMail';
 import { mailSafe } from '@/lib/mailSafe';
 import type { Translate } from '@/lib/translate';
-import type { MailRun } from '../srp/srpResultMail';
 
 export interface VettingDecisionMailInput {
   outcome: 'accepted' | 'rejected';
@@ -20,8 +28,9 @@ export interface VettingDecisionMailInput {
   role?: string;
   pilot: string;
   corpName: string;
-  rejection: VettingRejection;
-  /** The notes of the reviewers who said no; written into the mail only when the corp shows them. */
+  /** How the corp words a no. */
+  wording: VettingRejection['wording'];
+  /** The notes the pilot may read: each from a no the corp showed pilots when it was written. */
   reasons: readonly string[];
 }
 
@@ -37,10 +46,9 @@ export function buildVettingDecisionMail(
     subject = t(key('acceptedSubject'), vars);
     paragraphs.push(t(key('accepted'), vars), t(key('acceptedNext'), vars));
   } else {
-    const { wording, showReason } = input.rejection;
-    subject = t(key(`${wording}Subject`), vars);
-    paragraphs.push(t(key(wording), vars));
-    const reasons = showReason ? input.reasons.map((reason) => reason.trim()).filter(Boolean) : [];
+    subject = t(key(`${input.wording}Subject`), vars);
+    paragraphs.push(t(key(input.wording), vars));
+    const reasons = input.reasons.map((reason) => reason.trim()).filter(Boolean);
     if (reasons.length > 0) {
       paragraphs.push(
         reasons.map((reason) => t('vetting.mail.reason', { reason: mailSafe(reason) })).join('\n')
@@ -53,7 +61,7 @@ export function buildVettingDecisionMail(
 /** What a decided review's mail says, from the report the reviewer is looking at. Null while open. */
 export function decisionMailInput(
   review: Pick<VettingReview, 'state' | 'kind' | 'role' | 'pilot' | 'signOffs'>,
-  rejection: VettingRejection,
+  wording: VettingRejection['wording'],
   corpName: string
 ): VettingDecisionMailInput | null {
   if (review.state !== 'accepted' && review.state !== 'rejected') return null;
@@ -63,14 +71,32 @@ export function decisionMailInput(
     ...(review.role ? { role: review.role } : {}),
     pilot: review.pilot.name,
     corpName,
-    rejection,
+    wording,
     reasons: review.signOffs.flatMap((signOff) =>
-      signOff.decision === 'no' && signOff.note ? [signOff.note] : []
+      signOff.decision === 'no' && signOff.reasonShown === true && signOff.note
+        ? [signOff.note]
+        : []
     ),
   };
 }
 
-/** Puts the one mail on the Officer mail queue. Never throws. */
+/**
+ * Whether the reviewer is offered the mail: the review is decided, the corp wants a mail, and
+ * the caller is one of its sign-offs. It reads the review alone, so a reload, a later visit or
+ * the return from granting the mail permission offers it again.
+ */
+export function offersDecisionMail(
+  review: Pick<VettingReview, 'state' | 'signOffs'>,
+  settings: Pick<VettingSettings, 'mailDecision'> | null
+): boolean {
+  if (review.state !== 'accepted' && review.state !== 'rejected') return false;
+  return settings?.mailDecision === true && review.signOffs.some((signOff) => signOff.you);
+}
+
+/**
+ * Puts the one mail on the Officer mail queue. Never throws. A mail this device already queued
+ * for the review is not queued twice: the run then comes back with nobody queued and nobody failed.
+ */
 export async function queueVettingDecisionMail(
   t: TFunction,
   input: {

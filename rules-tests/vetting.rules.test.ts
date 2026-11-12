@@ -43,7 +43,7 @@ beforeEach(async () => {
     const db = ctx.firestore();
     await setDoc(doc(db, `${CORP}/vetting/settings`), { on: true });
     await setDoc(doc(db, `${CORP}/vetting/reviewers`), {
-      reviewers: { 'char:2': { characterId: 2, lastSeenAt: 0 } },
+      reviewers: { 'char:2': { characterId: 2, ownerHash: 'h2', lastSeenAt: 0 } },
     });
     // The pilot, the requester and a reviewer are all named on the review: none may read it.
     await setDoc(doc(db, REVIEW), {

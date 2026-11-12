@@ -294,7 +294,12 @@ export function askedMinimums(
   ];
 }
 
-const MINIMUM_IDS: readonly VettingMinimumId[] = ['ageDays', 'skillPoints', 'characters'];
+/** Every minimum a corp can set, in the order the pages list them. */
+export const VETTING_MINIMUM_IDS: readonly VettingMinimumId[] = [
+  'ageDays',
+  'skillPoints',
+  'characters',
+];
 
 /**
  * The minimums a `below-minimum` refusal names: the server lists the unmet ids in its message,
@@ -304,7 +309,7 @@ export function unmetFromRefusal(error: unknown): VettingMinimumId[] {
   const message = (error as { message?: unknown } | null)?.message;
   if (typeof message !== 'string') return [];
   const named = message.split(/[^A-Za-z]+/);
-  return MINIMUM_IDS.filter((id) => named.includes(id));
+  return VETTING_MINIMUM_IDS.filter((id) => named.includes(id));
 }
 
 /** What stands between the applicant and Send, first thing first; null when Send is live. */

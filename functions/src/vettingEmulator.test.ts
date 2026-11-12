@@ -284,6 +284,21 @@ emulatorSuite('vetting (emulator)', () => {
     expect(esiCalls).toEqual([]);
   });
 
+  it('refuses a start when vetting was turned off while the character was read', async () => {
+    await turnOn();
+    const read = esi.readCharacter;
+    esi.readCharacter = async (...args) => {
+      await settingsDoc().update({ on: false });
+      return read(...args);
+    };
+    try {
+      expect(await reason(start())).toBe('vetting-off');
+    } finally {
+      esi.readCharacter = read;
+    }
+    expect((await corp().collection('vettingReviews').get()).size).toBe(0);
+  });
+
   it('starts a draft, adds, re-reads and removes characters', async () => {
     await turnOn();
     const { handle, status } = await start();
@@ -1057,16 +1072,35 @@ emulatorSuite('vetting (emulator)', () => {
   });
 
   it('starts an invite-only application only with a live code, counts it, and shows its label', async () => {
-    await turnOn({ inviteOnly: true });
+    const minimums = { ageDays: 90, skillPoints: 5_000_000, characters: 1 };
+    await turnOn({ inviteOnly: true, welcome: 'Fly with us', minimums });
     const { invites } = await invite('Reddit');
     const code = invites[0].code;
     const info = await getVettingCorp(deps(), { corporationId: CORP, invite: code });
-    expect(info).toMatchObject({ inviteOnly: true, inviteOk: true });
+    expect(info).toMatchObject({
+      inviteOnly: true,
+      inviteOk: true,
+      welcome: 'Fly with us',
+      minimums,
+    });
     // Nothing about the invite itself leaves through the public page.
     expect(JSON.stringify(info)).not.toContain('Reddit');
-    expect(await getVettingCorp(deps(), { corporationId: CORP })).toMatchObject({
+    // Without a live code the page is told the corp exists and is invite-only, and no more:
+    // not its welcome, not what it requires.
+    const closed = {
+      corporationId: CORP,
+      name: 'Test Corp',
+      ticker: 'TEST',
+      on: true,
+      welcome: '',
+      minimums: VETTING_DEFAULT_SETTINGS.minimums,
+      inviteOnly: true,
       inviteOk: false,
-    });
+    };
+    expect(await getVettingCorp(deps(), { corporationId: CORP })).toEqual(closed);
+    expect(await getVettingCorp(deps(), { corporationId: CORP, invite: 'wrongwrong12' })).toEqual(
+      closed
+    );
 
     expect(await reason(start())).toBe('invite-required');
     expect(await reason(start(APPLICANT, 'wrongwrong12'))).toBe('invite-required');
@@ -1184,28 +1218,49 @@ emulatorSuite('vetting (emulator)', () => {
     expect(await submit(asked)).toMatchObject({ state: 'open', questions: [], answers: [] });
   });
 
-  it('tells the pilot the contact once shared, and why it was rejected only when the corp shows it', async () => {
+  it('tells the pilot the contact once shared, and only the reasons written while the corp showed them', async () => {
     await turnOn({ contact: 'Ask Bob in Discord', signOffs: { application: 2, promotion: 2 } });
     const { handle, status } = await start();
     expect(status.contact).toBe('');
     expect((await submit(handle)).contact).toBe('Ask Bob in Discord');
     expect(await getVettingStatus(deps(), handle)).not.toHaveProperty('rejection');
 
+    // Signed while the corp keeps reasons to itself.
     await decide(handle.reviewId, RECRUITER, 'no', 'Too new to the game');
-    await decide(handle.reviewId, RECRUITER_2, 'yes', 'Seems fine to me');
+    const closed = await decide(handle.reviewId, RECRUITER_2, 'yes', 'Seems fine to me');
+    expect(closed.signOffs).toMatchObject([
+      { decision: 'no', note: 'Too new to the game', reasonShown: false },
+      { decision: 'yes', reasonShown: false },
+    ]);
+    expect((await stored(handle.reviewId))?.signOffs).toMatchObject([
+      { reasonShown: false },
+      { reasonShown: false },
+    ]);
     expect(await getVettingStatus(deps(), handle)).toMatchObject({
       state: 'rejected',
       contact: 'Ask Bob in Discord',
       rejection: { wording: 'rejected', reasons: [] },
     });
+    // A Director turning reasons on later reveals nothing written before; the wording is live.
     await save({ rejection: { wording: 'notNow', showReason: true } });
-    const told = await getVettingStatus(deps(), handle);
-    expect(told.rejection).toEqual({ wording: 'notNow', reasons: ['Too new to the game'] });
+    const kept = await getVettingStatus(deps(), handle);
+    expect(kept.rejection).toEqual({ wording: 'notNow', reasons: [] });
+    expect(JSON.stringify(kept)).not.toContain('Too new');
+
+    // Signed while the corp shows reasons: the no's note reaches the pilot, never a yes's.
+    const later = await start(STRANGER);
+    await submit(later.handle);
+    const first = await decide(later.handle.reviewId, RECRUITER, 'no', 'Come back in a year');
+    expect(first.signOffs).toMatchObject([{ note: 'Come back in a year', reasonShown: true }]);
+    await decide(later.handle.reviewId, RECRUITER_2, 'yes', 'Seems fine to me');
+    const told = await getVettingStatus(deps(), later.handle);
+    expect(told.rejection).toEqual({ wording: 'notNow', reasons: ['Come back in a year'] });
     expect(JSON.stringify(told)).not.toContain('Seems fine');
-    await save({ rejection: { wording: 'notNow', showReason: false } });
-    expect((await getVettingStatus(deps(), handle)).rejection).toEqual({
-      wording: 'notNow',
-      reasons: [],
+    // What the reviewer wrote to be shown stays shown.
+    await save({ rejection: { wording: 'rejected', showReason: false } });
+    expect((await getVettingStatus(deps(), later.handle)).rejection).toEqual({
+      wording: 'rejected',
+      reasons: ['Come back in a year'],
     });
   });
 
@@ -1217,8 +1272,8 @@ emulatorSuite('vetting (emulator)', () => {
     await overviewAs(RECRUITER);
     await overviewAs(DIRECTOR);
     expect(await reviewers()).toEqual({
-      [`char:${RECRUITER}`]: { characterId: RECRUITER, lastSeenAt: T0 },
-      [`char:${DIRECTOR}`]: { characterId: DIRECTOR, lastSeenAt: T0 },
+      [`char:${RECRUITER}`]: { characterId: RECRUITER, ownerHash: `h${RECRUITER}`, lastSeenAt: T0 },
+      [`char:${DIRECTOR}`]: { characterId: DIRECTOR, ownerHash: `h${DIRECTOR}`, lastSeenAt: T0 },
     });
     // Seen again within the day: not rewritten. 30 days on, the one not seen since is dropped.
     now = T0 + HOUR_MS;
@@ -1227,7 +1282,11 @@ emulatorSuite('vetting (emulator)', () => {
     now = T0 + 30 * DAY_MS;
     await overviewAs(RECRUITER);
     expect(await reviewers()).toEqual({
-      [`char:${RECRUITER}`]: { characterId: RECRUITER, lastSeenAt: now },
+      [`char:${RECRUITER}`]: {
+        characterId: RECRUITER,
+        ownerHash: `h${RECRUITER}`,
+        lastSeenAt: now,
+      },
     });
   });
 
@@ -1255,9 +1314,10 @@ emulatorSuite('vetting (emulator)', () => {
       characterId: RECRUITER,
       corporationId: CORP,
       reviewId: handle.reviewId,
-      pilotName: `Pilot ${APPLICANT}`,
       kind: 'application',
     });
+    // The pilot is not named anywhere in what a reviewer's device keeps.
+    expect(JSON.stringify(pushed[0].data)).not.toContain(`Pilot ${APPLICANT}`);
 
     // A reviewer not seen for 30 days is no longer told.
     now = T0 + 30 * DAY_MS;
@@ -1278,5 +1338,35 @@ emulatorSuite('vetting (emulator)', () => {
     const { handle } = await start(STRANGER);
     expect(await submit(handle)).toMatchObject({ state: 'open' });
     expect(pushed).toEqual([]);
+  });
+
+  it("never pushes a report to a reviewer on the pilot's own account", async () => {
+    await turnOn();
+    // The applicant's other character is a recruiter of the corp.
+    owners.set(RECRUITER_2, ownerOf(APPLICANT));
+    await overviewAs(RECRUITER);
+    await overviewAs(RECRUITER_2);
+    await device('recruiter', RECRUITER, ['vettingShared']);
+    await device('own-alt', RECRUITER_2, ['vettingShared']);
+    await shared();
+    expect(pushed.map((message) => message.token)).toEqual(['fcm-recruiter']);
+  });
+
+  it('answers the pilot without the push when it takes longer than its budget', async () => {
+    await turnOn();
+    await overviewAs(RECRUITER);
+    await device('recruiter', RECRUITER, ['vettingShared']);
+    const { handle } = await start();
+    const warned: string[] = [];
+    const slow: VettingDeps = {
+      ...deps(),
+      // FCM never answers.
+      push: { send: () => new Promise<string>(() => {}) },
+      notifyBudgetMs: 50,
+      logWarn: (message) => warned.push(message),
+    };
+    const status = await submitVetting(slow, { ...handle, note: '', answers: [] });
+    expect(status).toMatchObject({ state: 'open' });
+    expect(warned).toEqual(['vettingShared push timed out']);
   });
 });

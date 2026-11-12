@@ -12388,9 +12388,9 @@
         "body": "{{name}} asked to join {{community}} and is waiting for you to let them in."
       },
       "vettingShared": {
-        "title": "New vetting report: {{pilot}}",
-        "application": "{{pilot}} applied and shared a vetting report.",
-        "promotion": "{{pilot}} shared the review they were asked for."
+        "title": "New vetting report",
+        "application": "A pilot shared a report for review.",
+        "promotion": "A member shared the review they were asked for."
       },
       "communityMemberJoined": {
         "title": "New member in {{community}}",
@@ -14510,7 +14510,7 @@
           "description": "Only if your corporation uses SRP or a Corp Tax Book, or you shared a Vetting report with a corporation. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it. A Vetting report is the exception: the pilot can delete their own from its status page.",
           "srp": "SRP Claims: the killmail, the Character's name and ID, the hull, system and loss value, the fleet or FC and note you gave, the Reimbursement and the claim's state. Also the corporation's SRP settings, its Doctrine Fits and its SRP log: each filing (with the pilot's name, killmail, hull and amount) and each officer action. The CEO, Directors and Accountants read all of it; a pilot reads only their own claims.",
           "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a log of who did each, and which books bill each Character (kept under that Character's ID). The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link.",
-          "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), the pilot's note and their answers to the corporation's questions, the invite link it started from, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist, questions, invite links and settings."
+          "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), the pilot's note and their answers to the corporation's questions, the invite link it started from, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist, questions, invite links and settings, and which of its reviewers opened the vetting page in the last 30 days, used only to send the alert for a new report."
         },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
@@ -19867,15 +19867,12 @@
       "copy": "Copy link",
       "copyNamed": "Copy link for {{label}}",
       "revoke": "Revoke",
-      "revokeNamed": "Revoke link for {{label}}",
       "columns": {
         "label": "For",
         "by": "Made by",
         "when": "Made",
         "uses": "Started"
       },
-      "phoneLine_one": "{{by}} · {{when}} · {{count}} started",
-      "phoneLine_other": "{{by}} · {{when}} · {{count}} started",
       "emptyTitle": "No invite links",
       "emptyHint": "Make one for each pilot or post.",
       "full": "{{count}} invite links is the most. Revoke one to make another.",
@@ -20242,11 +20239,12 @@
         "promotion": "Object to {{pilot}}'s promotion"
       },
       "reason": "Reason, kept with your decision",
-      "refuseHint": "The other reviewers see it. The pilot does not.",
-      "refuseHintShown": "The other reviewers see it. So does the pilot.",
+      "refuseHint": "The other reviewers see this note. The pilot will not.",
+      "refuseHintShown": "The pilot will see this note. So do the other reviewers.",
       "mail": {
         "offer": "Mail {{pilot}} the decision",
         "hint": "In game, from your character.",
+        "already": "Already queued from this device.",
         "grantTitle": "Can't mail the pilot",
         "grantHint": "The mail goes out from your Character. Grant the mail permission to send it.",
         "grantAction": "Grant mail permission"
@@ -20414,7 +20412,7 @@
           "promotion_other": "{{count}} characters read. The report is with the officers."
         },
         "accepted": "Accepted {{when}}.",
-        "rejected": "Not accepted. Decided {{when}}.",
+        "rejected": "Rejected. Decided {{when}}.",
         "notNow": "Not at this time. Decided {{when}}.",
         "withdrawn": "You withdrew. The report is deleted.",
         "declined": "You declined. Nothing was read.",

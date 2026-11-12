@@ -66,6 +66,7 @@ import {
   type TimedEntry,
 } from './vettingDecide.js';
 import {
+  VETTING_DEFAULT_SETTINGS,
   VETTING_MAX_CHARACTERS,
   assessVetting,
   settleVettingAnswers,
@@ -92,6 +93,7 @@ import {
   HOUR_MS,
   VETTING_INPUTS,
   VETTING_MAX_READS,
+  VETTING_NOTIFY_BUDGET_MS,
   VETTING_REVIEWERS_DOC,
   VETTING_REVIEWS,
   VETTING_SETTINGS_COLLECTION,
@@ -109,6 +111,8 @@ export interface VettingDeps extends SrpDeps {
   push: PushSender;
   /** Where a push that could not be sent is noted; never the caller's problem. */
   logWarn?: (message: string, meta?: Record<string, unknown>) => void;
+  /** Test seam: how long a submit waits for the push. `VETTING_NOTIFY_BUDGET_MS` when absent. */
+  notifyBudgetMs?: number;
 }
 
 /** The in-game role that may read and sign off reviews, beside Director and the CEO. */
@@ -259,7 +263,8 @@ export function clearVettingCorpCache(): void {
 
 /**
  * Public: what the apply page shows before any sign-in. `inviteOk` says only whether the code
- * sent is live; nothing else about a corp's invites leaves through here.
+ * sent is live; nothing else about a corp's invites leaves through here. An invite-only corp's
+ * welcome and minimums are for those it invited: without a live code they read as the defaults.
  */
 export async function getVettingCorp(
   deps: VettingDeps,
@@ -268,15 +273,17 @@ export async function getVettingCorp(
   const { corporationId } = input;
   // Read on every call: only the ESI name below is cached, never an answer about an invite.
   const settings = await loadSettings(deps, corporationId);
+  const inviteOk = vettingInviteOk(settings, input.invite);
+  const shown = inviteOk ? settings : VETTING_DEFAULT_SETTINGS;
   const info = (corp: { name: string; ticker: string }): VettingCorpInfo => ({
     corporationId,
     name: corp.name,
     ticker: corp.ticker,
     on: settings.on,
-    welcome: settings.welcome,
-    minimums: settings.minimums,
+    welcome: shown.welcome,
+    minimums: { ...shown.minimums },
     inviteOnly: settings.inviteOnly,
-    inviteOk: vettingInviteOk(settings, input.invite),
+    inviteOk,
   });
   if (settings.corporationName !== undefined && settings.corporationTicker !== undefined) {
     return info(await corpName(deps, corporationId, settings));
@@ -422,10 +429,12 @@ export async function startVetting(
   };
   const ref = reviewRef(deps.db, input.corporationId, reviewId);
   const settingsDoc = settingsRef(deps.db, input.corporationId);
-  // One transaction: the invite is checked again as it is now (it may have been revoked while
-  // the character was read) and its use is counted with the review it started.
+  // One transaction: the settings are checked again as they are now (vetting may have been
+  // turned off, or the invite revoked, while the character was read) and the invite's use is
+  // counted with the review it started.
   const made = await deps.db.runTransaction(async (tx) => {
     const current = readVettingSettings((await tx.get(settingsDoc)).data());
+    requireOn(current);
     requireInvite(current, input.invite);
     const invite = liveVettingInvite(current, input.invite);
     const next: StoredVettingReview = invite
@@ -638,11 +647,8 @@ function requireApplicationMet(
   return answers;
 }
 
-/**
- * Tells the reviewers seen lately that a report was shared, on the devices that chose it. After
- * the submit has committed, and never its problem: a failure here is logged and swallowed.
- */
-async function notifyShared(
+/** Sends `vettingShared` to each reviewer `vettingSharedRecipients` picks. Never throws. */
+async function pushShared(
   deps: VettingDeps,
   reviewId: string,
   review: StoredVettingReview
@@ -660,7 +666,6 @@ async function notifyShared(
             characterId,
             corporationId: review.corporationId,
             reviewId,
-            pilotName: review.pilot.name,
             kind: review.kind,
           },
           now,
@@ -671,6 +676,25 @@ async function notifyShared(
   } catch (err) {
     deps.logWarn?.('vettingShared push failed', { error: String(err) });
   }
+}
+
+/**
+ * Tells the reviewers seen lately that a report was shared, on the devices that chose it. After
+ * the submit has committed, and never its problem: a failure is logged and swallowed, and the
+ * pilot's answer waits for it no longer than the budget (the report is in the queue either way).
+ */
+async function notifyShared(
+  deps: VettingDeps,
+  reviewId: string,
+  review: StoredVettingReview
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<true>((resolve) => {
+    timer = setTimeout(() => resolve(true), deps.notifyBudgetMs ?? VETTING_NOTIFY_BUDGET_MS);
+  });
+  const late = await Promise.race([pushShared(deps, reviewId, review), timedOut]);
+  clearTimeout(timer);
+  if (late) deps.logWarn?.('vettingShared push timed out', { reviewId });
 }
 
 /**
@@ -921,8 +945,9 @@ async function overview(
 }
 
 /**
- * Notes that this caller held a reviewer role just now, so a shared report can find them
- * (`notifyShared`). At most one write a day per reviewer; a failure costs only a push.
+ * Notes that this caller held a reviewer role just now, and on which EVE account, so a shared
+ * report can find them and leave out its own pilot (`notifyShared`). At most one write a day
+ * per reviewer; a failure costs only a push.
  */
 async function recordReviewer(
   deps: VettingDeps,
@@ -931,16 +956,9 @@ async function recordReviewer(
 ): Promise<void> {
   const ref = reviewersRef(deps.db, corporationId);
   try {
-    if (!seenVettingReviewer((await ref.get()).data(), actor.uid, actor.characterId, deps.now())) {
-      return;
-    }
+    if (!seenVettingReviewer((await ref.get()).data(), actor, deps.now())) return;
     await deps.db.runTransaction(async (tx) => {
-      const next = seenVettingReviewer(
-        (await tx.get(ref)).data(),
-        actor.uid,
-        actor.characterId,
-        deps.now()
-      );
+      const next = seenVettingReviewer((await tx.get(ref)).data(), actor, deps.now());
       if (next) tx.set(ref, next);
     });
   } catch (err) {
@@ -1067,7 +1085,14 @@ export async function decideVettingReview(
   return deps.db.runTransaction(async (tx) => {
     const review = officerReview(await tx.get(ref));
     refuseOwnReview(review, actor);
-    const out = decideSignOff(review, actor, input.decision, input.note, deps.now());
+    // Read with the review: whether this note may reach the pilot is settled as it is written.
+    const settings = await loadSettings(deps, call.corporationId, tx);
+    const sign = {
+      decision: input.decision,
+      note: input.note,
+      reasonShown: settings.rejection.showReason,
+    };
+    const out = decideSignOff(review, actor, sign, deps.now());
     if (!out.ok) {
       const [code, message] = REFUSAL[out.reason];
       return fail(code, message, out.reason);

@@ -40,6 +40,7 @@ import {
 import {
   DAY_MS,
   HOUR_MS,
+  VETTING_NOTIFY_MAX,
   VETTING_REVIEWER_DAYS,
   type StoredVettingReview,
   type StoredVettingSettings,
@@ -103,35 +104,41 @@ const invite = (code: string, over: Partial<VettingInvite> = {}): VettingInvite 
   ...over,
 });
 
+const sign = (decision: 'yes' | 'no', note = '', reasonShown = false) => ({
+  decision,
+  note,
+  reasonShown,
+});
+
 const decided = (r: StoredVettingReview, by: VettingActor, decision: 'yes' | 'no', at = T0) => {
-  const out = decideSignOff(r, by, decision, `note ${by.characterId}`, at);
+  const out = decideSignOff(r, by, sign(decision, `note ${by.characterId}`), at);
   if (!out.ok) throw new Error(out.reason);
   return out.review;
 };
 
 describe('decideSignOff', () => {
   it('refuses a review that is not open', () => {
-    expect(decideSignOff(review({ state: 'requested' }), actor(2), 'yes', '', T0)).toEqual({
+    expect(decideSignOff(review({ state: 'requested' }), actor(2), sign('yes'), T0)).toEqual({
       ok: false,
       reason: 'not-open',
     });
   });
 
   it('bars the requester, on any character of the same account, and the pilot', () => {
-    expect(decideSignOff(review(), actor(1), 'yes', '', T0)).toMatchObject({ reason: 'barred' });
-    expect(decideSignOff(review(), actor(9, 'h1'), 'yes', '', T0)).toMatchObject({
+    expect(decideSignOff(review(), actor(1), sign('yes'), T0)).toMatchObject({ reason: 'barred' });
+    expect(decideSignOff(review(), actor(9, 'h1'), sign('yes'), T0)).toMatchObject({
       reason: 'barred',
     });
-    expect(decideSignOff(review(), actor(50), 'yes', '', T0)).toMatchObject({ reason: 'barred' });
+    expect(decideSignOff(review(), actor(50), sign('yes'), T0)).toMatchObject({ reason: 'barred' });
   });
 
   it('takes one sign-off per person, not per character', () => {
     const once = decided(review(), actor(2), 'yes');
     expect(once.state).toBe('open');
-    expect(decideSignOff(once, actor(2), 'yes', '', T0)).toMatchObject({
+    expect(decideSignOff(once, actor(2), sign('yes'), T0)).toMatchObject({
       reason: 'already-signed',
     });
-    expect(decideSignOff(once, actor(22, 'h2'), 'yes', '', T0)).toMatchObject({
+    expect(decideSignOff(once, actor(22, 'h2'), sign('yes'), T0)).toMatchObject({
       reason: 'already-signed',
     });
   });
@@ -224,7 +231,15 @@ describe('reviewView', () => {
     expect(blind.yours).toBe(true);
 
     const own = reviewView('r1', once, actor(2));
-    expect(own.signOffs[0]).toMatchObject({ you: true, decision: 'yes', note: 'note 2' });
+    expect(own.signOffs[0]).toEqual({
+      characterId: 2,
+      name: 'Pilot 2',
+      you: true,
+      at: T0,
+      decision: 'yes',
+      note: 'note 2',
+      reasonShown: false,
+    });
     expect(own.yours).toBe(false);
 
     const twice = decided(once, actor(3), 'yes');
@@ -254,6 +269,30 @@ describe('reviewView', () => {
         { decision: 'no', note: 'note 2' },
         { decision: 'yes', note: 'note 3' },
       ],
+    });
+  });
+
+  it('says whether a note was written while the corp showed reasons, to those who see the note', () => {
+    const open = review({ signOffsNeeded: 3 });
+    const stamped = decideSignOff(open, actor(2), sign('no', 'Too new', true), T0);
+    if (!stamped.ok) throw new Error(stamped.reason);
+    expect(stamped.review.signOffs[0]).toMatchObject({ note: 'Too new', reasonShown: true });
+    expect(reviewView('r1', stamped.review, actor(2)).signOffs[0]).toMatchObject({
+      note: 'Too new',
+      reasonShown: true,
+    });
+    // Hidden with the decision and the note while the second review is blind.
+    expect(reviewView('r1', stamped.review, actor(3)).signOffs[0]).not.toHaveProperty(
+      'reasonShown'
+    );
+    // A sign-off stored before the stamp existed was never shown to the pilot.
+    const legacy = review({
+      state: 'rejected',
+      signOffs: [{ ...actor(2), at: T0, decision: 'no', note: 'Old note' }],
+    });
+    expect(reviewView('r1', legacy, actor(3)).signOffs[0]).toMatchObject({
+      note: 'Old note',
+      reasonShown: false,
     });
   });
 
@@ -419,20 +458,33 @@ describe('pilotStatus', () => {
     });
   });
 
-  it("tells a rejected pilot the corp's wording, and its reasons only when it shows them", () => {
-    const open = review({ signOffsNeeded: 3 });
-    const no = (r: StoredVettingReview, by: number, note: string) => {
-      const out = decideSignOff(r, actor(by), by === 3 ? 'yes' : 'no', note, T0);
+  it("tells a rejected pilot the corp's wording as it is now, and only the reasons written to be shown", () => {
+    const open = review({ signOffsNeeded: 4 });
+    const signed = (
+      r: StoredVettingReview,
+      by: number,
+      decision: 'yes' | 'no',
+      note: string,
+      reasonShown: boolean
+    ) => {
+      const out = decideSignOff(r, actor(by), sign(decision, note, reasonShown), T0);
       if (!out.ok) throw new Error(out.reason);
       return out.review;
     };
-    const rejected = no(no(no(open, 2, 'Too new'), 3, 'Seems fine'), 4, '  ');
+    let rejected = signed(open, 2, 'no', ' Too new ', true);
+    rejected = signed(rejected, 3, 'yes', 'Seems fine', true);
+    rejected = signed(rejected, 4, 'no', '  ', true);
+    // Written while the corp kept reasons to itself: never the pilot's to read.
+    rejected = signed(rejected, 5, 'no', 'Private doubt', false);
     expect(rejected.state).toBe('rejected');
-    expect(pilotStatus('r1', rejected, settingsOf(), T0).rejection).toEqual({
-      wording: 'rejected',
-      reasons: [],
-    });
+
+    const hidden = settingsOf();
     const shown = settingsOf({ rejection: { wording: 'notNow', showReason: true } });
+    // The stamp decides, whatever the corp's setting is when the pilot looks.
+    expect(pilotStatus('r1', rejected, hidden, T0).rejection).toEqual({
+      wording: 'rejected',
+      reasons: ['Too new'],
+    });
     expect(pilotStatus('r1', rejected, shown, T0).rejection).toEqual({
       wording: 'notNow',
       reasons: ['Too new'],
@@ -440,6 +492,16 @@ describe('pilotStatus', () => {
     expect(pilotStatus('r1', { ...rejected, state: 'accepted' }, shown, T0)).not.toHaveProperty(
       'rejection'
     );
+
+    // A note stored before the stamp existed stays hidden even once the corp shows reasons.
+    const legacy = review({
+      state: 'rejected',
+      signOffs: [{ ...actor(2), at: T0, decision: 'no', note: 'Old note' }],
+    });
+    expect(pilotStatus('r1', legacy, shown, T0).rejection).toEqual({
+      wording: 'notNow',
+      reasons: [],
+    });
   });
 });
 
@@ -645,29 +707,88 @@ describe('invites', () => {
 
 describe('known reviewers', () => {
   const day = DAY_MS;
-  it('records a reviewer, rewrites at most once a day, and prunes those not seen in 30 days', () => {
-    const first = seenVettingReviewer(undefined, 'char:2', 2, T0);
-    expect(first).toEqual({ reviewers: { 'char:2': { characterId: 2, lastSeenAt: T0 } } });
-    expect(seenVettingReviewer(first, 'char:2', 2, T0 + day - 1)).toBeNull();
-    const later = seenVettingReviewer(first, 'char:3', 3, T0 + VETTING_REVIEWER_DAYS * day);
-    expect(later).toEqual({
-      reviewers: { 'char:3': { characterId: 3, lastSeenAt: T0 + VETTING_REVIEWER_DAYS * day } },
-    });
-    expect(seenVettingReviewer({ reviewers: 'junk' }, 'char:2', 2, T0)).toEqual(first);
+  const seen = (id: number, owner = `h${id}`) => ({
+    uid: `char:${id}`,
+    characterId: id,
+    ownerHash: owner,
   });
 
-  it('tells the reviewers seen in 30 days, never one the report is about', () => {
-    const doc = {
+  it('records a reviewer, rewrites at most once a day, and prunes those not seen in 30 days', () => {
+    const first = seenVettingReviewer(undefined, seen(2), T0);
+    expect(first).toEqual({
+      reviewers: { 'char:2': { characterId: 2, ownerHash: 'h2', lastSeenAt: T0 } },
+    });
+    expect(seenVettingReviewer(first, seen(2), T0 + day - 1)).toBeNull();
+    const later = seenVettingReviewer(first, seen(3), T0 + VETTING_REVIEWER_DAYS * day);
+    expect(later).toEqual({
+      reviewers: {
+        'char:3': { characterId: 3, ownerHash: 'h3', lastSeenAt: T0 + VETTING_REVIEWER_DAYS * day },
+      },
+    });
+    expect(seenVettingReviewer({ reviewers: 'junk' }, seen(2), T0)).toEqual(first);
+  });
+
+  it('rewrites an entry stored without its account at once, keeping the others as they are', () => {
+    const held = {
       reviewers: {
         'char:2': { characterId: 2, lastSeenAt: T0 },
-        'char:3': { characterId: 3, lastSeenAt: T0 - VETTING_REVIEWER_DAYS * day },
-        'char:50': { characterId: 50, lastSeenAt: T0 },
-        'char:4': { characterId: 4, lastSeenAt: T0 - 5 },
+        'char:3': { characterId: 3, lastSeenAt: T0 },
+      },
+    };
+    expect(seenVettingReviewer(held, seen(2), T0 + 1)).toEqual({
+      reviewers: {
+        'char:2': { characterId: 2, ownerHash: 'h2', lastSeenAt: T0 + 1 },
+        'char:3': { characterId: 3, lastSeenAt: T0 },
+      },
+    });
+  });
+
+  it('tells the reviewers seen in 30 days, most recently seen first, never one the report is about', () => {
+    const doc = {
+      reviewers: {
+        'char:4': { characterId: 4, ownerHash: 'h4', lastSeenAt: T0 - 5 },
+        'char:2': { characterId: 2, ownerHash: 'h2', lastSeenAt: T0 },
+        'char:3': { characterId: 3, ownerHash: 'h3', lastSeenAt: T0 - VETTING_REVIEWER_DAYS * day },
+        'char:50': { characterId: 50, ownerHash: 'h50', lastSeenAt: T0 },
         'char:9': { characterId: 'x', lastSeenAt: T0 },
+        // The same Character signed in under two uids is told once.
+        'other:2': { characterId: 2, ownerHash: 'h2', lastSeenAt: T0 - 9 },
       },
     };
     expect(vettingSharedRecipients(doc, review(), T0)).toEqual([2, 4]);
     expect(vettingSharedRecipients(undefined, review(), T0)).toEqual([]);
+  });
+
+  it("never tells another character of the pilot's own account", () => {
+    const read = { ...review().characters[0], ownerHash: 'h50' };
+    const about = review({ characters: [read] });
+    const doc = {
+      reviewers: {
+        // The pilot's reviewer alt, on the account the report was read from.
+        'char:60': { characterId: 60, ownerHash: 'h50', lastSeenAt: T0 },
+        'char:2': { characterId: 2, ownerHash: 'h2', lastSeenAt: T0 },
+        // Stored before the account was kept: matched by character only.
+        'char:61': { characterId: 61, lastSeenAt: T0 - 1 },
+        'char:50': { characterId: 50, lastSeenAt: T0 },
+      },
+    };
+    expect(vettingSharedRecipients(doc, about, T0)).toEqual([2, 61]);
+  });
+
+  it('tells at most 50 reviewers, the most recently seen', () => {
+    const reviewers: Record<string, unknown> = {};
+    for (let i = 0; i < VETTING_NOTIFY_MAX + 10; i++) {
+      reviewers[`char:${100 + i}`] = {
+        characterId: 100 + i,
+        ownerHash: `o${i}`,
+        lastSeenAt: T0 - i,
+      };
+    }
+    const told = vettingSharedRecipients({ reviewers }, review(), T0);
+    expect(VETTING_NOTIFY_MAX).toBe(50);
+    expect(told).toHaveLength(VETTING_NOTIFY_MAX);
+    expect(told[0]).toBe(100);
+    expect(told[told.length - 1]).toBe(100 + VETTING_NOTIFY_MAX - 1);
   });
 });
 

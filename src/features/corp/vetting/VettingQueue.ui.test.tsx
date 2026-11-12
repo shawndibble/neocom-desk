@@ -290,6 +290,47 @@ describe('VettingPage settings', () => {
     expect(screen.getByRole('button', { name: 'New invite link' })).toBeInTheDocument();
   });
 
+  it('moves focus to the neighbouring question when one is removed, and keeps an end button focusable', async () => {
+    await setup('/corp/vetting/settings/applicants', { settings: VETTING_FIXTURE_CONFIGURED });
+    const remove = (n: number) => screen.getByRole('button', { name: `Remove question ${n}` });
+    await screen.findByRole('button', { name: 'Remove question 1' });
+    const count = screen.getAllByRole('button', { name: /^Remove question/ }).length;
+    expect(count).toBeGreaterThanOrEqual(2);
+
+    // Inert at the ends, but not `disabled`: Tab still reaches it.
+    const up = screen.getByRole('button', { name: 'Move question 1 up' });
+    expect(up).toHaveAttribute('aria-disabled', 'true');
+    expect(up).not.toBeDisabled();
+    // Moving the second question up leaves its button at the top: focus stays on it.
+    await userEvent.click(screen.getByRole('button', { name: 'Move question 2 up' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Move question 1 up' })).toHaveFocus()
+    );
+
+    // Not the last: the question that takes its place.
+    await userEvent.click(remove(1));
+    await waitFor(() => expect(remove(1)).toHaveFocus());
+    // The last: the one before it.
+    for (let left = count - 1; left > 1; left -= 1) {
+      await userEvent.click(remove(left));
+      await waitFor(() => expect(remove(left - 1)).toHaveFocus());
+    }
+    // None left: Add question.
+    await userEvent.click(remove(1));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add a question' })).toHaveFocus()
+    );
+  });
+
+  it('moves focus to the next watchlist entry when one is removed', async () => {
+    await setup('/corp/vetting/settings/watchlist');
+    const buttons = await screen.findAllByRole('button', { name: /^Remove / });
+    expect(buttons.length).toBeGreaterThanOrEqual(2);
+    const nextName = buttons[1].getAttribute('aria-label')!;
+    await userEvent.click(buttons[0]);
+    await waitFor(() => expect(screen.getByRole('button', { name: nextName })).toHaveFocus());
+  });
+
   it('discards a draft, and blocks Save on a minimum that is not a number', async () => {
     await setup('/corp/vetting/settings/applicants');
     const points = await screen.findByLabelText('Skill points');
@@ -309,8 +350,14 @@ describe('VettingPage settings', () => {
     expect(await screen.findByLabelText('Question 1')).toHaveValue('What timezone do you play in?');
     expect(screen.getByText('3 of 8')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Question 1 is required' })).toBeChecked();
-    expect(screen.getByRole('button', { name: 'Move question 1 up' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Move question 3 down' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move question 1 up' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Move question 3 down' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
 
     await userEvent.click(screen.getByRole('button', { name: 'Add a question' }));
     // A question with no wording blocks Save until it is written or removed.
@@ -395,7 +442,11 @@ describe('VettingPage invites', () => {
     expect(forum.getByText('Ilse Marrow')).toBeInTheDocument();
     expect(forum.getByText('4')).toBeInTheDocument();
 
-    await userEvent.click(forum.getByRole('button', { name: 'Revoke link for Forum post' }));
+    // One visible action per row; Revoke is in the row's menu.
+    expect(forum.getByRole('button', { name: 'Copy link for Forum post' })).toBeInTheDocument();
+    expect(forum.queryByRole('button', { name: /Revoke/ })).toBeNull();
+    await userEvent.click(forum.getByRole('button', { name: 'More actions for Forum post' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Revoke' }));
     expect(fixture.calls.some((call) => call.method === 'revokeInvite')).toBe(false);
     const confirm = within(await screen.findByRole('dialog', { name: 'Revoke this invite link?' }));
     expect(confirm.getByText(/The link for Forum post stops working/)).toBeInTheDocument();
@@ -403,6 +454,18 @@ describe('VettingPage invites', () => {
     await waitFor(() => expect(dialog.queryByText('Forum post')).toBeNull());
     expect(fixture.calls.find((call) => call.method === 'revokeInvite')?.args[2]).toBe('inv-forum');
     expect(dialog.getByText('Pell Okonru')).toBeInTheDocument();
+    // The row and its menu button are gone: focus lands on a link that is left.
+    await waitFor(() =>
+      expect(dialog.getByRole('button', { name: 'Copy link for Pell Okonru' })).toHaveFocus()
+    );
+  });
+
+  it('offers Invites to every reviewer, by invite only or not, with or without a link made', async () => {
+    await setup('/corp/vetting/open', { empty: true, canConfigure: false });
+    await userEvent.click(await screen.findByRole('button', { name: 'Invites' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Invite links' }));
+    expect(dialog.getByText('No invite links')).toBeInTheDocument();
+    expect(dialog.getByRole('button', { name: 'Create link' })).toBeInTheDocument();
   });
 
   it('opens the invite links from Settings, for a Director', async () => {

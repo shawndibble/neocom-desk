@@ -72,7 +72,6 @@ const GUARDS: Record<ServerPushedEventId, (raw: unknown) => boolean> = {
     characterId: is.number,
     corporationId: is.number,
     reviewId: is.string,
-    pilotName: is.string,
     kind: is.oneOf(['application', 'promotion'] as const),
   }),
   // Lenient on the optional parts: a push without a sender or subject still reads as a new mail.

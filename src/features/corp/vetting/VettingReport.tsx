@@ -456,7 +456,9 @@ export function VettingReport({
             review={review}
             reviewerId={characterId}
             settings={known}
-            onMail={known === null ? undefined : () => mailDecision(review, known.rejection)}
+            onMail={
+              known === null ? undefined : () => mailDecision(review, known.rejection.wording)
+            }
             onDecide={async (decision, note) => {
               const next = await vettingBackend().decide(
                 characterId,

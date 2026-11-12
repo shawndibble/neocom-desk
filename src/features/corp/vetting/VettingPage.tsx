@@ -135,7 +135,6 @@ export function VettingPage() {
       {t(copied ? 'vetting.copied' : 'vetting.copyLink')}
     </Button>
   );
-  const showInvites = inviteOnly || overview.invites.length > 0;
 
   return page(
     <>
@@ -148,9 +147,8 @@ export function VettingPage() {
         </p>
         <span className="flex flex-wrap gap-2">
           {on ? copyButton : <Tooltip content={t('vetting.copyOff')}>{copyButton}</Tooltip>}
-          {showInvites && (
-            <Button onClick={() => setInvitesOpen('list')}>{t('vetting.invites.open')}</Button>
-          )}
+          {/* Every reviewer may hand out an invite link, by invite only or not. */}
+          <Button onClick={() => setInvitesOpen('list')}>{t('vetting.invites.open')}</Button>
           <Button onClick={() => setRequesting(true)}>{t('vetting.reviewMember')}</Button>
         </span>
         <LiveStatus>{copied ? t('vetting.copied') : ''}</LiveStatus>

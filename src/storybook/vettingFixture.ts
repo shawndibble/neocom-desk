@@ -713,13 +713,15 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
   const backend: VettingBackend = {
     corpInfo: async (corporationId, invite) => {
       if (corporationId !== corp.corporationId) throw refusal('unknown-corp');
+      const inviteOk = !settings.inviteOnly || liveInvite(invite) !== undefined;
+      // As the server: an invite-only corp tells a stranger nothing it wrote or set.
       return {
         ...corp,
         on: settings.on,
-        welcome: settings.welcome,
-        minimums: { ...settings.minimums },
+        welcome: inviteOk ? settings.welcome : '',
+        minimums: { ...(inviteOk ? settings.minimums : VETTING_DEFAULT_SETTINGS.minimums) },
         inviteOnly: settings.inviteOnly,
-        inviteOk: !settings.inviteOnly || liveInvite(invite) !== undefined,
+        inviteOk,
       };
     },
     start: async (corporationId, accessToken, invite) => {
@@ -797,6 +799,8 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
           at: now,
           decision,
           note,
+          // Stamped when written, as the server does: a later settings change does not move it.
+          reasonShown: settings.rejection.showReason,
         },
       ];
       review.signed = review.signOffs.length;

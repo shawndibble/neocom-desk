@@ -547,10 +547,9 @@ export function unmetVettingMinimums(
   now: number
 ): VettingMinimumId[] {
   const unmet: VettingMinimumId[] = [];
-  const day = 86_400_000;
   if (
     minimums.ageDays > 0 &&
-    !characters.some((c) => now - Date.parse(c.birthday) >= minimums.ageDays * day)
+    !characters.some((c) => now - Date.parse(c.birthday) >= minimums.ageDays * DAY)
   ) {
     unmet.push('ageDays');
   }
@@ -624,6 +623,8 @@ export interface VettingSignOffView {
   /** Absent while hidden: another reviewer's decision shows only once the caller has decided. */
   decision?: 'yes' | 'no';
   note?: string;
+  /** The corp showed pilots the reason when this note was written, so a no's note reaches the pilot. */
+  reasonShown?: boolean;
 }
 
 /** A queue row. */

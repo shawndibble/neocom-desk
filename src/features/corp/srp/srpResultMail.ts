@@ -9,7 +9,7 @@ import { clipToCodePoints, MAX_MAIL_SUBJECT } from '@/engine/communities/request
 import { formatIsk } from '@/lib/isk';
 import { mailSafe } from '@/lib/mailSafe';
 import { enqueueSrpResultMails } from '@/features/corpTaxBook/mailQueue';
-import { queueOfficerMail } from '@/features/corpTaxBook/officerMail';
+import { mailSummary, queueOfficerMail, type MailRun } from '@/features/corpTaxBook/officerMail';
 
 export type SrpMailKind = 'approved' | 'rejected';
 
@@ -85,15 +85,6 @@ export function groupByPilot(
   return [...byId.values()];
 }
 
-export interface MailRun {
-  /** Pilots whose mail is on the paced send queue (it goes out about 5 a minute). */
-  queued: string[];
-  /** Pilots whose mail could not be queued; the decision stands. */
-  failed: string[];
-  /** The officer's Character cannot send mail, so none was tried. */
-  missingScope: boolean;
-}
-
 /**
  * One mail per pilot, put on the Officer mail queue (one place that paces every Officer mail,
  * so a dozen pilots do not trip EVE's spam limit). Never throws.
@@ -144,17 +135,6 @@ export async function queueSrpResultMails(
   }
   if (out.status === 'no-scope') return { ...run, missingScope: true };
   return { ...run, failed: pilots.map((p) => p.characterName) };
-}
-
-/** The mail half of the result line; empty when there was nothing to mail. */
-export function mailSummary(t: TFunction, run: MailRun): string {
-  if (run.missingScope) return t('srp.officer.mail.noScope');
-  return [
-    run.queued.length > 0 ? t('srp.officer.mail.queuedFor', { count: run.queued.length }) : '',
-    run.failed.length > 0 ? t('srp.officer.mail.failedFor', { names: run.failed.join(', ') }) : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
 }
 
 /** `head` then the mail summary, as one toast line. */

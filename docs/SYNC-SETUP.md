@@ -110,8 +110,11 @@ there and falls back the same way without it.
 corp's `notifyReviewers` setting is on, the submit action pushes to the devices of that
 corporation's known reviewers that enabled the event. It is sent from inside the action, so
 there is no trigger to deploy and no secret to set (FCM through the Admin SDK). The reviewers
-are those the overview saw holding the role in the last 30 days, kept in
-`corps/{id}/vetting/reviewers`, which the existing `vetting` rule already closes.
+are those the overview saw holding the role in the last 30 days, kept (with the EVE account
+each was on, so a report is never pushed to its own pilot's other character) in
+`corps/{id}/vetting/reviewers`, which the existing `vetting` rule already closes. The push names
+no pilot, goes to at most 50 reviewers (the most recently seen) and holds the submit up for at
+most 3 seconds; one that fails or runs out of time is logged and the report is shared regardless.
 
 ### Index exemptions are a one-way-ish deploy
 

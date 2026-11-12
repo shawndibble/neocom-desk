@@ -10,7 +10,7 @@
  * vetting on or off and the watchlist each save by themselves.
  */
 import { useId, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -29,7 +29,6 @@ import {
   UnsavedChangesBar,
   type DataTableColumn,
 } from '@/components/ui';
-import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import * as Icon from '@/components/ui/icons';
@@ -48,6 +47,11 @@ import {
   type VettingSettings,
   type VettingWatchEntry,
 } from '@/engine/vetting';
+import {
+  AttentionDot,
+  sectionRailClassName,
+  SectionRailLink,
+} from '@/features/settings/sectionRail';
 import { ActionResult, CheckboxField, SettingsHint } from '@/features/settings/settingsFields';
 import { callableErrorReason } from '@/lib/callableError';
 import { cx } from '@/lib/cx';
@@ -66,13 +70,12 @@ import {
   patchQuestion,
   removeQuestion,
   settleMinimum,
-  VETTING_MINIMUM_IDS,
   VETTING_SETTINGS_SECTIONS,
   type VettingSettingsForm,
   type VettingSettingsSection,
 } from './vettingSettingsForm';
 import { settingsSectionPath } from './vettingTabs';
-import { vettingErrorKey } from './vettingView';
+import { VETTING_MINIMUM_IDS, vettingErrorKey } from './vettingView';
 
 const KINDS: readonly VettingKind[] = ['application', 'promotion'];
 const SIGN_OFF_CHOICES = ['1', '2', '3'] as const;
@@ -118,6 +121,16 @@ export function VettingSettingsView({
   const [saveFailed, setSaveFailed] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const nextKey = useRef(0);
+  // DESIGN.md §7: an action that removes its own control hands focus to the neighbouring row.
+  const focusAfterCommit = useFocusAfterCommit();
+  const controls = useRef(new Map<string, HTMLButtonElement>());
+  const control = (id: string) => (el: HTMLButtonElement | null) => {
+    if (el) controls.current.set(id, el);
+    else controls.current.delete(id);
+  };
+  const at = (id: string | undefined) => () => (id === undefined ? null : controls.current.get(id));
+  const addQuestionRef = useRef<HTMLButtonElement>(null);
+  const watchHeadingRef = useRef<HTMLDivElement>(null);
 
   const form = draft ?? formFromSettings(settings);
   const edit = (next: VettingSettingsForm) => {
@@ -183,16 +196,30 @@ export function VettingSettingsView({
       cardActions: true,
       render: (row) => (
         <Button
+          ref={control(`watch:${row.id}`)}
           size="sm"
           loading={busy === `remove:${row.id}`}
           aria-label={t('vetting.settings.watchlist.removeNamed', { name: row.name })}
-          onClick={() => void save(`remove:${row.id}`, { removeWatch: [row.id] })}
+          onClick={() => void removeWatch(row.id)}
         >
           {t('vetting.settings.watchlist.remove')}
         </Button>
       ),
     },
   ];
+
+  /** Removes one entry; the row goes, so focus moves to the next, the one before, or the list's top. */
+  const removeWatch = async (id: number) => {
+    const index = settings.watchlist.findIndex((entry) => entry.id === id);
+    const next = settings.watchlist[index + 1]?.id;
+    const previous = settings.watchlist[index - 1]?.id;
+    if (!(await save(`remove:${id}`, { removeWatch: [id] }))) return;
+    focusAfterCommit(
+      at(next === undefined ? undefined : `watch:${next}`),
+      at(previous === undefined ? undefined : `watch:${previous}`),
+      watchHeadingRef
+    );
+  };
 
   const full = settings.watchlist.length >= VETTING_WATCHLIST_MAX;
   const add = async () => {
@@ -369,22 +396,41 @@ export function VettingSettingsView({
                           <span aria-hidden="true">{t('vetting.settings.questions.required')}</span>
                         </label>
                         <span className="flex items-center gap-1">
+                          {/* Inert at either end, never `disabled`: the button a move leaves at
+                              the end keeps keyboard focus. */}
                           <IconButton
+                            ref={control(`up:${question.key}`)}
                             icon={<Icon.Ascending size={Icon.ICON_SIZE.sm} />}
                             label={t('vetting.settings.questions.moveUp', { n })}
-                            disabled={index === 0}
-                            onClick={() => edit(moveQuestion(form, question.key, -1))}
+                            aria-disabled={index === 0 || undefined}
+                            onClick={() => {
+                              edit(moveQuestion(form, question.key, -1));
+                              focusAfterCommit(at(`up:${question.key}`));
+                            }}
                           />
                           <IconButton
+                            ref={control(`down:${question.key}`)}
                             icon={<Icon.Descending size={Icon.ICON_SIZE.sm} />}
                             label={t('vetting.settings.questions.moveDown', { n })}
-                            disabled={index === form.questions.length - 1}
-                            onClick={() => edit(moveQuestion(form, question.key, 1))}
+                            aria-disabled={index === form.questions.length - 1 || undefined}
+                            onClick={() => {
+                              edit(moveQuestion(form, question.key, 1));
+                              focusAfterCommit(at(`down:${question.key}`));
+                            }}
                           />
                           <IconButton
+                            ref={control(`remove:${question.key}`)}
                             icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
                             label={t('vetting.settings.questions.remove', { n })}
-                            onClick={() => edit(removeQuestion(form, question.key))}
+                            onClick={() => {
+                              edit(removeQuestion(form, question.key));
+                              // The next question, else the one before, else Add question.
+                              focusAfterCommit(
+                                at(`remove:${form.questions[index + 1]?.key}`),
+                                at(`remove:${form.questions[index - 1]?.key}`),
+                                addQuestionRef
+                              );
+                            }}
                           />
                         </span>
                       </div>
@@ -395,6 +441,7 @@ export function VettingSettingsView({
             )}
             <div className="flex flex-wrap items-center gap-3">
               <Button
+                ref={addQuestionRef}
                 className="max-sm:w-full"
                 aria-disabled={questionsFull || undefined}
                 onClick={
@@ -504,90 +551,73 @@ export function VettingSettingsView({
       </>
     ),
     watchlist: (
-      <Panel
-        title={t('vetting.settings.watchlist.title')}
-        meta={t('vetting.settings.watchlist.count', { count: settings.watchlist.length })}
-        padded={false}
-      >
-        {settings.watchlist.length === 0 ? (
-          <EmptyState
-            title={t('vetting.settings.watchlist.emptyTitle')}
-            hint={t('vetting.settings.watchlist.emptyHint')}
-          />
-        ) : (
-          <DataTable
-            label={t('vetting.settings.watchlist.title')}
-            columns={columns}
-            rows={settings.watchlist}
-            rowKey={(row) => row.id}
-          />
-        )}
-        <form
-          className="flex flex-wrap items-end gap-2 border-t border-line p-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void add();
-          }}
+      // Takes focus when the last entry is removed (it has no ring: it is not a control).
+      <div ref={watchHeadingRef} className="focus:outline-none">
+        <Panel
+          title={t('vetting.settings.watchlist.title')}
+          meta={t('vetting.settings.watchlist.count', { count: settings.watchlist.length })}
+          padded={false}
         >
-          <label className="block min-w-0 flex-1 space-y-1">
-            <span className="text-xs text-text-dim">
-              {t('vetting.settings.watchlist.addLabel')}
-            </span>
-            <TextInput
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              autoComplete="off"
-              spellCheck={false}
+          {settings.watchlist.length === 0 ? (
+            <EmptyState
+              title={t('vetting.settings.watchlist.emptyTitle')}
+              hint={t('vetting.settings.watchlist.emptyHint')}
             />
-          </label>
-          <Button
-            type="submit"
-            loading={busy === 'add'}
-            aria-disabled={name.trim() === '' || full || undefined}
-          >
-            {t('vetting.settings.watchlist.add')}
-          </Button>
-          {full && (
-            <p className="w-full text-xs text-text-dim">
-              {t('vetting.settings.watchlist.full', { count: VETTING_WATCHLIST_MAX })}
-            </p>
+          ) : (
+            <DataTable
+              label={t('vetting.settings.watchlist.title')}
+              columns={columns}
+              rows={settings.watchlist}
+              rowKey={(row) => row.id}
+            />
           )}
-        </form>
-      </Panel>
+          <form
+            className="flex flex-wrap items-end gap-2 border-t border-line p-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void add();
+            }}
+          >
+            <label className="block min-w-0 flex-1 space-y-1">
+              <span className="text-xs text-text-dim">
+                {t('vetting.settings.watchlist.addLabel')}
+              </span>
+              <TextInput
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+            <Button
+              type="submit"
+              loading={busy === 'add'}
+              aria-disabled={name.trim() === '' || full || undefined}
+            >
+              {t('vetting.settings.watchlist.add')}
+            </Button>
+            {full && (
+              <p className="w-full text-xs text-text-dim">
+                {t('vetting.settings.watchlist.full', { count: VETTING_WATCHLIST_MAX })}
+              </p>
+            )}
+          </form>
+        </Panel>
+      </div>
     ),
   };
 
   const shown = stacked ? VETTING_SETTINGS_SECTIONS : [section];
   return (
     <div className="grid gap-4 md:grid-cols-[10rem_minmax(0,1fr)] md:gap-6">
-      <nav
-        aria-label={t('vetting.settings.sectionsLabel')}
-        className="hidden md:sticky md:top-4 md:block md:self-start"
-      >
+      <nav aria-label={t('vetting.settings.sectionsLabel')} className={sectionRailClassName}>
         <ul className="space-y-px">
           {VETTING_SETTINGS_SECTIONS.map((id) => (
             <li key={id}>
-              <Link
-                to={settingsSectionPath(id)}
-                aria-current={id === section ? 'page' : undefined}
-                className={cx(
-                  'block border-l-2 px-2 py-1.5 text-xs',
-                  interactiveClassName,
-                  focusRingInsetClassName,
-                  id === section
-                    ? 'border-accent bg-panel text-text'
-                    : 'border-transparent text-text-dim hover:bg-panel-2 hover:text-text active:bg-panel'
-                )}
-              >
+              <SectionRailLink to={settingsSectionPath(id)} active={id === section}>
                 {t(`vetting.settings.sections.${id}`)}
-                {edited.has(id) && (
-                  <span
-                    role="img"
-                    aria-label={t('vetting.settings.unsaved')}
-                    className="ml-1.5 inline-block size-1.5 rounded-full bg-accent align-middle"
-                  />
-                )}
-              </Link>
+                {edited.has(id) && <AttentionDot label={t('vetting.settings.unsaved')} />}
+              </SectionRailLink>
             </li>
           ))}
         </ul>

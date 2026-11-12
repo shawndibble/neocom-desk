@@ -194,14 +194,14 @@ export interface PriceAlertTriggeredFire {
 
 /**
  * A vetting report was shared with a corp: told to each reviewer (`characterId`) the overview
- * saw in the last 30 days. Only what the queue row already shows a reviewer.
+ * saw in the last 30 days. It names no pilot: a fire is kept in the reviewer's notification
+ * feed, which outlives the pilot deleting their report.
  */
 export interface VettingSharedFire {
   eventId: 'vettingShared';
   characterId: number;
   corporationId: number;
   reviewId: string;
-  pilotName: string;
   kind: 'application' | 'promotion';
 }
 
@@ -326,8 +326,8 @@ function floorCopy(fire: ServerEventFire): { title: string; body: string } {
         title: 'New vetting report',
         body:
           fire.kind === 'promotion'
-            ? `${fire.pilotName} shared the review you asked for.`
-            : `${fire.pilotName} applied and shared a vetting report.`,
+            ? 'A member shared the review they were asked for.'
+            : 'A pilot shared a report for review.',
       };
   }
 }
