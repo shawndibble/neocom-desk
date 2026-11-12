@@ -333,7 +333,8 @@ function WidgetFrame({
   const { setRowsPerPage } = useOverviewEdit();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const now = useTicker(OVERVIEW_TICK_MS);
-  const scope = scopePresentation(widget.kind, widget.scope, widget);
+  // The scope it is read with, so a widget saved on All that reads one corporation draws no chip.
+  const scope = scopePresentation(widget.kind, readScope(useWidgetBoard(), widget), widget);
   const { state, showLastGood, reauthNote } = resolveWidget(view.status);
   const isPhone = useIsPhone();
   const navigate = useNavigate();

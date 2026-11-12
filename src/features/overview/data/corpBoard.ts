@@ -74,7 +74,7 @@ function oldest(dates: readonly (Date | null)[]): Date | null {
  * another answered ("nothing from this corporation", the others still list); only
  * when every one failed does the widget get its Retry.
  */
-async function settleCorps<T>(
+export async function settleCorps<T>(
   readers: ReadonlyMap<number, number>,
   what: string,
   load: (characterId: number) => Promise<T>
@@ -93,7 +93,7 @@ async function settleCorps<T>(
 }
 
 /** The active Character reads its own corporation, sharing the cache rows `/corp` warmed. */
-const activeReader = () => useActiveCharacter.getState().activeCharacterId ?? undefined;
+export const activeReader = () => useActiveCharacter.getState().activeCharacterId ?? undefined;
 
 /** Every readable corporation's structures as one list, for a widget scoped to All characters. */
 export async function loadAllStructuresBoardData(): Promise<StructuresBoardData> {
@@ -276,5 +276,5 @@ export async function loadAllMoonChunksBoardData(): Promise<MoonChunksBoardData>
     ? openToOfficer(merged)
     : merged;
   // One corporation of several failed: the rest draws, flagged.
-  return partlyFailed && readers.size > 0 ? { ...view, partlyFailed: true } : view;
+  return partlyFailed ? { ...view, partlyFailed: true } : view;
 }

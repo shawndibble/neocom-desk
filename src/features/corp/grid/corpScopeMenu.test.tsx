@@ -80,15 +80,26 @@ describe('Corp Board scope choice', () => {
   it('offers the corp wallet Divisions only on All, and says why', async () => {
     setup('corpWallet', 2);
     await userEvent.click(screen.getByRole('button', { name: /^Settings for / }));
-    expect(screen.queryByRole('menuitemradio', { name: 'Flow' })).toBeNull();
-    expect(screen.queryByRole('menuitemradio', { name: 'Sources' })).toBeNull();
-    expect(screen.getByText('All my corporations shows balances only.')).toBeInTheDocument();
+    expect(screen.getByRole('menuitemradio', { name: 'Divisions' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    for (const name of ['Flow', 'Sources']) {
+      expect(screen.getByRole('menuitemradio', { name })).toHaveAttribute('aria-disabled', 'true');
+    }
+    expect(
+      screen.getByText('Flow and Sources read one corporation: pick This corporation for them.')
+    ).toBeInTheDocument();
   });
 
   it('offers the corp wallet every Show on its own corporation', async () => {
     setup('corpWallet', 2, 'header');
     await userEvent.click(screen.getByRole('button', { name: /^Settings for / }));
-    expect(screen.getByRole('menuitemradio', { name: 'Flow' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitemradio', { name: 'Sources' })).toBeInTheDocument();
+    for (const name of ['Flow', 'Sources']) {
+      expect(screen.getByRole('menuitemradio', { name })).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      );
+    }
   });
 });

@@ -25,6 +25,7 @@ import {
 } from '../../data/corpCards';
 import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { corpCell, fractionBar } from './cellKit';
+import { flagPartlyFailed } from './corpAcrossKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
 import type { NumberModel, TableCell, TableModel } from './types';
 import type { Translate } from '@/lib/translate';
@@ -302,11 +303,10 @@ export const moonChunks: Builder = (feeds, { t, now, scopeAll }) => {
   };
 
   return {
-    ...blank(to, {
-      ...statusOf(feed, { isEmpty: chunks.length === 0 }),
-      // One corporation of several failed: what the others gave still draws, flagged.
-      ...(scopeAll && data.partlyFailed ? { error: true } : {}),
-    }),
+    ...flagPartlyFailed(
+      blank(to, statusOf(feed, { isEmpty: chunks.length === 0 })),
+      scopeAll && data.partlyFailed === true
+    ),
     fetchedAt: data.fetchedAt,
     number:
       ready > 0 || !nextChunk

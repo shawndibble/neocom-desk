@@ -88,7 +88,7 @@ describe('corpWallet across corporations', () => {
       ['HOLD', '100', '150'],
     ]);
     expect(view.table?.rows[0]?.cells[0]).toEqual({ text: 'MOON', hint: 'Moon Two' });
-    expect(view.table?.footer).toBe('overview.widgets.corpWallet.balancesOnly');
+    expect(view.table?.footer).toBe('overview.widgets.corpWallet.balancesOnly{"isk":"550"}');
   });
 
   it('draws one readable corporation as its own divisions, naming no corporation', () => {

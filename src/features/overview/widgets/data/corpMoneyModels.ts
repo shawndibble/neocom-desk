@@ -170,7 +170,8 @@ function walletAcross(feeds: Feeds, { t }: Pick<BuildContext, 't'>): KindView {
       to: TO,
       cells: [corpCell(label(row.corporationId)), iskCell(row.master), iskCell(row.total)],
     })),
-    footer: t(`${K}.balancesOnly`),
+    // The grand total, under the corporations' rows.
+    footer: t(`${K}.balancesOnly`, { isk: formatIskCompact(total) }),
   };
   return flagPartlyFailed(
     {

@@ -64,6 +64,8 @@ import { loadCorpLabels } from '@/features/corp/corpTicker';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import {
+  activeReader,
+  settleCorps,
   startFeederChunks,
   type FeederChunks,
   loadMoonChunksBoardData,
@@ -719,26 +721,15 @@ async function loadEveryCorp<F extends CorpFeedBase>(
   load: (characterId: number) => Promise<F>
 ): Promise<CorpAllFeed<F>> {
   const accounts = await loadAccountCorpAccess();
-  const preferred = useActiveCharacter.getState().activeCharacterId ?? undefined;
-  const readers = [...corpReadersFor(accounts, capability, preferred)];
-  const reads = new Map<number, F>();
-  await mapWithConcurrencyLimit(readers, ESI_FANOUT_CONCURRENCY, async ([corp, characterId]) => {
-    try {
-      reads.set(corp, await load(characterId));
-    } catch {
-      // Left out: `partlyFailed` below says so.
-    }
-  });
-  if (readers.length > 0 && reads.size === 0) throw new CorpReadFailed(what);
-  // Reader order, never completion order, so the rows hold still between reads.
-  const corporations = readers.flatMap(([corporationId]) => {
-    const feed = reads.get(corporationId);
-    return feed ? [{ corporationId, feed }] : [];
-  });
+  const { reads, partlyFailed } = await settleCorps(
+    corpReadersFor(accounts, capability, activeReader()),
+    what,
+    load
+  );
   return {
-    corporations,
-    labels: await loadCorpLabels(corporations.map((read) => read.corporationId)),
-    partlyFailed: corporations.length < readers.length,
+    corporations: reads.map((read) => ({ corporationId: read.corporationId, feed: read })),
+    labels: await loadCorpLabels(reads.map((read) => read.corporationId)),
+    partlyFailed,
   };
 }
 

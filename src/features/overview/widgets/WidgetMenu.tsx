@@ -218,11 +218,11 @@ export function WidgetMenu({
   const offersScope =
     board.characterScope === 'always' || (canSum && board.allScopeOffered(widget.kind));
   const scopeKey = board.id === 'corp' ? 'corp.grid.menu' : 'overview.menu';
-  // Read across every corporation, only the Shows that sum are offered (the corp wallet's balances).
+  // Read across every corporation, a Show that cannot sum is disabled with its reason (DESIGN §6c).
   const onAll = offersScope && canSum && readScope(board, widget) === 'all';
-  const shows = onAll
-    ? kind.shows.filter((show) => kindSumsAcrossCharacters(widget.kind, { ...widget, show }))
-    : kind.shows;
+  const showSums = (show: WidgetShow) =>
+    !onAll || kindSumsAcrossCharacters(widget.kind, { ...widget, show });
+  const someShowsOff = kind.shows.some((show) => !showSums(show));
   const index = edit.layout.widgets.findIndex((w) => w.id === widget.id);
   const last = edit.layout.widgets.length - 1;
 
@@ -239,19 +239,22 @@ export function WidgetMenu({
         </>
       )}
       {/* What the widget draws comes before how; every Show offers the kind's views, so View stays put. */}
-      {shows.length > 1 && (
+      {kind.shows.length > 1 && (
         <>
           <MenuLabel>{t('overview.menu.show')}</MenuLabel>
           <MenuRadioGroup
             value={showOf(kind, widget.show)}
             onValueChange={(next) => edit.setShow(widget.id, next as WidgetShow)}
           >
-            {shows.map((show) => (
-              <MenuRadioItem key={show} value={show}>
+            {kind.shows.map((show) => (
+              <MenuRadioItem key={show} value={show} disabled={!showSums(show)}>
                 {t(`overview.menu.showChoice.${show}`)}
               </MenuRadioItem>
             ))}
           </MenuRadioGroup>
+          {someShowsOff && (
+            <p className="px-2 pb-1 text-xs text-text-dim">{t(`${scopeKey}.showsOnOne`)}</p>
+          )}
           <MenuSeparator />
         </>
       )}
@@ -286,11 +289,6 @@ export function WidgetMenu({
           </MenuRadioGroup>
           {!canSum && (
             <p className="px-2 pb-1 text-xs text-text-dim">{t('overview.menu.nameOnly')}</p>
-          )}
-          {shows.length < kind.shows.length && (
-            <p className="px-2 pb-1 text-xs text-text-dim">
-              {t(`overview.widgets.${widget.kind}.allScopeShows`)}
-            </p>
           )}
         </>
       )}

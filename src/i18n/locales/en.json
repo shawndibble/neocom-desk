@@ -6239,12 +6239,11 @@
         "biggest": "{{name}} holds {{share}}% of it",
         "chartNote": "Share of the corporation's ISK by division",
         "chartNoteAcross": "Share of the ISK by corporation",
-        "acrossCorps_one": "Across {{count}} corporation",
-        "acrossCorps_other": "Across {{count}} corporations",
+        "acrossCorps_one": "Balances across {{count}} corporation",
+        "acrossCorps_other": "Balances across {{count}} corporations",
         "summaryAcross_one": "{{isk}} ISK in {{count}} corporation.",
         "summaryAcross_other": "{{isk}} ISK across {{count}} corporations.",
-        "balancesOnly": "Balances only: cash flow and income read one corporation.",
-        "allScopeShows": "All my corporations shows balances only.",
+        "balancesOnly": "{{isk}} ISK in all. Balances only: cash flow and income read one corporation.",
         "unused_one": "{{count}} unused division",
         "unused_other": "{{count}} unused divisions"
       },
@@ -15669,7 +15668,8 @@
         "remove": "Remove from Corp Board",
         "character": "Corporations",
         "header": "This corporation",
-        "all": "All my corporations"
+        "all": "All my corporations",
+        "showsOnOne": "Flow and Sources read one corporation: pick This corporation for them."
       },
       "header": {
         "breakdownCaption": "When each widget on the Corp Board last read its data"
