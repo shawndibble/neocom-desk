@@ -6,6 +6,9 @@ import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { BoardStructureSource } from '@/engine/corp/board';
 import * as boardData from '@/features/overview/data/boardData';
+import * as fuelBayData from '@/features/corp/structures/fuelBays';
+import { configureClipboard } from '@/lib/clipboard';
+import { formatCount } from '@/lib/formatCount';
 import { LocationProbe } from '@/test/LocationProbe';
 import { CorpStructures } from './CorpStructures';
 
@@ -13,6 +16,9 @@ vi.mock('@/features/overview/data/boardData', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/overview/data/boardData')>()),
   loadAllStructuresBoard: vi.fn(),
   loadAllMoonChunksBoard: vi.fn(),
+}));
+vi.mock('@/features/corp/structures/fuelBays', () => ({
+  loadStructureFuelBays: vi.fn(),
 }));
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: vi.fn(async () => new Map([[35832, 'Astrahus']])),
@@ -26,6 +32,7 @@ vi.mock('@/features/route/useSolarSystems', () => ({
 }));
 
 const mocked = vi.mocked(boardData);
+const mockedBays = vi.mocked(fuelBayData.loadStructureFuelBays);
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const now = Date.now();
@@ -104,6 +111,8 @@ function columnHeaders(tableEl: HTMLElement): string[] {
 beforeEach(() => {
   vi.clearAllMocks();
   useActiveCharacter.setState({ activeCharacterId: 42, hydrated: true });
+  mockedBays.mockResolvedValue(new Map());
+  configureClipboard(null);
   mocked.loadAllMoonChunksBoard.mockResolvedValue({
     chunks: null,
     needsReauth: false,
@@ -199,5 +208,97 @@ describe('CorpStructures', () => {
     });
     renderPage();
     expect(await screen.findByText("No corporation's structures to show")).toBeInTheDocument();
+  });
+
+  describe('fuel plan', () => {
+    /** One column's cell text, by header, in table order. */
+    function column(tableEl: HTMLElement, header: string): string[] {
+      // A header with a tooltip ends in its "?" trigger.
+      const index = columnHeaders(tableEl)
+        .map((text) => text.replace(/\?$/, ''))
+        .indexOf(header);
+      return within(tableEl)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[index]?.textContent ?? '');
+    }
+    const count = (text: string) => Number(text.replace(/[^0-9]/g, ''));
+
+    it('shows time left and says why when a corporation’s assets cannot be read', async () => {
+      feed(
+        [ALPHA, GAMMA],
+        [
+          [10, 'ALP', 'Alpha Corp'],
+          [20, 'GAM', 'Gamma Corp'],
+        ]
+      );
+      mockedBays.mockResolvedValue(
+        new Map([[10, { bays: new Map([[1, 400]]), readAt: new Date(now) }]])
+      );
+      renderPage();
+      const tableEl = await table();
+      await waitFor(() => expect(column(tableEl, 'Fuel blocks')).toContain('No access'));
+      const rows = column(tableEl, 'Structure');
+      const gamma = rows.indexOf('Gamma');
+      const alpha = rows.indexOf('Alpha');
+      expect(column(tableEl, 'Fuel blocks')[gamma]).toBe('No access');
+      expect(column(tableEl, 'Needed')[gamma]).toBe('—');
+      expect(column(tableEl, 'Fuel')[gamma]).toMatch(/\d/);
+      expect(column(tableEl, 'Fuel blocks')[alpha]).toBe('40020/day');
+      expect(screen.getByText(/which EVE opens only to a Director/)).toBeInTheDocument();
+    });
+
+    it('totals the visible rows and copies the same list', async () => {
+      const writes: string[] = [];
+      configureClipboard(async (text) => {
+        writes.push(text);
+      });
+      const done = structure({
+        structureId: 4,
+        name: 'Efa - Done',
+        corporationId: 10,
+        fuelExpiresMs: now + 90 * DAY,
+      });
+      feed(
+        [ALPHA, GAMMA, done],
+        [
+          [10, 'ALP', 'Alpha Corp'],
+          [20, 'GAM', 'Gamma Corp'],
+        ]
+      );
+      mockedBays.mockResolvedValue(
+        new Map([
+          [
+            10,
+            {
+              bays: new Map([
+                [1, 400],
+                [4, 900],
+              ]),
+              readAt: new Date(now),
+            },
+          ],
+          [20, { bays: new Map([[3, 100]]), readAt: new Date(now) }],
+        ])
+      );
+      renderPage();
+      const tableEl = await table();
+      await waitFor(() => expect(column(tableEl, 'Fuel blocks')).not.toContain('No access'));
+      const needed = column(tableEl, 'Needed').map(count);
+      expect(needed[column(tableEl, 'Structure').indexOf('Done')]).toBe(0);
+      const sum = needed.reduce((a, b) => a + b, 0);
+      expect(sum).toBeGreaterThan(0);
+      expect(count(screen.getByTestId('fuel-total').textContent!.split('·')[0]!)).toBe(sum);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Copy list' }));
+      await waitFor(() => expect(writes).toHaveLength(1));
+      const lines = writes[0]!.split('\n');
+      const rows = column(tableEl, 'Structure');
+      const listed = rows.filter((_, i) => needed[i]! > 0);
+      expect(lines.slice(0, -1)).toEqual(
+        listed.map((name) => `${name} (Efa): ${needed[rows.indexOf(name)]} fuel blocks`)
+      );
+      expect(lines.at(-1)).toContain(`${sum} fuel blocks, ${formatCount(sum * 5)} m³`);
+    });
   });
 });

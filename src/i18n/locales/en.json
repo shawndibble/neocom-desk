@@ -15182,7 +15182,26 @@
         "state": "State",
         "timer": "Timer",
         "services": "Services",
-        "unanchoring": "Unanchoring"
+        "unanchoring": "Unanchoring",
+        "blocks": "Fuel blocks",
+        "needed": "Needed"
+      },
+      "fuelPlan": {
+        "until": "Fuel until",
+        "blocksHint": "Fuel blocks in the structure's fuel bay, and how many it burns a day",
+        "neededHint": "Fuel blocks to add so the structure stays fuelled to the end of the Fuel until date (EVE time)",
+        "perDay": "{{count}}/day",
+        "noBayAccess": "No access",
+        "noBayAccessHint": "Fuel blocks come from the corporation's assets, which EVE opens only to a Director. Structures marked No access show time left only.",
+        "total_one": "Total {{blocks}} block · {{volume}} m³",
+        "total_other": "Total {{blocks}} blocks · {{volume}} m³",
+        "unknown_one": "{{count}} structure unknown",
+        "unknown_other": "{{count}} structures unknown",
+        "copy": "Copy list",
+        "copied": "Copied",
+        "copyFailed": "Copy failed",
+        "copyLine": "{{structure}} ({{system}}): {{count}} fuel blocks",
+        "copyTotal": "Total to {{date}}: {{count}} fuel blocks, {{volume}} m³"
       },
       "servicesOnline_one": "{{count}} online",
       "servicesOnline_other": "{{count}} online",
