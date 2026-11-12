@@ -30,7 +30,9 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  TextInput,
   Tooltip,
+  textActionClassName,
   type ActiveFilter,
   type DataTableColumn,
 } from '@/components/ui';
@@ -39,9 +41,13 @@ import * as Icon from '@/components/ui/icons';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { DataGate } from '@/components/DataGate';
 import type { BoardExtractionSource } from '@/engine/corp/board';
+import { FUEL_BLOCK_VOLUME_M3, fuelPlan, fuelUntilMs, type FuelPlan } from '@/engine/corp/fuelPlan';
+import { shiftUtcDate, utcDay } from '@/engine/localDay';
 import { structureStateLabel } from '@/features/corp/boardSources';
 import { corpLabelText, type CorpLabel } from '@/features/corp/corpTicker';
 import { StructureDetail } from '@/features/corp/structures/StructureDetail';
+import { loadStructureFuelBays, type CorpFuelBays } from '@/features/corp/structures/fuelBays';
+import { useFuelUntil } from '@/features/corp/structures/fuelUntilPref';
 import {
   byUrgency,
   filterStructureRows,
@@ -59,7 +65,12 @@ import {
 } from '@/features/overview/data/boardData';
 import { structuresView } from '@/features/overview/data/corpCards';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
+import { writeToClipboard } from '@/lib/clipboard';
 import { formatEveDateTime } from '@/lib/eveTime';
+import { formatCount } from '@/lib/formatCount';
+import { createNumberFormat } from '@/lib/numberLocale';
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { useNow } from '@/lib/useNow';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
@@ -78,19 +89,33 @@ const OPEN_PARAM = optionalIdParam();
 const ANY = '__any';
 const DASH = '—';
 const NO_CORPORATIONS: ReadonlyMap<number, CorpLabel> = new Map();
+/** A slow burn (under a block a day) keeps its tenth rather than rounding to 0. */
+const formatTenths = createNumberFormat({ maximumFractionDigits: 1 });
+/** The "Fuel until" date an untouched page plans toward, in days from today. */
+const DEFAULT_FUEL_DAYS = 30;
+
+/** A structure's fuel bay and what it implies; `blocks` is null when the bay cannot be read. */
+interface FuelRow {
+  blocks: number | null;
+  plan: FuelPlan;
+}
 
 interface StructuresSnapshot {
   data: StructuresBoardData;
   /** Refinery extractions by structure id; empty when no reader can read them. */
   extractions: ReadonlyMap<number, BoardExtractionSource>;
   typeNames: ReadonlyMap<number, string>;
+  /** Fuel bays by corporation id; a corporation without assets access has no entry. */
+  fuelBays: ReadonlyMap<number, CorpFuelBays>;
 }
 
 async function loadStructuresSnapshot(): Promise<StructuresSnapshot> {
-  const [data, moons] = await Promise.all([
+  const [data, moons, fuelBays] = await Promise.all([
     loadAllStructuresBoard(),
     // Extractions only add a section to a refinery's detail: a failed read costs that, nothing else.
     loadAllMoonChunksBoard().catch(() => null),
+    // Fuel bays only add the block counts: without them every row shows time left alone.
+    loadStructureFuelBays().catch(() => new Map<number, CorpFuelBays>()),
   ]);
   const typeIds = (data.structures ?? [])
     .map((structure) => structure.typeId)
@@ -101,6 +126,7 @@ async function loadStructuresSnapshot(): Promise<StructuresSnapshot> {
       (moons?.extractions ?? []).map((extraction) => [extraction.structureId, extraction])
     ),
     typeNames: typeIds.length === 0 ? new Map() : await loadTypeNames(typeIds),
+    fuelBays,
   };
 }
 
@@ -123,6 +149,16 @@ export function CorpStructures() {
   const [sort, setSort] = useUrlParam('sort', SORT_PARAM);
   const [openId, setOpenId] = useUrlParam('structure', OPEN_PARAM);
   const [search] = useDebouncedValue(params.q);
+  const storedFuelUntil = useFuelUntil((s) => s.value);
+  const setFuelUntil = useFuelUntil((s) => s.setValue);
+  useHydratedStore(useFuelUntil);
+  const today = utcDay(now);
+  // A saved date that has passed would zero every row: plan the default month instead.
+  const fuelUntil =
+    storedFuelUntil !== null && storedFuelUntil >= today
+      ? storedFuelUntil
+      : shiftUtcDate(today, DEFAULT_FUEL_DAYS);
+  const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
 
   const view = useMemo(() => (data ? structuresView(data, now) : null), [data, now]);
   const rows = useMemo(
@@ -133,6 +169,33 @@ export function CorpStructures() {
     [view, data]
   );
   const corporations = data?.corporations ?? NO_CORPORATIONS;
+  const fuelRows = useMemo(() => {
+    const byId = new Map<number, FuelRow>();
+    const untilMs = fuelUntilMs(fuelUntil);
+    const expiryReadAtMs = data?.fetchedAt?.getTime() ?? 0;
+    for (const { source } of rows) {
+      const corp =
+        source.corporationId === undefined
+          ? undefined
+          : snapshot.data?.fuelBays.get(source.corporationId);
+      const blocks = corp ? (corp.bays.get(source.structureId) ?? 0) : null;
+      byId.set(source.structureId, {
+        blocks,
+        plan: fuelPlan({
+          blocks,
+          bayReadAtMs: corp?.readAt.getTime() ?? 0,
+          fuelExpiresMs: source.fuelExpiresMs,
+          expiryReadAtMs,
+          untilMs,
+        }),
+      });
+    }
+    return byId;
+  }, [rows, data, snapshot.data, fuelUntil]);
+  const fuelOf = useCallback(
+    (row: StructureRow) => fuelRows.get(row.source.structureId),
+    [fuelRows]
+  );
   const multiCorp = corporations.size > 1;
   const corpOf = useCallback(
     (row: StructureRow) =>
@@ -250,6 +313,52 @@ export function CorpStructures() {
         sortValue: (row) => (row.fuel ? row.remaining : undefined),
       },
       {
+        id: 'blocks',
+        header: t(`${C}.blocks`),
+        align: 'right',
+        headerTooltip: t('corp.structures.fuelPlan.blocksHint'),
+        render: (row) => {
+          const fuel = fuelOf(row);
+          if (!fuel || fuel.blocks === null)
+            return (
+              <span className="text-xs text-text-dim">
+                {t('corp.structures.fuelPlan.noBayAccess')}
+              </span>
+            );
+          return (
+            <span className="flex flex-col items-end">
+              <span className="tabular-nums">{formatCount(fuel.blocks)}</span>
+              {fuel.plan.perDay !== null && (
+                <span className="text-xs text-text-dim">
+                  {t('corp.structures.fuelPlan.perDay', {
+                    rate:
+                      fuel.plan.perDay < 1
+                        ? formatTenths(fuel.plan.perDay)
+                        : formatCount(fuel.plan.perDay),
+                  })}
+                </span>
+              )}
+            </span>
+          );
+        },
+        sortValue: (row) => fuelOf(row)?.blocks ?? undefined,
+      },
+      {
+        id: 'needed',
+        header: t(`${C}.needed`),
+        align: 'right',
+        headerTooltip: t('corp.structures.fuelPlan.neededHint'),
+        render: (row) => {
+          const needed = fuelOf(row)?.plan.needed ?? null;
+          return needed === null ? (
+            DASH
+          ) : (
+            <span className="tabular-nums">{formatCount(needed)}</span>
+          );
+        },
+        sortValue: (row) => fuelOf(row)?.plan.needed ?? undefined,
+      },
+      {
         id: 'state',
         header: t(`${C}.state`),
         phoneHidden: true,
@@ -298,7 +407,47 @@ export function CorpStructures() {
         sortValue: (row) => row.unanchor?.deadlineMs ?? undefined,
       },
     ];
-  }, [t, multiCorp, corpOf, systemOf, systemName, snapshot.data]);
+  }, [t, multiCorp, corpOf, systemOf, systemName, snapshot.data, fuelOf]);
+
+  /** The visible rows that need blocks, in table order: the footer total and Copy list both read this. */
+  const shoppingList = useMemo(
+    () =>
+      visible.flatMap((row) => {
+        const needed = fuelOf(row)?.plan.needed ?? null;
+        return needed !== null && needed > 0 ? [{ row, needed }] : [];
+      }),
+    [visible, fuelOf]
+  );
+  const totalNeeded = shoppingList.reduce((sum, item) => sum + item.needed, 0);
+  const unknownNeeded = visible.filter((row) => (fuelOf(row)?.plan.needed ?? null) === null).length;
+  const noBayAccess = visible.some((row) => (fuelOf(row)?.blocks ?? null) === null);
+
+  async function copyList() {
+    const lines = shoppingList.map(({ row, needed }) =>
+      t('corp.structures.fuelPlan.copyLine', {
+        structure: shortStructureName(row.source.name),
+        system: systemName(row),
+        count: needed,
+        blocks: formatCount(needed),
+      })
+    );
+    lines.push(
+      t('corp.structures.fuelPlan.copyTotal', {
+        date: fuelUntil,
+        count: totalNeeded,
+        blocks: formatCount(totalNeeded),
+        volume: formatCount(totalNeeded * FUEL_BLOCK_VOLUME_M3),
+      })
+    );
+    if (unknownNeeded > 0)
+      lines.push(t('corp.structures.fuelPlan.unknown', { count: unknownNeeded }));
+    try {
+      await writeToClipboard(lines.join('\n'));
+      flash('copied');
+    } catch {
+      flash('failed');
+    }
+  }
 
   const activeFilters = useMemo(() => {
     const active: ActiveFilter<StructureFilter>[] = [];
@@ -456,6 +605,55 @@ export function CorpStructures() {
                   selectedRowKey={openId}
                   mobileSort
                 />
+              )}
+              {visible.length > 0 && (
+                <div className="space-y-1 border-t border-border px-3 py-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <label className="flex items-center gap-1 text-xs text-text-dim">
+                      {t('corp.structures.fuelPlan.until')}
+                      <TextInput
+                        type="date"
+                        className="w-36"
+                        value={fuelUntil}
+                        min={today}
+                        onChange={(event) =>
+                          void setFuelUntil(event.target.value === '' ? null : event.target.value)
+                        }
+                      />
+                    </label>
+                    <span data-testid="fuel-total" className="tabular-nums">
+                      {t('corp.structures.fuelPlan.total', {
+                        count: totalNeeded,
+                        blocks: formatCount(totalNeeded),
+                        volume: formatCount(totalNeeded * FUEL_BLOCK_VOLUME_M3),
+                      })}
+                      {unknownNeeded > 0 && (
+                        <span className="text-text-dim">
+                          {' · '}
+                          {t('corp.structures.fuelPlan.unknown', { count: unknownNeeded })}
+                        </span>
+                      )}
+                    </span>
+                    {shoppingList.length > 0 && (
+                      <button
+                        type="button"
+                        className={textActionClassName('ml-auto')}
+                        onClick={() => void copyList()}
+                      >
+                        {copied === 'copied'
+                          ? t('corp.structures.fuelPlan.copied')
+                          : copied === 'failed'
+                            ? t('corp.structures.fuelPlan.copyFailed')
+                            : t('corp.structures.fuelPlan.copy')}
+                      </button>
+                    )}
+                  </div>
+                  {noBayAccess && (
+                    <p className="text-xs text-text-dim">
+                      {t('corp.structures.fuelPlan.noBayAccessHint')}
+                    </p>
+                  )}
+                </div>
               )}
             </Panel>
           </div>
