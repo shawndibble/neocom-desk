@@ -13,15 +13,13 @@ import {
   NO_CORP_CAPABILITIES,
   type CorpCapabilities,
 } from '@/engine/corpRoles';
-import { ESI_REGISTRY, type Scope } from '@/esi/registry';
+import type { Scope } from '@/esi/registry';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { corpWideRoles, loadCharacterRoles } from './roles';
 import { corpGrantCoverage } from './corpScopes';
-
-/** Read off the registry rather than hand-copied, like every other derived scope constant in this codebase. */
-const ROLES_SCOPE: Scope = ESI_REGISTRY.getCharacterRoles.scope;
+import { CORP_ROLES_SCOPE as ROLES_SCOPE } from './corpStanding';
 
 /**
  * - `unknown` — scopes not resolved yet (the first frames of a cold load)

@@ -4976,8 +4976,15 @@
       "spReady": "SP ready",
       "alerts": "Alerts",
       "starred": "Starred",
-      "achievement": "Title / Score"
+      "achievement": "Title / Score",
+      "corpRoles": "Corporation roles",
+      "corpAccess": "Corporation access",
+      "alertsWhenClosed": "Alerts when closed"
     },
+    "corpRolesNotGranted": "Not granted",
+    "corpAccessReady": "Ready",
+    "corpAccessMissing": "Missing access ({{count}})",
+    "corpAccessMissingUnknown": "Missing access",
     "jobSlotCategory": {
       "manufacturing": "Mfg",
       "science": "Sci",
