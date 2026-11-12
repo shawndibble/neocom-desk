@@ -80,9 +80,9 @@ export const MEMBER_CHARACTERS: VettingCharacter[] = [
 /** What a read covers, in the applicant's words. `note` narrows a line that would otherwise worry. */
 export const READS: { label: string; note?: string }[] = [
   { label: 'Corporation history' },
-  { label: 'Wallet journal and transactions', note: 'About the last 30 days' },
+  { label: 'Wallet journal and transactions', note: 'Last 30 days' },
   { label: 'Contacts and standings' },
-  { label: 'Mail', note: 'Who and the subject line. Never the message itself' },
+  { label: 'Mail', note: 'Who and subject, never the message' },
   { label: 'Contracts' },
   { label: 'Assets and where they are' },
   { label: 'Skills' },
@@ -115,8 +115,7 @@ export const FLAGS: Flag[] = [
     id: 'hostile-isk',
     severity: 'critical',
     title: 'ISK from a watchlist corporation',
-    finding:
-      'Received 1,200,000,000 ISK in 3 donations from Corvin Hale of Black Kite Syndicate, which is on your watchlist.',
+    finding: '1,200,000,000 ISK in 3 donations from Corvin Hale, Black Kite Syndicate (watchlist).',
     on: 'Tamsin Vell',
     source: 'Wallet journal',
     evidence: [
@@ -148,7 +147,7 @@ export const FLAGS: Flag[] = [
     severity: 'warning',
     title: 'Likely undeclared character',
     finding:
-      'Orrin Dask appears in 9 wallet rows and 4 contracts across two of these characters, shares no corporation with them and was not declared.',
+      'Orrin Dask: 9 wallet rows and 4 contracts with two of these characters. Not declared.',
     on: 'Tamsin Vell, Vell Hauling',
     source: 'Wallet journal, contracts',
     evidence: [
@@ -162,7 +161,7 @@ export const FLAGS: Flag[] = [
     severity: 'warning',
     title: 'Cyno skills, no capital pilot declared',
     finding:
-      'Has Cynosural Field Theory V. None of the 3 declared characters can fly a capital or black ops ship.',
+      'Cynosural Field Theory V, but no declared character flies a capital or black ops ship.',
     on: 'Tamsin Vell',
     source: 'Skills',
     evidence: [{ at: 'Trained', who: 'Tamsin Vell', what: 'Cynosural Field Theory V' }],
@@ -175,7 +174,7 @@ export const PROMOTION_FLAGS: Flag[] = [
     severity: 'warning',
     title: 'Assets moved out of corp space',
     finding:
-      '14,300,000,000 ISK of ships and modules left the home structure for Jita in the last 21 days. Nothing of that size moved in the 6 months before.',
+      '14,300,000,000 ISK of assets moved to Jita in 21 days. Nothing that size in the 6 months before.',
     on: 'Joss Arden',
     source: 'Assets, contracts',
     isNew: true,
@@ -220,7 +219,7 @@ export const CLEAR_CHECKS: Check[] = [
 export const MISSING_CHECKS: Check[] = [
   {
     name: 'Mail with the watchlist',
-    detail: 'Mira Vell did not share Mail. Tamsin Vell and Vell Hauling: nothing found.',
+    detail: 'Mira Vell did not share Mail.',
   },
 ];
 
@@ -331,14 +330,14 @@ export const PROMOTION_SIGNOFFS: SignOff[] = [
     who: 'Ilse Marrow',
     role: 'CEO',
     state: 'hidden',
-    note: 'Decided 11 Nov. Shown once you decide',
+    note: 'Decided 11 Nov. Hidden until you decide',
   },
   { who: 'You', role: 'Kestrel Vane, Director', state: 'you', note: 'Not decided' },
   {
     who: 'Bram Soto',
     role: 'Director',
     state: 'barred',
-    note: 'Asked for this review, so cannot sign it off',
+    note: 'Asked for this review',
   },
 ];
 

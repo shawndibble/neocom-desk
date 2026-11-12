@@ -38,7 +38,6 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { NewComponent } from './NewComponent';
 import { Portrait } from './vettingApplicantParts';
 import {
-  CORP,
   QUEUE,
   VIEW_LOG,
   type Check,
@@ -164,7 +163,7 @@ export function QueuePage({ rows = QUEUE, empty }: { rows?: Review[]; empty?: Re
           <span className="font-semibold">{rows.length} open</span>
           <span className="text-text-dim"> · </span>
           <span className="font-semibold">{yours}</span>
-          <span className="text-text-dim"> need your sign-off at {CORP.name}</span>
+          <span className="text-text-dim"> need your sign-off</span>
         </p>
         <span className="flex flex-wrap gap-2">
           <Button>Copy apply link</Button>
@@ -246,8 +245,8 @@ export function ResultLine({
               </span>
             )}
             {flags === 0
-              ? 'This is what the data shows, not a verdict. A character that was never declared cannot be checked.'
-              : 'Each flag is a reason to ask, with the rows behind it. The decision is yours.'}
+              ? 'Not a verdict. An undeclared character cannot be checked.'
+              : 'Each flag is a reason to ask.'}
           </p>
         </div>
       </div>
@@ -357,9 +356,7 @@ export function MissingChecks({ checks }: { checks: Check[] }) {
       <CheckRows checks={checks} tone="warning" />
       <div className="flex flex-wrap items-center gap-3 border-t border-line p-3">
         <Button size="sm">Ask for a fresh read</Button>
-        <span className="text-xs text-text-dim">
-          The corp keeps no sign-in, so the pilot has to share again.
-        </span>
+        <span className="text-xs text-text-dim">The pilot has to share again.</span>
       </div>
     </Panel>
   );
@@ -501,7 +498,7 @@ export function Decision({
       title="Decision"
       meta={
         <span className="text-xs text-text-dim tabular-nums">
-          {needed === 1 ? '1 sign-off needed' : `${needed} sign-offs needed, by different people`}
+          {needed === 1 ? '1 sign-off needed' : `${needed} sign-offs needed`}
         </span>
       }
       metaOwnRow
@@ -523,7 +520,7 @@ export function Decision({
         </NewComponent>
         <label className="block space-y-1">
           <span className="text-xs text-text-dim">Note, kept with your decision</span>
-          <TextArea rows={2} placeholder="What you asked and what they said" />
+          <TextArea rows={2} placeholder="Optional" />
         </label>
         <div className="grid grid-cols-2 gap-2 [&>button]:w-full">
           <Button>{verb.no}…</Button>

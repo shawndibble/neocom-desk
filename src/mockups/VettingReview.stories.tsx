@@ -216,7 +216,7 @@ function Empty() {
         <Panel title="Open reviews">
           <EmptyState
             title="Nobody to review"
-            hint="Send applicants the apply link. They sign in with EVE and their report lands here. Use Review a member before a promotion."
+            hint="Send applicants the apply link, or use Review a member before a promotion."
           />
         </Panel>
       }

@@ -64,9 +64,9 @@ export function ApplyHeading({ sub }: { sub: string }) {
 }
 
 const STEPS = [
-  'Sign in with EVE, once for each of your characters.',
-  'Neocom Desk reads each character one time, while you wait.',
-  `${CORP.name}'s recruiters get a report. You hear back from them in game.`,
+  'Sign in with EVE, once per character.',
+  'Each character is read once.',
+  'Recruiters get a report and reply in game.',
 ];
 
 export function Steps() {
@@ -111,7 +111,7 @@ export function ConsentTerms({ promotion }: { promotion?: boolean }) {
               <li>
                 Your EVE sign-in
                 <span className="block text-xs text-text-dim">
-                  Neocom Desk keeps no key to your characters, so nothing is read again later
+                  No key is kept. Nothing is read again
                 </span>
               </li>
             </ul>
@@ -119,9 +119,9 @@ export function ConsentTerms({ promotion }: { promotion?: boolean }) {
           <div className="space-y-2">
             <Eyebrow>You stay in control</Eyebrow>
             <ul className="space-y-1.5">
-              <li>Only {CORP.name}&apos;s reviewers can open the report</li>
-              <li>You can see who opened it</li>
-              <li>It is deleted 30 days after they decide, or when you withdraw</li>
+              <li>Only the reviewers can open it</li>
+              <li>You see who opened it</li>
+              <li>Deleted 30 days after the decision, or when you withdraw</li>
             </ul>
           </div>
         </div>
@@ -167,9 +167,7 @@ function CharacterLine({
       </span>
       {needsFix && (
         <p className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-dim">
-          <span>
-            {character.missing} was not shared, so the report will say that check could not run.
-          </span>
+          <span>{character.missing} not shared. That check will not run.</span>
           <button type="button" className={textActionClassName()}>
             Sign in again
           </button>
@@ -213,9 +211,7 @@ export function CharacterList({
 export function ApplyStart() {
   return (
     <PublicPage>
-      <ApplyHeading
-        sub={`${CORP.name} asks every applicant for a one-time read of their characters. It takes about two minutes and needs no Neocom Desk account.`}
-      />
+      <ApplyHeading sub="A one-time read of your characters. About two minutes, no account needed." />
       <Panel title="How it works">
         <Steps />
       </Panel>
@@ -224,9 +220,7 @@ export function ApplyStart() {
       </Panel>
       <div className="space-y-2">
         <EveSsoButton size="large" label="Log in with EVE Online" pending={false} onClick={noop} />
-        <p className="text-xs text-text-dim">
-          Start with your main. You add your other characters on the next step.
-        </p>
+        <p className="text-xs text-text-dim">Start with your main. Add the rest next.</p>
       </div>
     </PublicPage>
   );
@@ -260,8 +254,7 @@ export function ApplyCharacters({ characters }: { characters: VettingCharacter[]
             <span>
               These are all my characters.
               <span className="block text-xs text-text-dim">
-                Recruiters see who each character trades and contracts with. A character left out
-                usually shows up there.
+                A character left out usually shows up in the others&apos; trades.
               </span>
             </span>
           </label>
@@ -283,14 +276,14 @@ export function ApplyCharacters({ characters }: { characters: VettingCharacter[]
 }
 
 const NEXT_SENT = [
-  'A recruiter reads the report. You can see below when someone opens it.',
-  'They contact you in game, usually with a few questions.',
-  'If they accept, this page tells you how to join in game.',
+  'A recruiter reads the report.',
+  'They contact you in game.',
+  'If accepted, this page says how to join.',
 ];
 
 const NEXT_ACCEPTED = [
   `In EVE, open ${CORP.name}'s corporation window and press Apply to join.`,
-  'A recruiter accepts the application in game. Neocom Desk cannot do that step for you.',
+  'A recruiter accepts it in game.',
 ];
 
 /**
@@ -310,8 +303,8 @@ function StatusBody({ accepted, inApp }: { accepted?: boolean; inApp?: boolean }
         <div className="space-y-3 text-sm">
           <p>
             {accepted
-              ? `Kestrel Vane accepted your application to ${CORP.name} on 13 Nov 2026 19:20 EVE.`
-              : `3 characters were read on 12 Nov 2026 14:02 EVE and the report is with ${CORP.name}'s recruiters.`}
+              ? `Kestrel Vane accepted you on 13 Nov 2026 19:20 EVE.`
+              : `3 characters read. The report is with the recruiters.`}
           </p>
           <div className="space-y-2">
             <Eyebrow>What happens next</Eyebrow>
@@ -351,10 +344,7 @@ function StatusBody({ accepted, inApp }: { accepted?: boolean; inApp?: boolean }
               </div>
             </dl>
           </NewComponent>
-          <p className="text-text-dim">
-            Neocom Desk&apos;s servers kept no sign-in for your characters. Nothing more is read
-            unless you share again.
-          </p>
+          <p className="text-text-dim">No sign-in was kept. Nothing more is read.</p>
           <button type="button" className={textActionClassName()}>
             {accepted ? 'Delete the report now…' : 'Withdraw and delete the report…'}
           </button>
@@ -363,19 +353,13 @@ function StatusBody({ accepted, inApp }: { accepted?: boolean; inApp?: boolean }
       {!inApp && (
         <Panel title="Use Neocom Desk">
           <div className="space-y-3 text-sm">
-            <p>
-              Keep these 3 characters signed in on this device to use Neocom Desk: skills, wallet,
-              industry and the rest. It is free.
-            </p>
+            <p>Keep these 3 characters signed in to use Neocom Desk. Free.</p>
             <p className="text-text-dim">
-              The sign-in stays in this browser only, never on our servers. You can also come back
-              to this page without the link, and a later read for {CORP.name} is one press.
+              The sign-in stays in this browser, never on our servers.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Button>Open Neocom Desk with these characters</Button>
-              <span className="text-xs text-text-dim">
-                Otherwise keep this page&apos;s link to come back.
-              </span>
+              <span className="text-xs text-text-dim">Or keep this page&apos;s link.</span>
             </div>
           </div>
         </Panel>
@@ -429,13 +413,9 @@ export function PromotionRequest({ characters }: { characters: VettingCharacter[
         <div className="space-y-2 text-sm">
           <p>
             <span className="font-semibold">Bram Soto</span> (Director) asked for a review before
-            you are made <span className="font-semibold">Director</span>. Two other officers read
-            the report and each decides on their own.
+            you are made <span className="font-semibold">Director</span>. Two other officers decide.
           </p>
-          <p className="text-text-dim">
-            This is a one-time read. It also shows what has changed since your application in March
-            2026.
-          </p>
+          <p className="text-text-dim">A one-time read. It also shows changes since March 2026.</p>
         </div>
       </Panel>
       <Panel
@@ -454,9 +434,7 @@ export function PromotionRequest({ characters }: { characters: VettingCharacter[
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="primary">Share 3 characters</Button>
         <Button>Decline…</Button>
-        <span className="text-xs text-text-dim">
-          Declining is allowed. The reviewers are told you declined.
-        </span>
+        <span className="text-xs text-text-dim">The reviewers are told if you decline.</span>
       </div>
     </div>
   );
