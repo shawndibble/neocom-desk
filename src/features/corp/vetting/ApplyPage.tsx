@@ -1,3 +1,5 @@
+import { cx } from '@/lib/cx';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 /**
  * The public apply page's body (`/apply/<corpId>`): one page, five states. Start (the corp's
  * welcome and what it asks, how it works, what is shared, the EVE sign-in), characters (each one
@@ -455,7 +457,7 @@ export function ApplyPage({ corporationId, invite, login, onSignIn, onOpenApp }:
               />
             </label>
           ))}
-          <label className="flex items-start gap-2">
+          <label className={cx(tappableRowClassName, 'flex items-start gap-2')}>
             <Checkbox
               className="mt-0.5"
               checked={allMine}

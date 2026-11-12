@@ -7,6 +7,7 @@
  * Firebase is reached through `await import()` only, so the public apply page's chunk does not
  * carry the SDK until its first call (`app/bootImportGraph.test.ts`).
  */
+import { isSyncConfigured } from '@/app/syncStatus';
 import { getValidAccessToken } from '@/auth/session';
 import type {
   VettingCorpInfo,
@@ -93,7 +94,10 @@ const client: VettingBackend = {
   decline: async (handle) => {
     await open<unknown>(ACTION.decline, withHandle(handle));
   },
-  myRequests: (characterId) => signedIn(characterId, ACTION.myRequests, {}),
+  // Vetting lives in the cloud backend; with none configured there is no request to find, not a
+  // failed load (as SRP's member page does).
+  myRequests: async (characterId) =>
+    isSyncConfigured() ? signedIn(characterId, ACTION.myRequests, {}) : [],
   overview: (characterId, corporationId) =>
     signedIn<VettingOverview>(characterId, ACTION.overview, { corporationId }),
   open: (characterId, corporationId, reviewId) =>

@@ -29,7 +29,7 @@ import {
   UnsavedChangesBar,
   type DataTableColumn,
 } from '@/components/ui';
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import * as Icon from '@/components/ui/icons';
 import { InlineError } from '@/components/ui/InlineError';
@@ -380,7 +380,12 @@ export function VettingSettingsView({
                         )}
                       </div>
                       <div className="flex items-center justify-between gap-1">
-                        <label className="mr-2 inline-flex items-center gap-2 text-sm">
+                        <label
+                          className={cx(
+                            tappableRowClassName,
+                            'mr-2 inline-flex items-center gap-2 text-sm'
+                          )}
+                        >
                           <span className={touchCheckboxLabelClassName}>
                             <Checkbox
                               aria-label={t('vetting.settings.questions.requiredNamed', { n })}
