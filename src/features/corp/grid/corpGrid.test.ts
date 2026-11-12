@@ -134,7 +134,19 @@ describe('the Corp Board board', () => {
     // Not yet known: the header scope is read, so one corporation never fans out.
     expect(corpWidgetBoard(ALL).allScopeOffered('structures')).toBe(false);
     expect(corpWidgetBoard(ALL).opensOnAll).toEqual(
-      new Set(['corpDeadlines', 'structures', 'moonChunks', 'corpJobs', 'corpWallet', 'corpKills'])
+      new Set([
+        'corpDeadlines',
+        'structures',
+        'moonChunks',
+        'corpJobs',
+        'corpWallet',
+        'corpKills',
+        'corpCustomsOffices',
+        'corpStarbases',
+        'corpSovereignty',
+        'corpContracts',
+        'corpOrders',
+      ])
     );
   });
 

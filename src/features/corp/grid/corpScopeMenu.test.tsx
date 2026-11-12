@@ -25,6 +25,11 @@ const ACROSS = [
   'corpJobs',
   'corpWallet',
   'corpKills',
+  'corpCustomsOffices',
+  'corpStarbases',
+  'corpSovereignty',
+  'corpContracts',
+  'corpOrders',
 ] as const;
 
 function setup(

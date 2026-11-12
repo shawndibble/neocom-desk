@@ -50,6 +50,12 @@ const OPENS_ON_ALL = [
   'corpJobs',
   'corpWallet',
   'corpKills',
+  // #6101's Gallery kinds, not in the default layout.
+  'corpCustomsOffices',
+  'corpStarbases',
+  'corpSovereignty',
+  'corpContracts',
+  'corpOrders',
 ] as const;
 
 const onAll = (kind: (typeof OPENS_ON_ALL)[number]): WidgetSeed => ({ kind, scope: 'all' });

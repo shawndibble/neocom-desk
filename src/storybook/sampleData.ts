@@ -60,6 +60,8 @@ export function sampleCharacterPublicInfo(
 
 /** Jita IV - Moon 4 - Caldari Navy Assembly Plant. */
 export const SAMPLE_STATION_ID = 60003760;
+/** Jita, the system `SAMPLE_STATION_ID` sits in. */
+export const SAMPLE_SYSTEM_ID = 30000142;
 export const SAMPLE_REGION_ID = 10000002;
 
 export const SAMPLE_WALLET_BALANCE = 1_284_390_551.17;

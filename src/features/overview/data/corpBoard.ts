@@ -18,6 +18,7 @@ import {
   type AccountCorpAccess,
 } from '@/features/corp/corpReadAccess';
 import { loadCorpLabels, type CorpLabel } from '@/features/corp/corpTicker';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadMoonChunks } from '@/features/character/calendarMoonChunks';
 import type { MoonChunksBoardData, StructuresBoardData } from './boardData';
@@ -64,30 +65,37 @@ export async function loadMoonChunksBoardData(characterId: number): Promise<Moon
 // --- All characters: every corporation the pilot's Characters can read -----------------
 
 /** The oldest of the reads' timestamps: the merged list is only as fresh as its stalest corporation. */
-function oldest(dates: readonly (Date | null)[]): Date | null {
+export function oldest(dates: readonly (Date | null)[]): Date | null {
   const known = dates.filter((date): date is Date => date !== null);
   return known.length === 0 ? null : new Date(Math.min(...known.map((date) => date.getTime())));
 }
 
 /**
- * Settles one read per corporation. A corporation that failed is left out while
- * another answered ("nothing from this corporation", the others still list); only
- * when every one failed does the widget get its Retry.
+ * Settles one read per corporation, at most `concurrency` corporations at once. A
+ * corporation that failed is left out while another answered ("nothing from this
+ * corporation", the others still list); only when every one failed does the widget
+ * get its Retry. Reads come back in reader order, never completion order.
  */
 export async function settleCorps<T>(
   readers: ReadonlyMap<number, number>,
   what: string,
-  load: (characterId: number) => Promise<T>
+  load: (characterId: number) => Promise<T>,
+  concurrency = ESI_FANOUT_CONCURRENCY
 ): Promise<{ reads: (T & { corporationId: number })[]; partlyFailed: boolean }> {
-  const settled = await Promise.allSettled(
-    [...readers].map(async ([corporationId, characterId]) => ({
-      ...(await load(characterId)),
-      corporationId,
-    }))
+  const entries = [...readers];
+  const settled: ((T & { corporationId: number }) | null)[] = entries.map(() => null);
+  await mapWithConcurrencyLimit(
+    entries.map((entry, index) => ({ entry, index })),
+    concurrency,
+    async ({ entry: [corporationId, characterId], index }) => {
+      try {
+        settled[index] = { ...(await load(characterId)), corporationId };
+      } catch {
+        // Left out: the others still list.
+      }
+    }
   );
-  const reads = settled.flatMap((outcome) =>
-    outcome.status === 'fulfilled' ? [outcome.value] : []
-  );
+  const reads = settled.filter((read) => read !== null);
   if (reads.length === 0 && readers.size > 0) throw new CorpReadFailed(what);
   return { reads, partlyFailed: reads.length < readers.size };
 }
