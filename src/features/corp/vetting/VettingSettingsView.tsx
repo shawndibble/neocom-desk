@@ -193,11 +193,12 @@ export function VettingSettingsView({
       id: 'remove',
       header: '',
       align: 'right',
-      cardActions: true,
+      className: 'whitespace-nowrap',
       render: (row) => (
         <Button
           ref={control(`watch:${row.id}`)}
           size="sm"
+          className="whitespace-nowrap"
           loading={busy === `remove:${row.id}`}
           aria-label={t('vetting.settings.watchlist.removeNamed', { name: row.name })}
           onClick={() => void removeWatch(row.id)}
