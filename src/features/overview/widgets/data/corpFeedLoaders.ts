@@ -624,8 +624,7 @@ const DEADLINE_READS: readonly {
  * Every corporation's Due soon sources, each read through a Character whose roles and grant
  * cover that source there (`corpReadersFor`), so no read is made that can only 403. A read
  * that fails leaves its corporation without that source, flagged; only when every read
- * fails does the widget get its Retry. `only` narrows the read to some sources (the
- * Calendar reads no starbases or sovereignty).
+ * fails does the widget get its Retry. `only` narrows the read to those sources.
  */
 export async function loadCorpDeadlinesAll(
   only?: readonly CorpDeadlineSource[]

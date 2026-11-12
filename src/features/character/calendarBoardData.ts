@@ -70,11 +70,8 @@ export interface CalendarBoardData {
   mercenaryDens?: BoardClockSource[];
   /** Moon drills of every readable corporation. Left `undefined` when no corporation can be read for them. */
   moonChunks?: BoardClockSource[];
-  /** Structures running out of fuel, every readable corporation. */
   structureFuel?: BoardClockSource[];
-  /** Structure timers ending, every readable corporation. */
   structureTimers?: BoardClockSource[];
-  /** Corp industry jobs finishing, every readable corporation. */
   corpJobs?: BoardClockSource[];
   /** The corporations behind the corp events: the corporation filter's choices. Empty when none is readable. */
   corporations: BoardCorporation[];
@@ -287,7 +284,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     { kind: 'industryJob', result: jobsResult, rows: jobs },
     { kind: 'planetExtraction', result: planetsResult, rows: planets },
     { kind: 'mercenaryDen', result: densResult, rows: dens },
-    // The pilot's own answer, from Dexie: no cache metadata, nothing to re-authorise.
+    // The pilot's own answer, from Dexie.
     { kind: 'accelerator', result: NO_CACHE, rows: acceleratorSources },
     // Corp reads carry their own fetch times (`corpRead.fetched`), folded in below. A
     // corporation whose grant lapsed is left out, never a re-auth notice for another Character.
@@ -298,7 +295,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     { kind: 'skyhookRaid', result: skyhookRead.result, rows: skyhookRead.sources },
     { kind: 'contractExpiry', result: contractsResult, rows: contracts },
     { kind: 'orderExpiry', result: ordersResult, rows: orders },
-    // Not an ESI read: no cache metadata, and nothing to re-authorise.
+    // Not an ESI read.
     { kind: 'skillPlan', result: NO_CACHE, rows: planSchedule?.scheduled },
   ] satisfies {
     kind: CharacterBoardItemKind;

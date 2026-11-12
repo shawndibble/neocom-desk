@@ -19,11 +19,15 @@ export const useCalendarCorpFilter = createLocalSetting<CorpEventFilter>({
       : null,
 });
 
-/** A saved corporation the account can no longer read filters nothing. */
+/**
+ * A saved corporation filters nothing once the account can no longer read it,
+ * or once it is the only one left: the menu then offers no row to undo it.
+ */
 export function activeCorpFilter(
   saved: CorpEventFilter,
   corporations: readonly BoardCorporation[]
 ): CorpEventFilter {
   if (typeof saved !== 'number') return saved;
-  return corporations.some((corporation) => corporation.id === saved) ? saved : 'all';
+  const offered = corporations.length > 1 && corporations.some(({ id }) => id === saved);
+  return offered ? saved : 'all';
 }

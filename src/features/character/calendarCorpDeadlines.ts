@@ -12,11 +12,7 @@
 import type { BoardClockSource, BoardCorporation } from '@/engine/character/board';
 import { toCorpCalendarSources } from '@/engine/character/corpCalendar';
 import { mergeCorpBoards } from '@/engine/corp/board';
-import {
-  boardOf,
-  readableSources,
-  type CorpDeadlineSource,
-} from '@/features/overview/widgets/data/corpDeadlineSources';
+import type { CorpDeadlineSource } from '@/features/overview/widgets/data/corpDeadlineSources';
 
 export interface CorpCalendarRead {
   structureFuel?: BoardClockSource[];
@@ -37,7 +33,10 @@ const CALENDAR_SOURCES: readonly CorpDeadlineSource[] = ['structures', 'moonChun
 
 export async function loadCorpCalendar(nowMs: number): Promise<CorpCalendarRead> {
   // Lazy: the corp loaders are a chunk of their own, and most pilots read no corporation.
-  const { loadCorpDeadlinesAll } = await import('@/features/overview/widgets/data/corpFeedLoaders');
+  const [{ loadCorpDeadlinesAll }, { boardOf, readableSources }] = await Promise.all([
+    import('@/features/overview/widgets/data/corpFeedLoaders'),
+    import('@/features/overview/widgets/data/corpDeadlineSources'),
+  ]);
   let feed: Awaited<ReturnType<typeof loadCorpDeadlinesAll>>;
   try {
     feed = await loadCorpDeadlinesAll(CALENDAR_SOURCES);
@@ -53,6 +52,12 @@ export async function loadCorpCalendar(nowMs: number): Promise<CorpCalendarRead>
     .filter(({ read }) => read.readable);
   if (reads.length === 0) return NOTHING_READABLE;
 
+  // `loadCorpLabels` names every corporation it is asked for, falling back to the id.
+  const corporations = new Map<number, BoardCorporation>();
+  for (const { corporationId } of reads) {
+    const label = feed.labels.get(corporationId);
+    if (label) corporations.set(corporationId, { id: corporationId, ...label });
+  }
   const sources = toCorpCalendarSources(
     mergeCorpBoards(
       reads.map(({ corporationId, read }) => ({
@@ -60,7 +65,7 @@ export async function loadCorpCalendar(nowMs: number): Promise<CorpCalendarRead>
         items: boardOf(read.sources, nowMs, { includeRunningJobs: true }),
       }))
     ),
-    feed.labels
+    corporations
   );
   const readable = (source: 'structures' | 'extractions' | 'jobs') =>
     reads.some(({ read }) => read.sources[source] !== undefined);
@@ -69,16 +74,7 @@ export async function loadCorpCalendar(nowMs: number): Promise<CorpCalendarRead>
     structureTimers: readable('structures') ? sources.structureTimers : undefined,
     moonChunks: readable('extractions') ? sources.moonChunks : undefined,
     corpJobs: readable('jobs') ? sources.corpJobs : undefined,
-    corporations: reads
-      .map(({ corporationId }) => {
-        const label = feed.labels.get(corporationId);
-        return {
-          id: corporationId,
-          name: label?.name ?? String(corporationId),
-          ticker: label?.ticker ?? String(corporationId),
-        };
-      })
-      .sort((a, b) => a.name.localeCompare(b.name)),
+    corporations: [...corporations.values()].sort((a, b) => a.name.localeCompare(b.name)),
     fetched: reads.flatMap(({ read }) => read.fetched),
     fromCache: reads.some(({ read }) => read.fromCache),
   };

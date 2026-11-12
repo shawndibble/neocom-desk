@@ -1,5 +1,5 @@
 /**
- * The character's Coming Up board: eleven heterogeneous clocks in, one ordered
+ * The character's Coming Up board: heterogeneous clocks in, one ordered
  * list out.
  *
  * The corp side of this exists already (`engine/corp/board.ts`) and answers the
@@ -141,7 +141,6 @@ export interface CharacterBoardSources {
   structureFuel?: readonly BoardClockSource[];
   /** Structure reinforcement, vulnerability and unanchor timers ending. */
   structureTimers?: readonly BoardClockSource[];
-  /** Corp industry jobs finishing. */
   corpJobs?: readonly BoardClockSource[];
   /** Corp skyhook theft windows — absent unless the Character holds `canReadSkyhooks`. */
   skyhookRaids?: readonly BoardClockSource[];
@@ -196,7 +195,8 @@ const KIND_RANK = new Map<CharacterBoardItemKind, number>(
  */
 export function pastDeadlineLabelKey(kind: CharacterBoardItemKind): string {
   if (kind === 'calendarEvent') return 'calendar.started';
-  if (kind === 'industryJob' || kind === 'corpJob') return 'calendar.detail.industryJob.ready';
+  if (kind === 'industryJob') return 'calendar.detail.industryJob.ready';
+  if (kind === 'corpJob') return 'calendar.detail.corpJob.ready';
   return 'calendar.overdue';
 }
 

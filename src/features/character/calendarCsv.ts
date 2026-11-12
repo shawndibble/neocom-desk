@@ -32,7 +32,6 @@ export function calendarCsvColumns(t: CsvTranslate): CsvColumn<CharacterBoardIte
           ? t(`calendar.detail.${item.kind}.${item.detail}`, { defaultValue: item.detail })
           : undefined,
     },
-    // Corp events only; blank on the pilot's own clocks.
     { header: t('calendar.csvCorporation'), value: (item) => item.corporation?.name },
     {
       header: t('calendar.csvResponse'),

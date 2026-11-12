@@ -142,10 +142,10 @@ export function countsByKind(
   return counts;
 }
 
-/** The Calendar's corporation filter: every corp event, none, or one corporation's. */
+/** A `number` is a corporation id. */
 export type CorpEventFilter = 'all' | 'none' | number;
 
-/** The corporation filter, applied. The pilot's own clocks always pass. */
+/** The pilot's own clocks always pass. */
 export function filterByCorporation(
   items: readonly CharacterBoardItem[],
   filter: CorpEventFilter

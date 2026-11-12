@@ -130,7 +130,7 @@ Never a status, never interactive. A fifth location reuses the first hue, so the
 
 Every other color scale in this app is **ordinal or semantic** — `securityStatusColor`
 is a position on a numeric scale, `STANDING_TONE` and the severity ladder are
-magnitudes. These ten are **nominal**: no order, no magnitude, identity only. They say
+magnitudes. These are **nominal**: no order, no magnitude, identity only. They say
 which part of the app a deadline came from, and they are read by
 `src/components/ui/kindTone.ts` (`KIND_FILL`, `KIND_TEXT`).
 

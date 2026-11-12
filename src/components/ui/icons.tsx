@@ -495,7 +495,6 @@ export const NavCorpWallet = withWeight(Vault);
 export const NavCorpAssets = withWeight(Warehouse);
 // Upwell structures are anchored in space: an anchor (Mercenary Den already has the turret).
 export const NavCorpStructures = withWeight(Anchor);
-/** Calendar kinds: a structure running out of fuel, and a structure timer ending. */
 export const StructureFuel = withWeight(GasPump);
 export const StructureTimer = withWeight(Timer);
 export const NavCorpMoons = withWeight(Moon);

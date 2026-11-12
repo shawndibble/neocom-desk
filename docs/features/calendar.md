@@ -2,7 +2,7 @@
 
 `/calendar` (nav: Social group, phone tab). The Character's "Coming Up" surface: the in-game calendar events plus every other clock the Character can read (skill queue, industry jobs, PI extractors, contracts, market orders, optional projected skill plan), plus corporation deadlines (structure fuel, structure timers, moon chunks, corp jobs) for every corporation the account can read, shown as a **Calendar Map** (grid) beside the **Coming Up Rail** (list). Replaced the old Month/Week/Agenda tabs (scope decision `20260907-123312-calendar-becomes-the-characters-coming-up-surface`).
 
-Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,calendarBoardSources,calendar,calendarMoonChunks,calendarSkillPlan,calendarKindFilter,calendarKindLabels,calendarViewPref,calendarWeekStart,calendarCsv,calendarResponseTone}.ts`; components `CalendarMap`, `CalendarDayTicker`, `ComingUpRail`, `CharacterBoardRow`, `CalendarKindFilterMenu`, `EventDetailModal`; engine `src/engine/character/{board,deadlines,calendarRetention}.ts`; grid math `src/lib/calendarGrid.ts`; export `src/lib/calendarExport.ts`.
+Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,calendarBoardSources,calendar,calendarCorpDeadlines,calendarCorpFilter,calendarSkillPlan,calendarKindFilter,calendarKindLabels,calendarViewPref,calendarWeekStart,calendarCsv,calendarResponseTone}.ts`; components `CalendarMap`, `CalendarDayTicker`, `ComingUpRail`, `CharacterBoardRow`, `CalendarKindFilterMenu`, `EventDetailModal`; engine `src/engine/character/{board,deadlines,corpCalendar,calendarRetention}.ts`; grid math `src/lib/calendarGrid.ts`; export `src/lib/calendarExport.ts`.
 
 ## Summary
 

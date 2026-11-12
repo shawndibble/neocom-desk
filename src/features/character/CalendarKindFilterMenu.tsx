@@ -169,7 +169,7 @@ export function CalendarKindFilterMenu({
       <DropdownMenuContent align="end" className="min-w-56">
         <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{t('calendar.filter.title')}</p>
         {CHARACTER_BOARD_ITEM_KINDS.filter(
-          // A moon-chunk source the Character was never allowed to ask about
+          // A corp source the Character was never allowed to ask about
           // gets no row, rather than an "Unavailable" hinting at corp access
           // they lack. Kinds with nothing due also drop out: see `hasRow`.
           hasRow

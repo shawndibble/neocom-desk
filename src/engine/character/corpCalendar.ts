@@ -26,7 +26,7 @@ const SOURCE_OF: Partial<Record<CorpBoardItemKind, keyof CorpCalendarSources>> =
 
 export function toCorpCalendarSources(
   items: readonly CorpBoardItem[],
-  corporations: ReadonlyMap<number, Omit<BoardCorporation, 'id'>>
+  corporations: ReadonlyMap<number, BoardCorporation>
 ): CorpCalendarSources {
   const sources: CorpCalendarSources = {
     structureFuel: [],
@@ -38,8 +38,8 @@ export function toCorpCalendarSources(
     const key = SOURCE_OF[item.kind];
     // No instant, no day to put it on: a structure already dry has no date.
     if (key === undefined || item.deadlineMs === null) continue;
-    const id = item.corporationId;
-    const label = id === undefined ? undefined : corporations.get(id);
+    const corporation =
+      item.corporationId === undefined ? undefined : corporations.get(item.corporationId);
     sources[key].push({
       id: item.id,
       subject: item.subject,
@@ -51,15 +51,7 @@ export function toCorpCalendarSources(
             : 'ready'
           : item.detail,
       deadlineMs: item.deadlineMs,
-      ...(id === undefined
-        ? {}
-        : {
-            corporation: {
-              id,
-              name: label?.name ?? String(id),
-              ticker: label?.ticker ?? String(id),
-            },
-          }),
+      ...(corporation ? { corporation } : {}),
     });
   }
   return sources;

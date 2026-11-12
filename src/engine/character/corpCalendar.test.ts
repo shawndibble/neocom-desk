@@ -10,8 +10,8 @@ const DAY = 24 * HOUR;
 const NOW = Date.UTC(2026, 10, 12, 23, 30);
 
 const LABELS = new Map([
-  [1, { name: 'Main Corp', ticker: 'MAIN' }],
-  [2, { name: 'Holding Two', ticker: 'HOLD2' }],
+  [1, { id: 1, name: 'Main Corp', ticker: 'MAIN' }],
+  [2, { id: 2, name: 'Holding Two', ticker: 'HOLD2' }],
 ]);
 
 function corpBoard(sources: Omit<CorpBoardSources, 'nowMs' | 'staleWindowMs'>) {
@@ -150,17 +150,6 @@ describe('toCorpCalendarSources', () => {
       },
     ]);
     expect(Object.values(toCorpCalendarSources(board, LABELS)).flat()).toEqual([]);
-  });
-
-  it('falls back to the corporation id when the corporation has no label', () => {
-    const board = mergeCorpBoards([
-      { corporationId: 3, items: corpBoard({ structures: [structure(1, 'Fort', NOW + DAY)] }) },
-    ]);
-    expect(toCorpCalendarSources(board, LABELS).structureFuel[0]?.corporation).toEqual({
-      id: 3,
-      name: '3',
-      ticker: '3',
-    });
   });
 });
 
