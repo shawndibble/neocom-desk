@@ -8,7 +8,7 @@ import type { LostLoss, MemberClaim } from '@/features/corp/srp/srpMemberModel';
 import type { SrpStatus } from '@/features/corp/srpTypes';
 import { DAY_MS } from '@/lib/age';
 import type { FixtureRoute } from './fixtureFetch';
-import { SAMPLE_CHARACTERS } from './sampleData';
+import { sampleCharacterPublicInfo } from './sampleData';
 
 const HASH = 'c'.repeat(40);
 
@@ -60,16 +60,7 @@ export function srpPublicInfoRoutes(
       path: /^\/characters\/\d+$/,
       respond: ({ url }) => {
         const id = Number(url.pathname.split('/').pop());
-        return {
-          body: {
-            name: SAMPLE_CHARACTERS.find((c) => c.characterId === id)?.name ?? 'Pilot',
-            corporation_id: corporationOf(id),
-            birthday: '2016-03-01T00:00:00Z',
-            bloodline_id: 1,
-            gender: 'male',
-            race_id: 1,
-          },
-        };
+        return { body: sampleCharacterPublicInfo(id, corporationOf(id)) };
       },
     },
   ];

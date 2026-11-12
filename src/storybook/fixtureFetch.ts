@@ -8,6 +8,7 @@
  *
  * Same-origin requests (the SDE bake, fonts) pass through to the real fetch.
  */
+import { SAMPLE_CHARACTERS, sampleCharacterPublicInfo } from './sampleData';
 
 export interface FixtureRequest {
   method: string;
@@ -33,6 +34,23 @@ const unexpected: string[] = [];
 export function unexpectedRequests(): readonly string[] {
   return unexpected;
 }
+
+/**
+ * Every shell story seeds `SAMPLE_CHARACTERS`, and the app reads their public
+ * sheets from work no one story owns (the corp identity read, public info), which
+ * can run while no table that answers them is installed. A CI run recorded one as
+ * unexpected (#6114), so the router answers these itself, after every installed
+ * table so a story's own fixture still wins. Any other Character's sheet is still
+ * recorded.
+ */
+const SAMPLE_SHEETS: readonly FixtureRoute[] = [
+  {
+    path: new RegExp(`^/characters/(${SAMPLE_CHARACTERS.map((c) => c.characterId).join('|')})$`),
+    respond: ({ url }) => ({
+      body: sampleCharacterPublicInfo(Number(url.pathname.split('/').pop())),
+    }),
+  },
+];
 
 function matches(route: FixtureRoute, method: string, path: string): boolean {
   if ((route.method ?? 'GET') !== method) return false;
@@ -70,7 +88,9 @@ async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit): Promi
     return original!(input, init);
   }
   const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
-  const route = [...installed].flat().find((candidate) => matches(candidate, method, url.pathname));
+  const route = [...[...installed].flat(), ...SAMPLE_SHEETS].find((candidate) =>
+    matches(candidate, method, url.pathname)
+  );
   if (!route) {
     const label = `${method} ${url.origin}${url.pathname}`;
     unexpected.push(label);

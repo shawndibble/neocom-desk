@@ -6,6 +6,7 @@
  */
 import type {
   CharacterAsset,
+  CharacterPublicInfo,
   CharacterLoyaltyPoints,
   IndustryJob,
   MarketOrder,
@@ -37,6 +38,25 @@ export const SAMPLE_CHARACTERS: readonly SampleCharacter[] = [
 ];
 
 export const SAMPLE_ACTIVE_CHARACTER = SAMPLE_CHARACTERS[0];
+
+/**
+ * A pilot's public sheet (`GET /characters/{id}`): a sample Character's name and
+ * corporation, or "Pilot" for any other id. `corporationId` overrides the corporation.
+ */
+export function sampleCharacterPublicInfo(
+  characterId: number,
+  corporationId?: number
+): CharacterPublicInfo {
+  const sample = SAMPLE_CHARACTERS.find((c) => c.characterId === characterId);
+  return {
+    name: sample?.name ?? 'Pilot',
+    corporation_id: corporationId ?? sample?.corporationId ?? 1,
+    birthday: '2016-03-01T00:00:00Z',
+    bloodline_id: 1,
+    gender: 'male',
+    race_id: 1,
+  };
+}
 
 /** Jita IV - Moon 4 - Caldari Navy Assembly Plant. */
 export const SAMPLE_STATION_ID = 60003760;
