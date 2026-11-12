@@ -5847,15 +5847,6 @@
           "fuel": "Fuel left",
           "state": "State",
           "timer": "Timer"
-        },
-        "detail": {
-          "unanchors": "Unanchors in",
-          "services": "Services",
-          "serviceState": {
-            "online": "Online",
-            "offline": "Offline",
-            "cleanup": "Going offline"
-          }
         }
       },
       "moonChunks": {
@@ -15202,7 +15193,12 @@
         "services": "Services",
         "moonExtraction": "Moon extraction",
         "chunkArrives": "Chunk arrives",
-        "naturalDecay": "Natural decay"
+        "naturalDecay": "Natural decay",
+        "serviceState": {
+          "online": "Online",
+          "offline": "Offline",
+          "cleanup": "Going offline"
+        }
       }
     },
     "rolesUnavailable": "Can't check your corporation roles right now",

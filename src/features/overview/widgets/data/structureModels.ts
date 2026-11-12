@@ -6,7 +6,11 @@ import { DAY_MS } from '@/lib/age';
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import type { CorpBoardItem } from '@/engine/corp/board';
 import { structureStateLabel } from '@/features/corp/boardSources';
-import { structureRows } from '@/features/corp/structures/structureRows';
+import {
+  shortStructureName,
+  structureRows,
+  structureWhen,
+} from '@/features/corp/structures/structureRows';
 import { formatCountdown } from '@/lib/duration';
 import { moonChunksSummary, structuresSummary } from '../../data/boardSummary';
 import {
@@ -29,12 +33,6 @@ const STRUCTURES_PAGE = '/corp/structures';
 
 // --- Structures -------------------------------------------------------------------
 
-/** "Efa - Helios Prime" is long on a tile; the name after the system prefix is the one a pilot knows it by. */
-export function shortStructureName(name: string): string {
-  const cut = name.indexOf(' - ');
-  return cut > 0 && cut + 3 < name.length ? name.slice(cut + 3) : name;
-}
-
 /**
  * A full tank is not in the data (ESI gives only when the fuel runs out), so the
  * bar reads against a fixed horizon: 30 days of fuel is a full bar.
@@ -47,14 +45,6 @@ function fuelCell(item: CorpBoardItem, t: Translate): TableCell {
   if (item.timing !== 'timed' || item.withinStaleWindow) return text;
   const bar = fractionBar(item.remainingMs ?? 0, FUEL_BAR_HORIZON_MS);
   return bar === undefined ? text : { text, bar };
-}
-
-export function structureWhen(item: CorpBoardItem, t: Translate): string {
-  if (item.timing === 'passed') return t('overview.board.structureDry');
-  if (item.timing === 'untimed') return t('overview.board.structureOffline');
-  // A clock shorter than CCP's hour-long cache may already be over, so it is not ticked down.
-  if (item.withinStaleWindow) return t('overview.board.structureSoon');
-  return formatCountdown(Math.max(0, item.remainingMs ?? 0) / 1000);
 }
 
 /**

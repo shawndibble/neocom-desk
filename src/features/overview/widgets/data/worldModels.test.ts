@@ -3,7 +3,8 @@ import type { BoardStructureSource } from '@/engine/corp/board';
 import { visibleColumns } from '../tableModel';
 import { buildView, feedsFor, feedsOf, kindHasAllFeeds } from './models';
 import { elapsedShare } from './industryModels';
-import { FUEL_BAR_HORIZON_MS, shortStructureName } from './structureModels';
+import { FUEL_BAR_HORIZON_MS } from './structureModels';
+import { shortStructureName } from '@/features/corp/structures/structureRows';
 import type { BuildContext, FeedState, Feeds, KindView, TableCell } from './types';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');

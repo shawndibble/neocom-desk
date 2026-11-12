@@ -12,12 +12,11 @@ import type { DeadlineSeverity } from '@/engine/character/severity';
 import type { BoardExtractionSource, CorpBoardItem } from '@/engine/corp/board';
 import { SystemLink } from '@/features/entities';
 import { structureStateLabel } from '@/features/corp/boardSources';
-import type { CorpLabel } from '@/features/corp/corpTicker';
-import { structureWhen } from '@/features/overview/widgets/data/structureModels';
+import { corpLabelText, type CorpLabel } from '@/features/corp/corpTicker';
 import type { SolarSystemEntry } from '@/sde/marketTypes';
 import { formatEveDateTime } from '@/lib/eveTime';
 import { formatTimestamp } from '@/lib/timestamp';
-import type { StructureRow } from './structureRows';
+import { structureWhen, type StructureRow } from './structureRows';
 
 const TONE: Record<DeadlineSeverity, StatChipTone> = {
   critical: 'danger',
@@ -88,7 +87,7 @@ export function StructureDetail({
 }: StructureDetailProps) {
   const { t } = useTranslation();
   const C = 'corp.structures.col';
-  const S = 'overview.widgets.structures.detail.serviceState';
+  const S = 'corp.structures.detail.serviceState';
   return (
     <SlideOver
       open={row !== null}
@@ -100,7 +99,7 @@ export function StructureDetail({
       {row && (
         <div className="space-y-4">
           <ValueList>
-            {corp && <ValueRow label={t(`${C}.corp`)} value={`${corp.name} [${corp.ticker}]`} />}
+            {corp && <ValueRow label={t(`${C}.corp`)} value={corpLabelText(corp)} />}
             {row.source.systemId !== undefined && (
               <ValueRow
                 label={t(`${C}.system`)}

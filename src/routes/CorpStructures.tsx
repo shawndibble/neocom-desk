@@ -40,12 +40,14 @@ import { SecurityStatus } from '@/components/SecurityStatus';
 import { DataGate } from '@/components/DataGate';
 import type { BoardExtractionSource } from '@/engine/corp/board';
 import { structureStateLabel } from '@/features/corp/boardSources';
-import type { CorpLabel } from '@/features/corp/corpTicker';
+import { corpLabelText, type CorpLabel } from '@/features/corp/corpTicker';
 import { StructureDetail } from '@/features/corp/structures/StructureDetail';
 import {
   byUrgency,
   filterStructureRows,
+  shortStructureName,
   structureRows,
+  structureWhen,
   type StructureFilter,
   type StructureRow,
 } from '@/features/corp/structures/structureRows';
@@ -56,10 +58,6 @@ import {
   type StructuresBoardData,
 } from '@/features/overview/data/boardData';
 import { structuresView } from '@/features/overview/data/corpCards';
-import {
-  shortStructureName,
-  structureWhen,
-} from '@/features/overview/widgets/data/structureModels';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { formatEveDateTime } from '@/lib/eveTime';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
@@ -112,7 +110,7 @@ function namePrefix(name: string): string {
   return cut > 0 ? name.slice(0, cut) : DASH;
 }
 
-function CorpStructuresView() {
+export function CorpStructures() {
   const { t } = useTranslation();
   const now = useNow();
   const systems = useSolarSystemIndex();
@@ -414,7 +412,7 @@ function CorpStructuresView() {
                           <SelectItem value={ANY}>{t('corp.structures.corpFilterAll')}</SelectItem>
                           {corpOptions.map(([id, corp]) => (
                             <SelectItem key={id} value={String(id)}>
-                              {`${corp.name} [${corp.ticker}]`}
+                              {corpLabelText(corp)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -477,8 +475,4 @@ function CorpStructuresView() {
       />
     </div>
   );
-}
-
-export function CorpStructures() {
-  return <CorpStructuresView />;
 }

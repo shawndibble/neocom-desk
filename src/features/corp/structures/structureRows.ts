@@ -9,6 +9,23 @@
  */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import type { BoardStructureSource, CorpBoardItem } from '@/engine/corp/board';
+import { formatCountdown } from '@/lib/duration';
+import type { Translate } from '@/lib/translate';
+
+/** "Efa - Helios Prime" is long on a tile; the name after the system prefix is the one a pilot knows it by. */
+export function shortStructureName(name: string): string {
+  const cut = name.indexOf(' - ');
+  return cut > 0 && cut + 3 < name.length ? name.slice(cut + 3) : name;
+}
+
+/** A structure clock's text: a countdown, or Dry, Offline or Soon when it cannot tick. */
+export function structureWhen(item: CorpBoardItem, t: Translate): string {
+  if (item.timing === 'passed') return t('overview.board.structureDry');
+  if (item.timing === 'untimed') return t('overview.board.structureOffline');
+  // A clock shorter than CCP's hour-long cache may already be over, so it is not ticked down.
+  if (item.withinStaleWindow) return t('overview.board.structureSoon');
+  return formatCountdown(Math.max(0, item.remainingMs ?? 0) / 1000);
+}
 
 export interface StructureRow {
   source: BoardStructureSource;
