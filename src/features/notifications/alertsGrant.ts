@@ -54,6 +54,37 @@ export type AlertsGrantOutcome =
     }
   | { status: 'failed'; characterId: number };
 
+/** What an Alerts round trip's return says about one Character's approval. */
+export type AlertsReturn =
+  | { kind: 'on' }
+  | { kind: 'failed' }
+  | { kind: 'cancelled' }
+  | { kind: 'wrong-character'; signedInAs: string };
+
+/**
+ * Read an Alerts round trip's return for a chain that asked `characterId` to
+ * approve (the moon run's alerts step, "Finish setting up"; issue #6103). `null`
+ * when the return is about another Character. A cancel names no one, so it
+ * counts for whichever approval was waiting.
+ */
+export function alertsReturnFor(
+  grant: AlertsCallbackState['alertsGrant'],
+  characterId: number
+): AlertsReturn | null {
+  switch (grant.status) {
+    case 'cancelled':
+      return { kind: 'cancelled' };
+    case 'mismatch':
+      return grant.expectedCharacterId === characterId
+        ? { kind: 'wrong-character', signedInAs: grant.authorizedName }
+        : null;
+    case 'on':
+      return grant.characterId === characterId ? { kind: 'on' } : null;
+    case 'failed':
+      return grant.characterId === characterId ? { kind: 'failed' } : null;
+  }
+}
+
 export async function readAlertsGrants(): Promise<Record<number, AlertsGrantRecord>> {
   const row = await db.settings.get(GRANTS_KEY);
   const value = row?.value;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, Disclosure, Modal, NativeSelect, Panel } from '@/components/ui';
+import { Button, Checkbox, Disclosure, Modal, NativeSelect, Panel } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import type { AddCorpsCandidate, CoverageChoice } from '@/engine/corpTaxBook/addCorpsRun';
 
@@ -10,20 +10,29 @@ const CHOICES = ['today', '7', '14', '30'] as const;
 const toChoice = (v: string): CoverageChoice =>
   v === 'today' ? 'today' : (Number(v) as 7 | 14 | 30);
 
-/** Step 2: one confirm for the whole batch: what the book sees, and how far back to count. */
+/**
+ * Step 2: one confirm for the whole batch: what the book sees, and how far back to count.
+ * With closed-app alerts on for the account, one switch chains each CEO's alerts approval
+ * straight after its corp's sign-in (issue #6103); off skips it for the whole run.
+ */
 export function ConfirmBatchDialog({
   corps,
+  offerAlerts = false,
   onBack,
   onConnect,
   onClose,
 }: {
   corps: readonly AddCorpsCandidate[];
+  /** Whether closed-app alerts are on for the account and some CEO here lacks them. */
+  offerAlerts?: boolean;
   onBack: () => void;
-  onConnect: (choice: CoverageChoice) => void;
+  /** `alerts`: chain each CEO's alerts approval after its corp (always false when not offered). */
+  onConnect: (choice: CoverageChoice, alerts: boolean) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const [choice, setChoice] = useState<string>('today');
+  const [alerts, setAlerts] = useState(true);
   const [open, setOpen] = useState(false);
   const count = corps.length;
   return (
@@ -35,7 +44,10 @@ export function ConfirmBatchDialog({
       footer={
         <div className="flex items-center justify-between gap-2">
           <Button onClick={onBack}>{t(k('back_button'))}</Button>
-          <Button variant="primary" onClick={() => onConnect(toChoice(choice))}>
+          <Button
+            variant="primary"
+            onClick={() => onConnect(toChoice(choice), offerAlerts && alerts)}
+          >
             {t(k('go'), { count })}
           </Button>
         </div>
@@ -74,6 +86,19 @@ export function ConfirmBatchDialog({
           </NativeSelect>
           <span className="block text-xs text-text-dim">{t(k('backHint'), { count })}</span>
         </label>
+        {offerAlerts && (
+          <label className="flex items-start gap-2">
+            <Checkbox
+              className="mt-0.5"
+              checked={alerts}
+              onChange={(e) => setAlerts(e.target.checked)}
+            />
+            <span>
+              <span className="block font-semibold">{t(k('alerts'))}</span>
+              <span className="block text-xs text-text-dim">{t(k('alertsHint'))}</span>
+            </span>
+          </label>
+        )}
         <Disclosure
           label={t(k('batch'), { count })}
           expanded={open}

@@ -4868,6 +4868,41 @@
     }
   },
   "characters": {
+    "finishSetup": {
+      "title": "Finish setting up {{name}}",
+      "signedIn": "Your EVE account is still signed in as {{name}}, so each of these is one Authorize press at EVE.",
+      "hint": "EVE sends you back here after each one. Picking a different character at EVE approves nothing.",
+      "continue": "Continue",
+      "notNow": "Not now",
+      "stop": "Stop here",
+      "failed": "Could not open EVE's login. Try again.",
+      "moon": {
+        "label": "Add {{corp}} to the moon book",
+        "why": "Lets the book read {{corp}}'s mining ledger, counted from today.",
+        "action": "Approve the moon book at EVE"
+      },
+      "alerts": {
+        "label": "Alerts when the app is closed",
+        "why": "Sends {{name}}'s EVE alerts to your devices while Neocom Desk is closed, like your other characters.",
+        "action": "Approve alerts at EVE"
+      },
+      "result": {
+        "done": "Done: {{label}}.",
+        "notDone": "Not approved: {{label}}. You can do it later where it lives.",
+        "refused": "Not approved: {{label}}. {{reason}}",
+        "wrong": "You approved as {{signedInAs}}, so nothing was approved. Pick {{name}} on EVE's login page and try again."
+      },
+      "state": {
+        "done": "Done",
+        "notDone": "Not done",
+        "now": "Now",
+        "next": "Next"
+      },
+      "doneTitle": "{{name}} is set up",
+      "doneBody": "Anything not done here is still offered later: the moon book from the Moons page, alerts from Settings › Notifications.",
+      "addAnother": "Add another character",
+      "done": "Done"
+    },
     "csvPiExpires": "PI expires",
     "csvTrainingFinishes": "Training finishes",
     "csvAchievementTitle": "Title",
@@ -18119,7 +18154,9 @@
           "batch": "Corps in this batch ({{count}})",
           "back_button": "Back",
           "go_one": "Connect {{count}} corp",
-          "go_other": "Connect {{count}} corps"
+          "go_other": "Connect {{count}} corps",
+          "alerts": "Also approve closed-app alerts for each CEO",
+          "alertsHint": "Straight after each corp, while EVE is still signed in as its CEO: one more Authorize press. Turn off to skip alerts for this whole run."
         },
         "signIn": {
           "title": "Logging in: corp {{n}} of {{total}}",
@@ -18133,6 +18170,14 @@
           "wrong": "You logged in as {{signedInAs}}. {{corp}} needs {{ceo}}. Nothing was connected; try again with the character below.",
           "notConnected": "{{name}} was not connected. {{reason}} It is listed under Needs you.",
           "cancelled": "The EVE login did not finish.",
+          "alertsTitle": "Corp {{n}} of {{total}}: one more approval for alerts",
+          "alertsWhy": "This turns on alerts when the app is closed for {{ceo}}, like your other characters.",
+          "alertsHint": "EVE is still signed in as {{ceo}}, so this is one Authorize press. Picking someone else approves nothing.",
+          "alertsAction": "Approve alerts as {{ceo}}",
+          "alertsSkip": "Skip alerts",
+          "alertsWrong": "You approved as {{signedInAs}}, so alerts were not turned on. Pick {{ceo}} and try again.",
+          "alertsOn": "Alerts are on for {{ceo}}.",
+          "alertsNotOn": "Alerts were not turned on for {{ceo}}. You can do it later in Settings › Notifications.",
           "stop": "Stop here",
           "action": "Log in as {{ceo}} with EVE",
           "failed": "Could not open EVE's login. Try again.",

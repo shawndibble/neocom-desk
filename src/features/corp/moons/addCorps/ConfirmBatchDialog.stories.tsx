@@ -18,3 +18,6 @@ export const Default: Story = {};
 
 /** @summary One corp. */
 export const OneCorp: Story = { args: { corps: CORPS.slice(0, 1) } };
+
+/** @summary Closed-app alerts are on for the account: one switch chains each CEO's alerts approval. */
+export const WithAlerts: Story = { args: { offerAlerts: true } };

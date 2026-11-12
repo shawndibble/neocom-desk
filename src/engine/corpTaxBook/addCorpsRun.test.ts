@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   advance,
+  currentAlerts,
+  recordAlertsOutcome,
   coverageFromForChoice,
   current,
   isDone,
@@ -148,5 +150,60 @@ describe('retry', () => {
   it('ignores a corp that is not in the run', () => {
     const run = fresh();
     expect(retry(run, 99)).toBe(run);
+  });
+});
+
+describe('chaining closed-app alerts after each moon sign-in', () => {
+  const chained = () =>
+    startRun({
+      collectorCorporationId: 9,
+      editorCharacterId: 1,
+      queue: corps,
+      alertsFor: [101, 103],
+    });
+
+  it('asks for the CEO alerts approval right after a corp connects', () => {
+    const run = recordOutcome(chained(), { kind: 'connected' });
+    expect(currentAlerts(run)?.corporationId).toBe(1);
+    expect(current(run)?.corporationId).toBe(2);
+    expect(isDone(run)).toBe(false);
+  });
+
+  it('does not chain for a CEO who already has alerts, or a corp that did not connect', () => {
+    let run = recordOutcome(chained(), { kind: 'skipped' });
+    expect(currentAlerts(run)).toBeUndefined();
+    run = recordOutcome(chained(), { kind: 'connected' });
+    run = recordAlertsOutcome(run, { kind: 'on' });
+    run = recordOutcome(run, { kind: 'connected' });
+    expect(currentAlerts(run)).toBeUndefined();
+  });
+
+  it('a wrong character keeps the alerts step; any other result ends it', () => {
+    let run = recordOutcome(chained(), { kind: 'connected' });
+    run = recordAlertsOutcome(run, { kind: 'wrong-character', signedInAs: 'Dax' });
+    expect(currentAlerts(run)?.corporationId).toBe(1);
+    expect(run.alertsStep?.signedInAs).toBe('Dax');
+    run = recordAlertsOutcome(run, { kind: 'skipped' });
+    expect(currentAlerts(run)).toBeUndefined();
+    expect(run.lastAlerts).toEqual({ corporationId: 1, kind: 'skipped' });
+  });
+
+  it('is not done while the last corp still has its alerts step', () => {
+    let run = startRun({
+      collectorCorporationId: 9,
+      editorCharacterId: 1,
+      queue: corps.slice(0, 1),
+      alertsFor: [101],
+    });
+    run = recordOutcome(run, { kind: 'connected' });
+    expect(isDone(run)).toBe(false);
+    run = recordAlertsOutcome(run, { kind: 'on' });
+    expect(isDone(run)).toBe(true);
+  });
+
+  it('stopping drops a pending alerts step', () => {
+    const run = stop(recordOutcome(chained(), { kind: 'connected' }));
+    expect(currentAlerts(run)).toBeUndefined();
+    expect(isDone(run)).toBe(true);
   });
 });

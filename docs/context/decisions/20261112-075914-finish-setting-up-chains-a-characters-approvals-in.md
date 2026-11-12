@@ -1,0 +1,10 @@
+# Scope decisions — Finish setting up chains a character's approvals in one sitting (issue #6103)
+
+_Recorded 2026-11-12 · issue #6103._
+
+- **After a sign-in, a Character's other EVE approvals are offered in one step, never started without a press.** "Finish setting up {character}" lists the moon book (its CEO corporation) and closed-app alerts, ticked, with Continue and Not now; Continue walks them one EVE round trip each. The three tokens stay separate and as narrow as before (ADR 0020, ADR 0025): only the order and the moment change, so the player signs in to each EVE account once per sitting rather than three times. Rules out asking for either server-held scope in the app's own sign-in.
+- **What the step offers comes only from what the device already knows.** The moon book is the one this device last opened as an editor (remembered by the Moons page), not every book the account might edit: finding those would mean a verified, priced Firestore read per corporation on every sign-in. Alerts are offered only once the player has them on for another Character, so a player who never chose closed-app alerts is never asked after a sign-in.
+- **A corporation added outside a run counts from today.** The step has no "How far back?"; the moon run's own rules are unchanged and still offer the longer windows.
+- **Not now is per Character and per approval, and device-local.** The existing entry points (the Moons page, Settings › Notifications) still offer both later.
+- **The moon run chains alerts only after a corp connects.** That is when EVE is certainly signed in as the CEO. A skipped, cancelled or refused corp asks for nothing; one switch on the confirm screen (default on) skips alerts for the whole run.
+- **The step's own state is a short-lived session record, not a third general queue.** The Alerts walk (sessionStorage, per Character) and the moon run (Dexie, outcomes kept for Needs you) answer different questions and stay as they are; the step reads both callbacks' router state and keeps only its current item, the same 15-minute bound as a Pending Login.
