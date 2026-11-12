@@ -32,6 +32,7 @@ export function calendarCsvColumns(t: CsvTranslate): CsvColumn<CharacterBoardIte
           ? t(`calendar.detail.${item.kind}.${item.detail}`, { defaultValue: item.detail })
           : undefined,
     },
+    { header: t('calendar.csvCorporation'), value: (item) => item.corporation?.name },
     {
       header: t('calendar.csvResponse'),
       value: (item) => (item.response === null ? undefined : t(RESPONSE_KEY[item.response])),

@@ -119,7 +119,10 @@ Never a status, never interactive. A fifth location reuses the first hue, so the
 | `kind-industry-job`      | `#e59a55` | Industry job deliveries.                                 |
 | `kind-planet-extraction` | `#6fdecd` | PI extractor program ends.                               |
 | `kind-mercenary-den`     | `#c88be9` | Mercenary Den reinforcement ends and operation expiries. |
+| `kind-structure-timer`   | `#88b078` | Corp structure timers ending.                            |
+| `kind-structure-fuel`    | `#b8a858` | Corp structures running out of fuel.                     |
 | `kind-moon-chunk`        | `#a0a8b8` | Moon chunk arrivals and decays.                          |
+| `kind-corp-job`          | `#c0e0d8` | Corp industry jobs finishing.                            |
 | `kind-skyhook-raid`      | `#d9a7a0` | Corp skyhook raid windows opening and closing.           |
 | `kind-contract-expiry`   | `#f2879f` | Contract expiries.                                       |
 | `kind-order-expiry`      | `#c9d96a` | Market-order expiries.                                   |
@@ -127,7 +130,7 @@ Never a status, never interactive. A fifth location reuses the first hue, so the
 
 Every other color scale in this app is **ordinal or semantic** — `securityStatusColor`
 is a position on a numeric scale, `STANDING_TONE` and the severity ladder are
-magnitudes. These ten are **nominal**: no order, no magnitude, identity only. They say
+magnitudes. These are **nominal**: no order, no magnitude, identity only. They say
 which part of the app a deadline came from, and they are read by
 `src/components/ui/kindTone.ts` (`KIND_FILL`, `KIND_TEXT`).
 
@@ -1703,7 +1706,7 @@ Every interactive element takes its states from one shared recipe in
 | `line-bright` on `panel-2` (resting field border, non-text ≥3:1) | 3.15                  |
 | `::selection` fill / `text`                                      | 4.64                  |
 
-Clock-kind tokens (§1) color countdown **text**, so all ten are measured on all three
+Clock-kind tokens (§1) color countdown **text**, so each is measured on all three
 surfaces — `bg` / `panel` / `panel-2`:
 
 | Token                    | Ratios                |
@@ -1713,7 +1716,10 @@ surfaces — `bg` / `panel` / `panel-2`:
 | `kind-industry-job`      | 8.37 / 7.86 / 7.33    |
 | `kind-planet-extraction` | 11.98 / 11.25 / 10.50 |
 | `kind-mercenary-den`     | 7.67 / 7.20 / 6.72    |
+| `kind-structure-timer`   | 7.85 / 7.38 / 6.88    |
+| `kind-structure-fuel`    | 8.09 / 7.59 / 7.09    |
 | `kind-moon-chunk`        | 8.09 / 7.60 / 7.09    |
+| `kind-corp-job`          | 13.72 / 12.88 / 12.02 |
 | `kind-skyhook-raid`      | 9.20 / 8.64 / 8.06    |
 | `kind-contract-expiry`   | 8.05 / 7.56 / 7.05    |
 | `kind-order-expiry`      | 12.54 / 11.78 / 10.99 |
@@ -1759,6 +1765,9 @@ Ship Tree golds (§1), also used as text, on `bg` / `panel` / `panel-2`:
   only (ΔE ≥ 30 from every other tone); it leans on the glyph and name like the rest.
   `kind-skyhook-raid` (a dusty clay) is ΔE ≥ 23 from every other clock kind and ≥ 41 from
   the four status tones under normal vision, and likewise leans on its glyph and name.
+  `kind-structure-timer` (sage), `kind-structure-fuel` (olive gold) and `kind-corp-job`
+  (pale mint) are each ΔE ≥ 23 from every other clock kind and ≥ 27 from the status
+  tones, normal vision only.
 - Tabs: full `role="tablist"` semantics + arrow-key navigation.
 - Status messages go through `LiveStatus` (§4). Never mount a `role="status"` node together with its text. Never add it as the last child of a `space-y-*` / `divide-y` container.
 - Spinners expose `role="status"`; DataAgeBadge exposes absolute timestamp via

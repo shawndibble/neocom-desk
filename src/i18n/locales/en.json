@@ -9171,6 +9171,12 @@
     "csvImportant": "Important",
     "csvProjected": "Projected",
     "csvId": "ID",
+    "csvCorporation": "Corporation",
+    "corpFilter": {
+      "title": "Corporation events",
+      "all": "All corporations",
+      "none": "Hide corporation events"
+    },
     "downloadIcs": "Download .ics",
     "addToGoogleCalendar": "Add to Google Calendar",
     "rsvpGrantTitle": "Permission to respond to events",
@@ -9207,7 +9213,10 @@
       "industryJob": "Industry jobs",
       "planetExtraction": "Planets",
       "mercenaryDen": "Mercenary dens",
+      "structureTimer": "Structure timers",
+      "structureFuel": "Structure fuel",
       "moonChunk": "Moon chunks",
+      "corpJob": "Corp industry jobs",
       "skyhookRaid": "Skyhook raids",
       "contractExpiry": "Contracts",
       "orderExpiry": "Market orders",
@@ -9217,6 +9226,24 @@
       "moonChunk": {
         "arrival": "arrives",
         "decay": "decays if not fractured"
+      },
+      "structureTimer": {
+        "anchor_vulnerable": "anchor vulnerability ends",
+        "anchoring": "anchoring ends",
+        "armor_reinforce": "armor reinforcement ends",
+        "armor_vulnerable": "armor vulnerability ends",
+        "deploy_vulnerable": "deployment vulnerability ends",
+        "fitting_invulnerable": "fitting invulnerability ends",
+        "hull_reinforce": "hull reinforcement ends",
+        "hull_vulnerable": "hull vulnerability ends",
+        "onlining_vulnerable": "onlining vulnerability ends",
+        "shield_vulnerable": "shield vulnerability ends",
+        "unanchoring": "unanchors",
+        "unknown": "timer ends"
+      },
+      "corpJob": {
+        "active": "in progress",
+        "ready": "ready to deliver"
       },
       "skyhookRaid": {
         "upcoming": "raid window opens",

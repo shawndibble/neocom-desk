@@ -40,6 +40,7 @@ export const VIEW_PREFERENCE_KEYS: readonly string[] = [
   'assetsItemSort',
   'assetsRoutePreference',
   'assetsStationSort',
+  'calendarCorpFilter',
   'calendarHiddenKinds',
   'calendarView',
   'characterFilterPicks',
