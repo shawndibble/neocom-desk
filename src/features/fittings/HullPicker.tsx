@@ -1,4 +1,5 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -129,7 +130,12 @@ function HullPickerView({
           onChange={(event) => setQuery(event.target.value)}
         />
         {flyMarks !== null && (
-          <label className="flex min-h-9 cursor-pointer items-center gap-2 text-sm text-text-dim md:min-h-7">
+          <label
+            className={cx(
+              tappableRowClassName,
+              'flex cursor-pointer items-center gap-2 text-sm text-text-dim'
+            )}
+          >
             <Checkbox checked={flyOnly} onChange={() => setFlyOnly(!flyOnly)} />
             {t('fittings.start.onlyFlyable')}
           </label>

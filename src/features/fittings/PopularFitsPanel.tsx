@@ -15,12 +15,14 @@ import {
   Spinner,
 } from '@/components/ui';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
 import type { FitSkillVerdict, MissingSkill } from '@/engine/fittings/fitSkillVerdict';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { popularFitLoad, type PopularFit } from '@/engine/fittings/popularFits';
 import { fittingRequirementTypeIds } from '@/engine/fittings/skillGaps';
 import { formatAge } from '@/lib/age';
+import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
 import { useTouchContext } from '@/lib/useMediaQuery';
 import { useNow } from '@/lib/useNow';
@@ -338,7 +340,12 @@ export function PopularFitsPanel({
           onChange={setFilter}
         />
         {verdicts !== null && (
-          <label className="flex min-h-9 cursor-pointer items-center gap-2 text-xs text-text md:min-h-7 touch:min-h-9">
+          <label
+            className={cx(
+              tappableRowClassName,
+              'flex cursor-pointer items-center gap-2 text-xs text-text'
+            )}
+          >
             <Checkbox checked={flyOnly} onChange={() => setFlyOnly(!flyOnly)} />
             {t('fittings.popular.canFlyNow')}
             <span className="text-text-dim tabular-nums">
