@@ -1,8 +1,11 @@
 /**
  * The editable fields of one cerebral accelerator (GLOSSARY.md **Accelerator**):
- * its bonus and when it runs out, entered as time left (EVE's own tooltip) or as
- * the date and time it ends. Shared by the Skill Plan's Accelerator section and the
- * Characters table's popover, so the two can never drift apart.
+ * when it runs out, entered as time left (EVE's own tooltip) or, behind a quiet
+ * switch, as the date and time it ends; then its bonus, unless the attribute sheet
+ * already gave it (the caller shows that once, as a fact). Time comes first: it is
+ * the one value EVE never reports, and nothing saves without it. Shared by the
+ * Skill Plan's Accelerator section and the Characters table's popover, so the
+ * two can never drift apart.
  *
  * Stateless about where the value lives: the caller owns it and `onExpiresChange`
  * reports whether the edit applied. The expiry is always an instant; the two modes only differ in
@@ -13,23 +16,13 @@
  * commits `null` only when focus leaves the group and every box is blank,
  * because clearing a box to retype it must not erase a saved expiry.
  */
-import { useId, useState, type FocusEvent } from 'react';
+import { useId, useState, type FocusEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SegmentedControl, TextInput } from '@/components/ui';
-import {
-  disabledClassName,
-  focusRingClassName,
-  interactiveClassName,
-  tappableRowClassName,
-  toggleChipStateClassName,
-} from '@/components/ui/controlStyles';
-import { cx } from '@/lib/cx';
+import { Button, TextInput } from '@/components/ui';
 import { useTimeZone } from '@/lib/timeFormat';
 import { inputValueToInstant, instantToInputValue } from '@/lib/zonedInput';
 import {
-  BOOSTER_QUICK_PICKS,
   MAX_BOOSTER_BONUS,
-  boosterExpiryFromNow,
   clampBoosterBonus,
   joinBoosterDuration,
   splitBoosterDuration,
@@ -45,7 +38,7 @@ function useDurationFields(
   onCommit: (expiresAt: number | null) => boolean
 ) {
   // `syncedTo` is the committed expiry the draft was typed against: a draft
-  // for any other value (a quick pick, a sync, the row in front moving) is stale.
+  // for any other value (a sync, the row in front moving) is stale.
   const [draft, setDraft] = useState<{ syncedTo: number | null; text: DurationDraft } | null>(null);
   // eslint-disable-next-line react-hooks/purity -- display-only: the time left reads the clock
   const now = Date.now();
@@ -95,6 +88,10 @@ export interface AcceleratorFieldsProps {
   onExpiresChange: (expiresAt: number | null) => boolean;
   /** `aria-invalid` and friends, spread onto each input while the caller rejects the value. */
   invalidProps?: { 'aria-invalid': true; 'aria-describedby': string };
+  /** A note under the time, such as why it still needs setting. */
+  hint?: ReactNode;
+  /** Controls at the end of the bottom row, beside the entry-mode switch (Clear). */
+  actions?: ReactNode;
 }
 
 export function AcceleratorFields({
@@ -104,41 +101,20 @@ export function AcceleratorFields({
   onBonusChange,
   onExpiresChange,
   invalidProps,
+  hint,
+  actions,
 }: AcceleratorFieldsProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const modeId = useId();
+  const hintId = useId();
+  // Read with the time boxes, so a screen reader hears why the time is needed.
+  const describedBy = hint ? { 'aria-describedby': hintId } : {};
   const [mode, setMode] = useState<EntryMode>('remaining');
   const expiresIn = useDurationFields(expiresAt, onExpiresChange);
 
   return (
     <div className="space-y-2">
-      <label className="flex items-center justify-between gap-2">
-        {t('plans.boosterBonus')}
-        {bonusLocked ? (
-          <span className="font-semibold">+{bonus}</span>
-        ) : (
-          <TextInput
-            size="md"
-            type="number"
-            min={1}
-            max={MAX_BOOSTER_BONUS}
-            value={bonus}
-            onChange={(e) => onBonusChange(clampBoosterBonus(Number(e.target.value)))}
-            {...invalidProps}
-            className="field-no-spinner w-16 text-center"
-          />
-        )}
-      </label>
-      <SegmentedControl<EntryMode>
-        label={t('accelerator.entryMode')}
-        value={mode}
-        onChange={setMode}
-        options={[
-          { value: 'remaining', label: t('accelerator.modeRemaining') },
-          { value: 'expires', label: t('accelerator.modeExpires') },
-        ]}
-      />
       {mode === 'remaining' ? (
         <div role="group" aria-label={t('plans.boosterExpiresIn')} onBlur={expiresIn.onBlur}>
           <div className="flex items-center justify-between gap-2">
@@ -151,9 +127,9 @@ export function AcceleratorFields({
                     type="text"
                     inputMode="numeric"
                     aria-label={t(`plans.boosterUnit.${unit}`)}
-                    placeholder="0"
                     value={expiresIn.text[unit]}
                     onChange={(e) => expiresIn.onChange(unit, e.target.value)}
+                    {...describedBy}
                     {...invalidProps}
                     className="w-12 text-center"
                   />
@@ -175,31 +151,37 @@ export function AcceleratorFields({
               const at = inputValueToInstant(e.target.value, timeZone);
               if (at !== null) onExpiresChange(at);
             }}
+            {...describedBy}
             {...invalidProps}
             className="w-auto"
           />
         </label>
       )}
-      <div role="group" aria-label={t('plans.boosterQuickPicks')} className="flex flex-wrap gap-1">
-        {BOOSTER_QUICK_PICKS.map(({ hours }) => (
-          <button
-            key={hours}
-            type="button"
-            onClick={() => onExpiresChange(boosterExpiryFromNow(hours, Date.now()))}
-            className={cx(
-              tappableRowClassName,
-              'rounded-xs border px-1.5 text-[0.6875rem]',
-              toggleChipStateClassName(false),
-              interactiveClassName,
-              focusRingClassName,
-              disabledClassName
-            )}
-          >
-            {hours % 24 === 0
-              ? t('plans.boosterQuickPickDays', { days: hours / 24 })
-              : t('plans.boosterQuickPickHours', { hours })}
-          </button>
-        ))}
+      {hint && <div id={hintId}>{hint}</div>}
+      {!bonusLocked && (
+        <label className="flex items-center justify-between gap-2">
+          {t('plans.boosterBonus')}
+          <TextInput
+            size="md"
+            type="number"
+            min={1}
+            max={MAX_BOOSTER_BONUS}
+            value={bonus}
+            onChange={(e) => onBonusChange(clampBoosterBonus(Number(e.target.value)))}
+            {...invalidProps}
+            className="field-no-spinner w-16 text-center"
+          />
+        </label>
+      )}
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => setMode(mode === 'remaining' ? 'expires' : 'remaining')}
+        >
+          {mode === 'remaining' ? t('accelerator.useEndTime') : t('accelerator.useTimeLeft')}
+        </Button>
+        {actions}
       </div>
     </div>
   );

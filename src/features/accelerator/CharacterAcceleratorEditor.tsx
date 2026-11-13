@@ -36,34 +36,37 @@ export function CharacterAcceleratorEditor({
   const bonus = record?.bonus ?? detectedBonus ?? draftBonus;
 
   return (
-    <div className="space-y-3">
-      <AcceleratorFields
-        bonus={bonus}
-        expiresAt={record?.expiresAt ?? null}
-        bonusLocked={!record && detectedBonus !== null}
-        onBonusChange={(next) => {
-          // An emptied box reads as 0: not a bonus anyone means to save.
-          if (next < 1) return;
-          setDraftBonus(next);
-          if (record) void setCharacterAccelerator(characterId, next, record.expiresAt);
-        }}
-        onExpiresChange={(expiresAt) => {
-          if (expiresAt === null) void clearCharacterAccelerator(characterId);
-          else void setCharacterAccelerator(characterId, bonus, expiresAt);
-          return true;
-        }}
-      />
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-text-dim">{t('accelerator.autoDetectHint')}</p>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={!record}
-          onClick={() => void clearCharacterAccelerator(characterId)}
-        >
-          {t('accelerator.clear')}
-        </Button>
-      </div>
-    </div>
+    <AcceleratorFields
+      bonus={bonus}
+      expiresAt={record?.expiresAt ?? null}
+      bonusLocked={!record && detectedBonus !== null}
+      onBonusChange={(next) => {
+        // An emptied box reads as 0: not a bonus anyone means to save.
+        if (next < 1) return;
+        setDraftBonus(next);
+        if (record) void setCharacterAccelerator(characterId, next, record.expiresAt);
+      }}
+      onExpiresChange={(expiresAt) => {
+        if (expiresAt === null) void clearCharacterAccelerator(characterId);
+        else void setCharacterAccelerator(characterId, bonus, expiresAt);
+        return true;
+      }}
+      hint={
+        record ? null : (
+          <p className="text-[0.6875rem] text-text-dim">{t('plans.acceleratorNoExpiry')}</p>
+        )
+      }
+      actions={
+        record ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void clearCharacterAccelerator(characterId)}
+          >
+            {t('accelerator.clear')}
+          </Button>
+        ) : null
+      }
+    />
   );
 }

@@ -47,18 +47,31 @@ describe('AcceleratorCell', () => {
     expect(screen.getByText('No')).toBeInTheDocument();
   });
 
-  it('always offers the pencil, and saving a quick pick stores the accelerator', async () => {
+  it('always offers the pencil, and typing the time left stores the accelerator', async () => {
     const user = userEvent.setup();
     renderCell(undefined, 12);
     await user.click(screen.getByRole('button', { name: 'Edit accelerator for Pilot Seven' }));
-    // The bonus is a fact read from the attribute sheet: shown, not an input.
-    await screen.findByRole('button', { name: /^24\s?h|1 ?d/i });
+    // The bonus is a fact read from the attribute sheet: not an input.
+    const days = await screen.findByLabelText('Days');
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^24\s?h|1 ?d/i }));
+    expect(days).toHaveAccessibleDescription(/EVE doesn’t report when boosters expire/);
+    await user.type(days, '1');
     await waitFor(async () => {
       const row = await db.characterAccelerators.get('7');
       expect(row?.bonus).toBe(12);
       expect(row?.expiresAt).toBeGreaterThan(Date.now() + 23 * HOUR);
     });
+  });
+
+  it('switches to entering the end time from a quiet control under the fields', async () => {
+    const user = userEvent.setup();
+    renderCell(undefined, 12);
+    await user.click(screen.getByRole('button', { name: 'Edit accelerator for Pilot Seven' }));
+    await user.click(await screen.findByRole('button', { name: 'Enter end time instead' }));
+
+    expect(screen.getByLabelText('Ends at')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Days')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Enter time left instead' }));
+    expect(screen.getByLabelText('Days')).toBeInTheDocument();
   });
 });

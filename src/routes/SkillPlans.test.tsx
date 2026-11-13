@@ -472,9 +472,7 @@ describe('SkillPlans: an injected accelerator under Attributes', () => {
     render(<App />);
 
     const panel = await attributesPanel();
-    expect(
-      await within(panel).findByText('+3 from the EVE API has been auto applied.')
-    ).toBeInTheDocument();
+    expect(await within(panel).findByText('+3 detected')).toBeInTheDocument();
     expect(within(panel).getByRole('group', { name: 'Time left' })).toBeInTheDocument();
   });
 
