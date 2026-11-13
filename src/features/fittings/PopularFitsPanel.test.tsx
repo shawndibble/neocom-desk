@@ -299,13 +299,16 @@ describe('PopularFitsPanel EVE Workbench guides', () => {
     useMarketHub.setState({ value: 'jita' });
   });
 
+  // One date for every fit: read per fit, a clock tick between two makes the
+  // later one "newer", and the default Newest sort reorders the list.
+  const ADDED = Date.now() - 2.5 * 86_400_000;
   function wbFit(id: string, extra: Partial<WorkbenchFit> = {}): WorkbenchFit {
     return {
       id,
       name: `Fit ${id}`,
       authorId: 1,
       authorName: 'Saryna Dach',
-      dateAdded: Date.now() - 2.5 * 86_400_000,
+      dateAdded: ADDED,
       eft: `[Vexor, Fit ${id}]`,
       ...extra,
     };
