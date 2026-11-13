@@ -23,6 +23,8 @@ import { newPlan } from '@/features/skills/planner/newPlan';
 import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { AttributesPane } from '@/features/skills/planner/AttributesPane';
+import { AcceleratorSection } from '@/features/skills/planner/AcceleratorSection';
+import { isAcceleratorLive } from '@/engine/accelerator';
 import { CurrentQueuePanel } from '@/features/skills/planner/CurrentQueuePanel';
 import { QueueStrip } from '@/features/skills/planner/QueueStrip';
 import { SkillPlanCard } from '@/features/skills/planner/SkillPlanCard';
@@ -97,6 +99,12 @@ export function SkillPlans() {
   // Shared with every other 30 s clock on screen; paused while the tab is hidden.
   const nowMs = useTicker(TICK_MS);
   const timeZone = useTimeZone();
+  // An injected booster: typed in and still running, or read off the attribute
+  // sheet (EVE gives its size but never its expiry, so the pilot sets that here).
+  const runningAccelerator =
+    accelerator && isAcceleratorLive(accelerator, nowMs) ? accelerator : null;
+  const detectedAccelerator =
+    attributeBaseline?.kind === 'accelerated' ? attributeBaseline.acceleratorBonus : null;
   const weekStart = useCalendarWeekStart((state) => state.value);
   useHydratedStore(useCalendarWeekStart);
   const queueView = useMemo(
@@ -242,6 +250,15 @@ export function SkillPlans() {
             remapInfo={remapInfo}
             onOptimizeQueue={scheduleInputs && remapInfo ? () => void optimizeQueue() : undefined}
             queueEmpty={queueResult != null && queueResult.data.length === 0}
+            accelerator={
+              (runningAccelerator !== null || detectedAccelerator !== null) && (
+                <AcceleratorSection
+                  characterId={activeCharacterId}
+                  running={runningAccelerator}
+                  detectedBonus={detectedAccelerator}
+                />
+              )
+            }
           />
         </aside>
         {catalog && (

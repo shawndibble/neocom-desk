@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, Panel, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -23,6 +24,12 @@ interface AttributesPaneProps {
   onOptimizeQueue?: () => void;
   /** The in-game queue has nothing in it: the button stays focusable and says why. */
   queueEmpty?: boolean;
+  /**
+   * The injected Accelerator's controls (`AcceleratorSection`), under Optimize
+   * queue so the pilot can set its time left without opening a plan; omitted
+   * when nothing is injected.
+   */
+  accelerator?: ReactNode;
   className?: string;
 }
 
@@ -45,6 +52,7 @@ export function AttributesPane({
   remapInfo,
   onOptimizeQueue,
   queueEmpty = false,
+  accelerator,
   className,
 }: AttributesPaneProps) {
   const { t } = useTranslation();
@@ -85,12 +93,16 @@ export function AttributesPane({
       </div>
     );
   };
+  const acceleratorSection = accelerator ? (
+    <div className="mt-3 border-t border-line pt-3 text-xs">{accelerator}</div>
+  ) : null;
   if (!isDesktop) {
     // One line, no card. The remap note and data age are desktop reference.
     return (
       <section aria-label={t('skills.attributes')} className="px-1">
         {chips()}
         {optimizeQueue()}
+        {acceleratorSection}
       </section>
     );
   }
@@ -120,6 +132,7 @@ export function AttributesPane({
           </p>
         )}
         {optimizeQueue()}
+        {acceleratorSection}
       </Panel>
     </>
   );
