@@ -923,11 +923,6 @@ export function MinerDetail({ id }: { id: string }) {
           minerName={name}
           defaultAmount={row.owed}
           statementId={openStatement?.id}
-          statementLabel={
-            openStatement
-              ? periodLabel(openStatement.periodStart, openStatement.periodEnd)
-              : undefined
-          }
         />
       )}
       {dialog?.kind === 'dismiss' && (

@@ -12,6 +12,7 @@ import {
   dismissalCredits,
   isBeforeBook,
   type Allocation,
+  type AllocationInput,
   type DismissalCredit,
   type PaymentCredit,
   type RecordedWriteOff,
@@ -222,6 +223,8 @@ interface MinerInternals {
   statements: Statement[];
   payments: TaxPayment[];
   allocation: Allocation;
+  /** What `allocation` was computed from, so a payment can be previewed against it. */
+  allocationInput: AllocationInput;
   draft: StatementDraft;
   days: DayRow[];
 }
@@ -397,13 +400,14 @@ export function buildBookView(input: BookViewInput): BookView {
     const mine = charges.filter((c) => c.minerId === id);
 
     const credits = dismissalCredits(statements, input.dismissals, mine);
-    const allocation = allocatePayments({
+    const allocationInput: AllocationInput = {
       statements,
       payments,
       dismissalCredits: credits,
       officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === id),
       startDate: input.startDate,
-    });
+    };
+    const allocation = allocatePayments(allocationInput);
     const forgivenKeys = forgivenDayKeys(statements, allocation, credits);
     const draft = minerDraft(input, id, statements, mine, billableThrough);
 
@@ -515,7 +519,7 @@ export function buildBookView(input: BookViewInput): BookView {
       paused,
     };
     miners.push(row);
-    byMiner.set(id, { statements, payments, allocation, draft, days });
+    byMiner.set(id, { statements, payments, allocation, allocationInput, draft, days });
 
     for (const d of input.declarations) {
       if (d.resolution || !statements.some((s) => s.id === d.statementId)) continue;
