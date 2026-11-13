@@ -38,11 +38,13 @@ export function FittingLibraryDialogs({
         open={library === 'open'}
         onClose={onClose}
         title={t('fittings.header.libraryTitle')}
-        placement={isPhone ? 'sheet' : 'wide'}
+        // Room for the preview beside the list, as on the Start page.
+        placement={isPhone ? 'sheet' : 'page'}
       >
         {library === 'open' && (
           <FittingStartScreen
             variant="dialog"
+            preview
             workspace={workspace}
             catalogue={catalogue}
             characterId={characterId}

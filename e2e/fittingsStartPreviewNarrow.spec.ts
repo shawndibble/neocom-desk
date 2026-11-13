@@ -28,7 +28,7 @@ async function openInGamePreview(page: Page, size: { width: number; height: numb
   await signInAndGoto(page, './ships/fittings');
   await answerAnyType(page);
   await page.setViewportSize(size);
-  await page.getByRole('button', { name: /^PvP Rifter/ }).click();
+  await page.getByRole('button', { name: /^PvP Rifter/ }).hover();
   await expect(page.getByRole('meter', { name: 'CPU' })).toBeVisible({ timeout: 60_000 });
 }
 

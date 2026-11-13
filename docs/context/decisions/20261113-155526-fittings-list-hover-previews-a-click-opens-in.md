@@ -1,0 +1,8 @@
+# Scope decisions — Fittings list: hover previews, a click opens, in the Open dialog too
+
+_Recorded 2026-11-13. Replaces `20260925-152418`'s desktop click-to-preview, double-click-to-open behaviour, its Keyboard bullet's "Space selects", and its "the dialog and picker have no use for one" for the editor's Open dialog; and `20261001-210222`'s bullet that the Open a fitting dialog is a list where a tap opens. The rest of both stands._
+
+- **A click, Enter or Space on a Fittings list row opens it, on the Start page and in the editor's Open dialog.** On the desktop Start page a click used to only pick the row for the preview, and opening took a double-click or the preview's Open fitting button: an extra step before the thing the pilot came to do.
+- **On a desktop the preview follows the hovered or focused row.** The pointer has to rest on a row for 150 ms before the preview moves, so a pointer crossing other rows on its way to the preview's buttons (Compare, notes) leaves it be. Focus moves the preview at once and cancels a pending hover. Leaving the list keeps the last row previewed. The arrow keys move focus, and the preview with it. A touch has no hover, so on a touch screen a tap opens and the preview stays on the first row.
+- **The editor's Open a fitting dialog previews too.** It is the Start page's list and preview at the `page` modal size, so switching Fittings shows the same ring, stats and skills as arriving on the page. Rules out the plain list it was, which named the fits but showed nothing about them.
+- **The Compare picker stays a plain list,** and a phone still has no preview: a row there is only ever picked, and a phone has no room beside the list.
