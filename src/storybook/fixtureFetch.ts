@@ -53,6 +53,10 @@ export function unexpectedRequests(): readonly string[] {
  * the Requests stories' location read under the next Communities story, the
  * Hauling skill queue under Market Stock). Those two get the same fallback: docked
  * at the sample station, nothing training.
+ *
+ * The Forge's public order book is the same kind of late read (the Mining Tax
+ * row-detail story saw one land under it in CI): a price read from the previous
+ * story's page. It gets an empty book, never a recorded miss.
  */
 const SAMPLE_IDS = SAMPLE_CHARACTERS.map((c) => c.characterId).join('|');
 const sampleRead = (tail: string) => new RegExp(`^/characters/(${SAMPLE_IDS})${tail}$`);
@@ -68,6 +72,7 @@ const SAMPLE_CHARACTER_READS: readonly FixtureRoute[] = [
     respond: () => ({ body: { solar_system_id: SAMPLE_SYSTEM_ID, station_id: SAMPLE_STATION_ID } }),
   },
   { path: sampleRead('/skillqueue'), respond: () => ({ body: [] }) },
+  { path: '/markets/10000002/orders', respond: () => ({ body: [] }) },
 ];
 
 function matches(route: FixtureRoute, method: string, path: string): boolean {
