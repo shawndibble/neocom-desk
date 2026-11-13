@@ -1,9 +1,8 @@
 /**
- * The training that makes an over-budget Fitting fit (`findSkillFixes`): each
- * fix's skill levels, the time they take (prerequisites included) and Add to
- * plan — or the plan that already trains them. Shared by What to train, where
- * it heads the list (with the skills the fit is missing, which fix it too),
- * and Make it fit.
+ * Training that makes a Fitting fit — over-budget fixes (`findSkillFixes`), or
+ * the skills it is missing: each fix's skill levels, the time they take
+ * (prerequisites included) and Add to plan — or the plan that already trains
+ * them. Shared by What to train, where it heads the list, and Make it fit.
  */
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
@@ -27,7 +26,7 @@ interface Props {
   plannedLevels: ReadonlyMap<number, number>;
   onAdd: (entries: readonly PlanEntry[]) => void;
   /** Why each row fixes the fit; default: it brings the Fitting under budget. */
-  detail?: string;
+  reason?: string;
 }
 
 /** Quickest to train first; a fix not yet timed last. */
@@ -38,7 +37,7 @@ export function SkillFixList({
   plan,
   plannedLevels,
   onAdd,
-  detail,
+  reason,
 }: Props) {
   const { t } = useTranslation();
   const rows = fixes
@@ -79,7 +78,7 @@ export function SkillFixList({
                 </p>
                 <p className={STAT_DETAIL}>
                   {joinDetail([
-                    detail ?? t('fittings.skillFixes.makesItFit'),
+                    reason ?? t('fittings.skillFixes.makesItFit'),
                     includesPrerequisites ? t('fittings.whatToTrain.withPrerequisites') : null,
                   ])}
                 </p>

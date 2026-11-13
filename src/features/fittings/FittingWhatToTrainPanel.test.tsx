@@ -513,6 +513,23 @@ describe('FittingWhatToTrainPanel — over budget', () => {
     });
   });
 
+  it('lists the missing skills while the ranking is still working out', async () => {
+    render(
+      <MemoryRouter>
+        <FittingWhatToTrainPanel
+          evaluator={null}
+          characterId={CHARACTER_ID}
+          fittingName="Rifter"
+          catalogue={catalogue}
+          missingSkills={[{ skillTypeID: 3436, targetLevel: 4 }]}
+        />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText('Makes it fit')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Add to plan: Drones IV' })).toBeVisible();
+    expect(screen.getByText(/Working out each skill/)).toBeInTheDocument();
+  });
+
   it('shows no fix block within budget', async () => {
     skillFixesState.fixes = [{ entries: [{ skillTypeID: 3436, targetLevel: 4 }], after: {} }];
     renderPanel();
