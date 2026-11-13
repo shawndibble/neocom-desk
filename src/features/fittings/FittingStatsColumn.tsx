@@ -101,6 +101,7 @@ export function FittingStatsColumn({
             characterId={characterId}
             fittingName={fitting.name}
             catalogue={catalogue}
+            missingSkills={showMissingSkills ? gaps.missing : undefined}
           />
         }
         yourCharacters={yourCharacters.length > 1 ? yourCharacters : undefined}
@@ -128,19 +129,14 @@ export function FittingStatsColumn({
                 characterName: characterName ?? null,
                 missingSkills: gaps?.missing.length,
                 skillsUnknown: gaps?.unknown === true,
-                notes:
-                  showMissingSkills || showSkillsUnknown ? (
-                    <>
-                      {showMissingSkills && (
-                        <MissingSkillsChip
-                          entries={gaps.missing}
-                          characterId={characterId}
-                          fittingName={fitting.name}
-                        />
-                      )}
-                      {showSkillsUnknown && <SkillsUnknownNote />}
-                    </>
-                  ) : undefined,
+                notes: showSkillsUnknown ? <SkillsUnknownNote /> : undefined,
+                missingSkillsChip: showMissingSkills ? (
+                  <MissingSkillsChip
+                    entries={gaps.missing}
+                    characterId={characterId}
+                    fittingName={fitting.name}
+                  />
+                ) : undefined,
               }
         }
       />

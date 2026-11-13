@@ -492,6 +492,44 @@ describe('FittingWhatToTrainPanel — over budget', () => {
     expect(ranked.getAllByRole('listitem')[0]).toHaveTextContent(/^1Drones/);
   });
 
+  it('lists the skills the fit is missing as fixes, within budget too', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <FittingWhatToTrainPanel
+          evaluator={evaluator}
+          characterId={CHARACTER_ID}
+          fittingName="Rifter"
+          catalogue={catalogue}
+          missingSkills={[{ skillTypeID: 3436, targetLevel: 4 }]}
+        />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText('Makes it fit')).toBeInTheDocument();
+    expect(screen.getByText(/Needed to fly the ship or use its modules/)).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Add to plan: Drones IV' }));
+    await waitFor(async () => {
+      expect(await planEntries()).toEqual([{ skillTypeID: 3436, targetLevel: 4 }]);
+    });
+  });
+
+  it('lists the missing skills while the ranking is still working out', async () => {
+    render(
+      <MemoryRouter>
+        <FittingWhatToTrainPanel
+          evaluator={null}
+          characterId={CHARACTER_ID}
+          fittingName="Rifter"
+          catalogue={catalogue}
+          missingSkills={[{ skillTypeID: 3436, targetLevel: 4 }]}
+        />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText('Makes it fit')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Add to plan: Drones IV' })).toBeVisible();
+    expect(screen.getByText(/Working out each skill/)).toBeInTheDocument();
+  });
+
   it('shows no fix block within budget', async () => {
     skillFixesState.fixes = [{ entries: [{ skillTypeID: 3436, targetLevel: 4 }], after: {} }];
     renderPanel();

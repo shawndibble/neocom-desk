@@ -1296,6 +1296,7 @@
     "skillFixes": {
       "heading": "Makes it fit",
       "makesItFit": "Brings the Fitting under budget",
+      "missing": "Needed to fly the ship or use its modules",
       "inPlan": "In {{plan}}"
     },
     "whatToTrain": {

@@ -87,13 +87,18 @@ export interface FittingWhatToTrainPanelProps {
   fittingName: string;
   /** Module names, racks and variations, for the Tech II upgrades; null while loading. */
   catalogue: FittingCatalogue | null;
+  /** Skills the Character lacks to fly the hull or use its modules: listed with the fixes. */
+  missingSkills?: readonly PlanEntry[];
 }
+
+const NO_ENTRIES: readonly PlanEntry[] = [];
 
 export function FittingWhatToTrainPanel({
   evaluator,
   characterId,
   fittingName,
   catalogue,
+  missingSkills,
 }: FittingWhatToTrainPanelProps) {
   const { t } = useTranslation();
   const overridden = useSkillOverrides((state) => hasSkillOverrides(state.skills));
@@ -107,6 +112,7 @@ export function FittingWhatToTrainPanel({
       characterId={characterId}
       fittingName={fittingName}
       catalogue={catalogue}
+      missingSkills={missingSkills}
     />
   );
 }
@@ -116,11 +122,13 @@ function WhatToTrainRanking({
   characterId,
   fittingName,
   catalogue,
+  missingSkills = NO_ENTRIES,
 }: {
   evaluator: SkillGainEvaluator | null;
   characterId: number;
   fittingName: string;
   catalogue: FittingCatalogue | null;
+  missingSkills?: readonly PlanEntry[];
 }) {
   const { t } = useTranslation();
   const [sort, setSort] = useState<GainSort>('overall');
@@ -136,6 +144,11 @@ function WhatToTrainRanking({
   // Only once some level is seen to clear part of an overage: a fit within budget has nothing to fix.
   const overBudget = gains?.some((gain) => (gain.budgetFreed ?? 0) > 0) ?? false;
   const skillFixes = useSkillFixes(evaluator, overBudget);
+  // Each missing skill is a fix on its own: the fit can't be flown without it.
+  const missingFixes = useMemo(
+    () => missingSkills.map((entry) => ({ entries: [entry] })),
+    [missingSkills]
+  );
 
   // Worked out once per result, not per sort change.
   const rows = useMemo((): WhatToTrainRow[] | null => {
@@ -174,10 +187,6 @@ function WhatToTrainRanking({
   const targetPlan = target.plans?.find((plan) => plan.id === target.targetPlanId);
   const plannedLevels = usePlannedLevels(targetPlan, catalog, trainedSkills, trainedSkillsKnown);
 
-  if (evaluator === null || loading)
-    return <StatNote>{t('fittings.whatToTrain.loading')}</StatNote>;
-  if (failed || ranked === null) return <StatNote>{t('fittings.whatToTrain.failed')}</StatNote>;
-
   async function addEntries(entries: readonly PlanEntry[]) {
     const result = await target.addEntries(entries, fittingName);
     if (result.added.length === 0) return;
@@ -186,6 +195,58 @@ function WhatToTrainRanking({
   const add = (row: WhatToTrainRow, level: number) =>
     addEntries([{ skillTypeID: row.skillTypeId, targetLevel: level }]);
   const plan = target.plans === undefined ? undefined : (targetPlan ?? null);
+  const fixListProps = {
+    skillName: (id: number) => catalog?.engineSkills.get(id)?.name ?? `#${id}`,
+    scheduleEntriesFor,
+    plan,
+    plannedLevels,
+    onAdd: (entries: readonly PlanEntry[]) => void addEntries(entries),
+  };
+  // Missing skills don't wait on the ranking: they show while it loads, or if it fails.
+  const fixBlock = (missingFixes.length > 0 ||
+    (skillFixes.fixes && skillFixes.fixes.length > 0)) && (
+    <div className="space-y-1">
+      <p className={cx(STAT_EYEBROW_TYPE, 'text-warning')}>{t('fittings.skillFixes.heading')}</p>
+      {missingFixes.length > 0 && (
+        <SkillFixList
+          fixes={missingFixes}
+          {...fixListProps}
+          reason={t('fittings.skillFixes.missing')}
+        />
+      )}
+      {skillFixes.fixes && skillFixes.fixes.length > 0 && (
+        <SkillFixList fixes={skillFixes.fixes} {...fixListProps} />
+      )}
+    </div>
+  );
+  const toast = added && (
+    <Toast
+      message={t('skills.fitCheck.addedToast', {
+        count: added.entries.length,
+        plan: added.planName,
+      })}
+      undo={{
+        label: t('skills.fitCheck.addedToastUndo'),
+        onUndo: () => {
+          void target.removeEntries(added.planId, added.entries);
+          setAdded(null);
+        },
+      }}
+      onClose={() => setAdded(null)}
+    />
+  );
+
+  const stillLoading = evaluator === null || loading;
+  if (stillLoading || failed || ranked === null)
+    return (
+      <div className="space-y-3">
+        {fixBlock}
+        <StatNote>
+          {t(stillLoading ? 'fittings.whatToTrain.loading' : 'fittings.whatToTrain.failed')}
+        </StatNote>
+        {toast}
+      </div>
+    );
 
   const rankByLabel = t('fittings.whatToTrain.rankBy');
   return (
@@ -236,23 +297,9 @@ function WhatToTrainRanking({
           </Link>
         </div>
       </div>
-      {skillFixes.fixes && skillFixes.fixes.length > 0 && (
-        <div className="space-y-1">
-          <p className={cx(STAT_EYEBROW_TYPE, 'text-warning')}>
-            {t('fittings.skillFixes.heading')}
-          </p>
-          <SkillFixList
-            fixes={skillFixes.fixes}
-            skillName={(id) => catalog?.engineSkills.get(id)?.name ?? `#${id}`}
-            scheduleEntriesFor={scheduleEntriesFor}
-            plan={plan}
-            plannedLevels={plannedLevels}
-            onAdd={(entries) => void addEntries(entries)}
-          />
-        </div>
-      )}
+      {fixBlock}
       {/* Only once no Tech II upgrade is left to suggest either: else it reads as "nothing to train". */}
-      {ranked.length === 0 && rankedUpgrades?.length === 0 && (
+      {ranked.length === 0 && rankedUpgrades?.length === 0 && missingFixes.length === 0 && (
         <StatNote>{t('fittings.whatToTrain.none')}</StatNote>
       )}
       {ranked.length > 0 && (
@@ -285,22 +332,7 @@ function WhatToTrainRanking({
         plannedLevels={plannedLevels}
         onAdd={addEntries}
       />
-      {added && (
-        <Toast
-          message={t('skills.fitCheck.addedToast', {
-            count: added.entries.length,
-            plan: added.planName,
-          })}
-          undo={{
-            label: t('skills.fitCheck.addedToastUndo'),
-            onUndo: () => {
-              void target.removeEntries(added.planId, added.entries);
-              setAdded(null);
-            },
-          }}
-          onClose={() => setAdded(null)}
-        />
-      )}
+      {toast}
     </div>
   );
 }
