@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { focusRingClassName, interactiveClassName } from './controlStyles';
@@ -57,6 +57,9 @@ export function StatChip({
   to,
 }: StatChipProps) {
   const { t } = useTranslation();
+  // A linked value is named with its label ("Overdue 9.3M"), so a bare figure never reads alone.
+  const labelId = useId();
+  const linkId = useId();
   return (
     <span
       data-testid={testId}
@@ -67,7 +70,9 @@ export function StatChip({
       // moves the whole chip to the next line instead.
       className={`inline-flex h-7 shrink-0 items-center gap-1.5 text-[0.6875rem] whitespace-nowrap ${truncate ? 'max-w-full' : ''} ${className}`}
     >
-      <span className="font-semibold tracking-widest text-text-dim uppercase">{label}</span>
+      <span id={labelId} className="font-semibold tracking-widest text-text-dim uppercase">
+        {label}
+      </span>
       {tooltip && (
         <InfoTooltip
           label={t('common.aboutLabel', { label })}
@@ -80,7 +85,9 @@ export function StatChip({
       >
         {to ? (
           <Link
+            id={linkId}
             to={to}
+            aria-labelledby={`${labelId} ${linkId}`}
             className={`rounded-xs underline decoration-1 underline-offset-2 hover:decoration-2 ${interactiveClassName} ${focusRingClassName}`}
           >
             {value}

@@ -45,7 +45,7 @@ describe('StatChip', () => {
     expect(chip).toHaveClass('w-40', 'shrink-0');
   });
 
-  it('makes only its value a link with `to`, keeping the tone', () => {
+  it('makes only its value a link with `to`, named with its label, keeping the tone', () => {
     render(
       <MemoryRouter>
         <StatChip
@@ -57,7 +57,7 @@ describe('StatChip', () => {
       </MemoryRouter>
     );
 
-    const link = screen.getByRole('link', { name: '9.3M' });
+    const link = screen.getByRole('link', { name: 'Overdue 9.3M' });
     expect(link).toHaveAttribute('href', '/corp/moons/miners?balance=overdue');
     expect(link).toHaveClass('underline');
     expect(link.parentElement).toHaveClass('text-danger');

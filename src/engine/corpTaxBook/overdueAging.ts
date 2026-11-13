@@ -42,10 +42,15 @@ export function overdueAging(miners: readonly AgedMiner[]): OverdueAgeRow[] {
 export const MINER_BALANCES = [
   'owing',
   'overdue',
-  ...OVERDUE_AGE_BUCKETS.map((b) => `overdue-${b}` as const),
+  ...OVERDUE_AGE_BUCKETS.map((b) => balanceOfBucket(b)),
   'credit',
 ] as const;
-export type MinerBalance = (typeof MINER_BALANCES)[number];
+export type MinerBalance = 'owing' | 'overdue' | `overdue-${OverdueAgeBucket}` | 'credit';
+
+/** The Balance filter value that lists one age bucket's Miners. */
+export function balanceOfBucket(bucket: OverdueAgeBucket): `overdue-${OverdueAgeBucket}` {
+  return `overdue-${bucket}`;
+}
 
 export function matchesMinerBalance(m: AgedMiner, balance: MinerBalance): boolean {
   switch (balance) {
@@ -56,7 +61,12 @@ export function matchesMinerBalance(m: AgedMiner, balance: MinerBalance): boolea
     // A sub-ISK remainder is no credit, as the Credit column shows it.
     case 'credit':
       return Math.round(m.credit) > 0;
-    default:
-      return m.overdueDays !== null && `overdue-${overdueAgeBucketOf(m.overdueDays)}` === balance;
+    case 'overdue-0-30':
+    case 'overdue-31-60':
+    case 'overdue-61-90':
+    case 'overdue-over-90':
+      return (
+        m.overdueDays !== null && balanceOfBucket(overdueAgeBucketOf(m.overdueDays)) === balance
+      );
   }
 }

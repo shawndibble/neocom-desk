@@ -1,11 +1,24 @@
-import { useMemo, type ReactNode } from 'react';
+import { useId, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StatChip, StatChips } from '@/components/ui';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { overdueAging } from '@/engine/corpTaxBook/overdueAging';
+import {
+  balanceOfBucket,
+  matchesMinerBalance,
+  overdueAging,
+  type MinerBalance,
+} from '@/engine/corpTaxBook/overdueAging';
+import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { useTabsProjection } from './useTabsProjection';
 import { isk } from './moonsFormat';
 import { minersBalancePath } from './moonsPaths';
+
+/** A link to the Miners tab at `balance`, only while that list would hold someone (same rule as the filter). */
+function linkTo(miners: readonly MinerRow[], balance: MinerBalance) {
+  return miners.some((m) => matchesMinerBalance(m, balance))
+    ? { to: minersBalancePath(balance) }
+    : {};
+}
 
 /**
  * The book's totals strip on the Overview and Miners tabs. A figure that a Miners view lists
@@ -15,14 +28,14 @@ import { minersBalancePath } from './moonsPaths';
  */
 export function BookTotals({ children }: { children?: ReactNode }) {
   const { t } = useTranslation();
-  const { totals } = useTabsProjection();
+  const { totals, miners } = useTabsProjection();
   return (
     <StatChips>
       <StatChip
         label={t('corpTaxBook.moons.chips.owed')}
         value={isk(totals.owed)}
         emphasis
-        {...(Math.round(totals.owed) > 0 ? { to: minersBalancePath('owing') } : {})}
+        {...linkTo(miners, 'owing')}
       />
       <StatChip
         label={t('corpTaxBook.moons.chips.overdue')}
@@ -30,14 +43,14 @@ export function BookTotals({ children }: { children?: ReactNode }) {
           amount: isk(totals.overdue),
           count: totals.overdueCount,
         })}
-        {...(totals.overdue > 0 ? { tone: 'danger' as const } : {})}
-        {...(totals.overdueCount > 0 ? { to: minersBalancePath('overdue') } : {})}
+        {...(totals.overdueCount > 0 ? { tone: 'danger' as const } : {})}
+        {...linkTo(miners, 'overdue')}
       />
       <StatChip label={t('corpTaxBook.moons.chips.unbilled')} value={isk(totals.unbilled)} />
       <StatChip
         label={t('corpTaxBook.moons.chips.credit')}
         value={isk(totals.credit)}
-        {...(Math.round(totals.credit) > 0 ? { to: minersBalancePath('credit') } : {})}
+        {...linkTo(miners, 'credit')}
       />
       {children}
     </StatChips>
@@ -53,11 +66,13 @@ export function OverdueAging() {
   const { t } = useTranslation();
   const { miners, totals } = useTabsProjection();
   const aging = useMemo(() => overdueAging(miners), [miners]);
+  const titleId = useId();
   if (totals.overdueCount === 0) return null;
-  const title = t('corpTaxBook.moons.aging.title');
   return (
-    <section aria-label={title} className="flex flex-wrap items-center gap-x-3">
-      <h3 className={eyebrowClassName}>{title}</h3>
+    <section aria-labelledby={titleId} className="flex flex-wrap items-center gap-x-3">
+      <h3 id={titleId} className={eyebrowClassName}>
+        {t('corpTaxBook.moons.aging.title')}
+      </h3>
       <StatChips>
         {aging.map((b) => (
           <StatChip
@@ -71,7 +86,7 @@ export function OverdueAging() {
                   })
                 : '—'
             }
-            {...(b.count > 0 ? { to: minersBalancePath(`overdue-${b.id}`) } : {})}
+            {...(b.count > 0 ? { to: minersBalancePath(balanceOfBucket(b.id)) } : {})}
           />
         ))}
       </StatChips>

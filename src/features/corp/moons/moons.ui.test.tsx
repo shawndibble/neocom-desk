@@ -363,11 +363,11 @@ describe('Totals links and Overdue by age', () => {
 
   it('links Owed and Overdue to the Miners narrowed to them; an empty Credit stays a readout', () => {
     renderBook(<BookTotals />, overdueBook(), '/corp/moons/overview');
-    expect(screen.getByRole('link', { name: /^300,000\b(?!.*Miner)/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Owed 300,000' })).toHaveAttribute(
       'href',
       '/corp/moons/miners?balance=owing'
     );
-    expect(screen.getByRole('link', { name: /2 Miners/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^Overdue 300,000 · 2 Miners$/ })).toHaveAttribute(
       'href',
       '/corp/moons/miners?balance=overdue'
     );
@@ -377,14 +377,12 @@ describe('Totals links and Overdue by age', () => {
   it('breaks overdue debt into age buckets, each linking to its Miners', () => {
     renderBook(<OverdueAging />, overdueBook(), '/corp/moons/overview');
     const aging = screen.getByRole('region', { name: 'Overdue by age' });
-    expect(within(aging).getByRole('link', { name: /100,000 · 1 Miner/ })).toHaveAttribute(
-      'href',
-      '/corp/moons/miners?balance=overdue-0-30'
-    );
-    expect(within(aging).getByRole('link', { name: /200,000 · 1 Miner/ })).toHaveAttribute(
-      'href',
-      '/corp/moons/miners?balance=overdue-31-60'
-    );
+    expect(
+      within(aging).getByRole('link', { name: '0–30 days 100,000 · 1 Miner' })
+    ).toHaveAttribute('href', '/corp/moons/miners?balance=overdue-0-30');
+    expect(
+      within(aging).getByRole('link', { name: '31–60 days 200,000 · 1 Miner' })
+    ).toHaveAttribute('href', '/corp/moons/miners?balance=overdue-31-60');
     expect(within(aging).getAllByRole('link')).toHaveLength(2);
   });
 
