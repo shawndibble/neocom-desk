@@ -59,13 +59,13 @@ export function SkillFixList({
         includesPrerequisites && scheduled && skills
           ? buildFitCheckRows(scheduledSkillTargets(scheduled), skills, trainedSkills, scheduled)
           : [];
-      return { fix, seconds, includesPrerequisites, prerequisiteRows };
+      return { fix, seconds, prerequisiteRows };
     })
     .sort((a, b) => (a.seconds ?? Infinity) - (b.seconds ?? Infinity));
 
   return (
     <ul className="m-0 list-none p-0 text-xs">
-      {rows.map(({ fix, seconds, includesPrerequisites, prerequisiteRows }) => {
+      {rows.map(({ fix, seconds, prerequisiteRows }) => {
         const label = fix.entries
           .map((e) => `${skillName(e.skillTypeID)} ${romanLevel(e.targetLevel)}`)
           .join(', ');
@@ -95,7 +95,8 @@ export function SkillFixList({
                 ) : (
                   formatCountdown(seconds)
                 )}
-                {seconds !== null && includesPrerequisites && (
+                {/* Once the catalogue is in: an empty card says nothing. */}
+                {seconds !== null && prerequisiteRows.length > 0 && (
                   <div>
                     <WhatToTrainPrerequisites
                       skill={label}
