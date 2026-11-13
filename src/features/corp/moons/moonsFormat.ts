@@ -77,6 +77,11 @@ export function addDays(date: string, days: number): string {
   return utcDay(Date.UTC(y, m - 1, d + days));
 }
 
+/** A `YYYY-MM-DD` paid date as the instant the book stores: now for today, else noon EVE time that day. */
+export function paidAtFor(date: string, now: Date = new Date()): string {
+  return date === utcDay(now.getTime()) ? now.toISOString() : `${date}T12:00:00.000Z`;
+}
+
 export function newId(prefix: string): string {
   return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }

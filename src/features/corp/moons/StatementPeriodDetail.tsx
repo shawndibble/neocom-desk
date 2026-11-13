@@ -241,10 +241,6 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
           minerName={names.character(recordingMiner.mainCharacterId)}
           defaultAmount={recording.outstanding}
           statementId={recording.statement.id}
-          statementLabel={periodLabel(
-            recording.statement.periodStart,
-            recording.statement.periodEnd
-          )}
         />
       )}
     </div>
