@@ -1,0 +1,7 @@
+# Scope decisions — Corp Tax Book totals link to filtered Miners; Overdue by age buckets a Miner by its oldest Statement
+
+_Recorded 2026-11-12._
+
+- **Owed, Overdue and Credit held link to the Miners tab filtered by a new Balance filter (`?balance=owing|overdue|overdue-<bucket>|credit`); Next Statement and Billable through stay readouts.** A figure links only where a Miners view lists exactly what it counts, and only while it counts someone (a link to an empty list is clutter, DESIGN §6c restraint). The filter is a Select in the Miners funnel and shows as a pill, so it is linkable, Back works and the pilot can clear it.
+- **Overdue by age has four buckets, 0–30, 31–60, 61–90 and over 90 days, and a Miner sits in one, with its whole debt, by its oldest overdue Statement (`MinerRow.overdueDays`).** That keeps the buckets adding up to the Overdue chip (which already sums each overdue Miner's whole Owed) and each bucket's count to Miners, matching the filter it links to. Splitting by Statement would make the bucket counts disagree with the Miners list. Day 0 (the day it went Overdue) falls in the first bucket, so it is "0–30", not Stripe's "1–30".
+- **The age line shows on the Overview only, under the totals, and is gone while nothing is overdue.** Every bucket shows while any is non-empty (an empty one as a dash), so the line keeps its shape. The Miners tab carries the same buckets in its Balance filter instead of a second line.

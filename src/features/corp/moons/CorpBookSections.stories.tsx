@@ -147,3 +147,11 @@ export const StatementPeriodPage: Story = {
 };
 /** @summary Statement period page, phone. */
 export const StatementPeriodPagePhone: Story = { ...StatementPeriodPage, ...phone };
+
+/** @summary Miners list as the Overdue total's link opens it: `?balance=overdue`, a Balance pill. */
+export const MinersOverdue: Story = {
+  ...Miners,
+  parameters: { shell: { path: '/corp/moons/miners?balance=overdue', scopes: [] } },
+};
+/** @summary Miners list filtered to overdue Miners, phone. */
+export const MinersOverduePhone: Story = { ...MinersOverdue, ...phone };

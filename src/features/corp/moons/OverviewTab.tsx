@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Panel, StatChip, StatChips } from '@/components/ui';
+import { Panel, StatChip } from '@/components/ui';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { POPS_WINDOW_DAYS } from '@/engine/corpTaxBook/bookSections';
 import type { ScheduleRow } from '@/engine/corpTaxBook/readModels';
@@ -8,6 +8,7 @@ import { formatCountdown } from '@/lib/duration';
 import { useBook } from './useBook';
 import { useTabsProjection } from './useTabsProjection';
 import { NeedsYouQueue } from './NeedsYouQueue';
+import { BookTotals, OverdueAging } from './BookTotals';
 import { isk, shortDate } from './moonsFormat';
 import { extractionPath } from './moonsPaths';
 import { PlaceCell } from './sectionParts';
@@ -21,7 +22,7 @@ import { PlaceCell } from './sectionParts';
 export function OverviewTab() {
   const { t } = useTranslation();
   const { view, names } = useBook();
-  const { totals, billableThrough, donationsBeforeBook, schedule } = useTabsProjection();
+  const { billableThrough, donationsBeforeBook, schedule } = useTabsProjection();
   const now = Date.parse(view.input.now);
   const until = (iso: string) => formatCountdown(Math.max(0, Date.parse(iso) - now) / 1000);
   const groups: {
@@ -62,25 +63,15 @@ export function OverviewTab() {
   ];
   return (
     <div className="space-y-4">
-      <StatChips>
-        <StatChip label={t('corpTaxBook.moons.chips.owed')} value={isk(totals.owed)} emphasis />
-        <StatChip
-          label={t('corpTaxBook.moons.chips.overdue')}
-          value={t('corpTaxBook.moons.chips.overdueValue', {
-            amount: isk(totals.overdue),
-            count: totals.overdueCount,
-          })}
-          {...(totals.overdue > 0 ? { tone: 'danger' as const } : {})}
-        />
-        <StatChip label={t('corpTaxBook.moons.chips.unbilled')} value={isk(totals.unbilled)} />
-        <StatChip label={t('corpTaxBook.moons.chips.credit')} value={isk(totals.credit)} />
+      <BookTotals>
         <StatChip
           label={t('corpTaxBook.moons.overview.billableThrough')}
           value={billableThrough ? shortDate(billableThrough) : '—'}
           tooltip={t('corpTaxBook.moons.health.billableHint', { hours: view.input.graceHours })}
           tooltipGlyph="info"
         />
-      </StatChips>
+      </BookTotals>
+      <OverdueAging />
       {donationsBeforeBook > 0 && (
         <p className="text-xs text-text-dim">
           {t('corpTaxBook.moons.beforeBook.donations', { count: donationsBeforeBook })}

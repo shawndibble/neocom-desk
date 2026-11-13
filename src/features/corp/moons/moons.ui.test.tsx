@@ -15,6 +15,7 @@ import {
 import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
 import { BookProvider } from './BookContext';
 import { MinersTab } from './MinersTab';
+import { BookTotals, OverdueAging } from './BookTotals';
 import { MINERS_COLUMN_IDS, useVisibleMinersColumns } from './moonsColumns';
 import { StatementRun } from './StatementRun';
 import type { BookSettings, OfficerVerdict } from '../taxBook/bookClient';
@@ -340,5 +341,64 @@ describe('StatementRun', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Send 2 Statements' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('An issued Statement never changes');
     expect(enqueueStatements).not.toHaveBeenCalled();
+  });
+});
+
+describe('Totals links and Overdue by age', () => {
+  /**
+   * Pilot 1 (100,000 owed) issued 2026-09-02: 2 days overdue on 2026-09-18. Pilot 2 (200,000)
+   * issued 2026-07-20: 46 days overdue.
+   */
+  function overdueBook() {
+    const first = buildBookView(input({ now: '2026-09-02T12:00:00Z' }));
+    const plan = planStatementRun(first, nextRunPeriod(first)!);
+    const statements = plan.lines.map((l) => {
+      const s = statementForLine(first, plan, l);
+      return s.minerId === first.miners.find((m) => m.mainCharacterId === 2)?.id
+        ? { ...s, issuedAt: '2026-07-20T00:00:00Z' }
+        : s;
+    });
+    return { statements };
+  }
+
+  it('links Owed and Overdue to the Miners narrowed to them; an empty Credit stays a readout', () => {
+    renderBook(<BookTotals />, overdueBook(), '/corp/moons/overview');
+    expect(screen.getByRole('link', { name: 'Owed 300,000' })).toHaveAttribute(
+      'href',
+      '/corp/moons/miners?balance=owing'
+    );
+    expect(screen.getByRole('link', { name: /^Overdue 300,000 · 2 Miners$/ })).toHaveAttribute(
+      'href',
+      '/corp/moons/miners?balance=overdue'
+    );
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+  });
+
+  it('breaks overdue debt into age buckets, each linking to its Miners', () => {
+    renderBook(<OverdueAging />, overdueBook(), '/corp/moons/overview');
+    const aging = screen.getByRole('region', { name: 'Overdue by age' });
+    expect(
+      within(aging).getByRole('link', { name: '0–30 days 100,000 · 1 Miner' })
+    ).toHaveAttribute('href', '/corp/moons/miners?balance=overdue-0-30');
+    expect(
+      within(aging).getByRole('link', { name: '31–60 days 200,000 · 1 Miner' })
+    ).toHaveAttribute('href', '/corp/moons/miners?balance=overdue-31-60');
+    expect(within(aging).getAllByRole('link')).toHaveLength(2);
+  });
+
+  it('is gone while nothing is overdue', () => {
+    renderBook(<OverdueAging />, {}, '/corp/moons/overview');
+    expect(screen.queryByRole('region', { name: 'Overdue by age' })).not.toBeInTheDocument();
+  });
+
+  it('reads ?balance= into a Balance pill and lists only the Miners in that bucket', async () => {
+    renderBook(<MinersTab />, overdueBook(), '/corp/moons/miners?balance=overdue-31-60');
+    const table = screen.getByRole('table', { name: 'Miners' });
+    expect(within(table).getByText('Pilot 2')).toBeInTheDocument();
+    expect(within(table).queryByText('Pilot 1')).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Remove filter: Balance: Overdue 31–60 days' })
+    );
+    expect(await within(table).findByText('Pilot 1')).toBeInTheDocument();
   });
 });
