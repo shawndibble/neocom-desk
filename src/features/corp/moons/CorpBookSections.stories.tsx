@@ -27,7 +27,8 @@ function Page({ children, tab }: { children: ReactNode; tab?: SectionTab }) {
   const { t } = useTranslation();
   const [value, setValue] = useState(tab);
   return (
-    <BookProvider value={BOOK_CONTEXT}>
+    // openSettings stands in for the route's settings host, so Settings steps show their buttons.
+    <BookProvider value={{ ...BOOK_CONTEXT, openSettings: () => {} }}>
       <div className="mx-auto max-w-page space-y-4 px-4 py-4">
         {tab && (
           <>
