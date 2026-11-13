@@ -52,12 +52,12 @@ export function CharacterAcceleratorEditor({
         return true;
       }}
       hint={
-        !record && (
+        record ? null : (
           <p className="text-[0.6875rem] text-text-dim">{t('plans.acceleratorNoExpiry')}</p>
         )
       }
       actions={
-        record && (
+        record ? (
           <Button
             size="sm"
             variant="ghost"
@@ -65,7 +65,7 @@ export function CharacterAcceleratorEditor({
           >
             {t('accelerator.clear')}
           </Button>
-        )
+        ) : null
       }
     />
   );

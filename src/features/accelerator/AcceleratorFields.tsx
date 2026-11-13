@@ -3,8 +3,9 @@
  * when it runs out, entered as time left (EVE's own tooltip) or, behind a quiet
  * switch, as the date and time it ends; then its bonus, unless the attribute sheet
  * already gave it (the caller shows that once, as a fact). Time comes first: it is
- * the one value EVE never reports, and nothing saves without it. Shared by the Skill Plan's Accelerator section and the
- * Characters table's popover, so the two can never drift apart.
+ * the one value EVE never reports, and nothing saves without it. Shared by the
+ * Skill Plan's Accelerator section and the Characters table's popover, so the
+ * two can never drift apart.
  *
  * Stateless about where the value lives: the caller owns it and `onExpiresChange`
  * reports whether the edit applied. The expiry is always an instant; the two modes only differ in
@@ -106,6 +107,9 @@ export function AcceleratorFields({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const modeId = useId();
+  const hintId = useId();
+  // Read with the time boxes, so a screen reader hears why the time is needed.
+  const describedBy = hint ? { 'aria-describedby': hintId } : {};
   const [mode, setMode] = useState<EntryMode>('remaining');
   const expiresIn = useDurationFields(expiresAt, onExpiresChange);
 
@@ -125,6 +129,7 @@ export function AcceleratorFields({
                     aria-label={t(`plans.boosterUnit.${unit}`)}
                     value={expiresIn.text[unit]}
                     onChange={(e) => expiresIn.onChange(unit, e.target.value)}
+                    {...describedBy}
                     {...invalidProps}
                     className="w-12 text-center"
                   />
@@ -146,12 +151,13 @@ export function AcceleratorFields({
               const at = inputValueToInstant(e.target.value, timeZone);
               if (at !== null) onExpiresChange(at);
             }}
+            {...describedBy}
             {...invalidProps}
             className="w-auto"
           />
         </label>
       )}
-      {hint}
+      {hint && <div id={hintId}>{hint}</div>}
       {!bonusLocked && (
         <label className="flex items-center justify-between gap-2">
           {t('plans.boosterBonus')}

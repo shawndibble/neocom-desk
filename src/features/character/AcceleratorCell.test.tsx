@@ -54,6 +54,7 @@ describe('AcceleratorCell', () => {
     // The bonus is a fact read from the attribute sheet: not an input.
     const days = await screen.findByLabelText('Days');
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+    expect(days).toHaveAccessibleDescription(/EVE doesn’t report when boosters expire/);
     await user.type(days, '1');
     await waitFor(async () => {
       const row = await db.characterAccelerators.get('7');
