@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { ComponentProps } from 'react';
@@ -11,6 +11,7 @@ import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import type { CharacterFitting } from '@/esi/endpoints';
 import { FittingStartScreen } from './FittingStartScreen';
+import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
 import type { FittingLibrarySource } from './useFittingPicker';
 
 const useEndpointsGrantedMock = vi.hoisted(() => vi.fn());
@@ -263,7 +264,7 @@ describe('FittingStartScreen', () => {
     // A pointer passing over a row on its way elsewhere leaves the preview be.
     await userEvent.hover(kite);
     await userEvent.unhover(kite);
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, ADD_PREVIEW_DELAY_MS + 50));
     expect(screen.getByText('preview of Armor Drake')).toBeInTheDocument();
 
     await userEvent.hover(kite);
@@ -271,6 +272,23 @@ describe('FittingStartScreen', () => {
     expect(kite).toHaveAttribute('aria-current', 'true');
     await userEvent.unhover(kite);
     expect(screen.getByText('preview of Kite')).toBeInTheDocument();
+  });
+
+  it('a row scrolled under a still pointer, or one the focus has moved past, never takes the preview', async () => {
+    renderScreen();
+    const kite = await screen.findByRole('button', { name: /^Kite/ });
+    await screen.findByText('preview of Armor Drake');
+
+    // Boundary events alone, as a scroll under a still pointer fires them.
+    fireEvent.pointerOver(kite, { pointerType: 'mouse' });
+    await new Promise((resolve) => setTimeout(resolve, ADD_PREVIEW_DELAY_MS + 50));
+    expect(screen.getByText('preview of Armor Drake')).toBeInTheDocument();
+
+    // A pending hover loses to the keyboard focus that follows it.
+    await userEvent.hover(kite);
+    act(() => screen.getByRole('button', { name: /^PvP Rifter/ }).focus());
+    await new Promise((resolve) => setTimeout(resolve, ADD_PREVIEW_DELAY_MS + 50));
+    expect(screen.getByText('preview of PvP Rifter')).toBeInTheDocument();
   });
 
   it('Open in the preview hands a saved one to openSaved', async () => {

@@ -41,6 +41,7 @@ import { setFittingNotes } from './myFittings';
 import { FittingExportNotice } from './FittingExportMenu';
 import { DeleteFittingModal, RenameFittingModal } from './SavedFittingModals';
 import { useLibraryRowActions } from './useLibraryRowActions';
+import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
 import { fittingCompareHref } from './fittingRoutes';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { FittingLibrarySource } from './useFittingPicker';
@@ -64,7 +65,7 @@ interface FittingStartScreenProps {
   /**
    * `page`: the Start screen with nothing open — New from hull and Import
    * beside the search. `dialog`: the editor's "Open a fitting" dialog or the
-   * Compare picker, with neither.
+   * Compare picker.
    */
   variant?: 'page' | 'dialog';
   /**
@@ -96,12 +97,6 @@ interface FittingStartScreenProps {
 const QUERY_KEY = 'q';
 const QUERY_PARAM = textParam();
 
-/**
- * How long the pointer rests on a row before the preview follows it, so a
- * pointer crossing other rows on its way to the preview's buttons leaves it be.
- */
-const PREVIEW_HOVER_MS = 150;
-
 /** The content under a page tab bar as its panel; without a bar it is just the content. */
 function MaybeTabPanel({
   panel,
@@ -120,11 +115,11 @@ function MaybeTabPanel({
 
 /**
  * Every way into a Fitting, as one list (scope decisions `20260925-152418`,
- * `20261001-210222` and `20261106-233825`): one search over the Character's
- * Active Fit, then their saved and In-game Fittings grouped by hull. A click
- * (or Enter) on a row opens it everywhere. On a desktop page and in the
- * editor's Open dialog, the hovered or focused row is also previewed beside
- * the list, and the preview keeps the last one when the pointer leaves.
+ * `20261001-210222`, `20261106-233825` and `20261113-155526`): one search over
+ * the Character's Active Fit, then their saved and In-game Fittings grouped by
+ * hull. A click, Enter or Space opens a row. On a desktop page and in the
+ * editor's Open dialog the hovered or focused row is previewed beside the
+ * list; the last one stays when the pointer leaves.
  */
 export function FittingStartScreen({
   workspace,
@@ -155,8 +150,13 @@ export function FittingStartScreen({
   const query = page ? urlQuery : dialogQuery;
   const setQuery = page ? setUrlQuery : setDialogQuery;
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(hoverTimer.current), []);
+  // The row the pointer is resting on, and its timer to take the preview.
+  const hover = useRef<{ rowId: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const cancelHover = () => {
+    clearTimeout(hover.current?.timer);
+    hover.current = null;
+  };
+  useEffect(() => () => clearTimeout(hover.current?.timer), []);
   const [hullOpen, setHullOpen] = useState(false);
   // A Fitting Share Code that won't open lands on Import, where its message is.
   const [importOpen, setImportOpen] = useState(page && workspace.shareError !== null);
@@ -304,18 +304,30 @@ export function FittingStartScreen({
           data-inline-height="exempt"
           aria-current={isSelected || undefined}
           onClick={() => open(row)}
-          onFocus={previewing ? () => setSelectedId(row.id) : undefined}
-          onPointerEnter={
+          onFocus={
             previewing
-              ? (event) => {
-                  // A touch has no hover: its tap opens the row.
-                  if (event.pointerType === 'touch') return;
-                  clearTimeout(hoverTimer.current);
-                  hoverTimer.current = setTimeout(() => setSelectedId(row.id), PREVIEW_HOVER_MS);
+              ? () => {
+                  cancelHover();
+                  setSelectedId(row.id);
                 }
               : undefined
           }
-          onPointerLeave={previewing ? () => clearTimeout(hoverTimer.current) : undefined}
+          // Move, not enter: scrolling under a still pointer fires enter on passing rows.
+          onPointerMove={
+            previewing
+              ? (event) => {
+                  // A touch has no hover: its tap opens the row.
+                  if (event.pointerType === 'touch' || isSelected) return;
+                  if (hover.current?.rowId === row.id) return;
+                  cancelHover();
+                  hover.current = {
+                    rowId: row.id,
+                    timer: setTimeout(() => setSelectedId(row.id), ADD_PREVIEW_DELAY_MS),
+                  };
+                }
+              : undefined
+          }
+          onPointerLeave={previewing ? cancelHover : undefined}
           className={cx(
             'group flex min-h-9 min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm',
             rowInteractiveClassName,
