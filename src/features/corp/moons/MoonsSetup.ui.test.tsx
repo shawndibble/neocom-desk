@@ -82,7 +82,7 @@ describe('MoonsSetup', () => {
   it('disables the book choices for a non-Director', async () => {
     renderSetup(undefined, '', { ...verdict, isDirector: false });
     await screen.findByText("Run your corporation's book");
-    expect(screen.getByRole('button', { name: "Turn on your corporation's book" })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Turn on the book' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Start collecting' })).toBeDisabled();
   });
 
@@ -147,9 +147,7 @@ describe('MoonsSetup', () => {
     getFeederStatus.mockResolvedValue({ status: 'none', ownBookFrom: leaveDay });
     renderSetup();
     const user = userEvent.setup();
-    await user.click(
-      await screen.findByRole('button', { name: "Turn on your corporation's book" })
-    );
+    await user.click(await screen.findByRole('button', { name: 'Turn on the book' }));
     const date = screen.getByLabelText('Start date (EVE time)');
     expect(date).toHaveValue(leaveDay);
     expect(date).toHaveAttribute('min', leaveDay);

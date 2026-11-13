@@ -7,6 +7,7 @@ import { DAY_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
 import { useBook } from './useBook';
 import { useTabsProjection } from './useTabsProjection';
+import { SetupChecklist } from './SetupChecklist';
 import { NeedsYouQueue } from './NeedsYouQueue';
 import { isk, shortDate } from './moonsFormat';
 import { extractionPath } from './moonsPaths';
@@ -62,6 +63,7 @@ export function OverviewTab() {
   ];
   return (
     <div className="space-y-4">
+      <SetupChecklist />
       <StatChips>
         <StatChip label={t('corpTaxBook.moons.chips.owed')} value={isk(totals.owed)} emphasis />
         <StatChip

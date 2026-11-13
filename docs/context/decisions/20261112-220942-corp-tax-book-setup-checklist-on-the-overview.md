@@ -1,0 +1,13 @@
+# Scope decisions — Corp Tax Book setup checklist on the Overview
+
+_Recorded 2026-11-12._
+
+- **A book shows "Set up the book" on its Overview until every step is done or it is dismissed.** Steps: Corp tax rate set, Automatic sync turned on, Refinery names readable, First Statement issued. Each is read off the book the page already holds (`view.input.rates`, `data.scheduledSync`, `names.refinery` for the book's own refineries, `view.input.statements`); the checklist adds no server read and stores nothing on the server. Pure derivation: `src/features/corp/moons/setupChecklist.ts`.
+- **Only an officer who can edit sees it.** A viewer could act on none of the steps, so it would be clutter for them.
+- **A step to do carries one ghost button to where it is done**, and a done step carries none (§6c restraint): the rate opens Settings on Rates, Automatic sync opens Settings on Access, the first Statement goes to the Statements tab. Refinery names has no button: a name is read with the viewing Character's docking access, so the step says that instead of offering a control that would do nothing.
+- **Refinery names is left out for a book with no refineries of its own** (one that only collects for moon owners), and reads "Checking…" while lookups are still answering, so it never flashes "to do".
+- **Automatic sync counts only while it runs.** A stopped schedule is "to do" again; the health strip already says why it stopped.
+- **Dismissal is per viewer and device** (`localStorage`, one key per corporation, through `safeLocalStorage`), a convenience like a one-time hint. Clearing site data shows it again, which is harmless. Once every step is done it hides for good on its own, whatever the dismissal.
+- **The checklist hosts its own Settings dialog** instead of reaching into the page's, so the Overview change is one mount line; the dialog is the same `BookSettingsDialog` with `initialTab`.
+- **The Moons setup choices lead with running your own book.** It is the common path: a full-width row with the view's one primary button, the two other choices beneath it with ghost buttons. When the viewer is not a Director the book choices are off, and the paste-an-invite Continue becomes the primary, being the only way forward.
+- **The Statement run shows the mail beside Check and Send on a desktop** (`lg` and up), picked by a visible "Preview for" select; below `lg` the "Preview mail" button and dialog stay. Both render the one `StatementMailPreview`.

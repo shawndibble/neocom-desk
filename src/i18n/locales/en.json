@@ -18042,7 +18042,8 @@
         "unmailed_one": "{{count}} earlier Statement was issued but never mailed; it goes with this run",
         "unmailed_other": "{{count}} earlier Statements were issued but never mailed; they go with this run",
         "unmatched": "An Unmatched donation is not on anyone's Statement until it is assigned",
-        "previewFor": "Preview mail for",
+        "previewFor": "Preview for",
+        "mailPreview": "Mail preview",
         "continue": "Continue to send",
         "preview": "Preview mail",
         "loadingCorporation": "Loading corporation name…",
@@ -18282,6 +18283,35 @@
           "unknown": "Could not connect this corporation. Try again later."
         }
       },
+      "setupChecklist": {
+        "title": "Set up the book",
+        "progress": "{{done}} of {{total}} done",
+        "dismiss": "Hide the setup checklist",
+        "stateDone": "(done)",
+        "stateTodo": "(to do)",
+        "checking": "Checking the refinery names…",
+        "rate": {
+          "title": "Corp tax rate set",
+          "done": "{{pct}}% for every Miner without a rate of their own",
+          "todo": "No Miner is taxed until a rate is set.",
+          "action": "Set the rate"
+        },
+        "autoSync": {
+          "title": "Automatic sync turned on",
+          "todo": "Keeps the book current without an officer opening this page.",
+          "action": "Turn on"
+        },
+        "refineryNames": {
+          "title": "Refinery names readable",
+          "todo_one": "{{count}} refinery shows as Unknown/Undockable. Open this page with a Character that can dock there and its name is read.",
+          "todo_other": "{{count}} refineries show as Unknown/Undockable. Open this page with a Character that can dock there and their names are read."
+        },
+        "firstStatement": {
+          "title": "First Statement issued",
+          "todo": "Once a period closes, send each Miner what they owe.",
+          "action": "Go to Statements"
+        }
+      },
       "setup": {
         "back": "Back",
         "paste": "Paste an invite link or code",
@@ -18290,7 +18320,7 @@
         "own": {
           "title": "Run your corporation's book",
           "hint": "Track the moon mining tax for your corporation's refineries in this app.",
-          "action": "Turn on your corporation's book"
+          "action": "Turn on the book"
         },
         "handled": {
           "title": "Let an accounting corporation handle it",

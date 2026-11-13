@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -22,9 +22,12 @@ import { MailLimitNotice } from '@/features/corpTaxBook/MailLimitNotice';
 import { MailQueueSummary } from '@/features/corpTaxBook/MailQueuePanel';
 import { listQueue } from '@/features/corpTaxBook/mailQueueStore';
 import {
+  StatementMailPreview,
   StatementMailPreviewDialog,
   type MailPreviewContent,
 } from '@/features/corpTaxBook/StatementMailPreview';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { useIsBelowDesktop } from '@/lib/useIsBelowDesktop';
 import { editBook } from '../taxBook/bookClient';
 import { editErrorMessage, useBook } from './useBook';
 import { isk, periodLabel } from './moonsFormat';
@@ -67,7 +70,8 @@ function StepDot({
  * Check → Send → Done (#4056 steps 10-12). Check shows what the period would
  * send; Send issues each Statement (which creates its verify link, so it must
  * come first) and hands the mails to the queue (#4064), which paces them and
- * shows its own chip on every page.
+ * shows its own chip on every page. On a desktop the chosen Miner's mail shows
+ * beside Check and Send; below it, "Preview mail" opens it in a dialog.
  */
 export function StatementRun() {
   const { t } = useTranslation();
@@ -77,6 +81,8 @@ export function StatementRun() {
   const [step, setStep] = useState<Step>('check');
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const inline = !useIsBelowDesktop();
+  const previewLabelId = useId();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
@@ -171,6 +177,11 @@ export function StatementRun() {
     };
   };
   const previewItem = previews.find((p) => p.key === previewId) ?? previews[0];
+  const showInline = inline && previewItem !== undefined && step !== 'done';
+  const mail =
+    previewItem && corporationName && (showInline || previewOpen)
+      ? previewFor(previewItem, corporationName)
+      : null;
   /** Previous / Next Statement in the run, wrapping round. */
   const stepPreview = (delta: number) => {
     if (previews.length === 0 || !previewItem) return;
@@ -238,6 +249,27 @@ export function StatementRun() {
   const order: Step[] = ['check', 'send', 'done'];
   const at = order.indexOf(step);
   const stateOf = (i: number) => (at > i ? 'done' : at === i ? 'now' : 'next');
+  /** Whose mail the preview shows, with a visible label: the run's Miners by main Character. */
+  const minerPicker = previews.length > 1 && previewItem && (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+      <span id={previewLabelId} className="text-text-dim">
+        {t('corpTaxBook.moons.run.previewFor')}
+      </span>
+      <Select value={previewItem.key} onValueChange={setPreviewId}>
+        <SelectTrigger aria-labelledby={previewLabelId} className="w-full max-w-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {previews.map((p) => (
+            <SelectItem key={p.key} value={p.key}>
+              {names.character(minerRow(p.minerId).mainCharacterId)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   const title = period
     ? t('corpTaxBook.moons.run.title', { period: periodLabel(period.start, period.end) })
     : t('corpTaxBook.moons.run.titleNone');
@@ -257,172 +289,179 @@ export function StatementRun() {
               state={step === 'done' ? 'now' : 'next'}
             />
           </ol>
-          {step === 'check' && (
-            <div className="space-y-3 text-sm">
-              <StatChips>
-                <StatChip
-                  label={t('corpTaxBook.moons.run.statements')}
-                  value={t('corpTaxBook.moons.run.toSend', { count: total })}
-                  emphasis
-                />
-                {plan && (
-                  <StatChip
-                    label={t('corpTaxBook.moons.run.balances')}
-                    value={isk(plan.totalDue)}
-                    tooltip={t('corpTaxBook.moons.run.balancesTip')}
-                    tooltipGlyph="info"
-                  />
-                )}
-                {plan && (
-                  <StatChip
-                    label={t('corpTaxBook.moons.run.belowMinimum', {
-                      amount: isk(view.input.minimumStatement),
+          <div
+            className={cx(
+              showInline &&
+                'grid items-start gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]'
+            )}
+          >
+            <div className="min-w-0">
+              {step === 'check' && (
+                <div className="space-y-3 text-sm">
+                  <StatChips>
+                    <StatChip
+                      label={t('corpTaxBook.moons.run.statements')}
+                      value={t('corpTaxBook.moons.run.toSend', { count: total })}
+                      emphasis
+                    />
+                    {plan && (
+                      <StatChip
+                        label={t('corpTaxBook.moons.run.balances')}
+                        value={isk(plan.totalDue)}
+                        tooltip={t('corpTaxBook.moons.run.balancesTip')}
+                        tooltipGlyph="info"
+                      />
+                    )}
+                    {plan && (
+                      <StatChip
+                        label={t('corpTaxBook.moons.run.belowMinimum', {
+                          amount: isk(view.input.minimumStatement),
+                        })}
+                        value={t('corpTaxBook.moons.run.rollIn', { count: plan.belowMinimum })}
+                      />
+                    )}
+                    {plan && (
+                      <StatChip
+                        label={t('corpTaxBook.moons.run.creditApplied')}
+                        value={isk(plan.creditApplied)}
+                      />
+                    )}
+                  </StatChips>
+                  <ul className="space-y-1">
+                    <li className="flex items-center gap-2">
+                      <Icon.SeverityClear
+                        size={Icon.ICON_SIZE.sm}
+                        className="text-success"
+                        aria-hidden
+                      />
+                      {t('corpTaxBook.moons.run.billable', {
+                        hub:
+                          TRADE_HUBS.find((h) => h.id === view.input.hubId)?.systemName ??
+                          view.input.hubId,
+                        form: t(`corpTaxBook.moons.settings.form.${view.input.oreForm}`),
+                      })}
+                    </li>
+                    {unmailed.length > 0 && (
+                      <li className="flex items-center gap-2">
+                        <Icon.Warn size={Icon.ICON_SIZE.sm} className="text-warning" aria-hidden />
+                        {t('corpTaxBook.moons.run.unmailed', { count: unmailed.length })}
+                      </li>
+                    )}
+                    {view.needsYou.some((n) => n.kind === 'unmatched') && (
+                      <li className="flex items-center gap-2">
+                        <Icon.Warn size={Icon.ICON_SIZE.sm} className="text-warning" aria-hidden />
+                        {t('corpTaxBook.moons.run.unmatched')}
+                      </li>
+                    )}
+                  </ul>
+                  {!inline && minerPicker}
+                  {corporationName === null && (
+                    <p role="status" className="text-text-dim">
+                      {t('corpTaxBook.moons.run.loadingCorporation')}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="primary" onClick={() => setStep('send')} disabled={!canEdit}>
+                      {t('corpTaxBook.moons.run.continue')}
+                    </Button>
+                    {previewItem && !inline && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => setPreviewOpen(true)}
+                        disabled={corporationName === null}
+                      >
+                        {t('corpTaxBook.moons.run.preview')}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+              {step === 'send' && (
+                <div className="space-y-3 text-sm">
+                  <p>
+                    {t('corpTaxBook.moons.run.sendIntro', {
+                      count: total,
+                      name: names.character(characterId),
                     })}
-                    value={t('corpTaxBook.moons.run.rollIn', { count: plan.belowMinimum })}
-                  />
-                )}
-                {plan && (
-                  <StatChip
-                    label={t('corpTaxBook.moons.run.creditApplied')}
-                    value={isk(plan.creditApplied)}
-                  />
-                )}
-              </StatChips>
-              <ul className="space-y-1">
-                <li className="flex items-center gap-2">
-                  <Icon.SeverityClear
-                    size={Icon.ICON_SIZE.sm}
-                    className="text-success"
-                    aria-hidden
-                  />
-                  {t('corpTaxBook.moons.run.billable', {
-                    hub:
-                      TRADE_HUBS.find((h) => h.id === view.input.hubId)?.systemName ??
-                      view.input.hubId,
-                    form: t(`corpTaxBook.moons.settings.form.${view.input.oreForm}`),
-                  })}
-                </li>
-                {unmailed.length > 0 && (
-                  <li className="flex items-center gap-2">
-                    <Icon.Warn size={Icon.ICON_SIZE.sm} className="text-warning" aria-hidden />
-                    {t('corpTaxBook.moons.run.unmailed', { count: unmailed.length })}
-                  </li>
-                )}
-                {view.needsYou.some((n) => n.kind === 'unmatched') && (
-                  <li className="flex items-center gap-2">
-                    <Icon.Warn size={Icon.ICON_SIZE.sm} className="text-warning" aria-hidden />
-                    {t('corpTaxBook.moons.run.unmatched')}
-                  </li>
-                )}
-              </ul>
-              {previews.length > 1 && (
-                <Select value={previewItem?.key ?? ''} onValueChange={setPreviewId}>
-                  <SelectTrigger
-                    aria-label={t('corpTaxBook.moons.run.previewFor')}
-                    className="w-full max-w-xs"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {previews.map((p) => (
-                      <SelectItem key={p.key} value={p.key}>
-                        {names.character(minerRow(p.minerId).mainCharacterId)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  </p>
+                  <MailLimitNotice count={total} senderName={names.character(characterId)} />
+                  {corporationName === null && (
+                    <p role="status" className="text-text-dim">
+                      {t('corpTaxBook.moons.run.loadingCorporation')}
+                    </p>
+                  )}
+                  {error && (
+                    <p role="alert" className="text-danger">
+                      {error}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {previewItem && !inline && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => setPreviewOpen(true)}
+                        disabled={busy || corporationName === null}
+                      >
+                        {t('corpTaxBook.moons.run.preview')}
+                      </Button>
+                    )}
+                    <Button
+                      variant="primary"
+                      onClick={() => void send()}
+                      disabled={busy || corporationName === null}
+                    >
+                      {t('corpTaxBook.moons.run.sendButton', { count: total })}
+                    </Button>
+                    <Button variant="ghost" onClick={() => setStep('check')} disabled={busy}>
+                      {t('corpTaxBook.moons.run.back')}
+                    </Button>
+                  </div>
+                </div>
               )}
-              {corporationName === null && (
-                <p role="status" className="text-text-dim">
-                  {t('corpTaxBook.moons.run.loadingCorporation')}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <Button variant="primary" onClick={() => setStep('send')} disabled={!canEdit}>
-                  {t('corpTaxBook.moons.run.continue')}
-                </Button>
-                {previewItem && (
-                  <Button
-                    variant="ghost"
-                    onClick={() => setPreviewOpen(true)}
-                    disabled={corporationName === null}
-                  >
-                    {t('corpTaxBook.moons.run.preview')}
+              {step === 'done' && (
+                <div className="space-y-3 text-sm">
+                  {result && (
+                    <p>
+                      {t('corpTaxBook.moons.run.queued', { count: result.queued })}
+                      {result.skipped > 0 &&
+                        ` ${t('corpTaxBook.moons.run.skipped', { count: result.skipped })}`}
+                      {result.missingLink > 0 &&
+                        ` ${t('corpTaxBook.moons.run.missingLink', { count: result.missingLink })}`}
+                    </p>
+                  )}
+                  <MailQueueSummary items={queue} now={now} />
+                  <p className="text-xs text-text-dim">{t('corpTaxBook.moons.run.chipNote')}</p>
+                  <Button variant="ghost" onClick={() => setStep('check')}>
+                    {t('corpTaxBook.moons.run.again')}
                   </Button>
+                </div>
+              )}
+            </div>
+            {showInline && (
+              <section
+                aria-label={t('corpTaxBook.moons.run.mailPreview')}
+                className="min-w-0 space-y-3 rounded-xs border border-line p-3"
+              >
+                <h3 className={eyebrowClassName}>{t('corpTaxBook.moons.run.mailPreview')}</h3>
+                {minerPicker}
+                {mail ? (
+                  <div className="max-h-[36rem] overflow-y-auto">
+                    <StatementMailPreview {...mail} />
+                  </div>
+                ) : (
+                  <p role="status" className="text-sm text-text-dim">
+                    {t('corpTaxBook.moons.run.loadingCorporation')}
+                  </p>
                 )}
-              </div>
-            </div>
-          )}
-          {step === 'send' && (
-            <div className="space-y-3 text-sm">
-              <p>
-                {t('corpTaxBook.moons.run.sendIntro', {
-                  count: total,
-                  name: names.character(characterId),
-                })}
-              </p>
-              <MailLimitNotice count={total} senderName={names.character(characterId)} />
-              {corporationName === null && (
-                <p role="status" className="text-text-dim">
-                  {t('corpTaxBook.moons.run.loadingCorporation')}
-                </p>
-              )}
-              {error && (
-                <p role="alert" className="text-danger">
-                  {error}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                {previewItem && (
-                  <Button
-                    variant="ghost"
-                    onClick={() => setPreviewOpen(true)}
-                    disabled={busy || corporationName === null}
-                  >
-                    {t('corpTaxBook.moons.run.preview')}
-                  </Button>
-                )}
-                <Button
-                  variant="primary"
-                  onClick={() => void send()}
-                  disabled={busy || corporationName === null}
-                >
-                  {t('corpTaxBook.moons.run.sendButton', { count: total })}
-                </Button>
-                <Button variant="ghost" onClick={() => setStep('check')} disabled={busy}>
-                  {t('corpTaxBook.moons.run.back')}
-                </Button>
-              </div>
-            </div>
-          )}
-          {step === 'done' && (
-            <div className="space-y-3 text-sm">
-              {result && (
-                <p>
-                  {t('corpTaxBook.moons.run.queued', { count: result.queued })}
-                  {result.skipped > 0 &&
-                    ` ${t('corpTaxBook.moons.run.skipped', { count: result.skipped })}`}
-                  {result.missingLink > 0 &&
-                    ` ${t('corpTaxBook.moons.run.missingLink', { count: result.missingLink })}`}
-                </p>
-              )}
-              <MailQueueSummary items={queue} now={now} />
-              <p className="text-xs text-text-dim">{t('corpTaxBook.moons.run.chipNote')}</p>
-              <Button variant="ghost" onClick={() => setStep('check')}>
-                {t('corpTaxBook.moons.run.again')}
-              </Button>
-            </div>
-          )}
+              </section>
+            )}
+          </div>
         </>
       )}
       <StatementMailPreviewDialog
-        open={previewOpen}
+        open={previewOpen && !inline}
         onClose={() => setPreviewOpen(false)}
-        mail={
-          previewOpen && previewItem && corporationName
-            ? previewFor(previewItem, corporationName)
-            : null
-        }
+        mail={mail}
         {...(previews.length > 1 && previewItem
           ? {
               nav: {
