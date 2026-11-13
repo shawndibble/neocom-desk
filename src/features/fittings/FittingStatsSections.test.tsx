@@ -1504,7 +1504,7 @@ describe('FittingStatsSections — column and side panels', () => {
         pilot={{
           characterName: 'Test Pilot',
           missingSkills: 3,
-          notes: <span>Missing chip</span>,
+          missingSkillsChip: <span>Missing chip</span>,
         }}
         tacticalMode={<span>Mode picker</span>}
         whatToTrain={<span>Train list</span>}
@@ -1526,6 +1526,17 @@ describe('FittingStatsSections — column and side panels', () => {
     expect(pilot.getByText('Missing chip')).toBeInTheDocument();
     expect(pilot.getByRole('combobox', { name: 'Skills' })).toBeInTheDocument();
     expect(pilot.getByRole('heading', { name: 'What to train' })).toBeInTheDocument();
+    // The chip sits just above What to train, below the Skills controls.
+    expect(
+      pilot
+        .getByRole('combobox', { name: 'Skills' })
+        .compareDocumentPosition(pilot.getByText('Missing chip'))
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(
+      pilot
+        .getByText('Missing chip')
+        .compareDocumentPosition(pilot.getByRole('heading', { name: 'What to train' }))
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     // No collapsible sections in the Pilot panel.
     expect(pilot.queryByRole('button', { name: 'What to train' })).toBeNull();
     await user.click(pilot.getByRole('button', { name: 'Close' }));

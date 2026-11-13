@@ -2,7 +2,8 @@
  * The training that makes an over-budget Fitting fit (`findSkillFixes`): each
  * fix's skill levels, the time they take (prerequisites included) and Add to
  * plan — or the plan that already trains them. Shared by What to train, where
- * it heads the list, and Make it fit.
+ * it heads the list (with the skills the fit is missing, which fix it too),
+ * and Make it fit.
  */
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
@@ -16,7 +17,7 @@ import { STAT_DETAIL, joinDetail, statRowClassName } from './statKit';
 import type { ScheduleEntries } from './useModuleUpgrades';
 
 interface Props {
-  fixes: readonly SkillFix[];
+  fixes: readonly Pick<SkillFix, 'entries'>[];
   skillName: (skillTypeId: number) => string;
   /** Null before the Character's skills are in. */
   scheduleEntriesFor: ScheduleEntries | null;
@@ -25,6 +26,8 @@ interface Props {
   /** The highest level the plan trains each skill to, prerequisite rows included. */
   plannedLevels: ReadonlyMap<number, number>;
   onAdd: (entries: readonly PlanEntry[]) => void;
+  /** Why each row fixes the fit; default: it brings the Fitting under budget. */
+  detail?: string;
 }
 
 /** Quickest to train first; a fix not yet timed last. */
@@ -35,6 +38,7 @@ export function SkillFixList({
   plan,
   plannedLevels,
   onAdd,
+  detail,
 }: Props) {
   const { t } = useTranslation();
   const rows = fixes
@@ -75,7 +79,7 @@ export function SkillFixList({
                 </p>
                 <p className={STAT_DETAIL}>
                   {joinDetail([
-                    t('fittings.skillFixes.makesItFit'),
+                    detail ?? t('fittings.skillFixes.makesItFit'),
                     includesPrerequisites ? t('fittings.whatToTrain.withPrerequisites') : null,
                   ])}
                 </p>
