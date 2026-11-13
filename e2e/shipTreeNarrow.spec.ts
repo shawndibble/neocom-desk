@@ -44,9 +44,11 @@ test.describe('Ship Tree — narrow', () => {
       const info = page.getByRole('dialog', { name: 'Merlin' });
       await expect(info).toBeVisible();
       await info.getByRole('tab', { name: 'Fitting' }).click();
+      // On a phone the hull's stats fold behind a disclosure, so the fits start near the top.
+      await info.getByRole('button', { name: 'Slots and fitting resources' }).click();
       await expect(info.getByText('High slots')).toBeVisible();
       // Nothing (the phone tab bar, say) sits over the sheet's own actions.
-      await info.getByRole('button', { name: 'Simulate' }).click({ trial: true });
+      await info.getByRole('button', { name: 'Start empty fit' }).click({ trial: true });
       await expectNoPageOverflow(page);
     });
   }

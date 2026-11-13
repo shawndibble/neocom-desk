@@ -1,12 +1,15 @@
 /**
  * Ship Info › Fitting: the hull's slots, hardpoints and fitting resources
- * as CCP ships them (before the pilot's skills), and Simulate — a new,
- * empty Fitting of the hull in the editor — or one of its Popular fits.
+ * as CCP ships them (before the pilot's skills), in two columns (folded
+ * behind a disclosure on a phone, so the fits start near the top), and Start
+ * empty fit — a new, empty Fitting of the hull in the editor — or one of its
+ * Popular fits.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui';
+import { Button, Disclosure } from '@/components/ui';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { newFitting } from '@/engine/fittings/fittingEdit';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
@@ -26,9 +29,11 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
-  /** Which open failed: the bare hull (Simulate) or a Popular fit. */
+  /** Which open failed: the bare hull (Start empty fit) or a Popular fit. */
   const [failed, setFailed] = useState<'hull' | 'popular' | null>(null);
   const s = ship.stats;
+  const phone = useIsPhone();
+  const [statsOpen, setStatsOpen] = useState(false);
 
   const rows: [string, string][] = [];
   if (!slotsFromSubsystems(ship)) {
@@ -87,32 +92,47 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
     }
   }
 
+  const stats = (
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-1">
+      {rows.map(([label, value]) => (
+        <div key={label} className="flex justify-between gap-2">
+          <dt className="text-text-dim">{label}</dt>
+          <dd className="text-right text-text tabular-nums">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+
   return (
     <div className="space-y-3 text-xs">
       {slotsFromSubsystems(ship) && (
         <p className="text-text-dim">{t('ships.info.fitting.subsystems')}</p>
       )}
-      <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
-        {rows.map(([label, value]) => (
-          <div key={label} className="contents">
-            <dt className="text-text-dim">{label}</dt>
-            <dd className="text-right text-text tabular-nums">{value}</dd>
-          </div>
-        ))}
-      </dl>
+      {phone ? (
+        <Disclosure
+          label={t('ships.info.fitting.stats')}
+          expanded={statsOpen}
+          onToggle={() => setStatsOpen(!statsOpen)}
+          className="border border-line"
+        >
+          <div className="p-2">{stats}</div>
+        </Disclosure>
+      ) : (
+        stats
+      )}
       <p className="text-text-dim">{t('ships.info.fitting.unskilledNote')}</p>
       <Button
         variant="primary"
         onClick={() => void openInEditor(newFitting(ship.typeID, ship.name), 'hull')}
         disabled={busy}
       >
-        {t('ships.info.fitting.simulate')}
+        {t('ships.info.fitting.startEmptyFit')}
       </Button>
       {failed !== null && (
         <p role="alert" className="text-danger">
           {t(
             failed === 'hull'
-              ? 'ships.info.fitting.simulateFailed'
+              ? 'ships.info.fitting.startEmptyFitFailed'
               : 'ships.info.fitting.popularFailed'
           )}
         </p>

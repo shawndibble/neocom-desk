@@ -1,15 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { HullPicker } from './HullPicker';
 
-const { usePopularFitsMock, useHullFlyMarksMock } = vi.hoisted(() => ({
+const { usePopularFitsMock, useHullFlyMarksMock, useRecentHullIdsMock } = vi.hoisted(() => ({
   usePopularFitsMock: vi.fn(),
   useHullFlyMarksMock: vi.fn<() => HullFlyMarks | null>(() => null),
+  useRecentHullIdsMock: vi.fn<() => number[]>(() => []),
 }));
-vi.mock('./popularFits', () => ({ usePopularFits: usePopularFitsMock }));
+// The EVE Workbench rows read the losses too, for their "Seen on zKillboard" badge.
+vi.mock('./popularFits', () => ({
+  usePopularFits: usePopularFitsMock,
+  loadPopularFits: () => Promise.resolve({ ok: true, fits: [] }),
+}));
 vi.mock('./useHullFlyMarks', () => ({ useHullFlyMarks: useHullFlyMarksMock }));
+vi.mock('./useRecentHulls', () => ({ useRecentHullIds: useRecentHullIdsMock }));
 import type { HullFlyMarks } from './useHullFlyMarks';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
@@ -43,18 +49,49 @@ describe('HullPicker', () => {
     expect(screen.queryByRole('button', { name: 'Vexor' })).toBeNull();
   });
 
+  it('asks for a hull to be picked, with nothing to start, until one is', () => {
+    render(<HullPicker catalogue={catalogue} onStart={() => {}} />);
+    expect(screen.getByText('Pick a hull to start')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Start empty fit' })).toBeNull();
+    search('rift');
+    fireEvent.click(screen.getByRole('button', { name: 'Rifter' }));
+    expect(screen.queryByText('Pick a hull to start')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Rifter' })).toBeTruthy();
+  });
+
   it('groups matches by class and starts the one picked', () => {
     const onStart = vi.fn();
     render(<HullPicker catalogue={catalogue} onStart={onStart} />);
     search('r');
-    expect(screen.getByRole('heading', { name: /Frigates/ })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: /Cruisers/ })).toBeTruthy();
+    const list = screen.getByTestId('hull-list');
+    expect(within(list).getByRole('heading', { name: /Frigates/ })).toBeTruthy();
+    expect(within(list).getByRole('heading', { name: /Cruisers/ })).toBeTruthy();
 
-    const start = screen.getByRole('button', { name: 'Start fitting' });
-    expect((start as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Vexor' }));
-    fireEvent.click(start);
+    fireEvent.click(screen.getByRole('button', { name: 'Start empty fit' }));
     expect(onStart).toHaveBeenCalledWith({ typeId: 626, name: 'Vexor', group: 'Gallente' });
+  });
+
+  it('goes back to the hulls from the picked one', () => {
+    render(<HullPicker catalogue={catalogue} onStart={() => {}} />);
+    search('rift');
+    fireEvent.click(screen.getByRole('button', { name: 'Rifter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hulls' }));
+    expect(screen.getByText('Pick a hull to start')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Start empty fit' })).toBeNull();
+  });
+
+  it("lists the Character's recent hulls before anything is typed", () => {
+    useRecentHullIdsMock.mockReturnValue([587]);
+    try {
+      render(<HullPicker catalogue={catalogue} onStart={() => {}} />);
+      expect(screen.getByRole('heading', { name: 'Recent hulls' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Rifter' })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Vexor' })).toBeNull();
+      expect(screen.queryByText('Search for a hull to begin.')).toBeNull();
+    } finally {
+      useRecentHullIdsMock.mockReturnValue([]);
+    }
   });
 
   it('narrows the classes to the hulls the search matches', () => {
@@ -114,6 +151,8 @@ describe('HullPicker', () => {
   describe('can-fly marks', () => {
     beforeEach(() => useActiveCharacter.setState({ activeCharacterId: 7 }));
     afterEach(() => {
+      // Unmount first: clearing the Character re-renders a mounted picker outside act.
+      cleanup();
       useHullFlyMarksMock.mockReset().mockReturnValue(null);
       useActiveCharacter.setState({ activeCharacterId: null });
     });
@@ -135,6 +174,28 @@ describe('HullPicker', () => {
       });
       expect(vexor.querySelector('[data-shape="ring"]')).toBeTruthy();
       expect(vexor.textContent).toContain('Ω');
+    });
+
+    it('narrows the hulls to the ones the Character can fly', () => {
+      useHullFlyMarksMock.mockReturnValue((typeId) =>
+        typeId === 587
+          ? { status: { canFly: true, secondsToFly: 0, mastery: 1 }, needsOmega: false }
+          : { status: { canFly: false, secondsToFly: 3_600, mastery: 0 }, needsOmega: false }
+      );
+      render(<HullPicker catalogue={catalogue} onStart={() => {}} />);
+      search('r');
+      expect(screen.getByRole('button', { name: 'Vexor' })).toBeTruthy();
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Only hulls I can fly' }));
+      expect(screen.getByRole('button', { name: 'Rifter' })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Vexor' })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Cruisers/ })).toBeNull();
+      search('vex');
+      expect(screen.getByText('No hull you can fly matches that search.')).toBeTruthy();
+    });
+
+    it('offers no can-fly filter until the marks are known', () => {
+      render(<HullPicker catalogue={catalogue} onStart={() => {}} />);
+      expect(screen.queryByRole('checkbox', { name: 'Only hulls I can fly' })).toBeNull();
     });
 
     it('lists hulls unmarked until the marks are known', () => {

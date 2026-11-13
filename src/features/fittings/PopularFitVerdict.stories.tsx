@@ -56,8 +56,10 @@ export const InRowsAtPhoneWidth: Story = {
     <ul className="w-[358px] space-y-1">
       <li className={FIT_ROW_CLASS}>
         <PopularFitRow
+          source="loss"
           title="12 losses"
-          meta=" · last seen 2h ago · ~87.5M ISK"
+          meta=" · last seen 2h ago"
+          price="~87.5M ISK"
           verdict={<PopularFitVerdict verdict={{ kind: 'canFly' }} />}
           modules={[]}
           names={NO_NAMES}
@@ -66,8 +68,10 @@ export const InRowsAtPhoneWidth: Story = {
       </li>
       <li className={FIT_ROW_CLASS}>
         <PopularFitRow
+          source="loss"
           title="7 losses"
-          meta=" · last seen 1d ago · ~64.2M ISK"
+          meta=" · last seen 1d ago"
+          price="~64.2M ISK"
           verdict={<PopularFitVerdict verdict={{ ...GAPS, omegaOnly: true }} />}
           modules={[
             { slot: 'high', typeId: 3001 },

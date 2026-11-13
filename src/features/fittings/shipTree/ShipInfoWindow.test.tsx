@@ -23,7 +23,11 @@ vi.mock('@/engine/fittings/fittingShare', async (importOriginal) => {
   return { ...real, encodeFittingShare: vi.fn(real.encodeFittingShare) };
 });
 const { usePopularFitsMock } = vi.hoisted(() => ({ usePopularFitsMock: vi.fn() }));
-vi.mock('../popularFits', () => ({ usePopularFits: usePopularFitsMock }));
+// The EVE Workbench rows read the losses too, for their "Seen on zKillboard" badge.
+vi.mock('../popularFits', () => ({
+  usePopularFits: usePopularFitsMock,
+  loadPopularFits: () => Promise.resolve({ ok: true, fits: [] }),
+}));
 vi.mock('@/sde/loadSde', async (importOriginal) => {
   const f = await import('./__fixtures__/shipTreeFixture');
   return {
@@ -188,7 +192,7 @@ describe('Ship Info window', () => {
     expect(within(dialog).getByText('Frigate')).toBeVisible();
   });
 
-  it('Fitting: base slots and resources, and Simulate opens a new Fitting in the editor', async () => {
+  it('Fitting: base slots and resources, and Start empty fit opens a new Fitting in the editor', async () => {
     const { user, dialog } = await openShip(/^Merlin/);
     await user.click(within(dialog).getByRole('tab', { name: 'Fitting' }));
     expect(within(dialog).getByText('High slots').nextElementSibling).toHaveTextContent('3');
@@ -196,7 +200,7 @@ describe('Ship Info window', () => {
     expect(within(dialog).getByText('CPU').nextElementSibling).toHaveTextContent('180 tf');
     expect(within(dialog).getByText('Base values, before your skills.')).toBeVisible();
 
-    await user.click(within(dialog).getByRole('button', { name: 'Simulate' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Start empty fit' }));
     await waitFor(() => {
       const [pathname, search] = screen.getByTestId('location').textContent!.split('?');
       expect(pathname).toBe(FITTING_EDIT_PATH);
@@ -204,16 +208,16 @@ describe('Ship Info window', () => {
     });
   });
 
-  it("Fitting: Simulate says so when the new Fitting can't be encoded", async () => {
+  it("Fitting: Start empty fit says so when the new Fitting can't be encoded", async () => {
     vi.mocked(encodeFittingShare).mockResolvedValueOnce({ ok: false, reason: 'too-large' });
     const { user, dialog } = await openShip(/^Merlin/);
     await user.click(within(dialog).getByRole('tab', { name: 'Fitting' }));
-    await user.click(within(dialog).getByRole('button', { name: 'Simulate' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Start empty fit' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       "Couldn't open this hull in the editor."
     );
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/ships\/tree(\?ship=\d+)?$/);
-    expect(within(dialog).getByRole('button', { name: 'Simulate' })).toBeEnabled();
+    expect(within(dialog).getByRole('button', { name: 'Start empty fit' })).toBeEnabled();
   });
 
   it('Fitting: a Popular fit opens in the editor', async () => {
@@ -242,8 +246,7 @@ describe('Ship Info window', () => {
     const { user, dialog } = await openShip(/^Merlin/);
     await user.click(within(dialog).getByRole('tab', { name: 'Fitting' }));
     expect(usePopularFitsMock.mock.lastCall?.[0]).toBe(HULL_ID);
-    expect(within(dialog).getByText('4 losses')).toBeVisible();
-    await user.click(within(dialog).getByRole('button', { name: '4 losses' }));
+    await user.click(await within(dialog).findByRole('button', { name: '4 losses' }));
     await waitFor(() => {
       expect(screen.getByTestId('location').textContent).toMatch(/\?f=/);
     });

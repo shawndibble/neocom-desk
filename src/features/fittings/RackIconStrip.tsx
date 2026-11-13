@@ -1,7 +1,7 @@
 /**
- * A Popular fits panel row's modules as icons, rack by rack (issues #2327, #2493) —
- * shared by the zKillboard and EVE Workbench tabs so both draw modules the
- * same way.
+ * A Popular fits panel row's modules as icons, rack by rack (issues #2327, #2493),
+ * each rack led by its initial (H, M, L, R) — one strip for losses and guides
+ * alike, so both draw modules the same way.
  */
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TypeIcon } from '@/components/ui';
@@ -50,6 +50,13 @@ export function RackIconStrip({
             className="relative flex flex-wrap gap-0.5 pl-3"
           >
             <span aria-hidden className="absolute inset-y-0 left-1.5 border-l border-line" />
+            {/* The rack's initial, as the fitting window's rack labels: the group's label names it in full. */}
+            <span
+              aria-hidden
+              className="w-3 self-center text-[0.6875rem] font-semibold text-text-dim"
+            >
+              {t(`fittings.list.rackShort.${rack}`)}
+            </span>
             {typeIds.map((typeId, slotIndex) => {
               const known = names.get(typeId) ?? `#${typeId}`;
               const cantUse = unusable?.has(typeId) ?? false;
