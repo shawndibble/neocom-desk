@@ -16,16 +16,14 @@ import { unexpectedRequests, whenFetchQuiet, whenFixturesRetired } from '@/story
 setProjectAnnotations(preview.default);
 
 /**
- * Between stories no fixture table is installed and `fetch` is the real one, and
- * CI is offline, where a real request hangs until its timeout (15 s for
- * Fuzzwork). A page's work that outlived its story's drain then failed 15 s
- * later into its fallback, whose request landed in whatever story was rendering
- * by then: an ESI order book blamed on CorpTaxBookFinal's PersonalRowDetailPhone.
- * Here the network refuses at once instead, so a late request and its fallback
- * fail while no story is installed to be blamed. Same-origin (the SDE bake)
- * still passes through.
+ * Between stories no fixture table is installed and `fetch` is the real one. CI
+ * is offline, where a real request hangs until its timeout (15 s for Fuzzwork),
+ * so a page's late request failed long after its story, and its fallback's
+ * request was blamed on whichever story was rendering by then. Refusing at once
+ * keeps a late request and its fallback inside the gap. Same-origin (the SDE
+ * bake) still passes through.
  */
-function refuseTheNetwork(): () => void {
+function refuseCrossOriginFetch(): () => void {
   const real = globalThis.fetch;
   globalThis.fetch = (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input), location.href);
@@ -40,7 +38,7 @@ function refuseTheNetwork(): () => void {
 export function describeStorySmoke(modules: Record<string, Record<string, unknown>>) {
   let restoreNetwork: (() => void) | undefined;
   beforeAll(() => {
-    restoreNetwork = refuseTheNetwork();
+    restoreNetwork = refuseCrossOriginFetch();
   });
   afterAll(() => restoreNetwork?.());
   describe.each(Object.entries(modules))('%s', (_file, mod) => {
