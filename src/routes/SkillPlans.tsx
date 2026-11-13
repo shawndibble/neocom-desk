@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { acceleratorId } from '@/features/accelerator/characterAccelerators';
+import { acceleratorId, injectedAccelerator } from '@/features/accelerator/characterAccelerators';
 import { DataAgeBadge, Spinner, CachedNotice, Toast } from '@/components/ui';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -23,6 +23,7 @@ import { newPlan } from '@/features/skills/planner/newPlan';
 import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { AttributesPane } from '@/features/skills/planner/AttributesPane';
+import { AcceleratorSection } from '@/features/skills/planner/AcceleratorSection';
 import { CurrentQueuePanel } from '@/features/skills/planner/CurrentQueuePanel';
 import { QueueStrip } from '@/features/skills/planner/QueueStrip';
 import { SkillPlanCard } from '@/features/skills/planner/SkillPlanCard';
@@ -97,6 +98,9 @@ export function SkillPlans() {
   // Shared with every other 30 s clock on screen; paused while the tab is hidden.
   const nowMs = useTicker(TICK_MS);
   const timeZone = useTimeZone();
+  // An injected booster: typed in and still running, or read off the attribute
+  // sheet (EVE gives its size but never its expiry, so the pilot sets that here).
+  const injected = injectedAccelerator(accelerator, attributeBaseline, nowMs);
   const weekStart = useCalendarWeekStart((state) => state.value);
   useHydratedStore(useCalendarWeekStart);
   const queueView = useMemo(
@@ -242,6 +246,15 @@ export function SkillPlans() {
             remapInfo={remapInfo}
             onOptimizeQueue={scheduleInputs && remapInfo ? () => void optimizeQueue() : undefined}
             queueEmpty={queueResult != null && queueResult.data.length === 0}
+            accelerator={
+              injected.running !== null || injected.detected !== null ? (
+                <AcceleratorSection
+                  characterId={activeCharacterId}
+                  running={injected.running}
+                  detectedBonus={injected.detected}
+                />
+              ) : null
+            }
           />
         </aside>
         {catalog && (
