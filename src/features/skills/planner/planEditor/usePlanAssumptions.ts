@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type SkillPlanRecord, type WhatIfImplantSelection } from '@/db';
-import { isAcceleratorLive } from '@/engine/accelerator';
-import { acceleratorId } from '@/features/accelerator/characterAccelerators';
+import { acceleratorId, injectedAccelerator } from '@/features/accelerator/characterAccelerators';
 import { useNow } from '@/lib/useNow';
 import type { AttributeBaseline } from '@/engine/attributeBaseline';
 import type { CloneState, Implants } from '@/engine/types';
@@ -77,15 +76,16 @@ export function usePlanAssumptions({
   // running costs the plan; one only detected from the attribute sheet has a
   // size but no known expiry, so it is shown and costs nothing until the pilot
   // says when it runs out (`acceleratorBoosters`).
-  const detectedAccelerator =
-    attributeBaseline?.kind === 'accelerated' ? attributeBaseline.acceleratorBonus : null;
   const storedAccelerator = useLiveQuery(
     () => db.characterAccelerators.get(acceleratorId(characterId)),
     [characterId]
   );
   const now = useNow();
-  const runningAccelerator =
-    storedAccelerator && isAcceleratorLive(storedAccelerator, now) ? storedAccelerator : null;
+  const { running: runningAccelerator, detected: detectedAccelerator } = injectedAccelerator(
+    storedAccelerator,
+    attributeBaseline,
+    now
+  );
   const activeBoosters = useMemo(
     () => acceleratorBoosters(runningAccelerator),
     [runningAccelerator]

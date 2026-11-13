@@ -104,7 +104,7 @@ describe('Community Fittings in the library', () => {
     expect(screen.queryByRole('button', { name: /^Mine/ })).not.toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Shared in a Community' })).toBeInTheDocument();
 
-    await userEvent.dblClick(row);
+    await userEvent.click(row);
     expect(workspace.loadFromInput).toHaveBeenCalledWith(code);
     expect(workspace.openSaved).not.toHaveBeenCalled();
   });

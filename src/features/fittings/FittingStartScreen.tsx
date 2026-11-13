@@ -5,7 +5,7 @@ import {
   selectedRowClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -41,6 +41,7 @@ import { setFittingNotes } from './myFittings';
 import { FittingExportNotice } from './FittingExportMenu';
 import { DeleteFittingModal, RenameFittingModal } from './SavedFittingModals';
 import { useLibraryRowActions } from './useLibraryRowActions';
+import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
 import { fittingCompareHref } from './fittingRoutes';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { FittingLibrarySource } from './useFittingPicker';
@@ -63,11 +64,16 @@ interface FittingStartScreenProps {
   inGameKey: number;
   /**
    * `page`: the Start screen with nothing open — New from hull and Import
-   * beside the search, and on a desktop the picked row previewed beside the
-   * list. `dialog`: the list alone, in the editor's "Open a fitting" dialog
-   * or the Compare picker.
+   * beside the search. `dialog`: the editor's "Open a fitting" dialog or the
+   * Compare picker.
    */
   variant?: 'page' | 'dialog';
+  /**
+   * On a desktop, the hovered or focused row previewed beside the list. On by
+   * default for the page; the editor's Open dialog turns it on, the Compare
+   * picker leaves it off.
+   */
+  preview?: boolean;
   /** The page's New from hull button. */
   onStartHull?: (hull: StartHull) => void;
   /** A dialog's Import, swapping the list for the Load card in place, so no dialog opens over a dialog. */
@@ -109,10 +115,11 @@ function MaybeTabPanel({
 
 /**
  * Every way into a Fitting, as one list (scope decisions `20260925-152418`,
- * `20261001-210222` and `20261106-233825`): one search over the Character's
- * Active Fit, then their saved and In-game Fittings grouped by hull. On a desktop page the picked row is previewed
- * beside the list and a double-click (or Enter) opens it; everywhere else —
- * a phone, the editor's Open dialog, the Compare picker — a tap opens it.
+ * `20261001-210222`, `20261106-233825` and `20261113-155526`): one search over
+ * the Character's Active Fit, then their saved and In-game Fittings grouped by
+ * hull. A click, Enter or Space opens a row. On a desktop page and in the
+ * editor's Open dialog the hovered or focused row is previewed beside the
+ * list; the last one stays when the pointer leaves.
  */
 export function FittingStartScreen({
   workspace,
@@ -120,6 +127,7 @@ export function FittingStartScreen({
   characterId,
   inGameKey,
   variant = 'page',
+  preview = variant === 'page',
   onStartHull,
   importInline = false,
   rowMenus = true,
@@ -132,8 +140,8 @@ export function FittingStartScreen({
   const navigate = useNavigate();
   const isPhone = useIsPhone();
   const page = variant === 'page';
-  // A phone has no room for a preview beside the list: a tap opens instead.
-  const previewing = page && !isPhone;
+  // A phone has no room for a preview beside the list.
+  const previewing = preview && !isPhone;
   // Only the page's search is URL state. A dialog's (the editor's Open, the
   // Compare picker) is a passing pick over another page's URL: written there,
   // it would outlive the dialog and come back the next time it opened.
@@ -142,6 +150,13 @@ export function FittingStartScreen({
   const query = page ? urlQuery : dialogQuery;
   const setQuery = page ? setUrlQuery : setDialogQuery;
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The row the pointer is resting on, and its timer to take the preview.
+  const hover = useRef<{ rowId: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const cancelHover = () => {
+    clearTimeout(hover.current?.timer);
+    hover.current = null;
+  };
+  useEffect(() => () => clearTimeout(hover.current?.timer), []);
   const [hullOpen, setHullOpen] = useState(false);
   // A Fitting Share Code that won't open lands on Import, where its message is.
   const [importOpen, setImportOpen] = useState(page && workspace.shareError !== null);
@@ -277,7 +292,7 @@ export function FittingStartScreen({
     );
   }
 
-  /** One row of the list: a tap previews it (or opens it, with no preview), its menu the rest. */
+  /** One row of the list: a click opens it, hover or focus previews it, its menu the rest. */
   const renderRow = (row: LibraryRow) => {
     const isSelected = previewing && selected?.id === row.id;
     const item = (
@@ -287,15 +302,32 @@ export function FittingStartScreen({
           data-row-id={row.id}
           // A list row, not a toolbar control: a second line (hull, sharer) makes it taller than Compare.
           data-inline-height="exempt"
-          aria-pressed={previewing ? isSelected : undefined}
-          onClick={() => (previewing ? setSelectedId(row.id) : open(row))}
-          onDoubleClick={previewing ? () => open(row) : undefined}
-          onKeyDown={(event) => {
-            // Enter opens, as a double-click does; Space still selects.
-            if (!previewing || event.key !== 'Enter') return;
-            event.preventDefault();
-            open(row);
-          }}
+          aria-current={isSelected || undefined}
+          onClick={() => open(row)}
+          onFocus={
+            previewing
+              ? () => {
+                  cancelHover();
+                  setSelectedId(row.id);
+                }
+              : undefined
+          }
+          // Move, not enter: scrolling under a still pointer fires enter on passing rows.
+          onPointerMove={
+            previewing
+              ? (event) => {
+                  // A touch has no hover: its tap opens the row.
+                  if (event.pointerType === 'touch' || isSelected) return;
+                  if (hover.current?.rowId === row.id) return;
+                  cancelHover();
+                  hover.current = {
+                    rowId: row.id,
+                    timer: setTimeout(() => setSelectedId(row.id), ADD_PREVIEW_DELAY_MS),
+                  };
+                }
+              : undefined
+          }
+          onPointerLeave={previewing ? cancelHover : undefined}
           className={cx(
             'group flex min-h-9 min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm',
             rowInteractiveClassName,
@@ -361,9 +393,14 @@ export function FittingStartScreen({
     );
   };
 
-  // Beside a preview the list scrolls in its own box; elsewhere the page or
-  // the dialog's body scrolls it.
-  const listHeight = previewing ? 'max-h-72 lg:h-[calc(100dvh-11rem)] lg:max-h-none' : '';
+  // Beside a preview the list scrolls in its own box, filling the page or the
+  // dialog (`Modal`'s `page` placement, 90dvh) under the search; elsewhere the
+  // page or the dialog's body scrolls it.
+  const listHeight = !previewing
+    ? ''
+    : page
+      ? 'max-h-72 lg:h-[calc(100dvh-11rem)] lg:max-h-none'
+      : 'max-h-72 lg:h-[calc(90dvh-8rem)] lg:max-h-none';
   const showNew = page && onStartHull !== undefined;
   const showImport = page || importInline;
   const empty = !hasRows && !active.pending && !loading;
@@ -449,19 +486,16 @@ export function FittingStartScreen({
               aria-label={t('fittings.start.listLabel')}
               className={`overflow-y-auto border border-line bg-panel ${listHeight}`}
               onKeyDown={(event) => {
-                // Arrow keys walk the list: focus moves, and with a preview the pick too.
+                // Arrow keys walk the list: focus moves, and a preview follows the focus.
                 if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
                 // From a row's ⋮ too, not just the row itself.
                 const focusedId = document.activeElement
                   ?.closest('li')
                   ?.querySelector<HTMLElement>('[data-row-id]')?.dataset.rowId;
-                const from = visible.findIndex(
-                  (row) => row.id === (previewing ? selected?.id : focusedId)
-                );
+                const from = visible.findIndex((row) => row.id === focusedId);
                 const next = visible[from + (event.key === 'ArrowDown' ? 1 : -1)];
                 if (!next) return;
                 event.preventDefault();
-                if (previewing) setSelectedId(next.id);
                 event.currentTarget
                   .querySelector<HTMLElement>(`[data-row-id="${CSS.escape(next.id)}"]`)
                   ?.focus();
