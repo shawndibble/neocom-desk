@@ -28,7 +28,8 @@ export function NewFromHullDialog({
 }) {
   const { t } = useTranslation();
   return (
-    <Modal open={open} onClose={onClose} title={t('fittings.start.newTitle')}>
+    // `page`: two panes side by side from `md`, full screen and one pane at a time on a phone.
+    <Modal open={open} onClose={onClose} title={t('fittings.start.newTitle')} placement="page">
       <HullPicker catalogue={catalogue} onStart={onStart} onOpenPopular={onOpenPopular} />
     </Modal>
   );

@@ -1,20 +1,48 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { Trans, useTranslation } from 'react-i18next';
-import { IskAmount, Spinner, TabPanel, Tabs, useTabsId } from '@/components/ui';
+import {
+  Button,
+  Checkbox,
+  InfoTooltip,
+  IskAmount,
+  SegmentedControl,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Spinner,
+} from '@/components/ui';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
-import type { FitSkillVerdict } from '@/engine/fittings/fitSkillVerdict';
+import type { FitSkillVerdict, MissingSkill } from '@/engine/fittings/fitSkillVerdict';
 import type { LoadedFitting } from '@/engine/fittings/load';
-import { popularFitLoad } from '@/engine/fittings/popularFits';
+import { popularFitLoad, type PopularFit } from '@/engine/fittings/popularFits';
 import { fittingRequirementTypeIds } from '@/engine/fittings/skillGaps';
 import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
+import { formatCountdown } from '@/lib/duration';
+import { useTouchContext } from '@/lib/useMediaQuery';
 import { useNow } from '@/lib/useNow';
 import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import { typeName } from '@/sde/loadSde';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { MissingSkillsList } from './MissingSkillsList';
+import { useMissingSkillRows } from './useMissingSkillRows';
+import {
+  closestFit,
+  listFits,
+  sourceCounts,
+  type FitSort,
+  type FitSourceFilter,
+  type ListedFit,
+} from './popularFitList';
 import { usePopularFits } from './popularFits';
 import { PopularFitRow } from './PopularFitRow';
-import { PopularFitVerdict } from './PopularFitVerdict';
+import { FitVerdictControl } from './PopularFitVerdict';
+import { useFitTrainingSeconds } from './useFitTrainingSeconds';
 import {
   fitVerdictSources,
   usePopularFitVerdicts,
@@ -22,7 +50,7 @@ import {
   type VerdictFit,
 } from './usePopularFitVerdicts';
 import { useModuleNames } from './useModuleNames';
-import { FIT_ROW_CLASS, VirtualFitList } from './VirtualFitList';
+import { VirtualFitList } from './VirtualFitList';
 import {
   useWorkbenchHullRows,
   workbenchHullSources,
@@ -32,7 +60,7 @@ import {
 import { OutOfDateNote } from './WorkbenchOutOfDate';
 import { WorkbenchSightingBadge } from './WorkbenchSightingBadge';
 
-/** What both tabs read from outside: the Workbench rows' sources, module names, and can-fly verdicts. */
+/** What the panel reads from outside: the Workbench rows' sources, module names, and can-fly verdicts. */
 export interface PopularFitsSources extends WorkbenchHullSources, FitVerdictSources {
   typeName: (typeId: number) => Promise<string>;
 }
@@ -59,43 +87,37 @@ interface PopularFitsPanelProps {
   sources?: PopularFitsSources;
 }
 
-type PopularFitsSource = 'zkillboard' | 'workbench';
+/** One row of the merged list: a group of zKillboard losses or an EVE Workbench guide. */
+type PanelRow = ListedFit &
+  (
+    | { source: 'loss'; fit: PopularFit; /** Its place among the losses, by count. */ rank: number }
+    | { source: 'guide'; guide: WorkbenchRow }
+  );
+
+const SORTS: readonly FitSort[] = ['newest', 'seen', 'training', 'cheapest'];
 
 /**
- * Popular fits (issues #2327, #2484), in two tabs. zKillboard: the hull's
- * recent losses grouped into distinct fits. EVE Workbench: the community fits
- * published there for the hull, from our own synced copy in R2 (`workbenchFits.ts`).
- * Either opens a fit in the editor; a failure is a one-line note — the rest of
- * the page works without it. Each row ends with whether the active Character
- * can fly it (#6011).
+ * A row's height before it is measured: title line and one line of module
+ * icons, plus the gap below it.
  */
-export function PopularFitsPanel(props: PopularFitsPanelProps) {
-  const { t } = useTranslation();
-  const tabsId = useTabsId();
-  const [source, setSource] = useState<PopularFitsSource>('zkillboard');
+const ROW_ESTIMATE = 104;
 
-  return (
-    <section aria-label={t('fittings.popular.title')} className="space-y-2">
-      <p className="text-xs text-text-dim">{t('fittings.popular.caption')}</p>
-      <Tabs
-        tabsId={tabsId}
-        label={t('fittings.popular.sourceLabel')}
-        tabs={[
-          { id: 'zkillboard', label: t('fittings.popular.tabZkillboard') },
-          { id: 'workbench', label: t('fittings.popular.tabWorkbench') },
-        ]}
-        value={source}
-        onChange={(id) => setSource(id as PopularFitsSource)}
-      />
-      <TabPanel tabsId={tabsId} tabId={source} className="space-y-2">
-        {source === 'zkillboard' ? <ZkillboardFits {...props} /> : <WorkbenchFits {...props} />}
-      </TabPanel>
-    </section>
-  );
-}
+const rowKey = (row: PanelRow) => row.key;
 
-/** The zKillboard tab: the hull's recent losses grouped into distinct fits (issue #2327). */
-function ZkillboardFits({
+/** The types a row's verdict says the pilot can't use; none without a gap. */
+const unusableOf = (verdict: FitSkillVerdict | undefined) =>
+  verdict?.kind === 'missing' ? verdict.unusableTypeIds : undefined;
+
+/**
+ * Popular fits (issues #2327, #2484): one list of the hull's recent zKillboard
+ * losses, grouped into distinct fits, and the community fits published on EVE
+ * Workbench (our own synced copy in R2, `workbenchFits.ts`). A source filter,
+ * "Can fly now" (#6011's verdicts) and a sort narrow and order it; a fit the
+ * active Character can't fly yet opens to the skills it needs. Any row opens
+ * the fit in the editor; a source that fails is a one-line note — the other
+ * source and the rest of the page work without it.
+ */
+export function PopularFitsPanel({
   shipTypeId,
   hullName,
   onOpen,
@@ -104,191 +126,334 @@ function ZkillboardFits({
   sources = POPULAR_FITS_SOURCES,
 }: PopularFitsPanelProps) {
   const { t } = useTranslation();
-  const result = usePopularFits(shipTypeId, sources.popularFits);
   const now = useNow();
-  const fits = result?.ok ? result.fits : null;
-  const typeIds = useMemo(
-    () => fits?.flatMap((fit) => fit.parts.modules.map((m) => m.typeId)) ?? null,
-    [fits]
+  const characterId = useActiveCharacter((state) => state.activeCharacterId);
+  const losses = usePopularFits(shipTypeId, sources.popularFits);
+  const guides = useWorkbenchHullRows(shipTypeId, sources);
+  const [filter, setFilter] = useState<FitSourceFilter>('all');
+  const [flyOnly, setFlyOnly] = useState(false);
+  const [sort, setSort] = useState<FitSort>('newest');
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const lossFits = losses?.ok ? losses.fits : null;
+  const guideRows = guides.status === 'ready' ? guides.rows : null;
+  const rows = useMemo(
+    (): PanelRow[] => [
+      ...(lossFits ?? []).map((fit, index): PanelRow => ({
+        key: `loss:${fit.key}`,
+        source: 'loss',
+        fit,
+        rank: index + 1,
+        newest: fit.lastSeen === null ? null : Date.parse(fit.lastSeen),
+        seen: fit.count,
+        isk: fit.value,
+      })),
+      ...(guideRows ?? []).map((row): PanelRow => ({
+        key: `guide:${row.fit.id}`,
+        source: 'guide',
+        guide: row,
+        newest: row.fit.dateAdded,
+        seen: row.sighting?.count ?? 0,
+        isk: row.price?.sell ?? null,
+      })),
+    ],
+    [lossFits, guideRows]
   );
+
+  const typeIds = useMemo(() => {
+    if (lossFits === null && guides.moduleTypeIds === null) return null;
+    return [
+      ...(lossFits ?? []).flatMap((fit) => fit.parts.modules.map((m) => m.typeId)),
+      ...(guides.moduleTypeIds ?? []),
+    ];
+  }, [lossFits, guides.moduleTypeIds]);
   const names = useModuleNames(typeIds, sources.typeName);
   const verdictFits = useMemo(
     () =>
-      fits?.map((fit): VerdictFit => ({
-        key: fit.key,
-        typeIds: fittingRequirementTypeIds({ shipTypeId: fit.parts.hullTypeId, ...fit.parts }),
-      })) ?? null,
-    [fits]
+      rows.length === 0
+        ? null
+        : rows.map((row): VerdictFit => ({
+            key: row.key,
+            typeIds:
+              row.source === 'loss'
+                ? fittingRequirementTypeIds({
+                    shipTypeId: row.fit.parts.hullTypeId,
+                    ...row.fit.parts,
+                  })
+                : row.guide.requirementTypeIds,
+          })),
+    [rows]
   );
   const verdicts = usePopularFitVerdicts(verdictFits, sources);
+  const seconds = useFitTrainingSeconds(verdicts);
 
-  return (
-    <>
-      {result === null ? (
-        <Spinner size="sm" delayMs={200} label={t('fittings.popular.loading')} />
-      ) : !result.ok ? (
-        <p role="status" className="text-xs text-warning">
-          {t(zkillFailureKey(result.reason, 'fittings.popular.failed'))}
-        </p>
-      ) : result.fits.length === 0 ? (
-        <p className="text-xs text-text-dim">{t('fittings.popular.empty')}</p>
-      ) : (
-        <ul className={cx('space-y-1', capped && 'max-h-72 overflow-y-auto')}>
-          {result.fits.map((fit, index) => (
-            <li key={fit.key} className={FIT_ROW_CLASS}>
-              <PopularFitRow
-                title={t('fittings.popular.losses', { count: fit.count })}
-                verdict={<PopularFitVerdict verdict={verdicts?.get(fit.key)} />}
-                unusable={unusableOf(verdicts?.get(fit.key))}
-                meta={
-                  <>
-                    {fit.lastSeen !== null &&
-                      ` · ${t('fittings.popular.lastSeen', {
-                        age: formatAge(Math.max(0, now - Date.parse(fit.lastSeen)), t),
-                      })}`}
-                    {fit.value !== null && (
-                      <>
-                        {' · '}
-                        <Trans
-                          i18nKey="fittings.popular.value"
-                          components={{ isk: <IskAmount value={fit.value} /> }}
-                        />
-                      </>
-                    )}
-                  </>
-                }
-                modules={fit.parts.modules}
-                names={names}
-                disabled={busy}
-                onOpen={() =>
-                  onOpen(
-                    popularFitLoad(
-                      fit,
-                      t('fittings.popular.fitName', { hullName, rank: index + 1 })
-                    )
-                  )
-                }
+  const touch = useTouchContext();
+  // Without verdicts there is nothing to filter on: a Character switched away leaves it off.
+  const flyFilter = flyOnly && verdicts !== null;
+  const lookup = useMemo(
+    () => ({
+      canFly: (key: string) => {
+        const kind = verdicts?.get(key)?.kind;
+        return kind === undefined ? undefined : kind === 'canFly';
+      },
+      seconds: (key: string) => seconds.get(key),
+    }),
+    [verdicts, seconds]
+  );
+  const { counts, inScope, shown, flyable } = useMemo(() => {
+    const inScope = listFits(rows, { source: filter, flyOnly: false, sort }, lookup);
+    const flyableRows = inScope.filter((row) => lookup.canFly(row.key) === true);
+    return {
+      counts: sourceCounts(rows),
+      inScope,
+      shown: flyFilter ? flyableRows : inScope,
+      flyable: flyableRows.length,
+    };
+  }, [rows, filter, sort, flyFilter, lookup]);
+  const closest = flyFilter && shown.length === 0 ? closestFit(inScope, lookup.seconds) : undefined;
+
+  const titleOf = (row: PanelRow) =>
+    row.source === 'loss'
+      ? t('fittings.popular.losses', { count: row.fit.count })
+      : row.guide.fit.name || t('fittings.popular.workbench.unnamed');
+
+  function renderRow(row: PanelRow) {
+    const verdict = verdicts?.get(row.key);
+    const open = expanded === row.key && verdict?.kind === 'missing';
+    const shared = {
+      source: row.source,
+      title: titleOf(row),
+      names,
+      unusable: unusableOf(verdict),
+      verdict: (
+        <FitVerdictControl
+          verdict={verdict}
+          seconds={seconds.get(row.key)}
+          expanded={open}
+          onToggle={() => setExpanded(open ? null : row.key)}
+        />
+      ),
+      details:
+        open && characterId !== null ? (
+          <InlineMissingSkills
+            entries={verdict.skills}
+            characterId={characterId}
+            fittingName={titleOf(row)}
+          />
+        ) : undefined,
+    };
+    if (row.source === 'loss') {
+      const { fit } = row;
+      return (
+        <PopularFitRow
+          {...shared}
+          meta={
+            fit.lastSeen === null
+              ? undefined
+              : ` · ${t('fittings.popular.lastSeen', {
+                  age: formatAge(Math.max(0, now - Date.parse(fit.lastSeen)), t),
+                })}`
+          }
+          price={
+            fit.value === null ? undefined : (
+              <Trans
+                i18nKey="fittings.popular.value"
+                components={{ isk: <IskAmount value={fit.value} /> }}
               />
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
-  );
-}
+            )
+          }
+          modules={fit.parts.modules}
+          disabled={busy}
+          onOpen={() =>
+            onOpen(popularFitLoad(fit, t('fittings.popular.fitName', { hullName, rank: row.rank })))
+          }
+        />
+      );
+    }
+    const { fit, modules, price, sighting, loadFailed } = row.guide;
+    return (
+      <PopularFitRow
+        {...shared}
+        meta={` · ${t('fittings.popular.workbench.created', {
+          age: formatAge(Math.max(0, now - fit.dateAdded), t),
+        })}`}
+        price={price === undefined ? undefined : <WorkbenchFitPrice price={price} />}
+        modules={modules}
+        disabled={busy || guides.loading}
+        onOpen={() => void guides.load(fit, onOpen)}
+      >
+        {price?.partial && (
+          <p className="text-xs text-text-dim">
+            {t('fittings.popular.workbench.unpriced', {
+              count: price.unpricedTypes,
+              hub: guides.hub.systemName,
+            })}
+          </p>
+        )}
+        <WorkbenchSightingBadge sighting={sighting} />
+        {loadFailed && <InlineError>{t('fittings.popular.workbench.loadFailed')}</InlineError>}
+      </PopularFitRow>
+    );
+  }
 
-/** The types a row's verdict says the pilot can't use; none without a gap. */
-const unusableOf = (verdict: FitSkillVerdict | undefined) =>
-  verdict?.kind === 'missing' ? verdict.unusableTypeIds : undefined;
-
-/**
- * A Workbench row's height before it is measured: name, date and price,
- * and one line of module icons, plus the gap below it.
- */
-const WORKBENCH_ROW_ESTIMATE = 104;
-
-const workbenchRowKey = (row: WorkbenchRow) => row.fit.id;
-
-/**
- * The EVE Workbench tab (issue #2484): the hull's published fits, newest
- * first, as rows `useWorkbenchHullRows` checks, prices, badges and Loads.
- * Windowed (`VirtualFitList`): a popular hull lists 500+ fits.
- */
-function WorkbenchFits({
-  shipTypeId,
-  onOpen,
-  busy = false,
-  capped = true,
-  sources = POPULAR_FITS_SOURCES,
-}: PopularFitsPanelProps) {
-  const { t } = useTranslation();
-  const tab = useWorkbenchHullRows(shipTypeId, sources);
-  const names = useModuleNames(tab.moduleTypeIds, sources.typeName);
-  const now = useNow();
-  const listed = tab.status === 'ready';
-  const verdictFits = useMemo(
-    () =>
-      listed
-        ? tab.rows.map((row): VerdictFit => ({ key: row.fit.id, typeIds: row.requirementTypeIds }))
-        : null,
-    [listed, tab.rows]
-  );
-  const verdicts = usePopularFitVerdicts(verdictFits, sources);
+  const lossStatus: ReactNode =
+    losses === null ? (
+      <Spinner size="sm" delayMs={200} label={t('fittings.popular.loading')} />
+    ) : !losses.ok ? (
+      <p role="status" className="text-xs text-warning">
+        {t(zkillFailureKey(losses.reason, 'fittings.popular.failed'))}
+      </p>
+    ) : losses.fits.length === 0 && (filter === 'loss' || rows.length === 0) ? (
+      <p className="text-xs text-text-dim">{t('fittings.popular.empty')}</p>
+    ) : null;
+  const guideStatus: ReactNode =
+    guides.status === 'loading' ? (
+      <Spinner size="sm" delayMs={200} label={t('fittings.popular.workbench.loading')} />
+    ) : guides.status === 'failed' ? (
+      <p role="status" className="text-xs text-warning">
+        {t('fittings.popular.workbench.failed')}
+      </p>
+    ) : guides.status === 'empty' && (filter === 'guide' || rows.length === 0) ? (
+      <p className="text-xs text-text-dim">{t('fittings.popular.workbench.empty')}</p>
+    ) : null;
 
   return (
-    <>
-      {tab.status === 'loading' ? (
-        <Spinner size="sm" delayMs={200} label={t('fittings.popular.workbench.loading')} />
-      ) : tab.status === 'failed' ? (
-        <p role="status" className="text-xs text-warning">
-          {t('fittings.popular.workbench.failed')}
-        </p>
-      ) : tab.status === 'empty' ? (
-        <p className="text-xs text-text-dim">{t('fittings.popular.workbench.empty')}</p>
-      ) : (
-        <VirtualFitList
-          items={tab.rows}
-          itemKey={workbenchRowKey}
-          estimateSize={WORKBENCH_ROW_ESTIMATE}
-          label={t('fittings.popular.tabWorkbench')}
-          capped={capped}
-          renderItem={({ fit, modules, price, sighting, loadFailed }) => (
-            <PopularFitRow
-              title={fit.name || t('fittings.popular.workbench.unnamed')}
-              verdict={<PopularFitVerdict verdict={verdicts?.get(fit.id)} />}
-              unusable={unusableOf(verdicts?.get(fit.id))}
-              meta={
-                <>
-                  {` · ${t('fittings.popular.workbench.created', {
-                    age: formatAge(Math.max(0, now - fit.dateAdded), t),
-                  })}`}
-                  <WorkbenchFitPrice price={price} />
-                </>
-              }
-              modules={modules}
-              names={names}
-              disabled={busy || tab.loading}
-              onOpen={() => void tab.load(fit, onOpen)}
-            >
-              {price?.partial && (
-                <p className="text-xs text-text-dim">
-                  {t('fittings.popular.workbench.unpriced', {
-                    count: price.unpricedTypes,
-                    hub: tab.hub.systemName,
-                  })}
-                </p>
-              )}
-              <WorkbenchSightingBadge sighting={sighting} />
-              {loadFailed && (
-                <InlineError>{t('fittings.popular.workbench.loadFailed')}</InlineError>
-              )}
-            </PopularFitRow>
+    <section aria-label={t('fittings.popular.title')} className="space-y-2">
+      <div className="flex items-center gap-1.5">
+        <h3 className={eyebrowClassName}>{t('fittings.popular.heading')}</h3>
+        <InfoTooltip
+          glyph="info"
+          label={t('fittings.popular.sourcesLabel')}
+          content={t('fittings.popular.sources')}
+        />
+      </div>
+      <p className="text-xs text-text-dim">{t('fittings.popular.caption', { context: touch })}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <SegmentedControl<FitSourceFilter>
+          size="sm"
+          label={t('fittings.popular.sourceLabel')}
+          options={(['all', 'loss', 'guide'] as const).map((value) => ({
+            value,
+            label: t(`fittings.popular.filter.${value}`, { n: counts[value] }),
+          }))}
+          value={filter}
+          onChange={setFilter}
+        />
+        {verdicts !== null && (
+          <label
+            className={cx(
+              tappableRowClassName,
+              'flex cursor-pointer items-center gap-2 text-xs text-text'
+            )}
+          >
+            <Checkbox checked={flyOnly} onChange={() => setFlyOnly(!flyOnly)} />
+            {t('fittings.popular.canFlyNow')}
+            <span className="text-text-dim tabular-nums">
+              {t('fittings.popular.canFlyCount', { flyable, total: inScope.length })}
+            </span>
+          </label>
+        )}
+        <div className="ml-auto flex items-center gap-1.5 text-xs text-text-dim">
+          <span aria-hidden="true">{t('fittings.popular.sortLabel')}</span>
+          <Select value={sort} onValueChange={(value) => setSort(value as FitSort)}>
+            <SelectTrigger aria-label={t('fittings.popular.sortLabel')} size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORTS.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {t(`fittings.popular.sort.${value}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      {filter !== 'guide' && lossStatus}
+      {filter !== 'loss' && guideStatus}
+      {flyFilter && shown.length === 0 && inScope.length > 0 && (
+        <div className="space-y-2 border border-dashed border-line-bright p-3 text-sm">
+          <p>{t('fittings.popular.noneFlyable', { count: inScope.length })}</p>
+          {closest && (
+            <p className="text-xs text-text-dim">
+              {t('fittings.popular.closest', {
+                name:
+                  closest.source === 'loss'
+                    ? t('fittings.popular.closestLoss', { count: closest.fit.count })
+                    : titleOf(closest),
+                time: formatCountdown(seconds.get(closest.key) ?? 0),
+              })}
+            </p>
           )}
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => setFlyOnly(false)}>
+              {t('fittings.popular.showAll')}
+            </Button>
+            {closest && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  setFlyOnly(false);
+                  setSort('training');
+                  setExpanded(closest.key);
+                }}
+              >
+                {t('fittings.popular.showClosest')}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+      {shown.length > 0 && (
+        <VirtualFitList
+          items={shown}
+          itemKey={rowKey}
+          estimateSize={ROW_ESTIMATE}
+          label={t('fittings.popular.listLabel')}
+          capped={capped}
+          renderItem={renderRow}
         />
       )}
-      {listed && <OutOfDateNote list={tab} />}
-    </>
+      {filter !== 'loss' && guides.status === 'ready' && <OutOfDateNote list={guides} />}
+    </section>
+  );
+}
+
+/** The skills a fit still needs, opened from its verdict, with Fit Check's add-to-plan bar. */
+function InlineMissingSkills({
+  entries,
+  characterId,
+  fittingName,
+}: {
+  entries: readonly MissingSkill[];
+  characterId: number;
+  fittingName: string;
+}) {
+  const missing = useMissingSkillRows(entries, characterId);
+  if (!missing) return <Spinner size="sm" delayMs={200} />;
+  return (
+    <MissingSkillsList
+      entries={entries}
+      characterId={characterId}
+      fittingName={fittingName}
+      missing={missing}
+    />
   );
 }
 
 /**
- * A Workbench row's price at the Default Trade Hub, after its date, in the
- * zKillboard row's "~87.5M ISK" style; nothing while loading or with nothing
- * priced. A partial total's missing items are on the line below.
+ * A Workbench row's price at the Default Trade Hub, in the zKillboard row's
+ * "~87.5M ISK" style. A partial total's missing items are on the line below.
  */
-function WorkbenchFitPrice({ price }: { price: FitSellPrice | undefined }) {
-  if (price === undefined) return null;
+function WorkbenchFitPrice({ price }: { price: FitSellPrice }) {
   return (
-    <>
-      {' · '}
-      <Trans
-        i18nKey={
-          price.partial
-            ? 'fittings.popular.workbench.pricePartial'
-            : 'fittings.popular.workbench.price'
-        }
-        components={{ isk: <IskAmount value={price.sell} /> }}
-      />
-    </>
+    <Trans
+      i18nKey={
+        price.partial
+          ? 'fittings.popular.workbench.pricePartial'
+          : 'fittings.popular.workbench.price'
+      }
+      components={{ isk: <IskAmount value={price.sell} /> }}
+    />
   );
 }

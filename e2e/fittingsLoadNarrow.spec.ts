@@ -108,7 +108,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await newFromHull.click();
     await page.getByRole('searchbox', { name: 'Search hulls' }).fill('Rifter');
     await page.getByRole('button', { name: 'Rifter', exact: true }).click();
-    const start = page.getByRole('button', { name: 'Start fitting' });
+    const start = page.getByRole('button', { name: 'Start empty fit' });
     expect((await start.boundingBox())!.height).toBeGreaterThanOrEqual(36);
     await start.click();
 

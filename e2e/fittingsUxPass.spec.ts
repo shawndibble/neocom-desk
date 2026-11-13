@@ -16,7 +16,7 @@ async function openRifter(page: Page) {
   if (await newFromHull.isVisible()) await newFromHull.click();
   await hullSearch.fill('Rifter');
   await page.getByRole('button', { name: 'Rifter', exact: true }).click();
-  await page.getByRole('button', { name: 'Start fitting' }).click();
+  await page.getByRole('button', { name: 'Start empty fit' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Rifter' })).toBeVisible();
 }
 
