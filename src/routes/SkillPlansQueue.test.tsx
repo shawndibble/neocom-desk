@@ -252,7 +252,7 @@ describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
     const panel = await queuePanel();
     expect(await screen.findByRole('region', { name: 'Training now' })).toBeInTheDocument();
     expect(within(panel).getByText(/^2h/)).toBeInTheDocument();
-    expect(within(panel).getByText(/^left · done /)).toBeInTheDocument();
+    expect(within(panel).getByText(/^done /)).toBeInTheDocument();
   });
 
   it('calls a queue with no dates paused, rather than pretending it starts now', async () => {

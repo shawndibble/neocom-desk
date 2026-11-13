@@ -2884,7 +2884,7 @@
     "trainingNow": "Training now",
     "heroSpPerHour": "{{sp}} SP/hr",
     "heroAttributes": "{{primary}} + {{secondary}}",
-    "heroLeftDone": "left · done {{date}}",
+    "heroDone": "done {{date}}",
     "heroProgress": "{{percent}}% of level {{level}}",
     "heroNext": "Next: {{name}} {{level}}",
     "periodWeek": "This week",

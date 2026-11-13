@@ -64,7 +64,7 @@ export function NowTrainingCard({ row, next, catalog, nowMs }: NowTrainingCardPr
             <div className="text-xl font-semibold text-text tabular-nums sm:text-2xl">
               {formatCountdown(secondsRemaining)}
             </div>
-            <div className="text-sm text-text-dim">{t('plans.heroLeftDone', { date: finish })}</div>
+            <div className="text-sm text-text-dim">{t('plans.heroDone', { date: finish })}</div>
           </div>
         )}
       </div>
