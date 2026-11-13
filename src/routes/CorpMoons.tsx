@@ -13,7 +13,7 @@
  * is read through the officer rules, so the Character is verified first
  * (`useCorpBook`), and a corporation with no book shows the Director's turn-on.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canViewCorpTaxBook } from '@/engine/corpRoles';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -73,18 +73,13 @@ function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }
   const { t } = useTranslation();
   const audit = useBookAudit(200);
   const subject = useAuditSubject();
-  // A Miner link in the feed opens their page: close over it rather than cover it.
-  const { pathname } = useLocation();
-  const [openedAt] = useState(pathname);
-  useEffect(() => {
-    if (pathname !== openedAt) onClose();
-  }, [pathname, openedAt, onClose]);
   return (
     <SlideOver open={open} onClose={onClose} title={t('corpTaxBook.moons.activity.title')} wide>
       {audit.loading ? (
         <Spinner label={t('common.loading')} />
       ) : (
-        <AuditFeed entries={audit.entries} subject={subject} />
+        // A Miner link opens their page: close over it rather than cover it.
+        <AuditFeed entries={audit.entries} subject={subject} onOpen={onClose} />
       )}
     </SlideOver>
   );
@@ -104,16 +99,14 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   // Back from EVE's page after the Automatic sync opt-in: show the settings it was pressed in.
   const { state: routerState } = useLocation();
   // Open (on a tab) or closed; back from the opt-in it opens where it was pressed.
-  const [settings, setSettings] = useState<{ tab?: SettingsTab } | null>(() =>
+  const [settingsDialog, setSettingsDialog] = useState<{ tab?: SettingsTab } | null>(() =>
     (routerState as { corpSyncGrant?: unknown } | null)?.corpSyncGrant !== undefined ? {} : null
   );
   const book = useBook();
   const { view, canEdit, characterId, corporationId, names } = book;
   // The Overview's setup checklist opens this same dialog, so there is one settings host.
-  const withSettings = useMemo(
-    () => ({ ...book, openSettings: (tab?: SettingsTab) => setSettings({ tab }) }),
-    [book]
-  );
+  const openSettings = useCallback((tab?: SettingsTab) => setSettingsDialog({ tab }), []);
+  const bookWithSettings = useMemo(() => ({ ...book, openSettings }), [book, openSettings]);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
@@ -122,7 +115,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const detail = moonsDetail(pathname);
   const tabs = tabBarTabs(MOONS_TABS);
   return (
-    <BookContext.Provider value={withSettings}>
+    <BookContext.Provider value={bookWithSettings}>
       <div className="mx-auto max-w-page space-y-4 px-4 py-4">
         {detail === null && (
           <>
@@ -175,7 +168,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
                   <IconButton
                     icon={<Icon.Settings />}
                     label={t('corpTaxBook.moons.settings.open')}
-                    onClick={() => setSettings({})}
+                    onClick={() => openSettings()}
                   />
                   {isPhone && (
                     <HeaderMoreMenu>
@@ -224,11 +217,11 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
         {detail?.kind === 'miner' && <MinerDetail key={detail.id} id={detail.id} />}
         {detail?.kind === 'moonOwner' && <MoonOwnerDetail id={detail.id} />}
         {detail?.kind === 'statementPeriod' && <StatementPeriodDetail periodStart={detail.id} />}
-        {view && settings && (
+        {view && settingsDialog && (
           <BookSettingsDialog
             open
-            initialTab={settings.tab}
-            onClose={() => setSettings(null)}
+            initialTab={settingsDialog.tab}
+            onClose={() => setSettingsDialog(null)}
             onSaved={() => setSaved(true)}
             onDeleteBook={() => setDeleteOpen(true)}
           />

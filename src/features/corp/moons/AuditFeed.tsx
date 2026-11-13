@@ -40,11 +40,14 @@ export function AuditLine({
   entry: a,
   subject,
   context,
+  onOpen,
 }: {
   entry: AuditEntry;
   subject?: AuditSubject;
   /** What the entry is about, when the page does not already say it (a Statement's period and amount). */
   context?: ReactNode;
+  /** Called when a Miner link is followed (the panel showing the feed closes). */
+  onOpen?: () => void;
 }) {
   const { t } = useTranslation();
   const why = detailLine(a, t);
@@ -54,7 +57,7 @@ export function AuditLine({
     a.action === 'recordMail' && a.detail.kind === 'reminder' ? 'recordReminder' : a.action;
   // The Miner's name opens their page, in the sentence when it names them, else after it.
   const minerLink = who?.path ? (
-    <Link to={who.path} className={entityLinkClassName()}>
+    <Link to={who.path} className={entityLinkClassName()} onClick={onOpen}>
       {who.name}
     </Link>
   ) : undefined;
@@ -86,10 +89,13 @@ export function AuditFeed({
   entries,
   empty,
   subject,
+  onOpen,
 }: {
   entries: readonly AuditEntry[];
   empty?: string;
   subject?: AuditSubject;
+  /** Called when a Miner link is followed. */
+  onOpen?: () => void;
 }) {
   const { t } = useTranslation();
   if (entries.length === 0)
@@ -99,7 +105,7 @@ export function AuditFeed({
   return (
     <ul className="divide-y divide-line text-sm">
       {entries.map((a) => (
-        <AuditLine key={a.id} entry={a} subject={subject} />
+        <AuditLine key={a.id} entry={a} subject={subject} onOpen={onOpen} />
       ))}
     </ul>
   );
