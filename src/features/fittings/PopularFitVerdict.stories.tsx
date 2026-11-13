@@ -3,7 +3,6 @@ import { PopularFitRow } from './PopularFitRow';
 import { PopularFitVerdict } from './PopularFitVerdict';
 import { FIT_ROW_CLASS } from './VirtualFitList';
 
-/** @summary A Popular fit row's can-fly verdict for the active Character (#6011). */
 const GAPS = {
   kind: 'missing',
   skills: [
@@ -15,6 +14,7 @@ const GAPS = {
   omegaOnly: false,
 } as const;
 
+/** @summary A Popular fit row's can-fly verdict for the active Character (#6011). */
 const meta = {
   title: 'fittings/PopularFitVerdict',
   component: PopularFitVerdict,

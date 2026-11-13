@@ -20,8 +20,8 @@ function modulesByRack(
 
 /**
  * The modules' icons grouped by rack, each named; nothing when there are none.
- * A module the active Character can't use yet sits on a `danger` tint, as the
- * editor's own "Can't use" does.
+ * A module the active Character can't use yet sits on a `danger` tint (DESIGN.md:
+ * "can't use" is `danger` on its own element) and says so in its tooltip.
  */
 export function RackIconStrip({
   modules,

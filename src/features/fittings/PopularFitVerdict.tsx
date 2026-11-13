@@ -34,13 +34,16 @@ export function PopularFitVerdict({ verdict }: { verdict: FitSkillVerdict | unde
     </Pill>
   );
   if (verdict.kind !== 'missing') return pill;
-  const lines = verdict.skills.map(skillLine).join('\n');
+  const lines = verdict.skills.map(skillLine);
   return (
-    <Tooltip content={lines} openOnTap>
+    <Tooltip content={lines.join('\n')} openOnTap>
       {/* The list reaches screen readers as the label; the bubble is for sight. */}
       <span
         role="img"
-        aria-label={`${t('fittings.popular.verdict.missing', { count: verdict.skills.length })}: ${verdict.skills.map(skillLine).join(', ')}`}
+        aria-label={t('fittings.popular.verdict.missingNamed', {
+          count: lines.length,
+          skills: lines.join(', '),
+        })}
         className="inline-flex shrink-0"
       >
         {pill}
