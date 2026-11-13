@@ -1,5 +1,6 @@
 import { createContext, useContext, useId, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
+import { eyebrowClassName } from './eyebrowClassName';
 import { FieldNoteContext } from './fieldNote';
 
 /**
@@ -62,6 +63,21 @@ export function Fields({
     <VariantContext.Provider value={variant}>
       <div className={cx('grid text-xs', GRID[variant])}>{children}</div>
     </VariantContext.Provider>
+  );
+}
+
+/**
+ * A section title across a `Fields` grid, so two titled groups in one panel share
+ * one label column and their controls line up (DESIGN.md "Stacked controls line
+ * up"). The row after it drops its hairline: the title already separates it.
+ */
+export function FieldsHeading({ children }: { children: ReactNode }) {
+  return (
+    <h3
+      className={cx(eyebrowClassName, 'col-span-full pt-3 first:pt-0 [&+*]:border-t-0 [&+*]:pt-0')}
+    >
+      {children}
+    </h3>
   );
 }
 

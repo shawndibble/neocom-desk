@@ -72,6 +72,12 @@ function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }
   const { t } = useTranslation();
   const audit = useBookAudit(200);
   const subject = useAuditSubject();
+  // A Miner link in the feed opens their page: close over it rather than cover it.
+  const { pathname } = useLocation();
+  const [openedAt] = useState(pathname);
+  useEffect(() => {
+    if (pathname !== openedAt) onClose();
+  }, [pathname, openedAt, onClose]);
   return (
     <SlideOver open={open} onClose={onClose} title={t('corpTaxBook.moons.activity.title')} wide>
       {audit.loading ? (

@@ -17897,6 +17897,7 @@
         "payments": "Payments",
         "paymentsHint": "Credited oldest debt first",
         "sum": "Statements {{billed}} − written off {{written}} − payments and dismissals {{settled}} = {{owed}} owed",
+        "sumNoWriteOff": "Statements {{billed}} − payments and dismissals {{settled}} = {{owed}} owed",
         "dismissals": "Dismissals",
         "reversed": "reversed",
         "reverse": "Reverse",
@@ -17985,10 +17986,10 @@
           "stopReminders": "stopped reminders"
         },
         "actionsTo": {
-          "issueStatement": "issued a Statement to {{name}}, {{amount}} ISK",
-          "issueStatementPlain": "issued a Statement to {{name}}",
-          "recordMail": "mailed a Statement to {{name}}",
-          "recordReminder": "sent a reminder to {{name}}"
+          "issueStatement": "issued a Statement to <name>{{name}}</name>, {{amount}} ISK",
+          "issueStatementPlain": "issued a Statement to <name>{{name}}</name>",
+          "recordMail": "mailed a Statement to <name>{{name}}</name>",
+          "recordReminder": "sent a reminder to <name>{{name}}</name>"
         }
       },
       "health": {

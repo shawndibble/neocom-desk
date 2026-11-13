@@ -12,6 +12,7 @@ import { AdjustmentDialog, RateOverrideDialog, RebillDialog } from './Correction
 import { DeleteBookDialog } from './DeleteBookSection';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { TurnOnBook } from './TurnOnBook';
+import { useAuditSubject } from './useAuditSubject';
 import { BOOK_CONTEXT, BOOK_VIEW, MOON_ID, VARRO_ID } from './corpBookFixture';
 
 /**
@@ -64,6 +65,11 @@ const AUDIT: AuditEntry[] = [
   },
 ];
 
+/** The route's own subject resolver, so Miner names link like the real panel's. */
+function ActivityFeed() {
+  return <AuditFeed entries={AUDIT} subject={useAuditSubject()} />;
+}
+
 function Book({ children }: { children: ReactNode }) {
   return <BookProvider value={BOOK_CONTEXT}>{children}</BookProvider>;
 }
@@ -83,7 +89,7 @@ const noop = () => {};
 export const Activity: Story = {
   render: () => (
     <SlideOver open onClose={noop} title="Activity" wide>
-      <AuditFeed entries={AUDIT} />
+      <ActivityFeed />
     </SlideOver>
   ),
 };

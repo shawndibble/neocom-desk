@@ -7,6 +7,7 @@ import {
   Button,
   Checkbox,
   Field,
+  FieldsHeading,
   Fields,
   InfoTooltip,
   IskInput,
@@ -532,147 +533,135 @@ export function BookSettingsDialog({
           )}
 
           {tab === 'billing' && (
-            <>
-              <Section title={t('corpTaxBook.moons.settings.pricing')}>
-                <Fields variant="form">
-                  <Field label={t('corpTaxBook.moons.settings.hub')}>
-                    <Select value={hubId} onValueChange={setHubId}>
-                      <SelectTrigger aria-label={t('corpTaxBook.moons.settings.hub')}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COMPARED_HUBS.map((h) => (
-                          <SelectItem key={h.id} value={h.id}>
-                            {h.systemName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label={t('corpTaxBook.moons.settings.oreForm')}>
-                    <SegmentedControl
-                      label={t('corpTaxBook.moons.settings.oreForm')}
-                      value={oreForm}
-                      onChange={setOreForm}
-                      options={[
-                        {
-                          value: 'compressed',
-                          label: t('corpTaxBook.moons.settings.form.compressed'),
-                        },
-                        { value: 'raw', label: t('corpTaxBook.moons.settings.form.raw') },
-                      ]}
-                      uppercase={false}
-                    />
-                  </Field>
-                </Fields>
-              </Section>
-
-              <Section title={t('corpTaxBook.moons.settings.statements')}>
-                <Fields variant="form">
-                  <Field
-                    label={t('corpTaxBook.moons.settings.startDate')}
-                    htmlFor={`${fieldId}-start`}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      {verdict.isDirector ? (
-                        <TextInput
-                          type="date"
-                          id={`${fieldId}-start`}
-                          max={today}
-                          value={startDate}
-                          onChange={(e) => e.target.value && setStartDate(e.target.value)}
-                        />
-                      ) : (
-                        <span className="tabular-nums">{displayDate(settings.startDate)}</span>
-                      )}
-                      <InfoTooltip
-                        label={t('common.aboutLabel', {
-                          label: t('corpTaxBook.moons.settings.startDate'),
-                        })}
-                        content={t('corpTaxBook.moons.settings.startHint')}
-                      />
-                    </span>
-                  </Field>
-                  <Field label={t('corpTaxBook.moons.settings.cadenceLabel')}>
-                    <SegmentedControl
-                      label={t('corpTaxBook.moons.settings.cadenceLabel')}
-                      value={cadence}
-                      onChange={setCadence}
-                      options={[
-                        {
-                          value: 'monthly',
-                          label: t('corpTaxBook.moons.settings.cadence.monthly'),
-                        },
-                        { value: 'days', label: t('corpTaxBook.moons.settings.cadence.days') },
-                      ]}
-                      uppercase={false}
-                    />
-                    {cadence === 'days' && (
-                      <TextInput
-                        className="w-20"
-                        inputMode="numeric"
-                        aria-label={t('corpTaxBook.moons.settings.cadenceDays')}
-                        value={cadenceDays}
-                        onChange={(e) => setCadenceDays(e.target.value)}
-                      />
-                    )}
-                  </Field>
-                  <Field label={t('corpTaxBook.moons.settings.minimum')}>
-                    <IskInput
-                      value={minimum}
-                      onChange={setMinimum}
-                      aria-label={t('corpTaxBook.moons.settings.minimum')}
-                    />
-                  </Field>
-                  <Field label={t('corpTaxBook.moons.settings.grace')} htmlFor={`${fieldId}-grace`}>
+            // One grid for both groups, so Pricing's controls line up with Statements'.
+            <Fields variant="form">
+              <FieldsHeading>{t('corpTaxBook.moons.settings.pricing')}</FieldsHeading>
+              <Field label={t('corpTaxBook.moons.settings.hub')}>
+                <Select value={hubId} onValueChange={setHubId}>
+                  <SelectTrigger aria-label={t('corpTaxBook.moons.settings.hub')}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMPARED_HUBS.map((h) => (
+                      <SelectItem key={h.id} value={h.id}>
+                        {h.systemName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label={t('corpTaxBook.moons.settings.oreForm')}>
+                <SegmentedControl
+                  label={t('corpTaxBook.moons.settings.oreForm')}
+                  value={oreForm}
+                  onChange={setOreForm}
+                  options={[
+                    {
+                      value: 'compressed',
+                      label: t('corpTaxBook.moons.settings.form.compressed'),
+                    },
+                    { value: 'raw', label: t('corpTaxBook.moons.settings.form.raw') },
+                  ]}
+                  uppercase={false}
+                />
+              </Field>
+              <FieldsHeading>{t('corpTaxBook.moons.settings.statements')}</FieldsHeading>
+              <Field label={t('corpTaxBook.moons.settings.startDate')} htmlFor={`${fieldId}-start`}>
+                <span className="flex items-center gap-1.5">
+                  {verdict.isDirector ? (
                     <TextInput
-                      className="w-20"
-                      inputMode="decimal"
-                      id={`${fieldId}-grace`}
-                      value={grace}
-                      onChange={(e) => setGrace(e.target.value)}
+                      type="date"
+                      id={`${fieldId}-start`}
+                      max={today}
+                      value={startDate}
+                      onChange={(e) => e.target.value && setStartDate(e.target.value)}
                     />
-                  </Field>
-                  <Field
-                    label={t('corpTaxBook.moons.settings.overdue')}
-                    htmlFor={`${fieldId}-overdue`}
-                  >
-                    <TextInput
-                      className="w-20"
-                      inputMode="numeric"
-                      id={`${fieldId}-overdue`}
-                      value={overdue}
-                      onChange={(e) => setOverdue(e.target.value)}
-                    />
-                  </Field>
-                  <Field label={t('corpTaxBook.moons.settings.divisions')}>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {DIVISIONS.map((d) => (
-                        <label key={d} className={cx(touchCheckboxLabelClassName, 'gap-1.5')}>
-                          <Checkbox
-                            checked={divisions.includes(d)}
-                            onChange={() =>
-                              setDivisions((prev) =>
-                                prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
-                              )
-                            }
-                            aria-label={
-                              divisionNames.has(d)
-                                ? t('corpTaxBook.moons.settings.divisionNamed', {
-                                    n: d,
-                                    name: divisionNames.get(d),
-                                  })
-                                : t('corpTaxBook.moons.settings.division', { n: d })
-                            }
-                          />
-                          {divisionNames.get(d) ?? d}
-                        </label>
-                      ))}
-                    </div>
-                  </Field>
-                </Fields>
-              </Section>
-            </>
+                  ) : (
+                    <span className="tabular-nums">{displayDate(settings.startDate)}</span>
+                  )}
+                  <InfoTooltip
+                    label={t('common.aboutLabel', {
+                      label: t('corpTaxBook.moons.settings.startDate'),
+                    })}
+                    content={t('corpTaxBook.moons.settings.startHint')}
+                  />
+                </span>
+              </Field>
+              <Field label={t('corpTaxBook.moons.settings.cadenceLabel')}>
+                <SegmentedControl
+                  label={t('corpTaxBook.moons.settings.cadenceLabel')}
+                  value={cadence}
+                  onChange={setCadence}
+                  options={[
+                    {
+                      value: 'monthly',
+                      label: t('corpTaxBook.moons.settings.cadence.monthly'),
+                    },
+                    { value: 'days', label: t('corpTaxBook.moons.settings.cadence.days') },
+                  ]}
+                  uppercase={false}
+                />
+                {cadence === 'days' && (
+                  <TextInput
+                    className="w-20"
+                    inputMode="numeric"
+                    aria-label={t('corpTaxBook.moons.settings.cadenceDays')}
+                    value={cadenceDays}
+                    onChange={(e) => setCadenceDays(e.target.value)}
+                  />
+                )}
+              </Field>
+              <Field label={t('corpTaxBook.moons.settings.minimum')}>
+                <IskInput
+                  value={minimum}
+                  onChange={setMinimum}
+                  aria-label={t('corpTaxBook.moons.settings.minimum')}
+                />
+              </Field>
+              <Field label={t('corpTaxBook.moons.settings.grace')} htmlFor={`${fieldId}-grace`}>
+                <TextInput
+                  className="w-20"
+                  inputMode="decimal"
+                  id={`${fieldId}-grace`}
+                  value={grace}
+                  onChange={(e) => setGrace(e.target.value)}
+                />
+              </Field>
+              <Field label={t('corpTaxBook.moons.settings.overdue')} htmlFor={`${fieldId}-overdue`}>
+                <TextInput
+                  className="w-20"
+                  inputMode="numeric"
+                  id={`${fieldId}-overdue`}
+                  value={overdue}
+                  onChange={(e) => setOverdue(e.target.value)}
+                />
+              </Field>
+              <Field label={t('corpTaxBook.moons.settings.divisions')}>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {DIVISIONS.map((d) => (
+                    <label key={d} className={cx(touchCheckboxLabelClassName, 'gap-1.5')}>
+                      <Checkbox
+                        checked={divisions.includes(d)}
+                        onChange={() =>
+                          setDivisions((prev) =>
+                            prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
+                          )
+                        }
+                        aria-label={
+                          divisionNames.has(d)
+                            ? t('corpTaxBook.moons.settings.divisionNamed', {
+                                n: d,
+                                name: divisionNames.get(d),
+                              })
+                            : t('corpTaxBook.moons.settings.division', { n: d })
+                        }
+                      />
+                      {divisionNames.get(d) ?? d}
+                    </label>
+                  ))}
+                </div>
+              </Field>
+            </Fields>
           )}
 
           {tab === 'extractions' && (
