@@ -20,3 +20,13 @@ export function sum(values: readonly number[]): number {
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+/**
+ * Compare two possibly-missing numbers for a sort: `direction` 1 ascending,
+ * -1 descending, and a null (unknown, unpriced) always after every number.
+ */
+export function nullsLast(a: number | null, b: number | null, direction: 1 | -1): number {
+  if (a === null || b === null) return a === b ? 0 : a === null ? 1 : -1;
+  if (a === b) return 0;
+  return a < b ? -direction : direction;
+}

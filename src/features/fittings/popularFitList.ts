@@ -4,6 +4,8 @@
  * the filtered, sorted order. Pure, so the panel only maps its rows in and out.
  */
 
+import { nullsLast } from '@/engine/math';
+
 export type FitSource = 'loss' | 'guide';
 export type FitSourceFilter = 'all' | FitSource;
 export type FitSort = 'newest' | 'seen' | 'training' | 'cheapest';
@@ -40,13 +42,6 @@ export function sourceCounts(fits: readonly ListedFit[]): Record<FitSourceFilter
   return { all: fits.length, loss, guide: fits.length - loss };
 }
 
-/** Descending, unknown last. */
-const desc = (a: number | null, b: number | null) =>
-  a === null ? (b === null ? 0 : 1) : b === null ? -1 : b - a;
-/** Ascending, unknown last. */
-const asc = (a: number | null, b: number | null) =>
-  a === null ? (b === null ? 0 : 1) : b === null ? -1 : a - b;
-
 export function listFits<T extends ListedFit>(
   fits: readonly T[],
   { source, flyOnly, sort }: FitListOptions,
@@ -55,10 +50,10 @@ export function listFits<T extends ListedFit>(
   const training = (fit: ListedFit) =>
     verdicts.canFly(fit.key) === true ? 0 : (verdicts.seconds(fit.key) ?? null);
   const compare: Record<FitSort, (a: T, b: T) => number> = {
-    newest: (a, b) => desc(a.newest, b.newest),
-    seen: (a, b) => b.seen - a.seen || desc(a.newest, b.newest),
-    cheapest: (a, b) => asc(a.isk, b.isk),
-    training: (a, b) => asc(training(a), training(b)) || desc(a.newest, b.newest),
+    newest: (a, b) => nullsLast(a.newest, b.newest, -1),
+    seen: (a, b) => b.seen - a.seen || nullsLast(a.newest, b.newest, -1),
+    cheapest: (a, b) => nullsLast(a.isk, b.isk, 1),
+    training: (a, b) => nullsLast(training(a), training(b), 1) || nullsLast(a.newest, b.newest, -1),
   };
   return fits
     .filter((fit) => source === 'all' || fit.source === source)

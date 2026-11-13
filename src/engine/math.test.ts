@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clamp, upperMedian, median, sum } from './math';
+import { clamp, nullsLast, upperMedian, median, sum } from './math';
 
 describe('median', () => {
   it('takes the middle of an odd count', () => expect(median([3, 1, 2])).toBe(2));
@@ -28,4 +28,22 @@ describe('clamp', () => {
   it('pins below the floor', () => expect(clamp(-1, 0, 5)).toBe(0));
   it('pins above the ceiling', () => expect(clamp(9, 0, 5)).toBe(5));
   it('passes a value in range', () => expect(clamp(3, 0, 5)).toBe(3));
+});
+
+describe('nullsLast', () => {
+  const sorted = (values: (number | null)[], direction: 1 | -1) =>
+    [...values].sort((a, b) => nullsLast(a, b, direction));
+
+  it('sorts ascending with null after every number', () => {
+    expect(sorted([3, null, 1, 2], 1)).toEqual([1, 2, 3, null]);
+  });
+
+  it('sorts descending with null still last', () => {
+    expect(sorted([3, null, 1, null, 2], -1)).toEqual([3, 2, 1, null, null]);
+  });
+
+  it('calls two nulls, or two equal numbers, a tie', () => {
+    expect(nullsLast(null, null, 1)).toBe(0);
+    expect(nullsLast(4, 4, -1)).toBe(0);
+  });
 });
