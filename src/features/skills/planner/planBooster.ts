@@ -72,35 +72,6 @@ export interface CharacterAcceleratorInput {
   expiresAt: number;
 }
 
-/** One quick-pick option: an accelerator duration, named in hours. */
-export interface BoosterQuickPick {
-  readonly hours: number;
-}
-
-/**
- * Common cerebral-accelerator durations, ascending. Not sourced from ESI —
- * nothing in the API exposes a duration list — so this is a curated set
- * spanning the tiers players actually run, from the short combat/PI boosts up
- * through the 30-day skill accelerators.
- */
-export const BOOSTER_QUICK_PICKS: readonly BoosterQuickPick[] = [
-  { hours: 1 },
-  { hours: 4 },
-  { hours: 12 },
-  { hours: 24 },
-  { hours: 24 * 3 },
-  { hours: 24 * 7 },
-  { hours: 24 * 30 },
-];
-
-/**
- * The expiry a quick pick sets: `hours` past `now`. Takes `now` rather than
- * reading the clock, so this stays unit-testable without faking `Date`.
- */
-export function boosterExpiryFromNow(hours: number, now: number): number {
-  return now + hours * HOUR_MS;
-}
-
 /** Whole days, hours (0-23) and minutes (0-59) — the units EVE's tooltip uses. */
 export interface BoosterDuration {
   days: number;

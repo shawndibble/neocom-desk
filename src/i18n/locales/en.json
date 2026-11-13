@@ -2797,11 +2797,9 @@
     }
   },
   "accelerator": {
-    "entryMode": "How to enter when it ends",
     "clear": "Clear",
-    "autoDetectHint": "Cleared or run out, it goes back to being guessed from the attribute sheet.",
-    "modeRemaining": "Time remaining",
-    "modeExpires": "Expires at",
+    "useEndTime": "Enter end time instead",
+    "useTimeLeft": "Enter time left instead",
     "expiresAt": "Ends at"
   },
   "plans": {
@@ -3010,11 +3008,8 @@
       "hours": "h",
       "minutes": "m"
     },
-    "acceleratorDetected": "+{{bonus}} from the EVE API has been auto applied.",
-    "acceleratorNoExpiry": "EVE does not say when it runs out. Until you set the time left, this plan is costed as if you had none.",
-    "boosterQuickPicks": "Quick picks for the time left",
-    "boosterQuickPickHours": "+{{hours}}h",
-    "boosterQuickPickDays": "+{{days}}d",
+    "acceleratorDetected": "+{{bonus}} detected",
+    "acceleratorNoExpiry": "EVE doesn’t report when boosters expire. Set the time left to include it in training times.",
     "importAction": "Import",
     "importFileChoose": "Or choose a .emp or .xml file",
     "importDialogTitle": "Import plan",

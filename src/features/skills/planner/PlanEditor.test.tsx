@@ -1698,8 +1698,9 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.getByText(/\+12 from the EVE API has been auto applied/i)).toBeInTheDocument();
-    expect(screen.getByText('+12')).toBeInTheDocument();
+    // Once, beside the heading: not again as a Bonus row.
+    expect(screen.getByText('+12 detected')).toBeInTheDocument();
+    expect(screen.queryByText('+12')).toBeNull();
     expect(screen.queryByLabelText('Bonus')).toBeNull();
   });
 
@@ -1710,7 +1711,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     await openAssumptions(user);
 
     expect(screen.getByLabelText<HTMLInputElement>('Days').value).toBe('');
-    expect(screen.getByText(/costed as if you had none/i)).toBeInTheDocument();
+    expect(screen.getByText(/include it in training times/i)).toBeInTheDocument();
   });
 
   it('shows whatever tier was detected, not a fixed number', async () => {
@@ -1721,7 +1722,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.getByText('+4')).toBeInTheDocument();
+    expect(screen.getByText('+4 detected')).toBeInTheDocument();
   });
 
   it('saves the detected bonus with the time the pilot sets', async () => {
@@ -1730,7 +1731,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    await user.click(screen.getByRole('button', { name: '+12h' }));
+    await user.type(screen.getByLabelText('Hours'), '12');
 
     await waitFor(async () => expect((await db.characterAccelerators.get('1'))?.bonus).toBe(12));
   });
@@ -1743,19 +1744,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
 
     await user.type(screen.getByLabelText('Days'), '5');
 
-    await waitFor(() => expect(screen.queryByText(/costed as if you had none/i)).toBeNull());
-  });
-
-  it('sets the expiry in one click from a quick pick, clearing the warning', async () => {
-    const user = userEvent.setup();
-    renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
-    await openTools(user);
-    await openAssumptions(user);
-
-    await user.click(screen.getByRole('button', { name: '+12h' }));
-
-    await waitFor(() => expect(screen.getByLabelText<HTMLInputElement>('Hours').value).toBe('12'));
-    expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
+    await waitFor(() => expect(screen.queryByText(/include it in training times/i)).toBeNull());
   });
 });
 
@@ -1935,7 +1924,7 @@ describe('a character with no accelerator', () => {
 
     expect(screen.getByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
     expect(screen.queryByText(/cerebral accelerator/i)).toBeNull();
-    expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
+    expect(screen.queryByText(/include it in training times/i)).toBeNull();
     expect(screen.queryByText(/cannot be read/i)).toBeNull();
   });
 });
