@@ -492,7 +492,7 @@ describe('FittingStartScreen on a phone', () => {
     await userEvent.click(await screen.findByRole('button', { name: /^Kite/ }));
     expect(workspace.openSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
     expect(screen.queryByText(/^preview of/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Kite/ })).not.toHaveAttribute('aria-pressed');
+    expect(screen.getByRole('button', { name: /^Kite/ })).not.toHaveAttribute('aria-current');
     expect(screen.getByRole('button', { name: 'New from hull' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Import' })).toBeInTheDocument();
   });
