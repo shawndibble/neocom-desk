@@ -3,6 +3,7 @@
  * its best option for the chosen sort, with the other variations behind it.
  */
 import type { ImproveCandidate, ImproveOption } from './improve';
+import { nullsLast } from '@/engine/math';
 
 export const IMPROVE_SORTS = ['gain', 'value', 'cheapest'] as const;
 export type ImproveSort = (typeof IMPROVE_SORTS)[number];
@@ -30,13 +31,6 @@ function valueOf(option: ImproveOption): number | null {
   if (option.iskDelta === null) return null;
   if (option.iskDelta > 0) return option.score / (option.iskDelta / MILLION);
   return option.score > 0 ? Infinity : option.score;
-}
-
-/** Null (unpriced) sorts after every number. */
-function nullsLast(a: number | null, b: number | null, direction: 1 | -1): number {
-  if (a === null || b === null) return a === b ? 0 : a === null ? 1 : -1;
-  if (a === b) return 0;
-  return a < b ? -direction : direction;
 }
 
 const byGain = (a: ImproveOption, b: ImproveOption) => b.score - a.score;

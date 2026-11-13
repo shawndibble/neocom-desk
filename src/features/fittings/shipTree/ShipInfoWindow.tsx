@@ -9,17 +9,13 @@ import { useTranslation } from 'react-i18next';
 import { Modal, SlideOver, TabPanel, Tabs, Toast, useTabsId } from '@/components/ui';
 import { useTargetPlan } from '@/features/skills/useTargetPlan';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { romanLevel } from '@/engine/projection';
-import { cx } from '@/lib/cx';
 import { typeRenderUrl } from '@/lib/eveImages';
 import type { ShipTreeShip } from '@/sde/types';
 import { BlueprintTab } from './BlueprintTab';
 import { AttributesTab } from './AttributesTab';
 import { FittingTab } from './FittingTab';
-import { FlyDot } from './FlyDot';
-import { MasteryBadge } from './IsisTile';
+import { HullFlyStatus } from './HullFlyStatus';
 import { SkillsMasteryTab, type AddedToPlan } from './SkillsMasteryTab';
-import { flyLabel } from './flyLabel';
 import { factionNameOf } from './shipTreeModel';
 import type { ShipTreeSource } from './useShipTreeData';
 
@@ -135,7 +131,6 @@ function InfoSurface({
 function ShipInfoHeader({ ship, source }: { ship: ShipTreeShip; source: ShipTreeSource }) {
   const { t } = useTranslation();
   const status = source.statuses.get(ship.typeID);
-  const mastery = status?.mastery ?? 0;
   const faction = factionNameOf(source.data.factions, ship.factionID);
   const className = source.data.groups[String(ship.treeGroupID)]?.name ?? '';
   return (
@@ -155,25 +150,7 @@ function ShipInfoHeader({ ship, source }: { ship: ShipTreeShip; source: ShipTree
             tech: t('ships.info.tech', { level: ship.techLevel }),
           })}
         </div>
-        <div className="flex items-center gap-2">
-          <FlyDot status={status} />
-          <span>{flyLabel(t, status)}</span>
-        </div>
-        <div className="flex items-center gap-2 text-text-dim">
-          <MasteryBadge
-            mastery={mastery}
-            className={cx(
-              'inline-flex items-center gap-px',
-              mastery >= 5 ? 'text-mastery-elite' : 'text-text-dim'
-            )}
-            ringClassName="flex h-5 min-w-5 items-center justify-center rounded-full border border-current px-1 text-[0.625rem] font-bold"
-          />
-          <span>
-            {mastery
-              ? t('ships.info.mastery', { level: romanLevel(mastery) })
-              : t('ships.info.masteryNone')}
-          </span>
-        </div>
+        <HullFlyStatus status={status} />
       </div>
     </div>
   );

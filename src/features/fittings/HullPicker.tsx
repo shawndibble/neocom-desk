@@ -5,7 +5,6 @@ import { lazy, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, EmptyState, SearchInput, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { romanLevel } from '@/engine/projection';
 import {
   buildHullCatalogue,
   searchHulls,
@@ -16,8 +15,7 @@ import type { LoadedFitting } from '@/engine/fittings/load';
 import { CatalogueLoadingNote } from './FittingDataNotices';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { HullPickerRow } from './HullPickerRow';
-import { FlyDot } from './shipTree/FlyDot';
-import { flyLabel } from './shipTree/flyLabel';
+import { HullFlyStatus } from './shipTree/HullFlyStatus';
 import { useHullFlyMarks, type HullFlyMark, type HullFlyMarks } from './useHullFlyMarks';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import { useRecentHullIds } from './useRecentHulls';
@@ -229,7 +227,6 @@ function SelectedHull({
   onStart: () => void;
 }) {
   const { t } = useTranslation();
-  const mastery = mark?.status.mastery ?? 0;
   return (
     <div className="flex flex-wrap items-center gap-3">
       <TypeIcon typeId={hull.typeId} size={64} width={56} height={56} />
@@ -237,17 +234,9 @@ function SelectedHull({
         <h3 className="text-base font-semibold">{hull.name}</h3>
         <p className="text-xs text-text-dim">{hull.group}</p>
         {mark && (
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs">
-            <span className="flex items-center gap-1.5">
-              <FlyDot status={mark.status} />
-              {flyLabel(t, mark.status)}
-            </span>
-            {mastery > 0 && (
-              <span className="text-text-dim">
-                {t('ships.info.mastery', { level: romanLevel(mastery) })}
-              </span>
-            )}
-          </p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-4 text-xs">
+            <HullFlyStatus status={mark.status} />
+          </div>
         )}
       </div>
       <Button variant="primary" className="max-md:w-full" onClick={onStart}>
