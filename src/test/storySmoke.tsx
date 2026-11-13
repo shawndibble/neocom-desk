@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import { composeStories, setProjectAnnotations } from '@storybook/react-vite';
 import * as preview from '../../.storybook/preview';
@@ -15,7 +15,34 @@ import { unexpectedRequests, whenFetchQuiet, whenFixturesRetired } from '@/story
 // a new story file is covered by default and none can fall between them.
 setProjectAnnotations(preview.default);
 
+/**
+ * Between stories no fixture table is installed and `fetch` is the real one, and
+ * CI is offline, where a real request hangs until its timeout (15 s for
+ * Fuzzwork). A page's work that outlived its story's drain then failed 15 s
+ * later into its fallback, whose request landed in whatever story was rendering
+ * by then: an ESI order book blamed on CorpTaxBookFinal's PersonalRowDetailPhone.
+ * Here the network refuses at once instead, so a late request and its fallback
+ * fail while no story is installed to be blamed. Same-origin (the SDE bake)
+ * still passes through.
+ */
+function refuseTheNetwork(): () => void {
+  const real = globalThis.fetch;
+  globalThis.fetch = (input, init) => {
+    const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+    if (url.origin === location.origin) return real(input, init);
+    return Promise.reject(new TypeError(`Story smoke is offline: ${url.origin}${url.pathname}`));
+  };
+  return () => {
+    globalThis.fetch = real;
+  };
+}
+
 export function describeStorySmoke(modules: Record<string, Record<string, unknown>>) {
+  let restoreNetwork: (() => void) | undefined;
+  beforeAll(() => {
+    restoreNetwork = refuseTheNetwork();
+  });
+  afterAll(() => restoreNetwork?.());
   describe.each(Object.entries(modules))('%s', (_file, mod) => {
     const stories = composeStories(mod as Parameters<typeof composeStories>[0]) as Record<
       string,
