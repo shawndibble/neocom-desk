@@ -1,8 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Pill, type PillTone } from '@/components/ui/Pill';
-import { Caret, Tooltip } from '@/components/ui';
-import { focusRingClassName } from '@/components/ui/controlStyles';
-import { cx } from '@/lib/cx';
+import { Button, Caret, Tooltip } from '@/components/ui';
 import { formatCountdown } from '@/lib/duration';
 import { romanLevel } from '@/engine/projection';
 import type { FitSkillVerdict, MissingSkill } from '@/engine/fittings/fitSkillVerdict';
@@ -56,9 +54,9 @@ export function PopularFitVerdict({ verdict }: { verdict: FitSkillVerdict | unde
 }
 
 /**
- * A row's verdict where it can open: "3 skills · 26d 10h" with §6c's leading
- * caret (expands in place), listing the skills under the row. Any other verdict
- * is the plain pill, which never opens.
+ * A row's verdict where it can open: a warning button, "3 skills · 26d 10h"
+ * behind §6c's leading caret (expands in place), listing the skills under the
+ * row. Any other verdict is the plain pill, which never opens.
  */
 export function FitVerdictControl({
   verdict,
@@ -76,17 +74,7 @@ export function FitVerdictControl({
   if (verdict?.kind !== 'missing') return <PopularFitVerdict verdict={verdict} />;
   const count = verdict.skills.length;
   return (
-    <button
-      type="button"
-      aria-expanded={expanded}
-      title={t('fittings.popular.trainingToggle')}
-      onClick={onToggle}
-      className={cx(
-        'inline-flex h-6 shrink-0 items-center gap-1 rounded-xs border border-warning/50 bg-warning/10 px-1.5',
-        'text-[0.6875rem] font-semibold tracking-wider text-warning uppercase',
-        focusRingClassName
-      )}
-    >
+    <Button variant="warning" size="sm" aria-expanded={expanded} onClick={onToggle}>
       <Caret expanded={expanded} />
       <span data-testid="popular-fit-verdict">
         {seconds !== undefined
@@ -94,6 +82,6 @@ export function FitVerdictControl({
           : t('fittings.popular.verdict.missing', { count })}
         {verdict.omegaOnly && ` · ${t('fittings.alpha.omega')}`}
       </span>
-    </button>
+    </Button>
   );
 }

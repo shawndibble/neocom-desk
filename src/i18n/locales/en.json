@@ -720,6 +720,7 @@
       "title": "Popular fits",
       "heading": "Start from a proven fit",
       "caption": "Click a fit to open it in the editor.",
+      "caption_touch": "Tap a fit to open it in the editor.",
       "sourcesLabel": "Where these fits come from",
       "sources": "Seen in losses: fits from recent losses on zKillboard. Guides: fits published on EVE Workbench.",
       "verdict": {
@@ -750,10 +751,8 @@
         "cheapest": "Cheapest"
       },
       "tag": { "loss": "Loss", "guide": "Guide" },
-      "tagTitle": { "loss": "Seen on zKillboard", "guide": "Published on EVE Workbench" },
       "training_one": "{{count}} skill · {{time}}",
       "training_other": "{{count}} skills · {{time}}",
-      "trainingToggle": "Show the skills this fit needs",
       "listLabel": "Popular fits",
       "noneFlyable_one": "You can't fly this fit yet.",
       "noneFlyable_other": "You can't fly any of these {{count}} fits yet.",
@@ -762,7 +761,6 @@
       "closestLoss_other": "the fit seen in {{count}} losses",
       "showAll": "Show all fits",
       "showClosest": "Show the closest",
-      "noneInSource": "No fits from this source.",
       "seenOnZkillboard_one": "Seen on zKillboard: {{count}} recent loss",
       "seenOnZkillboard_other": "Seen on zKillboard: {{count}} recent losses",
       "seenOnZkillboardLastSeen_one": "Seen on zKillboard: {{count}} recent loss · last seen {{age}}",

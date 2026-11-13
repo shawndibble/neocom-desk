@@ -162,7 +162,7 @@ function HullPickerView({
             ))}
           </div>
         )}
-        {(hasQuery || recent.length > 0) && (
+        {hasQuery && shown.length > 0 && (
           <p className="text-xs text-text-dim max-md:hidden">{t('fittings.start.pickAHull')}</p>
         )}
       </div>

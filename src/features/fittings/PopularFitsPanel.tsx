@@ -6,8 +6,12 @@ import {
   Checkbox,
   InfoTooltip,
   IskAmount,
-  NativeSelect,
   SegmentedControl,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
 } from '@/components/ui';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
@@ -18,6 +22,7 @@ import { popularFitLoad, type PopularFit } from '@/engine/fittings/popularFits';
 import { fittingRequirementTypeIds } from '@/engine/fittings/skillGaps';
 import { formatAge } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
+import { useTouchContext } from '@/lib/useMediaQuery';
 import { useNow } from '@/lib/useNow';
 import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import { typeName } from '@/sde/loadSde';
@@ -84,7 +89,7 @@ interface PopularFitsPanelProps {
 type PanelRow = ListedFit &
   (
     | { source: 'loss'; fit: PopularFit; /** Its place among the losses, by count. */ rank: number }
-    | { source: 'guide'; row: WorkbenchRow }
+    | { source: 'guide'; guide: WorkbenchRow }
   );
 
 const SORTS: readonly FitSort[] = ['newest', 'seen', 'training', 'cheapest'];
@@ -144,7 +149,7 @@ export function PopularFitsPanel({
       ...(guideRows ?? []).map((row): PanelRow => ({
         key: `guide:${row.fit.id}`,
         source: 'guide',
-        row,
+        guide: row,
         newest: row.fit.dateAdded,
         seen: row.sighting?.count ?? 0,
         isk: row.price?.sell ?? null,
@@ -173,30 +178,42 @@ export function PopularFitsPanel({
                     shipTypeId: row.fit.parts.hullTypeId,
                     ...row.fit.parts,
                   })
-                : row.row.requirementTypeIds,
+                : row.guide.requirementTypeIds,
           })),
     [rows]
   );
   const verdicts = usePopularFitVerdicts(verdictFits, sources);
   const seconds = useFitTrainingSeconds(verdicts);
 
-  const lookup = {
-    canFly: (key: string) => {
-      const kind = verdicts?.get(key)?.kind;
-      return kind === undefined ? undefined : kind === 'canFly';
-    },
-    seconds: (key: string) => seconds.get(key),
-  };
-  const counts = sourceCounts(rows);
-  const flyable = rows.filter((row) => lookup.canFly(row.key) === true).length;
-  const shown = listFits(rows, { source: filter, flyOnly, sort }, lookup);
-  const inScope = listFits(rows, { source: filter, flyOnly: false, sort }, lookup);
-  const closest = flyOnly && shown.length === 0 ? closestFit(inScope, lookup.seconds) : undefined;
+  const touch = useTouchContext();
+  // Without verdicts there is nothing to filter on: a Character switched away leaves it off.
+  const flyFilter = flyOnly && verdicts !== null;
+  const lookup = useMemo(
+    () => ({
+      canFly: (key: string) => {
+        const kind = verdicts?.get(key)?.kind;
+        return kind === undefined ? undefined : kind === 'canFly';
+      },
+      seconds: (key: string) => seconds.get(key),
+    }),
+    [verdicts, seconds]
+  );
+  const { counts, inScope, shown, flyable } = useMemo(() => {
+    const inScope = listFits(rows, { source: filter, flyOnly: false, sort }, lookup);
+    const flyableRows = inScope.filter((row) => lookup.canFly(row.key) === true);
+    return {
+      counts: sourceCounts(rows),
+      inScope,
+      shown: flyFilter ? flyableRows : inScope,
+      flyable: flyableRows.length,
+    };
+  }, [rows, filter, sort, flyFilter, lookup]);
+  const closest = flyFilter && shown.length === 0 ? closestFit(inScope, lookup.seconds) : undefined;
 
   const titleOf = (row: PanelRow) =>
     row.source === 'loss'
       ? t('fittings.popular.losses', { count: row.fit.count })
-      : row.row.fit.name || t('fittings.popular.workbench.unnamed');
+      : row.guide.fit.name || t('fittings.popular.workbench.unnamed');
 
   function renderRow(row: PanelRow) {
     const verdict = verdicts?.get(row.key);
@@ -229,10 +246,11 @@ export function PopularFitsPanel({
         <PopularFitRow
           {...shared}
           meta={
-            fit.lastSeen !== null &&
-            ` · ${t('fittings.popular.lastSeen', {
-              age: formatAge(Math.max(0, now - Date.parse(fit.lastSeen)), t),
-            })}`
+            fit.lastSeen === null
+              ? undefined
+              : ` · ${t('fittings.popular.lastSeen', {
+                  age: formatAge(Math.max(0, now - Date.parse(fit.lastSeen)), t),
+                })}`
           }
           price={
             fit.value === null ? undefined : (
@@ -250,7 +268,7 @@ export function PopularFitsPanel({
         />
       );
     }
-    const { fit, modules, price, sighting, loadFailed } = row.row;
+    const { fit, modules, price, sighting, loadFailed } = row.guide;
     return (
       <PopularFitRow
         {...shared}
@@ -283,7 +301,7 @@ export function PopularFitsPanel({
       <p role="status" className="text-xs text-warning">
         {t(zkillFailureKey(losses.reason, 'fittings.popular.failed'))}
       </p>
-    ) : losses.fits.length === 0 ? (
+    ) : losses.fits.length === 0 && (filter === 'loss' || rows.length === 0) ? (
       <p className="text-xs text-text-dim">{t('fittings.popular.empty')}</p>
     ) : null;
   const guideStatus: ReactNode =
@@ -293,7 +311,7 @@ export function PopularFitsPanel({
       <p role="status" className="text-xs text-warning">
         {t('fittings.popular.workbench.failed')}
       </p>
-    ) : guides.status === 'empty' ? (
+    ) : guides.status === 'empty' && (filter === 'guide' || rows.length === 0) ? (
       <p className="text-xs text-text-dim">{t('fittings.popular.workbench.empty')}</p>
     ) : null;
 
@@ -307,7 +325,7 @@ export function PopularFitsPanel({
           content={t('fittings.popular.sources')}
         />
       </div>
-      <p className="text-xs text-text-dim">{t('fittings.popular.caption')}</p>
+      <p className="text-xs text-text-dim">{t('fittings.popular.caption', { context: touch })}</p>
       <div className="flex flex-wrap items-center gap-2">
         <SegmentedControl<FitSourceFilter>
           size="sm"
@@ -324,28 +342,29 @@ export function PopularFitsPanel({
             <Checkbox checked={flyOnly} onChange={() => setFlyOnly(!flyOnly)} />
             {t('fittings.popular.canFlyNow')}
             <span className="text-text-dim tabular-nums">
-              {t('fittings.popular.canFlyCount', { flyable, total: rows.length })}
+              {t('fittings.popular.canFlyCount', { flyable, total: inScope.length })}
             </span>
           </label>
         )}
-        <label className="ml-auto flex items-center gap-1.5 text-xs text-text-dim">
-          {t('fittings.popular.sortLabel')}
-          <NativeSelect
-            size="sm"
-            value={sort}
-            onChange={(event) => setSort(event.target.value as FitSort)}
-          >
-            {SORTS.map((value) => (
-              <option key={value} value={value}>
-                {t(`fittings.popular.sort.${value}`)}
-              </option>
-            ))}
-          </NativeSelect>
-        </label>
+        <div className="ml-auto flex items-center gap-1.5 text-xs text-text-dim">
+          <span aria-hidden="true">{t('fittings.popular.sortLabel')}</span>
+          <Select value={sort} onValueChange={(value) => setSort(value as FitSort)}>
+            <SelectTrigger aria-label={t('fittings.popular.sortLabel')} size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORTS.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {t(`fittings.popular.sort.${value}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       {filter !== 'guide' && lossStatus}
       {filter !== 'loss' && guideStatus}
-      {flyOnly && shown.length === 0 && inScope.length > 0 && (
+      {flyFilter && shown.length === 0 && inScope.length > 0 && (
         <div className="space-y-2 border border-dashed border-line-bright p-3 text-sm">
           <p>{t('fittings.popular.noneFlyable', { count: inScope.length })}</p>
           {closest && (

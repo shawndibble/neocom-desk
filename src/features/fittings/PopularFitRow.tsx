@@ -2,6 +2,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { disabledClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { isRowOwnEvent } from '@/components/ui/rowEvents';
+import { Pill } from '@/components/ui/Pill';
 import { cx } from '@/lib/cx';
 import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { useTranslation } from 'react-i18next';
@@ -76,9 +77,7 @@ export function PopularFitRow({
     >
       {/* Wraps at a phone's width: the verdict drops below rather than squeezing the title. */}
       <div className="-mx-1 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line/50 px-1 pt-1 pb-2">
-        <span className="w-12 shrink-0 border border-line py-px text-center text-[0.6875rem] font-semibold tracking-wider text-text-dim uppercase">
-          {t(`fittings.popular.tag.${source}`)}
-        </span>
+        <Pill className="w-12 shrink-0 justify-center">{t(`fittings.popular.tag.${source}`)}</Pill>
         {/* -mx/px: room inside the truncating box for the title's focus ring. */}
         <p className="-mx-1 min-w-0 flex-1 basis-40 truncate px-1 text-sm">
           <button

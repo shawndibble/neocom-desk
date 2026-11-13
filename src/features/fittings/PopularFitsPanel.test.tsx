@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { EngineSkill, TrainedSkill } from '@/engine/types';
@@ -400,9 +401,9 @@ describe('PopularFitsPanel EVE Workbench guides', () => {
         .getAllByRole('listitem')
         .map((item) => within(item).getAllByRole('button')[0].textContent);
     expect(titles()).toEqual(['2 losses', 'Fit a', '9 losses']);
-    fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), {
-      target: { value: 'seen' },
-    });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('combobox', { name: 'Sort' }));
+    await user.click(screen.getByRole('option', { name: 'Most seen' }));
     expect(titles()).toEqual(['9 losses', '2 losses', 'Fit a']);
   });
 
@@ -979,9 +980,7 @@ describe('Popular fits can-fly verdicts', () => {
       // Fit b lacks only Drones I; fit a lacks Gunnery V too.
       expect(screen.getByText(/^Closest: the fit seen in 3 losses, /)).toBeTruthy();
       fireEvent.click(screen.getByRole('button', { name: 'Show the closest' }));
-      expect((screen.getByRole('combobox', { name: 'Sort' }) as HTMLSelectElement).value).toBe(
-        'training'
-      );
+      expect(screen.getByRole('combobox', { name: 'Sort' }).textContent).toBe('Least training');
       const row = screen.getByText('3 losses').closest('li')!;
       expect(within(row).getByRole('button', { expanded: true })).toBeTruthy();
       expect(within(row).getByRole('link', { name: 'Drones' })).toBeTruthy();
