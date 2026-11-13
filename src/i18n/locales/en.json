@@ -1306,6 +1306,7 @@
       "failed": "Couldn't work out which skills affect this fit.",
       "none": "No single skill level would change this fit — every skill that affects it is trained to V.",
       "rankBy": "Rank by",
+      "improvesFit": "Improves fit",
       "withPrerequisites": "incl. prerequisites",
       "addToPlan": "Add to plan",
       "addLevel": "Add {{level}}",
