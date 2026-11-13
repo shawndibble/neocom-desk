@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import { refineryPlaceholder, refineryUnreadable } from './moonsFormat';
-import { setupChecklist, type SetupChecklistInput } from './setupChecklist';
+import { setupChecklist, type SetupChecklistInput } from './setupSteps';
 
 const active: ScheduledSyncStatus = {
   status: 'active',

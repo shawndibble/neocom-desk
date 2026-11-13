@@ -9,7 +9,7 @@ import { cx } from '@/lib/cx';
 import { tabPath } from '@/lib/pageTabs';
 import type { SettingsTab } from './BookSettingsDialog';
 import { MOONS_TABS } from './moonsPaths';
-import { setupChecklist, type SetupStep } from './setupChecklist';
+import { setupChecklist, type SetupStep } from './setupSteps';
 import { useBook } from './useBook';
 
 const k = (key: string) => `corpTaxBook.moons.setupChecklist.${key}`;

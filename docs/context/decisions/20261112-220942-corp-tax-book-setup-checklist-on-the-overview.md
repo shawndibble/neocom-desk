@@ -2,7 +2,7 @@
 
 _Recorded 2026-11-12._
 
-- **A book shows "Set up the book" on its Overview until every step is done or it is dismissed.** Steps: Corp tax rate set, Automatic sync turned on, Refinery names readable, First Statement issued. Each is read off the book the page already holds (`view.input.rates`, `data.scheduledSync`, `names.refinery` for the book's own refineries, `view.input.statements`); the checklist adds no server read and stores nothing on the server. Pure derivation: `src/features/corp/moons/setupChecklist.ts`.
+- **A book shows "Set up the book" on its Overview until every step is done or it is dismissed.** Steps: Corp tax rate set, Automatic sync turned on, Refinery names readable, First Statement issued. Each is read off the book the page already holds (`view.input.rates`, `data.scheduledSync`, `names.refinery` for the book's own refineries, `view.input.statements`); the checklist adds no server read and stores nothing on the server. Pure derivation: `src/features/corp/moons/setupSteps.ts`.
 - **Only an officer who can edit sees it.** A viewer could act on none of the steps, so it would be clutter for them.
 - **A step to do carries one ghost button to where it is done**, and a done step carries none (§6c restraint): the rate opens Settings on Rates, Automatic sync opens Settings on Access, the first Statement goes to the Statements tab. Refinery names has no button: a name is read with the viewing Character's docking access, so the step says that instead of offering a control that would do nothing.
 - **Refinery names is left out for a book with no refineries of its own** (one that only collects for moon owners), and reads "Checking…" while lookups are still answering, so it never flashes "to do".
