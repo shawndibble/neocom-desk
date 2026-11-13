@@ -7,6 +7,7 @@ import { DAY_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
 import { useBook } from './useBook';
 import { useTabsProjection } from './useTabsProjection';
+import { SetupChecklist } from './SetupChecklist';
 import { NeedsYouQueue } from './NeedsYouQueue';
 import { BookTotals, OverdueAging } from './BookTotals';
 import { isk, shortDate } from './moonsFormat';
@@ -63,6 +64,7 @@ export function OverviewTab() {
   ];
   return (
     <div className="space-y-4">
+      <SetupChecklist />
       <BookTotals>
         <StatChip
           label={t('corpTaxBook.moons.overview.billableThrough')}

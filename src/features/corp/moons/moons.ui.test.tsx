@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { LocationProbe } from '@/test/LocationProbe';
+import { stubViewport } from '@/test/viewport';
+import { BELOW_DESKTOP_QUERY } from '@/lib/useIsBelowDesktop';
 import {
   buildBookView,
   nextRunPeriod,
@@ -266,7 +268,19 @@ describe('Record payment dialog', () => {
 });
 
 describe('StatementRun', () => {
+  it("on a desktop shows the chosen Miner's mail beside the step, picked by a labelled select", async () => {
+    renderBook(<StatementRun />);
+    const preview = screen.getByRole('region', { name: 'Mail preview' });
+    expect(within(preview).getByText(/moon tax Statement, Aug 2026/)).toBeInTheDocument();
+    expect(within(preview).getByRole('combobox', { name: 'Preview for' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Preview mail' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
+    expect(screen.getByRole('region', { name: 'Mail preview' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Preview mail' })).not.toBeInTheDocument();
+  });
+
   it('keeps Send disabled until the corporation name resolves, then previews with it', async () => {
+    stubViewport(BELOW_DESKTOP_QUERY);
     corpName.value = null;
     const first = renderBook(<StatementRun />);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
@@ -285,6 +299,7 @@ describe('StatementRun', () => {
   });
 
   it('previews the mail of each Miner from the Send step, before sending', async () => {
+    stubViewport(BELOW_DESKTOP_QUERY);
     renderBook(<StatementRun />);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
     await userEvent.click(screen.getByRole('button', { name: 'Preview mail' }));
@@ -295,6 +310,7 @@ describe('StatementRun', () => {
   });
 
   it('previews the mail of an earlier issued Statement the run will still send', async () => {
+    stubViewport(BELOW_DESKTOP_QUERY);
     const first = buildBookView(input());
     const plan = planStatementRun(first, nextRunPeriod(first)!);
     const issued = plan.lines.map((l) => statementForLine(first, plan, l));
