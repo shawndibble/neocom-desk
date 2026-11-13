@@ -81,7 +81,8 @@ function Training({
       ) : (
         <SkillFixList
           fixes={fixes}
-          skillName={(id) => catalog?.engineSkills.get(id)?.name ?? `#${id}`}
+          skills={catalog?.engineSkills}
+          trainedSkills={trainedSkills}
           scheduleEntriesFor={scheduleEntriesFor}
           plan={target.plans === undefined ? undefined : (targetPlan ?? null)}
           plannedLevels={plannedLevels}

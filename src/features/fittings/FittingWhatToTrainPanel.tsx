@@ -179,6 +179,16 @@ function WhatToTrainRanking({
     () => (rows === null ? null : rankSkillGains(rows, activeSort)),
     [rows, activeSort]
   );
+  // A skill under Makes it fit isn't listed again under Improves fit.
+  const improves = useMemo(() => {
+    if (ranked === null) return null;
+    const fixSkills = new Set(
+      [...missingFixes, ...(skillFixes.fixes ?? [])].flatMap((fix) =>
+        fix.entries.map((entry) => entry.skillTypeID)
+      )
+    );
+    return ranked.filter((row) => !fixSkills.has(row.skillTypeId));
+  }, [ranked, missingFixes, skillFixes.fixes]);
   const rankedUpgrades = useMemo(
     () => (upgrades.rows === null ? null : rankModuleUpgrades(upgrades.rows, activeSort)),
     [upgrades.rows, activeSort]
@@ -196,15 +206,16 @@ function WhatToTrainRanking({
     addEntries([{ skillTypeID: row.skillTypeId, targetLevel: level }]);
   const plan = target.plans === undefined ? undefined : (targetPlan ?? null);
   const fixListProps = {
-    skillName: (id: number) => catalog?.engineSkills.get(id)?.name ?? `#${id}`,
+    skills: catalog?.engineSkills,
+    trainedSkills,
     scheduleEntriesFor,
     plan,
     plannedLevels,
     onAdd: (entries: readonly PlanEntry[]) => void addEntries(entries),
   };
   // Missing skills don't wait on the ranking: they show while it loads, or if it fails.
-  const fixBlock = (missingFixes.length > 0 ||
-    (skillFixes.fixes && skillFixes.fixes.length > 0)) && (
+  const hasFixes = missingFixes.length > 0 || (skillFixes.fixes?.length ?? 0) > 0;
+  const fixBlock = hasFixes && (
     <div className="space-y-1">
       <p className={cx(STAT_EYEBROW_TYPE, 'text-warning')}>{t('fittings.skillFixes.heading')}</p>
       {missingFixes.length > 0 && (
@@ -237,7 +248,7 @@ function WhatToTrainRanking({
   );
 
   const stillLoading = evaluator === null || loading;
-  if (stillLoading || failed || ranked === null)
+  if (stillLoading || failed || improves === null)
     return (
       <div className="space-y-3">
         {fixBlock}
@@ -299,29 +310,33 @@ function WhatToTrainRanking({
       </div>
       {fixBlock}
       {/* Only once no Tech II upgrade is left to suggest either: else it reads as "nothing to train". */}
-      {ranked.length === 0 && rankedUpgrades?.length === 0 && missingFixes.length === 0 && (
+      {improves.length === 0 && rankedUpgrades?.length === 0 && !hasFixes && (
         <StatNote>{t('fittings.whatToTrain.none')}</StatNote>
       )}
-      {ranked.length > 0 && (
-        <ul
-          aria-label={t('fittings.stats.section.whatToTrain')}
-          className="m-0 list-none p-0 text-xs"
-        >
-          {ranked.map((row, index) => (
-            <WhatToTrainItem
-              key={row.skillTypeId}
-              row={row}
-              rank={index + 1}
-              evaluator={evaluator}
-              plan={plan}
-              plannedLevels={plannedLevels}
-              scheduleFor={scheduleFor}
-              skills={catalog?.engineSkills}
-              trainedSkills={trainedSkills}
-              onAdd={add}
-            />
-          ))}
-        </ul>
+      {improves.length > 0 && (
+        <div className="space-y-1">
+          {/* Named only beside Makes it fit: alone, What to train's own title says it. */}
+          {hasFixes && <p className={STAT_EYEBROW_TYPE}>{t('fittings.whatToTrain.improvesFit')}</p>}
+          <ul
+            aria-label={t('fittings.stats.section.whatToTrain')}
+            className="m-0 list-none p-0 text-xs"
+          >
+            {improves.map((row, index) => (
+              <WhatToTrainItem
+                key={row.skillTypeId}
+                row={row}
+                rank={index + 1}
+                evaluator={evaluator}
+                plan={plan}
+                plannedLevels={plannedLevels}
+                scheduleFor={scheduleFor}
+                skills={catalog?.engineSkills}
+                trainedSkills={trainedSkills}
+                onAdd={add}
+              />
+            ))}
+          </ul>
+        </div>
       )}
       <ModuleUpgradeList
         rows={rankedUpgrades}
