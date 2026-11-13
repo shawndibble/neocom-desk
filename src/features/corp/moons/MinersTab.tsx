@@ -11,8 +11,11 @@ import {
   FilterField,
   Panel,
   SearchInput,
-  StatChip,
-  StatChips,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   sortRows,
   summarizeFilterValues,
   useOpenAfterMenu,
@@ -26,12 +29,18 @@ import {
   type MinerRow,
   type MinerStanding,
 } from '@/engine/corpTaxBook/bookView';
+import {
+  MINER_BALANCES,
+  matchesMinerBalance,
+  type MinerBalance,
+} from '@/engine/corpTaxBook/overdueAging';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { boolParam, textParam } from '@/lib/urlState';
+import { boolParam, optionalEnumParam, textParam } from '@/lib/urlState';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { useBook } from './useBook';
 import { useTabsProjection } from './useTabsProjection';
+import { BookTotals } from './BookTotals';
 import { isk, shortDate } from './moonsFormat';
 import {
   MINERS_COLUMN_IDS,
@@ -51,7 +60,12 @@ const PARAMS = {
   q: textParam(),
   members: boolParam(true),
   guests: boolParam(true),
+  // Set by the totals' links and the Overview's Overdue by age (`minersBalancePath`).
+  balance: optionalEnumParam(MINER_BALANCES),
 };
+
+/** The Balance select's "no narrowing" item; Radix Select cannot hold an empty value. */
+const ANY_BALANCE = 'any';
 
 /** A Miner is listed while it owes, is owed, or has days waiting; the rest are only counted. */
 const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 || m.credit > 0;
@@ -61,10 +75,11 @@ const STANDING_RANK: readonly MinerStanding[] = ['member', 'guest', 'left'];
 
 const DEFAULT_SORT: DataTableSort = { columnId: 'overdue', direction: 'desc' };
 
-/** What the funnel edits: which standings the table lists. Search sits in the row, outside it. */
+/** What the funnel edits: which standings and balances the table lists. Search sits in the row, outside it. */
 interface MinersFilter {
   members: boolean;
   guests: boolean;
+  balance: MinerBalance | null;
 }
 
 const OPEN_MINER_KEY = 'corpTaxBook.minersTab.openMiner.';
@@ -90,7 +105,7 @@ function writeOpenMiner(corporationId: number, id: string | null) {
 export function MinersTab() {
   const { t } = useTranslation();
   const { view, names, edit, canEdit, corporationId } = useBook();
-  const { miners, totals, donationsBeforeBook } = useTabsProjection();
+  const { miners, donationsBeforeBook } = useTabsProjection();
   const [dialog, setDialog] = useState<
     | { kind: 'record' | 'dismiss'; miner: MinerRow }
     | { kind: 'notTax'; miner: MinerRow; paymentId: string }
@@ -133,6 +148,7 @@ export function MinersTab() {
     return miners.filter((m) => {
       const inGroup = m.standing === 'guest' ? params.guests : params.members;
       if (!inGroup || !isActive(m)) return false;
+      if (params.balance && !matchesMinerBalance(m, params.balance)) return false;
       if (!q) return true;
       return [nameOf(m), ...m.characterIds.map(names.character)].some((n) =>
         n.toLowerCase().includes(q)
@@ -238,10 +254,15 @@ export function MinersTab() {
     : allColumns.find((c) => c.id === sort.columnId);
   const sortedRows = hiddenSortColumn ? sortRows(rows, hiddenSortColumn, sort.direction) : rows;
 
-  const filter: MinersFilter = { members: params.members, guests: params.guests };
+  const filter: MinersFilter = {
+    members: params.members,
+    guests: params.guests,
+    balance: params.balance,
+  };
   const standingLabel = t('corpTaxBook.moons.cols.inCorp');
-  const active: ActiveFilter<MinersFilter>[] =
-    filter.members && filter.guests
+  const balanceLabel = t('corpTaxBook.moons.miners.balance.label');
+  const active: ActiveFilter<MinersFilter>[] = [
+    ...(filter.members && filter.guests
       ? []
       : [
           {
@@ -253,25 +274,23 @@ export function MinersTab() {
               ],
               t
             ),
-            clear: (value) => ({ ...value, members: true, guests: true }),
+            clear: (value: MinersFilter) => ({ ...value, members: true, guests: true }),
           },
-        ];
+        ]),
+    ...(filter.balance
+      ? [
+          {
+            label: balanceLabel,
+            value: t(`corpTaxBook.moons.miners.balance.${filter.balance}`),
+            clear: (value: MinersFilter) => ({ ...value, balance: null }),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className="space-y-4">
-      <StatChips>
-        <StatChip label={t('corpTaxBook.moons.chips.owed')} value={isk(totals.owed)} emphasis />
-        <StatChip
-          label={t('corpTaxBook.moons.chips.overdue')}
-          value={t('corpTaxBook.moons.chips.overdueValue', {
-            amount: isk(totals.overdue),
-            count: totals.overdueCount,
-          })}
-          {...(totals.overdue > 0 ? { tone: 'danger' as const } : {})}
-        />
-        <StatChip label={t('corpTaxBook.moons.chips.unbilled')} value={isk(totals.unbilled)} />
-        <StatChip label={t('corpTaxBook.moons.chips.credit')} value={isk(totals.credit)} />
-      </StatChips>
+      <BookTotals />
       {donationsBeforeBook > 0 && (
         <p className="text-xs text-text-dim">
           {t('corpTaxBook.moons.beforeBook.donations', { count: donationsBeforeBook })}
@@ -307,22 +326,53 @@ export function MinersTab() {
           }
         >
           {(value, onChange) => (
-            <FilterField label={standingLabel} stretch={false}>
-              <div role="group" aria-label={standingLabel} className="flex flex-wrap gap-2">
-                <FilterChip
-                  label={t('corpTaxBook.moons.miners.members')}
-                  selected={value.members}
-                  onToggle={() => onChange({ ...value, members: !value.members })}
-                  count={counts.members}
-                />
-                <FilterChip
-                  label={t('corpTaxBook.moons.miners.nonMembers')}
-                  selected={value.guests}
-                  onToggle={() => onChange({ ...value, guests: !value.guests })}
-                  count={counts.guests}
-                />
-              </div>
-            </FilterField>
+            <>
+              <FilterField label={standingLabel} stretch={false}>
+                <div role="group" aria-label={standingLabel} className="flex flex-wrap gap-2">
+                  <FilterChip
+                    label={t('corpTaxBook.moons.miners.members')}
+                    selected={value.members}
+                    onToggle={() => onChange({ ...value, members: !value.members })}
+                    count={counts.members}
+                  />
+                  <FilterChip
+                    label={t('corpTaxBook.moons.miners.nonMembers')}
+                    selected={value.guests}
+                    onToggle={() => onChange({ ...value, guests: !value.guests })}
+                    count={counts.guests}
+                  />
+                </div>
+              </FilterField>
+              <FilterField label={balanceLabel} stretch={false}>
+                <Select
+                  value={value.balance ?? ANY_BALANCE}
+                  onValueChange={(next) =>
+                    onChange({
+                      ...value,
+                      balance: next === ANY_BALANCE ? null : (next as MinerBalance),
+                    })
+                  }
+                >
+                  <SelectTrigger
+                    active={value.balance !== null}
+                    aria-label={balanceLabel}
+                    className="w-56"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ANY_BALANCE}>
+                      {t('corpTaxBook.moons.miners.balance.any')}
+                    </SelectItem>
+                    {MINER_BALANCES.map((b) => (
+                      <SelectItem key={b} value={b}>
+                        {t(`corpTaxBook.moons.miners.balance.${b}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            </>
           )}
         </FilterBar>
         {rows.length === 0 ? (

@@ -3,7 +3,8 @@
  * drill-down pages live below their tab (`PageTab.deep`), so the page stays
  * mounted and Back returns to the table.
  */
-import { definePageTabs } from '@/lib/pageTabs';
+import type { MinerBalance } from '@/engine/corpTaxBook/overdueAging';
+import { definePageTabs, tabPath } from '@/lib/pageTabs';
 
 export const MOONS_TABS = definePageTabs('/corp/moons', [
   { id: 'overview', labelKey: 'corpTaxBook.moons.tabs.overview' },
@@ -37,3 +38,7 @@ export const minerPath = (id: string) => `/corp/moons/miners/${encodeURIComponen
 export const moonOwnerPath = (id: string) => `/corp/moons/moon-owners/${encodeURIComponent(id)}`;
 export const statementPeriodPath = (periodStart: string) =>
   `/corp/moons/statements/${encodeURIComponent(periodStart)}`;
+
+/** The Miners tab narrowed by its Balance filter (`?balance=`): who owes, who is overdue, who holds credit. */
+export const minersBalancePath = (balance: MinerBalance) =>
+  `${tabPath(MOONS_TABS, 'miners')}?balance=${balance}`;

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
+import { focusRingClassName, interactiveClassName } from './controlStyles';
 import { InfoTooltip } from './Tooltip';
 import { STAT_CHIP_TONE_TEXT_CLASS, type StatChipTone } from './statChipTone';
 
@@ -27,11 +29,18 @@ interface StatChipProps {
    * first, since the cut falls at the end.
    */
   truncate?: boolean;
+  /**
+   * The value becomes a link to the view that lists what it counts (the Corp Tax Book's
+   * Overdue figure opens the Miners filtered to overdue Miners). Solid underline at rest,
+   * the value keeps its tone; the chip itself stays unboxed (DESIGN.md §6c).
+   */
+  to?: string;
 }
 
 /**
  * A static label + value readout. It has no border or fill: a box means
- * "you can click this" (DESIGN.md §6), and a chip can't be clicked.
+ * "you can click this" (DESIGN.md §6), and a chip can't be clicked. With `to`
+ * only its value is a link, underlined like any readout that opens its list.
  *
  * @summary A static label and value readout (ISK balance, SP, a count); no box, because it can't be clicked.
  */
@@ -45,6 +54,7 @@ export function StatChip({
   testId,
   emphasis = false,
   truncate = false,
+  to,
 }: StatChipProps) {
   const { t } = useTranslation();
   return (
@@ -68,7 +78,16 @@ export function StatChip({
       <span
         className={`tabular-nums ${emphasis ? 'text-sm font-semibold' : 'font-medium'} ${truncate ? 'min-w-0 truncate' : ''} ${STAT_CHIP_TONE_TEXT_CLASS[tone]}`}
       >
-        {value}
+        {to ? (
+          <Link
+            to={to}
+            className={`rounded-xs underline decoration-1 underline-offset-2 hover:decoration-2 ${interactiveClassName} ${focusRingClassName}`}
+          >
+            {value}
+          </Link>
+        ) : (
+          value
+        )}
       </span>
     </span>
   );

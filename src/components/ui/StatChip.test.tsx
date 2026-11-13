@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { StatChip, StatChips } from './StatChip';
 
@@ -42,6 +43,25 @@ describe('StatChip', () => {
 
     const chip = screen.getByText('SP').parentElement;
     expect(chip).toHaveClass('w-40', 'shrink-0');
+  });
+
+  it('makes only its value a link with `to`, keeping the tone', () => {
+    render(
+      <MemoryRouter>
+        <StatChip
+          label="Overdue"
+          value="9.3M"
+          tone="danger"
+          to="/corp/moons/miners?balance=overdue"
+        />
+      </MemoryRouter>
+    );
+
+    const link = screen.getByRole('link', { name: '9.3M' });
+    expect(link).toHaveAttribute('href', '/corp/moons/miners?balance=overdue');
+    expect(link).toHaveClass('underline');
+    expect(link.parentElement).toHaveClass('text-danger');
+    expect(screen.getByText('Overdue').closest('a')).toBeNull();
   });
 });
 
