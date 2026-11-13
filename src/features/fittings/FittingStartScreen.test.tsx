@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { ComponentProps } from 'react';
@@ -249,10 +249,34 @@ describe('FittingStartScreen', () => {
     );
   });
 
-  it('previews the picked row and Open hands a saved one to openSaved', async () => {
+  it('a click on a row opens it at once', async () => {
     const workspace = renderScreen();
     await userEvent.click(await screen.findByRole('button', { name: /^Kite/ }));
+    expect(workspace.openSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
+  });
+
+  it('previews the hovered row once the pointer rests, and keeps it when the pointer leaves', async () => {
+    renderScreen();
+    const kite = await screen.findByRole('button', { name: /^Kite/ });
+    expect(await screen.findByText('preview of Armor Drake')).toBeInTheDocument();
+
+    // A pointer passing over a row on its way elsewhere leaves the preview be.
+    await userEvent.hover(kite);
+    await userEvent.unhover(kite);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(screen.getByText('preview of Armor Drake')).toBeInTheDocument();
+
+    await userEvent.hover(kite);
+    expect(await screen.findByText('preview of Kite')).toBeInTheDocument();
+    expect(kite).toHaveAttribute('aria-current', 'true');
+    await userEvent.unhover(kite);
     expect(screen.getByText('preview of Kite')).toBeInTheDocument();
+  });
+
+  it('Open in the preview hands a saved one to openSaved', async () => {
+    const workspace = renderScreen();
+    await userEvent.hover(await screen.findByRole('button', { name: /^Kite/ }));
+    expect(await screen.findByText('preview of Kite')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Open fitting' }));
     expect(workspace.openSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
@@ -260,7 +284,8 @@ describe('FittingStartScreen', () => {
 
   it('Open hands an In-game one to openLoaded, mapped', async () => {
     const workspace = renderScreen();
-    await userEvent.click(await screen.findByRole('button', { name: /^Armor Drake/ }));
+    await userEvent.hover(await screen.findByRole('button', { name: /^Armor Drake/ }));
+    await screen.findByText('preview of Armor Drake');
     await userEvent.click(screen.getByRole('button', { name: 'Open fitting' }));
     expect(workspace.openLoaded).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -290,18 +315,21 @@ describe('FittingStartScreen', () => {
 
   it('Compare goes to the compare page with the fitting in ?f=', async () => {
     renderScreen();
-    await userEvent.click(await screen.findByRole('button', { name: /^Kite/ }));
+    await userEvent.hover(await screen.findByRole('button', { name: /^Kite/ }));
+    await screen.findByText('preview of Kite');
     await userEvent.click(screen.getByRole('button', { name: 'Compare' }));
     expect(navigateMock).toHaveBeenCalledWith('/ships/fittings/compare?f=1.abc');
   });
 
   it('keeps edited notes on a saved fitting, and only there', async () => {
     renderScreen();
-    await userEvent.click(await screen.findByRole('button', { name: /^Kite/ }));
+    await userEvent.hover(await screen.findByRole('button', { name: /^Kite/ }));
+    await screen.findByText('preview of Kite');
     await userEvent.click(screen.getByRole('button', { name: 'Save notes' }));
     await vi.waitFor(async () => expect((await db.fittings.get('r1'))?.notes).toBe('Kite first.'));
 
-    await userEvent.click(screen.getByRole('button', { name: /^Armor Drake/ }));
+    await userEvent.hover(screen.getByRole('button', { name: /^Armor Drake/ }));
+    await screen.findByText('preview of Armor Drake');
     await userEvent.click(screen.getByRole('button', { name: 'Save notes' }));
     expect(await db.fittings.count()).toBe(1);
   });
@@ -319,9 +347,10 @@ describe('FittingStartScreen', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
-  it('Enter on a row opens it and the arrow keys walk the list', async () => {
+  it('Enter on a row opens it and the arrow keys walk the list, the preview following', async () => {
     const workspace = renderScreen();
-    await userEvent.click(await screen.findByRole('button', { name: /^Armor Drake/ }));
+    const drake = await screen.findByRole('button', { name: /^Armor Drake/ });
+    act(() => drake.focus());
     await userEvent.keyboard('{ArrowDown}');
     expect(screen.getByText('preview of Kite')).toBeInTheDocument();
     await userEvent.keyboard('{Enter}');
@@ -477,6 +506,16 @@ describe('FittingStartScreen on a phone', () => {
 });
 
 describe('FittingStartScreen in a dialog', () => {
+  it('as the editor’s Open dialog: previews the hovered row, and a click opens it and reports it', async () => {
+    const { workspace, onOpened } = renderDialog({ preview: true });
+    const kite = await screen.findByRole('button', { name: /^Kite/ });
+    await userEvent.hover(kite);
+    expect(await screen.findByText('preview of Kite')).toBeInTheDocument();
+    await userEvent.click(kite);
+    expect(workspace.openSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
+    expect(onOpened).toHaveBeenCalled();
+  });
+
   it('is the list alone, and a tap opens the row and reports it', async () => {
     const { workspace, onOpened } = renderDialog();
     await userEvent.click(await screen.findByRole('button', { name: /^Armor Drake/ }));
