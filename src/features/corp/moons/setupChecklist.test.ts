@@ -53,6 +53,14 @@ describe('setupChecklist', () => {
     expect(list.corpRatePct).toBe(12);
   });
 
+  it('quotes no rate while the only corp rate is still to start', () => {
+    const list = setupChecklist({
+      ...fresh,
+      rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-11-01' }],
+    });
+    expect(list.corpRatePct).toBeUndefined();
+  });
+
   it('no corp rate leaves the rate step to do', () => {
     expect(stateOf({ ...fresh, rates: [] }).rate).toBe('todo');
   });

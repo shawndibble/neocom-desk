@@ -49,14 +49,17 @@ describe('SetupChecklist', () => {
     expect(screen.queryByText('Set up the book')).not.toBeInTheDocument();
   });
 
-  it('hides itself once every step is done', () => {
-    render({
+  it('hides itself once every step is done, and stays hidden if a step later lapses', () => {
+    const done = render({
       ...BOOK_CONTEXT,
       data: {
         ...(BOOK_CONTEXT.data as object),
         scheduledSync: { status: 'active', characterId: 1, characterName: 'A', enabledAt: 0 },
       } as never,
     });
+    expect(screen.queryByText('Set up the book')).not.toBeInTheDocument();
+    done.unmount();
+    render();
     expect(screen.queryByText('Set up the book')).not.toBeInTheDocument();
   });
 });

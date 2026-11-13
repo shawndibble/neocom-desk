@@ -48,7 +48,7 @@ export function MoonsChoices({
             <p className="text-text-dim">{t('corpTaxBook.moons.setup.own.hint')}</p>
           </div>
           <Button
-            variant="primary"
+            variant={canOwn ? 'primary' : 'ghost'}
             disabled={!canOwn}
             onClick={() => onChoose('own')}
             className="shrink-0 self-start sm:self-center"

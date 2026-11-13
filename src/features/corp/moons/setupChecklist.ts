@@ -33,7 +33,7 @@ export interface SetupChecklist {
   steps: SetupStep[];
   done: number;
   complete: boolean;
-  /** The corp rate in force today (else the first one set); undefined with none. */
+  /** The corp rate in force today; undefined while none has started. */
   corpRatePct?: number;
 }
 
@@ -41,7 +41,7 @@ export function setupChecklist(input: SetupChecklistInput): SetupChecklist {
   const corp = input.rates
     .filter((r): r is Extract<TaxRate, { scope: 'corp' }> => r.scope === 'corp')
     .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
-  const inForce = corp.filter((r) => r.effectiveFrom <= input.today).at(-1) ?? corp[0];
+  const inForce = corp.filter((r) => r.effectiveFrom <= input.today).at(-1);
   const steps: SetupStep[] = [
     { id: 'rate', state: corp.length > 0 ? 'done' : 'todo' },
     { id: 'autoSync', state: input.scheduledSync?.status === 'active' ? 'done' : 'todo' },

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
+  Eyebrow,
   Panel,
   Select,
   SelectContent,
@@ -26,7 +27,6 @@ import {
   StatementMailPreviewDialog,
   type MailPreviewContent,
 } from '@/features/corpTaxBook/StatementMailPreview';
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useIsBelowDesktop } from '@/lib/useIsBelowDesktop';
 import { editBook } from '../taxBook/bookClient';
 import { editErrorMessage, useBook } from './useBook';
@@ -82,6 +82,12 @@ export function StatementRun() {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const inline = !useIsBelowDesktop();
+  // A dialog left open on a phone must not pop back after a trip through the desktop layout.
+  const [wasInline, setWasInline] = useState(inline);
+  if (wasInline !== inline) {
+    setWasInline(inline);
+    if (inline) setPreviewOpen(false);
+  }
   const previewLabelId = useId();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -442,14 +448,14 @@ export function StatementRun() {
                 aria-label={t('corpTaxBook.moons.run.mailPreview')}
                 className="min-w-0 space-y-3 rounded-xs border border-line p-3"
               >
-                <h3 className={eyebrowClassName}>{t('corpTaxBook.moons.run.mailPreview')}</h3>
+                <Eyebrow as="h3">{t('corpTaxBook.moons.run.mailPreview')}</Eyebrow>
                 {minerPicker}
                 {mail ? (
                   <div className="max-h-[36rem] overflow-y-auto">
                     <StatementMailPreview {...mail} />
                   </div>
                 ) : (
-                  <p role="status" className="text-sm text-text-dim">
+                  <p className="text-sm text-text-dim">
                     {t('corpTaxBook.moons.run.loadingCorporation')}
                   </p>
                 )}

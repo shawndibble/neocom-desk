@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { MoonsChoices } from './MoonsChoices';
 
-/** @summary The Moons page of a corporation with no book: three choices side by side (own book, accounting corporation, collect for others). */
+/** @summary The Moons page of a corporation with no book: running its own book leads, the accounting-corporation and collect-for-others choices beneath it. */
 const meta = {
   title: 'corp/MoonsSetup',
   component: MoonsChoices,

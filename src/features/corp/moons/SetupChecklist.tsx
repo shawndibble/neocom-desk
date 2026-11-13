@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, Panel, ProgressBar, Toast } from '@/components/ui';
@@ -71,6 +71,11 @@ export function SetupChecklist() {
       )}
     </>
   );
+  // Done once is done for good: a schedule that stops later is the health strip's to say.
+  useEffect(() => {
+    if (canEdit && list.complete) writeLocal(dismissedKey(corporationId), 'done');
+  }, [canEdit, list.complete, corporationId]);
+
   if (!canEdit || dismissed || list.complete) return dialogs;
 
   const dismiss = () => {
