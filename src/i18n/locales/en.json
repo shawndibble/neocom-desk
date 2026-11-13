@@ -721,6 +721,8 @@
         "canFly": "Can fly",
         "missing_one": "Missing {{count}} skill",
         "missing_other": "Missing {{count}} skills",
+        "missingNamed_one": "Missing {{count}} skill: {{skills}}",
+        "missingNamed_other": "Missing {{count}} skills: {{skills}}",
         "unknown": "Skills unknown"
       },
       "loading": "Loading popular fits from zKillboard…",
