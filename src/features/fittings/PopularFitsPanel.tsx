@@ -3,6 +3,7 @@ import { InlineError } from '@/components/ui/InlineError';
 import { Trans, useTranslation } from 'react-i18next';
 import { IskAmount, Spinner, TabPanel, Tabs, useTabsId } from '@/components/ui';
 import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
+import type { FitSkillVerdict } from '@/engine/fittings/fitSkillVerdict';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { popularFitLoad } from '@/engine/fittings/popularFits';
 import { fittingRequirementTypeIds } from '@/engine/fittings/skillGaps';
@@ -138,6 +139,7 @@ function ZkillboardFits({
               <PopularFitRow
                 title={t('fittings.popular.losses', { count: fit.count })}
                 verdict={<PopularFitVerdict verdict={verdicts?.get(fit.key)} />}
+                unusable={unusableOf(verdicts?.get(fit.key))}
                 meta={
                   <>
                     {fit.lastSeen !== null &&
@@ -174,6 +176,10 @@ function ZkillboardFits({
     </>
   );
 }
+
+/** The types a row's verdict says the pilot can't use; none without a gap. */
+const unusableOf = (verdict: FitSkillVerdict | undefined) =>
+  verdict?.kind === 'missing' ? verdict.unusableTypeIds : undefined;
 
 /**
  * A Workbench row's height before it is measured: name, date and price,
@@ -230,6 +236,7 @@ function WorkbenchFits({
             <PopularFitRow
               title={fit.name || t('fittings.popular.workbench.unnamed')}
               verdict={<PopularFitVerdict verdict={verdicts?.get(fit.id)} />}
+              unusable={unusableOf(verdicts?.get(fit.id))}
               meta={
                 <>
                   {` · ${t('fittings.popular.workbench.created', {

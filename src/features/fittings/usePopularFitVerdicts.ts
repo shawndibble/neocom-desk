@@ -29,8 +29,8 @@ export interface FitVerdictSources {
   requirements: (
     typeIds: readonly number[]
   ) => Promise<ReadonlyMap<number, readonly RequiredSkill[]>>;
-  /** Skills by type id, for the Alpha cap. */
-  skills: () => Promise<ReadonlyMap<number, Pick<EngineSkill, 'alphaMaxLevel'>>>;
+  /** Skills by type id, for names and the Alpha cap. */
+  skills: () => Promise<ReadonlyMap<number, Pick<EngineSkill, 'alphaMaxLevel' | 'name'>>>;
 }
 
 export const fitVerdictSources: FitVerdictSources = {

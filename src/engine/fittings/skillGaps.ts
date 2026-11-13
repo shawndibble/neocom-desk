@@ -100,17 +100,33 @@ export function missingSkillEntries(
   return [...highest].map(([skillTypeID, targetLevel]) => ({ skillTypeID, targetLevel }));
 }
 
+/** The `typeIds` the pilot lacks a required skill level for: the "Can't use" rule. */
+export function unusableTypeIds(
+  typeIds: Iterable<number>,
+  requirementsByType: ReadonlyMap<number, readonly RequiredSkill[]>,
+  skillLevels: ReadonlyMap<number, number>
+): Set<number> {
+  const lacksSkill = lacksSkillAt(skillLevels);
+  const unusable = new Set<number>();
+  for (const typeId of typeIds) {
+    if ((requirementsByType.get(typeId) ?? []).some(lacksSkill)) unusable.add(typeId);
+  }
+  return unusable;
+}
+
 export function computeSkillGaps(
   fitting: Fitting,
   requirementsByType: ReadonlyMap<number, readonly RequiredSkill[]>,
   skillLevels: ReadonlyMap<number, number>
 ): SkillGaps {
-  const lacksSkill = lacksSkillAt(skillLevels);
-  const unusable = new Set<string>();
-  for (const module of fitting.modules) {
-    if ((requirementsByType.get(module.typeId) ?? []).some(lacksSkill))
-      unusable.add(moduleKey(module));
-  }
+  const unusableTypes = unusableTypeIds(
+    fitting.modules.map((module) => module.typeId),
+    requirementsByType,
+    skillLevels
+  );
+  const unusable = new Set(
+    fitting.modules.filter((module) => unusableTypes.has(module.typeId)).map(moduleKey)
+  );
   const missing = missingSkillEntries(
     fittingRequirementTypeIds(fitting),
     requirementsByType,

@@ -73,9 +73,9 @@ function sources(overrides: Partial<PopularFitsSources> = {}): PopularFitsSource
     skills: () =>
       Promise.resolve(
         new Map([
-          [CRUISERS, { alphaMaxLevel: 4 }],
-          [GUNNERY, { alphaMaxLevel: 4 }],
-          [DRONES, { alphaMaxLevel: 4 }],
+          [CRUISERS, { alphaMaxLevel: 4, name: 'Gallente Cruiser' }],
+          [GUNNERY, { alphaMaxLevel: 4, name: 'Gunnery' }],
+          [DRONES, { alphaMaxLevel: 4, name: 'Drones' }],
         ])
       ),
     ...overrides,
@@ -701,6 +701,27 @@ describe('Popular fits can-fly verdicts', () => {
     expect((await within(row).findByTestId('popular-fit-verdict')).textContent).toBe(
       'Missing 2 skills · Omega only'
     );
+  });
+
+  it('names the missing skills and tints the modules the pilot cannot use', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    renderWith({ skillLevels: () => Promise.resolve(new Map([[CRUISERS, 1]])) });
+    const row = (await screen.findByText('12 losses')).closest('li')!;
+    expect(
+      await within(row).findByRole('img', { name: 'Missing 2 skills: Drones I, Gunnery V' })
+    ).toBeTruthy();
+    const gun = within(row).getByRole('img', {
+      name: 'Heavy Neutron Blaster II\nCan’t use: missing skills',
+    });
+    expect(gun.hasAttribute('data-cant-use')).toBe(true);
+  });
+
+  it('tints no module the pilot can use', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    renderWith({});
+    const row = (await screen.findByText('12 losses')).closest('li')!;
+    await within(row).findByTestId('popular-fit-verdict');
+    expect(row.querySelector('[data-cant-use]')).toBeNull();
   });
 
   it("shows no verdict when the pilot's skills could not be read", async () => {

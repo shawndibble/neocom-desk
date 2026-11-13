@@ -15,6 +15,8 @@ interface PopularFitRowProps {
   verdict?: ReactNode;
   modules: ComponentProps<typeof RackIconStrip>['modules'];
   names: ComponentProps<typeof RackIconStrip>['names'];
+  /** Module types the active Character can't use yet: their icons are tinted. */
+  unusable?: ComponentProps<typeof RackIconStrip>['unusable'];
   /** Lines under the icons: a sighting, a failure. */
   children?: ReactNode;
   disabled?: boolean;
@@ -24,7 +26,7 @@ interface PopularFitRowProps {
 /**
  * One Popular fit's card body, shared by the zKillboard and EVE Workbench tabs.
  * The whole card opens the fit; the blue title is its keyboard and screen-reader
- * control, and a tap on a module icon shows the module's name instead
+ * control, and a tap on a module icon or the verdict shows its tooltip instead
  * (`isRowOwnEvent`) — but only under a finger; with a mouse the hover has shown
  * it, so a click on an icon opens the card too.
  *
@@ -37,6 +39,7 @@ export function PopularFitRow({
   verdict,
   modules,
   names,
+  unusable,
   children,
   disabled = false,
   onOpen,
@@ -46,8 +49,8 @@ export function PopularFitRow({
     <div
       onClick={(event) => {
         if (disabled) return;
-        // A module icon is a tooltip trigger. With a mouse its name is already on
-        // hover, so a click is the card's; a finger has no hover, so its tap names it.
+        // A module icon or the verdict is a tooltip trigger. With a mouse it has
+        // already shown on hover, so a click is the card's; a finger has no hover.
         const onIcon =
           !coarse &&
           event.target instanceof Element &&
@@ -74,7 +77,7 @@ export function PopularFitRow({
         </p>
         {verdict}
       </div>
-      <RackIconStrip modules={modules} names={names} />
+      <RackIconStrip modules={modules} names={names} unusable={unusable} />
       {children}
     </div>
   );

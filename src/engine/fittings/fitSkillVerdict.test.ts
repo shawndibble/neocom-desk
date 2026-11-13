@@ -24,9 +24,9 @@ function input(overrides: Partial<FitSkillVerdictInput> = {}): FitSkillVerdictIn
       [DRONES, 2],
     ]),
     skills: new Map([
-      [FRIGATE, { alphaMaxLevel: 4 }],
-      [GUNNERY, { alphaMaxLevel: 4 }],
-      [DRONES, { alphaMaxLevel: 4 }],
+      [FRIGATE, { alphaMaxLevel: 4, name: 'Minmatar Frigate' }],
+      [GUNNERY, { alphaMaxLevel: 4, name: 'Gunnery' }],
+      [DRONES, { alphaMaxLevel: 4, name: 'Drones' }],
     ]),
     cloneState: 'omega',
     ...overrides,
@@ -43,7 +43,15 @@ describe('fitSkillVerdict', () => {
       [HULL, GUN, DRONE],
       input({ skillLevels: new Map([[FRIGATE, 1]]) })
     );
-    expect(verdict).toEqual({ kind: 'missing', count: 2, omegaOnly: false });
+    expect(verdict).toEqual({
+      kind: 'missing',
+      skills: [
+        { skillTypeID: DRONES, targetLevel: 2, name: 'Drones' },
+        { skillTypeID: GUNNERY, targetLevel: 5, name: 'Gunnery' },
+      ],
+      unusableTypeIds: new Set([GUN, DRONE]),
+      omegaOnly: false,
+    });
   });
 
   it('is Omega only for an Alpha who needs a skill past the Alpha cap', () => {
@@ -54,11 +62,10 @@ describe('fitSkillVerdict', () => {
     ]);
     expect(
       fitSkillVerdict([HULL, GUN], input({ skillLevels: levels, cloneState: 'alpha' }))
-    ).toEqual({ kind: 'missing', count: 1, omegaOnly: true });
+    ).toMatchObject({ kind: 'missing', omegaOnly: true });
     // An Omega can train it: the gap is only a gap.
-    expect(fitSkillVerdict([HULL, GUN], input({ skillLevels: levels }))).toEqual({
+    expect(fitSkillVerdict([HULL, GUN], input({ skillLevels: levels }))).toMatchObject({
       kind: 'missing',
-      count: 1,
       omegaOnly: false,
     });
   });
@@ -68,7 +75,12 @@ describe('fitSkillVerdict', () => {
       [GUN],
       input({ skillLevels: new Map(), skills: new Map(), cloneState: 'alpha' })
     );
-    expect(verdict).toEqual({ kind: 'missing', count: 1, omegaOnly: false });
+    expect(verdict).toEqual({
+      kind: 'missing',
+      skills: [{ skillTypeID: GUNNERY, targetLevel: 5, name: undefined }],
+      unusableTypeIds: new Set([GUN]),
+      omegaOnly: false,
+    });
   });
 
   it('is unknown, never can fly, when a type it carries could not be read', () => {
@@ -77,6 +89,6 @@ describe('fitSkillVerdict', () => {
 
   it('a confirmed gap wins over an unreadable type', () => {
     const verdict = fitSkillVerdict([GUN, 9999], input({ skillLevels: new Map() }));
-    expect(verdict).toEqual({ kind: 'missing', count: 1, omegaOnly: false });
+    expect(verdict).toMatchObject({ kind: 'missing', omegaOnly: false });
   });
 });
