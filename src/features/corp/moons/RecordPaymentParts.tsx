@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Radio, SearchInput } from '@/components/ui';
 import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import type { PaymentOutcome } from '@/engine/corpTaxBook/paymentPreview';
+import { netOf, type PaymentOutcome } from '@/engine/corpTaxBook/paymentPreview';
 import type { Statement } from '@/engine/corpTaxBook/statements';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import { cx } from '@/lib/cx';
@@ -36,7 +36,6 @@ export function PaymentOutcomePanel({
   return (
     <section
       aria-label={t(`${k}.outcomeTitle`)}
-      aria-live="polite"
       className="space-y-1.5 rounded-xs border border-line bg-panel-2 p-2 text-xs tabular-nums"
     >
       <h3 className={eyebrowClassName}>{t(`${k}.outcomeTitle`)}</h3>
@@ -64,6 +63,7 @@ export function PaymentOutcomePanel({
             </ul>
           )}
           <p
+            aria-live="polite"
             className={cx('font-medium', outcome.lines.length > 0 && 'border-t border-line pt-1.5')}
           >
             {outcome.owedAfter > 0
@@ -100,7 +100,8 @@ export function DonationPicker({
     ? donations.filter(
         (d) =>
           nameOf(d.characterId).toLowerCase().includes(needle) ||
-          (digits !== '' && String(Math.round(d.amount)).includes(digits)) ||
+          (digits !== '' && String(Math.round(netOf(d))).includes(digits)) ||
+          // The chosen donation stays listed, so a search never hides what Assign will send.
           d.id === value
       )
     : donations;
@@ -139,7 +140,7 @@ export function DonationPicker({
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="tabular-nums">
                     {t(`${k}.donationRow`, {
-                      amount: isk(d.amount),
+                      amount: isk(netOf(d)),
                       name: nameOf(d.characterId),
                     })}
                   </span>
@@ -151,10 +152,8 @@ export function DonationPicker({
             </li>
           );
         })}
-        {shown.length === 0 && (
-          <li className="px-2 py-1.5 text-xs text-text-dim">{t(`${k}.noDonationMatch`)}</li>
-        )}
       </ul>
+      {shown.length === 0 && <p className="text-xs text-text-dim">{t(`${k}.noDonationMatch`)}</p>}
     </div>
   );
 }

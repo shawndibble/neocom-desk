@@ -2,8 +2,10 @@
  * What one more Tax Payment would do to a Miner, before it is recorded: which
  * Statements it clears or part-pays, what is still owed after, and the credit
  * held when it pays more than is owed. It runs the book's own allocation
- * (`allocatePayments`) with and without the payment and reads the difference,
- * so the preview can never disagree with what the book shows afterwards.
+ * (`allocatePayments`) with and without the payment, so the preview can never
+ * disagree with what the book shows afterwards. The lines are the payment's own
+ * credits: a backdated payment that moves an older one onto a later Statement
+ * lists only where its own ISK went.
  */
 import {
   allocatePayments,
@@ -27,10 +29,14 @@ export interface PaymentOutcome {
   lines: PaymentOutcomeLine[];
   owedBefore: number;
   owedAfter: number;
-  creditBefore: number;
   creditAfter: number;
   /** Credit this payment adds (the overpayment). */
   creditAdded: number;
+}
+
+/** What a payment can credit: its amount less any part an officer marked not tax. */
+export function netOf(p: { amount: number; notTaxAmount?: number }): number {
+  return p.amount - Math.min(p.notTaxAmount ?? 0, p.amount);
 }
 
 function owedOf(allocation: Allocation): number {
@@ -49,11 +55,11 @@ export function previewPayment(input: AllocationInput, payment: TaxPayment): Pay
   if (pinned > 0) ordered.unshift(...ordered.splice(pinned, 1));
   const lines: PaymentOutcomeLine[] = [];
   for (const s of ordered) {
-    const was = before.byStatement.get(s.id);
     const now = after.byStatement.get(s.id);
-    if (!was || !now) continue;
-    const applied = now.credited - was.credited;
-    if (applied <= 0) continue;
+    const applied = after.paymentCredits
+      .filter((c) => c.paymentId === payment.id && c.statementId === s.id)
+      .reduce((sum, c) => sum + c.amount, 0);
+    if (!now || applied <= 0) continue;
     lines.push({
       statementId: s.id,
       applied,
@@ -65,7 +71,6 @@ export function previewPayment(input: AllocationInput, payment: TaxPayment): Pay
     lines,
     owedBefore: owedOf(before),
     owedAfter: owedOf(after),
-    creditBefore: before.credit,
     creditAfter: after.credit,
     creditAdded: Math.max(0, after.credit - before.credit),
   };

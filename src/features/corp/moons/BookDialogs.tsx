@@ -21,7 +21,7 @@ import {
   TextInput,
 } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
-import { previewMinerPayment } from '@/engine/corpTaxBook/paymentPreview';
+import { netOf, previewMinerPayment } from '@/engine/corpTaxBook/paymentPreview';
 import { utcDay } from '@/engine/localDay';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { callableErrorText } from './feederErrorText';
@@ -209,9 +209,7 @@ export function RecordPaymentDialog({
   const donations = useMemo(
     () =>
       view.needsYou.flatMap((n) =>
-        n.kind === 'unmatched' && (n.payment.notTaxAmount ?? 0) < n.payment.amount
-          ? [n.payment]
-          : []
+        n.kind === 'unmatched' && netOf(n.payment) > 0 ? [n.payment] : []
       ),
     [view.needsYou]
   );
@@ -253,7 +251,7 @@ export function RecordPaymentDialog({
       title={t(`${k}.title`, { name: minerName })}
       confirmLabel={
         mode === 'donation'
-          ? t(`${k}.confirmMatch`, { amount: isk(donation?.amount ?? 0) })
+          ? t(`${k}.confirmMatch`, { amount: isk(donation ? netOf(donation) : 0) })
           : t(`${k}.confirm`, { amount: isk(value || 0) })
       }
       canConfirm={mode === 'donation' ? donation !== undefined : value > 0 && dateError === null}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AllocationInput, TaxPayment } from './allocation';
-import { previewPayment } from './paymentPreview';
+import { netOf, previewPayment } from './paymentPreview';
 import type { Statement } from './statements';
 
 function statement(id: string, amount: number, issuedAt: string): Statement {
@@ -93,6 +93,19 @@ describe('previewPayment', () => {
     expect(out.owedAfter).toBe(14_000_000);
   });
 
+  it("lists only where a backdated payment's own ISK goes", () => {
+    // The new payment, dated first, takes June; the older 10M moves on to July and part of August.
+    const out = previewPayment(
+      book({ payments: [payment('old', 10_000_000, '2026-09-01T00:00:00Z')] }),
+      payment('new', 10_000_000, '2026-07-02T00:00:00Z')
+    );
+    expect(out.lines).toEqual([
+      { statementId: 's1', applied: 10_000_000, remainingAfter: 0, settled: true },
+    ]);
+    expect(out.owedBefore).toBe(14_000_000);
+    expect(out.owedAfter).toBe(4_000_000);
+  });
+
   it('takes nothing for an amount of zero', () => {
     const out = previewPayment(book(), payment('new', 0, '2026-09-05T00:00:00Z'));
     expect(out.lines).toEqual([]);
@@ -106,5 +119,13 @@ describe('previewPayment', () => {
     );
     expect(out.lines).toEqual([]);
     expect(out.creditAdded).toBe(5_000_000);
+  });
+});
+
+describe('netOf', () => {
+  it('takes off the part marked not tax, never below zero', () => {
+    expect(netOf({ amount: 10 })).toBe(10);
+    expect(netOf({ amount: 10, notTaxAmount: 4 })).toBe(6);
+    expect(netOf({ amount: 10, notTaxAmount: 40 })).toBe(0);
   });
 });
