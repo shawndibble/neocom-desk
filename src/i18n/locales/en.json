@@ -13360,7 +13360,7 @@
       "buyWalkHint": "Avg {{avg}} ISK a unit. The top bid, {{topBid}} ISK, takes {{takes}} of {{units}}; the rest sells into lower buy orders that reach this hub.",
       "buyWalkUnsoldHint": "Avg {{avg}} ISK a unit. The top bid, {{topBid}} ISK, takes {{takes}} of {{units}}. {{unsold}} units find no buy order that reaches this hub and are not in the total.",
       "refinePartialHint": "At least one material has no price on this basis, so this total is a floor rather than the full value.",
-      "pricesFromYesterday": "The live price source is down, so these are yesterday's closing prices.",
+      "pricesFromSnapshot": "The live price source is down, so these prices come from an earlier snapshot and may be out of date.",
       "refineUnpriced_one": "{{count}} refine value has an unpriced material, so it is a floor rather than the full total.",
       "refineUnpriced_other": "{{count}} refine values have an unpriced material, so they are floors rather than the full total.",
       "lpTotalCell": "{{isk}} + {{lp}} LP ({{corp}})",

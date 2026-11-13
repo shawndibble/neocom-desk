@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   fetchOrderCounts: vi.fn(),
   getMarketOrders: vi.fn(),
   loadStoredOpenPrices: vi.fn(),
+  loadHaulingBooks: vi.fn(),
   lookupNpcStation: vi.fn(),
   lookupSolarSystem: vi.fn(),
 }));
@@ -18,12 +19,16 @@ vi.mock('@/esi/endpoints', () => ({ getMarketOrders: mocks.getMarketOrders }));
 vi.mock('@/features/market/marketOpenPrices', () => ({
   loadStoredOpenPrices: mocks.loadStoredOpenPrices,
 }));
+vi.mock('@/features/market/haulingBooks', () => ({
+  loadHaulingBooks: mocks.loadHaulingBooks,
+}));
 vi.mock('@/sde/npcStations', () => ({ lookupNpcStation: mocks.lookupNpcStation }));
 vi.mock('@/sde/solarSystems', () => ({ lookupSolarSystem: mocks.lookupSolarSystem }));
 
 import {
   ESI_FALLBACK_MAX_TYPES,
   FUZZWORK_BACKOFF_MS,
+  R2_FALLBACK_MAX_TYPES,
   fetchAggregatesWithFallback,
   fetchOrderCountsWithFallback,
   resetPriceFallback,
@@ -133,6 +138,43 @@ describe('fetchAggregatesWithFallback', () => {
     });
     const now = () => Date.parse('2026-10-21T12:00:00Z');
     await expect(fetchAggregatesWithFallback(JITA, [34], 'station', now)).rejects.toThrow();
+  });
+
+  it('prices a hub batch past every per-type cap from one read of its order books, flagged stale', async () => {
+    mocks.fetchAggregates.mockRejectedValue(new Error('503'));
+    const ids = Array.from({ length: 2000 }, (_, i) => i + 1);
+    mocks.loadHaulingBooks.mockResolvedValue({
+      asOf: 0,
+      lastSyncedAt: 0,
+      types: new Map([
+        [
+          1,
+          {
+            sell: [
+              { price: 4, units: 10, orders: 1 },
+              { price: 5, units: 2, orders: 1 },
+            ],
+            buy: [{ price: 3, units: 7, orders: 2 }],
+          },
+        ],
+      ]),
+    });
+    const out = await fetchAggregatesWithFallback(JITA, ids);
+    expect(mocks.loadHaulingBooks).toHaveBeenCalledTimes(1);
+    expect(mocks.loadHaulingBooks).toHaveBeenCalledWith(JITA);
+    expect(mocks.loadStoredOpenPrices).not.toHaveBeenCalled();
+    expect(mocks.getMarketOrders).not.toHaveBeenCalled();
+    expect(out.prices.get(1)).toEqual({ sellMin: 4, buyMax: 3, sellVolume: 12, buyVolume: 7 });
+    expect(out.prices.get(2)).toEqual(none);
+    expect(out.stale.size).toBe(ids.length);
+  });
+
+  it('reads no per-type R2 close past its cap when the books are unavailable', async () => {
+    mocks.fetchAggregates.mockRejectedValue(new Error('503'));
+    mocks.loadHaulingBooks.mockResolvedValue(null);
+    const ids = Array.from({ length: R2_FALLBACK_MAX_TYPES + 1 }, (_, i) => i + 1);
+    await expect(fetchAggregatesWithFallback(JITA, ids)).rejects.toThrow();
+    expect(mocks.loadStoredOpenPrices).not.toHaveBeenCalled();
   });
 
   it('skips ESI past the type cap and goes to R2', async () => {
