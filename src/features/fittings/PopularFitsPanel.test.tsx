@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import type { EngineSkill, TrainedSkill } from '@/engine/types';
 import { gameItemLookup } from '@/engine/fittings/fitCurrency';
 import { loadText } from '@/engine/fittings/load';
 import type { PopularFit } from '@/engine/fittings/popularFits';
@@ -11,6 +15,39 @@ import type { PopularFitsResult } from './popularFits';
 import { PopularFitsPanel, type PopularFitsSources } from './PopularFitsPanel';
 import type { WorkbenchFit, WorkbenchFitsResult } from './workbenchFits';
 import { resetWorkbenchCheckCache } from './workbenchHullRows';
+
+/**
+ * The skill schedule behind a missing verdict's training time and its inline
+ * list: none by default (no times, "Missing N skills"); a test that needs the
+ * times sets `planData.catalog`.
+ */
+const planData = vi.hoisted(() => ({
+  catalog: null as { engineSkills: ReadonlyMap<number, EngineSkill> } | null,
+  trained: new Map() as ReadonlyMap<number, TrainedSkill>,
+}));
+vi.mock('@/features/skills/planner/usePlanEditorData', () => {
+  const attributes = { intelligence: 20, memory: 20, perception: 20, willpower: 20, charisma: 19 };
+  const implants = {};
+  return {
+    usePlanEditorData: () => ({
+      catalog: planData.catalog,
+      trainedSkills: planData.trained,
+      trainedSkillsKnown: true,
+      attributes,
+      implants,
+    }),
+  };
+});
+vi.mock('@/features/skills/useTargetPlan', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTargetPlan: () => ({
+    plans: [],
+    targetPlanId: null,
+    setTargetPlanId: vi.fn(),
+    addEntries: vi.fn(),
+    removeEntries: vi.fn(),
+  }),
+}));
 
 /** The loader's catalogue: a Vexor and one gun — less than the game has. */
 const TYPE_BY_NAME = new Map([
@@ -45,6 +82,24 @@ const ALL_TRAINED = new Map([
   [DRONES, 1],
 ]);
 
+const engineSkill = (typeID: number, name: string): EngineSkill => ({
+  typeID,
+  name,
+  rank: 1,
+  primary: 'perception',
+  secondary: 'willpower',
+  prereqs: [],
+  alphaMaxLevel: 4,
+});
+/** The skill catalog the training times and the inline missing-skills list read. */
+const SKILL_CATALOG = {
+  engineSkills: new Map([
+    [CRUISERS, engineSkill(CRUISERS, 'Gallente Cruiser')],
+    [GUNNERY, engineSkill(GUNNERY, 'Gunnery')],
+    [DRONES, engineSkill(DRONES, 'Drones')],
+  ]),
+};
+
 /** Fake sources: one Vexor with a single high slot, and real EFT through the real text Load. */
 function sources(overrides: Partial<PopularFitsSources> = {}): PopularFitsSources {
   return {
@@ -73,9 +128,9 @@ function sources(overrides: Partial<PopularFitsSources> = {}): PopularFitsSource
     skills: () =>
       Promise.resolve(
         new Map([
-          [CRUISERS, { alphaMaxLevel: 4 }],
-          [GUNNERY, { alphaMaxLevel: 4 }],
-          [DRONES, { alphaMaxLevel: 4 }],
+          [CRUISERS, { alphaMaxLevel: 4, name: 'Gallente Cruiser' }],
+          [GUNNERY, { alphaMaxLevel: 4, name: 'Gunnery' }],
+          [DRONES, { alphaMaxLevel: 4, name: 'Drones' }],
         ])
       ),
     ...overrides,
@@ -113,6 +168,9 @@ function renderPanel(result: PopularFitsResult | null, onOpen = vi.fn()) {
   );
   return onOpen;
 }
+
+/** A row's card, the clickable body: the list's `li` holds the row box, which holds the card. */
+const cardOf = (row: HTMLElement) => row.firstElementChild!.firstElementChild!;
 
 /** A price figure is `IskAmount` inside a sentence: the figure, its hidden exact value, then the unit. */
 const priceBeside = (
@@ -152,7 +210,7 @@ describe('PopularFitsPanel', () => {
     const row = (await screen.findByText('5 losses')).closest('li')!;
     fireEvent.click(within(row).getAllByRole('img')[0]);
     expect(onOpen).toHaveBeenCalledTimes(1);
-    fireEvent.click(row.firstElementChild!);
+    fireEvent.click(cardOf(row));
     expect(onOpen).toHaveBeenCalledTimes(2);
   });
 
@@ -165,7 +223,7 @@ describe('PopularFitsPanel', () => {
       const row = (await screen.findByText('5 losses')).closest('li')!;
       fireEvent.click(within(row).getAllByRole('img')[0]);
       expect(onOpen).not.toHaveBeenCalled();
-      fireEvent.click(row.firstElementChild!);
+      fireEvent.click(cardOf(row));
       expect(onOpen).toHaveBeenCalledTimes(1);
     } finally {
       window.matchMedia = matchMedia;
@@ -207,6 +265,9 @@ describe('PopularFitsPanel', () => {
       })
     ).toBeTruthy();
     expect(screen.queryByRole('group', { name: 'Rigs' })).toBeNull();
+    // Each rack leads with its initial, hidden from screen readers (the group names it).
+    const initial = highs.querySelector('[aria-hidden]:not(.absolute)')!;
+    expect(initial.textContent).toBe('H');
   });
 
   it('says so, without blocking anything, when zKillboard fails', async () => {
@@ -227,7 +288,7 @@ describe('PopularFitsPanel', () => {
   });
 });
 
-describe('PopularFitsPanel EVE Workbench tab', () => {
+describe('PopularFitsPanel EVE Workbench guides', () => {
   const getHubPricesMock = vi.fn<PopularFitsSources['hubPrices']>();
   const workbenchFitsMock = vi.fn<PopularFitsSources['workbenchFits']>();
 
@@ -250,7 +311,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     };
   }
 
-  /** The Workbench tab's sources, its stored list answering `result` (`null`: never). */
+  /** The panel's sources, the Workbench stored list answering `result` (`null`: never). */
   function workbenchSources(
     result: WorkbenchFitsResult | null,
     overrides: Partial<PopularFitsSources> = {}
@@ -274,21 +335,76 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
         sources={workbenchSources(result, overrides)}
       />
     );
-    fireEvent.click(screen.getByRole('tab', { name: 'EVE Workbench' }));
     return onOpen;
   }
 
-  it('starts on zKillboard and only reads Workbench once its tab is picked', () => {
-    render(
-      <PopularFitsPanel
-        shipTypeId={626}
-        hullName="Vexor"
-        onOpen={vi.fn()}
-        sources={workbenchSources({ ok: true, fits: [] })}
-      />
-    );
-    expect(screen.getByRole('tab', { name: 'zKillboard', selected: true })).toBeTruthy();
-    expect(workbenchFitsMock).not.toHaveBeenCalled();
+  it('loads both sources at once into one list, and the source filter narrows it', async () => {
+    openWorkbench({ ok: true, fits: [wbFit('a')] }, vi.fn(), {
+      popularFits: () => Promise.resolve({ ok: true, fits: [fit('x', 5), fit('y', 1)] }),
+    });
+    expect(workbenchFitsMock).toHaveBeenCalledWith(626);
+    const list = await screen.findByRole('list', { name: 'Popular fits' });
+    await within(list).findByText('Fit a');
+    expect(within(list).getByText('5 losses')).toBeTruthy();
+    expect(within(list).getByText('1 loss')).toBeTruthy();
+    // Each row says where it came from.
+    expect(within(rowOf('Fit a')).getByText('Guide')).toBeTruthy();
+    expect(within(rowOf('5 losses')).getByText('Loss')).toBeTruthy();
+
+    const source = screen.getByRole('group', { name: 'Fit source' });
+    const all = within(source).getByRole('button', { name: 'All 3' });
+    expect(all.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(within(source).getByRole('button', { name: 'Guides 1' }));
+    expect(screen.getByText('Fit a')).toBeTruthy();
+    expect(screen.queryByText('5 losses')).toBeNull();
+    fireEvent.click(within(source).getByRole('button', { name: 'Seen in losses 2' }));
+    expect(screen.getByText('5 losses')).toBeTruthy();
+    expect(screen.getByText('1 loss')).toBeTruthy();
+    expect(screen.queryByText('Fit a')).toBeNull();
+  });
+
+  it("shows each source's status line only while the filter includes it", async () => {
+    openWorkbench({ ok: true, fits: [] });
+    expect(await screen.findByText('No recent losses of this hull with a full fit.')).toBeTruthy();
+    expect(
+      await screen.findByText('Nobody has published a fit for this hull on EVE Workbench yet.')
+    ).toBeTruthy();
+    const source = screen.getByRole('group', { name: 'Fit source' });
+    fireEvent.click(within(source).getByRole('button', { name: 'Guides 0' }));
+    expect(screen.queryByText('No recent losses of this hull with a full fit.')).toBeNull();
+    expect(
+      screen.getByText('Nobody has published a fit for this hull on EVE Workbench yet.')
+    ).toBeTruthy();
+    fireEvent.click(within(source).getByRole('button', { name: 'Seen in losses 0' }));
+    expect(screen.getByText('No recent losses of this hull with a full fit.')).toBeTruthy();
+    expect(
+      screen.queryByText('Nobody has published a fit for this hull on EVE Workbench yet.')
+    ).toBeNull();
+  });
+
+  it('lists the newest first across both sources, and Most seen by losses', async () => {
+    const day = 86_400_000;
+    openWorkbench({ ok: true, fits: [wbFit('a', { dateAdded: Date.now() - 2 * day })] }, vi.fn(), {
+      popularFits: () =>
+        Promise.resolve({
+          ok: true,
+          fits: [
+            fit('many', 9, { lastSeen: new Date(Date.now() - 5 * day).toISOString() }),
+            fit('few', 2, { lastSeen: new Date(Date.now() - day).toISOString() }),
+          ],
+        }),
+    });
+    const list = await screen.findByRole('list', { name: 'Popular fits' });
+    await within(list).findByText('Fit a');
+    const titles = () =>
+      within(list)
+        .getAllByRole('listitem')
+        .map((item) => within(item).getAllByRole('button')[0].textContent);
+    expect(titles()).toEqual(['2 losses', 'Fit a', '9 losses']);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('combobox', { name: 'Sort' }));
+    await user.click(screen.getByRole('option', { name: 'Most seen' }));
+    expect(titles()).toEqual(['9 losses', '2 losses', 'Fit a']);
   });
 
   it('lists fits with name and date created, no author, each name a Load button', async () => {
@@ -336,9 +452,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     ).toBeTruthy();
     cleanup();
     openWorkbench({ ok: false });
-    expect((await screen.findByRole('status')).textContent).toMatch(
-      /Couldn't reach the EVE Workbench fit list/
-    );
+    expect(await screen.findByText(/Couldn't reach the EVE Workbench fit list/)).toBeTruthy();
   });
 
   it('lists only current fits, never an out-of-date one', async () => {
@@ -589,7 +703,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
       const first = rowOf('Fit 1');
       expect(first.getAttribute('aria-posinset')).toBe('1');
       expect(first.getAttribute('aria-setsize')).toBe('80');
-      expect(first.parentElement).toBe(screen.getByRole('list', { name: 'EVE Workbench' }));
+      expect(first.parentElement).toBe(screen.getByRole('list', { name: 'Popular fits' }));
       expect(screen.queryByText('Fit 80')).toBeNull();
     });
 
@@ -618,7 +732,6 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
           />
         </div>
       );
-      fireEvent.click(screen.getByRole('tab', { name: 'EVE Workbench' }));
       await screen.findByText('Fit 1');
       // The list draws no scroll box of its own.
       expect(document.querySelectorAll('[data-virtual-scroll-root]')).toHaveLength(1);
@@ -641,7 +754,6 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
           sources={workbenchSources({ ok: true, fits: MANY })}
         />
       );
-      fireEvent.click(screen.getByRole('tab', { name: 'EVE Workbench' }));
       await screen.findByText(/^Fit 80/);
       expect(loadButtons()).toHaveLength(80);
     });
@@ -656,28 +768,40 @@ describe('Popular fits can-fly verdicts', () => {
   afterEach(() => {
     useActiveCharacter.setState({ activeCharacterId: null });
     useCloneStates.setState({ value: {} });
+    planData.catalog = null;
+    planData.trained = new Map();
   });
 
-  const renderWith = (overrides: Partial<PopularFitsSources>) =>
-    render(
+  /** In a router: the inline missing-skills list links each skill. */
+  const renderInRouter = (ui: ReactElement) => render(<MemoryRouter>{ui}</MemoryRouter>);
+
+  const renderWith = (overrides: Partial<PopularFitsSources>, onOpen = vi.fn()) => {
+    renderInRouter(
       <PopularFitsPanel
         shipTypeId={626}
         hullName="Vexor"
-        onOpen={vi.fn()}
+        onOpen={onOpen}
         sources={sources({
           popularFits: () => Promise.resolve({ ok: true, fits: [fit('a', 12)] }),
           ...overrides,
         })}
       />
     );
+    return onOpen;
+  };
 
   it('says where the fits come from', () => {
     renderWith({});
-    expect(
-      screen.getByText(
-        'Fits other pilots actually fly: from recent kills (zKillboard) and published guides (EVE Workbench).'
-      )
-    ).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Start from a proven fit' })).toBeTruthy();
+    expect(screen.getByText('Click a fit to open it in the editor.')).toBeTruthy();
+    // The sources are named in the heading's info tooltip.
+    expect(screen.getByRole('button', { name: 'Where these fits come from' })).toBeTruthy();
+  });
+
+  it('offers Can fly now only with a Character', async () => {
+    renderWith({});
+    await screen.findByText('12 losses');
+    expect(screen.queryByRole('checkbox', { name: /Can fly now/ })).toBeNull();
   });
 
   it('shows no verdict with no Character', async () => {
@@ -701,6 +825,27 @@ describe('Popular fits can-fly verdicts', () => {
     expect((await within(row).findByTestId('popular-fit-verdict')).textContent).toBe(
       'Missing 2 skills · Omega only'
     );
+  });
+
+  it('counts the missing skills and tints the modules the pilot cannot use', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    renderWith({ skillLevels: () => Promise.resolve(new Map([[CRUISERS, 1]])) });
+    const row = (await screen.findByText('12 losses')).closest('li')!;
+    expect((await within(row).findByTestId('popular-fit-verdict')).textContent).toBe(
+      'Missing 2 skills'
+    );
+    const gun = within(row).getByRole('img', {
+      name: 'Heavy Neutron Blaster II\nCan’t use: missing skills',
+    });
+    expect(gun.hasAttribute('data-cant-use')).toBe(true);
+  });
+
+  it('tints no module the pilot can use', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    renderWith({});
+    const row = (await screen.findByText('12 losses')).closest('li')!;
+    await within(row).findByTestId('popular-fit-verdict');
+    expect(row.querySelector('[data-cant-use]')).toBeNull();
   });
 
   it("shows no verdict when the pilot's skills could not be read", async () => {
@@ -736,10 +881,109 @@ describe('Popular fits can-fly verdicts', () => {
       workbenchFits: () => Promise.resolve({ ok: true, fits: [workbenchFit] }),
       skillLevels: () => Promise.resolve(new Map([[CRUISERS, 1]])),
     });
-    fireEvent.click(screen.getByRole('tab', { name: 'EVE Workbench' }));
-    await screen.findByText('Rail Vexor');
-    await waitFor(() =>
-      expect(screen.getByTestId('popular-fit-verdict').textContent).toBe('Missing 1 skill')
+    const row = (await screen.findByText('Rail Vexor')).closest('li')!;
+    expect((await within(row).findByTestId('popular-fit-verdict')).textContent).toBe(
+      'Missing 1 skill'
     );
+  });
+
+  it('opens the missing skills under the row from the verdict, without opening the fit', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    planData.catalog = SKILL_CATALOG;
+    planData.trained = new Map([[CRUISERS, { level: 1, sp: 250 }]]);
+    const onOpen = renderWith({ skillLevels: () => Promise.resolve(new Map([[CRUISERS, 1]])) });
+    const row = (await screen.findByText('12 losses')).closest('li')!;
+    // With the skill schedule read, the verdict tells the training time.
+    const verdict = await within(row).findByRole('button', { name: /^2 skills · / });
+    expect(verdict.getAttribute('aria-expanded')).toBe('false');
+    expect(within(row).queryByRole('link', { name: 'Gunnery' })).toBeNull();
+
+    fireEvent.click(verdict);
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(verdict.getAttribute('aria-expanded')).toBe('true');
+    expect(within(row).getByRole('link', { name: 'Gunnery' })).toBeTruthy();
+    expect(within(row).getByRole('link', { name: 'Drones' })).toBeTruthy();
+
+    fireEvent.click(verdict);
+    expect(verdict.getAttribute('aria-expanded')).toBe('false');
+    expect(within(row).queryByRole('link', { name: 'Gunnery' })).toBeNull();
+  });
+
+  describe('Can fly now', () => {
+    /** Fit a needs Gunnery V; fit b (a charge-only module and the drones) needs nothing missing. */
+    const FITS: PopularFitsResult = {
+      ok: true,
+      fits: [
+        fit('a', 12),
+        fit('b', 3, {
+          parts: {
+            hullTypeId: 626,
+            modules: [{ slot: 'high', slotIndex: 0, typeId: 900, state: 'active' }],
+            drones: [{ typeId: 500, quantity: 5, state: 'online' }],
+            cargo: [],
+            unresolved: [],
+          },
+        }),
+      ],
+    };
+
+    it('keeps only the fits the Character can fly, with the count', async () => {
+      useActiveCharacter.setState({ activeCharacterId: 7 });
+      renderWith({
+        popularFits: () => Promise.resolve(FITS),
+        skillLevels: () =>
+          Promise.resolve(
+            new Map([
+              [CRUISERS, 1],
+              [DRONES, 1],
+            ])
+          ),
+      });
+      const flyNow = await screen.findByRole('checkbox', { name: /^Can fly now/ });
+      await waitFor(() => expect(flyNow.closest('label')!.textContent).toBe('Can fly now1/2'));
+      expect(screen.getByText('12 losses')).toBeTruthy();
+      fireEvent.click(flyNow);
+      expect(screen.getByText('3 losses')).toBeTruthy();
+      expect(screen.queryByText('12 losses')).toBeNull();
+    });
+
+    it('says so when the Character can fly none, and Show all fits brings them back', async () => {
+      useActiveCharacter.setState({ activeCharacterId: 7 });
+      renderWith({
+        popularFits: () => Promise.resolve(FITS),
+        skillLevels: () => Promise.resolve(new Map([[CRUISERS, 1]])),
+      });
+      const flyNow = await screen.findByRole('checkbox', { name: /^Can fly now/ });
+      await waitFor(() => expect(flyNow.closest('label')!.textContent).toBe('Can fly now0/2'));
+      fireEvent.click(flyNow);
+      expect(screen.getByText("You can't fly any of these 2 fits yet.")).toBeTruthy();
+      expect(screen.queryByRole('list', { name: 'Popular fits' })).toBeNull();
+      // No training times known: no closest fit to offer.
+      expect(screen.queryByRole('button', { name: 'Show the closest' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Show all fits' }));
+      expect(screen.getByText('12 losses')).toBeTruthy();
+      expect(screen.getByText('3 losses')).toBeTruthy();
+      expect((flyNow as HTMLInputElement).checked).toBe(false);
+    });
+
+    it('names the closest fit, and Show the closest opens its missing skills', async () => {
+      useActiveCharacter.setState({ activeCharacterId: 7 });
+      planData.catalog = SKILL_CATALOG;
+      planData.trained = new Map([[CRUISERS, { level: 1, sp: 250 }]]);
+      renderWith({
+        popularFits: () => Promise.resolve(FITS),
+        skillLevels: () => Promise.resolve(new Map([[CRUISERS, 1]])),
+      });
+      const flyNow = await screen.findByRole('checkbox', { name: /^Can fly now/ });
+      await waitFor(() => expect(flyNow.closest('label')!.textContent).toBe('Can fly now0/2'));
+      fireEvent.click(flyNow);
+      // Fit b lacks only Drones I; fit a lacks Gunnery V too.
+      expect(screen.getByText(/^Closest: the fit seen in 3 losses, /)).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Show the closest' }));
+      expect(screen.getByRole('combobox', { name: 'Sort' }).textContent).toBe('Least training');
+      const row = screen.getByText('3 losses').closest('li')!;
+      expect(within(row).getByRole('button', { expanded: true })).toBeTruthy();
+      expect(within(row).getByRole('link', { name: 'Drones' })).toBeTruthy();
+    });
   });
 });

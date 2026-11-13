@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@/i18n';
-import { Field } from './Fields';
+import { Field, Fields, FieldsHeading } from './Fields';
 import { IskInput } from './IskInput';
 import { TextInput } from './TextInput';
 import { NativeSelect } from './NativeSelect';
@@ -53,5 +53,28 @@ describe('Field note', () => {
     );
     const input = screen.getByLabelText('Price');
     expect(input).toHaveAccessibleDescription('Per unit');
+  });
+});
+
+describe('FieldsHeading', () => {
+  it('titles a group inside the one grid its Fields share', () => {
+    const { container } = render(
+      <Fields variant="form">
+        <FieldsHeading>Pricing</FieldsHeading>
+        <Field label="Hub" htmlFor="hub">
+          <TextInput id="hub" />
+        </Field>
+        <FieldsHeading>Statements</FieldsHeading>
+        <Field label="Grace" htmlFor="grace">
+          <TextInput id="grace" />
+        </Field>
+      </Fields>
+    );
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'Pricing',
+      'Statements',
+    ]);
+    // One grid: both groups' rows are its children, so they share the label column.
+    expect(container.querySelectorAll(':scope > div > *')).toHaveLength(4);
   });
 });

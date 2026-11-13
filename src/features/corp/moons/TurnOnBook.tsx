@@ -117,10 +117,17 @@ export function TurnOnBook({
             onChange={(e) => setStartDate(e.target.value)}
           />
         </div>
-        <label className="block space-y-1">
-          <span className="text-xs text-text-dim">{t('corpTaxBook.moons.off.rate')}</span>
-          <TextInput inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
-        </label>
+        <div className="space-y-1">
+          <label htmlFor="turn-on-rate" className="block text-xs text-text-dim">
+            {t('corpTaxBook.moons.off.rate')}
+          </label>
+          <TextInput
+            id="turn-on-rate"
+            inputMode="decimal"
+            value={rate}
+            onChange={(e) => setRate(e.target.value)}
+          />
+        </div>
         <p className="text-xs text-text-dim">
           {t(
             collect

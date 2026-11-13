@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { DOCK_MIN_PANEL_WIDTH } from '@/features/pi/map/mapModel';
@@ -69,13 +69,18 @@ describe('PlanMap: the detail drawer', () => {
 
   // Felsic Magma is a Lava product; the pilot has no Lava colony. It shows on
   // the map once Lava is a what-if, and tracing it keeps that tick. Kept as
-  // short tests: each map click re-renders the whole map (~0.5s), so one chain
-  // of a dozen was slow enough to fail its focus wait on a loaded CI runner.
+  // short tests: each map click re-renders the whole map (~0.5s).
   async function traceFelsicMagmaWithLavaWhatIf() {
     const user = userEvent.setup({ delay: null });
     renderMap();
     await user.click(planet('Lava'));
     await user.keyboard('{Escape}');
+    // Escape hands focus back to the Lava planet on the next animation frame.
+    // Let that frame run (frames fire in request order): on a loaded runner it
+    // could otherwise land after the click below and pull focus out of the
+    // product drawer it opens.
+    await act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+    expect(planet('Lava')).toHaveFocus();
     await user.click(product('Felsic Magma'));
     return user;
   }
@@ -84,7 +89,8 @@ describe('PlanMap: the detail drawer', () => {
     await traceFelsicMagmaWithLavaWhatIf();
     const dialog = screen.getByRole('dialog', { name: /^(How to make|Where to get) / });
     expect(planet('Lava')).toHaveAttribute('aria-pressed', 'true');
-    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+    // The drawer takes focus as it opens, in the same act as the click.
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
   });
 
   it('unticks the what-if on a click even though the trace needs it, keeping the trace', async () => {

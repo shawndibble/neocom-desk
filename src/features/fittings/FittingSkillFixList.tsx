@@ -1,23 +1,28 @@
 /**
- * The training that makes an over-budget Fitting fit (`findSkillFixes`): each
- * fix's skill levels, the time they take (prerequisites included) and Add to
- * plan — or the plan that already trains them. Shared by What to train, where
- * it heads the list, and Make it fit.
+ * Training that makes a Fitting fit — over-budget fixes (`findSkillFixes`), or
+ * the skills it is missing: each fix's skill levels, the time they take
+ * (prerequisites included) and Add to plan — or the plan that already trains
+ * them. Shared by What to train, where it heads the list, and Make it fit.
  */
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { SkillFix } from '@/engine/fittings/skillFixes';
+import { scheduledSkillTargets } from '@/engine/fittings/skillGains';
 import { romanLevel } from '@/engine/projection';
-import type { PlanEntry } from '@/engine/types';
+import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 import type { SkillPlanRecord } from '@/db';
 import { SkillLink } from '@/features/entities';
 import { formatCountdown } from '@/lib/duration';
-import { STAT_DETAIL, joinDetail, statRowClassName } from './statKit';
+import { buildFitCheckRows } from '@/features/skills/ships/fitCheckRows';
+import { WhatToTrainPrerequisites } from './FittingWhatToTrainPrerequisites';
+import { STAT_DETAIL, statRowClassName } from './statKit';
 import type { ScheduleEntries } from './useModuleUpgrades';
 
 interface Props {
-  fixes: readonly SkillFix[];
-  skillName: (skillTypeId: number) => string;
+  fixes: readonly Pick<SkillFix, 'entries'>[];
+  /** The skill catalogue; undefined while it loads. */
+  skills: ReadonlyMap<number, EngineSkill> | undefined;
+  trainedSkills: ReadonlyMap<number, TrainedSkill>;
   /** Null before the Character's skills are in. */
   scheduleEntriesFor: ScheduleEntries | null;
   /** The target Skill Plan; null when the Character has none yet, undefined while plans load. */
@@ -25,18 +30,23 @@ interface Props {
   /** The highest level the plan trains each skill to, prerequisite rows included. */
   plannedLevels: ReadonlyMap<number, number>;
   onAdd: (entries: readonly PlanEntry[]) => void;
+  /** Why each row fixes the fit; default: it brings the Fitting under budget. */
+  reason?: string;
 }
 
 /** Quickest to train first; a fix not yet timed last. */
 export function SkillFixList({
   fixes,
-  skillName,
+  skills,
+  trainedSkills,
   scheduleEntriesFor,
   plan,
   plannedLevels,
   onAdd,
+  reason,
 }: Props) {
   const { t } = useTranslation();
+  const skillName = (id: number) => skills?.get(id)?.name ?? `#${id}`;
   const rows = fixes
     .map((fix) => {
       const scheduled = scheduleEntriesFor?.(fix.entries) ?? null;
@@ -45,13 +55,17 @@ export function SkillFixList({
       const includesPrerequisites =
         scheduled?.some((step) => !fix.entries.some((e) => e.skillTypeID === step.skillTypeID)) ??
         false;
-      return { fix, seconds, includesPrerequisites };
+      const prerequisiteRows =
+        includesPrerequisites && scheduled && skills
+          ? buildFitCheckRows(scheduledSkillTargets(scheduled), skills, trainedSkills, scheduled)
+          : [];
+      return { fix, seconds, prerequisiteRows };
     })
     .sort((a, b) => (a.seconds ?? Infinity) - (b.seconds ?? Infinity));
 
   return (
     <ul className="m-0 list-none p-0 text-xs">
-      {rows.map(({ fix, seconds, includesPrerequisites }) => {
+      {rows.map(({ fix, seconds, prerequisiteRows }) => {
         const label = fix.entries
           .map((e) => `${skillName(e.skillTypeID)} ${romanLevel(e.targetLevel)}`)
           .join(', ');
@@ -73,18 +87,25 @@ export function SkillFixList({
                     </span>
                   ))}
                 </p>
-                <p className={STAT_DETAIL}>
-                  {joinDetail([
-                    t('fittings.skillFixes.makesItFit'),
-                    includesPrerequisites ? t('fittings.whatToTrain.withPrerequisites') : null,
-                  ])}
-                </p>
+                <p className={STAT_DETAIL}>{reason ?? t('fittings.skillFixes.makesItFit')}</p>
               </div>
               <div className="shrink-0 text-right tabular-nums">
                 {seconds === null ? (
                   <span className="text-text-dim">{t('common.loading')}</span>
                 ) : (
                   formatCountdown(seconds)
+                )}
+                {/* Once the catalogue is in: an empty card says nothing. */}
+                {seconds !== null && prerequisiteRows.length > 0 && (
+                  <div>
+                    <WhatToTrainPrerequisites
+                      skill={label}
+                      rows={prerequisiteRows}
+                      plannedLevels={plannedLevels}
+                      planEntries={plan?.entries}
+                      totalSeconds={seconds}
+                    />
+                  </div>
                 )}
               </div>
             </div>

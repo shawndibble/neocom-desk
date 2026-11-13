@@ -2,25 +2,33 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState, type ReactNode } from 'react';
 import { PageHeader, Tabs } from '@/components/ui';
 import { BookProvider } from './BookContext';
-import { BOOK_CONTEXT, MOON_ID, VARRO_ID } from './corpBookFixture';
+import { BOOK_CONTEXT, BOOK_VIEW, MOON_ID, VARRO_ID } from './corpBookFixture';
+import { ExtractionsTab } from './ExtractionsTab';
 import { MinerDetail } from './MinerDetail';
 import { MinersTab } from './MinersTab';
 import { MoonDetail } from './MoonDetail';
 import { OverviewTab } from './OverviewTab';
+import { StatementPeriodDetail } from './StatementPeriodDetail';
+import { StatementsTab } from './StatementsTab';
 import { MOONS_TABS } from './moonsPaths';
 import { tabBarTabs } from '@/lib/pageTabs';
 import { useTranslation } from 'react-i18next';
 
 /**
  * The Corp Tax Book's section pages on a sample book the real engine built: the
- * Overview, the Miners list (a row opened in place) and the Miner and moon pages, each at
- * desktop and phone width. The components are the route's own.
+ * Overview, Extractions, Miners (a row opened in place) and Statements tabs, and the Miner,
+ * moon and Statement period pages, each at desktop and phone width. The components are the
+ * route's own.
  */
-function Page({ children, tab }: { children: ReactNode; tab?: 'overview' | 'miners' }) {
+type SectionTab = 'overview' | 'extractions' | 'miners' | 'statements';
+const ISSUED_PERIOD = BOOK_VIEW.input.statements[0]?.periodStart ?? '2026-08-01';
+
+function Page({ children, tab }: { children: ReactNode; tab?: SectionTab }) {
   const { t } = useTranslation();
   const [value, setValue] = useState(tab);
   return (
-    <BookProvider value={BOOK_CONTEXT}>
+    // openSettings stands in for the route's settings host, so Settings steps show their buttons.
+    <BookProvider value={{ ...BOOK_CONTEXT, openSettings: () => {} }}>
       <div className="mx-auto max-w-page space-y-4 px-4 py-4">
         {tab && (
           <>
@@ -107,3 +115,44 @@ export const MoonPage: Story = {
 };
 /** @summary Moon page, phone. */
 export const MoonPagePhone: Story = { ...MoonPage, ...phone };
+
+/** @summary Extractions tab: the timeline of past, ready and extracting chunks. */
+export const Extractions: Story = {
+  render: () => (
+    <Page tab="extractions">
+      <ExtractionsTab />
+    </Page>
+  ),
+};
+/** @summary Extractions tab, phone. */
+export const ExtractionsPhone: Story = { ...Extractions, ...phone };
+
+/** @summary Statements tab: issued periods and the next run. */
+export const Statements: Story = {
+  render: () => (
+    <Page tab="statements">
+      <StatementsTab />
+    </Page>
+  ),
+};
+/** @summary Statements tab, phone. */
+export const StatementsPhone: Story = { ...Statements, ...phone };
+
+/** @summary Statement period page: one issued period's Statements and what each paid. */
+export const StatementPeriodPage: Story = {
+  render: () => (
+    <Page>
+      <StatementPeriodDetail periodStart={ISSUED_PERIOD} />
+    </Page>
+  ),
+};
+/** @summary Statement period page, phone. */
+export const StatementPeriodPagePhone: Story = { ...StatementPeriodPage, ...phone };
+
+/** @summary Miners list as the Overdue total's link opens it: `?balance=overdue`, a Balance pill. */
+export const MinersOverdue: Story = {
+  ...Miners,
+  parameters: { shell: { path: '/corp/moons/miners?balance=overdue', scopes: [] } },
+};
+/** @summary Miners list filtered to overdue Miners, phone. */
+export const MinersOverduePhone: Story = { ...MinersOverdue, ...phone };

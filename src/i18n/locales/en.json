@@ -245,9 +245,10 @@
         "mbit": "{{value}} Mbit/s",
         "unskilledNote": "Base values, before your skills.",
         "subsystems": "A Tech III hull's slots and hardpoints come from the subsystems fitted to it.",
-        "simulate": "Simulate",
-        "simulateFailed": "Couldn't open this hull in the editor.",
-        "popularFailed": "Couldn't open that fit in the editor."
+        "startEmptyFit": "Start empty fit",
+        "startEmptyFitFailed": "Couldn't open this hull in the editor.",
+        "popularFailed": "Couldn't open that fit in the editor.",
+        "stats": "Slots and fitting resources"
       },
       "skills": {
         "masteryTitle": "Mastery",
@@ -421,6 +422,7 @@
         "rig": "Rigs",
         "subsystem": "Subsystems"
       },
+      "rackShort": { "high": "H", "medium": "M", "low": "L", "rig": "R", "subsystem": "S" },
       "moduleState": {
         "offline": "offline",
         "online": "online",
@@ -716,11 +718,17 @@
     },
     "popular": {
       "title": "Popular fits",
-      "caption": "Fits other pilots actually fly: from recent kills (zKillboard) and published guides (EVE Workbench).",
+      "heading": "Start from a proven fit",
+      "caption": "Click a fit to open it in the editor.",
+      "caption_touch": "Tap a fit to open it in the editor.",
+      "sourcesLabel": "Where these fits come from",
+      "sources": "Seen in losses: fits from recent losses on zKillboard. Guides: fits published on EVE Workbench.",
       "verdict": {
         "canFly": "Can fly",
         "missing_one": "Missing {{count}} skill",
         "missing_other": "Missing {{count}} skills",
+        "missingNamed_one": "Missing {{count}} skill: {{skills}}",
+        "missingNamed_other": "Missing {{count}} skills: {{skills}}",
         "unknown": "Skills unknown"
       },
       "loading": "Loading popular fits from zKillboard…",
@@ -731,9 +739,28 @@
       "lastSeen": "last seen {{age}}",
       "value": "~<isk/> ISK",
       "fitName": "{{hullName}} popular fit {{rank}}",
-      "sourceLabel": "Popular fits source",
-      "tabZkillboard": "zKillboard",
-      "tabWorkbench": "EVE Workbench",
+      "sourceLabel": "Fit source",
+      "filter": { "all": "All {{n}}", "loss": "Seen in losses {{n}}", "guide": "Guides {{n}}" },
+      "canFlyNow": "Can fly now",
+      "canFlyCount": "{{flyable}}/{{total}}",
+      "sortLabel": "Sort",
+      "sort": {
+        "newest": "Newest",
+        "seen": "Most seen",
+        "training": "Least training",
+        "cheapest": "Cheapest"
+      },
+      "tag": { "loss": "Loss", "guide": "Guide" },
+      "training_one": "{{count}} skill · {{time}}",
+      "training_other": "{{count}} skills · {{time}}",
+      "listLabel": "Popular fits",
+      "noneFlyable_one": "You can't fly this fit yet.",
+      "noneFlyable_other": "You can't fly any of these {{count}} fits yet.",
+      "closest": "Closest: {{name}}, {{time}} of training.",
+      "closestLoss_one": "the fit seen in {{count}} loss",
+      "closestLoss_other": "the fit seen in {{count}} losses",
+      "showAll": "Show all fits",
+      "showClosest": "Show the closest",
       "seenOnZkillboard_one": "Seen on zKillboard: {{count}} recent loss",
       "seenOnZkillboard_other": "Seen on zKillboard: {{count}} recent losses",
       "seenOnZkillboardLastSeen_one": "Seen on zKillboard: {{count}} recent loss · last seen {{age}}",
@@ -757,13 +784,19 @@
       }
     },
     "start": {
-      "newTitle": "New fitting from a hull",
+      "newTitle": "New fitting",
       "searchHulls": "Search hulls",
       "searchHullsPlaceholder": "Vexor, Gila, heavy assault…",
       "searchToBegin": "Search for a hull to begin.",
       "noHulls": "No hull matches that search.",
-      "pickAHull": "Pick a hull, then start fitting it. Double-click a hull to start at once.",
-      "startFitting": "Start fitting",
+      "pickAHull": "Double-click a hull to start an empty fit at once.",
+      "startEmptyFit": "Start empty fit",
+      "onlyFlyable": "Only hulls I can fly",
+      "recentHulls": "Recent hulls",
+      "noFlyableHulls": "No hull you can fly matches that search.",
+      "pickTitle": "Pick a hull to start",
+      "pickHint": "Start from an empty hull, or from a proven fit: one seen on recent zKillboard losses or published on EVE Workbench, marked with whether you can fly it.",
+      "backToHulls": "Hulls",
       "tabInGame": "In-game",
       "searchFittings": "Search fittings",
       "searchFittingsPlaceholder": "Search by name or hull…",
@@ -1294,6 +1327,7 @@
     "skillFixes": {
       "heading": "Makes it fit",
       "makesItFit": "Brings the Fitting under budget",
+      "missing": "Needed to fly the ship or use its modules",
       "inPlan": "In {{plan}}"
     },
     "whatToTrain": {
@@ -1303,6 +1337,7 @@
       "failed": "Couldn't work out which skills affect this fit.",
       "none": "No single skill level would change this fit — every skill that affects it is trained to V.",
       "rankBy": "Rank by",
+      "improvesFit": "Improves fit",
       "withPrerequisites": "incl. prerequisites",
       "addToPlan": "Add to plan",
       "addLevel": "Add {{level}}",
@@ -13358,7 +13393,7 @@
       "buyWalkHint": "Avg {{avg}} ISK a unit. The top bid, {{topBid}} ISK, takes {{takes}} of {{units}}; the rest sells into lower buy orders that reach this hub.",
       "buyWalkUnsoldHint": "Avg {{avg}} ISK a unit. The top bid, {{topBid}} ISK, takes {{takes}} of {{units}}. {{unsold}} units find no buy order that reaches this hub and are not in the total.",
       "refinePartialHint": "At least one material has no price on this basis, so this total is a floor rather than the full value.",
-      "pricesFromYesterday": "The live price source is down, so these are yesterday's closing prices.",
+      "pricesFromSnapshot": "The live price source is down, so these prices come from an earlier snapshot and may be out of date.",
       "refineUnpriced_one": "{{count}} refine value has an unpriced material, so it is a floor rather than the full total.",
       "refineUnpriced_other": "{{count}} refine values have an unpriced material, so they are floors rather than the full total.",
       "lpTotalCell": "{{isk}} + {{lp}} LP ({{corp}})",
@@ -17837,7 +17872,25 @@
         "moreMoons_other": "and {{count}} more moons",
         "openPage": "Open page",
         "empty": "No Miner owes tax, is owed credit or has days waiting.",
-        "emptyFiltered": "No Miner matches these filters."
+        "emptyFiltered": "No Miner matches these filters.",
+        "balance": {
+          "label": "Balance",
+          "any": "Any",
+          "owing": "Owes tax",
+          "overdue": "Overdue",
+          "overdue-0-30": "Overdue 0–30 days",
+          "overdue-31-60": "Overdue 31–60 days",
+          "overdue-61-90": "Overdue 61–90 days",
+          "overdue-over-90": "Overdue over 90 days",
+          "credit": "Holds credit"
+        }
+      },
+      "aging": {
+        "title": "Overdue by age",
+        "0-30": "0–30 days",
+        "31-60": "31–60 days",
+        "61-90": "61–90 days",
+        "over-90": "Over 90 days"
       },
       "needs": {
         "title_one": "Needs you · {{count}}",
@@ -17897,6 +17950,7 @@
         "payments": "Payments",
         "paymentsHint": "Credited oldest debt first",
         "sum": "Statements {{billed}} − written off {{written}} − payments and dismissals {{settled}} = {{owed}} owed",
+        "sumNoWriteOff": "Statements {{billed}} − payments and dismissals {{settled}} = {{owed}} owed",
         "dismissals": "Dismissals",
         "reversed": "reversed",
         "reverse": "Reverse",
@@ -17985,10 +18039,10 @@
           "stopReminders": "stopped reminders"
         },
         "actionsTo": {
-          "issueStatement": "issued a Statement to {{name}}, {{amount}} ISK",
-          "issueStatementPlain": "issued a Statement to {{name}}",
-          "recordMail": "mailed a Statement to {{name}}",
-          "recordReminder": "sent a reminder to {{name}}"
+          "issueStatement": "issued a Statement to <name>{{name}}</name>, {{amount}} ISK",
+          "issueStatementPlain": "issued a Statement to <name>{{name}}</name>",
+          "recordMail": "mailed a Statement to <name>{{name}}</name>",
+          "recordReminder": "sent a reminder to <name>{{name}}</name>"
         }
       },
       "health": {
@@ -18042,7 +18096,8 @@
         "unmailed_one": "{{count}} earlier Statement was issued but never mailed; it goes with this run",
         "unmailed_other": "{{count}} earlier Statements were issued but never mailed; they go with this run",
         "unmatched": "An Unmatched donation is not on anyone's Statement until it is assigned",
-        "previewFor": "Preview mail for",
+        "previewFor": "Preview for",
+        "mailPreview": "Mail preview",
         "continue": "Continue to send",
         "preview": "Preview mail",
         "loadingCorporation": "Loading corporation name…",
@@ -18282,6 +18337,35 @@
           "unknown": "Could not connect this corporation. Try again later."
         }
       },
+      "setupChecklist": {
+        "title": "Set up the book",
+        "progress": "{{done}} of {{total}} done",
+        "dismiss": "Hide the setup checklist",
+        "stateDone": "(done)",
+        "stateTodo": "(to do)",
+        "checking": "Checking the refinery names…",
+        "rate": {
+          "title": "Corp tax rate set",
+          "done": "{{pct}}% for every Miner without a rate of their own",
+          "todo": "No Miner is taxed until a rate is set.",
+          "action": "Set the rate"
+        },
+        "autoSync": {
+          "title": "Automatic sync turned on",
+          "todo": "Keeps the book current without an officer opening this page.",
+          "action": "Turn on"
+        },
+        "refineryNames": {
+          "title": "Refinery names readable",
+          "todo_one": "{{count}} refinery shows as Unknown/Undockable. Open this page with a Character that can dock there and its name is read.",
+          "todo_other": "{{count}} refineries show as Unknown/Undockable. Open this page with a Character that can dock there and their names are read."
+        },
+        "firstStatement": {
+          "title": "First Statement issued",
+          "todo": "Once a period closes, send each Miner what they owe.",
+          "action": "Go to Statements"
+        }
+      },
       "setup": {
         "back": "Back",
         "paste": "Paste an invite link or code",
@@ -18290,7 +18374,7 @@
         "own": {
           "title": "Run your corporation's book",
           "hint": "Track the moon mining tax for your corporation's refineries in this app.",
-          "action": "Turn on your corporation's book"
+          "action": "Turn on the book"
         },
         "handled": {
           "title": "Let an accounting corporation handle it",
@@ -18720,8 +18804,29 @@
           "intro": "For ISK the wallet journal cannot show: a contract, another division, a handover in person. A donation into the corporation's wallet is found on its own.",
           "amount": "Amount",
           "paidBy": "Paid by",
-          "effect": "Credited oldest debt first. An overpayment is held as credit for {{name}}.",
-          "effectPinned": "Credited toward the {{period}} Statement first, then oldest debt first. An overpayment is held as credit for {{name}}."
+          "datePaid": "Date paid (EVE time)",
+          "dateMissing": "Enter the date it was paid.",
+          "dateFuture": "A payment can't be dated after today (EVE time).",
+          "dateBeforeBook": "The book starts {{date}}; a payment can't be dated before it.",
+          "source": "Where the ISK came from",
+          "sourceHand": "Not in the wallet",
+          "sourceDonation_one": "Wallet donation ({{count}})",
+          "sourceDonation_other": "Wallet donations ({{count}})",
+          "matchIntro": "Donations no Miner has been matched to yet. Picking one credits it to {{name}} instead of recording new ISK, so it is never counted twice.",
+          "donations": "Unmatched donations",
+          "findDonation": "Find by pilot or amount",
+          "noDonationMatch": "No donation matches.",
+          "donationRow": "{{amount}} from {{name}}",
+          "donationAt": "{{date}} {{time}} EVE time",
+          "confirmMatch": "Assign {{amount}}",
+          "outcomeTitle": "After this payment",
+          "enterAmount": "Enter an amount to see which Statements it pays.",
+          "statementLine": "{{period}} Statement",
+          "clears": "Paid in full",
+          "partPays": "Part paid, {{left}} left",
+          "stillOwes": "{{name}} still owes {{amount}}",
+          "owesNothing": "{{name}} owes nothing",
+          "creditHeld": "{{amount}} held as credit toward the next Statement"
         },
         "notTax": {
           "title": "Mark part of a donation as not tax",

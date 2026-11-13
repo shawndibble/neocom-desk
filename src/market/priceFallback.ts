@@ -6,12 +6,18 @@
  *
  *   1. ESI region orders for the item, folded to the station. Live and exact,
  *      but one request per type, so only for a small batch.
- *   2. The daily open prices in R2 (hub stations only): yesterday's close, with
- *      no volumes. Flagged stale so the caller can say so and never caches it.
+ *   2. The hub's order books in R2 (`hauling-books/<stationId>.json`, rebuilt
+ *      every 30 minutes from EVE Ref): one read prices every type at the hub.
+ *   3. The daily open prices in R2 (hub stations only): yesterday's close, with
+ *      no volumes. One read per type, so only for a batch up to
+ *      `R2_FALLBACK_MAX_TYPES`.
+ *
+ * Steps 2 and 3 are flagged stale so the caller can say so and never caches them.
  *
  * Nothing here caches: `prices.ts` owns the TTLs, and wraps this module.
  */
 import { getMarketOrders } from '@/esi/endpoints';
+import { sum } from '@/engine/math';
 import { summarizeStationBook, type StationBook } from '@/engine/market/stationBook';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { lookupNpcStation } from '@/sde/npcStations';
@@ -35,9 +41,12 @@ export const FUZZWORK_BACKOFF_MS = MINUTE_MS;
 /** Fan-out for the ESI step; under `ESI_FANOUT_CONCURRENCY` so Sentry's N+1 detector stays quiet. */
 const ESI_STEP_CONCURRENCY = Math.min(4, ESI_FANOUT_CONCURRENCY);
 
+/** Past this many types the per-type R2 step is skipped: one read each took ~16 s for a ~1,850-type hauling scan. */
+export const R2_FALLBACK_MAX_TYPES = 200;
+
 export interface FallbackPrices {
   prices: Map<number, HubAggregate>;
-  /** Types whose price is yesterday's close from R2, not a live book. */
+  /** Types priced from an R2 snapshot (order books or yesterday's close), not a live source. */
   stale: ReadonlySet<number>;
 }
 
@@ -111,6 +120,41 @@ async function esiBooks(
   return books;
 }
 
+function isTradeHub(stationId: number): boolean {
+  return TRADE_HUBS.some((h) => h.stationId === stationId);
+}
+
+/**
+ * Every type's best prices at a hub from its published order books, or null for
+ * a non-hub station or books that are missing or too old (`loadHaulingBooks`
+ * judges that). The books keep the best 30 levels a side, so volumes are a floor.
+ */
+async function r2HubBookPrices(
+  stationId: number,
+  typeIds: readonly number[]
+): Promise<Map<number, HubAggregate> | null> {
+  if (!isTradeHub(stationId)) return null;
+  // Imported on demand so the R2 reader loads only when a fallback needs it.
+  const { loadHaulingBooks } = await import('@/features/market/haulingBooks');
+  const books = await loadHaulingBooks(stationId);
+  if (!books) return null;
+  const prices = new Map<number, HubAggregate>();
+  let answered = false;
+  for (const typeId of typeIds) {
+    const b = books.types.get(typeId);
+    const sellMin = b?.sell[0]?.price ?? null;
+    const buyMax = b?.buy[0]?.price ?? null;
+    if (sellMin !== null || buyMax !== null) answered = true;
+    prices.set(typeId, {
+      sellMin,
+      buyMax,
+      sellVolume: b ? sum(b.sell.map((l) => l.units)) : 0,
+      buyVolume: b ? sum(b.buy.map((l) => l.units)) : 0,
+    });
+  }
+  return answered ? prices : null;
+}
+
 /** Older than this, a close is no longer "yesterday's" and is not offered as a price. */
 export const R2_MAX_AGE_DAYS = 3;
 
@@ -124,7 +168,7 @@ async function r2Prices(
   typeIds: readonly number[],
   nowMs: number
 ): Promise<Map<number, HubAggregate> | null> {
-  if (!TRADE_HUBS.some((h) => h.stationId === stationId)) return null;
+  if (!isTradeHub(stationId) || typeIds.length > R2_FALLBACK_MAX_TYPES) return null;
   // Imported on demand so the R2 reader loads only when a fallback needs it.
   const { loadStoredOpenPrices } = await import('@/features/market/marketOpenPrices');
   const prices = new Map<number, HubAggregate>();
@@ -183,7 +227,8 @@ export async function fetchAggregatesWithFallback(
   }
 
   if (scope === 'station') {
-    const prices = await r2Prices(locationId, typeIds, now());
+    const prices =
+      (await r2HubBookPrices(locationId, typeIds)) ?? (await r2Prices(locationId, typeIds, now()));
     if (prices) return { prices, stale: new Set(prices.keys()) };
   }
 

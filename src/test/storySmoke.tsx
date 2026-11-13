@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import { composeStories, setProjectAnnotations } from '@storybook/react-vite';
 import * as preview from '../../.storybook/preview';
@@ -15,7 +15,32 @@ import { unexpectedRequests, whenFetchQuiet, whenFixturesRetired } from '@/story
 // a new story file is covered by default and none can fall between them.
 setProjectAnnotations(preview.default);
 
+/**
+ * Between stories no fixture table is installed and `fetch` is the real one. CI
+ * is offline, where a real request hangs until its timeout (15 s for Fuzzwork),
+ * so a page's late request failed long after its story, and its fallback's
+ * request was blamed on whichever story was rendering by then. Refusing at once
+ * keeps a late request and its fallback inside the gap. Same-origin (the SDE
+ * bake) still passes through.
+ */
+function refuseCrossOriginFetch(): () => void {
+  const real = globalThis.fetch;
+  globalThis.fetch = (input, init) => {
+    const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+    if (url.origin === location.origin) return real(input, init);
+    return Promise.reject(new TypeError(`Story smoke is offline: ${url.origin}${url.pathname}`));
+  };
+  return () => {
+    globalThis.fetch = real;
+  };
+}
+
 export function describeStorySmoke(modules: Record<string, Record<string, unknown>>) {
+  let restoreNetwork: (() => void) | undefined;
+  beforeAll(() => {
+    restoreNetwork = refuseCrossOriginFetch();
+  });
+  afterAll(() => restoreNetwork?.());
   describe.each(Object.entries(modules))('%s', (_file, mod) => {
     const stories = composeStories(mod as Parameters<typeof composeStories>[0]) as Record<
       string,

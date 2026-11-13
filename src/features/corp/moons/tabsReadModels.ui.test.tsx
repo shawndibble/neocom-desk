@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { READ_MODELS_SCHEMA } from '../../../../functions/src/corpTaxBookVersionKeys';
@@ -38,7 +38,11 @@ function renderTab(ui: React.ReactElement, readModels: unknown = DOCS) {
   );
 }
 
-const headings = () => screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+/** The schedule panel's group headings (the Overview has other h3s, e.g. Overdue by age). */
+const headings = () =>
+  within(screen.getByRole('heading', { level: 2, name: 'Moons' }).closest('section')!)
+    .getAllByRole('heading', { level: 3 })
+    .map((h) => h.textContent);
 
 const VARRO_DOCS = {
   ...DOCS,

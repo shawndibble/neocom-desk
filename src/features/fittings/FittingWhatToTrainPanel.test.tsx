@@ -479,17 +479,83 @@ describe('FittingWhatToTrainPanel — skill detail', () => {
 describe('FittingWhatToTrainPanel — over budget', () => {
   it('heads the list with the training that makes it fit, and ranks a level that frees CPU first', async () => {
     skillGainsState.overBudget = true;
-    skillFixesState.fixes = [{ entries: [{ skillTypeID: 3436, targetLevel: 4 }], after: {} }];
+    skillFixesState.fixes = [{ entries: [{ skillTypeID: 3300, targetLevel: 3 }], after: {} }];
     const user = userEvent.setup();
     renderPanel();
     expect(await screen.findByText('Makes it fit')).toBeInTheDocument();
     // Awaited: the heading renders at once, but the fix block's button waits for the target plan to load.
+    await user.click(await screen.findByRole('button', { name: 'Add to plan: Gunnery III' }));
+    await waitFor(async () => {
+      expect(await planEntries()).toEqual([{ skillTypeID: 3300, targetLevel: 3 }]);
+    });
+    // The rest sit under their own heading, without the skill Makes it fit already lists.
+    expect(screen.getByText('Improves fit')).toBeInTheDocument();
+    const ranked = within(screen.getByRole('list', { name: 'What to train' }));
+    const items = ranked.getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent(/^1Drones/);
+    expect(items.map((item) => item.textContent)).not.toContainEqual(
+      expect.stringMatching(/Gunnery/)
+    );
+  });
+
+  it('lists the skills the fit is missing as fixes, within budget too', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <FittingWhatToTrainPanel
+          evaluator={evaluator}
+          characterId={CHARACTER_ID}
+          fittingName="Rifter"
+          catalogue={catalogue}
+          missingSkills={[{ skillTypeID: 3436, targetLevel: 4 }]}
+        />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText('Makes it fit')).toBeInTheDocument();
+    expect(screen.getByText(/Needed to fly the ship or use its modules/)).toBeInTheDocument();
+    const ranked = within(screen.getByRole('list', { name: 'What to train' }));
+    expect(ranked.queryByRole('link', { name: 'Drones' })).toBeNull();
     await user.click(await screen.findByRole('button', { name: 'Add to plan: Drones IV' }));
     await waitFor(async () => {
       expect(await planEntries()).toEqual([{ skillTypeID: 3436, targetLevel: 4 }]);
     });
-    const ranked = within(screen.getByRole('list', { name: 'What to train' }));
-    expect(ranked.getAllByRole('listitem')[0]).toHaveTextContent(/^1Drones/);
+  });
+
+  it('lists the missing skills while the ranking is still working out', async () => {
+    render(
+      <MemoryRouter>
+        <FittingWhatToTrainPanel
+          evaluator={null}
+          characterId={CHARACTER_ID}
+          fittingName="Rifter"
+          catalogue={catalogue}
+          missingSkills={[{ skillTypeID: 3436, targetLevel: 4 }]}
+        />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText('Makes it fit')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Add to plan: Drones IV' })).toBeVisible();
+    expect(screen.getByText(/Working out each skill/)).toBeInTheDocument();
+  });
+
+  it('lists a missing skill\'s prerequisites behind "incl. prerequisites", as ranked rows do', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <FittingWhatToTrainPanel
+          evaluator={evaluator}
+          characterId={CHARACTER_ID}
+          fittingName="Rifter"
+          catalogue={catalogue}
+          missingSkills={[{ skillTypeID: 3315, targetLevel: 1 }]}
+        />
+      </MemoryRouter>
+    );
+    await user.click(
+      await screen.findByRole('button', { name: /incl\. prerequisites: surgical strike i/i })
+    );
+    const card = await screen.findByText(/^Skills needed for Surgical Strike I$/);
+    expect(within(card.closest('div') as HTMLElement).getByText('Gunnery')).toBeInTheDocument();
   });
 
   it('shows no fix block within budget', async () => {
@@ -497,5 +563,6 @@ describe('FittingWhatToTrainPanel — over budget', () => {
     renderPanel();
     await screen.findByText('Surgical Strike');
     expect(screen.queryByText('Makes it fit')).toBeNull();
+    expect(screen.queryByText('Improves fit')).toBeNull();
   });
 });

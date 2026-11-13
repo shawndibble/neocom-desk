@@ -13,7 +13,7 @@
  * is read through the officer rules, so the Character is verified first
  * (`useCorpBook`), and a corporation with no book shows the Director's turn-on.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canViewCorpTaxBook } from '@/engine/corpRoles';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -49,7 +49,8 @@ import { BookProvider } from '@/features/corp/moons/BookContext';
 import { useBook } from '@/features/corp/moons/useBook';
 import { BookHealthStrip } from '@/features/corp/moons/BookHealthStrip';
 import { DeleteBookDialog } from '@/features/corp/moons/DeleteBookSection';
-import { BookSettingsDialog } from '@/features/corp/moons/BookSettingsDialog';
+import { BookSettingsDialog, type SettingsTab } from '@/features/corp/moons/BookSettingsDialog';
+import { BookContext } from '@/features/corp/moons/bookContextValue';
 import { ExtractionsTab } from '@/features/corp/moons/ExtractionsTab';
 import { InviteMoonOwnerDialog } from '@/features/corp/moons/InviteMoonOwnerDialog';
 import { MinerDetail } from '@/features/corp/moons/MinerDetail';
@@ -77,7 +78,8 @@ function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }
       {audit.loading ? (
         <Spinner label={t('common.loading')} />
       ) : (
-        <AuditFeed entries={audit.entries} subject={subject} />
+        // A Miner link opens their page: close over it rather than cover it.
+        <AuditFeed entries={audit.entries} subject={subject} onOpen={onClose} />
       )}
     </SlideOver>
   );
@@ -86,7 +88,6 @@ function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }
 function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const { view, canEdit, characterId, corporationId, names } = useBook();
   // With no moon owners the empty state carries the invite button itself.
   const { rows: moonOwnerRows } = useMoonOwners();
   const hasMoonOwners = moonOwnerRows.length > 0;
@@ -97,9 +98,15 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const tabsId = useTabsId();
   // Back from EVE's page after the Automatic sync opt-in: show the settings it was pressed in.
   const { state: routerState } = useLocation();
-  const [settingsOpen, setSettingsOpen] = useState(
-    () => (routerState as { corpSyncGrant?: unknown } | null)?.corpSyncGrant !== undefined
+  // Open (on a tab) or closed; back from the opt-in it opens where it was pressed.
+  const [settingsDialog, setSettingsDialog] = useState<{ tab?: SettingsTab } | null>(() =>
+    (routerState as { corpSyncGrant?: unknown } | null)?.corpSyncGrant !== undefined ? {} : null
   );
+  const book = useBook();
+  const { view, canEdit, characterId, corporationId, names } = book;
+  // The Overview's setup checklist opens this same dialog, so there is one settings host.
+  const openSettings = useCallback((tab?: SettingsTab) => setSettingsDialog({ tab }), []);
+  const bookWithSettings = useMemo(() => ({ ...book, openSettings }), [book, openSettings]);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
@@ -108,137 +115,140 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const detail = moonsDetail(pathname);
   const tabs = tabBarTabs(MOONS_TABS);
   return (
-    <div className="mx-auto max-w-page space-y-4 px-4 py-4">
-      {detail === null && (
-        <>
-          <PageHeader
-            title={t('corp.moons.title')}
-            meta={
-              sync.status.kind !== 'never' ? (
-                <DataAgeBadge
-                  date={new Date(sync.status.at)}
-                  note={t('corpTaxBook.moons.health.syncedBy', {
-                    name: sync.status.scheduled
-                      ? t('corpTaxBook.moons.scheduledBy', { name: sync.status.byName })
-                      : sync.status.byName,
-                  })}
-                  alwaysVisible
-                />
-              ) : undefined
-            }
-            actions={
-              <span className="flex flex-wrap items-center justify-end gap-1">
-                {!isPhone && tab === 'moon-owners' && canEdit && hasMoonOwners && (
-                  <Button variant="ghost" onClick={() => setInviteOpen(true)}>
-                    {t('corpTaxBook.moons.moonOwners.invite')}
-                  </Button>
-                )}
-                {tab === 'moon-owners' && addCorps.showButton && (
-                  <Button variant="primary" onClick={addCorps.open}>
-                    {t(
-                      isPhone
-                        ? 'corpTaxBook.moons.addCorps.openShort'
-                        : 'corpTaxBook.moons.addCorps.open'
-                    )}
-                  </Button>
-                )}
-                {!isPhone && (
-                  <Button variant="ghost" onClick={() => setActivityOpen(true)}>
-                    <Icon.Recent size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                    {t('corpTaxBook.moons.activity.button')}
-                  </Button>
-                )}
-                {sync.ledger.state === 'ready' && (
-                  <IconButton
-                    icon={syncing ? <Spinner /> : <Icon.Refresh />}
-                    label={t('corpTaxBook.moons.syncNow')}
-                    // The book's own ledger and every moon owner's, side by side (#6117).
-                    onClick={() => void Promise.all([sync.sync(), moonOwnersSync.run()])}
-                    busy={syncing}
+    <BookContext.Provider value={bookWithSettings}>
+      <div className="mx-auto max-w-page space-y-4 px-4 py-4">
+        {detail === null && (
+          <>
+            <PageHeader
+              title={t('corp.moons.title')}
+              meta={
+                sync.status.kind !== 'never' ? (
+                  <DataAgeBadge
+                    date={new Date(sync.status.at)}
+                    note={t('corpTaxBook.moons.health.syncedBy', {
+                      name: sync.status.scheduled
+                        ? t('corpTaxBook.moons.scheduledBy', { name: sync.status.byName })
+                        : sync.status.byName,
+                    })}
+                    alwaysVisible
                   />
-                )}
-                <IconButton
-                  icon={<Icon.Settings />}
-                  label={t('corpTaxBook.moons.settings.open')}
-                  onClick={() => setSettingsOpen(true)}
-                />
-                {isPhone && (
-                  <HeaderMoreMenu>
-                    {tab === 'moon-owners' && canEdit && hasMoonOwners && (
-                      <DropdownMenuItem onSelect={() => setInviteOpen(true)}>
-                        {t('corpTaxBook.moons.moonOwners.invite')}
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onSelect={() => setActivityOpen(true)}>
+                ) : undefined
+              }
+              actions={
+                <span className="flex flex-wrap items-center justify-end gap-1">
+                  {!isPhone && tab === 'moon-owners' && canEdit && hasMoonOwners && (
+                    <Button variant="ghost" onClick={() => setInviteOpen(true)}>
+                      {t('corpTaxBook.moons.moonOwners.invite')}
+                    </Button>
+                  )}
+                  {tab === 'moon-owners' && addCorps.showButton && (
+                    <Button variant="primary" onClick={addCorps.open}>
+                      {t(
+                        isPhone
+                          ? 'corpTaxBook.moons.addCorps.openShort'
+                          : 'corpTaxBook.moons.addCorps.open'
+                      )}
+                    </Button>
+                  )}
+                  {!isPhone && (
+                    <Button variant="ghost" onClick={() => setActivityOpen(true)}>
+                      <Icon.Recent size={Icon.ICON_SIZE.sm} aria-hidden="true" />
                       {t('corpTaxBook.moons.activity.button')}
-                    </DropdownMenuItem>
-                  </HeaderMoreMenu>
-                )}
-              </span>
-            }
-          />
-          <Tabs
-            tabsId={tabsId}
-            label={t('corpTaxBook.moons.title')}
-            value={tab}
-            onChange={(id) => selectTab(id as typeof tab)}
-            tabs={tabs.map((x) => ({ id: x.id, label: t(x.labelKey) }))}
-          />
-          {sync.ledger.state !== 'ready' && (
-            <p className="text-sm text-text-dim" role="note">
-              {t('corpTaxBook.moons.viewOnly')}
-            </p>
-          )}
-          <BookHealthStrip sync={sync} />
-          <TabPanel tabsId={tabsId} tabId={tab}>
-            {tab === 'overview' && <OverviewTab />}
-            {tab === 'extractions' && <ExtractionsTab />}
-            {tab === 'miners' && <MinersTab />}
-            {tab === 'statements' && <StatementsTab />}
-            {tab === 'moon-owners' && (
-              <div className="space-y-4">
-                {addCorps.notices}
-                {addCorps.needsYou}
-                <MoonOwnersTab onInvite={() => setInviteOpen(true)} />
-              </div>
+                    </Button>
+                  )}
+                  {sync.ledger.state === 'ready' && (
+                    <IconButton
+                      icon={syncing ? <Spinner /> : <Icon.Refresh />}
+                      label={t('corpTaxBook.moons.syncNow')}
+                      // The book's own ledger and every moon owner's, side by side (#6117).
+                      onClick={() => void Promise.all([sync.sync(), moonOwnersSync.run()])}
+                      busy={syncing}
+                    />
+                  )}
+                  <IconButton
+                    icon={<Icon.Settings />}
+                    label={t('corpTaxBook.moons.settings.open')}
+                    onClick={() => openSettings()}
+                  />
+                  {isPhone && (
+                    <HeaderMoreMenu>
+                      {tab === 'moon-owners' && canEdit && hasMoonOwners && (
+                        <DropdownMenuItem onSelect={() => setInviteOpen(true)}>
+                          {t('corpTaxBook.moons.moonOwners.invite')}
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onSelect={() => setActivityOpen(true)}>
+                        {t('corpTaxBook.moons.activity.button')}
+                      </DropdownMenuItem>
+                    </HeaderMoreMenu>
+                  )}
+                </span>
+              }
+            />
+            <Tabs
+              tabsId={tabsId}
+              label={t('corpTaxBook.moons.title')}
+              value={tab}
+              onChange={(id) => selectTab(id as typeof tab)}
+              tabs={tabs.map((x) => ({ id: x.id, label: t(x.labelKey) }))}
+            />
+            {sync.ledger.state !== 'ready' && (
+              <p className="text-sm text-text-dim" role="note">
+                {t('corpTaxBook.moons.viewOnly')}
+              </p>
             )}
-          </TabPanel>
-        </>
-      )}
-      {detail?.kind === 'extraction' && <MoonDetail key={detail.id} id={detail.id} />}
-      {detail?.kind === 'miner' && <MinerDetail key={detail.id} id={detail.id} />}
-      {detail?.kind === 'moonOwner' && <MoonOwnerDetail id={detail.id} />}
-      {detail?.kind === 'statementPeriod' && <StatementPeriodDetail periodStart={detail.id} />}
-      {view && settingsOpen && (
-        <BookSettingsDialog
-          open
-          onClose={() => setSettingsOpen(false)}
-          onSaved={() => setSaved(true)}
-          onDeleteBook={() => setDeleteOpen(true)}
-        />
-      )}
-      {deleteOpen && <DeleteBookDialog onClose={() => setDeleteOpen(false)} />}
-      {moonOwnersSync.notice && (
-        <Toast
-          message={moonOwnersSync.notice.message}
-          instance={moonOwnersSync.notice.instance}
-          onClose={moonOwnersSync.clearNotice}
-        />
-      )}
-      {saved && (
-        <Toast message={t('corpTaxBook.moons.settings.saved')} onClose={() => setSaved(false)} />
-      )}
-      {inviteOpen && (
-        <InviteMoonOwnerDialog
-          characterId={characterId}
-          corporationId={corporationId}
-          characterName={names.character}
-          onClose={() => setInviteOpen(false)}
-        />
-      )}
-      {addCorps.dialogs}
-      {activityOpen && <ActivityPanel open onClose={() => setActivityOpen(false)} />}
-    </div>
+            <BookHealthStrip sync={sync} />
+            <TabPanel tabsId={tabsId} tabId={tab}>
+              {tab === 'overview' && <OverviewTab />}
+              {tab === 'extractions' && <ExtractionsTab />}
+              {tab === 'miners' && <MinersTab />}
+              {tab === 'statements' && <StatementsTab />}
+              {tab === 'moon-owners' && (
+                <div className="space-y-4">
+                  {addCorps.notices}
+                  {addCorps.needsYou}
+                  <MoonOwnersTab onInvite={() => setInviteOpen(true)} />
+                </div>
+              )}
+            </TabPanel>
+          </>
+        )}
+        {detail?.kind === 'extraction' && <MoonDetail key={detail.id} id={detail.id} />}
+        {detail?.kind === 'miner' && <MinerDetail key={detail.id} id={detail.id} />}
+        {detail?.kind === 'moonOwner' && <MoonOwnerDetail id={detail.id} />}
+        {detail?.kind === 'statementPeriod' && <StatementPeriodDetail periodStart={detail.id} />}
+        {view && settingsDialog && (
+          <BookSettingsDialog
+            open
+            initialTab={settingsDialog.tab}
+            onClose={() => setSettingsDialog(null)}
+            onSaved={() => setSaved(true)}
+            onDeleteBook={() => setDeleteOpen(true)}
+          />
+        )}
+        {deleteOpen && <DeleteBookDialog onClose={() => setDeleteOpen(false)} />}
+        {moonOwnersSync.notice && (
+          <Toast
+            message={moonOwnersSync.notice.message}
+            instance={moonOwnersSync.notice.instance}
+            onClose={moonOwnersSync.clearNotice}
+          />
+        )}
+        {saved && (
+          <Toast message={t('corpTaxBook.moons.settings.saved')} onClose={() => setSaved(false)} />
+        )}
+        {inviteOpen && (
+          <InviteMoonOwnerDialog
+            characterId={characterId}
+            corporationId={corporationId}
+            characterName={names.character}
+            onClose={() => setInviteOpen(false)}
+          />
+        )}
+        {addCorps.dialogs}
+        {activityOpen && <ActivityPanel open onClose={() => setActivityOpen(false)} />}
+      </div>
+    </BookContext.Provider>
   );
 }
 

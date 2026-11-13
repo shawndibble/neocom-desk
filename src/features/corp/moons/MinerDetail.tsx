@@ -761,12 +761,18 @@ export function MinerDetail({ id }: { id: string }) {
               {...table}
             />
             <p className="border-t border-line px-3 py-2 text-xs text-text-dim tabular-nums">
-              {t('corpTaxBook.moons.miner.sum', {
-                billed: isk(billedTotal),
-                written: iskOrDash(toleranceTotal),
-                settled: isk(billedTotal - toleranceTotal - row.owed),
-                owed: isk(row.owed),
-              })}
+              {/* Nothing written off: leave the term out rather than print "− written off —". */}
+              {t(
+                Math.abs(toleranceTotal) < 1
+                  ? 'corpTaxBook.moons.miner.sumNoWriteOff'
+                  : 'corpTaxBook.moons.miner.sum',
+                {
+                  billed: isk(billedTotal),
+                  written: iskOrDash(toleranceTotal),
+                  settled: isk(billedTotal - toleranceTotal - row.owed),
+                  owed: isk(row.owed),
+                }
+              )}
             </p>
           </>
         )}
@@ -917,11 +923,6 @@ export function MinerDetail({ id }: { id: string }) {
           minerName={name}
           defaultAmount={row.owed}
           statementId={openStatement?.id}
-          statementLabel={
-            openStatement
-              ? periodLabel(openStatement.periodStart, openStatement.periodEnd)
-              : undefined
-          }
         />
       )}
       {dialog?.kind === 'dismiss' && (

@@ -13,6 +13,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { mockFlatHubPrices } from './support/piPrices';
 import { CONTROL_ROW_WIDTHS, expectInlineControlsAligned } from './support/controlHeights';
 import { ROUTE_REQUIREMENTS } from '../src/app/routeScopes';
 import { PAGE_TABS } from '../src/app/pageTabs';
@@ -38,10 +39,23 @@ async function waitForPageSettled(page: Page): Promise<void> {
   ).toHaveCount(0, { timeout: 8000 });
 }
 
+/**
+ * Hauling's scan prices every candidate type at both hubs. The shared Fuzzwork
+ * fixture prices none of them, so the app reads Fuzzwork as having nothing; ESI
+ * order books are capped far below that many types, so it falls back to R2's
+ * Open Prices one type at a time (shard, then the type's own object) and the
+ * spinner outlasts the settle wait. One flat price everywhere: Fuzzwork answers,
+ * there is no margin between the hubs, and the scan settles on its empty result.
+ */
+async function signInAndGotoPriced(page: Page, url: string): Promise<void> {
+  if (url.startsWith('/market/hauling')) await mockFlatHubPrices(page, { buy: 5, sell: 5 });
+  await signInAndGoto(page, url);
+}
+
 for (const url of [...new Set([...ROUTES, ...TABS])]) {
   test(`${url}: inline controls share one height`, async ({ page }) => {
     await page.setViewportSize({ width: CONTROL_ROW_WIDTHS[0], height: 900 });
-    await signInAndGoto(page, url);
+    await signInAndGotoPriced(page, url);
     for (const width of CONTROL_ROW_WIDTHS) {
       await page.setViewportSize({ width, height: 900 });
       await waitForPageSettled(page);
@@ -56,7 +70,7 @@ for (const url of [...new Set([...ROUTES, ...TABS])]) {
 for (const url of [...new Set([...ROUTES, ...TABS])]) {
   test(`${url}: the open filters share one height`, async ({ page }) => {
     await page.setViewportSize({ width: CONTROL_ROW_WIDTHS[0], height: 900 });
-    await signInAndGoto(page, url);
+    await signInAndGotoPriced(page, url);
     await waitForPageSettled(page);
     const funnels = page.getByRole('button', { name: /^Filters/ });
     const count = await funnels.count();

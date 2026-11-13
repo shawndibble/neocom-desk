@@ -64,8 +64,10 @@ interface FittingStatsSectionsProps {
     missingSkills?: number;
     /** The fit's skill requirements could not be read. */
     skillsUnknown?: boolean;
-    /** Top of the Pilot panel: the missing-skills chip, the skills-unknown note. */
+    /** Top of the Pilot panel: the skills-unknown note. */
     notes?: ReactNode;
+    /** Just above What to train: the missing-skills chip, whose skills that list also names. */
+    missingSkillsChip?: ReactNode;
   };
   /**
    * The Abyssal weather the figures on screen were worked out in, for the
@@ -362,6 +364,9 @@ export function FittingStatsSections({
                   </div>
                   {implantsNote}
                 </div>
+              )}
+              {pilot?.missingSkillsChip && (
+                <div className="border-b border-line px-3 py-2">{pilot.missingSkillsChip}</div>
               )}
               {stats && whatToTrain && (
                 <PanelSection id="whatToTrain" title={t('fittings.stats.section.whatToTrain')}>
