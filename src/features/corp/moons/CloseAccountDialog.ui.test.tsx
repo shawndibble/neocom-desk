@@ -111,7 +111,7 @@ beforeEach(() => {
 describe('CloseAccountDialog', () => {
   it('shows the final Statement and closes the account with the reason', async () => {
     const { onClose } = renderDialog();
-    expect(screen.getByText(/Final Statement: .* through 2026-09-17/)).toBeInTheDocument();
+    expect(screen.getByText(/Final Statement: .* through 17 Sep( 2026)?\./)).toBeInTheDocument();
     const confirm = screen.getByRole('button', { name: 'Close account' });
     expect(confirm).toBeDisabled();
     await userEvent.type(screen.getByLabelText(/Reason/), 'Left the area');

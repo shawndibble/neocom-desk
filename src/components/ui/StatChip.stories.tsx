@@ -48,3 +48,19 @@ export const Strip: Story = {
     </StatChips>
   ),
 };
+
+/** @summary `to` makes the value a link to the list it counts: underlined, tone kept. */
+export const Linked: Story = {
+  render: () => (
+    <StatChips>
+      <StatChip label="Owed" value="12.4M" emphasis to="/miners?balance=owing" />
+      <StatChip
+        label="Overdue"
+        value="9.3M · 3 Miners"
+        tone="danger"
+        to="/miners?balance=overdue"
+      />
+      <StatChip label="Next Statement" value="2.1M" />
+    </StatChips>
+  ),
+};

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, Panel } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { minersOnMoon } from '@/engine/corpTaxBook/bookSections';
@@ -59,86 +59,91 @@ export function FullyMinedPanel({ id }: { id: string }) {
   const flagged = loss.kind === 'residue';
   const head = 'py-1 font-normal ' + eyebrowClassName;
   return (
-    <section className="space-y-3" aria-labelledby={`fully-mined-${id}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 id={`fully-mined-${id}`} className="text-base font-semibold">
-            {t(
-              flagged ? 'corpTaxBook.moons.fullyMined.residue' : 'corpTaxBook.moons.fullyMined.lost'
-            )}
-          </h2>
-          <p className="text-xs text-text-dim">
-            {t(
-              flagged
-                ? 'corpTaxBook.moons.fullyMined.summaryResidue'
-                : 'corpTaxBook.moons.fullyMined.summaryCombined',
-              { pct: loss.totalPct }
-            )}
-          </p>
-        </div>
-        {canEdit && !flagged && row.state !== 'extracting' && (
+    // A panel like the page's other sections, so it reads as one of them (not loose text).
+    <Panel
+      title={t(
+        flagged ? 'corpTaxBook.moons.fullyMined.residue' : 'corpTaxBook.moons.fullyMined.lost'
+      )}
+      meta={t(
+        flagged
+          ? 'corpTaxBook.moons.fullyMined.summaryResidue'
+          : 'corpTaxBook.moons.fullyMined.summaryCombined',
+        { pct: loss.totalPct }
+      )}
+      wrapMeta
+      actions={
+        canEdit &&
+        !flagged &&
+        row.state !== 'extracting' && (
           <Button size="sm" disabled={busy} onClick={() => void setMark(true)}>
             {t('corpTaxBook.moons.fullyMined.mark')}
           </Button>
-        )}
-      </div>
-      <p className="text-xs text-text-dim">
-        {row.fullyMined ? (
-          <>
-            {t('corpTaxBook.moons.fullyMined.markedBy', {
-              name: row.fullyMined.byName,
-              at: dateTimeUtc(row.fullyMined.at),
-            })}
-            {canEdit && (
-              <>
-                {' '}
-                <button
-                  type="button"
-                  className={entityLinkClassName()}
-                  disabled={busy}
-                  onClick={() => void setMark(false)}
-                >
-                  {t('corpTaxBook.moons.fullyMined.clear')}
-                </button>
-              </>
-            )}
-          </>
-        ) : (
-          t('corpTaxBook.moons.fullyMined.why')
-        )}
-      </p>
-      {error !== undefined && <InlineError>{error}</InlineError>}
-      <table
-        className="w-full text-sm tabular-nums"
-        aria-label={t('corpTaxBook.moons.fullyMined.tableLabel')}
-      >
-        <thead>
-          <tr className="text-left">
-            <th className={head}>{t('corpTaxBook.moons.fullyMined.cols.ore')}</th>
-            <th className={head + ' text-right'}>{t('corpTaxBook.moons.fullyMined.cols.chunk')}</th>
-            <th className={head + ' text-right'}>{t('corpTaxBook.moons.fullyMined.cols.mined')}</th>
-            <th className={head + ' text-right'}>
-              {t(
-                flagged
-                  ? 'corpTaxBook.moons.fullyMined.cols.residue'
-                  : 'corpTaxBook.moons.fullyMined.cols.lost'
+        )
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-xs text-text-dim">
+          {row.fullyMined ? (
+            <>
+              {t('corpTaxBook.moons.fullyMined.markedBy', {
+                name: row.fullyMined.byName,
+                at: dateTimeUtc(row.fullyMined.at),
+              })}
+              {canEdit && (
+                <>
+                  {' '}
+                  <button
+                    type="button"
+                    className={entityLinkClassName()}
+                    disabled={busy}
+                    onClick={() => void setMark(false)}
+                  >
+                    {t('corpTaxBook.moons.fullyMined.clear')}
+                  </button>
+                </>
               )}
-            </th>
-            <th className={head + ' text-right'}>%</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loss.rows.map((r) => (
-            <tr key={r.typeId} className="border-t border-line">
-              <td className="py-1 pr-2 font-sans">{names.ore(r.typeId)}</td>
-              <td className="py-1 text-right">{formatCount(r.chunk)}</td>
-              <td className="py-1 text-right">{formatCount(r.mined)}</td>
-              <td className="py-1 text-right">{formatCount(r.lost)}</td>
-              <td className="py-1 text-right">{r.pct}%</td>
+            </>
+          ) : (
+            t('corpTaxBook.moons.fullyMined.why')
+          )}
+        </p>
+        {error !== undefined && <InlineError>{error}</InlineError>}
+        <table
+          className="w-full text-sm tabular-nums"
+          aria-label={t('corpTaxBook.moons.fullyMined.tableLabel')}
+        >
+          <thead>
+            <tr className="text-left">
+              <th className={head}>{t('corpTaxBook.moons.fullyMined.cols.ore')}</th>
+              <th className={head + ' text-right'}>
+                {t('corpTaxBook.moons.fullyMined.cols.chunk')}
+              </th>
+              <th className={head + ' text-right'}>
+                {t('corpTaxBook.moons.fullyMined.cols.mined')}
+              </th>
+              <th className={head + ' text-right'}>
+                {t(
+                  flagged
+                    ? 'corpTaxBook.moons.fullyMined.cols.residue'
+                    : 'corpTaxBook.moons.fullyMined.cols.lost'
+                )}
+              </th>
+              <th className={head + ' text-right'}>%</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
+          </thead>
+          <tbody>
+            {loss.rows.map((r) => (
+              <tr key={r.typeId} className="border-t border-line">
+                <td className="py-1 pr-2 font-sans">{names.ore(r.typeId)}</td>
+                <td className="py-1 text-right">{formatCount(r.chunk)}</td>
+                <td className="py-1 text-right">{formatCount(r.mined)}</td>
+                <td className="py-1 text-right">{formatCount(r.lost)}</td>
+                <td className="py-1 text-right">{r.pct}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
   );
 }

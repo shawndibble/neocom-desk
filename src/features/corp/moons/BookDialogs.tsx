@@ -4,10 +4,11 @@
  * through `useBook().edit` (`editBook`, role re-checked live on the server)
  * and shows the refusal's mapped reason when it refuses.
  */
-import { useState, type ReactNode } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  FieldError,
   IskInput,
   Modal,
   SegmentedControl,
@@ -17,12 +18,16 @@ import {
   SelectTrigger,
   SelectValue,
   TextArea,
+  TextInput,
 } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
+import { netOf, previewMinerPayment } from '@/engine/corpTaxBook/paymentPreview';
+import { utcDay } from '@/engine/localDay';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
-import { isk, newId } from './moonsFormat';
+import { dateWithYear, isk, newId, paidAtFor } from './moonsFormat';
+import { DonationPicker, PaymentOutcomePanel } from './RecordPaymentParts';
 
 export function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
   return (
@@ -168,7 +173,13 @@ export function ReasonDialog({
   );
 }
 
-/** Record payment: ISK that reached the corporation outside the wallet journal. */
+/**
+ * Record payment: ISK that reached the corporation outside the wallet journal. It shows,
+ * before confirming, which Statements the ISK clears or part-pays and what is owed or held
+ * after (the book's own allocation). When the wallet holds Unmatched donations it also offers
+ * to match one of them instead: that assigns the donation to this Miner, so the same ISK is
+ * never recorded twice.
+ */
 export function RecordPaymentDialog({
   open,
   onClose,
@@ -176,7 +187,6 @@ export function RecordPaymentDialog({
   minerName,
   defaultAmount,
   statementId,
-  statementLabel,
   onRecorded,
 }: {
   open: boolean;
@@ -184,67 +194,154 @@ export function RecordPaymentDialog({
   miner: MinerRow;
   minerName: string;
   defaultAmount: number;
+  /** Credit this Statement first (a payment code would do the same). */
   statementId?: string;
-  /** The pinned Statement's period, so the dialog says where the payment goes first. */
-  statementLabel?: string;
   onRecorded?: () => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const { edit, names } = useBook();
+  const { edit, names, view } = useBook();
+  const k = 'corpTaxBook.moons.dialogs.record';
   const [amount, setAmount] = useState(defaultAmount >= 1 ? String(Math.round(defaultAmount)) : '');
   const [payer, setPayer] = useState(String(miner.mainCharacterId));
+  const today = utcDay();
+  const startDate = view.input.startDate;
+  const [date, setDate] = useState(today);
+  const donations = useMemo(
+    () =>
+      view.needsYou.flatMap((n) =>
+        n.kind === 'unmatched' && netOf(n.payment) > 0 ? [n.payment] : []
+      ),
+    [view.needsYou]
+  );
+  const [mode, setMode] = useState<'hand' | 'donation'>('hand');
+  const [donationId, setDonationId] = useState<string | null>(null);
+  const donation = mode === 'donation' ? donations.find((d) => d.id === donationId) : undefined;
   const value = Number(amount);
+  const dateError =
+    date === ''
+      ? t(`${k}.dateMissing`)
+      : date > today
+        ? t(`${k}.dateFuture`)
+        : date < startDate
+          ? t(`${k}.dateBeforeBook`, { date: dateWithYear(startDate) })
+          : null;
+  const dateErrorId = useId();
+
+  const outcome = useMemo(() => {
+    if (mode === 'donation') {
+      if (!donation) return undefined;
+      return previewMinerPayment(view, miner.id, donation);
+    }
+    if (!(value > 0)) return undefined;
+    return previewMinerPayment(view, miner.id, {
+      id: '__preview__',
+      characterId: Number(payer),
+      amount: value,
+      at: dateError ? new Date().toISOString() : paidAtFor(date),
+      source: 'manual',
+      ...(statementId ? { statementId } : {}),
+    });
+  }, [mode, donation, value, payer, date, dateError, statementId, view, miner.id]);
+  const statements = view.internals.byMiner.get(miner.id)?.statements ?? [];
+
   return (
     <DialogShell
       open={open}
       onClose={onClose}
-      title={t('corpTaxBook.moons.dialogs.record.title', { name: minerName })}
-      confirmLabel={t('corpTaxBook.moons.dialogs.record.confirm', { amount: isk(value || 0) })}
-      canConfirm={value > 0}
+      title={t(`${k}.title`, { name: minerName })}
+      confirmLabel={
+        mode === 'donation'
+          ? t(`${k}.confirmMatch`, { amount: isk(donation ? netOf(donation) : 0) })
+          : t(`${k}.confirm`, { amount: isk(value || 0) })
+      }
+      canConfirm={mode === 'donation' ? donation !== undefined : value > 0 && dateError === null}
       showLogged="plain"
       run={async () => {
-        await edit({
-          action: 'recordPayment',
-          paymentId: newId('m'),
-          minerId: miner.id,
-          characterId: Number(payer),
-          amount: value,
-          at: new Date().toISOString(),
-          ...(statementId ? { statementId } : {}),
-        });
+        if (mode === 'donation') {
+          if (!donation) return;
+          await edit({ action: 'assignPayment', paymentId: donation.id, minerId: miner.id });
+        } else {
+          await edit({
+            action: 'recordPayment',
+            paymentId: newId('m'),
+            minerId: miner.id,
+            characterId: Number(payer),
+            amount: value,
+            at: paidAtFor(date),
+            ...(statementId ? { statementId } : {}),
+          });
+        }
         await onRecorded?.();
       }}
     >
-      <p className="text-text-dim">{t('corpTaxBook.moons.dialogs.record.intro')}</p>
-      <Label text={t('corpTaxBook.moons.dialogs.record.amount')}>
-        <IskInput
-          value={amount}
-          onChange={setAmount}
-          aria-label={t('corpTaxBook.moons.dialogs.record.amount')}
-        />
-      </Label>
-      {miner.characterIds.length > 1 && (
-        <Label text={t('corpTaxBook.moons.dialogs.record.paidBy')}>
+      <p className="text-text-dim">{t(`${k}.intro`)}</p>
+      {donations.length > 0 && (
+        <Label text={t(`${k}.source`)}>
           <SegmentedControl
-            label={t('corpTaxBook.moons.dialogs.record.paidBy')}
-            value={payer}
-            onChange={setPayer}
-            options={miner.characterIds.map((id) => ({
-              value: String(id),
-              label: names.character(id),
-            }))}
+            label={t(`${k}.source`)}
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: 'hand', label: t(`${k}.sourceHand`) },
+              {
+                value: 'donation',
+                label: t(`${k}.sourceDonation`, { count: donations.length }),
+              },
+            ]}
             uppercase={false}
           />
         </Label>
       )}
-      <Effect>
-        {statementId && statementLabel
-          ? t('corpTaxBook.moons.dialogs.record.effectPinned', {
-              name: minerName,
-              period: statementLabel,
-            })
-          : t('corpTaxBook.moons.dialogs.record.effect', { name: minerName })}
-      </Effect>
+      {mode === 'donation' ? (
+        <>
+          <p className="text-xs text-text-dim">{t(`${k}.matchIntro`, { name: minerName })}</p>
+          <DonationPicker
+            donations={donations}
+            nameOf={names.character}
+            value={donationId}
+            onChange={setDonationId}
+          />
+        </>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Label text={t(`${k}.amount`)}>
+              <IskInput value={amount} onChange={setAmount} aria-label={t(`${k}.amount`)} />
+            </Label>
+            <Label text={t(`${k}.datePaid`)}>
+              <TextInput
+                type="date"
+                value={date}
+                min={startDate}
+                max={today}
+                onChange={(e) => setDate(e.target.value)}
+                aria-invalid={dateError !== null}
+                aria-describedby={dateError ? dateErrorId : undefined}
+              />
+              {dateError && (
+                <FieldError id={dateErrorId} className="block text-xs">
+                  {dateError}
+                </FieldError>
+              )}
+            </Label>
+          </div>
+          {miner.characterIds.length > 1 && (
+            <Label text={t(`${k}.paidBy`)}>
+              <SegmentedControl
+                label={t(`${k}.paidBy`)}
+                value={payer}
+                onChange={setPayer}
+                options={miner.characterIds.map((id) => ({
+                  value: String(id),
+                  label: names.character(id),
+                }))}
+                uppercase={false}
+              />
+            </Label>
+          )}
+        </>
+      )}
+      <PaymentOutcomePanel outcome={outcome} statements={statements} minerName={minerName} />
     </DialogShell>
   );
 }

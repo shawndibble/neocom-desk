@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Checkbox } from './Checkbox';
-import { Field, Fields } from './Fields';
+import { Field, Fields, FieldsHeading } from './Fields';
 import { NativeSelect } from './NativeSelect';
 import { TextInput } from './TextInput';
 
@@ -46,6 +46,25 @@ export const InlineCheckbox: Story = {
     <Fields variant={args.variant}>
       <Field label="Hide bait sells" htmlFor="fields-bait" inline note="Drops likely scam orders.">
         <Checkbox id="fields-bait" />
+      </Field>
+    </Fields>
+  ),
+};
+
+/** @summary `FieldsHeading`: two titled groups in one grid share a label column, so their controls line up. */
+export const WithHeadings: Story = {
+  args: { variant: 'form' },
+  render: (args) => (
+    <Fields variant={args.variant}>
+      <FieldsHeading>Pricing</FieldsHeading>
+      <Field label="Hub" htmlFor="fh-hub">
+        <NativeSelect id="fh-hub">
+          <option>Jita</option>
+        </NativeSelect>
+      </Field>
+      <FieldsHeading>Statements</FieldsHeading>
+      <Field label="Grace after day end (hours)" htmlFor="fh-grace">
+        <TextInput id="fh-grace" defaultValue="6" />
       </Field>
     </Fields>
   ),

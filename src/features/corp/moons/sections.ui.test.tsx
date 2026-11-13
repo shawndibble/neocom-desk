@@ -30,7 +30,10 @@ function renderBook(ui: React.ReactElement) {
 describe('Overview', () => {
   it('orders Fractured, Ready, then moons popping in the next 7 days', () => {
     renderBook(<OverviewTab />);
-    const titles = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    const schedule = screen.getByRole('heading', { level: 2, name: 'Moons' }).closest('section')!;
+    const titles = within(schedule)
+      .getAllByRole('heading', { level: 3 })
+      .map((h) => h.textContent);
     expect(titles).toEqual(['Fractured · 1', 'Ready · 1', 'Pops in the next 7 days · 1']);
   });
 });

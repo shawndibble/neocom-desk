@@ -76,7 +76,7 @@ export { FieldError } from './FieldError';
 export { UnsavedChangesBar } from './UnsavedChangesBar';
 export { Eyebrow } from './Eyebrow';
 export { eyebrowClassName } from './eyebrowClassName';
-export { Fields, Field } from './Fields';
+export { Fields, Field, FieldsHeading } from './Fields';
 export type { FieldsVariant } from './Fields';
 export { LogoMark } from './LogoMark';
 export { SeverityIcon } from './SeverityIcon';

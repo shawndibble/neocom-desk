@@ -15,7 +15,7 @@ import {
   type CreditDisposition,
 } from '@/engine/corpTaxBook/closeAccount';
 import { DialogShell, Effect, Label } from './BookDialogs';
-import { isk } from './moonsFormat';
+import { dateWithYear, isk } from './moonsFormat';
 import { useBook } from './useBook';
 import { statementRefineryNames, useCorporationName } from './statementMailing';
 
@@ -88,7 +88,7 @@ export function CloseAccountDialog({
         {plan?.statement
           ? t('corpTaxBook.moons.dialogs.close.finalStatement', {
               amount: isk(plan.statement.amount),
-              through: plan.statement.coversThrough,
+              through: dateWithYear(plan.statement.coversThrough),
             })
           : t('corpTaxBook.moons.dialogs.close.noStatement')}{' '}
         {t('corpTaxBook.moons.dialogs.close.owedAfter', {

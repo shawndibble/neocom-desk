@@ -17837,7 +17837,25 @@
         "moreMoons_other": "and {{count}} more moons",
         "openPage": "Open page",
         "empty": "No Miner owes tax, is owed credit or has days waiting.",
-        "emptyFiltered": "No Miner matches these filters."
+        "emptyFiltered": "No Miner matches these filters.",
+        "balance": {
+          "label": "Balance",
+          "any": "Any",
+          "owing": "Owes tax",
+          "overdue": "Overdue",
+          "overdue-0-30": "Overdue 0–30 days",
+          "overdue-31-60": "Overdue 31–60 days",
+          "overdue-61-90": "Overdue 61–90 days",
+          "overdue-over-90": "Overdue over 90 days",
+          "credit": "Holds credit"
+        }
+      },
+      "aging": {
+        "title": "Overdue by age",
+        "0-30": "0–30 days",
+        "31-60": "31–60 days",
+        "61-90": "61–90 days",
+        "over-90": "Over 90 days"
       },
       "needs": {
         "title_one": "Needs you · {{count}}",
@@ -17897,6 +17915,7 @@
         "payments": "Payments",
         "paymentsHint": "Credited oldest debt first",
         "sum": "Statements {{billed}} − written off {{written}} − payments and dismissals {{settled}} = {{owed}} owed",
+        "sumNoWriteOff": "Statements {{billed}} − payments and dismissals {{settled}} = {{owed}} owed",
         "dismissals": "Dismissals",
         "reversed": "reversed",
         "reverse": "Reverse",
@@ -17985,10 +18004,10 @@
           "stopReminders": "stopped reminders"
         },
         "actionsTo": {
-          "issueStatement": "issued a Statement to {{name}}, {{amount}} ISK",
-          "issueStatementPlain": "issued a Statement to {{name}}",
-          "recordMail": "mailed a Statement to {{name}}",
-          "recordReminder": "sent a reminder to {{name}}"
+          "issueStatement": "issued a Statement to <name>{{name}}</name>, {{amount}} ISK",
+          "issueStatementPlain": "issued a Statement to <name>{{name}}</name>",
+          "recordMail": "mailed a Statement to <name>{{name}}</name>",
+          "recordReminder": "sent a reminder to <name>{{name}}</name>"
         }
       },
       "health": {
@@ -18042,7 +18061,8 @@
         "unmailed_one": "{{count}} earlier Statement was issued but never mailed; it goes with this run",
         "unmailed_other": "{{count}} earlier Statements were issued but never mailed; they go with this run",
         "unmatched": "An Unmatched donation is not on anyone's Statement until it is assigned",
-        "previewFor": "Preview mail for",
+        "previewFor": "Preview for",
+        "mailPreview": "Mail preview",
         "continue": "Continue to send",
         "preview": "Preview mail",
         "loadingCorporation": "Loading corporation name…",
@@ -18282,6 +18302,35 @@
           "unknown": "Could not connect this corporation. Try again later."
         }
       },
+      "setupChecklist": {
+        "title": "Set up the book",
+        "progress": "{{done}} of {{total}} done",
+        "dismiss": "Hide the setup checklist",
+        "stateDone": "(done)",
+        "stateTodo": "(to do)",
+        "checking": "Checking the refinery names…",
+        "rate": {
+          "title": "Corp tax rate set",
+          "done": "{{pct}}% for every Miner without a rate of their own",
+          "todo": "No Miner is taxed until a rate is set.",
+          "action": "Set the rate"
+        },
+        "autoSync": {
+          "title": "Automatic sync turned on",
+          "todo": "Keeps the book current without an officer opening this page.",
+          "action": "Turn on"
+        },
+        "refineryNames": {
+          "title": "Refinery names readable",
+          "todo_one": "{{count}} refinery shows as Unknown/Undockable. Open this page with a Character that can dock there and its name is read.",
+          "todo_other": "{{count}} refineries show as Unknown/Undockable. Open this page with a Character that can dock there and their names are read."
+        },
+        "firstStatement": {
+          "title": "First Statement issued",
+          "todo": "Once a period closes, send each Miner what they owe.",
+          "action": "Go to Statements"
+        }
+      },
       "setup": {
         "back": "Back",
         "paste": "Paste an invite link or code",
@@ -18290,7 +18339,7 @@
         "own": {
           "title": "Run your corporation's book",
           "hint": "Track the moon mining tax for your corporation's refineries in this app.",
-          "action": "Turn on your corporation's book"
+          "action": "Turn on the book"
         },
         "handled": {
           "title": "Let an accounting corporation handle it",
@@ -18720,8 +18769,29 @@
           "intro": "For ISK the wallet journal cannot show: a contract, another division, a handover in person. A donation into the corporation's wallet is found on its own.",
           "amount": "Amount",
           "paidBy": "Paid by",
-          "effect": "Credited oldest debt first. An overpayment is held as credit for {{name}}.",
-          "effectPinned": "Credited toward the {{period}} Statement first, then oldest debt first. An overpayment is held as credit for {{name}}."
+          "datePaid": "Date paid (EVE time)",
+          "dateMissing": "Enter the date it was paid.",
+          "dateFuture": "A payment can't be dated after today (EVE time).",
+          "dateBeforeBook": "The book starts {{date}}; a payment can't be dated before it.",
+          "source": "Where the ISK came from",
+          "sourceHand": "Not in the wallet",
+          "sourceDonation_one": "Wallet donation ({{count}})",
+          "sourceDonation_other": "Wallet donations ({{count}})",
+          "matchIntro": "Donations no Miner has been matched to yet. Picking one credits it to {{name}} instead of recording new ISK, so it is never counted twice.",
+          "donations": "Unmatched donations",
+          "findDonation": "Find by pilot or amount",
+          "noDonationMatch": "No donation matches.",
+          "donationRow": "{{amount}} from {{name}}",
+          "donationAt": "{{date}} {{time}} EVE time",
+          "confirmMatch": "Assign {{amount}}",
+          "outcomeTitle": "After this payment",
+          "enterAmount": "Enter an amount to see which Statements it pays.",
+          "statementLine": "{{period}} Statement",
+          "clears": "Paid in full",
+          "partPays": "Part paid, {{left}} left",
+          "stillOwes": "{{name}} still owes {{amount}}",
+          "owesNothing": "{{name}} owes nothing",
+          "creditHeld": "{{amount}} held as credit toward the next Statement"
         },
         "notTax": {
           "title": "Mark part of a donation as not tax",
