@@ -15,6 +15,7 @@ import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { Layout } from './Layout';
 import { useHiddenNav, useRecentNav } from './navPreferences';
+import { useUpdateStatus } from './updateAvailable';
 import { seedGrant as seedGrantFor } from '@/test/seed';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
@@ -129,6 +130,8 @@ beforeEach(async () => {
   useRecentNav.setState({ value: [], hydrated: true });
   // These tests list the whole rail: every page shows, as for a new pilot.
   useHiddenNav.setState({ value: [], hydrated: true });
+  // No newer build waiting unless a test says so.
+  useUpdateStatus.setState({ status: 'unknown', build: null, found: 0 });
 });
 
 describe('Layout sync status dot', () => {
@@ -283,6 +286,20 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
     expect(screen.queryByRole('dialog', { name: 'More' })).not.toBeInTheDocument();
   });
+
+  it.each([
+    ['phone', false, false],
+    ['desktop', true, true],
+  ])(
+    'new-version callout at %s widths: shown %s (on a phone it points at nothing)',
+    (_width, desktop, shown) => {
+      mockIsSyncConfigured.mockReturnValue(false);
+      useUpdateStatus.setState({ status: 'available', found: 1 });
+      stubViewport(() => desktop);
+      renderLayout();
+      expect(screen.queryByText('A new version is ready.') !== null).toBe(shown);
+    }
+  );
 
   describe('skip link', () => {
     function stubDesktop(matches: boolean) {

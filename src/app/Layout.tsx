@@ -383,7 +383,10 @@ export const Layout = memo(function Layout() {
                       attention={railSettingsAttention}
                       className="flex-1"
                     />
-                    <RailUpgradeButton />
+                    {/* Mounted only where the rail shows: the rail is CSS-hidden below `md`,
+                        but the callout is a portaled popover that would escape it and
+                        point at nothing on a phone. */}
+                    {isDesktop && <RailUpgradeButton />}
                   </div>
                 ) : (
                   <NavItem key={page.path} to={page.path} label={t(page.labelKey)} locked={false} />
