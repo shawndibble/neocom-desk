@@ -23,7 +23,7 @@ export interface SkillRowProps {
   /** The highest level the target Skill Plan already targets for this skill, past `currentLevel` — drawn on the bar itself. Omit when nothing is planned past what's trained. */
   plannedLevel?: number | null;
   /** The level this row asks for, drawn on the bar as the levels still needed. */
-  requiredLevel?: number;
+  requiredLevel?: number | null;
   /** When set, the name opens the shared Skill Detail popover (#400/#405) instead of rendering as inert text. */
   skillTypeID?: number;
   /** The target Skill Plan's entries, carried into the Skill Detail popover so its prerequisites read "Planned". */

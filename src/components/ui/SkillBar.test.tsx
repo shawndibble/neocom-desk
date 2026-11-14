@@ -73,6 +73,13 @@ describe('SkillBar', () => {
     expect(segments[2]?.className).toContain('bg-text-dim');
   });
 
+  it('draws banked progress over the first needed segment', () => {
+    render(<SkillBar level={2} progress={0.5} requiredLevel={4} />);
+    const segments = screen.getByRole('img').querySelectorAll('[aria-hidden="true"]');
+    expect(segments[2]?.className).toContain('bg-text-dim');
+    expect(segments[2]?.querySelector('span')).toHaveStyle({ width: '50%' });
+  });
+
   it('ignores a requiredLevel already trained', () => {
     render(<SkillBar level={4} requiredLevel={3} />);
     expect(screen.getByRole('img', { name: 'Level 4 of 5' })).toBeInTheDocument();

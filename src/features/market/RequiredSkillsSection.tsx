@@ -14,6 +14,7 @@
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
+import { romanLevel } from '@/engine/projection';
 import type { TrainedSkill } from '@/engine/types';
 import type { RequiredSkill } from '@/features/skills/dogma';
 import { isEntryCovered, plannedLevelFor } from '@/features/skills/planner/reorder';
@@ -86,7 +87,7 @@ export function RequiredSkillsSection({
           return (
             <SkillRow
               key={req.skillTypeID}
-              name={name}
+              name={`${name} ${romanLevel(req.level)}`}
               skillTypeID={req.skillTypeID}
               planEntries={planEntries}
               status={skillTrainingStatus(currentLevel, req.level)}

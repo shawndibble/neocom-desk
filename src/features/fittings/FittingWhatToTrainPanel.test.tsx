@@ -388,6 +388,8 @@ describe('FittingWhatToTrainPanel — Skill Plan button and prerequisites', () =
     // Each row names the level it needs: the pips only show what's trained.
     expect(within(list).getByText('Gunnery III')).toBeInTheDocument();
     expect(within(list).getByText('Surgical Strike I')).toBeInTheDocument();
+    // …and the bar draws it as the levels still needed.
+    expect(within(list).getByRole('img', { name: /needs 3/ })).toBeInTheDocument();
   });
 });
 

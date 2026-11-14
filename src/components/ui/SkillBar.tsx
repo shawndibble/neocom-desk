@@ -31,6 +31,15 @@ interface SkillBarProps {
 
 const LEVELS = [1, 2, 3, 4, 5] as const;
 
+type Segment = 'trained' | 'planned' | 'needed' | 'untrained';
+
+const SEGMENT_CLASS: Record<Segment, string> = {
+  trained: 'bg-accent',
+  planned: 'border border-accent-dim bg-accent-dim/40',
+  needed: 'border border-text-dim bg-text-dim',
+  untrained: 'border border-line bg-transparent',
+};
+
 export function SkillBar({
   level,
   progress,
@@ -41,14 +50,15 @@ export function SkillBar({
   const { t } = useTranslation();
   const planned = plannedLevel != null && plannedLevel > level ? plannedLevel : null;
   const needed = requiredLevel != null && requiredLevel > level ? requiredLevel : null;
-  const ariaLabel =
-    planned !== null && needed !== null
-      ? t('skills.levelOfFivePlannedNeeded', { level, planned, needed })
-      : planned !== null
-        ? t('skills.levelOfFivePlanned', { level, planned })
-        : needed !== null
-          ? t('skills.levelOfFiveNeeded', { level, needed })
-          : t('skills.levelOfFive', { level });
+  const ariaKey =
+    planned !== null
+      ? needed !== null
+        ? 'skills.levelOfFivePlannedNeeded'
+        : 'skills.levelOfFivePlanned'
+      : needed !== null
+        ? 'skills.levelOfFiveNeeded'
+        : 'skills.levelOfFive';
+  const ariaLabel = t(ariaKey, { level, planned, needed });
   return (
     <span
       role="img"
@@ -56,23 +66,24 @@ export function SkillBar({
       className={`inline-flex items-center gap-0.5 ${className}`}
     >
       {LEVELS.map((segment) => {
-        const trained = segment <= level;
-        const inPlan = !trained && planned !== null && segment <= planned;
-        const required = !trained && !inPlan && needed !== null && segment <= needed;
-        const partial = !trained && !inPlan && segment === level + 1 && progress != null;
+        const state: Segment =
+          segment <= level
+            ? 'trained'
+            : planned !== null && segment <= planned
+              ? 'planned'
+              : needed !== null && segment <= needed
+                ? 'needed'
+                : 'untrained';
+        // Banked progress reads on the hairline or the gray needed fill alike.
+        const partial =
+          (state === 'untrained' || state === 'needed') &&
+          segment === level + 1 &&
+          progress != null;
         return (
           <span
             key={segment}
             aria-hidden="true"
-            className={`relative h-2.5 w-1.5 overflow-hidden rounded-[1px] ${
-              trained
-                ? 'bg-accent'
-                : inPlan
-                  ? 'border border-accent-dim bg-accent-dim/40'
-                  : required
-                    ? 'border border-text-dim bg-text-dim'
-                    : 'border border-line bg-transparent'
-            }`}
+            className={`relative h-2.5 w-1.5 overflow-hidden rounded-[1px] ${SEGMENT_CLASS[state]}`}
           >
             {partial && (
               <span
