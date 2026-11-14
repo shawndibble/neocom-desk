@@ -368,9 +368,12 @@ describe('FittingStartScreen', () => {
   it('Enter on a row opens it and the arrow keys walk the list, the preview following', async () => {
     const workspace = renderScreen();
     const drake = await screen.findByRole('button', { name: /^Armor Drake/ });
+    // Kite (saved) and Armor Drake (In-game) load separately: ArrowDown from Drake reaches
+    // Kite only once both are listed.
+    await screen.findByRole('button', { name: /^Kite/ });
     act(() => drake.focus());
     await userEvent.keyboard('{ArrowDown}');
-    expect(screen.getByText('preview of Kite')).toBeInTheDocument();
+    expect(await screen.findByText('preview of Kite')).toBeInTheDocument();
     await userEvent.keyboard('{Enter}');
     expect(workspace.openSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
   });
