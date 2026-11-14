@@ -243,22 +243,14 @@ export function historyColumns({
       className: 'tabular-nums',
       sortValue: (job) => job.runs,
       render: (job) => {
-        // A finished invention job's result rides on its runs (issue #6166):
-        // dim, never a failure tone, since a miss is a normal outcome.
+        // A finished invention job's runs read as its result (issue #6166),
+        // never in a failure tone: a miss is a normal outcome.
         const outcome = inventionOutcome(job);
         if (!outcome) return formatCount(job.runs);
-        return (
-          <>
-            {formatCount(job.runs)}
-            <span className="text-text-dim">
-              {' · '}
-              {t('industry.historyInventionSucceeded', {
-                succeeded: formatCount(outcome.succeeded),
-                runs: formatCount(outcome.runs),
-              })}
-            </span>
-          </>
-        );
+        return t('industry.historyInventionSucceeded', {
+          succeeded: formatCount(outcome.succeeded),
+          runs: formatCount(outcome.runs),
+        });
       },
     },
     {

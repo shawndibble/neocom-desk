@@ -113,6 +113,7 @@ export function classifyHistoryJobs(
 /** Activity ids the Production Log can record: manufacturing and reactions. */
 const LOGGABLE_ACTIVITIES = new Set([1, 11]);
 
+/** ESI `activity_id` for invention. */
 const INVENTION_ACTIVITY = 8;
 
 /**

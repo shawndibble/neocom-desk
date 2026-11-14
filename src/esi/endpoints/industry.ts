@@ -265,6 +265,7 @@ export interface CorporationIndustryJob {
   licensed_runs?: number;
   probability?: number;
   product_type_id?: number;
+  /** Delivered jobs only: for invention, how many of `runs` produced a copy. Typed for parity; History is personal jobs only. */
   successful_runs?: number;
 }
 

@@ -1686,8 +1686,9 @@ describe('ActiveJobsPanel: Job History (#2866)', () => {
     await expandJobs();
     await openHistory();
 
-    const zero = await screen.findByText('· 0 of 5 succeeded');
-    expect(zero).toHaveClass('text-text-dim');
+    const zero = await screen.findByText('0 of 5 succeeded');
+    expect(zero).not.toHaveClass('text-danger');
+    // Job 8 (no count from ESI) and job 9 (manufacturing) show plain runs.
     expect(screen.getAllByText(/of \d+ succeeded/)).toHaveLength(1);
   });
 
