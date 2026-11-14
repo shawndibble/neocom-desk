@@ -6,6 +6,7 @@ import {
   mergeJobHistory,
   classifyHistoryJobs,
   countUnloggedDeliveries,
+  inventionOutcome,
   type LoggedRunRef,
 } from './jobHistory';
 
@@ -166,5 +167,37 @@ describe('countUnloggedDeliveries', () => {
     ];
     const states = classifyHistoryJobs(rows, [run({ sourceJobId: 3 })]);
     expect(countUnloggedDeliveries(rows, states, { dismissedJobIds: new Set([2, 3]) })).toBe(1);
+  });
+});
+
+describe('inventionOutcome (#6166)', () => {
+  it('reads successes out of runs for an invention job', () => {
+    expect(inventionOutcome(job({ activity_id: 8, runs: 5, successful_runs: 3 }))).toEqual({
+      succeeded: 3,
+      runs: 5,
+    });
+  });
+
+  it('keeps zero successes as a result, not a missing one', () => {
+    expect(inventionOutcome(job({ activity_id: 8, runs: 5, successful_runs: 0 }))).toEqual({
+      succeeded: 0,
+      runs: 5,
+    });
+  });
+
+  it('is null when ESI left the field out', () => {
+    expect(inventionOutcome(job({ activity_id: 8, runs: 5 }))).toBeNull();
+  });
+
+  it('is null for every other activity, even with the field', () => {
+    expect(inventionOutcome(job({ activity_id: 1, runs: 5, successful_runs: 5 }))).toBeNull();
+  });
+});
+
+describe('mergeJobHistory picks up successful_runs (#6166)', () => {
+  it('replaces a stored copy without the field by a fetched copy with it', () => {
+    const stored = [job({ job_id: 9, activity_id: 8, runs: 5 })];
+    const fetched = [job({ job_id: 9, activity_id: 8, runs: 5, successful_runs: 2 })];
+    expect(mergeJobHistory(stored, fetched)[0].successful_runs).toBe(2);
   });
 });
