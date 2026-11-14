@@ -391,7 +391,8 @@
     },
     "missingSkills": {
       "chip_one": "Missing {{count}} skill · {{time}}",
-      "chip_other": "Missing {{count}} skills · {{time}}"
+      "chip_other": "Missing {{count}} skills · {{time}}",
+      "prerequisite": "(prerequisite)"
     },
     "mastery": {
       "chip": "Mastery",
