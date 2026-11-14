@@ -591,6 +591,8 @@ export function useAssetsData() {
     mergedAssets,
     abyssal,
     priceByTypeId,
+    /** False only while the snapshot's market prices are still loading. */
+    pricesReady: data?.pricesReady !== false,
     itemValueByItemId,
     mergedTypeNames,
     blueprintTypeIds,

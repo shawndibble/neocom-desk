@@ -18,6 +18,8 @@ import {
   goBack,
 } from '@/test/assetsPage';
 import { ABYSSAL_NEUT, abyssalEstimate } from '@/test/assetsMocks';
+import { formatIskCompact } from '@/lib/isk';
+import { formatCubicMetres } from '@/lib/volume';
 
 vi.mock('virtual:pwa-register/react', async () =>
   (await import('@/test/assetsMocks')).pwaRegisterMock()
@@ -99,8 +101,66 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Select Drake and its contents' }));
 
     expect(
-      await screen.findByText('1 item selected', { selector: '[aria-hidden="true"]' })
+      await screen.findByText('1 item selected', { selector: 'span[aria-hidden="true"]' })
     ).toBeInTheDocument();
+  });
+
+  it('totals a selection at its items only: a cascaded ship adds its cargo, never its hull (#6165)', async () => {
+    server.use(
+      http.get('https://esi.evetech.net/markets/prices', () =>
+        HttpResponse.json([
+          { type_id: 650, average_price: 50_000_000 },
+          { type_id: 34, average_price: 5 },
+        ])
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    const user = userEvent.setup({ delay: null });
+    render(<App />);
+    await openLocation(user, JITA);
+    await screen.findByRole('heading', { name: 'Drake' });
+
+    await clickTool(user, 'Select');
+    await user.click(screen.getByRole('checkbox', { name: 'Select Drake and its contents' }));
+
+    // The cargo's 50 × 5 ISK, not the Drake's 50M: the hull is never added.
+    // The ISK part holds an `IskAmount` (shorthand plus its exact figure as
+    // hidden text), so match the part span by its shorthand and suffix.
+    const [iskPart] = await screen.findAllByText(
+      (_, element) =>
+        element?.tagName === 'SPAN' &&
+        element.textContent?.trim().startsWith(`· ${formatIskCompact(250)}`) === true &&
+        element.textContent.endsWith(' ISK')
+    );
+    expect(iskPart).not.toHaveAttribute('aria-hidden');
+    expect(
+      screen.getByText(`· ${formatCubicMetres(0.5)} m³`, { selector: 'span[aria-hidden="true"]' })
+    ).toHaveClass('max-sm:hidden');
+    expect(screen.queryByText(/unpriced/)).not.toBeInTheDocument();
   });
 
   it('turning off select mode clears the current selection', async () => {
@@ -112,7 +172,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
     expect(
-      await screen.findByText('1 item selected', { selector: '[aria-hidden="true"]' })
+      await screen.findByText('1 item selected', { selector: 'span[aria-hidden="true"]' })
     ).toBeInTheDocument();
 
     await clickTool(user, 'Select');
@@ -297,7 +357,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await user.click(screen.getByRole('button', { name: 'Select all in view' }));
 
     expect(
-      await screen.findByText('2 items selected', { selector: '[aria-hidden="true"]' })
+      await screen.findByText('2 items selected', { selector: 'span[aria-hidden="true"]' })
     ).toBeInTheDocument();
     for (const checkbox of screen.getAllByRole('checkbox')) {
       expect(checkbox).toBeChecked();
@@ -325,7 +385,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('button', { name: 'Select all in view' }));
     expect(
-      await screen.findByText('2 items selected', { selector: '[aria-hidden="true"]' })
+      await screen.findByText('2 items selected', { selector: 'span[aria-hidden="true"]' })
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Deselect all' }));

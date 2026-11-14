@@ -1,6 +1,10 @@
-import { useTranslation } from 'react-i18next';
-import { Button, LiveStatus } from '@/components/ui';
+import { useMemo, type ReactNode } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
+import { Button, IskAmount, LiveStatus } from '@/components/ui';
+import { formatIskCompact } from '@/lib/isk';
+import { formatCubicMetres } from '@/lib/volume';
 import { AssetsFilterRow } from './AssetsFilterRow';
+import { selectionTotals } from './assetSelection';
 import type { AssetsData } from './useAssetsData';
 import type { AssetsRows } from './useAssetsRows';
 
@@ -24,12 +28,51 @@ export function AssetsToolbar({
     handleDeselectAll,
   } = assetsRows;
   const { t } = useTranslation();
+  const { assetsByItemId, priceByTypeId, pricesReady, itemValueByItemId, volumeByTypeId } =
+    assetsData;
+  const totals = useMemo(
+    () =>
+      selectionTotals(
+        selectedIds,
+        assetsByItemId,
+        priceByTypeId,
+        itemValueByItemId,
+        volumeByTypeId
+      ),
+    [selectedIds, assetsByItemId, priceByTypeId, itemValueByItemId, volumeByTypeId]
+  );
+  // "N items selected · 1.2B ISK · 4,310 m³ · 3 unpriced" (issue #6165). ISK
+  // and the unpriced count wait for prices, so nothing reads unpriced while
+  // they load; m³ is the part a phone drops.
+  // ISK on screen is an `IskAmount` (exact figure one gesture away); the
+  // status line for screen readers keeps the plain shorthand.
+  const selectionParts: { text: string; shown?: ReactNode; phoneHidden?: boolean }[] = [
+    { text: t('assets.select.selectedCount', { count: selectedIds.size }) },
+  ];
+  if (pricesReady) {
+    selectionParts.push({
+      text: t('assets.select.totalIsk', { amount: formatIskCompact(totals.isk) }),
+      shown: (
+        <Trans
+          i18nKey="assets.select.totalIskShown"
+          components={{ isk: <IskAmount value={totals.isk} /> }}
+        />
+      ),
+    });
+  }
+  selectionParts.push({
+    text: t('assets.select.totalVolume', { volume: formatCubicMetres(totals.volume) }),
+    phoneHidden: true,
+  });
+  if (pricesReady && totals.unpriced > 0) {
+    selectionParts.push({ text: t('assets.select.unpriced', { count: totals.unpriced }) });
+  }
   return (
     <>
       {
         <LiveStatus>
           {selectMode && selectedIds.size > 0
-            ? t('assets.select.selectedCount', { count: selectedIds.size })
+            ? selectionParts.map((part) => part.text).join(' · ')
             : searchActive && debouncedSearch.trim().length > 0
               ? t('assets.search.resultCount', { count: flatMatches.length })
               : null}
@@ -41,8 +84,19 @@ export function AssetsToolbar({
       {selectMode && (
         <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
           {selectedIds.size > 0 && (
-            <span aria-hidden="true" className="text-[0.6875rem] text-text-dim tabular-nums">
-              {t('assets.select.selectedCount', { count: selectedIds.size })}
+            <span className="whitespace-nowrap text-[0.6875rem] text-text-dim tabular-nums">
+              {selectionParts.map((part, index) => (
+                // Plain parts are already read by the status line above; the
+                // ISK part stays in reach so its exact figure can be focused.
+                <span
+                  key={index}
+                  aria-hidden={part.shown ? undefined : 'true'}
+                  className={part.phoneHidden ? 'max-sm:hidden' : undefined}
+                >
+                  {index > 0 && ' · '}
+                  {part.shown ?? part.text}
+                </span>
+              ))}
             </span>
           )}
           <Button size="sm" onClick={handleSelectAllInView}>
