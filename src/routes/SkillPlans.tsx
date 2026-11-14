@@ -22,8 +22,10 @@ import { useCloneStates, cloneStateFor } from '@/features/skills/cloneState';
 import { newPlan } from '@/features/skills/planner/newPlan';
 import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
-import { AttributesPane } from '@/features/skills/planner/AttributesPane';
+import { AttributesPane, PlanAttributeChips } from '@/features/skills/planner/AttributesPane';
 import { AcceleratorSection } from '@/features/skills/planner/AcceleratorSection';
+import { AcceleratorRow } from '@/features/skills/planner/AcceleratorRow';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { CurrentQueuePanel } from '@/features/skills/planner/CurrentQueuePanel';
 import { QueueStrip } from '@/features/skills/planner/QueueStrip';
 import { SkillPlanCard } from '@/features/skills/planner/SkillPlanCard';
@@ -98,6 +100,7 @@ export function SkillPlans() {
   // Shared with every other 30 s clock on screen; paused while the tab is hidden.
   const nowMs = useTicker(TICK_MS);
   const timeZone = useTimeZone();
+  const isDesktop = useIsDesktop();
   // An injected booster: typed in and still running, or read off the attribute
   // sheet (EVE gives its size but never its expiry, so the pilot sets that here).
   const injected = injectedAccelerator(accelerator, attributeBaseline, nowMs);
@@ -208,6 +211,9 @@ export function SkillPlans() {
     }
   }, [activeCharacterId, scheduleInputs, cloneStates, remapInfo, navigate, t, timeZone]);
 
+  const onOptimizeQueue = scheduleInputs && remapInfo ? () => void optimizeQueue() : undefined;
+  const queueEmpty = queueResult != null && queueResult.data.length === 0;
+
   if (!hydrated) {
     return <Spinner block="page" label={t('common.loading')} />;
   }
@@ -238,24 +244,43 @@ export function SkillPlans() {
             activeCharacterId={activeCharacterId}
             remapInfo={remapInfo}
             scheduleInputs={scheduleInputs}
+            // A phone has no Attributes panel to carry the button.
+            onOptimizeQueue={isDesktop ? undefined : onOptimizeQueue}
+            queueEmpty={queueEmpty}
           />
-          <AttributesPane
-            result={attributesResult}
-            implantBonuses={implants}
-            attributeBaseline={attributeBaseline}
-            remapInfo={remapInfo}
-            onOptimizeQueue={scheduleInputs && remapInfo ? () => void optimizeQueue() : undefined}
-            queueEmpty={queueResult != null && queueResult.data.length === 0}
-            accelerator={
-              injected.running !== null || injected.detected !== null ? (
-                <AcceleratorSection
-                  characterId={activeCharacterId}
-                  running={injected.running}
-                  detectedBonus={injected.detected}
+          {isDesktop ? (
+            <AttributesPane
+              result={attributesResult}
+              implantBonuses={implants}
+              attributeBaseline={attributeBaseline}
+              remapInfo={remapInfo}
+              onOptimizeQueue={onOptimizeQueue}
+              queueEmpty={queueEmpty}
+              accelerator={
+                injected.running !== null || injected.detected !== null ? (
+                  <AcceleratorSection
+                    characterId={activeCharacterId}
+                    running={injected.running}
+                    detectedBonus={injected.detected}
+                  />
+                ) : null
+              }
+            />
+          ) : (
+            <AcceleratorRow
+              characterId={activeCharacterId}
+              running={injected.running}
+              detectedBonus={injected.detected}
+              nowMs={nowMs}
+              attributes={
+                <PlanAttributeChips
+                  result={attributesResult}
+                  implantBonuses={implants}
+                  attributeBaseline={attributeBaseline}
                 />
-              ) : null
-            }
-          />
+              }
+            />
+          )}
         </aside>
         {catalog && (
           <CurrentQueuePanel

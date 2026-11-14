@@ -2832,6 +2832,7 @@
     "newPlanOptions": "More ways to start a plan",
     "fromCertifiedItem": "From a Certified Plan",
     "fromCommunityItem": "From a Community plan",
+    "fromQueueOptimizedItem": "From your skill queue, optimized",
     "newPlanName": "Untitled plan",
     "optimizeQueue": "Optimize queue",
     "optimizeQueueEmptyTip": "Your skill queue is empty: nothing to optimize.",
@@ -3012,6 +3013,9 @@
       "minutes": "m"
     },
     "acceleratorDetected": "+{{bonus}} detected",
+    "acceleratorRowRunning": "+{{bonus}} · {{left}} left",
+    "acceleratorRowNeedsTime": "+{{bonus}} detected · set time left",
+    "acceleratorRowNone": "None",
     "acceleratorNoExpiry": "EVE doesn’t report when boosters expire. Set the time left to include it in training times.",
     "importAction": "Import",
     "importFileChoose": "Or choose a .emp or .xml file",
