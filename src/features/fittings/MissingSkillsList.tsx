@@ -61,10 +61,7 @@ export function MissingSkillsList({
                 </SkillLink>{' '}
                 {romanLevel(row.targetLevel)}
                 {row.prerequisite && (
-                  <span className="text-text-dim">
-                    {' '}
-                    {t('fittings.yourCharacters.prerequisite')}
-                  </span>
+                  <span className="text-text-dim"> {t('fittings.missingSkills.prerequisite')}</span>
                 )}
               </span>
               <span className="text-text-dim">{formatCountdown(row.seconds)}</span>

@@ -81,6 +81,13 @@ describe('MissingSkillsChip', () => {
 
     const prereq = screen.getByText('Drones').closest('li');
     expect(prereq).toHaveTextContent('(prerequisite)');
+
+    // The plan pulls prerequisites in itself; only the fit's own skill is added.
+    addEntries.mockClear();
+    await user.click(screen.getByRole('button', { name: 'Add all to Skill Plan' }));
+    await waitFor(() =>
+      expect(addEntries).toHaveBeenCalledWith([{ skillTypeID: 23594, targetLevel: 1 }], 'Ishtar')
+    );
   });
 
   it('confirms next to the button once the skills were added', async () => {
