@@ -8097,12 +8097,10 @@
         "region": "This ore is also billed by the corporation"
       },
       "pay": {
-        "title": "Pay {{corp}}",
-        "amount": "Send",
         "copy": "Copy",
-        "copied": "Copied.",
-        "how": "Send it as a donation from your wallet to {{corp}}, into division {{division}}. The corp's book finds it in its own wallet journal and credits it; nothing is recorded here.",
+        "how": "Send it as a donation to {{corp}}, into division {{division}}: the corp's book finds it in its wallet journal and credits it. Recording it here marks it paid on your side meanwhile.",
         "code": "{{period}} Statement: put this code in the donation's reason to pin it to that Statement.",
+        "codeInReason": "The Reason is your {{period}} Statement's code: it pins the donation to that Statement.",
         "noCode": "No code is needed: the donation credits you, oldest day first."
       },
       "claim": {

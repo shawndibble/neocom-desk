@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type MiningTaxAssignmentRecord, type PayeeRecord } from '@/db';
+import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS, PAYEES } from '@/sync/syncedCollections';
@@ -16,6 +17,7 @@ import {
   continueSession,
   deletePayee,
   dismiss,
+  recordCorpPayment,
   settle,
   unassign,
   uncombine,
@@ -500,5 +502,135 @@ describe('unsettleByIds', () => {
     const result = await unsettleByIds(['missing']);
 
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('recordCorpPayment', () => {
+  const CORP = { corporationId: 98000001, name: 'Bureau' };
+  function bookRow(overrides: Partial<BookRowView> = {}): BookRowView {
+    return {
+      id: 'book:1',
+      corporationId: CORP.corporationId,
+      corpName: CORP.name,
+      characterId: CHAR,
+      date: '2026-09-04',
+      solarSystemId: SYSTEM,
+      state: 'billed',
+      oreLines: [{ typeId: ORE, quantity: 100 }],
+      unitPrices: { [ORE]: 10 },
+      priceSources: {},
+      taxPct: 10,
+      rateScope: 'corp',
+      estimatedValue: 1000,
+      taxOwed: 100,
+      billed: 100,
+      hubId: 'jita',
+      oreForm: 'raw',
+      ...overrides,
+    };
+  }
+  const payee = (id: string): PayeeRecord => ({
+    id,
+    characterId: CHAR,
+    name: id,
+    defaultTaxPct: 10,
+    updatedAt: 1,
+  });
+  const PAYMENT = { paidOn: '2026-09-05', method: 'contract' as const, amount: 100 };
+
+  it('records the row paid under a new Payee verified as the corporation', async () => {
+    const result = await recordCorpPayment(CORP, [bookRow()], PAYMENT);
+
+    expect(result.ok).toBe(true);
+    const [payee] = await db.payees.toArray();
+    expect(payee).toMatchObject({
+      characterId: CHAR,
+      name: 'Bureau',
+      entityId: CORP.corporationId,
+      entityKind: 'corporation',
+    });
+    const [paid] = await db.miningTaxAssignments.toArray();
+    expect(paid).toMatchObject({
+      payeeId: payee.id,
+      date: '2026-09-04',
+      solarSystemId: SYSTEM,
+      oreLines: [{ typeId: ORE, quantity: 100 }],
+      taxOwed: 100,
+      status: 'paid',
+      payment: expect.objectContaining({ method: 'contract', paidOn: '2026-09-05' }),
+    });
+  });
+
+  it('reuses the verified corporation Payee, never one that only shares its name', async () => {
+    const sameName: PayeeRecord = { ...payee('p1'), name: 'Bureau' };
+    const verified: PayeeRecord = {
+      ...payee('p2'),
+      name: 'Bureau',
+      entityId: CORP.corporationId,
+      entityKind: 'corporation',
+    };
+    await db.payees.bulkPut([sameName, verified]);
+
+    await recordCorpPayment(CORP, [bookRow()]);
+
+    expect(await db.payees.count()).toBe(2);
+    const [paid] = await db.miningTaxAssignments.toArray();
+    expect(paid).toMatchObject({ payeeId: 'p2', status: 'paid' });
+    expect(paid.payment).toBeUndefined();
+  });
+
+  it('records only the ore the member has not already marked paid', async () => {
+    const verified: PayeeRecord = {
+      ...payee('p2'),
+      entityId: CORP.corporationId,
+      entityKind: 'corporation',
+    };
+    await db.payees.put(verified);
+    await db.miningTaxAssignments.put(
+      assignment({
+        id: 'mark',
+        payeeId: 'p2',
+        status: 'paid',
+        oreLines: [{ typeId: ORE, quantity: 40 }],
+      })
+    );
+
+    await recordCorpPayment(CORP, [
+      bookRow({
+        markedPaidIds: ['mark'],
+        taxOwed: 60,
+        personalOreLines: [{ typeId: ORE, quantity: 100 }],
+      }),
+    ]);
+
+    const added = (await db.miningTaxAssignments.toArray()).find((a) => a.id !== 'mark');
+    expect(added).toMatchObject({ oreLines: [{ typeId: ORE, quantity: 60 }], taxOwed: 60 });
+  });
+
+  it("marks the member's own owed Assignment under the corporation paid, not a second claim", async () => {
+    await db.payees.put({
+      ...payee('p2'),
+      entityId: CORP.corporationId,
+      entityKind: 'corporation',
+    });
+    await db.miningTaxAssignments.put(assignment({ id: 'own', payeeId: 'p2' }));
+
+    const result = await recordCorpPayment(
+      CORP,
+      [bookRow({ personalOreLines: [{ typeId: ORE, quantity: 100 }] })],
+      PAYMENT
+    );
+
+    expect(result.ok).toBe(true);
+    const all = await db.miningTaxAssignments.toArray();
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ id: 'own', status: 'paid', payment: expect.anything() });
+  });
+
+  it('skips a row that never lined up with a ledger entry', async () => {
+    const result = await recordCorpPayment(CORP, [bookRow({ solarSystemId: 0 })]);
+
+    expect(result.ok).toBe(true);
+    expect(await db.miningTaxAssignments.count()).toBe(0);
   });
 });
