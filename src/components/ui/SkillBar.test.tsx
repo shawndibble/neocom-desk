@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import '@/i18n';
 import { SkillBar } from './SkillBar';
 
 describe('SkillBar', () => {
@@ -51,6 +52,30 @@ describe('SkillBar', () => {
     const segments = screen.getByRole('img').querySelectorAll('[aria-hidden="true"]');
     expect(segments[2]?.querySelector('span')).toBeNull();
     expect(segments[2]?.className).toContain('accent-dim');
+  });
+
+  it('fills segments past level through requiredLevel in gray: the levels still needed', () => {
+    render(<SkillBar level={1} requiredLevel={4} />);
+    const bar = screen.getByRole('img', { name: 'Level 1 of 5, needs 4' });
+    const segments = bar.querySelectorAll('[aria-hidden="true"]');
+    expect(segments[0]?.className).toContain('bg-accent');
+    expect(segments[1]?.className).toContain('bg-text-dim');
+    expect(segments[3]?.className).toContain('bg-text-dim');
+    expect(segments[4]?.className).not.toContain('bg-text-dim');
+  });
+
+  it('shows planned over needed, and needed past what the plan covers', () => {
+    render(<SkillBar level={1} plannedLevel={2} requiredLevel={4} />);
+    const bar = screen.getByRole('img', { name: 'Level 1 of 5, planned to 2, needs 4' });
+    const segments = bar.querySelectorAll('[aria-hidden="true"]');
+    expect(segments[1]?.className).toContain('accent-dim');
+    expect(segments[1]?.className).not.toContain('bg-text-dim');
+    expect(segments[2]?.className).toContain('bg-text-dim');
+  });
+
+  it('ignores a requiredLevel already trained', () => {
+    render(<SkillBar level={4} requiredLevel={3} />);
+    expect(screen.getByRole('img', { name: 'Level 4 of 5' })).toBeInTheDocument();
   });
 
   it('ignores a plannedLevel at or below the trained level', () => {

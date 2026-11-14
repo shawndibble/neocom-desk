@@ -91,6 +91,7 @@ export function RequiredSkillsSection({
               planEntries={planEntries}
               status={skillTrainingStatus(currentLevel, req.level)}
               currentLevel={currentLevel}
+              requiredLevel={req.level}
               plannedLevel={plannedLevelFor(planEntries, req.skillTypeID)}
               addLabel={planned ? t('skills.requiredSkills.added') : addLabel}
               onAdd={() =>

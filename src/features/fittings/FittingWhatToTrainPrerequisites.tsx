@@ -69,6 +69,7 @@ export function WhatToTrainPrerequisites({
                   planEntries={planEntries}
                   status={row.status}
                   currentLevel={row.currentLevel}
+                  requiredLevel={row.targetLevel}
                   timeLabel={formatCountdown(row.seconds)}
                   inPlanLabel={
                     (plannedLevels.get(row.skillTypeID) ?? 0) >= row.targetLevel

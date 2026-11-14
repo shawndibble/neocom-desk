@@ -2681,6 +2681,8 @@
     },
     "levelOfFive": "Level {{level}} of 5",
     "levelOfFivePlanned": "Level {{level}} of 5, planned to {{planned}}",
+    "levelOfFiveNeeded": "Level {{level}} of 5, needs {{needed}}",
+    "levelOfFivePlannedNeeded": "Level {{level}} of 5, planned to {{planned}}, needs {{needed}}",
     "searchPlaceholder": "Search skills…",
     "noResults": "No skills match your search.",
     "searchResultCount_one": "{{count}} skill matches",

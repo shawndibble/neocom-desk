@@ -199,6 +199,7 @@ export function CertificateRow({
                       planEntries={planEntries}
                       status={skillTrainingStatus(have, entry.level)}
                       currentLevel={have}
+                      requiredLevel={entry.level}
                       timeLabel={formatCountdown(entry.seconds)}
                       inPlanLabel={
                         isEntryCovered(planEntries, entry.skillTypeID, entry.level)

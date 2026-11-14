@@ -195,6 +195,7 @@ export function MasteryChip({
                   planEntries={planEntries}
                   status={row.status}
                   currentLevel={row.currentLevel}
+                  requiredLevel={row.targetLevel}
                   timeLabel={
                     row.status === 'trained'
                       ? t('skills.fitCheck.trained')

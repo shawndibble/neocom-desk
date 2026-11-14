@@ -22,6 +22,8 @@ export interface SkillRowProps {
   inPlanLabel?: string;
   /** The highest level the target Skill Plan already targets for this skill, past `currentLevel` — drawn on the bar itself. Omit when nothing is planned past what's trained. */
   plannedLevel?: number | null;
+  /** The level this row asks for, drawn on the bar as the levels still needed. */
+  requiredLevel?: number;
   /** When set, the name opens the shared Skill Detail popover (#400/#405) instead of rendering as inert text. */
   skillTypeID?: number;
   /** The target Skill Plan's entries, carried into the Skill Detail popover so its prerequisites read "Planned". */
@@ -39,6 +41,7 @@ export function SkillRow({
   tags,
   inPlanLabel,
   plannedLevel,
+  requiredLevel,
   skillTypeID,
   planEntries,
 }: SkillRowProps) {
@@ -70,7 +73,7 @@ export function SkillRow({
       <div className="ml-auto flex shrink-0 items-center gap-3">
         {tags !== undefined && <span className="flex gap-1">{tags}</span>}
         {inPlan && <Pill tone="accent">{inPlanLabel}</Pill>}
-        <SkillBar level={currentLevel} plannedLevel={plannedLevel} />
+        <SkillBar level={currentLevel} plannedLevel={plannedLevel} requiredLevel={requiredLevel} />
         {timeLabel !== undefined && (
           <span className="w-16 text-right text-text-dim tabular-nums">{timeLabel}</span>
         )}
