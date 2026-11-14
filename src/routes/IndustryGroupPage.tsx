@@ -124,7 +124,8 @@ export function IndustryGroupPage() {
       pricingInputs.corpBlueprints,
       bpcRows,
       pricingInputs.communityRows,
-      accountSkills
+      accountSkills,
+      pricingInputs.standings
     );
     if (picks.size === 0) return;
     await patchBuildPlans([...picks.keys()], (p) => {
