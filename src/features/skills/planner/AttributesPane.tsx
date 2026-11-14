@@ -9,7 +9,6 @@ import type { CharacterAttributes } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 import { formatLocalDate } from '@/lib/localDate';
 import { useTimeZone } from '@/lib/timeFormat';
-import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { RemapAvailability } from './remapAvailability';
 
 interface AttributesPaneProps {
@@ -44,6 +43,10 @@ interface AttributesPaneProps {
  * same `AttributeChips` + `DataAgeBadge` pair — but as a section inside
  * `PlanToolsPane`, not as another panel, because its sidebar already carries
  * the plan list and the tools panel. See `PlanEditor`'s `attributes` section.
+ *
+ * Desktop only. A phone gets `AcceleratorRow` (the chips live in its sheet)
+ * and Optimize queue in the New plan menu, so "Training now" is not pushed
+ * below the fold by reference and once-per-booster controls.
  */
 export function AttributesPane({
   result,
@@ -57,8 +60,7 @@ export function AttributesPane({
 }: AttributesPaneProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  const isDesktop = useIsDesktop();
-  const chips = () => (
+  const chips = (
     <AttributeChips
       attributes={result?.data ?? null}
       implantBonuses={implantBonuses}
@@ -96,16 +98,6 @@ export function AttributesPane({
   const acceleratorSection = accelerator ? (
     <div className="mt-3 border-t border-line pt-3 text-xs">{accelerator}</div>
   ) : null;
-  if (!isDesktop) {
-    // One line, no card. The remap note and data age are desktop reference.
-    return (
-      <section aria-label={t('skills.attributes')} className="px-1">
-        {chips()}
-        {optimizeQueue()}
-        {acceleratorSection}
-      </section>
-    );
-  }
   return (
     <>
       <Panel
@@ -115,7 +107,7 @@ export function AttributesPane({
           result?.fetchedAt && <DataAgeBadge date={result.fetchedAt} expiresAt={result.expiresAt} />
         }
       >
-        {chips()}
+        {chips}
         {/* Same live remap read the plan editor costs against (#1726) — a
             pilot checking Attributes shouldn't have to open a plan to see it. */}
         {remapInfo && (
