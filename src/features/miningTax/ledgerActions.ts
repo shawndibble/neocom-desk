@@ -24,6 +24,8 @@ import {
   type MiningTaxPaymentLinkSource,
   type PayeeRecord,
 } from '@/db';
+import type { BookRowView } from '@/engine/corpTaxBook/personal';
+import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { scheduleSync } from '@/sync';
 import {
   AlreadyAssignedError,
@@ -56,6 +58,7 @@ import {
 } from './assignments';
 import { recordDefaultOptOuts } from './defaultOptOuts';
 import type { GroupMember } from './groupRows';
+import { isCorpEntityPayee } from './corpBook/corpRows';
 import { removePayeeRecord } from './payees';
 import type { SessionContinuation } from './sessionContinuation';
 
@@ -405,4 +408,73 @@ export function linkRecordedPayment(
   ref: PaymentTransactionRef
 ): Promise<LedgerActionResult> {
   return commit(charactersOf(assignments), () => linkRecordedPaymentPrimitive(assignments, ref));
+}
+
+/**
+ * Settle up for a Corp Tax Book: the member's side of a payment to the corporation. Each owed
+ * book row becomes a Paid Assignment, under the member's Payee verified as the corporation
+ * (created when they have none), for the ore their own paid marks don't already cover. The
+ * book counts that as paid on the member's side; the corporation still confirms it against its
+ * wallet. A row that never lined up with a ledger entry has no ore to record and stays owed.
+ */
+export function recordCorpPayment(
+  corp: { corporationId: number; name: string },
+  rows: readonly BookRowView[],
+  payment?: PaymentInput
+): Promise<LedgerActionResult> {
+  return commit(charactersOf(rows), async () => {
+    const payeeOf = new Map<number, string>();
+    const recorded: MiningTaxAssignmentRecord[] = [];
+    for (const row of rows) {
+      if (row.solarSystemId === 0) continue;
+      const marked = (await db.miningTaxAssignments.bulkGet(row.markedPaidIds ?? [])).flatMap(
+        (a) => a?.oreLines ?? []
+      );
+      const oreLines = row.oreLines
+        .map((line) => ({
+          typeId: line.typeId,
+          quantity:
+            line.quantity -
+            marked.filter((m) => m.typeId === line.typeId).reduce((n, m) => n + m.quantity, 0),
+        }))
+        .filter((line) => line.quantity > 0);
+      if (oreLines.length === 0) continue;
+      let payeeId = payeeOf.get(row.characterId);
+      if (payeeId === undefined) {
+        const payees = await db.payees.where('characterId').equals(row.characterId).toArray();
+        payeeId = payees.find((p) => isCorpEntityPayee(p, corp.corporationId))?.id;
+        if (payeeId === undefined) {
+          payeeId = crypto.randomUUID();
+          await db.payees.put({
+            id: payeeId,
+            characterId: row.characterId,
+            name: corp.name,
+            defaultTaxPct: row.taxPct,
+            entityId: corp.corporationId,
+            entityKind: 'corporation',
+            updatedAt: Date.now(),
+          });
+        }
+        payeeOf.set(row.characterId, payeeId);
+      }
+      const prices = new Map(Object.entries(row.unitPrices).map(([id, p]) => [Number(id), p]));
+      const value = computeAssignmentValue(oreLines, prices, row.taxPct);
+      recorded.push(
+        await createAssignment({
+          characterId: row.characterId,
+          date: row.date,
+          solarSystemId: row.solarSystemId,
+          payeeId,
+          oreLines,
+          ...(row.personalOreLines ? { entryOreLines: row.personalOreLines } : {}),
+          taxPct: row.taxPct,
+          estimatedValue: value.estimatedValue,
+          taxOwed: value.taxOwed,
+          markPaid: false,
+          ...(row.refineryLabel ? { label: row.refineryLabel } : {}),
+        })
+      );
+    }
+    await markAssignmentsPaid(recorded, payment);
+  });
 }

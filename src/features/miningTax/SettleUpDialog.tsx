@@ -23,7 +23,7 @@ import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
 import { unmaskNumber } from '@/lib/numberMask';
 import { buildSettleUpReason, formatDateRange } from './groupRows';
-import { settle, type PaymentInput } from './ledgerActions';
+import { settle, type LedgerActionResult, type PaymentInput } from './ledgerActions';
 import { systemLabel } from './names';
 import { SETTLE_FIELD_LABEL, useCopiedField } from './settleUpFields';
 import { SettleCopyRow, SettleSentOnAndMethod } from './SettleUpParts';
@@ -70,6 +70,19 @@ interface SettleUpDialogProps {
    * entries wait unticked under "Also pay N other entries".
    */
   focusIds?: ReadonlySet<string>;
+  /**
+   * Writes the ticked entries paid, with the payment when one was recorded. Absent, they are
+   * the member's own Assignments and `settle` marks them; a Corp Tax Book's rows are not, so
+   * its Settle up records them its own way (`recordCorpPayment`).
+   */
+  record?: (
+    rows: readonly SettleUpRow[],
+    payment: PaymentInput | undefined
+  ) => Promise<LedgerActionResult>;
+  /** The Reason to copy in place of the dates-and-systems one (a Statement's code). */
+  reason?: string;
+  /** Payee-specific lines under the To / Amount / Reason box (where a corp's book wants it sent). */
+  notice?: ReactNode;
 }
 
 /** More Characters than this pick from a list instead of a segmented row (DESIGN §4). */
@@ -105,6 +118,9 @@ export function SettleUpDialog({
   arrivalCheck,
   payerId,
   focusIds,
+  record,
+  reason: reasonOverride,
+  notice,
 }: SettleUpDialogProps) {
   const { t } = useTranslation();
   // Rows can refresh while open (`liveSettleUpRows`) but never change who's in them.
@@ -175,7 +191,9 @@ export function SettleUpDialog({
   const sortedDates = included.map((r) => r.assignment.date).sort();
   const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
   const systems = [...new Set(included.map((r) => systemName(r.assignment.solarSystemId)))];
-  const reason = buildSettleUpReason(t('miningTax.settleUpReasonPrefix'), systems, sortedDates);
+  const reason =
+    reasonOverride ??
+    buildSettleUpReason(t('miningTax.settleUpReasonPrefix'), systems, sortedDates);
 
   function toggle(id: string) {
     setExcluded((previous) => toggleInSet(previous, id));
@@ -250,11 +268,15 @@ export function SettleUpDialog({
   async function commit(withPayment: boolean) {
     if (included.length === 0) return;
     await run(
-      () =>
-        settle(
-          included.map((r) => r.assignment),
-          withPayment ? paymentInput() : undefined
-        ),
+      () => {
+        const payment = withPayment ? paymentInput() : undefined;
+        return record
+          ? record(included, payment)
+          : settle(
+              included.map((r) => r.assignment),
+              payment
+            );
+      },
       () => {
         onPaid();
         onClose();
@@ -489,6 +511,7 @@ export function SettleUpDialog({
           )}
           {copyRow('reason', t('miningTax.settleUp.reasonLabel'), reason, reason, true)}
         </div>
+        {notice}
 
         <div className="space-y-1.5">
           <button

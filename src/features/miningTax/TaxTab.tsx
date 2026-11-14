@@ -476,7 +476,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           linkSuggestions={linkSuggestions}
           corpView={corpView}
           corpStateHint={corpStateHint}
-          corpOwedNow={corpOwedNow}
           dismissTargets={selection.dismissTargets}
           showCharacterColumn={showCharacterColumn}
           estimatedValueOf={estimatedValueOf}
