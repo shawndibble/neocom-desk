@@ -26,24 +26,30 @@ export function AcceleratorSection({
   characterId,
   running,
   detectedBonus,
+  startAdding = false,
+  showTitle = true,
 }: {
   characterId: number;
   /** The typed-in accelerator, only while it is still running. */
   running: CharacterAcceleratorRecord | null;
   detectedBonus: number | null;
+  /** Open straight on the editor when nothing is injected (the phone's sheet, opened to add one). */
+  startAdding?: boolean;
+  /** False inside a container already titled "Accelerator" (the phone's sheet). */
+  showTitle?: boolean;
 }) {
   const { t } = useTranslation();
   useCharacterAccelerators();
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(startAdding);
   const shown = running !== null || detectedBonus !== null || adding;
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-1.5">
         <span>
-          {t('plans.accelerator')}
+          {showTitle && t('plans.accelerator')}
           {running === null && detectedBonus !== null && (
-            <span className="ml-2 font-semibold">
+            <span className={showTitle ? 'ml-2 font-semibold' : 'font-semibold'}>
               {t('plans.acceleratorDetected', { bonus: detectedBonus })}
             </span>
           )}

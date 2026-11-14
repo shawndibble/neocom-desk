@@ -55,12 +55,17 @@ describe('SkillPlans Optimize queue', () => {
     const user = userEvent.setup({ delay: null });
     render(<App />);
 
-    // The button is aria-disabled until the queue loads, and a click on it does
-    // nothing — wait for it to enable. Re-queried each poll: the node can remount.
-    const optimizeQueue = () => screen.getByRole('button', { name: 'Optimize queue' });
-    await screen.findByRole('button', { name: 'Optimize queue' });
-    await waitFor(() => expect(optimizeQueue()).not.toHaveAttribute('aria-disabled', 'true'));
-    await user.click(optimizeQueue());
+    // A phone (jsdom's default) offers it in the New plan menu. The item is
+    // disabled until the queue loads, so reopen the menu until it enables.
+    const optimizeItem = () =>
+      screen.getByRole('menuitem', { name: 'From your skill queue, optimized' });
+    await waitFor(async () => {
+      if (!screen.queryByRole('menu')) {
+        await user.click(screen.getByRole('button', { name: 'More ways to start a plan' }));
+      }
+      expect(optimizeItem()).not.toHaveAttribute('aria-disabled', 'true');
+    });
+    await user.click(optimizeItem());
 
     const stored = await waitFor(async () => {
       const all = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
@@ -87,13 +92,13 @@ describe('SkillPlans Optimize queue', () => {
     const user = userEvent.setup({ delay: null });
     render(<App />);
 
-    // Re-queried on every poll, never held: the page can swap the button's DOM
-    // node (a remount while its inputs settle) after the first find, and a held
-    // reference then goes stale and never shows aria-disabled.
-    const optimizeQueue = () => screen.getByRole('button', { name: 'Optimize queue' });
-    await screen.findByRole('button', { name: 'Optimize queue' });
-    await waitFor(() => expect(optimizeQueue()).toHaveAttribute('aria-disabled', 'true'));
-    await user.click(optimizeQueue());
+    // Re-queried on every poll, never held: the menu can remount its items
+    // while the page's inputs settle, and a held reference then goes stale.
+    const optimizeItem = () =>
+      screen.getByRole('menuitem', { name: 'From your skill queue, optimized' });
+    await user.click(await screen.findByRole('button', { name: 'More ways to start a plan' }));
+    await waitFor(() => expect(optimizeItem()).toHaveAttribute('aria-disabled', 'true'));
+    await user.click(optimizeItem());
     expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(0);
   });
 });
@@ -312,9 +317,10 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     await db.skillPlans.add(seedPlan());
     render(<App />);
 
-    // The rail leads on a phone: the plan row and the attributes line, then the queue.
+    // The rail leads on a phone: the plan row and the one Accelerator row, then the queue.
     expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
-    expect(await screen.findByRole('region', { name: 'Attributes' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Accelerator/ })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Attributes' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
 
     await user.click(await screen.findByText('Test plan'));
@@ -330,7 +336,7 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
 
-    expect(await screen.findByRole('region', { name: 'Attributes' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Accelerator/ })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
   });
 
@@ -340,6 +346,11 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
     render(<App />);
+
+    // Desktop keeps the Attributes panel (with Optimize queue) and no phone Accelerator row.
+    expect(await screen.findByRole('heading', { name: 'Attributes' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Optimize queue' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Accelerator/ })).not.toBeInTheDocument();
 
     await user.click(await screen.findByRole('link', { name: /^Test plan/ }));
     await screen.findByText('Your entries');

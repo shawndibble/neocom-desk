@@ -40,10 +40,16 @@ export function NewPlanSplitButton({
   activeCharacterId,
   remapInfo,
   certified,
+  onOptimizeQueue,
+  queueEmpty = false,
 }: {
   activeCharacterId: number;
   remapInfo: RemapAvailability | null;
   certified?: { open: boolean; onOpenChange: (open: boolean) => void };
+  /** Adds "from your skill queue, optimized" (the phone's home for Optimize queue); omitted hides it. */
+  onOptimizeQueue?: () => void;
+  /** The in-game queue is empty: the item stays listed but disabled. */
+  queueEmpty?: boolean;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -136,6 +142,14 @@ export function NewPlanSplitButton({
             <DropdownMenuItem onSelect={() => newPlanMenu.run(() => setCommunityOpen(true))}>
               {t('plans.fromCommunityItem')}
             </DropdownMenuItem>
+            {onOptimizeQueue && (
+              <DropdownMenuItem
+                disabled={queueEmpty}
+                onSelect={() => newPlanMenu.run(onOptimizeQueue)}
+              >
+                {t('plans.fromQueueOptimizedItem')}
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

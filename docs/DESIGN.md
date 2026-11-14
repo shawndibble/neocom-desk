@@ -1312,7 +1312,9 @@ Alerts when closed row) is a tall row (36px minimum): title, one dim line of sta
 and a right chevron (`Icon.GoTo`). The whole row is the one control. The
 section opens in the page with a "‹ All topics" button above it and the choice
 in the URL, so Back returns to the list; a sheet that opens another sheet is
-the one thing to avoid. Beside a row's checkboxes, a phone prints the word
+the one thing to avoid. A lone row with no sibling topics may open its section
+as a `Modal placement="sheet"` instead (Skills › Plans' Accelerator row on a
+phone: status line, sheet with the editor). Beside a row's checkboxes, a phone prints the word
 ("Device", "Alerts") inside the checkbox's label, since it has no column header.
 
 ### Settings scope line

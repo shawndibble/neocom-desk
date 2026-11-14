@@ -19,6 +19,9 @@ interface SkillPlanCardProps {
   activeCharacterId: number;
   remapInfo: RemapAvailability | null;
   scheduleInputs?: PlanStatsInputs;
+  /** Passed to the New plan menu; see `NewPlanSplitButton`. */
+  onOptimizeQueue?: () => void;
+  queueEmpty?: boolean;
 }
 
 /**
@@ -34,6 +37,8 @@ export function SkillPlanCard({
   activeCharacterId,
   remapInfo,
   scheduleInputs,
+  onOptimizeQueue,
+  queueEmpty,
 }: SkillPlanCardProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -97,6 +102,8 @@ export function SkillPlanCard({
         activeCharacterId={activeCharacterId}
         remapInfo={remapInfo}
         certified={{ open: certifiedOpen, onOpenChange: setCertifiedOpen }}
+        onOptimizeQueue={onOptimizeQueue}
+        queueEmpty={queueEmpty}
       />
     </div>
   );
