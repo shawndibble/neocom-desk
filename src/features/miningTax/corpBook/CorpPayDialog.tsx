@@ -1,4 +1,4 @@
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { DisplayRow } from '../groupRows';
 import { recordCorpPayment } from '../ledgerActions';
@@ -23,9 +23,11 @@ interface Props {
 /**
  * Settle up for the corp Payee: the same dialog as any Payee's (Open in EVE, To / Amount /
  * Reason, the date and how it was paid), recording the payment on the member's side
- * (`recordCorpPayment`). What only a book adds sits under the copy box: the division the
- * donation goes into, a Statement's code (the Reason, when one Statement is open), and whether
- * it is safe to send yet (D12). The corp's book still credits the donation from its own wallet.
+ * (`recordCorpPayment`). What only a book adds sits under the copy box, kept to a line each: the
+ * Account to pick in EVE's transfer window (division 1 is always the Master Wallet; a member
+ * cannot read the corp's own division names), a Statement's code (the Reason, when one
+ * Statement is open), and whether it is safe to send yet (D12). The corp's book still credits
+ * the donation from its own wallet.
  */
 export function CorpPayDialog({
   onClose,
@@ -76,7 +78,18 @@ export function CorpPayDialog({
       }
       notice={
         <div className="space-y-1.5 text-xs text-text-dim">
-          <p>{t('miningTax.corpBook.pay.how', { corp: book.corpName, division })}</p>
+          <p>
+            <Trans
+              i18nKey="miningTax.corpBook.pay.account"
+              values={{
+                account:
+                  division === 1
+                    ? t('miningTax.corpBook.pay.masterWallet')
+                    : t('miningTax.corpBook.pay.division', { division }),
+              }}
+              components={{ strong: <strong className="font-semibold text-text" /> }}
+            />
+          </p>
           {onlyCode ? (
             <p>{t('miningTax.corpBook.pay.codeInReason', { period: onlyCode.period })}</p>
           ) : statementCodes.length > 1 ? (
@@ -93,10 +106,8 @@ export function CorpPayDialog({
                 </li>
               ))}
             </ul>
-          ) : (
-            <p>{t('miningTax.corpBook.pay.noCode')}</p>
-          )}
-          <CorpBookSyncNote book={book} owedNow={owed} />
+          ) : null}
+          <CorpBookSyncNote book={book} owedNow={owed} showCredit={false} />
         </div>
       }
     />
