@@ -15,6 +15,7 @@ import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { Layout } from './Layout';
 import { useHiddenNav, useRecentNav } from './navPreferences';
+import { useUpdateStatus } from './updateAvailable';
 import { seedGrant as seedGrantFor } from '@/test/seed';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
@@ -282,6 +283,20 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
     await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
     expect(screen.queryByRole('dialog', { name: 'More' })).not.toBeInTheDocument();
+  });
+
+  it('shows the new-version callout only at desktop widths: on a phone it points at nothing', () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    useUpdateStatus.setState({ status: 'available', found: 1 });
+    stubViewport(() => false);
+    const { unmount } = renderLayout();
+    expect(screen.queryByText('A new version is ready.')).not.toBeInTheDocument();
+    unmount();
+
+    stubViewport(() => true);
+    renderLayout();
+    expect(screen.getByText('A new version is ready.')).toBeInTheDocument();
+    useUpdateStatus.setState({ status: 'unknown', build: null, found: 0 });
   });
 
   describe('skip link', () => {
