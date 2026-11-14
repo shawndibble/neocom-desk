@@ -333,7 +333,7 @@ describe('Ship Info window', () => {
   it('Skills & Mastery: Show missing hides what the pilot already has trained', async () => {
     const { user, dialog } = await openShip(/^Crow/);
     await user.click(within(dialog).getByRole('tab', { name: 'Skills & Mastery' }));
-    expect(within(dialog).getByText('Caldari Frigate')).toBeVisible();
+    expect(within(dialog).getAllByText(/^Caldari Frigate [IV]+$/)[0]).toBeVisible();
 
     await user.click(within(dialog).getByRole('button', { name: 'Show missing' }));
     expect(within(dialog).getByRole('button', { name: 'Show missing' })).toHaveAttribute(
@@ -341,7 +341,7 @@ describe('Ship Info window', () => {
       'true'
     );
     // Caldari Frigate IV is trained; Interceptors isn't, in the required list or tier I.
-    expect(within(dialog).queryByText('Caldari Frigate')).not.toBeInTheDocument();
+    expect(within(dialog).queryAllByText(/^Caldari Frigate [IV]+$/)).toHaveLength(0);
     expect(within(dialog).getAllByText(/^Interceptors/).length).toBeGreaterThan(0);
   });
 

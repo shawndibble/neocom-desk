@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-/** 5-segment skill level indicator: filled accent squares = trained, hairline = untrained. */
+/** 5-segment skill level indicator: filled accent = trained, accent outline = planned, gray fill = needed, hairline = untrained. */
 interface SkillBarProps {
   level: number;
   /**
@@ -19,17 +19,46 @@ interface SkillBarProps {
    * Omit, or `null`, when nothing is planned past what's trained.
    */
   plannedLevel?: number | null;
+  /**
+   * The level something (a ship, a fit, a prerequisite) needs. Segments past
+   * `level` up to this one, and not already planned, fill gray, so an
+   * untrained requirement shows how far it goes instead of five empty pips.
+   * Omit, or `null`, where nothing asks for a level.
+   */
+  requiredLevel?: number | null;
   className?: string;
 }
 
 const LEVELS = [1, 2, 3, 4, 5] as const;
 
-export function SkillBar({ level, progress, plannedLevel, className = '' }: SkillBarProps) {
+type Segment = 'trained' | 'planned' | 'needed' | 'untrained';
+
+const SEGMENT_CLASS: Record<Segment, string> = {
+  trained: 'bg-accent',
+  planned: 'border border-accent-dim bg-accent-dim/40',
+  needed: 'border border-text-dim bg-text-dim',
+  untrained: 'border border-line bg-transparent',
+};
+
+export function SkillBar({
+  level,
+  progress,
+  plannedLevel,
+  requiredLevel,
+  className = '',
+}: SkillBarProps) {
   const { t } = useTranslation();
-  const ariaLabel =
-    plannedLevel != null && plannedLevel > level
-      ? t('skills.levelOfFivePlanned', { level, planned: plannedLevel })
-      : t('skills.levelOfFive', { level });
+  const planned = plannedLevel != null && plannedLevel > level ? plannedLevel : null;
+  const needed = requiredLevel != null && requiredLevel > level ? requiredLevel : null;
+  const ariaKey =
+    planned !== null
+      ? needed !== null
+        ? 'skills.levelOfFivePlannedNeeded'
+        : 'skills.levelOfFivePlanned'
+      : needed !== null
+        ? 'skills.levelOfFiveNeeded'
+        : 'skills.levelOfFive';
+  const ariaLabel = t(ariaKey, { level, planned, needed });
   return (
     <span
       role="img"
@@ -37,20 +66,24 @@ export function SkillBar({ level, progress, plannedLevel, className = '' }: Skil
       className={`inline-flex items-center gap-0.5 ${className}`}
     >
       {LEVELS.map((segment) => {
-        const trained = segment <= level;
-        const planned = !trained && plannedLevel != null && segment <= plannedLevel;
-        const partial = !trained && !planned && segment === level + 1 && progress != null;
+        const state: Segment =
+          segment <= level
+            ? 'trained'
+            : planned !== null && segment <= planned
+              ? 'planned'
+              : needed !== null && segment <= needed
+                ? 'needed'
+                : 'untrained';
+        // Banked progress reads on the hairline or the gray needed fill alike.
+        const partial =
+          (state === 'untrained' || state === 'needed') &&
+          segment === level + 1 &&
+          progress != null;
         return (
           <span
             key={segment}
             aria-hidden="true"
-            className={`relative h-2.5 w-1.5 overflow-hidden rounded-[1px] ${
-              trained
-                ? 'bg-accent'
-                : planned
-                  ? 'border border-accent-dim bg-accent-dim/40'
-                  : 'border border-line bg-transparent'
-            }`}
+            className={`relative h-2.5 w-1.5 overflow-hidden rounded-[1px] ${SEGMENT_CLASS[state]}`}
           >
             {partial && (
               <span

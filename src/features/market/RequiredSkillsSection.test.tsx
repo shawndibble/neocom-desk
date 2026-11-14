@@ -49,7 +49,7 @@ function renderSection(levels: Record<number, number>) {
 describe('RequiredSkillsSection', () => {
   it('hides the plan picker when every required skill is trained', () => {
     renderSection({ [GUNNERY]: 5, [SMALL_ENERGY]: 1 });
-    expect(screen.getByText('Gunnery')).toBeInTheDocument();
+    expect(screen.getByText('Gunnery II')).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: /Adding to/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add to Skill Plan' })).not.toBeInTheDocument();
   });

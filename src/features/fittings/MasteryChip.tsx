@@ -190,11 +190,12 @@ export function MasteryChip({
             return (
               <div key={row.skillTypeID} className="border-b border-line py-1.5 last:border-b-0">
                 <SkillRow
-                  name={row.name}
+                  name={`${row.name} ${romanLevel(row.targetLevel)}`}
                   skillTypeID={row.skillTypeID}
                   planEntries={planEntries}
                   status={row.status}
                   currentLevel={row.currentLevel}
+                  requiredLevel={row.targetLevel}
                   timeLabel={
                     row.status === 'trained'
                       ? t('skills.fitCheck.trained')

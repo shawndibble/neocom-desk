@@ -567,7 +567,7 @@ describe('ItemDetailModal', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Caldari Frigate')).toBeInTheDocument();
+    expect(await screen.findByText(/^Caldari Frigate [IV]+$/)).toBeInTheDocument();
     // Never trained -> the 3-state status icon reads "not trained", not the
     // no-Character degraded "Level 3" text.
     expect(screen.getByLabelText('Not trained')).toBeInTheDocument();
@@ -639,7 +639,7 @@ describe('ItemDetailModal', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Caldari Frigate')).toBeInTheDocument();
+    expect(await screen.findByText(/^Caldari Frigate [IV]+$/)).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Added' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add to Skill Plan' })).not.toBeInTheDocument();
   });
