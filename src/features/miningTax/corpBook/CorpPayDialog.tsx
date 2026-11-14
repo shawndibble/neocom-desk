@@ -16,6 +16,8 @@ interface Props {
   systemNames: ReadonlyMap<number, string>;
   /** Codes of the open Statements: a code in the donation reason pins it to one. */
   statementCodes: readonly { code: string; period: string }[];
+  /** Opened from one row: only it starts ticked, paid by its Character. */
+  focus?: { rowId: string; characterId: number };
 }
 
 /**
@@ -25,7 +27,15 @@ interface Props {
  * donation goes into, a Statement's code (the Reason, when one Statement is open), and whether
  * it is safe to send yet (D12). The corp's book still credits the donation from its own wallet.
  */
-export function CorpPayDialog({ onClose, onPaid, book, rows, systemNames, statementCodes }: Props) {
+export function CorpPayDialog({
+  onClose,
+  onPaid,
+  book,
+  rows,
+  systemNames,
+  statementCodes,
+  focus,
+}: Props) {
   const { t } = useTranslation();
   const { copied, copy } = useCopiedField();
   const division = book.loaded.divisions[0] ?? 1;
@@ -53,6 +63,8 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, systemNames, statem
       onClose={onClose}
       onPaid={onPaid}
       rows={settleRows}
+      payerId={focus?.characterId}
+      focusIds={focus ? new Set([focus.rowId]) : undefined}
       systemNames={systemNames}
       reason={onlyCode?.code}
       recordPaid={(ticked, payment) =>

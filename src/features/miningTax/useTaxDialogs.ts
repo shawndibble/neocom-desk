@@ -33,6 +33,8 @@ export interface TaxDialogState {
   settleUpStart: SettleUpStart;
   linkWalletTarget: LinkWalletTarget | null;
   corpPayTarget: number | null;
+  /** Opened from one book row: that row (and its Character) starts ticked, the rest wait under "Also pay". */
+  corpPayFocus: { rowId: string; characterId: number } | null;
   bulkDismissOpen: boolean;
   linkPaymentOpen: boolean;
   /** Whether a dialog's ledger action is writing; mirrored here so `TaxTab` can disable its own controls. */
@@ -51,6 +53,7 @@ const CLOSED: TaxDialogState = {
   settleUpStart: {},
   linkWalletTarget: null,
   corpPayTarget: null,
+  corpPayFocus: null,
   bulkDismissOpen: false,
   linkPaymentOpen: false,
   acting: false,
@@ -112,9 +115,10 @@ function createActions(patch: (next: Patch) => void) {
     openLinkWallet: (target: LinkWalletTarget | null) => patch({ linkWalletTarget: target }),
     linkWalletFromDetail: (target: LinkWalletTarget) =>
       patch({ linkWalletTarget: target, detailTarget: null }),
-    openCorpPay: (corporationId: number | null) => patch({ corpPayTarget: corporationId }),
-    corpPayFromDetail: (corporationId: number) =>
-      patch({ corpPayTarget: corporationId, detailTarget: null }),
+    openCorpPay: (corporationId: number | null) =>
+      patch({ corpPayTarget: corporationId, corpPayFocus: null }),
+    corpPayFromDetail: (corporationId: number, focus: { rowId: string; characterId: number }) =>
+      patch({ corpPayTarget: corporationId, corpPayFocus: focus, detailTarget: null }),
     openBulkDismiss: (open: boolean) => patch({ bulkDismissOpen: open }),
     openLinkPayment: (open: boolean) => patch({ linkPaymentOpen: open }),
     setActing: (acting: boolean) => patch({ acting }),
