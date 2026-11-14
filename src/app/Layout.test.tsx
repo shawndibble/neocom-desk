@@ -130,6 +130,8 @@ beforeEach(async () => {
   useRecentNav.setState({ value: [], hydrated: true });
   // These tests list the whole rail: every page shows, as for a new pilot.
   useHiddenNav.setState({ value: [], hydrated: true });
+  // No newer build waiting unless a test says so.
+  useUpdateStatus.setState({ status: 'unknown', build: null, found: 0 });
 });
 
 describe('Layout sync status dot', () => {
@@ -285,19 +287,19 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     expect(screen.queryByRole('dialog', { name: 'More' })).not.toBeInTheDocument();
   });
 
-  it('shows the new-version callout only at desktop widths: on a phone it points at nothing', () => {
-    mockIsSyncConfigured.mockReturnValue(false);
-    useUpdateStatus.setState({ status: 'available', found: 1 });
-    stubViewport(() => false);
-    const { unmount } = renderLayout();
-    expect(screen.queryByText('A new version is ready.')).not.toBeInTheDocument();
-    unmount();
-
-    stubViewport(() => true);
-    renderLayout();
-    expect(screen.getByText('A new version is ready.')).toBeInTheDocument();
-    useUpdateStatus.setState({ status: 'unknown', build: null, found: 0 });
-  });
+  it.each([
+    ['phone', false, false],
+    ['desktop', true, true],
+  ])(
+    'new-version callout at %s widths: shown %s (on a phone it points at nothing)',
+    (_width, desktop, shown) => {
+      mockIsSyncConfigured.mockReturnValue(false);
+      useUpdateStatus.setState({ status: 'available', found: 1 });
+      stubViewport(() => desktop);
+      renderLayout();
+      expect(screen.queryByText('A new version is ready.') !== null).toBe(shown);
+    }
+  );
 
   describe('skip link', () => {
     function stubDesktop(matches: boolean) {
