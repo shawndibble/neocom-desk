@@ -2559,7 +2559,14 @@
         "ship_restricted": "{{name}} can't be fitted on this hull.",
         "capital_item": "{{name}} needs a capital ship.",
         "structure_item": "{{name}} fits structures, not ships.",
-        "ship_item": "{{name}} fits ships, not structures."
+        "ship_item": "{{name}} fits ships, not structures.",
+        "not_a_module": "{{name}} isn't a module.",
+        "not_a_drone": "{{name}} isn't a drone.",
+        "not_a_fighter": "{{name}} isn't a fighter.",
+        "not_an_implant": "{{name}} isn't an implant or booster.",
+        "not_a_hull": "This hull isn't a ship the fitter can work out.",
+        "not_a_mode": "This tactical mode doesn't belong to this hull.",
+        "not_a_skill": "The pilot's skill list holds an item that isn't a skill."
       }
     },
     "mutation": {

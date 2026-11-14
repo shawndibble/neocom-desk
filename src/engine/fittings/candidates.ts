@@ -91,7 +91,10 @@ export function browserTree<T extends CandidateEntry>(
 /**
  * Rules (the engine's `Rule.type`) under which an item cannot go on this hull
  * at all, whatever else is fitted: wrong rack, no hardpoint, wrong rig size,
- * a hull-restricted or capital/structure item, a one-per-ship limit.
+ * a hull-restricted or capital/structure item, a one-per-ship limit, a
+ * type that is not a module or drone at all. (Candidates are only ever
+ * probed in a rack or the drone bay, so the engine's other `not_a_*` rules —
+ * fighter, implant, hull, mode, skill — cannot come up here.)
  * Resource overflow is not a hull rule (the game lets you fit an item that
  * overflows CPU or powergrid — it just can't online): it is its own answer,
  * `fitsResources`, since an item that overflows the bare hull alone can never
@@ -109,6 +112,8 @@ const HULL_RULES: ReadonlySet<string> = new Set([
   'ship_item',
   'max_group',
   'max_type',
+  'not_a_module',
+  'not_a_drone',
 ]);
 
 /** The resources a lone module can overflow the bare hull on, as `resource:<kind>`. */

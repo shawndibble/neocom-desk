@@ -21,8 +21,8 @@ skills, PI and reprocessing need.
 
 ## Decision
 
-Use `@eveshipfit/dogma-engine` (Rust compiled to WASM, MIT, ~409 KB) with its
-matching patched data file from `@eveshipfit/sde` (`sde.dat`, ~9.7 MB), which
+Use `@eveshipfit/dogma-engine` (Rust compiled to WASM, MIT, ~580 KB) with its
+matching patched data file from `@eveshipfit/sde` (`sde.dat`, ~10.3 MB), which
 fills in the missing modifiers and derived attributes such as align time.
 
 - Both load lazily, the first time a Fitting is opened, without blocking the
@@ -30,12 +30,15 @@ fills in the missing modifiers and derived attributes such as align time.
   runtime-cached so fitting works offline afterwards, and neither is
   precached with the app shell.
 - Both versions are pinned together and bumped when a game patch changes
-  dogma. Pinned now: `@eveshipfit/dogma-engine` 13.6.0 with `@eveshipfit/sde`
-  12.3646012.0 (the old pair gave Tech 3 cruisers no slots or hardpoints). The
+  dogma. Pinned now: `@eveshipfit/dogma-engine` 15.0.0 with `@eveshipfit/sde`
+  14.3693310.0, game build 3693310 (the Fractured Skies bump: the old pair
+  knew none of its hulls or synchronizer rigs). From engine 14 a stack of
+  drones projects as one effect with a `quantity`, which `ProjectedEffects`
+  carries through and `withIncoming` hands back. The
   cache bucket name carries both versions, so a bump makes every pilot fetch
   the new files. The engine runs without the data package's `texts.dat`, so the
   app does not serve it.
-- The engine takes everything a Fitting carries: modules with offline, online, active and overload state, loaded charges, drones, fighters, cargo, **implants and boosters** (as slots, with booster side effects), mutated modules, a skills map, and a damage profile. Checked against the v13.0.1 typings; v13.6.0 only adds loaders and savers.
+- The engine takes everything a Fitting carries: modules with offline, online, active and overload state, loaded charges, drones, fighters, cargo, **implants and boosters** (as slots, with booster side effects), mutated modules, a skills map, and a damage profile. Checked against the v13.0.1 typings; through v15.0.0 the only input change is the `quantity` on incoming projected effects.
 - The engine is reached only through one seam module that takes a Fitting
   plus a skills/implants profile and returns stats. Nothing else imports it,
   so it could be swapped out.

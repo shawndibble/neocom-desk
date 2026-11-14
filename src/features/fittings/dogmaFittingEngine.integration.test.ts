@@ -69,6 +69,12 @@ const WARRIOR_II = 2488;
 const RIFTER = 587;
 const REACTIVE_ARMOR_HARDENER = 4403;
 const CARACAL = 621;
+const LIGHT_ARMOR_MAINTENANCE_BOT_I = 23711;
+// Fractured Skies (game build 3693310): a new hull, a synchronizer rig and a module of its set.
+const HERALD = 97793;
+const PENITENCE = 97904;
+const MEDIUM_FEDERATION_NAVY_SYNCHRONIZER = 96128;
+const FEDERATION_NAVY_MAGNETIC_FIELD_STABILIZER = 15895;
 // Looked up by exact name in `public/data/types.json`, 2026-10-25.
 const VEDMAK = 47270;
 const HEAVY_ENTROPIC_DISINTEGRATOR_II = 47918;
@@ -785,8 +791,12 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
   it('never calls a fit stable that its cap booster only holds up by never reloading', () => {
     // Medium Capacitor Booster II + Navy Cap Booster 400, a shield booster and
-    // five neutralizers: the engine counts the booster at 33.3 GJ/s with no
+    // two neutralizers: the engine counts the booster at 33.3 GJ/s with no
     // reload and says stable; averaged over its reload (26.1) the cap drains.
+    // (`SUPPORT_SKILL_IDS` is a blind id range that also holds Cap Batteries,
+    // 3488 and 3496; engines before 14.0 applied them as if fitted, puffing
+    // the capacitor to 4785 GJ. At the true 1562.5 the old five-and-four
+    // neutralizer pair both drain.)
     const caracal = (neuts: number): Fitting => ({
       name: 'Integration Test Caracal booster-dependent',
       shipTypeId: CARACAL,
@@ -820,28 +830,28 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       };
     };
 
-    const five = run(5);
-    expect(five.engineStable).toBe(true);
-    expect(five.budget.delta).toBeLessThan(0);
-    expect(five.stats.capacitor.stable).toBe(false);
-    const drain = five.budget.peakRecharge - five.budget.delta;
-    expect(five.stats.capacitor).toEqual(
+    const two = run(2);
+    expect(two.engineStable).toBe(true);
+    expect(two.budget.delta).toBeLessThan(0);
+    expect(two.stats.capacitor.stable).toBe(false);
+    const drain = two.budget.peakRecharge - two.budget.delta;
+    expect(two.stats.capacitor).toEqual(
       capacitorStatusAtDrain(
-        five.stats.capacitorCapacity,
-        five.stats.capacitorRechargeTime / 1000,
+        two.stats.capacitorCapacity,
+        two.stats.capacitorRechargeTime / 1000,
         drain
       )
     );
 
-    // Four still hold, at the level the reload-averaged drain settles at.
-    const four = run(4);
-    expect(four.budget.delta).toBeGreaterThan(0);
-    expect(four.stats.capacitor.stable).toBe(true);
-    expect(four.stats.capacitor).toEqual(
+    // One still holds, at the level the reload-averaged drain settles at.
+    const one = run(1);
+    expect(one.budget.delta).toBeGreaterThan(0);
+    expect(one.stats.capacitor.stable).toBe(true);
+    expect(one.stats.capacitor).toEqual(
       capacitorStatusAtDrain(
-        four.stats.capacitorCapacity,
-        four.stats.capacitorRechargeTime / 1000,
-        four.budget.peakRecharge - four.budget.delta
+        one.stats.capacitorCapacity,
+        one.stats.capacitorRechargeTime / 1000,
+        one.budget.peakRecharge - one.budget.delta
       )
     );
   });
@@ -1528,6 +1538,68 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(booster.projection.buffs.length).toBeGreaterThan(0);
     // Rapid Deployment: the afterburner's speed bonus is up.
     expect(speed(booster.ship)).toBeGreaterThan(speed(alone));
+  });
+
+  it('takes in a stack of repair drones as many times as the stack is big', () => {
+    // Since engine v14 a stack projects as one effect with a quantity; that
+    // quantity has to survive the round trip through our own shape.
+    const allV = buildAllVProfile(SUPPORT_SKILL_IDS);
+    const targetFit = fittingToDogmaFit(
+      { name: 'Rifter', shipTypeId: RIFTER, modules: [], drones: [], cargo: [] },
+      allV
+    );
+    const repsWith = (quantity: number) => {
+      const source: Fitting = {
+        name: 'Vexor',
+        shipTypeId: VEXOR_NAVY_ISSUE,
+        modules: [],
+        drones: [{ typeId: LIGHT_ARMOR_MAINTENANCE_BOT_I, quantity, state: 'active' }],
+        cargo: [],
+      };
+      const projection = toProjectedEffects(calculate(fittingToDogmaFit(source, allV)).outgoing);
+      return calculate(withIncoming(targetFit, projection)).ship.attributes.get(-45)?.value ?? 0;
+    };
+    const one = repsWith(1);
+    expect(one).toBeGreaterThan(0);
+    expect(repsWith(5)).toBeCloseTo(one * 5, 6);
+  });
+
+  it('knows the Fractured Skies hulls and grows a synchronizer rig with its faction modules', () => {
+    const untrained = buildPilotProfile(new Map(), []);
+    const hull = (fitting: Fitting) =>
+      calculate(fittingToDogmaFit(fitting, untrained)).ship.attributes.get(9)!.value;
+    const bare = (shipTypeId: number): Fitting => ({
+      name: 'H',
+      shipTypeId,
+      modules: [],
+      drones: [],
+      cargo: [],
+    });
+    expect(hull(bare(HERALD))).toBe(1100);
+    expect(hull(bare(PENITENCE))).toBe(2400);
+
+    // The Federation Navy Synchronizer's hull bonus is 5%, +1% for every
+    // Federation Navy module fitted — online or not, as pyfa v2.70.0 has it —
+    // on the Vexor Navy Issue's untrained 3000 hull.
+    expect(hull(bare(VEXOR_NAVY_ISSUE))).toBe(3000);
+    const vexor = (stabilizers: number, state: 'online' | 'offline'): Fitting => ({
+      name: 'V',
+      shipTypeId: VEXOR_NAVY_ISSUE,
+      modules: [
+        { slot: 'rig', slotIndex: 0, typeId: MEDIUM_FEDERATION_NAVY_SYNCHRONIZER, state: 'online' },
+        ...Array.from({ length: stabilizers }, (_, slotIndex) => ({
+          slot: 'low' as const,
+          slotIndex,
+          typeId: FEDERATION_NAVY_MAGNETIC_FIELD_STABILIZER,
+          state,
+        })),
+      ],
+      drones: [],
+      cargo: [],
+    });
+    expect(hull(vexor(0, 'online'))).toBeCloseTo(3000 * 1.05, 6);
+    expect(hull(vexor(3, 'online'))).toBeCloseTo(3000 * 1.08, 6);
+    expect(hull(vexor(3, 'offline'))).toBeCloseTo(3000 * 1.08, 6);
   });
 
   it('adds nothing when nothing is projected', () => {
