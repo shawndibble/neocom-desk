@@ -115,6 +115,28 @@ produces depth — discovery, scheduling, restocking, routing, competition decay
 source — a long changelog, a big release, a tool with many screens — drafts up
 to **10**. Go through it item by item; don't stop at the headline features.
 
+**Translate every change into the question it answers.** For each release-note
+line, changelog entry or feature, first write down the player question or
+problem behind it, in the player's words, before thinking about any feature:
+a "job completion timeline" answers _"which of my jobs frees a slot first?"_;
+an "export to multibuy" answers _"how do I get this shopping list into the
+client?"_. Then ask whether Neocom Desk answers **that question**, by whatever
+means — not whether it has the same feature:
+
+- **Already answered** (a different page, a column, a tooltip, a sort) → drop,
+  and record the question and the module that answers it.
+- **Answered, but worse** (more clicks, buried, partial, wrong unit) → the
+  candidate is an improvement to the surface that answers it, not a copy of
+  the other tool's feature.
+- **Not answered** → a candidate, framed as the question, with the other tool's
+  feature as one possible answer. Pick the answer that fits Neocom's pages and
+  `docs/DESIGN.md`, which may not be theirs.
+
+A change whose question you cannot state is usually plumbing (a refactor, a
+data-source swap, a bug fix) — skip it. Grepping for the other tool's feature
+name misses a question we answer under a different name; grepping for the
+question's domain nouns finds it.
+
 **Small ideas count.** A new column, a data point, a filter, a sort or a
 grouping on an existing table is a real candidate. So is a UI/UX pattern from
 the tool's screenshots: a layout, a summary line, a way of marking estimates.
@@ -148,6 +170,8 @@ own prior art.
 
 Each surviving candidate carries, as required fields:
 
+- **Player question**: the question or problem from the step above, in the
+  player's words, and why no existing surface answers it.
 - **Player value**: the in-game problem this solves, and roughly what share of
   industry-focused players could actually use it. Answer it in players, not in
   features — see the player-reach bar in step 4.
@@ -191,7 +215,9 @@ Give it this kill-bar:
 - **Settled scope**: does a `docs/context/decisions/` file or `.out-of-scope/`
   entry constrain this? Hand it the step 3 hits; a decision outranks the
   reviewer's own reasoning.
-- **Overlap**: does an existing route or module already do this?
+- **Overlap**: does an existing route or module already answer the candidate's
+  player question, even under another name or shape? Judge the question, not
+  the feature.
 - **Maintenance**: what breaks on the next SDE or ESI change?
 
 Require a verdict per candidate on its own line: `SHIP`, `NARROW` (state the
@@ -257,6 +283,7 @@ reads only this before deciding whether to read on.
 
 **Category:** enhancement
 **Summary:** one line
+**Player question:** the question or problem this answers, in the player's words
 **Prior art:** the third-party tool(s) that do this, and what they get right
 **Player value:** the in-game problem this solves, and what share of
 industry-focused players can use it
@@ -298,7 +325,8 @@ Maintain these sections, each keyed by topic, not by run:
   wall, no write-scoped ESI, "picture of data already on screen", etc.). Add
   one only if it's genuinely reusable, not specific to a single candidate.
 - **Filed candidates** — issue number, verdict, one-line description.
-- **Killed / dropped candidates** — one line: what, why. This is what stops a
+- **Killed / dropped candidates** — one line: the player question, and why it
+  was dropped (for "already answered", the module that answers it). This is what stops a
   re-pitch, so keep the reason, not the narrative.
 
 ### Commit it via one shared PR, not a new one per run
