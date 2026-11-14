@@ -38,6 +38,7 @@ import {
 } from './payouts';
 import { DEFAULT_GRACE_HOURS, dayClosesAt } from './billable';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
+import { DIVISION_NAME_MAX } from './divisionNames';
 import { mergeObservedRows, observedRowKey } from './observed';
 import { canOverrideRecordRate, isRetroactiveRate } from './rates';
 import {
@@ -374,6 +375,7 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect(mirror.BOOK_DEFAULTS.graceHours).toBe(DEFAULT_GRACE_HOURS);
     expect(mirror.BOOK_DEFAULTS.minimumStatement).toBe(DEFAULT_MINIMUM_STATEMENT);
     expect(mirror.BOOK_DEFAULTS.overdueDays).toBe(DEFAULT_OVERDUE_DAYS);
+    expect(mirror.DIVISION_NAME_MAX).toBe(DIVISION_NAME_MAX);
   });
 });
 

@@ -32,12 +32,18 @@ describe('classifyRuleBreaks', () => {
     });
   });
 
-  it.each(['wrong_slot', 'slots', 'rig_size', 'ship_restricted', 'capital_item', 'max_group'])(
-    'treats %s as not fitting the hull',
-    (rule) => {
-      expect(classifyRuleBreaks([rule]).fitsHull).toBe(false);
-    }
-  );
+  it.each([
+    'wrong_slot',
+    'slots',
+    'rig_size',
+    'ship_restricted',
+    'capital_item',
+    'max_group',
+    'not_a_module',
+    'not_a_drone',
+  ])('treats %s as not fitting the hull', (rule) => {
+    expect(classifyRuleBreaks([rule]).fitsHull).toBe(false);
+  });
 });
 
 describe('browserTree', () => {

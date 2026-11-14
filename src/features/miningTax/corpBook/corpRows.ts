@@ -14,7 +14,8 @@ import type {
   PersonalOverlay,
 } from '@/engine/corpTaxBook/personal';
 import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
-import { entryKey, type OreLine } from '@/engine/miningTax/types';
+import { minusLines } from '@/engine/miningTax/oreLines';
+import { entryKey } from '@/engine/miningTax/types';
 import { flatten, type DisplayRow } from '../groupRows';
 import type { MoonMiningTaxRow } from '../snapshot';
 
@@ -93,14 +94,6 @@ const STATUS_OF_STATE: Record<BookRowView['state'], MiningTaxAssignmentStatus> =
   // Forgiven in full by an officer write-off (#4637): not owed, like a dismissal.
   waived: 'dismissed',
 };
-
-function minusLines(from: readonly OreLine[], take: readonly OreLine[] | undefined): OreLine[] {
-  if (!take) return [...from];
-  const gone = new Map(take.map((l) => [l.typeId, l.quantity]));
-  return from
-    .map((l) => ({ typeId: l.typeId, quantity: l.quantity - (gone.get(l.typeId) ?? 0) }))
-    .filter((l) => l.quantity > 0);
-}
 
 function syntheticRow(view: BookRowView, characterName: string, corpName: string): DisplayRow {
   const assignment: MiningTaxAssignmentRecord = {

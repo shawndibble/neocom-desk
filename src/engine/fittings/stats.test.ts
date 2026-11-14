@@ -1342,24 +1342,27 @@ describe('extractFittingStats resources', () => {
 });
 
 describe('extractLockedTargets', () => {
-  const character = (bonus?: number) =>
-    new Map(bonus === undefined ? [] : [[192, { value: bonus }]]);
+  const character = (locks: number) => new Map([[192, { value: locks }]]);
 
-  it('is the lower of the hull’s limit and the pilot’s: two, plus a target a level of Target Management and Advanced Target Management', () => {
-    expect(extractLockedTargets(attrs({ maxLockedTargets: 7 }), character(10))).toEqual({
+  it('is the lower of the hull’s limit and the pilot’s, the pilot’s base two included by the engine', () => {
+    expect(extractLockedTargets(attrs({ maxLockedTargets: 7 }), character(12))).toEqual({
       ship: 7,
       pilot: 12,
       effective: 7,
     });
-    expect(extractLockedTargets(attrs({ maxLockedTargets: 7 }), character(1))).toEqual({
+    expect(extractLockedTargets(attrs({ maxLockedTargets: 7 }), character(3))).toEqual({
       ship: 7,
       pilot: 3,
       effective: 3,
     });
   });
 
-  it('gives an untrained pilot the base two', () => {
-    expect(extractLockedTargets(attrs({ maxLockedTargets: 7 }), character()).effective).toBe(2);
+  it('falls back to the base two when the character result carries no figure', () => {
+    expect(extractLockedTargets(attrs({ maxLockedTargets: 7 }), new Map())).toEqual({
+      ship: 7,
+      pilot: 2,
+      effective: 2,
+    });
   });
 });
 

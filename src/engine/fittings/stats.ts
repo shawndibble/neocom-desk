@@ -1,4 +1,5 @@
 import {
+  CHARACTER_BASE_LOCKED_TARGETS,
   CHARACTER_DOGMA_ATTRIBUTE,
   CHARGE_GROUP_ATTRIBUTES,
   DOGMA_ATTRIBUTE,
@@ -23,7 +24,6 @@ import {
   type SensorType,
   type TankStats,
   type FighterStats,
-  CHARACTER_BASE_LOCKED_TARGETS,
 } from './types';
 import {
   capacitorBudget,
@@ -210,9 +210,9 @@ function jumpDriveStats(shipAttributes: AttributeMap): JumpDriveStats | null {
 }
 
 /**
- * The hull's lock limit against the pilot's. The engine's own "effective"
- * figure misses the pilot's base of two, so this adds it back to the skill
- * bonus the character result carries (`CHARACTER_DOGMA_ATTRIBUTE`).
+ * The hull's lock limit against the pilot's: the character result carries
+ * the pilot's whole figure, base two and skills (`CHARACTER_DOGMA_ATTRIBUTE`);
+ * without one, the base two.
  */
 export function extractLockedTargets(
   shipAttributes: AttributeMap,
@@ -220,8 +220,8 @@ export function extractLockedTargets(
 ): LockedTargets {
   const ship = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.maxLockedTargets);
   const pilot =
-    CHARACTER_BASE_LOCKED_TARGETS +
-    readAttribute(characterAttributes, CHARACTER_DOGMA_ATTRIBUTE.maxLockedTargets);
+    characterAttributes.get(CHARACTER_DOGMA_ATTRIBUTE.maxLockedTargets)?.value ??
+    CHARACTER_BASE_LOCKED_TARGETS;
   return { ship, pilot, effective: Math.min(ship, pilot) };
 }
 

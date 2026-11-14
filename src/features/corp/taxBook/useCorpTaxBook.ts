@@ -15,6 +15,7 @@ import { useActiveCorporationId } from '../owner';
 import { useCorpAccess } from '../useCorpAccess';
 import { readBookSummary, type BookSummary } from './bookClient';
 import { useMiningLedgerAccess, type MiningLedgerAccess } from './miningLedgerAccess';
+import { pushDivisionNames } from './pushDivisionNames';
 import {
   syncCorpTaxBook,
   type SyncCapabilities,
@@ -137,6 +138,23 @@ export function useCorpTaxBook(options: { autoSync?: boolean } = {}): CorpTaxBoo
     visited.current = key;
     if (shouldAutoSync(summary, now)) void sync();
   }, [autoSync, canSync, loaded, key, summary, now, sync]);
+
+  // A Director's visit stores the corp's wallet division names on the book (#6161), once per
+  // visit, so members' Settle up names the Account. Silent: a failure changes nothing on screen.
+  const canReadDivisions = access.capabilities.canReadDivisions;
+  const namesPushed = useRef<string | null>(null);
+  useEffect(() => {
+    if (!autoSync || !canReadDivisions || !loaded || !summary?.active) return;
+    if (key === null || namesPushed.current === key) return;
+    if (characterId === null || corporationId === null) return;
+    namesPushed.current = key;
+    pushDivisionNames(characterId, corporationId, summary).catch((error: unknown) =>
+      console.warn(
+        'Storing the wallet division names on the Corp Tax Book failed',
+        error instanceof Error ? error.message : String(error)
+      )
+    );
+  }, [autoSync, canReadDivisions, loaded, key, summary, characterId, corporationId]);
 
   return {
     summary: loaded ? summary : null,

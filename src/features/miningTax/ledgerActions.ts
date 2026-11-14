@@ -24,6 +24,9 @@ import {
   type MiningTaxPaymentLinkSource,
   type PayeeRecord,
 } from '@/db';
+import type { BookRowView } from '@/engine/corpTaxBook/personal';
+import { minusLines, priceMap } from '@/engine/miningTax/oreLines';
+import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { scheduleSync } from '@/sync';
 import {
   AlreadyAssignedError,
@@ -56,6 +59,7 @@ import {
 } from './assignments';
 import { recordDefaultOptOuts } from './defaultOptOuts';
 import type { GroupMember } from './groupRows';
+import { isCorpEntityPayee } from './corpBook/corpRows';
 import { removePayeeRecord } from './payees';
 import type { SessionContinuation } from './sessionContinuation';
 
@@ -405,4 +409,87 @@ export function linkRecordedPayment(
   ref: PaymentTransactionRef
 ): Promise<LedgerActionResult> {
   return commit(charactersOf(assignments), () => linkRecordedPaymentPrimitive(assignments, ref));
+}
+
+/** The character's Payee verified as the corporation: the first one, or a new one named for it. */
+async function corpEntityPayeeIds(
+  characterId: number,
+  corp: { corporationId: number; name: string },
+  taxPct: number
+): Promise<string[]> {
+  const payees = await db.payees.where('characterId').equals(characterId).toArray();
+  const ids = payees.filter((p) => isCorpEntityPayee(p, corp.corporationId)).map((p) => p.id);
+  if (ids.length > 0) return ids;
+  const id = crypto.randomUUID();
+  await db.payees.put({
+    id,
+    characterId,
+    name: corp.name,
+    defaultTaxPct: taxPct,
+    entityId: corp.corporationId,
+    entityKind: 'corporation',
+    updatedAt: Date.now(),
+  });
+  return [id];
+}
+
+/**
+ * Settle up for a Corp Tax Book: the member's side of a payment to the corporation. The ore of
+ * each owed book row is recorded Paid under the member's Payee verified as the corporation
+ * (created when they have none): their own owed Assignments under it are marked paid, and a new
+ * Paid Assignment covers the rest their marks don't. The book counts that as paid on the
+ * member's side; the corporation still confirms it against its wallet. A row that never lined up
+ * with a ledger entry has no ore to record and stays owed.
+ */
+export function recordCorpPayment(
+  corp: { corporationId: number; name: string },
+  rows: readonly BookRowView[],
+  payment?: PaymentInput
+): Promise<LedgerActionResult> {
+  return commit(charactersOf(rows), async () => {
+    const payeesOf = new Map<number, string[]>();
+    const recorded: MiningTaxAssignmentRecord[] = [];
+    for (const row of rows) {
+      if (row.solarSystemId === 0) continue;
+      let payeeIds = payeesOf.get(row.characterId);
+      if (!payeeIds) {
+        payeeIds = await corpEntityPayeeIds(row.characterId, corp, row.taxPct);
+        payeesOf.set(row.characterId, payeeIds);
+      }
+      const own = (
+        await db.miningTaxAssignments.where('characterId').equals(row.characterId).toArray()
+      ).filter(
+        (a) =>
+          a.date === row.date &&
+          a.solarSystemId === row.solarSystemId &&
+          a.payeeId !== undefined &&
+          payeeIds.includes(a.payeeId) &&
+          (a.status === 'paid' || a.status === 'outstanding')
+      );
+      const owedOwn = own.filter((a) => a.status === 'outstanding');
+      recorded.push(...owedOwn);
+      const oreLines = minusLines(
+        row.oreLines,
+        own.flatMap((a) => a.oreLines)
+      );
+      if (oreLines.length === 0) continue;
+      const value = computeAssignmentValue(oreLines, priceMap(row.unitPrices), row.taxPct);
+      recorded.push(
+        await createAssignment({
+          characterId: row.characterId,
+          date: row.date,
+          solarSystemId: row.solarSystemId,
+          payeeId: payeeIds[0],
+          oreLines,
+          ...(row.personalOreLines ? { entryOreLines: row.personalOreLines } : {}),
+          taxPct: row.taxPct,
+          estimatedValue: value.estimatedValue,
+          taxOwed: value.taxOwed,
+          markPaid: false,
+          ...(row.refineryLabel ? { label: row.refineryLabel } : {}),
+        })
+      );
+    }
+    await markAssignmentsPaid(recorded, payment);
+  });
 }

@@ -1,0 +1,8 @@
+# Scope decisions — Corp Tax Book stores wallet division names from a Director's own read (issue #6161)
+
+_Recorded 2026-11-14 · issue #6161._
+
+- **A Director's own corp login reads the wallet division names and stores them on the book.** When a Director (`canReadDivisions`) opens Corp Moons, the client reads `/corporations/{id}/divisions` and, only when the names of the book's divisions differ from what the book holds, writes them through the existing `updateSettings` action as `divisionNames` (a map of division `"1"`–`"7"` to a name of at most 50 characters). A member's corp Settle up then reads "Account: <the corp's name>" instead of "Master Wallet" or "Division N (number N in the list)", which stay as the fallback when no name is stored.
+- **The Corp Tax Book sync grant does not gain `esi-corporations.read_divisions.v1`.** Widening it would leave every existing book on the fallback until its holder re-granted, and the holder may be an Accountant, who cannot read divisions at all (the endpoint is Director-only). Rules out reading the names in the scheduled sync.
+- **The names refresh only when a Director visits.** A corp that renames a division shows the old name to members until then; the cost is accepted, since renames are rare and the Account dropdown still lists the division in the same place.
+- **Only the book's own divisions are stored, and the map is replaced whole.** A division the corp never named, or named past the bound, is left out so the member sees the numbered fallback rather than a cut name. The write goes in the book's audit like any settings change; it happens only when a name changed.

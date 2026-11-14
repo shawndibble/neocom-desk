@@ -483,6 +483,21 @@ describe('settings patch: start date and member visibility', () => {
     expect(() => parseSettingsPatch({ startDate: 'x' })).toThrow();
     expect(() => parseSettingsPatch({ showToMembers: false })).toThrow();
   });
+
+  it('takes the wallet division names a Director read (#6161)', () => {
+    expect(parseSettingsPatch({ divisionNames: { '1': ' Master ', '5': 'MOON TAXES' } })).toEqual({
+      divisionNames: { '1': 'Master', '5': 'MOON TAXES' },
+    });
+    // An empty map clears the names: the corp reset them to defaults.
+    expect(parseSettingsPatch({ divisionNames: {} })).toEqual({ divisionNames: {} });
+    expect(() => parseSettingsPatch({ divisionNames: { '8': 'x' } })).toThrow();
+    expect(() => parseSettingsPatch({ divisionNames: { '0': 'x' } })).toThrow();
+    expect(() => parseSettingsPatch({ divisionNames: { one: 'x' } })).toThrow();
+    expect(() => parseSettingsPatch({ divisionNames: { '2': '   ' } })).toThrow();
+    expect(() => parseSettingsPatch({ divisionNames: { '2': 7 } })).toThrow();
+    expect(() => parseSettingsPatch({ divisionNames: { '2': 'x'.repeat(51) } })).toThrow();
+    expect(() => parseSettingsPatch({ divisionNames: ['x'] })).toThrow();
+  });
 });
 
 describe('reanchorCadence', () => {

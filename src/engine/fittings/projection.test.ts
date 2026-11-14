@@ -3,7 +3,7 @@ import { combineProjections, projectsNothing } from './projection';
 
 const logi = {
   buffs: [],
-  effects: [{ typeId: 26913, effectId: -86, attributes: { [-45]: 42.5 } }],
+  effects: [{ typeId: 26913, effectId: -86, attributes: { [-45]: 42.5 }, quantity: 1 }],
 };
 const booster = {
   buffs: [{ id: 12, value: 25 }],

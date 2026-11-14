@@ -106,6 +106,9 @@ export const BOOK_DEFAULTS = {
   cadence: { kind: 'monthly' },
 } as const;
 
+/** The longest wallet division name a book stores (#6161); mirrors `src/engine/corpTaxBook/divisionNames.ts`. */
+export const DIVISION_NAME_MAX = 50;
+
 // --- Payment allocation (issue #4066) ---------------------------------------
 // Mirror of src/engine/corpTaxBook/allocation.ts `allocatePayments`, so the
 // verify link can show which payments were credited to one Statement.
