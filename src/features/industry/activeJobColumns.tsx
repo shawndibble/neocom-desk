@@ -8,7 +8,7 @@ import { ItemInfoLink, CharacterLink } from '@/features/entities';
 import { formatEveDateTime } from '@/lib/eveTime';
 import { activityI18nKey, jobProgress, type ActiveJob } from './jobs';
 import { JobEndsInCell, JobProgressCell } from './JobCells';
-import { isLoggableHistoryJob, type HistoryJobState } from './jobHistory';
+import { inventionOutcome, isLoggableHistoryJob, type HistoryJobState } from './jobHistory';
 
 /**
  * A row on the table, tagged with its Character even in the single-character
@@ -242,7 +242,24 @@ export function historyColumns({
       align: 'right',
       className: 'tabular-nums',
       sortValue: (job) => job.runs,
-      render: (job) => formatCount(job.runs),
+      render: (job) => {
+        // A finished invention job's result rides on its runs (issue #6166):
+        // dim, never a failure tone, since a miss is a normal outcome.
+        const outcome = inventionOutcome(job);
+        if (!outcome) return formatCount(job.runs);
+        return (
+          <>
+            {formatCount(job.runs)}
+            <span className="text-text-dim">
+              {' · '}
+              {t('industry.historyInventionSucceeded', {
+                succeeded: formatCount(outcome.succeeded),
+                runs: formatCount(outcome.runs),
+              })}
+            </span>
+          </>
+        );
+      },
     },
     {
       id: 'delivered',

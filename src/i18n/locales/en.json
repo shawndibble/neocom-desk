@@ -4107,6 +4107,7 @@
     "historyLogged": "Logged",
     "historyViewPlan": "View plan",
     "historyColDelivered": "Delivered",
+    "historyInventionSucceeded": "{{succeeded}} of {{runs}} succeeded",
     "historyEmptyTitle": "No delivered jobs yet",
     "historyEmptyHint": "Jobs you deliver show up here after the next refresh, and stay after ESI stops returning them.",
     "historyTableLabel": "Delivered industry jobs",
