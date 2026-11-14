@@ -192,6 +192,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     settleUpStart,
     linkWalletTarget,
     corpPayTarget,
+    corpPayFocus,
     bulkDismissOpen,
     linkPaymentOpen,
   } = useTaxDialogState(store);
@@ -593,7 +594,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
       case 'unassign':
         return actions.confirmUnassignFor(dr);
       case 'corpPay':
-        if (dr.corp?.kind === 'row') actions.corpPayFromDetail(dr.corp.view.corporationId);
+        if (dr.corp?.kind === 'row')
+          actions.corpPayFromDetail(dr.corp.view.corporationId, {
+            rowId: dr.corp.view.id,
+            characterId: dr.corp.view.characterId,
+          });
         return;
     }
   }
@@ -688,7 +693,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
           systemName={systemName(detailTarget)}
           systemSecurity={systemSecurityOf(detailTarget)}
           typeNames={typeNames}
-          onPay={() => actions.corpPayFromDetail(corpDetail.view.corporationId)}
+          onPay={() =>
+            actions.corpPayFromDetail(corpDetail.view.corporationId, {
+              rowId: corpDetail.view.id,
+              characterId: corpDetail.view.characterId,
+            })
+          }
           onUnmarkPaid={() => unmarkCorpPayment(corpDetail.view.markedPaidIds)}
           notice={
             (corpDetail.view.overlap || corpDetail.view.state === 'conflict') && (
@@ -742,6 +752,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 rows={owedRows}
                 systemNames={systemNames}
                 statementCodes={codes}
+                focus={corpPayFocus ?? undefined}
               />
             </Suspense>
           );
