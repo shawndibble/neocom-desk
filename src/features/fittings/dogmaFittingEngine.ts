@@ -251,6 +251,7 @@ export function withIncoming(fit: Fit, projected?: ProjectedEffects): Fit {
           type_id: effect.typeId,
           effect_id: effect.effectId,
           attributes: effect.attributes,
+          quantity: effect.quantity,
         })),
       ],
       buffs: [...(incoming.buffs ?? []), ...projected.buffs],
@@ -287,6 +288,7 @@ export function toProjectedEffects(outgoing: Projection | undefined): ProjectedE
       typeId: effect.type_id,
       effectId: effect.effect_id,
       attributes: attributeRecord(effect.attributes),
+      quantity: effect.quantity ?? 1,
     })),
   };
 }

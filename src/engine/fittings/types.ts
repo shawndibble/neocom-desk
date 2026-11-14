@@ -161,7 +161,13 @@ export interface PilotProfile {
  */
 export interface ProjectedEffects {
   buffs: { id: number; value: number }[];
-  effects: { typeId: number; effectId: number; attributes: Record<number, number> }[];
+  /** `quantity`: how many items aim it — a stack of drones is one effect. */
+  effects: {
+    typeId: number;
+    effectId: number;
+    attributes: Record<number, number>;
+    quantity: number;
+  }[];
 }
 
 export type CapacitorStatus =
@@ -310,7 +316,14 @@ export interface ItemRuleBreak {
     | 'structure_item'
     | 'ship_item'
     | 'charge_group'
-    | 'charge_size';
+    | 'charge_size'
+    | 'not_a_module'
+    | 'not_a_drone'
+    | 'not_a_fighter'
+    | 'not_an_implant'
+    | 'not_a_hull'
+    | 'not_a_mode'
+    | 'not_a_skill';
   /** The fitted item (the module, for a charge) that breaks it; null when the rule names the ship. */
   typeId: number | null;
 }
@@ -694,11 +707,11 @@ export type StatsErrorReason = 'skills' | 'shipData';
  */
 export const CHARACTER_DOGMA_ATTRIBUTE = {
   maxActiveDrones: 352,
-  // The targets the pilot's skills add: Target Management and Advanced
-  // Target Management each +1 a level (their `maxTargetBonus`, 311, is 1).
-  // The engine leaves out the character's own base of two
-  // (`CHARACTER_BASE_LOCKED_TARGETS`): a live run reads 5 at Target
-  // Management V alone and nothing untrained (2026-09-25).
+  // The targets the pilot can lock: the CharacterType's (1373) base of two,
+  // plus Target Management and Advanced Target Management each +1 a level
+  // (their `maxTargetBonus`, 311, is 1). Engine 13.6.1 loads the character's
+  // own attributes from the SDE (from 13.6.1): a live run reads 2 untrained, 3 at Target
+  // Management I and 12 at both V (2026-11-14).
   maxLockedTargets: 192,
 } as const;
 
