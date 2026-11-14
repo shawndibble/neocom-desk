@@ -8098,10 +8098,11 @@
       },
       "pay": {
         "copy": "Copy",
-        "how": "Send it as a donation to {{corp}}, into division {{division}}: the corp's book finds it in its wallet journal and credits it. Recording it here marks it paid on your side meanwhile.",
-        "code": "{{period}} Statement: put this code in the donation's reason to pin it to that Statement.",
-        "codeInReason": "The Reason is your {{period}} Statement's code: it pins the donation to that Statement.",
-        "noCode": "No code is needed: the donation credits you, oldest day first."
+        "account": "Account: <strong>{{account}}</strong>",
+        "masterWallet": "Master Wallet",
+        "division": "Division {{division}} (number {{division}} in the list)",
+        "code": "{{period}} Statement code (put it in the reason):",
+        "codeInReason": "The Reason is your {{period}} Statement's code."
       },
       "claim": {
         "title": "A donation to {{corp}} is not matched to you",

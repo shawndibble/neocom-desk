@@ -571,21 +571,24 @@ export function SettleUpDialog({
           }
         />
 
-        <p className="text-xs text-text-dim">
-          {t('miningTax.settleUp.hint')}
-          {onPickFromWallet && (
-            <>
-              {' '}
-              <button
-                type="button"
-                className={inlineLinkClassName}
-                onClick={() => onPickFromWallet(new Set(included.map((r) => r.assignment.id)))}
-              >
-                {t('miningTax.settleUp.pickFromWallet')}
-              </button>
-            </>
-          )}
-        </p>
+        {/* A Payee-specific writer (a corp's book) brings its own notice; the wallet-link hint is the ledger's. */}
+        {!recordPaid && (
+          <p className="text-xs text-text-dim">
+            {t('miningTax.settleUp.hint')}
+            {onPickFromWallet && (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className={inlineLinkClassName}
+                  onClick={() => onPickFromWallet(new Set(included.map((r) => r.assignment.id)))}
+                >
+                  {t('miningTax.settleUp.pickFromWallet')}
+                </button>
+              </>
+            )}
+          </p>
+        )}
 
         <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">

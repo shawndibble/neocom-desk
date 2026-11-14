@@ -356,6 +356,7 @@ describe('SettleUpDialog paying from one Character', () => {
 
     expect(screen.getByText('STMT-42')).toBeInTheDocument();
     expect(screen.getByText('Into division 1')).toBeInTheDocument();
+    expect(screen.queryByText(/links itself/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: RECORD }));
 
     await waitFor(() => expect(record).toHaveBeenCalledTimes(1));
