@@ -22,11 +22,9 @@ import { useCloneStates, cloneStateFor } from '@/features/skills/cloneState';
 import { newPlan } from '@/features/skills/planner/newPlan';
 import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
-import { AttributesPane } from '@/features/skills/planner/AttributesPane';
+import { AttributesPane, PlanAttributeChips } from '@/features/skills/planner/AttributesPane';
 import { AcceleratorSection } from '@/features/skills/planner/AcceleratorSection';
 import { AcceleratorRow } from '@/features/skills/planner/AcceleratorRow';
-import { AttributeChips } from '@/features/skills/AttributeChips';
-import { acceleratorBonusOf } from '@/engine/attributeBaseline';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { CurrentQueuePanel } from '@/features/skills/planner/CurrentQueuePanel';
 import { QueueStrip } from '@/features/skills/planner/QueueStrip';
@@ -275,12 +273,10 @@ export function SkillPlans() {
               detectedBonus={injected.detected}
               nowMs={nowMs}
               attributes={
-                <AttributeChips
-                  attributes={attributesResult?.data ?? null}
+                <PlanAttributeChips
+                  result={attributesResult}
                   implantBonuses={implants}
-                  boosterBonus={acceleratorBonusOf(attributeBaseline)}
-                  dense
-                  short
+                  attributeBaseline={attributeBaseline}
                 />
               }
             />

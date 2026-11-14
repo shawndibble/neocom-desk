@@ -32,6 +32,23 @@ interface AttributesPaneProps {
   className?: string;
 }
 
+/** The attribute chips as the Plans page shows them: here on desktop, in the phone's Accelerator sheet. */
+export function PlanAttributeChips({
+  result,
+  implantBonuses,
+  attributeBaseline,
+}: Pick<AttributesPaneProps, 'result' | 'implantBonuses' | 'attributeBaseline'>) {
+  return (
+    <AttributeChips
+      attributes={result?.data ?? null}
+      implantBonuses={implantBonuses}
+      boosterBonus={acceleratorBonusOf(attributeBaseline)}
+      dense
+      short
+    />
+  );
+}
+
 /**
  * The character's current attributes, filling the plan list's detail pane
  * until a plan is opened (#158 put a "select a plan" placeholder there, which
@@ -61,12 +78,10 @@ export function AttributesPane({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const chips = (
-    <AttributeChips
-      attributes={result?.data ?? null}
+    <PlanAttributeChips
+      result={result}
       implantBonuses={implantBonuses}
-      boosterBonus={acceleratorBonusOf(attributeBaseline)}
-      dense
-      short
+      attributeBaseline={attributeBaseline}
     />
   );
   const optimizeQueue = () => {

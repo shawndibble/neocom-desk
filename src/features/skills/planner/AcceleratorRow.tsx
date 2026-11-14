@@ -10,7 +10,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal } from '@/components/ui';
+import { Eyebrow, Modal } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { CharacterAcceleratorRecord } from '@/db';
 import { resolveAccelerator } from '@/engine/accelerator';
@@ -34,7 +34,7 @@ export function AcceleratorRow({
   attributes: ReactNode;
 }) {
   const { t } = useTranslation();
-  // Purges a run-out record, as the inline section does on desktop.
+  // Purges a run-out record. The section does too, but here it is mounted only while the sheet is open.
   useCharacterAccelerators();
   const [open, setOpen] = useState(false);
   const state = resolveAccelerator(running, detectedBonus, nowMs);
@@ -86,12 +86,12 @@ export function AcceleratorRow({
             running={running}
             detectedBonus={detectedBonus}
             startAdding
-            labelled={false}
+            showTitle={false}
           />
           <section aria-label={t('skills.attributes')} className="border-t border-line pt-3">
-            <h3 className="mb-2 text-[0.6875rem] tracking-wide text-text-dim uppercase">
+            <Eyebrow as="h3" className="mb-2">
               {t('skills.attributes')}
-            </h3>
+            </Eyebrow>
             {attributes}
           </section>
         </div>

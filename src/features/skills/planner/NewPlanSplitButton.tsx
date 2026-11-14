@@ -143,7 +143,10 @@ export function NewPlanSplitButton({
               {t('plans.fromCommunityItem')}
             </DropdownMenuItem>
             {onOptimizeQueue && (
-              <DropdownMenuItem disabled={queueEmpty} onSelect={onOptimizeQueue}>
+              <DropdownMenuItem
+                disabled={queueEmpty}
+                onSelect={() => newPlanMenu.run(onOptimizeQueue)}
+              >
                 {t('plans.fromQueueOptimizedItem')}
               </DropdownMenuItem>
             )}

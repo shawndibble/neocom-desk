@@ -347,6 +347,11 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     await db.skillPlans.add(seedPlan());
     render(<App />);
 
+    // Desktop keeps the Attributes panel (with Optimize queue) and no phone Accelerator row.
+    expect(await screen.findByRole('heading', { name: 'Attributes' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Optimize queue' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Accelerator/ })).not.toBeInTheDocument();
+
     await user.click(await screen.findByRole('link', { name: /^Test plan/ }));
     await screen.findByText('Your entries');
 

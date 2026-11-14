@@ -27,7 +27,7 @@ export function AcceleratorSection({
   running,
   detectedBonus,
   startAdding = false,
-  labelled = true,
+  showTitle = true,
 }: {
   characterId: number;
   /** The typed-in accelerator, only while it is still running. */
@@ -36,7 +36,7 @@ export function AcceleratorSection({
   /** Open straight on the editor when nothing is injected (the phone's sheet, opened to add one). */
   startAdding?: boolean;
   /** False inside a container already titled "Accelerator" (the phone's sheet). */
-  labelled?: boolean;
+  showTitle?: boolean;
 }) {
   const { t } = useTranslation();
   useCharacterAccelerators();
@@ -47,9 +47,9 @@ export function AcceleratorSection({
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-1.5">
         <span>
-          {labelled && t('plans.accelerator')}
+          {showTitle && t('plans.accelerator')}
           {running === null && detectedBonus !== null && (
-            <span className={labelled ? 'ml-2 font-semibold' : 'font-semibold'}>
+            <span className={showTitle ? 'ml-2 font-semibold' : 'font-semibold'}>
               {t('plans.acceleratorDetected', { bonus: detectedBonus })}
             </span>
           )}
