@@ -18,6 +18,8 @@ import {
   goBack,
 } from '@/test/assetsPage';
 import { ABYSSAL_NEUT, abyssalEstimate } from '@/test/assetsMocks';
+import { formatIskCompact } from '@/lib/isk';
+import { formatCubicMetres } from '@/lib/volume';
 
 vi.mock('virtual:pwa-register/react', async () =>
   (await import('@/test/assetsMocks')).pwaRegisterMock()
@@ -99,8 +101,63 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Select Drake and its contents' }));
 
     expect(
-      await screen.findByText('1 item selected', { selector: '[aria-hidden="true"]' })
+      await screen.findByText('1 item selected', { selector: '[aria-hidden="true"] > span' })
     ).toBeInTheDocument();
+  });
+
+  it('totals a selection at its items only: a cascaded ship adds its cargo, never its hull (#6165)', async () => {
+    server.use(
+      http.get('https://esi.evetech.net/markets/prices', () =>
+        HttpResponse.json([
+          { type_id: 650, average_price: 50_000_000 },
+          { type_id: 34, average_price: 5 },
+        ])
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    const user = userEvent.setup({ delay: null });
+    render(<App />);
+    await openLocation(user, JITA);
+    await screen.findByRole('heading', { name: 'Drake' });
+
+    await clickTool(user, 'Select');
+    await user.click(screen.getByRole('checkbox', { name: 'Select Drake and its contents' }));
+
+    expect(
+      await screen.findByText(`· ${formatIskCompact(250)} ISK`, {
+        selector: '[aria-hidden="true"] > span',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(`· ${formatCubicMetres(0.5)} m³`, {
+        selector: '[aria-hidden="true"] > span',
+      })
+    ).toHaveClass('max-sm:hidden');
+    expect(screen.queryByText(/unpriced/)).not.toBeInTheDocument();
   });
 
   it('turning off select mode clears the current selection', async () => {
@@ -112,7 +169,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
     expect(
-      await screen.findByText('1 item selected', { selector: '[aria-hidden="true"]' })
+      await screen.findByText('1 item selected', { selector: '[aria-hidden="true"] > span' })
     ).toBeInTheDocument();
 
     await clickTool(user, 'Select');
@@ -297,7 +354,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await user.click(screen.getByRole('button', { name: 'Select all in view' }));
 
     expect(
-      await screen.findByText('2 items selected', { selector: '[aria-hidden="true"]' })
+      await screen.findByText('2 items selected', { selector: '[aria-hidden="true"] > span' })
     ).toBeInTheDocument();
     for (const checkbox of screen.getAllByRole('checkbox')) {
       expect(checkbox).toBeChecked();
@@ -325,7 +382,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('button', { name: 'Select all in view' }));
     expect(
-      await screen.findByText('2 items selected', { selector: '[aria-hidden="true"]' })
+      await screen.findByText('2 items selected', { selector: '[aria-hidden="true"] > span' })
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Deselect all' }));
