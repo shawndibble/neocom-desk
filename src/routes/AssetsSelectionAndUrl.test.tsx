@@ -101,7 +101,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Select Drake and its contents' }));
 
     expect(
-      await screen.findByText('1 item selected', { selector: '[aria-hidden="true"] > span' })
+      await screen.findByText('1 item selected', { selector: 'span[aria-hidden="true"]' })
     ).toBeInTheDocument();
   });
 
@@ -147,15 +147,18 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Drake and its contents' }));
 
+    // The cargo's 50 × 5 ISK, not the Drake's 50M: the hull is never added.
+    // The ISK part holds an `IskAmount` (shorthand plus its exact figure as
+    // hidden text), so match the part span by its shorthand and suffix.
+    const [iskPart] = await screen.findAllByText(
+      (_, element) =>
+        element?.tagName === 'SPAN' &&
+        element.textContent?.trim().startsWith(`· ${formatIskCompact(250)}`) === true &&
+        element.textContent.endsWith(' ISK')
+    );
+    expect(iskPart).not.toHaveAttribute('aria-hidden');
     expect(
-      await screen.findByText(`· ${formatIskCompact(250)} ISK`, {
-        selector: '[aria-hidden="true"] > span',
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(`· ${formatCubicMetres(0.5)} m³`, {
-        selector: '[aria-hidden="true"] > span',
-      })
+      screen.getByText(`· ${formatCubicMetres(0.5)} m³`, { selector: 'span[aria-hidden="true"]' })
     ).toHaveClass('max-sm:hidden');
     expect(screen.queryByText(/unpriced/)).not.toBeInTheDocument();
   });
@@ -169,7 +172,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
     expect(
-      await screen.findByText('1 item selected', { selector: '[aria-hidden="true"] > span' })
+      await screen.findByText('1 item selected', { selector: 'span[aria-hidden="true"]' })
     ).toBeInTheDocument();
 
     await clickTool(user, 'Select');
@@ -354,7 +357,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await user.click(screen.getByRole('button', { name: 'Select all in view' }));
 
     expect(
-      await screen.findByText('2 items selected', { selector: '[aria-hidden="true"] > span' })
+      await screen.findByText('2 items selected', { selector: 'span[aria-hidden="true"]' })
     ).toBeInTheDocument();
     for (const checkbox of screen.getAllByRole('checkbox')) {
       expect(checkbox).toBeChecked();
@@ -382,7 +385,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('button', { name: 'Select all in view' }));
     expect(
-      await screen.findByText('2 items selected', { selector: '[aria-hidden="true"] > span' })
+      await screen.findByText('2 items selected', { selector: 'span[aria-hidden="true"]' })
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Deselect all' }));

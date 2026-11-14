@@ -8886,9 +8886,10 @@
       "copyNames": "Copy names",
       "copyWithQuantities": "Copy with quantities",
       "totalIsk": "{{amount}} ISK",
+      "totalIskShown": "<isk/> ISK",
       "totalVolume": "{{volume}} m³",
-      "unpriced_one": "{{count}} unpriced",
-      "unpriced_other": "{{count}} unpriced"
+      "unpriced_one": "{{count, number}} unpriced",
+      "unpriced_other": "{{count, number}} unpriced"
     },
     "itemCount_one": "{{count, number}} item",
     "itemCount_other": "{{count, number}} items",
