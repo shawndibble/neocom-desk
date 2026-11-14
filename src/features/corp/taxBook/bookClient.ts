@@ -10,6 +10,7 @@
  */
 import type { CallableAction } from '../../../../functions/src/callableManifest';
 import { DEFAULT_GRACE_HOURS } from '@/engine/corpTaxBook/billable';
+import { readDivisionNames, type DivisionNames } from '@/engine/corpTaxBook/divisionNames';
 import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
 import {
   collection,
@@ -83,6 +84,8 @@ export interface BookSummary {
   active: boolean;
   startDate: string;
   divisions: number[];
+  /** The corp's own names for those divisions, as a Director's visit last stored them (#6161). */
+  divisionNames?: DivisionNames;
   lastSync: LastSync | null;
   structureExpiryHours: Record<string, number>;
 }
@@ -293,6 +296,7 @@ function summaryFrom(d: Record<string, unknown>): BookSummary {
     active: d.active === true,
     startDate: String(d.startDate ?? ''),
     divisions: Array.isArray(d.divisions) ? (d.divisions as number[]) : [1],
+    divisionNames: readDivisionNames(d.divisionNames),
     lastSync: (d.lastSync as LastSync | null | undefined) ?? null,
     structureExpiryHours: (d.structureExpiryHours as Record<string, number> | undefined) ?? {},
   };
@@ -447,6 +451,7 @@ function settingsFrom(d: Record<string, unknown>): BookSettings {
     active: d.active === true,
     startDate: String(d.startDate ?? ''),
     divisions: Array.isArray(d.divisions) ? (d.divisions as number[]) : [1],
+    divisionNames: readDivisionNames(d.divisionNames),
     lastSync: (d.lastSync as LastSync | null | undefined) ?? null,
     structureExpiryHours: (d.structureExpiryHours as Record<string, number> | undefined) ?? {},
     hubId: typeof d.hubId === 'string' ? d.hubId : 'jita',

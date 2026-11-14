@@ -5,6 +5,7 @@ import { recordCorpPayment } from '../ledgerActions';
 import { SettleUpDialog, type SettleUpRow } from '../SettleUpDialog';
 import { useCopiedField } from '../settleUpFields';
 import { CorpBookSyncNote } from './CorpBookSyncNote';
+import { corpPayAccount } from './corpPayAccount';
 import type { CorpBookViewBook } from './corpBookView';
 
 interface Props {
@@ -24,8 +25,8 @@ interface Props {
  * Settle up for the corp Payee: the same dialog as any Payee's (Open in EVE, To / Amount /
  * Reason, the date and how it was paid), recording the payment on the member's side
  * (`recordCorpPayment`). What only a book adds sits under the copy box, kept to a line each: the
- * Account to pick in EVE's transfer window (division 1 is always the Master Wallet; a member
- * cannot read the corp's own division names), a Statement's code (the Reason, when one
+ * Account to pick in EVE's transfer window (the corp's own name for the division when a
+ * Director's visit stored it, #6161; a member cannot read the names itself), a Statement's code (the Reason, when one
  * Statement is open), and whether it is safe to send yet (D12). The corp's book still credits
  * the donation from its own wallet.
  */
@@ -81,12 +82,7 @@ export function CorpPayDialog({
           <p>
             <Trans
               i18nKey="miningTax.corpBook.pay.account"
-              values={{
-                account:
-                  division === 1
-                    ? t('miningTax.corpBook.pay.masterWallet')
-                    : t('miningTax.corpBook.pay.division', { division }),
-              }}
+              values={{ account: corpPayAccount(division, book.loaded.divisionNames, t) }}
               components={{ strong: <strong className="font-semibold text-text" /> }}
             />
           </p>

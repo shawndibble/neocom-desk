@@ -21,6 +21,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, docId, record } from './communities.js';
 import {
   BOOK_DEFAULTS,
+  DIVISION_NAME_MAX,
   shiftDate,
   statementDays,
   type ForfeitBasis,
@@ -299,6 +300,12 @@ export interface SettingsPatch {
   minimumStatement?: number;
   overdueDays?: number;
   divisions?: number[];
+  /**
+   * The corp's own names for its wallet divisions, by division "1".."7" (#6161): a Director's
+   * client reads them with its ordinary corp login and pushes them, so a member's Settle up can
+   * name the Account to pick. Replaces the stored map whole; `{}` clears it.
+   */
+  divisionNames?: Record<string, string>;
   cadence?: { kind: 'monthly' } | { kind: 'days'; days: number; anchor: string };
   chunkM3PerHour?: number;
   structureExpiryHours?: Record<string, number>;
@@ -310,6 +317,18 @@ export interface SettingsPatch {
 }
 
 const HUBS = ['jita', 'amarr', 'dodixie', 'rens', 'hek'] as const;
+
+function parseDivisionNames(value: unknown): Record<string, string> {
+  if (Array.isArray(value)) throw new HttpsError('invalid-argument', 'divisionNames must be a map');
+  const names: Record<string, string> = {};
+  for (const [division, name] of Object.entries(record(value))) {
+    if (!/^[1-7]$/.test(division)) {
+      throw new HttpsError('invalid-argument', 'divisionNames keys must be divisions 1-7');
+    }
+    names[division] = boundedString(name, 'division name', DIVISION_NAME_MAX);
+  }
+  return names;
+}
 
 export function parseSettingsPatch(data: unknown): SettingsPatch {
   const d = record(data);
@@ -328,6 +347,7 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
       throw new HttpsError('invalid-argument', 'divisions cannot be empty');
     patch.divisions = [...new Set(divisions)].sort();
   }
+  if (d.divisionNames !== undefined) patch.divisionNames = parseDivisionNames(d.divisionNames);
   if (d.cadence !== undefined) {
     const c = record(d.cadence);
     patch.cadence =
