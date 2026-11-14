@@ -8,6 +8,7 @@ import * as Icon from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import type { PlanEntry } from '@/engine/types';
+import { romanLevel } from '@/engine/projection';
 import { formatCountdown } from '@/lib/duration';
 import type { FitCheckRow } from '@/features/skills/ships/fitCheckRows';
 import { SkillRow } from '@/features/skills/SkillRow';
@@ -63,7 +64,7 @@ export function WhatToTrainPrerequisites({
             {rows.map((row) => (
               <div key={row.skillTypeID} className="border-b border-line py-1.5 last:border-b-0">
                 <SkillRow
-                  name={row.name}
+                  name={`${row.name} ${romanLevel(row.targetLevel)}`}
                   skillTypeID={row.skillTypeID}
                   planEntries={planEntries}
                   status={row.status}

@@ -385,8 +385,9 @@ describe('FittingWhatToTrainPanel — Skill Plan button and prerequisites', () =
     );
     const card = await screen.findByText(/^Skills needed for Surgical Strike I$/);
     const list = card.closest('div') as HTMLElement;
-    expect(within(list).getByText('Gunnery')).toBeInTheDocument();
-    expect(within(list).getByText('Surgical Strike')).toBeInTheDocument();
+    // Each row names the level it needs: the pips only show what's trained.
+    expect(within(list).getByText('Gunnery III')).toBeInTheDocument();
+    expect(within(list).getByText('Surgical Strike I')).toBeInTheDocument();
   });
 });
 
@@ -555,7 +556,7 @@ describe('FittingWhatToTrainPanel — over budget', () => {
       await screen.findByRole('button', { name: /incl\. prerequisites: surgical strike i/i })
     );
     const card = await screen.findByText(/^Skills needed for Surgical Strike I$/);
-    expect(within(card.closest('div') as HTMLElement).getByText('Gunnery')).toBeInTheDocument();
+    expect(within(card.closest('div') as HTMLElement).getByText('Gunnery III')).toBeInTheDocument();
   });
 
   it('shows no fix block within budget', async () => {
