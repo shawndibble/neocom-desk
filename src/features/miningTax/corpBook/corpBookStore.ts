@@ -22,6 +22,7 @@ import { DEFAULT_GRACE_HOURS } from '@/engine/corpTaxBook/billable';
 import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
+import { readDivisionNames, type DivisionNames } from '@/engine/corpTaxBook/divisionNames';
 import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
 import { ownerRefinerySystemsToLearn } from '@/engine/corpTaxBook/refinery';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
@@ -65,6 +66,8 @@ export interface LoadedCorpBook {
   oreForm: 'compressed' | 'raw';
   /** The book's divisions, division 1 by default — where a donation should go. */
   divisions: number[];
+  /** The corp's own names for those divisions, when a Director's visit stored them (#6161). */
+  divisionNames?: DivisionNames;
   rates: TaxRate[];
   /** When an officer last synced it; absent when never. */
   lastSyncedAt?: string;
@@ -119,6 +122,7 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
     );
   });
   const syncedAt = num((d.lastSync as Data | null | undefined)?.at);
+  const divisionNames = readDivisionNames(d.divisionNames);
   return {
     corporationId,
     startDate,
@@ -128,6 +132,7 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
     divisions: (Array.isArray(d.divisions) ? d.divisions : [1]).filter(
       (x): x is number => typeof x === 'number'
     ),
+    ...(Object.keys(divisionNames).length > 0 ? { divisionNames } : {}),
     rates,
     ...(syncedAt !== undefined ? { lastSyncedAt: new Date(syncedAt).toISOString() } : {}),
   };

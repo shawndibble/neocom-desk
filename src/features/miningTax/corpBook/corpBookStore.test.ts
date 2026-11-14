@@ -42,6 +42,16 @@ describe('readBookSettings', () => {
     });
   });
 
+  it("reads the corp's wallet division names a Director stored (#6161), skipping garbage", () => {
+    expect(
+      readBookSettings(1, { ...book, divisionNames: { '2': 'MOON TAXES', '9': 'x', '3': 5 } })
+        ?.divisionNames
+    ).toEqual({ 2: 'MOON TAXES' });
+    expect(readBookSettings(1, { ...book, divisionNames: 'junk' })).not.toHaveProperty(
+      'divisionNames'
+    );
+  });
+
   it('keeps a per-feeder rate', () => {
     const feeder = { scope: 'feeder', feederId: 7, pct: 6, effectiveFrom: '2026-10-01' };
     expect(readBookSettings(1, { ...book, rates: [feeder] })?.rates).toEqual([feeder]);
