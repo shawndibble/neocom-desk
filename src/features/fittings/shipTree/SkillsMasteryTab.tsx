@@ -265,6 +265,7 @@ export function SkillsMasteryTab({
                           planEntries={planEntries}
                           status={status}
                           currentLevel={have}
+                          requiredLevel={p.level}
                           timeLabel={
                             status === 'trained'
                               ? t('skills.fitCheck.trained')

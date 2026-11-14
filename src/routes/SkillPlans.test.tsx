@@ -449,6 +449,43 @@ describe('SkillPlans: current attributes beside the plan list', () => {
   });
 });
 
+describe('SkillPlans: an injected accelerator under Attributes', () => {
+  beforeEach(() => {
+    stubViewport(() => true);
+  });
+  const attributesPanel = async () =>
+    (await screen.findByRole('heading', { name: 'Attributes' })).closest('section')!;
+
+  it('lets the pilot set the time left on a detected accelerator without opening a plan', async () => {
+    // +3 on every attribute over a legal 99-point sheet: an injected accelerator.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({
+          charisma: 22,
+          intelligence: 23,
+          memory: 23,
+          perception: 23,
+          willpower: 23,
+        })
+      )
+    );
+    render(<App />);
+
+    const panel = await attributesPanel();
+    expect(await within(panel).findByText('+3 detected')).toBeInTheDocument();
+    expect(within(panel).getByRole('group', { name: 'Time left' })).toBeInTheDocument();
+  });
+
+  it('shows no accelerator controls when nothing is injected', async () => {
+    render(<App />);
+
+    const panel = await attributesPanel();
+    expect(await within(panel).findByText('INT')).toBeInTheDocument();
+    expect(within(panel).queryByText('Accelerator')).not.toBeInTheDocument();
+    expect(within(panel).queryByRole('button', { name: 'Add accelerator' })).toBeNull();
+  });
+});
+
 describe('SkillPlans editor: the same attributes, on the route they are costed on', () => {
   it("shows the character's current attributes in the editor's tools pane, dated", async () => {
     // Distinct from usePlanEditorData's DEFAULT_ATTRIBUTES (20/20/20/20/19),

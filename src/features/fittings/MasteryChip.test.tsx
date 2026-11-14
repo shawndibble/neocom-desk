@@ -77,28 +77,28 @@ describe('MasteryChip', () => {
 
     expect(await screen.findByText('Vexor Mastery')).toBeInTheDocument();
     // Gunnery is named by tiers I-III at levels 2/3/3: one row, not three.
-    expect(screen.getAllByText('Gunnery')).toHaveLength(1);
-    expect(screen.getByText('Drones')).toBeInTheDocument();
+    expect(screen.getAllByText('Gunnery III')).toHaveLength(1);
+    expect(screen.getByText('Drones IV')).toBeInTheDocument();
   });
 
   it('narrows to the chosen tier', async () => {
     const user = userEvent.setup();
     await openChip(user);
-    await screen.findByText('Drones');
+    await screen.findByText('Drones IV');
 
     await user.click(screen.getByRole('button', { name: 'II' }));
 
-    expect(screen.queryByText('Drones')).not.toBeInTheDocument();
-    expect(screen.getByText('Gunnery')).toBeInTheDocument();
+    expect(screen.queryByText('Drones IV')).not.toBeInTheDocument();
+    expect(screen.getByText('Gunnery III')).toBeInTheDocument();
   });
 
   it('Hide completed drops trained rows and Add All adds only the untrained ones on screen', async () => {
     const user = userEvent.setup();
     await openChip(user);
-    await screen.findByText('Drones');
+    await screen.findByText('Drones IV');
 
     await user.click(screen.getByRole('button', { name: 'Hide completed' }));
-    expect(screen.queryByText('Gunnery')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gunnery III')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /create skill plan and add/i }));
     await waitFor(() =>
@@ -118,7 +118,7 @@ describe('MasteryChip', () => {
     target.targetPlanId = 'plan-1';
     try {
       await openChip(user);
-      await screen.findByText('Drones');
+      await screen.findByText('Drones IV');
       // Gunnery is trained; Drones is the only untrained row and is planned.
       expect(
         screen.getByText('All of these skills are already in the Skill Plan')
@@ -164,7 +164,7 @@ describe('MasteryChip', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('Vexor Mastery')).toBeInTheDocument();
-    expect(await screen.findByText('Drones')).toBeInTheDocument();
+    expect(await screen.findByText('Drones IV')).toBeInTheDocument();
   });
 
   it('keeps the unavailable panel, with Retry busy and focused, while a retry runs', async () => {

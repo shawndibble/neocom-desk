@@ -391,7 +391,8 @@
     },
     "missingSkills": {
       "chip_one": "Missing {{count}} skill · {{time}}",
-      "chip_other": "Missing {{count}} skills · {{time}}"
+      "chip_other": "Missing {{count}} skills · {{time}}",
+      "prerequisite": "(prerequisite)"
     },
     "mastery": {
       "chip": "Mastery",
@@ -2680,6 +2681,8 @@
     },
     "levelOfFive": "Level {{level}} of 5",
     "levelOfFivePlanned": "Level {{level}} of 5, planned to {{planned}}",
+    "levelOfFiveNeeded": "Level {{level}} of 5, needs {{needed}}",
+    "levelOfFivePlannedNeeded": "Level {{level}} of 5, planned to {{planned}}, needs {{needed}}",
     "searchPlaceholder": "Search skills…",
     "noResults": "No skills match your search.",
     "searchResultCount_one": "{{count}} skill matches",
@@ -2797,11 +2800,9 @@
     }
   },
   "accelerator": {
-    "entryMode": "How to enter when it ends",
     "clear": "Clear",
-    "autoDetectHint": "Cleared or run out, it goes back to being guessed from the attribute sheet.",
-    "modeRemaining": "Time remaining",
-    "modeExpires": "Expires at",
+    "useEndTime": "Enter end time instead",
+    "useTimeLeft": "Enter time left instead",
     "expiresAt": "Ends at"
   },
   "plans": {
@@ -2884,7 +2885,7 @@
     "trainingNow": "Training now",
     "heroSpPerHour": "{{sp}} SP/hr",
     "heroAttributes": "{{primary}} + {{secondary}}",
-    "heroLeftDone": "left · done {{date}}",
+    "heroDone": "done {{date}}",
     "heroProgress": "{{percent}}% of level {{level}}",
     "heroNext": "Next: {{name}} {{level}}",
     "periodWeek": "This week",
@@ -3010,11 +3011,8 @@
       "hours": "h",
       "minutes": "m"
     },
-    "acceleratorDetected": "+{{bonus}} from the EVE API has been auto applied.",
-    "acceleratorNoExpiry": "EVE does not say when it runs out. Until you set the time left, this plan is costed as if you had none.",
-    "boosterQuickPicks": "Quick picks for the time left",
-    "boosterQuickPickHours": "+{{hours}}h",
-    "boosterQuickPickDays": "+{{days}}d",
+    "acceleratorDetected": "+{{bonus}} detected",
+    "acceleratorNoExpiry": "EVE doesn’t report when boosters expire. Set the time left to include it in training times.",
     "importAction": "Import",
     "importFileChoose": "Or choose a .emp or .xml file",
     "importDialogTitle": "Import plan",

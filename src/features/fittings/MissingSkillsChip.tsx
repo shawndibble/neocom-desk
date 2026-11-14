@@ -30,7 +30,7 @@ export function MissingSkillsChip({ entries, characterId, fittingName }: Missing
       <PopoverTrigger asChild>
         <Button variant="warning">
           {t('fittings.missingSkills.chip', {
-            count: missing.rows.length,
+            count: missing.missingCount,
             time: formatCountdown(missing.totalSeconds),
           })}
         </Button>

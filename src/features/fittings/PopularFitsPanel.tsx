@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ComponentProps, type ReactNode } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { Trans, useTranslation } from 'react-i18next';
 import {
@@ -220,7 +220,7 @@ export function PopularFitsPanel({
   function renderRow(row: PanelRow) {
     const verdict = verdicts?.get(row.key);
     const open = expanded === row.key && verdict?.kind === 'missing';
-    const shared = {
+    const shared: SharedRowProps = {
       source: row.source,
       title: titleOf(row),
       names,
@@ -242,57 +242,27 @@ export function PopularFitsPanel({
           />
         ) : undefined,
     };
-    if (row.source === 'loss') {
-      const { fit } = row;
-      return (
-        <PopularFitRow
-          {...shared}
-          meta={
-            fit.lastSeen === null
-              ? undefined
-              : ` · ${t('fittings.popular.lastSeen', {
-                  age: formatAge(Math.max(0, now - Date.parse(fit.lastSeen)), t),
-                })}`
-          }
-          price={
-            fit.value === null ? undefined : (
-              <Trans
-                i18nKey="fittings.popular.value"
-                components={{ isk: <IskAmount value={fit.value} /> }}
-              />
-            )
-          }
-          modules={fit.parts.modules}
-          disabled={busy}
-          onOpen={() =>
-            onOpen(popularFitLoad(fit, t('fittings.popular.fitName', { hullName, rank: row.rank })))
-          }
-        />
-      );
-    }
-    const { fit, modules, price, sighting, loadFailed } = row.guide;
-    return (
-      <PopularFitRow
-        {...shared}
-        meta={` · ${t('fittings.popular.workbench.created', {
-          age: formatAge(Math.max(0, now - fit.dateAdded), t),
-        })}`}
-        price={price === undefined ? undefined : <WorkbenchFitPrice price={price} />}
-        modules={modules}
+    return row.source === 'loss' ? (
+      <LossFitRow
+        shared={shared}
+        fit={row.fit}
+        now={now}
+        disabled={busy}
+        onOpen={() =>
+          onOpen(
+            popularFitLoad(row.fit, t('fittings.popular.fitName', { hullName, rank: row.rank }))
+          )
+        }
+      />
+    ) : (
+      <GuideFitRow
+        shared={shared}
+        guide={row.guide}
+        now={now}
+        hub={guides.hub.systemName}
         disabled={busy || guides.loading}
-        onOpen={() => void guides.load(fit, onOpen)}
-      >
-        {price?.partial && (
-          <p className="text-xs text-text-dim">
-            {t('fittings.popular.workbench.unpriced', {
-              count: price.unpricedTypes,
-              hub: guides.hub.systemName,
-            })}
-          </p>
-        )}
-        <WorkbenchSightingBadge sighting={sighting} />
-        {loadFailed && <InlineError>{t('fittings.popular.workbench.loadFailed')}</InlineError>}
-      </PopularFitRow>
+        onOpen={() => void guides.load(row.guide.fit, onOpen)}
+      />
     );
   }
 
@@ -416,6 +386,84 @@ export function PopularFitsPanel({
       )}
       {filter !== 'loss' && guides.status === 'ready' && <OutOfDateNote list={guides} />}
     </section>
+  );
+}
+
+/** What a row takes from the panel whichever source it is: tag, title, names, verdict and its skills. */
+type SharedRowProps = Pick<
+  ComponentProps<typeof PopularFitRow>,
+  'source' | 'title' | 'names' | 'unusable' | 'verdict' | 'details'
+>;
+
+interface SourceRowProps {
+  shared: SharedRowProps;
+  now: number;
+  disabled: boolean;
+  onOpen: () => void;
+}
+
+/** A group of zKillboard losses: when it was last seen, and its mean value. */
+function LossFitRow({ shared, fit, now, disabled, onOpen }: SourceRowProps & { fit: PopularFit }) {
+  const { t } = useTranslation();
+  return (
+    <PopularFitRow
+      {...shared}
+      meta={
+        fit.lastSeen === null
+          ? undefined
+          : ` · ${t('fittings.popular.lastSeen', {
+              age: formatAge(Math.max(0, now - Date.parse(fit.lastSeen)), t),
+            })}`
+      }
+      price={
+        fit.value === null ? undefined : (
+          <Trans
+            i18nKey="fittings.popular.value"
+            components={{ isk: <IskAmount value={fit.value} /> }}
+          />
+        )
+      }
+      modules={fit.parts.modules}
+      disabled={disabled}
+      onOpen={onOpen}
+    />
+  );
+}
+
+/**
+ * An EVE Workbench guide: when it was published, its price at the Default
+ * Trade Hub (and what that leaves unpriced), its zKillboard sighting, and a
+ * Load that failed.
+ */
+function GuideFitRow({
+  shared,
+  guide,
+  now,
+  hub,
+  disabled,
+  onOpen,
+}: SourceRowProps & { guide: WorkbenchRow; hub: string }) {
+  const { t } = useTranslation();
+  const { fit, modules, price, sighting, loadFailed } = guide;
+  return (
+    <PopularFitRow
+      {...shared}
+      meta={` · ${t('fittings.popular.workbench.created', {
+        age: formatAge(Math.max(0, now - fit.dateAdded), t),
+      })}`}
+      price={price === undefined ? undefined : <WorkbenchFitPrice price={price} />}
+      modules={modules}
+      disabled={disabled}
+      onOpen={onOpen}
+    >
+      {price?.partial && (
+        <p className="text-xs text-text-dim">
+          {t('fittings.popular.workbench.unpriced', { count: price.unpricedTypes, hub })}
+        </p>
+      )}
+      <WorkbenchSightingBadge sighting={sighting} />
+      {loadFailed && <InlineError>{t('fittings.popular.workbench.loadFailed')}</InlineError>}
+    </PopularFitRow>
   );
 }
 

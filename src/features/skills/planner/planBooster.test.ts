@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   acceleratorBoosters,
-  BOOSTER_QUICK_PICKS,
-  boosterExpiryFromNow,
   clampBoosterBonus,
   joinBoosterDuration,
   MAX_BOOSTER_BONUS,
@@ -63,24 +61,6 @@ describe('booster duration <-> days/hours/minutes', () => {
   it('round-trips through joinBoosterDuration', () => {
     const duration = { days: 3, hours: 4, minutes: 5 };
     expect(splitBoosterDuration(NOW + joinBoosterDuration(duration), NOW)).toEqual(duration);
-  });
-});
-
-describe('boosterExpiryFromNow', () => {
-  const now = Date.UTC(2026, 8, 10, 12, 0, 0);
-
-  it('is now plus the duration, in hours', () => {
-    expect(boosterExpiryFromNow(1, now)).toBe(now + 60 * 60 * 1000);
-    expect(boosterExpiryFromNow(24, now)).toBe(now + 24 * 60 * 60 * 1000);
-  });
-});
-
-describe('BOOSTER_QUICK_PICKS', () => {
-  it('is a fixed, ascending list of accelerator durations', () => {
-    const hours = BOOSTER_QUICK_PICKS.map((pick) => pick.hours);
-    expect(hours).toEqual([...hours].sort((a, b) => a - b));
-    expect(new Set(hours).size).toBe(hours.length);
-    expect(hours.length).toBeGreaterThan(0);
   });
 });
 

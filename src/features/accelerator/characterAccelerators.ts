@@ -13,9 +13,27 @@ import { appendTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { CHARACTER_ACCELERATORS } from '@/sync/syncedCollections';
 import { isAcceleratorLive } from '@/engine/accelerator';
 import { clampBoosterBonus } from '@/features/skills/planner/planBooster';
+import type { AttributeBaseline } from '@/engine/attributeBaseline';
 
 export function acceleratorId(characterId: number): string {
   return String(characterId);
+}
+
+/**
+ * The Character's injected accelerator as the Accelerator controls see it:
+ * the typed-in record while it still runs, and the bonus read off the
+ * attribute sheet (EVE gives its size, never its expiry). Both null means
+ * nothing is injected.
+ */
+export function injectedAccelerator(
+  stored: CharacterAcceleratorRecord | null | undefined,
+  baseline: AttributeBaseline | null | undefined,
+  nowMs: number
+): { running: CharacterAcceleratorRecord | null; detected: number | null } {
+  return {
+    running: stored && isAcceleratorLive(stored, nowMs) ? stored : null,
+    detected: baseline?.kind === 'accelerated' ? baseline.acceleratorBonus : null,
+  };
 }
 
 /** Saves the accelerator running on `characterId`, replacing any earlier one. */
