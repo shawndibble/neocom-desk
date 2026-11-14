@@ -25,6 +25,7 @@ import {
   type PayeeRecord,
 } from '@/db';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
+import { minusLines, priceMap } from '@/engine/miningTax/oreLines';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { scheduleSync } from '@/sync';
 import {
@@ -410,12 +411,35 @@ export function linkRecordedPayment(
   return commit(charactersOf(assignments), () => linkRecordedPaymentPrimitive(assignments, ref));
 }
 
+/** The character's Payee verified as the corporation: the first one, or a new one named for it. */
+async function corpEntityPayeeIds(
+  characterId: number,
+  corp: { corporationId: number; name: string },
+  taxPct: number
+): Promise<string[]> {
+  const payees = await db.payees.where('characterId').equals(characterId).toArray();
+  const ids = payees.filter((p) => isCorpEntityPayee(p, corp.corporationId)).map((p) => p.id);
+  if (ids.length > 0) return ids;
+  const id = crypto.randomUUID();
+  await db.payees.put({
+    id,
+    characterId,
+    name: corp.name,
+    defaultTaxPct: taxPct,
+    entityId: corp.corporationId,
+    entityKind: 'corporation',
+    updatedAt: Date.now(),
+  });
+  return [id];
+}
+
 /**
- * Settle up for a Corp Tax Book: the member's side of a payment to the corporation. Each owed
- * book row becomes a Paid Assignment, under the member's Payee verified as the corporation
- * (created when they have none), for the ore their own paid marks don't already cover. The
- * book counts that as paid on the member's side; the corporation still confirms it against its
- * wallet. A row that never lined up with a ledger entry has no ore to record and stays owed.
+ * Settle up for a Corp Tax Book: the member's side of a payment to the corporation. The ore of
+ * each owed book row is recorded Paid under the member's Payee verified as the corporation
+ * (created when they have none): their own owed Assignments under it are marked paid, and a new
+ * Paid Assignment covers the rest their marks don't. The book counts that as paid on the
+ * member's side; the corporation still confirms it against its wallet. A row that never lined up
+ * with a ledger entry has no ore to record and stays owed.
  */
 export function recordCorpPayment(
   corp: { corporationId: number; name: string },
@@ -423,48 +447,39 @@ export function recordCorpPayment(
   payment?: PaymentInput
 ): Promise<LedgerActionResult> {
   return commit(charactersOf(rows), async () => {
-    const payeeOf = new Map<number, string>();
+    const payeesOf = new Map<number, string[]>();
     const recorded: MiningTaxAssignmentRecord[] = [];
     for (const row of rows) {
       if (row.solarSystemId === 0) continue;
-      const marked = (await db.miningTaxAssignments.bulkGet(row.markedPaidIds ?? [])).flatMap(
-        (a) => a?.oreLines ?? []
-      );
-      const oreLines = row.oreLines
-        .map((line) => ({
-          typeId: line.typeId,
-          quantity:
-            line.quantity -
-            marked.filter((m) => m.typeId === line.typeId).reduce((n, m) => n + m.quantity, 0),
-        }))
-        .filter((line) => line.quantity > 0);
-      if (oreLines.length === 0) continue;
-      let payeeId = payeeOf.get(row.characterId);
-      if (payeeId === undefined) {
-        const payees = await db.payees.where('characterId').equals(row.characterId).toArray();
-        payeeId = payees.find((p) => isCorpEntityPayee(p, corp.corporationId))?.id;
-        if (payeeId === undefined) {
-          payeeId = crypto.randomUUID();
-          await db.payees.put({
-            id: payeeId,
-            characterId: row.characterId,
-            name: corp.name,
-            defaultTaxPct: row.taxPct,
-            entityId: corp.corporationId,
-            entityKind: 'corporation',
-            updatedAt: Date.now(),
-          });
-        }
-        payeeOf.set(row.characterId, payeeId);
+      let payeeIds = payeesOf.get(row.characterId);
+      if (!payeeIds) {
+        payeeIds = await corpEntityPayeeIds(row.characterId, corp, row.taxPct);
+        payeesOf.set(row.characterId, payeeIds);
       }
-      const prices = new Map(Object.entries(row.unitPrices).map(([id, p]) => [Number(id), p]));
-      const value = computeAssignmentValue(oreLines, prices, row.taxPct);
+      const own = (
+        await db.miningTaxAssignments.where('characterId').equals(row.characterId).toArray()
+      ).filter(
+        (a) =>
+          a.date === row.date &&
+          a.solarSystemId === row.solarSystemId &&
+          a.payeeId !== undefined &&
+          payeeIds.includes(a.payeeId) &&
+          (a.status === 'paid' || a.status === 'outstanding')
+      );
+      const owedOwn = own.filter((a) => a.status === 'outstanding');
+      recorded.push(...owedOwn);
+      const oreLines = minusLines(
+        row.oreLines,
+        own.flatMap((a) => a.oreLines)
+      );
+      if (oreLines.length === 0) continue;
+      const value = computeAssignmentValue(oreLines, priceMap(row.unitPrices), row.taxPct);
       recorded.push(
         await createAssignment({
           characterId: row.characterId,
           date: row.date,
           solarSystemId: row.solarSystemId,
-          payeeId,
+          payeeId: payeeIds[0],
           oreLines,
           ...(row.personalOreLines ? { entryOreLines: row.personalOreLines } : {}),
           taxPct: row.taxPct,

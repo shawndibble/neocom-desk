@@ -607,6 +607,26 @@ describe('recordCorpPayment', () => {
     expect(added).toMatchObject({ oreLines: [{ typeId: ORE, quantity: 60 }], taxOwed: 60 });
   });
 
+  it("marks the member's own owed Assignment under the corporation paid, not a second claim", async () => {
+    await db.payees.put({
+      ...payee('p2'),
+      entityId: CORP.corporationId,
+      entityKind: 'corporation',
+    });
+    await db.miningTaxAssignments.put(assignment({ id: 'own', payeeId: 'p2' }));
+
+    const result = await recordCorpPayment(
+      CORP,
+      [bookRow({ personalOreLines: [{ typeId: ORE, quantity: 100 }] })],
+      PAYMENT
+    );
+
+    expect(result.ok).toBe(true);
+    const all = await db.miningTaxAssignments.toArray();
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ id: 'own', status: 'paid', payment: expect.anything() });
+  });
+
   it('skips a row that never lined up with a ledger entry', async () => {
     const result = await recordCorpPayment(CORP, [bookRow({ solarSystemId: 0 })]);
 

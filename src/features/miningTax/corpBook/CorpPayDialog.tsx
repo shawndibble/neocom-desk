@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
-import { writeToClipboard } from '@/lib/clipboard';
 import type { DisplayRow } from '../groupRows';
 import { recordCorpPayment } from '../ledgerActions';
 import { SettleUpDialog, type SettleUpRow } from '../SettleUpDialog';
+import { useCopiedField } from '../settleUpFields';
 import { CorpBookSyncNote } from './CorpBookSyncNote';
 import type { CorpBookViewBook } from './corpBookView';
 
@@ -27,7 +27,9 @@ interface Props {
  */
 export function CorpPayDialog({ onClose, onPaid, book, rows, systemNames, statementCodes }: Props) {
   const { t } = useTranslation();
+  const { copied, copy } = useCopiedField();
   const division = book.loaded.divisions[0] ?? 1;
+  // A book row's synthetic Assignment and its DisplayRow share the row's id (`corpRows.syntheticRow`).
   const views = new Map(
     rows.flatMap((dr) => (dr.corp?.kind === 'row' ? [[dr.key, dr.corp.view] as const] : []))
   );
@@ -53,7 +55,7 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, systemNames, statem
       rows={settleRows}
       systemNames={systemNames}
       reason={onlyCode?.code}
-      record={(ticked, payment) =>
+      recordPaid={(ticked, payment) =>
         recordCorpPayment(
           { corporationId: book.loaded.corporationId, name: book.corpName },
           ticked.flatMap((r) => views.get(r.assignment.id) ?? []),
@@ -71,8 +73,10 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, systemNames, statem
                 <li key={s.code} className="flex flex-wrap items-center gap-2">
                   <span>{t('miningTax.corpBook.pay.code', { period: s.period })}</span>
                   <span className="font-mono text-text">{s.code}</span>
-                  <Button size="sm" onClick={() => void writeToClipboard(s.code)}>
-                    {t('miningTax.corpBook.pay.copy')}
+                  <Button size="sm" onClick={() => void copy(s.code, s.code)}>
+                    {copied === s.code
+                      ? t('miningTax.settleUpCopied')
+                      : t('miningTax.corpBook.pay.copy')}
                   </Button>
                 </li>
               ))}

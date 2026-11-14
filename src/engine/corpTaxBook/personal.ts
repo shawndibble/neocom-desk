@@ -23,6 +23,7 @@
  */
 import { computeAssignmentValue } from '../miningTax/valuation';
 import { entryKey, type OreLine } from '../miningTax/types';
+import { minusLines, priceMap } from '../miningTax/oreLines';
 import {
   allocatePayments,
   dismissalCredits,
@@ -262,21 +263,10 @@ export function combineOverlaps(
   };
 }
 
-function minusLines(from: readonly OreLine[], take: readonly OreLine[]): OreLine[] {
-  const gone = new Map(take.map((l) => [l.typeId, l.quantity]));
-  return from
-    .map((l) => ({ typeId: l.typeId, quantity: l.quantity - (gone.get(l.typeId) ?? 0) }))
-    .filter((l) => l.quantity > 0);
-}
-
 const quantityOf = (lines: readonly OreLine[]) => lines.reduce((sum, l) => sum + l.quantity, 0);
 
 function quantityOfTypes(lines: readonly OreLine[], typeIds: ReadonlySet<number>): number {
   return lines.filter((l) => typeIds.has(l.typeId)).reduce((sum, l) => sum + l.quantity, 0);
-}
-
-function priceMap(prices: Record<number, number>): Map<number, number> {
-  return new Map(Object.entries(prices).map(([typeId, price]) => [Number(typeId), price]));
 }
 
 /** The personal entry an Observed Mining Entry lines up with, or undefined. */

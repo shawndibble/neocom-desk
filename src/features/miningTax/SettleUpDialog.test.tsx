@@ -348,7 +348,7 @@ describe('SettleUpDialog paying from one Character', () => {
         rows={ONE_ROW}
         systemNames={new Map([[30000142, 'Jita']])}
         onPaid={vi.fn()}
-        record={record}
+        recordPaid={record}
         reason="STMT-42"
         notice={<p>Into division 1</p>}
       />

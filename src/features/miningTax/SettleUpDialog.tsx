@@ -75,7 +75,7 @@ interface SettleUpDialogProps {
    * the member's own Assignments and `settle` marks them; a Corp Tax Book's rows are not, so
    * its Settle up records them its own way (`recordCorpPayment`).
    */
-  record?: (
+  recordPaid?: (
     rows: readonly SettleUpRow[],
     payment: PaymentInput | undefined
   ) => Promise<LedgerActionResult>;
@@ -118,7 +118,7 @@ export function SettleUpDialog({
   arrivalCheck,
   payerId,
   focusIds,
-  record,
+  recordPaid,
   reason: reasonOverride,
   notice,
 }: SettleUpDialogProps) {
@@ -270,8 +270,8 @@ export function SettleUpDialog({
     await run(
       () => {
         const payment = withPayment ? paymentInput() : undefined;
-        return record
-          ? record(included, payment)
+        return recordPaid
+          ? recordPaid(included, payment)
           : settle(
               included.map((r) => r.assignment),
               payment
