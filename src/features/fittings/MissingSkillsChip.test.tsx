@@ -16,6 +16,12 @@ const GUNNERY: EngineSkill = {
   prereqs: [],
 };
 const DRONES: EngineSkill = { ...GUNNERY, typeID: 3436, name: 'Drones' };
+const SENTRY: EngineSkill = {
+  ...GUNNERY,
+  typeID: 23594,
+  name: 'Sentry Drone Interfacing',
+  prereqs: [{ typeID: 3436, level: 5 }],
+};
 const ENTRIES: PlanEntry[] = [
   { skillTypeID: 3300, targetLevel: 3 },
   { skillTypeID: 3436, targetLevel: 4 },
@@ -27,6 +33,7 @@ vi.mock('@/features/skills/planner/usePlanEditorData', () => ({
       engineSkills: new Map([
         [3300, GUNNERY],
         [3436, DRONES],
+        [23594, SENTRY],
       ]),
     },
     trainedSkills: new Map(),
@@ -58,6 +65,24 @@ async function openChip(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('MissingSkillsChip', () => {
+  it('times and lists the prerequisites the schedule trains, not only the skills the fit names', async () => {
+    planEntries = [];
+    const user = userEvent.setup();
+    renderInRouter(
+      <MissingSkillsChip
+        entries={[{ skillTypeID: 23594, targetLevel: 1 }]}
+        characterId={1}
+        fittingName="Ishtar"
+      />
+    );
+    // Drones I–V (256,000 SP at 30 SP/min) dwarfs Sentry Drone Interfacing I.
+    const chip = await screen.findByRole('button', { name: /missing 1 skill · 5d 22h/i });
+    await user.click(chip);
+
+    const prereq = screen.getByText('Drones').closest('li');
+    expect(prereq).toHaveTextContent('(prerequisite)');
+  });
+
   it('confirms next to the button once the skills were added', async () => {
     planEntries = [];
     const user = userEvent.setup();

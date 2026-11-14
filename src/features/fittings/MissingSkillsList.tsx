@@ -60,6 +60,12 @@ export function MissingSkillsList({
                   {row.name}
                 </SkillLink>{' '}
                 {romanLevel(row.targetLevel)}
+                {row.prerequisite && (
+                  <span className="text-text-dim">
+                    {' '}
+                    {t('fittings.yourCharacters.prerequisite')}
+                  </span>
+                )}
               </span>
               <span className="text-text-dim">{formatCountdown(row.seconds)}</span>
               {isEntryCovered(planEntries, row.skillTypeID, row.targetLevel) && (
