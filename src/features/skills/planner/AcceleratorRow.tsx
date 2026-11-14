@@ -11,6 +11,8 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eyebrow, Modal } from '@/components/ui';
+import { focusRingClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import * as Icon from '@/components/ui/icons';
 import type { CharacterAcceleratorRecord } from '@/db';
 import { resolveAccelerator } from '@/engine/accelerator';
@@ -66,7 +68,11 @@ export function AcceleratorRow({
         type="button"
         aria-haspopup="dialog"
         onClick={() => setOpen(true)}
-        className="flex min-h-9 w-full items-center justify-between gap-2 rounded-xs border border-line bg-panel px-3 py-1.5 text-left"
+        className={cx(
+          'flex min-h-9 w-full items-center justify-between gap-2 rounded-xs border border-line bg-panel px-3 py-1.5 text-left',
+          rowInteractiveClassName,
+          focusRingClassName
+        )}
       >
         <span className="min-w-0">
           <span className="block text-sm">{t('plans.accelerator')}</span>
