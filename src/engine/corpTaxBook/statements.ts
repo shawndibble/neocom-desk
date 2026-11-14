@@ -9,6 +9,7 @@
  */
 import { shiftDate } from '../miningTax/yieldRange';
 import { computeAssignmentValue } from '../miningTax/valuation';
+import { priceMap } from '../miningTax/oreLines';
 import { activeDismissalFor, type Dismissal } from './dismissals';
 import type { DayCharge } from './charges';
 import type { TaxPriceSource } from '../miningTax/priceBasis';
@@ -232,10 +233,6 @@ export function canRebillFrom(
 ): boolean {
   // Every day a Statement billed is on or before its `coversThrough`.
   return statements.every((s) => !paidStatementIds.has(s.id) || date > s.coversThrough);
-}
-
-function priceMap(unitPrices: Record<number, number>): Map<number, number> {
-  return new Map(Object.entries(unitPrices).map(([typeId, price]) => [Number(typeId), price]));
 }
 
 function growth(current: readonly OreLine[], billed: ReadonlyMap<number, number>): OreLine[] {

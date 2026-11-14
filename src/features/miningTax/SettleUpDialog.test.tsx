@@ -337,4 +337,31 @@ describe('SettleUpDialog paying from one Character', () => {
     renderDialog(THREE_ROWS);
     expect(screen.queryByRole('group', { name: 'Paying from' })).not.toBeInTheDocument();
   });
+
+  it('hands the ticked rows to a Payee-specific writer, with its own Reason and notice', async () => {
+    const record = vi.fn<(...args: unknown[]) => Promise<LedgerActionResult>>();
+    record.mockResolvedValue({ ok: true, value: undefined });
+    render(
+      <SettleUpDialog
+        open
+        onClose={vi.fn()}
+        rows={ONE_ROW}
+        systemNames={new Map([[30000142, 'Jita']])}
+        onPaid={vi.fn()}
+        recordPaid={record}
+        reason="STMT-42"
+        notice={<p>Into division 1</p>}
+      />
+    );
+
+    expect(screen.getByText('STMT-42')).toBeInTheDocument();
+    expect(screen.getByText('Into division 1')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: RECORD }));
+
+    await waitFor(() => expect(record).toHaveBeenCalledTimes(1));
+    expect(settle).not.toHaveBeenCalled();
+    const [rows, payment] = record.mock.calls[0] as [SettleUpRow[], Record<string, unknown>];
+    expect(rows.map((r) => r.assignment.id)).toEqual(['a-1']);
+    expect(payment).toMatchObject({ method: 'donation', amount: 10_000 });
+  });
 });

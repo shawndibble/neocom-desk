@@ -10,7 +10,6 @@ import type { PayeeBalance } from '@/features/miningTax/balances';
 import { BulkDismissDialog } from '@/features/miningTax/BulkDismissDialog';
 import { CorpOverlapNotice } from '@/features/miningTax/corpBook/CorpOverlapNotice';
 import { conflictSiblings } from '@/features/miningTax/corpBook/conflictSummary';
-import { CorpPayDialog } from '@/features/miningTax/corpBook/CorpPayDialog';
 import { CorpRowDetailModal } from '@/features/miningTax/corpBook/CorpRowDetailModal';
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
 import type { useCorpStateHint } from '@/features/miningTax/corpBook/useCorpStateText';
@@ -70,6 +69,11 @@ const SettleUpDialog = lazy(() =>
     default: m.SettleUpDialog,
   }))
 );
+const CorpPayDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/corpBook/CorpPayDialog')).then((m) => ({
+    default: m.CorpPayDialog,
+  }))
+);
 const JoinAssignDialog = lazy(() =>
   guarded(() => import('@/features/miningTax/JoinAssignDialog')).then((m) => ({
     default: m.JoinAssignDialog,
@@ -116,7 +120,6 @@ export interface TaxDialogsHostProps {
   linkSuggestions: ReturnType<typeof useLinkSuggestions>;
   corpView: CorpBookView | null;
   corpStateHint: ReturnType<typeof useCorpStateHint>;
-  corpOwedNow: (corporationId: number) => number;
   dismissTargets: DisplayRow[];
   showCharacterColumn: boolean;
   estimatedValueOf: (dr: DisplayRow) => number;
@@ -163,7 +166,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     linkSuggestions,
     corpView,
     corpStateHint,
-    corpOwedNow,
     dismissTargets,
     showCharacterColumn,
     estimatedValueOf,
@@ -711,13 +713,16 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
         (() => {
           const book = corpView?.books.find((b) => b.loaded.corporationId === corpPayTarget);
           if (!book) return null;
+          const owedRows = characterFiltered.filter(
+            (dr) =>
+              dr.corp?.kind === 'row' &&
+              dr.corp.view.corporationId === corpPayTarget &&
+              dr.status === 'outstanding'
+          );
           const codes = [
             ...new Set(
-              characterFiltered.flatMap((dr) =>
-                dr.corp?.kind === 'row' &&
-                dr.corp.view.corporationId === corpPayTarget &&
-                dr.corp.view.statementId &&
-                dr.status === 'outstanding'
+              owedRows.flatMap((dr) =>
+                dr.corp?.kind === 'row' && dr.corp.view.statementId
                   ? [dr.corp.view.statementId]
                   : []
               )
@@ -729,13 +734,16 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
               : [];
           });
           return (
-            <CorpPayDialog
-              open
-              onClose={() => actions.openCorpPay(null)}
-              book={book}
-              owed={corpOwedNow(corpPayTarget)}
-              statementCodes={codes}
-            />
+            <Suspense fallback={null}>
+              <CorpPayDialog
+                onClose={() => actions.openCorpPay(null)}
+                onPaid={refresh}
+                book={book}
+                rows={owedRows}
+                systemNames={systemNames}
+                statementCodes={codes}
+              />
+            </Suspense>
           );
         })()}
 
