@@ -230,8 +230,8 @@ async function resetMarketSession(): Promise<void> {
   // Price history reads through esiCache; a row left by one test would answer
   // the next test's request for the same item without reaching its handler.
   await db.esiCache.clear();
-  // Market needs no ESI scope and no *active* Character, but in the App the
-  // feature area sits behind RequireCharacter, so a signed-in one exists.
+  // Market needs no ESI scope and no *active* Character; a signed-in one exists,
+  // as the App's RequireCharacter guarantees, for the tests that read Characters.
   await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
@@ -273,7 +273,7 @@ export function installMarketHarness(): void {
   beforeEach(resetMarketSession);
 }
 
-// The Market Group, not the nav rail's "Ships" link: the group is a button.
+// The Market Group, not the "Ships" link an App render's nav rail adds: the group is a button.
 // Matches the plain browse header and the search one, which appends " · <count>".
 export const SHIPS_GROUP = { name: /^Ships(?: ·|$)/ } as const;
 
