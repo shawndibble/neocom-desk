@@ -112,11 +112,12 @@ export const SKYHOOK_RAIDABLE_MIN_UNIT_OPTIONS: readonly number[] = [1, 100, 100
 
 export const DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS = 2;
 
+export const DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS = 1;
+
 /** The lead times `sharedMoonPop`'s inline control offers (issue #6225): at the Pop Time, or up to two hours before it. */
 export const SHARED_MOON_POP_LEAD_MINUTE_OPTIONS: readonly number[] = [0, 15, 30, 60, 120];
 /** At the Pop Time: when the belt can be mined (the scope decision's default). */
 export const DEFAULT_SHARED_MOON_POP_LEAD_MINUTES = 0;
-export const DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS = 1;
 
 export const DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS = 1;
 export const DEFAULT_ACCELERATOR_EXPIRING_LEAD_HOURS = 1;

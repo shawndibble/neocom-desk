@@ -3,18 +3,28 @@
  * pilot, each with a Mute checkbox. A muted corporation stays listed after its pops end, so it
  * can always be unmuted. The list belongs to the account, not to a Character.
  */
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { resolveNames } from '@/features/character/names';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import type { CharacterRef } from './CharacterChipGrid';
 import {
   mutedSharedPopCorporations,
   setSharedPopCorporationMuted,
+  useNotificationPreferences,
   type NotificationPreferencesValue,
 } from './preferences';
-import { loadSharedPopsCached } from './sharedPopsCache';
+import { loadSharedPopsCached, sharingCorporationLabel } from './sharedPopsCache';
+
+/** The sharing corporations, plus any already muted, with their names (best-effort). */
+async function loadSharing(): Promise<{ ids: number[]; names: ReadonlyMap<number, string> }> {
+  const pops = await loadSharedPopsCached();
+  const muted = mutedSharedPopCorporations(useNotificationPreferences.getState().value);
+  const ids = [...new Set([...pops.map((pop) => pop.corporationId), ...muted])];
+  const names = await resolveNames(ids).catch(() => new Map<number, string>());
+  return { ids, names };
+}
 
 export function SharedPopMutes({
   prefsValue,
@@ -24,36 +34,12 @@ export function SharedPopMutes({
   characters: readonly CharacterRef[];
 }) {
   const { t } = useTranslation();
-  const [sharing, setSharing] = useState<readonly number[]>([]);
-  const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
+  const sharing = useAsyncLoad(loadSharing);
   const muted = mutedSharedPopCorporations(prefsValue);
-
-  useEffect(() => {
-    let live = true;
-    loadSharedPopsCached()
-      .then((pops) => {
-        if (live) setSharing([...new Set(pops.map((pop) => pop.corporationId))]);
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  const corporationIds = [...new Set([...sharing, ...muted])].sort((a, b) => a - b);
-  const idsKey = corporationIds.join(',');
-  useEffect(() => {
-    if (idsKey === '') return;
-    let live = true;
-    resolveNames(idsKey.split(',').map(Number))
-      .then((resolved) => {
-        if (live) setNames(resolved);
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [idsKey]);
+  const corporationIds = [...new Set([...(sharing.data?.ids ?? []), ...muted])].sort(
+    (a, b) => a - b
+  );
+  const names = sharing.data?.names;
 
   if (corporationIds.length === 0) return null;
   const characterIds = characters.map((character) => character.characterId);
@@ -74,7 +60,7 @@ export function SharedPopMutes({
             }
           />
           {t('settings.notifications.sharedMoonPopMuteLabel', {
-            corporation: names.get(corporationId) ?? `#${corporationId}`,
+            corporation: sharingCorporationLabel(corporationId, names?.get(corporationId)),
           })}
         </label>
       ))}

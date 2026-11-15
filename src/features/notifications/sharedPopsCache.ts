@@ -8,11 +8,15 @@
  * The read seam is imported lazily: it reaches Firebase, which stays out of the main bundle.
  */
 import { MINUTE_MS } from '@/lib/age';
+import { registerTestReset } from '@/lib/testResets';
 import type { SharedPopView } from '@/sync/sharedPops';
 
 export const SHARED_POPS_CACHE_MS = 15 * MINUTE_MS;
 
 let cached: { at: number; pops: Promise<SharedPopView[]> } | null = null;
+registerTestReset(() => {
+  cached = null;
+});
 
 export function loadSharedPopsCached(now: number = Date.now()): Promise<SharedPopView[]> {
   if (cached !== null && now - cached.at < SHARED_POPS_CACHE_MS) return cached.pops;
@@ -27,7 +31,7 @@ export function loadSharedPopsCached(now: number = Date.now()): Promise<SharedPo
   return entry.pops;
 }
 
-/** Tests only. */
-export function resetSharedPopsCache(): void {
-  cached = null;
+/** A sharing corporation by name, or by id when its name is unknown. */
+export function sharingCorporationLabel(corporationId: number, name: string | undefined): string {
+  return name ?? `#${corporationId}`;
 }

@@ -31,12 +31,14 @@ const isSharedMoonPopEntry = shapeGuard<SharedMoonPopEntrySnapshot>({
   popAtMs: is.number,
   ratePct: is.number,
   leadMs: is.number,
+  muted: is.optional(is.boolean),
 });
 
 /**
  * The Shared Pops one Character is told about: those the server says that Character is in an
  * audience for (`viewerCharacterIds`; a server deployed before it existed sends none, and every
- * Character then counts), from a sharing corporation not muted, with a readable Pop Time.
+ * Character then counts), with a readable Pop Time. A muted sharing corporation's pops are kept
+ * and marked, so unmuting reaches the Projection without waiting for a poll.
  */
 export function sharedMoonPopEntries(
   pops: readonly SharedPopView[],
@@ -46,7 +48,7 @@ export function sharedMoonPopEntries(
 ): SharedMoonPopEntrySnapshot[] {
   return pops.flatMap((pop) => {
     const popAtMs = Date.parse(pop.popAt);
-    if (!Number.isFinite(popAtMs) || muted.has(pop.corporationId)) return [];
+    if (!Number.isFinite(popAtMs)) return [];
     if (pop.viewerCharacterIds !== undefined && !pop.viewerCharacterIds.includes(characterId))
       return [];
     return [
@@ -58,6 +60,7 @@ export function sharedMoonPopEntries(
         popAtMs,
         ratePct: pop.ratePct,
         leadMs,
+        ...(muted.has(pop.corporationId) ? { muted: true } : {}),
       },
     ];
   });
@@ -118,7 +121,8 @@ export const sharedMoonPopDomain = defineDomain<
     return projectSharedMoonPops(
       characterId,
       characterName,
-      snapshot.entries.map((entry) => ({ ...entry, leadMs })),
+      // The Projection judges mutes afresh: the baked flag is the diff's.
+      snapshot.entries.map((entry) => ({ ...entry, leadMs, muted: false })),
       muted,
       { corporations, when: popTimeLabel },
       NOTIFICATION_EVENT_ENTRIES.sharedMoonPop.projection.push,

@@ -18,6 +18,7 @@ import {
   type EveTypeEnabledMap,
 } from './eventSelection';
 import { isQuietTimePrefs, type QuietTimePrefs } from './quietTime';
+import { isCorporationIdList } from './corporationIdList';
 import { isCharacterEventThresholds, type CharacterEventThresholds } from './eventThresholdFields';
 import {
   SYNCED_NOTIFICATION_FEED_PREFS_KEY,
@@ -128,11 +129,6 @@ function isOptionalBoolean(raw: unknown): boolean {
 }
 
 const isThresholdsByCharacter = recordByCharacterId(isCharacterEventThresholds);
-
-/** A list of corporation ids, as `mutedSharedPopCorporations` stores. */
-export function isCorporationIdList(raw: unknown): raw is number[] {
-  return Array.isArray(raw) && raw.every((id) => Number.isSafeInteger(id));
-}
 
 /** The sharing corporations whose Shared Moon Pops are muted (issue #6225). */
 export function mutedSharedPopCorporations(

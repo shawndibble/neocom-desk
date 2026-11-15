@@ -1,5 +1,6 @@
 import type { SharedMoonPopFire, SharedPopTime } from '@/engine/notificationDiffs';
 import { assertProjectionWording, type PushCopy } from '@/engine/projection';
+import { sharingCorporationLabel } from '../../sharedPopsCache';
 import { type DomainCopy, fired } from './shared';
 
 export interface SharedMoonPopNames {
@@ -10,7 +11,7 @@ export interface SharedMoonPopNames {
 }
 
 const corporationOf = (fire: SharedMoonPopFire, names: SharedMoonPopNames): string =>
-  names.corporation ?? `#${fire.corporationId}`;
+  sharingCorporationLabel(fire.corporationId, names.corporation);
 
 const PUSH_POP_TIME: Record<SharedPopTime, string> = {
   ready: 'Ready',

@@ -37,8 +37,10 @@ describe('sharedMoonPopEntries', () => {
     ]);
   });
 
-  it('drops a muted sharing corporation', () => {
-    expect(sharedMoonPopEntries([pop()], 7, 0, new Set([98000001]))).toEqual([]);
+  it('keeps a muted sharing corporation, marked, so an unmute needs no new poll', () => {
+    expect(sharedMoonPopEntries([pop()], 7, 0, new Set([98000001]))).toEqual([
+      expect.objectContaining({ popId: '98000001_1035_1762900000000', muted: true }),
+    ]);
   });
 
   it('keeps only pops whose audience holds this Character, when the server says', () => {

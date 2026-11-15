@@ -28,6 +28,7 @@ import {
 } from './eventSelection';
 import type { NotificationEventId } from './events';
 import type { NotificationPreferencesValue } from './preferencesStore';
+import { isCorporationIdList } from './corporationIdList';
 import { setThresholds, type CharacterEventThresholds } from './eventThresholdFields';
 import { recordByCharacterId } from './recordByCharacterId';
 
@@ -168,8 +169,7 @@ function isSyncedFeedPrefs(raw: unknown): raw is SyncedFeedPrefs {
     isBooleanMapByCharacter(r.eveNotificationTypesByCharacter) &&
     isThresholdsByCharacter(r.thresholdsByCharacter) &&
     (r.mutedSharedPopCorporations === undefined ||
-      (Array.isArray(r.mutedSharedPopCorporations) &&
-        r.mutedSharedPopCorporations.every((id) => Number.isSafeInteger(id))))
+      isCorporationIdList(r.mutedSharedPopCorporations))
   );
 }
 

@@ -65,6 +65,17 @@ describe('diffSharedMoonPop', () => {
     expect(fires[0].thresholdMs).toBe(HOUR_MS - 5 * MINUTE_MS);
   });
 
+  it('fires nothing for a muted sharing corporation', () => {
+    const pop = entry({ popAtMs: NOW + 5 * MINUTE_MS, muted: true });
+    expect(
+      diffSharedMoonPop(
+        7,
+        { entries: [pop], nowMs: NOW },
+        { entries: [pop], nowMs: NOW + 10 * MINUTE_MS }
+      )
+    ).toEqual([]);
+  });
+
   it('fires nothing without a baseline, before the fire time, or long after it', () => {
     const pop = entry({ popAtMs: NOW + 5 * MINUTE_MS });
     expect(diffSharedMoonPop(7, undefined, { entries: [pop], nowMs: NOW + HOUR_MS })).toEqual([]);

@@ -6,8 +6,8 @@
  *
  * Window-crossing: it fires when the fire time (`popAtMs - leadMs`) falls between the previous
  * poll and this one, so a pop is told once. A crossing more than `LATE_LIMIT_MS` ago is dropped:
- * a device opened hours later is not told the belt "is popping now". Which Characters see a pop,
- * and which sharing corporations are muted, the poll domain has already applied to `entries`.
+ * a device opened hours later is not told the belt "is popping now". Which Characters see a pop
+ * the poll domain has already applied to `entries`; a muted one fires nothing.
  */
 import { HOUR_MS } from '@/lib/age';
 
@@ -27,6 +27,11 @@ export interface SharedMoonPopEntrySnapshot {
   ratePct: number;
   /** The Character's lead time, in ms, as it stood when this poll ran; 0 fires at the Pop Time. */
   leadMs: number;
+  /**
+   * Whether its sharing corporation was muted when this poll ran. Kept in the snapshot rather
+   * than dropped, so an unmute reaches the next Projection upload without waiting for a poll.
+   */
+  muted?: boolean;
 }
 
 export interface SharedMoonPopSnapshot {
@@ -75,6 +80,7 @@ export function diffSharedMoonPop(
   if (!prev) return [];
   return next.entries
     .filter((entry) => {
+      if (entry.muted === true) return false;
       const fireAt = entry.popAtMs - entry.leadMs;
       return fireAt > prev.nowMs && fireAt <= next.nowMs && next.nowMs - fireAt <= LATE_LIMIT_MS;
     })
