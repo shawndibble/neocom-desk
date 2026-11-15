@@ -31,7 +31,7 @@ const shareCode = vi.hoisted(() =>
 );
 vi.mock('./doctrineSources', () => ({
   snapshotFromEft: eft,
-  snapshotFromFitting: vi.fn(),
+  doctrineFromFitting: vi.fn(),
   doctrineShareCode: shareCode,
 }));
 

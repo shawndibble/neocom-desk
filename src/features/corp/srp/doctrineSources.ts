@@ -25,7 +25,7 @@ export interface DoctrineSourceFit {
 }
 
 /** The saved Fitting's snapshot and whole fit; null when its share code no longer decodes. */
-export async function snapshotFromFitting(
+export async function doctrineFromFitting(
   record: Pick<FittingRecord, 'code' | 'name'>
 ): Promise<DoctrineSourceFit | null> {
   const decoded = await decodeFittingShare(record.code);

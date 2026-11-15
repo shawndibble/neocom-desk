@@ -21,7 +21,7 @@ import type { DoctrineFitSnapshot } from '@/engine/srpDoctrine';
 import type { Fitting } from '@/engine/fittings/types';
 import { useSavedFittingRecords } from '@/features/fittings/useSavedFittingRecords';
 import type { SaveDoctrineInput } from '../srpTypes';
-import { doctrineShareCode, snapshotFromEft, snapshotFromFitting } from './doctrineSources';
+import { doctrineShareCode, snapshotFromEft, doctrineFromFitting } from './doctrineSources';
 import { useDoctrineTypeNames } from './useDoctrineTypeNames';
 
 export type DoctrineSource = 'fitting' | 'eft';
@@ -65,7 +65,7 @@ export function AddDoctrineDialog({ source, characterId, onAdd, onClose }: Props
       const record = fittings?.find((f) => f.id === picked);
       if (!record) apply(NONE);
       else
-        snapshotFromFitting(record).then(
+        doctrineFromFitting(record).then(
           (read) =>
             apply({
               snapshot: read?.snapshot ?? null,

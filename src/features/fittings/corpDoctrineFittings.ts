@@ -34,6 +34,7 @@ export async function doctrineRows(
   slotByTypeId: () => Promise<EftSlotLookup>
 ): Promise<DoctrineRow[]> {
   const rows: DoctrineRow[] = [];
+  let slots: Promise<EftSlotLookup> | null = null; // read once, and only when an older fit needs it
   for (const fit of fits) {
     const base = {
       id: `doctrine-${fit.id}`,
@@ -44,7 +45,11 @@ export async function doctrineRows(
       rows.push({ ...base, source: 'doctrine', code: fit.shareCode, legacy: false });
       continue;
     }
-    const fitting = fittingFromDoctrineSnapshot(fit.snapshot, fit.name, await slotByTypeId());
+    const fitting = fittingFromDoctrineSnapshot(
+      fit.snapshot,
+      fit.name,
+      await (slots ??= slotByTypeId())
+    );
     const encoded = await encodeFittingShare(fittingToShareInput(fitting));
     if (encoded.ok) rows.push({ ...base, source: 'doctrine', code: encoded.payload, legacy: true });
   }
