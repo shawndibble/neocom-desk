@@ -1113,7 +1113,7 @@ describe('grace period past the freshness window', () => {
    * A real quarter second per test is the cheaper price.
    */
   async function expireGrace(): Promise<void> {
-    // eslint-disable-next-line no-restricted-syntax -- a real timer on purpose; see above
+    // eslint-disable-next-line no-restricted-syntax -- the real grace timer; fake timers deadlock fake-indexeddb
     await new Promise((resolve) => setTimeout(resolve, STALE_GRACE_MS + 25));
   }
 

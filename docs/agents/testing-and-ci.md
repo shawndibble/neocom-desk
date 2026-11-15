@@ -124,7 +124,8 @@ Most past flake fixes were a test asserting before async work settled. Lint
 - **No sleeps in a test's own flow.** An awaited `new Promise(… setTimeout …)` in
   a test, hook, `act` callback or helper is an error, and so is a helper that is
   only such a promise. A delay inside a stub (an argument to `mockImplementation`
-  or `vi.fn`, a property of a fake) simulates latency and stays legal.
+  or `vi.fn`, a property of a fake) simulates latency and stays legal; write
+  it inline, as a named helper that is only a timed promise is flagged too.
 - **e2e: no `page.waitForTimeout`.** Use a web-first `expect`, `expect.poll` on
   the real condition, or `page.waitForResponse`.
 
@@ -148,7 +149,7 @@ What to wait on instead:
 A sleep that is genuinely the only option (a real timer the code races and
 fake timers deadlock, or Node's unhandled-rejection turn) takes an
 `eslint-disable-next-line no-restricted-syntax -- <reason>` on that line. Keep
-those rare: there are five in the tree.
+those rare; grep for the existing ones before adding another.
 
 ## Running the app against the Firebase emulators (local only)
 

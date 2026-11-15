@@ -404,7 +404,7 @@ describe('Mail', () => {
       // hops before asserting on the result. A dropped page leaves nothing to
       // observe, so these turns are all there is to wait on.
       for (let i = 0; i < 10; i++) {
-        // eslint-disable-next-line no-restricted-syntax -- see above
+        // eslint-disable-next-line no-restricted-syntax -- a dropped stale page leaves nothing to observe
         await new Promise((resolve) => setTimeout(resolve, 0));
       }
     });

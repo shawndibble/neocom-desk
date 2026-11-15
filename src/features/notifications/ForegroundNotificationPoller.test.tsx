@@ -204,7 +204,7 @@ describe('ForegroundNotificationPoller', () => {
         run();
         // Node reports an unhandled rejection a turn after it goes unhandled; with
         // nothing to observe when none comes, a turn is the only thing to wait on.
-        // eslint-disable-next-line no-restricted-syntax -- see above
+        // eslint-disable-next-line no-restricted-syntax -- Node's unhandled-rejection turn; nothing else to observe
         await new Promise((resolve) => setTimeout(resolve, 10));
       } finally {
         process.off('unhandledRejection', listener);

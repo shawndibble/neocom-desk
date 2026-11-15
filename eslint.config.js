@@ -175,30 +175,32 @@ const sortArrowSyntax = [
 // A test waits for a signal, never a duration (docs/agents/testing-and-ci.md
 // "Wait for a signal"). Bans an awaited `new Promise(… setTimeout …)` in a
 // test's own flow — a test, hook, `act` callback or a helper — and a helper
-// that is nothing but such a promise. A delay inside a stub (an argument to
+// that is nothing but such a promise (write a latency stub inline, not as a
+// named helper). A delay inside a stub (an argument to
 // `mockImplementation`, `vi.fn`, an object of fakes, or a factory that
 // returns one) simulates latency in the code under test and stays legal.
 const sleepMessage =
   'A test waits for a signal, never a duration: findBy*/waitFor on the outcome, or fake timers when the code is timer-driven (docs/agents/testing-and-ci.md).';
 const sleepPromise =
-  "NewExpression[callee.name='Promise']:has(CallExpression[callee.name='setTimeout'])";
+  "NewExpression[callee.name='Promise']:has(CallExpression[callee.name='setTimeout'], CallExpression[callee.property.name='setTimeout'])";
 const testFlowCall =
-  'CallExpression:not([callee.name=/^(it|test|beforeEach|afterEach|beforeAll|afterAll|describe|act)$/]):not([callee.object.name=/^(it|test|describe)$/]):not([callee.callee.object.name=/^(it|test|describe)$/])';
+  'CallExpression:not([callee.name=/^(it|test|beforeEach|afterEach|beforeAll|afterAll|describe|act|waitFor)$/]):not([callee.object.name=/^(it|test|describe)$/]):not([callee.callee.object.name=/^(it|test|describe)$/])';
 const sleepSyntax = [
   {
     selector: `AwaitExpression:not(${testFlowCall} > :function AwaitExpression):not(${testFlowCall} > TSAsExpression > :function AwaitExpression):not(Property > :function AwaitExpression):not(:function > :function AwaitExpression) > ${sleepPromise}`,
     message: sleepMessage,
   },
   {
-    selector: `VariableDeclarator > ArrowFunctionExpression > ${sleepPromise}`,
+    selector: `:matches(VariableDeclarator > ArrowFunctionExpression, VariableDeclarator > ArrowFunctionExpression > BlockStatement > ReturnStatement, Program > FunctionDeclaration > BlockStatement > ReturnStatement) > ${sleepPromise}`,
     message: sleepMessage,
   },
 ];
 
 // The async-settle half of eslint-plugin-testing-library: un-awaited queries,
 // utils and events, side effects or several assertions inside a `waitFor`
-// retry, `waitFor` + `getBy` where `findBy` says it, and an `act` that wraps
-// nothing or wraps a call that already acts.
+// retry, `waitFor` + `getBy` where `findBy` says it, an `act` that wraps
+// nothing or wraps a call that already acts, and `getBy`/`queryBy` matched to
+// presence/absence so a missing element fails at the query.
 const testingLibraryRules = Object.fromEntries(
   [
     'await-async-queries',

@@ -66,7 +66,7 @@ function makeElections(locks: FakeLockManager) {
 async function settle() {
   // The fake models the browser's lock queue on timer turns, and drains in a bounded number of
   // them; there is no single settled signal to wait on.
-  // eslint-disable-next-line no-restricted-syntax -- see above
+  // eslint-disable-next-line no-restricted-syntax -- the fake lock queue runs on timer turns; no settled signal
   for (let i = 0; i < 10; i++) await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
