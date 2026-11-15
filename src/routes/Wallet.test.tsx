@@ -273,18 +273,25 @@ describe('Wallet', () => {
       expect(screen.getByRole('link', { name: /Wallet/ })).toHaveAttribute('href', '/wallet');
     });
 
-    // On `<App />`: the button this finds is the shell's (Layout's broker-fee
-    // standings notice); the route on its own draws no grant note for a
-    // Character missing the wallet scope.
+    // `ScopeGate` judges the active Character's grant, which holds the wallet
+    // scope, so the page renders; the named Character's journal read is what
+    // ESI refuses (the 403 a token without the scope gets), and that refusal
+    // is what draws the Journal's grant note.
     it('shows the grant note for a Character without the wallet scope', async () => {
       await seedSecond();
       await db.tokens.update(92, { scopes: [] });
+      server.use(
+        http.get('https://esi.evetech.net/characters/92/wallet/journal', () =>
+          HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+        )
+      );
       window.history.pushState({}, '', '/wallet/journal?char=92');
-      render(<App />);
-      expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
+      renderWalletRoute();
+      expect(await screen.findByText('Log in again to see your wallet')).toBeInTheDocument();
       expect(
-        (await screen.findAllByRole('button', { name: /grant|log in again/i })).length
-      ).toBeGreaterThan(0);
+        screen.getByRole('button', { name: 'Log in again with EVE Online' })
+      ).toBeInTheDocument();
+      expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_ID);
     });
   });
 });
