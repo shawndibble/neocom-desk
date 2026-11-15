@@ -20,7 +20,7 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
 import { Industry } from '@/routes/Industry';
-import { renderRouteWithoutShell } from '@/test/routeWithoutShell';
+import { renderPageRoute } from '@/test/renderPage';
 import { useLpValue } from '@/features/loyalty/lpValue';
 import {
   communityOfferToSearchRow,
@@ -365,7 +365,7 @@ beforeAll(async () => {
 
 /** The Industry page (Sourcing is its tab) on its route, without App's boot or the shell. */
 function renderIndustry() {
-  return renderRouteWithoutShell('/industry', <Industry />);
+  return renderPageRoute('/industry', <Industry />);
 }
 
 beforeEach(resetSession);

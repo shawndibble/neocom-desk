@@ -14,7 +14,7 @@ import { useCharacterFilterPicks } from '@/features/character/characterFilterPic
 import * as routeChunks from '@/app/routeChunks';
 import { Assets } from '@/routes/Assets';
 import { mswServer } from '@/test/msw';
-import { renderRouteWithoutShell } from '@/test/routeWithoutShell';
+import { renderPageRoute } from '@/test/renderPage';
 
 // Shared harness for the Assets route tests (src/routes/Assets*.test.tsx), one
 // file per concern so CI runs them in parallel. The `vi.mock` calls stay in each
@@ -117,11 +117,11 @@ async function resetSession() {
 
 /**
  * The Assets page on its own route, without App's boot or the signed-in shell
- * (`renderRouteWithoutShell`). What nearly every Assets test renders; only the
+ * (`renderPageRoute`). What nearly every Assets test renders; only the
  * App wiring tests (Assets.test.tsx's "App wiring" block) render `<App />`.
  */
 export function renderAssetsRoute() {
-  return renderRouteWithoutShell('/assets', <Assets />);
+  return renderPageRoute('/assets', <Assets />);
 }
 
 /**

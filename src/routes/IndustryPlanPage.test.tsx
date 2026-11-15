@@ -23,7 +23,8 @@ import {
 } from '@/features/industry/reactionFacilityDefaults';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 import { stubViewport } from '@/test/viewport';
-import { holdHydration, renderIndustryRoutes } from '@/test/industryRoutes';
+import { holdHydration } from '@/test/holdHydration';
+import { renderIndustryRoutes } from '@/test/industryRoutes';
 
 // The "vs 90d" figures read market history; nothing here is about them.
 vi.mock('@/features/market/priceVsMedian', () => ({ loadPriceVsMedian: async () => null }));

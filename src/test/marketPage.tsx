@@ -20,7 +20,7 @@ import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
 import * as routeChunks from '@/app/routeChunks';
 import { Market } from '@/routes/Market';
-import { renderRouteWithoutShell } from '@/test/routeWithoutShell';
+import { renderPageRoute } from '@/test/renderPage';
 import {
   CORAX_TYPE_ID,
   CORMORANT_TYPE_ID,
@@ -40,7 +40,7 @@ import {
  * App wiring — the rail, the shell — render `<App />` (Market.sections.test.tsx).
  */
 export function renderMarketRoute() {
-  return renderRouteWithoutShell('/market', <Market />);
+  return renderPageRoute('/market', <Market />);
 }
 
 export const RIFTER_REGION_ID = 10000002; // The Forge (Jita hub's region)
