@@ -81,6 +81,10 @@ export interface CalendarKindFilterMenuProps {
   corporations?: readonly BoardCorporation[];
   corpFilter?: CorpEventFilter;
   onCorpFilter?: (filter: CorpEventFilter) => void;
+  /** The corporations sharing pops. Fewer than two hides that filter: the kind row already hides them all. */
+  sharingCorporations?: readonly BoardCorporation[];
+  sharingCorpFilter?: CorpEventFilter;
+  onSharingCorpFilter?: (filter: CorpEventFilter) => void;
 }
 
 const NO_CORPORATIONS: readonly BoardCorporation[] = [];
@@ -96,6 +100,7 @@ const OPT_IN_KINDS: ReadonlySet<CharacterBoardItemKind> = new Set([
   'structureFuel',
   'corpJob',
   'moonChunk',
+  'sharedMoonPop',
   'skyhookRaid',
   'mercenaryDen',
 ]);
@@ -114,6 +119,9 @@ export function CalendarKindFilterMenu({
   corporations = NO_CORPORATIONS,
   corpFilter = 'all',
   onCorpFilter,
+  sharingCorporations = NO_CORPORATIONS,
+  sharingCorpFilter = 'all',
+  onSharingCorpFilter,
 }: CalendarKindFilterMenuProps) {
   const { t } = useTranslation();
   const hiddenSet = new Set(hidden);
@@ -163,7 +171,11 @@ export function CalendarKindFilterMenu({
               ? t('calendar.filter.open')
               : t('calendar.filter.openWithCount', { count: hidden.length })
           }
-          pressed={hidden.length > 0 || (corporations.length > 0 && corpFilter !== 'all')}
+          pressed={
+            hidden.length > 0 ||
+            (corporations.length > 0 && corpFilter !== 'all') ||
+            (sharingCorporations.length > 1 && sharingCorpFilter !== 'all')
+          }
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">
@@ -224,6 +236,36 @@ export function CalendarKindFilterMenu({
                 <DropdownMenuRadioItem value="none" onSelect={(event) => event.preventDefault()}>
                   {t('calendar.corpFilter.none')}
                 </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        )}
+        {/* One sharing corporation alone would repeat All, and the kind row hides them all. */}
+        {sharingCorporations.length > 1 && (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <KindGlyph kind="sharedMoonPop" />
+              <span className="flex-1">{t('calendar.sharingCorpFilter.title')}</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuRadioGroup
+                value={String(sharingCorpFilter)}
+                onValueChange={(value) =>
+                  onSharingCorpFilter?.(value === 'all' ? value : Number(value))
+                }
+              >
+                <DropdownMenuRadioItem value="all" onSelect={(event) => event.preventDefault()}>
+                  {t('calendar.sharingCorpFilter.all')}
+                </DropdownMenuRadioItem>
+                {sharingCorporations.map((corporation) => (
+                  <DropdownMenuRadioItem
+                    key={corporation.id}
+                    value={String(corporation.id)}
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    <span className="flex-1 truncate">{corpLabelText(corporation)}</span>
+                  </DropdownMenuRadioItem>
+                ))}
               </DropdownMenuRadioGroup>
             </DropdownMenuSubContent>
           </DropdownMenuSub>

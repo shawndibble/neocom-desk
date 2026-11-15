@@ -55,6 +55,12 @@ vi.mock('@/lib/downloadCsv', async (importOriginal) => ({
   exportRows: vi.fn(async () => {}),
 }));
 
+// The Shared Pops callable (#6223): no Firebase here; each test says what it returns.
+const sharedPops = vi.hoisted(() => ({ list: [] as unknown[] }));
+vi.mock('@/sync/sharedPops', () => ({
+  fetchSharedPops: async () => sharedPops.list,
+}));
+
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
     needRefresh: [false, vi.fn()],
@@ -182,6 +188,7 @@ beforeEach(async () => {
   useCalendarDensity.setState({ value: DEFAULT_CALENDAR_DENSITY, hydrated: false });
   useCalendarHiddenKinds.setState({ value: DEFAULT_HIDDEN_KINDS, hydrated: false });
   useCalendarCorpFilter.setState({ value: DEFAULT_CORP_FILTER, hydrated: false });
+  sharedPops.list = [];
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -316,6 +323,75 @@ describe('Calendar corporation events', () => {
     expect(await screen.findByRole('menuitemcheckbox', { name: /calendar events/i })).toBeVisible();
     expect(screen.queryByRole('menuitem', { name: /corporation events/i })).toBeNull();
     expect(screen.queryByRole('menuitemcheckbox', { name: /structure/i })).toBeNull();
+  });
+});
+
+const SHARING_CORP_ID = 98000005;
+
+/** A Shared Pop of refinery 1001, the one `grantCorpScopes` also reads from ESI. */
+function sharePop() {
+  sharedPops.list = [
+    {
+      id: `${SHARING_CORP_ID}_x1`,
+      extractionId: 'x1',
+      moonId: 40000001,
+      structureId: 1001,
+      refineryName: 'Efa - Shared Tatara',
+      solarSystemId: 30000142,
+      popTime: 'ready',
+      popAt: inHours(8).toISOString(),
+      fractured: false,
+      startedAt: inHours(-48).toISOString(),
+      expiresAt: inHours(60).toISOString(),
+      ore: null,
+      notes: 'Fleet forms in local.',
+      ratePct: 12,
+      corporationId: SHARING_CORP_ID,
+      syncedAt: null,
+    },
+  ];
+  server.use(
+    http.get('https://esi.evetech.net/universe/moons/40000001', () =>
+      HttpResponse.json({ moon_id: 40000001, name: 'Efa I - Moon 1', system_id: 30000142 })
+    ),
+    http.get(`https://esi.evetech.net/corporations/${SHARING_CORP_ID}`, () =>
+      HttpResponse.json({ name: 'Sharing Corp', ticker: 'SHARE' })
+    )
+  );
+}
+
+describe('Calendar Shared Pops', () => {
+  it('shows a Shared Pop with its moon and sharing corporation', async () => {
+    sharePop();
+    renderCalendarRoute();
+
+    const rail = await screen.findByRole('list', { name: /coming up/i });
+    expect(await within(rail).findByText('Efa - Shared Tatara')).toBeInTheDocument();
+    expect(within(rail).getByText('Efa I - Moon 1')).toBeInTheDocument();
+    expect(within(rail).getByText(/Shared moon pops · ready · Sharing Corp/)).toBeInTheDocument();
+  });
+
+  it('hides it when the pilot reads that moon from ESI', async () => {
+    sharePop();
+    await grantCorpScopes(['Station_Manager']);
+    renderCalendarRoute();
+
+    expect(await screen.findByText('Moon 40000001')).toBeInTheDocument();
+    expect(screen.queryByText('Efa - Shared Tatara')).toBeNull();
+  });
+
+  it('opens the Shared Pop from ?pop=<id> with its Survey start link, leaving a clean URL', async () => {
+    sharePop();
+    window.history.pushState({}, '', `/calendar?pop=${SHARING_CORP_ID}_x1`);
+    renderCalendarRoute();
+
+    const dialog = await screen.findByRole('dialog', { name: 'Efa - Shared Tatara' });
+    expect(within(dialog).getByText('Fleet forms in local.')).toBeInTheDocument();
+    const link = within(dialog).getByRole('link', { name: /start a survey here/i });
+    expect(link.getAttribute('href')).toBe(
+      `/survey?place=Efa+-+Shared+Tatara&placeId=1001&payeeId=${SHARING_CORP_ID}&rate=12`
+    );
+    await waitFor(() => expect(window.location.search).not.toContain('pop='));
   });
 });
 

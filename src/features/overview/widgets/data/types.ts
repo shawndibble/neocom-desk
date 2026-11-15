@@ -222,10 +222,13 @@ export interface RowDetailModel {
   /** A titled list, each entry a toned badge, its text and a trailing value. */
   list?: {
     title: string;
-    items: { key: string; badge: string; tone: DetailTone; text: string; value: string }[];
+    /** `badge` and `tone` are left out for a plain line (a Shared Pop's ore). */
+    items: { key: string; badge?: string; tone?: DetailTone; text: string; value: string }[];
   };
   /** Where it is: Set destination, and the jump count as a link to Route Safety. */
   place?: { systemId: number; name: string; jumps?: number };
+  /** One in-app destination the record leads on to (a Shared Pop's Survey start link). */
+  link?: { label: string; to: string };
 }
 
 export interface TableModel {

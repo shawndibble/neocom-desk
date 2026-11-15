@@ -21,12 +21,22 @@ export interface CorpCalendarRead {
   corpJobs?: BoardClockSource[];
   /** The corporations with at least one readable source, by name: the filter's choices. */
   corporations: BoardCorporation[];
+  /**
+   * Every refinery whose drill the account reads (ESI or its own book), arrived or not: a Shared
+   * Pop at one of these is left out, since the corp `moonChunk` row wins.
+   */
+  refineryIds: number[];
   /** When each read landed, for the page's Data Age. */
   fetched: Date[];
   fromCache: boolean;
 }
 
-const NOTHING_READABLE: CorpCalendarRead = { corporations: [], fetched: [], fromCache: false };
+const NOTHING_READABLE: CorpCalendarRead = {
+  corporations: [],
+  refineryIds: [],
+  fetched: [],
+  fromCache: false,
+};
 
 /** Starbases and sovereignty windows are not Calendar kinds yet, so they are not read. */
 const CALENDAR_SOURCES: readonly CorpDeadlineSource[] = ['structures', 'moonChunks', 'jobs'];
@@ -75,6 +85,9 @@ export async function loadCorpCalendar(nowMs: number): Promise<CorpCalendarRead>
     moonChunks: readable('extractions') ? sources.moonChunks : undefined,
     corpJobs: readable('jobs') ? sources.corpJobs : undefined,
     corporations: [...corporations.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    refineryIds: reads.flatMap(({ read }) =>
+      (read.sources.extractions ?? []).map((x) => x.structureId)
+    ),
     fetched: reads.flatMap(({ read }) => read.fetched),
     fromCache: reads.some(({ read }) => read.fromCache),
   };

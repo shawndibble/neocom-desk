@@ -39,12 +39,15 @@ export interface CharacterBoardRowProps {
   onSelectEvent?: (eventId: number) => void;
   /** Skyhook raids open a detail modal of their own; the source id is the skyhook's. */
   onSelectSkyhook?: (skyhookId: number) => void;
+  /** Shared Pops open their detail (the Survey start link); the source id is the pop's. */
+  onSelectSharedPop?: (popId: string) => void;
 }
 
 export function CharacterBoardRow({
   item,
   onSelectEvent,
   onSelectSkyhook,
+  onSelectSharedPop,
 }: CharacterBoardRowProps) {
   const { t } = useTranslation();
   const zone = useTimeZone();
@@ -105,10 +108,12 @@ export function CharacterBoardRow({
           )}
         </span>
         <span className="mt-0.5 block truncate text-sm font-semibold">{item.subject}</span>
+        {item.subtitle && <span className="block truncate text-xs">{item.subtitle}</span>}
         <span className="mt-0.5 block truncate text-xs text-text-dim">
           {formatTimeOfDay(new Date(item.deadlineMs), zone)} · {t(KIND_LABEL[item.kind])}
           {item.detail && ` · ${t(`calendar.detail.${item.kind}.${item.detail}`, item.detail)}`}
           {item.corporation && ` · ${item.corporation.name}`}
+          {item.sharedBy && ` · ${item.sharedBy.name}`}
         </span>
       </span>
     </>
@@ -134,11 +139,18 @@ export function CharacterBoardRow({
     );
   }
 
-  if (item.kind === 'skyhookRaid' && onSelectSkyhook !== undefined) {
+  const onSelectDetail =
+    item.kind === 'skyhookRaid' && onSelectSkyhook !== undefined
+      ? () => onSelectSkyhook(Number(item.sourceId))
+      : item.kind === 'sharedMoonPop' && onSelectSharedPop !== undefined
+        ? () => onSelectSharedPop(item.sourceId)
+        : undefined;
+
+  if (onSelectDetail !== undefined) {
     return (
       <button
         type="button"
-        onClick={() => onSelectSkyhook(Number(item.sourceId))}
+        onClick={onSelectDetail}
         className={cx(
           'flex min-h-9 w-full items-start gap-2.5 px-3 py-2 text-left',
           rowInteractiveClassName,

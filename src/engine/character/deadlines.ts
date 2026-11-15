@@ -150,6 +150,26 @@ export function filterByCorporation(
   items: readonly CharacterBoardItem[],
   filter: CorpEventFilter
 ): CharacterBoardItem[] {
+  return byCorporationField(items, filter, (item) => item.corporation);
+}
+
+/** Shared Pops of one sharing corporation, or all of them; every other clock passes. */
+export function filterBySharingCorporation(
+  items: readonly CharacterBoardItem[],
+  filter: CorpEventFilter
+): CharacterBoardItem[] {
+  return byCorporationField(items, filter, (item) => item.sharedBy);
+}
+
+/** Rows without the field always pass; 'none' drops every row with one. */
+function byCorporationField(
+  items: readonly CharacterBoardItem[],
+  filter: CorpEventFilter,
+  field: (item: CharacterBoardItem) => { id: number } | undefined
+): CharacterBoardItem[] {
   if (filter === 'all') return [...items];
-  return items.filter((item) => item.corporation === undefined || item.corporation.id === filter);
+  return items.filter((item) => {
+    const corporation = field(item);
+    return corporation === undefined || corporation.id === filter;
+  });
 }

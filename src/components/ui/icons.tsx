@@ -107,6 +107,7 @@ import { MapTrifold } from '@phosphor-icons/react/dist/csr/MapTrifold';
 import { Minus } from '@phosphor-icons/react/dist/csr/Minus';
 import { Lifebuoy } from '@phosphor-icons/react/dist/csr/Lifebuoy';
 import { Moon } from '@phosphor-icons/react/dist/csr/Moon';
+import { MoonStars } from '@phosphor-icons/react/dist/csr/MoonStars';
 import { Package } from '@phosphor-icons/react/dist/csr/Package';
 import { PaperPlaneRight } from '@phosphor-icons/react/dist/csr/PaperPlaneRight';
 import { PencilSimple } from '@phosphor-icons/react/dist/csr/PencilSimple';
@@ -434,6 +435,8 @@ export const Corporation = withWeight(Buildings);
 export const Faction = withWeight(Flag);
 /** The Moon Mining Tax ledger. Its own glyph, not the industry factory — this is rent, not production. */
 export const MoonMining = withWeight(Moon);
+/** A Shared Pop on the Calendar: another corporation's moon, told apart from the pilot's own chunks. */
+export const SharedMoonPop = withWeight(MoonStars);
 /**
  * The notification *feature* as a whole, as sold on the login page. Distinct
  * from the per-channel notification toggles.

@@ -47,6 +47,8 @@ import { acceleratorId } from '@/features/accelerator/characterAccelerators';
 import { loadSkillPlanBoard, type SkillPlanChoice } from './calendarSkillPlan';
 import { loadCorpCalendar } from './calendarCorpDeadlines';
 import { loadSkyhookRaids } from './calendarSkyhooks';
+import { loadSharedPopsRead } from './calendarSharedPopsRead';
+import { toSharedPopSources, type SharedPopEntry } from './calendarSharedPops';
 import { loadCharacterDenRows } from './mercenaryDens';
 import type { SkyhookRaid } from './calendarBoardSources';
 import {
@@ -75,6 +77,12 @@ export interface CalendarBoardData {
   corpJobs?: BoardClockSource[];
   /** The corporations behind the corp events: the corporation filter's choices. Empty when none is readable. */
   corporations: BoardCorporation[];
+  /** Other corporations' Shared Pops, less any moon already read as a `moonChunk`. `undefined` when the read failed. */
+  sharedMoonPops?: BoardClockSource[];
+  /** Every live Shared Pop with its names, for the detail and the `?pop=` deep link. */
+  sharedPops: SharedPopEntry[];
+  /** The corporations sharing pops: the sharing-corporation filter's choices. */
+  sharingCorporations: BoardCorporation[];
   /** Corp skyhook raid windows. Left `undefined` unless the Character holds the corp role and scope to read them. */
   skyhookRaids?: BoardClockSource[];
   /** The skyhooks behind `skyhookRaids`, for the detail modal (system, stock, window). */
@@ -185,6 +193,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     skyhookRead,
     densResult,
     typedAccelerator,
+    sharedPopsRead,
   ] = await Promise.all([
     loadCalendarEvents(characterId),
     loadCharacterSkillQueueWithStatus(characterId),
@@ -197,7 +206,11 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     loadSkyhookRaids(characterId, loadedAtMs),
     loadCharacterDenRows(characterId),
     db.characterAccelerators.get(acceleratorId(characterId)),
+    loadSharedPopsRead(loadedAtMs),
   ]);
+  const sharedMoonPops =
+    sharedPopsRead.entries &&
+    toSharedPopSources(sharedPopsRead.entries, new Set(corpRead.refineryIds), loadedAtMs);
 
   const acceleratorSources = toAcceleratorSources(typedAccelerator, loadedAtMs, (bonus) =>
     i18n.t('calendar.acceleratorSubject', { bonus })
@@ -291,6 +304,8 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     { kind: 'structureTimer', result: NO_CACHE, rows: corpRead.structureTimers },
     { kind: 'structureFuel', result: NO_CACHE, rows: corpRead.structureFuel },
     { kind: 'moonChunk', result: NO_CACHE, rows: corpRead.moonChunks },
+    // Not an ESI read: a callable, held for minutes (`calendarSharedPopsRead.ts`).
+    { kind: 'sharedMoonPop', result: NO_CACHE, rows: sharedMoonPops },
     { kind: 'corpJob', result: NO_CACHE, rows: corpRead.corpJobs },
     { kind: 'skyhookRaid', result: skyhookRead.result, rows: skyhookRead.sources },
     { kind: 'contractExpiry', result: contractsResult, rows: contracts },
@@ -323,6 +338,9 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     structureTimers: corpRead.structureTimers,
     corpJobs: corpRead.corpJobs,
     corporations: corpRead.corporations,
+    sharedMoonPops,
+    sharedPops: sharedPopsRead.entries ?? [],
+    sharingCorporations: sharedPopsRead.corporations,
     skyhookRaids: skyhookRead.sources,
     skyhookRaidDetails: skyhookRead.raids,
     contractExpiries:

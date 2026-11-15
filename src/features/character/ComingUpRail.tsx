@@ -29,6 +29,7 @@ export interface ComingUpRailProps {
   onClearDay: () => void;
   onSelectEvent: (eventId: number) => void;
   onSelectSkyhook?: (skyhookId: number) => void;
+  onSelectSharedPop?: (popId: string) => void;
   /** True when the pilot has deselected every kind — a different answer from "nothing due". */
   noKindsSelected: boolean;
 }
@@ -40,6 +41,7 @@ export function ComingUpRail({
   onClearDay,
   onSelectEvent,
   onSelectSkyhook,
+  onSelectSharedPop,
   noKindsSelected,
 }: ComingUpRailProps) {
   const { t, i18n } = useTranslation();
@@ -91,6 +93,7 @@ export function ComingUpRail({
                   item={item}
                   onSelectEvent={onSelectEvent}
                   onSelectSkyhook={onSelectSkyhook}
+                  onSelectSharedPop={onSelectSharedPop}
                 />
               </li>
             ))}
