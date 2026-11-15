@@ -74,6 +74,7 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
       'marketOrderUndercut',
       'skyhookRaidable',
       'vettingShared',
+      'corpTaxBookSyncStopped',
     ]);
   });
 });

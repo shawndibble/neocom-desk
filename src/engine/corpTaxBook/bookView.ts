@@ -933,6 +933,41 @@ export function planStatementRun(view: BookView, period: StatementPeriod): State
   };
 }
 
+/** One period of a run, with the view it was planned on (its Statements are issued from that view). */
+export interface PlannedRun {
+  plan: StatementRunPlan;
+  view: BookView;
+}
+
+/**
+ * Every period a run sends, oldest first (#6208): `nextRunPeriod`, then the
+ * next one on a view that already holds the earlier period's Statements, so a
+ * later period's carried balance includes the one before it. A forgotten month
+ * is billed in the same run as the next, never left for a second one.
+ */
+export function planStatementRuns(view: BookView): PlannedRun[] {
+  const runs: PlannedRun[] = [];
+  const seen = new Set<string>();
+  let current = view;
+  for (;;) {
+    const period = nextRunPeriod(current);
+    if (period === undefined || seen.has(period.start)) return runs;
+    seen.add(period.start);
+    const plan = planStatementRun(current, period);
+    runs.push({ plan, view: current });
+    const issued = plan.lines.map((line) => statementForLine(current, plan, line));
+    current = buildBookView({
+      ...current.input,
+      statements: [...current.input.statements, ...issued],
+    });
+  }
+}
+
+/** The periods the next run bills, oldest first; empty when no run is due. */
+export function duePeriods(view: BookView): StatementPeriod[] {
+  return planStatementRuns(view).map((run) => run.plan.period);
+}
+
 /** A short code the miner can put in a donation's reason to pin it to a Statement (D15). */
 export function paymentCode(statementId: string): string {
   let h = 2166136261;

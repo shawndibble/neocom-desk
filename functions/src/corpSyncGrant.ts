@@ -24,6 +24,7 @@ import {
   META,
   decideRoles,
   parseBookCall,
+  OFFICERS,
   type OfficerAccess,
 } from './corpTaxBook.js';
 import {
@@ -62,6 +63,14 @@ import {
   type Caller,
 } from './actorAuth.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
+import type { PushSender } from './projectionStore.js';
+import { deliverServerEvent } from './serverEventStore.js';
+import {
+  SYNC_STOPPED_NOTIFY_BUDGET_MS,
+  isAlertedStop,
+  syncStoppedFires,
+  syncStoppedRecipients,
+} from './corpSyncStoppedAlert.js';
 
 export const CORP_SYNC_GRANTS_COLLECTION = 'corpTaxBookSyncGrants';
 export const SCHEDULED_SYNC_DOC = 'scheduledSync';
@@ -140,6 +149,13 @@ export interface CorpSyncDeps {
   esi?: SyncEsi;
   /** Receives only messages and ids — never a token. */
   log: (message: string, data?: Record<string, unknown>) => void;
+  /**
+   * Tells the book's editors' devices that the schedule stopped (`corpTaxBookSyncStopped`, ADR
+   * 0027; FCM in production). Without it a stop is only on the book's status.
+   */
+  push?: PushSender;
+  /** Test seam: how long a stop waits for its pushes. `SYNC_STOPPED_NOTIFY_BUDGET_MS` when absent. */
+  notifyBudgetMs?: number;
 }
 
 const PURPOSE = 'corpSyncGrant' as const;
@@ -956,6 +972,7 @@ async function stopGrant(
   grant: CorpSyncGrantDoc,
   reason: StopReason
 ): Promise<BookSyncResult> {
+  const stoppedAt = deps.now();
   const stopped = await deps.db.runTransaction(async (tx) => {
     const ref = grantRef(deps.db, grant.corporationId);
     const held = (await tx.get(ref)).data() as CorpSyncGrantDoc | undefined;
@@ -966,7 +983,7 @@ async function stopGrant(
       characterId: grant.characterId,
       characterName: grant.characterName,
       enabledAt: grant.enabledAt,
-      stoppedAt: deps.now(),
+      stoppedAt,
       stoppedReason: reason,
     };
     tx.set(statusRef(deps.db, grant.corporationId), status);
@@ -985,5 +1002,66 @@ async function stopGrant(
     await revokeStored(deps, grant);
   }
   deps.log('Scheduled Corp Tax Book sync stopped', { corporationId: grant.corporationId, reason });
+  // Only a stop this run made: a re-grant that won the race has nothing to tell.
+  if (stopped) await notifyStopped(deps, grant, reason, stoppedAt);
   return { kind: 'stopped', reason };
+}
+
+/** Sends `corpTaxBookSyncStopped` to each editor `syncStoppedRecipients` picks. Never throws. */
+async function pushStopped(
+  deps: CorpSyncDeps,
+  push: PushSender,
+  grant: CorpSyncGrantDoc,
+  reason: StopReason,
+  stoppedAt: number
+): Promise<void> {
+  if (!isAlertedStop(reason)) return;
+  try {
+    const now = deps.now();
+    const officers = await bookRef(deps.db, grant.corporationId).collection(OFFICERS).get();
+    const recipients = syncStoppedRecipients(
+      officers.docs.map((doc) => doc.data()),
+      grant.characterId,
+      reason,
+      now
+    );
+    const fires = syncStoppedFires(recipients, {
+      corporationId: grant.corporationId,
+      reason,
+      characterName: grant.characterName,
+      stoppedAt,
+    });
+    await Promise.all(fires.map((fire) => deliverServerEvent(deps.db, push, fire, now, deps.log)));
+  } catch (err) {
+    deps.log('corpTaxBookSyncStopped push failed', {
+      corporationId: grant.corporationId,
+      error: err instanceof Error ? err.name : 'unknown',
+    });
+  }
+}
+
+/**
+ * Tells the book's editors that the schedule stopped, on the devices that chose it. After the stop
+ * has committed and never its problem: a failure is logged and swallowed, and the run waits for it
+ * no longer than the budget before it moves on to the next book.
+ */
+async function notifyStopped(
+  deps: CorpSyncDeps,
+  grant: CorpSyncGrantDoc,
+  reason: StopReason,
+  stoppedAt: number
+): Promise<void> {
+  if (!deps.push) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<true>((resolve) => {
+    timer = setTimeout(() => resolve(true), deps.notifyBudgetMs ?? SYNC_STOPPED_NOTIFY_BUDGET_MS);
+  });
+  const late = await Promise.race([
+    pushStopped(deps, deps.push, grant, reason, stoppedAt),
+    timedOut,
+  ]);
+  clearTimeout(timer);
+  if (late) {
+    deps.log('corpTaxBookSyncStopped push timed out', { corporationId: grant.corporationId });
+  }
 }

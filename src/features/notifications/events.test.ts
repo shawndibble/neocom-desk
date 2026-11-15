@@ -54,6 +54,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'communityMemberJoined',
       'communityRequestPledged',
       'vettingShared',
+      'corpTaxBookSyncStopped',
     ]);
   });
 

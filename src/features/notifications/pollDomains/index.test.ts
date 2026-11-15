@@ -218,6 +218,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       skyhooks: ['skyhookRaidable'],
       communities: ['communityJoinRequest', 'communityMemberJoined', 'communityRequestPledged'],
       vetting: ['vettingShared'],
+      corpTaxBookSync: ['corpTaxBookSyncStopped'],
     });
   });
 

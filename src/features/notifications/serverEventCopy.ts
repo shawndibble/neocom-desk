@@ -19,6 +19,7 @@ import type {
   ShipLostFire,
 } from '@/engine/notificationDiffs';
 import type { VettingSharedFire } from '@/engine/vettingAlert';
+import type { CorpTaxBookSyncStoppedFire } from '@/engine/corpTaxBook/syncStoppedAlert';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import type { Translate } from '@/lib/translate';
 
@@ -63,6 +64,18 @@ export function vettingSharedText(t: Translate, fire: VettingSharedFire): Notifi
   return {
     title: fired(t, 'vettingShared', 'title'),
     body: fired(t, 'vettingShared', fire.kind),
+  };
+}
+
+/** Names the holder the way the book's own Automatic sync section does; never the corporation. */
+export function corpTaxBookSyncStoppedText(
+  t: Translate,
+  fire: CorpTaxBookSyncStoppedFire
+): NotificationCopy {
+  const name = fire.characterName || fired(t, 'corpTaxBookSyncStopped', 'holder');
+  return {
+    title: fired(t, 'corpTaxBookSyncStopped', 'title'),
+    body: fired(t, 'corpTaxBookSyncStopped', fire.reason, { name }),
   };
 }
 

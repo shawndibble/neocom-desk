@@ -20,6 +20,10 @@ import type { IncursionNearbyFire } from '@/engine/incursions/incursionAlert';
 import { INCURSION_STATES } from '@/engine/incursions/incursionRows';
 import type { SkyhookRaidableNearbyFire } from '@/engine/skyhooks/skyhookAlert';
 import type { VettingSharedFire } from '@/engine/vettingAlert';
+import {
+  SYNC_STOPPED_ALERT_REASONS,
+  type CorpTaxBookSyncStoppedFire,
+} from '@/engine/corpTaxBook/syncStoppedAlert';
 import { is, shapeGuard } from './snapshotShape';
 import type { ServerPushedEventId } from './serverEvents';
 
@@ -31,7 +35,8 @@ export type ServerEventFire =
   | NewMailPushFire
   | IncursionNearbyFire
   | SkyhookRaidableNearbyFire
-  | VettingSharedFire;
+  | VettingSharedFire
+  | CorpTaxBookSyncStoppedFire;
 
 const community = {
   characterId: is.number,
@@ -73,6 +78,14 @@ const GUARDS: Record<ServerPushedEventId, (raw: unknown) => boolean> = {
     corporationId: is.number,
     reviewId: is.string,
     kind: is.oneOf(['application', 'promotion'] as const),
+  }),
+  corpTaxBookSyncStopped: shapeGuard<CorpTaxBookSyncStoppedFire>({
+    eventId: is.oneOf(['corpTaxBookSyncStopped'] as const),
+    characterId: is.number,
+    corporationId: is.number,
+    reason: is.oneOf(SYNC_STOPPED_ALERT_REASONS),
+    characterName: is.string,
+    stoppedAt: is.number,
   }),
   // Lenient on the optional parts: a push without a sender or subject still reads as a new mail.
   newMail: shapeGuard<NewMailPushFire>({

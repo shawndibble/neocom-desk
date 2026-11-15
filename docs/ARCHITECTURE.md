@@ -546,6 +546,10 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   `editBookAs` (`assignPayment`, `settleStatements` only; never issues or mails).
   It stops the schedule and deletes the token when the holder lost the role, left
   the corp, SSO says `invalid_grant`, ESI refuses the token or the book is off.
+  A stop that commits (not `book-off`) pushes `corpTaxBookSyncStopped`, a server-pushed
+  Notification Event (ADR 0027; `engine/corpTaxBook/syncStoppedAlert.ts`), to the book's
+  editors checked in the last 30 days and the holder unless they lost the role or left
+  (`functions/src/corpSyncStoppedAlert.ts`).
   The pure half of the visit's pipeline is mirrored in
   `functions/src/corpTaxBookSyncEngine.ts`, pinned by
   `src/engine/corpTaxBook/syncMirror.test.ts`; emulator tests are

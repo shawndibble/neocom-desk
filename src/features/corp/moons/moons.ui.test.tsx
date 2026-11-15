@@ -350,6 +350,42 @@ describe('StatementRun', () => {
     expect(reload).toHaveBeenCalled();
   });
 
+  /** Aug and Sep both closed and unbilled: one run sends both, oldest first (#6208). */
+  const twoMonths = {
+    now: '2026-10-18T14:00:00Z',
+    lastSyncedAt: '2026-10-18T12:00:00Z',
+    entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 2000)],
+  };
+
+  it('sends every missed period in one run, issuing and queueing Aug before Sep', async () => {
+    renderBook(<StatementRun />, twoMonths);
+    expect(screen.getByText('Aug 2026 and Sep 2026 Statements')).toBeInTheDocument();
+    expect(screen.getByText('2 to send')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Send 2 Statements' }));
+    await waitFor(() => expect(enqueueStatements).toHaveBeenCalledTimes(2));
+    const ids = editBook.mock.calls.map(
+      (c) => (c[2] as { statement: { id: string } }).statement.id
+    );
+    expect(ids).toEqual(['2026-08-01_solo:1', '2026-09-01_solo:1']);
+    const due = enqueueStatements.mock.calls.map(
+      ([arg]) => (arg as { statements: { amountDue: number }[] }).statements[0].amountDue
+    );
+    expect(due).toEqual([100_000, 300_000]);
+  });
+
+  it('keeps the periods already issued and queued when a later one is refused', async () => {
+    editBook.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('Offline'));
+    renderBook(<StatementRun />, twoMonths);
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Send 2 Statements' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Offline');
+    expect(enqueueStatements).toHaveBeenCalledTimes(1);
+    expect(
+      (enqueueStatements.mock.calls[0][0] as { statements: unknown[] }).statements
+    ).toHaveLength(1);
+  });
+
   it('shows a refused issue instead of queueing mail', async () => {
     editBook.mockRejectedValueOnce(new Error('An issued Statement never changes'));
     renderBook(<StatementRun />);

@@ -4,18 +4,20 @@ import { useTranslation } from 'react-i18next';
 import { Button, Panel, plainTextActionClassName } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
-import { uncountedToShow, type UncountedDonation } from '@/engine/corpTaxBook/uncounted';
+import type { UncountedDonation } from '@/engine/corpTaxBook/uncounted';
 import { cx } from '@/lib/cx';
 import { useBook } from './useBook';
 import { useTabsProjection } from './useTabsProjection';
+import { useNeedsYou } from './useNeedsYou';
 import {
   AssignDonationDialog,
   MarkNotTaxDialog,
   RecordPaymentDialog,
   ReasonDialog,
 } from './BookDialogs';
-import { isk, periodLabel, shortDate } from './moonsFormat';
-import { minerPath } from './moonsPaths';
+import { isk, periodLabel, periodsLabel, shortDate } from './moonsFormat';
+import { MOONS_TABS, minerPath } from './moonsPaths';
+import { tabPath } from '@/lib/pageTabs';
 import { mailTarget, useCorporationName } from './statementMailing';
 
 /** The card's second action: a text link off the primary Button, so the pair is not two boxes (DESIGN.md §6, text action off a primary). */
@@ -73,13 +75,12 @@ type Open =
 export function NeedsYouQueue() {
   const { t } = useTranslation();
   const ctx = useBook();
-  const { view, names, edit, canEdit, characterId, corporationId, data, settings } = ctx;
-  const { miners, needsYou } = useTabsProjection();
+  const { view, names, edit, canEdit, characterId, corporationId, settings } = ctx;
+  const { miners } = useTabsProjection();
+  const { needsYou, uncounted, runDue, count } = useNeedsYou();
   const [open, setOpen] = useState<Open>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const close = () => setOpen(null);
-  // #6207: tax that looks paid into a division the book does not read, until it is counted.
-  const uncounted = uncountedToShow({ donations: data.uncounted ?? [] }, settings.divisions);
   const [busy, setBusy] = useState(false);
   // The corp's own name when a Director's visit stored one, else the numbered division.
   const divisionLabel = (division: number) =>
@@ -139,19 +140,33 @@ export function NeedsYouQueue() {
   };
 
   return (
-    <Panel
-      title={t('corpTaxBook.moons.needs.title', { count: needsYou.length + uncounted.length })}
-      padded={false}
-    >
+    <Panel title={t('corpTaxBook.moons.needs.title', { count })} padded={false}>
       {notice && (
         <p role="status" className="px-3 py-2 text-xs text-text-dim">
           {notice}
         </p>
       )}
-      {needsYou.length + uncounted.length === 0 && (
+      {count === 0 && (
         <p className="px-3 py-2.5 text-xs text-text-dim">{t('corpTaxBook.moons.needs.none')}</p>
       )}
       <ul className="divide-y divide-line">
+        {runDue.length > 0 && (
+          // #6208: closed periods nobody has billed. Overdue counts from issue, so a forgotten
+          // run would otherwise bill no one; the run sends every listed period, oldest first.
+          <QueueCard
+            tone="warning"
+            title={
+              <Link
+                to={tabPath(MOONS_TABS, 'statements')}
+                className={entityLinkClassName('inline-block py-0.5')}
+              >
+                {t('corpTaxBook.moons.needs.runDue.title', { periods: periodsLabel(runDue) })}
+              </Link>
+            }
+            body={t('corpTaxBook.moons.needs.runDue.body', { count: runDue.length })}
+            actions={null}
+          />
+        )}
         {needsYou.map((item) => {
           switch (item.kind) {
             case 'declaration': {

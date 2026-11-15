@@ -871,6 +871,96 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       expect(await status()).toMatchObject({ status: 'stopped', stoppedReason: 'book-off' });
     });
 
+    describe('telling the editors (#6208)', () => {
+      const pushed: { token: string; data: Record<string, string> }[] = [];
+      const pushDeps = (): CorpSyncDeps => ({
+        ...syncDeps(),
+        push: {
+          send: async (message) => {
+            pushed.push(message);
+            return 'sent';
+          },
+        },
+      });
+      /** A device registered for `characterId` with the given server events on. */
+      const device = (characterId: number, events: string[]) =>
+        db
+          .collection('deviceRegistrations')
+          .doc(`d${characterId}`)
+          .set({
+            fcmToken: `fcm-${characterId}`,
+            characterIds: [characterId],
+            serverEventsByCharacter: { [String(characterId)]: events },
+          });
+
+      beforeEach(async () => {
+        pushed.length = 0;
+        await device(DIRECTOR, ['corpTaxBookSyncStopped']);
+        await device(ACCOUNTANT, ['corpTaxBookSyncStopped']);
+      });
+
+      it('pushes the stop to the holder and each editor seen lately, keyed by the stop', async () => {
+        await optIn(ACCOUNTANT);
+        dead.add('rt-2-1');
+        await runScheduledCorpSyncs(pushDeps(), fakeEsi());
+        expect(pushed.map((m) => m.token).sort()).toEqual(['fcm-1', 'fcm-2']);
+        const director = pushed.find((m) => m.token === 'fcm-1');
+        expect(director?.data).toMatchObject({
+          characterId: String(DIRECTOR),
+          eventId: 'corpTaxBookSyncStopped',
+          occurrenceKey: `${DIRECTOR}:corpTaxBookSyncStopped:${CORP}:${T0}`,
+        });
+        expect(JSON.parse(director?.data.fire ?? '')).toEqual({
+          eventId: 'corpTaxBookSyncStopped',
+          characterId: DIRECTOR,
+          corporationId: CORP,
+          reason: 'token-revoked',
+          characterName: 'Pilot 2',
+          stoppedAt: T0,
+        });
+      });
+
+      it('does not tell a holder who lost the role', async () => {
+        await optIn(ACCOUNTANT);
+        identities.set(ACCOUNTANT, as(['Junior_Accountant']));
+        await runScheduledCorpSyncs(pushDeps(), fakeEsi());
+        expect(pushed.map((m) => m.token)).toEqual(['fcm-1']);
+      });
+
+      it('tells nobody when the book was turned off, or an editor was not seen for 30 days', async () => {
+        await optIn(ACCOUNTANT);
+        await book().update({ active: false });
+        await runScheduledCorpSyncs(pushDeps(), fakeEsi());
+        expect(pushed).toEqual([]);
+
+        await book().update({ active: true });
+        await optIn(ACCOUNTANT, 'rt-2-5');
+        identities.set(ACCOUNTANT, as(['Junior_Accountant']));
+        now = T0 + 30 * 86_400_000;
+        await runScheduledCorpSyncs(pushDeps(), fakeEsi());
+        expect(await status()).toMatchObject({ status: 'stopped', stoppedReason: 'role-lost' });
+        expect(pushed).toEqual([]);
+      });
+
+      it('stops the schedule even when the push hangs past its budget', async () => {
+        await optIn(ACCOUNTANT);
+        dead.add('rt-2-1');
+        const logged: string[] = [];
+        const summary = await runScheduledCorpSyncs(
+          {
+            ...syncDeps(),
+            push: { send: () => new Promise<string>(() => {}) },
+            notifyBudgetMs: 50,
+            log: (message) => logged.push(message),
+          },
+          fakeEsi()
+        );
+        expect(summary).toMatchObject({ stopped: 1 });
+        expect(await status()).toMatchObject({ status: 'stopped', stoppedReason: 'token-revoked' });
+        expect(logged).toContain('corpTaxBookSyncStopped push timed out');
+      });
+    });
+
     it('keeps the schedule through a transient failure and tries again next run', async () => {
       await optIn(ACCOUNTANT);
       refreshFailure = new Error('SSO is down');

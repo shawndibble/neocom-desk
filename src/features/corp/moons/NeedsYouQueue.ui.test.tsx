@@ -45,7 +45,12 @@ const noted: UncountedDonation = {
 
 function renderQueue(
   needsYou: NeedsYouItem[],
-  { miners = [miner('solo:7', 7)], uncounted = [] as UncountedDonation[], divisions = [1] } = {}
+  {
+    miners = [miner('solo:7', 7)],
+    uncounted = [] as UncountedDonation[],
+    divisions = [1],
+    view = undefined as unknown,
+  } = {}
 ) {
   projection.value = { miners, needsYou } as unknown as TabsProjection;
   render(
@@ -55,7 +60,7 @@ function renderQueue(
           {
             characterId: 9,
             corporationId: 98000001,
-            view: {
+            view: view ?? {
               input: {
                 statements: [{ id: 's1', periodStart: '2026-09-01', periodEnd: '2026-09-30' }],
               },
@@ -133,5 +138,52 @@ describe('NeedsYouQueue (#6207)', () => {
       },
     ]);
     expect(screen.getByText(/owed no tax then/)).toBeInTheDocument();
+  });
+});
+
+describe('NeedsYouQueue: a Statement run is due (#6208)', () => {
+  it('lists the closed periods nobody has billed and links to the Statements tab', async () => {
+    const { buildBookView } = await import('@/engine/corpTaxBook/bookView');
+    const view = buildBookView({
+      corporationId: 98000001,
+      now: '2026-10-18T14:00:00Z',
+      startDate: '2026-08-01',
+      graceHours: 6,
+      minimumStatement: 0,
+      overdueDays: 14,
+      cadence: { kind: 'monthly' },
+      hubId: 'jita',
+      oreForm: 'compressed',
+      structureExpiryHours: {},
+      lastSyncedAt: '2026-10-18T12:00:00Z',
+      rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-08-01' }],
+      entries: ['2026-08-10', '2026-09-10'].map((date) => ({
+        characterId: 7,
+        recordedCorporationId: 98000001,
+        structureId: 1001,
+        date,
+        oreLines: [{ typeId: 45490, quantity: 1000 }],
+      })),
+      miners: [],
+      statements: [],
+      payments: [],
+      dismissals: [],
+      declarations: [],
+      adjustments: [],
+      extractions: [],
+      paidStatementIds: new Set(),
+      pricesOn: () => ({ prices: new Map([[45490, 1000]]), sources: new Map() }),
+    });
+    renderQueue([], { view });
+    expect(screen.getByRole('heading', { name: 'Needs you · 1' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Statements ready for Aug 2026 and Sep 2026' })
+    ).toHaveAttribute('href', '/corp/moons/statements');
+    expect(screen.getByText(/One run sends them all, oldest first/)).toBeInTheDocument();
+  });
+
+  it('has no run card while every closed period is on a Statement', () => {
+    renderQueue([]);
+    expect(screen.queryByText(/Statements ready/)).not.toBeInTheDocument();
   });
 });

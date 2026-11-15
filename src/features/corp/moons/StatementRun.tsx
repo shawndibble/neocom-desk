@@ -14,7 +14,7 @@ import {
   StatChips,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { nextRunPeriod, planStatementRun, statementForLine } from '@/engine/corpTaxBook/bookView';
+import { planStatementRuns, statementForLine } from '@/engine/corpTaxBook/bookView';
 import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
 import { composeStatementMail } from '@/engine/corpTaxBook/statementMail';
 import type { Statement } from '@/engine/corpTaxBook/statements';
@@ -30,7 +30,7 @@ import {
 import { useIsBelowDesktop } from '@/lib/useIsBelowDesktop';
 import { editBook } from '../taxBook/bookClient';
 import { editErrorMessage, useBook } from './useBook';
-import { isk, periodLabel } from './moonsFormat';
+import { isk, periodsLabel } from './moonsFormat';
 import { TRADE_HUBS } from '@/market/hubs';
 import { mailTarget, statementRefineryNames, useCorporationName } from './statementMailing';
 
@@ -67,8 +67,9 @@ function StepDot({
 }
 
 /**
- * Check → Send → Done (#4056 steps 10-12). Check shows what the period would
- * send; Send issues each Statement (which creates its verify link, so it must
+ * Check → Send → Done (#4056 steps 10-12). Check shows what the run would
+ * send: every closed period not on a Statement yet, oldest first, so a forgotten
+ * month goes out with the next (#6208); Send issues each Statement (which creates its verify link, so it must
  * come first) and hands the mails to the queue (#4064), which paces them and
  * shows its own chip on every page. On a desktop the chosen Miner's mail shows
  * beside Check and Send; below it, "Preview mail" opens it in a dialog.
@@ -104,8 +105,15 @@ export function StatementRun() {
   }, [step]);
   const queue = useLiveQuery(() => listQueue(corporationId), [corporationId], []);
 
-  const period = useMemo(() => nextRunPeriod(view), [view]);
-  const plan = useMemo(() => (period ? planStatementRun(view, period) : null), [view, period]);
+  const runs = useMemo(() => planStatementRuns(view), [view]);
+  /** Every new Statement of the run, oldest period first, with the view it is issued from. */
+  const lines = useMemo(
+    () => runs.flatMap((run) => run.plan.lines.map((line) => ({ run, line }))),
+    [runs]
+  );
+  const latest = runs.at(-1)?.plan;
+  const totalDue = runs.reduce((sum, run) => sum + run.plan.totalDue, 0);
+  const creditApplied = runs.reduce((sum, run) => sum + run.plan.creditApplied, 0);
 
   // Statements issued earlier whose mail never went out (a closed tab, a refused enqueue).
   const unmailed = useMemo(
@@ -125,8 +133,8 @@ export function StatementRun() {
     [view, queue]
   );
 
-  const nothingToDo = !plan && unmailed.length === 0;
-  const total = (plan?.lines.length ?? 0) + unmailed.length;
+  const nothingToDo = runs.length === 0 && unmailed.length === 0;
+  const total = lines.length + unmailed.length;
   const minerRow = (id: string) => view.miners.find((m) => m.id === id)!;
 
   /** Everything the run will send: newly drafted Statements, then earlier unmailed ones. */
@@ -138,11 +146,11 @@ export function StatementRun() {
       amountDue: number;
       carried: number;
     }[] = [];
-    for (const line of plan?.lines ?? []) {
+    for (const { run, line } of lines) {
       out.push({
-        key: `line:${line.minerId}`,
+        key: `line:${run.plan.period.start}:${line.minerId}`,
         minerId: line.minerId,
-        statement: statementForLine(view, plan!, line),
+        statement: statementForLine(run.view, run.plan, line),
         amountDue: line.balanceDue,
         carried: line.carried,
       });
@@ -161,7 +169,7 @@ export function StatementRun() {
       });
     }
     return out;
-  }, [view, plan, unmailed]);
+  }, [view, lines, unmailed]);
 
   const previewFor = (item: (typeof previews)[number], corpName: string): MailPreviewContent => {
     const target = mailTarget(ctx, item.statement, minerRow(item.minerId), {
@@ -199,38 +207,13 @@ export function StatementRun() {
     if (corporationName === null) return;
     setBusy(true);
     setError(null);
-    try {
-      const targets = [];
-      for (const line of plan?.lines ?? []) {
-        const statement = statementForLine(view, plan!, line);
-        // A guest cannot look names up, so the verify page reads them off the Statement.
-        const refineryNames = statementRefineryNames(statement, names);
-        await editBook(characterId, corporationId, {
-          action: 'issueStatement',
-          statement: {
-            ...statement,
-            corporationName,
-            minerName: names.character(minerRow(line.minerId).mainCharacterId),
-            refineryNames,
-          },
-        });
-        targets.push(
-          mailTarget(ctx, statement, minerRow(line.minerId), {
-            amountDue: line.balanceDue,
-            carried: line.carried,
-          })
-        );
-      }
-      for (const s of unmailed) {
-        const row = minerRow(s.minerId);
-        targets.push(
-          mailTarget(ctx, s as Statement, row, {
-            amountDue: row.owed,
-            carried: Math.max(0, row.owed - s.amount),
-          })
-        );
-      }
-      const { enqueueStatements } = await import('@/features/corpTaxBook/mailQueue');
+    // Each period is issued and then queued before the next one starts, so a
+    // failure part-way keeps what was issued (and queued); the next run bills
+    // the remaining periods and offers any Statement whose mail never left.
+    const sent = { queued: 0, skipped: 0, missingLink: 0 };
+    const { enqueueStatements } = await import('@/features/corpTaxBook/mailQueue');
+    const queueTargets = async (targets: Parameters<typeof enqueueStatements>[0]['statements']) => {
+      if (targets.length === 0) return;
       const queued = await enqueueStatements({
         corporationId,
         corporationName,
@@ -238,11 +221,46 @@ export function StatementRun() {
         statements: targets,
         refineryName: (id) => names.refinery(id),
       });
-      setResult({
-        queued: queued.queued,
-        skipped: queued.skipped,
-        missingLink: queued.missingLink.length,
-      });
+      sent.queued += queued.queued;
+      sent.skipped += queued.skipped;
+      sent.missingLink += queued.missingLink.length;
+    };
+    try {
+      // Earlier Statements whose mail never went out are the oldest; they go first.
+      await queueTargets(
+        unmailed.map((s) => {
+          const row = minerRow(s.minerId);
+          return mailTarget(ctx, s as Statement, row, {
+            amountDue: row.owed,
+            carried: Math.max(0, row.owed - s.amount),
+          });
+        })
+      );
+      for (const run of runs) {
+        const targets = [];
+        for (const line of run.plan.lines) {
+          const statement = statementForLine(run.view, run.plan, line);
+          // A guest cannot look names up, so the verify page reads them off the Statement.
+          const refineryNames = statementRefineryNames(statement, names);
+          await editBook(characterId, corporationId, {
+            action: 'issueStatement',
+            statement: {
+              ...statement,
+              corporationName,
+              minerName: names.character(minerRow(line.minerId).mainCharacterId),
+              refineryNames,
+            },
+          });
+          targets.push(
+            mailTarget(ctx, statement, minerRow(line.minerId), {
+              amountDue: line.balanceDue,
+              carried: line.carried,
+            })
+          );
+        }
+        await queueTargets(targets);
+      }
+      setResult(sent);
       setStep('done');
     } catch (e) {
       setError(editErrorMessage(e));
@@ -276,9 +294,12 @@ export function StatementRun() {
     </div>
   );
 
-  const title = period
-    ? t('corpTaxBook.moons.run.title', { period: periodLabel(period.start, period.end) })
-    : t('corpTaxBook.moons.run.titleNone');
+  const title =
+    runs.length > 0
+      ? t('corpTaxBook.moons.run.title', {
+          period: periodsLabel(runs.map((run) => run.plan.period)),
+        })
+      : t('corpTaxBook.moons.run.titleNone');
 
   return (
     <Panel title={title}>
@@ -310,26 +331,26 @@ export function StatementRun() {
                       value={t('corpTaxBook.moons.run.toSend', { count: total })}
                       emphasis
                     />
-                    {plan && (
+                    {latest && (
                       <StatChip
                         label={t('corpTaxBook.moons.run.balances')}
-                        value={isk(plan.totalDue)}
+                        value={isk(totalDue)}
                         tooltip={t('corpTaxBook.moons.run.balancesTip')}
                         tooltipGlyph="info"
                       />
                     )}
-                    {plan && (
+                    {latest && (
                       <StatChip
                         label={t('corpTaxBook.moons.run.belowMinimum', {
                           amount: isk(view.input.minimumStatement),
                         })}
-                        value={t('corpTaxBook.moons.run.rollIn', { count: plan.belowMinimum })}
+                        value={t('corpTaxBook.moons.run.rollIn', { count: latest.belowMinimum })}
                       />
                     )}
-                    {plan && (
+                    {latest && (
                       <StatChip
                         label={t('corpTaxBook.moons.run.creditApplied')}
-                        value={isk(plan.creditApplied)}
+                        value={isk(creditApplied)}
                       />
                     )}
                   </StatChips>

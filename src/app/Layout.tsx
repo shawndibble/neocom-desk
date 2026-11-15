@@ -46,6 +46,7 @@ import { FinishSetupHost } from '@/features/character/finishSetup/FinishSetupHos
 import { NetWorthSnapshotRecorder } from '@/features/netWorth/NetWorthSnapshotRecorder';
 import { AlertsPanelProvider } from '@/features/notifications/AlertsPanelContext';
 import { useRequestBadgePoll } from '@/features/communities/requestBadge';
+import { useMoonsSyncStoppedPoll } from '@/features/corp/moons/moonsNavAttention';
 import { useAlertBadge } from '@/features/notifications/useUnreadAlertCount';
 import { barTabs, NAV_LABEL_KEYS, useMobileTabs } from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
@@ -316,6 +317,8 @@ export const Layout = memo(function Layout() {
   const alertBadge = useAlertBadge();
   // New Requests on the Communities item, read while the app is open (issue #3810).
   useRequestBadgePoll();
+  // The corp Moons dot's Automatic sync stop, between Moons visits (#6208).
+  useMoonsSyncStoppedPoll();
   const navBadge = useNavBadges();
   const settingsAttention = useSettingsNeedsAttention();
   const railSettingsAttention = useRailSettingsNeedsAttention();

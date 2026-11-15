@@ -12604,6 +12604,15 @@
         "application": "A pilot shared a report for review.",
         "promotion": "A member shared the review they were asked for."
       },
+      "corpTaxBookSyncStopped": {
+        "title": "Automatic sync stopped",
+        "holder": "The holder",
+        "role-lost": "{{name}} no longer has the Accountant, Director or CEO role. Turn it on again to keep the Corp Tax Book current.",
+        "left-corp": "{{name}} left the corporation. Turn it on again to keep the Corp Tax Book current.",
+        "token-revoked": "{{name}}'s EVE authorization was revoked or expired. Turn it on again to keep the Corp Tax Book current.",
+        "esi-refused": "EVE no longer lets {{name}}'s authorization read the mining ledger. Turn it on again to keep the Corp Tax Book current.",
+        "grant-unreadable": "The saved grant can't be read. Turn it on again to keep the Corp Tax Book current."
+      },
       "communityMemberJoined": {
         "title": "New member in {{community}}",
         "body": "{{name}} joined {{community}}."
@@ -14972,11 +14981,13 @@
         "communityMemberJoined": "Community member joined",
         "communityRequestPledged": "Pledge on your Request",
         "vettingShared": "New vetting report",
+        "corpTaxBookSyncStopped": "Corp Tax Book Automatic sync stopped",
         "priceAlertTriggered": "Quickbar price alert",
         "shipLost": "Ship lost",
         "characterNeedsLogin": "Character needs to log in again"
       },
       "vettingSharedHint": "Sent when a pilot shares a report with your corporation. Reaches reviewers who opened Vetting in the last 30 days.",
+      "corpTaxBookSyncStoppedHint": "Sent when our server stops your corporation's Automatic sync. Reaches the book's editors who opened the Corp Tax Book in the last 30 days.",
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Planetary Industry always shows the real expiry.",
       "mercenaryDenReinforcedHint": "Scheduled up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. A den that leaves reinforcement early can still send it.",
       "skyhookRaidableHint": "Scheduled up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Needs the Station Manager role.",
@@ -18015,6 +18026,11 @@
           "bodyReview": "{{date}}. {{name}}'s Miner owed no tax then and had no ore waiting for a Statement, so it may be for something else, such as a buyback. Assign it if it was tax, or mark it not tax.",
           "assign": "Assign to a Miner",
           "notTax": "Mark not tax"
+        },
+        "runDue": {
+          "title": "Statements ready for {{periods}}",
+          "body_one": "A closed period has Billable days on no Statement, so nobody is billed for it yet. Open Statements to send the run.",
+          "body_other": "{{count}} closed periods have Billable days on no Statement, so nobody is billed for them yet. One run sends them all, oldest first."
         },
         "uncounted": {
           "title": "Donation of {{amount}} from {{name}} into {{division}} — not counted",
