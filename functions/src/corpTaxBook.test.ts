@@ -564,3 +564,80 @@ describe('reanchorCadence', () => {
     expect(reanchorCadence(undefined, '2026-10-01', '2026-09-25')).toBeUndefined();
   });
 });
+
+describe('Pop Sharing edits (#6222)', () => {
+  it('parses turning sharing on and a Sharing default change', () => {
+    expect(
+      parseEditAction({
+        action: 'setPopSharing',
+        enabled: true,
+        defaults: {
+          audiences: [{ kind: 'corp' }, { kind: 'community', communityId: 'c1', name: ' Miners ' }],
+          popTime: 'auto-fracture',
+          showOre: false,
+          ratePct: 7.5,
+          notes: '  Fleet on comms  ',
+        },
+      })
+    ).toEqual({
+      action: 'setPopSharing',
+      enabled: true,
+      defaults: {
+        audiences: [{ kind: 'corp' }, { kind: 'community', communityId: 'c1', name: 'Miners' }],
+        popTime: 'auto-fracture',
+        showOre: false,
+        ratePct: 7.5,
+        notes: 'Fleet on comms',
+      },
+    });
+  });
+
+  it('takes empty notes, the book rate (null) and a lone switch', () => {
+    expect(
+      parseEditAction({ action: 'setPopSharing', defaults: { notes: '', ratePct: null } })
+    ).toEqual({ action: 'setPopSharing', defaults: { notes: '', ratePct: null } });
+    expect(parseEditAction({ action: 'setPopSharing', enabled: false })).toEqual({
+      action: 'setPopSharing',
+      enabled: false,
+    });
+  });
+
+  it('refuses nothing to change, a bad value, a duplicate audience or an unknown setting', () => {
+    const bad = (data: Record<string, unknown>) =>
+      expect(() => parseEditAction({ action: 'setPopSharing', ...data })).toThrow();
+    bad({});
+    bad({ enabled: 'yes' });
+    bad({ defaults: { popTime: 'whenever' } });
+    bad({ defaults: { ratePct: 101 } });
+    bad({ defaults: { notes: 'x'.repeat(501) } });
+    bad({ defaults: { audiences: [{ kind: 'corp' }, { kind: 'corp' }] } });
+    bad({ defaults: { audiences: [{ kind: 'community', communityId: '../x', name: 'a' }] } });
+    bad({ defaults: { colour: 'red' } });
+  });
+
+  it('parses a Moon override: settings to set, and settings back to the default', () => {
+    expect(
+      parseEditAction({
+        action: 'setPopSharingMoon',
+        moonId: 40001,
+        set: { popTime: 'ready', ratePct: null },
+        clear: ['notes'],
+      })
+    ).toEqual({
+      action: 'setPopSharingMoon',
+      moonId: 40001,
+      override: { set: { popTime: 'ready', ratePct: null }, clear: ['notes'] },
+    });
+    const bad = (data: Record<string, unknown>) =>
+      expect(() =>
+        parseEditAction({ action: 'setPopSharingMoon', moonId: 40001, ...data })
+      ).toThrow();
+    bad({});
+    bad({ set: {}, clear: [] });
+    bad({ clear: ['colour'] });
+    bad({ set: { notes: 'a' }, clear: ['notes'] });
+    expect(() =>
+      parseEditAction({ action: 'setPopSharingMoon', moonId: 'x', set: { notes: 'a' } })
+    ).toThrow();
+  });
+});

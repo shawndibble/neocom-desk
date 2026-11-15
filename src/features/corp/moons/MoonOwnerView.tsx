@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Checkbox,
   DataTable,
   Panel,
   Select,
@@ -31,6 +32,7 @@ import {
 } from '../taxBook/feederViewModel';
 import { DialogShell } from './BookDialogs';
 import { RefineryLabels } from './RefineryLabels';
+import { callableErrorText } from './feederErrorText';
 import { ChangePayeeDialog, PayeeChangeStrip, PayeeLine } from './MoonOwnerPayee';
 import { isk, monthLabel, shortDate } from './moonsFormat';
 
@@ -358,6 +360,55 @@ function Payments({
   );
 }
 
+/**
+ * The moon owner's Pop Sharing opt-out (#6222): one switch for all its moons, on by default.
+ * Off stops the accounting corporation sharing their pops at once; on lets it again.
+ */
+function PopSharingSwitch({
+  name,
+  share,
+  onChange,
+}: {
+  name: string;
+  share: boolean;
+  /** Absent: shown, not changeable (not an officer who edits). */
+  onChange?: (share: boolean) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const change = async (next: boolean) => {
+    if (!onChange) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onChange(next);
+    } catch (e) {
+      setError(callableErrorText(t, e, 'corpTaxBook.moons.ownerView.popSharing.failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Panel title={t('corpTaxBook.moons.ownerView.popSharing.title')}>
+      <div className="space-y-2 text-sm">
+        <label className="flex min-h-9 items-center gap-2">
+          <Checkbox
+            checked={share}
+            disabled={!onChange || busy}
+            onChange={(e) => void change(e.target.checked)}
+          />
+          {t('corpTaxBook.moons.ownerView.popSharing.label', { name })}
+        </label>
+        <p className="text-xs text-text-dim">
+          {t('corpTaxBook.moons.ownerView.popSharing.hint', { name })}
+        </p>
+        {error && <InlineError>{error}</InlineError>}
+      </div>
+    </Panel>
+  );
+}
+
 function AskRateDialog({
   initial,
   onClose,
@@ -405,6 +456,7 @@ export function MoonOwnerView({
   onSetRefineryLabel,
   onRequestRate,
   onDisputePayout,
+  onSetPopSharing,
   characterId,
   onSetPayee,
   banner,
@@ -424,6 +476,8 @@ export function MoonOwnerView({
   onRequestRate: (pct: number) => Promise<void>;
   /** Flag a payment as disputed, or withdraw it (#6209); with `canEdit`, shows Dispute. */
   onDisputePayout?: (payoutId: string, disputed: boolean) => Promise<void>;
+  /** The Pop Sharing opt-out (#6222): false stops the pops being shared. With `canEdit`, it changes. */
+  onSetPopSharing?: (share: boolean) => Promise<void>;
   /** Whose token the payee name search runs under; with `onSetPayee`, shows Change. */
   characterId?: number;
   onSetPayee?: (payee: Payee, name: string) => Promise<void>;
@@ -509,6 +563,13 @@ export function MoonOwnerView({
                 {...(labelEdit ? { edit: labelEdit } : {})}
               />
             </>
+          )}
+          {!ended && (
+            <PopSharingSwitch
+              name={name}
+              share={view.summary.popSharingOptedOut !== true}
+              {...(canEdit && onSetPopSharing ? { onChange: onSetPopSharing } : {})}
+            />
           )}
           {state === 'normal' && (
             <Panel title={t('corpTaxBook.moons.ownerView.paymentsAndRate')}>

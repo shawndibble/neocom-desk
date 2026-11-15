@@ -182,6 +182,62 @@ export async function disputeFeederPayout(
   return { ok: true };
 }
 
+export interface SetFeederPopSharingInput extends FeederCall {
+  /** True lets the accounting corporation share this moon owner's pop schedule (the default). */
+  share: boolean;
+}
+
+export function parseSetFeederPopSharingInput(data: unknown): SetFeederPopSharingInput {
+  const call = parseFeederCall(data);
+  const d = record(data);
+  if (typeof d.share !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'share must be true or false');
+  }
+  return { ...call, share: d.share };
+}
+
+/**
+ * The moon owner's Pop Sharing opt-out (#6222): one switch for all its moons, on by default.
+ * Off stops its pops at once; the book's settings for those moons are kept and apply again
+ * when it opts back in. Audited in the book's history.
+ */
+export async function setFeederPopSharing(
+  deps: CorpSyncDeps,
+  caller: Caller,
+  input: SetFeederPopSharingInput
+): Promise<{ ok: true }> {
+  const ctx = await authorizeFeederCaller(deps, caller, input, 'edit');
+  if (!ctx)
+    fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
+  const ref = feederRef(deps.db, ctx.collectorCorporationId, input.corporationId);
+  const changed = await deps.db.runTransaction(async (tx) => {
+    const rec = (await tx.get(ref)).data() as FeederRecord | undefined;
+    if (!rec || (rec.status !== 'active' && rec.status !== 'pending-removal')) {
+      fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
+    }
+    if ((rec.popSharingOptOut === undefined) === input.share) return false;
+    tx.update(ref, {
+      popSharingOptOut: input.share ? FieldValue.delete() : { by: ctx.callerId, at: deps.now() },
+    });
+    appendAudit(
+      tx,
+      feederBookDeps(deps),
+      ctx.collectorCorporationId,
+      { characterId: ctx.callerId, name: 'Moon owner' },
+      'feederPopSharingSet',
+      { feederCorporationId: input.corporationId, share: input.share }
+    );
+    return true;
+  });
+  if (changed)
+    await tryRebuildFeederView(
+      feederBookDeps(deps),
+      ctx.collectorCorporationId,
+      input.corporationId
+    );
+  return { ok: true };
+}
+
 const ENDED: readonly FeederRecord['status'][] = ['left', 'removed', 'disconnected'];
 
 /** The moon owner's officers dismiss the after-leaving view; it stays dismissed. */

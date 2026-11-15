@@ -29,6 +29,16 @@ import {
   type StatementDays,
 } from './corpTaxBookEngine.js';
 import { UNCOUNTED_LIMIT, type UncountedDonation } from './corpTaxBookSyncEngine.js';
+import {
+  MAX_POP_AUDIENCES,
+  MAX_POP_NOTES,
+  POP_SHARING_KEYS,
+  POP_TIMES,
+  audienceKey,
+  type PopAudience,
+  type PopSharingOverridePatch,
+  type PopSharingSettings,
+} from './popSharing.js';
 
 /** The Tax Book lives under the `corps/{id}` umbrella (issue #4858, ADR 0026). */
 export const BOOKS_COLLECTION = 'corps';
@@ -55,6 +65,8 @@ export const STATEMENT_LINKS = 'statementLinks';
 export const MINERS = 'miners';
 export const META = 'meta';
 export const PAID_DOC = 'paid';
+/** Doc under `meta`: the scheduled sync's public status (ADR 0025); `status: 'active'` is Automatic sync on. */
+export const SCHEDULED_SYNC_DOC = 'scheduledSync';
 /** Doc under `meta`: the donations a sync noted in divisions the book does not read (#6207). */
 export const UNCOUNTED_DOC = 'uncounted';
 /** How many "not tax" answers to uncounted donations the doc keeps, so a sync never re-notes them. */
@@ -536,6 +548,10 @@ export type EditAction =
       reason?: string;
     }
   | { action: 'recordReminder'; statementId: string }
+  /** Pop Sharing (#6222): the switch and the Sharing default. Turning it on needs Automatic sync. */
+  | { action: 'setPopSharing'; enabled?: boolean; defaults?: Partial<PopSharingSettings> }
+  /** One moon's overrides; null returns a setting to the Sharing default. */
+  | { action: 'setPopSharingMoon'; moonId: number; override: PopSharingOverridePatch }
   | {
       action: 'recordMail';
       statementId: string;
@@ -621,6 +637,8 @@ export function parseEditAction(data: unknown): EditAction {
     'resolveDeclaration',
     'recordReminder',
     'recordMail',
+    'setPopSharing',
+    'setPopSharingMoon',
   ] as const);
   switch (action) {
     case 'addRate':
@@ -794,6 +812,35 @@ export function parseEditAction(data: unknown): EditAction {
     }
     case 'recordReminder':
       return { action, statementId: docId(d.statementId, 'statementId') };
+    case 'setPopSharing': {
+      if (d.enabled !== undefined && typeof d.enabled !== 'boolean')
+        throw new HttpsError('invalid-argument', 'enabled must be true or false');
+      const defaults = d.defaults === undefined ? undefined : popSettingsPatch(d.defaults, false);
+      if (defaults && Object.keys(defaults).length === 0)
+        throw new HttpsError('invalid-argument', 'nothing to change');
+      if (d.enabled === undefined && defaults === undefined)
+        throw new HttpsError('invalid-argument', 'nothing to change');
+      return {
+        action,
+        ...(d.enabled === undefined ? {} : { enabled: d.enabled }),
+        ...(defaults ? { defaults } : {}),
+      };
+    }
+    case 'setPopSharingMoon': {
+      const set = d.set === undefined ? {} : popSettingsPatch(d.set, true);
+      const clear = [
+        ...new Set(
+          list(d.clear ?? [], 'clear', POP_SHARING_KEYS.length).map((k) =>
+            oneOf(k, 'clear', POP_SHARING_KEYS)
+          )
+        ),
+      ];
+      if (Object.keys(set).length + clear.length === 0)
+        throw new HttpsError('invalid-argument', 'nothing to change');
+      if (clear.some((k) => k in set))
+        throw new HttpsError('invalid-argument', 'a setting cannot be set and cleared');
+      return { action, moonId: int(d.moonId, 'moonId'), override: { set, clear } };
+    }
     case 'recordMail':
       return {
         action,
@@ -802,6 +849,63 @@ export function parseEditAction(data: unknown): EditAction {
         kind: oneOf(d.kind, 'kind', ['statement', 'reminder'] as const),
       };
   }
+}
+
+function popAudience(raw: unknown): PopAudience {
+  const a = record(raw);
+  const kind = oneOf(a.kind, 'audience.kind', ['corp', 'alliance', 'community'] as const);
+  if (kind !== 'community') return { kind };
+  return {
+    kind,
+    communityId: docId(a.communityId, 'communityId'),
+    name: boundedString(a.name, 'community name', 100),
+  };
+}
+
+/**
+ * Pop Sharing settings from a client (#6222): only known settings, each validated. A null
+ * `ratePct` is the book's own rate.
+ */
+function popSettingsPatch(raw: unknown, allowEmpty: boolean): Partial<PopSharingSettings> {
+  const p = record(raw);
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(p)) {
+    if (!(POP_SHARING_KEYS as readonly string[]).includes(key))
+      throw new HttpsError('invalid-argument', `unknown setting ${key}`);
+  }
+  for (const key of POP_SHARING_KEYS) {
+    const v = p[key];
+    if (v === undefined) continue;
+    switch (key) {
+      case 'audiences': {
+        const audiences = list(v, 'audiences', MAX_POP_AUDIENCES).map(popAudience);
+        if (new Set(audiences.map(audienceKey)).size !== audiences.length)
+          throw new HttpsError('invalid-argument', 'an audience is listed twice');
+        out.audiences = audiences;
+        break;
+      }
+      case 'popTime':
+        out.popTime = oneOf(v, 'popTime', POP_TIMES);
+        break;
+      case 'showOre':
+        if (typeof v !== 'boolean')
+          throw new HttpsError('invalid-argument', 'showOre must be true or false');
+        out.showOre = v;
+        break;
+      case 'ratePct':
+        out.ratePct = v === null ? null : pctField(v, 'ratePct');
+        break;
+      case 'notes': {
+        if (typeof v !== 'string' || v.trim().length > MAX_POP_NOTES)
+          throw new HttpsError('invalid-argument', `notes must be 0-${MAX_POP_NOTES} characters`);
+        out.notes = v.trim();
+        break;
+      }
+    }
+  }
+  if (!allowEmpty && Object.keys(out).length === 0)
+    throw new HttpsError('invalid-argument', 'nothing to change');
+  return out as Partial<PopSharingSettings>;
 }
 
 /** The Statement fields the book relies on; the rest of the engine's shape is stored as given. */

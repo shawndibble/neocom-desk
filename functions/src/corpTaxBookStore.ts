@@ -40,6 +40,7 @@ import {
   FEEDER_PREVIOUS_COLLECTION,
   MEMBER_SETUP_MS,
   META,
+  SCHEDULED_SYNC_DOC,
   MINERS,
   OBSERVED,
   OFFICERS,
@@ -98,6 +99,7 @@ import { VETTING_COLLECTIONS } from './vettingTypes.js';
 import { isMissingIndex } from './indexedSweep.js';
 import { FEEDER_OBSERVED, rollupChanges, writeRollupChanges } from './corpTaxBookFeederRollup.js';
 import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
+import { POP_SHARING_DOC, applyMoonOverride, popSharingFrom } from './popSharing.js';
 import { editScope } from './corpTaxBookMinerTotals.js';
 import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
 import { pullsOfDays, refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
@@ -1534,7 +1536,48 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         detail: { statementId: action.statementId, mailId: action.mailId, kind: action.kind },
       };
     }
+    case 'setPopSharing':
+    case 'setPopSharingMoon':
+      return applyPopSharingEdit(c, action);
   }
+}
+
+/**
+ * Pop Sharing settings (#6222): the switch, the Sharing default and Moon overrides, in
+ * `meta/popSharing`. Turning sharing on needs Automatic sync running; a Moon override must
+ * name a moon the book has an Extraction for (its own or a moon owner's).
+ */
+async function applyPopSharingEdit(
+  c: EditCtx,
+  action: Extract<EditAction, { action: 'setPopSharing' | 'setPopSharingMoon' }>
+): Promise<EditOutcome> {
+  const ref = col(c, META).doc(POP_SHARING_DOC);
+  const current = popSharingFrom((await c.tx.get(ref)).data());
+  const next = { ...current, moons: { ...current.moons } };
+  let detail: Data;
+  if (action.action === 'setPopSharing') {
+    if (action.enabled === true && !current.enabled) {
+      const sync = (await c.tx.get(col(c, META).doc(SCHEDULED_SYNC_DOC))).data();
+      if (sync?.status !== 'active')
+        fail('failed-precondition', 'Pop Sharing needs Automatic sync', 'needs-automatic-sync');
+    }
+    if (action.enabled !== undefined) next.enabled = action.enabled;
+    if (action.defaults) next.defaults = { ...current.defaults, ...action.defaults };
+    detail = {
+      ...(action.enabled === undefined ? {} : { enabled: action.enabled }),
+      ...(action.defaults ? { defaults: action.defaults } : {}),
+    };
+  } else {
+    const known = await c.tx.get(col(c, EXTRACTIONS).where('moonId', '==', action.moonId).limit(1));
+    if (known.empty) fail('not-found', 'This book has no such moon', 'unknown-moon');
+    const key = String(action.moonId);
+    const override = applyMoonOverride(current.moons[key], action.override);
+    if (override) next.moons[key] = override;
+    else delete next.moons[key];
+    detail = { moonId: action.moonId, set: action.override.set, clear: action.override.clear };
+  }
+  c.tx.set(ref, { ...next, updatedAt: c.now, updatedBy: c.access.characterId });
+  return { detail };
 }
 
 /** Stores an issued Statement and its verify link; returns the link's token. Reads nothing: callers check first. */

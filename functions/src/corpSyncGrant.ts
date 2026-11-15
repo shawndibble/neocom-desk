@@ -22,6 +22,7 @@ import { BOOK_SYNC_CRON } from './corpTaxBookSchedule.js';
 import {
   FEEDER_OF_COLLECTION,
   META,
+  SCHEDULED_SYNC_DOC,
   decideRoles,
   parseBookCall,
   OFFICERS,
@@ -73,7 +74,7 @@ import {
 } from './corpSyncStoppedAlert.js';
 
 export const CORP_SYNC_GRANTS_COLLECTION = 'corpTaxBookSyncGrants';
-export const SCHEDULED_SYNC_DOC = 'scheduledSync';
+export { SCHEDULED_SYNC_DOC };
 
 export { CORP_SYNC_SCOPES };
 

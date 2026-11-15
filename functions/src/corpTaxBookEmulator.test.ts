@@ -1589,4 +1589,74 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(await miner()).toMatchObject({ closeCredit: { disposition: 'forfeit' } });
     });
   });
+
+  describe('Pop Sharing settings (#6222)', () => {
+    const popSharing = async () => (await book().collection('meta').doc('popSharing').get()).data();
+    const automaticSync = (status: 'active' | 'stopped') =>
+      book().collection('meta').doc('scheduledSync').set({ status });
+    const moon = () =>
+      book().collection('extractions').doc('1000_1').set({ structureId: 1000, moonId: 7 });
+
+    it('refuses turning sharing on without Automatic sync, and allows it with', async () => {
+      await turnOn();
+      expect(await reason(edit(ACCOUNTANT, { action: 'setPopSharing', enabled: true }))).toBe(
+        'needs-automatic-sync'
+      );
+      await automaticSync('stopped');
+      expect(await reason(edit(ACCOUNTANT, { action: 'setPopSharing', enabled: true }))).toBe(
+        'needs-automatic-sync'
+      );
+      await automaticSync('active');
+      await edit(ACCOUNTANT, { action: 'setPopSharing', enabled: true });
+      expect(await popSharing()).toMatchObject({ enabled: true, updatedBy: ACCOUNTANT });
+    });
+
+    it('lets an editor set the default and a Moon override, and keeps each in the history', async () => {
+      await turnOn();
+      await moon();
+      await edit(ACCOUNTANT, {
+        action: 'setPopSharing',
+        defaults: { popTime: 'auto-fracture', notes: 'Comms in Discord' },
+      });
+      await edit(ACCOUNTANT, {
+        action: 'setPopSharingMoon',
+        moonId: 7,
+        set: { showOre: false, ratePct: 5 },
+      });
+      await edit(ACCOUNTANT, {
+        action: 'setPopSharingMoon',
+        moonId: 7,
+        clear: ['ratePct'],
+      });
+      expect(await popSharing()).toMatchObject({
+        enabled: false,
+        defaults: { popTime: 'auto-fracture', notes: 'Comms in Discord', showOre: true },
+        moons: { '7': { showOre: false } },
+      });
+      const audit = (await book().collection('audit').get()).docs.map((d) => d.data());
+      expect(audit).toContainEqual(
+        expect.objectContaining({
+          action: 'setPopSharingMoon',
+          by: ACCOUNTANT,
+          detail: { moonId: 7, set: {}, clear: ['ratePct'] },
+        })
+      );
+      expect(audit).toContainEqual(
+        expect.objectContaining({ action: 'setPopSharing', by: ACCOUNTANT })
+      );
+    });
+
+    it('refuses a read-only officer, and a moon the book does not handle', async () => {
+      await turnOn();
+      expect(
+        await reason(edit(JUNIOR, { action: 'setPopSharing', defaults: { notes: 'x' } }))
+      ).toBe('role-required');
+      expect(
+        await reason(
+          edit(ACCOUNTANT, { action: 'setPopSharingMoon', moonId: 99, set: { notes: 'x' } })
+        )
+      ).toBe('unknown-moon');
+      expect(await popSharing()).toBeUndefined();
+    });
+  });
 });

@@ -549,6 +549,8 @@ export interface BookFeeder extends FeederReadClock {
   refineryStructures?: Record<string, StoredRefineryStructure>;
   /** The moon owner's grant reads refinery names (#4654); absent on a grant from before. */
   readsStructureNames?: boolean;
+  /** The moon owner turned Pop Sharing off for its moons (#6222); absent is sharing allowed. */
+  popSharingOptOut?: { by: number; at: number };
   payouts: FeederPayoutRow[];
 }
 
