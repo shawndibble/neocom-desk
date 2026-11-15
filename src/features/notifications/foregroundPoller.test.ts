@@ -299,6 +299,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     communities: async () => [],
     vetting: async () => [],
     corpTaxBookSync: async () => [],
+    sharedMoonPops: async () => [],
     orderExpiry: async () => [],
     marketOrderUndercut: loadMarketOrderUndercut,
   };
@@ -331,6 +332,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     communities: domainState(undefined, undefined),
     vetting: domainState(undefined, undefined),
     corpTaxBookSync: domainState(undefined, undefined),
+    sharedMoonPops: domainState(undefined, undefined),
     marketOrderUndercut: domainState(undefined, undefined),
     orderExpiry: domainState(undefined, undefined),
   };

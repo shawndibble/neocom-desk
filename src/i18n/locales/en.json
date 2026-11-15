@@ -12580,6 +12580,13 @@
         "title": "Skill queue ending soon",
         "body": "{{character}}'s skill queue will run dry in under {{hours}} hours."
       },
+      "sharedMoonPop": {
+        "title": "Moon pop · {{refinery}}",
+        "titleUnnamed": "Moon pop",
+        "body": "{{popTime}} at {{when}} · taxed by {{corporation}} · {{rate}}%",
+        "ready": "Ready",
+        "autoFracture": "Auto-fracture"
+      },
       "acceleratorExpiring": {
         "title": "Accelerator running out soon",
         "body_one": "{{character}}'s cerebral accelerator should run out in about {{count}} hour.",
@@ -14973,6 +14980,7 @@
         "skillQueueEnding": "Skill queue ending",
         "acceleratorExpiring": "Accelerator expiring",
         "acceleratorEnded": "Accelerator ended",
+        "sharedMoonPop": "Shared moon pop",
         "omegaLapsed": "Omega may have ended",
         "spExtractionReady": "SP extraction ready",
         "industryJobComplete": "Industry job complete",
@@ -15056,6 +15064,12 @@
       "acceleratorExpiringLeadTimeLabel": "Warn this far before an accelerator runs out:",
       "acceleratorExpiringLeadTimeOption_one": "{{count}} hour",
       "acceleratorExpiringLeadTimeOption_other": "{{count}} hours",
+      "sharedMoonPopLeadTimeLabel": "Tell me this far before a shared moon pop:",
+      "sharedMoonPopLeadTimeOption_zero": "At the pop time",
+      "sharedMoonPopLeadTimeOption_one": "{{count}} minutes before",
+      "sharedMoonPopLeadTimeOption_other": "{{count}} minutes before",
+      "sharedMoonPopMutes": "Corporations sharing moon pops with you",
+      "sharedMoonPopMuteLabel": "Mute {{corporation}}",
       "shipLostMinimumIskLabel": "Minimum loss value (ISK):",
       "shipLostMinimumIskHint": "Leave at 0 to hear about every loss. Shorthand works: 500m, 1.5b (b billion, m million, t thousand). Read from zKillboard while the app is open.",
       "incursionNearbyJumpsLabel": "Alert when an Incursion is within:",

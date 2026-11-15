@@ -156,6 +156,22 @@ const VALID_RAW = rawFcmPayload({
 });
 
 describe('handlePush', () => {
+  it('opens a Shared Moon Pop on the Calendar, read off its Occurrence Key (issue #6225)', async () => {
+    const e = env();
+    const raw = rawFcmPayload({
+      characterId: '12345',
+      eventId: 'sharedMoonPop',
+      occurrenceKey: 'sharedMoonPop:98000001_1035_1762900000000:1763200000000:0',
+      title: 'Moon pop · Efa - Moon Drill',
+      body: 'Ready at 14:00 · taxed by Moon Collectors · 10%',
+    });
+    await handlePush(e, raw, Date.now());
+    const [, options] = vi.mocked(e.showNotification).mock.calls[0];
+    expect((options.data as { url: string }).url).toBe(
+      '/calendar?pop=98000001_1035_1762900000000&character=12345'
+    );
+  });
+
   it('shows a notification carrying the payload title and body', async () => {
     const e = env();
     await handlePush(e, VALID_RAW, Date.now());

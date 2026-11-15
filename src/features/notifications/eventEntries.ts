@@ -139,6 +139,9 @@ import {
   diffCharacterNeedsLogin,
   type CharacterNeedsLoginFire,
   type SignInSnapshot,
+  diffSharedMoonPop,
+  type SharedMoonPopFire,
+  type SharedMoonPopSnapshot,
 } from '@/engine/notificationDiffs';
 import type { NotificationCopy } from '@/engine/notificationWording';
 import type { ProjectableEventId, PushCopy } from '@/engine/projection';
@@ -178,6 +181,8 @@ import {
   communityRequestPledgedCopy,
   vettingSharedCopy,
   corpTaxBookSyncStoppedCopy,
+  sharedMoonPopCopy,
+  type SharedMoonPopNames,
   type IncursionNames,
   type DomainCopy,
   type NoNames,
@@ -238,7 +243,8 @@ export type AnyNotificationFire =
   | CommunityMemberJoinedFire
   | CommunityRequestPledgedFire
   | VettingSharedFire
-  | CorpTaxBookSyncStoppedFire;
+  | CorpTaxBookSyncStoppedFire
+  | SharedMoonPopFire;
 
 /* -------------------------------------------------------------------------- */
 /* Snapshot sources                                                            */
@@ -291,6 +297,7 @@ export const SNAPSHOT_SOURCES = {
   signIn: source<SignInSnapshot>('signIn'),
   vetting: source<VettingAlertSnapshot>('vetting'),
   corpTaxBookSync: source<SyncStoppedAlertSnapshot>('corpTaxBookSync'),
+  sharedMoonPops: source<SharedMoonPopSnapshot, SharedMoonPopNames>('sharedMoonPops'),
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -516,6 +523,16 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     projection: null,
     thresholds: { fields: [THRESHOLD_FIELDS.mercenaryDenAnarchyPercent], hintKey: null },
     rowHintKey: 'settings.notifications.mercenaryDenAnarchyForegroundOnlyHint',
+  }),
+  // Shared Pops another corporation's book shares (issue #6225): projected, so a closed app is
+  // told at the Pop Time or the Character's lead time before it.
+  sharedMoonPop: defineEvent({
+    source: SNAPSHOT_SOURCES.sharedMoonPops,
+    diff: diffSharedMoonPop,
+    copy: sharedMoonPopCopy,
+    projection: { push: sharedMoonPopCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.sharedMoonPopLeadMinutes], hintKey: null },
+    rowHintKey: null,
   }),
   marketOrderFilled: defineEvent({
     source: SNAPSHOT_SOURCES.marketOrders,

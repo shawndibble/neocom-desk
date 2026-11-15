@@ -171,6 +171,13 @@ const CATALOG = [
     scope: requiredScope('getCharacterMercenaryDens'),
   },
   {
+    // Shared Pops another corporation's Corp Tax Book shares (issue #6225). Read through the
+    // backend with the Characters' own sign-in, so no Permission gates it.
+    id: 'sharedMoonPop',
+    labelKey: 'settings.notifications.event.sharedMoonPop',
+    defaultChannels: 'both',
+  },
+  {
     id: 'marketOrderFilled',
     labelKey: 'settings.notifications.event.marketOrderFilled',
     defaultChannels: 'feedOnly',

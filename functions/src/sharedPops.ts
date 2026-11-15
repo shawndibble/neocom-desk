@@ -86,6 +86,12 @@ export type SharedPopView = Omit<SharedPop, 'audiences'> & {
   /** The book's corporation: the start link's payee, and the filter by sharing corporation. */
   corporationId: number;
   syncedAt: number | null;
+  /**
+   * Which of the caller's own Characters are in one of the pop's audiences, so the Shared Moon
+   * Pop notification goes to those Characters only (issue #6225). Absent from a server deployed
+   * before it existed: every Character then counts.
+   */
+  viewerCharacterIds?: number[];
 };
 
 /** The `sharedPops/{corporationId}` doc. */
@@ -236,6 +242,15 @@ export function inAudience(doc: SharedPopsDoc, pop: SharedPop, viewer: ViewerAcc
       return doc.allianceId !== null && viewer.allianceIds.has(doc.allianceId);
     return key.startsWith('community:') && viewer.communityIds.has(key.slice('community:'.length));
   });
+}
+
+/** The caller's Characters that are in one of a pop's audiences, each judged on its own access. */
+export function audienceCharacters(
+  doc: SharedPopsDoc,
+  pop: SharedPop,
+  characters: readonly { characterId: number; access: ViewerAccess }[]
+): number[] {
+  return characters.filter((c) => inAudience(doc, pop, c.access)).map((c) => c.characterId);
 }
 
 /** The pops of one book a viewer may read, still live at `now`. */

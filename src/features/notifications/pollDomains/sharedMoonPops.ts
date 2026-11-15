@@ -1,0 +1,132 @@
+import type {
+  SharedMoonPopEntrySnapshot,
+  SharedMoonPopFire,
+  SharedMoonPopSnapshot,
+} from '@/engine/notificationDiffs';
+import { projectSharedMoonPops } from '@/engine/projection';
+import { MINUTE_MS } from '@/lib/age';
+import { formatCalendarTimestamp } from '@/lib/timestamp';
+import { timeZoneFor, useTimeFormat } from '@/lib/timeFormat';
+import { resolveNames } from '@/features/character/names';
+import type { SharedPopView } from '@/sync/sharedPops';
+import type { SharedMoonPopNames } from '../domainCopy';
+import { NOTIFICATION_EVENT_ENTRIES, SNAPSHOT_SOURCES } from '../eventEntries';
+import {
+  hydrateNotificationPreferences,
+  mutedSharedPopCorporations,
+  useNotificationPreferences,
+} from '../preferences';
+import { loadSharedPopsCached } from '../sharedPopsCache';
+import { is, shapeGuard } from '../snapshotShape';
+import { defineDomain } from './defineDomain';
+import { currentThresholds } from './shared';
+
+/* Shared Moon Pop (issue #6225) ------------------------------------------------ */
+
+const isSharedMoonPopEntry = shapeGuard<SharedMoonPopEntrySnapshot>({
+  popId: is.string,
+  corporationId: is.number,
+  refineryName: is.nullable(is.string),
+  popTime: is.oneOf(['ready', 'auto-fracture'] as const),
+  popAtMs: is.number,
+  ratePct: is.number,
+  leadMs: is.number,
+});
+
+/**
+ * The Shared Pops one Character is told about: those the server says that Character is in an
+ * audience for (`viewerCharacterIds`; a server deployed before it existed sends none, and every
+ * Character then counts), from a sharing corporation not muted, with a readable Pop Time.
+ */
+export function sharedMoonPopEntries(
+  pops: readonly SharedPopView[],
+  characterId: number,
+  leadMs: number,
+  muted: ReadonlySet<number>
+): SharedMoonPopEntrySnapshot[] {
+  return pops.flatMap((pop) => {
+    const popAtMs = Date.parse(pop.popAt);
+    if (!Number.isFinite(popAtMs) || muted.has(pop.corporationId)) return [];
+    if (pop.viewerCharacterIds !== undefined && !pop.viewerCharacterIds.includes(characterId))
+      return [];
+    return [
+      {
+        popId: pop.id,
+        corporationId: pop.corporationId,
+        refineryName: pop.refineryName,
+        popTime: pop.popTime,
+        popAtMs,
+        ratePct: pop.ratePct,
+        leadMs,
+      },
+    ];
+  });
+}
+
+async function currentMuted(): Promise<ReadonlySet<number>> {
+  await hydrateNotificationPreferences();
+  return mutedSharedPopCorporations(useNotificationPreferences.getState().value);
+}
+
+async function currentLeadMs(characterId: number): Promise<number> {
+  return (await currentThresholds(characterId)).sharedMoonPopLeadMinutes * MINUTE_MS;
+}
+
+/** The Pop Time in the pilot's chosen clock, read from the store as the calendar domain does. */
+function popTimeLabel(ms: number): string {
+  return formatCalendarTimestamp(new Date(ms), timeZoneFor(useTimeFormat.getState().value));
+}
+
+/** Sharing corporations' names; best-effort, an unresolved one falls back to its id in the copy. */
+async function corporationNames(ids: readonly number[]): Promise<ReadonlyMap<number, string>> {
+  return resolveNames([...new Set(ids)]).catch(() => new Map<number, string>());
+}
+
+/**
+ * One cached read of every Shared Pop the device's Characters may see (`sharedPopsCache.ts`),
+ * split per Character. A failed read skips the poll (`null`) rather than writing an empty
+ * baseline. The Character's lead time and the account's mutes are baked in at load for the diff,
+ * and read afresh for the Projection, so a Settings change reaches the next upload.
+ */
+export const sharedMoonPopDomain = defineDomain<
+  SharedMoonPopEntrySnapshot,
+  SharedMoonPopSnapshot,
+  SharedMoonPopFire,
+  SharedMoonPopNames
+>({
+  source: SNAPSHOT_SOURCES.sharedMoonPops,
+  stateKey: 'notifications.pollerState.sharedMoonPops',
+  entriesKey: 'entries',
+  isEntry: isSharedMoonPopEntry,
+  load: async (characterId) => {
+    const pops = await loadSharedPopsCached().catch(() => null);
+    if (pops === null) return null;
+    return sharedMoonPopEntries(
+      pops,
+      characterId,
+      await currentLeadMs(characterId),
+      await currentMuted()
+    );
+  },
+  toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
+  projection: async (characterId, characterName, snapshot, nowMs) => {
+    const [leadMs, muted, corporations] = await Promise.all([
+      currentLeadMs(characterId),
+      currentMuted(),
+      corporationNames(snapshot.entries.map((entry) => entry.corporationId)),
+    ]);
+    return projectSharedMoonPops(
+      characterId,
+      characterName,
+      snapshot.entries.map((entry) => ({ ...entry, leadMs })),
+      muted,
+      { corporations, when: popTimeLabel },
+      NOTIFICATION_EVENT_ENTRIES.sharedMoonPop.projection.push,
+      nowMs
+    );
+  },
+  names: async (fire) => ({
+    corporation: (await corporationNames([fire.corporationId])).get(fire.corporationId),
+    when: popTimeLabel(fire.popAtMs),
+  }),
+});

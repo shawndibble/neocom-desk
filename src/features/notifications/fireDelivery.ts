@@ -10,7 +10,7 @@ import type { ContractNotificationFire } from '@/engine/notificationDiffs';
 import { renderNotification, notificationSubjectId, type AnyNotificationFire } from './pollDomains';
 import { recordFeedEntryAndSync } from './feedSync';
 import { displayPageNotification, livePageDisplayEnv } from './display';
-import { notificationOptionsFor } from './notificationOptions';
+import { notificationOptionsFor, occurrencePath } from './notificationOptions';
 import type { CharacterRef } from './foregroundPoller';
 
 /**
@@ -31,6 +31,7 @@ export async function sendBrowserNotification(
   override?: { title: string; body: string }
 ): Promise<void> {
   const { title, body } = override ?? (await renderNotification(fire, character.name));
+  const path = occurrencePath(fire.eventId, occurrenceKey(fire, Date.now()));
   await displayPageNotification(
     livePageDisplayEnv(),
     title,
@@ -39,6 +40,7 @@ export async function sendBrowserNotification(
         eventId: fire.eventId,
         characterId: character.characterId,
         subjectId: notificationSubjectId(fire),
+        ...(path === undefined ? {} : { path }),
       },
       body
     )

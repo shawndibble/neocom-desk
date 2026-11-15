@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { popSharingFrom, type PopSharingDoc } from './popSharing.js';
 import {
   OFFICER_WINDOW_MS,
+  audienceCharacters,
   bookRatePctFor,
   buildSharedPops,
   editorStampsFrom,
@@ -224,6 +225,17 @@ describe('visiblePops', () => {
 
   it('drops a pop once it is Expired, even before the next publish', () => {
     expect(ids(viewer({ corporationIds: new Set([98000001]) }), at(DECAY, 48))).toEqual([]);
+  });
+
+  it("names which of the viewer's Characters are in each pop's audience (issue #6225)", () => {
+    const characters = [
+      { characterId: 1, access: viewer({ corporationIds: new Set([98000001]) }) },
+      { characterId: 2, access: viewer({ allianceIds: new Set([99000001]) }) },
+      { characterId: 3, access: viewer({ communityIds: new Set(['c1']) }) },
+    ];
+    const [corpPop, alliancePop] = doc.pops;
+    expect(audienceCharacters(doc, corpPop, characters)).toEqual([1]);
+    expect(audienceCharacters(doc, alliancePop, characters)).toEqual([2, 3]);
   });
 });
 

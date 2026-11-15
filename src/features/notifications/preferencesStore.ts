@@ -70,6 +70,12 @@ export interface NotificationPreferencesValue {
    * device preference — see `syncedPreferences.ts`.
    */
   thresholdsByCharacter?: Record<number, CharacterEventThresholds>;
+  /**
+   * Sharing corporations whose Shared Moon Pops this account does not want (issue #6225): one
+   * list for every Character, since a pilot mutes the corporation, not a Character's view of it.
+   * Synced with the feed slice. Absent means none muted.
+   */
+  mutedSharedPopCorporations?: number[];
 }
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferencesValue = {
@@ -123,6 +129,18 @@ function isOptionalBoolean(raw: unknown): boolean {
 
 const isThresholdsByCharacter = recordByCharacterId(isCharacterEventThresholds);
 
+/** A list of corporation ids, as `mutedSharedPopCorporations` stores. */
+export function isCorporationIdList(raw: unknown): raw is number[] {
+  return Array.isArray(raw) && raw.every((id) => Number.isSafeInteger(id));
+}
+
+/** The sharing corporations whose Shared Moon Pops are muted (issue #6225). */
+export function mutedSharedPopCorporations(
+  value: NotificationPreferencesValue
+): ReadonlySet<number> {
+  return new Set(value.mutedSharedPopCorporations ?? []);
+}
+
 function isNotificationPreferencesValue(raw: unknown): raw is NotificationPreferencesValue {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
@@ -135,7 +153,9 @@ function isNotificationPreferencesValue(raw: unknown): raw is NotificationPrefer
     isPerCharacterMap(r.perCharacter) &&
     (r.eveNotificationTypesByCharacter === undefined ||
       isEveNotificationTypesByCharacter(r.eveNotificationTypesByCharacter)) &&
-    (r.thresholdsByCharacter === undefined || isThresholdsByCharacter(r.thresholdsByCharacter))
+    (r.thresholdsByCharacter === undefined || isThresholdsByCharacter(r.thresholdsByCharacter)) &&
+    (r.mutedSharedPopCorporations === undefined ||
+      isCorporationIdList(r.mutedSharedPopCorporations))
   );
 }
 

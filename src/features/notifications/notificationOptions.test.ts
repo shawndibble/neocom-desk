@@ -9,6 +9,8 @@ import {
   notificationTagFor,
   notificationOptionsFor,
   fallbackNotificationOptions,
+  notificationUrlForSubject,
+  occurrencePath,
 } from './notificationOptions';
 
 describe('notificationUrlFor', () => {
@@ -32,6 +34,24 @@ describe('notificationUrlFor', () => {
 
   it('opens the Structures page when a structure runs low on fuel', () => {
     expect(notificationUrlFor('structureFuelLow')).toBe('/corp/structures');
+  });
+});
+
+describe('occurrencePath (issue #6225)', () => {
+  const key = 'sharedMoonPop:98000001_1035_1762900000000:1763200000000:900000';
+
+  it("opens a Shared Moon Pop's own pop on the Calendar", () => {
+    expect(occurrencePath('sharedMoonPop', key)).toBe('/calendar?pop=98000001_1035_1762900000000');
+  });
+
+  it('names no path for any other event', () => {
+    expect(occurrencePath('newMail', '7:newMail:1')).toBeUndefined();
+  });
+
+  it('lands a feed row on the pop, naming its Character', () => {
+    expect(notificationUrlForSubject('sharedMoonPop', undefined, 7, key)).toBe(
+      '/calendar?pop=98000001_1035_1762900000000&character=7'
+    );
   });
 });
 

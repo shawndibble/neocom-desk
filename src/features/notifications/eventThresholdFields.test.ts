@@ -30,6 +30,7 @@ describe('THRESHOLD_FIELDS', () => {
       'mercenaryDenAnarchyPercent',
       'skyhookRaidableLeadHours',
       'skyhookRaidableMinUnits',
+      'sharedMoonPopLeadMinutes',
     ]);
   });
 
@@ -72,6 +73,7 @@ describe('defaultedThresholds', () => {
       mercenaryDenAnarchyPercent: 50,
       skyhookRaidableLeadHours: 2,
       skyhookRaidableMinUnits: 1,
+      sharedMoonPopLeadMinutes: 0,
     });
   });
 

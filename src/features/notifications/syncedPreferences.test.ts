@@ -204,3 +204,27 @@ describe('withSyncedFeedPrefsApplied', () => {
     });
   });
 });
+
+describe('muted Shared Pop corporations (issue #6225)', () => {
+  const base: NotificationPreferencesValue = { masterEnabled: true, perCharacter: {} };
+
+  it('carries the account-wide mute list, an emptied one included', () => {
+    expect(
+      toSyncedFeedPrefs({ ...base, mutedSharedPopCorporations: [98000001] })
+        .mutedSharedPopCorporations
+    ).toEqual([98000001]);
+    expect(
+      toSyncedFeedPrefs({ ...base, mutedSharedPopCorporations: [] }).mutedSharedPopCorporations
+    ).toEqual([]);
+    expect(toSyncedFeedPrefs(base)).not.toHaveProperty('mutedSharedPopCorporations');
+  });
+
+  it('applies a synced mute list, and leaves the local one alone when the blob predates it', () => {
+    const synced = toSyncedFeedPrefs({ ...base, mutedSharedPopCorporations: [7] });
+    expect(withSyncedFeedPrefsApplied(base, synced).mutedSharedPopCorporations).toEqual([7]);
+    const local = { ...base, mutedSharedPopCorporations: [9] };
+    expect(
+      withSyncedFeedPrefsApplied(local, toSyncedFeedPrefs(base)).mutedSharedPopCorporations
+    ).toEqual([9]);
+  });
+});
