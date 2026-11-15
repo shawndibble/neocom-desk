@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { configureClipboard } from '@/lib/clipboard';
-import { App } from '@/app/App';
 import {
   CHAR_ID,
   JITA,
@@ -13,6 +12,7 @@ import {
   assetPage1,
   server,
   installAssetsHarness,
+  renderAssetsRoute,
   clickTool,
   openLocation,
   goBack,
@@ -55,7 +55,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
 
   it('shows no checkboxes in browsing mode; toggling select mode reveals them', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
 
@@ -93,7 +93,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findByRole('heading', { name: 'Drake' });
 
@@ -140,7 +140,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findByRole('heading', { name: 'Drake' });
 
@@ -165,7 +165,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
 
   it('turning off select mode clears the current selection', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
 
@@ -200,7 +200,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
     await screen.findByText('Pyerite');
@@ -241,7 +241,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
     await screen.findByText('Heavy Abyssal Energy Neutralizer');
@@ -263,7 +263,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
 
   it('has no bulk Add to Compare, and Appraise opens the appraisal with the selection', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
 
@@ -290,7 +290,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     configureClipboard(writeText);
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
     await screen.findByText('Pyerite');
@@ -320,7 +320,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     configureClipboard(writeText);
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findAllByText('Tritanium');
 
@@ -348,7 +348,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
     await screen.findByText('Pyerite');
@@ -377,7 +377,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
     await screen.findByText('Pyerite');
@@ -398,7 +398,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
 
   it('"Deselect all" is disabled until something is selected', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
 
@@ -442,7 +442,7 @@ describe('view state in the URL (issue #1306)', () => {
       )
     );
     window.history.replaceState({}, '', '/assets?all=1&min=10000');
-    render(<App />);
+    renderAssetsRoute();
 
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
@@ -459,7 +459,7 @@ describe('view state in the URL (issue #1306)', () => {
 
   it('reads the search text from the URL', async () => {
     window.history.replaceState({}, '', '/assets?q=pyerite');
-    render(<App />);
+    renderAssetsRoute();
 
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/search items/i)).toHaveValue('pyerite');
@@ -468,7 +468,7 @@ describe('view state in the URL (issue #1306)', () => {
 
   it('writes changes to the URL and drops each key once back at its default', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     expect(window.location.search).toBe('');
 
@@ -486,7 +486,7 @@ describe('view state in the URL (issue #1306)', () => {
   it('falls back to defaults for garbage values', async () => {
     window.history.replaceState({}, '', '/assets?all=yes&chars=bogus');
     await seedSecondCharacter();
-    render(<App />);
+    renderAssetsRoute();
 
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Tools' }));
@@ -501,7 +501,7 @@ describe('view state in the URL (issue #1306)', () => {
   it('keeps the query string while drilling down, and the path still resolves', async () => {
     const user = userEvent.setup({ delay: null });
     window.history.replaceState({}, '', '/assets?min=0');
-    render(<App />);
+    renderAssetsRoute();
 
     await openLocation(user, JITA);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
@@ -516,7 +516,7 @@ describe('view state in the URL (issue #1306)', () => {
 
   it('opens a drilled-in path with a query already on it', async () => {
     window.history.replaceState({}, '', '/assets/items/60003760?q=pyerite');
-    render(<App />);
+    renderAssetsRoute();
 
     // Search wins over browsing, as it does when typed.
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
@@ -527,7 +527,7 @@ describe('view state in the URL (issue #1306)', () => {
   it('leaves search when a hit is opened, so the place lists its contents', async () => {
     const user = userEvent.setup({ delay: null });
     window.history.replaceState({}, '', '/assets?q=trit&chars=current');
-    render(<App />);
+    renderAssetsRoute();
 
     await user.click(await screen.findByRole('link', { name: /Tritanium/ }));
 
@@ -540,7 +540,7 @@ describe('view state in the URL (issue #1306)', () => {
   it('puts a More actions menu at the far right of a search hit', async () => {
     const user = userEvent.setup({ delay: null });
     window.history.replaceState({}, '', '/assets?q=trit');
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByRole('link', { name: /Tritanium/ });
 
     await user.click(screen.getByRole('button', { name: /more actions/i }));
@@ -551,7 +551,7 @@ describe('view state in the URL (issue #1306)', () => {
   it('uses the synced default character filter when the URL has none, without writing it to the URL', async () => {
     await seedSecondCharacter();
     await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
-    render(<App />);
+    renderAssetsRoute();
 
     expect(await screen.findByRole('button', { name: /^All characters/ })).toBeInTheDocument();
     expect(window.location.search).toBe('');
@@ -561,7 +561,7 @@ describe('view state in the URL (issue #1306)', () => {
     await seedSecondCharacter();
     await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
     window.history.replaceState({}, '', '/assets?chars=current');
-    render(<App />);
+    renderAssetsRoute();
 
     expect(await screen.findByRole('button', { name: 'This character' })).toBeInTheDocument();
     expect((await db.settings.get('sync.defaultCharacterFilter'))?.value).toBe('all');
@@ -572,7 +572,7 @@ describe('view state in the URL (issue #1306)', () => {
     async (key) => {
       await seedSecondCharacter();
       window.history.replaceState({}, '', `/assets?${key}=${CHAR_ID_2}`);
-      render(<App />);
+      renderAssetsRoute();
 
       expect(await screen.findByText('Pilot Two only')).toBeInTheDocument();
       expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_ID);
@@ -588,7 +588,7 @@ describe('view state in the URL (issue #1306)', () => {
       )
     );
     window.history.replaceState({}, '', `/assets?char=${CHAR_ID_2}`);
-    render(<App />);
+    renderAssetsRoute();
 
     expect(await screen.findByText('Log in again to see your assets')).toBeInTheDocument();
   });
@@ -596,7 +596,7 @@ describe('view state in the URL (issue #1306)', () => {
   it('writes a picked character filter to the URL', async () => {
     const user = userEvent.setup({ delay: null });
     await seedSecondCharacter();
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
 
     await user.click(screen.getByRole('button', { name: 'This character' }));

@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import { screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
-import { App } from '@/app/App';
 import { stubViewport } from '@/test/viewport';
 import { exportRows } from '@/lib/downloadCsv';
 import {
@@ -13,6 +12,7 @@ import {
   assetPage1,
   server,
   installAssetsHarness,
+  renderAssetsRoute,
   downloadCsv,
   escapeRegExp,
 } from '@/test/assetsPage';
@@ -100,7 +100,7 @@ describe('cross-character search (issue #85)', () => {
 
   it('does not show another character’s items until "All characters" is picked', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
 
     await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
@@ -120,7 +120,7 @@ describe('cross-character search (issue #85)', () => {
 
   it('reaches other characters once "All characters" is picked, tagging the match with a character badge', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
 
     await selectAllCharacters(user);
@@ -135,7 +135,7 @@ describe('cross-character search (issue #85)', () => {
   }
 
   it('puts the one Character picker in the page header', async () => {
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     expect(
       within(pageHeader()).getByRole('button', { name: 'This character' })
@@ -154,7 +154,7 @@ describe('cross-character search (issue #85)', () => {
       scopes: [],
     });
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     await user.click(within(pageHeader()).getByRole('button', { name: 'This character' }));
     await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
@@ -177,7 +177,7 @@ describe('cross-character search (issue #85)', () => {
       })
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     await user.click(within(pageHeader()).getByRole('button', { name: 'This character' }));
     await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
@@ -229,7 +229,7 @@ describe('cross-character search (issue #85)', () => {
 
     it('opens from the Ships tab and lists only the filtered characters’ ships', async () => {
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderAssetsRoute();
       const panel = await openMyShips(user);
 
       expect(window.location.pathname).toBe('/assets/ships');
@@ -242,7 +242,7 @@ describe('cross-character search (issue #85)', () => {
 
     it('widens to every character from the page’s Character filter', async () => {
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderAssetsRoute();
       const panel = await openMyShips(user);
       await within(panel).findByText('Rifter');
 
@@ -266,7 +266,7 @@ describe('cross-character search (issue #85)', () => {
       );
       const user = userEvent.setup({ delay: null });
       window.history.replaceState({}, '', '/assets/ships');
-      render(<App />);
+      renderAssetsRoute();
       await screen.findAllByText("Couldn't load");
       const picker = within(pageHeader()).getByRole('button', { name: 'This character' });
       await user.click(picker);
@@ -289,7 +289,7 @@ describe('cross-character search (issue #85)', () => {
         scopes: [],
       });
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderAssetsRoute();
       const panel = await openMyShips(user);
       await within(panel).findByText('Rifter');
       await user.click(within(pageHeader()).getByRole('button', { name: 'This character' }));
@@ -312,7 +312,7 @@ describe('cross-character search (issue #85)', () => {
         )
       );
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderAssetsRoute();
       const panel = await openMyShips(user);
 
       expect(await within(panel).findByText('Frigate')).toBeInTheDocument();
@@ -335,7 +335,7 @@ describe('cross-character search (issue #85)', () => {
 
     it('a row’s ⋮ menu holds Show info, Show fitting, Plan route and Open location assets', async () => {
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderAssetsRoute();
       const panel = await openMyShips(user);
 
       await within(panel).findByRole('button', { name: 'Rifter' });
@@ -358,7 +358,7 @@ describe('cross-character search (issue #85)', () => {
         )
       );
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderAssetsRoute();
       const panel = await openMyShips(user);
 
       await user.click(await within(panel).findByRole('button', { name: 'Show all characters' }));
@@ -369,7 +369,7 @@ describe('cross-character search (issue #85)', () => {
 
   it('returns to single-character search once switched back to "This character"', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
 
     await selectAllCharacters(user);
@@ -403,7 +403,7 @@ describe('cross-character search (issue #85)', () => {
       })
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
 
     await selectAllCharacters(user);
@@ -419,7 +419,7 @@ describe('cross-character search (issue #85)', () => {
 
   it('no longer carries a note that CSV export leaves other characters out', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
 
     await selectAllCharacters(user);
@@ -432,7 +432,7 @@ describe('cross-character search (issue #85)', () => {
   it("exports other characters' matches too while their results are on screen", async () => {
     vi.mocked(exportRows).mockClear();
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
 
     await selectAllCharacters(user);
@@ -447,7 +447,7 @@ describe('cross-character search (issue #85)', () => {
   it('exports only what the search matches, and nothing when nothing does', async () => {
     vi.mocked(exportRows).mockClear();
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
 
     async function exportCsv() {
@@ -477,7 +477,7 @@ describe('cross-character search (issue #85)', () => {
 describe('jumps-away distance (issue #87)', () => {
   it('shows 0 jumps for a pinned location in the character’s own system', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await user.click(
       await screen.findByRole('button', {
         name: new RegExp(`More actions for ${escapeRegExp(JITA)}`),
@@ -506,7 +506,7 @@ describe('jumps-away distance (issue #87)', () => {
       updatedAt: Date.now(),
     });
 
-    render(<App />);
+    renderAssetsRoute();
 
     expect(await screen.findByText('3 jumps')).toBeInTheDocument();
   });
@@ -541,7 +541,7 @@ describe('jumps-away distance (issue #87)', () => {
       updatedAt: Date.now(),
     });
 
-    render(<App />);
+    renderAssetsRoute();
 
     expect(await screen.findByText('3 jumps')).toBeInTheDocument();
   });
@@ -556,7 +556,7 @@ describe('jumps-away distance (issue #87)', () => {
       updatedAt: Date.now(),
     });
 
-    render(<App />);
+    renderAssetsRoute();
 
     const badge = await screen.findByText('-');
     await userEvent.hover(badge);
@@ -573,7 +573,7 @@ describe('jumps-away distance (issue #87)', () => {
       )
     );
 
-    render(<App />);
+    renderAssetsRoute();
 
     // Both visible locations degrade the same way — no pin needed for either.
     const badges = await screen.findAllByText('-');
@@ -601,7 +601,7 @@ describe('jumps-away distance (issue #87)', () => {
       updatedAt: Date.now(),
     });
 
-    render(<App />);
+    renderAssetsRoute();
     // The Travel default is Prefer safer: the three jumps through high-sec Hed and Far.
     await screen.findByText('3 jumps');
 
@@ -624,7 +624,7 @@ describe('jumps-away distance (issue #87)', () => {
       const restoreViewport = stubViewport(PHONE_QUERY);
       try {
         window.history.pushState({}, '', '/assets/items/60003760');
-        render(<App />);
+        renderAssetsRoute();
 
         const jumps = await screen.findByRole('button', { name: '0 jumps' });
         expect(screen.getAllByRole('button', { name: '0 jumps' })).toHaveLength(1);
@@ -647,7 +647,7 @@ describe('jumps-away distance (issue #87)', () => {
 
     it('leaves desktop with the security and jumps cluster beside the heading', async () => {
       window.history.pushState({}, '', '/assets/items/60003760');
-      render(<App />);
+      renderAssetsRoute();
 
       const jumps = await screen.findByRole('button', { name: '0 jumps' });
       expect(screen.getAllByRole('button', { name: '0 jumps' })).toHaveLength(1);
