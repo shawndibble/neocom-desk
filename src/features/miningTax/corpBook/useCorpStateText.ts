@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ConflictCause } from '@/engine/corpTaxBook/personal';
 import type { CorpRowInfo } from './corpRows';
 
 export type PillState = 'pending' | 'billed' | 'conflict' | 'unattributed' | 'dismissed' | 'waived';
@@ -29,6 +30,14 @@ export function useCorpStateLabel() {
   );
 }
 
+/** A Conflict's tooltip says why it clashes (`ConflictCause`). */
+const CONFLICT_HINT_KEY: Record<ConflictCause, string> = {
+  otherPayee: 'conflict',
+  overListed: 'conflictOverListed',
+  ownNeedsReview: 'conflictOwnNeedsReview',
+  ownerCollected: 'conflictOwnerCollected',
+};
+
 /** Why the row reads as it does — a tooltip, never the only place it is said (§6c). */
 export function useCorpStateHint() {
   const { t } = useTranslation();
@@ -38,7 +47,11 @@ export function useCorpStateHint() {
         return t(`miningTax.corpBook.hint.${PILL_KEY[corp.state]}`, { corp: corp.corpName });
       }
       const { view, corpName } = corp;
-      return t(`miningTax.corpBook.hint.${view.state}`, {
+      const key =
+        view.state === 'conflict' && view.conflictCause !== undefined
+          ? CONFLICT_HINT_KEY[view.conflictCause]
+          : view.state;
+      return t(`miningTax.corpBook.hint.${key}`, {
         corp: corpName,
         date: resolvesOn(view.resolvesAt),
         reason: view.dismissalReason ?? '',

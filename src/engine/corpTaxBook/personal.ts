@@ -54,7 +54,15 @@ import { MINUTE_MS } from '@/lib/age';
 export type BookSettledBy = 'yourMark' | 'statement' | 'donation';
 
 export type BookRowState = 'billed' | 'conflict' | 'dismissed' | 'waived' | 'paid';
-export type ConflictCause = 'otherPayee' | 'overListed';
+/**
+ * Why a Conflict clashes. `otherPayee`: the member gave the ore to a Payee that is not this
+ * corporation's. `overListed`: the member's entry for the corporation's own Payee lists more ore
+ * than the book recorded; the Conflict is that excess only. `ownNeedsReview`: the member's own
+ * entry for the corporation needs review, so the book cannot take it yet. `ownerCollected`: a
+ * Collector's book recorded the ore at a moon owner's refinery, and the member gave it to that
+ * moon owner.
+ */
+export type ConflictCause = 'otherPayee' | 'overListed' | 'ownNeedsReview' | 'ownerCollected';
 /** A relabel of a personal row that has no Payee yet, not a row of its own. */
 export type BookLabelState = 'pending' | 'unattributed';
 
@@ -68,8 +76,8 @@ export interface PersonalAllocation {
   status: string;
   /**
    * A Default System made this and the member has not touched it: it is ore given to no Payee as far
-   * as the book is concerned, so an unpaid one is the book's to bill like a corporation's own
-   * Payee's, never a conflict.
+   * as the book is concerned, so each book takes what it recorded of an unpaid one, by quantity,
+   * like a corporation's own Payee's; the rest stays with the default Payee. Never a conflict.
    */
   releasable?: boolean;
 }
@@ -108,6 +116,11 @@ export interface PersonalBook {
    * row replaces the Payee's (`PersonalOverlay.absorbed`).
    */
   ownPayeeIds?: readonly string[];
+  /**
+   * The member's stored Payees verified as a corporation, by Payee id: the corporation's id. Tells
+   * a Collector's conflict over a moon owner's ore apart (`ConflictCause` `ownerCollected`).
+   */
+  payeeCorporations?: Readonly<Record<string, number>>;
   /** The day's prices at the book's hub and Ore Form, by raw type id (`priceObservedDay`). */
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   /** Donations the member has sent the corp that the book has not credited yet. */
@@ -187,11 +200,12 @@ export interface BookRowView {
   /** A conflict: when it resolves to the corp. */
   resolvesAt?: string;
   /**
-   * A conflict: why the two records clash. `otherPayee`: the member gave the ore to a Payee
-   * that is not this corporation's. `overListed`: the member's entry for the corporation's own
-   * Payee lists more ore than the book recorded, so it can't stand in for the book's line.
+   * A conflict: why the two records clash (`ConflictCause`). An `overListed` one is ore the book
+   * never recorded: no Statement bills it (`billed` 0) and it never resolves to the corporation.
    */
   conflictCause?: ConflictCause;
+  /** An `ownerCollected` conflict: the member's Payee that is the moon owner. */
+  ownerPayeeId?: string;
   dispute?: BookDispute;
   /** The refinery that recorded the line. */
   structureId?: number;
@@ -229,6 +243,11 @@ export interface PersonalOverlay {
    * hides those rows, the book's row stands in for them.
    */
   absorbed: Map<string, Set<string>>;
+  /**
+   * Per Mining Ledger Entry key, the Assignments the books took only part of, by id: what stays
+   * with their Payee, and the share of the Assignment's value that part keeps (at the books' prices).
+   */
+  trimmed: Map<string, Map<string, { oreLines: OreLine[]; valueShare: number }>>;
   /** Per Mining Ledger Entry key, how its remaining free ore reads. */
   labels: Map<string, { state: BookLabelState; corporationId: number; corpName: string }>;
   books: BookSummary[];
@@ -472,7 +491,8 @@ function dayValue(p: PreparedCharge): {
 }
 
 /** What is left of each of the miner's allocations for the corporation's lines to overlap. */
-type OverlapPool = { allocation: PersonalAllocation; left: Map<number, number> }[];
+type PoolItem = { allocation: PersonalAllocation; left: Map<number, number> };
+type OverlapPool = PoolItem[];
 
 const overlapPool = (allocations: readonly PersonalAllocation[]): OverlapPool =>
   allocations.map((allocation) => ({
@@ -480,11 +500,18 @@ const overlapPool = (allocations: readonly PersonalAllocation[]): OverlapPool =>
     left: new Map(sumLines(allocation.oreLines).map((l) => [l.typeId, l.quantity])),
   }));
 
+const linesOfLeft = (left: ReadonlyMap<number, number>): OreLine[] =>
+  sumLines([...left].map(([typeId, quantity]) => ({ typeId, quantity })));
+
 /**
  * The ore both the miner's allocations and one corporation line claim, capped at what the
- * line observed. Takes it out of `pool`, so each line of the day gets its own share.
+ * line observed. Takes it out of `pool`, so each line of the day gets its own share. `touching`
+ * is every allocation it took from.
  */
-function takeOverlap(pool: OverlapPool, observed: readonly OreLine[]): BookOverlap | undefined {
+function takeOverlap(
+  pool: OverlapPool,
+  observed: readonly OreLine[]
+): { overlap: BookOverlap; touching: PersonalAllocation[] } | undefined {
   const want = new Map(sumLines(observed).map((l) => [l.typeId, l.quantity]));
   const taken: OreLine[] = [];
   const touching: PersonalAllocation[] = [];
@@ -502,18 +529,44 @@ function takeOverlap(pool: OverlapPool, observed: readonly OreLine[]): BookOverl
   }
   if (touching.length === 0) return undefined;
   return {
-    payeeIds: [...new Set(touching.map((a) => a.payeeId))],
-    ore: sumLines(taken),
-    paid: touching.every((a) => a.status === 'paid'),
+    overlap: {
+      payeeIds: [...new Set(touching.map((a) => a.payeeId))],
+      ore: sumLines(taken),
+      paid: touching.every((a) => a.status === 'paid'),
+    },
+    touching,
   };
 }
 
+/** Why a conflict's contested allocations clash with the book (`ConflictCause`). */
+function causeOf(
+  touching: readonly PersonalAllocation[],
+  book: PersonalBook,
+  observed: ObservedMiningEntry
+): { cause: ConflictCause; ownerPayeeId?: string } {
+  const reviewing = (a: PersonalAllocation) =>
+    book.ownPayeeIds?.includes(a.payeeId) === true &&
+    a.status !== 'paid' &&
+    a.status !== 'outstanding';
+  if (touching.some(reviewing)) {
+    return { cause: 'ownNeedsReview' };
+  }
+  const owner = observed.sourceCorporationId;
+  const ownerPayee =
+    owner === undefined || owner === book.corporationId
+      ? undefined
+      : touching.find((a) => book.payeeCorporations?.[a.payeeId] === owner);
+  if (ownerPayee) return { cause: 'ownerCollected', ownerPayeeId: ownerPayee.payeeId };
+  return { cause: 'otherPayee' };
+}
+
 /**
- * The allocations to the corporation's own Payees, and the unpaid ones a Default System made, that
- * the book's share covers whole. They leave
- * `pool`, so they overlap nothing and conflict with nothing; their ore joins the free ore the
- * share resolves from. `paidLines` is the part the member already paid: their side is done, and the
- * corporation confirms it against its wallet. One that lists more than the corporation observed stays another Payee's.
+ * Takes, by quantity and per ore type, what the book's share covers of the allocations to the
+ * corporation's own Payees, then of the unpaid ones a Default System made. What it takes leaves
+ * `pool`, so it overlaps nothing and conflicts with nothing, and joins the free ore the share
+ * resolves from; the rest stays in `pool` for the next book in the system. `paidLines` is the part
+ * the member already paid: their side is done, and the corporation confirms it against its wallet.
+ * An allocation that needs review is the member's to sort out, not the book's to take.
  */
 function takeOwnAllocations(
   pool: OverlapPool,
@@ -522,39 +575,47 @@ function takeOwnAllocations(
 ): {
   lines: OreLine[];
   paidLines: OreLine[];
-  ids: string[];
   paidIds: string[];
-  /** An allocation to the corporation's own Payee lists more than the book observed, so it stays. */
-  overListed: boolean;
+  /** What this book took of each allocation. */
+  taken: Map<PoolItem, OreLine[]>;
 } {
-  let overListed = false;
+  const room = new Map(sumLines(share).map((l) => [l.typeId, l.quantity]));
   const lines: OreLine[][] = [];
   const paid: OreLine[][] = [];
-  const ids: string[] = [];
   const paidIds: string[] = [];
-  let room = sumLines(share);
-  for (let i = 0; i < pool.length; i++) {
-    const { allocation } = pool[i];
-    const own = ownPayeeIds?.includes(allocation.payeeId) === true;
-    const unclaimed = allocation.releasable === true && allocation.status === 'outstanding';
-    if (!(own || unclaimed) || allocation.id === undefined) continue;
-    // A row needing review is the member's to sort out, not the book's to take.
-    if (allocation.status !== 'paid' && allocation.status !== 'outstanding') continue;
-    const listed = sumLines(allocation.oreLines);
-    if (listed.some((l) => l.quantity > quantityOfTypes(room, new Set([l.typeId])))) {
-      if (own) overListed = true;
-      continue;
+  const taken = new Map<PoolItem, OreLine[]>();
+  const own = (a: PersonalAllocation) => ownPayeeIds?.includes(a.payeeId) === true;
+  const takeable = (a: PersonalAllocation) =>
+    a.id !== undefined &&
+    (own(a)
+      ? a.status === 'paid' || a.status === 'outstanding'
+      : a.releasable === true && a.status === 'outstanding');
+  // The corporation's own Payee first: that ore is the book's by the member's own word.
+  const order = [
+    ...pool.filter((item) => own(item.allocation)),
+    ...pool.filter((item) => !own(item.allocation)),
+  ];
+  for (const item of order) {
+    const { allocation } = item;
+    if (!takeable(allocation)) continue;
+    const took: OreLine[] = [];
+    for (const [typeId, quantity] of item.left) {
+      const take = Math.min(quantity, room.get(typeId) ?? 0);
+      if (take <= 0) continue;
+      item.left.set(typeId, quantity - take);
+      room.set(typeId, (room.get(typeId) ?? 0) - take);
+      took.push({ typeId, quantity: take });
     }
-    room = minusLines(room, listed);
+    if (took.length === 0) continue;
+    const listed = sumLines(took);
+    taken.set(item, listed);
     lines.push(listed);
     if (allocation.status === 'paid') {
       paid.push(listed);
-      paidIds.push(allocation.id);
+      paidIds.push(allocation.id!);
     }
-    ids.push(allocation.id);
-    pool.splice(i--, 1);
   }
-  return { lines: sumLines(...lines), paidLines: sumLines(...paid), ids, paidIds, overListed };
+  return { lines: sumLines(...lines), paidLines: sumLines(...paid), paidIds, taken };
 }
 
 /**
@@ -592,11 +653,13 @@ function disputeOf(
   entry: PersonalEntry | undefined,
   bookLines: readonly OreLine[],
   bookPct: number,
-  sameRate = true
+  sameRate = true,
+  /** The member's side to compare: the book's share of the entry when several books split it. */
+  personalLines: readonly OreLine[] | undefined = entry?.oreLines
 ): BookDispute | undefined {
-  if (!entry) return undefined;
+  if (!entry || !personalLines) return undefined;
   const types = new Set(bookLines.map((l) => l.typeId));
-  const personalQuantity = quantityOfTypes(entry.oreLines, types);
+  const personalQuantity = quantityOfTypes(personalLines, types);
   const bookQuantity = quantityOf(bookLines);
   const pcts = new Set(entry.allocations.map((a) => a.taxPct));
   const personalPct = pcts.size === 1 ? [...pcts][0] : undefined;
@@ -629,6 +692,7 @@ export function overlayCorpBooks(input: {
   const takenFromFree = new Map<string, OreLine[]>();
   const labels: PersonalOverlay['labels'] = new Map();
   const absorbed: PersonalOverlay['absorbed'] = new Map();
+  const trimmed: PersonalOverlay['trimmed'] = new Map();
   // Per book, per entry key: the ore the member already paid under the corporation's own Payee.
   const memberPaid = new Map<number, Map<string, OreLine[]>>();
   // The ids of those paid Assignments, kept so a row they paid can offer to unmark them.
@@ -658,19 +722,11 @@ export function overlayCorpBooks(input: {
     rowsByBook.set(row.corporationId, list);
   };
 
-  const buildRows = (
-    p: Prepared,
-    charge: PreparedCharge,
-    lines: readonly OreLine[],
-    conflict: { lines: OreLine[]; resolvesAt: string; cause: ConflictCause } | undefined,
-    soleBook = true,
-    day?: { lines: OreLine[]; sameRate: boolean }
-  ) => {
+  // What every row of one charge shares.
+  const commonOf = (p: Prepared, charge: PreparedCharge, value: ReturnType<typeof dayValue>) => {
     const { book } = p;
-    const value = dayValue(charge);
-    const owedLines = conflict ? minusLines(value.lines, conflict.lines) : value.lines;
     const solarSystemId = charge.entry?.solarSystemId ?? charge.observed.solarSystemId ?? 0;
-    const common = {
+    return {
       corporationId: book.corporationId,
       corpName: book.corpName,
       characterId: charge.charge.characterId,
@@ -692,10 +748,52 @@ export function overlayCorpBooks(input: {
       hubId: book.hubId,
       oreForm: book.oreForm,
     };
-    // With several books the member's entry is split among them: one book's share is not a dispute.
-    const dispute = soleBook
-      ? disputeOf(charge.entry, day?.lines ?? lines, value.taxPct, day?.sameRate ?? true)
-      : undefined;
+  };
+
+  // Ore the member listed for the corporation's own Payee beyond what any book recorded: visible,
+  // never owed, never billed, and it never resolves to the corporation (#6203).
+  const pushExcess = (
+    p: Prepared,
+    charge: PreparedCharge,
+    allocation: PersonalAllocation,
+    excess: OreLine[]
+  ) => {
+    const value = dayValue(charge);
+    const worth = computeAssignmentValue(excess, priceMap(value.unitPrices), value.taxPct);
+    pushRow({
+      ...commonOf(p, charge, value),
+      id: `${p.book.corporationId}:${charge.charge.key}:overListed:${allocation.id ?? ''}`,
+      state: 'conflict',
+      oreLines: excess,
+      estimatedValue: worth.estimatedValue,
+      taxOwed: null,
+      billed: 0,
+      conflictCause: 'overListed',
+      overlap: { payeeIds: [allocation.payeeId], ore: excess, paid: allocation.status === 'paid' },
+    });
+  };
+
+  const buildRows = (
+    p: Prepared,
+    charge: PreparedCharge,
+    lines: readonly OreLine[],
+    conflict:
+      | { lines: OreLine[]; resolvesAt: string; cause: ConflictCause; ownerPayeeId?: string }
+      | undefined,
+    day?: { lines: OreLine[]; sameRate: boolean; share?: OreLine[] }
+  ) => {
+    const { book } = p;
+    const value = dayValue(charge);
+    const owedLines = conflict ? minusLines(value.lines, conflict.lines) : value.lines;
+    const common = commonOf(p, charge, value);
+    // With several books the member's entry is split among them: each book is held to its share.
+    const dispute = disputeOf(
+      charge.entry,
+      day?.lines ?? lines,
+      value.taxPct,
+      day?.sameRate ?? true,
+      day?.share ?? charge.entry?.oreLines
+    );
     if (conflict) {
       const worth = computeAssignmentValue(
         conflict.lines,
@@ -712,6 +810,7 @@ export function overlayCorpBooks(input: {
         billed: worth.taxOwed,
         resolvesAt: conflict.resolvesAt,
         conflictCause: conflict.cause,
+        ...(conflict.ownerPayeeId !== undefined ? { ownerPayeeId: conflict.ownerPayeeId } : {}),
         ...(dispute ? { dispute } : {}),
       });
       if (owedLines.length === 0) return;
@@ -758,14 +857,30 @@ export function overlayCorpBooks(input: {
     const split = splitAcrossBooks(entry.oreLines, observations);
     let left = free.get(key) ?? [];
     const pool = overlapPool(entry.allocations);
+    // What the books took of each allocation, and the book whose own Payee it names.
+    const takenOf = new Map<PoolItem, OreLine[]>();
+    const ownedBy = new Map<PoolItem, { p: Prepared; charge: PreparedCharge }>();
     for (const p of claiming) {
       const share = split.byBook.get(String(p.book.corporationId)) ?? [];
       const here = chargesOf(p, key);
       const onStatement = here.every((c) => c.statement !== undefined);
       // What the member listed under this corporation's own Payee is the book's to bill.
       const own = takeOwnAllocations(pool, p.book.ownPayeeIds, share);
-      if (own.ids.length > 0) {
-        absorbed.set(key, new Set([...(absorbed.get(key) ?? []), ...own.ids]));
+      for (const [item, lines] of own.taken)
+        takenOf.set(item, sumLines(takenOf.get(item) ?? [], lines));
+      // Ore listed for this corporation beyond what any book took is this book's excess (below).
+      const anchor = here.find((c) => !c.dismissal);
+      if (!onStatement && anchor) {
+        for (const item of pool) {
+          const a = item.allocation;
+          if (
+            !ownedBy.has(item) &&
+            a.id !== undefined &&
+            (a.status === 'paid' || a.status === 'outstanding') &&
+            p.book.ownPayeeIds?.includes(a.payeeId) === true
+          )
+            ownedBy.set(item, { p, charge: anchor });
+        }
       }
       if (own.paidLines.length > 0) {
         const paidOf = memberPaid.get(p.book.corporationId) ?? new Map<string, OreLine[]>();
@@ -789,17 +904,15 @@ export function overlayCorpBooks(input: {
       const contested =
         onStatement || resolved.conflict.length === 0 || resolved.conflictOwed
           ? undefined
-          : {
-              lines: resolved.conflict,
-              resolvesAt: resolved.conflictResolvesAt ?? '',
-              cause: own.overListed ? ('overListed' as const) : ('otherPayee' as const),
-            };
+          : { resolvesAt: resolved.conflictResolvesAt ?? '' };
       // What the member's Payees and this book both claim, whether or not it is still a
       // conflict (on a Statement, or after 14 days, the book bills it and it is an overlap).
       let remaining = resolved.conflict;
       const day = {
         lines: sumLines(...here.map((c) => c.oreLines)),
         sameRate: new Set(here.map((c) => dayValue(c).taxPct)).size <= 1,
+        // With several books the member's entry is split: each is held to its own share.
+        ...(claiming.length > 1 ? { share } : {}),
       };
       for (const charge of here) {
         // Hand the contested ore to the first charges that observed it.
@@ -812,6 +925,10 @@ export function overlayCorpBooks(input: {
           .filter((l) => l.quantity > 0);
         remaining = minusLines(remaining, claimed);
         const take = contested ? claimed : [];
+        // Only the contested ore overlaps a Payee: ore the book took from free ore is the member's
+        // to give, and capping here leaves the rest of the pool for the next book in the system.
+        // A dismissed charge leaves the pool alone, so the next book can still name the Payee.
+        const overlap = charge.dismissal ? undefined : takeOverlap(pool, claimed);
         const firstRow = rows.length;
         // A dismissed charge owes the corporation nothing, so the Payee's claim on its ore
         // clashes with nothing: no conflict, and no overlap to sort out.
@@ -820,17 +937,47 @@ export function overlayCorpBooks(input: {
           charge,
           charge.oreLines,
           contested && take.length > 0 && !charge.dismissal
-            ? { lines: take, resolvesAt: contested.resolvesAt, cause: contested.cause }
+            ? {
+                lines: take,
+                resolvesAt: contested.resolvesAt,
+                ...causeOf(overlap?.touching ?? [], p.book, charge.observed),
+              }
             : undefined,
-          claiming.length === 1,
           day
         );
-        // Only the contested ore overlaps a Payee: ore the book took from free ore is the member's
-        // to give, and capping here leaves the rest of the pool for the next book in the system.
-        // A dismissed charge leaves the pool alone, so the next book can still name the Payee.
-        const overlap = charge.dismissal ? undefined : takeOverlap(pool, claimed);
-        if (overlap && rows[firstRow]) rows[firstRow].overlap = overlap;
+        if (overlap && rows[firstRow]) rows[firstRow].overlap = overlap.overlap;
       }
+    }
+    // Each allocation the books took part of: the rest stays with its Payee, except what the member
+    // listed for a corporation's own Payee beyond any book's share: that excess is the
+    // corporation's over-listed conflict, and the book's rows then stand for the whole allocation.
+    // Priced at the books' hub prices of the day, for every type the allocation lists.
+    const prices = new Map<number, number>();
+    for (const p of claiming)
+      for (const [typeId, price] of p.book.pricesOn(entry.date).prices)
+        if (!prices.has(typeId)) prices.set(typeId, price);
+    const worth = (lines: readonly OreLine[]) =>
+      lines.reduce((sum, l) => sum + l.quantity * (prices.get(l.typeId) ?? 0), 0);
+    for (const item of pool) {
+      const { allocation } = item;
+      if (allocation.id === undefined) continue;
+      const owner = ownedBy.get(item);
+      const excess = owner ? linesOfLeft(item.left) : [];
+      if (owner && excess.length > 0) pushExcess(owner.p, owner.charge, allocation, excess);
+      const gone = sumLines(takenOf.get(item) ?? [], excess);
+      if (gone.length === 0) continue;
+      const listed = sumLines(allocation.oreLines);
+      const kept = minusLines(listed, gone);
+      if (kept.length === 0) {
+        absorbed.set(key, new Set([...(absorbed.get(key) ?? []), allocation.id]));
+        continue;
+      }
+      const whole = worth(listed);
+      const valueShare =
+        whole > 0 ? worth(kept) / whole : quantityOf(kept) / Math.max(1, quantityOf(listed));
+      const ofEntry = trimmed.get(key) ?? new Map();
+      ofEntry.set(allocation.id, { oreLines: kept, valueShare });
+      trimmed.set(key, ofEntry);
     }
     free.set(key, left);
   }
@@ -1045,7 +1192,7 @@ export function overlayCorpBooks(input: {
   });
 
   rows.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
-  return { rows, takenFromFree, absorbed, labels, books: summaries };
+  return { rows, takenFromFree, absorbed, trimmed, labels, books: summaries };
 }
 
 // --- Corrections -------------------------------------------------------------

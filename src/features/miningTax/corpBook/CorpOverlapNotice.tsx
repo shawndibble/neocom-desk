@@ -136,6 +136,7 @@ export function CorpOverlapNotice({
       <ConflictNotice
         corpName={corpName}
         cause={view.conflictCause}
+        {...(view.ownerPayeeId !== undefined && { ownerName: nameOf(view.ownerPayeeId) })}
         entries={mine.map((a) => ({
           id: a.id,
           payeeName: nameOf(a.payeeId ?? ''),
