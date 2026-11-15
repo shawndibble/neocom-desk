@@ -99,10 +99,23 @@ describe('diffSharedMoonPop', () => {
 
 describe('projectSharedMoonPops', () => {
   const names = { corporations: new Map([[98000001, 'Moon Collectors']]), when: () => '14:00' };
+  const project = (
+    entries: Parameters<typeof projectSharedMoonPops>[0]['entries'],
+    mutedCorporationIds: ReadonlySet<number> = new Set()
+  ) =>
+    projectSharedMoonPops({
+      characterId: 7,
+      characterName: 'Kestrel',
+      entries,
+      mutedCorporationIds,
+      names,
+      copy,
+      nowMs: NOW,
+    });
 
   it('projects one row at the pop time minus the lead time, with the deep-linkable key', () => {
     const pop = entry({ leadMs: 30 * MINUTE_MS });
-    const rows = projectSharedMoonPops(7, 'Kestrel', [pop], new Set(), names, copy, NOW);
+    const rows = project([pop]);
     expect(rows).toEqual([
       {
         characterId: 7,
@@ -117,17 +130,13 @@ describe('projectSharedMoonPops', () => {
   });
 
   it('projects nothing for a muted sharing corporation', () => {
-    expect(
-      projectSharedMoonPops(7, 'Kestrel', [entry()], new Set([98000001]), names, copy, NOW)
-    ).toEqual([]);
+    expect(project([entry()], new Set([98000001]))).toEqual([]);
   });
 
   it('projects nothing already past or beyond the horizon', () => {
     const past = entry({ popAtMs: NOW - MINUTE_MS });
     const far = entry({ popAtMs: NOW + 100 * HOUR_MS });
-    expect(projectSharedMoonPops(7, 'Kestrel', [past, far], new Set(), names, copy, NOW)).toEqual(
-      []
-    );
+    expect(project([past, far])).toEqual([]);
   });
 
   it('keys the occurrence without the Character, so two Characters share one push', () => {

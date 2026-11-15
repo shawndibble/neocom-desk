@@ -118,16 +118,16 @@ export const sharedMoonPopDomain = defineDomain<
       currentMuted(),
       corporationNames(snapshot.entries.map((entry) => entry.corporationId)),
     ]);
-    return projectSharedMoonPops(
+    return projectSharedMoonPops({
       characterId,
       characterName,
       // The Projection judges mutes afresh: the baked flag is the diff's.
-      snapshot.entries.map((entry) => ({ ...entry, leadMs, muted: false })),
-      muted,
-      { corporations, when: popTimeLabel },
-      NOTIFICATION_EVENT_ENTRIES.sharedMoonPop.projection.push,
-      nowMs
-    );
+      entries: snapshot.entries.map((entry) => ({ ...entry, leadMs, muted: false })),
+      mutedCorporationIds: muted,
+      names: { corporations, when: popTimeLabel },
+      copy: NOTIFICATION_EVENT_ENTRIES.sharedMoonPop.projection.push,
+      nowMs,
+    });
   },
   names: async (fire) => ({
     corporation: (await corporationNames([fire.corporationId])).get(fire.corporationId),
