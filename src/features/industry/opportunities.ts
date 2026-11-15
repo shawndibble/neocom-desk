@@ -22,6 +22,7 @@ import {
 import { buildPlanTypeIds } from './recipes';
 import { capProductPrice } from './productPriceCap';
 import type { MarketSnapshot, MarketSnapshotRequest } from './marketData';
+import { buyOrderFeePct } from '@/engine/industry/buyOrderPrices';
 import { materialPricesFor } from './priceBasis';
 import { onPlanHeroBasis } from './planOwnedBasis';
 import { planReactionLocation } from './planReactionLocation';
@@ -353,7 +354,11 @@ export function computeOpportunityRow(
     defaultsFrom
   );
   // Materials are bought at the side of the market the plan's basis names, as on the plan page.
-  const materialPrices = materialPricesFor(snapshot, basePlan.materialPriceBasis);
+  const materialPrices = materialPricesFor(
+    snapshot,
+    basePlan.materialPriceBasis,
+    buyOrderFeePct(modifiers.skills, standing)
+  );
 
   const systemCostIndex = snapshot.systemCostIndex ?? 0;
   const adjustedPrices = snapshot.adjustedPrices ?? {};

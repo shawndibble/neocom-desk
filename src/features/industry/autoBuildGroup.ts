@@ -16,6 +16,10 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { BpcContractRow, BpcSearchRow } from '@/engine/contracts/bpcSearch';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import {
+  tradeHubStanding,
+  type TradeHubStandingsMap,
+} from '@/features/market/useTradeHubStandings';
+import {
   autoBuildHere,
   maxAutoBuildDepth,
   type BuildStrategy,
@@ -185,7 +189,13 @@ export async function applyGroupAutoBuild(
    * install is forced to buy, the same gate a member's own page applies
    * (`BuildPlanDetail`'s Auto Build). Absent = purely cost-based.
    */
-  accountSkills?: ReadonlyMap<number, SkillLevels>
+  accountSkills?: ReadonlyMap<number, SkillLevels>,
+  /**
+   * Standings per Trade Hub, as each member's own page resolves them: a
+   * Buy order member's materials carry the broker fee at its hub (#6167).
+   * Absent = zero standing, plus the hub's own Safety Tax.
+   */
+  standings: TradeHubStandingsMap = new Map()
 ): Promise<Map<string, Set<number>>> {
   const members = plans.flatMap((plan) => {
     const member = resolveMember(plan, catalog);
@@ -212,6 +222,7 @@ export async function applyGroupAutoBuild(
           corpBlueprints: corpOwnedBlueprints,
           assumedMe,
           modifiers,
+          standing: tradeHubStanding(standings, hub.id),
           bpcOffersFor: offersForRegion(bpcRows, hub.regionId),
           bpcLastResortOffersFor: offersForRegion(bpcRows, hub.regionId, true),
           blueprintPurchaseOffersFor,
