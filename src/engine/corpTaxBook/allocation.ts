@@ -287,8 +287,9 @@ function carriesCode(reason: string, code: string): boolean {
  * Whom a donation into the book's division(s) credits. A code in the reason
  * wins, from any character, without revealing any grouping; then a character
  * the book knows — grouped into a Miner, or one that mined at its refineries —
- * but only while that Miner has an open balance: a donation from a Miner who
- * owes nothing (a buyback, say) is held for review instead (#6207). Anyone else
+ * but only while that Miner owes: an open balance on issued Statements, or ore
+ * not yet on one. A donation from a Miner with neither (a buyback, say) is held
+ * for review instead (#6207). Anyone else
  * is Unmatched, to be claimed or assigned.
  */
 export function matchDonation(
@@ -300,6 +301,8 @@ export function matchDonation(
     knownCharacterIds: ReadonlySet<number>;
     /** What each Miner still owes on issued Statements (`openBalances`); absent is nothing. */
     openBalance: ReadonlyMap<string, number>;
+    /** Miners with ore not yet on a Statement (`unbilledMinerIds`): they owe too. */
+    unbilled: ReadonlySet<string>;
   }
 ): DonationMatch {
   const reason = donation.reason ?? '';
@@ -310,7 +313,8 @@ export function matchDonation(
   const grouped = book.miners.some((m) => m.characterIds.includes(donation.characterId));
   if (grouped || book.knownCharacterIds.has(donation.characterId)) {
     const minerId = minerIdFor(donation.characterId, book.miners);
-    if ((book.openBalance.get(minerId) ?? 0) > 0) return { kind: 'miner', minerId };
+    if ((book.openBalance.get(minerId) ?? 0) > 0 || book.unbilled.has(minerId))
+      return { kind: 'miner', minerId };
     return { kind: 'review', minerId };
   }
   return { kind: 'unmatched' };

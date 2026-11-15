@@ -7,6 +7,7 @@ import {
   placeObservedRows,
   openBalances,
   planSettlements,
+  unbilledMinerIds,
   reconcileExtractions,
   resolveDonations,
   restampPlan,
@@ -326,6 +327,7 @@ describe('resolveDonations', () => {
     statements: [statement({ id: 's1', minerId: 'solo:7', code: 'MT-AB12' })],
     knownCharacterIds: new Set([7]),
     openBalance: new Map([['solo:7', 10]]),
+    unbilled: new Set<string>(),
   };
   const donation = (characterId: number, reason?: string, over = {}) => ({
     refId: 1,
@@ -359,6 +361,16 @@ describe('resolveDonations', () => {
     expect(held.reviewReason).toBe('no-open-balance');
   });
 
+  it('credits a Miner with ore not yet billed, whatever their balance', () => {
+    const [prepaid] = resolveDonations([donation(7)], {
+      ...book,
+      openBalance: new Map(),
+      unbilled: new Set(['solo:7']),
+    });
+    expect(prepaid).toMatchObject({ minerId: 'solo:7' });
+    expect(prepaid.reviewReason).toBeUndefined();
+  });
+
   it('spends the balance oldest first, so a second donation past it is held', () => {
     const later = donation(7, undefined, { refId: 2, at: '2026-08-03T00:00:00.000Z' });
     const earlier = donation(7, undefined, { refId: 1, at: '2026-08-02T00:00:00.000Z' });
@@ -374,6 +386,33 @@ describe('resolveDonations', () => {
     const plain = donation(7, undefined, { refId: 2, at: '2026-08-03T00:00:00.000Z' });
     const [, after] = resolveDonations([coded, plain], book);
     expect(after.reviewReason).toBe('no-open-balance');
+  });
+});
+
+describe('unbilledMinerIds (#6207)', () => {
+  const miners = [{ id: 'm1', characterIds: [7, 8], mainCharacterId: 7 }];
+  const row = (characterId: number, date: string, quantity = 10) => ({
+    characterId,
+    date,
+    quantity,
+  });
+  const billed = statement({ id: 's1', minerId: 'm1', coversThrough: '2026-08-31' });
+
+  it('is each Miner with ore after its last Statement, or any ore without one', () => {
+    const ids = unbilledMinerIds([row(8, '2026-09-02'), row(9, '2026-09-01')], {
+      miners,
+      statements: [billed],
+      startDate: '2026-01-01',
+    });
+    expect([...ids].sort()).toEqual(['m1', 'solo:9']);
+  });
+
+  it('leaves out ore a Statement already covers, before the book, or of no quantity', () => {
+    const ids = unbilledMinerIds(
+      [row(7, '2026-08-31'), row(9, '2025-12-31'), row(10, '2026-09-01', 0)],
+      { miners, statements: [billed], startDate: '2026-01-01' }
+    );
+    expect([...ids]).toEqual([]);
   });
 });
 

@@ -202,6 +202,7 @@ export function matchDonation(
     statements: readonly StatementLike[];
     knownCharacterIds: ReadonlySet<number>;
     openBalance: ReadonlyMap<string, number>;
+    unbilled: ReadonlySet<string>;
   }
 ): DonationMatch {
   const reason = donation.reason ?? '';
@@ -212,7 +213,8 @@ export function matchDonation(
   const grouped = book.miners.some((m) => m.characterIds.includes(donation.characterId));
   if (grouped || book.knownCharacterIds.has(donation.characterId)) {
     const minerId = minerIdFor(donation.characterId, book.miners);
-    if ((book.openBalance.get(minerId) ?? 0) > 0) return { kind: 'miner', minerId };
+    if ((book.openBalance.get(minerId) ?? 0) > 0 || book.unbilled.has(minerId))
+      return { kind: 'miner', minerId };
     return { kind: 'review', minerId };
   }
   return { kind: 'unmatched' };
@@ -226,6 +228,7 @@ export function resolveDonations(
     statements: readonly StatementLike[];
     knownCharacterIds: ReadonlySet<number>;
     openBalance: ReadonlyMap<string, number>;
+    unbilled: ReadonlySet<string>;
   }
 ): JournalDonation[] {
   const balance = new Map(book.openBalance);
@@ -283,6 +286,7 @@ export function noteUncounted(
     statements: readonly StatementLike[];
     knownCharacterIds: ReadonlySet<number>;
     openBalance: ReadonlyMap<string, number>;
+    unbilled: ReadonlySet<string>;
   },
   counted: readonly JournalDonation[] = []
 ): UncountedDonation[] {
@@ -654,6 +658,28 @@ export function planSettlements(input: SettleInput): string[] {
     }
   }
   return settled;
+}
+
+/** Engine `unbilledMinerIds`. */
+export function unbilledMinerIds(
+  rows: readonly { characterId: number; date: string; quantity: number }[],
+  book: {
+    miners: readonly MinerLike[];
+    statements: readonly { minerId: string; coversThrough?: string }[];
+    startDate: string;
+  }
+): Set<string> {
+  const billedThrough = new Map<string, string>();
+  for (const s of book.statements)
+    if (s.coversThrough && s.coversThrough > (billedThrough.get(s.minerId) ?? ''))
+      billedThrough.set(s.minerId, s.coversThrough);
+  const out = new Set<string>();
+  for (const r of rows) {
+    if (!(r.quantity > 0) || r.date < book.startDate) continue;
+    const minerId = minerIdFor(r.characterId, book.miners);
+    if (r.date > (billedThrough.get(minerId) ?? '')) out.add(minerId);
+  }
+  return out;
 }
 
 /** Engine `openBalances`: what each Miner still owes on issued Statements. */

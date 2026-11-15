@@ -71,6 +71,7 @@ import {
   planSettlements,
   reconcileExtractions,
   resolveDonations,
+  unbilledMinerIds,
   type JournalDonation,
   type MinerLike,
   type MoonNotification,
@@ -427,6 +428,7 @@ export async function runBookSync(
     statements: before.statements,
     knownCharacterIds: known,
     openBalance: quiet ? new Map<string, number>() : openBalanceOf(before),
+    unbilled: quiet ? new Set<string>() : unbilledOf(before, feed.rows),
   };
   const resolved = resolveDonations(fresh, matching);
   // #6207: what looks like tax paid into a division the book does not read. Only on a full run,
@@ -497,7 +499,7 @@ export async function runBookSync(
   // Quiet: the quiet run re-matched nothing, and no Unmatched donation or known Character is new.
   const { assigned, error: reassignError } = quiet
     ? { assigned: new Map<string, string>(), error: undefined }
-    : await reassignUnmatched(edit, before, known);
+    : await reassignUnmatched(edit, before, known, feed.rows);
 
   // --- Settle ---------------------------------------------------------------
   // Read again, right before settling, whenever this run brought in money: a settle is never
@@ -606,6 +608,18 @@ async function readDonationsElsewhere(
   return found;
 }
 
+/** The Miners with ore this read found that no Statement covers yet, for `matchDonation` (#6207). */
+function unbilledOf(
+  book: AdminBookState,
+  rows: readonly { characterId: number; date: string; quantity: number }[]
+): Set<string> {
+  return unbilledMinerIds(rows, {
+    miners: book.miners,
+    statements: book.statements as { minerId: string; coversThrough?: string }[],
+    startDate: book.startDate,
+  });
+}
+
 /** What each Miner owes on the book's issued Statements, for `matchDonation` (#6207). */
 function openBalanceOf(book: AdminBookState): Map<string, number> {
   return openBalances({
@@ -621,7 +635,8 @@ function openBalanceOf(book: AdminBookState): Map<string, number> {
 async function reassignUnmatched(
   edit: (action: ScheduledAction) => Promise<unknown>,
   before: AdminBookState,
-  known: ReadonlySet<number>
+  known: ReadonlySet<number>,
+  rows: readonly { characterId: number; date: string; quantity: number }[]
 ): Promise<{ assigned: Map<string, string>; error?: string }> {
   // One held for review (#6207) is the officer's to place, never re-matched.
   const unmatched = before.payments
@@ -635,6 +650,7 @@ async function reassignUnmatched(
   const assigned = new Map<string, string>();
   // Only toward an open balance, spent oldest first: a sender whose Miner owes nothing waits.
   const balance = openBalanceOf(before);
+  const unbilled = unbilledOf(before, rows);
   try {
     for (const p of unmatched) {
       const match = matchDonation(
@@ -644,6 +660,7 @@ async function reassignUnmatched(
           statements: before.statements,
           knownCharacterIds: known,
           openBalance: balance,
+          unbilled,
         }
       );
       if (match.kind !== 'miner' && match.kind !== 'statement') continue;

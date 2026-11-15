@@ -23,6 +23,7 @@ const book = {
   statements: [{ id: 's1', minerId: 'm1', code: 'MT-AB12' }] as unknown as Statement[],
   knownCharacterIds: new Set([9]),
   openBalance: new Map([['m1', 10_000_000]]),
+  unbilled: new Set<string>(),
 };
 
 describe('otherDivisions', () => {
@@ -56,6 +57,10 @@ describe('noteUncounted (#6207)', () => {
     expect(noteUncounted([donation({ characterId: 555 })], book)).toEqual([]);
     expect(noteUncounted([donation({ characterId: 9 })], book)).toEqual([]);
     expect(noteUncounted([donation()], { ...book, openBalance: new Map() })).toEqual([]);
+    // A Miner with ore not yet billed owes too.
+    expect(
+      noteUncounted([donation()], { ...book, openBalance: new Map(), unbilled: new Set(['m1']) })
+    ).toHaveLength(1);
   });
 
   it('leaves out a Miner whose debt this sync’s counted donation already paid', () => {

@@ -165,8 +165,36 @@ describe('syncCorpTaxBook', () => {
     });
   });
 
-  it('holds a known miner’s donation for review when their Miner owes nothing (#6207)', async () => {
+  it('credits a known miner’s donation toward ore not yet on a Statement (#6207)', async () => {
+    // Character 7 mined on 2026-07-19 and has no Statement: miners often pay the day they mine.
     const d = deps({
+      loadDonations: async () => [
+        { refId: 9, division: 1, characterId: 7, amount: 5, at: '2026-07-19T00:00:00.000Z' },
+      ],
+    });
+    await run(d);
+    const [donation] = vi.mocked(d.uploadSync).mock.calls[0][1].donations ?? [];
+    expect(donation).toMatchObject({ minerId: 'solo:7' });
+  });
+
+  it('holds a known miner’s donation for review when their Miner owes nothing (#6207)', async () => {
+    // Billed through the day they mined, and paid in full: nothing owed, no ore unbilled.
+    const billed = { ...owing('solo:7'), coversThrough: '2026-07-31' } as unknown as Statement;
+    const d = deps({
+      readBookState: async () =>
+        emptyState({
+          statements: [billed],
+          payments: [
+            {
+              id: 'j1_1',
+              minerId: 'solo:7',
+              characterId: 7,
+              amount: 10_000_000,
+              at: '2026-07-02T00:00:00Z',
+              source: 'donation',
+            },
+          ],
+        }),
       loadDonations: async () => [
         { refId: 9, division: 1, characterId: 7, amount: 5, at: '2026-07-19T00:00:00.000Z' },
       ],

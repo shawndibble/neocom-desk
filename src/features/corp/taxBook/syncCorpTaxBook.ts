@@ -16,6 +16,7 @@ import {
   planSettlements,
   reconcileExtractions,
   resolveDonations,
+  unbilledMinerIds,
   type JournalDonation,
   type MoonNotification,
   type SyncExtraction,
@@ -252,6 +253,7 @@ export async function syncCorpTaxBook(
     statements: before.statements as Statement[],
     knownCharacterIds: known,
     openBalance: openBalanceOf(before),
+    unbilled: unbilledOf(before, feed.rows),
   };
   const resolved = resolveDonations(fresh, matching);
   const uncounted = elsewhere === null ? undefined : noteUncounted(elsewhere, matching, resolved);
@@ -309,6 +311,7 @@ export async function syncCorpTaxBook(
     {
       before,
       known,
+      rows: feed.rows,
       regrouped: autoGrouped > 0,
     }
   );
@@ -350,6 +353,15 @@ export async function syncCorpTaxBook(
   };
 }
 
+/** The Miners with ore this read found that no Statement covers yet, for `matchDonation` (#6207). */
+function unbilledOf(book: BookState, rows: readonly ObservedRow[]): Set<string> {
+  return unbilledMinerIds(rows, {
+    miners: book.miners,
+    statements: book.statements as Statement[],
+    startDate: book.book.startDate,
+  });
+}
+
 /** What each Miner owes on the book's issued Statements, for `matchDonation` (#6207). */
 function openBalanceOf(book: BookState): Map<string, number> {
   return openBalances({
@@ -368,7 +380,12 @@ async function reassignUnmatched(
   deps: SyncDeps,
   characterId: number,
   corporationId: number,
-  args: { before: BookState; known: ReadonlySet<number>; regrouped: boolean }
+  args: {
+    before: BookState;
+    known: ReadonlySet<number>;
+    rows: readonly ObservedRow[];
+    regrouped: boolean;
+  }
 ): Promise<{ assigned: number; error?: string }> {
   // One held for review (#6207) is the officer's to place, never re-matched.
   const unmatched = args.before.payments
@@ -386,8 +403,10 @@ async function reassignUnmatched(
       ? ((await deps.readBookState(characterId, corporationId)) ?? args.before)
       : args.before;
     const known = new Set([...args.known, ...book.miners.flatMap((m) => m.characterIds)]);
-    // Only toward an open balance, spent oldest first: a sender whose Miner owes nothing waits.
+    // Only toward a Miner who owes (balance spent oldest first, or ore not yet billed): a sender
+    // whose Miner owes nothing waits.
     const balance = openBalanceOf(book);
+    const unbilled = unbilledOf(book, args.rows);
     for (const p of unmatched) {
       const match = matchDonation(
         { characterId: p.characterId, reason: (p as { reason?: string }).reason },
@@ -396,6 +415,7 @@ async function reassignUnmatched(
           statements: book.statements as Statement[],
           knownCharacterIds: known,
           openBalance: balance,
+          unbilled,
         }
       );
       if (match.kind !== 'miner' && match.kind !== 'statement') continue;

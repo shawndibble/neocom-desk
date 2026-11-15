@@ -17,7 +17,7 @@ import {
   type RecordedWriteOff,
   type TaxPayment,
 } from './allocation';
-import type { Miner } from './charges';
+import { minerIdFor, type Miner } from './charges';
 import type { Dismissal } from './dismissals';
 import { MOON_ORE_M3_PER_UNIT, extractionStatus, type Extraction } from './extraction';
 import type { Statement } from './statements';
@@ -243,6 +243,7 @@ export function resolveDonations(
     statements: readonly Statement[];
     knownCharacterIds: ReadonlySet<number>;
     openBalance: ReadonlyMap<string, number>;
+    unbilled: ReadonlySet<string>;
   }
 ): JournalDonation[] {
   const balance = new Map(book.openBalance);
@@ -426,6 +427,33 @@ export function planSettlements(input: SettleInput): string[] {
     }
   }
   return settled;
+}
+
+/**
+ * The Miners with ore in the book not yet on a Statement (#6207): a ledger row dated after
+ * the last day their Statements cover (any day from the book's start without one). Miners
+ * often pay the day they mine, before a Statement, so that counts as owing for
+ * `matchDonation`; any ore is enough, it is not valued.
+ */
+export function unbilledMinerIds(
+  rows: readonly { characterId: number; date: string; quantity: number }[],
+  book: {
+    miners: readonly Miner[];
+    statements: readonly { minerId: string; coversThrough?: string }[];
+    startDate: string;
+  }
+): Set<string> {
+  const billedThrough = new Map<string, string>();
+  for (const s of book.statements)
+    if (s.coversThrough && s.coversThrough > (billedThrough.get(s.minerId) ?? ''))
+      billedThrough.set(s.minerId, s.coversThrough);
+  const out = new Set<string>();
+  for (const r of rows) {
+    if (!(r.quantity > 0) || r.date < book.startDate) continue;
+    const minerId = minerIdFor(r.characterId, book.miners);
+    if (r.date > (billedThrough.get(minerId) ?? '')) out.add(minerId);
+  }
+  return out;
 }
 
 /**

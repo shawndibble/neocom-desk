@@ -8,6 +8,7 @@ import {
   detectGaps,
   donationsFromJournal,
   openBalances,
+  unbilledMinerIds,
   mergeGaps,
   observedRowsFromLedger,
   placeObservedRows,
@@ -161,8 +162,12 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
     ];
     const statements = [{ id: 's1', minerId: 'm1', code: 'ABC123' }] as unknown as Statement[];
     // #6207: m1 owes a little, solo:99 owes nothing, so the holds and the spent balance show.
-    for (const openBalance of [new Map([['m1', 1e6]]), new Map<string, number>()]) {
-      const book = { miners, statements, knownCharacterIds: new Set([99]), openBalance };
+    for (const [openBalance, unbilled] of [
+      [new Map([['m1', 1e6]]), new Set<string>()],
+      [new Map<string, number>(), new Set<string>()],
+      [new Map<string, number>(), new Set(['solo:51'])],
+    ] as const) {
+      const book = { miners, statements, knownCharacterIds: new Set([99]), openBalance, unbilled };
       expect(mirror.resolveDonations(donations, book)).toEqual(resolveDonations(donations, book));
       expect(mirror.noteUncounted(donations, book)).toEqual(noteUncounted(donations, book));
       const counted = resolveDonations(donations, book);
@@ -176,6 +181,23 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
           );
         }
       }
+    }
+  });
+
+  it('agrees on the Miners with ore not yet on a Statement (#6207)', () => {
+    const miners = [{ id: 'm1', characterIds: [50, 52], mainCharacterId: 50 }];
+    const statements = [
+      { id: 's1', minerId: 'm1', code: 'A', coversThrough: '2026-10-05' },
+    ] as unknown as Statement[];
+    const rows = [
+      { characterId: 52, date: '2026-10-05', quantity: 5 },
+      { characterId: 52, date: '2026-10-06', quantity: 5 },
+      { characterId: 51, date: '2026-09-30', quantity: 5 },
+      { characterId: 53, date: '2026-10-07', quantity: 0 },
+    ];
+    for (const startDate of ['2026-01-01', '2026-10-01']) {
+      const book = { miners, statements, startDate };
+      expect(mirror.unbilledMinerIds(rows, book)).toEqual(unbilledMinerIds(rows, book));
     }
   });
 

@@ -44,6 +44,7 @@ export function noteUncounted(
     statements: readonly Statement[];
     knownCharacterIds: ReadonlySet<number>;
     openBalance: ReadonlyMap<string, number>;
+    unbilled: ReadonlySet<string>;
   },
   counted: readonly JournalDonation[] = []
 ): UncountedDonation[] {
