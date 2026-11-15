@@ -1,6 +1,6 @@
 /**
  * Sync now's moon owner half (#6117): an editor of a book with moon owners reads every one of
- * them at once instead of waiting up to six hours for the schedule. The server rests it ten
+ * them at once instead of waiting up to two hours for the schedule. The server rests it ten
  * minutes per book; a press inside that says when it runs again. The book reloads after a read.
  */
 import { useCallback, useState } from 'react';

@@ -2,7 +2,7 @@
 // Dependency-free, so the client imports it too (the Moon owners tab's "next read" time).
 
 /** The UTC hours the scheduled sync fires in, at `BOOK_SYNC_MINUTE` past. */
-export const BOOK_SYNC_HOURS_UTC = [0, 6, 12, 18] as const;
+export const BOOK_SYNC_HOURS_UTC = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22] as const;
 export const BOOK_SYNC_MINUTE = 35;
 
 /** The `syncCorpTaxBooks` schedule, built from the slots above. */

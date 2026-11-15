@@ -532,7 +532,7 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   settlement plan). `useCorpTaxBook` exposes last-synced/stale/gaps and syncs
   on visit; `useMiningLedgerAccess` says when to ask for the mining scope.
   **Scheduled sync** (issue #4068, ADR 0025): `syncCorpTaxBooks`
-  (`onSchedule`, 00:35/06:35/12:35/18:35 UTC) syncs and settles each opted-in corporation's
+  (`onSchedule`, every 2 hours at 35 past, 00:35 UTC first) syncs and settles each opted-in corporation's
   book with the token of one opted-in book editor. The grant is
   `corpTaxBookSyncGrants/{corporationId}`: function-only (rules deny every
   client), one doc per corporation holding the holder's narrow-scope refresh

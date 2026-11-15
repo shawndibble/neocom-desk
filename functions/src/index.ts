@@ -1169,7 +1169,7 @@ corpTaxBookAction('revokeCorpTaxBookSyncGrantCallable', (request) =>
 );
 
 /**
- * syncCorpTaxBooks (issue #4068, ADR 0025): at 00:35, 06:35, 12:35 and 18:35 UTC, syncs and settles each
+ * syncCorpTaxBooks (issue #4068, ADR 0025): every 2 hours at 35 past (00:35 UTC first), syncs and settles each
  * opted-in corporation's Corp Tax Book with its grant holder's token. Never issues
  * a Statement or sends mail. Deploy is manual:
  * `firebase deploy --only functions:syncCorpTaxBooks`.
