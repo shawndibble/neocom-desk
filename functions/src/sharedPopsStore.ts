@@ -30,6 +30,7 @@ import {
   buildSharedPops,
   editorStampsFrom,
   qualifyingEditors,
+  audienceCharacters,
   visiblePops,
   type PopExtraction,
   type RateEntry,
@@ -365,9 +366,15 @@ export interface SharedPopsReadDeps {
   affiliations: AffiliationLookup;
 }
 
-/** The Communities the viewers are current Members of (ownerHash checked, as `isCurrentMember`). */
-async function communitiesOf(db: Firestore, viewers: readonly PopViewer[]): Promise<Set<string>> {
-  const out = new Set<string>();
+/**
+ * The Communities each viewer is a current Member of (ownerHash checked, as `isCurrentMember`),
+ * by Character.
+ */
+async function communitiesOf(
+  db: Firestore,
+  viewers: readonly PopViewer[]
+): Promise<Map<number, Set<string>>> {
+  const out = new Map<number, Set<string>>();
   await Promise.all(
     viewers.map(async (v) => {
       const index = await db
@@ -377,9 +384,11 @@ async function communitiesOf(db: Firestore, viewers: readonly PopViewer[]): Prom
         .get();
       if (index.empty) return;
       const members = await db.getAll(...index.docs.map((d) => memberDoc(db, d.id, v.characterId)));
+      const mine = new Set<string>();
       members.forEach((m, i) => {
-        if (m.exists && m.get('ownerHash') === v.ownerHash) out.add(index.docs[i].id);
+        if (m.exists && m.get('ownerHash') === v.ownerHash) mine.add(index.docs[i].id);
       });
+      out.set(v.characterId, mine);
     })
   );
   return out;
@@ -442,7 +451,8 @@ export async function sharedPopsFor(
     corporationIds.add(a.corporationId);
     if (a.allianceId !== null) allianceIds.add(a.allianceId);
   }
-  const memberOf = await communitiesOf(db, viewers);
+  const communitiesByCharacter = await communitiesOf(db, viewers);
+  const memberOf = new Set([...communitiesByCharacter.values()].flatMap((s) => [...s]));
 
   const docs = new Map<number, SharedPopsDoc>();
   const keep = (d: DocumentSnapshot) => {
@@ -464,11 +474,25 @@ export async function sharedPopsFor(
     const communityIds = new Set(
       candidates.filter((c) => status.get(c)?.officer && !status.get(c)?.blocked)
     );
+    // Each Character on its own access, so the notification reaches only those in an audience.
+    const characters = viewers.map((v) => {
+      const a = affiliations.get(v.characterId);
+      const mine = communitiesByCharacter.get(v.characterId) ?? new Set<string>();
+      return {
+        characterId: v.characterId,
+        access: {
+          corporationIds: new Set(a ? [a.corporationId] : []),
+          allianceIds: new Set(a && a.allianceId !== null ? [a.allianceId] : []),
+          communityIds: new Set([...mine].filter((c) => communityIds.has(c))),
+        },
+      };
+    });
     for (const pop of visiblePops(doc, { corporationIds, allianceIds, communityIds }, now)) {
       const view: SharedPopView & { audiences?: string[] } = {
         ...pop,
         corporationId: doc.corporationId,
         syncedAt: doc.syncedAt ?? null,
+        viewerCharacterIds: audienceCharacters(doc, pop, characters),
       };
       // Who else a pop is shared with is the book's business, not the viewer's.
       delete view.audiences;

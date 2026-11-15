@@ -37,6 +37,9 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
   planetaryExtractorExpiring: 'industryPi',
   mercenaryDenReinforced: 'industryPi',
   mercenaryDenAnarchy: 'industryPi',
+  // Moon mining: beside the den and PI clocks, not under Corporation, whose events ride the
+  // Corporation Permission. This one needs none.
+  sharedMoonPop: 'industryPi',
   marketOrderFilled: 'market',
   marketOrderUndercut: 'market',
   contractAccepted: 'market',

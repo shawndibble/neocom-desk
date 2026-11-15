@@ -51,6 +51,7 @@ import { notifications } from '@/i18n/locales/en.json';
 import {
   notificationOptionsFor,
   fallbackNotificationOptions,
+  occurrencePath,
   type AppNotificationOptions,
 } from './notificationOptions';
 import { NOTIFICATION_EVENT_IDS, type NotificationEventId } from './events';
@@ -421,12 +422,14 @@ export async function handlePush(env: PushEnv, rawText: string | null, now: numb
           NAME_READ_BUDGET_MS
         )
       : false;
+  // A Scheduled Push names its subject only through its key (a Shared Moon Pop's pop).
+  const ownPath = path ?? occurrencePath(payload.eventId, payload.occurrenceKey);
   const options = notificationOptionsFor(
     {
       eventId: payload.eventId,
       characterId: payload.characterId,
       subjectId,
-      ...(path === undefined ? {} : { path }),
+      ...(ownPath === undefined ? {} : { path: ownPath }),
     },
     body
   );

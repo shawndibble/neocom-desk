@@ -27,6 +27,10 @@
  */
 import { ALERT_CHARACTER_PARAM } from '@/lib/alertCharacterParam';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
+import {
+  sharedMoonPopPath,
+  sharedPopIdOfOccurrenceKey,
+} from '@/engine/notificationDiffs/sharedMoonPop';
 import type { NotificationEventId } from './events';
 
 const ICON_URL = '/icons/icon-192.png';
@@ -57,6 +61,8 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   newMail: '/mail',
   newCalendarEvent: '/calendar',
   calendarEventStarting: '/calendar',
+  // The Calendar, opened on the pop itself: `occurrencePath` reads its id off the Occurrence Key.
+  sharedMoonPop: '/calendar',
   // The explicit History path because Search, not History, is the page's
   // default tab — and this alert is about a row in *History*.
   // `notificationUrlForSubject` then adds `?highlight=`, which
@@ -166,6 +172,18 @@ export function notificationUrlFor(eventId: string): string {
   return NOTIFICATION_ROUTES[eventId as NotificationEventId] ?? NOTIFICATION_FALLBACK_ROUTE;
 }
 
+/**
+ * A destination the occurrence names through its own Occurrence Key, in place of the event's
+ * route: a Shared Moon Pop opens that pop on the Calendar (issue #6225). The key is what every
+ * path has — a Scheduled Push carries only the key and rendered text, and a feed row is keyed by
+ * it — so the pop-up, the push and the feed row all land on the same pop.
+ */
+export function occurrencePath(eventId: string, occurrenceKey: string): string | undefined {
+  if (eventId !== 'sharedMoonPop') return undefined;
+  const popId = sharedPopIdOfOccurrenceKey(occurrenceKey);
+  return popId === undefined ? undefined : sharedMoonPopPath(popId);
+}
+
 /** Adds one query parameter, whether or not `url` already carries a query string. */
 function withParam(url: string, key: string, value: string): string {
   const [path, query = ''] = url.split('?');
@@ -243,11 +261,14 @@ export const SUBJECT_ROUTED_EVENT_IDS = Object.keys(SUBJECT_URLS) as Notificatio
 export function notificationUrlForSubject(
   eventId: string,
   subjectId: number | undefined,
-  characterId?: number
+  characterId?: number,
+  occurrenceKey?: string
 ): string {
   const base = notificationUrlFor(eventId);
   const url = SUBJECT_URLS[eventId as NotificationEventId];
-  const routed = url === undefined || subjectId === undefined ? base : url(base, subjectId);
+  const own = occurrenceKey === undefined ? undefined : occurrencePath(eventId, occurrenceKey);
+  const routed =
+    own ?? (url === undefined || subjectId === undefined ? base : url(base, subjectId));
   // Names the Character the fire was about, so the shell can make it the active
   // one on arrival (`AlertCharacterSwitch`) — pages read the active Character
   // and would otherwise show whoever happened to be selected.

@@ -50,3 +50,4 @@ export * from './pollDomains/copy/dens';
 export * from './pollDomains/copy/accelerator';
 export * from './pollDomains/copy/acceleratorEnded';
 export * from './pollDomains/copy/skyhooksNearby';
+export * from './pollDomains/copy/sharedMoonPop';

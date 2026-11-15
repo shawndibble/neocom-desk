@@ -219,6 +219,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       communities: ['communityJoinRequest', 'communityMemberJoined', 'communityRequestPledged'],
       vetting: ['vettingShared'],
       corpTaxBookSync: ['corpTaxBookSyncStopped'],
+      sharedMoonPops: ['sharedMoonPop'],
     });
   });
 
@@ -498,6 +499,7 @@ describe('projection wiring', () => {
         'industryJobs',
         'mercenaryDens',
         'orderExpiry',
+        'sharedMoonPops',
         'skillQueue',
         'skyhooks',
         'structureFuel',

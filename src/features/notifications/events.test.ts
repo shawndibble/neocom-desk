@@ -26,6 +26,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'acceleratorEnded',
       'mercenaryDenReinforced',
       'mercenaryDenAnarchy',
+      'sharedMoonPop',
       'marketOrderFilled',
       'marketOrderUndercut',
       'newCalendarEvent',

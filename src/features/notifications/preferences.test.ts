@@ -281,6 +281,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
       skyhookRaidableLeadHours: DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
       skyhookRaidableMinUnits: DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
+      sharedMoonPopLeadMinutes: 0,
     });
   });
 
@@ -310,6 +311,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
       skyhookRaidableLeadHours: DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
       skyhookRaidableMinUnits: DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
+      sharedMoonPopLeadMinutes: 0,
     });
   });
 
@@ -340,6 +342,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
       skyhookRaidableLeadHours: DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
       skyhookRaidableMinUnits: DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
+      sharedMoonPopLeadMinutes: 0,
     });
   });
 
@@ -379,6 +382,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
       skyhookRaidableLeadHours: DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
       skyhookRaidableMinUnits: DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
+      sharedMoonPopLeadMinutes: 0,
     });
   });
 

@@ -50,6 +50,8 @@ export interface CharacterEventThresholds {
   skyhookRaidableLeadHours?: number;
   /** Least unsecured reagent units that make an open window a danger Alert (issue #4784); 0 makes every open window one. */
   skyhookRaidableMinUnits?: number;
+  /** Minutes before a Shared Pop's Pop Time that trigger `sharedMoonPop` (issue #6225); 0 fires at the Pop Time — one of `SHARED_MOON_POP_LEAD_MINUTE_OPTIONS`. */
+  sharedMoonPopLeadMinutes?: number;
 }
 
 export type ThresholdKey = keyof CharacterEventThresholds;
@@ -109,7 +111,13 @@ export const SKYHOOK_RAIDABLE_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6,
 export const SKYHOOK_RAIDABLE_MIN_UNIT_OPTIONS: readonly number[] = [1, 100, 1000, 10000];
 
 export const DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS = 2;
+
 export const DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS = 1;
+
+/** The lead times `sharedMoonPop`'s inline control offers (issue #6225): at the Pop Time, or up to two hours before it. */
+export const SHARED_MOON_POP_LEAD_MINUTE_OPTIONS: readonly number[] = [0, 15, 30, 60, 120];
+/** At the Pop Time: when the belt can be mined (the scope decision's default). */
+export const DEFAULT_SHARED_MOON_POP_LEAD_MINUTES = 0;
 
 export const DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS = 1;
 export const DEFAULT_ACCELERATOR_EXPIRING_LEAD_HOURS = 1;
@@ -341,6 +349,16 @@ export const THRESHOLD_FIELDS: { readonly [K in ThresholdKey]: ThresholdField<K>
       labelKey: 'settings.notifications.skyhookRaidableMinUnitsLabel',
       options: SKYHOOK_RAIDABLE_MIN_UNIT_OPTIONS,
       optionKey: 'settings.notifications.skyhookRaidableMinUnitsOption',
+    },
+  },
+  sharedMoonPopLeadMinutes: {
+    key: 'sharedMoonPopLeadMinutes',
+    defaultValue: DEFAULT_SHARED_MOON_POP_LEAD_MINUTES,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.sharedMoonPopLeadTimeLabel',
+      options: SHARED_MOON_POP_LEAD_MINUTE_OPTIONS,
+      optionKey: 'settings.notifications.sharedMoonPopLeadTimeOption',
     },
   },
 };

@@ -60,6 +60,7 @@ import type {
   PriceAlertTriggeredFire,
   ShipLostFire,
   CharacterNeedsLoginFire,
+  SharedMoonPopFire,
 } from './notificationDiffs';
 import type {
   CommunityJoinRequestFire,
@@ -119,7 +120,8 @@ export type OccurrenceFire =
   | IncursionNearbyFire
   | SkyhookRaidableNearbyFire
   | VettingSharedFire
-  | CorpTaxBookSyncStoppedFire;
+  | CorpTaxBookSyncStoppedFire
+  | SharedMoonPopFire;
 
 function dayBucket(nowMs: number): number {
   return Math.floor(nowMs / DAY_MS);
@@ -294,6 +296,11 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // Incursion above: two pilots in one system get one alert, not two.
     case 'skyhookRaidableNearby':
       return [fire.eventId, fire.systemId, fire.planetId, fire.startMs].join(':');
+    // Once per Shared Pop, Pop Time and lead time: a chunk fractured early moves the Pop Time and is
+    // told again. No Character in the key: a pilot with two Characters in the audience gets one
+    // push, not two. The pop id comes first so a push can open it (`sharedPopIdOfOccurrenceKey`).
+    case 'sharedMoonPop':
+      return [fire.eventId, fire.popId, fire.popAtMs, fire.thresholdMs].join(':');
     default: {
       const exhaustive: never = fire;
       throw new Error(`occurrenceKey: unhandled Notification Event ${JSON.stringify(exhaustive)}`);
@@ -386,6 +393,9 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     case 'mercenaryDenReinforced':
     case 'skyhookRaidable':
     case 'acceleratorExpiring':
+    // A Pop Time, or a lead time before it: the moment it is told is it.
+    // falls through
+    case 'sharedMoonPop':
     case 'mercenaryDenAnarchy':
     case 'corpMemberJoined':
     case 'corpMemberLeft':

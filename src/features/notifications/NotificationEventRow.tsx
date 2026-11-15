@@ -10,6 +10,7 @@ import { AggregateRow } from './AggregateRow';
 import { PermissionNote } from './PermissionNote';
 import { MailPushBadge, NearbyPushBadge, ScheduledPushBadge } from './ScheduledPushBadge';
 import { EventThresholdsList } from './EventThresholdsList';
+import { SharedPopMutes } from './SharedPopMutes';
 import { eventEntry } from './eventEntries';
 import { eventLabelKey, isCorpEventId, type NotificationEventId } from './events';
 import { isEventEnabledFor } from './eventSelection';
@@ -42,6 +43,8 @@ export function NotificationEventRow({
   const badge = pushBadgeKind(eventId);
   // A corp event's note is said once on its group header, not on every row.
   const isCorp = isCorpEventId(eventId);
+  // Its sharing corporations are listed under it, each to mute (issue #6225).
+  const isSharedMoonPop = eventId === 'sharedMoonPop';
   const availability = useEventAvailability(eventId, context);
   const { prefsValue } = context;
   // Writes read the store at click time, not a closed-over prop: a boot-time
@@ -98,12 +101,15 @@ export function NotificationEventRow({
       forceExpanded={context.forceExpanded}
       isDesktop={context.isDesktop}
       notes={
-        entry.rowHintKey !== null || (missing !== null && !isCorp) ? (
+        entry.rowHintKey !== null || (missing !== null && !isCorp) || isSharedMoonPop ? (
           <>
             {entry.rowHintKey !== null && (
               <p className="text-[0.6875rem] text-text-dim">{t(entry.rowHintKey)}</p>
             )}
             {missing !== null && !isCorp && <PermissionNote {...missing} />}
+            {isSharedMoonPop && (
+              <SharedPopMutes prefsValue={prefsValue} characters={context.characters} />
+            )}
           </>
         ) : undefined
       }
