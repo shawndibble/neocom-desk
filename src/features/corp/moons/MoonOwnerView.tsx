@@ -19,6 +19,7 @@ import {
 } from '../taxBook/feederViewModel';
 import { DialogShell } from './BookDialogs';
 import { RefineryLabels } from './RefineryLabels';
+import { callableErrorText } from './feederErrorText';
 import { ChangePayeeDialog, PayeeChangeStrip, PayeeLine } from './MoonOwnerPayee';
 import { isk, shortDate } from './moonsFormat';
 
@@ -325,8 +326,8 @@ function PopSharingSwitch({
     setError(null);
     try {
       await onChange(next);
-    } catch {
-      setError(t('corpTaxBook.moons.ownerView.popSharing.failed'));
+    } catch (e) {
+      setError(callableErrorText(t, e, 'corpTaxBook.moons.ownerView.popSharing.failed'));
     } finally {
       setBusy(false);
     }

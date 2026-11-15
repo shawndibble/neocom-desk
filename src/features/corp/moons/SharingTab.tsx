@@ -4,12 +4,13 @@
  * owners'), each row opening its overrides. Settings only: later tickets publish the Shared
  * Pops. Book editors change them; read-only officers see them.
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   Checkbox,
   DataTable,
+  Eyebrow,
   EmptyState,
   LoadFailedState,
   Panel,
@@ -17,13 +18,14 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Pill } from '@/components/ui/Pill';
 import { resolveRate } from '@/engine/corpTaxBook/rates';
 import { sharingMoons, type SharingMoonRow } from '@/engine/corpTaxBook/sharingMoons';
 import { utcDay } from '@/engine/localDay';
 import { loadMyCommunitiesCached } from '@/features/communities/communityStore';
-import type { PopSharingSettings } from '../../../../functions/src/popSharing';
 import { callableErrorText } from './feederErrorText';
+import { audienceKey, type PopSharingSettings } from '../../../../functions/src/popSharing';
 import { AudienceName, PopSharingDialog, type CommunityChoice } from './PopSharingDialog';
 import { PlaceCell } from './sectionParts';
 import { useBook } from './useBook';
@@ -37,7 +39,7 @@ function Audiences({ settings }: { settings: PopSharingSettings }) {
   return (
     <>
       {settings.audiences.map((a, i) => (
-        <span key={i}>
+        <span key={audienceKey(a)}>
           {i > 0 && ', '}
           <AudienceName audience={a} />
         </span>
@@ -102,17 +104,21 @@ export function SharingTab() {
     };
   }, [canEdit, characterId]);
 
-  const bookRatePct = useMemo(
-    () =>
+  // The book's own rate, at a moon when one is open (a moon, refinery or moon owner rate wins).
+  const bookRateAt = useCallback(
+    (row?: SharingMoonRow) =>
       resolveRate(settings.rates, {
         date: utcDay(),
         minerId: '',
-        moonId: undefined,
+        moonId: row?.moonId,
+        structureId: row?.structureId,
+        feederId: row?.ownerCorporationId,
         recordKey: '',
         isGuest: false,
       })?.pct ?? null,
     [settings.rates]
   );
+  const bookRatePct = useMemo(() => bookRateAt(), [bookRateAt]);
   const doc = load.state === 'ready' ? load.doc : null;
   const rows = useMemo(
     () => (doc ? sharingMoons(view.extractions, data.feeders ?? [], doc) : []),
@@ -225,7 +231,7 @@ export function SharingTab() {
               {openSettings && (
                 <button
                   type="button"
-                  className="text-accent underline-offset-2 hover:underline"
+                  className={inlineLinkClassName}
                   onClick={() => openSettings('access')}
                 >
                   {t(`${k}.openSyncSettings`)}
@@ -234,9 +240,9 @@ export function SharingTab() {
             </p>
           )}
           {switchError && <InlineError>{switchError}</InlineError>}
-          <h3 className="pt-1 text-xs font-semibold tracking-widest text-text-dim uppercase">
+          <Eyebrow as="h3" className="pt-1">
             {t(`${k}.default`)}
-          </h3>
+          </Eyebrow>
           <SettingsSummary settings={doc.defaults} bookRatePct={bookRatePct} />
         </div>
       </Panel>
@@ -274,13 +280,14 @@ export function SharingTab() {
         <PopSharingDialog
           title={t(`${k}.editMoon`, { moon: names.moon(editingMoon.moonId) })}
           settings={editingMoon.effective.settings}
+          defaults={doc.defaults}
           override={doc.moons[String(editingMoon.moonId)] ?? {}}
           communities={communities}
-          bookRatePct={bookRatePct}
+          bookRatePct={bookRateAt(editingMoon)}
           canEdit={canEdit}
           onClose={() => setEditing(null)}
           onSave={(patch) =>
-            save({ action: 'setPopSharingMoon', moonId: editingMoon.moonId, override: patch })
+            save({ action: 'setPopSharingMoon', moonId: editingMoon.moonId, ...patch })
           }
         />
       )}

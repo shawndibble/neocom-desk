@@ -60,18 +60,25 @@ export function defaultsPatch(
 
 /**
  * One moon's change: `overriding` names the settings the moon sets for itself, taken from
- * `next`; any other it overrode now follows the default (null).
+ * `next`; any other it overrode now follows the default (`clear`).
  */
 export function moonPatch(
   current: PopSharingOverride,
   next: PopSharingSettings,
   overriding: ReadonlySet<PopSharingKey>
 ): PopSharingOverridePatch {
-  const out: Record<string, unknown> = {};
+  const set: Record<string, unknown> = {};
+  const clear: PopSharingKey[] = [];
   for (const k of POP_SHARING_KEYS) {
     if (overriding.has(k)) {
-      if (!same(current[k], next[k])) out[k] = next[k];
-    } else if (current[k] !== undefined) out[k] = null;
+      if (current[k] === undefined || !same(current[k], next[k])) set[k] = next[k];
+    } else if (current[k] !== undefined) clear.push(k);
   }
-  return out as PopSharingOverridePatch;
+  return { set: set as Partial<PopSharingSettings>, clear };
 }
+
+/** Whether a patch changes anything. */
+export const isEmptyPatch = (p: Partial<PopSharingSettings> | PopSharingOverridePatch): boolean =>
+  'clear' in p && 'set' in p
+    ? p.clear.length === 0 && Object.keys(p.set).length === 0
+    : Object.keys(p).length === 0;

@@ -389,13 +389,13 @@ emulatorSuite('moon owner view', () => {
         accessToken: `roles-${id}`,
         share: on,
       });
-    expect(await summary()).toMatchObject({ popSharingOptedOut: false });
+    expect(await summary()).not.toHaveProperty('popSharingOptedOut');
     await share(false);
     expect((await feederRecord())?.popSharingOptOut).toEqual({ by: FEEDER_DIRECTOR, at: T0 });
     expect(await summary()).toMatchObject({ popSharingOptedOut: true });
     await share(true);
     expect(await feederRecord()).not.toHaveProperty('popSharingOptOut');
-    expect(await summary()).toMatchObject({ popSharingOptedOut: false });
+    expect(await summary()).not.toHaveProperty('popSharingOptedOut');
     const audit = (await collectorBook().collection('audit').get()).docs.map((d) => d.data());
     expect(audit.filter((a) => a.action === 'feederPopSharingSet')).toHaveLength(2);
     expect(await reason(share(false, FEEDER_JUNIOR))).toBe('not-your-feeder');

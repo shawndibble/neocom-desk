@@ -1621,12 +1621,12 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       await edit(ACCOUNTANT, {
         action: 'setPopSharingMoon',
         moonId: 7,
-        override: { showOre: false, ratePct: 5 },
+        set: { showOre: false, ratePct: 5 },
       });
       await edit(ACCOUNTANT, {
         action: 'setPopSharingMoon',
         moonId: 7,
-        override: { ratePct: null },
+        clear: ['ratePct'],
       });
       expect(await popSharing()).toMatchObject({
         enabled: false,
@@ -1638,7 +1638,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         expect.objectContaining({
           action: 'setPopSharingMoon',
           by: ACCOUNTANT,
-          detail: { moonId: 7, override: { ratePct: null } },
+          detail: { moonId: 7, set: {}, clear: ['ratePct'] },
         })
       );
       expect(audit).toContainEqual(
@@ -1653,7 +1653,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       ).toBe('role-required');
       expect(
         await reason(
-          edit(ACCOUNTANT, { action: 'setPopSharingMoon', moonId: 99, override: { notes: 'x' } })
+          edit(ACCOUNTANT, { action: 'setPopSharingMoon', moonId: 99, set: { notes: 'x' } })
         )
       ).toBe('unknown-moon');
       expect(await popSharing()).toBeUndefined();

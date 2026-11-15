@@ -3,11 +3,13 @@
  * moon lists every setting with "Set for this moon"; one left unticked follows the default,
  * so a later change to the default reaches it. A read-only officer sees the same, disabled.
  */
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, SegmentedControl, TextArea, TextInput } from '@/components/ui';
+import { Checkbox, FieldError, SegmentedControl, TextArea, TextInput } from '@/components/ui';
 import {
+  MAX_POP_NOTES,
   POP_SHARING_KEYS,
+  POP_TIMES,
   audienceKey,
   type PopAudience,
   type PopSharingKey,
@@ -20,6 +22,7 @@ import { DialogShell } from './BookDialogs';
 import {
   defaultsPatch,
   draftOf,
+  isEmptyPatch,
   moonPatch,
   settingsOfDraft,
   type SettingsDraft,
@@ -64,21 +67,20 @@ function Row({
 }) {
   const { t } = useTranslation();
   return (
-    <fieldset className="space-y-1.5 border-t border-line pt-3 first:border-t-0 first:pt-0">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <legend className="text-xs text-text-dim">{label}</legend>
-        {own && (
-          <label className="flex min-h-9 items-center gap-2 text-xs">
-            <Checkbox
-              checked={own.checked}
-              disabled={own.disabled}
-              onChange={(e) => own.onChange(e.target.checked)}
-            />
-            {t(`${k}.setForMoon`)}
-          </label>
-        )}
-      </div>
-      {children}
+    <fieldset className="border-t border-line pt-3 first:border-t-0 first:pt-0">
+      {/* The legend stays the fieldset's first child so it names the group. */}
+      <legend className="float-left py-2 text-xs text-text-dim">{label}</legend>
+      {own && (
+        <label className="float-right flex min-h-9 items-center gap-2 text-xs">
+          <Checkbox
+            checked={own.checked}
+            disabled={own.disabled}
+            onChange={(e) => own.onChange(e.target.checked)}
+          />
+          {t(`${k}.setForMoon`)}
+        </label>
+      )}
+      <div className="clear-both space-y-1.5">{children}</div>
     </fieldset>
   );
 }
@@ -86,6 +88,7 @@ function Row({
 export function PopSharingDialog({
   title,
   settings,
+  defaults,
   override,
   communities,
   bookRatePct,
@@ -96,6 +99,8 @@ export function PopSharingDialog({
   title: string;
   /** The settings now in effect: the default, or the moon's effective settings. */
   settings: PopSharingSettings;
+  /** Moon mode: the Sharing default, which a setting returns to when unticked. */
+  defaults?: PopSharingSettings;
   /** Moon mode: what the moon overrides now. Absent edits the Sharing default. */
   override?: PopSharingOverride;
   communities: readonly CommunityChoice[];
@@ -106,6 +111,7 @@ export function PopSharingDialog({
   onSave: (patch: Partial<PopSharingSettings> | PopSharingOverridePatch) => Promise<void>;
 }) {
   const { t } = useTranslation();
+  const rateErrorId = useId();
   const [draft, setDraft] = useState<SettingsDraft>(() => draftOf(settings));
   const [own, setOwn] = useState<ReadonlySet<PopSharingKey>>(
     () => new Set(POP_SHARING_KEYS.filter((key) => override?.[key] !== undefined))
@@ -122,13 +128,19 @@ export function PopSharingDialog({
       ? {
           checked: own.has(key),
           disabled: !canEdit,
-          onChange: (v: boolean) =>
+          onChange: (v: boolean) => {
             setOwn((prev) => {
               const out = new Set(prev);
               if (v) out.add(key);
               else out.delete(key);
               return out;
-            }),
+            });
+            // Unticked, the setting shows the default again (and drops a half-typed value).
+            if (!v && defaults) {
+              const field = key === 'ratePct' ? 'rate' : key;
+              set(field, draftOf(defaults)[field]);
+            }
+          },
         }
       : undefined;
   const chosen = new Set(draft.audiences.map(audienceKey));
@@ -146,7 +158,7 @@ export function PopSharingDialog({
       onClose={onClose}
       title={title}
       confirmLabel={t('common.save')}
-      canConfirm={canEdit && patch !== null && Object.keys(patch).length > 0}
+      canConfirm={canEdit && patch !== null && !isEmptyPatch(patch)}
       run={() => onSave(patch ?? {})}
       showLogged={canEdit ? 'plain' : false}
     >
@@ -172,7 +184,7 @@ export function PopSharingDialog({
           label={t(`${k}.fields.popTime`)}
           value={draft.popTime}
           onChange={(v) => set('popTime', v)}
-          options={(['ready', 'auto-fracture'] as const).map((value) => ({
+          options={POP_TIMES.map((value) => ({
             value,
             label: t(`${k}.popTime.${value}`),
             // The selected segment stays live so the value still reads; the other is inert.
@@ -200,18 +212,19 @@ export function PopSharingDialog({
             bookRatePct === null ? t(`${k}.bookRate`) : t(`${k}.bookRatePct`, { pct: bookRatePct })
           }
           aria-label={t(`${k}.fields.rate`)}
+          aria-describedby={next === null ? rateErrorId : undefined}
           onChange={(e) => set('rate', e.target.value)}
         />
         {next === null && (
-          <p role="alert" className="text-xs text-danger">
+          <FieldError id={rateErrorId} className="block text-xs">
             {t(`${k}.rateInvalid`)}
-          </p>
+          </FieldError>
         )}
       </Row>
       <Row label={t(`${k}.fields.notes`)} own={ownToggle('notes')}>
         <TextArea
           rows={3}
-          maxLength={500}
+          maxLength={MAX_POP_NOTES}
           value={draft.notes}
           disabled={!editable('notes')}
           aria-label={t(`${k}.fields.notes`)}

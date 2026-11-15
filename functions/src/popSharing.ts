@@ -8,6 +8,8 @@
 // `editCorpTaxBookCallable` actions `setPopSharing` / `setPopSharingMoon` write it). A moon
 // owner's opt-out lives on its feeder record (`corps/{corp}/feeders/{owner}.popSharingOptOut`).
 
+import { isPlainRecord as isRecord } from './guards.js';
+
 /** `corps/{corp}/meta/{POP_SHARING_DOC}`. */
 export const POP_SHARING_DOC = 'popSharing';
 
@@ -47,8 +49,14 @@ export const POP_SHARING_KEYS: readonly PopSharingKey[] = [
 /** A Moon override: only the settings that moon changed. */
 export type PopSharingOverride = Partial<PopSharingSettings>;
 
-/** A change to one moon's override: a value sets it, null returns it to the default. */
-export type PopSharingOverridePatch = { [K in PopSharingKey]?: PopSharingSettings[K] | null };
+/**
+ * A change to one moon's override: `set` overrides those settings (a `ratePct` of null is the
+ * book's own rate, overriding a default that names one); `clear` returns those to the default.
+ */
+export interface PopSharingOverridePatch {
+  set: Partial<PopSharingSettings>;
+  clear: PopSharingKey[];
+}
 
 export interface PopSharingDoc {
   /** Off by default; turning it on needs Automatic sync. */
@@ -71,7 +79,6 @@ export const MAX_POP_AUDIENCES = 20;
 export const MAX_POP_NOTES = 500;
 
 type Raw = Record<string, unknown>;
-const isRecord = (v: unknown): v is Raw => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 function readAudience(v: unknown): PopAudience | undefined {
   if (!isRecord(v)) return undefined;
@@ -90,7 +97,10 @@ function readAudience(v: unknown): PopAudience | undefined {
 export const audienceKey = (a: PopAudience): string =>
   a.kind === 'community' ? `community:${a.communityId}` : a.kind;
 
-/** The settings a stored record holds, each read only when it is well formed. */
+/**
+ * The settings a stored record holds, each read only when it is well formed. Lenient on purpose:
+ * the callable (`popSettingsPatch` in corpTaxBook.ts) is the strict gate on what is written.
+ */
 function readSettings(raw: unknown): PopSharingOverride {
   if (!isRecord(raw)) return {};
   const out: PopSharingOverride = {};
@@ -168,11 +178,8 @@ export function applyMoonOverride(
   patch: PopSharingOverridePatch
 ): PopSharingOverride | undefined {
   const next: Raw = { ...current };
-  for (const k of POP_SHARING_KEYS) {
-    if (!(k in patch)) continue;
-    if (patch[k] === null) delete next[k];
-    else next[k] = patch[k];
-  }
+  for (const k of patch.clear) delete next[k];
+  for (const k of POP_SHARING_KEYS) if (k in patch.set) next[k] = patch.set[k];
   return Object.keys(next).length > 0 ? (next as PopSharingOverride) : undefined;
 }
 

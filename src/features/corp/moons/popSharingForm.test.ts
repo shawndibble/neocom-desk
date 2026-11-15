@@ -25,8 +25,15 @@ describe('popSharingForm', () => {
     const settings = { ...DEFAULT_POP_SHARING, popTime: 'auto-fracture' as const, notes: 'x' };
     expect(
       moonPatch({ notes: 'x', showOre: false }, settings, new Set(['popTime', 'notes']))
-    ).toEqual({ popTime: 'auto-fracture', showOre: null });
+    ).toEqual({ set: { popTime: 'auto-fracture' }, clear: ['showOre'] });
     // Unchanged: nothing to send.
-    expect(moonPatch({ notes: 'x' }, settings, new Set(['notes']))).toEqual({});
+    expect(moonPatch({ notes: 'x' }, settings, new Set(['notes']))).toEqual({ set: {}, clear: [] });
+  });
+
+  it('a moon set to the book rate overrides a default that names a rate', () => {
+    expect(moonPatch({}, { ...DEFAULT_POP_SHARING, ratePct: null }, new Set(['ratePct']))).toEqual({
+      set: { ratePct: null },
+      clear: [],
+    });
   });
 });

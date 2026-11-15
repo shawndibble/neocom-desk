@@ -599,23 +599,29 @@ describe('Pop Sharing edits (#6222)', () => {
     bad({ defaults: { colour: 'red' } });
   });
 
-  it('parses a Moon override, null returning a setting to the default', () => {
+  it('parses a Moon override: settings to set, and settings back to the default', () => {
     expect(
       parseEditAction({
         action: 'setPopSharingMoon',
         moonId: 40001,
-        override: { popTime: 'ready', notes: null },
+        set: { popTime: 'ready', ratePct: null },
+        clear: ['notes'],
       })
     ).toEqual({
       action: 'setPopSharingMoon',
       moonId: 40001,
-      override: { popTime: 'ready', notes: null },
+      override: { set: { popTime: 'ready', ratePct: null }, clear: ['notes'] },
     });
+    const bad = (data: Record<string, unknown>) =>
+      expect(() =>
+        parseEditAction({ action: 'setPopSharingMoon', moonId: 40001, ...data })
+      ).toThrow();
+    bad({});
+    bad({ set: {}, clear: [] });
+    bad({ clear: ['colour'] });
+    bad({ set: { notes: 'a' }, clear: ['notes'] });
     expect(() =>
-      parseEditAction({ action: 'setPopSharingMoon', moonId: 40001, override: {} })
-    ).toThrow();
-    expect(() =>
-      parseEditAction({ action: 'setPopSharingMoon', moonId: 'x', override: { notes: 'a' } })
+      parseEditAction({ action: 'setPopSharingMoon', moonId: 'x', set: { notes: 'a' } })
     ).toThrow();
   });
 });

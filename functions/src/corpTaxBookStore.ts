@@ -1574,7 +1574,7 @@ async function applyPopSharingEdit(
     const override = applyMoonOverride(current.moons[key], action.override);
     if (override) next.moons[key] = override;
     else delete next.moons[key];
-    detail = { moonId: action.moonId, override: action.override };
+    detail = { moonId: action.moonId, set: action.override.set, clear: action.override.clear };
   }
   c.tx.set(ref, { ...next, updatedAt: c.now, updatedBy: c.access.characterId });
   return { detail };

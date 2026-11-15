@@ -811,10 +811,9 @@ export function parseEditAction(data: unknown): EditAction {
     case 'setPopSharing': {
       if (d.enabled !== undefined && typeof d.enabled !== 'boolean')
         throw new HttpsError('invalid-argument', 'enabled must be true or false');
-      const defaults =
-        d.defaults === undefined
-          ? undefined
-          : (popSettingsPatch(d.defaults, false) as Partial<PopSharingSettings>);
+      const defaults = d.defaults === undefined ? undefined : popSettingsPatch(d.defaults, false);
+      if (defaults && Object.keys(defaults).length === 0)
+        throw new HttpsError('invalid-argument', 'nothing to change');
       if (d.enabled === undefined && defaults === undefined)
         throw new HttpsError('invalid-argument', 'nothing to change');
       return {
@@ -823,12 +822,21 @@ export function parseEditAction(data: unknown): EditAction {
         ...(defaults ? { defaults } : {}),
       };
     }
-    case 'setPopSharingMoon':
-      return {
-        action,
-        moonId: int(d.moonId, 'moonId'),
-        override: popSettingsPatch(d.override, true) as PopSharingOverridePatch,
-      };
+    case 'setPopSharingMoon': {
+      const set = d.set === undefined ? {} : popSettingsPatch(d.set, true);
+      const clear = [
+        ...new Set(
+          list(d.clear ?? [], 'clear', POP_SHARING_KEYS.length).map((k) =>
+            oneOf(k, 'clear', POP_SHARING_KEYS)
+          )
+        ),
+      ];
+      if (Object.keys(set).length + clear.length === 0)
+        throw new HttpsError('invalid-argument', 'nothing to change');
+      if (clear.some((k) => k in set))
+        throw new HttpsError('invalid-argument', 'a setting cannot be set and cleared');
+      return { action, moonId: int(d.moonId, 'moonId'), override: { set, clear } };
+    }
     case 'recordMail':
       return {
         action,
@@ -851,10 +859,10 @@ function popAudience(raw: unknown): PopAudience {
 }
 
 /**
- * Pop Sharing settings from a client (#6222): only known settings, each validated. With
- * `clearable`, null returns a Moon override's setting to the Sharing default.
+ * Pop Sharing settings from a client (#6222): only known settings, each validated. A null
+ * `ratePct` is the book's own rate.
  */
-function popSettingsPatch(raw: unknown, clearable: boolean): PopSharingOverridePatch {
+function popSettingsPatch(raw: unknown, allowEmpty: boolean): Partial<PopSharingSettings> {
   const p = record(raw);
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(p)) {
@@ -864,10 +872,6 @@ function popSettingsPatch(raw: unknown, clearable: boolean): PopSharingOverrideP
   for (const key of POP_SHARING_KEYS) {
     const v = p[key];
     if (v === undefined) continue;
-    if (v === null && clearable) {
-      out[key] = null;
-      continue;
-    }
     switch (key) {
       case 'audiences': {
         const audiences = list(v, 'audiences', MAX_POP_AUDIENCES).map(popAudience);
@@ -895,8 +899,9 @@ function popSettingsPatch(raw: unknown, clearable: boolean): PopSharingOverrideP
       }
     }
   }
-  if (Object.keys(out).length === 0) throw new HttpsError('invalid-argument', 'nothing to change');
-  return out as PopSharingOverridePatch;
+  if (!allowEmpty && Object.keys(out).length === 0)
+    throw new HttpsError('invalid-argument', 'nothing to change');
+  return out as Partial<PopSharingSettings>;
 }
 
 /** The Statement fields the book relies on; the rest of the engine's shape is stored as given. */

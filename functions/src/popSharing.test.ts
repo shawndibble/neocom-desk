@@ -95,21 +95,27 @@ describe('effectivePopSharing', () => {
 
 describe('applyMoonOverride', () => {
   it('sets the given settings and keeps the rest', () => {
-    expect(applyMoonOverride({ notes: 'a' }, { popTime: 'auto-fracture' })).toEqual({
+    expect(
+      applyMoonOverride({ notes: 'a' }, { set: { popTime: 'auto-fracture' }, clear: [] })
+    ).toEqual({
       notes: 'a',
       popTime: 'auto-fracture',
     });
   });
 
-  it('null clears one setting back to the default', () => {
-    expect(applyMoonOverride({ notes: 'a', showOre: false }, { notes: null })).toEqual({
-      showOre: false,
-    });
+  it('clear returns one setting to the default', () => {
+    expect(
+      applyMoonOverride({ notes: 'a', showOre: false }, { set: {}, clear: ['notes'] })
+    ).toEqual({ showOre: false });
+  });
+
+  it('a null rate overrides to the book rate, not back to the default', () => {
+    expect(applyMoonOverride({}, { set: { ratePct: null }, clear: [] })).toEqual({ ratePct: null });
   });
 
   it('clearing the last setting leaves no override at all', () => {
-    expect(applyMoonOverride({ notes: 'a' }, { notes: null })).toBeUndefined();
-    expect(applyMoonOverride(undefined, {})).toBeUndefined();
+    expect(applyMoonOverride({ notes: 'a' }, { set: {}, clear: ['notes'] })).toBeUndefined();
+    expect(applyMoonOverride(undefined, { set: {}, clear: [] })).toBeUndefined();
   });
 });
 

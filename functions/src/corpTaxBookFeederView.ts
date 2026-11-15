@@ -484,7 +484,7 @@ export function buildFeederView(input: FeederViewInput): FeederView {
       ? { side: record.payeeSetBy.side, at: record.payeeSetBy.at }
       : null,
     refineryNamesGranted: record.readsStructureNames === true,
-    popSharingOptedOut: record.popSharingOptOut !== undefined,
+    ...(record.popSharingOptOut ? { popSharingOptedOut: true } : {}),
   };
   return {
     summary,
