@@ -8,8 +8,10 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { useCharacterFilterPicks } from '@/features/character/characterFilterPicks';
-import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
+import { Wallet } from '@/routes/Wallet';
+import { LoyaltyStore } from '@/routes/LoyaltyStore';
+import { renderPageRoutes } from '@/test/renderPage';
 
 // Shared harness for the Wallet route tests (src/routes/Wallet*.test.tsx), one file
 // per concern so CI runs them in parallel. The `vi.mock` calls stay in each test
@@ -87,20 +89,35 @@ export async function seed() {
   window.history.pushState({}, '', '/wallet');
 }
 
-export function installWalletHarness(): void {
+/**
+ * Renders the Wallet route and its LP Store tab's own route on their own (their
+ * TabRoute and info modals, no App boot or shell) at the current
+ * `window.location`. The few tests that prove the App wiring — the URL, legacy
+ * paths, the shell — render `<App />` (Wallet.test.tsx).
+ */
+export function renderWalletRoute() {
+  return renderPageRoutes([
+    ['/wallet', <Wallet />],
+    ['/wallet/lp-store', <LoyaltyStore />],
+    ['/wallet/lp-store/:corporationId', <LoyaltyStore />],
+  ]);
+}
+
+export function installWalletHarness({ warmApp = false }: { warmApp?: boolean } = {}): void {
   beforeAll(async () => {
     // One throwaway render, so no test pays for the first one. A worker's first
-    // `App` render (compiling the lazy Layout and route chunks, warming jsdom
-    // and React) took seconds under parallel load and landed on whichever test
-    // ran first, tipping it past its findBy / test timeout. Done here under the
-    // hook's own budget, as IndustryPlanPage.test.tsx does.
+    // render (compiling the route chunks, warming jsdom and React) took seconds
+    // under parallel load and landed on whichever test ran first, tipping it
+    // past its findBy / test timeout. Done here under the hook's own budget.
     await Promise.all([
-      routeChunks.loadLayout(),
       routeChunks.loadWallet(),
       routeChunks.loadLoyaltyStore(),
+      ...(warmApp ? [routeChunks.loadLayout()] : []),
     ]);
     await seed();
-    const { unmount } = render(<App />);
+    // App is imported only here, so a file without App-level tests never loads its graph.
+    const App = warmApp ? (await import('@/app/App')).App : null;
+    const { unmount } = App ? render(<App />) : renderWalletRoute();
     // Wait for real content, not just the shell: the first data load (Dexie, MSW,
     // the ESI cache) is part of the cold cost too.
     await screen.findByText('EverMarks', {}, { timeout: 25_000 });

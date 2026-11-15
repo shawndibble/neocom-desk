@@ -1,15 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import '@/i18n';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
-import { App } from '@/app/App';
 import { loadAllCharactersJournals } from '@/features/character/walletJournalAll';
 import { stubViewport } from '@/test/viewport';
-import { installWalletHarness, CHAR_ID, journalPage1, server } from '@/test/walletPage';
+import {
+  installWalletHarness,
+  renderWalletRoute,
+  CHAR_ID,
+  journalPage1,
+  server,
+} from '@/test/walletPage';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -18,14 +23,6 @@ vi.mock('@/features/character/walletJournalAll', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/features/character/walletJournalAll')>();
   return { ...actual, loadAllCharactersJournals: vi.fn(actual.loadAllCharactersJournals) };
 });
-
-vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: () => ({
-    needRefresh: [false, vi.fn()],
-    offlineReady: [false, vi.fn()],
-    updateServiceWorker: vi.fn(),
-  }),
-}));
 
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
@@ -43,7 +40,7 @@ installWalletHarness();
 describe('Wallet', () => {
   it('keeps the Journal panel header free of a Character portrait and scope label (issue #2993)', async () => {
     window.history.pushState({}, '', '/wallet/journal');
-    render(<App />);
+    renderWalletRoute();
     expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
     expect(screen.queryByText(/ only$/)).not.toBeInTheDocument();
   });
@@ -53,7 +50,7 @@ describe('Wallet', () => {
       .spyOn(Element.prototype, 'scrollIntoView')
       .mockImplementation(() => {});
     window.history.pushState({}, '', '/wallet/journal?highlight=2');
-    render(<App />);
+    renderWalletRoute();
 
     expect(await screen.findByText('Donation')).toBeInTheDocument();
     const pulsed = document.querySelector('[data-row-key="2"]');
@@ -71,7 +68,7 @@ describe('Wallet', () => {
 
   it('humanizes the raw ESI ref_type into readable text', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     // Scoped to the table: the same humanized strings also populate the
     // ref-type filter's <option> list (issue #413).
@@ -91,7 +88,7 @@ describe('Wallet', () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet`, () => HttpResponse.error())
     );
-    render(<App />);
+    renderWalletRoute();
     expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
   });
 
@@ -104,7 +101,7 @@ describe('Wallet', () => {
       })
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText('Bounty')).toBeInTheDocument();
     expect(screen.getByText(/incomplete data/i)).toBeInTheDocument();
@@ -112,7 +109,7 @@ describe('Wallet', () => {
 
   it('shows no truncation warning when the journal came back whole', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText('Bounty')).toBeInTheDocument();
     expect(screen.queryByText(/incomplete data/i)).not.toBeInTheDocument();
@@ -120,7 +117,7 @@ describe('Wallet', () => {
 
   it('narrows the journal to rows matching the ref-type filter (issue #413)', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
@@ -134,7 +131,7 @@ describe('Wallet', () => {
 
   it('breaks the journal down by ref type and filters on a row click (issue #2858)', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
@@ -154,7 +151,7 @@ describe('Wallet', () => {
 
   it('shows one full-precision signed Net column in the breakdown (issues #2995, #3220)', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
@@ -174,7 +171,7 @@ describe('Wallet', () => {
 
   it('tones the filtered net total by sign (issue #1961)', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
@@ -188,7 +185,7 @@ describe('Wallet', () => {
 
   it('narrows the journal by free text against the description (issue #413)', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
@@ -200,7 +197,7 @@ describe('Wallet', () => {
 
   it('shows no filtered-count summary when no filter is active (issue #1721)', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
@@ -209,7 +206,7 @@ describe('Wallet', () => {
 
   it('shows a filtered-count and net-total summary once a filter narrows the journal (issue #1721)', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
@@ -221,7 +218,7 @@ describe('Wallet', () => {
 
   it('shows a filtered-empty message, not the no-data empty state, when the filter matches nothing (issue #413)', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
@@ -236,7 +233,7 @@ describe('Wallet', () => {
 
   it('offers Reset filters on the filtered-empty journal, and restores every entry', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
@@ -251,7 +248,7 @@ describe('Wallet', () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet`, () => HttpResponse.error())
     );
-    render(<App />);
+    renderWalletRoute();
     expect(await screen.findByRole('heading', { name: 'Worth' })).toBeInTheDocument();
     expect(screen.getByText('Net worth', { selector: 'p' }).nextElementSibling).toHaveTextContent(
       '—'
@@ -259,7 +256,7 @@ describe('Wallet', () => {
   });
 
   it('puts net worth, EverMarks and the series picker in one Worth panel, with no scope readout', async () => {
-    render(<App />);
+    renderWalletRoute();
     const header = (await screen.findByRole('heading', { name: 'Worth' })).closest('header');
     expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     expect(within(header!).getByRole('button', { name: /^Layers:/ })).toBeInTheDocument();
@@ -275,7 +272,7 @@ describe('Wallet', () => {
       fetchedAt: STALE_FETCHED_AT,
     });
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
 
     // Initial load succeeds live — no banner at all yet.
     expect(await screen.findByText('EverMarks')).toBeInTheDocument();
@@ -296,7 +293,7 @@ describe('Wallet', () => {
       )
     );
 
-    render(<App />);
+    renderWalletRoute();
 
     expect(await screen.findByRole('button', { name: /log in again/i })).toBeInTheDocument();
     expect(screen.queryByText(/no wallet data cached/i)).not.toBeInTheDocument();
@@ -312,7 +309,7 @@ describe('Wallet', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText('No journal entries')).toBeInTheDocument();
     expect(
@@ -329,7 +326,7 @@ describe('Wallet', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText('Log in again to see your wallet')).toBeInTheDocument();
     expect(screen.queryByText('No journal entries cached')).not.toBeInTheDocument();
@@ -337,7 +334,7 @@ describe('Wallet', () => {
 
   it('shows no re-login banner when the journal loads normally', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText('Bounty')).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your wallet')).not.toBeInTheDocument();
@@ -356,7 +353,7 @@ describe('Wallet', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your wallet')).not.toBeInTheDocument();
@@ -375,7 +372,7 @@ describe('Wallet', () => {
     const restore = useNarrowViewport();
     try {
       const user = userEvent.setup();
-      render(<App />);
+      renderWalletRoute();
       await user.click(await screen.findByRole('tab', { name: 'Journal' }));
       await screen.findByText('Bounty');
 
@@ -432,7 +429,7 @@ describe('Wallet', () => {
       await seedSecondWithJournal();
       window.history.pushState({}, '', '/wallet/journal');
       const user = userEvent.setup();
-      render(<App />);
+      renderWalletRoute();
       await pickAllCharacters(user);
 
       const table = await screen.findByRole('table', { name: 'Journal' });
@@ -457,7 +454,7 @@ describe('Wallet', () => {
       window.history.pushState({}, '', '/wallet/journal');
       vi.mocked(loadAllCharactersJournals).mockRejectedValueOnce(new Error('boom'));
       const user = userEvent.setup();
-      render(<App />);
+      renderWalletRoute();
       await pickAllCharacters(user);
 
       await user.click(await screen.findByRole('button', { name: 'Try again' }));
