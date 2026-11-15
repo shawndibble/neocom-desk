@@ -45,6 +45,7 @@ describe('fake timers a test never restored', () => {
   it('are real again, the pending timer dropped', async () => {
     expect(vi.isFakeTimers()).toBe(false);
     expect(new Date().getUTCFullYear()).toBeGreaterThan(2020);
+    // eslint-disable-next-line no-restricted-syntax -- proves a dropped fake timer never fires: real time must pass its 10ms
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(fired).toBe(false);
   });
