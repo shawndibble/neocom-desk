@@ -401,7 +401,9 @@ describe('Mail', () => {
     // Same page instance, still waiting on the first Character's older page.
     expect(screen.getByRole('button', { name: 'Loading' })).toBeDisabled();
 
-    act(() => resolveOlderPage?.());
+    await act(async () => {
+      resolveOlderPage?.();
+    });
     // The stale request has settled once the button is back.
     expect(await screen.findByRole('button', { name: /load more/i })).toBeEnabled();
     expect(screen.queryByText('Older mail')).not.toBeInTheDocument();
