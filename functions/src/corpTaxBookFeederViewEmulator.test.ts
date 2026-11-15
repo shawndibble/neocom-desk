@@ -205,7 +205,11 @@ emulatorSuite('moon owner view', () => {
       schemaVersion: 1,
       status: 'active',
       requestedRatePct: 6,
-      effectiveRatePct: 6,
+      // The grant-time rate is a request: nothing accrues until a rate is agreed (#6209).
+      effectiveRatePct: null,
+      accruedIsk: 0,
+      // The first pull's day is not Billable yet, so nothing waits as pending either.
+      pendingValueIsk: 0,
       minedVolume: 100,
       minedValueIsk: 1000,
       refineryCount: 1,
@@ -334,7 +338,8 @@ emulatorSuite('moon owner view', () => {
   it('request rate: records a requested entry, and an agreed rate keeps winning', async () => {
     await save(await newInvite(), 6);
     await requestFeederRate(deps(), who(FEEDER_DIRECTOR), { ...asDirector, pct: 7 });
-    expect(await summary()).toMatchObject({ requestedRatePct: 7, effectiveRatePct: 7 });
+    // A request never takes effect on its own (#6209).
+    expect(await summary()).toMatchObject({ requestedRatePct: 7, effectiveRatePct: null });
     expect((await feederRecord())?.ownerRateHistory?.map((e) => e.pct)).toEqual([6, 7]);
 
     await collectorBook()

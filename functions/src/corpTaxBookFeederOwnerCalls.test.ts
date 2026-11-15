@@ -68,8 +68,13 @@ describe('appendAgreedRate', () => {
       recordedAt: '2026-10-18T12:00:00.000Z',
     });
     expect(effectiveOwnerRatePct(history, '2026-10-18')).toBe(6);
-    // Never reaches back: the day before still reads the request.
-    expect(effectiveOwnerRatePct(history, '2026-10-17')).toBe(4);
+    // A request never applies: the first agreed rate reaches back over the days before (#6209).
+    expect(effectiveOwnerRatePct(history, '2026-10-17')).toBe(6);
+  });
+  it('a later agreed rate never reaches back past the one already in force', () => {
+    const history = appendAgreedRate(record({ requestedRatePct: 4, agreedRatePct: 5 }), 6, NOW);
+    expect(effectiveOwnerRatePct(history, '2026-10-18')).toBe(6);
+    expect(effectiveOwnerRatePct(history, '2026-10-17')).toBe(5);
   });
   it('keeps earlier entries, deriving them from the legacy fields', () => {
     const history = appendAgreedRate(record({ requestedRatePct: 4, agreedRatePct: 5 }), 6, NOW);
