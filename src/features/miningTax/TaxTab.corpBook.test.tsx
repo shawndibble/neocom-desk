@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -126,6 +126,9 @@ describe('TaxTab with a Corp Tax Book', () => {
   beforeEach(() => {
     vi.setSystemTime(new Date('2026-10-18T14:00:00Z'));
     hoisted.view = null;
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('is the personal tab, unchanged, with no book (D24)', () => {

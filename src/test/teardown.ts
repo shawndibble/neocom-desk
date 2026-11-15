@@ -1,0 +1,246 @@
+/**
+ * Test-end teardown shared by both vitest projects (`vitest.setup.ts`,
+ * `vitest.setup.dom.ts`): nothing a test started may still be running when the
+ * next one begins, or after the file's environment is gone.
+ *
+ * Three kinds of work outlive a test on their own:
+ *
+ * - **Fake timers / a frozen `Date`** left on by a test that never restored
+ *   them, which every later test in the file then runs under.
+ * - **`fetch` still in flight.** Its late response writes into `esiCache` or
+ *   Dexie after the next test's reset, or calls `setState` after jsdom is torn
+ *   down ("window is not defined"). Every `fetch` a test makes carries a
+ *   test-scoped signal that is aborted when the test ends; MSW honours it for
+ *   mocked responses too, so a handler parked on a deferred cannot hang.
+ * - **IndexedDB requests and transactions** (Dexie writes, and Firebase's
+ *   heartbeat probe, whose `onsuccess` reads `self` — "self is not defined"
+ *   once jsdom is gone). Opens, deletes and transactions are tracked until they
+ *   finish, and the test waits for them.
+ *
+ * Production code is untouched: the hooks wrap the globals tests run against.
+ *
+ * Order matters. `vitest.runner.ts` calls `endTestWork` as soon as the test
+ * body finishes, **before** any `afterEach`: an aborted request is a failure to
+ * the app (a price source marked down, a fallback taken), and the test file's
+ * own `afterEach` resets have to run after that, not before. Then the shared
+ * `afterEach` in `vitest.setup.ts` restores timers and settles whatever the
+ * file's hooks started.
+ */
+import { expect, vi } from 'vitest';
+
+// Captured before any test can fake them: the waits below must run on real
+// time even when a test left fake timers on.
+const realSetTimeout = globalThis.setTimeout;
+const realClearTimeout = globalThis.clearTimeout;
+const realNow = Date.now.bind(Date);
+
+/** How long a test's leftover work may take to finish before it's reported. */
+const SETTLE_TIMEOUT_MS = 1000;
+
+const ENDED = 'test ended';
+
+// ---------------------------------------------------------------------------
+// Timers
+// ---------------------------------------------------------------------------
+
+/** Drops pending fake timers, then puts real timers and the real `Date` back. */
+export function restoreRealTimers(): void {
+  // Cleared first, so no faked callback fires into the next test.
+  if (vi.isFakeTimers()) vi.clearAllTimers();
+  // Unconditional: it also undoes a bare `vi.setSystemTime` (a mocked `Date`
+  // without fake timers), which `isFakeTimers()` doesn't report.
+  vi.useRealTimers();
+}
+
+// ---------------------------------------------------------------------------
+// fetch
+// ---------------------------------------------------------------------------
+
+/** The running test's; aborted at its end and left aborted until the next starts. */
+let testController: AbortController | null = null;
+const pendingFetches = new Set<Promise<unknown>>();
+const WRAPPED = Symbol('teardown-wrapped-fetch');
+
+type TrackedFetch = typeof fetch & { [WRAPPED]?: true };
+
+function callerSignal(input: RequestInfo | URL, init?: RequestInit): AbortSignal | undefined {
+  if (init?.signal) return init.signal;
+  return typeof Request !== 'undefined' && input instanceof Request ? input.signal : undefined;
+}
+
+/**
+ * Wraps whatever `fetch` is current — MSW's interceptor when the file has a
+ * server, since its `beforeAll` has already run. Called before each test: a
+ * `vi.stubGlobal('fetch', ...)` replaces the wrapper for that test only, and
+ * `unstubGlobals` puts it back, so it is wrapped at most once.
+ */
+function wrapFetch(): void {
+  const inner = globalThis.fetch as TrackedFetch | undefined;
+  if (typeof inner !== 'function' || inner[WRAPPED]) return;
+  const tracked: TrackedFetch = (input, init) => {
+    const controller = testController;
+    if (controller === null) return inner(input, init);
+    const own = callerSignal(input, init);
+    const signal = own ? AbortSignal.any([controller.signal, own]) : controller.signal;
+    const promise = inner(input, { ...init, signal });
+    pendingFetches.add(promise);
+    const forget = () => pendingFetches.delete(promise);
+    promise.then(forget, forget);
+    return promise;
+  };
+  tracked[WRAPPED] = true;
+  globalThis.fetch = tracked;
+}
+
+/** Before each test: a fresh signal for its requests. */
+export function beginTestFetches(): void {
+  testController = new AbortController();
+  wrapFetch();
+}
+
+/** Aborts every request the test still has in flight; later ones abort at once. */
+export function abortTestFetches(): void {
+  testController?.abort(new DOMException(ENDED, 'AbortError'));
+}
+
+// ---------------------------------------------------------------------------
+// IndexedDB
+// ---------------------------------------------------------------------------
+
+const pendingIdb = new Set<Promise<void>>();
+
+/** Tracks `target` until the first of `events` fires on it. */
+function trackUntil(target: EventTarget, events: readonly string[]): void {
+  const done = new Promise<void>((resolve) => {
+    const finish = () => {
+      for (const event of events) target.removeEventListener(event, finish);
+      resolve();
+    };
+    for (const event of events) target.addEventListener(event, finish);
+  });
+  pendingIdb.add(done);
+  void done.then(() => pendingIdb.delete(done));
+}
+
+/**
+ * Patches `fake-indexeddb`'s prototypes (installed as the globals by
+ * `fake-indexeddb/auto`, which must be imported first). Dexie and Firebase
+ * both reach IndexedDB through these. Idempotent.
+ */
+export function trackIndexedDb(): void {
+  if (typeof IDBFactory === 'undefined' || typeof IDBDatabase === 'undefined') return;
+  const factory = IDBFactory.prototype as IDBFactory & { [WRAPPED]?: true };
+  if (factory[WRAPPED]) return;
+  factory[WRAPPED] = true;
+
+  // `blocked` ends tracking too: a blocked open waits on another connection to
+  // close, which may be exactly what the test left open.
+  const requestEnds = ['success', 'error', 'blocked'] as const;
+  const open = factory.open;
+  factory.open = function trackedOpen(this: IDBFactory, ...args: Parameters<IDBFactory['open']>) {
+    const request = open.apply(this, args);
+    trackUntil(request, requestEnds);
+    return request;
+  };
+  const deleteDatabase = factory.deleteDatabase;
+  factory.deleteDatabase = function trackedDelete(
+    this: IDBFactory,
+    ...args: Parameters<IDBFactory['deleteDatabase']>
+  ) {
+    const request = deleteDatabase.apply(this, args);
+    trackUntil(request, requestEnds);
+    return request;
+  };
+
+  const database = IDBDatabase.prototype;
+  const transaction = database.transaction;
+  database.transaction = function trackedTransaction(
+    this: IDBDatabase,
+    ...args: Parameters<IDBDatabase['transaction']>
+  ) {
+    const tx = transaction.apply(this, args);
+    trackUntil(tx, ['complete', 'abort']);
+    return tx;
+  } as IDBDatabase['transaction'];
+}
+
+// ---------------------------------------------------------------------------
+// Settle
+// ---------------------------------------------------------------------------
+
+function nextMacrotask(): Promise<void> {
+  return new Promise((resolve) => realSetTimeout(resolve, 0));
+}
+
+/** What a settle waits on: requests only, or requests and IndexedDB. */
+type SettleScope = 'fetch' | 'all';
+
+function pendingIn(scope: SettleScope): Promise<unknown>[] {
+  return scope === 'fetch' ? [...pendingFetches] : [...pendingFetches, ...pendingIdb];
+}
+
+/**
+ * Resolves once no tracked work in `scope` is left, and none starts within one
+ * macrotask of the last finishing (a request's continuation often opens the
+ * transaction that writes its result). Throws after `timeoutMs`, with what is
+ * still pending.
+ */
+export async function settlePendingWork(
+  scope: SettleScope = 'all',
+  timeoutMs = SETTLE_TIMEOUT_MS
+): Promise<void> {
+  const deadline = realNow() + timeoutMs;
+  for (;;) {
+    const pending = pendingIn(scope);
+    if (pending.length === 0) {
+      await nextMacrotask();
+      if (pendingIn(scope).length === 0) return;
+      continue;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<'timeout'>((resolve) => {
+      timer = realSetTimeout(() => resolve('timeout'), Math.max(deadline - realNow(), 0));
+    });
+    const outcome = await Promise.race([
+      Promise.allSettled(pending).then(() => 'settled' as const),
+      timedOut,
+    ]);
+    realClearTimeout(timer);
+    if (outcome === 'timeout') {
+      throw new Error(
+        `still pending after ${timeoutMs}ms: ${pendingFetches.size} fetch, ${pendingIdb.size} IndexedDB`
+      );
+    }
+  }
+}
+
+/** `settlePendingWork`, reporting a timeout as a warning naming the test. */
+export async function settleOrWarn(
+  testName: string | undefined,
+  scope: SettleScope = 'all'
+): Promise<void> {
+  try {
+    await settlePendingWork(scope);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.warn(`[teardown] ${testName ?? '(file teardown)'}: ${reason}`);
+  }
+}
+
+/**
+ * The runner's step between the test body and its `afterEach` hooks: abort the
+ * test's requests and let their rejections land, so the file's own resets run
+ * after them. Requests only: the UI is still mounted here, and its live
+ * queries keep IndexedDB busy (waiting on that tripled the step's cost on
+ * route tests). IndexedDB is drained in `afterEach`, after the unmount, on
+ * real timers — `fake-indexeddb` runs on `setImmediate`, which a test may
+ * have faked.
+ */
+export async function endTestWork(): Promise<void> {
+  abortTestFetches();
+  await settleOrWarn(expect.getState().currentTestName, 'fetch');
+}
+
+/** How `vitest.runner.ts` reaches this module's state without importing it. */
+export const END_TEST_WORK = Symbol.for('neocom-desk.endTestWork');
+(globalThis as Record<symbol, unknown>)[END_TEST_WORK] = endTestWork;
