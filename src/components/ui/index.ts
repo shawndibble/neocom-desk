@@ -80,6 +80,7 @@ export { Fields, Field, FieldsHeading } from './Fields';
 export type { FieldsVariant } from './Fields';
 export { LogoMark } from './LogoMark';
 export { SeverityIcon } from './SeverityIcon';
+export { ShareMark } from './ShareMark';
 export { SEVERITY_FILL, SEVERITY_ICON, SEVERITY_LABEL, SEVERITY_TEXT } from './severityTone';
 export {
   ContextMenu,

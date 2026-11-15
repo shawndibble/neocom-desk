@@ -46,6 +46,7 @@ import type {
   CorpBoardItem,
 } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
+import type { PopShareMark } from '@/engine/corpTaxBook/popShareMarks';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 import type { CorpLabel } from '@/features/corp/corpTicker';
 import { DAY_MS } from '@/lib/age';
@@ -588,6 +589,11 @@ export interface MoonChunksBoardData {
   loadedAt: number;
   /** Read from a Corp Tax Book (a moon owner's pops, #6116), not from ESI. */
   fromBook?: true;
+  /**
+   * The Corp Tax Books' Pop Sharing marks by refinery (#6226): a drill's `id` is its refinery,
+   * so its row shows whether the book shares that moon's pops.
+   */
+  shareMarks?: Readonly<Record<string, PopShareMark>>;
   /** Read across several corporations, and one of them failed: the rest draws, flagged. */
   partlyFailed?: boolean;
 }
