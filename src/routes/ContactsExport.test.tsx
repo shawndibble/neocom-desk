@@ -1,9 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
-import { App } from '@/app/App';
 import * as download from '@/lib/download';
 import { loadCharacterAchievement } from '@/features/character/achievement';
 import {
@@ -13,6 +12,7 @@ import {
   addSecondCharacter,
   contactsPayload,
   installContactsHarness,
+  renderContactsRoute,
   server,
   showAllCharacters,
 } from '@/test/contactsPage';
@@ -67,7 +67,7 @@ async function armExport(menuName: string) {
 describe('CSV export (issue #2164)', () => {
   it('exports the Character tab visible rows, with a raw standing number', async () => {
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
 
     await armExport('Export Contacts');
@@ -88,7 +88,7 @@ describe('CSV export (issue #2164)', () => {
       () => new Promise<null>((resolve) => (finish = resolve))
     );
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
 
     await exportCsv('Export Contacts');
@@ -99,7 +99,7 @@ describe('CSV export (issue #2164)', () => {
 
   it('exports only what the search/type/standing filters currently show', async () => {
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     await userEvent
       .setup({ delay: null })
@@ -122,7 +122,7 @@ describe('CSV export (issue #2164)', () => {
       truncated: true,
     });
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
 
     await exportCsv('Export Contacts');
@@ -139,7 +139,7 @@ describe('CSV export (issue #2164)', () => {
       value: [contactsPayload[0]],
       fetchedAt: Date.now(),
     });
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     await showAllCharacters();
     await screen.findByRole('table', { name: /across/i });
@@ -171,7 +171,7 @@ describe('CSV export (issue #2164)', () => {
       fetchedAt: Date.now(),
     });
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     await showAllCharacters();
     await screen.findByRole('table', { name: /across/i });
@@ -184,7 +184,7 @@ describe('CSV export (issue #2164)', () => {
   it('still exports when the active tab has nothing visible — a header-only file, like every table', async () => {
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.json([])));
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('No contacts');
 
     await exportCsv('Export Contacts');
@@ -195,7 +195,7 @@ describe('CSV export (issue #2164)', () => {
 
 describe('Contacts standing tag (issue #403)', () => {
   it("uses the game's standing tag, and keeps the number in its accessible name", async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
 
     const goodRow = screen.getByText('Good Friend').closest('tr');
@@ -208,7 +208,7 @@ describe('Contacts standing tag (issue #403)', () => {
   });
 
   it('tags each tier by the standing it is for', async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
 
     expect(screen.getAllByRole('img', { name: 'Neutral standing (0)' }).length).toBe(2);
@@ -219,7 +219,7 @@ describe('Contacts standing tag (issue #403)', () => {
 describe('Contacts URL state', () => {
   it('restores the search text and sort from the URL', async () => {
     window.history.replaceState({}, '', '/contacts/character?q=corp&sort=name:asc');
-    render(<App />);
+    renderContactsRoute();
     const table = within(await screen.findByRole('table', { name: 'Contacts' }));
     expect(screen.getByRole('searchbox', { name: 'Name' })).toHaveValue('corp');
     expect(table.queryByText('Good Friend')).not.toBeInTheDocument();
@@ -232,7 +232,7 @@ describe('Contacts URL state', () => {
 
   it('writes typed search text to the URL once typing pauses', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     await user.type(screen.getByRole('searchbox', { name: 'Name' }), 'friend');
     await waitFor(() => expect(window.location.search).toBe('?q=friend'));
@@ -241,7 +241,7 @@ describe('Contacts URL state', () => {
 
   it('writes a header sort to the URL, and leaves the default sort out', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     await user.click(screen.getByRole('button', { name: 'Name' }));
     expect(window.location.search).toBe('?sort=name%3Aasc');
@@ -249,7 +249,7 @@ describe('Contacts URL state', () => {
 
   it('ignores an unreadable sort and falls back to standing, best first', async () => {
     window.history.replaceState({}, '', '/contacts/character?sort=bogus:asc');
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     expect(screen.getByRole('columnheader', { name: /Standing/ })).toHaveAttribute(
       'aria-sort',

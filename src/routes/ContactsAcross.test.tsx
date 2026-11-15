@@ -1,8 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { act, render, screen, fireEvent, within } from '@testing-library/react';
+import { act, screen, fireEvent, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { App } from '@/app/App';
 import {
   CHAR_ID,
   CHAR_ID_2,
@@ -11,6 +10,7 @@ import {
   cacheSecondCharacterContacts,
   contactsPayload,
   installContactsHarness,
+  renderContactsRoute,
   openFilters,
   server,
   showAllCharacters,
@@ -37,7 +37,7 @@ installContactsHarness();
 describe('Contacts', () => {
   describe('across characters', () => {
     it('offers no comparison when the device holds a single character', async () => {
-      render(<App />);
+      renderContactsRoute();
       await screen.findByText('Good Friend');
 
       expect(screen.queryByRole('button', { name: 'This character' })).not.toBeInTheDocument();
@@ -46,7 +46,7 @@ describe('Contacts', () => {
     it('gives each tab its own path, and restores the across tab and its toggle on reload', async () => {
       await addSecondCharacter();
       await cacheSecondCharacterContacts([contactsPayload[0]]);
-      render(<App />);
+      renderContactsRoute();
       await screen.findByText('Good Friend');
       // The bare page path settles on the default tab, with no defaults in the query.
       expect(window.location.pathname).toBe('/contacts/character');
@@ -65,7 +65,7 @@ describe('Contacts', () => {
       await addSecondCharacter();
       await cacheSecondCharacterContacts([contactsPayload[0]]);
       window.history.replaceState({}, '', '/contacts/across?across.disagree=1');
-      render(<App />);
+      renderContactsRoute();
 
       const table = within(await screen.findByRole('table', { name: /across/i }));
       expect(screen.getByRole('button', { name: /^All characters · 2$/ })).toBeInTheDocument();
@@ -76,7 +76,7 @@ describe('Contacts', () => {
     it('counts the characters holding each contact, and flags the ones that disagree', async () => {
       await addSecondCharacter();
       await cacheSecondCharacterContacts([contactsPayload[0]]);
-      render(<App />);
+      renderContactsRoute();
       await screen.findByText('Good Friend');
 
       await showAllCharacters();
@@ -92,7 +92,7 @@ describe('Contacts', () => {
     it('names the characters missing a contact when its count takes keyboard focus', async () => {
       await addSecondCharacter();
       await cacheSecondCharacterContacts([contactsPayload[0]]);
-      render(<App />);
+      renderContactsRoute();
       await screen.findByText('Good Friend');
 
       await showAllCharacters();
@@ -107,7 +107,7 @@ describe('Contacts', () => {
     it('narrows to the contacts the characters do not agree on', async () => {
       await addSecondCharacter();
       await cacheSecondCharacterContacts([contactsPayload[0]]);
-      render(<App />);
+      renderContactsRoute();
       await screen.findByText('Good Friend');
       await showAllCharacters();
       await screen.findByRole('table', { name: /across/i });
@@ -124,7 +124,7 @@ describe('Contacts', () => {
       useNarrowViewport();
       await addSecondCharacter();
       await cacheSecondCharacterContacts([contactsPayload[0]]);
-      render(<App />);
+      renderContactsRoute();
       await screen.findByText('Good Friend');
       await showAllCharacters();
       await screen.findByRole('table', { name: /across/i });
@@ -143,7 +143,7 @@ describe('Contacts', () => {
       await addSecondCharacter();
       // Pilot Two has Good Friend at -10; the main has them at +10.
       await cacheSecondCharacterContacts([{ ...contactsPayload[0], standing: -10 }]);
-      render(<App />);
+      renderContactsRoute();
       await screen.findByText('Good Friend');
 
       await showAllCharacters();
@@ -156,7 +156,7 @@ describe('Contacts', () => {
     it('says the comparison is built from what each character last cached', async () => {
       await addSecondCharacter();
       await cacheSecondCharacterContacts([contactsPayload[0]]);
-      render(<App />);
+      renderContactsRoute();
       await screen.findByText('Good Friend');
 
       await showAllCharacters();
@@ -170,7 +170,7 @@ describe('Contacts', () => {
       await addSecondCharacter();
       await cacheSecondCharacterContacts([]);
       window.history.replaceState({}, '', '/contacts/across');
-      render(<App />);
+      renderContactsRoute();
 
       expect(
         await screen.findByText(
@@ -185,7 +185,7 @@ describe('Contacts', () => {
       server.use(http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.json([])));
       await addSecondCharacter();
       window.history.replaceState({}, '', '/contacts/across');
-      render(<App />);
+      renderContactsRoute();
 
       expect(await screen.findByText('No contacts cached for any character')).toBeInTheDocument();
     });
@@ -202,9 +202,9 @@ describe('Contacts keyboard access (issue #3396)', () => {
         ])
       )
     );
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
-    const rows = Array.from(document.querySelectorAll('main tbody tr'));
+    const rows = Array.from(document.querySelectorAll('tbody tr'));
     const faction = rows.find((r) => r.getAttribute('data-row-key') === '500001');
     const character = rows.find((r) => r.getAttribute('data-row-key') === '1001');
     expect(faction).toBeDefined();
@@ -214,7 +214,7 @@ describe('Contacts keyboard access (issue #3396)', () => {
 
   it('selects "This character" on /contacts/across with a single Character', async () => {
     window.history.pushState({}, '', '/contacts/across');
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     const tab = await screen.findByRole('tab', { name: /contacts/i });
     expect(tab).toHaveAttribute('aria-selected', 'true');
@@ -224,7 +224,7 @@ describe('Contacts keyboard access (issue #3396)', () => {
 
 describe('Contacts standing filter chips (issue #403)', () => {
   it('stay visible through a manual refresh instead of disappearing', async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     openFilters();
 
@@ -273,7 +273,7 @@ describe('Contacts standing filter chips (issue #403)', () => {
       )
     );
 
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     openFilters();
     expect(screen.getByRole('group', { name: 'Standing' })).toBeInTheDocument();

@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeAll } from 'vitest';
 import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
+import { loadLayout } from '@/app/routeChunks';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
-import { App } from '@/app/App';
 import {
   DEFAULT_VISIBLE_CONTACTS_CHARACTER_COLUMNS,
   contactsCharacterColumnsStore,
@@ -15,6 +15,7 @@ import {
   ESI,
   contactsPayload,
   installContactsHarness,
+  renderContactsRoute,
   openFilters,
   server,
 } from '@/test/contactsPage';
@@ -35,9 +36,18 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 installContactsHarness();
+// The one App-level test below: its graph and shell chunk load here, under the
+// hook's own budget, not inside the test's findBy.
+beforeAll(async () => {
+  await Promise.all([import('@/app/App'), loadLayout()]);
+}, 30_000);
 
 describe('Contacts', () => {
-  it('lists contacts with resolved names, standings, and blocked/watched flags', async () => {
+  // The one App-level test of the Contacts route: it mounts at /contacts inside
+  // the signed-in shell, its rail link current. Every other Contacts test
+  // renders the page on its own (`renderContactsRoute`).
+  it('lists contacts with resolved names, standings, and blocked/watched flags, at /contacts inside the shell', async () => {
+    const { App } = await import('@/app/App');
     render(<App />);
     expect(await screen.findByText('Good Friend')).toBeInTheDocument();
     expect(screen.getByText('Neutral Corp')).toBeInTheDocument();
@@ -48,10 +58,13 @@ describe('Contacts', () => {
     // — and CSS shows exactly one (jsdom applies no CSS, so both are here).
     expect(screen.getAllByRole('img', { name: 'Watched' })).toHaveLength(2);
     expect(screen.getAllByRole('img', { name: 'Blocked' })).toHaveLength(2);
+    const rail = (await screen.findAllByRole('navigation'))[0];
+    const links = await within(rail).findAllByRole('link', { name: 'Contacts' });
+    expect(links.some((link) => link.getAttribute('aria-current') === 'page')).toBe(true);
   });
 
   it('names contact types the way a pilot does, not the way ESI does', async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
 
     // Scoped to the table: the same words label the type filter chips above it.
@@ -64,7 +77,7 @@ describe('Contacts', () => {
   });
 
   it('collapses rows into cards at phone width, now that a row carries two entity names', async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
 
     // `.dt-stack` is the below-`sm` collapse. The Corp / Alliance column
@@ -74,7 +87,7 @@ describe('Contacts', () => {
   });
 
   it('shows where a player contact is now', async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
 
     // Good Friend's corp, which the contact row itself never names.
@@ -84,7 +97,7 @@ describe('Contacts', () => {
   });
 
   it('says nothing about the affiliation of a corp or alliance contact — it is its own', async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Neutral Corp');
 
     const table = within(screen.getByRole('table', { name: 'Contacts' }));
@@ -94,7 +107,7 @@ describe('Contacts', () => {
   });
 
   it('badges a contact who flies for the reader\u2019s own corporation', async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
 
     expect(await screen.findByRole('img', { name: 'In your corporation' })).toBeInTheDocument();
@@ -102,7 +115,7 @@ describe('Contacts', () => {
   });
 
   it("tags a pilot whose corp is separately one of the reader's contacts", async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Stranger Pilot');
 
     // Stranger Pilot is 0 personally; Neutral Corp, which they fly for, is a
@@ -113,7 +126,7 @@ describe('Contacts', () => {
   });
 
   it('filters by standing category', async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     openFilters();
 
@@ -127,7 +140,7 @@ describe('Contacts', () => {
   });
 
   it('points at the filters when they leave no contacts', async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     openFilters();
 
@@ -139,7 +152,7 @@ describe('Contacts', () => {
   });
 
   it('offers Reset filters when the filters leave no contacts, and restores the list', async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     openFilters();
 
@@ -152,7 +165,7 @@ describe('Contacts', () => {
   });
 
   it('searches contacts by name', async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
 
     fireEvent.change(screen.getByRole('searchbox', { name: 'Name' }), {
@@ -165,7 +178,7 @@ describe('Contacts', () => {
   });
 
   it('filters by contact type', async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     openFilters();
 
@@ -177,7 +190,7 @@ describe('Contacts', () => {
   });
 
   it('counts every contact type on its chip, zeros included', async () => {
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     openFilters();
 
@@ -194,7 +207,7 @@ describe('Contacts', () => {
       fetchedAt: STALE_FETCHED_AT,
     });
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.error()));
-    render(<App />);
+    renderContactsRoute();
     expect(await screen.findByText('Good Friend')).toBeInTheDocument();
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
   });
@@ -211,7 +224,7 @@ describe('Contacts', () => {
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
-    render(<App />);
+    renderContactsRoute();
     expect(await screen.findByText('Log in again to refresh.')).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your contacts')).not.toBeInTheDocument();
     expect(await screen.findByText('Good Friend')).toBeInTheDocument();
@@ -219,13 +232,13 @@ describe('Contacts', () => {
 
   it('shows the empty state when there is no data at all', async () => {
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.error()));
-    render(<App />);
+    renderContactsRoute();
     expect(await screen.findByText(/no contacts cached/i)).toBeInTheDocument();
   });
 
   it('says what fills the page when the character really has no contacts', async () => {
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.json([])));
-    render(<App />);
+    renderContactsRoute();
     expect(await screen.findByText('No contacts')).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -240,7 +253,7 @@ describe('Contacts', () => {
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
-    render(<App />);
+    renderContactsRoute();
     expect(await screen.findByText('Log in again to see your contacts')).toBeInTheDocument();
     expect(screen.queryByText(/no contacts cached/i)).not.toBeInTheDocument();
   });
@@ -284,7 +297,7 @@ describe('Contacts Title / Score column', () => {
 
   it('is off by default, and reads no public record while off', async () => {
     const ids = recordPublicReads();
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     expect(screen.queryByRole('columnheader', { name: /Title \/ Score/ })).toBeNull();
     expect(screen.queryByText('1,240 points')).toBeNull();
@@ -294,7 +307,7 @@ describe('Contacts Title / Score column', () => {
   it('reads only player Characters once shown: no corp, alliance or NPC agent', async () => {
     const user = userEvent.setup({ delay: null });
     const ids = recordPublicReads();
-    render(<App />);
+    renderContactsRoute();
     await screen.findByText('Good Friend');
     await user.click(screen.getByRole('button', { name: 'Columns' }));
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'Title / Score' }));
@@ -321,7 +334,7 @@ describe('Contacts row click', () => {
         })
       )
     );
-    render(<App />);
+    renderContactsRoute();
     await user.click(await screen.findByText('Good Friend'));
 
     expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'character', id: 1001 });
@@ -330,7 +343,7 @@ describe('Contacts row click', () => {
   });
 
   it('has no More actions button or custom row menu: the row click is the one way in', async () => {
-    render(<App />);
+    renderContactsRoute();
     const row = (await screen.findByText('Good Friend')).closest('tr');
     if (!row) throw new Error('expected a Good Friend row');
     expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();

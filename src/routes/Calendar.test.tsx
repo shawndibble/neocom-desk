@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -21,10 +21,33 @@ import {
   DEFAULT_CORP_FILTER,
 } from '@/features/character/calendarCorpFilter';
 import { CHARACTER_BOARD_ITEM_KINDS } from '@/engine/character/board';
-import { App } from '@/app/App';
+import { Calendar } from '@/routes/Calendar';
+import { renderPageRoute } from '@/test/renderPage';
+import * as routeChunks from '@/app/routeChunks';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { exportRows } from '@/lib/downloadCsv';
 import { stubViewport } from '@/test/viewport';
+
+// A pinned "today": mid-month, mid-morning, so the hour offsets below and the
+// five-day-out fixture never cross midnight or a month end, whenever the suite
+// runs. Only `Date` is faked, and it keeps ticking (an RSVP must land before the
+// reload that overrides it), so every timer stays real. Hoisted, so `TODAY`
+// below and any clock a module reads at import see it; set again before each
+// test, since the shared teardown (`restoreRealTimers`) puts the real clock
+// back after every test.
+const { pinClock } = vi.hoisted(() => {
+  const pinClock = () =>
+    vi.useFakeTimers({
+      now: new Date(2026, 5, 10, 9, 0),
+      toFake: ['Date'],
+      shouldAdvanceTime: true,
+    });
+  pinClock();
+  return { pinClock };
+});
+beforeEach(() => {
+  pinClock();
+});
 
 // The export test reads the rows handed to the export rather than a file.
 vi.mock('@/lib/downloadCsv', async (importOriginal) => ({
@@ -50,11 +73,7 @@ vi.mock('@/sde/loadSde', () => ({
 const CHAR_ID = 91;
 const ESI = `https://esi.evetech.net/characters/${CHAR_ID}`;
 
-/**
- * Anchored to "today" rather than to a fixed date, so a fixture always lands
- * inside the visible grid and inside the board's own horizon whenever the
- * suite actually runs.
- */
+/** "Today", pinned before the page's modules load (see the `vi.hoisted` above). */
 const TODAY = new Date();
 const inHours = (hours: number) =>
   new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), TODAY.getHours() + hours);
@@ -247,10 +266,20 @@ async function addHoldingCorpDirector() {
   );
 }
 
+/** The Calendar page on its own route, with no App boot or signed-in shell. */
+const renderCalendarRoute = () => renderPageRoute('/calendar', <Calendar />);
+
+// The one App-level test below: its graph and shell chunk load here, under the
+// hook's own budget, not inside the test's findBy. Every other test renders the
+// page on its own (`renderCalendarRoute`).
+beforeAll(async () => {
+  await Promise.all([import('@/app/App'), routeChunks.loadLayout(), routeChunks.loadCalendar()]);
+}, 30_000);
+
 describe('Calendar corporation events', () => {
   it('shows fuel-out and timer events of a corporation the active Character is not in', async () => {
     await addHoldingCorpDirector();
-    render(<App />);
+    renderCalendarRoute();
 
     const rail = await screen.findByRole('list', { name: /coming up/i });
     const rows = await within(rail).findAllByText('Perimeter - Holding Astrahus');
@@ -264,7 +293,7 @@ describe('Calendar corporation events', () => {
   it("hides them from the corporation filter, and keeps the pilot's own events", async () => {
     const user = userEvent.setup();
     await addHoldingCorpDirector();
-    render(<App />);
+    renderCalendarRoute();
     await screen.findAllByText('Perimeter - Holding Astrahus');
 
     await user.click(screen.getByRole('button', { name: /filter event types/i }));
@@ -280,7 +309,7 @@ describe('Calendar corporation events', () => {
 
   it('offers no corporation filter when no corporation can be read', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderCalendarRoute();
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /filter event types/i }));
@@ -293,7 +322,7 @@ describe('Calendar corporation events', () => {
 describe('Calendar', () => {
   it('puts a moon chunk on the board for a Character who can read extractions', async () => {
     await grantCorpScopes(['Station_Manager']);
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText('Moon 40000001')).toBeInTheDocument();
     expect(screen.getByText(/arrives/i)).toBeInTheDocument();
@@ -308,7 +337,7 @@ describe('Calendar', () => {
         return HttpResponse.json([]);
       })
     );
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /filter event types/i }));
@@ -317,17 +346,23 @@ describe('Calendar', () => {
     expect(extractionRequests).not.toHaveBeenCalled();
   });
 
-  it('shows the calendar map and the coming-up rail together', async () => {
+  // The one App-level test of the Calendar route: it mounts at /calendar inside
+  // the signed-in shell, its rail link current.
+  it('shows the calendar map and the coming-up rail together, at /calendar inside the shell', async () => {
+    const { App } = await import('@/app/App');
     render(<App />);
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: /calendar map/i })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: /coming up/i })).toBeInTheDocument();
+    const rail = (await screen.findAllByRole('navigation'))[0];
+    const links = await within(rail).findAllByRole('link', { name: 'Calendar' });
+    expect(links.some((link) => link.getAttribute('aria-current') === 'page')).toBe(true);
   });
 
   it('keeps the shown month in the URL, and restores it on a fresh visit', async () => {
     const user = userEvent.setup();
-    const { unmount } = render(<App />);
+    const { unmount } = renderCalendarRoute();
     await screen.findByText('Fleet Op');
 
     await user.click(screen.getByRole('button', { name: 'Next month' }));
@@ -336,14 +371,14 @@ describe('Calendar', () => {
     const shownMonth = monthLabel.textContent;
 
     unmount();
-    render(<App />);
+    renderCalendarRoute();
     await screen.findByText('Fleet Op');
     expect(screen.getByText(shownMonth as string)).toBeInTheDocument();
   });
 
   it('falls back to today rather than crashing on a garbage anchor value', async () => {
     window.history.pushState({}, '', '/calendar?anchor=not-a-date');
-    render(<App />);
+    renderCalendarRoute();
     // Falls back to today's grid, where the fixture event actually lands —
     // a garbage anchor parsed literally would show an empty, unrelated month.
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
@@ -352,7 +387,7 @@ describe('Calendar', () => {
   /** The redesign's whole premise: the rail is not a calendar feed, it is every clock. */
   it('merges another clock source into the same list', async () => {
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
@@ -373,7 +408,7 @@ describe('Calendar', () => {
    */
   it('names the kinds landing on a day, rather than a severity', async () => {
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     // A month of cells, which is what proves this is the grid and not the ticker.
@@ -397,7 +432,7 @@ describe('Calendar', () => {
   it('names the same kinds on the Day Ticker', async () => {
     useNarrowViewport();
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     // Exactly a fortnight of columns — the ticker, not the grid.
@@ -424,7 +459,7 @@ describe('Calendar', () => {
       http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)),
       http.get(`${ESI}/calendar`, () => new HttpResponse(null, { status: 403 }))
     );
-    render(<App />);
+    renderCalendarRoute();
 
     // The industry job still arrives...
     expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
@@ -437,14 +472,14 @@ describe('Calendar', () => {
 
   it('opens the event detail from ?open=<eventId>, leaving a clean URL', async () => {
     window.history.pushState({}, '', '/calendar?open=1');
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
     await waitFor(() => expect(window.location.search).not.toContain('open='));
   });
 
   it('opens the event detail from a calendar row', async () => {
-    render(<App />);
+    renderCalendarRoute();
     await userEvent.click(await screen.findByText('Fleet Op'));
 
     expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
@@ -460,7 +495,7 @@ describe('Calendar', () => {
    */
   it('reflects an RSVP in the rail without waiting for a refetch', async () => {
     server.use(http.put(`${ESI}/calendar/1/`, () => new HttpResponse(null, { status: 204 })));
-    render(<App />);
+    renderCalendarRoute();
     await userEvent.click(await screen.findByText('Fleet Op'));
 
     expect(screen.queryByText('Declined')).not.toBeInTheDocument();
@@ -481,7 +516,7 @@ describe('Calendar', () => {
    */
   it('lets a fresh reload override the earlier local RSVP once one arrives', async () => {
     server.use(http.put(`${ESI}/calendar/1/`, () => new HttpResponse(null, { status: 204 })));
-    render(<App />);
+    renderCalendarRoute();
     await userEvent.click(await screen.findByText('Fleet Op'));
     await userEvent.click(await screen.findByRole('button', { name: 'Decline' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Decline' })).not.toBeDisabled());
@@ -495,7 +530,7 @@ describe('Calendar', () => {
 
   it('hides a kind from the filter menu and remembers it', async () => {
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
-    render(<App />);
+    renderCalendarRoute();
     expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /filter event types/i }));
@@ -517,7 +552,7 @@ describe('Calendar', () => {
     server.use(http.get(`${ESI}/calendar`, () => HttpResponse.json([...events, later])));
     vi.mocked(exportRows).mockClear();
     const user = userEvent.setup();
-    render(<App />);
+    renderCalendarRoute();
     expect(await screen.findByText('Later Op')).toBeInTheDocument();
 
     // Earliest day with a load holds the first event.
@@ -544,14 +579,14 @@ describe('Calendar', () => {
       key: CALENDAR_HIDDEN_KINDS_KEY,
       value: [...CHARACTER_BOARD_ITEM_KINDS],
     });
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText(/no event types selected/i)).toBeInTheDocument();
   });
 
   it('reports nothing coming up when every source reads fine and is empty', async () => {
     server.use(http.get(`${ESI}/calendar`, () => HttpResponse.json([])));
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText(/nothing coming up/i)).toBeInTheDocument();
   });

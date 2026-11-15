@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
@@ -8,7 +8,9 @@ import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { writeRouteSnapshot } from '@/lib/routeSnapshotCache';
-import { App } from '@/app/App';
+import { EmploymentHistory } from '@/routes/EmploymentHistory';
+import { renderPageRoute } from '@/test/renderPage';
+import * as routeChunks from '@/app/routeChunks';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -102,9 +104,24 @@ beforeEach(async () => {
 const stints = () =>
   within(screen.getByRole('list', { name: 'Employment' })).getAllByRole('listitem');
 
+/** The EmploymentHistory page on its own route, with no App boot or signed-in shell. */
+const renderEmploymentHistoryRoute = () =>
+  renderPageRoute('/employment-history', <EmploymentHistory />);
+
+// The one App-level test below: its graph and shell chunk load here, under the
+// hook's own budget, not inside the test's findBy. Every other test renders the
+// page on its own (`renderEmploymentHistoryRoute`).
+beforeAll(async () => {
+  await Promise.all([
+    import('@/app/App'),
+    routeChunks.loadLayout(),
+    routeChunks.loadEmploymentHistory(),
+  ]);
+}, 30_000);
+
 describe('EmploymentHistory', () => {
   it("shows each stint's date range once: under the name for a phone, in the gutter from md up", async () => {
-    render(<App />);
+    renderEmploymentHistoryRoute();
     await screen.findByRole('link', { name: 'Past Corp' });
 
     const past = stints()[1];
@@ -116,7 +133,10 @@ describe('EmploymentHistory', () => {
     expect(past.querySelector('.hidden.md\\:block')).not.toBeNull();
   });
 
-  it('lists corporations most-recent first, with resolved names, without any granted scope', async () => {
+  // The one App-level test of the Employment History route: it mounts at
+  // /employment-history inside the signed-in shell, its rail link current.
+  it('lists corporations most-recent first, with resolved names, without any granted scope, at /employment-history inside the shell', async () => {
+    const { App } = await import('@/app/App');
     render(<App />);
     // 'Past Corp' rather than 'Current Corp': the shared header names the
     // character's *current* corporation too, and it resolves first.
@@ -126,12 +146,15 @@ describe('EmploymentHistory', () => {
     expect(rows[1]).toHaveTextContent('Past Corp');
     // Past Corp ran exactly 2025-01-01 to 2026-01-01: a full non-leap year.
     expect(rows[1]).toHaveTextContent('1y');
+    const rail = (await screen.findAllByRole('navigation'))[0];
+    const links = await within(rail).findAllByRole('link', { name: 'Employment' });
+    expect(links.some((link) => link.getAttribute('aria-current') === 'page')).toBe(true);
   });
 
   it('badges the ongoing row when it matches the character record', async () => {
     // A typical user has no grant on /corp and would just be rejected there,
     // so the ongoing row's name opens Show Info (like every row's), never /corp.
-    render(<App />);
+    renderEmploymentHistoryRoute();
 
     await screen.findByRole('link', { name: 'Past Corp' });
     const rows = stints();
@@ -174,7 +197,7 @@ describe('EmploymentHistory', () => {
         })
       )
     );
-    render(<App />);
+    renderEmploymentHistoryRoute();
 
     await screen.findByRole('link', { name: 'Past Corp' });
     await screen.findByText('Other Corp');
@@ -182,7 +205,7 @@ describe('EmploymentHistory', () => {
   });
 
   it('carries the same character header the Overview tab shows, without reaching for a scope', async () => {
-    render(<App />);
+    renderEmploymentHistoryRoute();
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Pilot One' })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Current Corp' })).toBeInTheDocument();
@@ -215,7 +238,7 @@ describe('EmploymentHistory', () => {
         HttpResponse.error()
       )
     );
-    render(<App />);
+    renderEmploymentHistoryRoute();
     expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
     // The first stint is the cached, ongoing/matching corp — its name may or
     // may not have resolved yet.
@@ -257,7 +280,7 @@ describe('EmploymentHistory', () => {
       })
     );
 
-    render(<App />);
+    renderEmploymentHistoryRoute();
 
     expect(await screen.findByRole('link', { name: 'Past Corp' })).toBeInTheDocument();
     // The whole point: a load really is in flight, and no spinner is shown.
@@ -280,7 +303,7 @@ describe('EmploymentHistory', () => {
         HttpResponse.error()
       )
     );
-    render(<App />);
+    renderEmploymentHistoryRoute();
     expect(await screen.findByText(/no employment history cached/i)).toBeInTheDocument();
     // The panel's toolbar outlives its rows, so there is still a way back.
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
@@ -289,7 +312,7 @@ describe('EmploymentHistory', () => {
 
 describe('Employment History corporation names (issue #729)', () => {
   it('links every name to the corporation Show Info, with no ⋮ or row menu', async () => {
-    render(<App />);
+    renderEmploymentHistoryRoute();
     const row = (await screen.findByRole('link', { name: 'Past Corp' })).closest('li');
     if (!row) throw new Error('expected a Past Corp stint');
 
@@ -308,7 +331,7 @@ describe('Employment History corporation names (issue #729)', () => {
         HttpResponse.json([{ id: 200, name: 'Current Corp', category: 'corporation' }])
       )
     );
-    render(<App />);
+    renderEmploymentHistoryRoute();
 
     expect(await screen.findByRole('link', { name: '#100' })).toHaveAttribute(
       'href',

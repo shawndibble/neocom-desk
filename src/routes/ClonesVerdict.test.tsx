@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
 import '@/i18n';
@@ -7,7 +7,9 @@ import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useClonesSort } from '@/features/character/clonesSort';
-import { App } from '@/app/App';
+import { Clones } from '@/routes/Clones';
+import { renderPageRoute } from '@/test/renderPage';
+import { loadClones } from '@/app/routeChunks';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -232,9 +234,16 @@ const verdictCard = async (heading: string) => {
   return card;
 };
 
+/** The Clones page on its own route, with no App boot or signed-in shell. */
+const renderClonesRoute = () => renderPageRoute('/clones', <Clones />);
+
+// The route chunk compiles here, under the hook's own budget, not inside the
+// first test's findBy.
+beforeAll(() => loadClones(), 30_000);
+
 describe('Clones training verdict', () => {
   it('says a jump is worth it, with the saving, the reason and a route link', async () => {
-    render(<App />);
+    renderClonesRoute();
     const card = await verdictCard('Worth a jump');
     expect(within(card).getByText(/finishes your queue .* sooner/)).toBeInTheDocument();
     expect(within(card).getByText(/trains on Intelligence/)).toBeInTheDocument();
@@ -258,7 +267,7 @@ describe('Clones training verdict', () => {
     scenario.worn = [IMPLANT_INT5];
     scenario.intelligence = 25;
     scenario.jumpImplants = [[IMPLANT_PLAIN], []];
-    render(<App />);
+    renderClonesRoute();
     const card = await verdictCard('Stay put');
     expect(
       within(card).getByText('You are already in your fastest clone for this queue')
@@ -271,7 +280,7 @@ describe('Clones training verdict', () => {
     scenario.worn = [IMPLANT_INT5];
     scenario.intelligence = 25;
     scenario.jumpImplants = [[IMPLANT_PLAIN], []];
-    render(<App />);
+    renderClonesRoute();
     const card = await verdictCard('Stay put');
     const bar = within(card).getByRole('img', { name: /^Stay in this clone/ });
     const list = document.getElementById(bar.getAttribute('aria-describedby') ?? '');
@@ -288,7 +297,7 @@ describe('Clones training verdict', () => {
         HttpResponse.json({ ...clonesBody(), jump_clones: [] })
       )
     );
-    render(<App />);
+    renderClonesRoute();
     await screen.findByText('No jump clones');
     expect(screen.queryByRole('region', { name: 'Training verdict' })).not.toBeInTheDocument();
     expect(screen.queryByText('Stay put')).not.toBeInTheDocument();
@@ -296,7 +305,7 @@ describe('Clones training verdict', () => {
 
   it('shows no verdict for an empty queue', async () => {
     scenario.queue = () => [];
-    render(<App />);
+    renderClonesRoute();
     expect(await screen.findByText(/training queue is empty/)).toBeInTheDocument();
     expect(screen.queryByText('Worth a jump')).not.toBeInTheDocument();
     expect(screen.queryByText('Stay put')).not.toBeInTheDocument();
@@ -304,7 +313,7 @@ describe('Clones training verdict', () => {
 
   it('disables the training sort with its reason when there is no verdict, keeping the stored sort', async () => {
     scenario.queue = () => [];
-    render(<App />);
+    renderClonesRoute();
     await screen.findByText(/training queue is empty/);
     const group = screen.getByRole('group', { name: 'Sort clones' });
     const training = within(group).getByRole('button', { name: 'Best for training' });
@@ -319,14 +328,14 @@ describe('Clones training verdict', () => {
 
   it('shows no verdict for a paused queue', async () => {
     scenario.queue = () => [{ skill_id: 3300, queue_position: 0, finished_level: 5 }];
-    render(<App />);
+    renderClonesRoute();
     expect(await screen.findByText(/training queue is paused/)).toBeInTheDocument();
     expect(screen.queryByText('Worth a jump')).not.toBeInTheDocument();
   });
 
   it('shows no verdict without the implants grant, and the list still works', async () => {
     scenario.implantsStatus = 403;
-    render(<App />);
+    renderClonesRoute();
     expect(await screen.findByText(/worn implants could not be read/)).toBeInTheDocument();
     expect(screen.queryByText('Worth a jump')).not.toBeInTheDocument();
     expect(screen.queryByText('Stay put')).not.toBeInTheDocument();
@@ -336,7 +345,7 @@ describe('Clones training verdict', () => {
   it('sorts the list and remembers the choice on the device', async () => {
     // Clone 1: fast and near but cheap. Clone 2: slow, valuable, route unknown.
     scenario.jumpImplants = [[IMPLANT_INT5], [IMPLANT_PLAIN]];
-    render(<App />);
+    renderClonesRoute();
     await verdictCard('Worth a jump');
     const group = screen.getByRole('group', { name: 'Sort clones' });
     expect(within(group).getByRole('button', { name: 'Best for training' })).toHaveAttribute(
