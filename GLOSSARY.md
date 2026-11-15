@@ -338,7 +338,10 @@ here — they go one per file in `docs/context/decisions/`.
 - **Doctrine Fit**: A corporation's saved fit that SRP checks a claim's lost
   ship against, kept as the corp's own copy. A **Hull Rule** may list several;
   a claim must match one. Distinct from a **Fitting**, which is a pilot's own
-  and private.
+  and private. Every member sees the corp's Doctrine Fits in their Fittings
+  library, read-only and tagged Doctrine; Save a copy makes one their own
+  Fitting. Saved since #6202 with its whole fit as a **Fitting Share Code**;
+  an older one holds only its hull, modules, rigs and subsystems.
 - **Off doctrine**: The flag on an **SRP Claim** whose lost ship matches none
   of its hull's **Doctrine Fit**s. The officer still decides the claim.
 - **Corp Board**: `/corp`, a **Widget board** of corp **Widgets** the pilot

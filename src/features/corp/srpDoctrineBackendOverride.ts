@@ -3,12 +3,14 @@
  * `srpDoctrineClient` call answers from memory. Never set by the app itself. Its own module, like
  * `srpBackendOverride.ts`, so a test that mocks the client still leaves it unset.
  */
-import type { DoctrineFit, SaveDoctrineInput } from './srpTypes';
+import type { DoctrineFit, MemberDoctrineFit, SaveDoctrineInput } from './srpTypes';
 
 export interface SrpDoctrineBackendOverride {
   list: () => DoctrineFit[];
   save: (input: SaveDoctrineInput) => { id: string };
   remove: (id: string) => void;
+  /** A member's list for the Fittings library; absent: none. */
+  memberList?: () => MemberDoctrineFit[];
 }
 
 let override: SrpDoctrineBackendOverride | null = null;

@@ -8,7 +8,12 @@ import { parseBookCall } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import { parseSrpSettingsPatch } from './srp.js';
 import { parseDeleteDoctrine, parseSaveDoctrine } from './srpDoctrineInput.js';
-import { deleteSrpDoctrine, previewSrpDoctrineCheck, saveSrpDoctrine } from './srpDoctrineStore.js';
+import {
+  deleteSrpDoctrine,
+  listSrpDoctrineFits,
+  previewSrpDoctrineCheck,
+  saveSrpDoctrine,
+} from './srpDoctrineStore.js';
 import {
   parseFileClaimInput,
   type EsiKillmail,
@@ -75,6 +80,8 @@ const DIRECTOR = 2;
 const ACCOUNTANT = 3;
 const PILOT = 5;
 const OTHER_PILOT = 7;
+const OUTSIDER = 9;
+const OTHER_CORP = 98000002;
 const who = (id: number): Caller => ({ uid: `char:${id}`, ownerHash: `h${id}` });
 const call = (id: number) => parseBookCall({ corporationId: CORP, accessToken: `tok-${id}` });
 
@@ -139,6 +146,7 @@ const file = (id: number, pilot = PILOT) =>
     call(pilot),
     parseFileClaimInput({ killmail: `https://zkillboard.com/kill/${id}/` })
   );
+const list = (as = PILOT) => listSrpDoctrineFits(deps(), who(as), call(as));
 const preview = (id: number, pilot = PILOT) =>
   previewSrpDoctrineCheck(
     deps(),
@@ -160,6 +168,7 @@ emulatorSuite('SRP doctrine-fit (emulator)', () => {
     identities.set(ACCOUNTANT, { corporationId: CORP, ceoId: CEO, roles: ['Accountant'] });
     identities.set(PILOT, { corporationId: CORP, ceoId: CEO, roles: [] });
     for (const id of [CEO, DIRECTOR, ACCOUNTANT, PILOT, OTHER_PILOT]) affiliations.set(id, CORP);
+    affiliations.set(OUTSIDER, OTHER_CORP);
     await turnOnSrp(deps(), who(DIRECTOR), call(DIRECTOR));
     await setRules({ killmailPct: 80 });
   });
@@ -368,6 +377,55 @@ emulatorSuite('SRP doctrine-fit (emulator)', () => {
         .doc('settings')
         .update({ enabled: false });
       expect(await reason(preview(1002))).toBe('srp-off');
+    });
+  });
+
+  describe('members listing the Doctrine Fits', () => {
+    it('lists every fit to a member who is no officer, with its share code when saved with one', async () => {
+      const a = (await save(fit({ shareCode: 'Full-Fit_1' }))).id;
+      const b = (await save(fit({ name: 'Old Rifter' }))).id;
+      const { fits } = await list();
+      expect(fits).toHaveLength(2);
+      expect(fits.find((f) => f.id === a)).toEqual({
+        id: a,
+        name: 'Fleet Rifter',
+        snapshot: {
+          hullTypeId: HULL,
+          name: 'Fleet Rifter',
+          modules: [MED, HIGH].sort((x, y) => x - y),
+          rigs: [],
+        },
+        shareCode: 'Full-Fit_1',
+      });
+      // a fit saved before share codes: still listed, without one, and no creator details leak
+      expect(fits.find((f) => f.id === b)).toEqual({
+        id: b,
+        name: 'Old Rifter',
+        snapshot: expect.objectContaining({ hullTypeId: HULL }),
+      });
+    });
+
+    it('stores the share code on save and drops it when a re-save has none', async () => {
+      const { id } = await save(fit({ shareCode: 'Code1' }));
+      expect((await doctrines())[0]).toMatchObject({ shareCode: 'Code1' });
+      await save({ ...fit({ shareCode: 'Code2' }), id });
+      expect((await doctrines())[0]).toMatchObject({ shareCode: 'Code2' });
+      await save({ ...fit(), id });
+      expect((await doctrines())[0]).not.toHaveProperty('shareCode');
+    });
+
+    it('refuses a Character of another corporation and a former member', async () => {
+      await save(fit({ shareCode: 'Code1' }));
+      expect(await reason(list(OUTSIDER))).toBe('wrong-corp');
+      affiliations.set(PILOT, OTHER_CORP); // left the corp since
+      expect(await reason(list(PILOT))).toBe('wrong-corp');
+    });
+
+    it('lists nothing when SRP is off or the corp has no fits', async () => {
+      expect(await list()).toEqual({ fits: [] });
+      await save(fit());
+      await corp().collection('srp').doc('settings').update({ enabled: false });
+      expect(await list()).toEqual({ fits: [] });
     });
   });
 });

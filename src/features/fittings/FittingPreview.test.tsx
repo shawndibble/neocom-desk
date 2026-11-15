@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { FittingRecord } from '@/db';
@@ -93,6 +93,24 @@ describe('FittingPreview', () => {
     expect(screen.getByText(/can no longer be read/)).toBeInTheDocument();
     expect(screen.queryByTestId('ring')).not.toBeInTheDocument();
     expect(heading('Offense')).not.toBeInTheDocument();
+  });
+
+  it('names a Doctrine Fit as the corporation’s, with the re-save note only on an older one', () => {
+    const doctrine = (legacy: boolean): LibraryRow => ({
+      id: 'doctrine-a',
+      name: 'Fleet Rifter',
+      hull: 'Rifter',
+      source: 'doctrine',
+      code: '1.abc',
+      legacy,
+    });
+    show(doctrine(true));
+    expect(screen.getByText(/Your corporation's Doctrine Fit/)).toBeInTheDocument();
+    expect(screen.getByText(/Saved without drones or charges/)).toBeInTheDocument();
+    expect(heading('Notes')).not.toBeInTheDocument();
+    cleanup();
+    show(doctrine(false));
+    expect(screen.queryByText(/Saved without drones or charges/)).not.toBeInTheDocument();
   });
 
   describe('when no numbers come', () => {

@@ -20,7 +20,8 @@ import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue'
 import { useCompareFittings } from './useCompareFittings';
 import { useCompareStats } from './useCompareStats';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
-import { heldFitting, type LibraryRow } from './useLibraryFittings';
+import { heldFitting, libraryRowCode, type LibraryRow } from './useLibraryFittings';
+import { StatNote } from './StatFacts';
 
 interface FittingPreviewProps {
   row: LibraryRow;
@@ -47,17 +48,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** The Fitting Share Code a saved or shared row carries; an In-game row has none. */
-function rowCode(row: LibraryRow): string | null {
-  if (row.source === 'saved') return row.record.code;
-  return row.source === 'shared' ? row.shared.code : null;
-}
-
 /** In-game and Active Fit rows hold their Fitting, no code: encoded only when needed. */
 const holdsFitting = (row: LibraryRow) => row.source === 'inGame' || row.source === 'active';
 
 function usePreviewFitting(row: LibraryRow): Fitting | null {
-  const savedCode = rowCode(row);
+  const savedCode = libraryRowCode(row);
   const codes = useMemo(() => (savedCode === null ? [] : [savedCode]), [savedCode]);
   const decoded = useCompareFittings(codes)[0]?.fitting ?? null;
   const held = useMemo(() => heldFitting(row), [row]);
@@ -78,7 +73,7 @@ function useShareCode(row: LibraryRow, fitting: Fitting | null): string | null |
       cancelled = true;
     };
   }, [encodes, fitting]);
-  if (!encodes) return rowCode(row);
+  if (!encodes) return libraryRowCode(row);
   return encoded?.fitting === fitting ? encoded.code : undefined;
 }
 
@@ -156,7 +151,9 @@ export function FittingPreview({
                 ? t('fittings.start.sourceInGame')
                 : row.source === 'active'
                   ? t('fittings.start.sourceActive')
-                  : sharedByText(row, t)}
+                  : row.source === 'doctrine'
+                    ? t('fittings.start.doctrineOf')
+                    : sharedByText(row, t)}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {row.source === 'saved' && (
@@ -181,6 +178,10 @@ export function FittingPreview({
             </Button>
           </div>
         </div>
+
+        {row.source === 'doctrine' && row.legacy && (
+          <StatNote>{t('fittings.start.doctrineLegacy')}</StatNote>
+        )}
 
         {unreadable ? (
           <p className="text-xs text-warning">{t('fittings.start.preview.unreadable')}</p>
