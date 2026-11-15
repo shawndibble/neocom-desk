@@ -1,7 +1,9 @@
 /**
  * Dated tax rates (D3/D31): corp default → Guest default → per-feeder →
- * per-refinery → per-moon → per-Miner → per-record, most specific wins. The
- * per-feeder tier prices every refinery of one feeder corporation; the
+ * per-feeder members → per-refinery → per-moon → per-Miner → per-record, most
+ * specific wins. The per-feeder tier prices every refinery of one feeder
+ * corporation; the per-feeder members tier (`feeder-member`, #6210) prices only
+ * that corporation's own members at its refineries, who are otherwise Guests; the
  * per-refinery tier (`structure`, #4621) prices one refinery by its structure
  * id, which a moon owner's ledger-only row always has and a moon id never. Every rate but a per-record one
  * carries an effective-from date and applies only to days on or after it, so a
@@ -20,6 +22,7 @@ export type TaxRate =
   | (DatedRate & { scope: 'corp' })
   | (DatedRate & { scope: 'guest' })
   | (DatedRate & { scope: 'feeder'; feederId: number })
+  | (DatedRate & { scope: 'feeder-member'; feederId: number })
   | (DatedRate & { scope: 'miner'; minerId: string })
   | (DatedRate & { scope: 'moon'; moonId: number })
   | (DatedRate & { scope: 'structure'; structureId: number })
@@ -40,6 +43,8 @@ export interface RateContext {
   feederId?: number;
   /** The miner was outside the book's corporation when they mined. */
   isGuest: boolean;
+  /** The corporation the miner was in when they mined (the entry's recorded corporation). */
+  minerCorporationId?: number;
 }
 
 export interface ResolvedRate {
@@ -55,6 +60,7 @@ const SCOPE_ORDER: readonly RateScope[] = [
   'miner',
   'moon',
   'structure',
+  'feeder-member',
   'feeder',
   'guest',
   'corp',
@@ -70,6 +76,12 @@ function targets(rate: TaxRate, ctx: RateContext): boolean {
       return ctx.structureId !== undefined && rate.structureId === ctx.structureId;
     case 'feeder':
       return ctx.feederId !== undefined && rate.feederId === ctx.feederId;
+    case 'feeder-member':
+      return (
+        ctx.feederId !== undefined &&
+        rate.feederId === ctx.feederId &&
+        ctx.minerCorporationId === rate.feederId
+      );
     case 'miner':
       return rate.minerId === ctx.minerId;
     case 'guest':

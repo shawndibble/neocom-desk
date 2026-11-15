@@ -119,7 +119,7 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
     const rate = r as Data;
     return (
       num(rate.pct) !== undefined &&
-      ['corp', 'guest', 'feeder', 'miner', 'moon', 'structure', 'record'].includes(
+      ['corp', 'guest', 'feeder', 'feeder-member', 'miner', 'moon', 'structure', 'record'].includes(
         String(rate.scope)
       )
     );

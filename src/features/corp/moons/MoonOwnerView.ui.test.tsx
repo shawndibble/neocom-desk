@@ -203,13 +203,46 @@ describe('MoonOwnerView', () => {
   });
 });
 
+describe('MoonOwnerView: checking the numbers (#6210)', () => {
+  it('shows how the balance adds up, and the mining day by day, a month at a time', async () => {
+    const v = fixtureView({ accruedIsk: 33_024_480, paidIsk: 20_000_000 });
+    v.days = [
+      ...v.days,
+      {
+        date: '2026-09-28',
+        lines: [{ characterId: 1, structureId: 10, typeId: 45490, volume: 1234, quantity: 1234 }],
+      },
+    ];
+    render(<MoonOwnerView view={v} names={nameOf} canEdit onRequestRate={vi.fn()} />);
+    expect(
+      screen.getByText(
+        'How it adds up: 33,024,480 has built up for you at your rate, less 20,000,000 paid to you.'
+      )
+    ).toBeVisible();
+    expect(screen.getByText('28 Sep')).toBeVisible();
+    expect(screen.getAllByText('1 Oct').length).toBe(4);
+    await userEvent.click(screen.getByRole('combobox', { name: 'Month' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Sep 2026' }));
+    expect(screen.queryByText('1 Oct')).toBeNull();
+    expect(screen.getByText('28 Sep')).toBeVisible();
+  });
+});
+
 describe('OwnerStaleBanner', () => {
   it('names the date and reconnects', async () => {
     const onReconnect = vi.fn();
-    render(<OwnerStaleBanner since={Date.UTC(2026, 9, 11)} onReconnect={onReconnect} />);
+    render(
+      <OwnerStaleBanner since={Date.UTC(2026, 9, 11)} daysLeft={12} onReconnect={onReconnect} />
+    );
     expect(screen.getByText("We can't read your mining ledger since 11 Oct")).toBeVisible();
+    expect(screen.getByText(/Reconnect within 12 days/)).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
     expect(onReconnect).toHaveBeenCalled();
+  });
+
+  it('says when the oldest unread ore is already lost', () => {
+    render(<OwnerStaleBanner since={Date.UTC(2026, 9, 11)} daysLeft={0} onReconnect={vi.fn()} />);
+    expect(screen.getByText(/can never be counted/)).toBeVisible();
   });
 });
 

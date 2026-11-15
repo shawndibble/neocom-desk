@@ -1,6 +1,17 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, Panel, StatChip, StatChips, TextInput } from '@/components/ui';
+import {
+  DataTable,
+  Panel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatChip,
+  StatChips,
+  TextInput,
+} from '@/components/ui';
 import { Button } from '@/components/ui/Button';
 import { InlineError } from '@/components/ui/InlineError';
 import { payeeChangeNotice, payeeNoticeKey } from '@/engine/corpTaxBook/payeeChange';
@@ -8,7 +19,8 @@ import type { Payee } from '@/engine/corpTaxBook/payouts';
 import type { FeederView } from '../taxBook/feederViewClient';
 import {
   isSettledAfterLeaving,
-  minedRows,
+  minedDayRows,
+  minedMonths,
   pageState,
   payeeIdOf,
   parseRequestedRate,
@@ -20,7 +32,7 @@ import {
 import { DialogShell } from './BookDialogs';
 import { RefineryLabels } from './RefineryLabels';
 import { ChangePayeeDialog, PayeeChangeStrip, PayeeLine } from './MoonOwnerPayee';
-import { isk, shortDate } from './moonsFormat';
+import { isk, monthLabel, shortDate } from './moonsFormat';
 
 type Names = (characterId: number) => string;
 /** An ore's name; undefined until it resolves. */
@@ -74,6 +86,11 @@ function Statement({ view, name }: { view: FeederView; name: string }) {
                 amount: isk(s.lastPayout.amount),
                 date: shortDate(s.lastPayout.date),
               })}
+          </p>
+        )}
+        {s.balanceKind !== 'none' && (
+          <p className="text-xs text-text-dim">
+            {t(k('accrued'), { accrued: isk(s.accruedIsk), paid: isk(s.paidIsk) })}
           </p>
         )}
         {s.unpricedDays > 0 && (
@@ -141,7 +158,13 @@ function SettledOtherwise({
   );
 }
 
-/** Who mined at the moon owner's refineries, per character and refinery. Nothing is capped. */
+/** The month filter's "every month" value: Radix Select has no empty value. */
+const ALL_MONTHS = 'all';
+
+/**
+ * Who mined at the moon owner's refineries, per day, character, refinery and ore, so each day
+ * can be checked against the moon owner's own ledger (#6210); a month at a time. Nothing is capped.
+ */
 function MinedTable({
   view,
   names,
@@ -156,11 +179,37 @@ function MinedTable({
   title: string;
 }) {
   const { t } = useTranslation();
-  const rows = minedRows(view.days);
+  const months = minedMonths(view.days);
+  const [picked, setPicked] = useState<string>(ALL_MONTHS);
+  const month = picked !== ALL_MONTHS && months.includes(picked) ? picked : null;
+  const rows = minedDayRows(view.days, month);
   const oreName = (r: MinedRow) =>
     r.typeId === null ? '—' : (typeName?.(r.typeId) ?? `#${r.typeId}`);
+  const filterLabel = t('corpTaxBook.moons.ownerView.month');
   return (
-    <Panel title={title} padded={rows.length === 0}>
+    <Panel
+      title={title}
+      padded={rows.length === 0}
+      actions={
+        months.length > 1 ? (
+          <Select value={month ?? ALL_MONTHS} onValueChange={setPicked}>
+            <SelectTrigger aria-label={filterLabel} size="sm" active={month !== null}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_MONTHS}>
+                {t('corpTaxBook.moons.ownerView.allMonths')}
+              </SelectItem>
+              {months.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {monthLabel(m)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : undefined
+      }
+    >
       {rows.length === 0 ? (
         <p className="text-sm text-text-dim">{t('corpTaxBook.moons.owner.noMining')}</p>
       ) : (
@@ -168,8 +217,15 @@ function MinedTable({
           label={title}
           rows={rows}
           rowKey={(r) => r.key}
-          defaultSort={{ columnId: 'volume', direction: 'desc' }}
+          defaultSort={{ columnId: 'date', direction: 'desc' }}
           columns={[
+            {
+              id: 'date',
+              header: t('corpTaxBook.moons.ownerView.cols.date'),
+              className: 'tabular-nums whitespace-nowrap',
+              render: (r) => shortDate(r.date),
+              sortValue: (r) => r.date,
+            },
             {
               id: 'character',
               header: t('corpTaxBook.moons.ownerView.cols.character'),

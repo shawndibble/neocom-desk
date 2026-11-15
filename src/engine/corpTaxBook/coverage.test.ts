@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   clampCoverageFrom,
+  reconnectCoverageFrom,
   closePeriod,
   filterCovered,
   isDayCovered,
@@ -157,5 +158,33 @@ describe('clampCoverageFrom', () => {
     expect(from).toBe('2026-10-11');
     expect(() => reopenPeriod(periods, from)).not.toThrow();
     expect(clampCoverageFrom(periods, '2026-10-15', TODAY)).toBe('2026-10-15');
+  });
+});
+
+describe('reconnectCoverageFrom', () => {
+  const TODAY = '2026-10-20';
+
+  it('starts the day after the last covered day, so no ore EVE still holds is lost', () => {
+    const periods = [{ from: '2026-09-01', to: '2026-10-05' }];
+    const from = reconnectCoverageFrom(periods, TODAY);
+    expect(from).toBe('2026-10-06');
+    expect(() => reopenPeriod(periods, from)).not.toThrow();
+  });
+
+  it('reaches back no further than EVE keeps the ledger (30 days)', () => {
+    expect(reconnectCoverageFrom([{ from: '2026-08-01', to: '2026-09-01' }], TODAY)).toBe(
+      '2026-09-20'
+    );
+  });
+
+  it('starts today when nothing was ever covered', () => {
+    expect(reconnectCoverageFrom([], TODAY)).toBe(TODAY);
+  });
+
+  it('never reaches before the day it last joined: a spell never read left no period', () => {
+    // Left on 10-01, rejoined 10-10, never read well: the 10-10 period was dropped at disconnect.
+    const periods = [{ from: '2026-09-01', to: '2026-10-01' }];
+    expect(reconnectCoverageFrom(periods, TODAY, '2026-10-10')).toBe('2026-10-10');
+    expect(reconnectCoverageFrom(periods, TODAY, '2026-09-15')).toBe('2026-10-02');
   });
 });

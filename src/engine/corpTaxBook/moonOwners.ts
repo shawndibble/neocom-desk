@@ -1,6 +1,7 @@
 import { computeAssignmentValue } from '../miningTax/valuation';
 import { moonOwnerDayPrices } from './valuation';
 import { isDayCovered, type CoveragePeriod } from './coverage';
+import { daysUntilOreLost, staleLedgerClock } from './feederHealth';
 import {
   accrueValuedDays,
   deriveModeChanges,
@@ -61,6 +62,8 @@ export type MoonOwnerStatus =
   | 'active'
   | 'cant-read'
   | 'removal-pending'
+  /** A removal whose notice mail has not gone out: it never takes effect until it does (#6210). */
+  | 'removal-unsent'
   | 'settled-otherwise'
   /** The moon owner asked for a rate the accounting corporation has not agreed yet (#6209). */
   | 'rate-asked'
@@ -242,6 +245,26 @@ const paidOf = (payouts: readonly MoonOwnerPayout[]) =>
 
 const LIFECYCLE: readonly MoonOwnerFeeder['status'][] = ['disconnected', 'left', 'removed'];
 
+/**
+ * Whether an officer's client should ask to send the "we can't read your ledger" mail (#6210):
+ * the ledger of a moon owner still on the book (or just disconnected) cannot be read. One of
+ * the viewer's own corporations is never mailed (as with its other moon owner mail), nor one whose
+ * oldest unread mining EVE already dropped (the mail's "reconnect before" would be past). The
+ * server hands the mail to one officer per stale spell.
+ */
+export function staleLedgerMailDue(
+  row: Pick<MoonOwnerRow, 'status' | 'staleSince' | 'sameOwner' | 'lastReadWellAt'>,
+  now: string
+): boolean {
+  return (
+    row.staleSince !== undefined &&
+    row.sameOwner !== true &&
+    row.status !== 'left' &&
+    row.status !== 'removed' &&
+    daysUntilOreLost(staleLedgerClock(row.staleSince, row.lastReadWellAt), now) > 0
+  );
+}
+
 /** Whether the scheduled sync still reads a moon owner in this status (Sync now, "next read"). */
 export function isStillRead(status: MoonOwnerStatus): boolean {
   return !(LIFECYCLE as readonly string[]).includes(status);
@@ -253,7 +276,8 @@ function statusOf(
   ratePct: number | undefined,
   askedPct: number | undefined
 ): MoonOwnerStatus {
-  if (f.status === 'pending-removal') return 'removal-pending';
+  if (f.status === 'pending-removal')
+    return f.removal && f.removal.effectiveAt === undefined ? 'removal-unsent' : 'removal-pending';
   if (LIFECYCLE.includes(f.status)) return f.status as 'disconnected' | 'left' | 'removed';
   if (f.staleSince !== undefined) return 'cant-read';
   if (settledNow) return 'settled-otherwise';
@@ -296,6 +320,7 @@ function minerRateAt(
       moonId: e.moonId,
       structureId: e.structureId,
       isGuest: e.recordedCorporationId !== input.bookCorporationId,
+      minerCorporationId: e.recordedCorporationId,
     });
     if (rate) counts.set(rate.pct, (counts.get(rate.pct) ?? 0) + 1);
   }
@@ -370,7 +395,15 @@ function minerRateWithoutEntries(
   const base = { date: today, minerId: '', recordKey: '', feederId, moonId: undefined };
   // The entry path prices a moon owner with no ore yet as Guests.
   if (noRows) return resolveRate(input.rates, { ...base, isGuest: true });
-  if (input.rates.some((r) => r.scope === 'guest' || r.scope === 'structure' || r.scope === 'moon'))
+  if (
+    input.rates.some(
+      (r) =>
+        r.scope === 'guest' ||
+        r.scope === 'structure' ||
+        r.scope === 'moon' ||
+        (r.scope === 'feeder-member' && r.feederId === feederId)
+    )
+  )
     return 'depends';
   return resolveRate(input.rates, { ...base, isGuest: false });
 }
@@ -519,6 +552,7 @@ const listed = (row: MoonOwnerRow) =>
 const NEEDS_A_LOOK: readonly MoonOwnerStatus[] = [
   'cant-read',
   'removal-pending',
+  'removal-unsent',
   'rate-asked',
   'no-rate',
   'disconnected',

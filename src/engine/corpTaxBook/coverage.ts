@@ -60,6 +60,24 @@ export function clampCoverageFrom(
   return day;
 }
 
+/**
+ * The first covered day when a disconnected moon owner reconnects: the day after its last
+ * covered day, so ore EVE still holds is counted, but never more than 30 days back (what EVE
+ * keeps) and never before `joinedOn`, the day it last joined (a spell never read well leaves no
+ * period, so the last one may predate a leave). Nothing ever covered: today. Mirrored in
+ * `functions/`.
+ */
+export function reconnectCoverageFrom(
+  periods: readonly CoveragePeriod[],
+  today: string,
+  joinedOn?: string
+): string {
+  if (!periods.some((p) => p.to !== undefined)) return today;
+  const earliest = shiftUtcDate(today, -MAX_COVERAGE_BACKDATE_DAYS);
+  const asked = joinedOn !== undefined && joinedOn > earliest ? joinedOn : earliest;
+  return clampCoverageFrom(periods, asked, today);
+}
+
 /** Rows outside coverage owe nothing. */
 export function filterCovered<T extends { date: string }>(
   rows: readonly T[],

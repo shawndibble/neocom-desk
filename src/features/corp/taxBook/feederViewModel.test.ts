@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   isSettledAfterLeaving,
   isStale,
-  minedRows,
+  minedDayRows,
+  minedMonths,
   pageState,
   parseRequestedRate,
   payeeIdOf,
@@ -164,32 +165,6 @@ describe('parseRequestedRate', () => {
   });
 });
 
-describe('minedRows', () => {
-  const day = (date: string, lines: FeederViewDay['lines']): FeederViewDay => ({
-    date,
-    lines,
-  });
-  it('sums per character, refinery and ore across days, most first, none dropped', () => {
-    const rows = minedRows([
-      day('2026-10-01', [
-        { characterId: 1, structureId: 10, typeId: 45490, volume: 5, quantity: 5 },
-        { characterId: 2, structureId: 10, typeId: 45490, volume: 1, quantity: 1 },
-      ]),
-      day('2026-10-02', [
-        { characterId: 1, structureId: 10, typeId: 45490, volume: 5, quantity: 5 },
-        { characterId: 1, structureId: 10, typeId: 45492, volume: 2, quantity: 2 },
-        { characterId: 1, structureId: 11, volume: 2 },
-      ]),
-    ]);
-    expect(rows.map((r) => [r.characterId, r.structureId, r.typeId, r.volume])).toEqual([
-      [1, 10, 45490, 10],
-      [1, 10, 45492, 2],
-      [1, 11, null, 2],
-      [2, 10, 45490, 1],
-    ]);
-  });
-});
-
 describe('viewRefineryLabeler / payoutRows', () => {
   const refineries = [
     { structureId: 10, label: 'Efa', labelSetAt: '2026-10-12T00:00:00Z', solarSystemId: 30000142 },
@@ -226,5 +201,35 @@ describe('viewRefineryLabeler / payoutRows', () => {
       '2026-10-16',
       '2026-10-04',
     ]);
+  });
+});
+
+describe('mined per day and month (#6210)', () => {
+  const days: FeederViewDay[] = [
+    {
+      date: '2026-09-30',
+      lines: [{ characterId: 1, structureId: 10, typeId: 45490, volume: 3, quantity: 3 }],
+    },
+    {
+      date: '2026-10-02',
+      lines: [
+        { characterId: 1, structureId: 10, typeId: 45490, volume: 5, quantity: 5 },
+        { characterId: 1, structureId: 10, typeId: 45490, volume: 2, quantity: 2 },
+        { characterId: 2, structureId: 10, typeId: 45490, volume: 7, quantity: 7 },
+      ],
+    },
+  ];
+
+  it('lists the months mined, newest first', () => {
+    expect(minedMonths(days)).toEqual(['2026-10', '2026-09']);
+  });
+
+  it('keeps each day apart, newest day first, and filters by month', () => {
+    expect(minedDayRows(days, null).map((r) => [r.date, r.characterId, r.volume])).toEqual([
+      ['2026-10-02', 1, 7],
+      ['2026-10-02', 2, 7],
+      ['2026-09-30', 1, 3],
+    ]);
+    expect(minedDayRows(days, '2026-09').map((r) => r.date)).toEqual(['2026-09-30']);
   });
 });

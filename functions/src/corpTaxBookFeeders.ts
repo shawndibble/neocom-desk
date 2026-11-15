@@ -24,6 +24,7 @@ import {
 } from './corpTaxBook.js';
 import {
   clampCoverageFrom,
+  reconnectCoverageFrom,
   deriveModeChanges,
   reopenPeriod,
   type CoveragePeriod,
@@ -67,6 +68,8 @@ export interface FeederRecord {
   staleSince?: number;
   /** When it disconnected after 30 days stale (ms). */
   disconnectedAt?: number;
+  /** The `staleSince` whose "we can't read your ledger" mail an officer's client claimed (#6210). */
+  staleMailedFor?: number;
   /** One payee: a corporation or a player. */
   payee?: { kind: 'corporation' | 'character'; id: number };
   payeeChangedAt?: number;
@@ -397,6 +400,7 @@ export interface AcceptUndo {
 const FEED_STATE: readonly (keyof FeederRecord)[] = [
   'leftAt',
   'staleSince',
+  'staleMailedFor',
   'disconnectedAt',
   'lastSyncResult',
   // A rejoin's holder may read Extractions the old one could not (#6117).
@@ -482,7 +486,16 @@ export async function acceptInviteCore(
     // The first covered day: the invite's ask within 30 days back, never before the book began
     // and (on a rejoin) never inside an earlier period.
     const startDate: unknown = collectorBook.get('startDate');
-    let from = clampCoverageFrom(held?.coveragePeriods ?? [], invite.coverageFrom, today);
+    // Taking back a disconnected moon owner with no asked day is a reconnect: it reaches back to
+    // the day after its last covered one, so ore EVE still holds is not lost.
+    let from =
+      takenBack && invite.coverageFrom === undefined
+        ? reconnectCoverageFrom(
+            held?.coveragePeriods ?? [],
+            today,
+            held ? utcDate(held.joinedAt) : undefined
+          )
+        : clampCoverageFrom(held?.coveragePeriods ?? [], invite.coverageFrom, today);
     if (typeof startDate === 'string' && startDate > from && startDate <= today) from = startDate;
     const sameOwner = invite.sameOwner === true;
     const settled: FeederModeChange = { from, mode: 'settled-otherwise' };

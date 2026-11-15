@@ -5,7 +5,13 @@ import { placeOfFactory } from './bookView';
 import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
 import type { Dismissal } from './dismissals';
 import { extractionId, type SyncExtraction } from './sync';
-import { clampCoverageFrom, closePeriod, isDayCovered, reopenPeriod } from './coverage';
+import {
+  clampCoverageFrom,
+  closePeriod,
+  isDayCovered,
+  reconnectCoverageFrom,
+  reopenPeriod,
+} from './coverage';
 import { oreFormTypeId } from '../miningTax/oreForm';
 import { moonOwnerUnitPrice } from './valuation';
 import {
@@ -417,6 +423,20 @@ describe('feeder coverage mirror', () => {
       for (const day of [undefined, '2026-10-25', '2026-10-05', '2026-10-15', '2026-09-01']) {
         expect(mirror.clampCoverageFrom(set, day, '2026-10-20')).toBe(
           clampCoverageFrom(set, day, '2026-10-20')
+        );
+      }
+    }
+  });
+
+  it('starts a reconnect the same', () => {
+    for (const set of [
+      [],
+      [{ from: '2026-08-01', to: '2026-09-01' }],
+      [{ from: '2026-10-01', to: '2026-10-10' }],
+    ]) {
+      for (const joined of [undefined, '2026-09-10', '2026-10-15']) {
+        expect(mirror.reconnectCoverageFrom(set, '2026-10-20', joined)).toBe(
+          reconnectCoverageFrom(set, '2026-10-20', joined)
         );
       }
     }

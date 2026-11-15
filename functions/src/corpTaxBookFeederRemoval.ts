@@ -268,6 +268,47 @@ export async function cancelFeederRemoval(
   return { recipients: all };
 }
 
+// --- The stale-ledger mail (#6210) ---------------------------------------------
+
+/**
+ * The moon owner's ledger can't be read: the first officer client to see it claims this stale
+ * spell's one mail to both sides (the moon owner's CEO and payee, and the book's other
+ * officers), so every open tab does not send its own. Nobody named: nothing to send, another
+ * officer already claimed it, or it is one of the book's own corporations (never mailed). Mail
+ * is client-only (no server holds a mail token).
+ */
+export async function claimFeederStaleMail(
+  deps: BookDeps,
+  caller: Caller,
+  input: RemovalCall
+): Promise<{ recipients: number[]; ownerRecipients: number[] }> {
+  const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
+  const ref = feederRef(deps.db, input.corporationId, input.feederCorporationId);
+  const claimed = await deps.db.runTransaction(async (tx) => {
+    const held = (await tx.get(ref)).data() as FeederRecord | undefined;
+    if (
+      !held ||
+      held.staleSince === undefined ||
+      held.staleMailedFor === held.staleSince ||
+      held.sameOwner === true ||
+      held.status === 'left' ||
+      held.status === 'removed'
+    ) {
+      return undefined;
+    }
+    tx.update(ref, { staleMailedFor: held.staleSince });
+    return held;
+  });
+  if (!claimed) return { recipients: [], ownerRecipients: [] };
+  const { all, owner } = await recipientsFor(
+    deps,
+    input.corporationId,
+    claimed,
+    access.characterId
+  );
+  return { recipients: all, ownerRecipients: owner };
+}
+
 // --- The payee's link ---------------------------------------------------------
 
 /**

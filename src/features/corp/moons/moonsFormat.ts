@@ -30,6 +30,11 @@ export function shortDate(value: string): string {
   return `${d} ${MONTHS[m - 1]}`;
 }
 
+/** "Oct 2026" from a `YYYY-MM` month (or any date in it). */
+export function monthLabel(month: string): string {
+  return `${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
+}
+
 /** "18 Oct", or "18 Oct 2025" when the year is not `now`'s: a date that could be read as this year's. */
 export function dateWithYear(value: string, now: Date = new Date()): string {
   const year = Number(value.slice(0, 4));

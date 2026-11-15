@@ -318,6 +318,23 @@ export async function recordFeederRemovalSent(
   });
 }
 
+/**
+ * The moon owner's ledger can't be read: claims this stale spell's one mail (#6210). Nobody
+ * named: another officer already claimed it, or the ledger reads again.
+ */
+export async function claimFeederStaleMail(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number
+): Promise<{ recipients: number[]; ownerRecipients: number[] }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'claimCorpTaxBookFeederStaleMailCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+  });
+}
+
 /** Cancel a pending removal; returns whom the short cancellation mail goes to. */
 export async function cancelFeederRemoval(
   characterId: number,
