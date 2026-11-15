@@ -137,5 +137,22 @@ describe('Shared Pop start link and detail', () => {
     const detail = sharedPopDetail({ ...entry({ notes: '' }), ore: null }, NOW, t, 'UTC');
     expect(detail.list).toBeUndefined();
     expect(detail.status?.note).toBeUndefined();
+    expect(detail.facts.map((f) => f.label)).not.toContain('calendar.sharedPop.ore');
+  });
+
+  it('says the ore make-up is unknown when it is shared but the book holds none', () => {
+    const detail = sharedPopDetail({ ...entry({ oreShared: true }), ore: null }, NOW, t, 'UTC');
+    expect(detail.list).toBeUndefined();
+    expect(detail.facts).toContainEqual({
+      label: 'calendar.sharedPop.ore',
+      value: 'calendar.sharedPop.oreUnknown',
+    });
+  });
+
+  it('leaves the ore out when it is not shared, or the server predates the flag', () => {
+    for (const oreShared of [false, undefined]) {
+      const detail = sharedPopDetail({ ...entry({ oreShared }), ore: null }, NOW, t, 'UTC');
+      expect(detail.facts.map((f) => f.label)).not.toContain('calendar.sharedPop.ore');
+    }
   });
 });

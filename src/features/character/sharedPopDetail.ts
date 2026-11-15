@@ -33,7 +33,10 @@ const POP_TIME_KEY = {
   'auto-fracture': 'calendar.sharedPop.popTime.autoFracture',
 } as const;
 
-/** The detail modal: refinery, moon, Pop Time and countdown, ore make-up, notes, start link. */
+/**
+ * The detail modal: refinery, moon, Pop Time and countdown, ore make-up, notes, start link. Ore
+ * make-up shared but not known (a moon owner's moon) reads "Unknown"; not shared, it is absent.
+ */
 export function sharedPopDetail(
   entry: SharedPopEntry,
   nowMs: number,
@@ -61,6 +64,9 @@ export function sharedPopDetail(
       value: t('calendar.sharedPop.ratePct', { rate: pop.ratePct }),
     },
   ];
+  const oreKnown = entry.ore !== null && entry.ore.length > 0;
+  if (!oreKnown && pop.oreShared === true)
+    facts.push({ label: t('calendar.sharedPop.ore'), value: t('calendar.sharedPop.oreUnknown') });
   return {
     title: sharedPopTitle(entry),
     status: {

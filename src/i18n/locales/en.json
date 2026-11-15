@@ -9362,6 +9362,7 @@
       "rate": "Tax rate",
       "ratePct": "{{rate}}%",
       "ore": "Ore make-up",
+      "oreUnknown": "Unknown",
       "units_one": "{{count, number}} unit",
       "units_other": "{{count, number}} units",
       "startSurvey": "Start a Survey here"

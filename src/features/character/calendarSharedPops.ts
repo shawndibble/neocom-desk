@@ -35,6 +35,15 @@ export function sharedPopIsShown(pop: SharedPopView, nowMs: number): boolean {
 }
 
 /**
+ * The instant a Shared Pop's row is due: its Pop Time, or once popped the belt's expiry. The
+ * day a `?pop=` deep link moves the map to (issue #6239). NaN when the Pop Time is unreadable.
+ */
+export function sharedPopDeadlineMs(pop: SharedPopView, nowMs: number): number {
+  const popAtMs = Date.parse(pop.popAt);
+  return nowMs >= popAtMs ? Date.parse(pop.expiresAt) : popAtMs;
+}
+
+/**
  * The Calendar rows. `readableRefineries` are the refineries the pilot already reads as corp
  * moon chunks: those pops are left out. One refinery holds one moon's drill at a time.
  */
@@ -54,7 +63,7 @@ export function toSharedPopSources(
       id: pop.id,
       subject: sharedPopTitle(entry),
       detail: popped ? 'expires' : pop.popTime === 'ready' ? 'ready' : 'autoFracture',
-      deadlineMs: popped ? Date.parse(pop.expiresAt) : popAtMs,
+      deadlineMs: sharedPopDeadlineMs(pop, nowMs),
       sharedBy: entry.corporation,
       ...(pop.refineryName !== null && entry.moonName !== null ? { subtitle: entry.moonName } : {}),
     });

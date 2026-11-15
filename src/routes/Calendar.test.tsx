@@ -393,6 +393,24 @@ describe('Calendar Shared Pops', () => {
     );
     await waitFor(() => expect(window.location.search).not.toContain('pop='));
   });
+
+  it("moves the map to the pop's day from ?pop=<id>, scoping the rail to it", async () => {
+    sharePop();
+    // Seven weeks out: past any month grid that opens on today, so the map has to move.
+    Object.assign(sharedPops.list[0] as object, {
+      popAt: inHours(49 * 24).toISOString(),
+      expiresAt: inHours(49 * 24 + 48).toISOString(),
+    });
+    window.history.pushState({}, '', `/calendar?pop=${SHARING_CORP_ID}_x1`);
+    renderCalendarRoute();
+
+    await screen.findByRole('dialog', { name: 'Efa - Shared Tatara' });
+    // A day off the opening grid can only be pressed once the map moved to it.
+    expect(await screen.findByRole('button', { pressed: true })).toBeInTheDocument();
+    const rail = screen.getByRole('list', { name: /coming up/i });
+    expect(within(rail).getByText('Efa - Shared Tatara')).toBeInTheDocument();
+    expect(within(rail).queryByText('Fleet Op')).toBeNull();
+  });
 });
 
 describe('Calendar', () => {

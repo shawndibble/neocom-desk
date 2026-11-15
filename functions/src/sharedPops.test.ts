@@ -115,6 +115,7 @@ describe('buildSharedPops', () => {
         startedAt: START,
         expiresAt: new Date(at(DECAY, 48)).toISOString(),
         ore: [{ typeId: 45490, quantity: 10_000 }],
+        oreShared: true,
         notes: 'Bring Orcas',
         ratePct: 7,
         audiences: ['corp'],
@@ -129,7 +130,12 @@ describe('buildSharedPops', () => {
         bookRatePct: (x) => (x.moonId === 40001 ? 12 : 0),
       })
     );
-    expect(doc!.pops[0]).toMatchObject({ ratePct: 12, ore: null });
+    expect(doc!.pops[0]).toMatchObject({ ratePct: 12, ore: null, oreShared: false });
+  });
+
+  it('says the ore make-up is shared but unknown when the book holds none (a moon owner)', () => {
+    const doc = buildSharedPops(input({ extractions: [extraction({ oreLines: undefined })] }));
+    expect(doc!.pops[0]).toMatchObject({ ore: null, oreShared: true });
   });
 
   it('publishes nothing with sharing off, no audience left, or nothing live', () => {
