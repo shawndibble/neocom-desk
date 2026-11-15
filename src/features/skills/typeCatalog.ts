@@ -26,7 +26,8 @@ let itemNameMapPromise: Promise<Map<string, TypeCatalogEntry>> | null = null;
  * entries; skills.json is a fallback, never allowed to shadow an item name).
  * Memoized: the bundled SDE snapshot never changes within a session, so a
  * repeat caller (e.g. a picker reopened several times) doesn't rebuild the
- * whole ~13k-entry map from scratch each time.
+ * whole ~13k-entry map from scratch each time. A failed load is dropped, not
+ * memoized, so the next caller retries instead of failing until a reload.
  */
 export function loadItemNameMap(): Promise<Map<string, TypeCatalogEntry>> {
   itemNameMapPromise ??= (async () => {
@@ -40,6 +41,9 @@ export function loadItemNameMap(): Promise<Map<string, TypeCatalogEntry>> {
       if (!map.has(key)) map.set(key, { typeID: skill.typeID });
     }
     return map;
-  })();
+  })().catch((error: unknown) => {
+    itemNameMapPromise = null;
+    throw error;
+  });
   return itemNameMapPromise;
 }
