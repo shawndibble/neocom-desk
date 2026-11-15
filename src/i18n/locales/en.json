@@ -7930,6 +7930,7 @@
     "splitCollectorLabel": "Further ore reported for this day goes to",
     "splitCollectorKeeps": "{{payee}} (keeps)",
     "splitCollectorNew": "{{payee}} (new)",
+    "splitCollectorCurrent": "{{payee}} (collects now)",
     "splitNewSideLabel": "the new Payee",
     "splitKeepsLabel": "{{payee}} keeps",
     "splitNewLabel": "{{payee}} gets",
@@ -8008,7 +8009,7 @@
         "conflictOverListed": "Your entry for {{corp}} lists more of this ore than its book recorded. {{corp}} does not bill it: take it off your entry, or ask an officer to correct the book.",
         "conflictOwnNeedsReview": "Your own entry for {{corp}} needs review, so its book can't take it over. It is not owed; it resolves to {{corp}} on {{date}} or on {{corp}}'s next Statement, whichever comes first, unless you sort it out first.",
         "conflictOwnerCollected": "{{corp}} now collects tax for this moon, and you gave this ore to the moon's owner. It is not owed; it resolves to {{corp}} on {{date}} or on {{corp}}'s next Statement, whichever comes first, unless you sort it out first.",
-        "unattributed": "No Corp Tax Book claims this ore, so nobody is owed for it.",
+        "unattributed": "No Corp Tax Book claims this ore. Assign it to your Payee if you owe someone.",
         "dismissed": "{{corp}} dismissed this day: {{reason}}",
         "waived": "{{corp}} wrote this day off: {{reason}}",
         "paid": "Paid to {{corp}}."
@@ -8386,6 +8387,10 @@
       "deleteAnyway": "Delete anyway",
       "deleteAnywayHint": "Deleting anyway keeps those entries, but they will show as \"Unknown Payee\" until you assign them again.",
       "deleteFailed": "Couldn’t delete {{name}} — nothing was changed. Try again.",
+      "bookLink": {
+        "note": "{{corp}} keeps a Corp Tax Book. Link this Payee to it so the book counts what you pay as its own.",
+        "action": "Link to {{corp}}"
+      },
       "verify": {
         "openUnresolved": "Couldn't find one character, corporation or alliance named {{name}}, so there is nothing to open.",
         "suggestionsLabel": "Matching characters, corporations and alliances",

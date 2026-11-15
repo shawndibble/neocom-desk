@@ -122,6 +122,13 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     systemNames,
     systemSecurity,
   } = useTaxCorpBooks(data, characters, activeCharacterId);
+  // Offered by Manage Payees as the link for a Payee named for one (#6205).
+  const bookCorporations = useMemo(
+    () =>
+      corpView?.books.map((b) => ({ corporationId: b.loaded.corporationId, name: b.corpName })) ??
+      [],
+    [corpView]
+  );
   const corpStateLabel = useCorpStateLabel();
   const corpStateHint = useCorpStateHint();
 
@@ -450,6 +457,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           owedByPayee={owedByPayee}
           systemsByPayee={payeeSystems}
           systemNames={systemNames}
+          bookCorporations={bookCorporations}
           refresh={refresh}
         />
 

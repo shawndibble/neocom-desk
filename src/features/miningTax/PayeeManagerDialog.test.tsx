@@ -56,7 +56,7 @@ const characters = [{ characterId: CHAR, characterName: 'Miner Alt' }];
 
 type ExtraProps = Pick<
   ComponentProps<typeof PayeeManagerDialog>,
-  'owedByPayee' | 'systemsByPayee' | 'systemNames'
+  'owedByPayee' | 'systemsByPayee' | 'systemNames' | 'bookCorporations'
 >;
 
 function renderDialog(payees: PayeeRecord[] = [], extra: ExtraProps = {}) {
@@ -527,5 +527,62 @@ describe('PayeeManagerDialog — entity verification', () => {
       expect(payee.name).toBe('Moon Corp Holdings');
       expect('entityId' in payee || 'entityKind' in payee).toBe(false);
     });
+  });
+});
+
+describe('PayeeManagerDialog — linking a Payee named for a Corp Tax Book corporation (#6205)', () => {
+  const bookCorporations = [{ corporationId: 98_000_007, name: 'Corp A' }];
+
+  it('suggests the link on create, and saving stores it as the corporation', async () => {
+    searchMock.searchPayeeEntities.mockResolvedValue([]);
+    searchMock.resolvePayeeName.mockResolvedValue([]);
+    renderDialog([], { bookCorporations });
+
+    await userEvent.type(screen.getByLabelText('Name'), 'corp a');
+    await userEvent.click(screen.getByRole('button', { name: 'Link to Corp A' }));
+    expect(screen.queryByRole('button', { name: 'Link to Corp A' })).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Default tax %'), '10');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => {
+      expect((await loadPayees(CHAR))[0]).toMatchObject({
+        name: 'Corp A',
+        entityId: 98_000_007,
+        entityKind: 'corporation',
+      });
+    });
+  });
+
+  it('suggests the link when editing an unlinked Payee of that name', async () => {
+    const stored: PayeeRecord = {
+      id: 'p1',
+      characterId: CHAR,
+      name: 'Corp A',
+      defaultTaxPct: 10,
+      updatedAt: 1,
+    };
+    await db.payees.put(stored);
+    renderDialog([stored], { bookCorporations });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Corp A' }));
+    expect(screen.getByText(/Corp A keeps a Corp Tax Book/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Link to Corp A' })).toBeInTheDocument();
+  });
+
+  it('suggests nothing for a Payee already linked to that corporation', async () => {
+    const stored: PayeeRecord = {
+      id: 'p1',
+      characterId: CHAR,
+      name: 'Corp A',
+      defaultTaxPct: 10,
+      entityId: 98_000_007,
+      entityKind: 'corporation',
+      updatedAt: 1,
+    };
+    await db.payees.put(stored);
+    renderDialog([stored], { bookCorporations });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Corp A' }));
+    expect(screen.queryByRole('button', { name: 'Link to Corp A' })).not.toBeInTheDocument();
   });
 });

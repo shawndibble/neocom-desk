@@ -18,12 +18,15 @@
  * separately assignable row for the same day and system, so its status, ore
  * and tax never move here. Combined members and split sides alike.
  *
- * Unpaid growth skips the flag: it is absorbed straight into the Assignment
- * (`planNeedsReviewResolution`), since an unsettled obligation has no paid history to
- * protect. That includes a member of a combined entry — a session that crossed
- * midnight UTC is usually combined while the second day is still growing
- * (scope decision 20261004, "combined entries absorb unpaid growth"). Dismissed
- * growth still flags.
+ * Unpaid growth on a *sole* Assignment skips the flag: it is absorbed straight
+ * into the Assignment (`planNeedsReviewResolution`), since an unsettled
+ * obligation has no paid history to protect. That includes a member of a
+ * combined entry — a session that crossed midnight UTC is usually combined
+ * while the second day is still growing (scope decision 20261004, "combined
+ * entries absorb unpaid growth"). On a split day (2+ Assignments, paid or
+ * not) the Growth Collector's growth is flagged instead: ESI's ledger lags up
+ * to an hour (`oreArrival.ts`), so late ore may be another side's, and only
+ * the pilot can tell (scope decision 20261115-114019). Dismissed growth still flags.
  *
  * Run once per character after loading its fresh ledger (see
  * `snapshot.ts`), not on every render — `sameDiffs` skips the write (and the
@@ -87,11 +90,12 @@ export async function reconcileAssignments(
     const diffs = diffAssignedOreLines(assignment.oreLines, relevantFresh);
     if (diffs.length === 0) continue;
     if (assignment.status === 'needs-review' && sameDiffs(assignment.reviewDiff, diffs)) continue;
-    // Unpaid growth has no settled history to protect, so it folds straight
-    // in — the pilot then splits it from the ordinary row if the new ore
-    // belongs to another Payee. Combined or not: a combined member is billed
-    // with its siblings, but its own ore is still only its own day's.
-    if (assignment.status === 'outstanding') {
+    // A sole Assignment's unpaid growth has no settled history to protect, so
+    // it folds straight in. Combined or not: a combined member is billed with
+    // its siblings, but its own ore is still only its own day's. On a split
+    // day the late ore may belong to another side, so it is reviewed.
+    const soleOnItsDay = siblingsByKey.get(key)!.length === 1;
+    if (assignment.status === 'outstanding' && soleOnItsDay) {
       absorbs.push({ assignment, key });
       continue;
     }

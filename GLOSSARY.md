@@ -74,8 +74,9 @@ here — they go one per file in `docs/context/decisions/`.
   a Payee, snapshotting the tax % and ISK value at assignment time. It acts
   like an invoice thereafter: a later price move or an edited Payee default
   does not change what it shows as owed. If ESI later reports more ore for the
-  entry, an Outstanding Assignment absorbs the growth, while a Paid or
-  dismissed one flips to `needs-review` with a before/after diff. A
+  entry, a sole Outstanding Assignment absorbs the growth, while on a split
+  day (two or more Assignments) the Growth Collector, and a Paid or dismissed
+  one, flips to `needs-review` with a before/after diff. A
   `dismissed` Assignment ("I don't pay tax on this entry") carries no Payee
   but still surfaces growth.
 - **Attribute-Modifying Skill**: A skill that changes the effective value of
@@ -502,7 +503,9 @@ here — they go one per file in `docs/context/decisions/`.
   the pilot assigns it, and the new Assignment then takes over collecting.
   The other side may claim more than ESI has reported yet (the client's
   figure runs ahead of the ledger); later ore fills that claim first and the
-  collector gets only the excess.
+  collector gets only the excess. A collector's growth is flagged
+  `needs-review`, never absorbed: late ore may be the other side's. Every
+  split lets the pilot pick the collector.
 - **Global Market Region**: A region that exists only to hold one item's
   cluster-wide market. PLEX is the only one today: its orders live in a region
   of their own, yet each order still points at an ordinary station. So a global

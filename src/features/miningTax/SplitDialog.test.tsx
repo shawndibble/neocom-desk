@@ -321,6 +321,51 @@ describe('SplitDialog — typing what the first Payee keeps (issue #6180)', () =
     );
   });
 
+  describe('a second split, with a third Assignment already the Growth Collector (#6205)', () => {
+    const third: MiningTaxAssignmentRecord = {
+      ...assignment,
+      id: 'a-0',
+      payeeId: 'p-hek',
+      oreLines: [{ typeId: ZEOLITES, quantity: 20 }],
+      collectsGrowth: true,
+    };
+    const splitRow: MoonMiningTaxRow = { ...row, assignments: [third, assignment] };
+
+    it('still offers the choice, leaving the current Growth Collector by default', async () => {
+      renderDialog({ row: splitRow });
+      expect(screen.getByRole('radio', { name: /Hek landlord \(collects now\)/ })).toBeChecked();
+      await pickHek();
+      await userEvent.type(movesBox(), '40');
+      await userEvent.click(screen.getByRole('button', { name: 'Split · move 40 units' }));
+
+      const sent = vi.mocked(split).mock.lastCall?.[1];
+      expect(sent?.collector).toBeUndefined();
+    });
+
+    it('lets the new side take the Growth Collector over', async () => {
+      renderDialog({ row: splitRow });
+      await pickHek();
+      await userEvent.click(screen.getByRole('radio', { name: /Hek landlord \(new\)/ }));
+      await userEvent.type(movesBox(), '40');
+      await userEvent.click(screen.getByRole('button', { name: 'Split · move 40 units' }));
+
+      expect(split).toHaveBeenLastCalledWith(
+        assignment,
+        expect.objectContaining({ collector: 'new' }),
+        expect.anything()
+      );
+    });
+
+    it('lets the pilot keep more than ESI reports, handing later ore to the new side', async () => {
+      renderDialog({ row: splitRow });
+      await pickHek();
+      await userEvent.clear(keepsBox());
+      await userEvent.type(keepsBox(), '130');
+      expect(keepsBox()).toHaveValue('130');
+      expect(screen.getByRole('radio', { name: /Hek landlord \(new\)/ })).toBeChecked();
+    });
+  });
+
   it('never keeps more than held on a paid day', async () => {
     renderDialog({ assignment: { ...assignment, status: 'paid' } });
     await userEvent.clear(keepsBox());
