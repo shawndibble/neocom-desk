@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
-import { App } from '@/app/App';
+import { renderSkillsRoutes } from '@/test/skillsRoutes';
 import {
   CHAR_ID,
   server,
@@ -17,9 +17,6 @@ import {
 } from '@/test/skillPlansPage';
 import { scheduleSyncMock } from '@/test/skillPlansMocks';
 
-vi.mock('virtual:pwa-register/react', async () =>
-  (await import('@/test/skillPlansMocks')).pwaRegisterMock()
-);
 vi.mock('@/sync', async () => (await import('@/test/skillPlansMocks')).syncMock());
 vi.mock('@/app/syncStatus', async (importOriginal) =>
   (await import('@/test/skillPlansMocks')).syncStatusMock(
@@ -43,7 +40,7 @@ describe('SkillPlans editor: optimize remaps', () => {
       })
     );
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await screen.findByText('Your entries');
@@ -84,7 +81,7 @@ describe('SkillPlans editor: optimize remaps', () => {
       seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }], remapCount: 2 })
     );
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await screen.findByText('Your entries');
@@ -127,7 +124,7 @@ describe('SkillPlans editor: optimize remaps', () => {
       })
     );
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await screen.findByText('Your entries');
@@ -155,7 +152,7 @@ describe('SkillPlans editor: optimize remaps', () => {
       })
     );
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await screen.findByText('Your entries');
@@ -193,7 +190,7 @@ describe('SkillPlans editor: optimize remaps', () => {
       })
     );
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await screen.findByText('Your entries');
@@ -218,7 +215,7 @@ describe('SkillPlans editor: remap markers', () => {
       })
     );
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await screen.findByText('Your entries');
@@ -240,7 +237,7 @@ describe('SkillPlans editor: remap markers', () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await screen.findByText('Your entries');
@@ -264,7 +261,7 @@ describe('SkillPlans editor: remap markers', () => {
       })
     );
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await screen.findByText('Your entries');
@@ -304,7 +301,7 @@ describe('SkillPlans editor: remap markers', () => {
       })
     );
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await screen.findByText('Your entries');
@@ -335,7 +332,7 @@ describe('SkillPlans editor: remap markers', () => {
       })
     );
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await screen.findByText('Your entries');
@@ -351,7 +348,7 @@ describe('SkillPlans editor: remap markers', () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await screen.findByText('Your entries');
@@ -384,7 +381,7 @@ describe('SkillPlans editor: the remap cap is disclosed', () => {
       })
     );
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
     await clickOptimizeMode(user, 'Place remaps only');
     await screen.findByText(/^Remapping saves|^No remap improves/);
