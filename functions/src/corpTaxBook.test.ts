@@ -139,6 +139,38 @@ describe('parsers', () => {
     ).toHaveLength(1);
   });
 
+  it('takes the donations noted in other divisions, ids from their journal refs (#6207)', () => {
+    const now = Date.parse('2026-10-18T12:00:00Z');
+    const noted = { refId: 4, division: 2, characterId: 7, amount: 5, at: '2026-10-17T00:00:00Z' };
+    expect(parseSyncInput({ corporationId: 9, uncounted: [noted] }, now).uncounted).toEqual([
+      { id: 'j2_4', ...noted, at: '2026-10-17T00:00:00.000Z' },
+    ]);
+    expect('uncounted' in parseSyncInput({ corporationId: 9 }, now)).toBe(false);
+    expect(() =>
+      parseSyncInput({ corporationId: 9, uncounted: [{ ...noted, division: 8 }] }, now)
+    ).toThrow();
+    expect(() =>
+      parseSyncInput({ corporationId: 9, uncounted: Array(21).fill(noted) }, now)
+    ).toThrow();
+  });
+
+  it('keeps a donation held for review only when it names no Miner (#6207)', () => {
+    const now = Date.parse('2026-10-18T12:00:00Z');
+    const donation = {
+      refId: 1,
+      division: 1,
+      characterId: 2,
+      amount: 5,
+      at: '2026-10-17T00:00:00Z',
+      reviewReason: 'no-open-balance',
+    };
+    const parse = (d: Record<string, unknown>) =>
+      parseSyncInput({ corporationId: 9, donations: [d] }, now).donations[0];
+    expect(parse(donation).reviewReason).toBe('no-open-balance');
+    expect(parse({ ...donation, minerId: 'solo:2' }).reviewReason).toBeUndefined();
+    expect(parse({ ...donation, reviewReason: 'other' }).reviewReason).toBeUndefined();
+  });
+
   it('keeps the system and moon an officer client sends with an observer row', () => {
     const now = Date.parse('2026-10-18T12:00:00Z');
     const row = {

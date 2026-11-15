@@ -14,6 +14,7 @@
 //     statements/{id}                           issued Statements, create-only (forward-only)
 //     miners/{minerId}                          Miner groupings
 //     meta/paid                                 paidStatementIds, only ever grown (D22)
+//     meta/uncounted                            donations into divisions the book does not read (#6207)
 //     audit/{at~rand}                           immutable audit log
 //   corpTaxBookTokens/{token}                   verify-link tokens; no client access at all
 
@@ -27,6 +28,7 @@ import {
   type ForfeitBasis,
   type StatementDays,
 } from './corpTaxBookEngine.js';
+import { UNCOUNTED_LIMIT, type UncountedDonation } from './corpTaxBookSyncEngine.js';
 
 /** The Tax Book lives under the `corps/{id}` umbrella (issue #4858, ADR 0026). */
 export const BOOKS_COLLECTION = 'corps';
@@ -53,6 +55,10 @@ export const STATEMENT_LINKS = 'statementLinks';
 export const MINERS = 'miners';
 export const META = 'meta';
 export const PAID_DOC = 'paid';
+/** Doc under `meta`: the donations a sync noted in divisions the book does not read (#6207). */
+export const UNCOUNTED_DOC = 'uncounted';
+/** How many "not tax" answers to uncounted donations the doc keeps, so a sync never re-notes them. */
+export const UNCOUNTED_IGNORED_MAX = 200;
 export const AUDIT = 'audit';
 /** `corps/{collector}/feeders/{feederCorp}`: a feeder's record (issue #4507). */
 export const FEEDERS = 'feeders';
@@ -469,6 +475,8 @@ export type EditAction =
     }
   | { action: 'markNotTax'; paymentId: string; notTaxAmount: number; reason: string }
   | { action: 'assignPayment'; paymentId: string; minerId: string }
+  /** #6207: an officer says a donation into a division the book does not read is not tax. */
+  | { action: 'ignoreUncounted'; uncountedId: string }
   | {
       action: 'dismiss';
       scope: 'record' | 'miner' | 'moon' | 'extraction';
@@ -590,6 +598,7 @@ export function parseEditAction(data: unknown): EditAction {
     'recordPayment',
     'markNotTax',
     'assignPayment',
+    'ignoreUncounted',
     'dismiss',
     'dismissRecords',
     'reverseDismissal',
@@ -645,6 +654,8 @@ export function parseEditAction(data: unknown): EditAction {
         paymentId: docId(d.paymentId, 'paymentId'),
         minerId: docId(d.minerId, 'minerId'),
       };
+    case 'ignoreUncounted':
+      return { action, uncountedId: docId(d.uncountedId, 'uncountedId') };
     case 'dismiss':
       return {
         action,
@@ -898,8 +909,14 @@ export interface SyncInput extends BookCall {
     reason?: string;
     minerId?: string;
     statementId?: string;
+    reviewReason?: 'no-open-balance';
   }[];
   gaps: { structureId: number; from: string; to: string }[];
+  /**
+   * #6207: donations the sync noted in divisions the book does not read; replaces the stored
+   * list. Absent when the sync did not read those divisions, which leaves the list as it was.
+   */
+  uncounted?: UncountedDonation[];
 }
 
 export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
@@ -975,6 +992,11 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
       reason: x.reason === undefined ? undefined : String(x.reason).slice(0, 200),
       minerId: optId(x.minerId, 'minerId'),
       statementId: optId(x.statementId, 'statementId'),
+      // #6207: a known sender's donation held for review; only on one with no Miner.
+      reviewReason:
+        x.reviewReason === 'no-open-balance' && x.minerId === undefined
+          ? ('no-open-balance' as const)
+          : undefined,
     };
   });
   const gaps = list(d.gaps ?? [], 'gaps', 20).map((r) => {
@@ -985,7 +1007,30 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
       to: dateString(g.to, 'to'),
     };
   });
-  return { ...parseBookCall(data), observed, extractions, donations, gaps };
+  const uncounted =
+    d.uncounted === undefined
+      ? undefined
+      : list(d.uncounted, 'uncounted', UNCOUNTED_LIMIT).map((r) => {
+          const x = record(r);
+          const division = int(x.division, 'division', 1, 7);
+          const refId = int(x.refId, 'refId');
+          return {
+            id: `j${division}_${refId}`,
+            refId,
+            division,
+            characterId: int(x.characterId, 'characterId'),
+            amount: money(x.amount, 'amount'),
+            at: instant(x.at, 'at'),
+          };
+        });
+  return {
+    ...parseBookCall(data),
+    observed,
+    extractions,
+    donations,
+    gaps,
+    ...(uncounted ? { uncounted } : {}),
+  };
 }
 
 export interface TokenInput {

@@ -5,7 +5,9 @@ import {
   mergeGaps,
   observedRowsFromLedger,
   placeObservedRows,
+  openBalances,
   planSettlements,
+  unbilledMinerIds,
   reconcileExtractions,
   resolveDonations,
   restampPlan,
@@ -324,14 +326,17 @@ describe('resolveDonations', () => {
     miners: [],
     statements: [statement({ id: 's1', minerId: 'solo:7', code: 'MT-AB12' })],
     knownCharacterIds: new Set([7]),
+    openBalance: new Map([['solo:7', 10]]),
+    unbilled: new Set<string>(),
   };
-  const donation = (characterId: number, reason?: string) => ({
+  const donation = (characterId: number, reason?: string, over = {}) => ({
     refId: 1,
     division: 1,
     characterId,
     amount: 10,
     at: '2026-08-02T00:00:00.000Z',
     reason,
+    ...over,
   });
 
   it('pins a donation carrying a Statement code to that Statement, from any character', () => {
@@ -345,7 +350,102 @@ describe('resolveDonations', () => {
     const [known, stranger] = resolveDonations([donation(7), donation(99)], book);
     expect(known).toMatchObject({ minerId: 'solo:7' });
     expect(known.statementId).toBeUndefined();
+    expect(known.reviewReason).toBeUndefined();
     expect(stranger.minerId).toBeUndefined();
+    expect(stranger.reviewReason).toBeUndefined();
+  });
+
+  it('holds a known miner’s code-less donation for review when they owe nothing (#6207)', () => {
+    const [held] = resolveDonations([donation(7)], { ...book, openBalance: new Map() });
+    expect(held.minerId).toBeUndefined();
+    expect(held.reviewReason).toBe('no-open-balance');
+  });
+
+  it('credits a Miner with ore not yet billed, whatever their balance', () => {
+    const [prepaid] = resolveDonations([donation(7)], {
+      ...book,
+      openBalance: new Map(),
+      unbilled: new Set(['solo:7']),
+    });
+    expect(prepaid).toMatchObject({ minerId: 'solo:7' });
+    expect(prepaid.reviewReason).toBeUndefined();
+  });
+
+  it('spends the balance oldest first, so a second donation past it is held', () => {
+    const later = donation(7, undefined, { refId: 2, at: '2026-08-03T00:00:00.000Z' });
+    const earlier = donation(7, undefined, { refId: 1, at: '2026-08-02T00:00:00.000Z' });
+    // Newest first, the order the sync passes them in.
+    const [second, first] = resolveDonations([later, earlier], book);
+    expect(first).toMatchObject({ minerId: 'solo:7' });
+    expect(second.minerId).toBeUndefined();
+    expect(second.reviewReason).toBe('no-open-balance');
+  });
+
+  it('counts a pay-coded donation against the balance too', () => {
+    const coded = donation(7, 'MT-AB12', { refId: 1 });
+    const plain = donation(7, undefined, { refId: 2, at: '2026-08-03T00:00:00.000Z' });
+    const [, after] = resolveDonations([coded, plain], book);
+    expect(after.reviewReason).toBe('no-open-balance');
+  });
+});
+
+describe('unbilledMinerIds (#6207)', () => {
+  const miners = [{ id: 'm1', characterIds: [7, 8], mainCharacterId: 7 }];
+  const row = (characterId: number, date: string, quantity = 10) => ({
+    characterId,
+    date,
+    quantity,
+  });
+  const billed = statement({ id: 's1', minerId: 'm1', coversThrough: '2026-08-31' });
+
+  it('is each Miner with ore after its last Statement, or any ore without one', () => {
+    const ids = unbilledMinerIds([row(8, '2026-09-02'), row(9, '2026-09-01')], {
+      miners,
+      statements: [billed],
+      startDate: '2026-01-01',
+    });
+    expect([...ids].sort()).toEqual(['m1', 'solo:9']);
+  });
+
+  it('leaves out ore a Statement already covers, before the book, or of no quantity', () => {
+    const ids = unbilledMinerIds(
+      [row(7, '2026-08-31'), row(9, '2025-12-31'), row(10, '2026-09-01', 0)],
+      { miners, statements: [billed], startDate: '2026-01-01' }
+    );
+    expect([...ids]).toEqual([]);
+  });
+});
+
+describe('openBalances', () => {
+  const s1 = statement({ id: 's1', minerId: 'solo:7', amount: 10_000_000 });
+  const s2 = statement({ id: 's2', minerId: 'solo:8', amount: 4_000_000 });
+  const base = { miners: [], dismissals: [] as Dismissal[] };
+
+  it('is what each Miner still owes on issued Statements', () => {
+    const balances = openBalances({
+      ...base,
+      statements: [s1, s2],
+      payments: [
+        {
+          id: 'p1',
+          minerId: 'solo:7',
+          characterId: 7,
+          amount: 3_000_000,
+          at: '2026-08-02T00:00:00Z',
+          source: 'donation',
+        },
+        {
+          id: 'p2',
+          minerId: 'solo:8',
+          characterId: 8,
+          amount: 4_000_000,
+          at: '2026-08-02T00:00:00Z',
+          source: 'donation',
+        },
+      ],
+    });
+    expect(balances.get('solo:7')).toBe(7_000_000);
+    expect(balances.get('solo:8') ?? 0).toBe(0);
   });
 });
 

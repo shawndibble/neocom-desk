@@ -41,6 +41,11 @@ export interface TaxPayment {
   statementId?: string;
   /** How much of it an officer marked "not tax". */
   notTaxAmount?: number;
+  /**
+   * Why the sync left a known sender's donation Unmatched for an officer (#6207):
+   * their Miner owed nothing, so it may not be tax at all. Never auto-credited later.
+   */
+  reviewReason?: 'no-open-balance';
 }
 
 /** A dismissal of a day already on a Statement, credited to that Statement. */
@@ -266,6 +271,8 @@ export function allocatePayments(rawInput: AllocationInput): Allocation {
 export type DonationMatch =
   | { kind: 'statement'; statementId: string; minerId: string }
   | { kind: 'miner'; minerId: string }
+  /** A known sender with no code whose Miner owes nothing: Unmatched, for an officer to review. */
+  | { kind: 'review'; minerId: string }
   | { kind: 'unmatched' };
 
 function escapeRegExp(text: string): string {
@@ -279,8 +286,11 @@ function carriesCode(reason: string, code: string): boolean {
 /**
  * Whom a donation into the book's division(s) credits. A code in the reason
  * wins, from any character, without revealing any grouping; then a character
- * the book knows — grouped into a Miner, or one that mined at its refineries;
- * anyone else is Unmatched, to be claimed or assigned.
+ * the book knows — grouped into a Miner, or one that mined at its refineries —
+ * but only while that Miner owes: an open balance on issued Statements, or ore
+ * not yet on one. A donation from a Miner with neither (a buyback, say) is held
+ * for review instead (#6207). Anyone else
+ * is Unmatched, to be claimed or assigned.
  */
 export function matchDonation(
   donation: { characterId: number; reason: string | undefined },
@@ -289,6 +299,10 @@ export function matchDonation(
     statements: readonly Statement[];
     /** Characters seen in the book's observer rows. */
     knownCharacterIds: ReadonlySet<number>;
+    /** What each Miner still owes on issued Statements (`openBalances`); absent is nothing. */
+    openBalance: ReadonlyMap<string, number>;
+    /** Miners with ore not yet on a Statement (`unbilledMinerIds`): they owe too. */
+    unbilled: ReadonlySet<string>;
   }
 ): DonationMatch {
   const reason = donation.reason ?? '';
@@ -298,7 +312,10 @@ export function matchDonation(
   }
   const grouped = book.miners.some((m) => m.characterIds.includes(donation.characterId));
   if (grouped || book.knownCharacterIds.has(donation.characterId)) {
-    return { kind: 'miner', minerId: minerIdFor(donation.characterId, book.miners) };
+    const minerId = minerIdFor(donation.characterId, book.miners);
+    if ((book.openBalance.get(minerId) ?? 0) > 0 || book.unbilled.has(minerId))
+      return { kind: 'miner', minerId };
+    return { kind: 'review', minerId };
   }
   return { kind: 'unmatched' };
 }

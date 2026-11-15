@@ -38,6 +38,7 @@ import {
   type LearnedChunkRate,
 } from './extraction';
 import { overdueStatus, type Declaration, type OverdueState } from './overdue';
+import { netOf } from './paymentPreview';
 import {
   draftStatement,
   frozenDayRate,
@@ -573,7 +574,8 @@ export function buildBookView(input: BookViewInput): BookView {
   let donationsBeforeBook = 0;
   for (const p of input.payments) {
     if (p.source === 'donation' && isBeforeBook(p.at, input.startDate)) donationsBeforeBook++;
-    else if (!p.minerId) needsYou.push({ kind: 'unmatched', payment: p });
+    // A donation wholly marked not tax needs nothing more; a partly marked one still does.
+    else if (!p.minerId && netOf(p) > 0) needsYou.push({ kind: 'unmatched', payment: p });
   }
   // The same ordering the cards read in: declarations, then the oldest debt.
   const rank: Record<NeedsYouItem['kind'], number> = {

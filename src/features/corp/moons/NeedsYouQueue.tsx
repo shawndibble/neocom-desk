@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Panel, plainTextActionClassName } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
+import { uncountedToShow, type UncountedDonation } from '@/engine/corpTaxBook/uncounted';
 import { cx } from '@/lib/cx';
 import { useBook } from './useBook';
 import { useTabsProjection } from './useTabsProjection';
@@ -72,12 +73,40 @@ type Open =
 export function NeedsYouQueue() {
   const { t } = useTranslation();
   const ctx = useBook();
-  const { view, names, edit, canEdit, characterId, corporationId } = ctx;
+  const { view, names, edit, canEdit, characterId, corporationId, data, settings } = ctx;
   const { miners, needsYou } = useTabsProjection();
-  const corporationName = useCorporationName();
   const [open, setOpen] = useState<Open>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const close = () => setOpen(null);
+  // #6207: tax that looks paid into a division the book does not read, until it is counted.
+  const uncounted = uncountedToShow({ donations: data.uncounted ?? [] }, settings.divisions);
+  const [busy, setBusy] = useState(false);
+  // The corp's own name when a Director's visit stored one, else the numbered division.
+  const divisionLabel = (division: number) =>
+    settings.divisionNames?.[division] ?? t('corpTaxBook.moons.settings.division', { n: division });
+  const answerUncounted = async (u: UncountedDonation, how: 'count' | 'notTax') => {
+    setBusy(true);
+    try {
+      await edit(
+        how === 'count'
+          ? {
+              action: 'updateSettings',
+              patch: { divisions: [...settings.divisions, u.division].sort((a, b) => a - b) },
+            }
+          : { action: 'ignoreUncounted', uncountedId: u.id }
+      );
+      setNotice(
+        how === 'count'
+          ? t('corpTaxBook.moons.needs.uncounted.counted', { division: divisionLabel(u.division) })
+          : t('corpTaxBook.moons.needs.uncounted.ignored')
+      );
+    } catch {
+      setNotice(t('corpTaxBook.moons.needs.uncounted.failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const corporationName = useCorporationName();
   const minerOf = (id: string) => miners.find((m) => m.id === id)!;
   const nameOf = (id: string) => names.character(minerOf(id).mainCharacterId);
 
@@ -86,7 +115,8 @@ export function NeedsYouQueue() {
     return s ? periodLabel(s.periodStart, s.periodEnd) : id;
   };
 
-  const remind = async (item: Extract<NeedsYouItem, { kind: 'overdue' }>) => {
+  // An overdue Miner and a leaver get the same manual reminder (one per Statement).
+  const remind = async (item: { minerId: string; statementId?: string }) => {
     const miner = minerOf(item.minerId);
     const statement = view.input.statements.find((s) => s.id === item.statementId);
     if (!statement || corporationName === null) return;
@@ -109,13 +139,16 @@ export function NeedsYouQueue() {
   };
 
   return (
-    <Panel title={t('corpTaxBook.moons.needs.title', { count: needsYou.length })} padded={false}>
+    <Panel
+      title={t('corpTaxBook.moons.needs.title', { count: needsYou.length + uncounted.length })}
+      padded={false}
+    >
       {notice && (
         <p role="status" className="px-3 py-2 text-xs text-text-dim">
           {notice}
         </p>
       )}
-      {needsYou.length === 0 && (
+      {needsYou.length + uncounted.length === 0 && (
         <p className="px-3 py-2.5 text-xs text-text-dim">{t('corpTaxBook.moons.needs.none')}</p>
       )}
       <ul className="divide-y divide-line">
@@ -218,10 +251,13 @@ export function NeedsYouQueue() {
                     </MinerTitle>
                   }
                   body={t(
-                    // From the book as it is now: a sender who has since joined a Miner is not a stranger.
-                    miners.some((m) => m.characterIds.includes(item.payment.characterId))
-                      ? 'corpTaxBook.moons.needs.unmatched.bodyInMiner'
-                      : 'corpTaxBook.moons.needs.unmatched.body',
+                    // Held because the sender's Miner owed nothing (#6207); otherwise, from the book
+                    // as it is now: a sender who has since joined a Miner is not a stranger.
+                    item.payment.reviewReason === 'no-open-balance'
+                      ? 'corpTaxBook.moons.needs.unmatched.bodyReview'
+                      : miners.some((m) => m.characterIds.includes(item.payment.characterId))
+                        ? 'corpTaxBook.moons.needs.unmatched.bodyInMiner'
+                        : 'corpTaxBook.moons.needs.unmatched.body',
                     {
                       date: shortDate(item.payment.at),
                       name: names.character(item.payment.characterId),
@@ -262,9 +298,22 @@ export function NeedsYouQueue() {
                   body={t('corpTaxBook.moons.needs.leaver.body')}
                   actions={
                     canEdit && item.statementId ? (
-                      <Button size="sm" onClick={() => setOpen({ kind: 'writeOff', item, miner })}>
-                        {t('corpTaxBook.moons.needs.leaver.writeOff')}
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => void remind(item)}
+                          disabled={corporationName === null}
+                        >
+                          {t('corpTaxBook.moons.needs.leaver.remind')}
+                        </Button>
+                        <button
+                          type="button"
+                          className={secondaryActionClassName}
+                          onClick={() => setOpen({ kind: 'writeOff', item, miner })}
+                        >
+                          {t('corpTaxBook.moons.needs.leaver.writeOff')}
+                        </button>
+                      </>
                     ) : null
                   }
                 />
@@ -272,6 +321,45 @@ export function NeedsYouQueue() {
             }
           }
         })}
+        {uncounted.map((u) => (
+          <QueueCard
+            key={`x-${u.id}`}
+            tone="warning"
+            title={
+              <MinerTitle minerId={miners.find((m) => m.characterIds.includes(u.characterId))?.id}>
+                {t('corpTaxBook.moons.needs.uncounted.title', {
+                  amount: isk(u.amount),
+                  name: names.character(u.characterId),
+                  division: divisionLabel(u.division),
+                })}
+              </MinerTitle>
+            }
+            body={t('corpTaxBook.moons.needs.uncounted.body', { date: shortDate(u.at) })}
+            actions={
+              canEdit ? (
+                <>
+                  <Button
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => void answerUncounted(u, 'count')}
+                  >
+                    {t('corpTaxBook.moons.needs.uncounted.count', {
+                      division: divisionLabel(u.division),
+                    })}
+                  </Button>
+                  <button
+                    type="button"
+                    className={secondaryActionClassName}
+                    disabled={busy}
+                    onClick={() => void answerUncounted(u, 'notTax')}
+                  >
+                    {t('corpTaxBook.moons.needs.uncounted.notTax')}
+                  </button>
+                </>
+              ) : null
+            }
+          />
+        ))}
       </ul>
       {open?.kind === 'confirm' && (
         <RecordPaymentDialog

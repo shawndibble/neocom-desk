@@ -188,9 +188,10 @@ export function readPayment(
   };
   const minerId = str(d.minerId);
   if (!minerId) {
-    // Only a donation can be claimed, and not one an officer has marked "not tax" in full.
+    // Only a donation can be claimed, and not one an officer has marked "not tax" in full
+    // or one the sync held for an officer's review (#6207).
     const claimable =
-      d.source === 'donation' && (notTaxAmount ?? 0) < amount
+      d.source === 'donation' && (notTaxAmount ?? 0) < amount && d.reviewReason === undefined
         ? { id, characterId, amount, at }
         : undefined;
     return { held, ...(claimable ? { claimable } : {}) };

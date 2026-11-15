@@ -50,6 +50,31 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       detail: <p>{t('corpTaxBook.moons.health.scheduledStoppedDetail')}</p>,
     });
   }
+  // #6207: a source the last sync could not read (donations, Extractions) shows here, not only
+  // in Settings. With both a running schedule and this visit's sync, a source is unread only when
+  // neither read it: the schedule covers an officer without wallet roles, and a newer visit that
+  // read it clears an older scheduled miss.
+  const scheduledRun = scheduled?.status === 'active' ? scheduled.lastRun : undefined;
+  const scheduledMissing =
+    scheduledRun?.outcome === 'synced' ? (scheduledRun.missing ?? []) : undefined;
+  const visitMissing =
+    sync.run.phase === 'done' && sync.run.outcome.kind === 'synced'
+      ? (sync.run.outcome.missing ?? [])
+      : undefined;
+  const unread =
+    scheduledMissing && visitMissing
+      ? scheduledMissing.filter((m) => visitMissing.includes(m))
+      : (scheduledMissing ?? visitMissing ?? []);
+  if (unread.length > 0) {
+    items.push({
+      id: 'couldNotRead',
+      tone: 'warning',
+      title: t('corpTaxBook.moons.health.couldNotRead', {
+        sources: unread.map((m) => t(`corpTaxBook.moons.autoSync.missing.${m}`)).join(', '),
+      }),
+      detail: <p>{t('corpTaxBook.moons.health.couldNotReadDetail')}</p>,
+    });
+  }
   // Counted from the ledger rows, so only on a tab that reads them (the Moon owners tab does not).
   if ((data.parts?.has('observed') ?? true) && view.unrated.length > 0) {
     items.push({
