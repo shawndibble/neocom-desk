@@ -154,6 +154,12 @@ export async function installEsiMock(page: Page): Promise<void> {
     if (path === '/markets/prices') return json(MARKET_PRICES);
     // No market history unless a spec serves one: "vs 90d" reads it on every Opportunities row and plan.
     if (/^\/markets\/\d+\/history\/?$/.test(path)) return json([]);
+    // No region type list unless a spec serves one, so the Market tree's
+    // "No orders in {Region}" cue (#6200) stays off: an unread list is never
+    // "no orders", where an empty one would mark every row.
+    if (/^\/markets\/\d+\/types\/?$/.test(path)) {
+      return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+    }
     // Route Safety's Incursions near you (issue #3540): none active unless a spec overrides.
     if (path === '/incursions') return json([]);
     // The raidable skyhook list (issue #4784): public, none raidable unless a spec overrides.

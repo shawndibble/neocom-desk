@@ -5,12 +5,13 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { loadGlobalMarkets, loadMarketTypes, loadNpcStations } from '@/sde/loadMarketSde';
 import { ESI_BASE_URL } from '@/esi/client';
-import { RECENT_DATE, TYPES } from '@/test/marketMocks';
+import { CORMORANT_TYPE_ID, PLEX_TYPE_ID, RECENT_DATE, TYPES } from '@/test/marketMocks';
 import {
   RIFTER_REGION_ID,
   SHIPS_GROUP,
   historyHandler,
   installMarketHarness,
+  marketTypesHandler,
   ordersHandler,
   plexOrdersHandler,
   server,
@@ -200,6 +201,69 @@ describe('Market Browser', () => {
     expect(await screen.findByText('Merlin')).toBeInTheDocument();
     expect(screen.getByRole('button', SHIPS_GROUP)).toBeInTheDocument();
     expect(screen.getByText('Destroyers')).toBeInTheDocument();
+  });
+
+  describe('"No orders in {Region}" on tree rows (issue #6200)', () => {
+    const listedExcept = (...absent: number[]) =>
+      marketTypesHandler(
+        TYPES.map((type) => type.typeId).filter((typeId) => !absent.includes(typeId))
+      );
+
+    it('marks only the items with no order in the hub region', async () => {
+      server.use(listedExcept(CORMORANT_TYPE_ID));
+      window.history.pushState({}, '', '/market?group=4');
+      renderMarketRoute();
+
+      expect(
+        await screen.findByRole('button', { name: 'Cormorant No orders in The Forge' })
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Merlin' })).toBeInTheDocument();
+      expect(screen.getAllByText('No orders in The Forge')).toHaveLength(1);
+    });
+
+    it('never marks a Global Market Region item, which trades in its own region', async () => {
+      server.use(listedExcept(PLEX_TYPE_ID, 34));
+      window.history.pushState({}, '', '/market?group=3');
+      renderMarketRoute();
+
+      // The list is read once Tritanium, absent from it too, carries the cue.
+      expect(
+        await screen.findByRole('button', { name: 'Tritanium No orders in The Forge' })
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'PLEX' })).toBeInTheDocument();
+    });
+
+    it('shows no cue when the region list fails, since unread is never "no orders"', async () => {
+      let hits = 0;
+      server.use(
+        http.get(`${ESI_BASE_URL}/markets/:regionId/types`, () => {
+          hits += 1;
+          return HttpResponse.json({ error: 'down' }, { status: 503 });
+        })
+      );
+      window.history.pushState({}, '', '/market?group=4');
+      renderMarketRoute();
+
+      expect(await screen.findByRole('button', { name: 'Cormorant' })).toBeInTheDocument();
+      await waitFor(() => expect(hits).toBeGreaterThan(0));
+      expect(screen.queryByText(/No orders in/)).not.toBeInTheDocument();
+    });
+
+    it('asks no region for its list under All regions', async () => {
+      let hits = 0;
+      server.use(
+        http.get(`${ESI_BASE_URL}/markets/:regionId/types`, () => {
+          hits += 1;
+          return HttpResponse.json([]);
+        })
+      );
+      window.history.pushState({}, '', '/market?group=4&region=all');
+      renderMarketRoute();
+
+      expect(await screen.findByRole('button', { name: 'Cormorant' })).toBeInTheDocument();
+      expect(screen.queryByText(/No orders in/)).not.toBeInTheDocument();
+      expect(hits).toBe(0);
+    });
   });
 
   it('ignores a ?group= id that is not in the loaded catalogue', async () => {
