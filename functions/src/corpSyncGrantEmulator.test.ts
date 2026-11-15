@@ -1018,14 +1018,14 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         expect((await grantDoc())?.nextSyncAt).toBe(now + SYNC_REST_MS);
 
         esiState.calls.length = 0;
-        now += H;
+        now += SYNC_REST_MS - 60_000;
         expect(await runScheduledCorpSyncs(syncDeps(), fakeEsi())).toMatchObject({
           grants: 0,
           synced: 0,
         });
         expect(esiState.calls).toEqual([]);
 
-        now += SYNC_REST_MS;
+        now += 60_000;
         expect(await runScheduledCorpSyncs(syncDeps(), fakeEsi())).toMatchObject({
           grants: 1,
           synced: 1,

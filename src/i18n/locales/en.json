@@ -18656,7 +18656,7 @@
         },
         "stop": {
           "title": "To stop",
-          "body": "Leave any time. Nothing already collected is deleted. It re-syncs about every 6 hours."
+          "body": "Leave any time. Nothing already collected is deleted. It re-syncs about every 2 hours."
         },
         "rate": "Rate you ask for (%, optional)",
         "from": "{{name}} will handle the tax on your moons.",
@@ -18806,7 +18806,7 @@
       },
       "autoSync": {
         "title": "Automatic sync",
-        "hint": "Every 6 hours our server syncs this book for you, so it stays current when no officer visits. It reads the refinery ledger, Extractions and moon notifications, and donations into the selected wallet divisions, and settles Statements that donations now cover. It never issues a Statement and never sends mail.",
+        "hint": "Every 2 hours our server syncs this book for you, so it stays current when no officer visits. It reads the refinery ledger, Extractions and moon notifications, and donations into the selected wallet divisions, and settles Statements that donations now cover. It never issues a Statement and never sends mail.",
         "state": {
           "off": "Off. The book updates when an officer syncs it.",
           "on": "On, held by {{name}}.",
@@ -18821,7 +18821,7 @@
           "grant-unreadable": "the saved grant can't be read — turn it on again",
           "unknown": "it could not continue"
         },
-        "neverRan": "It has not run yet; the first run is within 6 hours.",
+        "neverRan": "It has not run yet; the first run is within 2 hours.",
         "lastRan": "Last ran {{age}}: {{rows}} ledger rows, {{donations}} new donations, {{settled}} Statements settled.",
         "couldNotRead": "It could not read {{sources}} that time.",
         "missing": {
