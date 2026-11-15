@@ -10,6 +10,7 @@ import { App } from '@/app/App';
 import { routeToHref } from '@/features/route/routeSafetyLink';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useCloneNicknames } from '@/features/character/cloneNicknames';
+import { clearMarketPriceCache } from '@/market/prices';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -158,6 +159,10 @@ const server = mswServer(
 );
 
 beforeEach(async () => {
+  // A price request the last test left running is aborted at its end, which
+  // the app reads as Fuzzwork down; without this, later tests price from the
+  // fallback instead of this file's handler.
+  clearMarketPriceCache();
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
