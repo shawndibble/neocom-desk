@@ -9,6 +9,11 @@ import { claimKeyOf } from '@/features/miningTax/corpBook/useAutoClaimDonations'
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
 import { corpBookAttention } from '@/features/miningTax/corpBook/corpAttention';
 import { corpPayAccounts } from '@/features/miningTax/corpBook/corpPayAccount';
+import {
+  CorpDeclarationStatus,
+  CorpDeclareAction,
+} from '@/features/miningTax/corpBook/CorpDeclareAction';
+import { canDeclare } from '@/engine/corpTaxBook/personal';
 import { verifyPeriodLabel } from '@/features/corpTaxBook/verifyPeriodLabel';
 import { systemLabel } from '@/features/miningTax/names';
 import { pricesAtHubOnDate, sellFallbackAtHubOnDate } from '@/features/miningTax/pricing';
@@ -225,6 +230,14 @@ export function useTaxAttentionItems({
   }
   // What a Corp Tax Book says that the tab alone would not (#6204).
   const corp = corpBookAttention(corpView);
+  // A tracked Character the Statement bills: its sign-in is on the Statement, so it may declare.
+  const declarerOf = (corporationId: number, statementId: string) => {
+    const loaded = corpView?.books.find((b) => b.loaded.corporationId === corporationId)?.loaded;
+    const statement = loaded?.statements.find((s) => s.id === statementId);
+    return statement?.lines
+      .map((l) => l.characterId)
+      .find((id): id is number => id !== undefined && (loaded?.characterIds.includes(id) ?? false));
+  };
   for (const o of corp.overdue) {
     attentionItems.push({
       id: `corp-overdue:${o.corporationId}:${o.statementId}`,
@@ -234,7 +247,28 @@ export function useTaxAttentionItems({
         period: verifyPeriodLabel(o.periodStart, o.periodEnd, i18n.language),
         date: o.overdueAt.slice(0, 10),
       }),
-      detail: <p>{t('miningTax.corpBook.attention.overdueDetail', { code: o.code })}</p>,
+      detail: (
+        <>
+          <p>{t('miningTax.corpBook.attention.overdueDetail', { code: o.code })}</p>
+          {o.declaration && (
+            <CorpDeclarationStatus declaration={o.declaration} corpName={o.corpName} />
+          )}
+        </>
+      ),
+      // #6206: the member says they paid it another way; the corporation's officers answer it.
+      ...(canDeclare(o.declaration) && declarerOf(o.corporationId, o.statementId) !== undefined
+        ? {
+            action: (
+              <CorpDeclareAction
+                corporationId={o.corporationId}
+                corpName={o.corpName}
+                statementId={o.statementId}
+                characterId={declarerOf(o.corporationId, o.statementId)!}
+                onDeclared={reloadCorpBooks}
+              />
+            ),
+          }
+        : {}),
     });
   }
   for (const u of corp.uncredited) {

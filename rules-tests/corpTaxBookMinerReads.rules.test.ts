@@ -18,7 +18,7 @@ import { characterAuth, createRulesEnv } from './testEnv';
 
 // Issue #4622: what a miner's personal tab reads beyond its own lines. The moon owner's
 // coverage copy (billed miners only, never the feeder record) and the Miner's own
-// Adjustments and write-offs. Nothing here is client-writable.
+// Adjustments, write-offs, declarations and disputes. Nothing here is client-writable.
 let env: RulesTestEnvironment;
 
 const BOOK = 'corps/98000001';
@@ -27,6 +27,8 @@ const RECORD = `${BOOK}/feeders/98000002`;
 const MINER = 3; // billed by the book
 const STRANGER = 4; // never mined there
 const OFFICER = 1;
+// #6206: declarations and disputes join them, so the Miner sees each one's answer.
+const OWN_KINDS = ['adjustments', 'writeOffs', 'declarations', 'disputes'];
 
 beforeAll(async () => {
   env = await createRulesEnv();
@@ -48,7 +50,7 @@ beforeEach(async () => {
       canView: true,
       expiresAt: Date.now() + 3_600_000,
     });
-    for (const kind of ['adjustments', 'writeOffs']) {
+    for (const kind of OWN_KINDS) {
       await setDoc(doc(db, `${BOOK}/${kind}/mine`), { minerId: 'solo:3', uids: [`char:${MINER}`] });
       await setDoc(doc(db, `${BOOK}/${kind}/theirs`), { minerId: 'solo:4', uids: ['char:4'] });
       await setDoc(doc(db, `${BOOK}/${kind}/old`), { minerId: 'solo:3' });
@@ -85,7 +87,7 @@ describe('moon owner coverage copy', () => {
   });
 });
 
-describe.each(['adjustments', 'writeOffs'])('a Miner’s own %s', (kind) => {
+describe.each(OWN_KINDS)('a Miner’s own %s', (kind) => {
   it('lets the Miner read their own, by query', async () => {
     await assertSucceeds(getDoc(doc(as(MINER), `${BOOK}/${kind}/mine`)));
     await assertSucceeds(

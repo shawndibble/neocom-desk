@@ -7,6 +7,7 @@ import {
   refineryNamesOf,
   readBookSettings,
   readDismissal,
+  readMemberDeclaration,
   readMiner,
   readObservedRow,
   readPayment,
@@ -170,6 +171,32 @@ describe('the other readers', () => {
       mainCharacterId: 2,
     });
     expect(readMiner('m', { characterIds: [] })).toBeNull();
+  });
+});
+
+describe('readMemberDeclaration (#6206)', () => {
+  it('reads a declaration with its amount and answer, and drops a malformed one', () => {
+    expect(
+      readMemberDeclaration('x1', {
+        statementId: 's1',
+        kind: 'another-way',
+        at: '2026-11-01T00:00:00.000Z',
+        amount: 5,
+        note: 'contract',
+        uids: ['char:1'],
+        resolution: { kind: 'rejected', at: '2026-11-02T00:00:00.000Z', by: 9, reason: 'no' },
+      })
+    ).toEqual({
+      id: 'x1',
+      statementId: 's1',
+      kind: 'another-way',
+      at: '2026-11-01T00:00:00.000Z',
+      amount: 5,
+      note: 'contract',
+      resolution: { kind: 'rejected', at: '2026-11-02T00:00:00.000Z', reason: 'no' },
+    });
+    expect(readMemberDeclaration('x2', { statementId: 's1', kind: 'other', at: 'x' })).toBeNull();
+    expect(readMemberDeclaration('x3', { kind: 'contract', at: 'x' })).toBeNull();
   });
 });
 

@@ -484,6 +484,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           paymentSources={paymentSources}
           linkSuggestions={linkSuggestions}
           corpView={corpView}
+          reloadCorpBooks={reloadCorpBooks}
           corpStateHint={corpStateHint}
           dismissTargets={selection.dismissTargets}
           showCharacterColumn={showCharacterColumn}

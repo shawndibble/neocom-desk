@@ -281,3 +281,46 @@ describe('CorpRowDetailModal', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('CorpRowDetailModal: I paid this another way (#6206)', () => {
+  const onStatement = (over: Partial<BookRowView> = {}) => {
+    const v = { ...view, statementId: 's1', ...over };
+    return { corp: { ...corp, view: v }, dr: { ...dr, corp: { ...corp, view: v } } as DisplayRow };
+  };
+
+  it('offers it on a day a Statement bills, when the books can be told', () => {
+    renderModal({ ...onStatement(), onBookChanged: vi.fn() });
+    expect(screen.getByRole('button', { name: 'I paid this another way' })).toBeInTheDocument();
+  });
+
+  it('offers nothing before the day is on a Statement, or with nowhere to send it', () => {
+    renderModal({ onBookChanged: vi.fn() });
+    expect(screen.queryByRole('button', { name: 'I paid this another way' })).toBeNull();
+  });
+
+  it('says it is waiting for the corporation, and does not offer it twice', () => {
+    renderModal({
+      ...onStatement({
+        declaration: { state: 'waiting', at: '2026-10-20T00:00:00Z', amount: 900_000 },
+      }),
+      onBookChanged: vi.fn(),
+    });
+    expect(
+      screen.getByText('Declared 900,000 ISK — waiting for Brass Meridian Logistics')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'I paid this another way' })).toBeNull();
+  });
+
+  it('shows a rejection with its reason and offers it again', () => {
+    renderModal({
+      ...onStatement({
+        declaration: { state: 'rejected', at: '2026-10-21T00:00:00Z', reason: 'No contract' },
+      }),
+      onBookChanged: vi.fn(),
+    });
+    expect(
+      screen.getByText('Brass Meridian Logistics rejected your declaration: No contract')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'I paid this another way' })).toBeInTheDocument();
+  });
+});

@@ -4,22 +4,25 @@ import { DAY_MS } from '@/lib/age';
  * default) after it is issued; no interest, reminders are manual. A miner's
  * declaration ("paid by contract / other division / wrong corp") pauses the
  * clock for at most 14 days, after which it resumes on its own with a note.
- * An officer confirming the declaration ends the pause there; rejecting it
- * gives a fresh 14 days from the rejection.
+ * An officer confirming or rejecting the declaration ends the pause there, and
+ * the original clock resumes: a rejection gives no fresh days (#6206).
  */
 
 export const DEFAULT_OVERDUE_DAYS = 14;
 /** The most a Statement's Overdue clock pauses for declarations, in total. */
 export const DECLARATION_PAUSE_DAYS = 14;
-/** A rejected declaration leaves at least this long before Overdue. */
-export const REJECTION_GRACE_DAYS = 14;
+
+/** `another-way`: the Miner's own "I paid this another way" (#6206). */
+export type DeclarationKind = 'contract' | 'other-division' | 'wrong-corp' | 'another-way';
 
 export interface Declaration {
   id: string;
   statementId: string;
-  kind: 'contract' | 'other-division' | 'wrong-corp';
+  kind: DeclarationKind;
   at: string;
   note?: string;
+  /** What the Miner says they paid, when they said (#6206). */
+  amount?: number;
   resolution?: { kind: 'confirmed' | 'rejected'; at: string; reason?: string };
 }
 
@@ -71,13 +74,8 @@ export function overdueStatus(input: OverdueInput): OverdueStatus {
     cursor = Math.max(cursor, w.end);
   }
 
-  let overdueAt =
+  const overdueAt =
     Date.parse(input.issuedAt) + (input.overdueDays ?? DEFAULT_OVERDUE_DAYS) * DAY_MS + paused;
-  for (const d of input.declarations) {
-    if (d.resolution?.kind === 'rejected') {
-      overdueAt = Math.max(overdueAt, Date.parse(d.resolution.at) + REJECTION_GRACE_DAYS * DAY_MS);
-    }
-  }
 
   const active = windows.filter((w) => w.start <= now && now < w.end);
   const resumedAfterPause = windows.some((w) => w.unanswered && now >= w.end);

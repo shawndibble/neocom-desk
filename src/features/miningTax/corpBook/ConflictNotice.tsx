@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
@@ -42,6 +43,8 @@ interface Props {
   onUnmarkPaid: () => void;
   /** Takes the contested ore off the unpaid entries, so the book alone bills it. */
   onTakeOver: () => void;
+  /** #6206: "Tell {corp}" this day's ore went to the entry's Payee, or what was sent. */
+  tell?: ReactNode;
 }
 
 /**
@@ -66,6 +69,7 @@ export function ConflictNotice({
   error,
   onUnmarkPaid,
   onTakeOver,
+  tell,
 }: Props) {
   const { t } = useTranslation();
   const anyPaid = entries.some((e) => e.paid);
@@ -147,7 +151,10 @@ export function ConflictNotice({
               />
             ))}
         </li>
-        <li>{t(k('entryRight'), { corp: corpName })}</li>
+        <li className="space-y-1">
+          <p>{t(k('entryRight'), { corp: corpName })}</p>
+          {tell}
+        </li>
       </ul>
       {error && <InlineError>{error}</InlineError>}
     </div>

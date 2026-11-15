@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
@@ -16,6 +17,11 @@ interface Props {
   error?: string | null;
   onTakeOver: () => void;
   onPaidAnotherWay: () => void;
+  /**
+   * Billed on a Statement (#6206): "I paid this another way" goes to the corporation, so this
+   * replaces the device-only button.
+   */
+  paidAnotherWay?: ReactNode;
 }
 
 /**
@@ -34,9 +40,15 @@ export function OverlapNotice({
   error,
   onTakeOver,
   onPaidAnotherWay,
+  paidAnotherWay,
 }: Props) {
   const { t } = useTranslation();
   const payee = payeeNames.join(', ');
+  const other = paidAnotherWay ?? (
+    <Button size="sm" disabled={busy} onClick={onPaidAnotherWay}>
+      {t('miningTax.corpBook.overlap.paidOther')}
+    </Button>
+  );
 
   return (
     <div
@@ -56,22 +68,14 @@ export function OverlapNotice({
         )}
       </p>
       {paid ? (
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" disabled={busy} onClick={onPaidAnotherWay}>
-            {t('miningTax.corpBook.overlap.paidOther')}
-          </Button>
-        </div>
+        <div className="flex flex-wrap gap-2">{other}</div>
       ) : (
         <TakeoverConfirm
           previews={previews}
           typeNames={typeNames}
           busy={busy}
           onTakeOver={onTakeOver}
-          others={
-            <Button size="sm" disabled={busy} onClick={onPaidAnotherWay}>
-              {t('miningTax.corpBook.overlap.paidOther')}
-            </Button>
-          }
+          others={other}
         />
       )}
       {error && <InlineError>{error}</InlineError>}

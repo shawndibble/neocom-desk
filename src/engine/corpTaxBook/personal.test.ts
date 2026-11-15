@@ -9,6 +9,8 @@ import {
   type PersonalEntry,
 } from './personal';
 import type { Statement } from './statements';
+import type { Declaration } from './overdue';
+import type { OreDispute } from './disputes';
 
 const CORP = 98000001;
 const ME = 90000001;
@@ -2354,6 +2356,126 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       const out = overlay([entry()], [book({ inFlight: [recent] })]);
       expect(out.rows[0]).toMatchObject({ state: 'paid', settledBy: 'donation' });
       expect(out.books[0].uncredited).toEqual([]);
+    });
+  });
+
+  describe("a Miner's own declaration and dispute (#6206)", () => {
+    const issued = statementOf({ issuedAt: '2026-10-01T00:00:00Z' });
+    const declared = (over: Partial<Declaration> = {}): Declaration => ({
+      id: 'x1',
+      statementId: 's1',
+      kind: 'another-way',
+      at: '2026-10-14T00:00:00.000Z',
+      amount: 500_000,
+      ...over,
+    });
+
+    it('marks a billed row and its Statement as declared, waiting for the corporation', () => {
+      const out = overlay(
+        [entry()],
+        [book({ statements: [statementOf()], declarations: [declared()] })]
+      );
+      expect(out.rows[0]).toMatchObject({
+        state: 'billed',
+        statementId: 's1',
+        declaration: { state: 'waiting', at: '2026-10-14T00:00:00.000Z', amount: 500_000 },
+      });
+      expect(out.books[0].openStatements[0].declaration).toMatchObject({ state: 'waiting' });
+    });
+
+    it('a waiting declaration pauses Overdue for the member as for the officers', () => {
+      const out = overlay([entry()], [book({ statements: [issued], declarations: [declared()] })]);
+      expect(out.books[0].overdue).toEqual([]);
+    });
+
+    it('a rejected one says so, with the reason, and Overdue counts again', () => {
+      const rejected = declared({
+        resolution: { kind: 'rejected', at: '2026-10-15T00:00:00.000Z', reason: 'No contract' },
+      });
+      const out = overlay([entry()], [book({ statements: [issued], declarations: [rejected] })]);
+      expect(out.books[0].overdue[0]).toMatchObject({
+        statementId: 's1',
+        declaration: { state: 'rejected', reason: 'No contract' },
+      });
+    });
+
+    it('reads only the latest declaration of a Statement', () => {
+      const older = declared({
+        id: 'x0',
+        at: '2026-10-10T00:00:00.000Z',
+        resolution: { kind: 'rejected', at: '2026-10-11T00:00:00.000Z', reason: 'no' },
+      });
+      const out = overlay(
+        [entry()],
+        [book({ statements: [statementOf()], declarations: [declared(), older] })]
+      );
+      expect(out.rows[0].declaration?.state).toBe('waiting');
+    });
+
+    const toOther = entry({
+      freeOreLines: [],
+      oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+      allocations: [
+        {
+          payeeId: 'ashfall',
+          taxPct: 10,
+          oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+          status: 'outstanding',
+        },
+      ],
+    });
+    const dispute = (over: Partial<OreDispute> = {}): OreDispute => ({
+      id: `solo_${ME}_2026-10-17`,
+      minerId: `solo:${ME}`,
+      date: '2026-10-17',
+      lines: [
+        {
+          recordKey: `${ME}:1000:2026-10-17`,
+          typeId: ZEO,
+          quantity: 43_050,
+          payeeName: 'Ashfall',
+        },
+      ],
+      by: ME,
+      at: '2026-10-18T13:00:00.000Z',
+      ...over,
+    });
+
+    it('gives a Conflict row its record key, and says when it was sent to the corporation', () => {
+      const before = overlay([toOther], [book()]);
+      expect(before.rows[0]).toMatchObject({
+        state: 'conflict',
+        recordKey: `${ME}:1000:2026-10-17`,
+      });
+      expect(before.rows[0].flagged).toBeUndefined();
+      const out = overlay([toOther], [book({ disputes: [dispute()] })]);
+      expect(out.rows[0].flagged).toEqual({ state: 'sent', at: '2026-10-18T13:00:00.000Z' });
+    });
+
+    it('a rejected day says so on a row the dispute did not name', () => {
+      const rejected = dispute({
+        lines: [{ recordKey: `${ME}:2000:2026-10-17`, typeId: ZEO, quantity: 5, payeeName: 'A' }],
+        resolution: { kind: 'rejected', at: '2026-10-19T00:00:00.000Z', by: 1, reason: 'Ours' },
+      });
+      const out = overlay([toOther], [book({ disputes: [rejected] })]);
+      expect(out.rows[0].flagged?.state).toBe('rejected');
+      // An open one on another refinery leaves this row free to add its own lines.
+      const open = { ...rejected };
+      delete open.resolution;
+      const still = overlay([toOther], [book({ disputes: [open] })]);
+      expect(still.rows[0].flagged).toBeUndefined();
+    });
+
+    it('says when an officer rejected the dispute, with the reason', () => {
+      const rejected = dispute({
+        resolution: { kind: 'rejected', at: '2026-10-19T00:00:00.000Z', by: 1, reason: 'Ours' },
+      });
+      const out = overlay([toOther], [book({ disputes: [rejected] })]);
+      expect(out.rows[0].flagged).toEqual({
+        state: 'rejected',
+        at: '2026-10-19T00:00:00.000Z',
+        reason: 'Ours',
+      });
     });
   });
 });

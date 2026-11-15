@@ -8112,7 +8112,25 @@
         "booksRight": "If the books are right: take what each corporation recorded off your entry.",
         "booksRightPaid": "If the books are right: unmark your payment, then take what each corporation recorded off your entry.",
         "letEachBill": "Let each corp bill its share",
-        "entryRight": "If your entry is right: ask a {{corp}} officer to correct the book."
+        "entryRight": "If your entry is right: ask a {{corp}} officer to correct the book.",
+        "tell": "Tell {{corp}} it went to {{payee}}",
+        "told": "Sent to {{corp}} on {{date}}. An officer answers it in the book.",
+        "toldRejected": "{{corp}} kept the bill: {{reason}}",
+        "tellFailed": "Could not send it. Try again.",
+        "tellRejected": "{{corp}} already answered this day; ask an officer.",
+        "otherPayee": "another Payee"
+      },
+      "declare": {
+        "action": "I paid this another way",
+        "title": "I paid this another way",
+        "intro": "Tell {{corp}} you paid this Statement outside the book: by contract, into another wallet division, or to the wrong corporation. Overdue pauses for up to 14 days while an officer checks.",
+        "amount": "Amount you paid (optional)",
+        "note": "Note for the officers (optional)",
+        "confirm": "Tell {{corp}}",
+        "waiting": "Declared — waiting for {{corp}}",
+        "waitingAmount": "Declared {{amount}} ISK — waiting for {{corp}}",
+        "confirmed": "{{corp}} confirmed your payment.",
+        "rejected": "{{corp}} rejected your declaration: {{reason}}"
       },
       "overlap": {
         "notice": "This ore is also on your list for <strong>{{payee}}</strong>. <strong>{{corp}}</strong> bills it.",
@@ -14736,7 +14754,7 @@
           "title": "Kept for your corporation",
           "description": "Only if your corporation uses SRP or a Corp Tax Book, or you shared a Vetting report with a corporation. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it. A Vetting report is the exception: the pilot can delete their own from its status page.",
           "srp": "SRP Claims: the killmail, the Character's name and ID, the hull, system and loss value, the fleet or FC and note you gave, the Reimbursement and the claim's state. Also the corporation's SRP settings, its Doctrine Fits and its SRP log: each filing (with the pilot's name, killmail, hull and amount) and each officer action. The CEO, Directors and Accountants read all of it; a pilot reads only their own claims.",
-          "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a log of who did each, and which books bill each Character (kept under that Character's ID). The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link.",
+          "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a miner's own \"I paid this another way\" declarations and disputes of a line with the officers' answers, a log of who did each, and which books bill each Character (kept under that Character's ID). The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link.",
           "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), the pilot's note and their answers to the corporation's questions, the invite link it started from, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist, questions, invite links and settings, and which of its reviewers opened the vetting page in the last 30 days, used only to send the alert for a new report."
         },
         "notes": {
@@ -18055,10 +18073,20 @@
           "kind": {
             "contract": "contract",
             "other-division": "another division",
-            "wrong-corp": "the wrong corporation"
+            "wrong-corp": "the wrong corporation",
+            "another-way": "another way"
           },
+          "declared": "They say they paid {{amount}}.",
+          "note": "“{{note}}”",
           "confirm": "Confirm paid",
           "reject": "Reject declaration"
+        },
+        "dispute": {
+          "title": "{{name}} says {{date}}'s ore went to {{payee}}",
+          "body": "{{ore}}. Dismiss the day if it was not ours to bill, or reject it with a note they read.",
+          "line": "{{quantity}} {{ore}} to {{payee}}",
+          "dismiss": "Dismiss the day",
+          "reject": "Reject"
         },
         "overdue": {
           "title_one": "{{name}} · overdue {{count}} day · {{amount}}",
@@ -18572,6 +18600,7 @@
           "invite-revoked": "That invite link was cancelled. Ask for a new one.",
           "invite-used": "That invite link was already used. Ask for a new one.",
           "own-book-exists": "This corporation already keeps its own book. Delete it before letting another corporation handle the tax.",
+          "already-declared": "A declaration for this Statement is already waiting for an officer.",
           "already-feeder": "This corporation is already handled by an accounting corporation.",
           "feeder-active": "This corporation is already connected.",
           "token-mismatch": "That login did not match your logged-in account. Try again.",
@@ -18593,6 +18622,7 @@
           "start-before-leave": "The book can start no earlier than the day the accounting corporation stopped handling your moons.",
           "survey-not-found": "That Survey could not be opened. Check the link, and that it has not expired.",
           "unknown-refinery": "That refinery has no mining for this corporation yet.",
+          "settled": "This Statement is already settled.",
           "role-required": "Your Character does not hold the corporation role this needs.",
           "start-over-billed": "A Statement already covers days before that date.",
           "start-in-future": "The start date can't be in the future.",
@@ -18990,6 +19020,12 @@
           "reason": "Reason (kept in the activity log)",
           "sendHint": "The final Statement is mailed from the Statements tab."
         },
+        "dispute": {
+          "dismissTitle": "Dismiss {{name}}'s {{date}}?",
+          "dismissIntro": "The day's ore they disputed is waived. It stays on the record as dismissed and can be reversed.",
+          "rejectTitle": "Reject {{name}}'s dispute for {{date}}?",
+          "rejectIntro": "The day stays billed. They read your reason on their Tax tab, and cannot dispute that day again."
+        },
         "dismissMiner": {
           "title": "Dismiss {{name}}'s tax?",
           "intro": "Everything this Miner owes, and everything waiting for the next Statement, is waived. Today's mining is not included. It stays on the record as dismissed and can be reversed."
@@ -19042,7 +19078,7 @@
           "intro": "They said they paid {{amount}} by another route. Overdue has been paused since.",
           "reason": "Reason (required, shown to the Miner)",
           "confirm": "Reject declaration",
-          "effect": "They get a fresh 14 days before Overdue counts again. Confirm paid instead if the payment turns up."
+          "effect": "Overdue resumes where it paused, with no extra days. Confirm paid instead if the payment turns up."
         },
         "assign": {
           "title": "Assign a donation to a Miner",
