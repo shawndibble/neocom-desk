@@ -165,6 +165,10 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
       const book = { miners, statements, knownCharacterIds: new Set([99]), openBalance };
       expect(mirror.resolveDonations(donations, book)).toEqual(resolveDonations(donations, book));
       expect(mirror.noteUncounted(donations, book)).toEqual(noteUncounted(donations, book));
+      const counted = resolveDonations(donations, book);
+      expect(mirror.noteUncounted(donations, book, counted)).toEqual(
+        noteUncounted(donations, book, counted)
+      );
       for (const characterId of [50, 51, 52, 99, 12345]) {
         for (const reason of [undefined, '', 'abc123', 'xABC123', 'ABC1234', 'ABC123 now']) {
           expect(mirror.matchDonation({ characterId, reason }, book)).toEqual(

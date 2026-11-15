@@ -254,7 +254,7 @@ export async function syncCorpTaxBook(
     openBalance: openBalanceOf(before),
   };
   const resolved = resolveDonations(fresh, matching);
-  const uncounted = elsewhere === null ? undefined : noteUncounted(elsewhere, matching);
+  const uncounted = elsewhere === null ? undefined : noteUncounted(elsewhere, matching, resolved);
 
   // The first call carries everything but the overflow of observer rows, so a
   // later failure loses only ledger rows (each call also records the visit).

@@ -283,11 +283,19 @@ export function noteUncounted(
     statements: readonly StatementLike[];
     knownCharacterIds: ReadonlySet<number>;
     openBalance: ReadonlyMap<string, number>;
-  }
+  },
+  counted: readonly JournalDonation[] = []
 ): UncountedDonation[] {
+  const openBalance = new Map(book.openBalance);
+  for (const c of counted)
+    if (c.minerId !== undefined)
+      openBalance.set(c.minerId, (openBalance.get(c.minerId) ?? 0) - c.amount);
   return donations
     .filter((d) => {
-      const kind = matchDonation({ characterId: d.characterId, reason: d.reason }, book).kind;
+      const kind = matchDonation(
+        { characterId: d.characterId, reason: d.reason },
+        { ...book, openBalance }
+      ).kind;
       return kind === 'statement' || kind === 'miner';
     })
     .sort((a, b) => b.at.localeCompare(a.at) || b.refId - a.refId)

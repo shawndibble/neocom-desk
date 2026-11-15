@@ -32,7 +32,11 @@ export function otherDivisions(divisions: readonly number[]): number[] {
   return WALLET_DIVISIONS.filter((d) => !divisions.includes(d));
 }
 
-/** The donations (from `otherDivisions`) worth an officer's look: ones `matchDonation` would credit. Newest first. */
+/**
+ * The donations (from `otherDivisions`) worth an officer's look: ones `matchDonation` would
+ * credit, against the balance left once this sync's `counted` donations (resolved) paid theirs.
+ * Newest first.
+ */
 export function noteUncounted(
   donations: readonly JournalDonation[],
   book: {
@@ -40,11 +44,19 @@ export function noteUncounted(
     statements: readonly Statement[];
     knownCharacterIds: ReadonlySet<number>;
     openBalance: ReadonlyMap<string, number>;
-  }
+  },
+  counted: readonly JournalDonation[] = []
 ): UncountedDonation[] {
+  const openBalance = new Map(book.openBalance);
+  for (const c of counted)
+    if (c.minerId !== undefined)
+      openBalance.set(c.minerId, (openBalance.get(c.minerId) ?? 0) - c.amount);
   return donations
     .filter((d) => {
-      const kind = matchDonation({ characterId: d.characterId, reason: d.reason }, book).kind;
+      const kind = matchDonation(
+        { characterId: d.characterId, reason: d.reason },
+        { ...book, openBalance }
+      ).kind;
       return kind === 'statement' || kind === 'miner';
     })
     .sort((a, b) => b.at.localeCompare(a.at) || b.refId - a.refId)

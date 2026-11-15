@@ -51,20 +51,20 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
     });
   }
   // #6207: a source the last sync could not read (donations, Extractions) shows here, not only
-  // in Settings. A source the running schedule did read covers a visit that could not.
+  // in Settings. With both a running schedule and this visit's sync, a source is unread only when
+  // neither read it: the schedule covers an officer without wallet roles, and a newer visit that
+  // read it clears an older scheduled miss.
   const scheduledRun = scheduled?.status === 'active' ? scheduled.lastRun : undefined;
   const scheduledMissing =
-    scheduledRun && scheduledRun.outcome === 'synced' ? (scheduledRun.missing ?? []) : undefined;
+    scheduledRun?.outcome === 'synced' ? (scheduledRun.missing ?? []) : undefined;
   const visitMissing =
     sync.run.phase === 'done' && sync.run.outcome.kind === 'synced'
       ? (sync.run.outcome.missing ?? [])
-      : [];
-  const unread = [
-    ...new Set([
-      ...visitMissing.filter((m) => !scheduledMissing || scheduledMissing.includes(m)),
-      ...(scheduledMissing ?? []),
-    ]),
-  ];
+      : undefined;
+  const unread =
+    scheduledMissing && visitMissing
+      ? scheduledMissing.filter((m) => visitMissing.includes(m))
+      : (scheduledMissing ?? visitMissing ?? []);
   if (unread.length > 0) {
     items.push({
       id: 'couldNotRead',

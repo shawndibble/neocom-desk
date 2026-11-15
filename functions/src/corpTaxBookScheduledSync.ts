@@ -434,7 +434,7 @@ export async function runBookSync(
   const elsewhere = quiet
     ? null
     : await readDonationsElsewhere(esi, corporationId, before.divisions, accessToken);
-  const uncounted = elsewhere === null ? undefined : noteUncounted(elsewhere, matching);
+  const uncounted = elsewhere === null ? undefined : noteUncounted(elsewhere, matching, resolved);
 
   const placed = placeObservedRows(
     feed.rows,

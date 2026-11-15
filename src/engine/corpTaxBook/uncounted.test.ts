@@ -58,6 +58,12 @@ describe('noteUncounted (#6207)', () => {
     expect(noteUncounted([donation()], { ...book, openBalance: new Map() })).toEqual([]);
   });
 
+  it('leaves out a Miner whose debt this sync’s counted donation already paid', () => {
+    const paid = donation({ division: 1, refId: 9, amount: 10_000_000, minerId: 'm1' });
+    expect(noteUncounted([donation()], book, [paid])).toEqual([]);
+    expect(noteUncounted([donation()], book, [{ ...paid, amount: 1 }])).toHaveLength(1);
+  });
+
   it('keeps the newest, up to the limit', () => {
     const many = Array.from({ length: UNCOUNTED_LIMIT + 5 }, (_, i) =>
       donation({ refId: i + 1, at: new Date(Date.UTC(2026, 9, 1 + i)).toISOString() })

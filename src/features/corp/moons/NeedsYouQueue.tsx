@@ -75,6 +75,9 @@ export function NeedsYouQueue() {
   const ctx = useBook();
   const { view, names, edit, canEdit, characterId, corporationId, data, settings } = ctx;
   const { miners, needsYou } = useTabsProjection();
+  const [open, setOpen] = useState<Open>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const close = () => setOpen(null);
   // #6207: tax that looks paid into a division the book does not read, until it is counted.
   const uncounted = uncountedToShow({ donations: data.uncounted ?? [] }, settings.divisions);
   const [busy, setBusy] = useState(false);
@@ -104,9 +107,6 @@ export function NeedsYouQueue() {
     }
   };
   const corporationName = useCorporationName();
-  const [open, setOpen] = useState<Open>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const close = () => setOpen(null);
   const minerOf = (id: string) => miners.find((m) => m.id === id)!;
   const nameOf = (id: string) => names.character(minerOf(id).mainCharacterId);
 

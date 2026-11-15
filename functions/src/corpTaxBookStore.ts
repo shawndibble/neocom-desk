@@ -745,8 +745,11 @@ export async function syncBookAs(
       }
     );
   });
+  // A note for officers, not the sync's own writes: best effort, the next sync writes it again.
   if (input.uncounted !== undefined)
-    await storeUncounted(deps, input.corporationId, input.uncounted);
+    await storeUncounted(deps, input.corporationId, input.uncounted).catch((e) =>
+      console.error('uncounted donations write failed', e instanceof Error ? e.message : e)
+    );
   if (paidMiners.size > 0) await refreshAfterEvent(deps.db, input.corporationId, [...paidMiners]);
   // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort, like the totals above.
   await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
@@ -1144,7 +1147,12 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const payment = await mustGet(c, ref, 'Payment');
       if (payment.minerId !== undefined)
         fail('failed-precondition', 'Already assigned', 'already-assigned');
-      tx.update(ref, { minerId: action.minerId, assignedBy: by });
+      // An officer placed a held donation: the review it waited for is done (#6207).
+      tx.update(ref, {
+        minerId: action.minerId,
+        assignedBy: by,
+        ...(payment.reviewReason !== undefined ? { reviewReason: FieldValue.delete() } : {}),
+      });
       return { detail: { paymentId: action.paymentId, minerId: action.minerId } };
     }
     case 'dismiss': {

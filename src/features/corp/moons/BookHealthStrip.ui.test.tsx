@@ -147,6 +147,11 @@ describe('BookHealthStrip, sources a sync could not read', () => {
     renderStrip(active([]), visit(['donations']));
     expect(screen.queryByText(/could not read/)).not.toBeInTheDocument();
   });
+
+  it('lets this visit’s read clear an older scheduled miss', () => {
+    renderStrip(active(['donations']), visit([]));
+    expect(screen.queryByText(/could not read/)).not.toBeInTheDocument();
+  });
 });
 
 describe('BookHealthStrip, member hold', () => {
