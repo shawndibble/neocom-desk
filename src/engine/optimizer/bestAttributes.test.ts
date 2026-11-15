@@ -241,6 +241,10 @@ describe('bestAttributes with Boosters', () => {
         startDate: START,
       }
     );
+    // Pinned before the comparison, so a failure names which call was wrong
+    // and what it returned, not just "not less than".
+    expect(plain.seconds.toPrecision(17)).toBe('1763437.6470588236');
+    expect(boosted.seconds.toPrecision(17)).toBe('1216639.8092209857');
     expect(boosted.seconds).toBeLessThan(plain.seconds);
   });
 
