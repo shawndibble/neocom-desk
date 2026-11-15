@@ -18,7 +18,7 @@ import { cleanup, configure } from '@testing-library/react';
 import { afterAll, afterEach, beforeEach, expect } from 'vitest';
 import { settleEsiCacheLoads } from '@/esi/cache';
 import { claimSessionHint, resetSessionHints } from '@/lib/hintFlags';
-import { restoreRealTimers } from '@/test/teardown';
+import { restoreRealTimers, unmountAtTestEnd } from '@/test/teardown';
 import { fakeMediaQueryList } from '@/test/viewport';
 
 /**
@@ -54,8 +54,10 @@ configure({ asyncUtilTimeout: 5000 });
  * `vitest.setup.ts`'s `afterEach` then runs and drains IndexedDB.
  * Don't hand-roll drains in a test file (`waitFor(esiInFlight)`, extra ticks).
  */
+unmountAtTestEnd(cleanup);
 afterEach(async () => {
   restoreRealTimers();
+  // Already unmounted by the runner step; this catches a render from a hook.
   cleanup();
   try {
     await settleEsiCacheLoads(1000);

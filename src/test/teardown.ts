@@ -233,16 +233,24 @@ export async function settleOrWarn(
   }
 }
 
+let unmountRendered: (() => void) | null = null;
+
+/** The dom project's Testing Library `cleanup`, run first at every test's end. */
+export function unmountAtTestEnd(cleanup: () => void): void {
+  unmountRendered = cleanup;
+}
+
 /**
- * The runner's step between the test body and its `afterEach` hooks: abort the
- * test's requests and let their rejections land, so the file's own resets run
- * after them. Requests only: the UI is still mounted here, and its live
- * queries keep IndexedDB busy (waiting on that tripled the step's cost on
- * route tests). IndexedDB is drained in `afterEach`, after the unmount, on
- * real timers — `fake-indexeddb` runs on `setImmediate`, which a test may
+ * The runner's step between the test body and its `afterEach` hooks. Unmount
+ * first: a UI left mounted while the step waits keeps running (a settings
+ * load hydrating, an effect calling a mock the next test has reset). Then
+ * abort the test's requests and let their rejections land, so the file's own
+ * resets run after them. Requests only: IndexedDB is drained in `afterEach`,
+ * on real timers — `fake-indexeddb` runs on `setImmediate`, which a test may
  * have faked.
  */
 export async function endTestWork(): Promise<void> {
+  unmountRendered?.();
   abortTestFetches();
   await settleOrWarn(expect.getState().currentTestName, 'fetch');
 }
