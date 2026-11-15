@@ -1961,6 +1961,50 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
     });
   });
 
+  it('lets a later book take its own Assignment before an earlier book names Payees', () => {
+    const books = [
+      book({ observed: [observedBy(CORP, 40_000)] }),
+      book({
+        corporationId: SECOND,
+        corpName: 'Ashfall Prospecting',
+        ownPayeeIds: ['ash'],
+        observed: [observedBy(SECOND, 20_000)],
+      }),
+    ];
+    const out = overlay(
+      [
+        allGiven(60_000, [
+          alloc({ id: 'a-ash', payeeId: 'ash', oreLines: [{ typeId: ZEO, quantity: 20_000 }] }),
+          alloc({ id: 'a-other', payeeId: 'other', oreLines: [{ typeId: ZEO, quantity: 40_000 }] }),
+        ]),
+      ],
+      books
+    );
+    expect(out.rows.map((r) => [r.corporationId, r.state, r.overlap?.payeeIds])).toEqual([
+      [CORP, 'conflict', ['other']],
+      [SECOND, 'billed', undefined],
+    ]);
+    expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-ash']);
+  });
+
+  it('names an own entry needing review whatever order the entries are in', () => {
+    const out = overlay(
+      [
+        allGiven(53_050, [
+          alloc({ payeeId: 'other', oreLines: [{ typeId: ZEO, quantity: 43_050 }] }),
+          alloc({
+            id: 'b',
+            payeeId: 'bmw',
+            status: 'needs-review',
+            oreLines: [{ typeId: ZEO, quantity: 10_000 }],
+          }),
+        ]),
+      ],
+      [book({ ownPayeeIds: ['bmw'] })]
+    );
+    expect(out.rows[0]).toMatchObject({ state: 'conflict', conflictCause: 'ownNeedsReview' });
+  });
+
   it("says a Collector now bills the moon when the miner's Payee is its owner", () => {
     const out = overlay(
       [

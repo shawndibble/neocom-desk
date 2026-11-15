@@ -538,24 +538,38 @@ function takeOverlap(
   };
 }
 
-/** Why a conflict's contested allocations clash with the book (`ConflictCause`). */
+const isOwnPayee = (ownPayeeIds: readonly string[] | undefined, a: PersonalAllocation) =>
+  ownPayeeIds?.includes(a.payeeId) === true;
+
+/** Paid or owed: a row needing review is the member's to sort out, not the book's to take. */
+const isSettledStatus = (a: PersonalAllocation) =>
+  a.status === 'paid' || a.status === 'outstanding';
+
+/**
+ * Why a conflict clashes with the book (`ConflictCause`): from the allocations it took the
+ * contested ore from, and any that still hold some of those ore types, whatever order the member's
+ * entry lists them in.
+ */
 function causeOf(
+  pool: OverlapPool,
   touching: readonly PersonalAllocation[],
+  contested: readonly OreLine[],
   book: PersonalBook,
   observed: ObservedMiningEntry
 ): { cause: ConflictCause; ownerPayeeId?: string } {
-  const reviewing = (a: PersonalAllocation) =>
-    book.ownPayeeIds?.includes(a.payeeId) === true &&
-    a.status !== 'paid' &&
-    a.status !== 'outstanding';
-  if (touching.some(reviewing)) {
+  const types = new Set(contested.map((l) => l.typeId));
+  const holding = pool
+    .filter((item) => [...types].some((typeId) => (item.left.get(typeId) ?? 0) > 0))
+    .map((item) => item.allocation);
+  const listing = [...new Set([...touching, ...holding])];
+  if (listing.some((a) => isOwnPayee(book.ownPayeeIds, a) && !isSettledStatus(a))) {
     return { cause: 'ownNeedsReview' };
   }
   const owner = observed.sourceCorporationId;
   const ownerPayee =
     owner === undefined || owner === book.corporationId
       ? undefined
-      : touching.find((a) => book.payeeCorporations?.[a.payeeId] === owner);
+      : listing.find((a) => book.payeeCorporations?.[a.payeeId] === owner);
   if (ownerPayee) return { cause: 'ownerCollected', ownerPayeeId: ownerPayee.payeeId };
   return { cause: 'otherPayee' };
 }
@@ -584,12 +598,9 @@ function takeOwnAllocations(
   const paid: OreLine[][] = [];
   const paidIds: string[] = [];
   const taken = new Map<PoolItem, OreLine[]>();
-  const own = (a: PersonalAllocation) => ownPayeeIds?.includes(a.payeeId) === true;
+  const own = (a: PersonalAllocation) => isOwnPayee(ownPayeeIds, a);
   const takeable = (a: PersonalAllocation) =>
-    a.id !== undefined &&
-    (own(a)
-      ? a.status === 'paid' || a.status === 'outstanding'
-      : a.releasable === true && a.status === 'outstanding');
+    own(a) ? isSettledStatus(a) : a.releasable === true && a.status === 'outstanding';
   // The corporation's own Payee first: that ore is the book's by the member's own word.
   const order = [
     ...pool.filter((item) => own(item.allocation)),
@@ -597,7 +608,8 @@ function takeOwnAllocations(
   ];
   for (const item of order) {
     const { allocation } = item;
-    if (!takeable(allocation)) continue;
+    const { id } = allocation;
+    if (id === undefined || !takeable(allocation)) continue;
     const took: OreLine[] = [];
     for (const [typeId, quantity] of item.left) {
       const take = Math.min(quantity, room.get(typeId) ?? 0);
@@ -612,7 +624,7 @@ function takeOwnAllocations(
     lines.push(listed);
     if (allocation.status === 'paid') {
       paid.push(listed);
-      paidIds.push(allocation.id!);
+      paidIds.push(id);
     }
   }
   return { lines: sumLines(...lines), paidLines: sumLines(...paid), paidIds, taken };
@@ -860,12 +872,17 @@ export function overlayCorpBooks(input: {
     // What the books took of each allocation, and the book whose own Payee it names.
     const takenOf = new Map<PoolItem, OreLine[]>();
     const ownedBy = new Map<PoolItem, { p: Prepared; charge: PreparedCharge }>();
+    const shareOf = (p: Prepared) => split.byBook.get(String(p.book.corporationId)) ?? [];
+    // What the member listed under each corporation's own Payee is that book's to bill: every book
+    // takes its own before any book names the Payees it contests, so book order changes nothing.
+    const ownOf = new Map(
+      claiming.map((p) => [p, takeOwnAllocations(pool, p.book.ownPayeeIds, shareOf(p))])
+    );
     for (const p of claiming) {
-      const share = split.byBook.get(String(p.book.corporationId)) ?? [];
+      const share = shareOf(p);
       const here = chargesOf(p, key);
       const onStatement = here.every((c) => c.statement !== undefined);
-      // What the member listed under this corporation's own Payee is the book's to bill.
-      const own = takeOwnAllocations(pool, p.book.ownPayeeIds, share);
+      const own = ownOf.get(p)!;
       for (const [item, lines] of own.taken)
         takenOf.set(item, sumLines(takenOf.get(item) ?? [], lines));
       // Ore listed for this corporation beyond what any book took is this book's excess (below).
@@ -876,8 +893,8 @@ export function overlayCorpBooks(input: {
           if (
             !ownedBy.has(item) &&
             a.id !== undefined &&
-            (a.status === 'paid' || a.status === 'outstanding') &&
-            p.book.ownPayeeIds?.includes(a.payeeId) === true
+            isSettledStatus(a) &&
+            isOwnPayee(p.book.ownPayeeIds, a)
           )
             ownedBy.set(item, { p, charge: anchor });
         }
@@ -940,7 +957,7 @@ export function overlayCorpBooks(input: {
             ? {
                 lines: take,
                 resolvesAt: contested.resolvesAt,
-                ...causeOf(overlap?.touching ?? [], p.book, charge.observed),
+                ...causeOf(pool, overlap?.touching ?? [], take, p.book, charge.observed),
               }
             : undefined,
           day
