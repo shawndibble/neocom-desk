@@ -1,9 +1,10 @@
 /**
  * Owner rate: what a feeder is owed, a history of its own that
  * never enters the miner rate chain. The feeder may request a rate at any time
- * and the Collector may agree one; the agreed rate wins, so a request made
- * after an override is recorded and changes nothing. Dates are bare EVE/UTC
- * days; every entry applies from its effective-from day and never reaches back.
+ * and the Collector may agree one; only an agreed rate is ever in effect, so a
+ * request is recorded and changes nothing on its own (#6209). Dates are bare
+ * EVE/UTC days; an agreed entry applies from its effective-from day, and the
+ * first one also reaches back over the days before it, which waited as pending.
  */
 
 export type OwnerRateKind = 'requested' | 'agreed';
@@ -42,12 +43,30 @@ function latestOf(
   return best;
 }
 
-/** The agreed rate in effect on `date` if one exists, else the requested one. */
+/** The first agreed entry: it reaches back over the days before any rate was agreed. */
+function firstAgreed(history: readonly OwnerRateEntry[]): OwnerRateEntry | undefined {
+  let first: OwnerRateEntry | undefined;
+  for (const entry of history) {
+    if (entry.kind !== 'agreed') continue;
+    if (
+      !first ||
+      entry.effectiveFrom < first.effectiveFrom ||
+      (entry.effectiveFrom === first.effectiveFrom && entry.recordedAt < first.recordedAt)
+    )
+      first = entry;
+  }
+  return first;
+}
+
+/**
+ * The agreed rate in effect on `date`; before the first agreed rate starts, that first one
+ * (backdated). A requested rate never takes effect: with nothing agreed there is no rate.
+ */
 export function effectiveOwnerRate(
   history: readonly OwnerRateEntry[],
   date: string
 ): EffectiveOwnerRate | undefined {
-  const entry = latestOf(history, 'agreed', date) ?? latestOf(history, 'requested', date);
+  const entry = latestOf(history, 'agreed', date) ?? firstAgreed(history);
   return entry && { pct: entry.pct, kind: entry.kind, effectiveFrom: entry.effectiveFrom };
 }
 
@@ -57,6 +76,28 @@ export function requestedOwnerRate(
   date: string
 ): number | undefined {
   return latestOf(history, 'requested', date)?.pct;
+}
+
+/**
+ * A request still waiting on the accounting corporation (#6209): the moon owner's latest request
+ * when nothing is agreed, or when it was recorded after the last agreement and asks for another
+ * rate. Undefined when there is none.
+ */
+export function pendingRateRequest(history: readonly OwnerRateEntry[]): number | undefined {
+  const last = (kind: OwnerRateKind) =>
+    history
+      .filter((e) => e.kind === kind)
+      .reduce<OwnerRateEntry | undefined>(
+        (l, e) => (!l || e.recordedAt >= l.recordedAt ? e : l),
+        undefined
+      );
+  const request = last('requested');
+  if (!request) return undefined;
+  const agreement = last('agreed');
+  if (!agreement) return request.pct;
+  return request.recordedAt > agreement.recordedAt && request.pct !== agreement.pct
+    ? request.pct
+    : undefined;
 }
 
 /** Miner rate minus owner rate, in percentage points. Computed on read, never stored. */

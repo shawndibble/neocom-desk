@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { composeRateChangeMail, moonOwnerMailRecipients } from './ownerRateMail';
+import {
+  composeModeChangeMail,
+  composeRateChangeMail,
+  moonOwnerMailRecipients,
+} from './ownerRateMail';
 
 const base = { accountingCorporationName: 'B-UH Moons', recipientName: 'Ada' };
 
@@ -53,5 +57,27 @@ describe('moonOwnerMailRecipients', () => {
   });
   it('drops what is unknown', () => {
     expect(moonOwnerMailRecipients({ ceoId: null })).toEqual([]);
+  });
+});
+
+describe('composeModeChangeMail (#6209)', () => {
+  it('says settled otherwise starts on a day and what was owed before stays owed', () => {
+    const mail = composeModeChangeMail({ ...base, mode: 'settled-otherwise', date: '2026-10-12' });
+    expect(mail.subject).toBe('Your moon mining is now settled another way');
+    expect(mail.body).toContain('B-UH Moons settles your moon mining another way from 2026-10-12');
+    expect(mail.body).toContain('What was owed to you before then stays owed');
+  });
+
+  it('says payment in ISK resumes on a day', () => {
+    const mail = composeModeChangeMail({ ...base, mode: 'normal', date: '2026-10-12' });
+    expect(mail.subject).toBe('Your moon mining is paid in ISK again');
+    expect(mail.body).toContain('From 2026-10-12, B-UH Moons pays your moon mining in ISK again');
+  });
+
+  it('never carries the miner rate, the margin or a dev term', () => {
+    for (const mode of ['normal', 'settled-otherwise'] as const) {
+      const { subject, body } = composeModeChangeMail({ ...base, mode, date: '2026-10-12' });
+      expect(`${subject} ${body}`).not.toMatch(/miner|margin|feeder|collector/i);
+    }
   });
 });

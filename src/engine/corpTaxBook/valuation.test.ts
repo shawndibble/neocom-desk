@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { moonOwnerUnitPrice, priceObservedDay, valueObservedEntry } from './valuation';
+import {
+  moonOwnerDayPrices,
+  moonOwnerUnitPrice,
+  priceObservedDay,
+  valueObservedEntry,
+} from './valuation';
 import type { ObservedMiningEntry } from './types';
 
 const RAW_A = 45490;
@@ -106,5 +111,34 @@ describe('moonOwnerUnitPrice (#4621)', () => {
     expect(moonOwnerUnitPrice({ buy: 0, sell: 150 })).toBe(150);
     expect(moonOwnerUnitPrice({ buy: null, sell: null })).toBe(0);
     expect(moonOwnerUnitPrice(undefined)).toBe(0);
+  });
+
+  it('falls back to the price the miner was billed at before 0 (#6209)', () => {
+    expect(moonOwnerUnitPrice({ buy: null, sell: null }, 80)).toBe(80);
+    expect(moonOwnerUnitPrice(undefined, 80)).toBe(80);
+    expect(moonOwnerUnitPrice({ buy: 120, sell: 150 }, 80)).toBe(120);
+    expect(moonOwnerUnitPrice(undefined, 0)).toBe(0);
+  });
+});
+
+describe('moonOwnerDayPrices (#6209)', () => {
+  it('keeps a saved price and takes the billed one where the day has none', () => {
+    const own = new Map([
+      [1, 100],
+      [2, 0],
+    ]);
+    const billed = new Map([
+      [1, 90],
+      [2, 70],
+      [3, 50],
+    ]);
+    expect(moonOwnerDayPrices(own, billed)).toEqual(
+      new Map([
+        [1, 100],
+        [2, 70],
+        [3, 50],
+      ])
+    );
+    expect(moonOwnerDayPrices(new Map([[2, 0]]), new Map())).toEqual(new Map([[2, 0]]));
   });
 });

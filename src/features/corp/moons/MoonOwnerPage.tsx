@@ -31,6 +31,22 @@ const k = (key: string) => `corpTaxBook.moons.moonOwners.page.${key}`;
 /** Payout states in the order the Status column sorts them: what needs a look first. */
 const PAYOUT_STATE_RANK: readonly PayoutStatus[] = ['waiting-for-journal', 'recorded', 'matched'];
 
+/** A payment's state word: waiting to be confirmed (#6209) first, then not counted, then its status. */
+const payoutStateKey = (p: MoonOwnerPayout) =>
+  p.unconfirmed
+    ? 'payouts.state.unconfirmed'
+    : p.notAPayout
+      ? 'payouts.state.not-a-payout'
+      : `payouts.state.${p.status}`;
+
+/** Sort rank: a payment to confirm first, then waiting on the journal, recorded, matched, not counted. */
+const payoutRank = (p: MoonOwnerPayout) =>
+  p.unconfirmed
+    ? -1
+    : p.notAPayout
+      ? PAYOUT_STATE_RANK.length
+      : PAYOUT_STATE_RANK.indexOf(p.status);
+
 /** Their rate beside the miner rate and the margin, with what they asked for. */
 export function RateReadout({
   theirPct,
@@ -204,11 +220,16 @@ export function MoonOwnerPage({
     {
       id: 'status',
       header: t(k('payouts.status')),
-      render: (p) =>
-        t(k(p.notAPayout ? 'payouts.state.not-a-payout' : `payouts.state.${p.status}`)),
-      // Needs-a-look first: waiting on the journal, then recorded, matched, and last what is not counted.
-      sortValue: (p) =>
-        p.notAPayout ? PAYOUT_STATE_RANK.length : PAYOUT_STATE_RANK.indexOf(p.status),
+      render: (p) => (
+        <>
+          {t(k(payoutStateKey(p)))}
+          {p.disputedAt !== undefined && (
+            <span className="block text-xs text-warning">{t(k('payouts.disputed'))}</span>
+          )}
+        </>
+      ),
+      // Needs-a-look first: to confirm, waiting on the journal, recorded, matched, not counted.
+      sortValue: payoutRank,
       sortFirst: 'asc',
     },
     ...(onMarkPayout
@@ -219,11 +240,22 @@ export function MoonOwnerPage({
             align: 'right' as const,
             stackEdge: 'end' as const,
             cellClassName: () => 'dt-action-row',
-            render: (p: MoonOwnerPayout) => (
-              <Button size="sm" variant="ghost" onClick={() => onMarkPayout(p.id, !p.notAPayout)}>
-                {t(k(p.notAPayout ? 'payouts.countIt' : 'payouts.notAPayout'))}
-              </Button>
-            ),
+            render: (p: MoonOwnerPayout) =>
+              p.unconfirmed ? (
+                // A donation without the payout reference (#6209): the officer says which it is.
+                <span className="inline-flex gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => onMarkPayout(p.id, false)}>
+                    {t(k('payouts.countIt'))}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => onMarkPayout(p.id, true)}>
+                    {t(k('payouts.notAPayout'))}
+                  </Button>
+                </span>
+              ) : (
+                <Button size="sm" variant="ghost" onClick={() => onMarkPayout(p.id, !p.notAPayout)}>
+                  {t(k(p.notAPayout ? 'payouts.countIt' : 'payouts.notAPayout'))}
+                </Button>
+              ),
           },
         ]
       : []),
@@ -294,7 +326,7 @@ export function MoonOwnerPage({
       <StatChips>
         <StatChip
           label={t(k('owed'))}
-          value={row.mode === 'settled-otherwise' ? '—' : isk(row.owed)}
+          value={row.mode === 'settled-otherwise' && row.owed === 0 ? '—' : isk(row.owed)}
           emphasis
         />
         <StatChip label={t(k('accrued'))} value={isk(detail.accrued)} />

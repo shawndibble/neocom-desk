@@ -22,11 +22,14 @@ import {
   feederBillableRule,
   onPayList,
 } from './feederAccrual';
+import { FEEDER_VIEW_RULES } from './moonOwners';
 import {
   balanceAfter,
   buildRecordedPayout,
+  carriesPayoutReference,
   outgoingDonationsFromJournal,
   PAYOUT_LINK_WINDOW_DAYS,
+  PAYOUT_REASON_PREFIX,
   payeeIdsAt,
   payoutId,
   payoutPeriod,
@@ -500,6 +503,8 @@ describe('feeder accrual mirror', () => {
     ];
     const r = { ...rules, modeChanges: [], isBillable: () => true, ownerRateHistory: history };
     expect(mirror.accrueValuedDays(days, r)).toEqual(accrueValuedDays(days, r));
+    const asked = { ...r, ownerRateHistory: history.filter((h) => h.kind === 'requested') };
+    expect(mirror.accrueValuedDays(days, asked)).toEqual(accrueValuedDays(days, asked));
   });
 });
 
@@ -565,6 +570,8 @@ describe('feeder view mirror', () => {
       { buy: null, sell: null },
     ]) {
       expect(mirror.moonOwnerUnitPrice(side)).toBe(moonOwnerUnitPrice(side));
+      for (const billed of [undefined, 0, 80])
+        expect(mirror.moonOwnerUnitPrice(side, billed)).toBe(moonOwnerUnitPrice(side, billed));
     }
   });
 
@@ -652,6 +659,24 @@ describe('feeder view mirror', () => {
       outgoing,
     };
     expect(mirror.reconcileBookOutgoing(input)).toEqual(reconcileBookOutgoing(input));
+    // With the payout reference on some donations and not others (#6209).
+    const referenced = {
+      ...input,
+      outgoing: outgoing.map((o, i) => (i === 1 ? { ...o, reason: 'Moon mining payout' } : o)),
+    };
+    expect(mirror.reconcileBookOutgoing(referenced)).toEqual(reconcileBookOutgoing(referenced));
+    const waiting = [
+      {
+        ...payouts[0]!,
+        id: 'j1_9',
+        status: 'matched' as const,
+        journalRef: 9,
+        notAPayout: true,
+        unconfirmed: true,
+      },
+    ];
+    const sent = { amount: 5e6, date: '2026-10-17', method: 'donation' as const };
+    expect(mirror.payoutToMerge(waiting, sent)).toBe(payoutToMerge(waiting, sent));
     for (const at of ['2026-10-18T10:00:00Z', '2026-10-19T10:00:00Z']) {
       expect(mirror.payeeIdsAt(input.owners[1]!, at)).toEqual(payeeIdsAt(input.owners[1]!, at));
     }
@@ -714,6 +739,9 @@ describe('remaining engine parity (#4515, #4520, #4621)', () => {
       );
     }
     expect(mirror.effectiveOwnerRatePct([], '2026-06-01')).toBeUndefined();
+    const askedOnly = [history[0]!];
+    expect(mirror.effectiveOwnerRatePct(askedOnly, '2026-06-02')).toBeUndefined();
+    expect(effectiveOwnerRate(askedOnly, '2026-06-02')).toBeUndefined();
   });
 
   it('removal state guards agree', () => {
@@ -772,6 +800,10 @@ describe('remaining engine parity (#4515, #4520, #4621)', () => {
 
   it('payout helpers agree', () => {
     expect(mirror.PAYOUT_LINK_WINDOW_DAYS).toBe(PAYOUT_LINK_WINDOW_DAYS);
+    expect(mirror.PAYOUT_REASON_PREFIX).toBe(PAYOUT_REASON_PREFIX);
+    expect(mirror.FEEDER_VIEW_RULES).toBe(FEEDER_VIEW_RULES);
+    for (const reason of [undefined, 'SRP refund', 'MOON MINING PAYOUT, 2026-10-01', ''])
+      expect(mirror.carriesPayoutReference(reason)).toBe(carriesPayoutReference(reason));
     expect(mirror.payoutId({ division: 2, refId: 55 })).toBe(payoutId({ division: 2, refId: 55 }));
     const period = { from: '2026-10-01', to: '2026-10-09' };
     for (const p of [period, undefined]) {

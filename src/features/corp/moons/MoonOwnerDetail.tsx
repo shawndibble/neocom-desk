@@ -21,7 +21,7 @@ import { canSendMail, queueOfficerMail } from '@/features/corpTaxBook/officerMai
 import { PayMoonOwnerHost } from './PayMoonOwnerHost';
 import { RemoveMoonOwnerDialog, SetRateDialog, SettledOtherwiseDialog } from './MoonOwnerDialogs';
 import { MoonOwnerPage } from './MoonOwnerPage';
-import { agreedRateChange, mailRateChange } from './rateChangeNotice';
+import { agreedRateChange, mailModeChange, mailRateChange } from './rateChangeNotice';
 import { Crumb } from './moonsParts';
 import {
   cancelRemovalAndMail,
@@ -227,15 +227,23 @@ export function MoonOwnerDetail({ id }: { id: string }) {
           initialNote={detail.note ?? ''}
           onClose={() => setDialog(null)}
           onSave={(on, note) =>
-            afterEdit(() =>
-              setFeederMode(
-                characterId,
-                corporationId,
-                corp,
-                on ? 'settled-otherwise' : 'normal',
-                on ? note : undefined
-              )
-            )
+            afterEdit(async () => {
+              const mode = on ? 'settled-otherwise' : 'normal';
+              await setFeederMode(characterId, corporationId, corp, mode, on ? note : undefined);
+              // A switch (not a note edit) is mailed to the moon owner (#6209); never awaited.
+              if (on !== settled && accountingName && !detail.row.sameOwner) {
+                void mailModeChange({
+                  grantedScopes,
+                  characterId,
+                  corporationId,
+                  accountingCorporationName: accountingName,
+                  feederCorporationId: corp,
+                  ...(feeder?.payee ? { payee: feeder.payee } : {}),
+                  mode,
+                  at: Date.now(),
+                });
+              }
+            })
           }
         />
       )}

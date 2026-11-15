@@ -15,7 +15,7 @@
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { CollectionReference, Firestore } from 'firebase-admin/firestore';
-import { FEEDER_VIEWS, utcDate } from './corpTaxBook.js';
+import { FEEDER_VIEWS, STATEMENTS, utcDate } from './corpTaxBook.js';
 import {
   BOOK_DEFAULTS,
   accrueValuedDays,
@@ -32,6 +32,8 @@ import {
   type OwnerRateEntry,
   type Payee,
   moonOwnerUnitPrice,
+  FEEDER_VIEW_RULES,
+  latestOwnerRate,
 } from './corpTaxBookEngine.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
 import { COMPRESSED_ORE_TYPE_IDS } from './data/compressedOreTypeIds.js';
@@ -95,6 +97,8 @@ export async function refreshMemberCoverage(
 
 export interface FeederViewSummary {
   schemaVersion: 1;
+  /** Absent on a summary built before #6209. */
+  rulesVersion?: number;
   feederCorporationId: number;
   collectorCorporationId: number;
   collectorName: string | null;
@@ -114,6 +118,11 @@ export interface FeederViewSummary {
   minedVolume: number;
   minedValueIsk: number;
   accruedIsk: number;
+  /**
+   * Ore value at 100% over covered, Billable days with no agreed rate yet (#6209): owed once a
+   * rate is agreed. Absent on a summary built before it.
+   */
+  pendingValueIsk?: number;
   paidIsk: number;
   balanceKind: 'owed' | 'credit' | 'even' | 'none';
   balanceIsk: number;
@@ -176,6 +185,8 @@ export interface FeederViewPayout {
   amount: number;
   method: 'donation' | 'other';
   status: 'recorded' | 'waiting-for-journal' | 'matched';
+  /** The moon owner flagged it as a payment it disputes (#6209); absent when it did not. */
+  disputed?: true;
 }
 
 /** `feederViews/{feeder}/viewers/{uid}`: what firestore.rules reads to let a moon owner in. */
@@ -310,6 +321,11 @@ export interface FeederViewInput {
   rows: readonly FeederViewRow[];
   /** The hub station's end-of-day prices, by `priceKey(oreFormTypeId, date)`. */
   prices: ReadonlyMap<string, SidePrices>;
+  /**
+   * The unit prices an issued Statement billed each miner's line at, by the line's `chargeKey`
+   * (`characterId:structureId:date`) then raw type id: what an unsaved day falls back to (#6209).
+   */
+  billedPrices?: ReadonlyMap<string, Readonly<Record<string, number>>>;
   payouts: readonly (FeederPayout & { id: string })[];
 }
 
@@ -320,15 +336,16 @@ export interface FeederView {
   payouts: FeederViewPayout[];
 }
 
+/** The latest entry of one kind in effect on `today` (a request never reaches back). */
 const latestPct = (
   history: readonly OwnerRateEntry[],
   kind: OwnerRateEntry['kind'],
   today: string
-) =>
-  effectiveOwnerRatePct(
-    history.filter((h) => h.kind === kind),
-    today
-  ) ?? null;
+) => latestOwnerRate(history, kind, today)?.pct ?? null;
+
+/** A row's Statement line key (engine `observedEntryKey`): character, refinery and day. */
+const chargeKeyOf = (r: Pick<FeederViewRow, 'characterId' | 'structureId' | 'date'>) =>
+  `${r.characterId}:${r.structureId}:${r.date}`;
 
 export function buildFeederView(input: FeederViewInput): FeederView {
   const { record, now } = input;
@@ -363,8 +380,10 @@ export function buildFeederView(input: FeederViewInput): FeederView {
     }
     if (!isDayCovered(record.coveragePeriods, r.date)) continue;
     const priced = oreFormTypeId(r.typeId, input.compressedByRaw, compressed);
-    // The accounting side prices a moon owner's accrual with the same rule (#4621).
-    const unit = moonOwnerUnitPrice(input.prices.get(priceKey(priced, r.date)));
+    // The accounting side prices a moon owner's accrual with the same rule (#4621); a day with
+    // no saved price takes what the miner's line was billed at (#6209).
+    const billed = input.billedPrices?.get(chargeKeyOf(r))?.[String(r.typeId)];
+    const unit = moonOwnerUnitPrice(input.prices.get(priceKey(priced, r.date)), billed);
     const value = r.quantity * unit;
     minedVolume += r.quantity;
     minedValueIsk += value;
@@ -421,6 +440,7 @@ export function buildFeederView(input: FeederViewInput): FeederView {
 
   const summary: FeederViewSummary = {
     schemaVersion: 1,
+    rulesVersion: FEEDER_VIEW_RULES,
     feederCorporationId: input.feederCorporationId,
     collectorCorporationId: input.collectorCorporationId,
     collectorName: input.collectorName,
@@ -443,6 +463,7 @@ export function buildFeederView(input: FeederViewInput): FeederView {
     minedVolume,
     minedValueIsk,
     accruedIsk: accrual.accrued,
+    pendingValueIsk: accrual.pending.reduce((sum, d) => sum + d.value, 0),
     paidIsk: counted.reduce((sum, p) => sum + p.amount, 0),
     balanceKind: display.kind,
     balanceIsk: display.isk,
@@ -487,6 +508,7 @@ export function buildFeederView(input: FeederViewInput): FeederView {
         amount: p.amount,
         method: p.method,
         status: p.status,
+        ...(p.disputedAt !== undefined ? { disputed: true as const } : {}),
       }))
       .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)),
   };
@@ -553,6 +575,43 @@ async function loadPrices(
 }
 
 /**
+ * What issued Statements billed the miners' lines at, for the covered rows with no saved price
+ * (#6209). Reads nothing when every row is priced; else only the Statements that reach the
+ * earliest such day.
+ */
+async function readBilledPrices(
+  book: FirebaseFirestore.DocumentReference,
+  rows: readonly FeederViewRow[],
+  record: FeederRecord,
+  prices: ReadonlyMap<string, SidePrices>,
+  oreForm: 'compressed' | 'raw'
+): Promise<Map<string, Record<string, number>>> {
+  const out = new Map<string, Record<string, number>>();
+  const keys = new Set<string>();
+  let earliest: string | undefined;
+  for (const r of rows) {
+    if (!isDayCovered(record.coveragePeriods, r.date)) continue;
+    const priced = oreFormTypeId(r.typeId, COMPRESSED_ORE_TYPE_IDS, oreForm === 'compressed');
+    if (moonOwnerUnitPrice(prices.get(priceKey(priced, r.date))) > 0) continue;
+    keys.add(chargeKeyOf(r));
+    if (earliest === undefined || r.date < earliest) earliest = r.date;
+  }
+  if (earliest === undefined) return out;
+  const snap = await book.collection(STATEMENTS).where('coversThrough', '>=', earliest).get();
+  for (const doc of snap.docs) {
+    const lines = doc.get('lines') as unknown;
+    if (!Array.isArray(lines)) continue;
+    for (const line of lines as { chargeKey?: unknown; unitPrices?: unknown }[]) {
+      if (typeof line.chargeKey !== 'string' || !keys.has(line.chargeKey)) continue;
+      if (out.has(line.chargeKey) || typeof line.unitPrices !== 'object' || !line.unitPrices)
+        continue;
+      out.set(line.chargeKey, line.unitPrices as Record<string, number>);
+    }
+  }
+  return out;
+}
+
+/**
  * Read the book and write the feeder's view. Returns false when there is no feeder record.
  * Throws when a price read fails, leaving the earlier view untouched: a half-priced view would
  * understate what is owed.
@@ -595,6 +654,7 @@ export async function rebuildFeederView(
     hubStationId(typeof hubId === 'string' ? hubId : BOOK_DEFAULTS.hubId)
   );
 
+  const billedPrices = await readBilledPrices(book, rows, record, prices, oreForm);
   const view = buildFeederView({
     now: deps.now(),
     feederCorporationId: feeder,
@@ -606,6 +666,7 @@ export async function rebuildFeederView(
     compressedByRaw: COMPRESSED_ORE_TYPE_IDS,
     rows,
     prices,
+    ...(billedPrices.size > 0 ? { billedPrices } : {}),
     payouts: payoutSnap.docs.map((d) => ({
       ...(d.data() as FeederPayout),
       notAPayout: d.get('notAPayout') === true,

@@ -7,6 +7,7 @@ const STATUS_TONE: Record<MoonOwnerStatus, PillTone> = {
   'cant-read': 'warning',
   'removal-pending': 'danger',
   'settled-otherwise': 'neutral',
+  'rate-asked': 'warning',
   'no-rate': 'neutral',
   disconnected: 'danger',
   left: 'neutral',

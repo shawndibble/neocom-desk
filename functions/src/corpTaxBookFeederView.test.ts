@@ -181,6 +181,8 @@ describe('buildFeederView', () => {
     expect(s.coverageTo).toBeNull();
     expect(s.refineryCount).toBe(1);
     expect(s.schemaVersion).toBe(1);
+    expect(s.rulesVersion).toBe(2);
+    expect(s.pendingValueIsk).toBe(0);
     expect(v.days.map((d) => d.date)).toEqual(['2026-10-12', '2026-10-13']);
     // The moon owner sees ore and quantity only: no value, rate or due (#5261).
     expect(v.days[0]).toEqual({
@@ -263,6 +265,69 @@ describe('buildFeederView', () => {
       accruedIsk: 0,
       balanceKind: 'even',
     });
+  });
+
+  it('a requested rate alone accrues nothing: the ore value waits as pending (#6209)', () => {
+    const v = buildFeederView(
+      input({
+        record: record({ agreedRatePct: undefined, requestedRatePct: 6 }),
+        rows: [row('2026-10-12', 10)],
+        prices,
+      })
+    );
+    expect(v.summary).toMatchObject({
+      effectiveRatePct: null,
+      requestedRatePct: 6,
+      agreedRatePct: null,
+      accruedIsk: 0,
+      pendingValueIsk: 1000,
+    });
+  });
+
+  it('settled otherwise after ore accrued keeps that owed (#6209)', () => {
+    const v = buildFeederView(
+      input({
+        record: record({
+          mode: 'settled-otherwise',
+          modeChanges: [{ from: '2026-10-13', mode: 'settled-otherwise' }],
+        }),
+        rows: [row('2026-10-12', 10), row('2026-10-13', 4)],
+        prices,
+      })
+    );
+    expect(v.summary).toMatchObject({ accruedIsk: 100, balanceKind: 'owed', balanceIsk: 100 });
+  });
+
+  it('shows a payment the moon owner disputes as disputed (#6209)', () => {
+    const v = buildFeederView(
+      input({
+        payouts: [
+          {
+            id: 'a',
+            date: '2026-10-15',
+            amount: 40,
+            method: 'donation',
+            status: 'matched',
+            notAPayout: false,
+            disputedAt: NOW - 1000,
+          },
+        ],
+      })
+    );
+    expect(v.payouts[0]?.disputed).toBe(true);
+  });
+
+  it('prices an unsaved day at what the miner was billed for that ore (#6209)', () => {
+    const v = buildFeederView(
+      input({
+        rows: [row('2026-10-14', 10), row('2026-10-15', 2)],
+        prices,
+        billedPrices: new Map([['900:77:2026-10-14', { '18': 30 }]]),
+      })
+    );
+    expect(v.summary.minedValueIsk).toBe(300);
+    // 10-15 has no saved price and no billed line: still unpriced.
+    expect(v.summary.unpricedDays).toBe(1);
   });
 
   it('lets the agreed rate win over a later request', () => {

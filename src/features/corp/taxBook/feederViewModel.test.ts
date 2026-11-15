@@ -82,14 +82,15 @@ describe('rateNote', () => {
       askedPct: 6,
     });
   });
-  it('is plain when agreed equals asked or only one exists', () => {
+  it('is set when agreed equals asked, and only asked for when nothing is agreed (#6209)', () => {
     const asked8 = [
       { kind: 'requested' as const, pct: 8, effectiveFrom: '2026-10-01', recordedAt: '' },
       { kind: 'agreed' as const, pct: 8, effectiveFrom: '2026-10-01', recordedAt: '' },
     ];
     expect(rateNote({ ...base, requestedRatePct: 8, rateHistory: asked8 })).toEqual({
-      kind: 'plain',
+      kind: 'set',
       pct: 8,
+      since: '2026-10-01',
     });
     expect(
       rateNote({
@@ -99,9 +100,17 @@ describe('rateNote', () => {
         rateHistory: [base.rateHistory[0]!],
       })
     ).toEqual({
-      kind: 'plain',
-      pct: 6,
+      kind: 'asked',
+      askedPct: 6,
     });
+    expect(
+      rateNote({
+        ...base,
+        agreedRatePct: null,
+        effectiveRatePct: null,
+        rateHistory: [base.rateHistory[0]!],
+      })
+    ).toEqual({ kind: 'asked', askedPct: 6 });
   });
   it('says who set the rate and when, when they never asked', () => {
     expect(
@@ -207,6 +216,7 @@ describe('viewRefineryLabeler / payoutRows', () => {
   });
   it('orders payments newest first', () => {
     const p = (date: string) => ({
+      id: date,
       date,
       amount: 1,
       method: 'donation' as const,

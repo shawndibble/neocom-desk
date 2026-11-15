@@ -34,6 +34,30 @@ export function composeRateChangeMail(input: {
 }
 
 /**
+ * The short mail a moon owner's CEO and payee get when the accounting corporation turns settled
+ * otherwise on or off (#6209). It says from which day, and that what was owed before stays owed.
+ */
+export function composeModeChangeMail(input: {
+  accountingCorporationName: string;
+  recipientName: string;
+  mode: 'normal' | 'settled-otherwise';
+  /** The UTC day the switch takes effect. */
+  date: string;
+}): RateChangeMail {
+  const { accountingCorporationName: by, recipientName: to, date } = input;
+  const settled = input.mode === 'settled-otherwise';
+  const line = settled
+    ? `Hi ${to}, ${by} settles your moon mining another way from ${date}: nothing more builds up in ISK from then. What was owed to you before then stays owed until it is paid.`
+    : `Hi ${to}. From ${date}, ${by} pays your moon mining in ISK again, at your rate.`;
+  return {
+    subject: settled
+      ? 'Your moon mining is now settled another way'
+      : 'Your moon mining is paid in ISK again',
+    body: serializeEveMarkup([text(line)]),
+  };
+}
+
+/**
  * Who is mailed about a moon owner: its CEO and its payee, once each. A payee
  * that is a corporation reaches that corporation's CEO. Unknown ids drop out.
  */

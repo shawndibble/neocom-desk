@@ -17667,6 +17667,7 @@
         "reminder": "Reminder",
         "rate-change": "Rate change",
         "payee-change": "Who gets paid changed",
+        "mode-change": "Settled otherwise changed",
         "srp-result": "SRP result",
         "vetting-result": "Vetting decision",
         "removal": "Moon owner removal",
@@ -18538,7 +18539,8 @@
       "ownerView": {
         "statement": {
           "intro": "{{name}} handles the tax on your moons.",
-          "noRate": "No rate is set, so nothing is owed to you yet. Ask for one below.",
+          "noRate": "No rate is agreed yet, so nothing is owed to you yet. Once one is agreed, it counts from your first day. Ask for one below.",
+          "pending": "{{value}} of ore mined is waiting for a rate.",
           "owed": "is owed to you for ore mined at your refineries since {{since}}, at your rate of {{pct}}%.",
           "owedUndated": "is owed to you for ore mined at your refineries, at your rate of {{pct}}%.",
           "credit": "more than is owed has been paid to you for ore mined at your refineries, at your rate of {{pct}}%.",
@@ -18569,7 +18571,8 @@
         "settledOtherwise": {
           "title": "How you are paid",
           "intro": "You are settled with {{name}} another way.",
-          "nothingOwed": "Nothing is owed in ISK, so no balance builds up."
+          "nothingOwed": "Nothing more builds up in ISK while this lasts.",
+          "stillOwed": "is still owed to you for ore mined before this."
         },
         "previous": {
           "title": "Previously handled by {{name}}",
@@ -18585,7 +18588,7 @@
         "rate": {
           "none": "No rate is set.",
           "plain": "Your rate is {{pct}}%.",
-          "asked": "You asked for {{pct}}%. Nothing changes until they agree.",
+          "asked": "You asked for {{pct}}%. Nothing is owed until they agree a rate; then it counts from your first day.",
           "override": "Rate set to {{pct}}% by {{name}} on {{date}}. You asked for {{asked}}%.",
           "overrideUndated": "Rate set to {{pct}}% by {{name}}. You asked for {{asked}}%.",
           "set": "Rate set to {{pct}}% by {{name}} on {{date}}.",
@@ -18618,7 +18621,11 @@
             "recorded": "Recorded",
             "waiting-for-journal": "Waiting for the wallet journal",
             "matched": "Matched in the wallet journal"
-          }
+          },
+          "disputed": "You dispute this",
+          "dispute": "Dispute",
+          "withdraw": "Withdraw dispute",
+          "disputeFailed": "That did not go through. Try again."
         },
         "mined": "Mined at your refineries",
         "minedWhile": "Mined while they handled it",
@@ -18962,6 +18969,7 @@
           "cant-read": "Can't read ledger",
           "removal-pending": "Removal pending",
           "settled-otherwise": "Settled otherwise",
+          "rate-asked": "Rate asked",
           "no-rate": "No rate set",
           "disconnected": "Disconnected",
           "left": "Left",
@@ -18980,7 +18988,8 @@
         "since": "since {{date}}",
         "until": "until {{date}}",
         "notSet": "Not set",
-        "nothingDue": "Nothing due",
+        "waitsForRate": "Waits for a rate",
+        "askedRate": "Asked {{pct}}%",
         "summary": "{{shown}} moon owners",
         "empty": {
           "title": "No moon owners yet",
@@ -19000,7 +19009,7 @@
           "marginHint": "Miner rate − their rate",
           "asked": "They asked for {{pct}}%. Yours stands.",
           "askedSame": "They asked for {{pct}}%.",
-          "noRate": "No rate set. Nothing is due until you set one.",
+          "noRate": "No rate set. Their ore waits until you set one, then counts from their first day.",
           "notSet": "Not set",
           "history": {
             "agreed": "Rate set to {{pct}}%",
@@ -19011,7 +19020,7 @@
           "setRate": "Set rate",
           "remove": "Remove from this book",
           "settledOtherwise": "Settled otherwise",
-          "settledNote": "Settled otherwise: nothing is due and no balance is kept.",
+          "settledNote": "Settled otherwise: nothing builds up while it lasts. What they were owed before stays owed until you pay it.",
           "stale": "Can't read their ledger since {{date}}. Their days wait until it reads again.",
           "removal": {
             "title": "Removal pending, takes effect {{time}}",
@@ -19038,8 +19047,10 @@
               "recorded": "Recorded",
               "waiting-for-journal": "Waiting for the wallet journal",
               "matched": "Matched in the wallet journal",
-              "not-a-payout": "Not a payout"
+              "not-a-payout": "Not a payout",
+              "unconfirmed": "To confirm: not counted yet"
             },
+            "disputed": "They dispute this payment",
             "add": "Add a payment",
             "notAPayout": "Not a payout",
             "countIt": "Count it"

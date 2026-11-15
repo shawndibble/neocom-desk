@@ -34,7 +34,13 @@ import {
   utcDate,
 } from './corpTaxBook.js';
 import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
-import { closePeriod, isDayCovered, reopenPeriod } from './corpTaxBookEngine.js';
+import {
+  closePeriod,
+  deriveOwnerRateHistory,
+  effectiveOwnerRatePct,
+  isDayCovered,
+  reopenPeriod,
+} from './corpTaxBookEngine.js';
 import type { CorporationLookup } from './corpTaxBookEsi.js';
 import {
   acceptInviteCore,
@@ -894,7 +900,8 @@ export async function getFeederStatus(
     readPrevious(deps.db, input.corporationId),
   ]);
   const name = book.get('corporationName');
-  const effective = rec.agreedRatePct ?? rec.requestedRatePct ?? null;
+  // Only an agreed rate is in effect; a request alone never is (#6209).
+  const effective = effectiveOwnerRatePct(deriveOwnerRateHistory(rec), utcDate(deps.now())) ?? null;
   const last = rec.lastSyncResult;
   return {
     status: 'feeder',

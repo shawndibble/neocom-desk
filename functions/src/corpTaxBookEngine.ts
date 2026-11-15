@@ -568,7 +568,8 @@ export interface OwnerRateEntry {
   recordedAt: string;
 }
 
-function latestOwnerRate(
+/** The entry of one kind in effect on `date`: latest effective-from on or before it, then latest recorded. */
+export function latestOwnerRate(
   history: readonly OwnerRateEntry[],
   kind: OwnerRateEntry['kind'],
   date: string
@@ -586,14 +587,33 @@ function latestOwnerRate(
   return best;
 }
 
-/** Engine `effectiveOwnerRate`, pct only: the agreed rate on `date` if any, else the requested. */
+function firstAgreedOwnerRate(history: readonly OwnerRateEntry[]): OwnerRateEntry | undefined {
+  let first: OwnerRateEntry | undefined;
+  for (const entry of history) {
+    if (entry.kind !== 'agreed') continue;
+    if (
+      !first ||
+      entry.effectiveFrom < first.effectiveFrom ||
+      (entry.effectiveFrom === first.effectiveFrom && entry.recordedAt < first.recordedAt)
+    )
+      first = entry;
+  }
+  return first;
+}
+
+/**
+ * Engine `effectiveOwnerRate`, pct only: the agreed rate on `date`, else the first agreed rate
+ * (backdated over the pending days). A requested rate never takes effect (#6209).
+ */
 export function effectiveOwnerRatePct(
   history: readonly OwnerRateEntry[],
   date: string
 ): number | undefined {
-  return (latestOwnerRate(history, 'agreed', date) ?? latestOwnerRate(history, 'requested', date))
-    ?.pct;
+  return (latestOwnerRate(history, 'agreed', date) ?? firstAgreedOwnerRate(history))?.pct;
 }
+
+/** Engine `FEEDER_VIEW_RULES`: the accrual rules a moon owner view summary is built under (#6209). */
+export const FEEDER_VIEW_RULES = 2;
 
 /** Engine `FeederMode`. */
 export type FeederMode = 'normal' | 'settled-otherwise';
@@ -625,16 +645,24 @@ export function accrueValuedDays(
     modeChanges: readonly FeederModeChange[];
     isBillable: (day: string) => boolean;
   }
-): { byDay: { date: string; value: number; pct: number; due: number }[]; accrued: number } {
+): {
+  byDay: { date: string; value: number; pct: number; due: number }[];
+  accrued: number;
+  pending: { date: string; value: number }[];
+} {
   const byDay: { date: string; value: number; pct: number; due: number }[] = [];
+  const pending: { date: string; value: number }[] = [];
   for (const { date, value } of [...days].sort((x, y) => x.date.localeCompare(y.date))) {
     if (!isDayCovered(rules.coveragePeriods, date) || !rules.isBillable(date)) continue;
     if (isSettledOn(rules.modeChanges, date)) continue;
     const pct = effectiveOwnerRatePct(rules.ownerRateHistory, date);
-    if (pct === undefined) continue;
+    if (pct === undefined) {
+      pending.push({ date, value });
+      continue;
+    }
     byDay.push({ date, value, pct, due: (value * pct) / 100 });
   }
-  return { byDay, accrued: byDay.reduce((sum, d) => sum + d.due, 0) };
+  return { byDay, accrued: byDay.reduce((sum, d) => sum + d.due, 0), pending };
 }
 
 /** Engine `feederBalance`. */
@@ -645,11 +673,14 @@ export function feederBalance(
 ) {
   const kindOf = (isk: number, balance: number): 'owed' | 'credit' | 'even' =>
     isk === 0 ? 'even' : balance > 0 ? 'owed' : 'credit';
-  if (settledOtherwise) return { balance: 0, display: { kind: 'none' as const, isk: 0 } };
   const paid = payouts.reduce((sum, p) => (p.notAPayout ? sum : sum + p.amount), 0);
   const balance = accrued - paid;
   const isk = Math.floor(Math.abs(balance));
-  return { balance, display: { kind: kindOf(isk, balance), isk } };
+  const kind = kindOf(isk, balance);
+  // Settled otherwise keeps what accrued before it owed (#6209); with nothing owed, no balance.
+  if (settledOtherwise && kind !== 'owed')
+    return { balance, display: { kind: 'none' as const, isk: 0 } };
+  return { balance, display: { kind, isk } };
 }
 
 /** Engine `onPayList`. */
@@ -663,6 +694,10 @@ export interface FeederPayout extends FeederPayoutAmount {
   method: 'donation' | 'other';
   status: 'recorded' | 'waiting-for-journal' | 'matched';
   journalRef?: number;
+  /** A donation without the payout reference, waiting for an officer to confirm it (#6209). */
+  unconfirmed?: boolean;
+  /** When the moon owner flagged the payment as disputed (ms). */
+  disputedAt?: number;
 }
 
 // --- Feeder view (#4512) -------------------------------------------------------
@@ -714,12 +749,14 @@ export function deriveModeChanges(record: FeederRulesRecord): FeederModeChange[]
     : [];
 }
 
-/** Engine `moonOwnerUnitPrice` (#4621): saved open buy, else open sell, else 0. */
+/** Engine `moonOwnerUnitPrice` (#4621): saved open buy, else open sell, else the billed price (#6209), else 0. */
 export function moonOwnerUnitPrice(
-  side: { buy?: number | null; sell?: number | null } | undefined
+  side: { buy?: number | null; sell?: number | null } | undefined,
+  billed?: number
 ): number {
   if (side?.buy != null && side.buy > 0) return side.buy;
   if (side?.sell != null && side.sell > 0) return side.sell;
+  if (billed !== undefined && billed > 0) return billed;
   return 0;
 }
 
@@ -1007,9 +1044,17 @@ export interface OwnerOutgoing {
 
 const dayGap = (date: string, at: string) => Math.abs(dayIndex(date) - dayIndex(at));
 
+/** Engine `PAYOUT_REASON_PREFIX`: the reason text that marks a donation as a payout (#6209). */
+export const PAYOUT_REASON_PREFIX = 'Moon mining payout';
+
+/** Engine `carriesPayoutReference`. */
+export const carriesPayoutReference = (reason: string | undefined): boolean =>
+  reason !== undefined && reason.toLowerCase().includes(PAYOUT_REASON_PREFIX.toLowerCase());
+
 /**
  * Attach each outgoing donation to the recorded payout with the same amount, date (within the
- * window) and recipient; a donation with no such record is recorded as a payout. One pass over
+ * window) and recipient. A donation with no such record is recorded as a payout when its reason
+ * carries the payout reference, else as not a payout and `unconfirmed` (#6209). One pass over
  * the whole book: a journal entry counts once across every moon owner, and a donation whose
  * recipient is the payee of more than one moon owner is never auto-recorded (an officer adds it
  * by hand). Only a donation payout takes a journal donation.
@@ -1064,6 +1109,7 @@ export function reconcileBookOutgoing(input: {
     const i = owners[0]!;
     const date = d.at.slice(0, 10);
     if (date < input.owners[i]!.since) continue;
+    const referenced = carriesPayoutReference(d.reason);
     results[i]!.create.push({
       id: payoutId(d),
       payout: {
@@ -1072,7 +1118,8 @@ export function reconcileBookOutgoing(input: {
         method: 'donation',
         status: 'matched',
         journalRef: d.refId,
-        notAPayout: false,
+        notAPayout: !referenced,
+        ...(referenced ? {} : { unconfirmed: true }),
       },
     });
   }
@@ -1096,7 +1143,7 @@ export function payoutToMerge(
       (p) =>
         AUTO_RECORDED.test(p.id) &&
         p.journalRef !== undefined &&
-        !p.notAPayout &&
+        (!p.notAPayout || p.unconfirmed === true) &&
         p.confirmedAt === undefined &&
         p.method === 'donation' &&
         p.amount === recorded.amount &&

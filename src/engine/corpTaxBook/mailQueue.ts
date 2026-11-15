@@ -19,8 +19,8 @@ export const OFFLINE_RETRY_MS = 30_000;
 const MAX_RATE_LIMIT_WAIT_MS = 10 * MINUTE_MS;
 
 /**
- * `rate-change` (#4515), `removal`/`removalCancelled` (#4520) and `payee-change` (#4653) are moon
- * owner mails, not Statements. `srp-result` (an officer telling a pilot an SRP claim was decided)
+ * `rate-change` (#4515), `removal`/`removalCancelled` (#4520), `payee-change` (#4653) and
+ * `mode-change` (settled otherwise on or off, #6209) are moon owner mails, not Statements. `srp-result` (an officer telling a pilot an SRP claim was decided)
  * and `vetting-result` (a reviewer telling a pilot how their vetting review was decided) belong to
  * no Corp Tax Book at all: they only ride the same paced queue.
  */
@@ -29,6 +29,7 @@ export type MailKind =
   | 'reminder'
   | 'rate-change'
   | 'payee-change'
+  | 'mode-change'
   | 'removal'
   | 'removalCancelled'
   | 'srp-result'

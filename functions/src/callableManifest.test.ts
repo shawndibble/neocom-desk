@@ -68,6 +68,7 @@ const WIRE_NAMES = [
   'corpTaxBook:recordCorpTaxBookFeederPayoutCallable',
   'corpTaxBook:markCorpTaxBookFeederPayoutCallable',
   'corpTaxBook:reconcileCorpTaxBookFeederPayoutsCallable',
+  'corpTaxBook:disputeCorpTaxBookFeederPayoutCallable',
   'corpTaxBook:listCorpTaxBookFeederInvitesCallable',
   'corpTaxBook:revokeCorpTaxBookSyncGrantCallable',
   'corpTaxBook:verifyCorpOfficerCallable',

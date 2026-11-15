@@ -88,10 +88,11 @@ function OwedLine({
   onPay: ((row: MoonOwnerRow) => void) | undefined;
 }) {
   const { t } = useTranslation();
-  if (r.mode === 'settled-otherwise')
+  // Settled otherwise still shows what was owed before the switch (#6209).
+  if (r.mode === 'settled-otherwise' && r.owed === 0)
     return <p className="pt-1 text-xs text-text-dim">{t(k('settled'))}</p>;
-  if (r.theirRatePct === undefined)
-    return <p className="pt-1 text-xs text-text-dim">{t(k('nothingDue'))}</p>;
+  if (r.theirRatePct === undefined && r.owed === 0)
+    return <p className="pt-1 text-xs text-text-dim">{t(k('waitsForRate'))}</p>;
   return (
     <div className="flex items-center justify-between gap-3 pt-1">
       <p className="min-w-0">
