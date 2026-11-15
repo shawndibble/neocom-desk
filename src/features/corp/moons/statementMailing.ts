@@ -52,7 +52,8 @@ export function mailTarget(
     periodLabel: periodLabel(statement.periodStart, statement.periodEnd),
     code: statement.code,
     // The wallet divisions the book reads: a donation into another one is never credited (#6204).
-    ...(ctx.settings
+    // An older settings doc (or a fixture) may carry none: then the mail names none.
+    ...(ctx.settings?.divisions?.length
       ? {
           accounts: corpPayAccounts(ctx.settings.divisions, ctx.settings.divisionNames, i18n.t),
         }
