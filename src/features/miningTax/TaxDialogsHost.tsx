@@ -120,6 +120,8 @@ export interface TaxDialogsHostProps {
   paymentSources: readonly MadePaymentSources[];
   linkSuggestions: ReturnType<typeof useLinkSuggestions>;
   corpView: CorpBookView | null;
+  /** Something reached a Corp Tax Book (a declaration or a dispute, #6206): read the books again. */
+  reloadCorpBooks: () => void;
   corpStateHint: ReturnType<typeof useCorpStateHint>;
   dismissTargets: DisplayRow[];
   showCharacterColumn: boolean;
@@ -166,6 +168,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     paymentSources,
     linkSuggestions,
     corpView,
+    reloadCorpBooks,
     corpStateHint,
     dismissTargets,
     showCharacterColumn,
@@ -701,6 +704,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             })
           }
           onUnmarkPaid={() => unmarkCorpPayment(corpDetail.view.markedPaidIds)}
+          onBookChanged={reloadCorpBooks}
           notice={
             (corpDetail.view.overlap || corpDetail.view.state === 'conflict') && (
               <CorpOverlapNotice
@@ -714,6 +718,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 payeeById={payeeById}
                 typeNames={typeNames}
                 onChanged={refresh}
+                onBookChanged={reloadCorpBooks}
               />
             )
           }

@@ -6,6 +6,7 @@ import '@/i18n';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
 import type { TabsProjection } from '@/engine/corpTaxBook/readModels';
 import type { UncountedDonation } from '@/engine/corpTaxBook/uncounted';
+import type { OreDispute } from '@/engine/corpTaxBook/disputes';
 import { BookProvider } from './BookContext';
 import { NeedsYouQueue } from './NeedsYouQueue';
 import type { BookContextValue } from './bookContextValue';
@@ -14,6 +15,13 @@ vi.mock('../taxBook/bookClient', () => ({ editBook: vi.fn(async () => ({})), rea
 vi.mock('./statementMailing', () => ({
   mailTarget: vi.fn(),
   useCorporationName: () => 'Brass Anvil Corp',
+}));
+// The record dialog previews against a whole book; here only the amount it opens with matters.
+vi.mock('./BookDialogs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./BookDialogs')>()),
+  RecordPaymentDialog: ({ defaultAmount }: { defaultAmount: number }) => (
+    <p>Record payment: {defaultAmount}</p>
+  ),
 }));
 const projection = vi.hoisted(() => ({ value: { miners: [], needsYou: [] } as unknown }));
 vi.mock('./useTabsProjection', () => ({ useTabsProjection: () => projection.value }));
@@ -50,6 +58,7 @@ function renderQueue(
     uncounted = [] as UncountedDonation[],
     divisions = [1],
     view = undefined as unknown,
+    disputes = [] as OreDispute[],
   } = {}
 ) {
   projection.value = { miners, needsYou } as unknown as TabsProjection;
@@ -63,10 +72,16 @@ function renderQueue(
             view: view ?? {
               input: {
                 statements: [{ id: 's1', periodStart: '2026-09-01', periodEnd: '2026-09-30' }],
+                dismissals: [],
               },
+              charges: [{ key: '7:1000:2026-09-05', taxOwed: 1_200_000 }],
             },
-            names: { character: (id: number) => `Pilot ${id}`, refinery: () => 'Refinery' },
-            data: { uncounted },
+            names: {
+              character: (id: number) => `Pilot ${id}`,
+              refinery: () => 'Refinery',
+              ore: () => 'Zeolites',
+            },
+            data: { uncounted, disputes },
             settings: { divisions, divisionNames: {} },
             verdict: { canEdit: true },
             reload: vi.fn(),
@@ -138,6 +153,97 @@ describe('NeedsYouQueue (#6207)', () => {
       },
     ]);
     expect(screen.getByText(/owed no tax then/)).toBeInTheDocument();
+  });
+
+  const dispute: OreDispute = {
+    id: 'solo_7_2026-09-05',
+    minerId: 'solo:7',
+    date: '2026-09-05',
+    lines: [
+      { recordKey: '7:1000:2026-09-05', typeId: 45490, quantity: 1200, payeeName: 'Rival Corp' },
+    ],
+    by: 7,
+    at: '2026-09-20T00:00:00.000Z',
+  };
+
+  it('lists a Miner’s dispute with the day, ore and their Payee, and dismisses the day (#6206)', async () => {
+    renderQueue([], { disputes: [dispute] });
+    expect(screen.getByText(/^Pilot 7 says .*'s ore went to Rival Corp$/)).toBeInTheDocument();
+    expect(screen.getByText(/1,200 Zeolites to Rival Corp/)).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Dismiss the day' }));
+    await user.type(screen.getByRole('textbox'), 'Their ore');
+    await user.click(screen.getAllByRole('button', { name: 'Dismiss the day' }).at(-1)!);
+    expect(editBook).toHaveBeenCalledWith(9, 98000001, {
+      action: 'dismissRecords',
+      targets: [{ targetId: '7:1000:2026-09-05', amountIsk: 1_200_000 }],
+      reason: 'Their ore',
+    });
+  });
+
+  it('rejects a dispute with a note (#6206)', async () => {
+    renderQueue([], { disputes: [dispute] });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Reject' }));
+    await user.type(screen.getByRole('textbox'), 'Our moon');
+    await user.click(screen.getAllByRole('button', { name: 'Reject' }).at(-1)!);
+    expect(editBook).toHaveBeenCalledWith(9, 98000001, {
+      action: 'rejectDispute',
+      disputeId: 'solo_7_2026-09-05',
+      reason: 'Our moon',
+    });
+  });
+
+  it('drops a dispute an officer already answered (#6206)', () => {
+    renderQueue([], {
+      disputes: [
+        {
+          ...dispute,
+          resolution: { kind: 'rejected', at: '2026-09-21T00:00:00Z', by: 9, reason: 'x' },
+        },
+      ],
+    });
+    expect(screen.queryByText(/went to Rival Corp/)).not.toBeInTheDocument();
+  });
+
+  it('shows what a Miner declared, amount and note (#6206)', () => {
+    renderQueue([
+      {
+        kind: 'declaration',
+        minerId: 'solo:7',
+        owed: 5_000_000,
+        declaration: {
+          id: 'x1',
+          statementId: 's1',
+          kind: 'another-way',
+          at: '2026-09-20T00:00:00Z',
+          amount: 4_000_000,
+          note: 'by contract',
+        },
+      },
+    ]);
+    expect(
+      screen.getByText(/paid by another way.*They say they paid 4,000,000\. “by contract”/)
+    ).toBeInTheDocument();
+  });
+
+  it('confirm pre-fills the amount the Miner declared (#6206)', async () => {
+    renderQueue([
+      {
+        kind: 'declaration',
+        minerId: 'solo:7',
+        owed: 5_000_000,
+        declaration: {
+          id: 'x1',
+          statementId: 's1',
+          kind: 'another-way',
+          at: '2026-09-20T00:00:00Z',
+          amount: 4_000_000,
+        },
+      },
+    ]);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Confirm paid' }));
+    expect(await screen.findByText('Record payment: 4000000')).toBeInTheDocument();
   });
 });
 

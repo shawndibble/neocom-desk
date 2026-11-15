@@ -9,6 +9,9 @@ import {
   isCacheFresh,
   moveStartRate,
   parseClaimPaymentInput,
+  parseDeclareOwnInput,
+  parseDisputeConflictInput,
+  disputeIdFor,
   needsLiveCheck,
   parseEditAction,
   parseSettingsPatch,
@@ -208,6 +211,83 @@ describe('parsers', () => {
     });
     expect(() => parseClaimPaymentInput({ corporationId: 9, paymentId: '../x' })).toThrow();
     expect(() => parseClaimPaymentInput({ corporationId: 0, paymentId: 'a' })).toThrow();
+  });
+
+  it('parses a Miner declaring their own Statement paid: amount and note optional (#6206)', () => {
+    expect(parseDeclareOwnInput({ corporationId: 9, statementId: 's1' })).toEqual({
+      corporationId: 9,
+      statementId: 's1',
+    });
+    expect(
+      parseDeclareOwnInput({
+        corporationId: 9,
+        statementId: 's1',
+        amount: 1500000,
+        note: ' sent by contract ',
+      })
+    ).toEqual({ corporationId: 9, statementId: 's1', amount: 1500000, note: 'sent by contract' });
+    expect(() => parseDeclareOwnInput({ corporationId: 9, statementId: '../x' })).toThrow();
+    expect(() =>
+      parseDeclareOwnInput({ corporationId: 9, statementId: 's1', amount: 0 })
+    ).toThrow();
+    expect(() =>
+      parseDeclareOwnInput({ corporationId: 9, statementId: 's1', note: 'x'.repeat(501) })
+    ).toThrow();
+  });
+
+  it('parses a Conflict dispute: one day, its own record keys, the Payee named (#6206)', () => {
+    const line = {
+      recordKey: '7:1000:2026-11-01',
+      typeId: 45490,
+      quantity: 1200,
+      payeeName: 'Rival Corp',
+    };
+    expect(
+      parseDisputeConflictInput({ corporationId: 9, date: '2026-11-01', lines: [line] })
+    ).toEqual({
+      corporationId: 9,
+      date: '2026-11-01',
+      lines: [line],
+    });
+    // A line from another day is not this day's dispute.
+    expect(() =>
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-02',
+        lines: [line],
+      })
+    ).toThrow();
+    expect(() =>
+      parseDisputeConflictInput({ corporationId: 9, date: '2026-11-01', lines: [] })
+    ).toThrow();
+    expect(() =>
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-01',
+        lines: [{ ...line, quantity: -1 }],
+      })
+    ).toThrow();
+    expect(() =>
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-01',
+        lines: [{ ...line, payeeName: '' }],
+      })
+    ).toThrow();
+  });
+
+  it('names one dispute per Miner and day, a safe doc id (#6206)', () => {
+    expect(disputeIdFor('solo:7', '2026-11-01')).toBe('solo_7_2026-11-01');
+    expect(disputeIdFor('m1', '2026-11-01')).toBe('m1_2026-11-01');
+  });
+
+  it('parses an officer rejecting a dispute: a reason is required (#6206)', () => {
+    expect(
+      parseEditAction({ action: 'rejectDispute', disputeId: 'm1_2026-11-01', reason: 'Our ore' })
+    ).toEqual({ action: 'rejectDispute', disputeId: 'm1_2026-11-01', reason: 'Our ore' });
+    expect(() =>
+      parseEditAction({ action: 'rejectDispute', disputeId: 'm1_2026-11-01', reason: '' })
+    ).toThrow();
   });
 
   it('accepts only a 43-character url-safe token', () => {

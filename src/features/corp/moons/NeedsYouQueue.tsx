@@ -5,7 +5,9 @@ import { Button, Panel, plainTextActionClassName } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
 import type { UncountedDonation } from '@/engine/corpTaxBook/uncounted';
+import type { OreDispute } from '@/engine/corpTaxBook/disputes';
 import { cx } from '@/lib/cx';
+import { formatCount } from '@/lib/formatCount';
 import { useBook } from './useBook';
 import { useTabsProjection } from './useTabsProjection';
 import { useNeedsYou } from './useNeedsYou';
@@ -69,6 +71,8 @@ type Open =
   | { kind: 'assign'; item: Extract<NeedsYouItem, { kind: 'unmatched' }> }
   | { kind: 'notTax'; item: Extract<NeedsYouItem, { kind: 'unmatched' }> }
   | { kind: 'writeOff'; item: Extract<NeedsYouItem, { kind: 'leaver' }>; miner: MinerRow }
+  | { kind: 'disputeDismiss'; dispute: OreDispute }
+  | { kind: 'disputeReject'; dispute: OreDispute }
   | null;
 
 /** "Needs you": the few things only an officer can answer, a panel of the Overview. */
@@ -77,7 +81,7 @@ export function NeedsYouQueue() {
   const ctx = useBook();
   const { view, names, edit, canEdit, characterId, corporationId, settings } = ctx;
   const { miners } = useTabsProjection();
-  const { needsYou, uncounted, runDue, count } = useNeedsYou();
+  const { needsYou, uncounted, disputes, runDue, count } = useNeedsYou();
   const [open, setOpen] = useState<Open>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const close = () => setOpen(null);
@@ -183,10 +187,22 @@ export function NeedsYouQueue() {
                       })}
                     </MinerTitle>
                   }
-                  body={t('corpTaxBook.moons.needs.declaration.body', {
-                    kind: t(`corpTaxBook.moons.needs.declaration.kind.${item.declaration.kind}`),
-                    date: shortDate(item.declaration.at),
-                  })}
+                  body={[
+                    t('corpTaxBook.moons.needs.declaration.body', {
+                      kind: t(`corpTaxBook.moons.needs.declaration.kind.${item.declaration.kind}`),
+                      date: shortDate(item.declaration.at),
+                    }),
+                    item.declaration.amount !== undefined &&
+                      t('corpTaxBook.moons.needs.declaration.declared', {
+                        amount: isk(item.declaration.amount),
+                      }),
+                    item.declaration.note &&
+                      t('corpTaxBook.moons.needs.declaration.note', {
+                        note: item.declaration.note,
+                      }),
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                   actions={
                     canEdit ? (
                       <>
@@ -336,6 +352,53 @@ export function NeedsYouQueue() {
             }
           }
         })}
+        {disputes.map((d) => (
+          <QueueCard
+            key={`p-${d.id}`}
+            tone="warning"
+            title={
+              <MinerTitle minerId={miners.some((m) => m.id === d.minerId) ? d.minerId : undefined}>
+                {t('corpTaxBook.moons.needs.dispute.title', {
+                  name: names.character(d.by),
+                  date: shortDate(d.date),
+                  payee: [...new Set(d.lines.map((l) => l.payeeName))].join(', '),
+                })}
+              </MinerTitle>
+            }
+            body={[
+              t('corpTaxBook.moons.needs.dispute.body', {
+                ore: d.lines
+                  .map((l) =>
+                    t('corpTaxBook.moons.needs.dispute.line', {
+                      quantity: formatCount(l.quantity),
+                      ore: names.ore(l.typeId),
+                      payee: l.payeeName,
+                    })
+                  )
+                  .join('; '),
+              }),
+              d.note && t('corpTaxBook.moons.needs.declaration.note', { note: d.note }),
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            actions={
+              canEdit ? (
+                <>
+                  <Button size="sm" onClick={() => setOpen({ kind: 'disputeDismiss', dispute: d })}>
+                    {t('corpTaxBook.moons.needs.dispute.dismiss')}
+                  </Button>
+                  <button
+                    type="button"
+                    className={secondaryActionClassName}
+                    onClick={() => setOpen({ kind: 'disputeReject', dispute: d })}
+                  >
+                    {t('corpTaxBook.moons.needs.dispute.reject')}
+                  </button>
+                </>
+              ) : null
+            }
+          />
+        ))}
         {uncounted.map((u) => (
           <QueueCard
             key={`x-${u.id}`}
@@ -382,7 +445,8 @@ export function NeedsYouQueue() {
           onClose={close}
           miner={open.miner}
           minerName={names.character(open.miner.mainCharacterId)}
-          defaultAmount={open.item.owed}
+          // The amount the Miner declared, when they gave one (#6206).
+          defaultAmount={open.item.declaration.amount ?? open.item.owed}
           onRecorded={async () => {
             await edit({
               action: 'resolveDeclaration',
@@ -410,6 +474,47 @@ export function NeedsYouQueue() {
               resolution: 'rejected',
               reason,
             });
+          }}
+        />
+      )}
+      {open?.kind === 'disputeDismiss' && (
+        <ReasonDialog
+          open
+          onClose={close}
+          title={t('corpTaxBook.moons.dialogs.dispute.dismissTitle', {
+            name: names.character(open.dispute.by),
+            date: shortDate(open.dispute.date),
+          })}
+          intro={t('corpTaxBook.moons.dialogs.dispute.dismissIntro')}
+          reasonLabel={t('corpTaxBook.moons.dialogs.reasonShown')}
+          confirmLabel={t('corpTaxBook.moons.needs.dispute.dismiss')}
+          run={async (reason) => {
+            // The day's records the dispute names, as one act (the Director limit sees the total).
+            const keys = [...new Set(open.dispute.lines.map((l) => l.recordKey))];
+            await edit({
+              action: 'dismissRecords',
+              targets: keys.map((key) => ({
+                targetId: key,
+                amountIsk: view.charges.find((c) => c.key === key)?.taxOwed ?? 0,
+              })),
+              reason,
+            });
+          }}
+        />
+      )}
+      {open?.kind === 'disputeReject' && (
+        <ReasonDialog
+          open
+          onClose={close}
+          title={t('corpTaxBook.moons.dialogs.dispute.rejectTitle', {
+            name: names.character(open.dispute.by),
+            date: shortDate(open.dispute.date),
+          })}
+          intro={t('corpTaxBook.moons.dialogs.dispute.rejectIntro')}
+          reasonLabel={t('corpTaxBook.moons.dialogs.reject.reason')}
+          confirmLabel={t('corpTaxBook.moons.needs.dispute.reject')}
+          run={async (reason) => {
+            await edit({ action: 'rejectDispute', disputeId: open.dispute.id, reason });
           }}
         />
       )}

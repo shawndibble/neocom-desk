@@ -588,6 +588,18 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // A Miner's declarations ("I paid this another way") and Conflict disputes (#6206): the Miner
+      // sees each one's answer. A declaration written before #6206 has no `uids`: officers only.
+      match /declarations/{declarationId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      match /disputes/{disputeId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
       // Each moon owner's coverage periods and read clock (issue #4622), server-written: the
       // miners this book bills (their `corpTaxBookBilledBy` pointer names it) read it to hold
       // the same days back the book does. No payee, rates, notes or names.
@@ -602,7 +614,7 @@ service cloud.firestore {
       }
 
       match /{officerOnly}/{docId} {
-        allow get, list: if officerOnly in ['extractions', 'declarations', 'rebills', 'meta', 'audit', 'feeders', 'minerTotals', 'moonDocs', 'readModels']
+        allow get, list: if officerOnly in ['extractions', 'rebills', 'meta', 'audit', 'feeders', 'minerTotals', 'moonDocs', 'readModels']
           && isOfficer();
         allow write: if false;
       }

@@ -46,6 +46,8 @@ export const EXTRACTIONS = 'extractions';
 export const PAYMENTS = 'payments';
 export const DISMISSALS = 'dismissals';
 export const DECLARATIONS = 'declarations';
+/** `disputes/{minerId_date}`: a Miner says a Conflict day's ore went to another Payee (#6206). */
+export const DISPUTES = 'disputes';
 export const ADJUSTMENTS = 'adjustments';
 export const WRITE_OFFS = 'writeOffs';
 export const REBILLS = 'rebills';
@@ -529,6 +531,7 @@ export type EditAction =
       kind: 'contract' | 'other-division' | 'wrong-corp';
       note?: string;
     }
+  | { action: 'rejectDispute'; disputeId: string; reason: string }
   | {
       action: 'resolveDeclaration';
       declarationId: string;
@@ -619,6 +622,7 @@ export function parseEditAction(data: unknown): EditAction {
     'settleStatements',
     'declare',
     'resolveDeclaration',
+    'rejectDispute',
     'recordReminder',
     'recordMail',
   ] as const);
@@ -792,6 +796,8 @@ export function parseEditAction(data: unknown): EditAction {
         reason: resolution === 'rejected' ? reason(d.reason) : optNote(d.reason),
       };
     }
+    case 'rejectDispute':
+      return { action, disputeId: docId(d.disputeId, 'disputeId'), reason: reason(d.reason) };
     case 'recordReminder':
       return { action, statementId: docId(d.statementId, 'statementId') };
     case 'recordMail':
@@ -1082,6 +1088,75 @@ export function parseDeclineByTokenInput(data: unknown): { token: string; charac
   if (typeof characterId !== 'number' || !Number.isSafeInteger(characterId) || characterId <= 0)
     throw new HttpsError('invalid-argument', 'characterId must be a positive integer');
   return { token: parseToken(data), characterId };
+}
+
+/** A Miner's own "I paid this another way" on one of their Statements (#6206). */
+export interface DeclareOwnInput {
+  corporationId: number;
+  statementId: string;
+  /** What they say they paid; absent when they did not say. */
+  amount?: number;
+  note?: string;
+}
+
+export function parseDeclareOwnInput(data: unknown): DeclareOwnInput {
+  const d = record(data);
+  const note = optNote(d.note);
+  return {
+    corporationId: parseBookCall(data).corporationId,
+    statementId: docId(d.statementId, 'statementId'),
+    ...(d.amount !== undefined ? { amount: money(d.amount, 'amount') } : {}),
+    ...(note !== undefined ? { note } : {}),
+  };
+}
+
+/** One ore line of a disputed Conflict day: the record, the ore, and the Payee the Miner gave it to. */
+export interface DisputeLine {
+  recordKey: string;
+  typeId: number;
+  quantity: number;
+  payeeName: string;
+}
+
+/** A Miner's "I gave this ore to {payee}" on a Conflict day (#6206). */
+export interface DisputeConflictInput {
+  corporationId: number;
+  date: string;
+  lines: DisputeLine[];
+  note?: string;
+}
+
+/** The most ore lines one disputed day carries: a day's ore types across a Miner's characters. */
+export const DISPUTE_LINES_MAX = 100;
+
+export function parseDisputeConflictInput(data: unknown): DisputeConflictInput {
+  const d = record(data);
+  const date = dateString(d.date, 'date');
+  const raw = list(d.lines, 'lines', DISPUTE_LINES_MAX);
+  if (raw.length === 0) throw new HttpsError('invalid-argument', 'lines must not be empty');
+  const lines = raw.map((x) => {
+    const l = record(x);
+    const key = parseRecordKey(l.recordKey);
+    if (key.date !== date) throw new HttpsError('invalid-argument', 'Every line must be that day');
+    return {
+      recordKey: key.key,
+      typeId: int(l.typeId, 'typeId'),
+      quantity: int(l.quantity, 'quantity'),
+      payeeName: boundedString(l.payeeName, 'payeeName', 100),
+    };
+  });
+  const note = optNote(d.note);
+  return {
+    corporationId: parseBookCall(data).corporationId,
+    date,
+    lines,
+    ...(note !== undefined ? { note } : {}),
+  };
+}
+
+/** One dispute per Miner and day: `solo:7` has a colon, which a doc id avoids. */
+export function disputeIdFor(minerId: string, date: string): string {
+  return `${minerId.replace(/[^A-Za-z0-9_-]/g, '_')}_${date}`;
 }
 
 /** A player claims one of their own Unmatched donations (D5). */

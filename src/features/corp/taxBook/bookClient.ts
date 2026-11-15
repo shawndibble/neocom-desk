@@ -39,6 +39,7 @@ import {
 } from '@/engine/corpTaxBook/sync';
 import { scheduledSyncFrom, type ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import { readUncounted, type UncountedDonation } from '@/engine/corpTaxBook/uncounted';
+import { readDisputes, type OreDispute } from '@/engine/corpTaxBook/disputes';
 import type {
   FeederMode,
   FeederModeChange,
@@ -384,7 +385,9 @@ async function openBook(characterId: number, corporationId: number) {
       undefined,
       false // its own Dexie copy (ADR 0031)
     );
-  return { db, data, part, read, list, observed, paidStatementIds };
+  // A collection the stamps never name was never written (every server write stamps it): no read.
+  const written = (name: string) => versions === null || versions.collections[name] !== undefined;
+  return { db, data, part, read, list, observed, paidStatementIds, written };
 }
 
 /** The book's settings and the collections the sync needs. Officer-only: verify first. */
@@ -580,6 +583,8 @@ export interface BookData {
   scheduledSync?: ScheduledSyncStatus | null;
   /** #6207: donations a sync noted in divisions the book does not read (`meta/uncounted`). */
   uncounted?: UncountedDonation[];
+  /** #6206: Miners' Conflict disputes (`disputes`), answered or not. Read with the ledger. */
+  disputes?: OreDispute[];
   /** Which slices this read covered (bookParts.ts); the rest are empty. Absent: the whole book. */
   parts?: BookPartSet;
   /** The Overview and Miners tab docs (ADR 0032); absent until the server has built them. */
@@ -678,7 +683,7 @@ export async function readBookData(
   const [
     [miners, statements, extractions, scheduled, feederRows, uncountedDoc],
     observed,
-    [payments, dismissals, declarations, adjustments, writeOffs],
+    [payments, dismissals, declarations, adjustments, writeOffs, disputes],
     answers,
     paidStatementIds,
     readModels,
@@ -707,8 +712,12 @@ export async function readBookData(
           list<BookDeclaration>('declarations'),
           list<Adjustment>('adjustments'),
           list<RecordedWriteOff>('writeOffs'),
+          // #6206: best effort, so a book whose rules predate disputes still opens.
+          book.written('disputes')
+            ? list<unknown>('disputes').catch(() => [] as unknown[])
+            : Promise.resolve([] as unknown[]),
         ] as const),
-      [none, none, none, none, none] as const
+      [none, none, none, none, none, none] as const
     ),
     slice(
       'answers',
@@ -759,6 +768,7 @@ export async function readBookData(
     groupingAnswers: groupingAnswersFrom(answers),
     scheduledSync: scheduledSyncFrom(scheduled),
     uncounted: readUncounted(uncountedDoc).donations,
+    disputes: readDisputes(disputes),
     parts,
     ...(readModels ? { readModels } : {}),
     ...(feederSummaries ? { feederSummaries } : {}),
@@ -1093,6 +1103,7 @@ export function mergeBookData(held: BookData, extra: BookData): BookData {
     scheduledSync: pick('core', held.scheduledSync, extra.scheduledSync),
     uncounted: pick('core', held.uncounted, extra.uncounted),
     declarations: pick('ledger', held.declarations, extra.declarations),
+    disputes: pick('ledger', held.disputes, extra.disputes),
     adjustments: pick('ledger', held.adjustments, extra.adjustments),
     groupingAnswers: pick('answers', held.groupingAnswers, extra.groupingAnswers),
     parts,

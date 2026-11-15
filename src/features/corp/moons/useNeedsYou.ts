@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { planStatementRuns, type BookView, type PlannedRun } from '@/engine/corpTaxBook/bookView';
 import { uncountedToShow } from '@/engine/corpTaxBook/uncounted';
+import { disputesToShow } from '@/engine/corpTaxBook/disputes';
 import { useBook } from './useBook';
 import { useTabsProjection } from './useTabsProjection';
 
@@ -22,6 +23,7 @@ export function plannedRuns(view: BookView): PlannedRun[] {
 /**
  * Everything the Overview's "Needs you" lists, and how many cards that is: the
  * book's own items, tax noted in a division the book does not read (#6207),
+ * a Miner's dispute of a Conflict day until it is dismissed or rejected (#6206),
  * and one card when a Statement run is due (#6208). The panel and the Moons nav
  * dot read the same count.
  */
@@ -32,11 +34,17 @@ export function useNeedsYou() {
     () => uncountedToShow({ donations: data.uncounted ?? [] }, settings.divisions),
     [data.uncounted, settings.divisions]
   );
+  const disputes = useMemo(
+    () => disputesToShow(data.disputes ?? [], view.input.dismissals),
+    [data.disputes, view.input.dismissals]
+  );
   const runDue = useMemo(() => plannedRuns(view).map((run) => run.plan.period), [view]);
   return {
     needsYou,
     uncounted,
+    disputes,
     runDue,
-    count: needsYou.length + uncounted.length + (runDue.length > 0 ? 1 : 0),
+    count:
+      needsYou.length + uncounted.length + disputes.length + (runDue.length > 0 ? 1 : 0),
   };
 }
