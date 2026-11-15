@@ -9,7 +9,6 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useAuthFailure } from '@/stores/authFailure';
 import { renderIndustryRoutes } from '@/test/industryRoutes';
-import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import {
   SYNCED_BUILD_GROUPS_KEY,
@@ -138,7 +137,6 @@ afterAll(() => server.close());
 
 afterEach(() => {
   server.resetHandlers();
-  clearMarketPriceCache();
   clearCostIndexCache();
 });
 async function resetSession() {
@@ -182,7 +180,6 @@ beforeAll(async () => {
   await screen.findByRole('link', { name: /Rifter run/ }, { timeout: 25_000 });
   unmount();
   server.resetHandlers();
-  clearMarketPriceCache();
   clearCostIndexCache();
 }, 30_000);
 

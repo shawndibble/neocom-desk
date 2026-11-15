@@ -8,7 +8,6 @@ import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import type { RegionOrder } from '@/esi/endpoints';
 import { db } from '@/db';
 import { clearOrderBookCache } from './orderBook';
-import { clearMarketPriceCache } from '@/market/prices';
 import {
   loadStationBestPrices,
   invalidateStationBestPrices,
@@ -20,7 +19,6 @@ const server = mswServer();
 
 afterEach(() => {
   clearOrderBookCache();
-  clearMarketPriceCache();
 });
 
 const STATION_A = 60003760;

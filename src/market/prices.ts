@@ -20,6 +20,7 @@ import {
 import type { HubAggregate } from './fuzzwork';
 import { fetchAggregatesWithFallback, resetPriceFallback } from './priceFallback';
 import { fetchAdjustedPrices, type AdjustedPrice } from './esiPrices';
+import { registerTestReset } from '@/lib/testResets';
 import type { TradeHub } from './hubs';
 
 export type { HubAggregate, AdjustedPrice };
@@ -115,7 +116,11 @@ async function readPersisted<V>(
   }
 }
 
-/** Test-only: production callers rely on TTL expiry instead of clearing. */
+/**
+ * Test-only: production callers rely on TTL expiry instead of clearing. Runs
+ * before every test (`registerTestReset`); a test calls it itself only to
+ * clear mid-test.
+ */
 export function clearMarketPriceCache(): void {
   hubPriceCache.clear();
   regionSellCache.clear();
@@ -128,6 +133,7 @@ export function clearMarketPriceCache(): void {
   persistedBypass.clear();
   persistedGeneration += 1;
 }
+registerTestReset(clearMarketPriceCache);
 
 /**
  * Drops the cached prices for specific types at one station, so the next

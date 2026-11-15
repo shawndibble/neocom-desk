@@ -7,7 +7,6 @@ import { db, type BuildPlanRecord } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useAuthFailure } from '@/stores/authFailure';
-import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
 import {
@@ -167,7 +166,6 @@ export function installIndustryHarness(
   afterAll(() => server.close());
   afterEach(() => {
     server.resetHandlers();
-    clearMarketPriceCache();
     clearCostIndexCache();
   });
   beforeAll(async () => {
@@ -181,7 +179,6 @@ export function installIndustryHarness(
     await screen.findByRole('searchbox', { name: 'Add Build Plan' }, { timeout: 25_000 });
     unmount();
     server.resetHandlers();
-    clearMarketPriceCache();
     clearCostIndexCache();
   }, 30_000);
   beforeEach(resetSession);

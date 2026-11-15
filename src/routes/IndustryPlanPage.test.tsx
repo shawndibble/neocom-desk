@@ -9,7 +9,6 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useAuthFailure } from '@/stores/authFailure';
 import { resetRevalidationState } from '@/esi/cache';
-import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
 import { useAssumedMe } from '@/features/industry/assumedMe';
@@ -196,7 +195,6 @@ afterEach(async () => {
   // global afterEach in vitest.setup.dom.ts.
   cleanup();
   server.resetHandlers();
-  clearMarketPriceCache();
   clearCostIndexCache();
 });
 /** A signed-in Pilot One on `/industry/plans/bp-1`, with nothing left over from the last test. */
@@ -257,7 +255,6 @@ beforeAll(async () => {
   await screen.findByRole('option', { name: 'Raitaru' });
   unmount();
   server.resetHandlers();
-  clearMarketPriceCache();
   clearCostIndexCache();
 }, 30_000);
 

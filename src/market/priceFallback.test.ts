@@ -31,7 +31,6 @@ import {
   R2_FALLBACK_MAX_TYPES,
   fetchAggregatesWithFallback,
   fetchOrderCountsWithFallback,
-  resetPriceFallback,
 } from './priceFallback';
 
 const JITA = 60003760;
@@ -51,7 +50,6 @@ const order = (o: Partial<RegionOrder>): RegionOrder =>
 
 beforeEach(() => {
   vi.resetAllMocks();
-  resetPriceFallback();
   mocks.fetchOrderCounts.mockRejectedValue(new Error('down'));
 });
 

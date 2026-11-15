@@ -1,10 +1,9 @@
-import { afterEach, beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import '@/i18n';
 import { db } from '@/db';
-import { clearMarketPriceCache } from '@/market/prices';
 import { useCompareSet } from '@/features/market/compareSet';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
@@ -125,12 +124,10 @@ export function renderAssetsRoute() {
 }
 
 /**
- * Registers the cold-render warm-up, the per-test session reset and the market
- * price cache clear (the MSW server's own lifecycle comes from `mswServer`). Call once at module scope of each Assets test file.
+ * Registers the cold-render warm-up and the per-test session reset (the MSW server's own lifecycle comes from `mswServer`). Call once at module scope of each Assets test file.
  * `warmApp` warms a full `<App />` render instead, for a file that keeps App-level tests.
  */
 export function installAssetsHarness({ warmApp = false }: { warmApp?: boolean } = {}): void {
-  afterEach(clearMarketPriceCache);
   beforeAll(async () => {
     // One throwaway render, so no test pays for the first one. A worker's first
     // render — compiling the route chunks, warming jsdom and React — lands on
@@ -144,7 +141,6 @@ export function installAssetsHarness({ warmApp = false }: { warmApp?: boolean } 
     await screen.findByText(JITA, undefined, { timeout: 25_000 });
     unmount();
     server.resetHandlers();
-    clearMarketPriceCache();
   }, 30_000);
 
   beforeEach(resetSession);

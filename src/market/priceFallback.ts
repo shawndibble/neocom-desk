@@ -31,6 +31,7 @@ import {
 } from './fuzzwork';
 import { TRADE_HUBS } from './hubs';
 import { MINUTE_MS, DAY_MS } from '@/lib/age';
+import { registerTestReset } from '@/lib/testResets';
 
 /** Past this many types the ESI step is skipped: one request each would eat the error-limit budget. */
 export const ESI_FALLBACK_MAX_TYPES = 50;
@@ -52,10 +53,15 @@ export interface FallbackPrices {
 
 let fuzzworkDownUntil = 0;
 
-/** Test-only: forget a recorded Fuzzwork outage. */
+/**
+ * Test-only: forget a recorded Fuzzwork outage. Runs before every test
+ * (`registerTestReset`): a request the last test left running is aborted at its
+ * end, which reads as Fuzzwork down and would send the next test to the fallback.
+ */
 export function resetPriceFallback(): void {
   fuzzworkDownUntil = 0;
 }
+registerTestReset(resetPriceFallback);
 
 function fuzzworkAvailable(nowMs: number): boolean {
   return nowMs >= fuzzworkDownUntil;
