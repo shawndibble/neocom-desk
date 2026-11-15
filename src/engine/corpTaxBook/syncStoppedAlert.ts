@@ -4,7 +4,7 @@
  * book's editors (ADR 0027; `functions/src/serverEvents.ts` mirrors this shape); nothing on the
  * device polls for it.
  */
-import type { ScheduledStopReason } from './scheduledSync';
+import { SCHEDULED_STOP_REASONS, type ScheduledStopReason } from './scheduledSync';
 
 /**
  * Why a stop is told: every stop reason but `book-off`, which an editor did on purpose
@@ -12,13 +12,9 @@ import type { ScheduledStopReason } from './scheduledSync';
  */
 export type SyncStoppedAlertReason = Exclude<ScheduledStopReason, 'book-off'>;
 
-export const SYNC_STOPPED_ALERT_REASONS = [
-  'role-lost',
-  'left-corp',
-  'token-revoked',
-  'esi-refused',
-  'grant-unreadable',
-] as const satisfies readonly SyncStoppedAlertReason[];
+/** Derived, so a stop reason added to the mirrored list is told rather than dropped by the guard. */
+export const SYNC_STOPPED_ALERT_REASONS: readonly SyncStoppedAlertReason[] =
+  SCHEDULED_STOP_REASONS.filter((r): r is SyncStoppedAlertReason => r !== 'book-off');
 
 export interface CorpTaxBookSyncStoppedFire {
   eventId: 'corpTaxBookSyncStopped';

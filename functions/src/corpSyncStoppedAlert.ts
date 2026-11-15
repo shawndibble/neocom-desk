@@ -3,6 +3,7 @@
 // officer docs and pushes, after the stop has committed.
 
 import { isPlainRecord } from './guards.js';
+import { DAY_MS } from './vettingTypes.js';
 import type { CorpTaxBookSyncStoppedFire, SyncStoppedAlertReason } from './serverEvents.js';
 import type { StopReason } from './corpTaxBookScheduledSync.js';
 
@@ -13,7 +14,7 @@ export const SYNC_STOPPED_NOTIFY_MAX = 25;
 /** How long the scheduled run waits for one stop's pushes before moving on to the next book. */
 export const SYNC_STOPPED_NOTIFY_BUDGET_MS = 5000;
 
-const EDITOR_RECENT_MS = SYNC_STOPPED_EDITOR_DAYS * 86_400_000;
+const EDITOR_RECENT_MS = SYNC_STOPPED_EDITOR_DAYS * DAY_MS;
 
 /**
  * Whether a stop is told at all. `book-off` is not: an editor turned the book off on purpose, and

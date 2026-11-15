@@ -1,8 +1,23 @@
 import { useMemo } from 'react';
-import { duePeriods } from '@/engine/corpTaxBook/bookView';
+import { planStatementRuns, type BookView, type PlannedRun } from '@/engine/corpTaxBook/bookView';
 import { uncountedToShow } from '@/engine/corpTaxBook/uncounted';
 import { useBook } from './useBook';
 import { useTabsProjection } from './useTabsProjection';
+
+const runsByView = new WeakMap<BookView, PlannedRun[]>();
+
+/**
+ * The run's periods for this view, planned once however many places ask: each missed period
+ * rebuilds the book, and the publisher, "Needs you" and the run all read it on one render.
+ */
+export function plannedRuns(view: BookView): PlannedRun[] {
+  let runs = runsByView.get(view);
+  if (runs === undefined) {
+    runs = planStatementRuns(view);
+    runsByView.set(view, runs);
+  }
+  return runs;
+}
 
 /**
  * Everything the Overview's "Needs you" lists, and how many cards that is: the
@@ -17,7 +32,7 @@ export function useNeedsYou() {
     () => uncountedToShow({ donations: data.uncounted ?? [] }, settings.divisions),
     [data.uncounted, settings.divisions]
   );
-  const runDue = useMemo(() => duePeriods(view), [view]);
+  const runDue = useMemo(() => plannedRuns(view).map((run) => run.plan.period), [view]);
   return {
     needsYou,
     uncounted,

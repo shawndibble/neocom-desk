@@ -14,7 +14,7 @@ import {
   StatChips,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { planStatementRuns, statementForLine } from '@/engine/corpTaxBook/bookView';
+import { statementForLine } from '@/engine/corpTaxBook/bookView';
 import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
 import { composeStatementMail } from '@/engine/corpTaxBook/statementMail';
 import type { Statement } from '@/engine/corpTaxBook/statements';
@@ -33,6 +33,7 @@ import { editErrorMessage, useBook } from './useBook';
 import { isk, periodsLabel } from './moonsFormat';
 import { TRADE_HUBS } from '@/market/hubs';
 import { mailTarget, statementRefineryNames, useCorporationName } from './statementMailing';
+import { plannedRuns } from './useNeedsYou';
 
 type Step = 'check' | 'send' | 'done';
 
@@ -105,12 +106,14 @@ export function StatementRun() {
   }, [step]);
   const queue = useLiveQuery(() => listQueue(corporationId), [corporationId], []);
 
-  const runs = useMemo(() => planStatementRuns(view), [view]);
+  const runs = useMemo(() => plannedRuns(view), [view]);
   /** Every new Statement of the run, oldest period first, with the view it is issued from. */
   const lines = useMemo(
     () => runs.flatMap((run) => run.plan.lines.map((line) => ({ run, line }))),
     [runs]
   );
+  // A period under the minimum rolls into the next one in the run, so only the last one's count
+  // is still waiting; the balances and credit are the whole run's.
   const latest = runs.at(-1)?.plan;
   const totalDue = runs.reduce((sum, run) => sum + run.plan.totalDue, 0);
   const creditApplied = runs.reduce((sum, run) => sum + run.plan.creditApplied, 0);
@@ -211,9 +214,10 @@ export function StatementRun() {
     // failure part-way keeps what was issued (and queued); the next run bills
     // the remaining periods and offers any Statement whose mail never left.
     const sent = { queued: 0, skipped: 0, missingLink: 0 };
-    const { enqueueStatements } = await import('@/features/corpTaxBook/mailQueue');
-    const queueTargets = async (targets: Parameters<typeof enqueueStatements>[0]['statements']) => {
+    const queueTargets = async (targets: ReturnType<typeof mailTarget>[]) => {
       if (targets.length === 0) return;
+      // Inside `try`: a chunk that will not load is an error shown, not a run stuck busy.
+      const { enqueueStatements } = await import('@/features/corpTaxBook/mailQueue');
       const queued = await enqueueStatements({
         corporationId,
         corporationName,

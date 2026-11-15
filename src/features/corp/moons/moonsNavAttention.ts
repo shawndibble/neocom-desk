@@ -123,9 +123,14 @@ export function useMoonsSyncStoppedPoll() {
     }
     refresh();
     const timer = setInterval(refresh, MOONS_SYNC_POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       seat.leave();
       clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [characterId, corporationId]);
 }
