@@ -105,7 +105,7 @@ describe('NeedsYouQueue (#6207)', () => {
     renderQueue([
       { kind: 'overdue', minerId: 'solo:7', days: 3, owed: 5_000_000, statementId: 's1' },
     ]);
-    expect(screen.getByRole('button', { name: 'Waive all…' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Waive all' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument();
   });
 

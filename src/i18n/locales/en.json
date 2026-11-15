@@ -17942,7 +17942,7 @@
           "title_other": "{{name}} · overdue {{count}} days · {{amount}}",
           "body": "The {{period}} Statement is unpaid past its due date.",
           "remind": "Send reminder",
-          "dismiss": "Waive all…"
+          "dismiss": "Waive all"
         },
         "unmatched": {
           "title": "Unmatched donation · {{amount}} from {{name}}",
