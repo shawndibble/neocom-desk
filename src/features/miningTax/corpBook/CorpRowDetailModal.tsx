@@ -102,6 +102,8 @@ export function CorpRowDetailModal({
   }
   // A conflict is the first thing to read and act on, so its notice leads.
   const conflict = view.state === 'conflict';
+  // Ore listed beyond what the book recorded: no Statement ever bills it.
+  const excess = conflict && view.conflictCause === 'overListed';
 
   return (
     <>
@@ -131,16 +133,23 @@ export function CorpRowDetailModal({
               )}
             >
               {/* A Conflict is not owed yet, but shows what the book bills if it is left. */}
-              {conflict
+              {conflict && !excess
                 ? `${formatIsk(view.billed)} ISK`
-                : view.taxOwed === null
+                : excess
                   ? '—'
-                  : `${formatIsk(owed)} ISK`}
+                  : view.taxOwed === null
+                    ? '—'
+                    : `${formatIsk(owed)} ISK`}
             </span>
           </div>
           {conflict && (
             <p className="-mt-2 text-right text-xs text-warning">
-              {t('miningTax.corpBook.conflict.headerNotOwed', { corp: corp.corpName })}
+              {t(
+                excess
+                  ? 'miningTax.corpBook.conflict.headerNotBilled'
+                  : 'miningTax.corpBook.conflict.headerNotOwed',
+                { corp: corp.corpName }
+              )}
             </p>
           )}
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-text-dim">

@@ -234,7 +234,11 @@ describe('overlayCorpBooks', () => {
         },
       ],
     });
-    const out = overlay([entry()], [book(), other]);
+    const whole = entry({
+      oreLines: [{ typeId: ZEO, quantity: 63_050 }],
+      freeOreLines: [{ typeId: ZEO, quantity: 63_050 }],
+    });
+    const out = overlay([whole], [book(), other]);
     expect(out.rows.every((r) => r.dispute === undefined)).toBe(true);
   });
 
@@ -462,7 +466,7 @@ describe('overlayCorpBooks', () => {
       expect(out.rows[0].taxOwed).toBeCloseTo((43_050 - 20_000) * 148 * 0.15, 4);
     });
 
-    it('hides only the allocation it took over, not a second one to the same Payee', () => {
+    it('takes a second allocation to the same Payee by quantity; its excess is the conflict', () => {
       const two = entry({
         freeOreLines: [],
         oreLines: [{ typeId: ZEO, quantity: 43_050 }],
@@ -484,7 +488,11 @@ describe('overlayCorpBooks', () => {
         ],
       });
       const out = overlay([two], [book({ ownPayeeIds: ['bmw'] })]);
-      expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['one']);
+      // 40,000 + 3,050 fill the book's 43,050; the other 5,950 of 'two' is over-listed.
+      expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['one', 'two']);
+      expect(out.rows.find((r) => r.state === 'conflict')?.oreLines).toEqual([
+        { typeId: ZEO, quantity: 5_950 },
+      ]);
     });
 
     it('does not take over an allocation that needs review', () => {
@@ -572,7 +580,9 @@ describe('overlayCorpBooks', () => {
         ],
       });
       const out = overlay([big], [book({ ownPayeeIds: ['bmw'] })]);
-      expect(out.rows[0]).toMatchObject({ state: 'conflict', conflictCause: 'overListed' });
+      expect(out.rows.find((r) => r.state === 'conflict')).toMatchObject({
+        conflictCause: 'overListed',
+      });
     });
 
     it('is still a conflict when the book does not name it as its own', () => {
@@ -1812,5 +1822,257 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
       ]
     ).rows[0];
     expect(row.correction).toBeUndefined();
+  });
+});
+
+describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (#6203)', () => {
+  const SECOND = 98000002;
+  const OWNER = 98000077;
+  const KEY = `${ME}:2026-10-17:${SYSTEM}`;
+  const observedBy = (corporationId: number, quantity: number, sourceCorporationId?: number) => ({
+    characterId: ME,
+    recordedCorporationId: corporationId,
+    structureId: corporationId === CORP ? 1000 : 2000,
+    date: '2026-10-17',
+    solarSystemId: SYSTEM,
+    oreLines: [{ typeId: ZEO, quantity }],
+    ...(sourceCorporationId !== undefined ? { sourceCorporationId } : {}),
+  });
+  const twoMoons = (ownFirst: string[] = []) => [
+    book({ ownPayeeIds: ownFirst, observed: [observedBy(CORP, 40_000)] }),
+    book({
+      corporationId: SECOND,
+      corpName: 'Ashfall Prospecting',
+      observed: [observedBy(SECOND, 20_000)],
+    }),
+  ];
+  const alloc = (
+    over: Partial<PersonalEntry['allocations'][number]>
+  ): PersonalEntry['allocations'][number] => ({
+    id: 'a',
+    payeeId: 'landlord',
+    taxPct: 10,
+    oreLines: [{ typeId: ZEO, quantity: 60_000 }],
+    status: 'outstanding',
+    ...over,
+  });
+  const allGiven = (quantity: number, allocations: PersonalEntry['allocations']) =>
+    entry({ oreLines: [{ typeId: ZEO, quantity }], freeOreLines: [], allocations });
+
+  describe("a Default System's unpaid Assignment", () => {
+    it('is split between two books by quantity, never a Conflict', () => {
+      const out = overlay(
+        [allGiven(60_000, [alloc({ id: 'a-default', releasable: true })])],
+        twoMoons()
+      );
+      expect(out.rows.map((r) => [r.corporationId, r.state, r.oreLines[0].quantity])).toEqual([
+        [CORP, 'billed', 40_000],
+        [SECOND, 'billed', 20_000],
+      ]);
+      expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-default']);
+      expect(out.trimmed.size).toBe(0);
+    });
+
+    it('keeps what no book took with its default Payee', () => {
+      const out = overlay(
+        [
+          allGiven(50_000, [
+            alloc({
+              id: 'a-default',
+              releasable: true,
+              oreLines: [
+                { typeId: ZEO, quantity: 43_050 + 6_950 },
+                { typeId: SYL, quantity: 1_000 },
+              ],
+            }),
+          ]),
+        ],
+        [book()]
+      );
+      expect(out.rows.map((r) => r.state)).toEqual(['billed']);
+      expect(out.absorbed.size).toBe(0);
+      const kept = out.trimmed.get(KEY)?.get('a-default');
+      expect(kept?.oreLines).toEqual([
+        { typeId: ZEO, quantity: 6_950 },
+        { typeId: SYL, quantity: 1_000 },
+      ]);
+      // The kept part's worth, at the book's prices, of the whole Assignment's.
+      const whole = 50_000 * 148 + 1_000 * 100;
+      expect(kept?.valueShare).toBeCloseTo((6_950 * 148 + 1_000 * 100) / whole, 6);
+    });
+  });
+
+  describe("an Assignment to the corporation's own Payee", () => {
+    it('is absorbed up to the share; only the excess is an over-listed Conflict', () => {
+      const out = overlay(
+        [
+          allGiven(50_000, [
+            alloc({ id: 'a-bmw', payeeId: 'bmw', oreLines: [{ typeId: ZEO, quantity: 50_000 }] }),
+          ]),
+        ],
+        [book({ ownPayeeIds: ['bmw'] })]
+      );
+      const billed = out.rows.find((r) => r.state === 'billed');
+      expect(billed?.oreLines).toEqual([{ typeId: ZEO, quantity: 43_050 }]);
+      expect(billed?.taxOwed).toBeCloseTo(43_050 * 148 * 0.15, 4);
+      const conflicts = out.rows.filter((r) => r.state === 'conflict');
+      expect(conflicts).toHaveLength(1);
+      expect(conflicts[0]).toMatchObject({
+        conflictCause: 'overListed',
+        oreLines: [{ typeId: ZEO, quantity: 6_950 }],
+        taxOwed: null,
+        // The book never recorded it, so no Statement bills it and it never resolves to the corp.
+        billed: 0,
+        overlap: { payeeIds: ['bmw'], ore: [{ typeId: ZEO, quantity: 6_950 }], paid: false },
+      });
+      expect(conflicts[0].resolvesAt).toBeUndefined();
+      // Both rows stand in for the Assignment.
+      expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-bmw']);
+    });
+
+    it("leaves what another book contests on the Assignment, not as this book's excess", () => {
+      const out = overlay(
+        [allGiven(60_000, [alloc({ id: 'a-bmw', payeeId: 'bmw' })])],
+        twoMoons(['bmw'])
+      );
+      expect(out.rows.map((r) => [r.corporationId, r.state, r.conflictCause])).toEqual([
+        [CORP, 'billed', undefined],
+        [SECOND, 'conflict', 'otherPayee'],
+      ]);
+      expect(out.trimmed.get(KEY)?.get('a-bmw')?.oreLines).toEqual([
+        { typeId: ZEO, quantity: 20_000 },
+      ]);
+    });
+
+    it('names an own entry that needs review as such, not another Payee', () => {
+      const out = overlay(
+        [
+          allGiven(43_050, [
+            alloc({
+              payeeId: 'bmw',
+              status: 'needs-review',
+              oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+            }),
+          ]),
+        ],
+        [book({ ownPayeeIds: ['bmw'] })]
+      );
+      expect(out.rows[0]).toMatchObject({ state: 'conflict', conflictCause: 'ownNeedsReview' });
+    });
+  });
+
+  it('lets a later book take its own Assignment before an earlier book names Payees', () => {
+    const books = [
+      book({ observed: [observedBy(CORP, 40_000)] }),
+      book({
+        corporationId: SECOND,
+        corpName: 'Ashfall Prospecting',
+        ownPayeeIds: ['ash'],
+        observed: [observedBy(SECOND, 20_000)],
+      }),
+    ];
+    const out = overlay(
+      [
+        allGiven(60_000, [
+          alloc({ id: 'a-ash', payeeId: 'ash', oreLines: [{ typeId: ZEO, quantity: 20_000 }] }),
+          alloc({ id: 'a-other', payeeId: 'other', oreLines: [{ typeId: ZEO, quantity: 40_000 }] }),
+        ]),
+      ],
+      books
+    );
+    expect(out.rows.map((r) => [r.corporationId, r.state, r.overlap?.payeeIds])).toEqual([
+      [CORP, 'conflict', ['other']],
+      [SECOND, 'billed', undefined],
+    ]);
+    expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-ash']);
+  });
+
+  it('names an own entry needing review whatever order the entries are in', () => {
+    const out = overlay(
+      [
+        allGiven(53_050, [
+          alloc({ payeeId: 'other', oreLines: [{ typeId: ZEO, quantity: 43_050 }] }),
+          alloc({
+            id: 'b',
+            payeeId: 'bmw',
+            status: 'needs-review',
+            oreLines: [{ typeId: ZEO, quantity: 10_000 }],
+          }),
+        ]),
+      ],
+      [book({ ownPayeeIds: ['bmw'] })]
+    );
+    expect(out.rows[0]).toMatchObject({ state: 'conflict', conflictCause: 'ownNeedsReview' });
+  });
+
+  it("says a Collector now bills the moon when the miner's Payee is its owner", () => {
+    const out = overlay(
+      [
+        allGiven(43_050, [
+          alloc({ payeeId: 'moonco', oreLines: [{ typeId: ZEO, quantity: 43_050 }] }),
+        ]),
+      ],
+      [
+        book({
+          observed: [observedBy(CORP, 43_050, OWNER)],
+          feeders: [{ corporationId: OWNER, lastReadWellAt: SYNCED }],
+          payeeCorporations: { moonco: OWNER, other: 1 },
+        }),
+      ]
+    );
+    expect(out.rows[0]).toMatchObject({
+      state: 'conflict',
+      conflictCause: 'ownerCollected',
+      ownerPayeeId: 'moonco',
+    });
+  });
+
+  it('is still another Payee when the Payee is not the moon owner', () => {
+    const out = overlay(
+      [
+        allGiven(43_050, [
+          alloc({ payeeId: 'other', oreLines: [{ typeId: ZEO, quantity: 43_050 }] }),
+        ]),
+      ],
+      [
+        book({
+          observed: [observedBy(CORP, 43_050, OWNER)],
+          feeders: [{ corporationId: OWNER, lastReadWellAt: SYNCED }],
+          payeeCorporations: { moonco: OWNER, other: 1 },
+        }),
+      ]
+    );
+    expect(out.rows[0].conflictCause).toBe('otherPayee');
+    expect(out.rows[0].ownerPayeeId).toBeUndefined();
+  });
+
+  it("disputes each book's quantity against its own share on a two-book day", () => {
+    // 50,000 mined, the books claim 40,000 + 20,000: each share is cut to 33,333 / 16,667.
+    const out = overlay(
+      [
+        entry({
+          oreLines: [{ typeId: ZEO, quantity: 50_000 }],
+          freeOreLines: [{ typeId: ZEO, quantity: 50_000 }],
+        }),
+      ],
+      twoMoons()
+    );
+    expect(out.rows.map((r) => [r.dispute?.personalQuantity, r.dispute?.bookQuantity])).toEqual([
+      [33_333, 40_000],
+      [16_667, 20_000],
+    ]);
+  });
+
+  it('does not dispute a two-book day whose shares match what each book recorded', () => {
+    const out = overlay(
+      [
+        entry({
+          oreLines: [{ typeId: ZEO, quantity: 60_000 }],
+          freeOreLines: [{ typeId: ZEO, quantity: 60_000 }],
+        }),
+      ],
+      twoMoons()
+    );
+    expect(out.rows.every((r) => r.dispute === undefined)).toBe(true);
   });
 });

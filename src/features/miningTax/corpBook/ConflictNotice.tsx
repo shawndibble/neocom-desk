@@ -5,6 +5,13 @@ import type { ConflictCause } from '@/engine/corpTaxBook/personal';
 import { formatIsk } from '@/lib/isk';
 import { TakeoverConfirm, type OverlapPreview } from './TakeoverConfirm';
 
+const TITLE_KEY: Record<ConflictCause, string> = {
+  otherPayee: 'titleOtherPayee',
+  overListed: 'titleOverListed',
+  ownNeedsReview: 'titleOwnNeedsReview',
+  ownerCollected: 'titleOwnerCollected',
+};
+
 /** One of the miner's own entries that gives the contested ore to a Payee. */
 export interface ConflictEntry {
   id: string;
@@ -17,6 +24,8 @@ interface Props {
   corpName: string;
   /** Why the records clash; absent on a row the engine gave no cause. */
   cause: ConflictCause | undefined;
+  /** An `ownerCollected` conflict: the name of the miner's Payee that is the moon owner. */
+  ownerName?: string;
   /** The entries behind the conflict; empty when none could be matched. */
   entries: readonly ConflictEntry[];
   /** Where the book recorded the ore: the refinery, else the system. */
@@ -37,7 +46,8 @@ interface Props {
 
 /**
  * A Conflict day's detail: what clashes (the entry, and why: another Payee holds the ore,
- * or the corporation's own Payee lists more than the book recorded), any other book
+ * the corporation's own Payee lists more than the book recorded or needs review, or a Collector
+ * now collects for the moon owner the entry names), any other book
  * contesting the same day, and the two ways out — the book is right (take the ore off the entry),
  * or the entry is right (an officer corrects the book). Facts first, then the fix. What it
  * bills, and when, is the modal's header line.
@@ -45,6 +55,7 @@ interface Props {
 export function ConflictNotice({
   corpName,
   cause,
+  ownerName = '',
   entries,
   recordedAt,
   resolvesOn,
@@ -67,8 +78,11 @@ export function ConflictNotice({
       className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
     >
       <p className="font-semibold text-warning">
-        {t(k(cause === 'overListed' ? 'titleOverListed' : 'titleOtherPayee'))}
+        {t(k(TITLE_KEY[cause ?? 'otherPayee']), { corp: corpName, owner: ownerName })}
       </p>
+      {cause === 'ownerCollected' && (
+        <p>{t(k('ownerCollectedAsk'), { corp: corpName, owner: ownerName })}</p>
+      )}
       <ul className="list-disc space-y-0.5 pl-4">
         {entries.length === 0 ? (
           <li>{t(k('yourEntryUnknown'))}</li>
