@@ -14,7 +14,7 @@
  * ID can be typed for a place, corporation, alliance or character; ESI's public
  * lookup names it. Structures and the saved Payees need a Character.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -168,15 +168,17 @@ export function SurveyStartScreen() {
   );
   const { trackedAdd, busy, error } = useScanFeedback(add);
 
+  // An effect event, not a listener rebound per render: a rebind waits for the passive effects, so a
+  // scan pasted just after a name resolved reached the old listener and started under the typed name.
+  const onPaste = useEffectEvent((event: ClipboardEvent) => {
+    if (event.defaultPrevented || isTypingTarget(event.target)) return;
+    const text = event.clipboardData?.getData('text/plain') ?? '';
+    if (parseSurveyScan(text) !== null) void trackedAdd(text);
+  });
   useEffect(() => {
-    function onPaste(event: ClipboardEvent) {
-      if (event.defaultPrevented || isTypingTarget(event.target)) return;
-      const text = event.clipboardData?.getData('text/plain') ?? '';
-      if (parseSurveyScan(text) !== null) void trackedAdd(text);
-    }
     document.addEventListener('paste', onPaste);
     return () => document.removeEventListener('paste', onPaste);
-  }, [trackedAdd]);
+  }, []);
 
   // A payee ESI found by its typed name travels as its ID, which names it for whoever opens the link.
   const verifiedPayeeId =
