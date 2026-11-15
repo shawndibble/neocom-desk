@@ -1,12 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { App } from '@/app/App';
 import { stubViewport } from '@/test/viewport';
 import { EVE_SCOUT_SIGNATURES_URL } from '@/lib/eveScout';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
-import { SIGNATURES, server, visit, installTravelHarness } from '@/test/travelPage';
+import {
+  SIGNATURES,
+  server,
+  visit,
+  installTravelHarness,
+  renderTravelRoute,
+} from '@/test/travelPage';
 import { JITA, UEDAMA, THERA } from '@/test/travelMocks';
 
 vi.mock('virtual:pwa-register/react', async () =>
@@ -69,7 +74,7 @@ describe('Travel › Route Safety › Thera / Turnur modal', () => {
 
   it('has no Thera / Turnur tab, and an old /travel/thera link lands on Route Safety', async () => {
     window.history.pushState({}, '', `/travel/thera?origin=${JITA}`);
-    render(<App />);
+    renderTravelRoute();
     expect(await screen.findByRole('tab', { name: 'Route Safety' })).toHaveAttribute(
       'aria-selected',
       'true'

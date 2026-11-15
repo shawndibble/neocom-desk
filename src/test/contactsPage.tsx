@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import '@/i18n';
@@ -8,10 +8,11 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
-import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
 import { mswServer } from '@/test/msw';
 import { stubViewport } from '@/test/viewport';
+import { Contacts } from '@/routes/Contacts';
+import { renderPageRoute } from '@/test/renderPage';
 
 // Shared harness for the Contacts route tests (src/routes/Contacts*.test.tsx), one
 // file per concern so CI runs them in parallel. Each file keeps its own `vi.mock`
@@ -120,17 +121,25 @@ export async function cacheSecondCharacterContacts(contacts: unknown[]) {
   });
 }
 
+/**
+ * The Contacts page on its own route (its ScopeGate, tabs and info modals), with
+ * no App boot or signed-in shell. The App wiring test (Contacts.test.tsx) renders
+ * `<App />`.
+ */
+export function renderContactsRoute() {
+  return renderPageRoute('/contacts', <Contacts />);
+}
+
 /** Registers the cold-render warm-up and the per-test session reset. Call once at module scope. */
 export function installContactsHarness(): void {
   beforeAll(async () => {
     // One throwaway render, so no test pays for the first one. A worker's first
-    // `App` render (compiling the lazy Layout and route chunks, warming jsdom
-    // and React) took seconds under parallel load and landed on whichever test
-    // ran first, tipping it past its findBy / test timeout. Done here under the
-    // hook's own budget, as IndustryPlanPage.test.tsx does.
-    await Promise.all([routeChunks.loadLayout(), routeChunks.loadContacts()]);
+    // render (compiling the route chunk, warming jsdom and React) took seconds
+    // under parallel load and landed on whichever test ran first, tipping it
+    // past its findBy / test timeout. Done here under the hook's own budget.
+    await routeChunks.loadContacts();
     await seed();
-    const { unmount } = render(<App />);
+    const { unmount } = renderContactsRoute();
     // Wait for real content, not just the shell: the first data load (Dexie, MSW,
     // the ESI cache) is part of the cold cost too.
     await screen.findByText('Good Friend', {}, { timeout: 25_000 });
