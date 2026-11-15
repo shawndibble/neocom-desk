@@ -5,7 +5,7 @@
  * the main Market suite.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -25,7 +25,7 @@ import { usePickedSystems } from '@/features/route/currentSystem';
 import type { LocalJumpDistances } from '@/features/route/localRoute';
 import { resetEsiBudget } from '@/esi/budget';
 import { ESI_BASE_URL } from '@/esi/client';
-import { App } from '@/app/App';
+import { renderMarketRoute } from '@/test/marketPage';
 import * as routeChunks from '@/app/routeChunks';
 import type {
   MarketGroupNode,
@@ -144,18 +144,18 @@ const server = setupServer();
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });
   // One throwaway render, so no test pays for the first one (the pattern
-  // `IndustryPlanPage.test.tsx` documents): a worker's first `App` render —
+  // `IndustryPlanPage.test.tsx` documents): a worker's first render —
   // compiling the lazy route chunk, warming jsdom and React — cost several
   // seconds on top of a warm render and landed on whichever test ran first,
   // timing out its first `findBy` under load. Done here under the hook's
   // own budget.
   await routeChunks.loadMarket();
-  // The same signed-in Character every test seeds, or the App redirects to /login.
+  // The same signed-in Character every test seeds (the App puts the page behind one).
   await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
   loadCharacterSolarSystemId.mockResolvedValue(null);
   localJumpDistances.mockResolvedValue({ kind: 'unknown' });
   window.history.pushState({}, '', '/market');
-  const { unmount } = render(<App />);
+  const { unmount } = renderMarketRoute();
   await screen.findByRole('searchbox', {}, { timeout: 25_000 });
   unmount();
 }, 30_000);
@@ -188,7 +188,7 @@ describe('Market Browser: All regions', () => {
     server.use(regionOrdersHandler(hits));
     const user = userEvent.setup({ delay: null });
     window.history.pushState({}, '', `/market/browser?type=${RIFTER}&region=${THE_FORGE}`);
-    render(<App />);
+    renderMarketRoute();
 
     await screen.findByRole('table', { name: 'Sell Orders' });
     await user.click(screen.getByRole('combobox', { name: 'Region' }));
@@ -204,7 +204,7 @@ describe('Market Browser: All regions', () => {
     const hits = new Map<number, number>();
     server.use(regionOrdersHandler(hits));
     window.history.pushState({}, '', `/market/browser?type=${RIFTER}&region=all`);
-    render(<App />);
+    renderMarketRoute();
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(await within(sellTable).findByText('1,000,000')).toBeInTheDocument();
@@ -224,7 +224,7 @@ describe('Market Browser: All regions', () => {
     const hits = new Map<number, number>();
     server.use(regionOrdersHandler(hits, [DOMAIN]));
     window.history.pushState({}, '', `/market/browser?type=${RIFTER}&region=all`);
-    render(<App />);
+    renderMarketRoute();
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(await within(sellTable).findByText('1,000,000')).toBeInTheDocument();
@@ -237,7 +237,7 @@ describe('Market Browser: All regions', () => {
   it('is a failed book, not an empty one, when every region failed', async () => {
     server.use(regionOrdersHandler(new Map(), [THE_FORGE, DOMAIN, HEIMATAR]));
     window.history.pushState({}, '', `/market/browser?type=${RIFTER}&region=all`);
-    render(<App />);
+    renderMarketRoute();
 
     expect(await screen.findByText("Couldn't load the order book")).toBeInTheDocument();
   });
@@ -256,7 +256,7 @@ describe('Market Browser: All regions', () => {
     const hits = new Map<number, number>();
     server.use(regionOrdersHandler(hits));
     window.history.pushState({}, '', `/market/browser?type=${RIFTER}&region=all&browser.jumps=5`);
-    render(<App />);
+    renderMarketRoute();
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(await within(sellTable).findByText('1,100,000')).toBeInTheDocument();
@@ -289,7 +289,7 @@ describe('Market Browser: All regions', () => {
     const hits = new Map<number, number>();
     server.use(regionOrdersHandler(hits));
     window.history.pushState({}, '', `/market/browser?type=${RIFTER}&browser.jumps=5`);
-    render(<App />);
+    renderMarketRoute();
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     // Amarr's order isn't at the hub station: only a range that drops the
@@ -315,7 +315,7 @@ describe('Market Browser: All regions', () => {
     loadCharacterSolarSystemId.mockResolvedValue(JITA);
     const user = userEvent.setup({ delay: null });
     window.history.pushState({}, '', '/market/browser');
-    render(<App />);
+    renderMarketRoute();
 
     // Always on the page, under the search box: no funnel click needed.
     const distance = await screen.findByRole('combobox', { name: 'Distance' });
@@ -366,7 +366,7 @@ describe('Market Browser: All regions', () => {
     server.use(regionOrdersHandler(hits));
     // No `browser.jumps` in the URL: the persisted filter is what applies.
     window.history.pushState({}, '', `/market/browser?type=${RIFTER}&region=all`);
-    render(<App />);
+    renderMarketRoute();
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(await within(sellTable).findByText('1,100,000')).toBeInTheDocument();

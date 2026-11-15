@@ -9,7 +9,7 @@ import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { App } from '@/app/App';
+import { renderMarketRoute } from '@/test/marketPage';
 import type { TypeMap } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -121,6 +121,8 @@ beforeAll(async () => {
   // Compile the lazy Market chunk here, under the hook's own budget: its first
   // import cost whichever test ran first more than `findBy`'s default wait.
   await routeChunks.loadMarket();
+  // The one App-level test below; its graph and shell chunk load here too.
+  await Promise.all([import('@/app/App'), routeChunks.loadLayout()]);
 }, 30_000);
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
@@ -148,13 +150,21 @@ beforeEach(async () => {
 });
 
 describe('Market top-level tabs', () => {
-  it('lands on the Market Browser tab by default, with no Orders nav link anywhere', async () => {
+  // The one App-level test of the Market route: it mounts at /market inside the
+  // signed-in shell, its rail link current, and the shell carries no Orders link.
+  // Every other Market test renders the page on its own (`renderMarketRoute`).
+  it('lands on the Market Browser tab by default inside the shell, with no Orders nav link anywhere', async () => {
     window.history.pushState({}, '', '/market');
+    const { App } = await import('@/app/App');
     render(<App />);
     expect(await screen.findByRole('tab', { name: 'Market' })).toHaveAttribute(
       'aria-selected',
       'true'
     );
+    const rail = (await screen.findAllByRole('navigation'))[0];
+    // The rail lists the page's tabs under it, so the Market tab link shares the name.
+    const marketLinks = await within(rail).findAllByRole('link', { name: 'Market' });
+    expect(marketLinks.some((link) => link.getAttribute('aria-current') === 'page')).toBe(true);
     expect(screen.queryByRole('link', { name: 'Orders' })).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Hauling' })).toBeInTheDocument();
   });
@@ -162,7 +172,7 @@ describe('Market top-level tabs', () => {
   it('opens Hauling from its URL and leaves its query behind on the way out', async () => {
     window.history.pushState({}, '', '/market/hauling?from=amarr&to=jita');
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     expect(await screen.findByRole('tab', { name: 'Hauling' })).toHaveAttribute(
       'aria-selected',
       'true'
@@ -175,7 +185,7 @@ describe('Market top-level tabs', () => {
   it('switches to Open Orders and History via the tab bar', async () => {
     window.history.pushState({}, '', '/market');
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await screen.findByRole('tab', { name: 'Market' });
 
     await user.click(screen.getByRole('tab', { name: 'Open' }));
@@ -206,7 +216,7 @@ describe('Market top-level tabs', () => {
     );
     window.history.pushState({}, '', '/market?type=34');
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await screen.findByRole('tab', { name: 'Market' });
 
     await user.click(screen.getByRole('tab', { name: 'Open' }));
@@ -220,7 +230,7 @@ describe('Market top-level tabs', () => {
   it('an Open Orders item name opens the order details, whose Market link lands on the Market Browser tab', async () => {
     window.history.pushState({}, '', '/market/orders');
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     // The fixture order is healthy (Fine), so it's folded until revealed.
     await user.click(await screen.findByRole('button', { name: 'Show' }));
@@ -240,11 +250,17 @@ describe('Market top-level tabs', () => {
 
   it('moves an old /market/history/transactions link to History, keeping its query', async () => {
     window.history.pushState({}, '', '/market/history/transactions?highlight=34');
-    render(<App />);
+    renderMarketRoute();
 
     await waitFor(() => expect(window.location.pathname).toBe('/market/history'));
-    expect(window.location.search).toBe('?highlight=34');
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+    // The query survived the move: History read `?highlight=34` (Tritanium's
+    // transaction pulses), then consumed it. Reading the URL itself raced that
+    // consume once the page rendered without App's boot in front of it.
+    await waitFor(() =>
+      expect(screen.getByRole('row', { name: /Tritanium/ })).toHaveClass('row-pulse')
+    );
+    await waitFor(() => expect(window.location.search).toBe(''));
     expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
     // One view, so no picker between Ended orders and Transactions.
     expect(screen.queryByRole('combobox', { name: 'History view' })).not.toBeInTheDocument();
@@ -255,7 +271,7 @@ describe('Market Open Orders tab', () => {
   it('shows open orders directly via a /market/orders deep link, with resolved item name', async () => {
     window.history.pushState({}, '', '/market/orders');
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     // The fixture order has no problems, so it is Fine, folded under the
     // Needs you list — Show opens All to see the resolved item name.
     await user.click(await screen.findByRole('button', { name: 'Show' }));
@@ -279,7 +295,7 @@ describe('Market Open Orders tab', () => {
     );
     window.history.pushState({}, '', '/market/orders');
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await user.click(await screen.findByRole('button', { name: 'Show' }));
     expect(
       within(screen.getByRole('table', { name: 'All orders' })).getByText('Tritanium')
@@ -292,7 +308,7 @@ describe('Market Open Orders tab', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders`, () => HttpResponse.error())
     );
     window.history.pushState({}, '', '/market/orders');
-    render(<App />);
+    renderMarketRoute();
     expect(await screen.findByText(/^no open orders$/i)).toBeInTheDocument();
   });
 
@@ -303,7 +319,7 @@ describe('Market Open Orders tab', () => {
       )
     );
     window.history.pushState({}, '', '/market/orders');
-    render(<App />);
+    renderMarketRoute();
     // The banner is now per character, since this page covers every selling
     // character at once — title is prefixed with the character's name.
     expect(
@@ -321,7 +337,7 @@ describe('Market Open Orders tab', () => {
 describe('Market History tab (Transactions)', () => {
   it('shows transactions with SDE item names resolved, directly via a /market/history deep link', async () => {
     window.history.pushState({}, '', '/market/history');
-    render(<App />);
+    renderMarketRoute();
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByText('Sell')).toBeInTheDocument();
   });
@@ -331,7 +347,7 @@ describe('Market History tab (Transactions)', () => {
       .spyOn(Element.prototype, 'scrollIntoView')
       .mockImplementation(() => {});
     window.history.pushState({}, '', '/market/history?highlight=34');
-    render(<App />);
+    renderMarketRoute();
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     await waitFor(() => {
@@ -356,7 +372,7 @@ describe('Market History tab (Transactions)', () => {
     // Type 35 is in the list, but only as a buy — and the alert only ever
     // fires for a filled *sell* order.
     window.history.pushState({}, '', '/market/history?highlight=35');
-    render(<App />);
+    renderMarketRoute();
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(document.querySelector('.row-pulse')).toBeNull();
@@ -369,7 +385,7 @@ describe('Market History tab (Transactions)', () => {
 
   it('signs and colors transaction totals: buy negative red, sell positive green', async () => {
     window.history.pushState({}, '', '/market/history');
-    render(<App />);
+    renderMarketRoute();
 
     const sellTotal = await screen.findByText('500.00');
     expect(sellTotal.className).toContain('text-isk-pos');
@@ -387,7 +403,7 @@ describe('Market History tab (Transactions)', () => {
       })
     );
     window.history.pushState({}, '', '/market/history');
-    render(<App />);
+    renderMarketRoute();
 
     // Five identical Tritanium fills come back, one per page.
     expect((await screen.findAllByText('Tritanium')).length).toBeGreaterThan(1);
@@ -405,7 +421,7 @@ describe('Market History tab (Transactions)', () => {
     });
     window.history.pushState({}, '', '/market/history');
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     // Initial load succeeds live — no banner at all yet.
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
@@ -428,7 +444,7 @@ describe('Market History tab (Transactions)', () => {
       )
     );
     window.history.pushState({}, '', '/market/history');
-    render(<App />);
+    renderMarketRoute();
     expect(await screen.findByText(/no transactions cached/i)).toBeInTheDocument();
   });
 });

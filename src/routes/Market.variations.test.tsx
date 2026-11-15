@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { db } from '@/db';
@@ -9,7 +9,6 @@ import { ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
 import { loadMarketGroups, loadMarketTypes, loadVariations } from '@/sde/loadMarketSde';
 import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
-import { App } from '@/app/App';
 import {
   CORAX_TYPE_ID,
   CORMORANT_TYPE_ID,
@@ -25,6 +24,7 @@ import {
   openVariationsTab,
   ordersHandler,
   server,
+  renderMarketRoute,
 } from '@/test/marketPage';
 
 vi.mock('@/sde/loadSde', async () => (await import('@/test/marketMocks')).loadSdeMock());
@@ -45,7 +45,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
   it("falls back to the selected item's Market Group siblings when it has no variation data, showing each sibling's own sell and buy price, excluding itself, and never conflating a missing side with true 'no orders at all'", async () => {
     server.use(destroyerOrdersHandler(new Map()));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
@@ -80,7 +80,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     });
     server.use(destroyerOrdersHandler(new Map()));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
@@ -120,7 +120,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     );
 
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
     await openVariationsTab(user);
@@ -147,7 +147,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     useCompareSet.setState({ items: [{ typeId: 999999, itemName: 'Pre-existing' }] });
 
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
     await openVariationsTab(user);
@@ -166,7 +166,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
     server.use(destroyerOrdersHandler(new Map()));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
     const table = await openVariationsTab(user);
@@ -207,7 +207,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
       dogma(CORMORANT_TYPE_ID, 1600)
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
     const table = await openVariationsTab(user);
@@ -226,7 +226,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
   it('right-clicking a Variations row opens the menu without also re-anchoring on it (left/right-click non-interference, issue #147)', async () => {
     server.use(destroyerOrdersHandler(new Map()));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
     const table = await openVariationsTab(user);
@@ -247,7 +247,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     vi.mocked(loadVariations).mockRejectedValueOnce(new Error('network error'));
     server.use(destroyerOrdersHandler(new Map()));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
@@ -264,7 +264,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
   it('clicking a row selects it, reloading the order book and re-anchoring the table on it', async () => {
     server.use(destroyerOrdersHandler(new Map()));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
@@ -284,7 +284,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
   it('re-anchors on a click anywhere in the row, not just the item name — identical to the old card click', async () => {
     server.use(destroyerOrdersHandler(new Map()));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
@@ -304,7 +304,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     const hits = new Map<number, number>();
     server.use(destroyerOrdersHandler(hits));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
@@ -321,7 +321,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
   it('respects the order-row station filter, matching the on-screen tables (GLOSSARY.md round 10)', async () => {
     server.use(destroyerOrdersHandler(new Map()));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
@@ -359,7 +359,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
   it('an item whose Market Group has no other members shows nothing, not an empty table', async () => {
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -398,7 +398,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     );
 
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'Selected Widget');
     await user.click(await screen.findByText('Selected Widget'));
@@ -441,7 +441,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     );
 
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'Selected Widget');
     await user.click(await screen.findByText('Selected Widget'));
@@ -470,7 +470,7 @@ describe('Market Browser tree leaf (issue #6)', () => {
 
   it('has no custom right-click menu and no More actions button: the row click opens the item', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await user.type(await screen.findByRole('searchbox'), 'rift');
     const item = await screen.findByText('Rifter');
     fireEvent.contextMenu(item);
@@ -495,7 +495,7 @@ describe('Market Browser tree leaf (issue #6)', () => {
     );
 
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
 
@@ -515,7 +515,7 @@ describe('Market Browser tree leaf (issue #6)', () => {
 describe('Compare toggle in the item header', () => {
   it('adds the selected item to the Compare Set and removes it again', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
 
