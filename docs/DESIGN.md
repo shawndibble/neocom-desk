@@ -122,6 +122,7 @@ Never a status, never interactive. A fifth location reuses the first hue, so the
 | `kind-structure-timer`   | `#88b078` | Corp structure timers ending.                            |
 | `kind-structure-fuel`    | `#b8a858` | Corp structures running out of fuel.                     |
 | `kind-moon-chunk`        | `#a0a8b8` | Moon chunk arrivals and decays.                          |
+| `kind-shared-moon-pop`   | `#8880b8` | Shared Pops: other corporations' moon pops.              |
 | `kind-corp-job`          | `#c0e0d8` | Corp industry jobs finishing.                            |
 | `kind-skyhook-raid`      | `#d9a7a0` | Corp skyhook raid windows opening and closing.           |
 | `kind-contract-expiry`   | `#f2879f` | Contract expiries.                                       |
@@ -1741,6 +1742,7 @@ surfaces — `bg` / `panel` / `panel-2`:
 | `kind-structure-timer`   | 7.85 / 7.38 / 6.88    |
 | `kind-structure-fuel`    | 8.09 / 7.59 / 7.09    |
 | `kind-moon-chunk`        | 8.09 / 7.60 / 7.09    |
+| `kind-shared-moon-pop`   | 5.37 / 5.04 / 4.70    |
 | `kind-corp-job`          | 13.72 / 12.88 / 12.02 |
 | `kind-skyhook-raid`      | 9.20 / 8.64 / 8.06    |
 | `kind-contract-expiry`   | 8.05 / 7.56 / 7.05    |
@@ -1789,7 +1791,9 @@ Ship Tree golds (§1), also used as text, on `bg` / `panel` / `panel-2`:
   the four status tones under normal vision, and likewise leans on its glyph and name.
   `kind-structure-timer` (sage), `kind-structure-fuel` (olive gold) and `kind-corp-job`
   (pale mint) are each ΔE ≥ 23 from every other clock kind and ≥ 27 from the status
-  tones, normal vision only.
+  tones, normal vision only. `kind-shared-moon-pop` (slate violet) is ΔE ≥ 25 from every
+  other clock kind and ≥ 39 from the status tones, normal vision only; its glyph
+  (`Icon.SharedMoonPop`, a moon with stars) sets it apart from `moonChunk`'s plain moon.
 - Tabs: full `role="tablist"` semantics + arrow-key navigation.
 - Status messages go through `LiveStatus` (§4). Never mount a `role="status"` node together with its text. Never add it as the last child of a `space-y-*` / `divide-y` container.
 - Spinners expose `role="status"`; DataAgeBadge exposes absolute timestamp via

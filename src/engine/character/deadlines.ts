@@ -153,3 +153,12 @@ export function filterByCorporation(
   if (filter === 'all') return [...items];
   return items.filter((item) => item.corporation === undefined || item.corporation.id === filter);
 }
+
+/** Shared Pops of one sharing corporation, or all of them; every other clock passes. */
+export function filterBySharingCorporation(
+  items: readonly CharacterBoardItem[],
+  filter: CorpEventFilter
+): CharacterBoardItem[] {
+  if (filter === 'all') return [...items];
+  return items.filter((item) => item.sharedBy === undefined || item.sharedBy.id === filter);
+}

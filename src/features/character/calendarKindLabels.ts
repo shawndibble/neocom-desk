@@ -17,6 +17,7 @@ export const KIND_LABEL: Record<CharacterBoardItemKind, string> = {
   structureTimer: 'calendar.kind.structureTimer',
   structureFuel: 'calendar.kind.structureFuel',
   moonChunk: 'calendar.kind.moonChunk',
+  sharedMoonPop: 'calendar.kind.sharedMoonPop',
   corpJob: 'calendar.kind.corpJob',
   skyhookRaid: 'calendar.kind.skyhookRaid',
   contractExpiry: 'calendar.kind.contractExpiry',

@@ -17,6 +17,8 @@ import * as Icon from '@/components/ui/icons';
 import { loadCalendarBoard } from '@/features/character/calendarBoardData';
 import { EventDetailModal } from '@/features/character/EventDetailModal';
 import { skyhookRaidDetail } from '@/features/character/skyhookRaidDetail';
+import { sharedPopDetail } from '@/features/character/calendarSharedPops';
+import { useSharedPopParam } from '@/features/character/sharedPopLink';
 import { RowDetailModal } from '@/features/overview/widgets/RowDetailModal';
 import { CalendarMap } from '@/features/character/CalendarMap';
 import { CalendarDayTicker } from '@/features/character/CalendarDayTicker';
@@ -34,13 +36,18 @@ import {
   shownKinds,
   toggleHiddenKind,
 } from '@/features/character/calendarKindFilter';
-import { activeCorpFilter, useCalendarCorpFilter } from '@/features/character/calendarCorpFilter';
+import {
+  activeCorpFilter,
+  useCalendarCorpFilter,
+  useCalendarSharingCorpFilter,
+} from '@/features/character/calendarCorpFilter';
 import { buildCharacterBoard, type CharacterBoardItemKind } from '@/engine/character/board';
 import {
   countsByDay,
   countsByKind,
   filterByCorporation,
   filterByKinds,
+  filterBySharingCorporation,
 } from '@/engine/character/deadlines';
 import {
   addDays,
@@ -147,10 +154,13 @@ export function Calendar() {
   const weekStart = useCalendarWeekStart((state) => state.value);
   const savedCorpFilter = useCalendarCorpFilter((state) => state.value);
   const setCorpFilter = useCalendarCorpFilter((state) => state.setValue);
+  const savedSharingCorpFilter = useCalendarSharingCorpFilter((state) => state.value);
+  const setSharingCorpFilter = useCalendarSharingCorpFilter((state) => state.setValue);
   useHydratedStore(
     useCalendarDensity,
     useCalendarHiddenKinds,
     useCalendarCorpFilter,
+    useCalendarSharingCorpFilter,
     useCalendarSkillPlans,
     useCalendarWeekStart
   );
@@ -191,6 +201,8 @@ export function Calendar() {
   // `?open=` selects the event as a click would; it shows once the events load.
   const [selectedEventId, setSelectedEventId] = useState<number | null>(openParamId);
   const [selectedSkyhookId, setSelectedSkyhookId] = useState<number | null>(null);
+  // `?pop=` (a Shared Moon Pop notification) opens that Shared Pop once the board loads.
+  const [selectedPopId, setSelectedPopId] = useState<string | null>(useSharedPopParam());
 
   /**
    * RSVP responses applied locally, ahead of `data` catching up.
@@ -284,9 +296,17 @@ export function Calendar() {
 
   const selected = useMemo(() => shownKinds(hiddenKinds), [hiddenKinds]);
   const corpFilter = activeCorpFilter(savedCorpFilter, data?.corporations ?? []);
+  const sharingCorpFilter = activeCorpFilter(
+    savedSharingCorpFilter,
+    data?.sharingCorporations ?? []
+  );
   const visible = useMemo(
-    () => filterByKinds(filterByCorporation(board, corpFilter), selected),
-    [board, corpFilter, selected]
+    () =>
+      filterByKinds(
+        filterBySharingCorporation(filterByCorporation(board, corpFilter), sharingCorpFilter),
+        selected
+      ),
+    [board, corpFilter, sharingCorpFilter, selected]
   );
   const loads = useMemo(() => countsByDay(visible, zone), [visible, zone]);
   // Counted off the unfiltered board: a kind's own count must not drop to zero
@@ -326,6 +346,11 @@ export function Calendar() {
     const raid = data?.skyhookRaidDetails.find((r) => r.id === selectedSkyhookId);
     return raid === undefined ? null : skyhookRaidDetail(raid, nowMs, t, zone);
   }, [data, selectedSkyhookId, nowMs, t, zone]);
+  // Looked up in every live pop, not only the rows: a link still opens one hidden as a duplicate.
+  const popDetail = useMemo(() => {
+    const entry = data?.sharedPops.find((e) => e.pop.id === selectedPopId);
+    return entry === undefined ? null : sharedPopDetail(entry, nowMs, t, zone);
+  }, [data, selectedPopId, nowMs, t, zone]);
 
   function goToday() {
     setAnchor(cellOf(Date.now(), zone));
@@ -419,6 +444,9 @@ export function Calendar() {
               corporations={data?.corporations}
               corpFilter={corpFilter}
               onCorpFilter={(filter) => void setCorpFilter(filter)}
+              sharingCorporations={data?.sharingCorporations}
+              sharingCorpFilter={sharingCorpFilter}
+              onSharingCorpFilter={(filter) => void setSharingCorpFilter(filter)}
             />
             <TableActionsMenu name={t('calendar.title')} tableExport={eventsExport} size="md" />
             <IconButton
@@ -491,6 +519,7 @@ export function Calendar() {
               onClearDay={() => setSelectedDayMs(null)}
               onSelectEvent={setSelectedEventId}
               onSelectSkyhook={setSelectedSkyhookId}
+              onSelectSharedPop={setSelectedPopId}
               noKindsSelected={selected.size === 0}
             />
           </div>
@@ -498,6 +527,7 @@ export function Calendar() {
       )}
 
       <RowDetailModal detail={skyhookDetail} onClose={() => setSelectedSkyhookId(null)} />
+      <RowDetailModal detail={popDetail} onClose={() => setSelectedPopId(null)} />
 
       {selectedEvent && activeCharacterId !== null && (
         <EventDetailModal

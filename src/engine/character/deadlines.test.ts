@@ -131,6 +131,7 @@ describe('countsByDay', () => {
       planetExtractions: [clock('planet', day)],
       mercenaryDens: [clock('den', day)],
       moonChunks: [clock('moon', day)],
+      sharedMoonPops: [clock('sharedPop', day)],
       structureFuel: [clock('fuel', day)],
       structureTimers: [clock('timer', day)],
       corpJobs: [clock('corpJob', day)],
@@ -142,7 +143,7 @@ describe('countsByDay', () => {
     });
 
     expect(countsByDay(board).get(local(2026, 9, 11, 0, 0))).toEqual({
-      count: 14,
+      count: 15,
       kinds: [...CHARACTER_BOARD_ITEM_KINDS],
     });
   });

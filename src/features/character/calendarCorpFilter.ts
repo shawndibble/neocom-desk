@@ -19,6 +19,16 @@ export const useCalendarCorpFilter = createLocalSetting<CorpEventFilter>({
       : null,
 });
 
+/** The sharing-corporation filter on Shared Pops: all of them, or one corporation's. */
+export const CALENDAR_SHARING_CORP_FILTER_KEY = 'calendarSharingCorpFilter';
+
+export const useCalendarSharingCorpFilter = createLocalSetting<CorpEventFilter>({
+  key: CALENDAR_SHARING_CORP_FILTER_KEY,
+  defaultValue: DEFAULT_CORP_FILTER,
+  parse: (raw) =>
+    raw === 'all' || (typeof raw === 'number' && Number.isInteger(raw)) ? raw : null,
+});
+
 /**
  * A saved corporation filters nothing once the account can no longer read it,
  * or once it is the only one left: the menu then offers no row to undo it.

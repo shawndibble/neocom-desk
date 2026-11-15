@@ -49,6 +49,7 @@ export const CHARACTER_BOARD_ITEM_KINDS = [
   'structureTimer',
   'structureFuel',
   'moonChunk',
+  'sharedMoonPop',
   'corpJob',
   'skyhookRaid',
   'contractExpiry',
@@ -87,6 +88,13 @@ export interface BoardClockSource {
   deadlineMs: number;
   /** Set on a corporation's clock (`corpCalendar.ts`); absent on the pilot's own. */
   corporation?: BoardCorporation;
+  /**
+   * The corporation sharing a Shared Pop with the pilot. Not `corporation`: the pilot reads
+   * nothing of it, so the Corporation events filter never touches it.
+   */
+  sharedBy?: BoardCorporation;
+  /** A second line under the subject, already named (a Shared Pop's moon). */
+  subtitle?: string;
 }
 
 /** A calendar event, which alone carries an RSVP state and an importance flag. */
@@ -137,6 +145,8 @@ export interface CharacterBoardSources {
   mercenaryDens?: readonly BoardClockSource[];
   /** Moon drills of every readable corporation; absent when none can be read. */
   moonChunks?: readonly BoardClockSource[];
+  /** Other corporations' Shared Pops; absent when the read failed. */
+  sharedMoonPops?: readonly BoardClockSource[];
   /** Structures running out of fuel, every readable corporation. */
   structureFuel?: readonly BoardClockSource[];
   /** Structure reinforcement, vulnerability and unanchor timers ending. */
@@ -163,6 +173,7 @@ const SOURCE_KEY = {
   structureTimer: 'structureTimers',
   structureFuel: 'structureFuel',
   moonChunk: 'moonChunks',
+  sharedMoonPop: 'sharedMoonPops',
   corpJob: 'corpJobs',
   skyhookRaid: 'skyhookRaids',
   contractExpiry: 'contractExpiries',
@@ -231,6 +242,8 @@ function toItem(
     response: isCalendarEvent(source) ? source.response : null,
     important: isCalendarEvent(source) ? source.important : false,
     ...(source.corporation ? { corporation: source.corporation } : {}),
+    ...(source.sharedBy ? { sharedBy: source.sharedBy } : {}),
+    ...(source.subtitle ? { subtitle: source.subtitle } : {}),
   };
 }
 
