@@ -948,8 +948,8 @@ describe('Assets in the App', () => {
   it('opens /assets inside the signed-in shell, its rail link current', async () => {
     render(<App />);
     expect(await screen.findByText(JITA)).toBeInTheDocument();
-    const rail = screen.getAllByRole('navigation')[0];
-    expect(within(rail).getByRole('link', { name: 'Assets' })).toHaveAttribute(
+    const rail = (await screen.findAllByRole('navigation'))[0];
+    expect(await within(rail).findByRole('link', { name: 'Assets' })).toHaveAttribute(
       'aria-current',
       'page'
     );

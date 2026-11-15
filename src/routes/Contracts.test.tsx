@@ -794,7 +794,7 @@ describe('Time format preference', () => {
     expect(within(table).getByText(formatDateOnly(EXPIRES))).toBeInTheDocument();
 
     // The store's own setter, exactly as a Settings control would call it —
-    // it takes the hydration generation, so App's in-flight `hydrate()`
+    // it takes the hydration generation, so the render's in-flight `hydrate()`
     // cannot land afterwards and undo the choice.
     await act(async () => {
       await useTimeFormat.getState().setValue('eve');
@@ -1214,8 +1214,8 @@ describe('Contracts in the App', () => {
   it('opens /contracts/history inside the signed-in shell, its rail link current', async () => {
     render(<App />);
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
-    const rail = screen.getAllByRole('navigation')[0];
-    expect(within(rail).getByRole('link', { name: 'Contracts' })).toHaveAttribute(
+    const rail = (await screen.findAllByRole('navigation'))[0];
+    expect(await within(rail).findByRole('link', { name: 'Contracts' })).toHaveAttribute(
       'aria-current',
       'page'
     );

@@ -13,14 +13,16 @@ import { EntityInfoRoute } from '@/features/entities';
 import { ItemInfoModal } from '@/features/entities/ItemInfoModal';
 import { PlaceInfoModal } from '@/features/entities/PlaceInfoModal';
 import { LocationProbe } from '@/test/LocationProbe';
-import { PublicInfoModal, RouteEffects } from '@/test/routeWithoutShellParts';
+import { PublicInfoModal, RouteEffects, SkillDetailModal } from '@/test/routeWithoutShellParts';
 
 // Renders one feature route the way App.tsx mounts it — its ScopeGate, its
 // TabRoute for a tabbed page, the info modals — but without App's boot work
 // and without the signed-in shell (Layout's rail, pollers, prefetch, sync).
 // That boot is what made a route test pay seconds per scenario and time out on
-// a loaded CI worker. A test that is about the App wiring itself (a redirect,
-// auth gating, the nav) still renders `<App />`.
+// a loaded CI worker. Left out, so still `<App />`'s to test: RequireCharacter
+// (no session -> /login), AuthFailureRedirect, the route table's redirects, the
+// shell and its nav, the font scale, and the remount on a number-format change.
+// The test seeds the session itself (an active Character in Dexie).
 
 /**
  * Renders the feature route at `path` (with `element` as its page) against
@@ -55,6 +57,7 @@ export function renderRouteWithoutShell(path: AppRoutePath, element: ReactElemen
         </Suspense>
         <EntityInfoRoute />
         <PublicInfoModal />
+        <SkillDetailModal />
         <ItemInfoModal />
         <PlaceInfoModal />
       </BrowserRouter>
