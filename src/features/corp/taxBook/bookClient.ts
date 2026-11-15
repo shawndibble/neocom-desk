@@ -23,6 +23,8 @@ import {
   where,
 } from 'firebase/firestore/lite';
 import { getValidAccessToken } from '@/auth/session';
+import { popShareMarks, type PopShareMarks } from '@/engine/corpTaxBook/popShareMarks';
+import { readPopSharing } from './popSharingClient';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
@@ -179,6 +181,11 @@ export interface FeederChunkParts {
     /** The Feeder's last good read (ms): its pops' Data Age. */
     lastReadWellAt?: number;
   })[];
+  /**
+   * Pop Sharing marks by refinery (#6226), the book's own moons and its Feeders' alike;
+   * absent when the sharing settings could not be read.
+   */
+  shareMarks?: PopShareMarks['structures'];
 }
 
 /**
@@ -197,9 +204,11 @@ export async function readFeederChunkParts(
   const book = doc(db, 'corps', String(corporationId));
   if (!(await getDoc(book)).exists()) return null;
   return asOfficer(characterId, corporationId, async () => {
-    const [overview, feeders] = await Promise.all([
+    const [overview, feeders, sharing] = await Promise.all([
       getDoc(doc(book, 'readModels', 'overview')),
       getDocs(collection(book, 'feeders')),
+      // Best effort: the pops still list without their marks.
+      readPopSharing(characterId, corporationId).catch(() => null),
     ]);
     const windowed = overview.data()?.extractions as SyncExtraction[] | undefined;
     const extractions =
@@ -212,8 +221,27 @@ export async function readFeederChunkParts(
           )
         )
       ).docs.map((d) => d.data() as SyncExtraction);
+    const records = feeders.docs.map((d) => ({
+      ...(d.data() as FeederDoc),
+      corporationId: Number(d.id),
+    }));
+    const shareMarks = sharing
+      ? popShareMarks(
+          extractions.map((x) => ({
+            moonId: x.moonId,
+            structureId: x.structureId,
+            startedAt: x.extractionStartTime,
+            ...(x.sourceCorporationId === undefined
+              ? {}
+              : { sourceCorporationId: x.sourceCorporationId }),
+          })),
+          records,
+          sharing
+        ).structures
+      : undefined;
     return {
       extractions: extractions.filter((x) => x.sourceCorporationId !== undefined),
+      ...(shareMarks ? { shareMarks } : {}),
       feeders: feeders.docs.map((d) => {
         const { refineryLabels, refineryStructures, lastReadWellAt } = d.data() as FeederDoc;
         return {

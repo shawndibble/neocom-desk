@@ -19,6 +19,8 @@ import { MoonOwnerStatusPill } from './MoonOwnerStatusPill';
 import { MoonOwnerCards } from './MoonOwnerCards';
 import { moonOwnerNote } from './moonOwnerNote';
 import { caretColumn } from './caretColumn';
+import type { PopShareMark } from '@/engine/corpTaxBook/popShareMarks';
+import { PopShareIcon } from './PopShareIcon';
 import { isk, shortDate } from './moonsFormat';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.${key}`;
@@ -36,6 +38,7 @@ export function MoonOwnersTable({
   now,
   onOpen,
   onPay,
+  shareMarks,
 }: {
   rows: readonly MoonOwnerRow[];
   totals: MoonOwnerTotals;
@@ -45,6 +48,8 @@ export function MoonOwnersTable({
   onOpen: (row: MoonOwnerRow) => void;
   /** Pay on a row that is owed. Absent for a viewer who may not record payments. */
   onPay?: (row: MoonOwnerRow) => void;
+  /** Pop Sharing marks by moon owner corporation (#6226). */
+  shareMarks?: Readonly<Record<string, PopShareMark>>;
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -60,6 +65,7 @@ export function MoonOwnersTable({
           <span className="inline-flex max-w-full items-center gap-2">
             <span className="truncate text-accent">{name(r.corporationId)}</span>
             {r.sameOwner && <Pill tone="accent">{t(k('yours'))}</Pill>}
+            <PopShareIcon mark={shareMarks?.[String(r.corporationId)]} />
           </span>
           <span className="block text-xs text-text-dim">{moonOwnerNote(r, now, t)}</span>
         </span>
@@ -175,6 +181,7 @@ export function MoonOwnersTable({
           name={name}
           now={now}
           onOpen={onOpen}
+          {...(shareMarks ? { shareMarks } : {})}
           {...(onPay ? { onPay } : {})}
         />
       ) : (

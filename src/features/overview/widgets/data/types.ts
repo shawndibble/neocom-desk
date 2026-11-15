@@ -139,6 +139,8 @@ export type TableCell =
   | { text: string; iskAmount: number; prefix?: string }
   /** Short text with more behind it (a ticker, the corporation's full name in a tooltip). */
   | { text: string; hint: string }
+  /** Text followed by a share mark (`ShareMark`): `label` is its tooltip, `off` slashes it. */
+  | { text: string; share: { label: string; off: boolean } }
   | { text: string; tone?: 'good' | 'caution' | 'bad'; bar?: number };
 
 export interface TableColumn {

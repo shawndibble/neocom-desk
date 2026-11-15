@@ -147,10 +147,13 @@ function mergeMoonChunks(
 /** A book read that has not answered by then is left out, so it never holds a widget back. */
 const BOOK_READ_LIMIT_MS = 15_000;
 
-/** Feeder pops by corporation, once the caller knows which corporations ESI answered for. */
-export type FeederChunks = (
+/**
+ * Feeder pops by corporation, once the caller knows which corporations ESI answered for, and
+ * the books' Pop Sharing marks by refinery (#6226) when any moon has one.
+ */
+export type FeederChunks = ((
   esiCorporations: ReadonlySet<number>
-) => Map<number, MoonChunksBoardData>;
+) => Map<number, MoonChunksBoardData>) & { shareMarks?: MoonChunksBoardData['shareMarks'] };
 
 const NO_FEEDER_CHUNKS: FeederChunks = () => new Map();
 
@@ -166,14 +169,16 @@ export async function startFeederChunks(
   if (!accounts.some(({ access }) => access.can('canViewTaxBook'))) return NO_FEEDER_CHUNKS;
   try {
     // Lazy: the book client is Firebase, and most pilots run no book.
-    const { readFeederBooks, feederChunkReads } =
+    const { readFeederBooks, feederChunkReads, feederShareMarks } =
       await import('@/features/corp/taxBook/feederBookChunks');
     const books = await Promise.race([
       readFeederBooks(accounts, preferred),
       new Promise<[]>((resolve) => setTimeout(() => resolve([]), BOOK_READ_LIMIT_MS)),
     ]);
     if (books.length === 0) return NO_FEEDER_CHUNKS;
-    return (esi) => feederChunkReads(books, esi);
+    const reads: FeederChunks = (esi) => feederChunkReads(books, esi);
+    const shareMarks = feederShareMarks(books);
+    return Object.keys(shareMarks).length > 0 ? Object.assign(reads, { shareMarks }) : reads;
   } catch {
     return NO_FEEDER_CHUNKS;
   }
@@ -211,6 +216,12 @@ function openToOfficer(read: MoonChunksBoardData): MoonChunksBoardData {
     : read;
 }
 
+/** A moon read carrying the books' Pop Sharing marks, when there are any. */
+const withShareMarks =
+  (shareMarks: MoonChunksBoardData['shareMarks']) =>
+  (read: MoonChunksBoardData): MoonChunksBoardData =>
+    shareMarks ? { ...read, shareMarks } : read;
+
 /** One Character's moon read, plus its book's Feeder pops when it views a Corp Tax Book. */
 export async function loadMoonChunksWithBook(characterId: number): Promise<MoonChunksBoardData> {
   const access = await resolveCorpReadAccess(characterId);
@@ -223,13 +234,14 @@ export async function loadMoonChunksWithBook(characterId: number): Promise<MoonC
     startFeederChunks([{ characterId, access }], characterId),
   ]);
   const book = await namedByCorporation(feeders(new Set([access.corporationId])));
+  const marked = withShareMarks(feeders.shareMarks);
   // The own read failed and no book answered: the widget's Retry.
   if ('error' in own) {
     if (book.length === 0) throw own.error;
-    return mergeMoonChunks(book, false, Date.now());
+    return marked(mergeMoonChunks(book, false, Date.now()));
   }
-  if (book.length === 0) return openToOfficer(own.read);
-  return mergeMoonChunks([own.read, ...book], own.read.needsReauth, own.read.loadedAt);
+  if (book.length === 0) return marked(openToOfficer(own.read));
+  return marked(mergeMoonChunks([own.read, ...book], own.read.needsReauth, own.read.loadedAt));
 }
 
 /** A read's drills stamped with their corporation, so a list across several can name it. */
@@ -283,6 +295,7 @@ export async function loadAllMoonChunksBoardData(): Promise<MoonChunksBoardData>
   const view = accounts.some(({ access }) => access.can('canViewTaxBook'))
     ? openToOfficer(merged)
     : merged;
+  const marked = withShareMarks(feeders.shareMarks)(view);
   // One corporation of several failed: the rest draws, flagged.
-  return partlyFailed ? { ...view, partlyFailed: true } : view;
+  return partlyFailed ? { ...marked, partlyFailed: true } : marked;
 }

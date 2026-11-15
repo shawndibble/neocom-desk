@@ -524,6 +524,40 @@ describe('moonChunks', () => {
     expect(view.table!.rows).toHaveLength(0);
     expect(view.number.tone).toBe('clear');
   });
+
+  it('marks a drill its book shares, or whose moon owner opted out, and leaves the rest bare', () => {
+    const view = buildView(
+      'moonChunks',
+      {
+        moonChunks: ok({
+          chunks: [
+            chunk('1', 'arrival', NOW + DAY),
+            chunk('2', 'arrival', NOW + 2 * DAY),
+            chunk('3', 'arrival', NOW + 3 * DAY),
+          ],
+          needsReauth: false,
+          fetchedAt: new Date(NOW),
+          loadedAt: NOW,
+          shareMarks: {
+            '1': { kind: 'shared', audiences: [{ kind: 'corp' }] },
+            '2': { kind: 'opted-out' },
+          },
+        }) as never,
+      },
+      ctx()
+    );
+    expect(view.table!.rows.map((r) => r.cells[0])).toEqual([
+      {
+        text: 'Efa Moon Drill',
+        share: { label: expect.stringContaining('sharing.mark.shared'), off: false },
+      },
+      {
+        text: 'Efa Moon Drill',
+        share: { label: expect.stringContaining('sharing.ownerOptedOut'), off: true },
+      },
+      'Efa Moon Drill',
+    ]);
+  });
 });
 
 describe('incursions', () => {
