@@ -22,6 +22,7 @@ import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import type { TaxPriceSource } from '@/engine/miningTax/priceBasis';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
+import { unreportedClaims } from '@/engine/miningTax/ownership';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
@@ -187,6 +188,11 @@ export function RowDetailModal({
   // creating across more than one line — showing it again above would be
   // pure duplication.
   const showOreCard = !(status === 'unassigned' && oreLines.length > 1);
+  // A split side that claimed the client's figure ahead of ESI (issue #6180)
+  // shows how much of it the ledger has caught up with.
+  const unreported = assignment
+    ? unreportedClaims(row.entry.oreLines, row.assignments, assignment.id)
+    : [];
 
   // The breakdown card only shows for an assigned row; hooks can't be
   // conditional, so the one that builds its copy text takes a placeholder
@@ -363,7 +369,17 @@ export function RowDetailModal({
                       {typeNames.get(line.typeId) ?? `#${line.typeId}`}
                     </OreLink>
                   </span>
-                  <span className="tabular-nums text-text-dim">{formatCount(line.quantity)}</span>
+                  <span className="tabular-nums text-text-dim">
+                    {(() => {
+                      const claim = unreported.find((u) => u.typeId === line.typeId);
+                      return claim
+                        ? t('miningTax.detailUnreported', {
+                            reported: formatCount(claim.reported),
+                            claimed: formatCount(claim.claimed),
+                          })
+                        : formatCount(line.quantity);
+                    })()}
+                  </span>
                 </li>
               ))}
             </ul>

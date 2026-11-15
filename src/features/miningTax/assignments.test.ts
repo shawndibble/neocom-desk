@@ -1376,6 +1376,47 @@ describe('splitAssignment', () => {
     ).rejects.toThrow();
   });
 
+  it('lets the kept side claim ore ESI has not reported yet, the new side collecting what comes after', async () => {
+    const original = await seedOriginal();
+
+    const { kept, created } = await splitAssignment(
+      original,
+      {
+        moves: [],
+        unreported: [{ typeId: TYPE_A, quantity: 30 }],
+        payeeId: 'payee-2',
+        taxPct: 8,
+        collector: 'new',
+      },
+      atOneHub
+    );
+
+    expect(kept.oreLines).toEqual([
+      { typeId: TYPE_A, quantity: 130 },
+      { typeId: TYPE_B, quantity: 50 },
+    ]);
+    expect(kept.estimatedValue).toBe(130 * 10 + 50 * 4);
+    expect(created.oreLines).toEqual([]);
+    expect(created.estimatedValue).toBe(0);
+    expect(created.collectsGrowth).toBe(true);
+  });
+
+  it('refuses an unreported claim the new side does not collect after, or on a paid original', async () => {
+    const original = await seedOriginal();
+    const claim = {
+      moves: [],
+      unreported: [{ typeId: TYPE_A, quantity: 30 }],
+      payeeId: 'payee-2',
+      taxPct: 8,
+    };
+    await expect(
+      splitAssignment(original, { ...claim, collector: 'original' }, atOneHub)
+    ).rejects.toThrow();
+    await expect(splitAssignment(original, claim, atOneHub)).rejects.toThrow();
+    const paid = await seedOriginal({ status: 'paid', paidAt: 5 });
+    await expect(splitAssignment(paid, { ...claim, collector: 'new' }, atOneHub)).rejects.toThrow();
+  });
+
   it('values each side at its own Payee’s hub when the two bill at different ones', async () => {
     const original = await seedOriginal();
 

@@ -34,6 +34,39 @@ describe('planSplit', () => {
   });
 });
 
+describe('planSplit with unreported ore', () => {
+  const original = [
+    { typeId: A, quantity: 100 },
+    { typeId: B, quantity: 50 },
+  ];
+
+  it('claims ore ESI has not reported yet on the kept side', () => {
+    const plan = planSplit(original, [], [{ typeId: A, quantity: 30 }]);
+    expect(plan.kept).toEqual([
+      { typeId: A, quantity: 130 },
+      { typeId: B, quantity: 50 },
+    ]);
+    expect(plan.moved).toEqual([]);
+  });
+
+  it('moves one type while the kept side claims more of another', () => {
+    const plan = planSplit(original, [{ typeId: B, quantity: 50 }], [{ typeId: A, quantity: 5 }]);
+    expect(plan.kept).toEqual([{ typeId: A, quantity: 105 }]);
+    expect(plan.moved).toEqual([{ typeId: B, quantity: 50 }]);
+  });
+
+  it('adds a type the entry has not reported at all', () => {
+    const plan = planSplit(original, [], [{ typeId: 999, quantity: 7 }]);
+    expect(plan.kept).toEqual([...original, { typeId: 999, quantity: 7 }]);
+  });
+
+  it('refuses to both move and claim more of one type', () => {
+    expect(() =>
+      planSplit(original, [{ typeId: A, quantity: 10 }], [{ typeId: A, quantity: 5 }])
+    ).toThrow();
+  });
+});
+
 describe('growthMoves', () => {
   it('moves what each type grew by, including a type that was new', () => {
     expect(

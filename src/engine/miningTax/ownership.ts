@@ -122,6 +122,44 @@ export function computeOwnership(
   return { unassigned: sortedByType(unassigned), ownedLines };
 }
 
+/** One ore type an Assignment claims more of than ESI has reported for it so far. */
+export interface UnreportedClaim {
+  typeId: number;
+  claimed: number;
+  /** What the entry holds for this Assignment once every other covering Assignment's claim is met — less than `claimed`. */
+  reported: number;
+}
+
+/**
+ * Where an Assignment claims more than ESI reports so far — a split whose
+ * kept side was given the client's figure ahead of the ledger (issue #6180,
+ * `planSplit`'s `unreported`). Shown so the pilot can watch ESI catch up;
+ * ownership itself needs nothing extra, since the claim already outranks
+ * the collector's growth in `computeOwnership`.
+ */
+export function unreportedClaims(
+  entryLines: readonly OreLine[],
+  covering: readonly CoveringAssignment[],
+  assignmentId: string
+): UnreportedClaim[] {
+  const own = covering.find((c) => c.id === assignmentId);
+  if (!own) return [];
+  const out: UnreportedClaim[] = [];
+  for (const line of sortedByType(own.oreLines)) {
+    const entry = entryLines.find((l) => l.typeId === line.typeId)?.quantity ?? 0;
+    const others = covering
+      .filter((c) => c.id !== assignmentId)
+      .reduce(
+        (sum, c) => sum + (c.oreLines.find((l) => l.typeId === line.typeId)?.quantity ?? 0),
+        0
+      );
+    const reported = Math.max(0, Math.min(line.quantity, entry - others));
+    if (reported < line.quantity)
+      out.push({ typeId: line.typeId, claimed: line.quantity, reported });
+  }
+  return out;
+}
+
 /** The fields `findDuplicateAssignmentIds` reads off a stored Assignment — narrower than the Dexie record, so the engine stays Dexie-free. */
 export interface DuplicateCandidate {
   id: string;
