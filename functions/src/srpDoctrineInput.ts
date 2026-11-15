@@ -13,6 +13,24 @@ export const MAX_DOCTRINE_NAME = 80;
 export const MAX_DOCTRINE_MODULES = 40;
 export const MAX_DOCTRINE_RIGS = 8;
 const TYPE_ID_MAX = 2_147_483_647;
+// Mirrors MAX_FITTING_SHARE_CODE_LENGTH and the base64url check of the client's Fitting Share Code
+// (src/engine/fittings); functions never import src/.
+export const MAX_DOCTRINE_SHARE_CODE = 20_100;
+const SHARE_CODE = /^[A-Za-z0-9_-]+$/;
+
+function shareCode(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    value.length > MAX_DOCTRINE_SHARE_CODE ||
+    !SHARE_CODE.test(value)
+  ) {
+    throw new HttpsError(
+      'invalid-argument',
+      `shareCode must be a Fitting Share Code of at most ${MAX_DOCTRINE_SHARE_CODE} characters`
+    );
+  }
+  return value;
+}
 
 function typeIds(value: unknown, field: string, max: number): number[] {
   if (!Array.isArray(value)) {
@@ -24,7 +42,11 @@ function typeIds(value: unknown, field: string, max: number): number[] {
   return sortedIds(value.map((v) => int(v, field, 1, TYPE_ID_MAX)));
 }
 
-/** `{ id?, name, snapshot: { hullTypeId, modules, rigs } }`; `id` present replaces that fit. */
+/**
+ * `{ id?, name, snapshot: { hullTypeId, modules, rigs }, shareCode? }`; `id` present replaces that
+ * fit. `shareCode` is the whole fit (charges, drones, cargo) members open; the snapshot alone is
+ * what SRP matches.
+ */
 export function parseSaveDoctrine(data: unknown): SaveDoctrineInput {
   const d = record(data);
   const name = boundedString(d.name, 'name', MAX_DOCTRINE_NAME);
@@ -39,6 +61,7 @@ export function parseSaveDoctrine(data: unknown): SaveDoctrineInput {
     },
   };
   if (d.id !== undefined) input.id = docId(d.id, 'id');
+  if (d.shareCode !== undefined) input.shareCode = shareCode(d.shareCode);
   return input;
 }
 

@@ -3,6 +3,7 @@ import {
   basesOfFromLookup,
   doctrineFitFromEft,
   doctrineFitFromFitting,
+  fittingFromDoctrineSnapshot,
 } from '@/engine/srpDoctrineFit';
 import { mutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
 import type { Fitting, FittingModule } from '@/engine/fittings/types';
@@ -72,9 +73,55 @@ A Drone x5
       fit: { hullTypeId: 1, name: 'Fit B', modules: [10, 12], rigs: [20] },
     });
   });
+  it('also keeps the whole fit, charges and drones included, for its share code', () => {
+    const r = doctrineFitFromEft(eft, typeByName, slots);
+    if (!r.ok) throw new Error('expected a fit');
+    expect(r.fitting).toMatchObject({ name: 'Fit B', shipTypeId: 1 });
+    expect(r.fitting.modules.find((m) => m.typeId === 10)?.chargeTypeId).toBe(30);
+    expect(r.fitting.drones).toEqual([{ typeId: 60, quantity: 5, state: expect.any(String) }]);
+  });
   it('reports an unknown hull', () => {
     const r = doctrineFitFromEft('[Nothing, X]\n', typeByName, slots);
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('fittingFromDoctrineSnapshot', () => {
+  const slots = { 10: 'high', 12: 'medium', 20: 'rig', 50: 'subsystem' } as const;
+  it('rebuilds hull, modules, rigs and subsystems in their racks, nothing else', () => {
+    const fitting = fittingFromDoctrineSnapshot(
+      { hullTypeId: 1, name: 'Old', modules: [10, 10, 12, 50], rigs: [20] },
+      'Old Fleet Fit',
+      slots
+    );
+    expect(fitting).toEqual({
+      name: 'Old Fleet Fit',
+      shipTypeId: 1,
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: 10, state: 'active' },
+        { slot: 'high', slotIndex: 1, typeId: 10, state: 'active' },
+        { slot: 'medium', slotIndex: 0, typeId: 12, state: 'active' },
+        { slot: 'rig', slotIndex: 0, typeId: 20, state: 'active' },
+        { slot: 'subsystem', slotIndex: 0, typeId: 50, state: 'active' },
+      ],
+      drones: [],
+      cargo: [],
+    });
+  });
+  it('round-trips through doctrineFitFromFitting to the same snapshot SRP matches', () => {
+    const snapshot = { hullTypeId: 1, name: 'X', modules: [10, 12, 50], rigs: [20] };
+    expect(doctrineFitFromFitting(fittingFromDoctrineSnapshot(snapshot, 'X', slots))).toEqual(
+      snapshot
+    );
+  });
+  it('drops a type the slot map no longer knows rather than carrying it as cargo', () => {
+    const fitting = fittingFromDoctrineSnapshot(
+      { hullTypeId: 1, name: 'X', modules: [10, 999], rigs: [] },
+      'X',
+      slots
+    );
+    expect(fitting.modules.map((m) => m.typeId)).toEqual([10]);
+    expect(fitting.cargo).toEqual([]);
   });
 });
 

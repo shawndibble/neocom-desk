@@ -77,7 +77,15 @@ export interface DoctrineFit {
   snapshot: DoctrineFitSnapshot;
   createdBy: number;
   createdAt: number;
+  /**
+   * The whole fit as a Fitting Share Code, so members open it with charges, drones and cargo.
+   * Absent on fits saved before #6202: those open from the snapshot alone.
+   */
+  shareCode?: string;
 }
+
+/** What a member reads of one Doctrine Fit (`listSrpDoctrineFitsCallable`). */
+export type MemberDoctrineFit = Pick<DoctrineFit, 'id' | 'name' | 'snapshot' | 'shareCode'>;
 
 /**
  * The doctrine-fit result stored on a claim at filing (never re-evaluated). `doctrineName` is the
@@ -91,6 +99,7 @@ export interface SaveDoctrineInput {
   id?: string;
   name: string;
   snapshot: DoctrineFitSnapshot;
+  shareCode?: string;
 }
 
 /** Jita values of a loss, no cargo. Each null when unpriced. */

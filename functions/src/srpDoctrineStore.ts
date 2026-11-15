@@ -1,7 +1,7 @@
 // SRP Doctrine Fits: the admin-SDK half. A Director saves or deletes a corp's
 // Doctrine Fit snapshot (re-checked live, CEO included, like Hull Rules); each change appends to
 // the audit log in the same transaction. Any member may preview the fit check of their
-// own loss; that writes nothing. Parsing: srpDoctrineInput.ts; the match: srpDoctrineCheck.ts.
+// own loss (that writes nothing) and list the corp's fits for their Fittings library. Parsing: srpDoctrineInput.ts; the match: srpDoctrineCheck.ts.
 
 import { fail, type Caller } from './actorAuth.js';
 import { randomBytes } from 'node:crypto';
@@ -25,6 +25,7 @@ import {
   MAX_DOCTRINES,
   type DoctrineFit,
   type DoctrinePreview,
+  type MemberDoctrineFit,
   type PayoutQuote,
   type HullRule,
   type SaveDoctrineInput,
@@ -76,6 +77,8 @@ export async function saveSrpDoctrine(
       snapshot: input.snapshot,
       createdBy: existing?.createdBy ?? access.characterId,
       createdAt: existing?.createdAt ?? deps.now(),
+      // a re-save without one (an older client) drops the old code: it no longer matches the fit
+      ...(input.shareCode !== undefined ? { shareCode: input.shareCode } : {}),
     };
     tx.set(ref, fit);
     appendSrpAudit(
@@ -129,6 +132,29 @@ export async function deleteSrpDoctrine(
     });
   });
   return { id: input.id };
+}
+
+/**
+ * The corp's Doctrine Fits for a verified member's Fittings library (#6202). Firestore rules keep
+ * `srpDoctrines` officers-only because they cannot check current membership; this re-checks it
+ * live, so a Character who left the corp reads nothing. SRP off lists nothing.
+ */
+export async function listSrpDoctrineFits(
+  deps: SrpDeps,
+  caller: Caller,
+  call: BookCall
+): Promise<{ fits: MemberDoctrineFit[] }> {
+  await authorizeMember(deps, caller, call);
+  const settings = (await srpSettingsRef(deps.db, call.corporationId).get()).data() as
+    SrpSettings | undefined;
+  if (!settings || settings.enabled !== true) return { fits: [] };
+  const docs = await doctrinesCollection(deps.db, call.corporationId).limit(MAX_DOCTRINES).get();
+  return {
+    fits: docs.docs.map((d) => {
+      const { id, name, snapshot, shareCode } = d.data() as DoctrineFit;
+      return shareCode ? { id, name, snapshot, shareCode } : { id, name, snapshot };
+    }),
+  };
 }
 
 /**

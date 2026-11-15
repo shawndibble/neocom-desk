@@ -26,9 +26,13 @@ vi.mock('@/features/fittings/useSavedFittingRecords', () => ({
   useSavedFittingRecords: () => [],
 }));
 const eft = vi.hoisted(() => vi.fn());
+const shareCode = vi.hoisted(() =>
+  vi.fn(async (_fitting: unknown, name: string) => `code-${name}`)
+);
 vi.mock('./doctrineSources', () => ({
   snapshotFromEft: eft,
-  snapshotFromFitting: vi.fn(),
+  doctrineFromFitting: vi.fn(),
+  doctrineShareCode: shareCode,
 }));
 
 import { SrpSettingsEditor } from './SrpSettingsEditor';
@@ -116,10 +120,12 @@ describe('Doctrine Fits in SRP settings', () => {
     );
   });
 
-  it('lists unresolved EFT lines and still adds the fit', async () => {
+  it('lists unresolved EFT lines and still adds the fit, with its whole fit as a share code', async () => {
+    const whole = { name: 'Pasted', shipTypeId: 627, modules: [], drones: [], cargo: [] };
     eft.mockResolvedValue({
       ok: true,
       fit: { hullTypeId: 627, name: 'Pasted', modules: [1], rigs: [] },
+      fitting: whole,
       unresolved: [{ line: 4, text: 'Not A Real Module', reason: 'x', kind: 'unknown-item' }],
     });
     setup();
@@ -130,7 +136,8 @@ describe('Doctrine Fits in SRP settings', () => {
     expect(screen.getByText('Line 4: Not A Real Module')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Add Doctrine Fit' }));
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
-    expect(save.mock.calls[0]![0]).toMatchObject({ name: 'Pasted' });
+    expect(save.mock.calls[0]![0]).toMatchObject({ name: 'Pasted', shareCode: 'code-Pasted' });
+    expect(shareCode).toHaveBeenCalledWith(whole, 'Pasted');
     expect((await screen.findAllByText('Pasted')).length).toBeGreaterThan(0);
   });
 
