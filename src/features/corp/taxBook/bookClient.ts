@@ -242,15 +242,16 @@ export async function readFeederChunkParts(
     return {
       extractions: extractions.filter((x) => x.sourceCorporationId !== undefined),
       ...(shareMarks ? { shareMarks } : {}),
-      feeders: feeders.docs.map((d) => {
-        const { refineryLabels, refineryStructures, lastReadWellAt } = d.data() as FeederDoc;
-        return {
-          corporationId: Number(d.id),
-          ...(typeof lastReadWellAt === 'number' ? { lastReadWellAt } : {}),
-          ...(refineryLabels ? { refineryLabels } : {}),
-          ...(refineryStructures ? { refineryStructures } : {}),
-        };
-      }),
+      feeders: records.map(
+        ({ corporationId, refineryLabels, refineryStructures, lastReadWellAt }) => {
+          return {
+            corporationId,
+            ...(typeof lastReadWellAt === 'number' ? { lastReadWellAt } : {}),
+            ...(refineryLabels ? { refineryLabels } : {}),
+            ...(refineryStructures ? { refineryStructures } : {}),
+          };
+        }
+      ),
     };
   });
 }
