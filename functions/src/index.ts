@@ -192,7 +192,12 @@ import {
 } from './corpTaxBookStore.js';
 import { parseSrpSettingsPatch } from './srp.js';
 import { getSrpClaimValues, parseClaimValuesInput } from './srpClaimValues.js';
-import { deleteSrpDoctrine, previewSrpDoctrineCheck, saveSrpDoctrine } from './srpDoctrineStore.js';
+import {
+  deleteSrpDoctrine,
+  listSrpDoctrineFits,
+  previewSrpDoctrineCheck,
+  saveSrpDoctrine,
+} from './srpDoctrineStore.js';
 import { parseDeleteDoctrine, parseSaveDoctrine } from './srpDoctrineInput.js';
 import { parseFileClaimInput } from './srpKillmail.js';
 import { srpKillmailSource } from './srpKillmailEsi.js';
@@ -1239,6 +1244,11 @@ corpTaxBookAction('saveSrpDoctrineCallable', (request) =>
     parseBookCall(request.data),
     parseSaveDoctrine(request.data)
   )
+);
+
+// Any verified member lists the corp's Doctrine Fits for their Fittings library (#6202).
+corpTaxBookAction('listSrpDoctrineFitsCallable', (request) =>
+  listSrpDoctrineFits(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 corpTaxBookAction('deleteSrpDoctrineCallable', (request) =>

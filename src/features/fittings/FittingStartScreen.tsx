@@ -54,6 +54,7 @@ import {
   useSavedFittings,
   type LibraryRow,
 } from './useLibraryFittings';
+import { useCorpDoctrineFittings } from './corpDoctrineFittings';
 
 interface FittingStartScreenProps {
   /** The open workspace, or the Compare picker's stand-in that returns a Fitting Share Code. */
@@ -181,6 +182,7 @@ export function FittingStartScreen({
   const inGame = useInGameFittings(characterId);
   const community = useCommunityFittings(characterId);
   const active = useActiveFitting(characterId);
+  const doctrine = useCorpDoctrineFittings(characterId);
   const timeZone = useTimeZone();
   const hasCharacter = characterId !== null;
   const { refresh: refreshInGame } = inGame;
@@ -199,8 +201,18 @@ export function FittingStartScreen({
           )
         : []),
       ...(hasCharacter ? community.rows : []),
+      ...(hasCharacter ? doctrine.rows : []),
     ],
-    [saved.records, saved.hulls, inGame.result, inGame.hullNames, community.rows, hasCharacter, t]
+    [
+      saved.records,
+      saved.hulls,
+      inGame.result,
+      inGame.hullNames,
+      community.rows,
+      doctrine.rows,
+      hasCharacter,
+      t,
+    ]
   );
   const groups = useMemo(() => groupByHull(filterMyFittings(rows, query)), [rows, query]);
   // Above the hulls, so it is the first pick.
@@ -220,6 +232,8 @@ export function FittingStartScreen({
     if (row.source === 'saved') workspace.openSaved(row.record);
     // A Community's Fitting opens like an import: stated for this pilot, nothing saved until they save.
     else if (row.source === 'shared') void workspace.loadFromInput(row.shared.code);
+    // The corp's Doctrine Fit opens the same way; Save a copy makes it the pilot's own.
+    else if (row.source === 'doctrine') void workspace.loadFromInput(row.code);
     // The flown ship opens as an In-game Fitting does (the Compare picker has no other way in).
     else if (row.source === 'active')
       void workspace.openLoaded({
@@ -274,6 +288,7 @@ export function FittingStartScreen({
         onClick={() => {
           void inGame.refresh();
           void active.refresh();
+          void doctrine.refresh();
         }}
         disabled={inGame.loading}
       />
@@ -344,6 +359,12 @@ export function FittingStartScreen({
                   .join(' · ')}
               </span>
             )}
+            {/* The preview pane says it when there is one; without it, the row does. */}
+            {row.source === 'doctrine' && row.legacy && !previewing && (
+              <span className="block text-xs text-text-dim">
+                {t('fittings.start.doctrineLegacy')}
+              </span>
+            )}
             {/* Its heading isn't its hull's, so the row names the hull. */}
             {row.source === 'active' && row.hull !== row.name && (
               <span className="block truncate text-xs text-text-dim">{row.hull}</span>
@@ -370,7 +391,9 @@ export function FittingStartScreen({
             <span className="shrink-0 text-[0.625rem] tracking-widest text-text-dim uppercase">
               {row.source === 'saved'
                 ? t('fittings.start.sourceSaved')
-                : t('fittings.start.sourceInGame')}
+                : row.source === 'doctrine'
+                  ? t('fittings.start.sourceDoctrine')
+                  : t('fittings.start.sourceInGame')}
             </span>
           )}
           {/* Without the preview pane a row opens the editor (it loads state, so no href). */}

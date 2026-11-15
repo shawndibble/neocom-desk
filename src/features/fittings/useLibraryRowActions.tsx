@@ -27,7 +27,7 @@ import { exportFitting } from './fittingExportText';
 import { fittingCompareHref } from './fittingRoutes';
 import { saveFitting } from './myFittings';
 import { useOnline } from '@/stores/network';
-import { heldFitting, type LibraryRow } from './useLibraryFittings';
+import { heldFitting, libraryRowCode, type LibraryRow } from './useLibraryFittings';
 import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
 import { LazySaveToEveDialog } from './LazySaveToEveDialog';
 
@@ -35,8 +35,8 @@ import { LazySaveToEveDialog } from './LazySaveToEveDialog';
 async function rowFitting(
   row: LibraryRow
 ): Promise<{ fitting: Fitting; code: string | null } | null> {
-  if (row.source === 'saved' || row.source === 'shared') {
-    const code = row.source === 'saved' ? row.record.code : row.shared.code;
+  const code = libraryRowCode(row);
+  if (code !== null) {
     const decoded = await decodeFittingShare(code);
     if (!decoded.ok) return null;
     return { fitting: shareToFitting(decoded.value, row.name), code };
@@ -170,8 +170,9 @@ export function useLibraryRowActions({
 
   function itemsFor(row: LibraryRow): ReactNode {
     const saved = row.source === 'saved' ? row : null;
-    // Someone else's Fitting: open it, compare it, keep a copy. It is theirs to rename or delete.
-    const shared = row.source === 'shared';
+    // Someone else's Fitting (a Community's, or the corp's Doctrine Fit): open it, compare it,
+    // keep a copy. It is theirs to rename or delete.
+    const shared = row.source === 'shared' || row.source === 'doctrine';
     return (
       <>
         <MenuItem onSelect={() => onOpen(row)}>{t('fittings.libraryMenu.open')}</MenuItem>

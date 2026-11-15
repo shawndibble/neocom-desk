@@ -11,7 +11,12 @@ import { ensureSignedIn } from '@/sync/syncAuth';
 import { srpDoctrineBackendOverride } from './srpDoctrineBackendOverride';
 import { invalidateSrpOfficer } from './srpClient';
 import { call } from './taxBook/bookClient';
-import type { DoctrineFit, DoctrinePreview, SaveDoctrineInput } from './srpTypes';
+import type {
+  DoctrineFit,
+  DoctrinePreview,
+  MemberDoctrineFit,
+  SaveDoctrineInput,
+} from './srpTypes';
 
 /** Most Doctrine Fits one read takes. */
 export const DOCTRINE_READ_CAP = 500;
@@ -89,4 +94,23 @@ export async function previewSrpDoctrineCheck(
     accessToken,
     killmail,
   });
+}
+
+/**
+ * Any verified member: the corp's Doctrine Fits for the Fittings library (#6202). A callable, not a
+ * Firestore read, because the rules keep `srpDoctrines` officers-only. SRP off lists none.
+ */
+export async function listCorpDoctrineFits(
+  characterId: number,
+  corporationId: number
+): Promise<MemberDoctrineFit[]> {
+  const stand = srpDoctrineBackendOverride();
+  if (stand) return stand.memberList?.() ?? [];
+  const accessToken = await getValidAccessToken(characterId);
+  const { fits } = await call<Record<string, unknown>, { fits: MemberDoctrineFit[] }>(
+    characterId,
+    'listSrpDoctrineFitsCallable',
+    { corporationId, accessToken }
+  );
+  return fits;
 }

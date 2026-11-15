@@ -18,9 +18,10 @@ import {
 import { Modal } from '@/components/ui/Modal';
 import type { LoadWarning } from '@/engine/fittings/load';
 import type { DoctrineFitSnapshot } from '@/engine/srpDoctrine';
+import type { Fitting } from '@/engine/fittings/types';
 import { useSavedFittingRecords } from '@/features/fittings/useSavedFittingRecords';
 import type { SaveDoctrineInput } from '../srpTypes';
-import { snapshotFromEft, snapshotFromFitting } from './doctrineSources';
+import { doctrineShareCode, snapshotFromEft, snapshotFromFitting } from './doctrineSources';
 import { useDoctrineTypeNames } from './useDoctrineTypeNames';
 
 export type DoctrineSource = 'fitting' | 'eft';
@@ -34,12 +35,14 @@ interface Props {
 
 interface Parsed {
   snapshot: DoctrineFitSnapshot | null;
+  /** The whole fit, stored as its share code so members open it with charges and drones. */
+  fitting: Fitting | null;
   unresolved: LoadWarning[];
   /** The source could not be read at all (no hull, or a Fitting that no longer decodes). */
   failed: boolean;
 }
 
-const NONE: Parsed = { snapshot: null, unresolved: [], failed: false };
+const NONE: Parsed = { snapshot: null, fitting: null, unresolved: [], failed: false };
 
 export function AddDoctrineDialog({ source, characterId, onAdd, onClose }: Props) {
   const { t } = useTranslation();
@@ -63,8 +66,14 @@ export function AddDoctrineDialog({ source, characterId, onAdd, onClose }: Props
       if (!record) apply(NONE);
       else
         snapshotFromFitting(record).then(
-          (snapshot) => apply({ snapshot, unresolved: [], failed: snapshot === null }),
-          () => apply({ snapshot: null, unresolved: [], failed: true })
+          (read) =>
+            apply({
+              snapshot: read?.snapshot ?? null,
+              fitting: read?.fitting ?? null,
+              unresolved: [],
+              failed: read === null,
+            }),
+          () => apply({ ...NONE, failed: true })
         );
     } else if (text.trim() === '') apply(NONE);
     else
@@ -72,17 +81,18 @@ export function AddDoctrineDialog({ source, characterId, onAdd, onClose }: Props
         (result) =>
           apply({
             snapshot: result.ok ? result.fit : null,
+            fitting: result.ok ? result.fitting : null,
             unresolved: result.unresolved,
             failed: !result.ok,
           }),
-        () => apply({ snapshot: null, unresolved: [], failed: true })
+        () => apply({ ...NONE, failed: true })
       );
     return () => {
       cancelled = true;
     };
   }, [source, picked, text, fittings]);
 
-  const { snapshot, unresolved } = parsed;
+  const { snapshot, fitting, unresolved } = parsed;
   const typeName = useDoctrineTypeNames(snapshot ? [snapshot.hullTypeId] : []);
   const name = typedName ?? snapshot?.name ?? '';
   const canAdd = snapshot !== null && name.trim() !== '' && !busy;
@@ -93,7 +103,9 @@ export function AddDoctrineDialog({ source, characterId, onAdd, onClose }: Props
     setBusy(true);
     setFailed(false);
     try {
-      await onAdd({ name: name.trim(), snapshot });
+      const trimmed = name.trim();
+      const shareCode = fitting ? await doctrineShareCode(fitting, trimmed) : undefined;
+      await onAdd({ name: trimmed, snapshot, ...(shareCode ? { shareCode } : {}) });
       onClose();
     } catch {
       setFailed(true);
