@@ -714,8 +714,8 @@ describe('PlanetaryIndustry', () => {
 
     // Grouped by character: the active Character's own group heading plus
     // the alt's, each above that character's colony rows. Scoped to the
-    // colonies panel — "Pilot One" is also the active Character's own name
-    // in the nav rail.
+    // colonies panel — "Pilot One" can appear elsewhere too (the app's nav
+    // rail, when the whole App is rendered).
     const panel = coloniesPanel();
     expect(within(panel).getByText('Pilot One')).toBeInTheDocument();
     expect(within(panel).getByText('Alt Two')).toBeInTheDocument();

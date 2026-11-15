@@ -76,7 +76,7 @@ function industryRoutes(): ReactElement {
 
 /**
  * Hydrates the active Character from Dexie (what `App`'s boot effect does),
- * then renders the industry routes. Seed Dexie and push the URL first.
+ * then renders the Industry and Planetary Industry routes. Seed Dexie and push the URL first.
  */
 export async function renderIndustryRoutes(): Promise<RenderResult> {
   await useActiveCharacter.getState().hydrate();
