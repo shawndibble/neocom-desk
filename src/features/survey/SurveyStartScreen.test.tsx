@@ -57,8 +57,7 @@ function renderScreen(search: string) {
   );
 }
 
-// The paste listener is rebound in a passive effect whenever a name resolves: a test awaits the
-// resolved name on screen (findBy, which drains pending work before it returns) before pasting.
+// The paste listener always sees the latest form, so a paste right after a name lands uses it.
 const pasteScan = () => {
   fireEvent.paste(document.body, { clipboardData: { getData: () => SCAN } });
 };
@@ -146,6 +145,33 @@ describe('SurveyStartScreen', () => {
     pasteScan();
     await waitFor(() => expect(startSurvey).toHaveBeenCalled());
     expect(startSurvey.mock.calls[0]![0].prefill.tax).toEqual({ name: 'Bob Corporation', pct: 10 });
+  });
+
+  it('takes a scan pasted the moment a typed payee name resolves under the in-game spelling', async () => {
+    resolveTypedPayee.mockResolvedValue({
+      ok: true,
+      name: 'Bob Corporation',
+      kind: 'corporation',
+      id: 98000001,
+    });
+    renderScreen('');
+    // Paste in the same task as the commit that shows the name, before React's passive effects run.
+    const observer = new MutationObserver(() => {
+      if (screen.queryByText('Found: Bob Corporation (corporation)') === null) return;
+      observer.disconnect();
+      pasteScan();
+    });
+    fireEvent.change(screen.getByLabelText('Moon tax rate (%)'), { target: { value: '10' } });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    fireEvent.change(screen.getByLabelText('Moon tax payee'), {
+      target: { value: 'bob corporation' },
+    });
+    await waitFor(() => expect(startSurvey).toHaveBeenCalled());
+    observer.disconnect();
+    expect(startSurvey.mock.calls[0]![0].prefill.tax).toEqual({
+      name: 'Bob Corporation',
+      pct: 10,
+    });
   });
 
   it('says so when no corporation, alliance or pilot has the typed name, and keeps the name', async () => {
