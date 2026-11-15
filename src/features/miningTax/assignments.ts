@@ -91,13 +91,20 @@ function assertUnclaimed(
  * collector's status (a Survey connection's ore). Meant to run inside the
  * write's transaction.
  */
-/** Every stored Assignment on `record`'s Mining Ledger Entry (same character, day and system). */
-async function entryAssignments(
+/**
+ * Every stored Assignment on `record`'s Mining Ledger Entry (same character,
+ * day and system). Returns Dexie's own promise, not an `async` wrapper: an
+ * extra native await inside a write's transaction commits it too early
+ * (`PrematureCommitError`).
+ */
+function entryAssignments(
   record: Pick<MiningTaxAssignmentRecord, 'characterId' | 'date' | 'solarSystemId'>
 ): Promise<MiningTaxAssignmentRecord[]> {
-  return (
-    await db.miningTaxAssignments.where('characterId').equals(record.characterId).toArray()
-  ).filter((a) => a.date === record.date && a.solarSystemId === record.solarSystemId);
+  return db.miningTaxAssignments
+    .where('characterId')
+    .equals(record.characterId)
+    .filter((a) => a.date === record.date && a.solarSystemId === record.solarSystemId)
+    .toArray();
 }
 
 async function claimNewOre(
