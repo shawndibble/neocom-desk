@@ -25,6 +25,11 @@ export interface StatementMailInput {
   periodLabel: string;
   /** The payment code that pins a donation to this Statement (D15). */
   code: string;
+  /**
+   * The Accounts (wallet divisions) the book reads donations from, as EVE's transfer window names
+   * them: a donation into another one is never credited (#6204).
+   */
+  accounts?: readonly string[];
   lines: readonly Pick<
     StatementLine,
     'kind' | 'date' | 'structureId' | 'estimatedValue' | 'tax' | 'reason'
@@ -116,7 +121,9 @@ function build(input: StatementMailInput, detail: MailDetailLevel): StatementMai
     ),
     br(),
     text(
-      `Donate to ${input.corporationName}; any of your characters counts. Code ${input.code} pins it to this Statement.`
+      `Donate to ${input.corporationName}` +
+        (input.accounts?.length ? ` (Account: ${input.accounts.join(' or ')})` : '') +
+        `; any of your characters counts. Code ${input.code} pins it to this Statement.`
     ),
     br(),
     text("The link has every line's pricing, terms and payments: "),

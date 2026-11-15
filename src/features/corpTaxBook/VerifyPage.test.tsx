@@ -108,6 +108,23 @@ describe('VerifyPage', () => {
     expect(await screen.findByText(/Donate ISK to Brass Meridian/)).toBeInTheDocument();
   });
 
+  it('names the Account the book reads donations from (#6204)', async () => {
+    api.read.mockResolvedValue(
+      payload({
+        terms: {
+          overdueDays: 14,
+          divisions: [1, 3],
+          divisionNames: { '3': 'MOON TAXES' },
+        },
+      })
+    );
+    render(<VerifyPage token="tok" />);
+    expect(
+      await screen.findByText(/Pick the Account Master Wallet, MOON TAXES in EVE's transfer window/)
+    ).toBeInTheDocument();
+    expect(screen.getByText('Master Wallet, MOON TAXES')).toBeInTheDocument();
+  });
+
   it("says an officer's write-off apart from a dismissal (#4637)", async () => {
     api.read.mockResolvedValue(
       payload({

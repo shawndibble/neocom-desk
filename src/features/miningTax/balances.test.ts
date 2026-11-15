@@ -72,6 +72,26 @@ describe('computePayeeBalances', () => {
     expect(balances[2].members).toEqual([]);
   });
 
+  it('leaves out what a Corp Tax Book bills too, and the Assignments it bills whole (#6204)', () => {
+    const rows = [
+      displayRow(assignment({ id: 'half', payeeId: 'p1', taxOwed: 100 })),
+      displayRow(assignment({ id: 'whole', payeeId: 'p1', taxOwed: 40 })),
+      displayRow(assignment({ id: 'mine', payeeId: 'p1', taxOwed: 25 })),
+    ];
+    const share = new Map([
+      ['half', 0.5],
+      ['whole', 1],
+    ]);
+
+    const [vega] = computePayeeBalances(rows, payees, (m) => share.get(m.assignment.id) ?? 0);
+
+    expect(vega.owed).toBeCloseTo(75, 6);
+    expect(vega.members.map((m) => [m.assignment.id, m.assignment.taxOwed])).toEqual([
+      ['half', 50],
+      ['mine', 25],
+    ]);
+  });
+
   it('counts every outstanding member of a joined group, and skips an unknown Payee', () => {
     const primary = assignment({ id: 'g1', payeeId: 'p2', taxOwed: 10, groupId: 'g' });
     const sibling = assignment({ id: 'g2', payeeId: 'p2', taxOwed: 20, groupId: 'g' });

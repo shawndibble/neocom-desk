@@ -8000,7 +8000,8 @@
         "conflict": "Conflict",
         "unattributed": "Unattributed",
         "dismissed": "Dismissed by corp",
-        "waived": "Waived"
+        "waived": "Waived",
+        "markedPaid": "Marked paid"
       },
       "hint": {
         "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own allocation applies and nothing is owed to the corp.",
@@ -8012,7 +8013,8 @@
         "unattributed": "No Corp Tax Book claims this ore. Assign it to your Payee if you owe someone.",
         "dismissed": "{{corp}} dismissed this day: {{reason}}",
         "waived": "{{corp}} wrote this day off: {{reason}}",
-        "paid": "Paid to {{corp}}."
+        "paid": "Paid to {{corp}}.",
+        "markedPaid": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed."
       },
       "sync": {
         "safe": "Safe to pay — {{date}} is closed ({{corp}} synced {{ago}}).",
@@ -8061,6 +8063,7 @@
         "factStatementFinal": "Issued, final",
         "factSettledBy": "Settled by",
         "yourMarkNote": "The corporation confirms your mark against its wallet.",
+        "markedPaidNote": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed. It confirms your mark against its wallet.",
         "settledBy": {
           "yourMark": "Your mark",
           "donation": "Donation",
@@ -8120,8 +8123,19 @@
         "account": "Account: <strong>{{account}}</strong>",
         "masterWallet": "Master Wallet",
         "division": "Division {{division}} (number {{division}} in the list)",
-        "code": "{{period}} Statement code (put it in the reason):",
-        "codeInReason": "The Reason is your {{period}} Statement's code."
+        "codeOf": "{{character}} · {{period}} Statement code:",
+        "codeInReason": "The Reason is your {{period}} Statement's code.",
+        "codeOldest": "The Reason is the code of the payer's oldest open Statement ({{period}}).",
+        "oldestFirst": "A payment goes to the oldest open Statement first; a code moves it to that Statement first."
+      },
+      "attention": {
+        "overdueTitle": "{{corp}} Statement {{period}} overdue since {{date}}",
+        "overdueDetail": "Code {{code}}. A payment goes to your oldest open Statement first.",
+        "uncreditedTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}} — check the wallet division",
+        "uncreditedDetail": "{{corp}} synced since and still doesn't hold it, so it no longer counts as paid here. Its book reads donations into: {{accounts}}.",
+        "alsoBilledTitle": "{{corp}} also bills ore you listed for {{payees}}",
+        "alsoBilledDetail": "It is left out of what you owe {{payees}}. Open the day and choose “{{action}}” to take it off your list.",
+        "openDay": "Open the day"
       },
       "claim": {
         "title": "A donation to {{corp}} is not matched to you",
@@ -17599,6 +17613,7 @@
       "howToPay": "Donate ISK to {{corp}}; any of your characters counts.",
       "payCodeLead": "Put the code",
       "payCodeTail": "in the reason to pin a donation to this Statement.",
+      "payAccount": "Pick the Account {{accounts}} in EVE's transfer window: a donation into another division is not credited.",
       "settled": "This Statement is settled.",
       "declaration": "You told {{corp}} on {{date}} that you paid another way.",
       "declarationPending": "An officer will confirm it.",
@@ -17608,7 +17623,8 @@
         "price": "Price",
         "due": "Due",
         "minimum": "Minimum Statement",
-        "paying": "Paying"
+        "paying": "Paying",
+        "account": "Account"
       },
       "rateFrom": "{{pct}}%, effective {{date}}",
       "rateNoDate": "{{pct}}%",

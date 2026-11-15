@@ -84,6 +84,7 @@ export function buildCorpBookView(
       characterIds: book.characterIds,
       startDate: book.startDate,
       graceHours: book.graceHours,
+      ...(book.overdueDays !== undefined ? { overdueDays: book.overdueDays } : {}),
       ...(book.lastSyncedAt !== undefined ? { lastSyncedAt: book.lastSyncedAt } : {}),
       rates: book.rates,
       miners: book.miners,

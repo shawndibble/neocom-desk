@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore/lite';
 import { db as localDb } from '@/db';
 import { DEFAULT_GRACE_HOURS } from '@/engine/corpTaxBook/billable';
+import { DEFAULT_OVERDUE_DAYS } from '@/engine/corpTaxBook/overdue';
 import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
@@ -62,6 +63,8 @@ export interface LoadedCorpBook {
   corporationId: number;
   startDate: string;
   graceHours: number;
+  /** Days after issue an unsettled Statement goes Overdue (the book's setting). */
+  overdueDays?: number;
   hubId: string;
   oreForm: 'compressed' | 'raw';
   /** The book's divisions, division 1 by default — where a donation should go. */
@@ -127,6 +130,7 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
     corporationId,
     startDate,
     graceHours: num(d.graceHours) ?? DEFAULT_GRACE_HOURS,
+    overdueDays: num(d.overdueDays) ?? DEFAULT_OVERDUE_DAYS,
     hubId: str(d.hubId) ?? 'jita',
     oreForm: d.oreForm === 'raw' ? ('raw' as const) : ('compressed' as const),
     divisions: (Array.isArray(d.divisions) ? d.divisions : [1]).filter(

@@ -22,6 +22,14 @@ export interface Miner {
   finalStatementId?: string;
 }
 
+/** The characters a Miner bills: its grouping's, or the one character of a Miner of its own. */
+export function characterIdsOfMiner(minerId: string, miners: readonly Miner[]): number[] {
+  const grouped = miners.find((m) => m.id === minerId);
+  if (grouped) return grouped.characterIds;
+  const solo = Number(minerId.replace(/^solo:/, ''));
+  return Number.isFinite(solo) && minerId.startsWith('solo:') ? [solo] : [];
+}
+
 /** The Miner a character is billed under: its grouping, or a Miner of its own. */
 export function minerIdFor(characterId: number, miners: readonly Miner[]): string {
   return miners.find((m) => m.characterIds.includes(characterId))?.id ?? `solo:${characterId}`;
