@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
@@ -9,6 +9,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useClonesSort } from '@/features/character/clonesSort';
 import { Clones } from '@/routes/Clones';
 import { renderPageRoute } from '@/test/renderPage';
+import { loadClones } from '@/app/routeChunks';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -235,6 +236,10 @@ const verdictCard = async (heading: string) => {
 
 /** The Clones page on its own route, with no App boot or signed-in shell. */
 const renderClonesRoute = () => renderPageRoute('/clones', <Clones />);
+
+// The route chunk compiles here, under the hook's own budget, not inside the
+// first test's findBy.
+beforeAll(() => loadClones(), 30_000);
 
 describe('Clones training verdict', () => {
   it('says a jump is worth it, with the saving, the reason and a route link', async () => {

@@ -181,7 +181,7 @@ const CALENDAR_SCOPE = 'esi-calendar.read_calendar_events.v1';
 
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });
-  // One throwaway render, so no test pays for the worker's first `App` render
+  // One throwaway render, so no test pays for the worker's first page render
   // (lazy route chunks, jsdom, React warm-up) inside a short `findBy` wait.
   // The one App-level test's graph and shell chunk load here too.
   await Promise.all([routeChunks.loadOverview(), routeChunks.loadLayout(), import('@/app/App')]);
@@ -452,16 +452,15 @@ describe('Overview widget grid', () => {
     renderOverviewRoute();
 
     await widgetCard('Wallet');
-    // The page alone, so everything on screen is its own (the shell's rail
-    // and top bar are not mounted).
-    const main = screen;
-    expect(main.queryByRole('button', { name: /character: /i })).not.toBeInTheDocument();
-    expect(main.queryByText('Total SP')).not.toBeInTheDocument();
-    expect(main.queryByText('Unallocated SP')).not.toBeInTheDocument();
+    // The page alone (the shell's rail and top bar are not mounted), so
+    // `screen` holds only the page's own header and content.
+    expect(screen.queryByRole('button', { name: /character: /i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Total SP')).not.toBeInTheDocument();
+    expect(screen.queryByText('Unallocated SP')).not.toBeInTheDocument();
     // No header Refresh; the data age sits on the tab row, not beside the name.
-    expect(main.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
-    const heading = main.getByRole('heading', { level: 1 });
-    const dataAge = await main.findByRole('button', { name: /Data updated/ });
+    expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 1 });
+    const dataAge = await screen.findByRole('button', { name: /Data updated/ });
     expect(heading.parentElement).not.toContainElement(dataAge);
   });
 
