@@ -1626,7 +1626,8 @@ describe('DataTable virtualize', () => {
       );
 
       expect(mountedIds()).toHaveLength(VIRTUALIZE_THRESHOLD);
-      expect(screen.getByRole('table').getAttribute('aria-rowcount')).toBeNull();
+      const tableEl = screen.getByRole('table');
+      expect(tableEl.getAttribute('aria-rowcount')).toBeNull();
     });
 
     it('windows once the rows pass the threshold, telling AT the full count', () => {
@@ -1839,7 +1840,8 @@ describe('DataTable virtualize', () => {
       // …and a narrowing filter brings it back under.
       rerender(table(VIRTUALIZE_THRESHOLD));
       expect(mountedIds()).toHaveLength(VIRTUALIZE_THRESHOLD);
-      expect(screen.getByRole('table').getAttribute('aria-rowcount')).toBeNull();
+      const tableEl = screen.getByRole('table');
+      expect(tableEl.getAttribute('aria-rowcount')).toBeNull();
       expect(document.querySelector('.dt-spacer')).toBeNull();
     });
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import '@/i18n';
 import { StartLinkHelp } from './StartLinkHelp';
 import { ShortLinkLimited } from './shortStartLink';
@@ -39,7 +39,7 @@ describe('StartLinkHelp', () => {
     makeShortLink.mockRejectedValue(new Error('down'));
     render(<StartLinkHelp path="/survey?rate=5" />);
     fireEvent.click(screen.getByRole('button', { name: 'Make short link' }));
-    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    expect(await screen.findByRole('alert')).toBeTruthy();
   });
 
   it('says how long to wait when the service asks it to slow down', async () => {

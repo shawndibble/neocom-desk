@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { App } from '@/app/App';
@@ -247,7 +247,7 @@ describe('Contacts standing filter chips (issue #403)', () => {
     ).toBeInTheDocument();
 
     resolveRefresh();
-    await waitFor(() => expect(screen.getByText('Good Friend')).toBeInTheDocument());
+    expect(await screen.findByText('Good Friend')).toBeInTheDocument();
   });
 
   it("does not carry the outgoing character's counts onto the incoming character", async () => {

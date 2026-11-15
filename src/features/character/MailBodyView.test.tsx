@@ -191,7 +191,7 @@ describe('MailBodyView', () => {
 
   it('opens a ship show-info link as an item, there being no ship window by typeID', async () => {
     renderMarkup('<a href="showinfo:587">Rifter</a>');
-    await waitFor(() => expect(screen.getByRole('link', { name: 'Rifter' })).toBeInTheDocument());
+    expect(await screen.findByRole('link', { name: 'Rifter' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Rifter' })).toHaveAttribute('href', '/?info=type-587');
   });
 });

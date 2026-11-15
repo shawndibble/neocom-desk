@@ -62,8 +62,16 @@ describe('UnloggedDeliveriesBadge', () => {
 
   it('renders nothing when every delivery is logged', async () => {
     await db.industryJobHistory.put({ characterId: 1, jobs: [], fetchedAt: 1 });
-    renderBadge();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    // Another Character with an unlogged delivery, beside it: once that badge
+    // is up, the same reads have answered for Character 1 too.
+    await db.industryJobHistory.put({ characterId: 2, jobs: [delivered(1)], fetchedAt: 1 });
+    render(
+      <MemoryRouter>
+        <UnloggedDeliveriesBadge characterId={1} blueprintTypeId={100} />
+        <UnloggedDeliveriesBadge characterId={2} blueprintTypeId={100} />
+      </MemoryRouter>
+    );
+    await screen.findByRole('link', { name: '1 delivered job not logged' });
+    expect(screen.getAllByRole('link')).toHaveLength(1);
   });
 });

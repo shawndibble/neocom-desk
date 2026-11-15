@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
@@ -90,7 +90,7 @@ describe('useCharacterShipTypeId', () => {
 
     await waitFor(() => expect(result.current.status).toBe('needsScope'));
     expect(result.current.typeId).toBeNull();
-    await act(async () => {});
+    // The effect that would fetch has run, and returned early, by the time the status reads.
     expect(called).not.toHaveBeenCalled();
   });
 

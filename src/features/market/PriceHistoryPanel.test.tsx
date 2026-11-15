@@ -106,7 +106,7 @@ describe('PriceHistoryPanel', () => {
     render(
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
-    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(await screen.findByTestId('chart')).toBeInTheDocument();
     expect(screen.getByTestId('chart')).toHaveTextContent('Tritanium: 1 points');
   });
 
@@ -128,7 +128,7 @@ describe('PriceHistoryPanel', () => {
     render(
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
-    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(await screen.findByTestId('chart')).toBeInTheDocument();
     expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
   });
 
@@ -157,7 +157,7 @@ describe('PriceHistoryPanel', () => {
     render(
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
-    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(await screen.findByTestId('chart')).toBeInTheDocument();
     // Shorthand on screen (#947), so each figure is matched by its accessible
     // name and still checked against the label it sits beside.
     expect(
@@ -182,7 +182,7 @@ describe('PriceHistoryPanel', () => {
     render(
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
-    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(await screen.findByTestId('chart')).toBeInTheDocument();
     expect(
       screen.getByText('44.00 ISK', { selector: '.sr-only' }).parentElement?.parentElement
     ).toHaveTextContent('High');
@@ -202,7 +202,7 @@ describe('PriceHistoryPanel', () => {
     render(
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
-    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(await screen.findByTestId('chart')).toBeInTheDocument();
     // Matched from the figure outward, like the ISK stats above, so each
     // number is pinned to the label it actually sits beside. The market's
     // first trade is 3 days before `now`, so 81 orders is 27 a day.
@@ -222,7 +222,7 @@ describe('PriceHistoryPanel', () => {
     render(
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
-    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(await screen.findByTestId('chart')).toBeInTheDocument();
     expect(screen.getByText('0.1').parentElement).toHaveTextContent('Orders / day');
   });
 
@@ -234,7 +234,7 @@ describe('PriceHistoryPanel', () => {
     render(
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
-    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(await screen.findByTestId('chart')).toBeInTheDocument();
     // One assertion over the whole group rather than a negative beside each
     // label: the substring checks elsewhere in this file would all still pass
     // if `Label:` came back, and five separate `not.toHaveTextContent` lines
@@ -256,7 +256,7 @@ describe('PriceHistoryPanel', () => {
     render(
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
-    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(await screen.findByTestId('chart')).toBeInTheDocument();
     expect(screen.getByTestId('chart')).toHaveTextContent('Tritanium: 2 points');
 
     await user.click(screen.getByRole('combobox', { name: 'Range' }));
@@ -281,7 +281,7 @@ describe('PriceHistoryPanel', () => {
     const { unmount } = render(
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
-    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(await screen.findByTestId('chart')).toBeInTheDocument();
     await user.click(screen.getByRole('combobox', { name: 'Range' }));
     await user.click(await screen.findByRole('option', { name: '7 days' }));
     unmount();
@@ -290,7 +290,7 @@ describe('PriceHistoryPanel', () => {
     render(
       <PriceHistoryPanel regionId={10000002} typeId={35} itemName="Pyerite" now={FIXED_NOW} />
     );
-    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(await screen.findByTestId('chart')).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: 'Range' })).toHaveTextContent('7 days');
     });
@@ -309,7 +309,7 @@ describe('PriceHistoryPanel', () => {
     render(
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
-    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(await screen.findByTestId('chart')).toBeInTheDocument();
     expect(screen.getByTestId('chart')).toHaveTextContent('0 ma points');
   });
 
@@ -330,7 +330,7 @@ describe('PriceHistoryPanel', () => {
     render(
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
-    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(await screen.findByTestId('chart')).toBeInTheDocument();
     expect(screen.getByTestId('chart')).toHaveTextContent('4 ma points');
   });
 
@@ -352,7 +352,7 @@ describe('PriceHistoryPanel', () => {
     render(
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
-    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(await screen.findByTestId('chart')).toBeInTheDocument();
     await user.click(screen.getByRole('combobox', { name: 'Range' }));
     await user.click(await screen.findByRole('option', { name: '7 days' }));
     expect(screen.getByTestId('chart')).toHaveTextContent('5 ma points');
@@ -381,7 +381,7 @@ describe('PriceHistoryPanel', () => {
     it('fetches nothing beyond the primary region until a region is picked', async () => {
       mockedLoad.mockResolvedValue(ONE_DAY);
       renderCompared([]);
-      await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+      expect(await screen.findByTestId('chart')).toBeInTheDocument();
       expect(mockedLoad).toHaveBeenCalledTimes(1);
       expect(screen.getByTestId('chart')).not.toHaveTextContent('[');
     });
@@ -453,7 +453,7 @@ describe('PriceHistoryPanel', () => {
       render(
         <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
       );
-      await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+      expect(await screen.findByTestId('chart')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Compare regions/ })).not.toBeInTheDocument();
     });
   });

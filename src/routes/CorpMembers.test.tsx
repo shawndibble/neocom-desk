@@ -599,7 +599,7 @@ describe('ship and location filters', () => {
 
   it('applies a location from the URL on arrival and counts it on the funnel', async () => {
     renderMembers('/corp/members?loc=60003760');
-    const table = await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+    const table = await screen.findByRole('table', { name: 'Corporation members' });
     expect(within(table).getByText('Jita Local')).toBeInTheDocument();
     expect(within(table).queryByText('Silent Ren')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Filters/ })).toHaveAccessibleName(
@@ -781,7 +781,7 @@ describe('filters and sort in the URL (issue #1306)', () => {
 
   it('applies search, dark-only and sort from the URL on arrival', async () => {
     renderMembers('/corp/members?q=ren&dark=1&sort=member:asc');
-    const table = await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+    const table = await screen.findByRole('table', { name: 'Corporation members' });
     expect(screen.getByPlaceholderText('Search name, ship, location…')).toHaveValue('ren');
     expect(screen.getByRole('button', { name: /^Filters/ })).toHaveAccessibleName(
       'Filters (1 active)'
@@ -824,7 +824,7 @@ describe('filters and sort in the URL (issue #1306)', () => {
 
   it('falls back to the defaults on garbage values', async () => {
     renderMembers('/corp/members?dark=maybe&sort=bogus:asc');
-    const table = await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+    const table = await screen.findByRole('table', { name: 'Corporation members' });
     await openFilters();
     expect(darkToggle()).toHaveAttribute('aria-pressed', 'false');
     expect(within(table).getByRole('columnheader', { name: 'Last seen' })).toHaveAttribute(
@@ -909,7 +909,7 @@ describe('Roles tab (#4613)', () => {
   it('moves the Roles path to the roster without the capability', async () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
     renderMembers('/corp/members/roles');
-    await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+    await screen.findByRole('table', { name: 'Corporation members' });
     expect(currentLocation()).toBe('/corp/members/roster');
     expect(roleAudit.loadRoleAudit).not.toHaveBeenCalled();
   });

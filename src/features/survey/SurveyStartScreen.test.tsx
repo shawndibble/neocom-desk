@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
@@ -57,10 +57,9 @@ function renderScreen(search: string) {
   );
 }
 
-// The paste listener is rebound in a passive effect whenever a name resolves, so let those effects
-// flush first: a paste fired between the render and the rebind reaches the stale listener.
-const pasteScan = async () => {
-  await act(async () => {});
+// The paste listener is rebound in a passive effect whenever a name resolves: a test awaits the
+// resolved name on screen (findBy, which drains pending work before it returns) before pasting.
+const pasteScan = () => {
   fireEvent.paste(document.body, { clipboardData: { getData: () => SCAN } });
 };
 
@@ -106,7 +105,7 @@ describe('SurveyStartScreen', () => {
     });
     renderScreen('?payeeId=98000001&rate=10');
     expect(await screen.findByText('Found: Bob Corporation (corporation)')).toBeTruthy();
-    await pasteScan();
+    pasteScan();
     await waitFor(() => expect(startSurvey).toHaveBeenCalled());
     expect(startSurvey).toHaveBeenCalledWith({
       owner: undefined,
@@ -123,7 +122,7 @@ describe('SurveyStartScreen', () => {
     expect(
       await screen.findByText(/No corporation, alliance or character has that ID/)
     ).toBeTruthy();
-    await pasteScan();
+    pasteScan();
     await waitFor(() => expect(startSurvey).toHaveBeenCalled());
     expect(startSurvey.mock.calls[0]![0].prefill.tax).toEqual({ name: 'Bob', pct: 10 });
   });
@@ -144,7 +143,7 @@ describe('SurveyStartScreen', () => {
     expect(screen.getByLabelText('Start link')).toHaveValue(
       `${window.location.origin}/survey?payeeId=98000001&rate=10`
     );
-    await pasteScan();
+    pasteScan();
     await waitFor(() => expect(startSurvey).toHaveBeenCalled());
     expect(startSurvey.mock.calls[0]![0].prefill.tax).toEqual({ name: 'Bob Corporation', pct: 10 });
   });
@@ -162,14 +161,14 @@ describe('SurveyStartScreen', () => {
     expect(screen.queryByLabelText('Place ID')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Add IDs instead' }));
     expect(await screen.findByText('Found: Efa')).toBeTruthy();
-    await pasteScan();
+    pasteScan();
     await waitFor(() => expect(startSurvey).toHaveBeenCalled());
     expect(startSurvey.mock.calls[0]![0].prefill.location).toEqual({ id: 30001, name: 'Efa' });
   });
 
   it('starts anonymously with the first scan, then opens its public page', async () => {
     renderScreen('?place=Efa&placeId=7');
-    await pasteScan();
+    pasteScan();
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/s/abc234'));
     expect(addSurveyScan).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'abc234', text: SCAN, expiresAt: EXPIRES })
@@ -180,7 +179,7 @@ describe('SurveyStartScreen', () => {
     await db.characters.put({ characterId: 7, name: 'Shawn Dibble', ownerHash: 'h', addedAt: 1 });
     useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
     renderScreen('');
-    await pasteScan();
+    pasteScan();
     await waitFor(() =>
       expect(screen.getByTestId('where')).toHaveTextContent('/mining/survey?survey=abc234')
     );
@@ -203,7 +202,7 @@ describe('SurveyStartScreen', () => {
   it('starts nothing for a paste that is not a scan', async () => {
     renderScreen('');
     fireEvent.paste(document.body, { clipboardData: { getData: () => 'hello' } });
-    await new Promise((r) => setTimeout(r, 20));
+    // The listener decides in the event itself: text that is no scan starts nothing.
     expect(startSurvey).not.toHaveBeenCalled();
   });
 });

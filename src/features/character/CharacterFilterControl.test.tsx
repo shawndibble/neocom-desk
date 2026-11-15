@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
@@ -8,6 +8,7 @@ import { IconButton, PageHeader } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { stubViewport } from '@/test/viewport';
 import { CharacterFilterControl, type CharacterScopeChoice } from './CharacterFilterControl';
+import { CorporationLogoGlyph } from './CorporationLogoGlyph';
 
 async function openMenu() {
   const user = userEvent.setup();
@@ -441,15 +442,21 @@ describe('CharacterFilterControl', () => {
       expect(screen.getByRole('button').contains(status)).toBe(false);
     });
 
-    it('announces nothing with full coverage or on "This character"', async () => {
-      const { rerender } = render(
-        <CharacterFilterControl {...partial} missingNames={[]} value="all" />
-      );
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(screen.getByRole('status')).toHaveTextContent('');
-      rerender(<CharacterFilterControl {...partial} value="current" />);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(screen.getByRole('status')).toHaveTextContent('');
+    it('announces nothing with full coverage or on "This character"', () => {
+      // The region fills a timer tick after its text is set (LiveStatus): step past it.
+      vi.useFakeTimers();
+      try {
+        const { rerender } = render(
+          <CharacterFilterControl {...partial} missingNames={[]} value="all" />
+        );
+        act(() => vi.advanceTimersByTime(1));
+        expect(screen.getByRole('status')).toHaveTextContent('');
+        rerender(<CharacterFilterControl {...partial} value="current" />);
+        act(() => vi.advanceTimersByTime(1));
+        expect(screen.getByRole('status')).toHaveTextContent('');
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('shows no "Not included" note in the menu on "This character"', async () => {
@@ -475,7 +482,8 @@ describe('CharacterFilterControl', () => {
     it('full coverage (no missing names) reads the plain count', () => {
       render(<CharacterFilterControl {...partial} missingNames={[]} value="all" />);
       expect(screen.getByRole('button', { name: 'All characters · 4' })).toBeInTheDocument();
-      expect(screen.getByRole('button').querySelector('[data-partial-dot]')).toBeNull();
+      const buttonEl = screen.getByRole('button');
+      expect(buttonEl.querySelector('[data-partial-dot]')).toBeNull();
     });
 
     it('shows a hidden spinner inside the trigger while loading, the box unchanged', () => {
@@ -500,7 +508,8 @@ describe('CharacterFilterControl', () => {
 
     it('draws no spinner when not loading', () => {
       render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
-      expect(screen.getByRole('button').querySelector('[role="status"]')).toBeNull();
+      const buttonEl = screen.getByRole('button');
+      expect(buttonEl.querySelector('[role="status"]')).toBeNull();
       expect(screen.getByRole('button')).not.toHaveAttribute('aria-busy');
     });
   });
@@ -592,10 +601,13 @@ describe('CharacterFilterControl', () => {
 
     it('shows the Buildings glyph when no corporation is known', async () => {
       await seedCharacter(1, 'Aria');
+      await seedCharacter(2, 'Bex', { corporationId: 98000001 });
       renderCorp();
+      // A Character whose corporation is known, beside it: once its logo is up,
+      // the same Dexie read has answered for the trigger too.
+      const { container: control } = render(<CorporationLogoGlyph characterId={2} size="md" />);
+      await waitFor(() => expect(control.querySelector('img')).not.toBeNull());
       const trigger = screen.getByRole('button', { name: 'Corporation' });
-      // Let the Dexie read settle; still no logo.
-      await new Promise((resolve) => setTimeout(resolve, 20));
       expect(trigger.querySelector('img')).toBeNull();
       expect(trigger.querySelector('svg[data-corp-fallback]')).toBeInTheDocument();
     });

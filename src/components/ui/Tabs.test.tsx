@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { stubAnimate } from '@/test/animate';
@@ -319,9 +319,7 @@ describe('Tabs', () => {
       const scroller = renderOverflowing();
       expect(chevrons()).toHaveLength(1);
       scroller.scrollLeft = 100;
-      act(() => {
-        fireEvent.scroll(scroller);
-      });
+      fireEvent.scroll(scroller);
       expect(chevrons()).toHaveLength(2);
     });
 

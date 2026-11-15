@@ -65,14 +65,12 @@ describe('SlideOver', () => {
         <p>Panel body</p>
       </SlideOver>
     );
-    // Radix arms its Escape listener shortly after mount, so retry until it takes.
-    await waitFor(() => {
-      fireEvent.keyDown(document, { key: 'Escape' });
-      expect(onClose).toHaveBeenCalled();
-    });
-    const afterEscape = onClose.mock.calls.length;
+    // Radix arms its Escape listener as the panel takes focus: wait for that.
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Add' })).toHaveFocus());
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'Close' }));
-    expect(onClose).toHaveBeenCalledTimes(afterEscape + 1);
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   it('leaves an Escape to a Modal opened from inside it', async () => {
@@ -85,11 +83,10 @@ describe('SlideOver', () => {
       </SlideOver>
     );
     const { rerender } = render(panel(false));
-    // Armed once an Escape with no window up closes the panel.
-    await waitFor(() => {
-      fireEvent.keyDown(document, { key: 'Escape' });
-      expect(onClose).toHaveBeenCalled();
-    });
+    // Armed once the panel holds focus; then an Escape with no window up closes it.
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'My sharing' })).toHaveFocus());
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
     onClose.mockClear();
     rerender(panel(true));
     fireEvent.keyDown(screen.getByRole('button', { name: 'Inside' }), { key: 'Escape' });

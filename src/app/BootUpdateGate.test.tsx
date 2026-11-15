@@ -60,9 +60,10 @@ describe('BootUpdateGate', () => {
   });
 
   it('stays on the boot screen while applying', async () => {
-    runBootUpdate.mockResolvedValue('applying');
+    const d = deferred<BootUpdateOutcome>();
+    runBootUpdate.mockReturnValue(d.promise);
     renderGate();
-    await act(async () => {});
+    await act(async () => d.resolve('applying'));
     expect(screen.queryByText('the app')).not.toBeInTheDocument();
     expect(screen.getByText('Neocom Desk')).toBeInTheDocument();
   });

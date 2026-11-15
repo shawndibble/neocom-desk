@@ -350,6 +350,7 @@ describe('Industry: Build Opportunities waits for the pricing-settings hydration
 
     // One `waitFor` so the find and the assert run in the same tick: the boot
     // screen's own spinner is also "Loading" and unmounts as the route lands.
+    // eslint-disable-next-line testing-library/prefer-find-by -- findBy can return the boot spinner, gone by the assert
     await waitFor(() =>
       expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument()
     );

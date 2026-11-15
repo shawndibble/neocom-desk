@@ -138,13 +138,8 @@ describe('SurveyShareScreen', () => {
   it('adds a scan pasted anywhere on the page, to this survey, with no sign-in', async () => {
     renderScreen();
     await screen.findByText('0% mined');
-    // The page's paste listener is re-registered once the survey has loaded
-    // (it needs the survey's expiry). A paste in the tick before that is
-    // dropped, so keep pasting until the page is ready: a dropped paste never
-    // reaches the store. Each paste re-renders the page, and the waitFor runs again
-    // on that, so more than one paste can land; one is all these tests need.
+    fireEvent.paste(document.body, { clipboardData: { getData: () => SCAN } });
     await waitFor(() => {
-      fireEvent.paste(document.body, { clipboardData: { getData: () => SCAN } });
       expect(addSurveyScan).toHaveBeenCalled();
     });
     expect(addSurveyScan).toHaveBeenCalledWith({
@@ -158,8 +153,8 @@ describe('SurveyShareScreen', () => {
   it('adds a paste that only shrinks the field', async () => {
     renderScreen();
     await screen.findByText('0% mined');
+    fireEvent.paste(document.body, { clipboardData: { getData: () => SHRUNK } });
     await waitFor(() => {
-      fireEvent.paste(document.body, { clipboardData: { getData: () => SHRUNK } });
       expect(addSurveyScan).toHaveBeenCalled();
     });
     expect(addSurveyScan).toHaveBeenCalledWith({
@@ -173,8 +168,8 @@ describe('SurveyShareScreen', () => {
   it('holds a different field for the login instead of adding it, and says why', async () => {
     renderScreen();
     await screen.findByText('0% mined');
+    fireEvent.paste(document.body, { clipboardData: { getData: () => DIFFERENT } });
     await waitFor(() => {
-      fireEvent.paste(document.body, { clipboardData: { getData: () => DIFFERENT } });
       expect(screen.getByText(/different field than this survey/i)).toBeTruthy();
     });
     expect(addSurveyScan).not.toHaveBeenCalled();

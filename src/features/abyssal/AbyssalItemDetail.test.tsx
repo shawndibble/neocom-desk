@@ -89,8 +89,10 @@ function renderDetail(typeId: number, dynamic: Parameters<typeof AbyssalItemDeta
 describe('AbyssalItemDetail', () => {
   it('renders nothing for an ordinary type', async () => {
     const { container } = renderDetail(587, { status: 'none' });
-    // Let the lookup and dictionary load.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // An Abyssal type beside it: once its table is up, the shared lookup and
+    // dictionary have loaded for both.
+    renderDetail(ABYSSAL_NEUT, { status: 'none' });
+    await screen.findByRole('table', { name: /Heavy Energy Neutralizer II/ });
     expect(container).toBeEmptyDOMElement();
   });
 

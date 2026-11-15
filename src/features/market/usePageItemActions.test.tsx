@@ -24,8 +24,8 @@ describe('usePageItemActions requestBlueprints', () => {
 
     act(() => result.current.actions.requestBlueprints());
     await waitFor(() => expect(loadBlueprintCatalog).toHaveBeenCalledTimes(1));
-    // Let the rejection land, then open another menu.
-    await act(async () => {});
+    // Once the rejection has landed, open another menu.
+    await waitFor(() => expect(loadBlueprintCatalog.mock.settledResults[0]?.type).toBe('rejected'));
     act(() => result.current.actions.requestBlueprints());
 
     await waitFor(() => expect(result.current.actions.blueprints).toBe(catalog));

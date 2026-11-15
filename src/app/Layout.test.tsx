@@ -738,7 +738,7 @@ describe('Layout corp nav entry', () => {
     useActiveCharacter.setState({ activeCharacterId: 42, hydrated: true });
     await db.characters.put({ characterId: 42, name: 'Pilot', ownerHash: 'h', addedAt: 0 });
     renderLayout();
-    await waitFor(() => expect(screen.getByText('page content')).toBeInTheDocument());
+    expect(await screen.findByText('page content')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Corp Board' })).not.toBeInTheDocument();
   });
 
@@ -824,7 +824,7 @@ describe('Layout route fade', () => {
     renderRoutes('/overview');
     animate.mockClear();
     await user.click(screen.getAllByRole('link', { name: 'Wallet' })[0]);
-    await waitFor(() => expect(screen.getByText('wallet page')).toBeInTheDocument());
+    expect(await screen.findByText('wallet page')).toBeInTheDocument();
     expect(animate).toHaveBeenCalledWith([{ opacity: 0 }, { opacity: 1 }], {
       duration: 220,
       easing: 'cubic-bezier(0.33, 1, 0.68, 1)',
@@ -847,7 +847,7 @@ describe('Layout route fade', () => {
     renderRoutes('/overview');
     animate.mockClear();
     await user.click(screen.getAllByRole('link', { name: 'Wallet' })[0]);
-    await waitFor(() => expect(screen.getByText('wallet page')).toBeInTheDocument());
+    expect(await screen.findByText('wallet page')).toBeInTheDocument();
     expect(animate).not.toHaveBeenCalled();
   });
 
@@ -861,7 +861,7 @@ describe('Layout route fade', () => {
     const { mounts } = renderRoutes('/assets');
     await waitFor(() => expect(mounts).toEqual(['assets']));
     await user.click(screen.getByRole('link', { name: 'drill down' }));
-    await waitFor(() => expect(screen.getByText('assets page')).toBeInTheDocument());
+    expect(await screen.findByText('assets page')).toBeInTheDocument();
     expect(mounts).toEqual(['assets']);
     // Still fades, though — it is a navigation, just not a new instance.
     expect(animate).toHaveBeenCalled();
@@ -873,7 +873,7 @@ describe('Layout route fade', () => {
     await waitFor(() => expect(mounts).toEqual(['contacts']));
     animate.mockClear();
     await user.click(screen.getByRole('link', { name: 'across tab' }));
-    await waitFor(() => expect(screen.getByText('contacts page')).toBeInTheDocument());
+    expect(await screen.findByText('contacts page')).toBeInTheDocument();
     expect(mounts).toEqual(['contacts']);
     expect(animate).not.toHaveBeenCalled();
   });

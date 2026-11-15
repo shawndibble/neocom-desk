@@ -131,8 +131,8 @@ describe('useAbyssalAssetEstimates', () => {
     );
     await waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(ABYSSAL_BACKGROUND_LOOKUPS));
     rerender({ list: [...assets], scope: 'a' });
-    await waitFor(() => expect(mocks.readCached).toHaveBeenCalledTimes(2));
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Its background is set (and any lookup started) right as the cache read answers.
+    await waitFor(() => expect(mocks.readCached).toHaveResolvedTimes(2));
     expect(mocks.get).toHaveBeenCalledTimes(ABYSSAL_BACKGROUND_LOOKUPS);
     rerender({ list: [...assets], scope: 'b' });
     await waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(count));

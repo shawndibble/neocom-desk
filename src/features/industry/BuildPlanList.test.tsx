@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { act, fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderInRouter as render } from '@/test/render';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -82,9 +82,8 @@ const NOOP_GROUP_PROPS = {
 /** The rename field must survive the menu closing: its focus hand-back would otherwise blur (and commit) it. */
 async function expectRenameFieldHeld(name: string) {
   const field = await screen.findByRole('textbox', { name });
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  });
+  // Once the menu is gone, its focus hand-back has run (waitFor drains a timer tick after).
+  await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
   expect(screen.getByRole('textbox', { name })).toBe(field);
   expect(field).toHaveFocus();
 }

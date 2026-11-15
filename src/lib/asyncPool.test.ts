@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { runPool } from './asyncPool';
 
-const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+/** A worker's await: a turn on the microtask queue, so the others get to run. */
+const tick = () => Promise.resolve();
 
 describe('runPool', () => {
   it('runs every item once and keeps at most `concurrency` in flight', async () => {

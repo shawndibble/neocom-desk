@@ -155,9 +155,9 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     // Not user-editable anymore, but still seeded once at creation
     // (offline-fallback `remapCount`) from live ESI: the yearly remap is on
     // cooldown, so only the 2 bonus remaps count.
-    await waitFor(() =>
-      expect(screen.getByText('Remaps: 2 bonus now · yearly from 2027-01-15')).toBeInTheDocument()
-    );
+    expect(
+      await screen.findByText('Remaps: 2 bonus now · yearly from 2027-01-15')
+    ).toBeInTheDocument();
     const created = (await db.skillPlans.where('characterId').equals(CHAR_ID).toArray()).find(
       (p) => p.name === 'Untitled plan'
     );
@@ -187,9 +187,7 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     await openPlanTools();
     // The cooldown date is already past, so the new plan's derived display
     // counts the yearly remap as ready too (1 bonus + yearly = 2 available).
-    await waitFor(() =>
-      expect(screen.getByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument()
-    );
+    expect(await screen.findByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument();
   });
 });
 
@@ -355,13 +353,14 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     await waitFor(async () => {
       const stored = await db.skillPlans.get('plan-1');
-      expect(stored?.whatIfImplants).toEqual({ kind: 'preset', preset: '+5' });
       // The running accelerator is the Character's, shared with the Characters table.
       const accelerator = await db.characterAccelerators.get(String(CHAR_ID));
-      expect(accelerator).toMatchObject({ bonus: 3 });
       const left = (accelerator?.expiresAt ?? 0) - Date.now();
-      expect(left).toBeGreaterThan(5 * 24 * 60 * 60 * 1000 - 60_000);
-      expect(left).toBeLessThanOrEqual(5 * 24 * 60 * 60 * 1000);
+      expect({
+        implants: stored?.whatIfImplants,
+        bonus: accelerator?.bonus,
+        fiveDaysLeft: left > 5 * 24 * 60 * 60 * 1000 - 60_000 && left <= 5 * 24 * 60 * 60 * 1000,
+      }).toEqual({ implants: { kind: 'preset', preset: '+5' }, bonus: 3, fiveDaysLeft: true });
     });
 
     // The reported bug: reopening the page put every control back to its

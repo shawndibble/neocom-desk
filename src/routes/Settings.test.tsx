@@ -1276,11 +1276,10 @@ describe('Settings — Notifications (issue #170)', () => {
       // The scheduler is module state: drop a rebuild an earlier test's browser click queued on
       // real timers (waiting out its 1s delay cost every test here a second), and let one already
       // past its timer land before counting.
-      await act(async () => {
-        scheduleProjectionRebuild.cancel();
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-      vi.mocked(rebuildProjection).mockClear();
+      scheduleProjectionRebuild.cancel();
+      const rebuild = vi.mocked(rebuildProjection);
+      await waitFor(() => expect(rebuild).toHaveResolvedTimes(rebuild.mock.calls.length));
+      rebuild.mockClear();
       vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] });
       return userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     }

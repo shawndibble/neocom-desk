@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
 import {
   loadPaginatedWithCacheStatus,
@@ -30,13 +30,15 @@ describe('settleEsiCacheLoads', () => {
 
   it('resolves only after a slow load has written its row', async () => {
     const live = deferred<string>();
-    const load = loadWithCacheStatus(CHAR_ID, KEY, () => live.promise);
+    const fetchLive = vi.fn(() => live.promise);
+    const load = loadWithCacheStatus(CHAR_ID, KEY, fetchLive);
 
     let settled = false;
     const settle = settleEsiCacheLoads().then(() => {
       settled = true;
     });
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // Past its cache reads and out on the network: only the write is left to wait for.
+    await vi.waitFor(() => expect(fetchLive).toHaveBeenCalled());
     expect(settled).toBe(false);
 
     live.resolve('payload');

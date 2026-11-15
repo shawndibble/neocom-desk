@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { ensureAnySession } from '@/sync/syncAuth';
-import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
+import { GLOBAL_CACHE_CHARACTER_ID, writeCachedMany } from '@/esi/cache';
 import {
   ABYSSAL_ESTIMATE_TTL_MS,
   ABYSSAL_NO_ESTIMATE_TTL_MS,
@@ -24,6 +24,11 @@ vi.mock('firebase/functions', () => ({
   httpsCallable: (_fns: unknown, name: string, options: unknown) => (data: unknown) =>
     callable(name, data, options),
 }));
+// Spied, so a test can wait for the fire-and-forget cache write to land.
+vi.mock('@/esi/cache', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/esi/cache')>();
+  return { ...actual, writeCachedMany: vi.fn(actual.writeCachedMany) };
+});
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFunctions: () => ({}) }));
 vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => 'char:7') }));
 vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
@@ -51,9 +56,10 @@ function setup(answer: MutamarketTransport) {
   return transport;
 }
 
-/** Lets the fire-and-forget Dexie write land. */
+/** Once every fire-and-forget cache write started so far has landed. */
 async function flushWrites() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  const write = vi.mocked(writeCachedMany);
+  await vi.waitFor(() => expect(write).toHaveResolvedTimes(write.mock.calls.length));
 }
 
 beforeEach(async () => {

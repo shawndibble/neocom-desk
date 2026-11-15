@@ -1826,8 +1826,9 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     await waitFor(async () => {
       const saved = await db.characterAccelerators.get('1');
       expect(saved?.expiresAt).toBeGreaterThanOrEqual(before + 3 * DAY);
-      expect(saved?.expiresAt).toBeLessThan(before + 3 * DAY + 10_000);
     });
+    const saved = await db.characterAccelerators.get('1');
+    expect(saved?.expiresAt).toBeLessThan(before + 3 * DAY + 10_000);
   });
 
   it('reopens on the Accelerator the Character was saved with', async () => {
@@ -1887,8 +1888,9 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     await waitFor(async () => {
       const saved = await db.characterAccelerators.get('1');
       expect(saved?.expiresAt).toBeGreaterThan(Date.now() + 4 * DAY - 10_000);
-      expect(saved?.expiresAt).toBeLessThan(Date.now() + 4 * DAY + 10_000);
     });
+    const saved = await db.characterAccelerators.get('1');
+    expect(saved?.expiresAt).toBeLessThan(Date.now() + 4 * DAY + 10_000);
     expect(await db.characterAccelerators.count()).toBe(1);
   });
 
@@ -1972,7 +1974,7 @@ describe('splitting a plan into one row per level', () => {
       trainedSkillsKnown: false,
     });
 
-    await waitFor(() => expect(screen.getByText('Your entries')).toBeInTheDocument());
+    expect(await screen.findByText('Your entries')).toBeInTheDocument();
     expect(onUpdate).not.toHaveBeenCalled();
   });
 });
@@ -2113,7 +2115,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
 
     await importFromQueue(user);
 
-    await waitFor(() => expect(screen.getByText(/in-game queue has 1 skill/i)).toBeInTheDocument());
+    expect(await screen.findByText(/in-game queue has 1 skill/i)).toBeInTheDocument();
     expect(onUpdate).not.toHaveBeenCalled();
   });
 
@@ -2125,7 +2127,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const { onUpdate } = renderEditor();
 
     await importFromQueue(user);
-    await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
+    await screen.findByText(/in-game queue has 1 skill/i);
     await user.click(screen.getByRole('button', { name: 'Append' }));
 
     expect(onUpdate).toHaveBeenCalledWith({
@@ -2145,7 +2147,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, markers: [1] } });
 
     await importFromQueue(user);
-    await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
+    await screen.findByText(/in-game queue has 1 skill/i);
     await user.click(screen.getByRole('button', { name: 'Replace plan' }));
 
     // Clearing the Remap Markers with it is replaceWithImport's (skillPlanEdit.test.ts).
@@ -2163,7 +2165,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const { onUpdate } = renderEditor(vi.fn(), { plan: originalPlan });
 
     await importFromQueue(user);
-    await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
+    await screen.findByText(/in-game queue has 1 skill/i);
     await user.click(screen.getByRole('button', { name: 'Replace plan' }));
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
@@ -2182,9 +2184,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
 
     await importFromQueue(user);
 
-    await waitFor(() =>
-      expect(screen.getByText(/in-game skill queue is empty/i)).toBeInTheDocument()
-    );
+    expect(await screen.findByText(/in-game skill queue is empty/i)).toBeInTheDocument();
     expect(onUpdate).not.toHaveBeenCalled();
   });
 
@@ -2196,12 +2196,12 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     renderEditor();
 
     await importFromQueue(user);
-    await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
+    await screen.findByText(/in-game queue has 1 skill/i);
     await user.click(screen.getByRole('button', { name: 'Replace plan' }));
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
 
     await importFromQueue(user);
-    await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
+    await screen.findByText(/in-game queue has 1 skill/i);
     await user.click(screen.getByRole('button', { name: 'Append' }));
 
     // The Append confirmation must not carry the earlier Replace's Undo —

@@ -199,7 +199,8 @@ describe('JournalDescriptionCell', () => {
       '/mining/tax?tax.entry=a3',
     ]);
     expect(links[0]).toHaveTextContent('Mining tax 2026-09-04 · 1,200,000 ISK');
-    expect(screen.getByText('Moon tax').closest('a')).toBeNull();
+    const textEl = screen.getByText('Moon tax');
+    expect(textEl.closest('a')).toBeNull();
   });
 
   it('makes the memo line the link when a linked line has one', () => {

@@ -112,7 +112,7 @@ describe('AuthFailureRedirect', () => {
     expect(screen.getByText('mail view')).toBeInTheDocument();
     // Marked for its own row and alert, but no redirect and no shell banner.
     await waitFor(() => expect(useNeedsLogin.getState().value).toEqual([CHARACTER_ID + 1]));
-    expect(screen.queryByText('mail view')).toBeInTheDocument();
+    expect(screen.getByText('mail view')).toBeInTheDocument();
   });
 });
 

@@ -45,7 +45,10 @@ for (const [label, viewport] of [
     await expect(missing).toBeVisible({ timeout: 20_000 });
 
     // Let late images and prices settle so only the hover's own shift is counted.
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
+    await expect
+      .poll(() => page.evaluate(() => [...document.images].every((image) => image.complete)))
+      .toBe(true);
     const rest = await measure(page);
     await page.evaluate(() => {
       const w = window as unknown as { __cls: number };

@@ -28,7 +28,7 @@ describe('SurveyStats Done at', () => {
     expect(local.textContent).not.toMatch(/local/i);
     expect(local.className).not.toMatch(/underline/);
     fireEvent.click(local);
-    await waitFor(() => expect(screen.getByRole('button', { name: /EVE$/ })).toBeTruthy());
+    expect(await screen.findByRole('button', { name: /EVE$/ })).toBeTruthy();
   });
 });
 
@@ -38,7 +38,7 @@ describe('SurveyStats Done at default', () => {
     render(<SurveyStats summary={summary} />);
     // Never EVE first: the tile waits for the stored choice instead of flashing the default.
     expect(screen.queryByRole('button', { name: /EVE$/ })).toBeNull();
-    await waitFor(() => expect(screen.getByRole('button')).toBeTruthy());
+    expect(await screen.findByRole('button')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /EVE$/ })).toBeNull();
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { Checkbox } from '@/components/ui';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -248,13 +248,12 @@ describe('phone cards: tap runs Start plan, controls are exempt', () => {
         />
       )
     );
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Start a plan for Widget Beta' }));
-    });
+    const button = screen.getByRole('button', { name: 'Start a plan for Widget Beta' });
+    fireEvent.click(button);
     expect(onStartPlan).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      fireEvent.click(screen.getByText('Widget Beta'));
-    });
+    // Nothing opened, so the guard re-arms as the button stops being busy.
+    await waitFor(() => expect(button).not.toHaveAttribute('aria-busy'));
+    fireEvent.click(screen.getByText('Widget Beta'));
     expect(onStartPlan).toHaveBeenCalledTimes(2);
   });
 });

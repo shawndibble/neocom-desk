@@ -7,6 +7,10 @@ import { TooltipHoldContext } from './tooltipHold';
 import { IconButton } from './IconButton';
 
 describe('Tooltip', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   /**
    * `Modal` runs on `showModal()`, so the dialog sits in the browser's top
    * layer, which no `z-index` can reach. A bubble portalled to `document.body`
@@ -28,14 +32,15 @@ describe('Tooltip', () => {
     expect(dialog).toContainElement(await screen.findByRole('tooltip'));
   });
 
-  it('shows no bubble when it has no content', async () => {
+  it('shows no bubble when it has no content', () => {
+    vi.useFakeTimers();
     render(
       <Tooltip content={null}>
         <button type="button">Trigger</button>
       </Tooltip>
     );
     fireEvent.pointerMove(screen.getByRole('button', { name: 'Trigger' }));
-    await act(async () => {});
+    act(() => vi.advanceTimersByTime(TOOLTIP_HOVER_DELAY_MS));
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
@@ -85,9 +90,10 @@ describe('Tooltip', () => {
       </Tooltip>
     );
     const trigger = screen.getByRole('button', { name: 'Gear' });
+    // One act, so React renders once after both: native events, as fireEvent acts on its own.
     act(() => {
-      fireEvent.focus(trigger);
-      fireEvent.blur(trigger);
+      trigger.focus();
+      trigger.blur();
     });
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
@@ -100,8 +106,8 @@ describe('Tooltip', () => {
     );
     const trigger = screen.getByRole('button', { name: 'Gear' });
     act(() => {
-      fireEvent.pointerMove(trigger);
-      fireEvent.click(trigger);
+      trigger.dispatchEvent(new MouseEvent('pointermove', { bubbles: true }));
+      trigger.click();
     });
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });

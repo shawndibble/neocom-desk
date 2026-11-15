@@ -117,7 +117,7 @@ describe('Miner page', () => {
     expect(within(chips).getByRole('button', { name: /^Mail/ })).toHaveTextContent('1');
     expect(within(chips).getByRole('button', { name: /^Audit/ })).toHaveTextContent('0');
     await userEvent.click(within(chips).getByRole('button', { name: /^Mail/ }));
-    await waitFor(() => expect(screen.getByText(/mailed a Statement/)).toBeInTheDocument());
+    expect(await screen.findByText(/mailed a Statement/)).toBeInTheDocument();
     vi.mocked(readAudit).mockResolvedValue([]);
   });
 
