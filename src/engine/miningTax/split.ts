@@ -13,8 +13,20 @@ export interface SplitPlan {
  * figures a pilot sees are exactly what gets stored. Throws on a move the
  * original cannot cover; clamping silently would let a typo move the wrong
  * amount of a real obligation.
+ *
+ * `unreported` is ore the pilot knows the original's Payee is owed but ESI
+ * has not reported yet (issue #6180: the client's figure runs ahead of the
+ * ledger). It is added to the kept side, so that side claims more than the
+ * entry holds; `computeOwnership` then routes later ore to the kept side's
+ * claim first, and only the excess to the growth collector. A type can take
+ * a move or an unreported claim, never both — keeping more than held and
+ * moving some of it away contradict each other.
  */
-export function planSplit(original: readonly OreLine[], moves: readonly OreLine[]): SplitPlan {
+export function planSplit(
+  original: readonly OreLine[],
+  moves: readonly OreLine[],
+  unreported: readonly OreLine[] = []
+): SplitPlan {
   const moveByType = new Map<number, number>();
   for (const move of moves) {
     if (move.quantity <= 0) continue;
@@ -24,10 +36,22 @@ export function planSplit(original: readonly OreLine[], moves: readonly OreLine[
     }
     moveByType.set(move.typeId, move.quantity);
   }
+  const extraByType = new Map<number, number>();
+  for (const extra of unreported) {
+    if (extra.quantity <= 0) continue;
+    if (!original.some((l) => l.typeId === extra.typeId)) {
+      throw new Error(`Cannot claim more of type ${extra.typeId}: none held`);
+    }
+    if (moveByType.has(extra.typeId)) {
+      throw new Error(`Cannot both move and claim more of type ${extra.typeId}`);
+    }
+    extraByType.set(extra.typeId, extra.quantity);
+  }
   const kept = original
     .map((line) => ({
       typeId: line.typeId,
-      quantity: line.quantity - (moveByType.get(line.typeId) ?? 0),
+      quantity:
+        line.quantity - (moveByType.get(line.typeId) ?? 0) + (extraByType.get(line.typeId) ?? 0),
     }))
     .filter((line) => line.quantity > 0);
   const moved = original

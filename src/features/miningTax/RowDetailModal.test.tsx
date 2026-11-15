@@ -447,3 +447,26 @@ describe('RowDetailModal backdrop dismissal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('RowDetailModal ore ESI has not reported yet (issue #6180)', () => {
+  it('shows how much of a claimed line ESI has reported so far', () => {
+    const claimed: MiningTaxAssignmentRecord = {
+      id: 'a1',
+      characterId: 1,
+      date: '2026-09-08',
+      solarSystemId: 30000142,
+      payeeId: 'p1',
+      oreLines: [{ typeId: VELDSPAR, quantity: 300 }],
+      taxPct: 10,
+      estimatedValue: 0,
+      taxOwed: 0,
+      status: 'outstanding',
+      updatedAt: 1,
+    };
+    renderModal('outstanding', claimed, undefined, vi.fn(), {
+      row: { ...row, assignments: [claimed], unassignedOreLines: [] },
+    });
+
+    expect(screen.getByText('250 of 300 reported')).toBeInTheDocument();
+  });
+});

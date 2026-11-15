@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   computeOwnership,
   findDuplicateAssignmentIds,
+  unreportedClaims,
   type CoveringAssignment,
   type DuplicateCandidate,
 } from './ownership';
@@ -188,6 +189,69 @@ describe('computeOwnership — a paid Assignment never grows (paid stays paid, A
     ]);
     expect(result.ownedLines.get('d')).toEqual([{ typeId: A, quantity: 150 }]);
     expect(result.unassigned).toEqual([]);
+  });
+});
+
+describe('computeOwnership — a kept side claiming ore ESI has not reported yet', () => {
+  // Corp A is owed 130 of A (the client's figure); ESI reports 100 so far.
+  // Corp B moved nothing yet but collects later ore.
+  const split = [covering('a', [{ typeId: A, quantity: 130 }]), covering('b', [], true)];
+
+  it('gives the collector nothing until ESI reports past the claim', () => {
+    const result = computeOwnership([{ typeId: A, quantity: 120 }], split);
+    expect(result.unassigned).toEqual([]);
+    expect(result.ownedLines.get('a')).toEqual([{ typeId: A, quantity: 130 }]);
+    expect(result.ownedLines.get('b')).toEqual([]);
+  });
+
+  it('routes only the ore past the claim to the collector', () => {
+    const result = computeOwnership([{ typeId: A, quantity: 145 }], split);
+    expect(result.ownedLines.get('a')).toEqual([{ typeId: A, quantity: 130 }]);
+    expect(result.ownedLines.get('b')).toEqual([{ typeId: A, quantity: 15 }]);
+  });
+});
+
+describe('unreportedClaims', () => {
+  it("lists the part of an Assignment's claim ESI has not reported yet", () => {
+    const entry = [
+      { typeId: A, quantity: 110 },
+      { typeId: B, quantity: 40 },
+    ];
+    const claims = [
+      covering('a', [
+        { typeId: A, quantity: 130 },
+        { typeId: B, quantity: 40 },
+      ]),
+      covering('b', [{ typeId: A, quantity: 0 }], true),
+    ];
+    expect(unreportedClaims(entry, claims, 'a')).toEqual([
+      { typeId: A, claimed: 130, reported: 110 },
+    ]);
+  });
+
+  it("counts the other sides' claims first, and a type ESI has not reported at all", () => {
+    const entry = [{ typeId: A, quantity: 100 }];
+    const claims = [
+      covering('a', [
+        { typeId: A, quantity: 80 },
+        { typeId: C, quantity: 5 },
+      ]),
+      covering('b', [{ typeId: A, quantity: 30 }]),
+    ];
+    expect(unreportedClaims(entry, claims, 'a')).toEqual([
+      { typeId: A, claimed: 80, reported: 70 },
+      { typeId: C, claimed: 5, reported: 0 },
+    ]);
+  });
+
+  it('is empty once ESI has caught up', () => {
+    expect(
+      unreportedClaims(
+        [{ typeId: A, quantity: 140 }],
+        [covering('a', [{ typeId: A, quantity: 130 }])],
+        'a'
+      )
+    ).toEqual([]);
   });
 });
 

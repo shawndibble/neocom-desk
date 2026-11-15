@@ -127,7 +127,10 @@ describe('SplitDialog — a needs-review Assignment', () => {
     };
     renderDialog({ assignment: grown });
 
-    expect(screen.getByRole('textbox', { name: /zeolites/i })).toHaveValue('30');
+    expect(screen.getByRole('textbox', { name: 'Units of Zeolites to move' })).toHaveValue('30');
+    expect(
+      screen.getByRole('textbox', { name: 'Units of Zeolites Jita landlord keeps' })
+    ).toHaveValue('100');
     // The original keeps what it was assigned.
     expect(screen.getByText('100,000 ISK · 10,000 ISK at 10%')).toBeInTheDocument();
   });
@@ -241,7 +244,7 @@ describe('SplitDialog — typing a quantity', () => {
     const big = { ...assignment, oreLines: [{ typeId: ZEOLITES, quantity: 100_000 }] };
     renderDialog({ assignment: big });
 
-    const input = screen.getByRole('textbox', { name: /Zeolites/ });
+    const input = screen.getByRole('textbox', { name: 'Units of Zeolites to move' });
     await userEvent.type(input, '54930');
 
     expect(input).toHaveValue('54,930');
@@ -261,5 +264,67 @@ describe('SplitDialog — dismissal', () => {
     renderDialog({ onClose });
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SplitDialog — typing what the first Payee keeps (issue #6180)', () => {
+  const keepsBox = () =>
+    screen.getByRole('textbox', { name: 'Units of Zeolites Jita landlord keeps' });
+  const movesBox = () => screen.getByRole('textbox', { name: 'Units of Zeolites to move' });
+  async function pickHek() {
+    await userEvent.click(screen.getByRole('combobox', { name: 'Move part of this day to' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Hek landlord' }));
+  }
+
+  it('fills in the moved figure from the kept one, and the other way round', async () => {
+    renderDialog();
+    await userEvent.clear(keepsBox());
+    await userEvent.type(keepsBox(), '70');
+    expect(movesBox()).toHaveValue('30');
+
+    await userEvent.clear(movesBox());
+    await userEvent.type(movesBox(), '45');
+    expect(keepsBox()).toHaveValue('55');
+  });
+
+  it('hands later ore to the new Payee by default', async () => {
+    renderDialog();
+    await pickHek();
+    await userEvent.type(movesBox(), '40');
+    await userEvent.click(screen.getByRole('button', { name: 'Split · move 40 units' }));
+
+    expect(split).toHaveBeenLastCalledWith(
+      assignment,
+      expect.objectContaining({ collector: 'new', unreported: [] }),
+      expect.anything()
+    );
+  });
+
+  it('keeps more than ESI reports yet: the new side collects only what comes past it', async () => {
+    renderDialog();
+    await pickHek();
+    await userEvent.clear(keepsBox());
+    await userEvent.type(keepsBox(), '130');
+
+    expect(screen.getByText(/30 more than ESI reports yet/)).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Jita landlord \(keeps\)/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Split · keep 30 more units' }));
+
+    expect(split).toHaveBeenLastCalledWith(
+      assignment,
+      expect.objectContaining({
+        moves: [],
+        unreported: [{ typeId: ZEOLITES, quantity: 30 }],
+        collector: 'new',
+      }),
+      expect.anything()
+    );
+  });
+
+  it('never keeps more than held on a paid day', async () => {
+    renderDialog({ assignment: { ...assignment, status: 'paid' } });
+    await userEvent.clear(keepsBox());
+    await userEvent.type(keepsBox(), '130');
+    expect(keepsBox()).toHaveValue('100');
   });
 });

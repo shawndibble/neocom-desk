@@ -610,6 +610,14 @@ export async function unlinkPaymentTransaction(
 export interface SplitInput {
   /** Units to move out of `original`, per ore type — each at most what `original` holds of that type; zero-quantity lines are ignored. */
   moves: readonly MiningTaxOreLine[];
+  /**
+   * Ore the original's Payee is owed that ESI has not reported yet (issue
+   * #6180) — the pilot's in-game figure running ahead of the ledger. Added to
+   * the kept side (`planSplit`), so later ore fills that claim before any
+   * reaches the new side. Needs `collector: 'new'`, and never on a paid
+   * original: paid stays paid (ADR 0024).
+   */
+  unreported?: readonly MiningTaxOreLine[];
   /** The second Payee, and the rate the moved ore is taxed at. */
   payeeId: string;
   taxPct: number;
@@ -657,9 +665,19 @@ export async function splitAssignment(
   input: SplitInput,
   prices: SplitPrices
 ): Promise<{ kept: MiningTaxAssignmentRecord; created: MiningTaxAssignmentRecord }> {
-  const { kept: keptLines, moved: movedLines } = planSplit(original.oreLines, input.moves);
-  if (movedLines.length === 0) throw new Error('Nothing to move');
+  const unreported = (input.unreported ?? []).filter((l) => l.quantity > 0);
+  const { kept: keptLines, moved: movedLines } = planSplit(
+    original.oreLines,
+    input.moves,
+    unreported
+  );
+  if (movedLines.length === 0 && unreported.length === 0) throw new Error('Nothing to move');
   if (keptLines.length === 0) throw new Error('Cannot move every unit — unassign instead');
+  if (unreported.length > 0) {
+    // The claim is only a cap if someone else takes the ore past it.
+    if (input.collector !== 'new') throw new Error('Unreported ore needs the new side to collect');
+    if (original.status === 'paid') throw new Error('A paid day cannot claim more ore');
+  }
 
   const now = Date.now();
   const marker = oreFormMarker();

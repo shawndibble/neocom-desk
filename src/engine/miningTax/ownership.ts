@@ -1,3 +1,4 @@
+import { clamp, sum } from '../math';
 import type { OreLine } from './types';
 
 /** The slice of one Mining Ledger Entry an Assignment already claims, plus whether it is the entry's growth collector. */
@@ -120,6 +121,45 @@ export function computeOwnership(
     );
   }
   return { unassigned: sortedByType(unassigned), ownedLines };
+}
+
+/** One ore type an Assignment claims more of than ESI has reported for it so far. */
+export interface UnreportedClaim {
+  typeId: number;
+  claimed: number;
+  /** What the entry holds for this Assignment once every other covering Assignment's claim is met — less than `claimed`. */
+  reported: number;
+}
+
+/**
+ * Where an Assignment claims more than ESI reports so far — most often a
+ * split whose kept side was given the client's figure ahead of the ledger
+ * (issue #6180, `planSplit`'s `unreported`), but equally a hand-corrected
+ * line or an entry ESI settled lower. Shown so the pilot can watch ESI
+ * catch up;
+ * ownership itself needs nothing extra, since the claim already outranks
+ * the collector's growth in `computeOwnership`.
+ */
+export function unreportedClaims(
+  entryLines: readonly OreLine[],
+  covering: readonly CoveringAssignment[],
+  assignmentId: string
+): UnreportedClaim[] {
+  const own = covering.find((c) => c.id === assignmentId);
+  if (!own) return [];
+  const out: UnreportedClaim[] = [];
+  for (const line of sortedByType(own.oreLines)) {
+    const entry = entryLines.find((l) => l.typeId === line.typeId)?.quantity ?? 0;
+    const others = sum(
+      covering
+        .filter((c) => c.id !== assignmentId)
+        .map((c) => c.oreLines.find((l) => l.typeId === line.typeId)?.quantity ?? 0)
+    );
+    const reported = clamp(entry - others, 0, line.quantity);
+    if (reported < line.quantity)
+      out.push({ typeId: line.typeId, claimed: line.quantity, reported });
+  }
+  return out;
 }
 
 /** The fields `findDuplicateAssignmentIds` reads off a stored Assignment — narrower than the Dexie record, so the engine stays Dexie-free. */

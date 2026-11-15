@@ -17,6 +17,7 @@ import {
   Slider,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import type { OreLine } from '@/engine/miningTax/types';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { growthMoves, planSplit } from '@/engine/miningTax/split';
 import { formatIsk } from '@/lib/isk';
@@ -29,6 +30,11 @@ import type { MoonMiningTaxRow } from './snapshot';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
 import { formatCount } from '@/lib/formatCount';
+import { clamp, sum } from '@/engine/math';
+
+// Whole units only: every non-digit is a grouping mark from the mask, so
+// `5,4930` is 54,930 — the locale parser would read it as 5.493.
+const typedUnits = (value: string) => Number(value.replace(/\D/g, ''));
 
 interface SplitDialogProps {
   open: boolean;
@@ -58,10 +64,13 @@ interface SplitDialogProps {
 /**
  * Splits one assigned EVE day between two Payees by quantity (issue #523):
  * one UTC day can hold two local-time sessions at two different corps' moons
- * in the same system, and ESI reports them as one entry. Per ore type a
- * slider (or typed figure) moves units to a second Payee, and a radio picks
- * which side collects any ore ESI reports for this day later
- * (`engine/miningTax/ownership.ts`). Each side is re-priced at *its own*
+ * in the same system, and ESI reports them as one entry. Per ore type the
+ * pilot types what the original keeps or what moves to a second Payee —
+ * whichever figure they know (issue #6180) — and a radio picks which side
+ * collects any ore ESI reports for this day later
+ * (`engine/miningTax/ownership.ts`). Keeping more than ESI reports so far
+ * claims the client's figure ahead of the ledger; the new side then collects
+ * only what ESI reports past it. Each side is re-priced at *its own*
  * Payee's trade hub, at the entry's mined date — the two Payees need not
  * share a hub — see `splitAssignment`.
  */
@@ -82,21 +91,28 @@ export function SplitDialog({
   const [payeeId, setPayeeId] = useState<string | null>(null);
   const [taxPct, setTaxPct] = useState('');
   const [label, setLabel] = useState('');
-  // A needs-review Assignment already carries the ore it grew by, and growth is
-  // what the pilot is nearly always here to hand to someone else — so it starts
-  // moved. Everything else starts with nothing moved.
-  const [moves, setMoves] = useState<ReadonlyMap<number, number>>(
-    () =>
-      new Map(
-        assignment.status === 'needs-review' && assignment.reviewDiff
-          ? growthMoves(assignment.reviewDiff, assignment.oreLines).map((l) => [
-              l.typeId,
-              l.quantity,
-            ])
-          : []
-      )
-  );
-  const [collector, setCollector] = useState<'original' | 'new'>('original');
+  const original = assignment.oreLines;
+  // One figure per ore type — what the original's Payee keeps (issue #6180).
+  // The pilot types whichever side they know: the Moves box writes
+  // `held − moved` here. Above `held` is ore the client shows but ESI has
+  // not reported yet. A needs-review Assignment starts with its growth moved,
+  // since that is what the pilot is nearly always here to hand on; anything
+  // else starts keeping everything.
+  const [keeps, setKeeps] = useState<ReadonlyMap<number, number>>(() => {
+    const growth =
+      assignment.status === 'needs-review' && assignment.reviewDiff
+        ? growthMoves(assignment.reviewDiff, original)
+        : [];
+    return new Map(
+      original.map((line) => [
+        line.typeId,
+        line.quantity - (growth.find((g) => g.typeId === line.typeId)?.quantity ?? 0),
+      ])
+    );
+  });
+  // Sessions run in order, so ore ESI reports after the split is nearly
+  // always from the moon the pilot moved on to — the new side.
+  const [collector, setCollector] = useState<'original' | 'new'>('new');
   const { pending: saving, error: saveError, run } = useLedgerAction();
 
   // A third Assignment on this entry already collecting leaves nothing to
@@ -104,14 +120,23 @@ export function SplitDialog({
   const someoneElseCollects = row.assignments.some(
     (a) => a.id !== assignment.id && a.collectsGrowth === true
   );
+  // Keeping more than ESI reports only works when the new side takes what
+  // comes after, and a paid day's bill never grows (ADR 0024).
+  const canClaimUnreported = !someoneElseCollects && assignment.status !== 'paid';
 
-  const original = assignment.oreLines;
-  // `setMove` clamps every quantity to what the line holds, so this never
-  // throws — and it is the same plan `splitAssignment` commits.
-  const { kept: keptLines, moved: movedLines } = planSplit(
-    original,
-    [...moves].map(([typeId, quantity]) => ({ typeId, quantity }))
-  );
+  const moves: OreLine[] = [];
+  const unreported: OreLine[] = [];
+  for (const line of original) {
+    const keep = keeps.get(line.typeId) ?? line.quantity;
+    if (keep < line.quantity) moves.push({ typeId: line.typeId, quantity: line.quantity - keep });
+    if (keep > line.quantity)
+      unreported.push({ typeId: line.typeId, quantity: keep - line.quantity });
+  }
+  // `setKeep` keeps every figure in range, so this never throws — and it is
+  // the same plan `splitAssignment` commits.
+  const { kept: keptLines, moved: movedLines } = planSplit(original, moves, unreported);
+  const claimsUnreported = unreported.length > 0;
+  const effectiveCollector = claimsUnreported ? 'new' : collector;
   const pctValue = Number(taxPct);
   const safePct = Number.isFinite(pctValue) ? pctValue : 0;
   // One book per side, resolved live: the preview below has to move when the
@@ -123,7 +148,8 @@ export function SplitDialog({
   };
   const keptValue = computeAssignmentValue(keptLines, prices.kept, assignment.taxPct);
   const newValue = computeAssignmentValue(movedLines, prices.moved, safePct);
-  const movedUnits = movedLines.reduce((sum, line) => sum + line.quantity, 0);
+  const movedUnits = sum(movedLines.map((line) => line.quantity));
+  const unreportedUnits = sum(unreported.map((line) => line.quantity));
 
   // The same Payee at the same rate would be fused back into one Assignment
   // on the next load (`coalesce.ts`), so it is no split at all.
@@ -136,20 +162,16 @@ export function SplitDialog({
   const canSplit =
     payeeId !== null &&
     !refuses &&
-    movedLines.length > 0 &&
+    (movedLines.length > 0 || claimsUnreported) &&
     keptLines.length > 0 &&
     Number.isFinite(pctValue) &&
     pctValue >= 0 &&
     pctValue <= 100;
 
-  function setMove(typeId: number, raw: number, max: number) {
-    const clamped = Math.max(0, Math.min(max, Math.round(raw)));
-    setMoves((previous) => {
-      const next = new Map(previous);
-      if (clamped === 0) next.delete(typeId);
-      else next.set(typeId, clamped);
-      return next;
-    });
+  function setKeep(typeId: number, raw: number, held: number) {
+    const ceiling = canClaimUnreported ? Number.MAX_SAFE_INTEGER : held;
+    const clamped = clamp(Math.round(raw), 0, ceiling);
+    setKeeps((previous) => new Map(previous).set(typeId, clamped));
   }
 
   async function handleSplit() {
@@ -160,10 +182,11 @@ export function SplitDialog({
           assignment,
           {
             moves: movedLines,
+            unreported,
             payeeId,
             taxPct: pctValue,
             label,
-            ...(someoneElseCollects ? {} : { collector }),
+            ...(someoneElseCollects ? {} : { collector: effectiveCollector }),
           },
           prices
         ),
@@ -259,56 +282,76 @@ export function SplitDialog({
           <div
             className={cx(
               eyebrowClassName,
-              'flex items-center justify-between gap-2 border-b border-line px-2 py-1'
+              'flex items-center gap-2 border-b border-line px-2 py-1'
             )}
           >
-            <span>{t('miningTax.oreColumn')}</span>
-            <span className="text-accent">{t('miningTax.splitMovesColumn')}</span>
+            <span className="min-w-0 flex-1">{t('miningTax.oreColumn')}</span>
+            <span className="w-24 text-right">{t('miningTax.splitKeepsColumn')}</span>
+            <span className="w-24 text-right text-accent">{t('miningTax.splitMovesColumn')}</span>
           </div>
           <ul className="divide-y divide-line">
             {original.map((line) => {
-              const moved = moves.get(line.typeId) ?? 0;
-              const inputId = `split-${line.typeId}`;
+              const keep = keeps.get(line.typeId) ?? line.quantity;
+              const moved = Math.max(0, line.quantity - keep);
+              const ore = typeNames.get(line.typeId) ?? `#${line.typeId}`;
               return (
                 <li key={line.typeId} className="space-y-1.5 px-2 py-2">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <OreIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
-                    <label htmlFor={inputId} className="min-w-0 flex-1 truncate">
-                      <OreLink typeId={line.typeId}>
-                        {typeNames.get(line.typeId) ?? `#${line.typeId}`}
-                      </OreLink>
+                    <span className="min-w-0 flex-1 truncate">
+                      <OreLink typeId={line.typeId}>{ore}</OreLink>
                       <span className="ml-1.5 text-xs text-text-dim tabular-nums">
                         {formatCount(line.quantity)}
                       </span>
-                    </label>
+                    </span>
                     <TextInput
-                      id={inputId}
                       size="sm"
                       type="text"
                       inputMode="numeric"
+                      aria-label={t('miningTax.splitKeepsInputLabel', {
+                        ore,
+                        payee: originalPayeeName,
+                      })}
+                      value={formatCount(keep)}
+                      onChange={(e) =>
+                        setKeep(line.typeId, typedUnits(e.target.value), line.quantity)
+                      }
+                      className={cx('w-24 text-right', keep > line.quantity && 'border-accent')}
+                    />
+                    <TextInput
+                      size="sm"
+                      type="text"
+                      inputMode="numeric"
+                      aria-label={t('miningTax.splitMovesInputLabel', { ore })}
                       value={moved === 0 ? '' : formatCount(moved)}
                       placeholder="0"
-                      // Whole units only: every non-digit is a grouping mark from the mask, so
-                      // `5,4930` is 54,930 — the locale parser would read it as 5.493.
                       onChange={(e) =>
-                        setMove(
+                        setKeep(
                           line.typeId,
-                          Number(e.target.value.replace(/\D/g, '')),
+                          line.quantity - Math.min(line.quantity, typedUnits(e.target.value)),
                           line.quantity
                         )
                       }
-                      className={cx('w-28 text-right', moved > 0 && 'border-accent')}
+                      className={cx('w-24 text-right', moved > 0 && 'border-accent')}
                     />
                   </div>
                   <Slider
-                    aria-label={t('miningTax.splitSliderLabel', {
-                      ore: typeNames.get(line.typeId) ?? `#${line.typeId}`,
-                    })}
+                    aria-label={t('miningTax.splitSliderLabel', { ore })}
                     min={0}
                     max={line.quantity}
                     value={moved}
-                    onChange={(e) => setMove(line.typeId, Number(e.target.value), line.quantity)}
+                    onChange={(e) =>
+                      setKeep(line.typeId, line.quantity - Number(e.target.value), line.quantity)
+                    }
                   />
+                  {keep > line.quantity && (
+                    <p className="text-[0.6875rem] text-text-dim">
+                      {t('miningTax.splitUnreportedHint', {
+                        payee: originalPayeeName,
+                        formatted: formatCount(keep - line.quantity),
+                      })}
+                    </p>
+                  )}
                 </li>
               );
             })}
@@ -324,7 +367,8 @@ export function SplitDialog({
               <Radio
                 className="mt-0.5"
                 name="split-collector"
-                checked={collector === 'original'}
+                checked={effectiveCollector === 'original'}
+                disabled={claimsUnreported}
                 onChange={() => setCollector('original')}
               />
               {t('miningTax.splitCollectorKeeps', { payee: originalPayeeName })}
@@ -335,7 +379,7 @@ export function SplitDialog({
               <Radio
                 className="mt-0.5"
                 name="split-collector"
-                checked={collector === 'new'}
+                checked={effectiveCollector === 'new'}
                 onChange={() => setCollector('new')}
               />
               {t('miningTax.splitCollectorNew', {
@@ -383,7 +427,11 @@ export function SplitDialog({
             disabled={!canSplit || saving || busy}
             onClick={() => void handleSplit()}
           >
-            {t('miningTax.splitConfirmAction', { count: movedUnits })}
+            {movedUnits > 0
+              ? t('miningTax.splitConfirmAction', { count: movedUnits })
+              : t('miningTax.splitConfirmClaimAction', {
+                  formatted: formatCount(unreportedUnits),
+                })}
           </Button>
           <Button size="sm" onClick={onClose}>
             {t('filters.cancel')}

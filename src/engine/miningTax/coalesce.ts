@@ -73,7 +73,12 @@ function sameLines(a: readonly OreLine[], b: readonly OreLine[]): boolean {
   return a.every((l) => quantities.get(l.typeId) === l.quantity);
 }
 
-/** True when the members together hold more of some ore type than the entry does. */
+/**
+ * True when the members together hold more of some ore type than the entry does.
+ * Only ever asked of records on identical terms: a split's kept side may
+ * legitimately claim more than ESI reports yet (issue #6180), but its sibling
+ * bills a different Payee or rate, so the two never share a bucket here.
+ */
 function claimsMoreThan(
   members: readonly CoalescableAssignment[],
   entryLines: readonly OreLine[]
