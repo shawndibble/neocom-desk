@@ -1,6 +1,6 @@
 /**
  * `/corp/moons` — the Corp Tax Book (issue #4063, epic #4055, D21): Overview,
- * Extractions, Miners, Statements and Moon owners as path-segment tabs (ADR 0015), the moon and Miner
+ * Extractions, Miners, Statements, Moon owners and Sharing as path-segment tabs (ADR 0015), the moon and Miner
  * pages below their tabs, settings behind the header's gear and the audit log
  * behind Activity.
  *
@@ -62,6 +62,7 @@ import { MoonOwnersTab } from '@/features/corp/moons/MoonOwnersTab';
 import { MOONS_TABS, moonsDetail } from '@/features/corp/moons/moonsPaths';
 import { StatementPeriodDetail } from '@/features/corp/moons/StatementPeriodDetail';
 import { StatementsTab } from '@/features/corp/moons/StatementsTab';
+import { SharingTab } from '@/features/corp/moons/SharingTab';
 import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
 import { useAddMyCorps } from '@/features/corp/moons/addCorps/useAddMyCorps';
@@ -203,6 +204,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
               {tab === 'extractions' && <ExtractionsTab />}
               {tab === 'miners' && <MinersTab />}
               {tab === 'statements' && <StatementsTab />}
+              {tab === 'sharing' && <SharingTab />}
               {tab === 'moon-owners' && (
                 <div className="space-y-4">
                   {addCorps.notices}

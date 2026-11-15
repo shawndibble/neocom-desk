@@ -12,6 +12,7 @@ export const MOONS_TABS = definePageTabs('/corp/moons', [
   { id: 'miners', labelKey: 'corpTaxBook.moons.tabs.miners', deep: true },
   { id: 'statements', labelKey: 'corpTaxBook.moons.tabs.statements', deep: true },
   { id: 'moon-owners', labelKey: 'corpTaxBook.moons.tabs.moonOwners', deep: true },
+  { id: 'sharing', labelKey: 'corpTaxBook.moons.tabs.sharing' },
 ]);
 
 export type MoonsDetail =

@@ -17728,7 +17728,55 @@
         "extractions": "Extractions",
         "miners": "Miners",
         "statements": "Statements",
-        "moonOwners": "Moon owners"
+        "moonOwners": "Moon owners",
+        "sharing": "Sharing"
+      },
+      "sharing": {
+        "title": "Pop sharing",
+        "intro": "Share when this book's moons pop with the pilots you choose: the refinery, its Pop Time and, if you like, the ore make-up and a start link at your rate. Nothing is shown to anyone until you turn sharing on.",
+        "enabled": "Share this book's moon pops",
+        "needsSync": "Sharing needs Automatic sync, so pops stay current without an officer visiting.",
+        "syncStopped": "Automatic sync has stopped: shared pops keep showing with their data age until it runs again.",
+        "openSyncSettings": "Automatic sync settings",
+        "default": "Sharing default",
+        "editDefault": "Edit sharing default",
+        "editMoon": "Pop sharing · {{moon}}",
+        "moons": "Moons",
+        "moonsSummary_one": "{{count}} moon",
+        "moonsSummary_other": "{{count}} moons",
+        "noMoons": "No moons yet: they appear once the book syncs an Extraction.",
+        "loadFailed": "Could not load the sharing settings",
+        "setForMoon": "Set for this moon",
+        "followsDefault": "Sharing default",
+        "overrides_one": "{{count}} set for this moon",
+        "overrides_other": "{{count}} set for this moon",
+        "ownerOptedOut": "Moon owner turned sharing off",
+        "bookRate": "Book's rate",
+        "bookRatePct": "Book's rate ({{pct}}%)",
+        "rateInvalid": "Enter a rate from 0 to 100, or leave it empty for the book's rate.",
+        "oreShown": "Shown",
+        "oreHidden": "Hidden",
+        "cols": {
+          "overrides": "Settings"
+        },
+        "fields": {
+          "audiences": "Shared with",
+          "audiencesHint": "Corp and Alliance are this book's own corporation and alliance. Communities list the ones you are a Member of.",
+          "popTime": "Pop Time",
+          "ore": "Ore make-up",
+          "showOre": "Show the ore make-up (never ISK)",
+          "rate": "Start link rate (%)",
+          "notes": "Notes"
+        },
+        "audience": {
+          "corp": "Corp",
+          "alliance": "Alliance",
+          "none": "No one"
+        },
+        "popTime": {
+          "ready": "Ready",
+          "auto-fracture": "Auto-fracture"
+        }
       },
       "scheduledBy": "Scheduled sync ({{name}})",
       "syncNow": "Sync now",
@@ -18117,7 +18165,10 @@
           "resolveDeclaration": "answered a declaration",
           "recordReminder": "sent a reminder",
           "recordMail": "mailed a Statement",
-          "stopReminders": "stopped reminders"
+          "stopReminders": "stopped reminders",
+          "setPopSharing": "changed pop sharing",
+          "setPopSharingMoon": "changed a moon's pop sharing",
+          "feederPopSharingSet": "changed whether its pop schedule is shared"
         },
         "actionsTo": {
           "issueStatement": "issued a Statement to <name>{{name}}</name>, {{amount}} ISK",
@@ -18504,7 +18555,9 @@
           "role-required": "Your Character does not hold the corporation role this needs.",
           "start-over-billed": "A Statement already covers days before that date.",
           "start-in-future": "The start date can't be in the future.",
-          "director-only": "Only a Director can do that."
+          "director-only": "Only a Director can do that.",
+          "needs-automatic-sync": "Turn on Automatic sync before sharing pops: the server publishes them from its sync.",
+          "unknown-moon": "This book has no Extraction at that moon."
         }
       },
       "consent": {
@@ -18643,6 +18696,12 @@
         "mined": "Mined at your refineries",
         "minedWhile": "Mined while they handled it",
         "paymentsAndRate": "Payments and rate",
+        "popSharing": {
+          "title": "Pop sharing",
+          "label": "Let {{name}} share my pop schedule",
+          "hint": "On by default, for all your moons. {{name}} chooses who sees when they pop. Turned off, nobody sees them until you turn it back on.",
+          "failed": "Could not change pop sharing. Try again."
+        },
         "paymentsToYou": "Payments to you",
         "minedValue": "Mined at your moons",
         "minedVolume": "Volume mined",

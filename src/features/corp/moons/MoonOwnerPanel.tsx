@@ -10,6 +10,7 @@ import {
   disputeFeederPayout,
   requestFeederRate,
   setFeederPayee,
+  setFeederPopSharing,
   setOwnRefineryLabel,
 } from '../taxBook/feederViewClient';
 import { isStale, owedOnLeaving } from '../taxBook/feederViewModel';
@@ -100,6 +101,10 @@ export function MoonOwnerPanel({
         }}
         onDisputePayout={async (payoutId, disputed) => {
           await disputeFeederPayout(characterId, corporationId, payoutId, disputed);
+          reload();
+        }}
+        onSetPopSharing={async (share) => {
+          await setFeederPopSharing(characterId, corporationId, share);
           reload();
         }}
         characterId={characterId}

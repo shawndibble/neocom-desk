@@ -22,7 +22,8 @@
     "functions/src/corpTaxBookMoonDocs.ts",
     "functions/src/corpTaxBookReadModels.ts",
     "functions/src/corpTaxBookSchedule.ts",
-    "functions/src/corpTaxBookVersionKeys.ts"
+    "functions/src/corpTaxBookVersionKeys.ts",
+    "functions/src/popSharing.ts"
   ],
   "exclude": [
     "src/**/*.test.ts",

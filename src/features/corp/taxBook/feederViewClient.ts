@@ -69,6 +69,8 @@ export interface FeederViewSummary {
    * to grant again; absent on a view built before it existed.
    */
   refineryNamesGranted?: boolean;
+  /** The moon owner turned Pop Sharing off (#6222); absent on a view built before it. */
+  popSharingOptedOut?: boolean;
   /** Server-side digest of the view; unused here, `builtAt` is the stamp. */
   contentHash?: string;
 }
@@ -192,6 +194,20 @@ export async function disputeFeederPayout(
     accessToken,
     payoutId,
     disputed,
+  });
+}
+
+/** The moon owner's Pop Sharing opt-out (#6222): `share` false turns it off for all its moons. */
+export async function setFeederPopSharing(
+  characterId: number,
+  corporationId: number,
+  share: boolean
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'setCorpTaxBookFeederPopSharingCallable', {
+    corporationId,
+    accessToken,
+    share,
   });
 }
 

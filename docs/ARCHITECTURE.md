@@ -616,6 +616,17 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   (a Miner's Statement days and one Open page link); `OreLinesTable` is the ore
   make-up table the Miner and moon pages share. `corpBookFixture.ts` builds a
   whole book for the section pages' stories.
+- **Pop Sharing settings** (issue #6222; scope in
+  `docs/context/decisions/20261115-122511-corp-tax-book-shares-moon-pop-schedules.md`).
+  Stored at `corps/{corp}/meta/popSharing` (`{ enabled, defaults, moons: { [moonId]: override } }`),
+  officer-readable through the existing `meta` rule, written only by the `editCorpTaxBookCallable`
+  actions `setPopSharing` (switch + Sharing default; turning on needs `meta/scheduledSync.status ==
+'active'`) and `setPopSharingMoon` (per-setting overrides, null clears one), both in the book's
+  audit. A moon owner's opt-out is `popSharingOptOut` on its feeder record, set by the
+  `setCorpTaxBookFeederPopSharingCallable` action and mirrored as `popSharingOptedOut` on its
+  view summary. The one resolver for a moon's effective settings is `effectivePopSharing`
+  (`functions/src/popSharing.ts`, shared with the client); the Sharing tab is
+  `features/corp/moons/SharingTab.tsx` over `engine/corpTaxBook/sharingMoons.ts`.
 - **Corp Tax Book send queue** (issue #4064, D16). Pure rules:
   `src/engine/corpTaxBook/mailQueue.ts` (pacing, 520 holds, summary, D27
   reminder rule) and `statementMail.ts` (the short Statement mail). Client:
