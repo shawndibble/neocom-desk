@@ -73,4 +73,12 @@ describe('ChargeChart', () => {
     ).toBeTruthy();
     expect(container.querySelector('svg')?.getAttribute('role')).not.toBe('img');
   });
+
+  it('shows the per-minute cost as short ISK with the exact figure as text', () => {
+    const pricey = { ...base, price: 1500 };
+    render(<ChargeChart choices={[pricey]} distance={null} loaded={new Set()} gunCount={1} />);
+    const figure = screen.getByText('15K', { exact: false });
+    expect(figure.textContent).toMatch(/^15K 15,000(\.00)? ISK$/);
+    expect(figure.parentElement?.textContent).toMatch(/15K.*\/min/);
+  });
 });
