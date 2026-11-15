@@ -97,6 +97,14 @@ export interface OrderBookOrchestration {
   regionMode: boolean;
   /** A set, measurable Jump Range: the book spans every region in reach, not the header's hub or region. */
   rangeAcross: boolean;
+  /**
+   * The one region the browser reads, for the Market Group tree's "No orders
+   * in {Region}" cue (#6200). Null until the saved scope settles, and under
+   * All regions or a Jump Range, which span many regions.
+   */
+  singleRegionId: number | null;
+  /** Global Market Region overrides (PLEX): null until they load. */
+  globalMarkets: ReadonlyMap<number, GlobalMarketOverride> | null;
 
   stationFilter: number | null;
   setStationFilter: (next: number | null) => void;
@@ -207,6 +215,10 @@ export function useOrderBookOrchestration({
     hideBait,
   } = filters;
   const fetchesAcross = allRegions || rangeReaches;
+  const singleRegionId =
+    hubHydrated && locationModeHydrated && filters.hydrated && !fetchesAcross
+      ? chosenRegionId
+      : null;
 
   // A range that reaches out ignores the header's hub and region entirely, so
   // changing them (or the range resolving) is no new book.
@@ -447,6 +459,8 @@ export function useOrderBookOrchestration({
       jumpRangeFilter,
       regionMode,
       rangeAcross,
+      singleRegionId,
+      globalMarkets,
       stationFilter,
       setStationFilter,
       stationFilterLabel,
@@ -485,6 +499,8 @@ export function useOrderBookOrchestration({
       jumpRangeFilter,
       regionMode,
       rangeAcross,
+      singleRegionId,
+      globalMarkets,
       stationFilter,
       setStationFilter,
       stationFilterLabel,

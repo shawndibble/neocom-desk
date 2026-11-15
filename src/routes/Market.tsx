@@ -19,7 +19,6 @@ import { tabPath } from '@/lib/pageTabs';
 import { HaulingPanel, type HaulingRefreshInfo } from '@/features/market/HaulingPanel';
 import {
   Button,
-  Caret,
   DataAgeBadge,
   EmptyState,
   FilterChip,
@@ -43,7 +42,6 @@ import {
   TabPanel,
   Tabs,
   Toast,
-  TypeIcon,
   useTabsId,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -54,16 +52,15 @@ import { ZERO_STANDINGS } from '@/engine/market/standings';
 import type { OrderFeeContext } from '@/engine/market/orderFees';
 import { useOnline } from '@/stores/network';
 import { orderBookFailedOffline } from '@/features/market/orderBookView';
-import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
 import { JumpRangeNote } from '@/features/route/JumpRangeControls';
 import {
   MARKET_TREE_MATCH_LIMIT,
   MARKET_TREE_MIN_QUERY_LENGTH,
-  type MarketTreeFilterResult,
-  type SearchCategorySummary,
 } from '@/features/market/marketTree';
+import { MarketGroupTree } from '@/features/market/MarketGroupTree';
+import { useNoOrdersCue } from '@/features/market/regionMarketTypes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
@@ -90,7 +87,6 @@ import { ALL_REGIONS } from '@/engine/market/locationMode';
 import type { RegionOrder } from '@/esi/endpoints';
 import type { MarketAppraiseState } from '@/lib/shortcuts';
 import { buttonClassName } from '@/components/ui/buttonClassName';
-import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
@@ -172,136 +168,6 @@ type MarketTab = (typeof MARKET_TABS.tabs)[number]['id'];
  */
 function usesHubPicker(tab: MarketTab): boolean {
   return tab === 'browser' || tab === 'appraisal';
-}
-
-interface MarketGroupTreeProps {
-  groups: readonly MarketGroupNode[];
-  childrenByParent: ReadonlyMap<number | null, MarketGroupNode[]>;
-  typesByGroup: ReadonlyMap<number, MarketTypeEntry[]>;
-  filterResult: MarketTreeFilterResult | null;
-  expandedIds: ReadonlySet<number>;
-  searchCollapsedIds: ReadonlySet<number>;
-  searchCategories: SearchCategorySummary | null;
-  onToggle: (id: number) => void;
-  onSelect: (typeId: number) => void;
-  selectedTypeId: number | null;
-}
-
-function MarketGroupTree({
-  childrenByParent,
-  typesByGroup,
-  filterResult,
-  expandedIds,
-  searchCollapsedIds,
-  searchCategories,
-  onToggle,
-  onSelect,
-  selectedTypeId,
-}: MarketGroupTreeProps) {
-  const { t } = useTranslation();
-  const filtering = filterResult !== null;
-
-  function renderItem(item: MarketTypeEntry, itemDepth: number) {
-    return (
-      <li key={item.typeId}>
-        <div className="flex items-center">
-          <button
-            type="button"
-            onClick={() => onSelect(item.typeId)}
-            style={{ paddingLeft: `${itemDepth * 0.75 + 0.75}rem` }}
-            // Read back on Back-to-finder (issue #1485), to return focus
-            // to the row that opened the item panel — `data-` rather
-            // than an id/ref, since the tree fully unmounts/remounts
-            // whenever a search collapses or re-expands a group.
-            data-tree-item-id={item.typeId}
-            aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
-            className={`flex min-h-9 min-w-0 flex-1 items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${interactiveClassName} ${focusRingInsetClassName} ${
-              selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
-            }`}
-          >
-            <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
-            <span className="truncate">{item.name}</span>
-          </button>
-        </div>
-      </li>
-    );
-  }
-
-  function renderGroup(group: MarketGroupNode, depth: number) {
-    if (filtering && !filterResult.visibleGroupIds.has(group.id)) return null;
-    const children = childrenByParent.get(group.id) ?? [];
-    const items = filtering
-      ? (filterResult.matchedTypesByGroup.get(group.id) ?? [])
-      : group.hasTypes
-        ? (typesByGroup.get(group.id) ?? [])
-        : [];
-    // Matched branches default open (marketTree.ts), but that default is just
-    // a starting point: `onToggle` below lets the user collapse/re-expand any
-    // group while search is active, independent of which items still match.
-    // Search only ever prunes *items*, never forces expand state.
-    // The one exception is a top-level category: those start collapsed when
-    // the matches are too many to fit (`searchCategories.openByDefault`), so
-    // the set holds flips from that default rather than only collapses.
-    const categoryCount =
-      filtering && depth === 0 ? searchCategories?.countsByRoot.get(group.id) : undefined;
-    const flipped = searchCollapsedIds.has(group.id);
-    const expanded = !filtering
-      ? expandedIds.has(group.id)
-      : categoryCount !== undefined && !searchCategories?.openByDefault
-        ? flipped
-        : !flipped;
-    const expandable = children.length > 0 || items.length > 0;
-
-    // `min-h-9 md:min-h-0` gives a thumb the 36px floor on the leaf row and
-    // on an expandable header — a disabled header is inert, so it stays dense
-    // rather than spending 36px of the phone's scrollport on nothing (55 of
-    // the catalogue's groups are childless and itemless, five in a row under
-    // ECCM alone). Not `controlHeightClassName.md`: its `md:h-9` would grow
-    // desktop's 24px rows too, which this fix must not do.
-    return (
-      <li key={group.id}>
-        <button
-          type="button"
-          disabled={!expandable}
-          aria-expanded={expandable ? expanded : undefined}
-          onClick={() => onToggle(group.id)}
-          style={{ paddingLeft: `${depth * 0.75}rem` }}
-          className={`flex w-full items-center gap-1.5 py-1 text-left text-xs text-text hover:text-accent disabled:hover:text-text ${interactiveClassName} ${focusRingInsetClassName} ${
-            expandable ? 'min-h-9 md:min-h-0' : ''
-          }`}
-        >
-          {expandable && <Caret expanded={expanded} />}
-          <span className={expandable ? '' : 'pl-3'}>
-            {categoryCount === undefined
-              ? group.name
-              : t('market.categoryHeader', { name: group.name, count: categoryCount })}
-          </span>
-        </button>
-        {expanded && (children.length > 0 || items.length > 0) && (
-          <ul>
-            {children.map((child) => renderGroup(child, depth + 1))}
-            {items.map((item) => renderItem(item, depth + 1))}
-          </ul>
-        )}
-      </li>
-    );
-  }
-
-  const roots = childrenByParent.get(null) ?? [];
-  return (
-    // Below `lg` a flat cap. From `lg` the finder panel is a viewport-bounded
-    // flex column and the tree is its flexible part: it takes whatever the
-    // search and the Quickbar leave, so neither is pushed off-screen.
-    <div className="max-h-[32rem] overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
-      {filterResult?.bestMatch && (
-        <div className="mb-2 border-b border-line pb-2">
-          <p className="pb-1 text-[0.6875rem] text-text-dim uppercase">{t('market.bestMatch')}</p>
-          <ul>{renderItem(filterResult.bestMatch, 0)}</ul>
-        </div>
-      )}
-      <ul>{roots.map((root) => renderGroup(root, 0))}</ul>
-    </div>
-  );
 }
 
 /**
@@ -602,6 +468,8 @@ export function Market() {
     jumpRangeFilter,
     regionMode,
     rangeAcross,
+    singleRegionId,
+    globalMarkets,
     stationFilter,
     setStationFilter,
     stationFilterLabel,
@@ -831,6 +699,17 @@ export function Market() {
       onClick={handleBackToFinderAndRestoreFocus}
     />
   ) : undefined;
+
+  // The tree's "No orders in {Region}" cue (#6200) names the browser's one
+  // region; a region pick with no name yet shows no cue rather than a guess.
+  // Only the Browser tab draws the tree, so no other tab asks for the list.
+  const noOrders = useNoOrdersCue(
+    tab === 'browser' ? singleRegionId : null,
+    effectiveLocation.mode === 'hub'
+      ? effectiveHub.regionName
+      : (marketRegions?.find((region) => region.id === singleRegionId)?.name ?? null),
+    globalMarkets
+  );
 
   // The header's hub or region, as the Distance select's "no range" option:
   // with no range set, that is what the book reads.
@@ -1115,6 +994,7 @@ export function Market() {
                       onToggle={handleToggle}
                       onSelect={handleSelectItem}
                       selectedTypeId={selectedTypeId}
+                      noOrders={noOrders}
                     />
                   </div>
                 )}

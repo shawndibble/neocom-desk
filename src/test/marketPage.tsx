@@ -28,6 +28,7 @@ import {
   KESTREL_TYPE_ID,
   MERLIN_TYPE_ID,
   PLEX_TYPE_ID,
+  TYPES,
 } from '@/test/marketMocks';
 
 // Shared harness for the Market route tests (src/routes/Market*.test.tsx), one
@@ -203,6 +204,13 @@ export function plexOrdersHandler(hits: { count: number }) {
   });
 }
 
+/** `GET /markets/{region_id}/types`: `typeIds` listed in every region. */
+export function marketTypesHandler(typeIds: readonly number[]) {
+  return http.get(`${ESI_BASE_URL}/markets/:regionId/types`, () =>
+    HttpResponse.json(typeIds, { headers: { 'X-Pages': '1' } })
+  );
+}
+
 export function historyHandler(
   hits: { count: number },
   regionId: number,
@@ -219,7 +227,10 @@ export function historyHandler(
 // read it override it; the rest don't care, and with no delay between keystrokes
 // it lands before teardown, where it would otherwise be an unhandled request.
 export const server = setupServer(
-  http.get(`${ESI_BASE_URL}/universe/types/:typeId`, () => HttpResponse.error())
+  http.get(`${ESI_BASE_URL}/universe/types/:typeId`, () => HttpResponse.error()),
+  // The tree's "No orders in {Region}" cue (#6200): every fixture type is
+  // listed in every region, so no row carries the cue unless a test says so.
+  marketTypesHandler(TYPES.map((type) => type.typeId))
 );
 
 /** The per-test reset: a fresh Dexie, store and module state, at /market. */
