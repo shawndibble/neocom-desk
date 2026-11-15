@@ -70,6 +70,12 @@ export function buildCorpBookView(
   const nameOf = (corporationId: number) =>
     input.corpNames.get(corporationId) ?? `#${corporationId}`;
 
+  // Payees verified as a corporation: a moon owner's among them names a Collector's conflict.
+  const payeeCorporations = Object.fromEntries(
+    input.payees.flatMap((p) =>
+      p.entityKind === 'corporation' && p.entityId !== undefined ? [[p.id, p.entityId]] : []
+    )
+  );
   const books: PersonalBook[] = ready.map((book) => {
     const dated = pricesByCorp.get(book.corporationId)!;
     return {
@@ -78,6 +84,7 @@ export function buildCorpBookView(
       characterIds: book.characterIds,
       startDate: book.startDate,
       graceHours: book.graceHours,
+      ...(book.overdueDays !== undefined ? { overdueDays: book.overdueDays } : {}),
       ...(book.lastSyncedAt !== undefined ? { lastSyncedAt: book.lastSyncedAt } : {}),
       rates: book.rates,
       miners: book.miners,
@@ -94,6 +101,7 @@ export function buildCorpBookView(
       ownPayeeIds: input.payees
         .filter((p) => isCorpEntityPayee(p, book.corporationId))
         .map((p) => p.id),
+      payeeCorporations,
       pricesOn: (date) => ({
         prices: new Map(pricesAtHubOnDate(dated, book.hubId, date)),
         sources: new Map(sourcesAtHubOnDate(dated, book.hubId, date)),

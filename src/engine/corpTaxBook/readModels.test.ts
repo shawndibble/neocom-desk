@@ -156,6 +156,22 @@ function book(): BookViewInput {
         at: '2026-09-09T00:00:00Z',
         source: 'manual',
       },
+      {
+        id: 'p7',
+        characterId: 98,
+        amount: 4_000,
+        notTaxAmount: 4_000,
+        at: '2026-09-10T00:00:00Z',
+        source: 'donation',
+      },
+      {
+        id: 'p8',
+        characterId: 98,
+        amount: 4_000,
+        notTaxAmount: 1_000,
+        at: '2026-09-11T00:00:00Z',
+        source: 'donation',
+      },
     ],
     declarations: [
       { id: 'd1', statementId: id('solo:2'), kind: 'contract', at: '2026-09-15T00:00:00Z' },
@@ -242,6 +258,15 @@ describe('Overview and Miners tab read models', () => {
     expect(old.schedule.ready).toHaveLength(1);
     expect(old.schedule.pops).toHaveLength(1);
     expect(next).toEqual(old);
+  });
+
+  it('drops an Unmatched donation once it is wholly not tax, on both paths', () => {
+    const input = book();
+    const unmatchedIds = (items: { kind: string; payment?: { id: string } }[]) =>
+      items.filter((i) => i.kind === 'unmatched').map((i) => i.payment?.id);
+    const old = fromBookView(buildBookView(input));
+    expect(unmatchedIds(old.needsYou)).toEqual(['p2', 'p8']);
+    expect(unmatchedIds(fromReadModels(docsAt(input), input).needsYou)).toEqual(['p2', 'p8']);
   });
 
   it('still agrees when the docs are read days after they were built', () => {

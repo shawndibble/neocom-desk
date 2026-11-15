@@ -1,8 +1,11 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ConflictCause } from '@/engine/corpTaxBook/personal';
+import { formatIsk } from '@/lib/isk';
 import type { CorpRowInfo } from './corpRows';
 
-export type PillState = 'pending' | 'billed' | 'conflict' | 'unattributed' | 'dismissed' | 'waived';
+export type PillState =
+  'pending' | 'billed' | 'conflict' | 'unattributed' | 'dismissed' | 'waived' | 'markedPaid';
 
 export const PILL_KEY: Record<PillState, string> = {
   pending: 'pending',
@@ -11,6 +14,7 @@ export const PILL_KEY: Record<PillState, string> = {
   unattributed: 'unattributed',
   dismissed: 'dismissed',
   waived: 'waived',
+  markedPaid: 'markedPaid',
 };
 
 /** The conflict's resolution day, as the row prints it. */
@@ -22,12 +26,22 @@ export function useCorpStateLabel() {
     (corp: CorpRowInfo): string =>
       corp.kind === 'label'
         ? t(`miningTax.corpBook.state.${PILL_KEY[corp.state]}`)
-        : corp.view.state === 'paid'
-          ? t('miningTax.status.paid')
-          : t(`miningTax.corpBook.state.${PILL_KEY[corp.view.state as PillState]}`),
+        : corp.view.bookOwed !== undefined
+          ? t('miningTax.corpBook.state.markedPaid')
+          : corp.view.state === 'paid'
+            ? t('miningTax.status.paid')
+            : t(`miningTax.corpBook.state.${PILL_KEY[corp.view.state as PillState]}`),
     [t]
   );
 }
+
+/** A Conflict's tooltip says why it clashes (`ConflictCause`). */
+const CONFLICT_HINT_KEY: Record<ConflictCause, string> = {
+  otherPayee: 'conflict',
+  overListed: 'conflictOverListed',
+  ownNeedsReview: 'conflictOwnNeedsReview',
+  ownerCollected: 'conflictOwnerCollected',
+};
 
 /** Why the row reads as it does — a tooltip, never the only place it is said (§6c). */
 export function useCorpStateHint() {
@@ -38,7 +52,18 @@ export function useCorpStateHint() {
         return t(`miningTax.corpBook.hint.${PILL_KEY[corp.state]}`, { corp: corp.corpName });
       }
       const { view, corpName } = corp;
-      return t(`miningTax.corpBook.hint.${view.state}`, {
+      // The member's mark is not the book's word: say what its Statement still shows (#6204).
+      if (view.bookOwed !== undefined) {
+        return t('miningTax.corpBook.hint.markedPaid', {
+          corp: corpName,
+          owed: formatIsk(view.bookOwed, 0),
+        });
+      }
+      const key =
+        view.state === 'conflict' && view.conflictCause !== undefined
+          ? CONFLICT_HINT_KEY[view.conflictCause]
+          : view.state;
+      return t(`miningTax.corpBook.hint.${key}`, {
         corp: corpName,
         date: resolvesOn(view.resolvesAt),
         reason: view.dismissalReason ?? '',

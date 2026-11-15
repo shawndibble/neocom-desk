@@ -64,6 +64,8 @@ import { resolveLoyaltyRowItem } from '@/features/loyalty/offerRowDisplay';
 import { LoyaltyStoreLanding } from '@/features/loyalty/LoyaltyStoreLanding';
 import { NearestStationLine } from '@/features/loyalty/NearestStationLine';
 import { LpStoreActions } from '@/features/loyalty/LpStoreChrome';
+import { SpendLpButton, SpendPlanPanel } from '@/features/loyalty/SpendPlan';
+import { useSpendPlan } from '@/features/loyalty/useSpendPlan';
 import type { LpSearchCrumbState } from '@/features/loyalty/lpStorePath';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
@@ -150,6 +152,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     toggleUseOwnMaterials,
     skills,
     standing,
+    ownedStockSnapshot,
   } = useLoyaltyStoreOffers(corporationId);
 
   const offersColumnVisibility = useColumnVisibility(
@@ -190,6 +193,19 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       return true;
     });
   }, [rows, rowsSearch, affordableOnly, blueprintsOnly, selectedOfferId, arrivedOfferId]);
+
+  // Spend my LP: nothing loads until the button is pressed (#6199).
+  const spendPlan = useSpendPlan({
+    corporationId,
+    rows: filteredRows,
+    catalog,
+    hub,
+    skills,
+    standing,
+    playerLp,
+    ownedStock: ownedStockSnapshot,
+    activeCharacterId,
+  });
 
   const affordableCount = useMemo(
     () => rows.filter((row) => row.profit.affordableLp !== false).length,
@@ -324,7 +340,14 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       actions={
         ready &&
         filteredRows.length > 0 && (
-          <TableActionsMenu name={t('loyaltyStore.title')} tableExport={offersExport} />
+          <span className="flex items-center gap-2">
+            <SpendLpButton
+              playerLp={playerLp}
+              loading={spendPlan.plan.status === 'loading'}
+              onClick={spendPlan.run}
+            />
+            <TableActionsMenu name={t('loyaltyStore.title')} tableExport={offersExport} />
+          </span>
         )
       }
       padded={false}
@@ -500,6 +523,15 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           </div>
 
           {offersFromCache && <CachedNotice withBadge fetchedAt={offersFetchedAt} />}
+
+          {spendPlan.open && (
+            <SpendPlanPanel
+              plan={spendPlan.plan}
+              playerLp={playerLp}
+              onSelectOffer={selectRow}
+              onClose={spendPlan.close}
+            />
+          )}
 
           {isDesktop ? (
             <div className="flex items-start gap-3">

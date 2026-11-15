@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDayCharges, minerIdFor, type Miner } from './charges';
+import { buildDayCharges, characterIdsOfMiner, minerIdFor, type Miner } from './charges';
 import type { ObservedMiningEntry } from './types';
 import type { TaxRate } from './rates';
 
@@ -38,6 +38,15 @@ const book = {
   placeOf: (structureId: number) =>
     structureId === 2002 ? { moonId: 40000001, extractionId: 'x1' } : {},
 };
+
+describe('characterIdsOfMiner', () => {
+  const miners: Miner[] = [{ id: 'm1', characterIds: [1, 2], mainCharacterId: 1 }];
+  it("gives a grouping's characters, a solo Miner's own one, and none for an unknown id", () => {
+    expect(characterIdsOfMiner('m1', miners)).toEqual([1, 2]);
+    expect(characterIdsOfMiner('solo:7', miners)).toEqual([7]);
+    expect(characterIdsOfMiner('gone', miners)).toEqual([]);
+  });
+});
 
 describe('minerIdFor', () => {
   it('finds the Miner a character is grouped into', () => {

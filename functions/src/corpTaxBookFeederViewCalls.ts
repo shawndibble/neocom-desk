@@ -3,8 +3,10 @@
 // caller is the moon owner's own officer (CEO, Director or Accountant, read live from ESI); the view itself is in
 // corpTaxBookFeederView.ts. Failures carry a stable `reason`; no player-facing text lives here.
 
+import { FieldValue } from 'firebase-admin/firestore';
+import { HttpsError } from 'firebase-functions/v2/https';
 import { fail, type Caller } from './actorAuth.js';
-import { record } from './communities.js';
+import { boundedString, record } from './communities.js';
 import { ACCESS_TTL_MS, pctField } from './corpTaxBook.js';
 import { type CorpSyncDeps } from './corpSyncGrant.js';
 import {
@@ -20,6 +22,7 @@ import {
   type FeederViewAccessResult,
   type FeederViewerAccess,
 } from './corpTaxBookFeederView.js';
+import { PAYOUTS } from './corpTaxBookFeederPayouts.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
 import { appendAudit, feederRef, type BookDeps } from './corpTaxBookStore.js';
 
@@ -116,6 +119,66 @@ export async function requestFeederRate(
     );
   });
   await tryRebuildFeederView(feederBookDeps(deps), ctx.collectorCorporationId, input.corporationId);
+  return { ok: true };
+}
+
+export interface DisputeFeederPayoutInput extends FeederCall {
+  payoutId: string;
+  /** True flags the payment as disputed; false withdraws the flag. */
+  disputed: boolean;
+}
+
+export function parseDisputeFeederPayoutInput(data: unknown): DisputeFeederPayoutInput {
+  const call = parseFeederCall(data);
+  const d = record(data);
+  if (typeof d.disputed !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'disputed must be true or false');
+  }
+  return { ...call, payoutId: boundedString(d.payoutId, 'payoutId', 64), disputed: d.disputed };
+}
+
+/**
+ * The moon owner flags a payment it disputes (#6209), or withdraws the flag: the accounting
+ * corporation's officers see it on the payment. Only a payment that counts can be disputed; the
+ * flag changes no figure.
+ */
+export async function disputeFeederPayout(
+  deps: CorpSyncDeps,
+  caller: Caller,
+  input: DisputeFeederPayoutInput
+): Promise<{ ok: true }> {
+  const ctx = await authorizeFeederCaller(deps, caller, input, 'edit');
+  if (!ctx)
+    fail('failed-precondition', 'This corporation has no moon owner view', 'not-your-feeder');
+  const ref = feederRef(deps.db, ctx.collectorCorporationId, input.corporationId)
+    .collection(PAYOUTS)
+    .doc(input.payoutId);
+  const changed = await deps.db.runTransaction(async (tx) => {
+    const row = await tx.get(ref);
+    if (!row.exists || row.get('notAPayout') === true)
+      fail('not-found', 'No such payment', 'no-payout');
+    if ((row.get('disputedAt') !== undefined) === input.disputed) return false;
+    tx.update(ref, { disputedAt: input.disputed ? deps.now() : FieldValue.delete() });
+    appendAudit(
+      tx,
+      feederBookDeps(deps),
+      ctx.collectorCorporationId,
+      { characterId: ctx.callerId, name: 'Moon owner' },
+      'feederPayoutDisputed',
+      {
+        feederCorporationId: input.corporationId,
+        payoutId: input.payoutId,
+        disputed: input.disputed,
+      }
+    );
+    return true;
+  });
+  if (changed)
+    await tryRebuildFeederView(
+      feederBookDeps(deps),
+      ctx.collectorCorporationId,
+      input.corporationId
+    );
   return { ok: true };
 }
 

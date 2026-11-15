@@ -77,15 +77,33 @@ export function priceObservedDay(rawTypeIds: readonly number[], inputs: DayPrice
 
 /**
  * What a moon owner's ore is worth (#4621): the hub's saved end-of-day open buy, else its open
- * sell, else 0 (unpriced). No live tier: the server writes the moon owner's page with this rule,
- * so the accounting side values a moon owner's accrual with it too and both show one figure.
+ * sell, else the unit price the miner's line was billed at (#6209), else 0 (unpriced). No live
+ * tier: the server writes the moon owner's page with this rule, so the accounting side values a
+ * moon owner's accrual with it too and both show one figure.
  */
 export function moonOwnerUnitPrice(
-  side: { buy?: number | null; sell?: number | null } | undefined
+  side: { buy?: number | null; sell?: number | null } | undefined,
+  billed?: number
 ): number {
   if (side?.buy != null && side.buy > 0) return side.buy;
   if (side?.sell != null && side.sell > 0) return side.sell;
+  if (billed !== undefined && billed > 0) return billed;
   return 0;
+}
+
+/**
+ * A day's moon owner unit prices by raw type id (`moonOwnerUnitPrice` over the saved prices), with
+ * the price the miners' lines are billed at standing in where the day has no saved one (#6209).
+ */
+export function moonOwnerDayPrices(
+  own: ReadonlyMap<number, number>,
+  billed: ReadonlyMap<number, number>
+): Map<number, number> {
+  const out = new Map(own);
+  for (const [typeId, price] of billed) {
+    if (!((out.get(typeId) ?? 0) > 0)) out.set(typeId, price > 0 ? price : 0);
+  }
+  return out;
 }
 
 /** One Observed Mining Entry's value and tax, at its day's prices (by raw type id) and rate. */

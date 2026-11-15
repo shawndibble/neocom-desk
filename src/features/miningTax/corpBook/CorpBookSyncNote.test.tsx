@@ -63,17 +63,9 @@ describe('CorpBookSyncNote', () => {
     expect(screen.queryByText(/waiting for .* to credit it/)).toBeNull();
   });
 
-  it('leaves the credit line out when showCredit is off, keeping the safe-to-pay line', () => {
-    render(
-      <CorpBookSyncNote
-        book={book({ credit: 1_000_000, lastSyncedAt: '2026-10-17T12:00:00Z' })}
-        owedNow={1}
-        now={NOW}
-        showCredit={false}
-      />
-    );
-    expect(screen.queryByText(/ISK credit/)).toBeNull();
-    expect(screen.getByText(/Safe to pay/)).toBeInTheDocument();
+  it('shows credit even with nothing owed now (#6204)', () => {
+    render(<CorpBookSyncNote book={book({ credit: 1_000_000 })} owedNow={0} now={NOW} />);
+    expect(screen.getByText(/1,000,000 ISK credit/)).toBeInTheDocument();
   });
 
   it('says nothing when there is nothing to say', () => {

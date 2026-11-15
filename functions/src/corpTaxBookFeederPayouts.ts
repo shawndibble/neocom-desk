@@ -4,6 +4,7 @@
 // moon owner writes. Failures carry a stable `reason`; no player-facing text lives here.
 // Payouts never touch Tax Payment matching or Statements.
 
+import { FieldValue } from 'firebase-admin/firestore';
 import { fail, type Caller } from './actorAuth.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
@@ -201,14 +202,21 @@ export async function recordFeederPayout(
     if (!feederSnap.exists) fail('not-found', 'No such moon owner', 'no-feeder');
     const { stored, totals } = await readForWrite(tx, feederSnap, col, payoutFloor([input.date]));
     const merge = payoutToMerge(stored, input);
-    if (merge) tx.update(col.doc(merge), { confirmedAt: deps.now() });
+    // A row waiting to be confirmed (#6209) starts counting once the officer says it was sent.
+    const waiting = merge !== undefined && stored.find((p) => p.id === merge)?.unconfirmed === true;
+    if (merge)
+      tx.update(col.doc(merge), {
+        confirmedAt: deps.now(),
+        ...(waiting ? { notAPayout: false, unconfirmed: FieldValue.delete() } : {}),
+      });
     else tx.create(fresh, payout);
-    // A merge confirms a row already counted; a new row adds one.
+    // A merge confirms a row already counted; a new row, or a waiting one now counted, adds one.
     tx.update(feeder, {
       [PAYOUTS_WRITTEN_AT]: deps.now(),
-      [PAYOUT_TOTALS]: merge
-        ? totals
-        : { count: totals.count + 1, amount: totals.amount + payout.amount },
+      [PAYOUT_TOTALS]:
+        merge && !waiting
+          ? totals
+          : { count: totals.count + 1, amount: totals.amount + payout.amount },
     });
     appendAudit(
       tx,
@@ -230,7 +238,10 @@ export async function recordFeederPayout(
   return { id };
 }
 
-/** An officer says a detected (or recorded) row is, or is not, a payout. It keeps its journal ref so it is never re-detected. */
+/**
+ * An officer says a detected (or recorded) row is, or is not, a payout. It keeps its journal ref
+ * so it is never re-detected; a row waiting to be confirmed (#6209) is confirmed either way.
+ */
 export async function markFeederPayout(
   deps: BookDeps,
   caller: Caller,
@@ -257,7 +268,7 @@ export async function markFeederPayout(
             notAPayout: d.id === ref.id ? input.notAPayout : d.get('notAPayout') === true,
           }))
         );
-    tx.update(ref, { notAPayout: input.notAPayout });
+    tx.update(ref, { notAPayout: input.notAPayout, unconfirmed: FieldValue.delete() });
     if (feederSnap.exists) tx.update(feeder, { [PAYOUT_TOTALS]: totals });
     appendAudit(
       tx,
@@ -384,11 +395,13 @@ export async function applyFeederPayoutPlan(
       tx.update(col.doc(a.id), { status: 'matched', journalRef: a.journalRef });
     }
     for (const c of create) tx.create(col.doc(c.id), c.payout);
+    // A donation without the payout reference waits for an officer and counts for nothing yet.
+    const counted = create.filter((c) => !c.payout.notAPayout);
     tx.update(feeder, {
       [PAYOUTS_WRITTEN_AT]: deps.now(),
       [PAYOUT_TOTALS]: {
-        count: totals.count + create.length,
-        amount: totals.amount + create.reduce((sum, c) => sum + c.payout.amount, 0),
+        count: totals.count + counted.length,
+        amount: totals.amount + counted.reduce((sum, c) => sum + c.payout.amount, 0),
       },
     });
     appendAudit(tx, deps, collector, actor, 'feederPayoutsReconciled', {

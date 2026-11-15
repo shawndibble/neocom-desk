@@ -136,6 +136,8 @@ export interface JournalDonation {
   reason?: string;
   minerId?: string;
   statementId?: string;
+  /** Set when a known sender's Miner owed nothing, so it stays Unmatched for review (#6207). */
+  reviewReason?: 'no-open-balance';
 }
 
 /** Engine `donationsFromJournal`. */
@@ -181,6 +183,7 @@ export function minerIdFor(characterId: number, miners: readonly MinerLike[]): s
 export type DonationMatch =
   | { kind: 'statement'; statementId: string; minerId: string }
   | { kind: 'miner'; minerId: string }
+  | { kind: 'review'; minerId: string }
   | { kind: 'unmatched' };
 
 function escapeRegExp(text: string): string {
@@ -198,6 +201,8 @@ export function matchDonation(
     miners: readonly MinerLike[];
     statements: readonly StatementLike[];
     knownCharacterIds: ReadonlySet<number>;
+    openBalance: ReadonlyMap<string, number>;
+    unbilled: ReadonlySet<string>;
   }
 ): DonationMatch {
   const reason = donation.reason ?? '';
@@ -207,7 +212,10 @@ export function matchDonation(
   }
   const grouped = book.miners.some((m) => m.characterIds.includes(donation.characterId));
   if (grouped || book.knownCharacterIds.has(donation.characterId)) {
-    return { kind: 'miner', minerId: minerIdFor(donation.characterId, book.miners) };
+    const minerId = minerIdFor(donation.characterId, book.miners);
+    if ((book.openBalance.get(minerId) ?? 0) > 0 || book.unbilled.has(minerId))
+      return { kind: 'miner', minerId };
+    return { kind: 'review', minerId };
   }
   return { kind: 'unmatched' };
 }
@@ -219,16 +227,91 @@ export function resolveDonations(
     miners: readonly MinerLike[];
     statements: readonly StatementLike[];
     knownCharacterIds: ReadonlySet<number>;
+    openBalance: ReadonlyMap<string, number>;
+    unbilled: ReadonlySet<string>;
   }
 ): JournalDonation[] {
-  return donations.map((d) => {
-    const match = matchDonation({ characterId: d.characterId, reason: d.reason }, book);
-    if (match.kind === 'statement') {
-      return { ...d, minerId: match.minerId, statementId: match.statementId };
-    }
-    if (match.kind === 'miner') return { ...d, minerId: match.minerId };
-    return d;
-  });
+  const balance = new Map(book.openBalance);
+  const resolved = new Map<JournalDonation, JournalDonation>();
+  const oldestFirst = [...donations].sort(
+    (a, b) => a.at.localeCompare(b.at) || a.division - b.division || a.refId - b.refId
+  );
+  for (const d of oldestFirst) {
+    const match = matchDonation(
+      { characterId: d.characterId, reason: d.reason },
+      { ...book, openBalance: balance }
+    );
+    if (match.kind === 'statement' || match.kind === 'miner')
+      balance.set(match.minerId, (balance.get(match.minerId) ?? 0) - d.amount);
+    resolved.set(
+      d,
+      match.kind === 'statement'
+        ? { ...d, minerId: match.minerId, statementId: match.statementId }
+        : match.kind === 'miner'
+          ? { ...d, minerId: match.minerId }
+          : match.kind === 'review'
+            ? { ...d, reviewReason: 'no-open-balance' }
+            : d
+    );
+  }
+  return donations.map((d) => resolved.get(d)!);
+}
+
+// --- Donations into divisions the book does not read (#6207) --------------
+
+/** Engine `WALLET_DIVISIONS`. */
+export const WALLET_DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
+/** Engine `UNCOUNTED_LIMIT`: also the sync callable's bound on `uncounted`. */
+export const UNCOUNTED_LIMIT = 20;
+
+export interface UncountedDonation {
+  id: string;
+  refId: number;
+  division: number;
+  characterId: number;
+  amount: number;
+  at: string;
+}
+
+/** Engine `otherDivisions`. */
+export function otherDivisions(divisions: readonly number[]): number[] {
+  return WALLET_DIVISIONS.filter((d) => !divisions.includes(d));
+}
+
+/** Engine `noteUncounted`. */
+export function noteUncounted(
+  donations: readonly JournalDonation[],
+  book: {
+    miners: readonly MinerLike[];
+    statements: readonly StatementLike[];
+    knownCharacterIds: ReadonlySet<number>;
+    openBalance: ReadonlyMap<string, number>;
+    unbilled: ReadonlySet<string>;
+  },
+  counted: readonly JournalDonation[] = []
+): UncountedDonation[] {
+  const openBalance = new Map(book.openBalance);
+  for (const c of counted)
+    if (c.minerId !== undefined)
+      openBalance.set(c.minerId, (openBalance.get(c.minerId) ?? 0) - c.amount);
+  return donations
+    .filter((d) => {
+      const kind = matchDonation(
+        { characterId: d.characterId, reason: d.reason },
+        { ...book, openBalance }
+      ).kind;
+      return kind === 'statement' || kind === 'miner';
+    })
+    .sort((a, b) => b.at.localeCompare(a.at) || b.refId - a.refId)
+    .slice(0, UNCOUNTED_LIMIT)
+    .map((d) => ({
+      id: `j${d.division}_${d.refId}`,
+      refId: d.refId,
+      division: d.division,
+      characterId: d.characterId,
+      amount: d.amount,
+      at: d.at,
+    }));
 }
 
 // --- Notification payloads ------------------------------------------------
@@ -549,10 +632,11 @@ export interface SettlePayment {
   statementId?: string;
   notTaxAmount?: number;
   source?: 'donation' | 'manual';
+  /** Held for an officer's review (#6207): never re-matched by a sync. */
+  reviewReason?: 'no-open-balance';
 }
 
-/** Engine `planSettlements`: the Statements now settled that the book does not yet hold as paid. */
-export function planSettlements(input: {
+interface SettleInput {
   statements: readonly SettleStatement[];
   payments: readonly SettlePayment[];
   dismissals: readonly MirrorDismissal[];
@@ -561,10 +645,57 @@ export function planSettlements(input: {
   /** Officer write-offs (#4637): a Statement one forgives in full is settled. */
   writeOffs?: readonly (AllocWriteOff & { minerId: string })[];
   startDate?: string;
-}): string[] {
+}
+
+/** Engine `planSettlements`: the Statements now settled that the book does not yet hold as paid. */
+export function planSettlements(input: SettleInput): string[] {
   const settled: string[] = [];
+  for (const { statements, allocation } of allocateEachMiner(input)) {
+    for (const s of statements) {
+      if (allocation.byStatement.get(s.id)?.settled && !input.alreadyPaid.has(s.id)) {
+        settled.push(s.id);
+      }
+    }
+  }
+  return settled;
+}
+
+/** Engine `unbilledMinerIds`. */
+export function unbilledMinerIds(
+  rows: readonly { characterId: number; date: string; quantity: number }[],
+  book: {
+    miners: readonly MinerLike[];
+    statements: readonly { minerId: string; coversThrough?: string }[];
+    startDate: string;
+  }
+): Set<string> {
+  const billedThrough = new Map<string, string>();
+  for (const s of book.statements)
+    if (s.coversThrough && s.coversThrough > (billedThrough.get(s.minerId) ?? ''))
+      billedThrough.set(s.minerId, s.coversThrough);
+  const out = new Set<string>();
+  for (const r of rows) {
+    if (!(r.quantity > 0) || r.date < book.startDate) continue;
+    const minerId = minerIdFor(r.characterId, book.miners);
+    if (r.date > (billedThrough.get(minerId) ?? '')) out.add(minerId);
+  }
+  return out;
+}
+
+/** Engine `openBalances`: what each Miner still owes on issued Statements. */
+export function openBalances(input: Omit<SettleInput, 'alreadyPaid'>): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const { minerId, allocation } of allocateEachMiner(input)) {
+    let owed = 0;
+    for (const s of allocation.byStatement.values()) if (!s.settled) owed += s.remaining;
+    if (owed > 0) out.set(minerId, owed);
+  }
+  return out;
+}
+
+function allocateEachMiner(input: Omit<SettleInput, 'alreadyPaid'>) {
   const minerIds = [...new Set(input.statements.map((s) => s.minerId))];
-  for (const minerId of minerIds) {
+  return minerIds.map((minerId) => {
     const statements = input.statements.filter((s) => s.minerId === minerId);
     const payments = input.payments.filter((p) => p.minerId === minerId);
     const allocation = allocatePayments({
@@ -580,11 +711,6 @@ export function planSettlements(input: {
       officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId),
       startDate: input.startDate,
     });
-    for (const s of statements) {
-      if (allocation.byStatement.get(s.id)?.settled && !input.alreadyPaid.has(s.id)) {
-        settled.push(s.id);
-      }
-    }
-  }
-  return settled;
+    return { minerId, statements, allocation };
+  });
 }

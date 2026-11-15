@@ -25,7 +25,7 @@ import { usePickedSystems } from '@/features/route/currentSystem';
 import type { LocalJumpDistances } from '@/features/route/localRoute';
 import { resetEsiBudget } from '@/esi/budget';
 import { ESI_BASE_URL } from '@/esi/client';
-import { renderMarketRoute } from '@/test/marketPage';
+import { marketTypesHandler, renderMarketRoute } from '@/test/marketPage';
 import * as routeChunks from '@/app/routeChunks';
 import type {
   MarketGroupNode,
@@ -139,7 +139,8 @@ function regionOrdersHandler(hits: Map<number, number>, failing: readonly number
   });
 }
 
-const server = setupServer();
+// Rifter is listed everywhere, so the tree's no-orders cue (#6200) stays off.
+const server = setupServer(marketTypesHandler([RIFTER]));
 
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });

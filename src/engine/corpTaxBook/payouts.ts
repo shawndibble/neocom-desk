@@ -22,6 +22,17 @@ export interface OutgoingDonation {
   reason?: string;
 }
 
+/**
+ * The text a payment's reason starts with (`payoutReason`): the pay dialog writes it, and only a
+ * donation carrying it is recorded as a payout on its own (#6209). Not translated: the in-game
+ * reason is matched against it.
+ */
+export const PAYOUT_REASON_PREFIX = 'Moon mining payout';
+
+/** Whether a donation's reason carries the payout reference, in any case. */
+export const carriesPayoutReference = (reason: string | undefined): boolean =>
+  reason !== undefined && reason.toLowerCase().includes(PAYOUT_REASON_PREFIX.toLowerCase());
+
 /** How far a recorded date may sit from the journal's day and still be the same payment. */
 export const PAYOUT_LINK_WINDOW_DAYS = 3;
 
@@ -140,7 +151,9 @@ const dayGap = (date: string, at: string) => Math.abs(dayIndex(date) - dayIndex(
 
 /**
  * Attach each outgoing donation to the recorded payout with the same amount, date (within the
- * window) and recipient; a donation with no such record is recorded as a payout. One pass over
+ * window) and recipient. A donation with no such record is recorded as a payout when its reason
+ * carries the payout reference; any other (an SRP refund, say) is recorded as not a payout and
+ * `unconfirmed`, for an officer to confirm either way (#6209). One pass over
  * the whole book: a journal entry counts once across every moon owner, and a donation whose
  * recipient is the payee of more than one moon owner is never auto-recorded (an officer adds it
  * by hand). Only a donation payout takes a journal donation.
@@ -195,6 +208,7 @@ export function reconcileBookOutgoing(input: {
     const i = owners[0]!;
     const date = d.at.slice(0, 10);
     if (date < input.owners[i]!.since) continue;
+    const referenced = carriesPayoutReference(d.reason);
     results[i]!.create.push({
       id: payoutId(d),
       payout: {
@@ -203,7 +217,8 @@ export function reconcileBookOutgoing(input: {
         method: 'donation',
         status: 'matched',
         journalRef: d.refId,
-        notAPayout: false,
+        notAPayout: !referenced,
+        ...(referenced ? {} : { unconfirmed: true }),
       },
     });
   }
@@ -215,7 +230,8 @@ const AUTO_RECORDED = /^j\d+_\d+$/;
 /**
  * "I've sent it" or a manual add after the journal already auto-recorded the same payment: the
  * journal row with the same amount within the matching window, which the officer's record then
- * confirms instead of counting it twice. Only a donation, and only a row not yet confirmed.
+ * confirms instead of counting it twice. Only a donation, and only a row not yet confirmed; a row
+ * waiting to be confirmed (`unconfirmed`) is the payment too, and the record confirms it.
  */
 export function payoutToMerge(
   stored: readonly StoredPayout[],
@@ -227,7 +243,7 @@ export function payoutToMerge(
       (p) =>
         AUTO_RECORDED.test(p.id) &&
         p.journalRef !== undefined &&
-        !p.notAPayout &&
+        (!p.notAPayout || p.unconfirmed === true) &&
         p.confirmedAt === undefined &&
         p.method === 'donation' &&
         p.amount === recorded.amount &&
@@ -288,7 +304,7 @@ export function payoutPeriod(
   return { from: (after[0] ?? dates[0]) as string, to };
 }
 
-/** The reason to paste into the in-game transfer. Never the miner rate or margin. */
+/** The reason to paste into the in-game transfer, after `PAYOUT_REASON_PREFIX`. Never the miner rate or margin. */
 export function payoutReason(prefix: string, period: { from: string; to: string } | undefined) {
   return period ? `${prefix}, ${period.from} to ${period.to}` : prefix;
 }

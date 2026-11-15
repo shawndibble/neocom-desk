@@ -496,6 +496,42 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       ).toBe(true);
     });
 
+    it('holds a known miner’s donation for review when their Miner owes nothing (#6207)', async () => {
+      // Billed through the day character 50 mined, and paid in full: nothing owed, nothing unbilled.
+      await book()
+        .collection('statements')
+        .doc('sPaid')
+        .set({ ...statement, id: 'sPaid', code: 'PAID01', coversThrough: '2026-10-31' });
+      await book().collection('payments').doc('j0').set({
+        id: 'j0',
+        source: 'manual',
+        minerId: 'solo:50',
+        characterId: 50,
+        uid: 'char:50',
+        amount: 10_000_000,
+        at: '2026-10-16T12:00:00.000Z',
+      });
+      await optIn(ACCOUNTANT);
+      const summary = await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+      expect(summary.synced).toBe(1);
+      const payment = (await book().collection('payments').doc('j1_1').get()).data();
+      expect(payment?.minerId).toBeUndefined();
+      expect(payment?.reviewReason).toBe('no-open-balance');
+    });
+
+    it('notes tax paid into a division the book does not read, without crediting it (#6207)', async () => {
+      await book().collection('statements').doc('s1').set(statement);
+      await optIn(ACCOUNTANT);
+      // The fake wallet answers the same journal for every division: division 2's copy is the
+      // Miner who owes paying where the book does not look.
+      await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+      const noted = (await book().collection('meta').doc('uncounted').get()).data();
+      expect(noted?.donations).toContainEqual(
+        expect.objectContaining({ id: 'j2_1', division: 2, characterId: 50 })
+      );
+      expect((await book().collection('payments').doc('j2_1').get()).exists).toBe(false);
+    });
+
     describe('settled rows (#5048)', () => {
       const H = 3_600_000;
       const row = (date: string, quantity: number, character = 50) => ({
@@ -576,10 +612,14 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
 
         now = T0 + 12 * H;
         esiState.ledger = readAt([row('2026-10-10', 100)]);
+        // Once: a run reads every wallet division's journal (#6207).
+        let recreated = false;
         const recreating: SyncEsi = {
           ...fakeEsi(),
           // While the run reads ESI, the book is deleted and turned on again, empty.
           journal: async () => {
+            if (recreated) return esiState.journal as never;
+            recreated = true;
             await deleteBook(
               bookDeps(),
               who(DIRECTOR),

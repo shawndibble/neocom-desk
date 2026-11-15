@@ -17,3 +17,12 @@ export function corpPayAccount(
     ? t('miningTax.corpBook.pay.masterWallet')
     : t('miningTax.corpBook.pay.division', { division });
 }
+
+/** Every Account the book reads donations from (`corpPayAccount` each), in division order. */
+export function corpPayAccounts(
+  divisions: readonly number[],
+  names: Readonly<DivisionNames> | undefined,
+  t: Translate
+): string[] {
+  return divisions.map((d) => corpPayAccount(d, names, t));
+}

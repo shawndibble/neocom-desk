@@ -19,7 +19,12 @@ import {
   type TaxPayment,
 } from './allocation';
 import { lastBillableDate } from './billable';
-import { splitByCoverageAndRead, type FeederReadClock } from './feederHealth';
+import {
+  heldBillableThrough,
+  splitByCoverageAndRead,
+  staleOwnerHolds,
+  type FeederReadClock,
+} from './feederHealth';
 import { buildDayCharges, type DayCharge, type Miner } from './charges';
 import type { FeederCoverage } from './coverage';
 import { activeDismissalFor, type Dismissal } from './dismissals';
@@ -33,6 +38,7 @@ import {
   type LearnedChunkRate,
 } from './extraction';
 import { overdueStatus, type Declaration, type OverdueState } from './overdue';
+import { netOf } from './paymentPreview';
 import {
   draftStatement,
   frozenDayRate,
@@ -227,6 +233,8 @@ interface MinerInternals {
   allocationInput: AllocationInput;
   draft: StatementDraft;
   days: DayRow[];
+  /** The book's `billableThrough`, stopped before a day of this miner's that is held (#6209). */
+  billableThrough: string | undefined;
 }
 
 /** Which Extraction a refinery was working on a date: from fracture through expiry. */
@@ -379,6 +387,17 @@ export function buildBookView(input: BookViewInput): BookView {
 
   const minerIds = minerIdsOf(input, charges);
   const latestCorp = latestCorporationOf(input.entries);
+  // A miner at a moon owner that cannot be read is held from its first unread day (#6209).
+  const heldFrom = staleOwnerHolds(
+    input.entries,
+    {
+      now: input.now,
+      graceHours: input.graceHours,
+      bookCorporationId: input.corporationId,
+      feeders: input.feeders ?? [],
+    },
+    billableThrough
+  );
 
   const byMiner = new Map<string, MinerInternals>();
   const miners: MinerRow[] = [];
@@ -409,7 +428,8 @@ export function buildBookView(input: BookViewInput): BookView {
     };
     const allocation = allocatePayments(allocationInput);
     const forgivenKeys = forgivenDayKeys(statements, allocation, credits);
-    const draft = minerDraft(input, id, statements, mine, billableThrough);
+    const minerThrough = heldBillableThrough(billableThrough, characterIds, heldFrom);
+    const draft = minerDraft(input, id, statements, mine, minerThrough);
 
     const draftLines = draft.kind === 'nothing' ? [] : draft.lines;
     const unbilledKeys = new Set(draftLines.map((l) => l.chargeKey));
@@ -519,7 +539,15 @@ export function buildBookView(input: BookViewInput): BookView {
       paused,
     };
     miners.push(row);
-    byMiner.set(id, { statements, payments, allocation, allocationInput, draft, days });
+    byMiner.set(id, {
+      statements,
+      payments,
+      allocation,
+      allocationInput,
+      draft,
+      days,
+      billableThrough: minerThrough,
+    });
 
     for (const d of input.declarations) {
       if (d.resolution || !statements.some((s) => s.id === d.statementId)) continue;
@@ -546,7 +574,8 @@ export function buildBookView(input: BookViewInput): BookView {
   let donationsBeforeBook = 0;
   for (const p of input.payments) {
     if (p.source === 'donation' && isBeforeBook(p.at, input.startDate)) donationsBeforeBook++;
-    else if (!p.minerId) needsYou.push({ kind: 'unmatched', payment: p });
+    // A donation wholly marked not tax needs nothing more; a partly marked one still does.
+    else if (!p.minerId && netOf(p) > 0) needsYou.push({ kind: 'unmatched', payment: p });
   }
   // The same ordering the cards read in: declarations, then the oldest debt.
   const rank: Record<NeedsYouItem['kind'], number> = {
@@ -871,7 +900,7 @@ export function planStatementRun(view: BookView, period: StatementPeriod): State
       issued: inner.statements,
       paidStatementIds: view.input.paidStatementIds,
       dismissals: view.input.dismissals,
-      billableThrough: view.billableThrough,
+      billableThrough: inner.billableThrough,
       minimumAmount: view.input.minimumStatement,
     });
     if (draft.kind === 'rolled-over') belowMinimum += 1;
@@ -1078,7 +1107,7 @@ function ownPeriodBilling(
       issued: view.internals.byMiner.get(m.id)!.statements,
       paidStatementIds: view.input.paidStatementIds,
       dismissals: view.input.dismissals,
-      billableThrough: view.billableThrough,
+      billableThrough: view.internals.byMiner.get(m.id)!.billableThrough,
       minimumAmount: minimum,
     });
     if (draft.kind === 'rolled-over') {

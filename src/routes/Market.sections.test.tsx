@@ -9,7 +9,7 @@ import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { renderMarketRoute } from '@/test/marketPage';
+import { marketTypesHandler, renderMarketRoute } from '@/test/marketPage';
 import type { TypeMap } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -97,6 +97,8 @@ const transactions = [
 ];
 
 const server = setupServer(
+  // The Browser tree's no-orders cue (#6200): every fixture type is listed.
+  marketTypesHandler([34, 35]),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders`, () =>
     HttpResponse.json([openOrder])
   ),

@@ -67,8 +67,8 @@ export function fixtureView(over: Partial<FeederViewSummary> = {}): FeederView {
       },
     ],
     payouts: [
-      { date: '2026-10-16', amount: 12_000_000, method: 'donation', status: 'matched' },
-      { date: '2026-10-04', amount: 8_000_000, method: 'donation', status: 'matched' },
+      { id: 'p2', date: '2026-10-16', amount: 12_000_000, method: 'donation', status: 'matched' },
+      { id: 'p1', date: '2026-10-04', amount: 8_000_000, method: 'donation', status: 'matched' },
     ],
   };
 }

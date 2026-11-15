@@ -52,8 +52,12 @@ export type RateNote =
 
 /** The rate line: the agreed rate wins; a different request is shown beside it. */
 export function rateNote(s: FeederViewSummary): RateNote {
-  // No effective rate means nothing is owed: stale history must not read as a rate set.
-  if (s.effectiveRatePct === null) return { kind: 'none' };
+  // No effective rate means nothing is owed yet: stale history must not read as a rate set. A
+  // request alone never takes effect (#6209); it waits for an agreement.
+  if (s.effectiveRatePct === null)
+    return s.requestedRatePct !== null
+      ? { kind: 'asked', askedPct: s.requestedRatePct }
+      : { kind: 'none' };
   // The rate-changed event drives the line; records with no event fall back to the plain fields.
   const change = latestRateChange(s.rateHistory);
   if (change) {
@@ -75,7 +79,8 @@ export function rateNote(s: FeederViewSummary): RateNote {
     }
     return { kind: 'plain', pct: s.agreedRatePct };
   }
-  if (s.requestedRatePct !== null) return { kind: 'plain', pct: s.requestedRatePct };
+  // A view built before #6209 took a request alone as the rate; it is still only asked for.
+  if (s.requestedRatePct !== null) return { kind: 'asked', askedPct: s.requestedRatePct };
   return s.effectiveRatePct === null
     ? { kind: 'none' }
     : { kind: 'plain', pct: s.effectiveRatePct };

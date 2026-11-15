@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, Panel, StatChip, StatChips, TextInput } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
+import { InlineError } from '@/components/ui/InlineError';
 import { payeeChangeNotice, payeeNoticeKey } from '@/engine/corpTaxBook/payeeChange';
 import type { Payee } from '@/engine/corpTaxBook/payouts';
 import type { FeederView } from '../taxBook/feederViewClient';
@@ -37,7 +38,14 @@ function Statement({ view, name }: { view: FeederView; name: string }) {
       <div className="space-y-1 text-sm">
         <p className="text-text-dim">{t(k('intro'), { name })}</p>
         {rate === null ? (
-          <p>{t(k('noRate'))}</p>
+          <>
+            <p>{t(k('noRate'))}</p>
+            {(s.pendingValueIsk ?? 0) > 0 && (
+              <p className="text-xs text-text-dim">
+                {t(k('pending'), { value: isk(s.pendingValueIsk ?? 0) })}
+              </p>
+            )}
+          </>
         ) : s.balanceKind === 'owed' ? (
           <>
             <p className="text-2xl font-semibold tabular-nums">{isk(s.balanceIsk)}</p>
@@ -76,21 +84,42 @@ function Statement({ view, name }: { view: FeederView; name: string }) {
   );
 }
 
-/** Settled otherwise: the note, mined volume and value, nothing owed in ISK. */
-function SettledOtherwise({ view, name }: { view: FeederView; name: string }) {
+/**
+ * Settled otherwise: the note, mined volume and value. Nothing more builds up in ISK, but what was
+ * owed before the switch stays owed and shows here until it is paid (#6209).
+ */
+function SettledOtherwise({
+  view,
+  name,
+  payments,
+}: {
+  view: FeederView;
+  name: string;
+  payments: ReactNode;
+}) {
   const { t } = useTranslation();
   const s = view.summary;
+  const owed = s.balanceKind === 'owed';
   return (
     <>
       <Panel title={t('corpTaxBook.moons.ownerView.settledOtherwise.title')}>
         <div className="space-y-1 text-sm">
           <p>{t('corpTaxBook.moons.ownerView.settledOtherwise.intro', { name })}</p>
           {s.note && <p className="font-semibold">{s.note}</p>}
+          {owed && (
+            <p>
+              <span className="text-2xl font-semibold tabular-nums">{isk(s.balanceIsk)}</span>{' '}
+              {t('corpTaxBook.moons.ownerView.settledOtherwise.stillOwed')}
+            </p>
+          )}
           <p className="text-xs text-text-dim">
             {t('corpTaxBook.moons.ownerView.settledOtherwise.nothingOwed')}
           </p>
         </div>
       </Panel>
+      {(owed || view.payouts.length > 0) && (
+        <Panel title={t('corpTaxBook.moons.ownerView.paymentsToYou')}>{payments}</Panel>
+      )}
       <StatChips>
         <StatChip
           label={t('corpTaxBook.moons.ownerView.minedValue')}
@@ -216,23 +245,60 @@ function RateLine({
 
 const METHOD = { donation: 'donation', other: 'other' } as const;
 
-function Payments({ view }: { view: FeederView }) {
+/**
+ * The payments to the moon owner, newest first. With `onDispute` (its officers), each one can be
+ * flagged as a payment it disputes, or the flag withdrawn (#6209); the accounting side sees it.
+ */
+function Payments({
+  view,
+  onDispute,
+}: {
+  view: FeederView;
+  onDispute?: (payoutId: string, disputed: boolean) => Promise<void>;
+}) {
   const { t } = useTranslation();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const k = (key: string) => `corpTaxBook.moons.ownerView.payments.${key}`;
   const rows = payoutRows(view.payouts);
-  if (rows.length === 0)
-    return (
-      <p className="text-sm text-text-dim">{t('corpTaxBook.moons.ownerView.payments.none')}</p>
-    );
+  if (rows.length === 0) return <p className="text-sm text-text-dim">{t(k('none'))}</p>;
+  const toggle = async (id: string, disputed: boolean) => {
+    if (!onDispute) return;
+    setBusy(id);
+    setFailed(false);
+    try {
+      await onDispute(id, disputed);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(null);
+    }
+  };
   return (
-    <ul className="space-y-0.5 text-xs text-text-dim">
-      {rows.map((p, i) => (
-        <li key={`${p.date}:${p.amount}:${i}`}>
-          {shortDate(p.date)} · <span className="tabular-nums">{isk(p.amount)}</span> ·{' '}
-          {t(`corpTaxBook.moons.ownerView.payments.method.${METHOD[p.method]}`)} ·{' '}
-          {t(`corpTaxBook.moons.ownerView.payments.status.${p.status}`)}
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-1">
+      <ul className="space-y-1 text-xs text-text-dim">
+        {rows.map((p) => (
+          <li key={p.id} className="flex items-center gap-2">
+            <span>
+              {shortDate(p.date)} · <span className="tabular-nums">{isk(p.amount)}</span> ·{' '}
+              {t(k(`method.${METHOD[p.method]}`))} · {t(k(`status.${p.status}`))}
+              {p.disputed && <span className="text-warning"> · {t(k('disputed'))}</span>}
+            </span>
+            {onDispute && (
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={busy === p.id}
+                onClick={() => void toggle(p.id, !p.disputed)}
+              >
+                {t(k(p.disputed ? 'withdraw' : 'dispute'))}
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {failed && <InlineError>{t(k('disputeFailed'))}</InlineError>}
+    </div>
   );
 }
 
@@ -282,6 +348,7 @@ export function MoonOwnerView({
   canEdit,
   onSetRefineryLabel,
   onRequestRate,
+  onDisputePayout,
   characterId,
   onSetPayee,
   banner,
@@ -299,6 +366,8 @@ export function MoonOwnerView({
   /** Label a refinery for both sides; null clears it. With `canEdit`, shows the pencil. */
   onSetRefineryLabel?: (structureId: number, label: string | null) => Promise<void>;
   onRequestRate: (pct: number) => Promise<void>;
+  /** Flag a payment as disputed, or withdraw it (#6209); with `canEdit`, shows Dispute. */
+  onDisputePayout?: (payoutId: string, disputed: boolean) => Promise<void>;
   /** Whose token the payee name search runs under; with `onSetPayee`, shows Change. */
   characterId?: number;
   onSetPayee?: (payee: Payee, name: string) => Promise<void>;
@@ -315,6 +384,12 @@ export function MoonOwnerView({
   const state = pageState(view.summary);
   const name = view.summary.collectorName ?? t('corpTaxBook.moons.owner.anonymous');
   const ended = state === 'ended';
+  const payments = (
+    <Payments
+      view={view}
+      {...(canEdit && !ended && onDisputePayout ? { onDispute: onDisputePayout } : {})}
+    />
+  );
   const setBy = view.summary.payeeSetBy ?? null;
   // The accounting corporation changed who gets paid (#4653): a strip until dismissed.
   const payeeNotice = payeeChangeNotice({
@@ -356,7 +431,9 @@ export function MoonOwnerView({
       {!folded && (
         <>
           {state === 'normal' && <Statement view={view} name={name} />}
-          {state === 'settled-otherwise' && <SettledOtherwise view={view} name={name} />}
+          {state === 'settled-otherwise' && (
+            <SettledOtherwise view={view} name={name} payments={payments} />
+          )}
           {(!ended || view.days.length > 0) && (
             <>
               <MinedTable
@@ -397,7 +474,7 @@ export function MoonOwnerView({
                     : {})}
                   onChange={canSetPayee ? () => setChangingPayee(true) : undefined}
                 />
-                <Payments view={view} />
+                {payments}
               </div>
             </Panel>
           )}

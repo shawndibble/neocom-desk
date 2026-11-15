@@ -115,18 +115,23 @@ export async function loadEsiExtractions(characterId: number, corporationId: num
   return result.cached?.data ?? null;
 }
 
-/** Donations into the given wallet divisions. A division that does not answer is skipped, not fatal. */
+/**
+ * Donations into the given wallet divisions. A division that does not answer is skipped, not
+ * fatal — unless `whole`, when it makes the read null: a caller that replaces a stored list
+ * (#6207) must not mistake an unread division for one with nothing in it.
+ */
 export async function loadDonations(
   characterId: number,
   corporationId: number,
-  divisions: readonly number[]
-): Promise<JournalDonation[]> {
+  divisions: readonly number[],
+  options: { whole?: boolean } = {}
+): Promise<JournalDonation[] | null> {
   const found: JournalDonation[] = [];
   for (const division of divisions) {
     const journal = await loadCorporationWalletJournal(characterId, corporationId, division);
     if (journal.cached) {
       found.push(...donationsFromJournal(journal.cached.data, division, corporationId));
-    }
+    } else if (options.whole) return null;
   }
   return found;
 }

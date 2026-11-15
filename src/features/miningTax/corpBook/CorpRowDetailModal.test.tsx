@@ -147,6 +147,22 @@ describe('CorpRowDetailModal', () => {
     expect(screen.queryByRole('button', { name: /settle up/i })).not.toBeInTheDocument();
   });
 
+  it('shows an over-listed excess as never billed: the book did not record it', () => {
+    const excess: BookRowView = {
+      ...view,
+      state: 'conflict',
+      conflictCause: 'overListed',
+      taxOwed: null,
+      billed: 0,
+      dispute: undefined,
+    };
+    renderModal({ corp: { ...corp, view: excess } });
+    expect(
+      screen.getByText("Not billed · Brass Meridian Logistics's book did not record this ore")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/next Statement/)).not.toBeInTheDocument();
+  });
+
   it('says why the day is locked and keeps the billed amount once it is paid', () => {
     const paid: BookRowView = {
       ...view,
@@ -199,6 +215,24 @@ describe('CorpRowDetailModal', () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /mark as unpaid/i }));
     expect(onUnmarkPaid).toHaveBeenCalledOnce();
+  });
+
+  it('says the book still bills a day the member marked paid while its Statement is open (#6204)', () => {
+    const marked: BookRowView = {
+      ...view,
+      state: 'paid',
+      taxOwed: 0,
+      settledBy: 'yourMark',
+      bookOwed: 900_000,
+      markedPaidIds: ['a1'],
+      dispute: undefined,
+    };
+    renderModal({ corp: { ...corp, view: marked } });
+    expect(
+      screen.getByText(
+        'Marked paid by you — Brass Meridian Logistics still shows 900,000 ISK owed. It confirms your mark against its wallet.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('says so when the member also marked a day the Statement settled, and offers the unmark', () => {

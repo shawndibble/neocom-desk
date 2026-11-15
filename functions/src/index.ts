@@ -128,7 +128,9 @@ import {
 } from './corpTaxBookFeederGrant.js';
 import {
   dismissFeederHistory,
+  disputeFeederPayout,
   getFeederViewAccess,
+  parseDisputeFeederPayoutInput,
   parseRequestFeederRateInput,
   requestFeederRate,
 } from './corpTaxBookFeederViewCalls.js';
@@ -1014,6 +1016,15 @@ corpTaxBookAction('getCorpTaxBookFeederViewAccessCallable', (request) =>
 
 corpTaxBookAction('requestCorpTaxBookFeederRateCallable', (request) =>
   requestFeederRate(corpSyncDeps(), callerOf(request), parseRequestFeederRateInput(request.data))
+);
+
+// The moon owner flags a payment it disputes, or withdraws the flag (#6209).
+corpTaxBookAction('disputeCorpTaxBookFeederPayoutCallable', (request) =>
+  disputeFeederPayout(
+    corpSyncDeps(),
+    callerOf(request),
+    parseDisputeFeederPayoutInput(request.data)
+  )
 );
 
 // The moon owner names its payee: its own CEO, Directors and Accountants. The accounting

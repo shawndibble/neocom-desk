@@ -371,7 +371,8 @@ emulatorSuite('moon owner onboarding', () => {
       collectorCorporationId: COLLECTOR,
       feederStatus: 'active',
       requestedRatePct: 6,
-      effectiveRatePct: 6,
+      // A request alone is no rate until one is agreed (#6209).
+      effectiveRatePct: null,
       isHolder: false,
       refineries: [{ structureId: 4001, volume: 100 }],
     });

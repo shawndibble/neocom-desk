@@ -118,6 +118,42 @@ describe('BookHealthStrip, scheduled sync', () => {
   });
 });
 
+describe('BookHealthStrip, sources a sync could not read', () => {
+  const visit = (missing: string[]) =>
+    ({
+      ...sync,
+      run: { phase: 'done', outcome: { kind: 'synced', missing } },
+    }) as unknown as CorpTaxBookSync;
+  const active = (missing?: ('extractions' | 'donations')[]) =>
+    ({
+      status: 'active',
+      characterId: 9,
+      characterName: 'Pilot 9',
+      enabledAt: 1,
+      lastRun: { at: 1, outcome: 'synced', missing },
+    }) as ScheduledSyncStatus;
+
+  it('warns on the Overview when the scheduled run could not read donations', () => {
+    renderStrip(active(['donations']));
+    expect(screen.getByText(/The last sync could not read donations/)).toBeInTheDocument();
+  });
+
+  it("warns when this visit's sync could not read Extractions", () => {
+    renderStrip(null, visit(['extractions']));
+    expect(screen.getByText(/The last sync could not read Extractions/)).toBeInTheDocument();
+  });
+
+  it('says nothing for a source the scheduled run did read', () => {
+    renderStrip(active([]), visit(['donations']));
+    expect(screen.queryByText(/could not read/)).not.toBeInTheDocument();
+  });
+
+  it('lets this visit’s read clear an older scheduled miss', () => {
+    renderStrip(active(['donations']), visit([]));
+    expect(screen.queryByText(/could not read/)).not.toBeInTheDocument();
+  });
+});
+
 describe('BookHealthStrip, member hold', () => {
   it('tells officers when members start to see a new book', () => {
     renderStrip(null, sync, [], { membersSeeFrom: Date.now() + 3_600_000 });

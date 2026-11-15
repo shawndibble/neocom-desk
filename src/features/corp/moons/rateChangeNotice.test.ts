@@ -74,16 +74,25 @@ describe('agreedRateChange', () => {
     effectiveFrom: '2026-10-01',
     recordedAt: '2026-10-01T00:00:00Z',
   };
+  const agreed = { ...req, kind: 'agreed' as const, pct: 7 };
   it('is the change an override makes, with what was asked', () => {
-    expect(agreedRateChange([req], 8, at)).toEqual({
+    expect(agreedRateChange([agreed, req], 8, at)).toEqual({
       date: '2026-10-05',
-      oldPct: 6,
+      oldPct: 7,
       newPct: 8,
       requestedPct: 6,
       recordedAt: at.toISOString(),
     });
   });
   it('is undefined when the agreed rate equals the rate already in force', () => {
-    expect(agreedRateChange([req], 6, at)).toBeUndefined();
+    expect(agreedRateChange([agreed, req], 7, at)).toBeUndefined();
+  });
+  it('a first agreement is a change even when it is the rate asked for: a request alone is no rate (#6209)', () => {
+    expect(agreedRateChange([req], 6, at)).toEqual({
+      date: '2026-10-05',
+      newPct: 6,
+      requestedPct: 6,
+      recordedAt: at.toISOString(),
+    });
   });
 });

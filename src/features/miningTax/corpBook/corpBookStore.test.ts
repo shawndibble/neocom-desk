@@ -34,6 +34,7 @@ describe('readBookSettings', () => {
       corporationId: 98000001,
       startDate: '2026-10-01',
       graceHours: 12,
+      overdueDays: 14,
       hubId: 'amarr',
       oreForm: 'raw',
       divisions: [2],
@@ -50,6 +51,11 @@ describe('readBookSettings', () => {
     expect(readBookSettings(1, { ...book, divisionNames: 'junk' })).not.toHaveProperty(
       'divisionNames'
     );
+  });
+
+  it("reads the book's Overdue days, 14 when unset (#6204)", () => {
+    expect(readBookSettings(1, { ...book, overdueDays: 21 })?.overdueDays).toBe(21);
+    expect(readBookSettings(1, book)?.overdueDays).toBe(14);
   });
 
   it('keeps a per-feeder rate', () => {

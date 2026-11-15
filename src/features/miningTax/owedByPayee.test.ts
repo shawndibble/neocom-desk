@@ -25,6 +25,22 @@ describe('computeOwedByPayee', () => {
     expect(owed.size).toBe(2);
   });
 
+  it('leaves out what a Corp Tax Book bills too, and an Assignment it bills whole (#6204)', () => {
+    const share = new Map([
+      ['half', 0.5],
+      ['whole', 1],
+    ]);
+    const owed = computeOwedByPayee(
+      [
+        assignment({ id: 'half', taxOwed: 100 }),
+        assignment({ id: 'whole', taxOwed: 40 }),
+        assignment({ id: 'mine', taxOwed: 25 }),
+      ],
+      (a) => share.get(a.id) ?? 0
+    );
+    expect(owed.get('p1')).toMatchObject({ amount: 75, count: 2 });
+  });
+
   it('is empty with nothing owed', () => {
     expect(computeOwedByPayee([]).size).toBe(0);
   });

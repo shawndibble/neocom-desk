@@ -174,6 +174,26 @@ describe('CorpOverlapNotice on a Conflict day', () => {
     );
   });
 
+  it('names an own entry for the corporation that needs review, not another Payee', () => {
+    renderConflict(assignment, { ...conflict, conflictCause: 'ownNeedsReview' });
+    expect(screen.getByRole('region', { name: 'Conflict' })).toHaveTextContent(
+      'Your own entry for Brass Meridian needs review'
+    );
+  });
+
+  it("says a Collector now collects for the moon owner the miner's entry names", () => {
+    renderConflict(assignment, {
+      ...conflict,
+      conflictCause: 'ownerCollected',
+      ownerPayeeId: 'p1',
+    });
+    const region = screen.getByRole('region', { name: 'Conflict' });
+    expect(region).toHaveTextContent("Brass Meridian now collects tax for Ashfall's moon");
+    expect(region).toHaveTextContent(
+      'If you already paid Ashfall, ask an officer of Brass Meridian.'
+    );
+  });
+
   it('takes what each corporation recorded off the entry in one go when several books contest the day', async () => {
     const second = {
       ...conflict,

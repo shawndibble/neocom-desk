@@ -1,6 +1,7 @@
 import { iskToneClass } from '@/features/character/format';
 import { fixed1 } from '@/lib/fixedFormat';
 import { formatCount } from '@/lib/formatCount';
+import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import type { LoyaltyOfferRow } from './offerRows';
 
 /**
@@ -56,4 +57,18 @@ export function resolveLoyaltyRowItem(row: LoyaltyOfferRow): {
 } {
   if (!row.isBlueprint) return { typeId: row.offer.type_id, itemName: row.itemName };
   return { typeId: row.productTypeId, itemName: row.productName ?? row.itemName };
+}
+
+/** Units one redemption hands over: the offer's quantity, or a blueprint's product per run. */
+export function outputUnitsOf(
+  row: LoyaltyOfferRow,
+  catalog: BlueprintCatalog | null
+): number | null {
+  if (!row.isBlueprint) return row.offer.quantity;
+  return catalog?.byBlueprintTypeID.get(row.offer.type_id)?.blueprint.products[0]?.quantity ?? null;
+}
+
+/** Per redemption: a blueprint's materials plus job fee, 0 for a plain item. */
+export function buildCostOf(row: LoyaltyOfferRow): number {
+  return row.build ? row.build.materialCost + row.build.jobFee.total : 0;
 }

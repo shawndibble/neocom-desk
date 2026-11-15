@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { ReachableBuyOrder } from '@/engine/market/buyReach';
-import { reachableBuyOrders } from '@/engine/market/liveBook';
+import { liveHubOrders, reachableBuyOrders } from '@/engine/market/liveBook';
 import type { HubOrder } from '@/engine/market/haulingMarket';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { priceRedemptions, type RedemptionsResult } from '@/engine/loyalty/redemptions';
@@ -16,7 +16,7 @@ import { getLiveBook, type LiveBook } from '@/features/market/liveBooks';
 import { useBuyJumps } from '@/features/market/useBuyJumps';
 import type { TradeHub } from '@/market/hubs';
 import type { LoyaltyOfferRow } from './offerRows';
-import { resolveLoyaltyRowItem } from './offerRowDisplay';
+import { buildCostOf, outputUnitsOf, resolveLoyaltyRowItem } from './offerRowDisplay';
 import type { PriceBasis } from './priceBasis';
 
 interface Args {
@@ -34,12 +34,6 @@ interface Args {
 type Books = ReadonlyMap<string, LiveBook | 'failed'>;
 
 const bookKey = (hub: TradeHub, typeId: number): string => `${hub.stationId}:${typeId}`;
-
-/** Units one redemption hands over: the offer's quantity, or a blueprint's product per run. */
-function outputUnitsOf(row: LoyaltyOfferRow, catalog: BlueprintCatalog | null): number | null {
-  if (!row.isBlueprint) return row.offer.quantity;
-  return catalog?.byBlueprintTypeID.get(row.offer.type_id)?.blueprint.products[0]?.quantity ?? null;
-}
 
 export function useRedemptionPricing({
   row,
@@ -86,15 +80,7 @@ export function useRedemptionPricing({
     for (const typeId of requiredTypeIds) {
       const book = books.get(bookKey(hub, typeId));
       if (book === undefined || book === 'failed') continue;
-      sellBooks.set(
-        typeId,
-        book.orders.map((o) => ({
-          price: o.price,
-          volume_remain: o.volume_remain ?? 0,
-          is_buy_order: o.is_buy_order,
-          location_id: o.location_id,
-        }))
-      );
+      sellBooks.set(typeId, liveHubOrders(book.orders));
     }
     const outputBook =
       instant && outputTypeId !== null ? books.get(bookKey(hub, outputTypeId)) : undefined;
@@ -115,7 +101,7 @@ export function useRedemptionPricing({
       outputUnits,
       outputTopUnitPrice:
         row.profit.revenue === null || !outputUnits ? null : row.profit.revenue / outputUnits,
-      buildCost: row.build ? row.build.materialCost + row.build.jobFee.total : 0,
+      buildCost: buildCostOf(row),
       stationId: hub.stationId,
       sellBooks,
       outputBasis: instant ? 'instant' : 'order',

@@ -71,6 +71,7 @@ export type {
   JoinMemberInput,
   PaymentInput,
   PaymentTransactionRef,
+  SplitCollector,
   SplitInput,
   SplitPrices,
   UpdateCombinedInput,

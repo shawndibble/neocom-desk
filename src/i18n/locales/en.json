@@ -7933,6 +7933,7 @@
     "splitCollectorLabel": "Further ore reported for this day goes to",
     "splitCollectorKeeps": "{{payee}} (keeps)",
     "splitCollectorNew": "{{payee}} (new)",
+    "splitCollectorCurrent": "{{payee}} (collects now)",
     "splitNewSideLabel": "the new Payee",
     "splitKeepsLabel": "{{payee}} keeps",
     "splitNewLabel": "{{payee}} gets",
@@ -8002,16 +8003,21 @@
         "conflict": "Conflict",
         "unattributed": "Unattributed",
         "dismissed": "Dismissed by corp",
-        "waived": "Waived"
+        "waived": "Waived",
+        "markedPaid": "Marked paid"
       },
       "hint": {
         "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own allocation applies and nothing is owed to the corp.",
         "billed": "{{corp}}'s Corp Tax Book decides this day.",
-        "conflict": "You gave this ore to another Payee, and {{corp}}'s book also recorded it. It is not owed; it resolves to {{corp}} on {{date}} unless you sort it out first.",
-        "unattributed": "No Corp Tax Book claims this ore, so nobody is owed for it.",
+        "conflict": "You gave this ore to another Payee, and {{corp}}'s book also recorded it. It is not owed; it resolves to {{corp}} on {{date}} or on {{corp}}'s next Statement, whichever comes first, unless you sort it out first.",
+        "conflictOverListed": "Your entry for {{corp}} lists more of this ore than its book recorded. {{corp}} does not bill it: take it off your entry, or ask an officer to correct the book.",
+        "conflictOwnNeedsReview": "Your own entry for {{corp}} needs review, so its book can't take it over. It is not owed; it resolves to {{corp}} on {{date}} or on {{corp}}'s next Statement, whichever comes first, unless you sort it out first.",
+        "conflictOwnerCollected": "{{corp}} now collects tax for this moon, and you gave this ore to the moon's owner. It is not owed; it resolves to {{corp}} on {{date}} or on {{corp}}'s next Statement, whichever comes first, unless you sort it out first.",
+        "unattributed": "No Corp Tax Book claims this ore. Assign it to your Payee if you owe someone.",
         "dismissed": "{{corp}} dismissed this day: {{reason}}",
         "waived": "{{corp}} wrote this day off: {{reason}}",
-        "paid": "Paid to {{corp}}."
+        "paid": "Paid to {{corp}}.",
+        "markedPaid": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed."
       },
       "sync": {
         "safe": "Safe to pay — {{date}} is closed ({{corp}} synced {{ago}}).",
@@ -8060,6 +8066,7 @@
         "factStatementFinal": "Issued, final",
         "factSettledBy": "Settled by",
         "yourMarkNote": "The corporation confirms your mark against its wallet.",
+        "markedPaidNote": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed. It confirms your mark against its wallet.",
         "settledBy": {
           "yourMark": "Your mark",
           "donation": "Donation",
@@ -8081,6 +8088,9 @@
         "region": "Conflict",
         "titleOtherPayee": "Your entry gives this ore to another Payee",
         "titleOverListed": "Your entry lists more ore than the book recorded",
+        "titleOwnNeedsReview": "Your own entry for {{corp}} needs review",
+        "titleOwnerCollected": "{{corp}} now collects tax for {{owner}}'s moon",
+        "ownerCollectedAsk": "If you already paid {{owner}}, ask an officer of {{corp}}.",
         "yourEntry": "Your entry: {{payee}} · {{amount}} ISK · {{status}}",
         "yourEntryUnknown": "Your entry: gives this ore to another Payee",
         "entryPaid": "marked paid",
@@ -8089,6 +8099,7 @@
         "alsoContested": "Also in conflict on this day: {{list}}.",
         "alsoContestedItem": "{{corp}} ({{amount}} ISK)",
         "headerNotOwed": "Not owed yet · on {{corp}}'s next Statement unless an officer changes the book",
+        "headerNotBilled": "Not billed · {{corp}}'s book did not record this ore",
         "countsFrom": "From {{date}} this app also counts it as owed to {{corp}}.",
         "cardBills": "Next Statement",
         "fixTitle": "To fix it",
@@ -8115,8 +8126,19 @@
         "account": "Account: <strong>{{account}}</strong>",
         "masterWallet": "Master Wallet",
         "division": "Division {{division}} (number {{division}} in the list)",
-        "code": "{{period}} Statement code (put it in the reason):",
-        "codeInReason": "The Reason is your {{period}} Statement's code."
+        "codeOf": "{{character}} · {{period}} Statement code:",
+        "codeInReason": "The Reason is your {{period}} Statement's code.",
+        "codeOldest": "The Reason is the code of the payer's oldest open Statement ({{period}}).",
+        "oldestFirst": "A payment goes to the oldest open Statement first; a code moves it to that Statement first."
+      },
+      "attention": {
+        "overdueTitle": "{{corp}} Statement {{period}} overdue since {{date}}",
+        "overdueDetail": "Code {{code}}. A payment goes to your oldest open Statement first.",
+        "uncreditedTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}} — check the wallet division",
+        "uncreditedDetail": "{{corp}} synced since and still doesn't hold it, so it no longer counts as paid here. Its book reads donations into: {{accounts}}.",
+        "alsoBilledTitle": "{{corp}} also bills ore you listed for {{payees}}",
+        "alsoBilledDetail": "It is left out of what you owe {{payees}}. Open the day and choose “{{action}}” to take it off your list.",
+        "openDay": "Open the day"
       },
       "claim": {
         "title": "A donation to {{corp}} is not matched to you",
@@ -8382,6 +8404,10 @@
       "deleteAnyway": "Delete anyway",
       "deleteAnywayHint": "Deleting anyway keeps those entries, but they will show as \"Unknown Payee\" until you assign them again.",
       "deleteFailed": "Couldn’t delete {{name}} — nothing was changed. Try again.",
+      "bookLink": {
+        "note": "{{corp}} keeps a Corp Tax Book. Link this Payee to it so the book counts what you pay as its own.",
+        "action": "Link to {{corp}}"
+      },
       "verify": {
         "openUnresolved": "Couldn't find one character, corporation or alliance named {{name}}, so there is nothing to open.",
         "suggestionsLabel": "Matching characters, corporations and alliances",
@@ -12136,6 +12162,38 @@
     "reauthAction": "Log in again with EVE Online"
   },
   "loyaltyStore": {
+    "spendPlan": {
+      "action": "Spend my LP",
+      "actionWithLp": "Spend my {{lp}} LP",
+      "actionHint": "Plan how to turn your LP into ISK across this store's best offers. Reads the order books, so it takes a few seconds.",
+      "lpUnknown": "Your LP with this corporation isn't known yet.",
+      "lpNone": "You have no LP with this corporation.",
+      "title": "Spend my LP",
+      "meta": "Sell now · top 10 offers that pass your filters",
+      "close": "Close the plan",
+      "colOffer": "Offer",
+      "colTimes": "Times",
+      "colLp": "LP",
+      "colIskCost": "ISK cost",
+      "colTurnIns": "Turn-ins",
+      "colIncome": "Instant income",
+      "ownedUsed_one": "{{count}} owned",
+      "ownedUsed_other": "{{count}} owned",
+      "headline": "Spends {{spent}} of {{balance}} LP → <income></income> instant income, <profit></profit> profit ({{rate}} ISK/LP). Needs <purchases></purchases> for purchases.",
+      "empty": "Nothing in this store earns ISK on instant sell right now.",
+      "emptyStopped": "No redemption to plan right now.",
+      "stopLp": "Stopped: the {{lp}} LP left is short of the next one, {{name}}.",
+      "stopLoss": "Stopped: the next one, {{name}}, would lose ISK.",
+      "stopUnpriced": "Stopped: the order books can't price any of these offers.",
+      "stopWallet": "Stopped: the next one, {{name}}, needs more ISK than your wallet holds ({{wallet}}).",
+      "stopFloorYours": "Stopped: next was {{name}} at {{rate}} ISK/LP, under your LP value of {{floor}}.",
+      "stopFloorMarket": "Stopped: next was {{name}} at {{rate}} ISK/LP, under this store's market rate of {{floor}}.",
+      "stopFloorBest": "Stopped: next was {{name}} at {{rate}} ISK/LP, under {{share}}% of the best, {{best}}.",
+      "lpLeft": "{{lp}} LP left.",
+      "walletUnknown": "Your wallet balance isn't known, so purchases aren't capped.",
+      "unpriced_one": "{{count}} offer dropped out: the order books couldn't price its next redemption.",
+      "unpriced_other": "{{count}} offers dropped out: the order books couldn't price their next redemption."
+    },
     "catalogUnavailable": "Blueprint data couldn't load, so blueprint offers show no build-versus-buy figures. Connect once to get them.",
     "csvIskCost": "ISK cost",
     "csvBlueprint": "Blueprint",
@@ -12780,6 +12838,7 @@
     "searchMatchCount_one": "{{count}} item matches",
     "searchMatchCount_other": "{{count}} items match",
     "noResults": "No items match your search.",
+    "noOrdersInRegion": "No orders in {{regionName}}",
     "selectPromptTitle": "Select an item",
     "selectPromptHint": "Search or browse the tree to see its live order book.",
     "backToFinder": "Back",
@@ -17557,6 +17616,7 @@
       "howToPay": "Donate ISK to {{corp}}; any of your characters counts.",
       "payCodeLead": "Put the code",
       "payCodeTail": "in the reason to pin a donation to this Statement.",
+      "payAccount": "Pick the Account {{accounts}} in EVE's transfer window: a donation into another division is not credited.",
       "settled": "This Statement is settled.",
       "declaration": "You told {{corp}} on {{date}} that you paid another way.",
       "declarationPending": "An officer will confirm it.",
@@ -17566,7 +17626,8 @@
         "price": "Price",
         "due": "Due",
         "minimum": "Minimum Statement",
-        "paying": "Paying"
+        "paying": "Paying",
+        "account": "Account"
       },
       "rateFrom": "{{pct}}%, effective {{date}}",
       "rateNoDate": "{{pct}}%",
@@ -17625,6 +17686,7 @@
         "reminder": "Reminder",
         "rate-change": "Rate change",
         "payee-change": "Who gets paid changed",
+        "mode-change": "Settled otherwise changed",
         "srp-result": "SRP result",
         "vetting-result": "Vetting decision",
         "removal": "Moon owner removal",
@@ -17938,18 +18000,29 @@
           "title_other": "{{name}} · overdue {{count}} days · {{amount}}",
           "body": "The {{period}} Statement is unpaid past its due date.",
           "remind": "Send reminder",
-          "dismiss": "Dismiss"
+          "dismiss": "Waive all"
         },
         "unmatched": {
           "title": "Unmatched donation · {{amount}} from {{name}}",
           "body": "{{date}}. {{name}} has not mined at your refineries, so there is no Miner to credit.",
-          "bodyInMiner": "{{date}}. {{name}} is in a Miner now; the next sync assigns it, or you can assign it.",
+          "bodyInMiner": "{{date}}. {{name}} is in a Miner now; a sync assigns it once that Miner owes tax, or you can assign it.",
+          "bodyReview": "{{date}}. {{name}}'s Miner owed no tax then and had no ore waiting for a Statement, so it may be for something else, such as a buyback. Assign it if it was tax, or mark it not tax.",
           "assign": "Assign to a Miner",
           "notTax": "Mark not tax"
         },
+        "uncounted": {
+          "title": "Donation of {{amount}} from {{name}} into {{division}} — not counted",
+          "body": "{{date}}. The book does not read that wallet division, so it paid no tax. Count the division to credit it, or mark it not tax.",
+          "count": "Count {{division}}",
+          "notTax": "Not tax",
+          "counted": "The book now reads {{division}}. The next sync credits what was paid there.",
+          "ignored": "Marked not tax. It will not be listed again.",
+          "failed": "Could not save that. Try again."
+        },
         "leaver": {
           "title": "{{name}} left the corp · owes {{amount}}",
-          "body": "Still mailed each month. Write it off once it is clear it will not be paid.",
+          "body": "No new Statement goes out unless they mine again. Send a reminder, or write it off once it is clear it will not be paid.",
+          "remind": "Send reminder",
           "writeOff": "Write off"
         },
         "reminderQueued": "Reminder to {{name}} is in the send queue.",
@@ -18085,6 +18158,8 @@
         "stale": "Synced by {{name}} {{age}} — the book is going stale",
         "failed": "The sync failed: {{message}}",
         "autoGroupFailed": "The sync worked, but grouping this account's Characters failed: {{message}}",
+        "couldNotRead": "The last sync could not read {{sources}}.",
+        "couldNotReadDetail": "What it could not read may be out of date until a sync reads it again. Check the syncing character's corporation roles and EVE authorization.",
         "reassignFailed": "The sync worked, but matching earlier unmatched payments to Miners failed: {{message}}",
         "scheduledStopped": "Automatic sync stopped: {{reason}}",
         "scheduledStoppedDetail": "Until someone turns it back on in the book's settings (Automatic sync), the book is only as fresh as the last officer sync.",
@@ -18496,7 +18571,8 @@
       "ownerView": {
         "statement": {
           "intro": "{{name}} handles the tax on your moons.",
-          "noRate": "No rate is set, so nothing is owed to you yet. Ask for one below.",
+          "noRate": "No rate is agreed yet, so nothing is owed to you yet. Once one is agreed, it counts from your first day. Ask for one below.",
+          "pending": "{{value}} of ore mined is waiting for a rate.",
           "owed": "is owed to you for ore mined at your refineries since {{since}}, at your rate of {{pct}}%.",
           "owedUndated": "is owed to you for ore mined at your refineries, at your rate of {{pct}}%.",
           "credit": "more than is owed has been paid to you for ore mined at your refineries, at your rate of {{pct}}%.",
@@ -18527,7 +18603,8 @@
         "settledOtherwise": {
           "title": "How you are paid",
           "intro": "You are settled with {{name}} another way.",
-          "nothingOwed": "Nothing is owed in ISK, so no balance builds up."
+          "nothingOwed": "Nothing more builds up in ISK while this lasts.",
+          "stillOwed": "is still owed to you for ore mined before this."
         },
         "previous": {
           "title": "Previously handled by {{name}}",
@@ -18543,7 +18620,7 @@
         "rate": {
           "none": "No rate is set.",
           "plain": "Your rate is {{pct}}%.",
-          "asked": "You asked for {{pct}}%. Nothing changes until they agree.",
+          "asked": "You asked for {{pct}}%. Nothing is owed until they agree a rate; then it counts from your first day.",
           "override": "Rate set to {{pct}}% by {{name}} on {{date}}. You asked for {{asked}}%.",
           "overrideUndated": "Rate set to {{pct}}% by {{name}}. You asked for {{asked}}%.",
           "set": "Rate set to {{pct}}% by {{name}} on {{date}}.",
@@ -18576,7 +18653,11 @@
             "recorded": "Recorded",
             "waiting-for-journal": "Waiting for the wallet journal",
             "matched": "Matched in the wallet journal"
-          }
+          },
+          "disputed": "You dispute this",
+          "dispute": "Dispute",
+          "withdraw": "Withdraw dispute",
+          "disputeFailed": "That did not go through. Try again."
         },
         "mined": "Mined at your refineries",
         "minedWhile": "Mined while they handled it",
@@ -18864,7 +18945,9 @@
           "part": "Part",
           "amount": "Amount not tax",
           "reason": "Reason (required)",
-          "effect": "The debt reopens by {{amount}}. What is left stays credited."
+          "effect": "The debt reopens by {{amount}}. What is left stays credited.",
+          "effectUnmatchedAll": "It leaves Unmatched. Nothing is credited to anyone.",
+          "effectUnmatchedPart": "{{amount}} is set aside. The rest stays Unmatched until you assign it."
         },
         "reject": {
           "title": "Reject {{name}}'s declaration",
@@ -18920,6 +19003,7 @@
           "cant-read": "Can't read ledger",
           "removal-pending": "Removal pending",
           "settled-otherwise": "Settled otherwise",
+          "rate-asked": "Rate asked",
           "no-rate": "No rate set",
           "disconnected": "Disconnected",
           "left": "Left",
@@ -18938,7 +19022,8 @@
         "since": "since {{date}}",
         "until": "until {{date}}",
         "notSet": "Not set",
-        "nothingDue": "Nothing due",
+        "waitsForRate": "Waits for a rate",
+        "askedRate": "Asked {{pct}}%",
         "summary": "{{shown}} moon owners",
         "empty": {
           "title": "No moon owners yet",
@@ -18958,7 +19043,7 @@
           "marginHint": "Miner rate − their rate",
           "asked": "They asked for {{pct}}%. Yours stands.",
           "askedSame": "They asked for {{pct}}%.",
-          "noRate": "No rate set. Nothing is due until you set one.",
+          "noRate": "No rate set. Their ore waits until you set one, then counts from their first day.",
           "notSet": "Not set",
           "history": {
             "agreed": "Rate set to {{pct}}%",
@@ -18969,7 +19054,7 @@
           "setRate": "Set rate",
           "remove": "Remove from this book",
           "settledOtherwise": "Settled otherwise",
-          "settledNote": "Settled otherwise: nothing is due and no balance is kept.",
+          "settledNote": "Settled otherwise: nothing builds up while it lasts. What they were owed before stays owed until you pay it.",
           "stale": "Can't read their ledger since {{date}}. Their days wait until it reads again.",
           "removal": {
             "title": "Removal pending, takes effect {{time}}",
@@ -18996,8 +19081,10 @@
               "recorded": "Recorded",
               "waiting-for-journal": "Waiting for the wallet journal",
               "matched": "Matched in the wallet journal",
-              "not-a-payout": "Not a payout"
+              "not-a-payout": "Not a payout",
+              "unconfirmed": "To confirm: not counted yet"
             },
+            "disputed": "They dispute this payment",
             "add": "Add a payment",
             "notAPayout": "Not a payout",
             "countIt": "Count it"
@@ -19530,6 +19617,7 @@
       "missingGrantMark": "Red slashed broadcast icon: this row needs a grant the Character lacks",
       "needsLogin": "Small warning \"Log in again\" button on a Character: its login is dead; press to log in again",
       "channelOff": "Greyed checkbox that keeps its tick: its channel is off",
+      "absenceNote": "Small dim text at a row's right edge: the row's item has none of something here; the row is not dimmed and stays clickable",
       "figureHistory": "Small dim glyph after a figure: click or tap for its history in a popover",
       "figureBreakdown": "Dashed underline on a figure: click or tap opens how it is worked out",
       "infoTooltip": "? circle: explains a term (InfoTooltip)",

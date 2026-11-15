@@ -325,7 +325,7 @@ describe('reconcileAssignments', () => {
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 
-  it("absorbs growth into the unpaid entry made from a paid day's late ore", async () => {
+  it("flags growth on the unpaid entry made from a paid day's late ore instead of absorbing it", async () => {
     const paid = assignment({ id: 'a1', status: 'paid', paidAt: 5 });
     const after = assignment({
       id: 'a2',
@@ -342,12 +342,43 @@ describe('reconcileAssignments', () => {
 
     await reconcileAssignments(CHAR_A, [entry]);
 
-    expect(assignmentsMock.planNeedsReviewResolution).toHaveBeenCalledTimes(1);
-    expect(assignmentsMock.planNeedsReviewResolution).toHaveBeenCalledWith(
-      after,
-      entry,
-      expect.arrayContaining([paid, after])
-    );
+    // Two Assignments on one day: the late ore may be the paid side's, so it
+    // is reviewed rather than grown silently. Paid stays paid (ADR 0024).
+    expect(assignmentsMock.planNeedsReviewResolution).not.toHaveBeenCalled();
+    const flagged = await db.miningTaxAssignments.get('a2');
+    expect(flagged?.status).toBe('needs-review');
+    expect(flagged?.reviewDiff).toEqual([{ typeId: TYPE_A, before: 50, after: 80 }]);
     expect(await db.miningTaxAssignments.get('a1')).toEqual(paid);
+  });
+
+  it('flags growth on the unpaid Growth Collector of a split day instead of absorbing it', async () => {
+    const kept = assignment({
+      id: 'a1',
+      payeeId: 'p1',
+      oreLines: [{ typeId: TYPE_A, quantity: 60 }],
+    });
+    const moved = assignment({
+      id: 'a2',
+      payeeId: 'p2',
+      oreLines: [{ typeId: TYPE_A, quantity: 40 }],
+      collectsGrowth: true,
+    });
+    await db.miningTaxAssignments.bulkPut([kept, moved]);
+
+    await reconcileAssignments(CHAR_A, [
+      {
+        characterId: CHAR_A,
+        date: '2026-09-04',
+        solarSystemId: 1,
+        oreLines: [{ typeId: TYPE_A, quantity: 130 }],
+      },
+    ]);
+
+    expect(assignmentsMock.planNeedsReviewResolution).not.toHaveBeenCalled();
+    const flagged = await db.miningTaxAssignments.get('a2');
+    expect(flagged?.status).toBe('needs-review');
+    expect(flagged?.reviewDiff).toEqual([{ typeId: TYPE_A, before: 40, after: 70 }]);
+    expect(await db.miningTaxAssignments.get('a1')).toEqual(kept);
+    expect(syncMock.scheduleSync).toHaveBeenCalledTimes(1);
   });
 });

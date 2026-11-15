@@ -36,6 +36,13 @@ export interface FeederPayout {
   journalRef?: number;
   /** Set when the officer decides a journal entry is not a payout. */
   notAPayout: boolean;
+  /**
+   * A donation to the moon owner without the payout reference (#6209): recorded as not a payout
+   * until an officer confirms it either way. Absent on every other row.
+   */
+  unconfirmed?: boolean;
+  /** When the moon owner flagged this payment as one it disputes (ms); absent when it did not. */
+  disputedAt?: number;
 }
 
 export interface FeederAccrualDay {
@@ -117,26 +124,37 @@ export type FeederAccrualRules = Omit<
   'feederCorporationId' | 'entries' | 'pricesOn'
 >;
 
+export interface FeederAccrual {
+  byDay: FeederAccrualDay[];
+  accrued: number;
+  /**
+   * Covered, Billable days with no agreed rate yet (#6209): nothing is owed for them until a
+   * rate is agreed, and the first agreed rate then reaches back over them.
+   */
+  pending: FeederValuedDay[];
+}
+
 /** Accrual over already-valued days: the part mirrored in `functions/`. */
 export function accrueValuedDays(
   days: readonly FeederValuedDay[],
   rules: FeederAccrualRules
-): { byDay: FeederAccrualDay[]; accrued: number } {
+): FeederAccrual {
   const byDay: FeederAccrualDay[] = [];
+  const pending: FeederValuedDay[] = [];
   for (const { date, value } of [...days].sort((x, y) => x.date.localeCompare(y.date))) {
     if (!isDayCovered(rules.coveragePeriods, date) || !rules.isBillable(date)) continue;
     if (isSettledOn(rules.modeChanges, date)) continue;
     const rate = effectiveOwnerRate(rules.ownerRateHistory, date);
-    if (!rate) continue;
+    if (!rate) {
+      pending.push({ date, value });
+      continue;
+    }
     byDay.push({ date, value, pct: rate.pct, due: (value * rate.pct) / 100 });
   }
-  return { byDay, accrued: byDay.reduce((sum, d) => sum + d.due, 0) };
+  return { byDay, accrued: byDay.reduce((sum, d) => sum + d.due, 0), pending };
 }
 
-export function accrueFeeder(input: FeederAccrualInput): {
-  byDay: FeederAccrualDay[];
-  accrued: number;
-} {
+export function accrueFeeder(input: FeederAccrualInput): FeederAccrual {
   const valueByDay = new Map<string, number>();
   for (const e of input.entries) {
     if (e.sourceCorporationId !== input.feederCorporationId) continue;
@@ -152,23 +170,24 @@ export type BalanceDisplay = { kind: 'owed' | 'credit' | 'even' | 'none'; isk: n
 /**
  * One running balance per feeder: accrued minus payouts received. Negative is
  * credit that later accruals absorb. The display rounds down to whole ISK
- * (credit too, so a credit is never overstated). Settled otherwise keeps no
- * balance: nothing is shown or owed (the accrued history is kept by the caller).
+ * (credit too, so a credit is never overstated). Settled otherwise accrues
+ * nothing from its effective day, but what accrued before it stays owed
+ * (#6209); once nothing is owed it shows no balance (`none`).
  */
 export function feederBalance(
   accrued: number,
   payouts: readonly Pick<FeederPayout, 'amount' | 'notAPayout'>[],
   settledOtherwise = false
 ): { balance: number; display: BalanceDisplay } {
-  if (settledOtherwise) return { balance: 0, display: { kind: 'none', isk: 0 } };
   const paid = payouts.reduce((sum, p) => (p.notAPayout ? sum : sum + p.amount), 0);
   const balance = accrued - paid;
   const isk = Math.floor(Math.abs(balance));
   const kind = isk === 0 ? 'even' : balance > 0 ? 'owed' : 'credit';
+  if (settledOtherwise && kind !== 'owed') return { balance, display: { kind: 'none', isk: 0 } };
   return { balance, display: { kind, isk } };
 }
 
-/** Whether the feeder appears on the pay list: owed whole ISK. Settled otherwise has no balance, so never. */
+/** Whether the feeder appears on the pay list: owed whole ISK, settled otherwise or not. */
 export function onPayList(balance: { display: BalanceDisplay }): boolean {
   return balance.display.kind === 'owed';
 }

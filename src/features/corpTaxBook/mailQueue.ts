@@ -14,7 +14,7 @@ import {
   type MailQueueItem,
 } from '@/engine/corpTaxBook/mailQueue';
 import { utcDay } from '@/engine/localDay';
-import { composeRateChangeMail } from '@/engine/corpTaxBook/ownerRateMail';
+import { composeModeChangeMail, composeRateChangeMail } from '@/engine/corpTaxBook/ownerRateMail';
 import { composePayeeChangeMail } from '@/engine/corpTaxBook/payeeChange';
 import type { OwnerRateChange } from '@/engine/corpTaxBook/ownerRate';
 import { composeStatementMail, type StatementMailInput } from '@/engine/corpTaxBook/statementMail';
@@ -286,6 +286,40 @@ export function enqueueRateChangeMail(input: {
         accountingCorporationName: input.accountingCorporationName,
         recipientName: r.name,
         change,
+      }),
+    }))
+  );
+}
+
+/**
+ * Queues the short "settled another way" / "paid in ISK again" mail (#6209), one per recipient.
+ * One switch (`at`) is mailed once per recipient.
+ */
+export function enqueueModeChangeMail(input: {
+  corporationId: number;
+  accountingCorporationName: string;
+  senderCharacterId: number;
+  feederCorporationId: number;
+  mode: 'normal' | 'settled-otherwise';
+  /** When the switch was made (ms). */
+  at: number;
+  recipients: readonly { id: number; name: string }[];
+}): Promise<{ queued: number }> {
+  return queueNotices(
+    {
+      corporationId: input.corporationId,
+      senderCharacterId: input.senderCharacterId,
+      kind: 'mode-change',
+      feederCorporationId: input.feederCorporationId,
+    },
+    input.recipients.map((r) => ({
+      recipient: r,
+      statementId: `mode:${input.feederCorporationId}:${input.at}:${r.id}`,
+      mail: composeModeChangeMail({
+        accountingCorporationName: input.accountingCorporationName,
+        recipientName: r.name,
+        mode: input.mode,
+        date: utcDay(input.at),
       }),
     }))
   );

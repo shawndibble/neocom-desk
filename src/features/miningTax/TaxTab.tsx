@@ -122,6 +122,13 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     systemNames,
     systemSecurity,
   } = useTaxCorpBooks(data, characters, activeCharacterId);
+  // Offered by Manage Payees as the link for a Payee named for one (#6205).
+  const bookCorporations = useMemo(
+    () =>
+      corpView?.books.map((b) => ({ corporationId: b.loaded.corporationId, name: b.corpName })) ??
+      [],
+    [corpView]
+  );
   const corpStateLabel = useCorpStateLabel();
   const corpStateHint = useCorpStateHint();
 
@@ -177,6 +184,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       allPayees,
       estimatedValueOf,
       madePayments,
+      alsoBilled: corpView?.overlay.alsoBilled,
     });
 
   // A Corp Tax Book row is the corp's to continue, not the member's.
@@ -214,6 +222,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     data,
     resolvedCharacterFilter,
     personalRows,
+    displayRows: characterFiltered,
     payeeById,
     corpView,
     failedClaims,
@@ -348,7 +357,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                     key={book.loaded.corporationId}
                     book={book}
                     owedNow={corpOwedNow(book.loaded.corporationId)}
-                    showCredit={false}
                   />
                 ))}
 
@@ -450,6 +458,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           owedByPayee={owedByPayee}
           systemsByPayee={payeeSystems}
           systemNames={systemNames}
+          bookCorporations={bookCorporations}
           refresh={refresh}
         />
 

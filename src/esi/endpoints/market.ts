@@ -55,6 +55,23 @@ export function getMarketOrders(
   });
 }
 
+// --- GET /markets/{region_id}/types (public) ---
+
+/**
+ * Every type with at least one active order, buy or sell, anywhere in the
+ * region (structures included), paginated (X-Pages). It says nothing about
+ * where the orders sit, so read it only for "no orders in this region".
+ */
+export function getMarketTypes(
+  regionId: number,
+  options: EndpointOptions = {}
+): Promise<TruncatableResult<number>> {
+  return fetchAllPagesStatus<number>(`/markets/${regionId}/types`, {
+    ...options,
+    endpointId: 'getMarketTypes',
+  });
+}
+
 // --- GET /markets/structures/{structure_id} (esi-markets.structure_markets.v1) ---
 
 export interface StructureMarketOrder {

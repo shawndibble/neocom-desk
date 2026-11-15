@@ -8,6 +8,7 @@ import * as server from '../../../functions/src/corpTaxBookEngine';
 import {
   buildMoonOwners,
   moonOwnersNeedRows,
+  FEEDER_VIEW_RULES,
   summaryFor,
   type MoonOwnerFeeder,
   type MoonOwnerPayout,
@@ -107,6 +108,8 @@ function serverSummary(
   const periods = [...f.coveragePeriods].sort((a, b) => a.from.localeCompare(b.from));
   return {
     schemaVersion: 1,
+    rulesVersion: FEEDER_VIEW_RULES,
+    mode: f.mode,
     status: f.status,
     builtAt: NOW_MS,
     coverageFrom: periods[0]?.from ?? null,
@@ -163,6 +166,15 @@ const FEEDERS: Record<string, MoonOwnerFeeder[]> = {
       mode: 'settled-otherwise',
       modeChanges: [{ from: '2026-10-01', mode: 'settled-otherwise' }],
     }),
+  ],
+  'an owner settled otherwise after ore accrued, still owed it (#6209)': [
+    feeder(A, {
+      mode: 'settled-otherwise',
+      modeChanges: [{ from: '2026-10-06', mode: 'settled-otherwise' }],
+    }),
+  ],
+  'an owner that asked for a rate nobody agreed yet (#6209)': [
+    feeder(A, { agreedRatePct: undefined, requestedRatePct: 6 }),
   ],
   'a same-owner corp, settled otherwise from its first day': [
     feeder(A, {
@@ -241,6 +253,9 @@ describe('summaryFor', () => {
     const s = serverSummary(i.feeders[0]!, ENTRIES);
     const old = { ...i, summaries: new Map([[A, { ...s, schemaVersion: 2 as never }]]) };
     expect(summaryFor(old, i.feeders[0]!)).toBeUndefined();
+    // Built before #6209's accrual rules: its figures cannot stand.
+    const before = { ...i, summaries: new Map([[A, { ...s, rulesVersion: undefined }]]) };
+    expect(summaryFor(before, i.feeders[0]!)).toBeUndefined();
   });
 
   it.each([

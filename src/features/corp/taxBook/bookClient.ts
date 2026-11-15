@@ -38,6 +38,7 @@ import {
   type SyncGap,
 } from '@/engine/corpTaxBook/sync';
 import { scheduledSyncFrom, type ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
+import { readUncounted, type UncountedDonation } from '@/engine/corpTaxBook/uncounted';
 import type {
   FeederMode,
   FeederModeChange,
@@ -110,6 +111,8 @@ export interface SyncUpload {
   extractions?: SyncExtraction[];
   donations?: JournalDonation[];
   gaps?: SyncGap[];
+  /** #6207: donations noted in divisions the book does not read; replaces the stored list. */
+  uncounted?: UncountedDonation[];
 }
 
 export interface SyncReceipt {
@@ -575,6 +578,8 @@ export interface BookData {
   groupingAnswers?: GroupingAnswer[];
   /** The scheduled sync's public status (ADR 0025); null when it was never turned on or was revoked. */
   scheduledSync?: ScheduledSyncStatus | null;
+  /** #6207: donations a sync noted in divisions the book does not read (`meta/uncounted`). */
+  uncounted?: UncountedDonation[];
   /** Which slices this read covered (bookParts.ts); the rest are empty. Absent: the whole book. */
   parts?: BookPartSet;
   /** The Overview and Miners tab docs (ADR 0032); absent until the server has built them. */
@@ -671,7 +676,7 @@ export async function readBookData(
     parts.has(name) ? readSlice() : Promise.resolve(empty);
   const none: never[] = [];
   const [
-    [miners, statements, extractions, scheduled, feederRows],
+    [miners, statements, extractions, scheduled, feederRows, uncountedDoc],
     observed,
     [payments, dismissals, declarations, adjustments, writeOffs],
     answers,
@@ -687,8 +692,9 @@ export async function readBookData(
           list<SyncExtraction>('extractions'),
           part('meta', async () => (await meta('scheduledSync')).data(), 'meta:schedule'),
           feedersOf(book, characterId, corporationId),
+          part('meta', async () => (await meta('uncounted')).data(), 'meta:uncounted'),
         ] as const),
-      [none, none, none, undefined, none] as const
+      [none, none, none, undefined, none, undefined] as const
     ),
     // The ledger rows are a part of their own: a tab that needs none never reads them (#5717).
     slice('observed', () => book.observed(), [] as ObservedRow[]),
@@ -752,6 +758,7 @@ export async function readBookData(
     feeders: feederRows,
     groupingAnswers: groupingAnswersFrom(answers),
     scheduledSync: scheduledSyncFrom(scheduled),
+    uncounted: readUncounted(uncountedDoc).donations,
     parts,
     ...(readModels ? { readModels } : {}),
     ...(feederSummaries ? { feederSummaries } : {}),
@@ -1084,6 +1091,7 @@ export function mergeBookData(held: BookData, extra: BookData): BookData {
     observed: pick('observed', held.observed, extra.observed),
     feeders: pick('core', held.feeders, extra.feeders),
     scheduledSync: pick('core', held.scheduledSync, extra.scheduledSync),
+    uncounted: pick('core', held.uncounted, extra.uncounted),
     declarations: pick('ledger', held.declarations, extra.declarations),
     adjustments: pick('ledger', held.adjustments, extra.adjustments),
     groupingAnswers: pick('answers', held.groupingAnswers, extra.groupingAnswers),

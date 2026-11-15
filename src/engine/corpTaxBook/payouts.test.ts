@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { FeederPayout } from './feederAccrual';
 import {
+  PAYOUT_REASON_PREFIX,
   balanceAfter,
   buildRecordedPayout,
+  carriesPayoutReference,
   outgoingDonationsFromJournal,
   payoutId,
   payoutPeriod,
@@ -20,6 +22,7 @@ const out = (over: Partial<OutgoingDonation> = {}): OutgoingDonation => ({
   recipientId: 77,
   amount: 5_000_000,
   at: '2026-10-18T10:00:00.000Z',
+  reason: 'Moon mining payout, 2026-10-01 to 2026-10-17',
   ...over,
 });
 
@@ -274,6 +277,56 @@ describe('reconcileBookOutgoing (#4617)', () => {
       ],
     });
     expect(r[0]?.create.map((c) => c.payout.journalRef)).toEqual([1]);
+  });
+});
+
+describe('the payout reference (#6209)', () => {
+  const owner = {
+    corporationId: 9999,
+    payee: { kind: 'character' as const, id: 77 },
+    payouts: [],
+    since: '2026-10-01',
+  };
+  it('is the reason the pay dialog writes, matched in any case and cut short', () => {
+    expect(PAYOUT_REASON_PREFIX).toBe('Moon mining payout');
+    expect(carriesPayoutReference(payoutReason(PAYOUT_REASON_PREFIX, undefined))).toBe(true);
+    expect(carriesPayoutReference('moon MINING payout, 2026-10-0')).toBe(true);
+    expect(carriesPayoutReference('SRP refund')).toBe(false);
+    expect(carriesPayoutReference(undefined)).toBe(false);
+  });
+  it('auto-records only a donation carrying it', () => {
+    const [r] = reconcileBookOutgoing({ owners: [owner], outgoing: [out()] });
+    expect(r?.create[0]?.payout).toMatchObject({ notAPayout: false });
+    expect(r?.create[0]?.payout.unconfirmed).toBeUndefined();
+  });
+  it('lists any other donation to the owner for an officer to confirm, counting nothing yet', () => {
+    const [r] = reconcileBookOutgoing({
+      owners: [owner],
+      outgoing: [out({ reason: 'SRP refund' }), out({ refId: 101, reason: undefined })],
+    });
+    expect(r?.create.map((c) => c.payout)).toEqual([
+      expect.objectContaining({ journalRef: 100, notAPayout: true, unconfirmed: true }),
+      expect.objectContaining({ journalRef: 101, notAPayout: true, unconfirmed: true }),
+    ]);
+  });
+  it('still attaches any donation to the payment an officer said they sent', () => {
+    const [r] = reconcileBookOutgoing({
+      owners: [{ ...owner, payouts: [payout()] }],
+      outgoing: [out({ reason: undefined })],
+    });
+    expect(r?.attach).toEqual([{ id: 'p1', journalRef: 100 }]);
+  });
+  it("an officer's own record folds into a row waiting to be confirmed", () => {
+    const waiting = payout({
+      id: 'j1_100',
+      status: 'matched',
+      journalRef: 100,
+      notAPayout: true,
+      unconfirmed: true,
+    });
+    expect(
+      payoutToMerge([waiting], { amount: 5_000_000, date: '2026-10-18', method: 'donation' })
+    ).toBe('j1_100');
   });
 });
 

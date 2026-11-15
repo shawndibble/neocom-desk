@@ -155,10 +155,33 @@ export function buildDisplayRows(
     overlay.absorbed
       .get(entryKey(dr.row.characterId, dr.row.entry.date, dr.row.entry.solarSystemId))
       ?.has(dr.assignment.id) === true;
+  // An Assignment the books took part of reads as what stays with its Payee (#6203).
+  const trim = (dr: DisplayRow, assignment: MiningTaxAssignmentRecord): DisplayRow => {
+    const kept = overlay.trimmed
+      .get(entryKey(dr.row.characterId, dr.row.entry.date, dr.row.entry.solarSystemId))
+      ?.get(assignment.id);
+    if (!kept) return dr;
+    // Per-type value overrides name the whole Assignment's lines, so the kept part drops them.
+    const shrunk: MiningTaxAssignmentRecord = {
+      ...assignment,
+      oreLines: kept.oreLines,
+      estimatedValue: assignment.estimatedValue * kept.valueShare,
+      taxOwed: assignment.taxOwed * kept.valueShare,
+    };
+    delete shrunk.oreLineValues;
+    return {
+      ...dr,
+      assignment: shrunk,
+      row: {
+        ...dr.row,
+        assignments: dr.row.assignments.map((a) => (a.id === assignment.id ? shrunk : a)),
+      },
+    };
+  };
   const flat = flatten(adjusted)
     .filter((dr) => !taken(dr))
     .map((dr): DisplayRow => {
-      if (dr.assignment) return dr;
+      if (dr.assignment) return trim(dr, dr.assignment);
       const label = overlay.labels.get(
         entryKey(dr.row.characterId, dr.row.entry.date, dr.row.entry.solarSystemId)
       );

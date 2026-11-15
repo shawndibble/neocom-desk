@@ -138,3 +138,78 @@ export function splitByCoverageAndRead<
   const kept = new Set(readable);
   return { readable, unread: covered.filter((r) => !kept.has(r)), outsideCoverage };
 }
+
+/**
+ * The last day a miner's next Statement may cover while one of its days is held (#6209): the day
+ * before its earliest held day, else the book's `billableThrough`. A Statement must not cover a
+ * held day: once paid, ore that lands on that day later would be written off as recorded after
+ * payment instead of reaching the next Statement.
+ */
+export function heldBillableThrough(
+  billableThrough: string | undefined,
+  characterIds: readonly number[],
+  heldFrom: ReadonlyMap<number, string>
+): string | undefined {
+  if (billableThrough === undefined) return undefined;
+  let through = billableThrough;
+  for (const id of characterIds) {
+    const held = heldFrom.get(id);
+    if (held === undefined) continue;
+    const before = shiftDate(held, -1);
+    if (before < through) through = before;
+  }
+  return through;
+}
+
+/**
+ * The day each miner is held from while a moon owner it mines at cannot be read (#6209): a stale
+ * moon owner's first unread day (its first covered day when never read well), for every character
+ * with a row at its refineries. Its ore for those days may not be read yet, so a Statement must not
+ * cover them. An owner read up to `billableThrough`, or whose coverage ended before its first
+ * unread day, holds nothing.
+ */
+export function staleOwnerHolds(
+  entries: readonly Pick<ObservedMiningEntry, 'characterId' | 'sourceCorporationId'>[],
+  clock: {
+    now: string;
+    graceHours?: number;
+    bookCorporationId: number;
+    feeders: readonly (FeederReadClock & FeederCoverage)[];
+  },
+  billableThrough: string | undefined
+): Map<number, string> {
+  const out = new Map<number, string>();
+  if (billableThrough === undefined) return out;
+  const heldFrom = new Map<number, string>();
+  for (const f of clock.feeders) {
+    if (f.corporationId === clock.bookCorporationId) continue;
+    const lastRead =
+      f.lastReadWellAt === undefined
+        ? undefined
+        : lastBillableDate({
+            now: f.lastReadWellAt,
+            lastSyncedAt: f.lastReadWellAt,
+            ...(clock.graceHours !== undefined ? { graceHours: clock.graceHours } : {}),
+          });
+    const unread = lastRead === undefined ? '' : shiftDate(lastRead, 1);
+    // The first covered day on or after it; no coverage known: the first unread day itself.
+    const first =
+      f.coveragePeriods === undefined
+        ? unread || undefined
+        : f.coveragePeriods
+            .filter((p) => p.to === undefined || p.to >= unread)
+            .map((p) => (p.from > unread ? p.from : unread))
+            .sort()[0];
+    if (first === undefined || first === '' || first > billableThrough) continue;
+    heldFrom.set(f.corporationId, first);
+  }
+  if (heldFrom.size === 0) return out;
+  for (const e of entries) {
+    const day =
+      e.sourceCorporationId === undefined ? undefined : heldFrom.get(e.sourceCorporationId);
+    if (day === undefined) continue;
+    const held = out.get(e.characterId);
+    if (held === undefined || day < held) out.set(e.characterId, day);
+  }
+  return out;
+}

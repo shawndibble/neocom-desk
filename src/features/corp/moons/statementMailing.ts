@@ -16,6 +16,8 @@ import type { StatementToMail } from '@/features/corpTaxBook/mailQueue';
 import { addDays, isRefineryPlaceholder, periodLabel } from './moonsFormat';
 import type { BookContextValue } from './bookContextValue';
 import { useBook } from './useBook';
+import i18n from '@/i18n';
+import { corpPayAccounts } from '@/features/miningTax/corpBook/corpPayAccount';
 
 /**
  * The refinery names an issued Statement carries, for a guest's verify page that cannot look them
@@ -36,7 +38,7 @@ export function statementRefineryNames(
 }
 
 export function mailTarget(
-  ctx: Pick<BookContextValue, 'names' | 'view'>,
+  ctx: Pick<BookContextValue, 'names' | 'view'> & Partial<Pick<BookContextValue, 'settings'>>,
   statement: Statement,
   miner: MinerRow,
   balance: { amountDue: number; carried: number }
@@ -49,6 +51,13 @@ export function mailTarget(
     carried: balance.carried,
     periodLabel: periodLabel(statement.periodStart, statement.periodEnd),
     code: statement.code,
+    // The wallet divisions the book reads: a donation into another one is never credited (#6204).
+    // An older settings doc (or a fixture) may carry none: then the mail names none.
+    ...(ctx.settings?.divisions?.length
+      ? {
+          accounts: corpPayAccounts(ctx.settings.divisions, ctx.settings.divisionNames, i18n.t),
+        }
+      : {}),
     dueDate: addDays(statement.issuedAt.slice(0, 10), ctx.view.input.overdueDays),
     lines: statement.lines,
   };

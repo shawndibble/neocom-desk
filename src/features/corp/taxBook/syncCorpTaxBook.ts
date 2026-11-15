@@ -12,14 +12,17 @@ import {
   detectGaps,
   mergeGaps,
   placeObservedRows,
+  openBalances,
   planSettlements,
   reconcileExtractions,
   resolveDonations,
+  unbilledMinerIds,
   type JournalDonation,
   type MoonNotification,
   type SyncExtraction,
 } from '@/engine/corpTaxBook/sync';
 import { matchDonation } from '@/engine/corpTaxBook/allocation';
+import { noteUncounted, otherDivisions } from '@/engine/corpTaxBook/uncounted';
 import { planAutoGroups, type GroupingEdit } from '@/engine/corpTaxBook/grouping';
 import type { Statement } from '@/engine/corpTaxBook/statements';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
@@ -73,8 +76,9 @@ export interface SyncDeps {
   loadDonations: (
     characterId: number,
     corporationId: number,
-    divisions: readonly number[]
-  ) => Promise<JournalDonation[]>;
+    divisions: readonly number[],
+    options?: { whole?: boolean }
+  ) => Promise<JournalDonation[] | null>;
   uploadSync: (characterId: number, upload: SyncUpload) => Promise<SyncReceipt>;
   /** Attaches the wallet's outgoing donations to the moon owner payouts recorded (no-op without moon owners). */
   reconcilePayouts?: (
@@ -189,7 +193,7 @@ export async function syncCorpTaxBook(
 
   const missing: MissingSource[] = [];
   const canExtract = capabilities.canReadMoonExtractions && verdict.isStationManager;
-  const [feedRead, esiExtractions, notifications, donations] = await Promise.all([
+  const [feedRead, esiExtractions, notifications, donations, elsewhere] = await Promise.all([
     deps.loadObserverFeed(characterId, corporationId),
     canExtract ? deps.loadEsiExtractions(characterId, corporationId) : Promise.resolve(null),
     canExtract
@@ -197,6 +201,14 @@ export async function syncCorpTaxBook(
       : Promise.resolve([] as MoonNotification[]),
     capabilities.canReadWallet
       ? deps.loadDonations(characterId, corporationId, before.book.divisions).catch(() => null)
+      : Promise.resolve(null),
+    // #6207: the divisions the book does not read, only to note what looks like tax paid there.
+    capabilities.canReadWallet
+      ? deps
+          .loadDonations(characterId, corporationId, otherDivisions(before.book.divisions), {
+            whole: true,
+          })
+          .catch(() => null)
       : Promise.resolve(null),
   ]);
   if (feedRead === 'needs-reauth') return { kind: 'skipped', reason: 'needs-reauth' };
@@ -236,11 +248,15 @@ export async function syncCorpTaxBook(
     .filter((d) => !stored.has(paymentId(d)))
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, DONATIONS_PER_CALL);
-  const resolved = resolveDonations(fresh, {
+  const matching = {
     miners: before.miners,
     statements: before.statements as Statement[],
     knownCharacterIds: known,
-  });
+    openBalance: openBalanceOf(before),
+    unbilled: unbilledOf(before, feed.rows),
+  };
+  const resolved = resolveDonations(fresh, matching);
+  const uncounted = elsewhere === null ? undefined : noteUncounted(elsewhere, matching, resolved);
 
   // The first call carries everything but the overflow of observer rows, so a
   // later failure loses only ledger rows (each call also records the visit).
@@ -261,6 +277,7 @@ export async function syncCorpTaxBook(
     ...first,
     donations: resolved,
     gaps,
+    ...(uncounted ? { uncounted } : {}),
   });
   const { donationsAdded } = receipt;
   for (const observed of batches) {
@@ -294,6 +311,7 @@ export async function syncCorpTaxBook(
     {
       before,
       known,
+      rows: feed.rows,
       regrouped: autoGrouped > 0,
     }
   );
@@ -335,16 +353,49 @@ export async function syncCorpTaxBook(
   };
 }
 
+/** The Miners with ore this read found that no Statement covers yet, for `matchDonation` (#6207). */
+function unbilledOf(book: BookState, rows: readonly ObservedRow[]): Set<string> {
+  return unbilledMinerIds(rows, {
+    miners: book.miners,
+    statements: book.statements as Statement[],
+    startDate: book.book.startDate,
+  });
+}
+
+/** What each Miner owes on the book's issued Statements, for `matchDonation` (#6207). */
+function openBalanceOf(book: BookState): Map<string, number> {
+  return openBalances({
+    statements: book.statements as Statement[],
+    payments: book.payments,
+    dismissals: book.dismissals,
+    miners: book.miners,
+    extractions: book.extractions,
+    ...(book.writeOffs ? { writeOffs: book.writeOffs } : {}),
+    startDate: book.book.startDate,
+  });
+}
+
 /** Re-runs `matchDonation` for stored Unmatched payments and assigns those that now match. A failure is not the sync's, so it is returned for the page to show. */
 async function reassignUnmatched(
   deps: SyncDeps,
   characterId: number,
   corporationId: number,
-  args: { before: BookState; known: ReadonlySet<number>; regrouped: boolean }
+  args: {
+    before: BookState;
+    known: ReadonlySet<number>;
+    rows: readonly ObservedRow[];
+    regrouped: boolean;
+  }
 ): Promise<{ assigned: number; error?: string }> {
-  const unmatched = args.before.payments.filter(
-    (p) => p.minerId === undefined && !(p.notTaxAmount && p.notTaxAmount > 0)
-  );
+  // One held for review (#6207) is the officer's to place, never re-matched.
+  const unmatched = args.before.payments
+    .filter(
+      (p) =>
+        p.minerId === undefined &&
+        !(p.notTaxAmount && p.notTaxAmount > 0) &&
+        p.reviewReason === undefined
+    )
+    .sort((a, b) => a.at.localeCompare(b.at));
   if (unmatched.length === 0) return { assigned: 0 };
   let assigned = 0;
   try {
@@ -352,6 +403,10 @@ async function reassignUnmatched(
       ? ((await deps.readBookState(characterId, corporationId)) ?? args.before)
       : args.before;
     const known = new Set([...args.known, ...book.miners.flatMap((m) => m.characterIds)]);
+    // Only toward a Miner who owes (balance spent oldest first, or ore not yet billed): a sender
+    // whose Miner owes nothing waits.
+    const balance = openBalanceOf(book);
+    const unbilled = unbilledOf(book, args.rows);
     for (const p of unmatched) {
       const match = matchDonation(
         { characterId: p.characterId, reason: (p as { reason?: string }).reason },
@@ -359,10 +414,13 @@ async function reassignUnmatched(
           miners: book.miners,
           statements: book.statements as Statement[],
           knownCharacterIds: known,
+          openBalance: balance,
+          unbilled,
         }
       );
-      if (match.kind === 'unmatched') continue;
+      if (match.kind !== 'miner' && match.kind !== 'statement') continue;
       await deps.assignPayment(characterId, corporationId, p.id, match.minerId);
+      balance.set(match.minerId, (balance.get(match.minerId) ?? 0) - p.amount);
       assigned += 1;
     }
     return { assigned };

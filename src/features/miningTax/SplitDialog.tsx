@@ -22,7 +22,7 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { growthMoves, planSplit } from '@/engine/miningTax/split';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
-import { split } from './ledgerActions';
+import { split, type SplitCollector } from './ledgerActions';
 import { ratesForPayee } from './payeeRates';
 import { labelSuggestions } from './assignmentLabel';
 import { LabelField } from './LabelField';
@@ -110,19 +110,25 @@ export function SplitDialog({
       ])
     );
   });
-  // Sessions run in order, so ore ESI reports after the split is nearly
-  // always from the moon the pilot moved on to — the new side.
-  const [collector, setCollector] = useState<'original' | 'new'>('new');
-  const { pending: saving, error: saveError, run } = useLedgerAction();
-
-  // A third Assignment on this entry already collecting leaves nothing to
-  // choose here — the split never silently steals that role from it.
-  const someoneElseCollects = row.assignments.some(
+  // A third Assignment on this entry may already be the Growth Collector
+  // (a second split). The choice is still offered on every split (#6205): ESI
+  // lags up to an hour, so the pilot knows better than any default which
+  // moon later ore is from. Left alone, that third Assignment keeps the role.
+  const currentCollector = row.assignments.find(
     (a) => a.id !== assignment.id && a.collectsGrowth === true
   );
+  // Sessions run in order, so ore ESI reports after the split is usually from
+  // the moon the pilot moved on to — the new side. Growth on a split day is
+  // always reviewed (reconcile.ts), so a wrong guess never grows silently.
+  // 'current' leaves the third Assignment collecting (no `collector` sent).
+  const [collector, setCollector] = useState<SplitCollector | 'current'>(
+    currentCollector ? 'current' : 'new'
+  );
+  const { pending: saving, error: saveError, run } = useLedgerAction();
+
   // Keeping more than ESI reports only works when the new side takes what
   // comes after, and a paid day's bill never grows (ADR 0024).
-  const canClaimUnreported = !someoneElseCollects && assignment.status !== 'paid';
+  const canClaimUnreported = assignment.status !== 'paid';
 
   const moves: OreLine[] = [];
   const unreported: OreLine[] = [];
@@ -186,7 +192,7 @@ export function SplitDialog({
             payeeId,
             taxPct: pctValue,
             label,
-            ...(someoneElseCollects ? {} : { collector: effectiveCollector }),
+            ...(effectiveCollector === 'current' ? {} : { collector: effectiveCollector }),
           },
           prices
         ),
@@ -197,6 +203,9 @@ export function SplitDialog({
   const originalPayeeName =
     payees.find((p) => p.id === assignment.payeeId)?.name ?? t('miningTax.unknownPayee');
   const newPayeeName = chosenPayee?.name ?? '';
+  const currentCollectorName = currentCollector
+    ? (payees.find((p) => p.id === currentCollector.payeeId)?.name ?? t('miningTax.unknownPayee'))
+    : '';
 
   return (
     <Modal
@@ -358,36 +367,48 @@ export function SplitDialog({
           </ul>
         </div>
 
-        {!someoneElseCollects && (
-          <fieldset className="space-y-1">
-            <legend className={eyebrowClassName}>{t('miningTax.splitCollectorLabel')}</legend>
+        <fieldset className="space-y-1">
+          <legend className={eyebrowClassName}>{t('miningTax.splitCollectorLabel')}</legend>
+          {currentCollector && (
             <label
               className={`flex cursor-pointer items-start gap-2 text-xs ${tappableRowClassName}`}
             >
               <Radio
                 className="mt-0.5"
                 name="split-collector"
-                checked={effectiveCollector === 'original'}
+                checked={effectiveCollector === 'current'}
                 disabled={claimsUnreported}
-                onChange={() => setCollector('original')}
+                onChange={() => setCollector('current')}
               />
-              {t('miningTax.splitCollectorKeeps', { payee: originalPayeeName })}
+              {t('miningTax.splitCollectorCurrent', { payee: currentCollectorName })}
             </label>
-            <label
-              className={`flex cursor-pointer items-start gap-2 text-xs ${tappableRowClassName}`}
-            >
-              <Radio
-                className="mt-0.5"
-                name="split-collector"
-                checked={effectiveCollector === 'new'}
-                onChange={() => setCollector('new')}
-              />
-              {t('miningTax.splitCollectorNew', {
-                payee: newPayeeName || t('miningTax.splitNewSideLabel'),
-              })}
-            </label>
-          </fieldset>
-        )}
+          )}
+          <label
+            className={`flex cursor-pointer items-start gap-2 text-xs ${tappableRowClassName}`}
+          >
+            <Radio
+              className="mt-0.5"
+              name="split-collector"
+              checked={effectiveCollector === 'original'}
+              disabled={claimsUnreported}
+              onChange={() => setCollector('original')}
+            />
+            {t('miningTax.splitCollectorKeeps', { payee: originalPayeeName })}
+          </label>
+          <label
+            className={`flex cursor-pointer items-start gap-2 text-xs ${tappableRowClassName}`}
+          >
+            <Radio
+              className="mt-0.5"
+              name="split-collector"
+              checked={effectiveCollector === 'new'}
+              onChange={() => setCollector('new')}
+            />
+            {t('miningTax.splitCollectorNew', {
+              payee: newPayeeName || t('miningTax.splitNewSideLabel'),
+            })}
+          </label>
+        </fieldset>
 
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="space-y-0.5 rounded-xs border border-line p-2">

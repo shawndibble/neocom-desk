@@ -67,6 +67,7 @@ export const CALLABLE_ACTIONS = {
     'recordCorpTaxBookFeederPayoutCallable',
     'markCorpTaxBookFeederPayoutCallable',
     'reconcileCorpTaxBookFeederPayoutsCallable',
+    'disputeCorpTaxBookFeederPayoutCallable',
     'listCorpTaxBookFeederInvitesCallable',
     'revokeCorpTaxBookSyncGrantCallable',
     'verifyCorpOfficerCallable',
