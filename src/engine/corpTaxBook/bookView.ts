@@ -144,6 +144,8 @@ export interface DayRow {
   rateEffectiveFrom?: string;
   tax: number;
   status: DayStatus;
+  /** A `not-billable` day held while this moon owner's ledger cannot be read (#6210). */
+  heldBy?: number;
   statementId?: string;
   dismissalId?: string;
 }
@@ -388,7 +390,7 @@ export function buildBookView(input: BookViewInput): BookView {
   const minerIds = minerIdsOf(input, charges);
   const latestCorp = latestCorporationOf(input.entries);
   // A miner at a moon owner that cannot be read is held from its first unread day (#6209).
-  const heldFrom = staleOwnerHolds(
+  const holds = staleOwnerHolds(
     input.entries,
     {
       now: input.now,
@@ -428,7 +430,19 @@ export function buildBookView(input: BookViewInput): BookView {
     };
     const allocation = allocatePayments(allocationInput);
     const forgivenKeys = forgivenDayKeys(statements, allocation, credits);
-    const minerThrough = heldBillableThrough(billableThrough, characterIds, heldFrom);
+    const minerThrough = heldBillableThrough(billableThrough, characterIds, holds);
+    // The hold that set `minerThrough`: its moon owner is why a held day waits (#6210).
+    const minerHold = characterIds
+      .map((cid) => holds.get(cid))
+      .filter((h) => h !== undefined)
+      .sort((a, b) => a.from.localeCompare(b.from))[0];
+    const heldByOf = (date: string) =>
+      minerHold &&
+      billableThrough !== undefined &&
+      date >= minerHold.from &&
+      date <= billableThrough
+        ? minerHold.ownerCorporationId
+        : undefined;
     const draft = minerDraft(input, id, statements, mine, minerThrough);
 
     const draftLines = draft.kind === 'nothing' ? [] : draft.lines;
@@ -462,6 +476,7 @@ export function buildBookView(input: BookViewInput): BookView {
             ? frozenDay(linesBy.get(c.key) ?? [], c)
             : undefined;
         if (frozen) frozenByKey.set(c.key, frozen);
+        const heldBy = status === 'not-billable' ? heldByOf(c.date) : undefined;
         const value = frozen ?? {
           oreLines: c.oreLines,
           unitPrices: c.unitPrices,
@@ -486,6 +501,7 @@ export function buildBookView(input: BookViewInput): BookView {
             : {}),
           tax: value.tax,
           status,
+          ...(heldBy !== undefined ? { heldBy } : {}),
           ...(statement ? { statementId: statement.id } : {}),
           ...(dismissal ? { dismissalId: dismissal.id } : {}),
         };

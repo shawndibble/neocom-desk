@@ -101,6 +101,7 @@ export function buildDayCharges(
       ...(entry.sourceCorporationId !== undefined ? { feederId: entry.sourceCorporationId } : {}),
       recordKey: key,
       isGuest,
+      minerCorporationId: entry.recordedCorporationId,
     });
     if (!rate) {
       result.unrated.push(entry);

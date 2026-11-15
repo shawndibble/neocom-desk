@@ -62,6 +62,7 @@ export const CALLABLE_ACTIONS = {
     'startCorpTaxBookFeederRemovalCallable',
     'recordCorpTaxBookFeederRemovalSentCallable',
     'cancelCorpTaxBookFeederRemovalCallable',
+    'claimCorpTaxBookFeederStaleMailCallable',
     'getCorpTaxBookRemovalLinkCallable',
     'forceCorpTaxBookRemovalCallable',
     'recordCorpTaxBookFeederPayoutCallable',

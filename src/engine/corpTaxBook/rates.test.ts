@@ -186,3 +186,53 @@ describe('canOverrideRecordRate', () => {
     expect(canOverrideRecordRate('2026-07-13', onStatement)).toBe(true);
   });
 });
+
+describe("a moon owner's own members (#6210)", () => {
+  const OWNER = 98000077;
+  const GUEST: TaxRate = { scope: 'guest', pct: 15, effectiveFrom: '2026-01-01' };
+  const member: TaxRate = {
+    scope: 'feeder-member',
+    feederId: OWNER,
+    pct: 4,
+    effectiveFrom: '2026-01-01',
+  };
+  const own = { ...ctx, feederId: OWNER, isGuest: true, minerCorporationId: OWNER };
+
+  it("prices the owner's members mining its own moon above the Guest default and its per-moon-owner rate", () => {
+    const feeder: TaxRate = {
+      scope: 'feeder',
+      feederId: OWNER,
+      pct: 7,
+      effectiveFrom: '2026-01-01',
+    };
+    expect(resolveRate([CORP, GUEST, feeder, member], own)).toEqual({
+      pct: 4,
+      scope: 'feeder-member',
+      effectiveFrom: '2026-01-01',
+    });
+  });
+
+  it("never reaches a Guest from another corporation, nor the owner's members at another refinery", () => {
+    expect(resolveRate([CORP, GUEST, member], { ...own, minerCorporationId: 98000999 })?.pct).toBe(
+      15
+    );
+    expect(resolveRate([CORP, GUEST, member], { ...own, feederId: 98000078 })?.pct).toBe(15);
+    expect(resolveRate([CORP, GUEST, member], { ...own, feederId: undefined })?.pct).toBe(15);
+  });
+
+  it('absent: the Guest default as before', () => {
+    expect(resolveRate([CORP, GUEST], own)?.pct).toBe(15);
+  });
+
+  it('loses to a per-refinery rate', () => {
+    const structure: TaxRate = {
+      scope: 'structure',
+      structureId: 1001,
+      pct: 9,
+      effectiveFrom: '2026-01-01',
+    };
+    expect(resolveRate([CORP, member, structure], { ...own, structureId: 1001 })?.scope).toBe(
+      'structure'
+    );
+  });
+});

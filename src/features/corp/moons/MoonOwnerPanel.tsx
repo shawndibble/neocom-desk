@@ -20,6 +20,7 @@ import { LeaveMoonOwnerDialog } from './LeaveMoonOwnerDialog';
 import { MoonOwnerPrevious } from './MoonOwnerPrevious';
 import { MoonOwnerView } from './MoonOwnerView';
 import { OwnerStaleBanner } from './OwnerStaleBanner';
+import { daysUntilOreLost, staleLedgerClock } from '@/engine/corpTaxBook/feederHealth';
 import { RefineryNamesBanner } from './RefineryNamesBanner';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
 import { shortDate } from './moonsFormat';
@@ -142,7 +143,14 @@ export function MoonOwnerPanel({
           <>
             {isStale(view.summary) && view.summary.staleSince !== null && (
               <>
-                <OwnerStaleBanner since={view.summary.staleSince} onReconnect={reconnect} />
+                <OwnerStaleBanner
+                  since={view.summary.staleSince}
+                  daysLeft={daysUntilOreLost(
+                    staleLedgerClock(view.summary.staleSince, view.summary.lastReadWellAt),
+                    new Date().toISOString()
+                  )}
+                  onReconnect={reconnect}
+                />
                 {reconnectError && <InlineError>{reconnectError}</InlineError>}
               </>
             )}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  composeGrantStaleMail,
   composeModeChangeMail,
   composeRateChangeMail,
   moonOwnerMailRecipients,
@@ -79,5 +80,23 @@ describe('composeModeChangeMail (#6209)', () => {
       const { subject, body } = composeModeChangeMail({ ...base, mode, date: '2026-10-12' });
       expect(`${subject} ${body}`).not.toMatch(/miner|margin|feeder|collector/i);
     }
+  });
+});
+
+describe('composeGrantStaleMail (#6210)', () => {
+  it('says whose ledger stopped reading since when, and by when to reconnect before ore is lost', () => {
+    const mail = composeGrantStaleMail({
+      ...base,
+      moonOwnerName: 'Brass Meridian',
+      staleSince: '2026-10-11',
+      lostOn: '2026-11-10',
+    });
+    expect(mail.subject).toBe("Brass Meridian's moon mining ledger can't be read");
+    expect(mail.body).toContain(
+      'Hi Ada, B-UH Moons cannot read the moon mining ledger of Brass Meridian since 2026-10-11'
+    );
+    expect(mail.body).toContain('Mining since then is not counted until it is reconnected');
+    expect(mail.body).toContain('before 2026-11-10');
+    expect(mail.body).not.toMatch(/feeder|collector/i);
   });
 });

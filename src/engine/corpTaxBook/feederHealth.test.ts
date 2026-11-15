@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   FEEDER_DISCONNECT_DAYS,
   advanceFeederHealth,
+  daysUntilOreLost,
+  oreLostOn,
   disconnectedCoverage,
   splitByCoverageAndRead,
   withholdUnreadFeederDays,
@@ -215,8 +217,8 @@ describe('splitByCoverageAndRead', () => {
 
 describe('heldBillableThrough (#6209)', () => {
   const held = new Map([
-    [1, '2026-08-20'],
-    [2, '2026-08-25'],
+    [1, { from: '2026-08-20' }],
+    [2, { from: '2026-08-25' }],
   ]);
   it('stops a miner the day before its earliest held day', () => {
     expect(heldBillableThrough('2026-09-17', [1], held)).toBe('2026-08-19');
@@ -251,10 +253,11 @@ describe('staleOwnerHolds (#6209)', () => {
   const rows = [row(1, '2026-08-10', OWNER), row(2, '2026-08-12'), row(3, '2026-08-20', OWNER)];
 
   it("holds every miner who mines at a stale owner's refineries from its first unread day", () => {
+    const hold = { from: '2026-08-15', ownerCorporationId: OWNER };
     expect(staleOwnerHolds(rows, clock('2026-08-15T10:00:00Z'), '2026-09-17')).toEqual(
       new Map([
-        [1, '2026-08-15'],
-        [3, '2026-08-15'],
+        [1, hold],
+        [3, hold],
       ])
     );
   });
@@ -264,6 +267,26 @@ describe('staleOwnerHolds (#6209)', () => {
     expect(staleOwnerHolds(rows, ended, '2026-09-17').size).toBe(0);
   });
   it('an owner never read well holds from its first covered day', () => {
-    expect(staleOwnerHolds(rows, clock(undefined), '2026-09-17').get(1)).toBe('2026-08-01');
+    expect(staleOwnerHolds(rows, clock(undefined), '2026-09-17').get(1)?.from).toBe('2026-08-01');
+  });
+});
+
+describe('daysUntilOreLost', () => {
+  it('counts down from the first unread day: EVE keeps 30 days of ledger', () => {
+    // Read well on the 10th at noon: the 9th is the last fully read day, the 10th the first unread.
+    const health = {
+      lastReadWellAt: '2026-10-10T12:00:00.000Z',
+      staleSince: '2026-10-11T00:00:00.000Z',
+    };
+    expect(daysUntilOreLost(health, '2026-10-20T12:00:00.000Z')).toBe(21);
+    // The 10th is still held on 2026-11-09 (30 days on), gone the day after.
+    expect(daysUntilOreLost(health, '2026-11-09T01:00:00.000Z')).toBe(1);
+    expect(daysUntilOreLost(health, '2026-11-10T01:00:00.000Z')).toBe(0);
+    expect(daysUntilOreLost(health, '2026-12-01T01:00:00.000Z')).toBe(0);
+    expect(oreLostOn(health)).toBe('2026-11-10');
+  });
+
+  it('never read well: counts from the day it went stale', () => {
+    expect(daysUntilOreLost({ staleSince: '2026-10-11T08:00:00.000Z' }, NOW)).toBe(22);
   });
 });

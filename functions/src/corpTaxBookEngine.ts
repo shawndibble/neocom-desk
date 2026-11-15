@@ -507,6 +507,18 @@ export function clampCoverageFrom(
   return day;
 }
 
+/** Engine `reconnectCoverageFrom`: the day after the last covered day, 30 days back at most, never before joining. */
+export function reconnectCoverageFrom(
+  periods: readonly CoveragePeriod[],
+  today: string,
+  joinedOn?: string
+): string {
+  if (!periods.some((p) => p.to !== undefined)) return today;
+  const earliest = shiftDate(today, -MAX_COVERAGE_BACKDATE_DAYS);
+  const asked = joinedOn !== undefined && joinedOn > earliest ? joinedOn : earliest;
+  return clampCoverageFrom(periods, asked, today);
+}
+
 // --- Feeder ledger health (#4509) --------------------------------------------
 
 const DAY_MS = 86_400_000;

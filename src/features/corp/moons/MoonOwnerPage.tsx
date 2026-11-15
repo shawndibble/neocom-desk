@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { daysUntilOreLost, staleLedgerClock } from '@/engine/corpTaxBook/feederHealth';
 import {
   Button,
   DataTable,
@@ -363,10 +364,17 @@ export function MoonOwnerPage({
       {payeeNotice}
       {row.status === 'cant-read' && row.staleSince !== undefined && (
         <p role="note" className="text-sm text-warning">
-          {t(k('stale'), { date: shortDate(new Date(row.staleSince).toISOString()) })}
+          {(() => {
+            const date = shortDate(new Date(row.staleSince).toISOString());
+            const count = daysUntilOreLost(
+              staleLedgerClock(row.staleSince, row.lastReadWellAt),
+              new Date().toISOString()
+            );
+            return count > 0 ? t(k('stale'), { date, count }) : t(k('staleLost'), { date });
+          })()}
         </p>
       )}
-      {row.status === 'removal-pending' && detail.removal && (
+      {(row.status === 'removal-pending' || row.status === 'removal-unsent') && detail.removal && (
         <RemovalStrip
           removal={detail.removal}
           onCancel={onCancelRemoval}

@@ -167,6 +167,7 @@ import {
 } from './corpTaxBookRefineryLabels.js';
 import {
   cancelFeederRemoval,
+  claimFeederStaleMail,
   finalizeDueRemovals,
   forceRemovalNow,
   getRemovalLink,
@@ -1114,6 +1115,10 @@ corpTaxBookAction('recordCorpTaxBookFeederRemovalSentCallable', (request) =>
 
 corpTaxBookAction('cancelCorpTaxBookFeederRemovalCallable', (request) =>
   cancelFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
+);
+
+corpTaxBookAction('claimCorpTaxBookFeederStaleMailCallable', (request) =>
+  claimFeederStaleMail(removalDeps(), callerOf(request), parseRemovalCall(request.data))
 );
 
 corpTaxBookAction('getCorpTaxBookRemovalLinkCallable', (request) =>

@@ -274,7 +274,7 @@ export type StoredRate =
   | { scope: 'miner'; minerId: string; pct: number; effectiveFrom: string }
   | { scope: 'moon'; moonId: number; pct: number; effectiveFrom: string }
   | { scope: 'structure'; structureId: number; pct: number; effectiveFrom: string }
-  | { scope: 'feeder'; feederId: number; pct: number; effectiveFrom: string }
+  | { scope: 'feeder' | 'feeder-member'; feederId: number; pct: number; effectiveFrom: string }
   | { scope: 'record'; recordKey: string; pct: number };
 
 export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'record' }> {
@@ -286,6 +286,7 @@ export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'rec
     'moon',
     'structure',
     'feeder',
+    'feeder-member',
   ] as const);
   const base = {
     pct: num(d.pct, 'pct', 0, 100),
@@ -297,7 +298,10 @@ export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'rec
   if (scope === 'structure')
     return { scope, structureId: int(d.structureId, 'structureId'), ...base };
   // Every refinery of one moon owner corporation: the miner rate chain's per-feeder tier.
-  if (scope === 'feeder') return { scope, feederId: int(d.feederId, 'feederId'), ...base };
+  // Every refinery of one moon owner corporation, for its own members only (#6210): above the
+  // Guest default they would otherwise mine its moon at.
+  if (scope === 'feeder' || scope === 'feeder-member')
+    return { scope, feederId: int(d.feederId, 'feederId'), ...base };
   return { scope, ...base };
 }
 
@@ -438,7 +442,7 @@ export const rateKey = (r: StoredRate): string =>
     ? `record:${r.recordKey}`
     : `${r.scope}:${'minerId' in r ? r.minerId : ''}:${'moonId' in r ? r.moonId : ''}:${r.effectiveFrom}` +
       (r.scope === 'structure' ? `:${r.structureId}` : '') +
-      (r.scope === 'feeder' ? `:${r.feederId}` : '');
+      (r.scope === 'feeder' || r.scope === 'feeder-member' ? `:${r.feederId}` : '');
 
 /**
  * An N-day cadence anchored on the old start date moves with the start date; a custom anchor,

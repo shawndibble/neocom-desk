@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  rateKey,
   ACCESS_TTL_MS,
   ROLE_CACHE_MS,
   decideRoles,
@@ -447,6 +448,21 @@ describe('per-moon-owner miner rate', () => {
         rate: { scope: 'feeder', pct: 9, effectiveFrom: '2026-10-21' },
       })
     ).toThrow();
+  });
+
+  it("parses a rate for the moon owner's own members, keyed apart from its per-moon-owner rate (#6210)", () => {
+    const rate = {
+      scope: 'feeder-member',
+      feederId: 98000002,
+      pct: 4,
+      effectiveFrom: '2026-10-21',
+    } as const;
+    expect(parseEditAction({ action: 'addRate', rate })).toEqual({ action: 'addRate', rate });
+    expect(() =>
+      parseEditAction({ action: 'addRate', rate: { ...rate, feederId: undefined } })
+    ).toThrow();
+    expect(rateKey(rate)).not.toBe(rateKey({ ...rate, scope: 'feeder' }));
+    expect(rateKey(rate)).not.toBe(rateKey({ ...rate, feederId: 98000003 }));
   });
 });
 
