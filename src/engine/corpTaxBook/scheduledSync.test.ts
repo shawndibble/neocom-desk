@@ -18,7 +18,19 @@ describe('scheduledSyncFrom', () => {
       characterName: 'Pilot 2',
       enabledAt: 5,
       lastRun: { at: 9, outcome: 'synced', observedRows: 3 },
+      refineryIds: [1],
     });
+  });
+
+  it("lists the refineries the sync read (its systems' keys), dropping malformed ids", () => {
+    expect(
+      scheduledSyncFrom({
+        status: 'active',
+        characterId: 2,
+        characterName: 'P',
+        systemIds: { '30': 1, '7': 2, x: 3 },
+      })?.refineryIds
+    ).toEqual([7, 30]);
   });
 
   it('reads a stopped schedule and its reason', () => {

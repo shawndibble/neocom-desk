@@ -1,8 +1,9 @@
 /**
  * The Moons page's Sharing tab (issue #6222): the book's Pop Sharing switch and Sharing
  * default on top, every moon the book handles below (its own refineries and its moon
- * owners'), each row opening its overrides. Settings only: later tickets publish the Shared
- * Pops. Book editors change them; read-only officers see them.
+ * owners'), each row opening its overrides. A refinery with no Extraction yet is listed apart:
+ * its moon is not known until one syncs (#6240). Book editors change the settings; read-only
+ * officers see them.
  */
 import {
   createContext,
@@ -29,7 +30,12 @@ import { InlineError } from '@/components/ui/InlineError';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Pill } from '@/components/ui/Pill';
 import { resolveRate } from '@/engine/corpTaxBook/rates';
-import { sharingMoons, type SharingMoonRow } from '@/engine/corpTaxBook/sharingMoons';
+import {
+  sharingMoons,
+  unplacedRefineries,
+  type SharingMoonRow,
+  type UnplacedRefinery,
+} from '@/engine/corpTaxBook/sharingMoons';
 import { utcDay } from '@/engine/localDay';
 import { loadMyCommunitiesCached } from '@/features/communities/communityStore';
 import { callableErrorText } from './feederErrorText';
@@ -72,6 +78,37 @@ function Audiences({ settings }: { settings: PopSharingSettings }) {
         );
       })}
     </>
+  );
+}
+
+/** The refineries no Extraction places at a moon yet: listed, not configurable (#6240). */
+function UnplacedRefineries({ refineries }: { refineries: readonly UnplacedRefinery[] }) {
+  const { t } = useTranslation();
+  const { names } = useBook();
+  return (
+    <section className="space-y-2 border-t border-line p-3">
+      <Eyebrow as="h3">{t(`${k}.unplaced.title`)}</Eyebrow>
+      <p className="text-sm text-text-dim">{t(`${k}.unplaced.hint`)}</p>
+      <ul className="space-y-1.5 text-sm">
+        {refineries.map((r) => (
+          <li key={r.structureId} className="min-w-0">
+            <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <PlaceCell
+                refinery={names.refinery(r.structureId)}
+                undockable={names.undockable?.(r.structureId)}
+                moon={undefined}
+              />
+              {r.ownerOptedOut && <Pill tone="warning">{t(`${k}.ownerOptedOut`)}</Pill>}
+            </span>
+            {r.ownerCorporationId !== undefined && (
+              <span className="block text-xs text-text-dim">
+                {names.corporation(r.ownerCorporationId)}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -153,6 +190,15 @@ export function SharingTab() {
   const rows = useMemo(
     () => (doc ? sharingMoons(view.extractions, data.feeders ?? [], doc) : []),
     [doc, view.extractions, data.feeders]
+  );
+  const unplaced = useMemo(
+    () =>
+      unplacedRefineries(
+        view.extractions,
+        data.feeders ?? [],
+        data.scheduledSync?.refineryIds ?? []
+      ),
+    [view.extractions, data.feeders, data.scheduledSync]
   );
 
   if (load.state === 'loading')
@@ -281,9 +327,8 @@ export function SharingTab() {
           </div>
         </Panel>
         <Panel title={t(`${k}.moons`)} padded={false}>
-          {rows.length === 0 ? (
-            <EmptyState title={t(`${k}.noMoons`)} />
-          ) : (
+          {rows.length === 0 && unplaced.length === 0 && <EmptyState title={t(`${k}.noMoons`)} />}
+          {rows.length > 0 && (
             <div className="overflow-x-auto">
               <DataTable
                 label={t(`${k}.moons`)}
@@ -299,6 +344,7 @@ export function SharingTab() {
               />
             </div>
           )}
+          {unplaced.length > 0 && <UnplacedRefineries refineries={unplaced} />}
         </Panel>
         {editing === 'default' && (
           <PopSharingDialog

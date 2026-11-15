@@ -448,6 +448,8 @@ export function useCorpBook(
     const refineryIds = new Set<number>([
       ...view.input.extractions.map((x) => x.structureId),
       ...view.charges.map((c) => c.structureId),
+      // The Sharing tab lists the book's refineries with no Extraction yet too (#6240).
+      ...(fetched.status === 'loaded' ? (fetched.data.scheduledSync?.refineryIds ?? []) : []),
     ]);
     const moonIds = [
       ...view.input.extractions.map((x) => x.moonId),
