@@ -540,7 +540,6 @@ export function PayeeManagerDialog({
                 </Select>
                 <Button
                   variant="danger"
-                  size="sm"
                   disabled={!moveTargetId}
                   onClick={() => confirmDelete(true)}
                 >

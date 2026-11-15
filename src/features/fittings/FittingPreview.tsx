@@ -161,10 +161,10 @@ export function FittingPreview({
           <div className="flex flex-wrap items-center gap-2">
             {row.source === 'saved' && (
               <>
-                <Button size="sm" variant="ghost" onClick={onRename}>
+                <Button variant="ghost" onClick={onRename}>
                   {t('fittings.start.preview.rename')}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={onDelete}>
+                <Button variant="ghost" onClick={onDelete}>
                   {t('fittings.start.preview.delete')}
                 </Button>
               </>
