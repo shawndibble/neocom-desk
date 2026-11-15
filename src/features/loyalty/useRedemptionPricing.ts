@@ -16,7 +16,7 @@ import { getLiveBook, type LiveBook } from '@/features/market/liveBooks';
 import { useBuyJumps } from '@/features/market/useBuyJumps';
 import type { TradeHub } from '@/market/hubs';
 import type { LoyaltyOfferRow } from './offerRows';
-import { resolveLoyaltyRowItem } from './offerRowDisplay';
+import { outputUnitsOf, resolveLoyaltyRowItem } from './offerRowDisplay';
 import type { PriceBasis } from './priceBasis';
 
 interface Args {
@@ -34,12 +34,6 @@ interface Args {
 type Books = ReadonlyMap<string, LiveBook | 'failed'>;
 
 const bookKey = (hub: TradeHub, typeId: number): string => `${hub.stationId}:${typeId}`;
-
-/** Units one redemption hands over: the offer's quantity, or a blueprint's product per run. */
-function outputUnitsOf(row: LoyaltyOfferRow, catalog: BlueprintCatalog | null): number | null {
-  if (!row.isBlueprint) return row.offer.quantity;
-  return catalog?.byBlueprintTypeID.get(row.offer.type_id)?.blueprint.products[0]?.quantity ?? null;
-}
 
 export function useRedemptionPricing({
   row,
