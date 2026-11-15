@@ -506,7 +506,11 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
     });
 
     it('notes tax paid into a division the book does not read, without crediting it (#6207)', async () => {
-      await book().collection('statements').doc('s1').set(statement);
+      // Owing more than the counted donation pays, so the Miner still owes after this sync.
+      await book()
+        .collection('statements')
+        .doc('s1')
+        .set({ ...statement, amount: 30_000_000 });
       await optIn(ACCOUNTANT);
       // The fake wallet answers the same journal for every division: division 2's copy is the
       // Miner who owes paying where the book does not look.
@@ -669,6 +673,20 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         ((await book().collection('meta').doc('paid').get()).data()?.ids as string[]) ?? [];
       /** Runs until the book holds a quiet marker: the donation lands, then a run finds nothing to do. */
       async function quietBook() {
+        // #6207: a code-less donation credits only a Miner who owes, so character 50 owes on a
+        // Statement issued after s1. Allocation pays the oldest first, so once s1 appears the
+        // donation settles s1, and this one never settles.
+        await book()
+          .collection('statements')
+          .doc('sOpen')
+          .set({
+            ...statement,
+            id: 'sOpen',
+            code: 'OPEN01',
+            issuedAt: '2026-10-17T00:00:00.000Z',
+            lines: [],
+            amount: 1_000_000_000,
+          });
         await optIn(ACCOUNTANT);
         for (let i = 1; i <= 2; i++) {
           now = T0 + i * 6 * H;
