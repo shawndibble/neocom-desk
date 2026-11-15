@@ -21,6 +21,9 @@ configureActiveCharacter(() => useActiveCharacter.getState().activeCharacterId);
 /**
  * What `App`'s boot effects (`AppEffects`) hydrate for every page: the active
  * Character, and the device preferences the shell reads before any route.
+ * Keep in step with `AppEffects` in `src/app/App.tsx`. Not mirrored: the route
+ * view snapshots (`hydrateRouteSnapshots`), which only paint a first frame
+ * early; every page still loads its own data without them.
  */
 function hydrateAppState(): void {
   void useActiveCharacter.getState().hydrate();
