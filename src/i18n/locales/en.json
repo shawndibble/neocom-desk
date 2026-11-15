@@ -17942,18 +17942,29 @@
           "title_other": "{{name}} · overdue {{count}} days · {{amount}}",
           "body": "The {{period}} Statement is unpaid past its due date.",
           "remind": "Send reminder",
-          "dismiss": "Dismiss"
+          "dismiss": "Waive all…"
         },
         "unmatched": {
           "title": "Unmatched donation · {{amount}} from {{name}}",
           "body": "{{date}}. {{name}} has not mined at your refineries, so there is no Miner to credit.",
-          "bodyInMiner": "{{date}}. {{name}} is in a Miner now; the next sync assigns it, or you can assign it.",
+          "bodyInMiner": "{{date}}. {{name}} is in a Miner now; a sync assigns it once that Miner owes tax, or you can assign it.",
+          "bodyReview": "{{date}}. {{name}}'s Miner owed no tax then, so it may be for something else, such as a buyback. Assign it if it was tax, or mark it not tax.",
           "assign": "Assign to a Miner",
           "notTax": "Mark not tax"
         },
+        "uncounted": {
+          "title": "Donation of {{amount}} from {{name}} into {{division}} — not counted",
+          "body": "{{date}}. The book does not read that wallet division, so it paid no tax. Count the division to credit it, or mark it not tax.",
+          "count": "Count {{division}}",
+          "notTax": "Not tax",
+          "counted": "The book now reads {{division}}. The next sync credits what was paid there.",
+          "ignored": "Marked not tax. It will not be listed again.",
+          "failed": "Could not save that. Try again."
+        },
         "leaver": {
           "title": "{{name}} left the corp · owes {{amount}}",
-          "body": "Still mailed each month. Write it off once it is clear it will not be paid.",
+          "body": "No new Statement goes out unless they mine again. Send a reminder, or write it off once it is clear it will not be paid.",
+          "remind": "Send reminder",
           "writeOff": "Write off"
         },
         "reminderQueued": "Reminder to {{name}} is in the send queue.",
@@ -18089,6 +18100,8 @@
         "stale": "Synced by {{name}} {{age}} — the book is going stale",
         "failed": "The sync failed: {{message}}",
         "autoGroupFailed": "The sync worked, but grouping this account's Characters failed: {{message}}",
+        "couldNotRead": "The last sync could not read {{sources}}.",
+        "couldNotReadDetail": "What it could not read may be out of date until a sync reads it again. Check the syncing character's corporation roles and EVE authorization.",
         "reassignFailed": "The sync worked, but matching earlier unmatched payments to Miners failed: {{message}}",
         "scheduledStopped": "Automatic sync stopped: {{reason}}",
         "scheduledStoppedDetail": "Until someone turns it back on in the book's settings (Automatic sync), the book is only as fresh as the last officer sync.",
@@ -18868,7 +18881,9 @@
           "part": "Part",
           "amount": "Amount not tax",
           "reason": "Reason (required)",
-          "effect": "The debt reopens by {{amount}}. What is left stays credited."
+          "effect": "The debt reopens by {{amount}}. What is left stays credited.",
+          "effectUnmatchedAll": "It leaves Unmatched. Nothing is credited to anyone.",
+          "effectUnmatchedPart": "{{amount}} is set aside. The rest stays Unmatched until you assign it."
         },
         "reject": {
           "title": "Reject {{name}}'s declaration",

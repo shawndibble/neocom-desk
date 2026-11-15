@@ -1,0 +1,7 @@
+# Scope decisions — Corp Tax Book notes tax paid into wallet divisions it does not read (issue #6207)
+
+_Recorded 2026-11-15 · issue #6207._
+
+- **Every sync also reads the wallet divisions the book does not count, and notes donations there that look like tax.** "Looks like tax" means it carries a Statement's pay code, or comes from a known character whose Miner has an open balance. Strangers, and Miners who owe nothing, are left out so a corp that uses another division for buyback or SRP is not flooded. The 20 newest are kept. Both the officer visit and a full scheduled run do this, with the scope and roles the sync already has (`esi-wallet.read_corporation_wallets.v1`, Accountant or Junior Accountant); no new grant is needed.
+- **Noted donations are never credited.** They are stored in `corps/{id}/meta/uncounted` (officers only, since it names donors and amounts), never as payments. The list is replaced only when every other division was read, so an unreadable division never empties it. A quiet scheduled run leaves it as it was, so the list can lag up to a day on a book that only syncs on schedule; an officer visit refreshes it.
+- **Needs you shows each one as "Donation of {isk} from {name} into {division} — not counted".** It offers "Count {division}", which adds the division to the book's settings so the next sync credits it through the usual matching, and "Not tax", which drops it and keeps its id (200 at most) so no later sync notes it again. A card disappears as soon as its division is counted.

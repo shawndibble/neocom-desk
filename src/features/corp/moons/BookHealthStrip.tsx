@@ -50,6 +50,31 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       detail: <p>{t('corpTaxBook.moons.health.scheduledStoppedDetail')}</p>,
     });
   }
+  // #6207: a source the last sync could not read (donations, Extractions) shows here, not only
+  // in Settings. A source the running schedule did read covers a visit that could not.
+  const scheduledRun = scheduled?.status === 'active' ? scheduled.lastRun : undefined;
+  const scheduledMissing =
+    scheduledRun && scheduledRun.outcome === 'synced' ? (scheduledRun.missing ?? []) : undefined;
+  const visitMissing =
+    sync.run.phase === 'done' && sync.run.outcome.kind === 'synced'
+      ? (sync.run.outcome.missing ?? [])
+      : [];
+  const unread = [
+    ...new Set([
+      ...visitMissing.filter((m) => !scheduledMissing || scheduledMissing.includes(m)),
+      ...(scheduledMissing ?? []),
+    ]),
+  ];
+  if (unread.length > 0) {
+    items.push({
+      id: 'couldNotRead',
+      tone: 'warning',
+      title: t('corpTaxBook.moons.health.couldNotRead', {
+        sources: unread.map((m) => t(`corpTaxBook.moons.autoSync.missing.${m}`)).join(', '),
+      }),
+      detail: <p>{t('corpTaxBook.moons.health.couldNotReadDetail')}</p>,
+    });
+  }
   // Counted from the ledger rows, so only on a tab that reads them (the Moon owners tab does not).
   if ((data.parts?.has('observed') ?? true) && view.unrated.length > 0) {
     items.push({

@@ -355,7 +355,7 @@ export function MarkNotTaxDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  payment: { id: string; amount: number; at: string; notTaxAmount?: number };
+  payment: { id: string; amount: number; at: string; notTaxAmount?: number; minerId?: string };
   fromName: string;
 }) {
   const { t } = useTranslation();
@@ -417,7 +417,15 @@ export function MarkNotTaxDialog({
       <Label text={t('corpTaxBook.moons.dialogs.notTax.reason')}>
         <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
       </Label>
-      <Effect>{t('corpTaxBook.moons.dialogs.notTax.effect', { amount: isk(amount || 0) })}</Effect>
+      <Effect>
+        {payment.minerId
+          ? t('corpTaxBook.moons.dialogs.notTax.effect', { amount: isk(amount || 0) })
+          : amount >= payment.amount
+            ? t('corpTaxBook.moons.dialogs.notTax.effectUnmatchedAll')
+            : t('corpTaxBook.moons.dialogs.notTax.effectUnmatchedPart', {
+                amount: isk(amount || 0),
+              })}
+      </Effect>
     </DialogShell>
   );
 }

@@ -65,6 +65,9 @@ import {
   observedRowsFromLedger,
   parseMoonPayload,
   placeObservedRows,
+  noteUncounted,
+  openBalances,
+  otherDivisions,
   planSettlements,
   reconcileExtractions,
   resolveDonations,
@@ -419,11 +422,19 @@ export async function runBookSync(
     .filter((d) => !stored.has(paymentId(d)))
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, DONATIONS_PER_CALL);
-  const resolved = resolveDonations(fresh, {
+  const matching = {
     miners: before.miners,
     statements: before.statements,
     knownCharacterIds: known,
-  });
+    openBalance: quiet ? new Map<string, number>() : openBalanceOf(before),
+  };
+  const resolved = resolveDonations(fresh, matching);
+  // #6207: what looks like tax paid into a division the book does not read. Only on a full run,
+  // which holds the Miners and balances it rests on; a quiet one leaves the stored list as it was.
+  const elsewhere = quiet
+    ? null
+    : await readDonationsElsewhere(esi, corporationId, before.divisions, accessToken);
+  const uncounted = elsewhere === null ? undefined : noteUncounted(elsewhere, matching);
 
   const placed = placeObservedRows(
     feed.rows,
@@ -442,12 +453,14 @@ export async function runBookSync(
   if (!(await args.stillHeld())) return { kind: 'skipped', reason: 'esi-unavailable' };
 
   // --- Upload (the first call carries everything but the overflow) ----------
-  const call = (part: Partial<Record<'observed' | 'extractions' | 'donations', unknown[]>>) =>
-    parseSyncInput({ corporationId, gaps, ...part }, now);
+  const call = (
+    part: Partial<Record<'observed' | 'extractions' | 'donations' | 'uncounted', unknown[]>>
+  ) => parseSyncInput({ corporationId, gaps, ...part }, now);
   const first = call({
     observed: batches.shift() ?? [],
     extractions: extraCalls.shift() ?? [],
     donations: resolved,
+    ...(uncounted ? { uncounted } : {}),
   });
   const receipt = await syncBookAs(deps, access, first, { scheduled: true });
   for (const observed of batches) {
@@ -574,23 +587,68 @@ export async function runBookSync(
   };
 }
 
+/**
+ * Donations into every wallet division the book does not read (#6207), or null unless each one
+ * answered: the stored list is replaced, so an unread division must not read as an empty one.
+ */
+async function readDonationsElsewhere(
+  esi: SyncEsi,
+  corporationId: number,
+  divisions: readonly number[],
+  accessToken: string
+): Promise<JournalDonation[] | null> {
+  const found: JournalDonation[] = [];
+  for (const division of otherDivisions(divisions)) {
+    const journal = await esi.journal(corporationId, division, accessToken);
+    if (journal.kind !== 'ok') return null;
+    found.push(...donationsFromJournal(journal.data, division, corporationId));
+  }
+  return found;
+}
+
+/** What each Miner owes on the book's issued Statements, for `matchDonation` (#6207). */
+function openBalanceOf(book: AdminBookState): Map<string, number> {
+  return openBalances({
+    statements: book.statements,
+    payments: book.payments,
+    dismissals: book.dismissals,
+    extractions: book.extractions,
+    ...(book.writeOffs ? { writeOffs: book.writeOffs } : {}),
+    startDate: book.startDate,
+  });
+}
+
 async function reassignUnmatched(
   edit: (action: ScheduledAction) => Promise<unknown>,
   before: AdminBookState,
   known: ReadonlySet<number>
 ): Promise<{ assigned: Map<string, string>; error?: string }> {
-  const unmatched = before.payments.filter(
-    (p) => p.minerId === undefined && !(p.notTaxAmount && p.notTaxAmount > 0)
-  );
+  // One held for review (#6207) is the officer's to place, never re-matched.
+  const unmatched = before.payments
+    .filter(
+      (p) =>
+        p.minerId === undefined &&
+        !(p.notTaxAmount && p.notTaxAmount > 0) &&
+        p.reviewReason === undefined
+    )
+    .sort((a, b) => a.at.localeCompare(b.at));
   const assigned = new Map<string, string>();
+  // Only toward an open balance, spent oldest first: a sender whose Miner owes nothing waits.
+  const balance = openBalanceOf(before);
   try {
     for (const p of unmatched) {
       const match = matchDonation(
         { characterId: p.characterId as number, reason: (p as { reason?: string }).reason },
-        { miners: before.miners, statements: before.statements, knownCharacterIds: known }
+        {
+          miners: before.miners,
+          statements: before.statements,
+          knownCharacterIds: known,
+          openBalance: balance,
+        }
       );
-      if (match.kind === 'unmatched') continue;
+      if (match.kind !== 'miner' && match.kind !== 'statement') continue;
       await edit({ action: 'assignPayment', paymentId: p.id, minerId: match.minerId });
+      balance.set(match.minerId, (balance.get(match.minerId) ?? 0) - p.amount);
       assigned.set(p.id, match.minerId);
     }
     return { assigned };

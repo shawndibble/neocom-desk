@@ -263,12 +263,17 @@ describe('dismissalCredits', () => {
 
 describe('matchDonation', () => {
   const miners = [{ id: 'm1', characterIds: [90000001, 90000002], mainCharacterId: 90000001 }];
+  /** Every Miner here owes something, so a known sender is credited. */
+  const owes = new Map([
+    ['m1', 1_000_000],
+    ['solo:777', 1_000_000],
+  ]);
 
   it('pins a donation whose reason carries a Statement code to that Statement', () => {
     expect(
       matchDonation(
         { characterId: 12345, reason: 'tax ndt-s2 thanks' },
-        { miners, statements: [JUNE, JULY], knownCharacterIds: new Set() }
+        { miners, statements: [JUNE, JULY], knownCharacterIds: new Set(), openBalance: new Map() }
       )
     ).toEqual({ kind: 'statement', statementId: 's2', minerId: 'm1' });
   });
@@ -277,7 +282,7 @@ describe('matchDonation', () => {
     expect(
       matchDonation(
         { characterId: 90000002, reason: '' },
-        { miners, statements: [], knownCharacterIds: new Set() }
+        { miners, statements: [], knownCharacterIds: new Set(), openBalance: owes }
       )
     ).toEqual({ kind: 'miner', minerId: 'm1' });
   });
@@ -286,16 +291,28 @@ describe('matchDonation', () => {
     expect(
       matchDonation(
         { characterId: 777, reason: undefined },
-        { miners, statements: [], knownCharacterIds: new Set([777]) }
+        { miners, statements: [], knownCharacterIds: new Set([777]), openBalance: owes }
       )
     ).toEqual({ kind: 'miner', minerId: 'solo:777' });
+  });
+
+  it('holds a code-less donation for review when its Miner owes nothing (#6207)', () => {
+    // e.g. a buyback payment: crediting it as tax would hide the next debt.
+    for (const openBalance of [new Map(), new Map([['m1', 0]]), new Map([['m1', -5]])]) {
+      expect(
+        matchDonation(
+          { characterId: 90000001, reason: 'ore buyback' },
+          { miners, statements: [], knownCharacterIds: new Set(), openBalance }
+        )
+      ).toEqual({ kind: 'review', minerId: 'm1' });
+    }
   });
 
   it('sends an unknown character with no code to Unmatched', () => {
     expect(
       matchDonation(
         { characterId: 555, reason: 'hi' },
-        { miners, statements: [JUNE], knownCharacterIds: new Set() }
+        { miners, statements: [JUNE], knownCharacterIds: new Set(), openBalance: owes }
       )
     ).toEqual({ kind: 'unmatched' });
   });

@@ -6,6 +6,7 @@
 // never written to Firestore or to the audit log.
 
 import { randomBytes } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import {
   FieldPath,
   FieldValue,
@@ -43,6 +44,8 @@ import {
   OBSERVED,
   OFFICERS,
   PAID_DOC,
+  UNCOUNTED_DOC,
+  UNCOUNTED_IGNORED_MAX,
   PAYMENTS,
   REBILLS,
   STATEMENTS,
@@ -705,6 +708,7 @@ export async function syncBookAs(
       ...(dn.reason !== undefined ? { reason: dn.reason } : {}),
       ...(dn.minerId !== undefined ? { minerId: dn.minerId } : {}),
       ...(dn.statementId !== undefined ? { statementId: dn.statementId } : {}),
+      ...(dn.reviewReason !== undefined ? { reviewReason: dn.reviewReason } : {}),
     };
     try {
       // create(): a re-synced donation never overwrites an officer's "not tax" mark.
@@ -741,6 +745,8 @@ export async function syncBookAs(
       }
     );
   });
+  if (input.uncounted !== undefined)
+    await storeUncounted(deps, input.corporationId, input.uncounted);
   if (paidMiners.size > 0) await refreshAfterEvent(deps.db, input.corporationId, [...paidMiners]);
   // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort, like the totals above.
   await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
@@ -748,6 +754,27 @@ export async function syncBookAs(
   if (donationsAdded > 0 || input.extractions.length > 0)
     await refreshReadModels(deps.db, input.corporationId, deps.now());
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
+}
+
+/**
+ * #6207: replaces the noted donations into divisions the book does not read, leaving out the
+ * ones an officer already called not tax. Officers-only (`meta`): it names donors and amounts.
+ */
+async function storeUncounted(
+  deps: BookDeps,
+  corporationId: number,
+  uncounted: NonNullable<SyncInput['uncounted']>
+) {
+  const ref = sub(deps.db, corporationId, META).doc(UNCOUNTED_DOC);
+  await deps.db.runTransaction(async (tx) => {
+    const held = (await tx.get(ref)).data();
+    const ignored = new Set((held?.ignored as string[] | undefined) ?? []);
+    const donations = uncounted.filter((u) => !ignored.has(u.id));
+    // Unchanged writes nothing: every write to `meta` moves its version stamp, which makes
+    // officers' devices read the doc again (#5047).
+    if (isDeepStrictEqual(donations, held?.donations ?? [])) return;
+    tx.set(ref, { donations }, { merge: true });
+  });
 }
 
 // --- Edits -----------------------------------------------------------------
@@ -1096,6 +1123,21 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           reason: action.reason,
         },
       };
+    }
+    case 'ignoreUncounted': {
+      const ref = col(c, META).doc(UNCOUNTED_DOC);
+      const held = (await tx.get(ref)).data();
+      const donations = ((held?.donations as Data[] | undefined) ?? []).filter(
+        (u) => u.id !== action.uncountedId
+      );
+      const ignored = [
+        ...((held?.ignored as string[] | undefined) ?? []).filter(
+          (id) => id !== action.uncountedId
+        ),
+        action.uncountedId,
+      ].slice(-UNCOUNTED_IGNORED_MAX);
+      tx.set(ref, { donations, ignored }, { merge: true });
+      return { detail: { uncountedId: action.uncountedId } };
     }
     case 'assignPayment': {
       const ref = col(c, PAYMENTS).doc(action.paymentId);
@@ -1891,6 +1933,9 @@ async function claimPaymentTx(
       fail('failed-precondition', 'Already assigned', 'already-assigned');
     if (((payment.notTaxAmount as number | undefined) ?? 0) >= (payment.amount as number))
       fail('failed-precondition', 'An officer marked this as not tax', 'not-tax');
+    // #6207: held because the player's Miner owed nothing (a buyback, say): an officer decides.
+    if (payment.reviewReason !== undefined)
+      fail('failed-precondition', 'An officer reviews this payment', 'in-review');
     const grouped = await tx.get(
       sub(deps.db, corporationId, MINERS).where('characterIds', 'array-contains', characterId)
     );

@@ -496,6 +496,28 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       ).toBe(true);
     });
 
+    it('holds a known miner’s donation for review when their Miner owes nothing (#6207)', async () => {
+      await optIn(ACCOUNTANT);
+      const summary = await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+      expect(summary.synced).toBe(1);
+      const payment = (await book().collection('payments').doc('j1_1').get()).data();
+      expect(payment?.minerId).toBeUndefined();
+      expect(payment?.reviewReason).toBe('no-open-balance');
+    });
+
+    it('notes tax paid into a division the book does not read, without crediting it (#6207)', async () => {
+      await book().collection('statements').doc('s1').set(statement);
+      await optIn(ACCOUNTANT);
+      // The fake wallet answers the same journal for every division: division 2's copy is the
+      // Miner who owes paying where the book does not look.
+      await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+      const noted = (await book().collection('meta').doc('uncounted').get()).data();
+      expect(noted?.donations).toContainEqual(
+        expect.objectContaining({ id: 'j2_1', division: 2, characterId: 50 })
+      );
+      expect((await book().collection('payments').doc('j2_1').get()).exists).toBe(false);
+    });
+
     describe('settled rows (#5048)', () => {
       const H = 3_600_000;
       const row = (date: string, quantity: number, character = 50) => ({
@@ -576,10 +598,14 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
 
         now = T0 + 12 * H;
         esiState.ledger = readAt([row('2026-10-10', 100)]);
+        // Once: a run reads every wallet division's journal (#6207).
+        let recreated = false;
         const recreating: SyncEsi = {
           ...fakeEsi(),
           // While the run reads ESI, the book is deleted and turned on again, empty.
           journal: async () => {
+            if (recreated) return esiState.journal as never;
+            recreated = true;
             await deleteBook(
               bookDeps(),
               who(DIRECTOR),
@@ -738,6 +764,11 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
           quantity: 10,
           last_updated: '2026-10-17',
         });
+        // #6207: re-matched only toward an open balance, so 51's Miner owes on a Statement.
+        await book()
+          .collection('statements')
+          .doc('s51')
+          .set({ ...statement, id: 's51', minerId: 'solo:51', code: 'DEF456' });
         now += 6 * H;
         await run();
         expect((await book().collection('payments').doc('j1_3').get()).data()?.minerId).toBe(

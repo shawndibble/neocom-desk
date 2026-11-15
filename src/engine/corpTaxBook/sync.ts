@@ -202,6 +202,8 @@ export interface JournalDonation {
   reason?: string;
   minerId?: string;
   statementId?: string;
+  /** Set when a known sender's Miner owed nothing, so it stays Unmatched for review (#6207). */
+  reviewReason?: 'no-open-balance';
 }
 
 /** ISK players sent into one wallet division: `player_donation`s from someone other than the corporation. */
@@ -228,23 +230,45 @@ export function donationsFromJournal(
   return out;
 }
 
-/** Fills each donation's `minerId` and `statementId` with `matchDonation`; a stranger's stays unset (Unmatched). */
+/**
+ * Fills each donation's `minerId` and `statementId` with `matchDonation`; a stranger's stays
+ * unset (Unmatched), and a known sender's whose Miner owes nothing is marked for review.
+ * Oldest first, each credited donation spends its Miner's balance, so two in one sync never
+ * both count against the same debt. Returned in the order given.
+ */
 export function resolveDonations(
   donations: readonly JournalDonation[],
   book: {
     miners: readonly Miner[];
     statements: readonly Statement[];
     knownCharacterIds: ReadonlySet<number>;
+    openBalance: ReadonlyMap<string, number>;
   }
 ): JournalDonation[] {
-  return donations.map((d) => {
-    const match = matchDonation({ characterId: d.characterId, reason: d.reason }, book);
-    if (match.kind === 'statement') {
-      return { ...d, minerId: match.minerId, statementId: match.statementId };
-    }
-    if (match.kind === 'miner') return { ...d, minerId: match.minerId };
-    return d;
-  });
+  const balance = new Map(book.openBalance);
+  const resolved = new Map<JournalDonation, JournalDonation>();
+  const oldestFirst = [...donations].sort(
+    (a, b) => a.at.localeCompare(b.at) || a.division - b.division || a.refId - b.refId
+  );
+  for (const d of oldestFirst) {
+    const match = matchDonation(
+      { characterId: d.characterId, reason: d.reason },
+      { ...book, openBalance: balance }
+    );
+    if (match.kind === 'statement' || match.kind === 'miner')
+      balance.set(match.minerId, (balance.get(match.minerId) ?? 0) - d.amount);
+    resolved.set(
+      d,
+      match.kind === 'statement'
+        ? { ...d, minerId: match.minerId, statementId: match.statementId }
+        : match.kind === 'miner'
+          ? { ...d, minerId: match.minerId }
+          : match.kind === 'review'
+            ? { ...d, reviewReason: 'no-open-balance' }
+            : d
+    );
+  }
+  return donations.map((d) => resolved.get(d)!);
 }
 
 // --- Settlement -----------------------------------------------------------
@@ -393,12 +417,38 @@ export interface SettleInput {
  * are closed for good (D22).
  */
 export function planSettlements(input: SettleInput): string[] {
+  const settled: string[] = [];
+  for (const { statements, allocation } of allocateEachMiner(input)) {
+    for (const s of statements) {
+      if (allocation.byStatement.get(s.id)?.settled && !input.alreadyPaid.has(s.id)) {
+        settled.push(s.id);
+      }
+    }
+  }
+  return settled;
+}
+
+/**
+ * What each Miner still owes on issued Statements, after payments, dismissals and
+ * write-offs: the open balance `matchDonation` checks before crediting a code-less
+ * donation (#6207). A Miner who owes nothing is absent or zero.
+ */
+export function openBalances(input: Omit<SettleInput, 'alreadyPaid'>): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const { minerId, allocation } of allocateEachMiner(input)) {
+    let owed = 0;
+    for (const s of allocation.byStatement.values()) if (!s.settled) owed += s.remaining;
+    if (owed > 0) out.set(minerId, owed);
+  }
+  return out;
+}
+
+function allocateEachMiner(input: Omit<SettleInput, 'alreadyPaid'>) {
   const extractions = (input.extractions ?? []).map(toEngineExtraction);
   const placeOf = (structureId: number | undefined, date: string) =>
     moonOnDay(extractions, structureId, date);
-  const settled: string[] = [];
   const minerIds = [...new Set(input.statements.map((s) => s.minerId))];
-  for (const minerId of minerIds) {
+  return minerIds.map((minerId) => {
     const statements = input.statements.filter((s) => s.minerId === minerId);
     const charges = statements.flatMap((s) =>
       s.lines.flatMap((line) =>
@@ -422,13 +472,8 @@ export function planSettlements(input: SettleInput): string[] {
       officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId),
       startDate: input.startDate,
     });
-    for (const s of statements) {
-      if (allocation.byStatement.get(s.id)?.settled && !input.alreadyPaid.has(s.id)) {
-        settled.push(s.id);
-      }
-    }
-  }
-  return settled;
+    return { minerId, statements, allocation };
+  });
 }
 
 // --- Extractions ----------------------------------------------------------

@@ -1,0 +1,8 @@
+# Scope decisions — Corp Tax Book credits a known miner's code-less donation only toward an open balance (issue #6207)
+
+_Recorded 2026-11-15 · issue #6207._
+
+- **A donation with no pay code from a known character credits their Miner only while that Miner has an open balance.** The open balance is what the Miner still owes on issued Statements after payments, dismissals and write-offs (`openBalances`, mirrored on the server). Supersedes the "Automatic credit (D5/D15)" rule in `20261018-134402`, under which every donation from a Miner's characters credited: a buyback or SRP payment then hid the next debt. A pay code still pins a donation to its Statement from anyone, whatever the balance.
+- **A donation held this way stays Unmatched for an officer, marked `reviewReason: 'no-open-balance'` on the payment doc.** Its card says why. No sync re-matches it later, even once the Miner owes, and the player cannot claim it, since it may not be tax at all. The officer assigns it or marks it not tax as usual. The field is additive: older payment docs lack it and behave as before.
+- **Within one sync, donations spend the balance oldest first.** Two code-less donations that together exceed what is owed credit the first; the second is held. Re-matching an older Unmatched donation (a sender who has since joined a Miner) follows the same rule, so it is assigned only toward an open balance and otherwise waits.
+- **A Miner who pays before their first Statement is issued is held for review too.** Unbilled ore is not an open balance; counting it would need the day charges, which the sync does not compute. This is accepted because it is rare and an officer can assign the payment in one step.

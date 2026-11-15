@@ -7,6 +7,7 @@ import {
   MOON_NOTIFICATION_TYPES,
   detectGaps,
   donationsFromJournal,
+  openBalances,
   mergeGaps,
   observedRowsFromLedger,
   placeObservedRows,
@@ -20,6 +21,7 @@ import {
 } from './sync';
 import type { Statement } from './statements';
 import { SCHEDULED_STOP_REASONS } from './scheduledSync';
+import { UNCOUNTED_LIMIT, noteUncounted, otherDivisions } from './uncounted';
 
 // The scheduled server sync (ADR 0025) runs a mirror of the officer sync's pure
 // half (functions/src/corpTaxBookSyncEngine.ts), because `functions/` cannot
@@ -158,15 +160,25 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
       { id: 'solo:51', characterIds: [51], mainCharacterId: 51 },
     ];
     const statements = [{ id: 's1', minerId: 'm1', code: 'ABC123' }] as unknown as Statement[];
-    const book = { miners, statements, knownCharacterIds: new Set([99]) };
-    expect(mirror.resolveDonations(donations, book)).toEqual(resolveDonations(donations, book));
-    for (const characterId of [50, 51, 52, 99, 12345]) {
-      for (const reason of [undefined, '', 'abc123', 'xABC123', 'ABC1234', 'ABC123 now']) {
-        expect(mirror.matchDonation({ characterId, reason }, book)).toEqual(
-          matchDonation({ characterId, reason }, book)
-        );
+    // #6207: m1 owes a little, solo:99 owes nothing, so the holds and the spent balance show.
+    for (const openBalance of [new Map([['m1', 1e6]]), new Map<string, number>()]) {
+      const book = { miners, statements, knownCharacterIds: new Set([99]), openBalance };
+      expect(mirror.resolveDonations(donations, book)).toEqual(resolveDonations(donations, book));
+      expect(mirror.noteUncounted(donations, book)).toEqual(noteUncounted(donations, book));
+      for (const characterId of [50, 51, 52, 99, 12345]) {
+        for (const reason of [undefined, '', 'abc123', 'xABC123', 'ABC1234', 'ABC123 now']) {
+          expect(mirror.matchDonation({ characterId, reason }, book)).toEqual(
+            matchDonation({ characterId, reason }, book)
+          );
+        }
       }
     }
+  });
+
+  it('agrees on the wallet divisions a book does not read, and their bound (#6207)', () => {
+    for (const divisions of [[1], [1, 2], [2, 5, 7], [1, 2, 3, 4, 5, 6, 7]])
+      expect(mirror.otherDivisions(divisions)).toEqual(otherDivisions(divisions));
+    expect(mirror.UNCOUNTED_LIMIT).toBe(UNCOUNTED_LIMIT);
   });
 
   describe('extractions', () => {
@@ -424,6 +436,17 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
       expect(theirs).toEqual(ours);
       expect(theirs.length).toBeGreaterThan(0);
     }
+    const balances = openBalances({
+      statements: statements as unknown as Statement[],
+      payments: payments.map((p) => ({ ...p, characterId: 1, source: 'donation' as const })),
+      dismissals,
+      miners: [],
+      extractions,
+    });
+    expect(mirror.openBalances({ statements, payments, dismissals, extractions })).toEqual(
+      balances
+    );
+    expect(balances.size).toBeGreaterThan(0);
   });
   it('planSettlements ignores a donation before the start date in both copies (#4505)', () => {
     const statements = [
