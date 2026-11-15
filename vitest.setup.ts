@@ -5,6 +5,7 @@
 import 'fake-indexeddb/auto';
 import { afterAll, afterEach, beforeEach, expect } from 'vitest';
 import { resetRouteSnapshots } from '@/lib/routeSnapshotCache';
+import { runTestResets } from '@/lib/testResets';
 import { beginTestFetches, restoreRealTimers, settleOrWarn, trackIndexedDb } from '@/test/teardown';
 
 /**
@@ -16,9 +17,17 @@ import { beginTestFetches, restoreRealTimers, settleOrWarn, trackIndexedDb } fro
  *
  * It also holds `useWarmLoad`'s values and the Industry workspace's last load
  * (`features/industry/workspaceLoadCache.ts`), so this reset covers those too.
+ *
+ * `runTestResets` clears the module state that production code registered with
+ * `registerTestReset` (`src/lib/testResets.ts`): the market price cache and the
+ * Fuzzwork-down flag. Before each test rather than after: the request a test
+ * left running is aborted at its end, and the failure it reports (Fuzzwork
+ * marked down) can land after the `afterEach` hooks. A file's own hooks run
+ * after this one, so a `beforeEach` that seeds state keeps it.
  */
 beforeEach(() => {
   resetRouteSnapshots();
+  runTestResets();
 });
 
 /**

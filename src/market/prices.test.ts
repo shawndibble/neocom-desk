@@ -30,7 +30,6 @@ beforeEach(() => {
   server.use(...fallbackSourcesDown);
 });
 afterEach(() => {
-  clearMarketPriceCache();
   resetMarketOpenPricesCache();
 });
 

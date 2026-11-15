@@ -65,7 +65,6 @@ const server = mswServer();
 beforeEach(() => server.use(...fallbackSourcesDown));
 afterEach(() => {
   resetMarketOpenPricesCache();
-  clearMarketPriceCache();
   clearAppraisalCatalogue();
   clearMarketTypeIndex();
   mockedLoadReprocessing.mockReset();
