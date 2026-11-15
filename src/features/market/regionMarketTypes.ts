@@ -11,8 +11,9 @@ import { useKeyedLoad } from '@/lib/useAsyncLoad';
  * The region's listed type ids, read through the shared cache for ESI's own
  * 10-minute window, so switching back to a region inside it costs no request.
  *
- * Null when the list is unavailable or missing pages: a short list would
- * claim live types have no orders, and absence of data is never "no orders".
+ * Null when the list is unavailable, missing pages, or a saved copy older
+ * than that window (the refresh failed): a short or old list would claim
+ * live types have no orders, and absence of data is never "no orders".
  */
 export async function loadRegionMarketTypes(regionId: number): Promise<ReadonlySet<number> | null> {
   const cached = await loadPaginatedWithCache(
@@ -22,6 +23,7 @@ export async function loadRegionMarketTypes(regionId: number): Promise<ReadonlyS
     { staleAfterMs: STALE_AFTER.default }
   );
   if (!cached || cached.truncated) return null;
+  if (Date.now() - cached.fetchedAt.getTime() > STALE_AFTER.default) return null;
   return new Set(cached.data);
 }
 

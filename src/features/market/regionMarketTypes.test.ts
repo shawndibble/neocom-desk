@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
@@ -12,6 +12,8 @@ const server = mswServer();
 beforeEach(async () => {
   await db.esiCache.clear();
 });
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('loadRegionMarketTypes', () => {
   it('collects every page of the region type list into one set', async () => {
@@ -60,6 +62,25 @@ describe('loadRegionMarketTypes', () => {
         if (page === '2') return HttpResponse.json({ error: 'down' }, { status: 503 });
         return HttpResponse.json([34], { headers: { 'X-Pages': '2' } });
       })
+    );
+
+    expect(await loadRegionMarketTypes(REGION_ID)).toBeNull();
+  });
+
+  it('is null when a refresh fails and only an out-of-window copy is saved', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${REGION_ID}/types`, () => HttpResponse.json([34]))
+    );
+    await loadRegionMarketTypes(REGION_ID);
+
+    // Eleven minutes on, past ESI's 600s window: a type listed since would
+    // read as "no orders" from the old copy, so nothing is claimed.
+    const later = Date.now() + 11 * 60_000;
+    vi.spyOn(Date, 'now').mockReturnValue(later);
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${REGION_ID}/types`, () =>
+        HttpResponse.json({ error: 'down' }, { status: 503 })
+      )
     );
 
     expect(await loadRegionMarketTypes(REGION_ID)).toBeNull();
