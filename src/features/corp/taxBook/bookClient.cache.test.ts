@@ -108,6 +108,29 @@ describe('readBookData over the version marker', () => {
     expect(again?.feeders?.[0]?.payouts).toEqual([{ amount: 1, id: 'p1' }]);
   });
 
+  it('reads disputes only once a write stamped them, then from the copy (#6206)', async () => {
+    const before = await readBookData(7, CORP);
+    expect(store.reads).not.toContain(`${BOOK}/disputes`);
+    expect(before?.disputes).toEqual([]);
+    clearBookCache();
+    store.reads.length = 0;
+    store.docs.set(BOOK, stamped({ disputes: 'disputes-1' }));
+    store.docs.set(`${BOOK}/disputes/d1`, {
+      id: 'd1',
+      minerId: 'm1',
+      date: '2026-10-02',
+      lines: [{ recordKey: '1:1000:2026-10-02', typeId: 1, quantity: 5, payeeName: 'P' }],
+      by: 1,
+      at: '2026-10-03T00:00:00.000Z',
+    });
+    const after = await readBookData(7, CORP);
+    expect(store.reads).toContain(`${BOOK}/disputes`);
+    expect(after?.disputes?.map((d) => d.id)).toEqual(['d1']);
+    store.reads.length = 0;
+    await readBookData(7, CORP);
+    expect(store.reads).not.toContain(`${BOOK}/disputes`);
+  });
+
   it('after a reload, serves the Dexie copy of an unchanged stamp with no collection read', async () => {
     store.docs.set(`${BOOK}/observed/o1`, {
       date: '2026-10-02',

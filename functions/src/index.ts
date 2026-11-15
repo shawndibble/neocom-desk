@@ -81,6 +81,8 @@ import {
 import {
   parseBookCall,
   parseClaimPaymentInput,
+  parseDeclareOwnInput,
+  parseDisputeConflictInput,
   parseConfirmGroupingInput,
   parseDeclineByTokenInput,
   parseEditAction,
@@ -181,6 +183,8 @@ import { esiSyncReader } from './corpTaxBookSyncEsi.js';
 import { verifyAllMinerTotals } from './corpTaxBookMinerTotalsStore.js';
 import {
   claimPayment,
+  declareOwnPayment,
+  disputeConflict,
   confirmGrouping,
   declineGrouping,
   declineGroupingByToken,
@@ -1435,6 +1439,15 @@ corpTaxBookAction('claimCorpTaxBookPaymentCallable', (request) => {
   const { corporationId, paymentId } = parseClaimPaymentInput(request.data);
   return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId);
 });
+
+// A Miner's own "I paid this another way" and Conflict dispute (#6206): uid-authorised, no officer role.
+corpTaxBookAction('declareCorpTaxBookPaymentCallable', (request) =>
+  declareOwnPayment(corpTaxBookDeps(), callerOf(request), parseDeclareOwnInput(request.data))
+);
+
+corpTaxBookAction('disputeCorpTaxBookConflictCallable', (request) =>
+  disputeConflict(corpTaxBookDeps(), callerOf(request), parseDisputeConflictInput(request.data))
+);
 
 corpTaxBookAction('confirmCorpTaxBookGroupingCallable', (request) => {
   const { corporationId, minerId } = parseConfirmGroupingInput(request.data);

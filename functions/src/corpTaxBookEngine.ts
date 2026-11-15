@@ -403,7 +403,6 @@ export function dismissalCredits(input: {
 // on `now`, so a running total can store it.
 
 const DECLARATION_PAUSE_DAYS = 14;
-const REJECTION_GRACE_DAYS = 14;
 
 export interface MirrorDeclaration {
   at: string;
@@ -431,13 +430,8 @@ export function overdueAtFor(
     if (end > start) paused += end - start;
     cursor = Math.max(cursor, w.end);
   }
-  let overdueAt = Date.parse(issuedAt) + overdueDays * DAY_MS + paused;
-  for (const d of declarations) {
-    if (d.resolution?.kind === 'rejected') {
-      overdueAt = Math.max(overdueAt, Date.parse(d.resolution.at) + REJECTION_GRACE_DAYS * DAY_MS);
-    }
-  }
-  return new Date(overdueAt).toISOString();
+  // A rejection resumes the original clock: no fresh days (#6206).
+  return new Date(Date.parse(issuedAt) + overdueDays * DAY_MS + paused).toISOString();
 }
 
 // --- Guest close-account (issue #4184) ---------------------------------------

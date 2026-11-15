@@ -19,7 +19,8 @@ import {
 } from 'firebase/firestore/lite';
 import { db as localDb } from '@/db';
 import { DEFAULT_GRACE_HOURS } from '@/engine/corpTaxBook/billable';
-import { DEFAULT_OVERDUE_DAYS } from '@/engine/corpTaxBook/overdue';
+import { DEFAULT_OVERDUE_DAYS, type Declaration } from '@/engine/corpTaxBook/overdue';
+import { readDisputes, type OreDispute } from '@/engine/corpTaxBook/disputes';
 import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
@@ -91,6 +92,10 @@ export interface LoadedCorpBook {
   adjustments?: Adjustment[];
   /** The tracked Characters' own officer write-offs (#4637). */
   writeOffs?: RecordedWriteOff[];
+  /** Declarations on their own Statements (#6206); absent before the rules let members read them. */
+  declarations?: Declaration[];
+  /** Their own Conflict disputes (#6206). */
+  disputes?: OreDispute[];
   /** Refinery names, where a Statement or ESI gave one (#4622). */
   structureNames?: Record<number, string>;
 }
@@ -232,6 +237,38 @@ export function readDismissal(id: string, d: Data): Dismissal | null {
     at,
     reason: str(d.reason) ?? '',
     ...(reversed ? { reversed: { by: num(reversed.by) ?? 0, at: str(reversed.at) ?? at } } : {}),
+  };
+}
+
+const DECLARATION_KINDS: readonly Declaration['kind'][] = [
+  'contract',
+  'other-division',
+  'wrong-corp',
+  'another-way',
+];
+
+/** A declaration on one of the member's own Statements (#6206). */
+export function readMemberDeclaration(id: string, d: Data): Declaration | null {
+  const statementId = str(d.statementId);
+  const kind = str(d.kind) as Declaration['kind'] | undefined;
+  const at = str(d.at);
+  if (!statementId || !at || !kind || !DECLARATION_KINDS.includes(kind)) return null;
+  const amount = num(d.amount);
+  const note = str(d.note);
+  const r = d.resolution as Data | undefined | null;
+  const rKind = str(r?.kind);
+  const rAt = str(r?.at);
+  const reason = str(r?.reason);
+  return {
+    id,
+    statementId,
+    kind,
+    at,
+    ...(amount !== undefined ? { amount } : {}),
+    ...(note !== undefined ? { note } : {}),
+    ...((rKind === 'confirmed' || rKind === 'rejected') && rAt
+      ? { resolution: { kind: rKind, at: rAt, ...(reason !== undefined ? { reason } : {}) } }
+      : {}),
   };
 }
 
@@ -501,6 +538,7 @@ async function readOneBook(
     return null;
   }
   const versions = bookVersionsOf(bookDoc);
+  const written = (name: string) => versions === null || versions.collections[name] !== undefined;
   const bookCreatedAt = typeof bookDoc?.createdAt === 'number' ? bookDoc.createdAt : undefined;
 
   const rows: ObservedRow[] = [];
@@ -512,6 +550,8 @@ async function readOneBook(
   const miners: Miner[][] = [];
   const adjustments: Adjustment[][] = [];
   const writeOffs: RecordedWriteOff[][] = [];
+  const declarations: Declaration[][] = [];
+  const disputes: OreDispute[][] = [];
   let feeders: MemberFeederCoverage[] | null = null;
   for (const characterId of characterIds) {
     const uid = await ensureSignedIn(characterId);
@@ -555,6 +595,8 @@ async function readOneBook(
       adjustmentDocs,
       writeOffDocs,
       coverageDocs,
+      declarationDocs,
+      disputeDocs,
     ] = await Promise.all([
       readMemberObserved({
         db: memberFs,
@@ -572,7 +614,14 @@ async function readOneBook(
       orNone(part('adjustments', 'uids')),
       orNone(part('writeOffs', 'uids')),
       coverageRead,
+      // #6206. A collection no write ever stamped holds nothing: no read.
+      written('declarations') ? orNone(part('declarations', 'uids')) : Promise.resolve(null),
+      written('disputes') ? orNone(part('disputes', 'uids')) : Promise.resolve(null),
     ]);
+    declarations.push(
+      declarationDocs?.flatMap((d) => readMemberDeclaration(d.id, d.data) ?? []) ?? []
+    );
+    disputes.push(readDisputes(disputeDocs?.map((d) => ({ id: d.id, ...d.data })) ?? []));
     adjustments.push(adjustmentDocs?.flatMap((d) => readAdjustment(d.id, d.data) ?? []) ?? []);
     writeOffs.push(writeOffDocs?.flatMap((d) => readWriteOff(d.id, d.data) ?? []) ?? []);
     if (coverageDocs) {
@@ -601,6 +650,8 @@ async function readOneBook(
     ...(feeders ? { feeders } : {}),
     adjustments: mergeById(adjustments),
     writeOffs: mergeById(writeOffs),
+    declarations: mergeById(declarations),
+    disputes: mergeById(disputes),
     structureNames,
     payments: mergeById([payments]),
     held,
@@ -636,6 +687,43 @@ export async function claimCorpTaxBookPayment(
     return callRouted<{ corporationId: number; paymentId: string }, { minerId: string }>(
       'claimCorpTaxBookPaymentCallable',
       { corporationId, paymentId },
+      characterId
+    );
+  });
+}
+
+/**
+ * A Miner's own "I paid this another way" on one of their Statements (#6206), with an optional
+ * amount and note. It pauses Overdue until an officer confirms or rejects it.
+ */
+export async function declareCorpTaxBookPayment(
+  characterId: number,
+  input: { corporationId: number; statementId: string; amount?: number; note?: string }
+): Promise<{ declarationId: string }> {
+  return underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return callRouted<typeof input, { declarationId: string }>(
+      'declareCorpTaxBookPaymentCallable',
+      input,
+      characterId
+    );
+  });
+}
+
+/** A Miner tells the book a Conflict day's ore went to another Payee (#6206). */
+export async function disputeCorpTaxBookConflict(
+  characterId: number,
+  input: {
+    corporationId: number;
+    date: string;
+    lines: { recordKey: string; typeId: number; quantity: number; payeeName: string }[];
+  }
+): Promise<{ disputeId: string }> {
+  return underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return callRouted<typeof input, { disputeId: string }>(
+      'disputeCorpTaxBookConflictCallable',
+      input,
       characterId
     );
   });

@@ -126,6 +126,7 @@ export const CORP_COLLECTION_FAQ_ITEM = {
   feederCoverage: 'corpTaxBook',
   extractions: 'corpTaxBook',
   declarations: 'corpTaxBook',
+  disputes: 'corpTaxBook',
   rebills: 'corpTaxBook',
   meta: 'corpTaxBook',
   audit: 'corpTaxBook',

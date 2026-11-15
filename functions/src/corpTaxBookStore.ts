@@ -32,6 +32,10 @@ import {
   BOOKS_COLLECTION,
   DECLARATIONS,
   DISMISSALS,
+  DISPUTES,
+  disputeIdFor,
+  type DeclareOwnInput,
+  type DisputeConflictInput,
   EXTRACTIONS,
   FEEDER_INVITES_COLLECTION,
   BILLED_BY_COLLECTION,
@@ -1508,7 +1512,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       return { detail: { statementIds: fresh }, result: { settled: fresh } };
     }
     case 'declare': {
-      await mustGet(c, col(c, STATEMENTS).doc(action.statementId), 'Statement');
+      const statement = await mustGet(c, col(c, STATEMENTS).doc(action.statementId), 'Statement');
       const id = `x${now}_${rand(4)}`;
       tx.create(col(c, DECLARATIONS).doc(id), {
         id,
@@ -1516,6 +1520,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         kind: action.kind,
         at: iso,
         recordedBy: by,
+        // The Miner reads their own declarations (#6206), as they read the Statement.
+        minerId: statement.minerId,
+        uids: statement.uids ?? [],
         ...(action.note ? { note: action.note } : {}),
       });
       return {
@@ -1543,6 +1550,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           ...(action.reason ? { reason: action.reason } : {}),
         },
       };
+    }
+    case 'rejectDispute': {
+      const ref = col(c, DISPUTES).doc(action.disputeId);
+      const dispute = await mustGet(c, ref, 'Dispute');
+      if (dispute.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
+      tx.update(ref, { resolution: { kind: 'rejected', at: iso, by, reason: action.reason } });
+      return { detail: { disputeId: action.disputeId, reason: action.reason } };
     }
     case 'recordReminder': {
       const ref = col(c, STATEMENTS).doc(action.statementId);
@@ -2025,13 +2039,9 @@ async function claimPaymentTx(
     // #6207: held because the player's Miner owed nothing (a buyback, say): an officer decides.
     if (payment.reviewReason !== undefined)
       fail('failed-precondition', 'An officer reviews this payment', 'in-review');
-    const grouped = await tx.get(
-      sub(deps.db, corporationId, MINERS).where('characterIds', 'array-contains', characterId)
-    );
-    // A guest's character stays unlinked until they confirm (D26b): only a Miner that lists
-    // this character in its readable `uids` counts.
-    const miner = grouped.docs.find((d) => (d.get('uids') as string[]).includes(caller.uid));
-    const minerId = miner ? miner.id : `solo:${characterId}`;
+    // A guest's character stays unlinked until they confirm (D26b): `callerMiner` counts only a
+    // Miner that lists this character in its readable `uids`.
+    const { minerId } = await callerMiner(tx, deps, corporationId, caller, characterId);
     tx.update(paymentRef, {
       minerId,
       claimedBy: characterId,
@@ -2046,6 +2056,151 @@ async function claimPaymentTx(
       { paymentId, minerId }
     );
     return { minerId };
+  });
+}
+
+/**
+ * The book a member writes to (#6206): it must exist, be on, and be past its setup
+ * window, as the member read path shows it. Read inside the transaction.
+ */
+async function memberBook(tx: Transaction, deps: BookDeps, corporationId: number): Promise<void> {
+  const book = await tx.get(bookRef(deps.db, corporationId));
+  if (!book.exists || book.get('active') !== true)
+    fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
+  const seeFrom = book.get('membersSeeFrom') as unknown;
+  if (typeof seeFrom === 'number' && deps.now() < seeFrom)
+    fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
+}
+
+/**
+ * The Miner the caller's character belongs to, as `claimPayment` finds it: a grouping that lists
+ * the caller's sign-in in its `uids` (a guest's unconfirmed character does not count), else a Miner
+ * of its own. `uids` are that Miner's confirmed sign-ins.
+ */
+async function callerMiner(
+  tx: Transaction,
+  deps: BookDeps,
+  corporationId: number,
+  caller: Caller,
+  characterId: number
+): Promise<{ minerId: string; uids: string[] }> {
+  const grouped = await tx.get(
+    sub(deps.db, corporationId, MINERS).where('characterIds', 'array-contains', characterId)
+  );
+  const miner = grouped.docs.find((d) => (d.get('uids') as string[]).includes(caller.uid));
+  return miner
+    ? { minerId: miner.id, uids: miner.get('uids') as string[] }
+    : { minerId: `solo:${characterId}`, uids: [caller.uid] };
+}
+
+/**
+ * A Miner's own "I paid this another way" (#6206): a declaration on one of their own
+ * unsettled Statements, with an optional amount and note. No officer role: the caller's
+ * sign-in must be one the Statement lists (`uids`, the same proof the rules give the member
+ * read), and the answer for someone else's Statement is the same as for a missing one. It
+ * pauses the Overdue clock like an officer-recorded declaration, until an officer answers.
+ */
+export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: DeclareOwnInput) {
+  const characterId = signedInCharacter(caller);
+  const { corporationId, statementId } = input;
+  const declared = await deps.db.runTransaction(async (tx) => {
+    await memberBook(tx, deps, corporationId);
+    const statementSnap = await tx.get(sub(deps.db, corporationId, STATEMENTS).doc(statementId));
+    const statement = statementSnap.data();
+    if (!statement || !((statement.uids as string[] | undefined) ?? []).includes(caller.uid))
+      fail('not-found', 'Statement not found', 'not-found');
+    const paid = (await tx.get(sub(deps.db, corporationId, META).doc(PAID_DOC))).data();
+    if (((paid?.ids as string[] | undefined) ?? []).includes(statementId))
+      fail('failed-precondition', 'This Statement is settled', 'settled');
+    const open = await tx.get(
+      sub(deps.db, corporationId, DECLARATIONS).where('statementId', '==', statementId)
+    );
+    if (open.docs.some((d) => d.get('resolution') === undefined))
+      fail('already-exists', 'A declaration is already waiting', 'already-declared');
+    const now = deps.now();
+    const id = `x${now}_${rand(4)}`;
+    tx.create(sub(deps.db, corporationId, DECLARATIONS).doc(id), {
+      id,
+      statementId,
+      kind: 'another-way',
+      at: new Date(now).toISOString(),
+      recordedBy: characterId,
+      via: 'player',
+      minerId: statement.minerId,
+      uids: statement.uids,
+      ...(input.amount !== undefined ? { amount: input.amount } : {}),
+      ...(input.note !== undefined ? { note: input.note } : {}),
+    });
+    appendAudit(
+      tx,
+      deps,
+      corporationId,
+      { characterId, name: 'Player declaration', via: 'player-claim' },
+      'declare',
+      {
+        declarationId: id,
+        statementId,
+        kind: 'another-way',
+        ...(input.amount !== undefined ? { amount: input.amount } : {}),
+      }
+    );
+    return { declarationId: id, minerId: statement.minerId as string };
+  });
+  await refreshAfterEvent(deps.db, corporationId, [declared.minerId]);
+  await refreshReadModels(deps.db, corporationId, deps.now());
+  return { declarationId: declared.declarationId };
+}
+
+/**
+ * A Miner flags a Conflict day to the book (#6206): "I gave this ore to {payee}". One record
+ * per Miner and day; a second flag for the same day adds its lines. Every line's character
+ * must be one of the caller's own Miner's confirmed characters. A day an officer already
+ * rejected cannot be flagged again. Officers answer in Needs you: dismiss the day, or reject.
+ */
+export async function disputeConflict(deps: BookDeps, caller: Caller, input: DisputeConflictInput) {
+  const characterId = signedInCharacter(caller);
+  const { corporationId, date } = input;
+  return deps.db.runTransaction(async (tx) => {
+    await memberBook(tx, deps, corporationId);
+    const { minerId, uids } = await callerMiner(tx, deps, corporationId, caller, characterId);
+    for (const line of input.lines) {
+      if (!uids.includes(`char:${parseRecordKey(line.recordKey).characterId}`))
+        fail('permission-denied', 'Not your ore', 'not-your-record');
+    }
+    const disputeId = disputeIdFor(minerId, date);
+    const ref = sub(deps.db, corporationId, DISPUTES).doc(disputeId);
+    const held = (await tx.get(ref)).data();
+    if (held?.resolution) fail('failed-precondition', 'An officer answered this day', 'rejected');
+    const iso = new Date(deps.now()).toISOString();
+    if (held) {
+      tx.update(ref, {
+        lines: FieldValue.arrayUnion(...input.lines),
+        uids,
+        updatedAt: iso,
+        ...(input.note !== undefined ? { note: input.note } : {}),
+      });
+    } else {
+      tx.create(ref, {
+        id: disputeId,
+        minerId,
+        date,
+        lines: input.lines,
+        by: characterId,
+        at: iso,
+        updatedAt: iso,
+        uids,
+        ...(input.note !== undefined ? { note: input.note } : {}),
+      });
+    }
+    appendAudit(
+      tx,
+      deps,
+      corporationId,
+      { characterId, name: 'Player dispute', via: 'player-claim' },
+      'disputeConflict',
+      { disputeId, minerId, date, lines: input.lines.length }
+    );
+    return { disputeId };
   });
 }
 
