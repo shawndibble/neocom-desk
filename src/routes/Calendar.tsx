@@ -17,7 +17,7 @@ import * as Icon from '@/components/ui/icons';
 import { loadCalendarBoard } from '@/features/character/calendarBoardData';
 import { EventDetailModal } from '@/features/character/EventDetailModal';
 import { skyhookRaidDetail } from '@/features/character/skyhookRaidDetail';
-import { sharedPopDetail } from '@/features/character/calendarSharedPops';
+import { sharedPopDetail } from '@/features/character/sharedPopDetail';
 import { useSharedPopParam } from '@/features/character/sharedPopLink';
 import { RowDetailModal } from '@/features/overview/widgets/RowDetailModal';
 import { CalendarMap } from '@/features/character/CalendarMap';

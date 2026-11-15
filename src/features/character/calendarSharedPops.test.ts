@@ -3,12 +3,8 @@ import { buildCharacterBoard } from '@/engine/character/board';
 import { filterByCorporation, filterBySharingCorporation } from '@/engine/character/deadlines';
 import { parseStartLink } from '@/features/survey/startLink';
 import type { SharedPopView } from '@/sync/sharedPops';
-import {
-  sharedPopDetail,
-  sharedPopStartLink,
-  toSharedPopSources,
-  type SharedPopEntry,
-} from './calendarSharedPops';
+import { toSharedPopSources, type SharedPopEntry } from './calendarSharedPops';
+import { sharedPopDetail, sharedPopStartLink } from './sharedPopDetail';
 
 const HOUR = 3_600_000;
 const NOW = Date.parse('2026-11-15T12:00:00Z');

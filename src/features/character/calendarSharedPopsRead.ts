@@ -7,7 +7,7 @@ import type { BoardCorporation } from '@/engine/character/board';
 import { loadCorpLabels } from '@/features/corp/corpTicker';
 import { registerTestReset } from '@/lib/testResets';
 import { MINUTE_MS } from '@/lib/age';
-import { fetchSharedPops, type SharedPopView } from '@/sync/sharedPops';
+import type { SharedPopView } from '@/sync/sharedPops';
 import { loadMoonNames } from './moonNames';
 import { loadTypeNames } from './typeNames';
 import type { SharedPopEntry } from './calendarSharedPops';
@@ -23,7 +23,8 @@ registerTestReset(() => {
 /** The viewer's Shared Pops, read at most once per `SHARED_POPS_TTL_MS`; a failed read is not kept. */
 function readSharedPops(nowMs: number): Promise<SharedPopView[]> {
   if (held !== null && nowMs - held.atMs < SHARED_POPS_TTL_MS) return held.pops;
-  const pops = fetchSharedPops();
+  // Lazy: the sync seam pulls in Firebase, which the boot graph must not reach (bootImportGraph.test).
+  const pops = import('@/sync/sharedPops').then(({ fetchSharedPops }) => fetchSharedPops());
   const entry = { atMs: nowMs, pops };
   held = entry;
   pops.catch(() => {
