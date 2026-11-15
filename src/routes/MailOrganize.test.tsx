@@ -1,22 +1,20 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import '@/i18n';
 import { db } from '@/db';
-import { App } from '@/app/App';
-import { CHAR_ID, headers, mailLabels, server, installMailHarness } from '@/test/mailPage';
+import {
+  CHAR_ID,
+  headers,
+  mailLabels,
+  server,
+  installMailHarness,
+  renderMailRoute,
+} from '@/test/mailPage';
 
 vi.mock('@/features/character/mailEditor/RichMailBodyEditor', async () => ({
   default: (await import('@/features/character/PlainBodyEditor.testHelper')).PlainBodyEditor,
-}));
-
-vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: () => ({
-    needRefresh: [false, vi.fn()],
-    offlineReady: [false, vi.fn()],
-    updateServiceWorker: vi.fn(),
-  }),
 }));
 
 vi.mock('@/sde/loadSde', () => ({
@@ -50,7 +48,7 @@ describe('Mail organize', () => {
   it('marks a read mail unread from its row menu, on ESI and in the list', async () => {
     const { puts } = trackWrites();
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Market report');
 
     await user.click(await screen.findByRole('button', { name: 'More actions for Market report' }));
@@ -65,7 +63,7 @@ describe('Mail organize', () => {
   it('asks before deleting, and deletes on ESI and from the list', async () => {
     const { deletes } = trackWrites();
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Market report');
 
     await user.click(await screen.findByRole('button', { name: 'More actions for Market report' }));
@@ -83,7 +81,7 @@ describe('Mail organize', () => {
   it('deletes nothing when the confirm is cancelled', async () => {
     const { deletes } = trackWrites();
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Market report');
 
     await user.click(await screen.findByRole('button', { name: 'More actions for Market report' }));
@@ -97,7 +95,7 @@ describe('Mail organize', () => {
   it('keeps the mail and says so when the delete fails', async () => {
     server.use(http.delete(`${MAIL}/:mailId/`, () => new HttpResponse(null, { status: 500 })));
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Market report');
 
     await user.click(await screen.findByRole('button', { name: 'More actions for Market report' }));
@@ -111,7 +109,7 @@ describe('Mail organize', () => {
   it('Select mode: marks only the mail that would change, then deletes the selection once', async () => {
     const { puts, deletes } = trackWrites();
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Market report');
 
     await user.click(await screen.findByRole('button', { name: 'Select' }));
@@ -140,7 +138,7 @@ describe('Mail organize', () => {
 
   it('shows no Select button and no row menu without the Mail organize Permission', async () => {
     await db.tokens.update(CHAR_ID, { scopes: ['esi-mail.read_mail.v1'] });
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Market report');
 
     expect(screen.queryByRole('button', { name: 'Select' })).not.toBeInTheDocument();
@@ -168,7 +166,7 @@ describe('Mail organize', () => {
         })
       )
     );
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Market report');
 
     const fleet = screen.getByText('Fleet up!').closest('li') as HTMLElement;
@@ -183,7 +181,7 @@ describe('Mail organize', () => {
   it('moves the folder chip counts at once, not only on the next load', async () => {
     trackWrites();
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     expect(await screen.findByRole('button', { name: /Corp.*2 unread/ })).toBeInTheDocument();
 
@@ -201,7 +199,7 @@ describe('Mail organize', () => {
   it('writes read again when a mail marked unread this session is opened', async () => {
     const { puts } = trackWrites();
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Market report');
 
     await user.click(await screen.findByRole('button', { name: 'More actions for Market report' }));
@@ -223,7 +221,7 @@ describe('Mail organize', () => {
   it('acts only on ticked mail the list still shows', async () => {
     const { deletes } = trackWrites();
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Market report');
 
     await user.click(await screen.findByRole('button', { name: 'Select' }));
@@ -244,7 +242,7 @@ describe('Mail organize', () => {
       http.delete(`${MAIL}/2/`, () => new HttpResponse(null, { status: 204 }))
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Market report');
 
     await user.click(await screen.findByRole('button', { name: 'Select' }));
@@ -273,7 +271,7 @@ describe('Mail organize', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await user.click(await screen.findByText('Fleet up!'));
     // Opening marks it read; its label shows on the row and in the reader.
     await waitFor(() => expect(puts).toEqual([{ id: '1', body: { read: true } }]));
