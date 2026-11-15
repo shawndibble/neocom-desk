@@ -387,16 +387,20 @@ shape has to be carried into them by hand.
   `Button size="sm"` beside it. `StatChip` and `DataAgeBadge` are the
   deliberate exception at a flat `h-7`: readouts, not targets, so they keep
   a control's height (to sit level beside one) without its box.
-- **One size per row, and e2e measures it.** Every boxed control on one line
-  of a flex row — `Button`, a `Link` with `buttonClassName`, `IconButton`,
+- **One size per row, checked in source and measured in e2e.** Every boxed
+  control on one line of a flex row — `Button`, a `Link` with `buttonClassName`, `IconButton`,
   `SearchInput`, `TextInput`, `Select`, `SegmentedControl` — renders at the
   same height, at desktop and phone width. Pick the row's size from its
   fixed member: `SearchInput` is always `md`, so a row with a search box is an
   `md` row, and `FilterChip`'s `sm` default needs `size="md"` beside it.
-  `e2e/inlineControlHeights.spec.ts` checks every route and tab, and
-  `e2e/support/controlHeights.ts`'s `expectInlineControlsAligned` is there for a
-  surface the route sweep can't reach (a dialog, a seeded backend — see
-  `communitiesControlHeights.dev.spec.ts`). A mismatch you mean opts out with
+  `src/components/ui/inlineControlSizes.test.ts` reads every flex row's
+  `src/components/ui` controls in source and fails on mixed `size`s (an
+  omitted `size` counts as the control's default);
+  `e2e/inlineControlHeights.spec.ts` measures a sample of mixed toolbars in
+  the browser, for what source can't show (a `Link` with `buttonClassName`, a
+  row a component lays out), and `e2e/support/controlHeights.ts`'s
+  `expectInlineControlsAligned` is there for a surface neither reaches (a
+  dialog, a seeded backend — see `communitiesControlHeights.dev.spec.ts`). A mismatch you mean opts out with
   `data-inline-height="exempt"` and a comment saying why. `SegmentedControl`'s
   border is inside its height, so it sits level with a `Button` of its size.
 - A control that would otherwise get `md` for its own sake (a primary

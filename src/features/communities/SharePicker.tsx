@@ -160,12 +160,8 @@ export function SharePicker({
           aria-label={t('communities.share.search')}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <Button size="sm" onClick={() => onChange(selectAll(owned))}>
-          {t('communities.share.all')}
-        </Button>
-        <Button size="sm" onClick={() => onChange(new Set())}>
-          {t('communities.share.none')}
-        </Button>
+        <Button onClick={() => onChange(selectAll(owned))}>{t('communities.share.all')}</Button>
+        <Button onClick={() => onChange(new Set())}>{t('communities.share.none')}</Button>
       </div>
       <p role="status" className="text-xs text-text-dim">
         {t('communities.share.count', { count, total: owned.length })}

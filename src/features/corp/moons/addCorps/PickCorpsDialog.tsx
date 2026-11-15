@@ -50,9 +50,7 @@ export function PickCorpsDialog({
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
           {hiddenCount > 0 ? (
-            <Button size="sm" onClick={onOpenHidden}>
-              {t(k('hiddenButton'), { count: hiddenCount })}
-            </Button>
+            <Button onClick={onOpenHidden}>{t(k('hiddenButton'), { count: hiddenCount })}</Button>
           ) : (
             <span />
           )}

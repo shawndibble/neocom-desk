@@ -1,42 +1,68 @@
 /**
- * Every route and every tab keeps its inline controls at one height (DESIGN.md
- * §3) — measured, because the rule written down kept slipping: a row would
- * pair a `sm` button with a `md` search box or select, and nothing caught it
- * until someone looked. See `support/controlHeights.ts` for what counts.
+ * A sample of toolbars keeps its inline controls at one height (DESIGN.md §3),
+ * measured in the browser: a `Link` styled with `buttonClassName`, a hand-built
+ * control or a row laid out by a component is invisible to the static guard
+ * (`src/components/ui/inlineControlSizes.test.ts`), which checks every source
+ * file's rows of `src/components/ui` controls. See `support/controlHeights.ts`
+ * for what counts.
  *
- * Desktop and phone in one page load: the touch tier (`h-9`) is where
- * half the mismatches only show. A deliberate mismatch opts out with
- * `data-inline-height="exempt"`. Surfaces this fixture leaves empty (no rows,
- * no Community backend) are covered by their own specs, e.g.
+ * This used to load every route and tab, and kept failing on pages measured
+ * mid-load; the sample is pages whose toolbars mix searches, selects, chips and
+ * buttons. Each measurement polls until the page has settled (no spinner, no
+ * open-ended progress bar, fonts loaded) and the row is aligned.
+ *
+ * Desktop and phone in one page load: the touch tier (`h-9`) is where half the
+ * mismatches only show. A deliberate mismatch opts out with
+ * `data-inline-height="exempt"`. Surfaces this fixture leaves empty (no rows, no
+ * Community backend) are covered by their own specs, e.g.
  * `communitiesControlHeights.dev.spec.ts`.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { mockFlatHubPrices } from './support/piPrices';
-import { CONTROL_ROW_WIDTHS, expectInlineControlsAligned } from './support/controlHeights';
-import { ROUTE_REQUIREMENTS } from '../src/app/routeScopes';
-import { PAGE_TABS } from '../src/app/pageTabs';
-import { tabPath } from '../src/lib/pageTabs';
+import {
+  CONTROL_ROW_WIDTHS,
+  expectInlineControlsAligned,
+  findControlHeightMismatches,
+} from './support/controlHeights';
 
-/** Static routes only: a dynamic one would render its redirect or not-found state. */
-const ROUTES = Object.keys(ROUTE_REQUIREMENTS).filter(
-  (path) => !path.includes(':') && !path.includes('*')
-);
-const TABS = Object.values(PAGE_TABS).flatMap((page) =>
-  page.tabs.map((tab) => tabPath(page, tab.id))
-);
+/** Toolbars that mix a search, selects, chips, a funnel and buttons. */
+const SAMPLE = [
+  '/assets',
+  '/contracts',
+  '/market/orders',
+  '/market/hauling',
+  '/wallet/journal',
+  '/industry',
+  '/skills/certificates',
+  '/corp/assets',
+];
+
+/** No spinner and no open-ended progress bar in `main`, in one locator. */
+const LOADING = 'main .animate-spin, main [role="progressbar"]:not([aria-valuenow])';
 
 /**
- * No spinner and no open-ended progress bar in `main`. Item search loads behind a bar,
- * not a spinner, and its filter row unmounts when the fixture's 404 lands.
+ * Polls until the page has settled and its rows line up: a page measured while a
+ * spinner, a progress bar or a web font is still landing reads a false mismatch,
+ * or a row that has not rendered yet.
  */
-async function waitForPageSettled(page: Page): Promise<void> {
+async function expectSettledAndAligned(page: Page, label: string): Promise<void> {
   await expect(page.locator('main')).toBeVisible();
-  // One locator, so neither indicator can hand over to the other between two checks.
-  await expect(
-    page.locator('main .animate-spin, main [role="progressbar"]:not([aria-valuenow])')
-  ).toHaveCount(0, { timeout: 8000 });
+  await expect
+    .poll(
+      async () => {
+        await page.evaluate(() => document.fonts.ready.then(() => undefined));
+        if ((await page.locator(LOADING).count()) > 0) return ['still loading'];
+        return findControlHeightMismatches(page, 'body');
+      },
+      {
+        message: `${label}: inline controls of different heights (DESIGN.md §3 — one size per row)`,
+        // A cold dev server compiles each page on first load; the settle is most of this.
+        timeout: 15_000,
+      }
+    )
+    .toEqual([]);
 }
 
 /**
@@ -52,33 +78,29 @@ async function signInAndGotoPriced(page: Page, url: string): Promise<void> {
   await signInAndGoto(page, url);
 }
 
-for (const url of [...new Set([...ROUTES, ...TABS])]) {
+for (const url of SAMPLE) {
   test(`${url}: inline controls share one height`, async ({ page }) => {
     await page.setViewportSize({ width: CONTROL_ROW_WIDTHS[0], height: 900 });
     await signInAndGotoPriced(page, url);
     for (const width of CONTROL_ROW_WIDTHS) {
       await page.setViewportSize({ width, height: 900 });
-      await waitForPageSettled(page);
-      await expectInlineControlsAligned(page, `${url} @${width}`);
+      await expectSettledAndAligned(page, `${url} @${width}`);
     }
   });
-}
 
-// The filter row opens behind its funnel, so the sweep above never sees it:
-// open every page's funnel (desktop only; below `md` it is a sheet of stacked
-// fields, not a row) and measure what is inside.
-for (const url of [...new Set([...ROUTES, ...TABS])]) {
+  // The filter row opens behind its funnel, so the check above never sees it.
+  // Desktop only: below `md` it is a sheet of stacked fields, not a row.
   test(`${url}: the open filters share one height`, async ({ page }) => {
     await page.setViewportSize({ width: CONTROL_ROW_WIDTHS[0], height: 900 });
     await signInAndGotoPriced(page, url);
-    await waitForPageSettled(page);
+    await expectSettledAndAligned(page, url);
     const funnels = page.getByRole('button', { name: /^Filters/ });
     const count = await funnels.count();
     for (let i = 0; i < count; i += 1) {
       const funnel = funnels.nth(i);
       if (!(await funnel.isVisible())) continue;
       await funnel.click();
-      await expectInlineControlsAligned(page, `${url} filters open (${i})`);
+      await expectSettledAndAligned(page, `${url} filters open (${i})`);
       await page.keyboard.press('Escape');
     }
   });

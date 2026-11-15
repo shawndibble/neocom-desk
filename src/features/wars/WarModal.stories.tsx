@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { StoredWar, WarAgainstMe } from '@/engine/wars';
 import { WarModal } from './WarModal';
 import { HOUR_MS } from '@/lib/age';
+import { seedCachedNames } from '@/features/character/names';
 
 const NOW = Date.UTC(2026, 9, 21, 12);
 
@@ -29,6 +30,19 @@ const meta = {
   title: 'wars/WarModal',
   component: WarModal,
   args: { open: true, onClose: () => undefined, wars: [active()] },
+  // The parties' names, so the story never asks ESI for them.
+  loaders: [
+    () =>
+      seedCachedNames({
+        1: 'Hired Guns',
+        2: 'Mercenary Coalition',
+        99005338: 'Pandemic Horde',
+        98000001: 'Neocom Logistics',
+        98000002: 'Red Frog Raiders',
+        98000003: 'Blood Moon Syndicate',
+        98000004: 'Quiet Haulers',
+      }),
+  ],
 } satisfies Meta<typeof WarModal>;
 
 export default meta;

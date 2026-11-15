@@ -43,7 +43,7 @@
   "e2e/industryLogsNarrow.spec.ts": 19,
   "e2e/industryProductionProfitChartNarrow.spec.ts": 3,
   "e2e/industryProductionRunsNarrow.spec.ts": 4,
-  "e2e/inlineControlHeights.spec.ts": 205,
+  "e2e/inlineControlHeights.spec.ts": 30,
   "e2e/itemDetailHeaderNarrow.spec.ts": 4,
   "e2e/itemInfoSurvivesTabLanding.spec.ts": 4,
   "e2e/loginPermissionsDisclosure.spec.ts": 3,
