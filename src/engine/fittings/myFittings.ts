@@ -54,16 +54,20 @@ export const LIBRARY_SOURCES = ['saved', 'inGame', 'shared', 'doctrine'] as cons
 export type LibrarySource = (typeof LIBRARY_SOURCES)[number];
 export type LibrarySourcePick = LibrarySource | 'all';
 
-const sourceOf = (source: string): string => (source === 'active' ? 'inGame' : source);
+/** A library row's own source: one of the filter's, or the Active Fitting's. */
+export type LibraryRowSource = LibrarySource | 'active';
+
+const sourceOf = (source: LibraryRowSource): LibrarySource =>
+  source === 'active' ? 'inGame' : source;
 
 /** The sources that have at least one row, in `LIBRARY_SOURCES` order. */
-export function librarySources(rows: readonly { source: string }[]): LibrarySource[] {
+export function librarySources(rows: readonly { source: LibraryRowSource }[]): LibrarySource[] {
   const present = new Set(rows.map((row) => sourceOf(row.source)));
   return LIBRARY_SOURCES.filter((source) => present.has(source));
 }
 
 /** Keeps the rows of the picked source; `all` keeps every row. */
-export function filterBySource<T extends { source: string }>(
+export function filterBySource<T extends { source: LibraryRowSource }>(
   rows: readonly T[],
   pick: LibrarySourcePick
 ): T[] {
