@@ -98,6 +98,7 @@ export const COMMUNITY_COLLECTION_FAQ_ITEM = {
   communities: 'membership',
   mailInviteQuota: 'mail',
   requestMailQuota: 'mail',
+  popSharingBlocks: 'membership',
 } as const satisfies Record<string, CommunityFaqItemId>;
 
 /** A line in the corporation records group. */

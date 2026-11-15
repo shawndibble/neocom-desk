@@ -104,6 +104,14 @@ import { isMissingIndex } from './indexedSweep.js';
 import { FEEDER_OBSERVED, rollupChanges, writeRollupChanges } from './corpTaxBookFeederRollup.js';
 import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
 import { POP_SHARING_DOC, applyMoonOverride, popSharingFrom } from './popSharing.js';
+import type { CorporationAllianceLookup } from './sharedPopsEsi.js';
+import {
+  refreshSharedPops,
+  sharedPopSourcesRef,
+  sharedPopsRef,
+  stampEditorUse,
+  stampFailedRoleCheck,
+} from './sharedPopsStore.js';
 import { editScope } from './corpTaxBookMinerTotals.js';
 import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
 import { pullsOfDays, refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
@@ -129,6 +137,8 @@ export interface BookDeps {
   openPrices?: OpenPricesReader;
   /** A corporation's CEO (public ESI); the removal (#4520) and payee (#4653) callables need it. */
   corporationCeo?: (corporationId: number) => Promise<number | undefined>;
+  /** The book corporation's alliance (public ESI), for Shared Pops (#6223); absent keeps the last read. */
+  corporationAlliance?: CorporationAllianceLookup;
 }
 
 type Data = Record<string, unknown>;
@@ -206,8 +216,12 @@ export async function authorizeOfficer(
         corporationId: call.corporationId,
         need: 'canView',
         denied: { message: 'No officer role in this corporation', reason: 'not-an-officer' },
-        // A failed renewal revokes the read access the old check granted.
-        onDenied: () => revokeOfficer(officerRef, held),
+        // A failed renewal revokes the read access the old check granted, and the officer stops
+        // counting for Community pop shares until their next editing use (#6223).
+        onDenied: async () => {
+          await stampFailedRoleCheck(deps.db, call.corporationId, characterId, now);
+          await revokeOfficer(officerRef, held);
+        },
       });
       access = {
         ...roles,
@@ -224,11 +238,15 @@ export async function authorizeOfficer(
     }
   }
   if (!satisfies(access, need)) {
+    if (need !== 'view' && !access.canEdit)
+      await stampFailedRoleCheck(deps.db, call.corporationId, characterId, now);
     throw new HttpsError('permission-denied', `This needs the ${need} role`, {
       reason: 'role-required',
       need,
     });
   }
+  // The Community officer rule's clock (#6223): a use of the book with an editing role.
+  if (access.canEdit) await stampEditorUse(deps.db, call.corporationId, access, now);
   return access;
 }
 
@@ -447,6 +465,11 @@ export async function deleteBook(
   await deleteBookContents(ref);
   // A scheduled sync that loaded its grant before it was dropped may still have been writing.
   await deleteBookContents(ref);
+  // Its published Shared Pops and their inputs go with it (#6223).
+  await Promise.all([
+    sharedPopsRef(deps.db, call.corporationId).delete(),
+    sharedPopSourcesRef(deps.db, call.corporationId).delete(),
+  ]);
   // Last, so a late sync has the narrowest window to write one back (can't close it).
   await deleteBilledByPointers(deps, call.corporationId);
   return { deleted: true };
@@ -655,6 +678,8 @@ export async function storeFeederExtractions(
   await refreshMoonDocs(deps.db, collectorCorporationId, touched);
   // The Overview and Extractions tabs read Extractions from the tab docs (ADR 0032).
   await refreshReadModels(deps.db, collectorCorporationId, deps.now());
+  // A moon owner's new or cancelled chunk is a Shared Pop too (#6223). Best effort.
+  await refreshSharedPops(deps, collectorCorporationId);
 }
 
 /**
@@ -762,6 +787,8 @@ export async function syncBookAs(
   // Only donations and Extractions are in the Overview and Miners tab docs (ADR 0032); rows are not. Best effort.
   if (donationsAdded > 0 || input.extractions.length > 0)
     await refreshReadModels(deps.db, input.corporationId, deps.now());
+  // Every sync republishes the book's Shared Pops (#6223). Best effort.
+  await refreshSharedPops(deps, input.corporationId);
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
 }
 
@@ -1833,8 +1860,19 @@ export async function editBookAs(
       Object.keys(action.patch.structureExpiryHours).map(Number)
     ).catch((e) => console.error('expiry restamp failed', e instanceof Error ? e.message : e));
   }
+  // Settings, a rate, an expiry or a survey change what the book's Shared Pops say (#6223).
+  if (SHARED_POP_EDITS.has(action.action)) await refreshSharedPops(deps, call.corporationId);
   return result;
 }
+
+/** Edits that change a Shared Pop: its settings, its rate, its expiry or its ore. */
+const SHARED_POP_EDITS = new Set<EditAction['action']>([
+  'setPopSharing',
+  'setPopSharingMoon',
+  'updateSettings',
+  'addRate',
+  'linkSurvey',
+]);
 
 /**
  * A guest or member confirms their own character into a Miner grouping (D26b). The only

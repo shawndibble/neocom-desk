@@ -72,6 +72,8 @@ import {
   syncStoppedFires,
   syncStoppedRecipients,
 } from './corpSyncStoppedAlert.js';
+import type { CorporationAllianceLookup } from './sharedPopsEsi.js';
+import { learnOwnRefineryNames, stampFailedRoleCheck } from './sharedPopsStore.js';
 
 export const CORP_SYNC_GRANTS_COLLECTION = 'corpTaxBookSyncGrants';
 export { SCHEDULED_SYNC_DOC };
@@ -143,6 +145,8 @@ export interface CorpSyncDeps {
   readIdentity: IdentityReader;
   /** Prices the moon owner's view, rebuilt after each ledger read (issue #4512). */
   openPrices?: OpenPricesReader;
+  /** The book corporation's alliance, for Shared Pops (#6223); absent keeps the last read. */
+  corporationAlliance?: CorporationAllianceLookup;
   /**
    * ESI for a moon owner's last ledger read before its grant is dropped (Leave, a removal
    * taking effect). Without it the feed ends on the last scheduled read.
@@ -172,6 +176,7 @@ const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
   verifyToken: deps.verify,
   readIdentity: deps.readIdentity,
   ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
+  ...(deps.corporationAlliance ? { corporationAlliance: deps.corporationAlliance } : {}),
 });
 
 function sameScopes(scopes: readonly string[]): boolean {
@@ -890,7 +895,11 @@ async function runOne(
   }
   if (identity.corporationId !== grant.corporationId) return stopGrant(deps, grant, 'left-corp');
   const roles = decideRoles(identity.roles, identity.ceoId === grant.characterId);
-  if (!roles.canEdit) return stopGrant(deps, grant, 'role-lost');
+  if (!roles.canEdit) {
+    // The holder stops counting as an officer for Community pop shares (#6223).
+    await stampFailedRoleCheck(deps.db, grant.corporationId, grant.characterId, deps.now());
+    return stopGrant(deps, grant, 'role-lost');
+  }
 
   const now = deps.now();
   const access: OfficerAccess = {
@@ -909,6 +918,10 @@ async function runOne(
     Object.entries(status?.systemIds ?? {}).map(([k, v]) => [Number(k), v])
   );
 
+  // Shared Pops name the book's own refineries; the grant carries the structures scope (#6223).
+  await learnOwnRefineryNames(bookDeps(deps), grant.corporationId, (id) =>
+    esi.structure(id, accessToken)
+  );
   const result = await runBookSync({
     deps: bookDeps(deps),
     esi,

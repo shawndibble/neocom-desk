@@ -72,6 +72,7 @@ import {
   fail,
   type Caller,
 } from './actorAuth.js';
+import { refreshSharedPops } from './sharedPopsStore.js';
 
 export interface FeederGrantDeps extends CorpSyncDeps {
   esi: SyncEsi;
@@ -87,6 +88,7 @@ export const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
   verifyToken: deps.verify,
   readIdentity: deps.readIdentity,
   ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
+  ...(deps.corporationAlliance ? { corporationAlliance: deps.corporationAlliance } : {}),
 });
 
 // --- Input -----------------------------------------------------------------
@@ -794,8 +796,11 @@ export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Prom
     return grant?.kind === 'feeder' ? grant : undefined;
   });
   if (dropped) await revokeStored(deps, dropped);
-  if (input.rebuildView !== false)
+  if (input.rebuildView !== false) {
     await tryRebuildFeederView(bookDeps(deps), collector, feederCorp);
+    // A moon owner the book no longer handles shares no pops through it (#6223).
+    await refreshSharedPops(bookDeps(deps), collector);
+  }
 }
 
 const ENDABLE: readonly FeederRecord['status'][] = ['active', 'pending-removal', 'disconnected'];

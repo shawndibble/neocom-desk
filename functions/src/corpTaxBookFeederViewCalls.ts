@@ -25,6 +25,7 @@ import {
 import { PAYOUTS } from './corpTaxBookFeederPayouts.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
 import { appendAudit, feederRef, type BookDeps } from './corpTaxBookStore.js';
+import { refreshSharedPops } from './sharedPopsStore.js';
 
 export { parseFeederCall };
 
@@ -35,6 +36,7 @@ export const feederBookDeps = (deps: CorpSyncDeps): BookDeps => ({
   verifyToken: deps.verify,
   readIdentity: deps.readIdentity,
   ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
+  ...(deps.corporationAlliance ? { corporationAlliance: deps.corporationAlliance } : {}),
 });
 
 export interface RequestFeederRateInput extends FeederCall {
@@ -229,12 +231,15 @@ export async function setFeederPopSharing(
     );
     return true;
   });
-  if (changed)
+  if (changed) {
     await tryRebuildFeederView(
       feederBookDeps(deps),
       ctx.collectorCorporationId,
       input.corporationId
     );
+    // An opt-out takes the moon owner's pops away at once; opting back in returns them (#6223).
+    await refreshSharedPops(feederBookDeps(deps), ctx.collectorCorporationId);
+  }
   return { ok: true };
 }
 

@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { PopSharingDoc } from '../../../../functions/src/popSharing';
-import { readPopSharing } from '../taxBook/popSharingClient';
+import {
+  readPopSharing,
+  readPopSharingCommunities,
+  type PopSharingCommunityStatus,
+} from '../taxBook/popSharingClient';
 
 export type PopSharingLoad =
   { state: 'loading' } | { state: 'failed' } | { state: 'ready'; doc: PopSharingDoc };
@@ -24,4 +28,27 @@ export function usePopSharing(
   }, [characterId, corporationId, attempt]);
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
   return { load, reload };
+}
+
+/**
+ * Whether each Community the settings name carries the book's pops (#6223), read when the
+ * settings load or change. Empty until read, or when the read fails: nothing is marked then.
+ */
+export function usePopSharingCommunities(
+  characterId: number,
+  corporationId: number,
+  settingsVersion: unknown
+): Record<string, PopSharingCommunityStatus> {
+  const [status, setStatus] = useState<Record<string, PopSharingCommunityStatus>>({});
+  useEffect(() => {
+    let cancelled = false;
+    readPopSharingCommunities(characterId, corporationId).then(
+      (s) => !cancelled && setStatus(s),
+      () => undefined
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [characterId, corporationId, settingsVersion]);
+  return status;
 }
