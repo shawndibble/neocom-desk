@@ -44,7 +44,6 @@ export function useNeedsYou() {
     uncounted,
     disputes,
     runDue,
-    count:
-      needsYou.length + uncounted.length + disputes.length + (runDue.length > 0 ? 1 : 0),
+    count: needsYou.length + uncounted.length + disputes.length + (runDue.length > 0 ? 1 : 0),
   };
 }
