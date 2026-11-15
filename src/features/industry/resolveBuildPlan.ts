@@ -48,6 +48,7 @@ import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { capProductPrice } from './productPriceCap';
 import type { MarketSnapshot } from './marketData';
 import { facilityContextFor, reactionPlanFacilityContextFor } from './planFacilityContext';
+import { buyOrderFeePct } from '@/engine/industry/buyOrderPrices';
 import { materialPriceBasisOf, materialPricesFor } from './priceBasis';
 import {
   inventionOffersLookup,
@@ -292,7 +293,11 @@ function prepareResolution(
     },
   };
   const recipeFor = recipeForLookup(recipeSources);
-  const basePrices = materialPricesFor(snapshot, plan.materialPriceBasis);
+  const basePrices = materialPricesFor(
+    snapshot,
+    plan.materialPriceBasis,
+    buyOrderFeePct(sources.modifiers.skills, sources.standing)
+  );
   const materialPrices =
     prices.depthPrices && materialPriceBasisOf(plan.materialPriceBasis) === 'sell'
       ? { ...basePrices, ...prices.depthPrices }

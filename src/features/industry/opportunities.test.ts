@@ -541,8 +541,8 @@ describe('rows price with the plan page’s settings', () => {
   it('buys materials at the side of the market the latest plan’s basis names', () => {
     const sell = rowWith(null);
     const buy = rowWith(latest);
-    // 90 Tritanium (the owned copy is ME 10) at 300 against 500.
-    expect(sell.result.materialCost - buy.result.materialCost).toBe(90 * (500 - 300));
+    // 90 Tritanium (the owned copy is ME 10) at 300, plus an untrained 3% placement fee, against 500.
+    expect(sell.result.materialCost - buy.result.materialCost).toBeCloseTo(90 * (500 - 300 * 1.03));
   });
 
   it('opens a plan at the same basis, and the plan page prices it as the row did', () => {

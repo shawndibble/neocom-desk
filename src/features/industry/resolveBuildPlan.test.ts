@@ -8,6 +8,7 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { MarketSnapshot } from './marketData';
 import { makeOrBuy } from '@/engine/industry/makeOrBuy';
+import { SKILL_IDS } from '@/engine/industry/types';
 import { materialRecipe } from './recipes';
 import { resolveBuildPlan, resolveMakeOrBuy, type BuildPlanSources } from './resolveBuildPlan';
 import type { InventionMarket } from './inventionSources';
@@ -314,7 +315,28 @@ describe('resolveBuildPlan', () => {
         snapshot: prices,
         depthPrices: { 34: 7 },
       });
-      expect(resolved.result?.materials.find((m) => m.typeID === 34)?.unitPrice).toBe(4);
+      // The highest buy order plus an untrained Character's 3% placement fee.
+      expect(resolved.result?.materials.find((m) => m.typeID === 34)?.unitPrice).toBeCloseTo(4.12);
+    });
+
+    it('hands make-or-buy verdicts the same fee-adjusted buy-order map (issue #6167)', () => {
+      const resolution = resolveMakeOrBuy(plan({ materialPriceBasis: 'buy' }), src, {
+        snapshot: { ...prices, adjustedPrices: {}, systemCostIndex: 0.01 },
+      });
+      expect(resolution?.ctx.materialPrices[34]).toBeCloseTo(4.12);
+    });
+
+    it("prices buy orders at the plan Character's own broker rate (issue #6167)", () => {
+      const trained = {
+        ...src,
+        modifiers: { ...NO_CHARACTER_MODIFIERS, skills: { [SKILL_IDS.brokerRelations]: 5 } },
+        standing: { factionStanding: 0, corpStanding: 0, safetyTaxPct: 5 },
+      };
+      const resolved = resolveBuildPlan(plan({ materialPriceBasis: 'buy' }), trained, {
+        snapshot: prices,
+      });
+      // 1.5% from Broker Relations V, plus the hub's 5% Safety Tax.
+      expect(resolved.result?.materials.find((m) => m.typeID === 34)?.unitPrice).toBeCloseTo(4.26);
     });
 
     it("keeps the pilot's own price over a depth price", () => {

@@ -119,6 +119,16 @@ export function CalculationBreakdown({
               ? t('industry.breakdown.pricesMaterialsBuy', { hub: context.hubName })
               : t('industry.breakdown.pricesMaterialsSell', { hub: context.hubName })}
           </p>
+          {context.materialPriceBasis === 'buy' && (
+            <p>
+              {t(
+                (context.standing?.safetyTaxPct ?? 0) > 0
+                  ? 'industry.breakdown.pricesMaterialsBuyBrokerSafety'
+                  : 'industry.breakdown.pricesMaterialsBuyBroker',
+                { pct: formatPercent(brokerPct) }
+              )}
+            </p>
+          )}
           <p>{t('industry.breakdown.pricesOre')}</p>
           <p>{t('industry.breakdown.pricesOwned')}</p>
           <p>{t('industry.breakdown.pricesBuilt')}</p>

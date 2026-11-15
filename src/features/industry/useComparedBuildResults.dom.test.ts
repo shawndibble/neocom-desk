@@ -340,7 +340,8 @@ describe('useComparedBuildResults', () => {
       mockedCompute.mock.calls.map(([args]) => [args.plan.runs, args.materialPrices])
     );
     expect(byRuns.get(5)).toEqual({ 34: 5 });
-    expect(byRuns.get(9)).toEqual({ 34: 4 });
+    // The highest buy order plus an untrained Character's 3% placement fee (#6167).
+    expect(byRuns.get(9)?.[34]).toBeCloseTo(4.12);
   });
 
   it('wires a recipeFor into computeBuildPlan, matching what BuildPlanDetail.tsx passes, so a buildHere material rolls up instead of pricing at the hub', async () => {
