@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
@@ -7,7 +7,6 @@ import { ACTIVE_CHARACTER_KEY } from '@/stores/activeCharacter';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import { ESI_BASE_URL } from '@/esi/client';
 import { configureClipboard } from '@/lib/clipboard';
-import { App } from '@/app/App';
 import { stubViewport } from '@/test/viewport';
 import { STRUCTURE_HITPOINTS_ATTR_ID, TYPES } from '@/test/marketMocks';
 import {
@@ -16,6 +15,7 @@ import {
   ordersHandler,
   pinRifterFromHeaderBell,
   server,
+  renderMarketRoute,
 } from '@/test/marketPage';
 
 vi.mock('@/sde/loadSde', async () => (await import('@/test/marketMocks')).loadSdeMock());
@@ -36,7 +36,7 @@ describe('Quickbar unavailable with no active character (issue #7)', () => {
   it('disables the header price alert bell with a tap-reachable explanation (issue #2162)', async () => {
     // Ambient state from the outer beforeEach: no active character.
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
 
@@ -62,19 +62,19 @@ describe('Quickbar unavailable with no active character (issue #7)', () => {
 
 describe('Quickbar (issue #7)', () => {
   beforeEach(async () => {
-    // App.tsx re-hydrates useActiveCharacter from Dexie on every mount, which
+    // The route (as in App.tsx) re-hydrates useActiveCharacter from Dexie on every mount, which
     // would clobber a direct store setState — seed the setting it reads instead.
     await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
   });
 
   it('shows a short hint when empty', async () => {
-    render(<App />);
+    renderMarketRoute();
     expect(await screen.findByText(/No items yet/)).toBeInTheDocument();
   });
 
   it('keeps the finder a bounded flex column: tree scrolls, Quickbar stays rendered', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await pinRifterFromHeaderBell(user);
 
     const quickbar = await screen.findByTestId('quickbar');
@@ -89,7 +89,7 @@ describe('Quickbar (issue #7)', () => {
 
   it('pins an item from the header price alert bell, and a re-save does not duplicate it', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await pinRifterFromHeaderBell(user);
 
     const quickbar = await screen.findByTestId('quickbar');
@@ -102,7 +102,7 @@ describe('Quickbar (issue #7)', () => {
 
   it('pins and unpins from the item header toggle, no target price needed', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
 
@@ -118,7 +118,7 @@ describe('Quickbar (issue #7)', () => {
 
   it('opens a ⋮ menu on a Quickbar row with Show info and Remove', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await pinRifterFromHeaderBell(user);
 
     const quickbar = await screen.findByTestId('quickbar');
@@ -130,7 +130,7 @@ describe('Quickbar (issue #7)', () => {
 
   it('removes an item, restoring the empty hint', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await pinRifterFromHeaderBell(user);
     await within(await screen.findByTestId('quickbar')).findByText('Rifter');
 
@@ -151,7 +151,7 @@ describe('Quickbar (issue #7)', () => {
   it('clicking a Quickbar item selects it and loads its order book', async () => {
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await pinRifterFromHeaderBell(user);
     const quickbar = await screen.findByTestId('quickbar');
     await within(quickbar).findByText('Rifter');
@@ -170,12 +170,12 @@ describe('Quickbar (issue #7)', () => {
 
   it('survives a reload from local storage alone (Firebase sync is not configured in tests)', async () => {
     const user = userEvent.setup({ delay: null });
-    const { unmount } = render(<App />);
+    const { unmount } = renderMarketRoute();
     await pinRifterFromHeaderBell(user);
     await within(await screen.findByTestId('quickbar')).findByText('Rifter');
     unmount();
 
-    render(<App />);
+    renderMarketRoute();
     const quickbar = await screen.findByTestId('quickbar');
     expect(await within(quickbar).findByText('Rifter')).toBeInTheDocument();
   });
@@ -189,7 +189,7 @@ describe('Market Browser order row context menu (issue #6)', () => {
     configureClipboard(writeText);
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -207,7 +207,7 @@ describe('Market Browser order row context menu (issue #6)', () => {
     configureClipboard(writeText);
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -255,7 +255,7 @@ describe('Market Browser order row context menu (issue #6)', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -282,7 +282,7 @@ describe('Market Browser order row context menu (issue #6)', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -320,7 +320,7 @@ describe('Market Browser order row context menu (issue #6)', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -345,7 +345,7 @@ describe('Market Browser order row context menu (issue #6)', () => {
   it('filters the book to one station, undone via the banner', async () => {
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -388,7 +388,7 @@ describe('Market Browser narrow-screen layout (issue #4)', () => {
     // so this already runs as a narrow viewport.
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     const searchBox = await screen.findByRole('searchbox');
     const finderPanel = searchBox.closest('section');
@@ -418,7 +418,7 @@ describe('Market Browser narrow-screen layout (issue #4)', () => {
     stubViewport(() => true);
 
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     const searchBox = await screen.findByRole('searchbox');
     const finderPanel = searchBox.closest('section');
@@ -448,7 +448,7 @@ describe('Market Browser', () => {
     );
     window.history.pushState({}, '', '/market?type=638');
 
-    render(<App />);
+    renderMarketRoute();
 
     expect(
       await screen.findByText('Copies of this blueprint are traded on contract, not on the market.')
@@ -471,7 +471,7 @@ describe('Market Browser', () => {
     );
     window.history.pushState({}, '', '/market?type=638');
 
-    render(<App />);
+    renderMarketRoute();
 
     expect(await screen.findByText("Couldn't load the order book")).toBeInTheDocument();
     expect(
@@ -488,7 +488,7 @@ describe('Market Browser', () => {
     );
     window.history.pushState({}, '', '/market?type=587');
 
-    render(<App />);
+    renderMarketRoute();
 
     expect(await screen.findByText('No sell orders')).toBeInTheDocument();
     expect(
