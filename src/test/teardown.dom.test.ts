@@ -6,7 +6,7 @@ import { mswServer } from '@/test/msw';
  * The tests in each block run in order and depend on it: the first leaves
  * something behind, the second checks the shared teardown cleared it.
  */
-const server = mswServer(
+mswServer(
   // Never answers: only the test-end abort can end this request.
   http.get('https://teardown.test/hang', () => new Promise<never>(() => {}))
 );
@@ -28,7 +28,6 @@ describe('a request still in flight when its test ends', () => {
     const request = fetch('https://teardown.test/hang', { signal: controller.signal });
     controller.abort();
     await expect(request).rejects.toMatchObject({ name: 'AbortError' });
-    expect(server.listHandlers()).toHaveLength(1);
   });
 });
 

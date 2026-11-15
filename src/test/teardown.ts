@@ -11,7 +11,8 @@
  *   Dexie after the next test's reset, or calls `setState` after jsdom is torn
  *   down ("window is not defined"). Every `fetch` a test makes carries a
  *   test-scoped signal that is aborted when the test ends; MSW honours it for
- *   mocked responses too, so a handler parked on a deferred cannot hang.
+ *   mocked responses too, so the caller's promise rejects even when the
+ *   handler is parked on a deferred that never resolves.
  * - **IndexedDB requests and transactions** (Dexie writes, and Firebase's
  *   heartbeat probe, whose `onsuccess` reads `self` — "self is not defined"
  *   once jsdom is gone). Opens, deletes and transactions are tracked until they
@@ -56,7 +57,7 @@ export function restoreRealTimers(): void {
 // fetch
 // ---------------------------------------------------------------------------
 
-/** The running test's; aborted at its end and left aborted until the next starts. */
+/** The running test's; `null` between tests, so hook-time requests run untracked. */
 let testController: AbortController | null = null;
 const pendingFetches = new Set<Promise<unknown>>();
 const WRAPPED = Symbol('teardown-wrapped-fetch');
@@ -98,9 +99,14 @@ export function beginTestFetches(): void {
   wrapFetch();
 }
 
-/** Aborts every request the test still has in flight; later ones abort at once. */
+/**
+ * Aborts every request the test still has in flight. Requests made after this
+ * (a later `beforeAll`, the file's `afterEach`) go through untracked: they
+ * belong to hooks, not to the test.
+ */
 export function abortTestFetches(): void {
   testController?.abort(new DOMException(ENDED, 'AbortError'));
+  testController = null;
 }
 
 // ---------------------------------------------------------------------------

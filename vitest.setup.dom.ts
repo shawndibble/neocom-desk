@@ -18,7 +18,7 @@ import { cleanup, configure } from '@testing-library/react';
 import { afterAll, afterEach, beforeEach, expect } from 'vitest';
 import { settleEsiCacheLoads } from '@/esi/cache';
 import { claimSessionHint, resetSessionHints } from '@/lib/hintFlags';
-import { abortTestFetches, restoreRealTimers } from '@/test/teardown';
+import { restoreRealTimers } from '@/test/teardown';
 import { fakeMediaQueryList } from '@/test/viewport';
 
 /**
@@ -48,20 +48,19 @@ configure({ asyncUtilTimeout: 5000 });
  * A read still running when its test ends writes into `esiCache` after the next
  * test's `resetSession()` cleared it, and that test reads the stale row as fresh
  * without ever calling its own MSW handler. Real timers back first (the settle
- * waits on `setTimeout`), then unmount (so nothing new starts), abort the
- * test's requests (`src/test/teardown.ts`), and wait for every cache load to
- * finish. A load that won't settle is reported here, naming its key.
+ * waits on `setTimeout`), then unmount (so nothing new starts) and wait for
+ * every cache load to finish — the runner already aborted the test's requests
+ * (`src/test/teardown.ts`). A load that won't settle is reported here, naming its key.
  * `vitest.setup.ts`'s `afterEach` then runs and drains IndexedDB.
  * Don't hand-roll drains in a test file (`waitFor(esiInFlight)`, extra ticks).
  */
 afterEach(async () => {
   restoreRealTimers();
   cleanup();
-  abortTestFetches();
   try {
     await settleEsiCacheLoads(1000);
   } catch (error) {
-    // Warn rather than fail: the requests are aborted above, so a load still
+    // Warn rather than fail: the requests are already aborted, so a load still
     // pending here is waiting on something other than the network. Failing
     // the test would blame it for that; the message names the key, so a real
     // late writer is findable.

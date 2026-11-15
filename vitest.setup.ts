@@ -5,13 +5,7 @@
 import 'fake-indexeddb/auto';
 import { afterAll, afterEach, beforeEach, expect } from 'vitest';
 import { resetRouteSnapshots } from '@/lib/routeSnapshotCache';
-import {
-  abortTestFetches,
-  beginTestFetches,
-  restoreRealTimers,
-  settleOrWarn,
-  trackIndexedDb,
-} from '@/test/teardown';
+import { beginTestFetches, restoreRealTimers, settleOrWarn, trackIndexedDb } from '@/test/teardown';
 
 /**
  * `lib/routeSnapshotCache.ts` is module state deliberately outliving a
@@ -45,7 +39,6 @@ beforeEach(() => {
 });
 afterEach(async () => {
   restoreRealTimers();
-  abortTestFetches();
   await settleOrWarn(expect.getState().currentTestName);
 });
 /** Work started by the file's own `afterAll` (a `server.close()`, a `db.close()`). */
