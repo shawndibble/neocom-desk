@@ -11,9 +11,10 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { DEFAULT_ASSET_SORT, useAssetSort } from '@/features/assets/assetSortPreference';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { useCharacterFilterPicks } from '@/features/character/characterFilterPicks';
-import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
+import { Assets } from '@/routes/Assets';
 import { mswServer } from '@/test/msw';
+import { renderRouteWithoutShell } from '@/test/routeWithoutShell';
 
 // Shared harness for the Assets route tests (src/routes/Assets*.test.tsx), one
 // file per concern so CI runs them in parallel. The `vi.mock` calls stay in each
@@ -115,19 +116,31 @@ async function resetSession() {
 }
 
 /**
+ * The Assets page on its own route, without App's boot or the signed-in shell
+ * (`renderRouteWithoutShell`). What nearly every Assets test renders; only the
+ * App wiring tests (Assets.test.tsx's "App wiring" block) render `<App />`.
+ */
+export function renderAssetsRoute() {
+  return renderRouteWithoutShell('/assets', <Assets />);
+}
+
+/**
  * Registers the cold-render warm-up, the per-test session reset and the market
  * price cache clear (the MSW server's own lifecycle comes from `mswServer`). Call once at module scope of each Assets test file.
+ * `warmApp` warms a full `<App />` render instead, for a file that keeps App-level tests.
  */
-export function installAssetsHarness(): void {
+export function installAssetsHarness({ warmApp = false }: { warmApp?: boolean } = {}): void {
   afterEach(clearMarketPriceCache);
   beforeAll(async () => {
     // One throwaway render, so no test pays for the first one. A worker's first
-    // `App` render — compiling the lazy route chunks, warming jsdom and React —
-    // lands on whichever test runs first and can outlast its 1s `findByText`
-    // under parallel load. Done here under the hook's own budget.
+    // render — compiling the route chunks, warming jsdom and React — lands on
+    // whichever test runs first and can outlast its `findByText` under parallel
+    // load. Done here under the hook's own budget.
     await routeChunks.loadAssets();
     await resetSession();
-    const { unmount } = render(<App />);
+    // App is imported only here, so a file without App-level tests never loads its graph.
+    const App = warmApp ? (await import('@/app/App')).App : null;
+    const { unmount } = App ? render(<App />) : renderAssetsRoute();
     await screen.findByText(JITA, undefined, { timeout: 25_000 });
     unmount();
     server.resetHandlers();

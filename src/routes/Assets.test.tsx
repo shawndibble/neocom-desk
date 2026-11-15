@@ -15,6 +15,7 @@ import {
   assetPage2,
   server,
   installAssetsHarness,
+  renderAssetsRoute,
   openLocation,
   goBack,
   locationOrder,
@@ -49,12 +50,12 @@ vi.mock('@/lib/downloadCsv', async (importOriginal) =>
   )
 );
 
-installAssetsHarness();
+installAssetsHarness({ warmApp: true });
 
 describe('Assets', () => {
   it('shows the word Tools on its trigger and keeps Refresh inside the menu, not beside it (#2945)', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(JITA)).toBeInTheDocument();
 
     const tools = screen.getByRole('button', { name: 'Tools' });
@@ -70,7 +71,7 @@ describe('Assets', () => {
 
   it('shows Tools as its icon-only ⋮ below md', async () => {
     const restoreViewport = stubViewport(NARROW_QUERY);
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tools' })).not.toHaveTextContent('Tools');
     restoreViewport();
@@ -78,7 +79,7 @@ describe('Assets', () => {
 
   it('has Items, Ships and Move tabs, opening on Items', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     expect(window.location.pathname).toBe('/assets/items');
     const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
@@ -96,7 +97,7 @@ describe('Assets', () => {
   it('keeps the query string when switching tabs', async () => {
     const user = userEvent.setup({ delay: null });
     window.history.replaceState({}, '', '/assets/items?chars=current&min=0');
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Ships' }));
     expect(window.location.pathname).toBe('/assets/ships');
@@ -106,7 +107,7 @@ describe('Assets', () => {
   it('keeps focus in the tab strip when arrowing from Ships onto Items (WCAG 2.4.3)', async () => {
     const user = userEvent.setup({ delay: null });
     window.history.replaceState({}, '', '/assets/ships');
-    render(<App />);
+    renderAssetsRoute();
     const ships = await screen.findByRole('tab', { name: 'Ships' });
     ships.focus();
     await user.keyboard('{ArrowLeft}');
@@ -117,14 +118,14 @@ describe('Assets', () => {
   it('puts focus back on the search box when Clear search removes itself (WCAG 2.4.3)', async () => {
     const user = userEvent.setup({ delay: null });
     window.history.replaceState({}, '', '/assets/items?q=trit');
-    render(<App />);
+    renderAssetsRoute();
     await user.click(await screen.findByRole('button', { name: /clear search/i }));
     await waitFor(() => expect(screen.getByRole('searchbox')).toHaveFocus());
   });
 
   it('moves a pre-tabs drill-down link under the Items tab', async () => {
     window.history.replaceState({}, '', '/assets/60003760?min=0');
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/assets/items/60003760');
     expect(window.location.search).toBe('?min=0');
@@ -132,7 +133,7 @@ describe('Assets', () => {
 
   it('opens a pre-tabs ?view=ships link on the Ships tab', async () => {
     window.history.replaceState({}, '', '/assets?view=ships');
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByRole('region', { name: 'My ships' })).toBeVisible();
     expect(window.location.pathname).toBe('/assets/ships');
     expect(window.location.search).toBe('');
@@ -140,7 +141,7 @@ describe('Assets', () => {
 
   it('heads the two toggles with a View caption and separates them from the actions (#3087)', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Tools' }));
 
@@ -169,7 +170,7 @@ describe('Assets', () => {
 
   it('lists locations at the root; drilling into one shows its contents', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     expect(screen.getByText(STRUCTURE)).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
@@ -186,7 +187,7 @@ describe('Assets', () => {
 
   it('shows the total value after the location count in the block title bar, hidden when drilled in (issue #1617)', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     const locationHeadings = screen
       .getAllByRole('heading', { level: 2 })
@@ -214,7 +215,7 @@ describe('Assets', () => {
 
   it('moves focus to the level heading on drill-in, and back to the root heading on Back (issue #1485)', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
 
     const levelHeading = await screen.findByRole('heading', {
@@ -254,7 +255,7 @@ describe('Assets', () => {
       )
     );
 
-    render(<App />);
+    renderAssetsRoute();
 
     expect(await screen.findByText('In space (Amamake)')).toBeInTheDocument();
   });
@@ -288,7 +289,7 @@ describe('Assets', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     expect(await screen.findByRole('heading', { name: 'Drake' })).toBeInTheDocument();
   });
@@ -318,7 +319,7 @@ describe('Assets', () => {
         HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
       )
     );
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(/Location unresolved/)).toBeInTheDocument();
     expect(screen.getByText('Container')).toBeInTheDocument();
   });
@@ -350,7 +351,7 @@ describe('Assets', () => {
         })
       )
     );
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(HANGAR_STRUCTURE)).toBeInTheDocument();
     expect(screen.queryByText(/Location unresolved/)).not.toBeInTheDocument();
     expect(screen.queryByText('Container')).not.toBeInTheDocument();
@@ -358,7 +359,7 @@ describe('Assets', () => {
 
   it('filters items via the search box, across every location at once', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
     // Search is debounced (issue #415) — wait it out rather than reading
@@ -370,7 +371,7 @@ describe('Assets', () => {
 
   it('clearing the search returns to the root location list', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
 
     const search = screen.getByPlaceholderText(/search items/i);
@@ -398,7 +399,7 @@ describe('Assets', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () => HttpResponse.error())
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
     await openLocation(user, JITA);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
@@ -417,7 +418,7 @@ describe('Assets', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText('Log in again to refresh.')).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your assets')).not.toBeInTheDocument();
     await openLocation(user, JITA);
@@ -432,12 +433,12 @@ describe('Assets', () => {
         return HttpResponse.json(assetPage1, { headers: { 'X-Pages': '2' } });
       })
     );
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(/incomplete data/i)).toBeInTheDocument();
   });
 
   it('shows no incomplete-data warning when every page came back', async () => {
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     expect(screen.queryByText(/incomplete data/i)).not.toBeInTheDocument();
   });
@@ -446,7 +447,7 @@ describe('Assets', () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () => HttpResponse.error())
     );
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(/no assets cached/i)).toBeInTheDocument();
     expect(screen.queryByText('Total value')).not.toBeInTheDocument();
   });
@@ -455,7 +456,7 @@ describe('Assets', () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () => HttpResponse.json([]))
     );
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText('No items')).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -471,13 +472,13 @@ describe('Assets', () => {
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText('Log in again to see your assets')).toBeInTheDocument();
     expect(screen.queryByText(/no assets cached/i)).not.toBeInTheDocument();
   });
 
   it('notes inline that jumps away are unavailable when the location scope was never granted (#1590)', async () => {
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     const note = (await screen.findByText('Jumps away unavailable')).closest('div');
     expect(note).not.toBeNull();
@@ -492,7 +493,7 @@ describe('Assets', () => {
     await db.tokens.update(CHAR_ID, {
       scopes: ['esi-assets.read_assets.v1', 'esi-location.read_location.v1'],
     });
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     expect(screen.queryByText('Jumps away unavailable')).not.toBeInTheDocument();
   });
@@ -506,7 +507,7 @@ describe('Assets', () => {
         });
       })
     );
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(/only the first 25 assets were fetched/i)).toBeInTheDocument();
   });
 
@@ -522,7 +523,7 @@ describe('Assets', () => {
       })
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(/only the first 25 assets were fetched/i);
     // The notice shows with the rows, before names and values finish; the
     // button is disabled until that load settles.
@@ -551,7 +552,7 @@ describe('Assets', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     // The jsdom scroll-container shim reports a fixed ~600px viewport at ~48px/row —
     // nowhere near the 2000 rows that exist, proving the virtualizer is windowing
@@ -572,7 +573,7 @@ describe('Assets', () => {
         return HttpResponse.json(pageItems, { headers: { 'X-Pages': '30' } });
       })
     );
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText(/only the first 1250 assets were fetched/i)).toBeInTheDocument();
     expect(screen.queryByText(/^Showing \d+ of \d+ assets\.$/)).not.toBeInTheDocument();
   });
@@ -590,7 +591,7 @@ describe('Assets', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
     const names = screen.getAllByText(/^(Tritanium|Pyerite)$/).map((el) => el.textContent);
@@ -613,7 +614,7 @@ describe('Assets', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findByRole('heading', { name: 'Drake' });
     const order = () =>
@@ -658,7 +659,7 @@ describe('Assets', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     await screen.findByRole('heading', { name: 'Drake' });
     expect(screen.getByText('1 item · 0 ISK')).toBeInTheDocument();
@@ -667,7 +668,7 @@ describe('Assets', () => {
   it('still renders cached assets when global market prices are unreachable', async () => {
     server.use(http.get('https://esi.evetech.net/markets/prices', () => HttpResponse.error()));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     await goBack(user);
@@ -704,7 +705,7 @@ describe('Assets', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
 
     await screen.findByRole('heading', { name: 'Drake' });
@@ -753,7 +754,7 @@ describe('Assets', () => {
     // navigated straight to, not reached via in-app links.
     window.history.pushState({}, '', '/assets/items/60003760/i:999');
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     expect(await screen.findByText('This location is gone')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Back to all locations' }));
     expect(await screen.findByText(JITA)).toBeInTheDocument();
@@ -787,7 +788,7 @@ describe('abyssal modules', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     expect(
       await screen.findByText("1 abyssal module at MutaMarket's estimate", undefined, {
         timeout: 3000,
@@ -821,7 +822,7 @@ async function pinViaMenu(user: ReturnType<typeof userEvent.setup>, place: strin
 describe('station pins (issue #84)', () => {
   it('cycles a location pin unpinned -> character -> account -> unpinned, persisting to Dexie', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
 
     await pinViaMenu(user, JITA, /pin for this character/i);
@@ -846,7 +847,7 @@ describe('station pins (issue #84)', () => {
 
   it('sorts a pinned location to the top of the list, regardless of its label', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     expect(locationOrder()).toEqual([JITA, STRUCTURE]);
 
@@ -865,7 +866,7 @@ describe('station pins (issue #84)', () => {
       scope: 'character',
       updatedAt: Date.now(),
     });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     expect(locationOrder()).toEqual([JITA, STRUCTURE]);
   });
@@ -878,7 +879,7 @@ describe('station pins (issue #84)', () => {
       scope: 'account',
       updatedAt: Date.now(),
     });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     await waitFor(() => {
       expect(locationOrder()).toEqual([STRUCTURE, JITA]);
@@ -889,7 +890,7 @@ describe('station pins (issue #84)', () => {
 describe('item name and blueprint badge', () => {
   it('links the item name to its Show info (Item Detail)', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
 
     const name = await screen.findByRole('link', { name: 'Tritanium' });
@@ -898,7 +899,7 @@ describe('item name and blueprint badge', () => {
   });
 
   it('keeps right-click on the name opening the row menu, not Show info', async () => {
-    render(<App />);
+    renderAssetsRoute();
     const user = userEvent.setup({ delay: null });
     await openLocation(user, JITA);
     const name = await screen.findByRole('link', { name: 'Tritanium' });
@@ -930,12 +931,34 @@ describe('item name and blueprint badge', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
 
     const badge = (await screen.findByText('Blueprint original')).parentElement;
     expect(badge).toHaveTextContent('BPO');
     expect(screen.getAllByText(/^Blueprint (original|copy)$/)).toHaveLength(1);
     vi.mocked(loadBlueprints).mockResolvedValue({});
+  });
+});
+
+// Every test above renders the page on its own route (`renderAssetsRoute`).
+// These few prove the App wiring that leaves out: the route mounts at /assets
+// inside the signed-in shell, and the app's scope gate stands in for it.
+describe('Assets in the App', () => {
+  it('opens /assets inside the signed-in shell, its rail link current', async () => {
+    render(<App />);
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+    const rail = screen.getAllByRole('navigation')[0];
+    expect(within(rail).getByRole('link', { name: 'Assets' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+  });
+
+  it('shows the scope gate, not the page, when the grant lacks the assets scope', async () => {
+    await db.tokens.update(CHAR_ID, { scopes: [] });
+    render(<App />);
+    expect(await screen.findByText('Log in again to see your assets')).toBeInTheDocument();
+    expect(screen.queryByText(JITA)).not.toBeInTheDocument();
   });
 });
