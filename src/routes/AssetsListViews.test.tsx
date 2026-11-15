@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
-import { App } from '@/app/App';
 import { exportRows } from '@/lib/downloadCsv';
 import {
   CHAR_ID,
@@ -11,6 +10,7 @@ import {
   STRUCTURE,
   server,
   installAssetsHarness,
+  renderAssetsRoute,
   clickTool,
   downloadCsv,
   openLocation,
@@ -55,7 +55,7 @@ async function minValueBox(user: ReturnType<typeof userEvent.setup>): Promise<HT
 describe('item context menu (issue #83)', () => {
   it('opens the same menu from a visible More actions button on the row (#1497)', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
 
     await user.click(await screen.findByRole('button', { name: 'More actions for Tritanium' }));
@@ -67,7 +67,7 @@ describe('item context menu (issue #83)', () => {
 
   it('opens the shared item context menu on right-click, with a View in Market action', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     const item = await screen.findByText('Tritanium');
     item.focus();
@@ -88,7 +88,7 @@ describe('item context menu (issue #83)', () => {
 
   it('adds an item to the Quickbar from the Assets context menu, persisting to Dexie', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     const item = await screen.findByText('Tritanium');
     item.focus();
@@ -105,7 +105,7 @@ describe('item context menu (issue #83)', () => {
 
   it('navigates to the Market Browser with the item preselected via View in Market', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     const item = await screen.findByText('Tritanium');
     item.focus();
@@ -146,7 +146,7 @@ describe('item context menu (issue #83)', () => {
       hubId: 'jita',
       updatedAt: 1,
     });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     const item = await screen.findByText('Tritanium');
     item.focus();
@@ -160,7 +160,7 @@ describe('item context menu (issue #83)', () => {
 
   it('omits "View in Industry as material" when no owned Build Plan consumes the item', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await openLocation(user, JITA);
     const item = await screen.findByText('Tritanium');
     item.focus();
@@ -188,7 +188,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 
   it('shows every item across every location, without drilling in, once toggled on', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
 
@@ -200,7 +200,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 
   it('hides items below the minimum value threshold', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
@@ -223,7 +223,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
       })
     );
     window.history.replaceState({}, '', '/assets?all=1&min=10000');
-    render(<App />);
+    renderAssetsRoute();
 
     // Prices parked: every stack values 0, which the filter must not read as "below the minimum".
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
@@ -244,7 +244,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 
     it('leaves out stacks below the minimum in the All items view', async () => {
       window.history.replaceState({}, '', '/assets?all=1&min=10000');
-      render(<App />);
+      renderAssetsRoute();
       await screen.findByText('Pyerite');
 
       const rows = await exportCsv();
@@ -264,7 +264,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
         })
       );
       window.history.replaceState({}, '', '/assets?all=1&min=10000');
-      render(<App />);
+      renderAssetsRoute();
       await screen.findByText('Tritanium');
 
       const rows = await exportCsv();
@@ -275,7 +275,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 
     it('leaves out stacks below the minimum in the tree view too (issue #5601)', async () => {
       window.history.replaceState({}, '', '/assets?min=10000');
-      render(<App />);
+      renderAssetsRoute();
       await screen.findByText(STRUCTURE);
       // Jita holds only the Tritanium stack, which is under the minimum.
       expect(screen.queryByText(JITA)).not.toBeInTheDocument();
@@ -288,7 +288,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 
   it('takes ISK shorthand in the minimum value, with no echo line in the strip (issue #2227)', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
@@ -302,7 +302,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 
   it('sorts the flat list by value, highest first', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
@@ -322,7 +322,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
    */
   it('remembers the flat list sort across a remount', async () => {
     const user = userEvent.setup({ delay: null });
-    const { unmount } = render(<App />);
+    const { unmount } = renderAssetsRoute();
     await screen.findByText(JITA);
     await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
@@ -333,7 +333,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     // A fresh visit: All Items rides the URL, the sort does not.
     window.history.replaceState({}, '', '/assets');
 
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
@@ -347,7 +347,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 
   it('keeps the minimum-value threshold in the URL only — a fresh visit starts without it', async () => {
     const user = userEvent.setup({ delay: null });
-    const { unmount } = render(<App />);
+    const { unmount } = renderAssetsRoute();
     await screen.findByText(JITA);
     await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
@@ -358,7 +358,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     unmount();
     window.history.replaceState({}, '', '/assets');
 
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     await clickTool(user, 'All items');
 
@@ -368,7 +368,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 
   it('applies the same min-value filter and sort to active search results', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     await user.type(screen.getByPlaceholderText(/search items/i), 'i');
     await screen.findByText('Tritanium');
@@ -398,7 +398,7 @@ describe('location sort (issue #88)', () => {
   }
 
   it('defaults to sorting locations by name', async () => {
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     expect(locationOrder()).toEqual([JITA, STRUCTURE]);
     expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveTextContent('Name');
@@ -406,7 +406,7 @@ describe('location sort (issue #88)', () => {
 
   it('shows the Route picker, left of Sort, only under the "Jumps away" sort', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     expect(screen.queryByRole('combobox', { name: 'Route' })).not.toBeInTheDocument();
 
@@ -427,7 +427,7 @@ describe('location sort (issue #88)', () => {
   it('re-sorts the location list by estimated value when "Value" is selected', async () => {
     const user = userEvent.setup({ delay: null });
     priceStructureAboveJita();
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     expect(locationOrder()).toEqual([JITA, STRUCTURE]);
 
@@ -449,7 +449,7 @@ describe('location sort (issue #88)', () => {
       scope: 'character',
       updatedAt: Date.now(),
     });
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
 
     await user.click(screen.getByRole('combobox', { name: 'Sort' }));
@@ -463,7 +463,7 @@ describe('location sort (issue #88)', () => {
   it('persists the chosen sort field across a remount', async () => {
     const user = userEvent.setup({ delay: null });
     priceStructureAboveJita();
-    const { unmount } = render(<App />);
+    const { unmount } = renderAssetsRoute();
     await screen.findByText(JITA);
 
     await user.click(screen.getByRole('combobox', { name: 'Sort' }));
@@ -473,7 +473,7 @@ describe('location sort (issue #88)', () => {
     });
     unmount();
 
-    render(<App />);
+    renderAssetsRoute();
     await screen.findByText(JITA);
     await waitFor(() => {
       expect(locationOrder()).toEqual([STRUCTURE, JITA]);
@@ -486,7 +486,7 @@ describe('Asset Category filter (issue #5601)', () => {
   it('shows the empty state with Reset filters when no category is ticked, and Reset brings everything back', async () => {
     const user = userEvent.setup({ delay: null });
     window.history.replaceState({}, '', '/assets/items?cat=');
-    render(<App />);
+    renderAssetsRoute();
 
     const reset = await screen.findByRole('button', { name: 'Reset filters' });
     // A filter emptied the list, not an empty hangar: the plain line, not what fills the page.
@@ -501,7 +501,7 @@ describe('Asset Category filter (issue #5601)', () => {
   it('lists the stations whose items are ticked', async () => {
     // An empty catalogue puts every type under "Not on the market" (id -1).
     window.history.replaceState({}, '', '/assets/items?cat=-1');
-    render(<App />);
+    renderAssetsRoute();
 
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     expect(screen.getByText(STRUCTURE)).toBeInTheDocument();
