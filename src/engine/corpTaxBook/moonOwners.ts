@@ -13,7 +13,7 @@ import {
   type FeederPayout,
 } from './feederAccrual';
 import { payeeOf, payoutPeriod, type Payee } from './payouts';
-import { effectiveOwnerRate, type OwnerRateEntry } from './ownerRate';
+import { effectiveOwnerRate, pendingRateRequest, type OwnerRateEntry } from './ownerRate';
 import { resolveRate, type TaxRate } from './rates';
 import type { ObservedMiningEntry } from './types';
 import { utcDay } from '@/engine/localDay';
@@ -61,6 +61,8 @@ export type MoonOwnerStatus =
   | 'cant-read'
   | 'removal-pending'
   | 'settled-otherwise'
+  /** The moon owner asked for a rate the accounting corporation has not agreed yet (#6209). */
+  | 'rate-asked'
   | 'no-rate'
   | 'disconnected'
   | 'left'
@@ -73,6 +75,10 @@ export type MoonOwnerStatus =
  */
 export interface MoonOwnerSummary {
   schemaVersion: number;
+  /** The accrual rules it was built under; absent before #6209 (`FEEDER_VIEW_RULES`). */
+  rulesVersion?: number;
+  /** The record's mode when it was built. */
+  mode?: FeederMode;
   status: MoonOwnerFeeder['status'];
   builtAt: number;
   coverageFrom: string | null;
@@ -127,8 +133,10 @@ export interface MoonOwnerRow {
   since?: string;
   /** Last day read: the day the ledger went stale, or where coverage ended. */
   until?: string;
-  /** The effective owner rate today; absent when none is set. */
+  /** The effective (agreed) owner rate today; absent when none is agreed. */
   theirRatePct?: number;
+  /** A rate the moon owner asked for that is not agreed yet (`pendingRateRequest`). */
+  askedRatePct?: number;
   /** What miners pay at their refineries. */
   minerRatePct?: number;
   /** Whole ISK still owed to them; 0 when nothing is. */
@@ -143,9 +151,11 @@ export interface MoonOwnerRow {
   readsStructureNames?: boolean;
 }
 
-/** Whether a row is on the pay list: whole ISK owed, on a normal (not settled otherwise) moon owner. */
-export const canPayMoonOwner = (row: Pick<MoonOwnerRow, 'mode' | 'owed'>) =>
-  row.mode === 'normal' && row.owed > 0;
+/**
+ * Whether a row is on the pay list: whole ISK owed. A settled otherwise moon owner still owed what
+ * accrued before the switch is on it too (#6209).
+ */
+export const canPayMoonOwner = (row: Pick<MoonOwnerRow, 'owed'>) => row.owed > 0;
 
 export interface MoonOwnerTotals {
   owed: number;
@@ -206,13 +216,32 @@ export function isStillRead(status: MoonOwnerStatus): boolean {
   return !(LIFECYCLE as readonly string[]).includes(status);
 }
 
-function statusOf(f: MoonOwnerFeeder, settledNow: boolean, ratePct: number | undefined) {
+function statusOf(
+  f: MoonOwnerFeeder,
+  settledNow: boolean,
+  ratePct: number | undefined,
+  askedPct: number | undefined
+): MoonOwnerStatus {
   if (f.status === 'pending-removal') return 'removal-pending';
   if (LIFECYCLE.includes(f.status)) return f.status as 'disconnected' | 'left' | 'removed';
   if (f.staleSince !== undefined) return 'cant-read';
   if (settledNow) return 'settled-otherwise';
+  if (askedPct !== undefined) return 'rate-asked';
   if (ratePct === undefined) return 'no-rate';
   return 'active';
+}
+
+/** The row's rate fields and status: the agreed rate today and a request still waiting on it. */
+function rateFields(f: MoonOwnerFeeder, settledNow: boolean, today: string) {
+  const history = deriveOwnerRateHistory(f);
+  const rate = effectiveOwnerRate(history, today);
+  // A same-owner corporation never has a rate to agree.
+  const asked = f.sameOwner ? undefined : pendingRateRequest(history);
+  return {
+    status: statusOf(f, settledNow, rate?.pct, asked),
+    ...(rate ? { theirRatePct: rate.pct } : {}),
+    ...(asked !== undefined ? { askedRatePct: asked } : {}),
+  };
 }
 
 /**
@@ -250,6 +279,9 @@ const historyKey = (h: readonly Pick<OwnerRateEntry, 'kind' | 'pct' | 'effective
     .sort()
     .join(';');
 
+/** The accrual rules a view summary must be built under to stand in for the rows (`functions/` writes it). */
+export const FEEDER_VIEW_RULES = 2;
+
 /**
  * The moon owner's summary when it still says what the record says, else undefined and the
  * entries are priced instead. The server rebuilds a view on a ledger read, a payout, a payee
@@ -262,7 +294,16 @@ export function summaryFor(
   f: MoonOwnerFeeder
 ): MoonOwnerSummary | undefined {
   const s = input.summaries?.get(f.corporationId);
-  if (!s || s.schemaVersion !== 1 || s.unpricedDays > 0 || s.status !== f.status) return undefined;
+  // A summary built before the #6209 rules (a request alone accruing, settled otherwise dropping
+  // what was owed) carries no `rulesVersion`: its figures cannot stand.
+  if (
+    !s ||
+    s.schemaVersion !== 1 ||
+    s.rulesVersion !== FEEDER_VIEW_RULES ||
+    s.unpricedDays > 0 ||
+    s.status !== f.status
+  )
+    return undefined;
   const today = input.now.slice(0, 10);
   const modes = deriveModeChanges(f);
   // The summary carries only today's mode and the outer coverage bounds: a closed settled window
@@ -270,7 +311,10 @@ export function summaryFor(
   if (modes.length > 1 || modes[0]?.mode === 'normal' || f.coveragePeriods.length > 2)
     return undefined;
   const settledNow = isSettledOn(modes, today);
-  if ((s.balanceKind === 'none') !== settledNow) return undefined;
+  // A mode switch does not rebuild the summary; a settled moon owner may still be owed.
+  if (s.mode !== f.mode) return undefined;
+  if (s.balanceKind === 'none' && !settledNow) return undefined;
+  if (settledNow && s.balanceKind !== 'none' && s.balanceKind !== 'owed') return undefined;
   const read = f.lastReadWellAt === undefined ? null : Date.parse(f.lastReadWellAt);
   if (s.lastReadWellAt !== read) return undefined;
   if (s.paidIsk !== paidOf(f.payouts)) return undefined;
@@ -309,7 +353,6 @@ function workFromSummary(
 ): MoonOwnerRow {
   const today = input.now.slice(0, 10);
   const settledNow = f.sameOwner === true || isSettledOn(deriveModeChanges(f), today);
-  const rate = effectiveOwnerRate(deriveOwnerRateHistory(f), today);
   const display: BalanceDisplay = { kind: s.balanceKind, isk: s.balanceIsk };
   const froms = f.coveragePeriods.map((p) => p.from).sort();
   const open = f.coveragePeriods.some((p) => p.to === undefined);
@@ -330,12 +373,11 @@ function workFromSummary(
   return {
     id: String(f.corporationId),
     corporationId: f.corporationId,
-    status: statusOf(f, settledNow, rate?.pct),
+    ...rateFields(f, settledNow, today),
     ...refineriesSeenInSummary(input, f.corporationId, s),
     mined: s.minedValueIsk,
     ...(froms[0] !== undefined ? { since: froms[0] } : {}),
     ...(until !== undefined ? { until } : {}),
-    ...(rate ? { theirRatePct: rate.pct } : {}),
     ...(minerRate ? { minerRatePct: minerRate.pct } : {}),
     owed: display.kind === 'owed' ? display.isk : 0,
     balance: display,
@@ -398,7 +440,6 @@ function work(
     }
   );
   const settledNow = f.sameOwner === true || isSettledOn(modeChanges, today);
-  const rate = effectiveOwnerRate(history, today);
   const { display } = feederBalance(accrued, f.payouts, settledNow);
   const mined = coveredValues.reduce((sum, v) => sum + v, 0);
   const froms = f.coveragePeriods.map((p) => p.from).sort();
@@ -417,7 +458,7 @@ function work(
     row: {
       id: String(f.corporationId),
       corporationId: f.corporationId,
-      status: statusOf(f, settledNow, rate?.pct),
+      ...rateFields(f, settledNow, today),
       ...refineriesSeen(
         input,
         f.corporationId,
@@ -426,7 +467,6 @@ function work(
       mined,
       ...(froms[0] !== undefined ? { since: froms[0] } : {}),
       ...(until !== undefined ? { until } : {}),
-      ...(rate ? { theirRatePct: rate.pct } : {}),
       ...(minerRate ? { minerRatePct: minerRate.pct } : {}),
       owed: display.kind === 'owed' ? display.isk : 0,
       balance: display,
@@ -448,6 +488,7 @@ const listed = (row: MoonOwnerRow) =>
 const NEEDS_A_LOOK: readonly MoonOwnerStatus[] = [
   'cant-read',
   'removal-pending',
+  'rate-asked',
   'no-rate',
   'disconnected',
 ];

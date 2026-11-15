@@ -16,6 +16,7 @@ import {
 } from './corpTaxBookFeederGrant.js';
 import {
   dismissFeederHistory,
+  disputeFeederPayout,
   getFeederViewAccess,
   requestFeederRate,
 } from './corpTaxBookFeederViewCalls.js';
@@ -823,14 +824,22 @@ emulatorSuite('moon owner payouts (emulator)', () => {
     (
       await collectorBook().collection('feeders').doc(String(FEEDER)).collection('payouts').get()
     ).docs.map((d) => ({ id: d.id, ...d.data() }));
-  /** A corporation wallet "Give ISK" to the moon owner corporation (its payee when none is set). */
-  const giveIsk = (id: number, amount: number) => ({
+  /**
+   * A corporation wallet "Give ISK" to the moon owner corporation (its payee when none is set),
+   * with the payout reference the pay dialog writes unless another reason is given (#6209).
+   */
+  const giveIsk = (
+    id: number,
+    amount: number,
+    reason = 'Moon mining payout, 2026-10-01 to 2026-10-17'
+  ) => ({
     id,
     date: '2026-10-18T15:00:00Z',
     ref_type: 'corporation_account_withdrawal',
     amount: -amount,
     first_party_id: COLLECTOR,
     second_party_id: FEEDER,
+    reason,
   });
 
   beforeEach(async () => {
@@ -845,6 +854,64 @@ emulatorSuite('moon owner payouts (emulator)', () => {
       parseTurnOnInput({ ...officer, startDate: '2026-10-01', startRatePct: 10 })
     );
     await save(await newInvite(), 6);
+    identities.set(FEEDER_DIRECTOR, { corporationId: FEEDER, ceoId: null, roles: ['Director'] });
+  });
+
+  it('a donation without the payout reference waits for an officer, counting nothing (#6209)', async () => {
+    journalRows = [giveIsk(510, 3_000_000, 'SRP refund')];
+    expect(await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), officer)).toEqual({
+      attached: 0,
+      recorded: 1,
+    });
+    expect(await payouts()).toMatchObject([
+      { id: 'j1_510', amount: 3_000_000, notAPayout: true, unconfirmed: true, journalRef: 510 },
+    ]);
+    expect((await feederRecord())?.payoutTotals).toEqual({ count: 0, amount: 0 });
+    // Read again: the same journal row is never recorded twice.
+    await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), officer);
+    expect(await payouts()).toHaveLength(1);
+    await markFeederPayout(bookDeps(), who(COLLECTOR_CEO), {
+      ...officer,
+      feederCorporationId: FEEDER,
+      payoutId: 'j1_510',
+      notAPayout: false,
+    });
+    const [row] = await payouts();
+    expect(row).toMatchObject({ notAPayout: false });
+    expect(row).not.toHaveProperty('unconfirmed');
+    expect((await feederRecord())?.payoutTotals).toEqual({ count: 1, amount: 3_000_000 });
+  });
+
+  it('an officer\'s "I\'ve sent it" confirms a waiting row and counts it once (#6209)', async () => {
+    journalRows = [giveIsk(511, 2_000_000, '')];
+    await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), officer);
+    await recordFeederPayout(bookDeps(), who(COLLECTOR_CEO), {
+      ...officer,
+      feederCorporationId: FEEDER,
+      amount: 2_000_000,
+      date: '2026-10-18',
+      method: 'donation',
+    });
+    const rows = await payouts();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: 'j1_511', notAPayout: false });
+    expect(rows[0]).not.toHaveProperty('unconfirmed');
+    expect((await feederRecord())?.payoutTotals).toEqual({ count: 1, amount: 2_000_000 });
+  });
+
+  it('the moon owner flags a payment it disputes, and withdraws the flag (#6209)', async () => {
+    journalRows = [giveIsk(512, 1_000_000)];
+    await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), officer);
+    const dispute = (disputed: boolean) =>
+      disputeFeederPayout(deps(), who(FEEDER_DIRECTOR), {
+        ...asDirector,
+        payoutId: 'j1_512',
+        disputed,
+      });
+    await dispute(true);
+    expect((await payouts())[0]).toHaveProperty('disputedAt');
+    await dispute(false);
+    expect((await payouts())[0]).not.toHaveProperty('disputedAt');
   });
 
   it('the officer call reads the journal itself, never a client list, and audits it (S3)', async () => {

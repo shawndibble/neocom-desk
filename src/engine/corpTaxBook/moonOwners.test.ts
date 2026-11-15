@@ -152,6 +152,74 @@ describe('buildMoonOwners', () => {
     const r = rowOf(input({ feeders: [feeder(A, { mode: 'settled-otherwise' })] }));
     expect(r.status).toBe('settled-otherwise');
     expect(r.owed).toBe(0);
+    expect(canPayMoonOwner(r)).toBe(false);
+  });
+
+  it('settled otherwise from a later day keeps what accrued before it owed and payable', () => {
+    const r = rowOf(
+      input({
+        entries: [entry(A, '2026-10-05', 1000), entry(A, '2026-10-12', 1000)],
+        feeders: [feeder(A, { modeChanges: [{ from: '2026-10-10', mode: 'settled-otherwise' }] })],
+      })
+    );
+    expect(r.status).toBe('settled-otherwise');
+    expect(r.mode).toBe('settled-otherwise');
+    expect(r.owed).toBe(80);
+    expect(r.balance).toEqual({ kind: 'owed', isk: 80 });
+    expect(canPayMoonOwner(r)).toBe(true);
+  });
+
+  it('a requested rate alone owes nothing yet, asks for a look, and backdates once agreed', () => {
+    const asked = feeder(A, { agreedRatePct: undefined, requestedRatePct: 6 });
+    const r = rowOf(input({ feeders: [asked] }));
+    expect(r.owed).toBe(0);
+    expect(r.status).toBe('rate-asked');
+    expect(r.askedRatePct).toBe(6);
+    expect(r.theirRatePct).toBeUndefined();
+    expect(buildMoonOwners(input({ feeders: [asked] })).totals.needALook).toBe(1);
+    const agreedLater = feeder(A, {
+      ownerRateHistory: [
+        {
+          kind: 'requested',
+          pct: 6,
+          effectiveFrom: '2026-10-01',
+          recordedAt: '2026-10-01T10:00:00Z',
+        },
+        { kind: 'agreed', pct: 6, effectiveFrom: '2026-10-15', recordedAt: '2026-10-15T10:00:00Z' },
+      ],
+    });
+    const agreed = rowOf(input({ feeders: [agreedLater] }));
+    expect(agreed.owed).toBe(60);
+    expect(agreed.status).toBe('active');
+  });
+
+  it('a request newer than the agreed rate asks for a look; the agreed rate stands', () => {
+    const r = rowOf(
+      input({
+        feeders: [
+          feeder(A, {
+            ownerRateHistory: [
+              {
+                kind: 'agreed',
+                pct: 8,
+                effectiveFrom: '2026-10-01',
+                recordedAt: '2026-10-01T10:00:00Z',
+              },
+              {
+                kind: 'requested',
+                pct: 10,
+                effectiveFrom: '2026-10-10',
+                recordedAt: '2026-10-10T10:00:00Z',
+              },
+            ],
+          }),
+        ],
+      })
+    );
+    expect(r.status).toBe('rate-asked');
+    expect(r.askedRatePct).toBe(10);
+    expect(r.theirRatePct).toBe(8);
+    expect(r.owed).toBe(80);
   });
 
   it('shows the miner rate the book charges at their refineries', () => {
@@ -209,6 +277,10 @@ describe('buildMoonOwners', () => {
       'settled-otherwise'
     );
     expect(statusOf({ agreedRatePct: undefined })).toBe('no-rate');
+    expect(statusOf({ agreedRatePct: undefined, requestedRatePct: 5 })).toBe('rate-asked');
+    expect(
+      statusOf({ mode: 'settled-otherwise', agreedRatePct: undefined, requestedRatePct: 5 })
+    ).toBe('settled-otherwise');
     expect(statusOf({})).toBe('active');
     expect(statusOf({ status: 'disconnected' })).toBe('disconnected');
   });

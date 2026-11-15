@@ -19,7 +19,12 @@ import {
   type TaxPayment,
 } from './allocation';
 import { lastBillableDate } from './billable';
-import { splitByCoverageAndRead, type FeederReadClock } from './feederHealth';
+import {
+  earliestHeldDays,
+  heldBillableThrough,
+  splitByCoverageAndRead,
+  type FeederReadClock,
+} from './feederHealth';
 import { buildDayCharges, type DayCharge, type Miner } from './charges';
 import type { FeederCoverage } from './coverage';
 import { activeDismissalFor, type Dismissal } from './dismissals';
@@ -227,6 +232,8 @@ interface MinerInternals {
   allocationInput: AllocationInput;
   draft: StatementDraft;
   days: DayRow[];
+  /** The book's `billableThrough`, stopped before a day of this miner's that is held (#6209). */
+  billableThrough: string | undefined;
 }
 
 /** Which Extraction a refinery was working on a date: from fracture through expiry. */
@@ -357,7 +364,11 @@ export function standingOf(
 export function buildBookView(input: BookViewInput): BookView {
   const placeOf = placeOfFactory(input.extractions, input.structureExpiryHours);
   // Coverage first: a moon owner's day outside it owes nothing, so it never holds a miner's day.
-  const { readable: entries, outsideCoverage } = splitByCoverageAndRead(input.entries, {
+  const {
+    readable: entries,
+    outsideCoverage,
+    unread,
+  } = splitByCoverageAndRead(input.entries, {
     now: input.now,
     graceHours: input.graceHours,
     bookCorporationId: input.corporationId,
@@ -379,6 +390,7 @@ export function buildBookView(input: BookViewInput): BookView {
 
   const minerIds = minerIdsOf(input, charges);
   const latestCorp = latestCorporationOf(input.entries);
+  const heldFrom = earliestHeldDays(unread);
 
   const byMiner = new Map<string, MinerInternals>();
   const miners: MinerRow[] = [];
@@ -409,7 +421,8 @@ export function buildBookView(input: BookViewInput): BookView {
     };
     const allocation = allocatePayments(allocationInput);
     const forgivenKeys = forgivenDayKeys(statements, allocation, credits);
-    const draft = minerDraft(input, id, statements, mine, billableThrough);
+    const minerThrough = heldBillableThrough(billableThrough, characterIds, heldFrom);
+    const draft = minerDraft(input, id, statements, mine, minerThrough);
 
     const draftLines = draft.kind === 'nothing' ? [] : draft.lines;
     const unbilledKeys = new Set(draftLines.map((l) => l.chargeKey));
@@ -519,7 +532,15 @@ export function buildBookView(input: BookViewInput): BookView {
       paused,
     };
     miners.push(row);
-    byMiner.set(id, { statements, payments, allocation, allocationInput, draft, days });
+    byMiner.set(id, {
+      statements,
+      payments,
+      allocation,
+      allocationInput,
+      draft,
+      days,
+      billableThrough: minerThrough,
+    });
 
     for (const d of input.declarations) {
       if (d.resolution || !statements.some((s) => s.id === d.statementId)) continue;
@@ -871,7 +892,7 @@ export function planStatementRun(view: BookView, period: StatementPeriod): State
       issued: inner.statements,
       paidStatementIds: view.input.paidStatementIds,
       dismissals: view.input.dismissals,
-      billableThrough: view.billableThrough,
+      billableThrough: inner.billableThrough,
       minimumAmount: view.input.minimumStatement,
     });
     if (draft.kind === 'rolled-over') belowMinimum += 1;
@@ -1078,7 +1099,7 @@ function ownPeriodBilling(
       issued: view.internals.byMiner.get(m.id)!.statements,
       paidStatementIds: view.input.paidStatementIds,
       dismissals: view.input.dismissals,
-      billableThrough: view.billableThrough,
+      billableThrough: view.internals.byMiner.get(m.id)!.billableThrough,
       minimumAmount: minimum,
     });
     if (draft.kind === 'rolled-over') {

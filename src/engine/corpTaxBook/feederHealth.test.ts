@@ -6,6 +6,7 @@ import {
   splitByCoverageAndRead,
   withholdUnreadFeederDays,
   type FeederHealth,
+  heldBillableThrough,
 } from './feederHealth';
 import type { ObservedMiningEntry } from './types';
 
@@ -207,5 +208,21 @@ describe('splitByCoverageAndRead', () => {
     expect(split.outsideCoverage).toEqual([outside]);
     expect(split.readable).toEqual([read, own]);
     expect(split.unread).toEqual([notRead, sameDay]);
+  });
+});
+
+describe('heldBillableThrough (#6209)', () => {
+  const held = new Map([
+    [1, '2026-08-20'],
+    [2, '2026-08-25'],
+  ]);
+  it('stops a miner the day before its earliest held day', () => {
+    expect(heldBillableThrough('2026-09-17', [1], held)).toBe('2026-08-19');
+    expect(heldBillableThrough('2026-09-17', [2, 1], held)).toBe('2026-08-19');
+  });
+  it('leaves a miner with no held day, or held after it, as it is', () => {
+    expect(heldBillableThrough('2026-09-17', [3], held)).toBe('2026-09-17');
+    expect(heldBillableThrough('2026-08-10', [1], held)).toBe('2026-08-10');
+    expect(heldBillableThrough(undefined, [1], held)).toBeUndefined();
   });
 });

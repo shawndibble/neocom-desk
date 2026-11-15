@@ -65,6 +65,7 @@ import {
   type BookPartSet,
 } from '../taxBook/bookParts';
 import { moonOwnersNeedRows } from '@/engine/corpTaxBook/moonOwners';
+import { moonOwnerDayPrices } from '@/engine/corpTaxBook/valuation';
 import { forgetObservedCopy } from '../taxBook/observedStore';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 import { isRefineryPlaceholder, refineryPlaceholder, refineryUnreadable } from './moonsFormat';
@@ -596,9 +597,13 @@ async function loadBookPrices(data: BookData, from?: string) {
       const day = priceDay(prices, data.settings.hubId, date);
       return day.prices.size > 0 ? day : priceDay(prices, data.settings.hubId, loadedOn);
     },
-    // No fallback day: the moon owner's page prices an unsaved day at 0, so this does too.
+    // No fallback day; a type with no saved price takes what its miners are billed at that day
+    // (#6209), the way the moon owner's page takes it from the Statement.
     moonOwnerPricesOn: (date: string) =>
-      moonOwnerPricesAtHubOnDate(prices, hubForPayee(data.settings.hubId).id, date),
+      moonOwnerDayPrices(
+        moonOwnerPricesAtHubOnDate(prices, hubForPayee(data.settings.hubId).id, date),
+        priceDay(prices, data.settings.hubId, date).prices
+      ),
   };
 }
 

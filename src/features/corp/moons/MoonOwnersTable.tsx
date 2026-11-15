@@ -99,7 +99,13 @@ export function MoonOwnersTable({
       render: (r) =>
         r.mode === 'settled-otherwise'
           ? '—'
-          : (pct(r.theirRatePct) ?? <span className="text-text-dim">{t(k('notSet'))}</span>),
+          : (pct(r.theirRatePct) ?? (
+              <span className="text-text-dim">
+                {r.askedRatePct !== undefined
+                  ? t(k('askedRate'), { pct: r.askedRatePct })
+                  : t(k('notSet'))}
+              </span>
+            )),
       sortValue: (r) => r.theirRatePct ?? -1,
     },
     {
@@ -115,8 +121,11 @@ export function MoonOwnersTable({
       header: t(k('cols.owed')),
       align: 'right',
       className: 'tabular-nums',
+      // Settled otherwise still shows what was owed before the switch (#6209).
       render: (r) =>
-        r.mode === 'settled-otherwise' ? (
+        r.owed > 0 ? (
+          isk(r.owed)
+        ) : r.mode === 'settled-otherwise' ? (
           '—'
         ) : r.theirRatePct === undefined ? (
           <span className="text-text-dim">{t(k('nothingDue'))}</span>

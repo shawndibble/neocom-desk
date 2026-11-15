@@ -138,3 +138,37 @@ export function splitByCoverageAndRead<
   const kept = new Set(readable);
   return { readable, unread: covered.filter((r) => !kept.has(r)), outsideCoverage };
 }
+
+/**
+ * The last day a miner's next Statement may cover while one of its days is held (#6209): the day
+ * before its earliest held day, else the book's `billableThrough`. A Statement must not cover a
+ * held day: once paid, ore that lands on that day later would be written off as recorded after
+ * payment instead of reaching the next Statement.
+ */
+export function heldBillableThrough(
+  billableThrough: string | undefined,
+  characterIds: readonly number[],
+  heldFrom: ReadonlyMap<number, string>
+): string | undefined {
+  if (billableThrough === undefined) return undefined;
+  let through = billableThrough;
+  for (const id of characterIds) {
+    const held = heldFrom.get(id);
+    if (held === undefined) continue;
+    const before = shiftDate(held, -1);
+    if (before < through) through = before;
+  }
+  return through;
+}
+
+/** Each character's earliest held day, from `splitByCoverageAndRead`'s `unread` rows. */
+export function earliestHeldDays(
+  unread: readonly Pick<ObservedMiningEntry, 'characterId' | 'date'>[]
+): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const r of unread) {
+    const held = out.get(r.characterId);
+    if (held === undefined || r.date < held) out.set(r.characterId, r.date);
+  }
+  return out;
+}

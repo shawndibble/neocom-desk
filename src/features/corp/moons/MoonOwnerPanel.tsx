@@ -7,6 +7,7 @@ import { Button, LoadFailedState, Spinner } from '@/components/ui';
 import { leaveFeeder, type FeederSetupStatus } from '../taxBook/feederClient';
 import {
   RECONNECT_CODE,
+  disputeFeederPayout,
   requestFeederRate,
   setFeederPayee,
   setOwnRefineryLabel,
@@ -95,6 +96,10 @@ export function MoonOwnerPanel({
         }}
         onRequestRate={async (pct) => {
           await requestFeederRate(characterId, corporationId, pct);
+          reload();
+        }}
+        onDisputePayout={async (payoutId, disputed) => {
+          await disputeFeederPayout(characterId, corporationId, payoutId, disputed);
           reload();
         }}
         characterId={characterId}

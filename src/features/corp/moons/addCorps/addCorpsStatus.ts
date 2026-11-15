@@ -63,7 +63,7 @@ export const isGoneQuiet = (row: OwnerRowLike): boolean =>
   row.sameOwner === true && (row.status === 'cant-read' || row.status === 'disconnected');
 
 /** Moon owner statuses the sync still reads (a removal or a disconnect asks for nothing else). */
-const READ = new Set(['active', 'no-rate', 'settled-otherwise']);
+const READ = new Set(['active', 'rate-asked', 'no-rate', 'settled-otherwise']);
 
 /** Whether a moon owner the book reads came without refinery names. */
 const lacksNames = (row: OwnerRowLike): boolean =>
