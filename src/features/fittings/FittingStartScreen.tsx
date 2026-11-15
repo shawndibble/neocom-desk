@@ -17,6 +17,11 @@ import {
   RowActionsMenu,
   RowMoreActions,
   SearchInput,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   TabPanel,
   Tooltip,
@@ -25,11 +30,20 @@ import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import type { FittingRecord } from '@/db';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
-import { filterMyFittings, groupByHull } from '@/engine/fittings/myFittings';
+import {
+  effectiveSource,
+  filterBySource,
+  filterMyFittings,
+  groupByHull,
+  LIBRARY_SOURCES,
+  librarySources,
+  type LibrarySource,
+  type LibrarySourcePick,
+} from '@/engine/fittings/myFittings';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { textParam } from '@/lib/urlState';
+import { enumParam, textParam } from '@/lib/urlState';
 import { useUrlParam } from '@/lib/useUrlState';
 import { warmDogmaEngine } from './dogmaFittingEngine';
 import { StatNote } from './StatFacts';
@@ -97,6 +111,16 @@ interface FittingStartScreenProps {
  */
 const QUERY_KEY = 'q';
 const QUERY_PARAM = textParam();
+/** The page's Source filter (issue #6217), in the URL beside the search as `?source=`. */
+const SOURCE_KEY = 'source';
+const SOURCE_PARAM = enumParam(['all', ...LIBRARY_SOURCES] as const, 'all');
+const SOURCE_LABEL: Record<LibrarySourcePick, string> = {
+  all: 'fittings.start.allSources',
+  saved: 'fittings.start.sourceSaved',
+  inGame: 'fittings.start.sourceInGame',
+  shared: 'fittings.start.sourceShared',
+  doctrine: 'fittings.start.sourceDoctrine',
+};
 
 /** The content under a page tab bar as its panel; without a bar it is just the content. */
 function MaybeTabPanel({
@@ -150,6 +174,11 @@ export function FittingStartScreen({
   const [dialogQuery, setDialogQuery] = useState('');
   const query = page ? urlQuery : dialogQuery;
   const setQuery = page ? setUrlQuery : setDialogQuery;
+  // The Source filter keeps to the search's rule: the page's in the URL, a dialog's its own.
+  const [urlSource, setUrlSource] = useUrlParam(SOURCE_KEY, SOURCE_PARAM);
+  const [dialogSource, setDialogSource] = useState<LibrarySourcePick>('all');
+  const pickedSource = page ? urlSource : dialogSource;
+  const setSource = page ? setUrlSource : setDialogSource;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // The row the pointer is resting on, and its timer to take the preview.
   const hover = useRef<{ rowId: string; timer: ReturnType<typeof setTimeout> } | null>(null);
@@ -214,11 +243,20 @@ export function FittingStartScreen({
       t,
     ]
   );
-  const groups = useMemo(() => groupByHull(filterMyFittings(rows, query)), [rows, query]);
-  // Above the hulls, so it is the first pick.
+  // Only the sources with rows are offered; a pick whose source has emptied reads as All sources.
+  const sources = useMemo<LibrarySource[]>(
+    () => librarySources(active.row ? [...rows, active.row] : rows),
+    [rows, active.row]
+  );
+  const source = effectiveSource(pickedSource, sources);
+  const groups = useMemo(
+    () => groupByHull(filterMyFittings(filterBySource(rows, source), query)),
+    [rows, source, query]
+  );
+  // Above the hulls, so it is the first pick. It is the ship fitted in game: In-game.
   const activeShown = useMemo(
-    () => (active.row ? filterMyFittings([active.row], query) : []),
-    [active.row, query]
+    () => (active.row ? filterMyFittings(filterBySource([active.row], source), query) : []),
+    [active.row, source, query]
   );
   const visible = useMemo(
     () => [...activeShown, ...groups.flatMap((group) => group.rows)],
@@ -450,15 +488,40 @@ export function FittingStartScreen({
       {pageTabs}
       <MaybeTabPanel panel={pageTabsPanel}>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="min-w-64 flex-1">
-            <SearchInput
-              aria-label={t('fittings.start.searchFittings')}
-              placeholder={t('fittings.start.searchFittingsPlaceholder')}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              // The page's own box; a dialog's is a passing pick, not a `/` target.
-              pageSearch={page}
-            />
+          {/* The Source filter stays on the search's line, down to a phone. */}
+          <div className="flex min-w-64 flex-1 gap-2">
+            <div className="min-w-0 flex-1">
+              <SearchInput
+                aria-label={t('fittings.start.searchFittings')}
+                placeholder={t('fittings.start.searchFittingsPlaceholder')}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                // The page's own box; a dialog's is a passing pick, not a `/` target.
+                pageSearch={page}
+              />
+            </div>
+            {/* One source has nothing to narrow to. */}
+            {sources.length > 1 && (
+              <Select
+                value={source}
+                onValueChange={(value) => setSource(value as LibrarySourcePick)}
+              >
+                <SelectTrigger
+                  active={source !== 'all'}
+                  aria-label={t('fittings.start.sourceFilter')}
+                  className="w-32 shrink-0"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(['all', ...sources] as const).map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {t(SOURCE_LABEL[option])}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           {/* A dialog has no page header for the In-game refresh: it sits by the search. */}
           {!pageTitle && refreshInGameButton}

@@ -44,3 +44,36 @@ export function filterMyFittings<T extends MyFittingRow>(rows: readonly T[], que
       row.name.toLowerCase().includes(needle) || (row.hull?.toLowerCase().includes(needle) ?? false)
   );
 }
+
+/**
+ * A Source filter's choices for the Fittings library (issue #6217), in the
+ * order they are offered. The Active Fitting has none of its own: it is the
+ * ship fitted in game, so it counts as In-game.
+ */
+export const LIBRARY_SOURCES = ['saved', 'inGame', 'shared', 'doctrine'] as const;
+export type LibrarySource = (typeof LIBRARY_SOURCES)[number];
+export type LibrarySourcePick = LibrarySource | 'all';
+
+const sourceOf = (source: string): string => (source === 'active' ? 'inGame' : source);
+
+/** The sources that have at least one row, in `LIBRARY_SOURCES` order. */
+export function librarySources(rows: readonly { source: string }[]): LibrarySource[] {
+  const present = new Set(rows.map((row) => sourceOf(row.source)));
+  return LIBRARY_SOURCES.filter((source) => present.has(source));
+}
+
+/** Keeps the rows of the picked source; `all` keeps every row. */
+export function filterBySource<T extends { source: string }>(
+  rows: readonly T[],
+  pick: LibrarySourcePick
+): T[] {
+  return pick === 'all' ? [...rows] : rows.filter((row) => sourceOf(row.source) === pick);
+}
+
+/** The pick, or All sources once its source has no rows, so a stale pick never empties the list. */
+export function effectiveSource(
+  pick: LibrarySourcePick,
+  offered: readonly LibrarySource[]
+): LibrarySourcePick {
+  return pick !== 'all' && offered.includes(pick) ? pick : 'all';
+}
