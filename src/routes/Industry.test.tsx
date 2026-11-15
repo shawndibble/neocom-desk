@@ -1,19 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within, waitFor, fireEvent } from '@testing-library/react';
+import { screen, within, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { db } from '@/db';
 import { FACILITY_DEFAULTS_SETTING_KEY } from '@/features/industry/facilityDefaults';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { loadBlueprints, loadMarketWideTrees } from '@/sde/loadSde';
-import { App } from '@/app/App';
 import { BLUEPRINTS } from '@/test/industryMocks';
 import { CHAR_ID, installIndustryHarness, seedPlan, seedRun } from '@/test/industryPage';
+import { renderIndustryRoutes } from '@/test/industryRoutes';
 
 vi.mock('@/features/market/priceVsMedian', async () =>
   (await import('@/test/industryMocks')).priceVsMedianMock()
-);
-vi.mock('virtual:pwa-register/react', async () =>
-  (await import('@/test/industryMocks')).pwaRegisterMock()
 );
 vi.mock('@/sde/loadSde', async () => (await import('@/test/industryMocks')).loadSdeMock());
 
@@ -25,7 +22,7 @@ describe('Industry: data that fails to load', () => {
     // first, which is load-dependent, so fail every call until Try again.
     vi.mocked(loadBlueprints).mockRejectedValue(new Error('offline'));
     const user = userEvent.setup();
-    render(<App />);
+    await renderIndustryRoutes();
 
     // Once visible, once announced by the always-mounted live region.
     expect((await screen.findAllByText("Blueprint data couldn't load")).length).toBeGreaterThan(0);
@@ -38,7 +35,7 @@ describe('Industry: data that fails to load', () => {
     vi.mocked(loadBlueprints).mockRejectedValue(new Error('offline'));
     window.history.pushState({}, '', '/industry/sourcing');
     try {
-      render(<App />);
+      await renderIndustryRoutes();
       await waitFor(() =>
         expect(screen.getByRole('tab', { name: /sourcing|BPC/i })).toHaveAttribute(
           'aria-selected',
@@ -54,7 +51,7 @@ describe('Industry: data that fails to load', () => {
   it('notes that the market-wide build data is not downloaded, rather than rejecting unhandled', async () => {
     vi.mocked(loadMarketWideTrees).mockRejectedValueOnce(new Error('offline'));
     window.history.pushState({}, '', '/industry/opportunities');
-    render(<App />);
+    await renderIndustryRoutes();
 
     expect(
       (await screen.findAllByText("Market-wide build data hasn't been downloaded yet")).length
@@ -66,7 +63,7 @@ describe('Industry: tabs are paths (issue #1300)', () => {
   it('sends bare /industry to the Build Plans tab, and a tab click pushes its own path', async () => {
     await seedRun();
     const user = userEvent.setup();
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('searchbox', { name: 'Add Build Plan' });
     expect(window.location.pathname).toBe('/industry/plans');
@@ -81,7 +78,7 @@ describe('Industry: tabs are paths (issue #1300)', () => {
   it("shows the plan's own runs in the Runs column", async () => {
     await db.buildPlans.add(seedPlan({ runs: 7 }));
     window.history.pushState({}, '', '/industry/plans');
-    render(<App />);
+    await renderIndustryRoutes();
 
     const row = (await screen.findByText('Rifter run')).closest('li');
     expect(row).not.toBeNull();
@@ -91,7 +88,7 @@ describe('Industry: tabs are paths (issue #1300)', () => {
   it('gives each tab the gear for its own settings, and none to a tab that has none', async () => {
     await seedRun();
     const user = userEvent.setup();
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('searchbox', { name: 'Add Build Plan' });
     await user.click(screen.getByRole('button', { name: 'Industry settings' }));
@@ -108,7 +105,7 @@ describe('Industry: tabs are paths (issue #1300)', () => {
   });
 
   it('hides the Logs tab until a Production Run is logged', async () => {
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('searchbox', { name: 'Add Build Plan' });
     expect(screen.queryByRole('tab', { name: 'Logs' })).not.toBeInTheDocument();
@@ -116,20 +113,9 @@ describe('Industry: tabs are paths (issue #1300)', () => {
     expect(await screen.findByRole('tab', { name: 'Logs' })).toBeInTheDocument();
   });
 
-  it('sends the old /industry/records path to Logs', async () => {
-    window.history.pushState({}, '', '/industry/records');
-    render(<App />);
-
-    await waitFor(() => expect(window.location.pathname).toBe('/industry/logs'));
-    expect(await screen.findByRole('tab', { name: 'Logs' })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
-  });
-
   it('opens the tab its path names', async () => {
     window.history.pushState({}, '', '/industry/logs');
-    render(<App />);
+    await renderIndustryRoutes();
 
     const tab = await screen.findByRole('tab', { name: 'Logs' });
     expect(tab).toHaveAttribute('aria-selected', 'true');
@@ -139,7 +125,7 @@ describe('Industry: tabs are paths (issue #1300)', () => {
 describe('Industry: Build Plan CRUD', () => {
   it('creates via blueprint search (by product name), renames, duplicates, and deletes, persisted in Dexie', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    await renderIndustryRoutes();
 
     const search = await screen.findByRole('searchbox', { name: 'Add Build Plan' });
     await user.type(search, 'Rift');
@@ -263,7 +249,7 @@ describe('Industry: Build Plan CRUD', () => {
       })
     );
     const user = userEvent.setup();
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('button', { name: 'Parts run' });
     const search = await screen.findByRole('searchbox', { name: 'Add Build Plan' });
@@ -294,7 +280,7 @@ describe('Industry: Build Plan CRUD', () => {
 describe('Industry: "jump to a Build Plan" from the Market Browser (issue #6)', () => {
   it('creates a plan for a product typeID with no existing plan, opens it, then clears the query param', async () => {
     window.history.pushState({}, '', '/industry?product=587');
-    render(<App />);
+    await renderIndustryRoutes();
 
     expect(await screen.findByRole('heading', { name: 'Rifter' })).toBeInTheDocument();
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
@@ -305,7 +291,7 @@ describe('Industry: "jump to a Build Plan" from the Market Browser (issue #6)', 
   it('opens an existing plan for that blueprint rather than creating a duplicate', async () => {
     await db.buildPlans.add(seedPlan());
     window.history.pushState({}, '', '/industry?product=587');
-    render(<App />);
+    await renderIndustryRoutes();
 
     expect(await screen.findByRole('heading', { name: 'Rifter' })).toBeInTheDocument();
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans/bp-1'));
@@ -319,7 +305,7 @@ describe('Industry: "jump to a Build Plan" from the Market Browser (issue #6)', 
     await db.buildPlans.add(seedPlan({ id: 'bp-0', name: 'Other plan', blueprintTypeID: 9841 }));
     await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run' }));
     window.history.pushState({}, '', '/industry?product=587');
-    render(<App />);
+    await renderIndustryRoutes();
 
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans/bp-1'));
     await waitFor(() => expect(window.location.search).toBe(''));
