@@ -13,6 +13,11 @@
  *   test-scoped signal that is aborted when the test ends; MSW honours it for
  *   mocked responses too, so the caller's promise rejects even when the
  *   handler is parked on a deferred that never resolves.
+ * - **`fetch` a test's work starts after the test ended** — a load still
+ *   awaiting IndexedDB or a token when the body returned. It is refused with
+ *   the same `AbortError`, never sent: sent untracked, it parked on the ended
+ *   test's never-resolving handler until the ESI client's 30s timeout, and
+ *   every later test's same-key load deduped onto it (#6188).
  * - **IndexedDB requests and transactions** (Dexie writes, and Firebase's
  *   heartbeat probe, whose `onsuccess` reads `self` — "self is not defined"
  *   once jsdom is gone). Opens, deletes and transactions are tracked until they
@@ -57,12 +62,29 @@ export function restoreRealTimers(): void {
 // fetch
 // ---------------------------------------------------------------------------
 
-/** The running test's; `null` between tests, so hook-time requests run untracked. */
+/**
+ * Who a `fetch` belongs to right now:
+ *
+ * - `hooks` — a suite's `beforeAll` (a warm-up render, seeding) before its
+ *   first test: the request runs untracked.
+ * - `test` — the running test, from its `beforeEach` to the end of its body:
+ *   the request carries `testController`'s signal.
+ * - `ended` — after a test's body, until the next test's `beforeEach` or the
+ *   next suite: whatever starts a request here is the ended test's leftover
+ *   work (no `afterEach` or `afterAll` in the repo fetches), so it is refused.
+ */
+type FetchPhase = 'hooks' | 'test' | 'ended';
+let phase: FetchPhase = 'hooks';
+/** The running test's; `null` outside the `test` phase. */
 let testController: AbortController | null = null;
 const pendingFetches = new Set<Promise<unknown>>();
 const WRAPPED = Symbol('teardown-wrapped-fetch');
 
 type TrackedFetch = typeof fetch & { [WRAPPED]?: true };
+
+function testEnded(): DOMException {
+  return new DOMException(ENDED, 'AbortError');
+}
 
 function callerSignal(input: RequestInfo | URL, init?: RequestInit): AbortSignal | undefined {
   if (init?.signal) return init.signal;
@@ -79,6 +101,9 @@ function wrapFetch(): void {
   const inner = globalThis.fetch as TrackedFetch | undefined;
   if (typeof inner !== 'function' || inner[WRAPPED]) return;
   const tracked: TrackedFetch = (input, init) => {
+    // Rejected as an aborted in-flight request would be, so the app takes the
+    // same path either way.
+    if (phase === 'ended') return Promise.reject(testEnded());
     const controller = testController;
     if (controller === null) return inner(input, init);
     const own = callerSignal(input, init);
@@ -95,18 +120,27 @@ function wrapFetch(): void {
 
 /** Before each test: a fresh signal for its requests. */
 export function beginTestFetches(): void {
+  phase = 'test';
   testController = new AbortController();
   wrapFetch();
 }
 
 /**
- * Aborts every request the test still has in flight. Requests made after this
- * (a later `beforeAll`, the file's `afterEach`) go through untracked: they
- * belong to hooks, not to the test.
+ * Aborts every request the test still has in flight, and refuses any it
+ * starts from now until the next test or suite begins.
  */
 export function abortTestFetches(): void {
-  testController?.abort(new DOMException(ENDED, 'AbortError'));
+  testController?.abort(testEnded());
   testController = null;
+  phase = 'ended';
+}
+
+/**
+ * A suite is starting: its `beforeAll` may fetch (a warm-up render), and runs
+ * untracked. Called by `vitest.runner.ts`.
+ */
+export function beginSuiteFetches(): void {
+  phase = 'hooks';
 }
 
 // ---------------------------------------------------------------------------
@@ -245,16 +279,22 @@ export function unmountAtTestEnd(cleanup: () => void): void {
  * first: a UI left mounted while the step waits keeps running (a settings
  * load hydrating, an effect calling a mock the next test has reset). Then
  * abort the test's requests and let their rejections land, so the file's own
- * resets run after them. Requests only: IndexedDB is drained in `afterEach`,
- * on real timers — `fake-indexeddb` runs on `setImmediate`, which a test may
- * have faked.
+ * resets run after them.
+ *
+ * IndexedDB is drained here too, so a load that was still reading a token or
+ * a cached row reaches its `fetch` now, is refused, and fails before the
+ * file's resets rather than after them (a price source marked down for the
+ * next test). Not under fake timers: `fake-indexeddb` runs on `setImmediate`,
+ * which a test may have faked; the shared `afterEach` drains it on real ones.
  */
 export async function endTestWork(): Promise<void> {
   unmountRendered?.();
   abortTestFetches();
-  await settleOrWarn(expect.getState().currentTestName, 'fetch');
+  await settleOrWarn(expect.getState().currentTestName, vi.isFakeTimers() ? 'fetch' : 'all');
 }
 
 /** How `vitest.runner.ts` reaches this module's state without importing it. */
 export const END_TEST_WORK = Symbol.for('neocom-desk.endTestWork');
+export const BEGIN_SUITE = Symbol.for('neocom-desk.beginSuite');
 (globalThis as Record<symbol, unknown>)[END_TEST_WORK] = endTestWork;
+(globalThis as Record<symbol, unknown>)[BEGIN_SUITE] = beginSuiteFetches;

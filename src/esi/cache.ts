@@ -435,12 +435,16 @@ async function withDedupe<R>(
     reason,
     global: characterId === GLOBAL_CACHE_CHARACTER_ID,
   });
+  let entry: { promise: Promise<unknown>; lane: EsiLane | undefined } | undefined;
   try {
     const promise = run();
-    inFlightLoads.set(dkey, { promise, lane });
+    entry = { promise, lane };
+    inFlightLoads.set(dkey, entry);
     return await promise;
   } finally {
-    inFlightLoads.delete(dkey);
+    // Only its own entry: a test's settle may have dropped it already
+    // (`settleEsiCacheLoads`), and a newer load may hold the key now.
+    if (entry && inFlightLoads.get(dkey) === entry) inFlightLoads.delete(dkey);
     endMiss();
   }
 }
@@ -466,7 +470,8 @@ function trackLoad<R>(characterId: number, key: string, run: () => Promise<R>): 
  * body is parsed and `esiCache.put` runs), this waits for the write itself, so a
  * read that outlives its test can't land in the next test's freshly cleared
  * cache. Throws, naming the keys still pending, rather than letting the next
- * test read a poisoned cache.
+ * test read a poisoned cache; those loads are forgotten, so no later load
+ * dedupes onto one.
  */
 export async function settleEsiCacheLoads(timeoutMs = 3000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -487,6 +492,11 @@ export async function settleEsiCacheLoads(timeoutMs = 3000): Promise<void> {
     clearTimeout(timer);
     if (outcome === 'timeout') {
       const keys = [...new Set(pending.map((entry) => entry.key))].join(', ');
+      // Forgotten, so the next test's load of the same key starts its own
+      // request instead of joining this stuck one, and its settle doesn't
+      // wait on it again.
+      inFlightLoads.clear();
+      pendingLoads.clear();
       throw new Error(`ESI cache load still pending after ${timeoutMs}ms: ${keys}`);
     }
     // Let the `finally` blocks that deregister the loads run before re-checking.
