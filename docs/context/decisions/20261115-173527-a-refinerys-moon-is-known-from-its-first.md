@@ -1,0 +1,7 @@
+# Scope decisions — A refinery's moon is known from its first Extraction (issue #6240)
+
+_Recorded 2026-11-15 · issue #6240._
+
+- **A refinery's moon is known once the book has any Extraction there, its own or a moon owner's, past, cancelled or live.** The book keeps every Extraction it ever synced, so a refinery between cycles (idle) keeps its moon: the Sharing tab lists it and its Moon overrides save. The server's `unknown-moon` check reads the same stored Extractions, so the two never disagree.
+- **A refinery with no Extraction yet is listed on the Sharing tab without a moon, and cannot be configured until its first Extraction syncs.** Nothing the book holds names its moon: ESI's mining observers, ledgers, structure lookups and refinery labels carry the refinery and its system, never the moon. Working it out from the structure's position against every moon in the system was ruled out: it needs docking access for each structure plus a lookup per moon, and guesses where two moons sit close. Nothing is lost by waiting: a new Extraction is synced within 6 hours and runs for days before it pops, and the Sharing default applies to it the moment it appears, so an officer still sets its overrides before the first pop. Overrides stay keyed by moon.
+- **Which refineries the book knows without an Extraction:** its own, from the mining observers the Automatic sync read (`meta/scheduledSync.systemIds`), and each handled moon owner's, from the refinery labels, systems and structure reads on its record.

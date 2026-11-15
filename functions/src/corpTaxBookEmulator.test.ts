@@ -1778,6 +1778,31 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       );
     });
 
+    it("saves an idle refinery's moon: one Extraction long past, cancelled, or a moon owner's (#6240)", async () => {
+      await turnOn();
+      const pulls = book().collection('extractions');
+      await pulls.doc('1000_1').set({
+        structureId: 1000,
+        moonId: 7,
+        extractionStartTime: '2024-01-01T00:00:00Z',
+        naturalDecayTime: '2024-01-07T00:00:00Z',
+      });
+      await pulls.doc('1001_1').set({
+        structureId: 1001,
+        moonId: 8,
+        extractionStartTime: '2025-03-01T00:00:00Z',
+        cancelledAt: '2025-03-02T00:00:00Z',
+      });
+      await pulls.doc('2000_1').set({ structureId: 2000, moonId: 9, sourceCorporationId: 555 });
+      for (const moonId of [7, 8, 9])
+        await edit(ACCOUNTANT, { action: 'setPopSharingMoon', moonId, set: { notes: 'idle' } });
+      expect((await popSharing())?.moons).toEqual({
+        '7': { notes: 'idle' },
+        '8': { notes: 'idle' },
+        '9': { notes: 'idle' },
+      });
+    });
+
     it('refuses a read-only officer, and a moon the book does not handle', async () => {
       await turnOn();
       expect(

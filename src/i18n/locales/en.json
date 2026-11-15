@@ -17847,6 +17847,10 @@
         "moonsSummary_one": "{{count}} moon",
         "moonsSummary_other": "{{count}} moons",
         "noMoons": "No moons yet: they appear once the book syncs an Extraction.",
+        "unplaced": {
+          "title": "Waiting for a first Extraction",
+          "hint": "These refineries have no Extraction yet, so their moon isn't known and they can't be set. Each one joins the moons above when its first Extraction syncs, following the Sharing default until you set it."
+        },
         "loadFailed": "Could not load the sharing settings",
         "setForMoon": "Set for this moon",
         "followsDefault": "Sharing default",

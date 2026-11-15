@@ -1586,7 +1586,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
 /**
  * Pop Sharing settings (#6222): the switch, the Sharing default and Moon overrides, in
  * `meta/popSharing`. Turning sharing on needs Automatic sync running; a Moon override must
- * name a moon the book has an Extraction for (its own or a moon owner's).
+ * name a moon the book has an Extraction for (its own or a moon owner's). Every Extraction ever
+ * synced is kept, past and cancelled ones too, so a refinery between cycles keeps its moon; one
+ * with no Extraction yet has no known moon (#6240).
  */
 async function applyPopSharingEdit(
   c: EditCtx,
