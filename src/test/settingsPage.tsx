@@ -2,12 +2,9 @@ import { afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { render, screen, within, type RenderResult } from '@testing-library/react';
 import type userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { Route } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { ESI_BASE_URL } from '@/esi/client';
-import { SETTINGS_TABS } from '@/app/pageTabs';
-import { TabRoute } from '@/app/TabRoute';
 import { Settings } from '@/routes/Settings';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { useActivityLog } from '@/stores/activityLog';
@@ -44,7 +41,7 @@ import {
   DEFAULT_NOTIFICATION_PROMPT_STATE,
 } from '@/features/notifications/permission';
 import { mswServer } from '@/test/msw';
-import { renderRoutesWithoutApp } from '@/test/routesWithoutApp';
+import { renderPageRoute } from '@/test/renderPage';
 
 // Shared harness for the Settings route tests (src/routes/Settings*.test.tsx),
 // one file per area so CI runs them in parallel. The `vi.mock` calls stay in
@@ -55,21 +52,11 @@ export const CHAR_ID = 91;
 
 /**
  * The Settings page at the current `window.location` (`/settings` or a section
- * under it), mounted the way `App` mounts it, inside its `TabRoute`, without
- * booting `App`. The App-level wiring (redirects to Help and Login, the `?`
+ * under it), through `renderPageRoute`. The App-level wiring (redirects to Help and Login, the `?`
  * shortcut, the shell's own rail) stays in `src/routes/SettingsApp.test.tsx`.
  */
 export function renderSettingsPage(): RenderResult {
-  return renderRoutesWithoutApp(
-    <Route
-      path="/settings/*"
-      element={
-        <TabRoute page={SETTINGS_TABS}>
-          <Settings />
-        </TabRoute>
-      }
-    />
-  );
+  return renderPageRoute('/settings', <Settings />);
 }
 
 /**

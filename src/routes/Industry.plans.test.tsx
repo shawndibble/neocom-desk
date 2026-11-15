@@ -11,7 +11,8 @@ import {
   seedPlan,
   server,
 } from '@/test/industryPage';
-import { holdHydration, renderIndustryRoutes } from '@/test/industryRoutes';
+import { holdHydration } from '@/test/holdHydration';
+import { renderIndustryRoutes } from '@/test/industryRoutes';
 
 vi.mock('@/features/market/priceVsMedian', async () =>
   (await import('@/test/industryMocks')).priceVsMedianMock()

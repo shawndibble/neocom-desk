@@ -95,6 +95,15 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   render (lazy route chunks, jsdom, React warm-up), which lands on whichever
   test happens to run first. Pay it once in a `beforeAll` warm-up render with
   its own hook timeout, as `src/routes/IndustryPlanPage.test.tsx` does.
+- **Test a page through `renderPageRoute` / `renderPageRoutes`
+  (`src/test/renderPage.tsx`), not `<App />`.** It mounts the route with
+  App's own per-page wiring (`src/app/appWiring.tsx`: ScopeGate, TabRoute,
+  info modals, ESI token provider, store hydration) and none of its boot,
+  shell or pollers, which is what cost a whole-App route test seconds per
+  scenario. Keep only one to three `<App />` tests per route, for what only
+  App does: the URL is reachable, legacy paths and redirects, the shell, auth
+  gating. Wrap it in a one-line area helper (`renderMarketRoute`) if a page's
+  tests need one; never copy its wiring.
 - **Unit shards are dealt out by file run time, not by hash.** `ci.yml`'s
   `test-shard` jobs run the files `scripts/test-shard.mjs` assigns them, using
   `scripts/test-shard-weights.json` (seconds per file). A new test file needs

@@ -18,7 +18,7 @@ import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
 import { Contracts } from '@/routes/Contracts';
-import { renderRouteWithoutShell } from '@/test/routeWithoutShell';
+import { renderPageRoute } from '@/test/renderPage';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { stubViewport } from '@/test/viewport';
 
@@ -153,7 +153,7 @@ beforeAll(async () => {
 
 /** The Contracts page on its route, without App's boot or the signed-in shell. */
 function renderContracts() {
-  return renderRouteWithoutShell('/contracts', <Contracts />);
+  return renderPageRoute('/contracts', <Contracts />);
 }
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
