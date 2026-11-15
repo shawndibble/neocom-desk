@@ -6,7 +6,13 @@ import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { App } from '@/app/App';
-import { installWalletHarness, CHAR_ID, journalPage1, server } from '@/test/walletPage';
+import {
+  installWalletHarness,
+  renderWalletRoute,
+  CHAR_ID,
+  journalPage1,
+  server,
+} from '@/test/walletPage';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -35,18 +41,41 @@ vi.mock('@/sde/loadSde', () => ({
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
-installWalletHarness();
+installWalletHarness({ warmApp: true });
 
-describe('Wallet', () => {
+// The App wiring: the URL reaches the page, and the legacy Market LP Store
+// paths, which only App's route table owns, land on Wallet's tab. Every other
+// scenario renders the route on its own (`renderWalletRoute`).
+describe('Wallet in the App', () => {
   it('shows the balance tab by default, from mocked ESI', async () => {
     render(<App />);
     expect(await screen.findByText('EverMarks')).toBeInTheDocument();
   });
 
-  it('shows EverMarks (Paragon LP) alongside ISK, with no per-corporation loyalty table', async () => {
+  it('moves an old Market LP Store link to Wallet, keeping the corporation and query (issue #3527)', async () => {
+    window.history.pushState({}, '', '/market/lp-store/1000167?affordableOnly=0#x');
     render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store/1000167'));
+    expect(window.location.search).toBe('?affordableOnly=0');
+    expect(window.location.hash).toBe('#x');
+    expect(
+      await screen.findByRole('tab', { name: 'LP Store', selected: true })
+    ).toBeInTheDocument();
+  });
+
+  it('moves the old Market LP Store landing to Wallet with its search (issue #3527)', async () => {
+    window.history.pushState({}, '', '/market/lp-store?q=tritanium');
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store'));
+    expect(window.location.search).toBe('?q=tritanium');
+  });
+});
+
+describe('Wallet', () => {
+  it('shows EverMarks (Paragon LP) alongside ISK, with no per-corporation loyalty table', async () => {
+    renderWalletRoute();
     expect(await screen.findByText('EverMarks')).toBeInTheDocument();
-    expect(screen.getByText('250')).toBeInTheDocument();
+    expect(await screen.findByText('250')).toBeInTheDocument();
     // The per-corporation list is the LP Store tab's, not Balance's.
     expect(screen.queryByRole('table', { name: 'Loyalty Points' })).not.toBeInTheDocument();
     expect(screen.queryByText('Caldari Navy')).not.toBeInTheDocument();
@@ -68,13 +97,13 @@ describe('Wallet', () => {
       )
     );
     window.history.pushState({}, '', '/wallet?char=all');
-    render(<App />);
+    renderWalletRoute();
     const everMarks = (await screen.findByText('EverMarks')).closest('div') as HTMLElement;
     expect(await within(everMarks).findByText('300')).toBeInTheDocument();
   });
 
   it('explains EverMarks with an info tooltip beside the label', async () => {
-    render(<App />);
+    renderWalletRoute();
     const label = await screen.findByText('EverMarks');
     // The glyph is a sibling of the label text, not a tooltip parked elsewhere
     // on the panel — that adjacency is the whole point of the affordance.
@@ -93,7 +122,7 @@ describe('Wallet', () => {
 
   it('shows the journal, concatenating every page, newest first', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     const rows = await screen.findAllByRole('row');
     // header + 2 entries, newest (2026-08-02) first
@@ -135,7 +164,7 @@ describe('Wallet', () => {
       )
     );
     window.history.pushState({}, '', '/wallet/journal');
-    render(<App />);
+    renderWalletRoute();
     const link = await screen.findByRole('link', { name: /Tritanium/ });
     expect(link.getAttribute('href')).toContain('info=type-34');
     // The bounty line has no fill behind it, so it names no item.
@@ -145,20 +174,20 @@ describe('Wallet', () => {
 
   it('opens straight to the journal tab when a walletBalanceChanged notification deep-links here', async () => {
     window.history.pushState({}, '', '/wallet/journal');
-    render(<App />);
+    renderWalletRoute();
     expect(await screen.findByText('Bounty')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Journal' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('shows Balance, Journal and LP Store tabs (issue #3527)', async () => {
-    render(<App />);
+    renderWalletRoute();
     const tabs = within(await screen.findByRole('tablist', { name: 'Wallet' })).getAllByRole('tab');
     expect(tabs.map((tab) => tab.textContent)).toEqual(['Balance', 'Journal', 'LP Store']);
   });
 
   it("opens the LP Store from Wallet's tab, leaving Wallet's query behind (issue #3527)", async () => {
     window.history.pushState({}, '', '/wallet/journal?journal.q=bounty');
-    render(<App />);
+    renderWalletRoute();
     fireEvent.click(await screen.findByRole('tab', { name: 'LP Store' }));
     await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store'));
     expect(window.location.search).toBe('');
@@ -169,40 +198,22 @@ describe('Wallet', () => {
 
   it('opens a store from its URL as the LP Store tab, under the Wallet tab bar (issue #3527)', async () => {
     window.history.pushState({}, '', '/wallet/lp-store/1000167');
-    render(<App />);
+    renderWalletRoute();
     expect(
       await screen.findByRole('tab', { name: 'LP Store', selected: true })
     ).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Balance' })).toBeInTheDocument();
   });
 
-  it('moves an old Market LP Store link to Wallet, keeping the corporation and query (issue #3527)', async () => {
-    window.history.pushState({}, '', '/market/lp-store/1000167?affordableOnly=0#x');
-    render(<App />);
-    await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store/1000167'));
-    expect(window.location.search).toBe('?affordableOnly=0');
-    expect(window.location.hash).toBe('#x');
-    expect(
-      await screen.findByRole('tab', { name: 'LP Store', selected: true })
-    ).toBeInTheDocument();
-  });
-
-  it('moves the old Market LP Store landing to Wallet with its search (issue #3527)', async () => {
-    window.history.pushState({}, '', '/market/lp-store?q=tritanium');
-    render(<App />);
-    await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store'));
-    expect(window.location.search).toBe('?q=tritanium');
-  });
-
   it('redirects /wallet/transactions to Market › History (issue #1749)', async () => {
     window.history.pushState({}, '', '/wallet/transactions');
-    render(<App />);
+    renderWalletRoute();
     await waitFor(() => expect(window.location.pathname).toBe('/market/history'));
   });
 
   it('links the personal Journal header to Market › History (issue #1749)', async () => {
     window.history.pushState({}, '', '/wallet/journal');
-    render(<App />);
+    renderWalletRoute();
     const link = await screen.findByRole('link', { name: 'Transactions' });
     expect(link).toHaveAttribute('href', '/market/history');
     // Rests in the accent colour so it reads as a link (issue #2019).
@@ -238,7 +249,7 @@ describe('Wallet', () => {
       async (key) => {
         await seedSecond();
         window.history.pushState({}, '', `/wallet/journal?${key}=92`);
-        render(<App />);
+        renderWalletRoute();
         expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
         expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_ID);
       }
@@ -247,11 +258,9 @@ describe('Wallet', () => {
     it('shows the ‹ Wallet crumb only when arriving from the Wallet chart', async () => {
       await seedSecond();
       window.history.pushState({}, '', '/wallet/journal?char=92');
-      const plain = render(<App />);
+      const plain = renderWalletRoute();
       expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
-      expect(
-        within(screen.getByRole('main')).queryByRole('link', { name: 'Wallet' })
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Wallet' })).not.toBeInTheDocument();
       plain.unmount();
 
       window.history.pushState(
@@ -259,13 +268,14 @@ describe('Wallet', () => {
         '',
         '/wallet/journal?char=92'
       );
-      render(<App />);
+      renderWalletRoute();
       expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
-      expect(
-        within(screen.getByRole('main')).getByRole('link', { name: /Wallet/ })
-      ).toHaveAttribute('href', '/wallet');
+      expect(screen.getByRole('link', { name: /Wallet/ })).toHaveAttribute('href', '/wallet');
     });
 
+    // On `<App />`: the button this finds is the shell's (Layout's broker-fee
+    // standings notice); the route on its own draws no grant note for a
+    // Character missing the wallet scope.
     it('shows the grant note for a Character without the wallet scope', async () => {
       await seedSecond();
       await db.tokens.update(92, { scopes: [] });
