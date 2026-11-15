@@ -298,6 +298,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     skyhooks: async () => [],
     communities: async () => [],
     vetting: async () => [],
+    corpTaxBookSync: async () => [],
     orderExpiry: async () => [],
     marketOrderUndercut: loadMarketOrderUndercut,
   };
@@ -329,6 +330,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     skyhooks: domainState(undefined, undefined),
     communities: domainState(undefined, undefined),
     vetting: domainState(undefined, undefined),
+    corpTaxBookSync: domainState(undefined, undefined),
     marketOrderUndercut: domainState(undefined, undefined),
     orderExpiry: domainState(undefined, undefined),
   };
