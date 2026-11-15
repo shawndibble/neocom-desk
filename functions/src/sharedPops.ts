@@ -71,6 +71,11 @@ export interface SharedPop {
   expiresAt: string;
   /** Null when the settings hide the ore make-up, or the book does not know it. */
   ore: OreLine[] | null;
+  /**
+   * Whether the settings share the ore make-up, so a null `ore` reads as "unknown" rather than
+   * "not shared" (issue #6239). Absent from a doc published before it existed.
+   */
+  oreShared?: boolean;
   notes: string;
   /** The start link's rate. */
   ratePct: number;
@@ -203,6 +208,7 @@ export function buildSharedPops(input: BuildSharedPopsInput): SharedPopsDoc | nu
         settings.showOre && x.oreLines && x.oreLines.length > 0
           ? x.oreLines.map((o) => ({ typeId: o.typeId, quantity: o.quantity }))
           : null,
+      oreShared: settings.showOre,
       notes: settings.notes,
       ratePct: startLinkRatePct(settings, input.bookRatePct(x)),
       audiences: settings.audiences.map(audienceKey),

@@ -19,6 +19,7 @@ import { EventDetailModal } from '@/features/character/EventDetailModal';
 import { skyhookRaidDetail } from '@/features/character/skyhookRaidDetail';
 import { sharedPopDetail } from '@/features/character/sharedPopDetail';
 import { useSharedPopParam } from '@/features/character/sharedPopLink';
+import { sharedPopDeadlineMs } from '@/features/character/calendarSharedPops';
 import { RowDetailModal } from '@/features/overview/widgets/RowDetailModal';
 import { CalendarMap } from '@/features/character/CalendarMap';
 import { CalendarDayTicker } from '@/features/character/CalendarDayTicker';
@@ -352,6 +353,28 @@ export function Calendar() {
     const entry = data?.sharedPops.find((e) => e.pop.id === selectedPopId);
     return entry === undefined ? null : sharedPopDetail(entry, nowMs, t, zone);
   }, [data, selectedPopId, nowMs, t, zone]);
+  // `?pop=` also moves the map to the pop's day and scopes the rail to it (issue #6239), once:
+  // the first snapshot that holds the pop. A later reload must not pull the pilot back.
+  // Adjusted during render, not an effect (`react-hooks/set-state-in-effect`); only the URL
+  // write of the anchor waits for the effect below.
+  const [popDayPending, setPopDayPending] = useState(popParam !== null);
+  const [popAnchorKey, setPopAnchorKey] = useState<string | null>(null);
+  if (popDayPending && data) {
+    const entry = data.sharedPops.find((e) => e.pop.id === popParam);
+    if (entry !== undefined) {
+      setPopDayPending(false);
+      const deadlineMs = sharedPopDeadlineMs(entry.pop, data.loadedAtMs);
+      if (!Number.isNaN(deadlineMs)) {
+        setSelectedDay({ zone, ms: dayStart(deadlineMs, zone) });
+        setPopAnchorKey(dayKey(cellOf(deadlineMs, zone)));
+      }
+    }
+  }
+  useEffect(() => {
+    if (popAnchorKey === null) return;
+    anchorKeyRef.current = popAnchorKey;
+    setAnchorKey(popAnchorKey);
+  }, [popAnchorKey, setAnchorKey]);
 
   function goToday() {
     setAnchor(cellOf(Date.now(), zone));

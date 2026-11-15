@@ -28,6 +28,7 @@
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DropdownMenu,
@@ -88,6 +89,61 @@ export interface CalendarKindFilterMenuProps {
 }
 
 const NO_CORPORATIONS: readonly BoardCorporation[] = [];
+
+/**
+ * A by-corporation filter as a submenu of radio rows: All, each corporation, then an optional
+ * None. The Corporation events filter and the Shared moon pops by filter share it. Every row
+ * keeps the menu open, like the kind rows.
+ */
+function CorporationFilterSub({
+  trigger,
+  value,
+  corporations,
+  allLabel,
+  noneLabel,
+  onChange,
+}: {
+  trigger: ReactNode;
+  value: CorpEventFilter;
+  corporations: readonly BoardCorporation[];
+  allLabel: string;
+  /** The "none" row's label; without it there is no such row. */
+  noneLabel?: string;
+  onChange: (filter: CorpEventFilter) => void;
+}) {
+  const keepOpen = (event: Event) => event.preventDefault();
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>{trigger}</DropdownMenuSubTrigger>
+      <DropdownMenuSubContent>
+        <DropdownMenuRadioGroup
+          value={String(value)}
+          onValueChange={(next) =>
+            onChange(next === 'all' || next === 'none' ? next : Number(next))
+          }
+        >
+          <DropdownMenuRadioItem value="all" onSelect={keepOpen}>
+            {allLabel}
+          </DropdownMenuRadioItem>
+          {corporations.map((corporation) => (
+            <DropdownMenuRadioItem
+              key={corporation.id}
+              value={String(corporation.id)}
+              onSelect={keepOpen}
+            >
+              <span className="flex-1 truncate">{corpLabelText(corporation)}</span>
+            </DropdownMenuRadioItem>
+          ))}
+          {noneLabel !== undefined && (
+            <DropdownMenuRadioItem value="none" onSelect={keepOpen}>
+              {noneLabel}
+            </DropdownMenuRadioItem>
+          )}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
 
 function KindGlyph({ kind }: { kind: CharacterBoardItemKind }) {
   const Glyph = KIND_ICON[kind];
@@ -210,65 +266,30 @@ export function CalendarKindFilterMenu({
         <DropdownMenuSeparator />
         {/* Only with a corp event source: a pilot who reads no corporation sees no hint of one. */}
         {corporations.length > 0 && (
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>{t('calendar.corpFilter.title')}</DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              <DropdownMenuRadioGroup
-                value={String(corpFilter)}
-                onValueChange={(value) =>
-                  onCorpFilter?.(value === 'all' || value === 'none' ? value : Number(value))
-                }
-              >
-                <DropdownMenuRadioItem value="all" onSelect={(event) => event.preventDefault()}>
-                  {t('calendar.corpFilter.all')}
-                </DropdownMenuRadioItem>
-                {/* One corporation alone would repeat All. */}
-                {corporations.length > 1 &&
-                  corporations.map((corporation) => (
-                    <DropdownMenuRadioItem
-                      key={corporation.id}
-                      value={String(corporation.id)}
-                      onSelect={(event) => event.preventDefault()}
-                    >
-                      <span className="flex-1 truncate">{corpLabelText(corporation)}</span>
-                    </DropdownMenuRadioItem>
-                  ))}
-                <DropdownMenuRadioItem value="none" onSelect={(event) => event.preventDefault()}>
-                  {t('calendar.corpFilter.none')}
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
+          <CorporationFilterSub
+            trigger={t('calendar.corpFilter.title')}
+            value={corpFilter}
+            // One corporation alone would repeat All.
+            corporations={corporations.length > 1 ? corporations : NO_CORPORATIONS}
+            allLabel={t('calendar.corpFilter.all')}
+            noneLabel={t('calendar.corpFilter.none')}
+            onChange={(filter) => onCorpFilter?.(filter)}
+          />
         )}
         {/* One sharing corporation alone would repeat All, and the kind row hides them all. */}
         {sharingCorporations.length > 1 && (
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <KindGlyph kind="sharedMoonPop" />
-              <span className="flex-1">{t('calendar.sharingCorpFilter.title')}</span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              <DropdownMenuRadioGroup
-                value={String(sharingCorpFilter)}
-                onValueChange={(value) =>
-                  onSharingCorpFilter?.(value === 'all' ? value : Number(value))
-                }
-              >
-                <DropdownMenuRadioItem value="all" onSelect={(event) => event.preventDefault()}>
-                  {t('calendar.sharingCorpFilter.all')}
-                </DropdownMenuRadioItem>
-                {sharingCorporations.map((corporation) => (
-                  <DropdownMenuRadioItem
-                    key={corporation.id}
-                    value={String(corporation.id)}
-                    onSelect={(event) => event.preventDefault()}
-                  >
-                    <span className="flex-1 truncate">{corpLabelText(corporation)}</span>
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
+          <CorporationFilterSub
+            trigger={
+              <>
+                <KindGlyph kind="sharedMoonPop" />
+                <span className="flex-1">{t('calendar.sharingCorpFilter.title')}</span>
+              </>
+            }
+            value={sharingCorpFilter}
+            corporations={sharingCorporations}
+            allLabel={t('calendar.sharingCorpFilter.all')}
+            onChange={(filter) => onSharingCorpFilter?.(filter)}
+          />
         )}
         {/* One plan per Character, so a radio group in a submenu rather than a
             section of its own in the kinds list. Picking the chosen plan again
