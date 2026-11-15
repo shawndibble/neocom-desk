@@ -8,6 +8,7 @@ import { moonOwnerPath } from './moonsPaths';
 import { PayMoonOwnerHost } from './PayMoonOwnerHost';
 import { MoonOwnersTable } from './MoonOwnersTable';
 import { useMoonOwners } from './useMoonOwners';
+import { usePopShareMarks } from './usePopShareMarks';
 
 /** The Moon owners tab of `/corp/moons`: the book's moon owners, from the book's own data. */
 export function MoonOwnersTab({ onInvite }: { onInvite?: () => void }) {
@@ -16,6 +17,7 @@ export function MoonOwnersTab({ onInvite }: { onInvite?: () => void }) {
   const [paying, setPaying] = useState<number | null>(null);
   const { input, rows, totals } = useMoonOwners();
   const navigate = useNavigate();
+  const shareMarks = usePopShareMarks();
   if (rows.length === 0) {
     return (
       <EmptyState
@@ -40,6 +42,7 @@ export function MoonOwnersTab({ onInvite }: { onInvite?: () => void }) {
         totals={totals}
         name={names.corporation}
         now={Date.parse(input.now)}
+        {...(shareMarks ? { shareMarks: shareMarks.owners } : {})}
         onOpen={(row) => navigate(moonOwnerPath(row.id))}
         {...(canEdit ? { onPay: (row: MoonOwnerRow) => setPaying(row.corporationId) } : {})}
       />

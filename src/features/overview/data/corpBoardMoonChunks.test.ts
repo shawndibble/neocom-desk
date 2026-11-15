@@ -37,7 +37,12 @@ vi.mock('@/features/character/calendarMoonChunks', () => ({
     return read ?? { result: { cached: null, needsReauth: false }, sources: undefined };
   },
 }));
-vi.mock('@/features/corp/taxBook/feederBookChunks', () => ({ readFeederBooks, feederChunkReads }));
+const feederShareMarks = vi.hoisted(() => vi.fn(() => ({})));
+vi.mock('@/features/corp/taxBook/feederBookChunks', () => ({
+  readFeederBooks,
+  feederChunkReads,
+  feederShareMarks,
+}));
 
 import { loadAllMoonChunksBoardData, loadMoonChunksWithBook } from './corpBoard';
 
@@ -67,9 +72,20 @@ beforeEach(() => {
   esiChunks.clear();
   readFeederBooks.mockReset().mockResolvedValue([{}]);
   feederChunkReads.mockReset().mockReturnValue(new Map());
+  feederShareMarks.mockReset().mockReturnValue({});
 });
 
 describe("moon owners' pops from a Corp Tax Book (#6116)", () => {
+  it("carries the books' Pop Sharing marks by refinery onto the read (#6226)", async () => {
+    characters.push(2);
+    access.set(2, { corporationId: 20, can: only('canViewTaxBook') });
+    feederChunkReads.mockReturnValue(new Map([[30, bookRead('moon-owner')]]));
+    const marks = { 'moon-owner': { kind: 'opted-out' as const } };
+    feederShareMarks.mockReturnValue(marks);
+    expect((await loadMoonChunksWithBook(2)).shareMarks).toEqual(marks);
+    expect((await loadAllMoonChunksBoardData()).shareMarks).toEqual(marks);
+  });
+
   it('All characters: adds the book’s moon owners beside the corporations ESI reads', async () => {
     characters.push(1, 2);
     access.set(1, { corporationId: 10, can: only('canReadMoonExtractions') });

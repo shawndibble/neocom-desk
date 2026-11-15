@@ -4,6 +4,7 @@
  * mounted and Back returns to the table.
  */
 import type { MinerBalance } from '@/engine/corpTaxBook/overdueAging';
+import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { definePageTabs, tabPath } from '@/lib/pageTabs';
 
 export const MOONS_TABS = definePageTabs('/corp/moons', [
@@ -39,6 +40,10 @@ export const minerPath = (id: string) => `/corp/moons/miners/${encodeURIComponen
 export const moonOwnerPath = (id: string) => `/corp/moons/moon-owners/${encodeURIComponent(id)}`;
 export const statementPeriodPath = (periodStart: string) =>
   `/corp/moons/statements/${encodeURIComponent(periodStart)}`;
+
+/** A moon's row on the Sharing tab, scrolled to and pulsed (`?highlight=`). */
+export const sharingMoonPath = (moonId: number) =>
+  `${tabPath(MOONS_TABS, 'sharing')}?${HIGHLIGHT_PARAM}=${moonId}`;
 
 /** The Miners tab narrowed by its Balance filter (`?balance=`): who owes, who is overdue, who holds credit. */
 export const minersBalancePath = (balance: MinerBalance) =>

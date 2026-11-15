@@ -18,6 +18,7 @@ import {
   type PopSharingSettings,
   type PopTime,
 } from '../../../../functions/src/popSharing';
+import { popAudienceName } from '../taxBook/popShareMarkLabel';
 import { DialogShell } from './BookDialogs';
 import {
   defaultsPatch,
@@ -52,7 +53,7 @@ function audienceChoices(chosen: readonly PopAudience[], communities: readonly C
 
 export function AudienceName({ audience }: { audience: PopAudience }) {
   const { t } = useTranslation();
-  return <>{audience.kind === 'community' ? audience.name : t(`${k}.audience.${audience.kind}`)}</>;
+  return <>{popAudienceName(t, audience)}</>;
 }
 
 function Row({

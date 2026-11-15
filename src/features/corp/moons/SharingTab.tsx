@@ -28,6 +28,9 @@ import { callableErrorText } from './feederErrorText';
 import { audienceKey, type PopSharingSettings } from '../../../../functions/src/popSharing';
 import { AudienceName, PopSharingDialog, type CommunityChoice } from './PopSharingDialog';
 import { PlaceCell } from './sectionParts';
+import { popShareMark } from '@/engine/corpTaxBook/popShareMarks';
+import { useHighlightParam } from '@/lib/useHighlightParam';
+import { PopShareIcon } from './PopShareIcon';
 import { useBook } from './useBook';
 import { usePopSharing } from './usePopSharing';
 
@@ -86,6 +89,8 @@ export function SharingTab() {
   const { view, data, settings, names, canEdit, edit, characterId, corporationId, openSettings } =
     useBook();
   const { load, reload } = usePopSharing(characterId, corporationId);
+  // A moon's share mark elsewhere (the Extractions tab) links to its row here.
+  const highlightedMoonId = useHighlightParam();
   const [communities, setCommunities] = useState<CommunityChoice[]>([]);
   const [editing, setEditing] = useState<'default' | SharingMoonRow | null>(null);
   const [switching, setSwitching] = useState(false);
@@ -161,12 +166,15 @@ export function SharingTab() {
       primary: true,
       render: (row) => (
         <>
-          <PlaceCell
-            refinery={names.refinery(row.structureId)}
-            undockable={names.undockable?.(row.structureId)}
-            moon={names.moon(row.moonId)}
-            accent
-          />
+          <span className="flex min-w-0 items-center gap-1.5">
+            <PlaceCell
+              refinery={names.refinery(row.structureId)}
+              undockable={names.undockable?.(row.structureId)}
+              moon={names.moon(row.moonId)}
+              accent
+            />
+            <PopShareIcon mark={popShareMark(row)} />
+          </span>
           {row.ownerCorporationId !== undefined && (
             <span className="block text-xs text-text-dim">
               {names.corporation(row.ownerCorporationId)}
@@ -257,6 +265,7 @@ export function SharingTab() {
               rows={rows}
               rowKey={(row) => String(row.moonId)}
               onRowClick={(row) => setEditing(row)}
+              highlightRowKey={highlightedMoonId === null ? null : String(highlightedMoonId)}
               defaultSort={{ columnId: 'moon', direction: 'asc' }}
               mobileSort
               stackColumns={2}

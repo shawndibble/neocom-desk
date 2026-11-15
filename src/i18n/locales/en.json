@@ -17804,6 +17804,9 @@
         "overrides_one": "{{count}} set for this moon",
         "overrides_other": "{{count}} set for this moon",
         "ownerOptedOut": "Moon owner turned sharing off",
+        "mark": {
+          "shared": "Pops shared with {{audiences}}"
+        },
         "bookRate": "Book's rate",
         "bookRatePct": "Book's rate ({{pct}}%)",
         "rateInvalid": "Enter a rate from 0 to 100, or leave it empty for the book's rate.",
