@@ -70,8 +70,9 @@ export function restoreRealTimers(): void {
  * - `test` — the running test, from its `beforeEach` to the end of its body:
  *   the request carries `testController`'s signal.
  * - `ended` — after a test's body, until the next test's `beforeEach` or the
- *   next suite: whatever starts a request here is the ended test's leftover
- *   work (no `afterEach` or `afterAll` in the repo fetches), so it is refused.
+ *   next suite's `beforeAll`: whatever starts a request here is the ended
+ *   test's leftover work (no `afterEach` or `afterAll` in the repo fetches),
+ *   so it is refused.
  */
 type FetchPhase = 'hooks' | 'test' | 'ended';
 let phase: FetchPhase = 'hooks';
@@ -137,10 +138,21 @@ export function abortTestFetches(): void {
 
 /**
  * A suite is starting: its `beforeAll` may fetch (a warm-up render), and runs
- * untracked. Called by `vitest.runner.ts`.
+ * untracked. When a test has just ended, its leftover work is drained first,
+ * while it is still refused: the last test of a `describe` gets the same
+ * window as any other. Called by `vitest.runner.ts`.
  */
-export function beginSuiteFetches(): void {
+export async function beginSuiteFetches(): Promise<void> {
+  if (phase === 'ended') await settleOrWarn(undefined);
   phase = 'hooks';
+}
+
+/**
+ * A nested suite finished: what runs next (a sibling suite's start, the
+ * parent's `afterAll`) is past its last test, so leftovers stay refused.
+ */
+export function endSuiteFetches(): void {
+  phase = 'ended';
 }
 
 // ---------------------------------------------------------------------------
@@ -295,6 +307,8 @@ export async function endTestWork(): Promise<void> {
 
 /** How `vitest.runner.ts` reaches this module's state without importing it. */
 export const END_TEST_WORK = Symbol.for('neocom-desk.endTestWork');
-export const BEGIN_SUITE = Symbol.for('neocom-desk.beginSuite');
+export const BEGIN_SUITE_FETCHES = Symbol.for('neocom-desk.beginSuiteFetches');
+export const END_SUITE_FETCHES = Symbol.for('neocom-desk.endSuiteFetches');
 (globalThis as Record<symbol, unknown>)[END_TEST_WORK] = endTestWork;
-(globalThis as Record<symbol, unknown>)[BEGIN_SUITE] = beginSuiteFetches;
+(globalThis as Record<symbol, unknown>)[BEGIN_SUITE_FETCHES] = beginSuiteFetches;
+(globalThis as Record<symbol, unknown>)[END_SUITE_FETCHES] = endSuiteFetches;

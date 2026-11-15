@@ -66,11 +66,15 @@ describe('a request a test’s load starts after the test ended', () => {
     expect(lateHits).toBe(0);
     await expect(leftover).resolves.toBeNull();
     server.use(http.get('https://teardown.test/late', () => HttpResponse.json('fresh')));
+    // A real-time cap: a load joined onto the stuck one never settles.
+    let cap: ReturnType<typeof setTimeout> | undefined;
     const settled = await Promise.race([
       loadLate(),
-      // A real-time cap: a load joined onto the stuck one never settles.
-      new Promise((resolve) => setTimeout(() => resolve('still joined'), 2000)),
+      new Promise((resolve) => {
+        cap = setTimeout(() => resolve('still joined'), 2000);
+      }),
     ]);
+    clearTimeout(cap);
     expect(settled).toMatchObject({ data: 'fresh' });
   });
 });
