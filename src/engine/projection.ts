@@ -730,20 +730,32 @@ export interface SharedMoonPopProjectionNames {
   readonly when: (ms: number) => string;
 }
 
+/** What `projectSharedMoonPops` reads. */
+export interface SharedMoonPopProjectionOptions {
+  readonly characterId: number;
+  readonly characterName: string;
+  readonly entries: readonly SharedMoonPopEntrySnapshot[];
+  readonly mutedCorporationIds: ReadonlySet<number>;
+  readonly names: SharedMoonPopProjectionNames;
+  readonly copy: PushCopy<SharedMoonPopFire, { corporation?: string; when?: string }>;
+  readonly nowMs: number;
+  readonly horizonMs?: number;
+}
+
 /**
  * `sharedMoonPop` (issue #6225): one row per Shared Pop at its Pop Time less the Character's lead
  * time. A muted sharing corporation projects nothing; so does a pop already past its fire time.
  */
-export function projectSharedMoonPops(
-  characterId: number,
-  characterName: string,
-  entries: readonly SharedMoonPopEntrySnapshot[],
-  mutedCorporationIds: ReadonlySet<number>,
-  names: SharedMoonPopProjectionNames,
-  copy: PushCopy<SharedMoonPopFire, { corporation?: string; when?: string }>,
-  nowMs: number,
-  horizonMs: number = PROJECTION_HORIZON_MS
-): ProjectionRow[] {
+export function projectSharedMoonPops({
+  characterId,
+  characterName,
+  entries,
+  mutedCorporationIds,
+  names,
+  copy,
+  nowMs,
+  horizonMs = PROJECTION_HORIZON_MS,
+}: SharedMoonPopProjectionOptions): ProjectionRow[] {
   const rows: ProjectionRow[] = [];
   for (const entry of entries) {
     if (mutedCorporationIds.has(entry.corporationId)) continue;
