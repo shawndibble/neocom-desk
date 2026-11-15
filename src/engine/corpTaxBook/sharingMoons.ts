@@ -12,6 +12,7 @@ import {
   type EffectivePopSharing,
   type PopSharingDoc,
 } from '../../../functions/src/popSharing';
+import type { MoonOwnerFeeder } from './moonOwners';
 
 export interface SharingMoonRow {
   moonId: number;
@@ -72,15 +73,15 @@ export interface UnplacedRefinery {
 
 interface KnownOwnerRefineries {
   corporationId: number;
-  status?: string;
+  status?: MoonOwnerFeeder['status'];
   popSharingOptOut?: unknown;
   refineryLabels?: Readonly<Record<string, unknown>>;
   refinerySystems?: Readonly<Record<string, unknown>>;
   refineryStructures?: Readonly<Record<string, unknown>>;
 }
 
-/** A moon owner the book still handles; one removed or gone has no refineries here. */
-const HANDLED = new Set(['active', 'pending-removal']);
+/** A moon owner the book still handles (as the publisher reads it); one gone has none here. */
+const HANDLED: ReadonlySet<MoonOwnerFeeder['status']> = new Set(['active', 'pending-removal']);
 
 /**
  * The refineries the book knows that no Extraction places at a moon yet (#6240): its own (the
