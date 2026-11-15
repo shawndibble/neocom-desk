@@ -31,6 +31,7 @@ import {
   useDetectedOwnedStock,
   useOwnedStockSnapshot,
 } from '@/features/industry/useDetectedOwnedStock';
+import type { OwnedStockSnapshot } from '@/features/industry/ownedStockDetection';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import type { MaterialSourcingMap, SkillLevels } from '@/engine/industry/types';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
@@ -66,6 +67,8 @@ export interface LoyaltyStoreResult {
   pricesUnreachable: boolean;
   useOwnMaterialsFor: ReadonlySet<number>;
   toggleUseOwnMaterials: (offerId: number) => void;
+  /** Every account Character's assets, for the Spend my LP plan's owned turn-ins. */
+  ownedStockSnapshot: OwnedStockSnapshot;
 }
 
 export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult {
@@ -294,5 +297,6 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     pricesUnreachable: snapshot?.hubPricesUnreachable === true,
     useOwnMaterialsFor,
     toggleUseOwnMaterials,
+    ownedStockSnapshot,
   };
 }

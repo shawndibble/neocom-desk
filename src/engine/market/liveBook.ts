@@ -11,6 +11,7 @@
  * cheapest seller, who is then a rival by construction.
  */
 import type { AppraisalBuyWalk, AppraisalItem } from '@/engine/market/appraisal';
+import type { HubOrder } from '@/engine/market/haulingMarket';
 import {
   buyOrderReaches,
   walkSellIntoBuys,
@@ -54,6 +55,16 @@ export function reachableBuyOrders(
     if (buyOrderReaches(candidate, station, jumps)) reaching.push(candidate);
   }
   return reaching;
+}
+
+/** A live book's orders as `HubOrder`s, for the sell-book walkers (`walkSellBook`, `hubLadders`). */
+export function liveHubOrders(orders: readonly LiveOrder[]): HubOrder[] {
+  return orders.map((o) => ({
+    price: o.price,
+    volume_remain: o.volume_remain ?? 0,
+    is_buy_order: o.is_buy_order,
+    location_id: o.location_id,
+  }));
 }
 
 /** What the buy walk needs: the hub's system, its gate jumps to every system, and the units to sell. */
