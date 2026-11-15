@@ -27,10 +27,15 @@ export interface UnassignedSummary {
  * included (owed 0) so the strip can offer to show them. An Assignment whose
  * Payee is no longer known is skipped rather than invented — the table still
  * shows it as "Unknown Payee".
+ *
+ * `alsoBilled` is the share of an Assignment's tax a Corp Tax Book bills too (#6204): that part
+ * is owed to the corporation, so it is not owed to this Payee as well; an Assignment the book
+ * bills whole drops out.
  */
 export function computePayeeBalances(
   rows: readonly DisplayRow[],
-  payees: readonly PayeeRecord[]
+  payees: readonly PayeeRecord[],
+  alsoBilled: (member: GroupMember) => number = () => 0
 ): PayeeBalance[] {
   const byPayee = new Map<string, PayeeBalance>(
     payees.map((payee) => [payee.id, { payee, owed: 0, members: [] }])
@@ -40,8 +45,14 @@ export function computePayeeBalances(
       if (member.assignment.status !== 'outstanding' || !member.assignment.payeeId) continue;
       const balance = byPayee.get(member.assignment.payeeId);
       if (!balance) continue;
-      balance.owed += member.assignment.taxOwed;
-      balance.members.push(member);
+      const share = Math.min(1, alsoBilled(member));
+      const owed = member.assignment.taxOwed * (1 - share);
+      if (share > 0 && owed < 0.01) continue;
+      balance.owed += owed;
+      // Settle up pays what is left for this Payee, not what the book bills too.
+      balance.members.push(
+        share > 0 ? { ...member, assignment: { ...member.assignment, taxOwed: owed } } : member
+      );
     }
   }
   return [...byPayee.values()].sort(

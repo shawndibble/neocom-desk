@@ -7,6 +7,9 @@ import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailabl
 import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
 import { claimKeyOf } from '@/features/miningTax/corpBook/useAutoClaimDonations';
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
+import { corpBookAttention } from '@/features/miningTax/corpBook/corpAttention';
+import { corpPayAccounts } from '@/features/miningTax/corpBook/corpPayAccount';
+import { verifyPeriodLabel } from '@/features/corpTaxBook/verifyPeriodLabel';
 import { systemLabel } from '@/features/miningTax/names';
 import { pricesAtHubOnDate, sellFallbackAtHubOnDate } from '@/features/miningTax/pricing';
 import { findPricingGaps } from '@/features/miningTax/pricingGaps';
@@ -27,6 +30,8 @@ interface Args {
   data: TaxSnapshot | null;
   resolvedCharacterFilter: MultiSelectFilter<number>;
   personalRows: readonly DisplayRow[];
+  /** Every row of the tab, the books' own included: an attention item opens one. */
+  displayRows: readonly DisplayRow[];
   payeeById: ReadonlyMap<string, PayeeRecord>;
   corpView: CorpBookView | null;
   failedClaims: ReadonlySet<string>;
@@ -42,6 +47,7 @@ export function useTaxAttentionItems({
   data,
   resolvedCharacterFilter,
   personalRows,
+  displayRows,
   payeeById,
   corpView,
   failedClaims,
@@ -51,7 +57,7 @@ export function useTaxAttentionItems({
   refresh,
   openDetail,
 }: Args): AttentionItem[] {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
   const { claiming, claimError, handleClaim } = useClaimDonation(reloadCorpBooks);
 
@@ -215,6 +221,62 @@ export function useTaxAttentionItems({
           </Button>
         </NeedsConnection>
       ),
+    });
+  }
+  // What a Corp Tax Book says that the tab alone would not (#6204).
+  const corp = corpBookAttention(corpView);
+  for (const o of corp.overdue) {
+    attentionItems.push({
+      id: `corp-overdue:${o.corporationId}:${o.statementId}`,
+      tone: 'warning',
+      title: t('miningTax.corpBook.attention.overdueTitle', {
+        corp: o.corpName,
+        period: verifyPeriodLabel(o.periodStart, o.periodEnd, i18n.language),
+        date: o.overdueAt.slice(0, 10),
+      }),
+      detail: <p>{t('miningTax.corpBook.attention.overdueDetail', { code: o.code })}</p>,
+    });
+  }
+  for (const u of corp.uncredited) {
+    const loaded = corpView?.books.find((b) => b.loaded.corporationId === u.corporationId)?.loaded;
+    const accounts = corpPayAccounts(loaded?.divisions ?? [], loaded?.divisionNames, t).join(', ');
+    attentionItems.push({
+      id: `corp-uncredited:${u.corporationId}:${u.characterId}:${u.at}`,
+      tone: 'warning',
+      title: t('miningTax.corpBook.attention.uncreditedTitle', {
+        corp: u.corpName,
+        amount: formatIsk(u.amount, 0),
+        date: u.at.slice(0, 10),
+      }),
+      detail: (
+        <p>{t('miningTax.corpBook.attention.uncreditedDetail', { corp: u.corpName, accounts })}</p>
+      ),
+    });
+  }
+  for (const a of corp.alsoBilled) {
+    const payees = a.payeeIds
+      .map((id) => payeeById.get(id)?.name ?? t('miningTax.unknownPayee'))
+      .join(', ');
+    const target = displayRows.find((dr) => dr.key === a.rowId);
+    attentionItems.push({
+      id: `corp-also-billed:${a.corporationId}`,
+      tone: 'warning',
+      title: t('miningTax.corpBook.attention.alsoBilledTitle', { corp: a.corpName, payees }),
+      detail: (
+        <p>
+          {t('miningTax.corpBook.attention.alsoBilledDetail', {
+            payees,
+            action: t('miningTax.corpBook.overlap.letBill'),
+          })}
+        </p>
+      ),
+      ...(target && {
+        action: (
+          <Button size="sm" onClick={() => openDetail(target)}>
+            {t('miningTax.corpBook.attention.openDay')}
+          </Button>
+        ),
+      }),
     });
   }
   for (const u of data.unclassified) {

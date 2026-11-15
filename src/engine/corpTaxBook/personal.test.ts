@@ -538,7 +538,7 @@ describe('overlayCorpBooks', () => {
           },
         ],
         // The donation that paid the 16th, also sitting in flight.
-        inFlight: [{ amount: 43_050 * 148 * 0.15, at: '2026-10-17T10:00:00Z' }],
+        inFlight: [{ characterId: ME, amount: 43_050 * 148 * 0.15, at: '2026-10-17T10:00:00Z' }],
       });
       const out = overlay([two, other], [b]);
       const byDate = (d: string) => out.rows.find((r) => r.date === d)!;
@@ -1053,7 +1053,10 @@ describe('overlayCorpBooks', () => {
     );
     // 10,000 × 148 × 15% = 222,000 a day.
     const out = overlay(entries, [
-      book({ observed, inFlight: [{ amount: 222_000, at: '2026-10-18T13:10:00Z' }] }),
+      book({
+        observed,
+        inFlight: [{ characterId: ME, amount: 222_000, at: '2026-10-18T13:10:00Z' }],
+      }),
     ]);
     const byDate = Object.fromEntries(out.rows.map((r) => [r.date, [r.state, r.taxOwed]]));
     expect(byDate).toEqual({
@@ -1066,7 +1069,7 @@ describe('overlayCorpBooks', () => {
   it('records a donation as how the day was settled', () => {
     const out = overlay(
       [entry()],
-      [book({ inFlight: [{ amount: 1_000_000, at: '2026-10-18T13:10:00Z' }] })]
+      [book({ inFlight: [{ characterId: ME, amount: 1_000_000, at: '2026-10-18T13:10:00Z' }] })]
     );
     expect(out.rows[0]).toMatchObject({ state: 'paid', settledBy: 'donation' });
     expect(out.rows[0].markedPaidIds).toBeUndefined();
@@ -1385,7 +1388,7 @@ describe('inFlightDonations', () => {
 
   it('counts donations to the corp the book has not credited yet', () => {
     expect(inFlightDonations([made()], [], CORP, '2026-10-01')).toEqual([
-      { amount: 500_000, at: '2026-10-18T13:10:00Z' },
+      { characterId: ME, amount: 500_000, at: '2026-10-18T13:10:00Z' },
     ]);
   });
 
@@ -1609,6 +1612,33 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
     expect(row.taxOwed).toBe(0);
     expect(row.dismissalReason).toBe('Goodwill');
     expect(row.correction).toEqual({ before: 900_000, after: 0, reasons: ['Goodwill'] });
+  });
+
+  it('a day written off in full is billed to nobody: its ore stays owed to the other Payee (#6204)', () => {
+    const toOther = entry({
+      freeOreLines: [],
+      oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+      allocations: [
+        {
+          id: 'a-other',
+          payeeId: 'other',
+          taxPct: 10,
+          oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+          status: 'outstanding',
+        },
+      ],
+    });
+    const out = overlay(
+      [toOther],
+      [
+        book({
+          statements: [issued([mined])],
+          writeOffs: [forgive(900_000, { statementId: 's1' })],
+        }),
+      ]
+    );
+    expect(out.rows[0].state).toBe('waived');
+    expect(out.alsoBilled.size).toBe(0);
   });
 
   it('a part write-off leaves the rest owed, and says so on the line (#4637)', () => {
@@ -2074,5 +2104,256 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
       twoMoons()
     );
     expect(out.rows.every((r) => r.dispute === undefined)).toBe(true);
+  });
+});
+
+describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
+  const ALT = 90000002;
+  const KEY = `${ME}:2026-10-17:${SYSTEM}`;
+  const line = (characterId: number, date: string, tax: number) => ({
+    kind: 'mined' as const,
+    date,
+    chargeKey: `${characterId}:1000:${date}`,
+    characterId,
+    structureId: 1000,
+    oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+    unitPrices: { [ZEO]: 140 },
+    taxPct: 15,
+    estimatedValue: tax / 0.15,
+    tax,
+  });
+  const statementOf = (over: Partial<Statement> = {}): Statement => ({
+    id: 's1',
+    minerId: `solo:${ME}`,
+    code: 'ABC',
+    periodStart: '2026-10-01',
+    periodEnd: '2026-10-31',
+    coversFrom: '2026-10-01',
+    coversThrough: '2026-10-17',
+    issuedAt: '2026-10-18T00:00:00Z',
+    hubId: 'jita',
+    oreForm: 'compressed',
+    amount: 900_000,
+    lines: [line(ME, '2026-10-17', 900_000)],
+    ...over,
+  });
+  const observedFor = (characterId: number, date = '2026-10-17') => ({
+    characterId,
+    recordedCorporationId: CORP,
+    structureId: 1000,
+    date,
+    solarSystemId: SYSTEM,
+    oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+  });
+  const paidToCorp = entry({
+    freeOreLines: [],
+    oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+    allocations: [
+      {
+        id: 'a-bmw',
+        payeeId: 'bmw',
+        taxPct: 15,
+        oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+        status: 'paid',
+      },
+    ],
+  });
+
+  describe('a day the member marked paid', () => {
+    it("carries what the book's unsettled Statement still shows owed", () => {
+      const out = overlay(
+        [paidToCorp],
+        [book({ ownPayeeIds: ['bmw'], statements: [statementOf()] })]
+      );
+      expect(out.rows[0]).toMatchObject({
+        state: 'paid',
+        settledBy: 'yourMark',
+        bookOwed: 900_000,
+      });
+    });
+
+    it('says nothing more before a Statement bills the day', () => {
+      const out = overlay([paidToCorp], [book({ ownPayeeIds: ['bmw'] })]);
+      expect(out.rows[0]).toMatchObject({ state: 'paid', settledBy: 'yourMark' });
+      expect(out.rows[0].bookOwed).toBeUndefined();
+    });
+
+    it('reads plain Paid once the Statement is settled', () => {
+      const out = overlay(
+        [paidToCorp],
+        [
+          book({
+            ownPayeeIds: ['bmw'],
+            statements: [statementOf()],
+            payments: [
+              {
+                id: 'p1',
+                minerId: `solo:${ME}`,
+                characterId: ME,
+                amount: 900_000,
+                at: '2026-10-18T10:00:00Z',
+                source: 'donation',
+              },
+            ],
+          }),
+        ]
+      );
+      expect(out.rows[0]).toMatchObject({ state: 'paid', settledBy: 'statement' });
+      expect(out.rows[0].bookOwed).toBeUndefined();
+    });
+  });
+
+  describe("a Miner's credit settles only its own days", () => {
+    // 43,050 × 148 × 15% = 955,710 a day; each payment is enough for one day.
+    const DAY = 43_050 * 148 * 0.15;
+    const twoMiners = (over: Partial<PersonalBook> = {}) =>
+      book({ observed: [observedFor(ME), observedFor(ALT)], ...over });
+    const both = [entry(), entry({ characterId: ALT })];
+    const stateOf = (out: ReturnType<typeof overlay>, characterId: number) =>
+      out.rows.find((r) => r.characterId === characterId)?.state;
+
+    it('credit the book holds for one Miner leaves the other owing', () => {
+      const out = overlay(both, [
+        twoMiners({
+          payments: [
+            {
+              id: 'p1',
+              minerId: `solo:${ME}`,
+              characterId: ME,
+              amount: DAY,
+              at: '2026-10-18T10:00:00Z',
+              source: 'donation',
+            },
+          ],
+        }),
+      ]);
+      expect(stateOf(out, ME)).toBe('paid');
+      expect(stateOf(out, ALT)).toBe('billed');
+    });
+
+    it("a donation in flight pays only its sender's Miner", () => {
+      const out = overlay(both, [
+        twoMiners({ inFlight: [{ characterId: ALT, amount: DAY, at: '2026-10-18T13:10:00Z' }] }),
+      ]);
+      expect(stateOf(out, ME)).toBe('billed');
+      expect(stateOf(out, ALT)).toBe('paid');
+    });
+
+    it("a grouped Miner's donation pays any of its characters' days", () => {
+      const out = overlay(both, [
+        twoMiners({
+          miners: [{ id: 'g1', characterIds: [ME, ALT], mainCharacterId: ME }],
+          inFlight: [{ characterId: ME, amount: 2 * DAY, at: '2026-10-18T13:10:00Z' }],
+        }),
+      ]);
+      expect(stateOf(out, ME)).toBe('paid');
+      expect(stateOf(out, ALT)).toBe('paid');
+    });
+  });
+
+  describe('ore the book bills that a hand-made Payee also lists', () => {
+    const toOther = (quantity: number) =>
+      entry({
+        freeOreLines: [],
+        oreLines: [{ typeId: ZEO, quantity }],
+        allocations: [
+          {
+            id: 'a-other',
+            payeeId: 'other',
+            taxPct: 10,
+            oreLines: [{ typeId: ZEO, quantity }],
+            status: 'outstanding',
+          },
+        ],
+      });
+
+    it('names the share of the Assignment the book bills too, once a Statement bills it', () => {
+      const out = overlay([toOther(43_050)], [book({ statements: [statementOf()] })]);
+      expect(out.rows[0].state).toBe('billed');
+      expect(out.alsoBilled.get(KEY)?.get('a-other')).toBeCloseTo(1, 6);
+    });
+
+    it('is only the part the book recorded', () => {
+      const out = overlay([toOther(50_000)], [book({ statements: [statementOf()] })]);
+      expect(out.alsoBilled.get(KEY)?.get('a-other')).toBeCloseTo(43_050 / 50_000, 6);
+    });
+
+    it('is nothing while the day is still a Conflict', () => {
+      const out = overlay([toOther(43_050)], [book()]);
+      expect(out.rows[0].state).toBe('conflict');
+      expect(out.alsoBilled.size).toBe(0);
+    });
+  });
+
+  describe('Overdue Statements', () => {
+    const issued = statementOf({ issuedAt: '2026-10-01T00:00:00Z' });
+
+    it('names an unsettled Statement past its Overdue days', () => {
+      const out = overlay([entry()], [book({ statements: [issued] })]);
+      expect(out.books[0].overdue).toEqual([
+        {
+          statementId: 's1',
+          minerId: `solo:${ME}`,
+          code: 'ABC',
+          periodStart: '2026-10-01',
+          periodEnd: '2026-10-31',
+          overdueAt: '2026-10-15T00:00:00.000Z',
+        },
+      ]);
+    });
+
+    it('lists every unsettled Statement, oldest first, for the pay dialog', () => {
+      const newer = statementOf({ id: 's2', code: 'NEW', issuedAt: '2026-10-10T00:00:00Z' });
+      const out = overlay([entry()], [book({ statements: [newer, issued] })]);
+      expect(out.books[0].openStatements.map((s) => [s.statementId, s.code])).toEqual([
+        ['s1', 'ABC'],
+        ['s2', 'NEW'],
+      ]);
+      expect(out.books[0].overdue.map((s) => s.statementId)).toEqual(['s1']);
+    });
+
+    it("follows the book's own Overdue days", () => {
+      const out = overlay([entry()], [book({ statements: [issued], overdueDays: 30 })]);
+      expect(out.books[0].overdue).toEqual([]);
+    });
+
+    it('never names a settled one', () => {
+      const out = overlay(
+        [entry()],
+        [
+          book({
+            statements: [issued],
+            payments: [
+              {
+                id: 'p1',
+                minerId: `solo:${ME}`,
+                characterId: ME,
+                amount: 900_000,
+                at: '2026-10-02T10:00:00Z',
+                source: 'donation',
+              },
+            ],
+          }),
+        ]
+      );
+      expect(out.books[0].overdue).toEqual([]);
+    });
+  });
+
+  describe('a donation the book never credits', () => {
+    const old = { characterId: ME, amount: 5_000_000, at: '2026-10-14T10:00:00Z' };
+
+    it('stops counting once the book synced 3 days after it, and is named', () => {
+      const out = overlay([entry()], [book({ inFlight: [old] })]);
+      expect(out.rows[0].state).toBe('billed');
+      expect(out.books[0].uncredited).toEqual([old]);
+    });
+
+    it('still counts while the book has not synced 3 days after it', () => {
+      const recent = { ...old, at: '2026-10-16T10:00:00Z' };
+      const out = overlay([entry()], [book({ inFlight: [recent] })]);
+      expect(out.rows[0]).toMatchObject({ state: 'paid', settledBy: 'donation' });
+      expect(out.books[0].uncredited).toEqual([]);
+    });
   });
 });

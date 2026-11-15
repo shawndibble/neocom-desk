@@ -4,6 +4,8 @@ import { computePayeeBalances, summarizeUnassigned } from '@/features/miningTax/
 import { allMembers, type DisplayRow } from '@/features/miningTax/groupRows';
 import { systemsByPayee } from '@/features/miningTax/suggestPayee';
 import { useLinkSuggestions } from '@/features/miningTax/useMadePayments';
+import { entryKey } from '@/engine/miningTax/types';
+import type { PersonalOverlay } from '@/engine/corpTaxBook/personal';
 import { computeOwedByPayee } from './owedByPayee';
 
 interface Args {
@@ -13,6 +15,8 @@ interface Args {
   allPayees: readonly PayeeRecord[];
   estimatedValueOf: (dr: DisplayRow) => number;
   madePayments: Parameters<typeof useLinkSuggestions>[0]['madePayments'];
+  /** What the Corp Tax Books bill too of the member's Assignments to other Payees (#6204). */
+  alsoBilled?: PersonalOverlay['alsoBilled'];
 }
 
 /** What the owed cards, the payment-link suggestions and the Payee manager read from the ledger. */
@@ -23,13 +27,23 @@ export function useTaxBalances({
   allPayees,
   estimatedValueOf,
   madePayments,
+  alsoBilled,
 }: Args) {
   // The owed cards: per Payee, what is owed *now*. Follows the Character
   // filter (an alt's debts are still debts) but deliberately not the Payee
   // filter — narrowing the ledger to one Payee must not change a balance.
+  // Ore a Corp Tax Book bills is owed to the corporation, not to the member's own Payee too.
   const balances = useMemo(
-    () => computePayeeBalances(characterFiltered, ledgerPayees),
-    [characterFiltered, ledgerPayees]
+    () =>
+      computePayeeBalances(
+        characterFiltered,
+        ledgerPayees,
+        ({ row, assignment }) =>
+          alsoBilled
+            ?.get(entryKey(row.characterId, row.entry.date, row.entry.solarSystemId))
+            ?.get(assignment.id) ?? 0
+      ),
+    [characterFiltered, ledgerPayees, alsoBilled]
   );
   // A row a Corp Tax Book has labelled (Pending corp record, Unattributed) is not waiting on the
   // member: it stays out of the "needs assigning" count.

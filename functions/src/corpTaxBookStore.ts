@@ -2062,6 +2062,8 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
       overdueDays: b.overdueDays,
       minimumStatement: b.minimumStatement,
       divisions: b.divisions,
+      // The corp's own names for them, so the verify page names the Account to pay into (#6204).
+      divisionNames: b.divisionNames,
       cadence: b.cadence,
     },
     payments: here

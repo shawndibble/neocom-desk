@@ -33,7 +33,7 @@ import {
 } from './allocation';
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
 import { dayClosesAt, isDayBillable, lastBillableDate } from './billable';
-import { buildDayCharges, type DayCharge, type Miner } from './charges';
+import { buildDayCharges, minerIdFor, type DayCharge, type Miner } from './charges';
 import type { FeederCoverage } from './coverage';
 import { activeDismissalFor, type Dismissal } from './dismissals';
 import { splitByCoverageAndRead, type FeederReadClock } from './feederHealth';
@@ -48,7 +48,8 @@ import {
 } from './statements';
 import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry } from './types';
-import { MINUTE_MS } from '@/lib/age';
+import { overdueStatus, DEFAULT_OVERDUE_DAYS } from './overdue';
+import { DAY_MS, MINUTE_MS } from '@/lib/age';
 
 /** What made a day Paid: the member's own mark, the corporation's settled Statement, or a donation. */
 export type BookSettledBy = 'yourMark' | 'statement' | 'donation';
@@ -123,8 +124,13 @@ export interface PersonalBook {
   payeeCorporations?: Readonly<Record<string, number>>;
   /** The day's prices at the book's hub and Ore Form, by raw type id (`priceObservedDay`). */
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
-  /** Donations the member has sent the corp that the book has not credited yet. */
-  inFlight: { amount: number; at: string }[];
+  /**
+   * Donations the member has sent the corp that the book has not credited yet. Each pays only its
+   * sender's Miner, as the book credits it.
+   */
+  inFlight: InFlightDonation[];
+  /** Days after issue an unsettled Statement goes Overdue (the book's setting; 14 by default). */
+  overdueDays?: number;
   /** Refinery names by structure id, where ESI let the app read them. */
   structureNames?: Record<number, string>;
   /**
@@ -137,6 +143,19 @@ export interface PersonalBook {
   /** The member's own officer write-offs the book lets them read (#4637). */
   writeOffs?: readonly RecordedWriteOff[];
 }
+
+/** A donation in the member's own wallet journal that the book does not hold yet. */
+export interface InFlightDonation {
+  characterId: number;
+  amount: number;
+  at: string;
+}
+
+/**
+ * A donation stops counting as paid once the book synced this long after it and still had not
+ * credited it: it most likely went to a wallet division the book does not read (#6204).
+ */
+export const UNCREDITED_AFTER_DAYS = 3;
 
 /** The miner's own listing of ore the corporation also bills (issue #4517). */
 export interface BookOverlap {
@@ -193,6 +212,11 @@ export interface BookRowView {
   billed: number;
   /** How a Paid day was settled; absent while it is owed, dismissed or waived. */
   settledBy?: BookSettledBy;
+  /**
+   * Paid by the member's own mark while the day's Statement is still unsettled in the book: what
+   * the book still shows owed for the day. The corporation has not credited the payment yet.
+   */
+  bookOwed?: number;
   /** The member's own paid Assignments this row stands in for, so the member can unmark them. */
   markedPaidIds?: string[];
   statementId?: string;
@@ -229,8 +253,29 @@ export interface BookSummary {
   closedThrough?: string;
   /** Payment the book holds beyond what its Statements bill — printed on the next Statement. */
   credit: number;
+  /** The member's unsettled Statements, oldest first: payments settle them in this order. */
+  openStatements: OpenStatementView[];
+  /** The member's unsettled Statements past their Overdue days, oldest first. */
+  overdue: OverdueStatementView[];
+  /** Donations the book synced past without crediting (`UNCREDITED_AFTER_DAYS`): not counted as paid. */
+  uncredited: InFlightDonation[];
   hubId: string;
   oreForm: 'compressed' | 'raw';
+}
+
+/** An Overdue Statement as the member reads it: without declarations, which only officers see. */
+export interface OverdueStatementView {
+  statementId: string;
+  minerId: string;
+  code: string;
+  periodStart: string;
+  periodEnd: string;
+  overdueAt: string;
+}
+
+/** A Statement the book has not settled yet. */
+export interface OpenStatementView extends Omit<OverdueStatementView, 'overdueAt'> {
+  issuedAt: string;
 }
 
 export interface PersonalOverlay {
@@ -248,6 +293,12 @@ export interface PersonalOverlay {
    * with their Payee, and the share of the Assignment's value that part keeps (at the books' prices).
    */
   trimmed: Map<string, Map<string, { oreLines: OreLine[]; valueShare: number }>>;
+  /**
+   * Per Mining Ledger Entry key, the Assignments to another Payee whose ore a book bills too (on a
+   * Statement, or a Conflict that ran its 14 days), by id: the share of the Assignment's value, as
+   * the tab shows it, that is not owed to that Payee as well.
+   */
+  alsoBilled: Map<string, Map<string, number>>;
   /** Per Mining Ledger Entry key, how its remaining free ore reads. */
   labels: Map<string, { state: BookLabelState; corporationId: number; corpName: string }>;
   books: BookSummary[];
@@ -333,7 +384,8 @@ interface Prepared {
     string,
     { settled: boolean; pool: number; forgiven: number; forgivenReasons: string[] }
   >;
-  credit: number;
+  /** Credit the book holds per Miner: it pays only that Miner's days. */
+  credit: Map<string, number>;
 }
 
 function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: string): Prepared {
@@ -402,7 +454,7 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
 
   // Payments credit each Miner's Statements, oldest first (D5/D15).
   const settlement: Prepared['settlement'] = new Map();
-  let credit = 0;
+  const credit = new Map<string, number>();
   // A Miner with payments and no Statement yet still has them, as credit.
   const minerIds = new Set([
     ...book.statements.map((s) => s.minerId),
@@ -419,7 +471,7 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
       officerWriteOffs: writeOffs,
       startDate: book.startDate,
     });
-    credit += allocation.credit;
+    if (allocation.credit > 0) credit.set(minerId, allocation.credit);
     for (const s of statements) {
       const result = allocation.byStatement.get(s.id);
       const dismissed = credits
@@ -511,21 +563,31 @@ const linesOfLeft = (left: ReadonlyMap<number, number>): OreLine[] =>
 function takeOverlap(
   pool: OverlapPool,
   observed: readonly OreLine[]
-): { overlap: BookOverlap; touching: PersonalAllocation[] } | undefined {
+):
+  | {
+      overlap: BookOverlap;
+      touching: PersonalAllocation[];
+      /** What it took of each allocation. */
+      byItem: Map<PoolItem, OreLine[]>;
+    }
+  | undefined {
   const want = new Map(sumLines(observed).map((l) => [l.typeId, l.quantity]));
   const taken: OreLine[] = [];
   const touching: PersonalAllocation[] = [];
+  const byItem = new Map<PoolItem, OreLine[]>();
   for (const item of pool) {
-    let touched = false;
+    const took: OreLine[] = [];
     for (const [typeId, quantity] of item.left) {
       const take = Math.min(quantity, want.get(typeId) ?? 0);
       if (take <= 0) continue;
       item.left.set(typeId, quantity - take);
       want.set(typeId, (want.get(typeId) ?? 0) - take);
-      taken.push({ typeId, quantity: take });
-      touched = true;
+      took.push({ typeId, quantity: take });
     }
-    if (touched) touching.push(item.allocation);
+    if (took.length === 0) continue;
+    taken.push(...took);
+    touching.push(item.allocation);
+    byItem.set(item, sumLines(took));
   }
   if (touching.length === 0) return undefined;
   return {
@@ -535,6 +597,7 @@ function takeOverlap(
       paid: touching.every((a) => a.status === 'paid'),
     },
     touching,
+    byItem,
   };
 }
 
@@ -705,6 +768,9 @@ export function overlayCorpBooks(input: {
   const labels: PersonalOverlay['labels'] = new Map();
   const absorbed: PersonalOverlay['absorbed'] = new Map();
   const trimmed: PersonalOverlay['trimmed'] = new Map();
+  const alsoBilled: PersonalOverlay['alsoBilled'] = new Map();
+  // The book rows behind each `alsoBilled` share: a day an officer writes off bills nobody.
+  const alsoBilledRows = new Map<string, Map<string, BookRowView[]>>();
   // Per book, per entry key: the ore the member already paid under the corporation's own Payee.
   const memberPaid = new Map<number, Map<string, OreLine[]>>();
   // The ids of those paid Assignments, kept so a row they paid can offer to unmark them.
@@ -872,6 +938,8 @@ export function overlayCorpBooks(input: {
     // What the books took of each allocation, and the book whose own Payee it names.
     const takenOf = new Map<PoolItem, OreLine[]>();
     const ownedBy = new Map<PoolItem, { p: Prepared; charge: PreparedCharge }>();
+    // What a book bills of an allocation to another Payee that still lists it.
+    const alsoBilledOf = new Map<PoolItem, { lines: OreLine[]; rows: BookRowView[] }>();
     const shareOf = (p: Prepared) => split.byBook.get(String(p.book.corporationId)) ?? [];
     // What the member listed under each corporation's own Payee is that book's to bill: every book
     // takes its own before any book names the Payees it contests, so book order changes nothing.
@@ -963,6 +1031,16 @@ export function overlayCorpBooks(input: {
           day
         );
         if (overlap && rows[firstRow]) rows[firstRow].overlap = overlap.overlap;
+        if (overlap && !contested) {
+          for (const [item, lines] of overlap.byItem) {
+            if (isOwnPayee(p.book.ownPayeeIds, item.allocation)) continue;
+            const held = alsoBilledOf.get(item) ?? { lines: [], rows: [] };
+            alsoBilledOf.set(item, {
+              lines: sumLines(held.lines, lines),
+              rows: [...held.rows, ...rows.slice(firstRow)],
+            });
+          }
+        }
       }
     }
     // Each allocation the books took part of: the rest stays with its Payee, except what the member
@@ -982,9 +1060,22 @@ export function overlayCorpBooks(input: {
       const excess = owner ? linesOfLeft(item.left) : [];
       if (owner && excess.length > 0) pushExcess(owner.p, owner.charge, allocation, excess);
       const gone = sumLines(takenOf.get(item) ?? [], excess);
-      if (gone.length === 0) continue;
       const listed = sumLines(allocation.oreLines);
       const kept = minusLines(listed, gone);
+      const billedToo = alsoBilledOf.get(item);
+      if (billedToo && quantityOf(kept) > 0) {
+        // Relative to what the tab shows of the Assignment: what stays after any book took part.
+        const base = worth(kept);
+        const share =
+          base > 0 ? worth(billedToo.lines) / base : quantityOf(billedToo.lines) / quantityOf(kept);
+        const ofEntry = alsoBilled.get(key) ?? new Map<string, number>();
+        ofEntry.set(allocation.id, Math.min(1, share));
+        alsoBilled.set(key, ofEntry);
+        const rowsOf = alsoBilledRows.get(key) ?? new Map<string, BookRowView[]>();
+        rowsOf.set(allocation.id, billedToo.rows);
+        alsoBilledRows.set(key, rowsOf);
+      }
+      if (gone.length === 0) continue;
       if (kept.length === 0) {
         absorbed.set(key, new Set([...(absorbed.get(key) ?? []), allocation.id]));
         continue;
@@ -1093,8 +1184,10 @@ export function overlayCorpBooks(input: {
     // What the member paid under the corporation's own Payee is paid on their side, day by day;
     // the corporation still confirms it against its wallet.
     const paidOf = memberPaid.get(p.book.corporationId);
-    // The same payment may also be a donation in flight or credit the book holds: count it once.
-    let creditedByMark = 0;
+    // The same payment may also be a donation in flight or credit the book holds: count it once,
+    // per Miner.
+    const creditedByMark = new Map<string, number>();
+    const minerOf = (row: BookRowView) => row.minerId ?? minerIdFor(row.characterId, p.book.miners);
     if (paidOf) {
       for (const row of mine) {
         if (row.state !== 'billed' || (row.taxOwed ?? 0) <= 0) continue;
@@ -1110,12 +1203,16 @@ export function overlayCorpBooks(input: {
         if (covered.length === 0) continue;
         paidOf.set(key, minusLines(left, covered));
         const { taxOwed } = computeAssignmentValue(covered, priceMap(row.unitPrices), row.taxPct);
-        const owed = Math.max(0, (row.taxOwed ?? 0) - taxOwed);
-        creditedByMark += (row.taxOwed ?? 0) - owed;
+        const before = row.taxOwed ?? 0;
+        const owed = Math.max(0, before - taxOwed);
+        creditedByMark.set(minerOf(row), (creditedByMark.get(minerOf(row)) ?? 0) + before - owed);
         row.taxOwed = owed < 0.01 ? 0 : owed;
         if (row.taxOwed === 0) {
           row.state = 'paid';
           row.settledBy = 'yourMark';
+          // The member's side is done; the book's Statement still bills the day until it credits it.
+          if (row.statementId !== undefined && p.settlement.get(row.statementId)?.settled !== true)
+            row.bookOwed = before;
         }
       }
     }
@@ -1123,20 +1220,28 @@ export function overlayCorpBooks(input: {
     // Statement yet, pay the oldest Billed days: the member's side is done,
     // and a corp that disagrees bills them again. Counting the credit keeps a
     // day Paid once the book credits the donation that paid it.
-    const paidAhead = Math.max(
-      0,
-      p.book.inFlight.reduce((sum, d) => sum + d.amount, p.credit) - creditedByMark
-    );
+    // Each Miner's money pays only that Miner's days, as the book credits it. A donation the
+    // book synced past without crediting no longer counts (`UNCREDITED_AFTER_DAYS`).
+    const counting = p.book.inFlight.filter((d) => !isUncredited(d, p.book.lastSyncedAt));
+    const ahead = new Map(p.credit);
+    for (const d of counting) {
+      const minerId = minerIdFor(d.characterId, p.book.miners);
+      ahead.set(minerId, (ahead.get(minerId) ?? 0) + d.amount);
+    }
     const open = mine.filter((r) => r.state === 'billed' && (r.taxOwed ?? 0) > 0);
-    for (const id of coverInFlight(
-      open.map((r) => ({ id: r.id, date: r.date, taxOwed: r.taxOwed ?? 0 })),
-      paidAhead
-    )) {
-      const row = open.find((r) => r.id === id);
-      if (row) {
-        row.state = 'paid';
-        row.settledBy = 'donation';
-        row.taxOwed = 0;
+    for (const [minerId, amount] of ahead) {
+      const paidAhead = Math.max(0, amount - (creditedByMark.get(minerId) ?? 0));
+      const own = open.filter((r) => minerOf(r) === minerId);
+      for (const id of coverInFlight(
+        own.map((r) => ({ id: r.id, date: r.date, taxOwed: r.taxOwed ?? 0 })),
+        paidAhead
+      )) {
+        const row = own.find((r) => r.id === id);
+        if (row) {
+          row.state = 'paid';
+          row.settledBy = 'donation';
+          row.taxOwed = 0;
+        }
       }
     }
     // Whatever settled the day, the member's own paid mark under the corporation's Payee stays
@@ -1148,6 +1253,14 @@ export function overlayCorpBooks(input: {
         if (ids?.length && row.state !== 'conflict') row.markedPaidIds = [...ids];
       }
     }
+  }
+
+  // A day an officer wrote off in full bills nobody: its ore is the other Payee's again.
+  for (const [key, ofEntry] of alsoBilledRows) {
+    for (const [id, billedRows] of ofEntry) {
+      if (billedRows.every((r) => r.state === 'waived')) alsoBilled.get(key)?.delete(id);
+    }
+    if (alsoBilled.get(key)?.size === 0) alsoBilled.delete(key);
   }
 
   // 5. How the free ore the books left reads: pending, or unattributed.
@@ -1202,14 +1315,51 @@ export function overlayCorpBooks(input: {
       startDate: p.book.startDate,
       ...(p.book.lastSyncedAt !== undefined ? { lastSyncedAt: p.book.lastSyncedAt } : {}),
       ...(closedThrough !== undefined ? { closedThrough } : {}),
-      credit: p.credit,
+      credit: [...p.credit.values()].reduce((sum, c) => sum + c, 0),
+      ...openAndOverdue(p, now),
+      uncredited: p.book.inFlight.filter((d) => isUncredited(d, p.book.lastSyncedAt)),
       hubId: p.book.hubId,
       oreForm: p.book.oreForm,
     };
   });
 
   rows.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
-  return { rows, takenFromFree, absorbed, trimmed, labels, books: summaries };
+  return { rows, takenFromFree, absorbed, trimmed, alsoBilled, labels, books: summaries };
+}
+
+/** The book synced `UNCREDITED_AFTER_DAYS` after the donation and still does not hold it. */
+const isUncredited = (d: InFlightDonation, lastSyncedAt: string | undefined) =>
+  lastSyncedAt !== undefined &&
+  Date.parse(lastSyncedAt) - Date.parse(d.at) >= UNCREDITED_AFTER_DAYS * DAY_MS;
+
+/** The member's unsettled Statements, and those past their Overdue days, oldest first. */
+function openAndOverdue(
+  p: Prepared,
+  now: string
+): { openStatements: OpenStatementView[]; overdue: OverdueStatementView[] } {
+  const open = p.book.statements
+    .filter((s) => p.settlement.has(s.id) && p.settlement.get(s.id)?.settled !== true)
+    .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id));
+  const view = (s: Statement) => ({
+    statementId: s.id,
+    minerId: s.minerId,
+    code: s.code,
+    periodStart: s.periodStart,
+    periodEnd: s.periodEnd,
+  });
+  const overdue: OverdueStatementView[] = [];
+  for (const s of open) {
+    const status = overdueStatus({
+      issuedAt: s.issuedAt,
+      settled: false,
+      now,
+      // A member cannot read declarations: the plain due date is all they know.
+      declarations: [],
+      overdueDays: p.book.overdueDays ?? DEFAULT_OVERDUE_DAYS,
+    });
+    if (status.state === 'overdue') overdue.push({ ...view(s), overdueAt: status.overdueAt });
+  }
+  return { openStatements: open.map((s) => ({ ...view(s), issuedAt: s.issuedAt })), overdue };
 }
 
 // --- Corrections -------------------------------------------------------------
@@ -1319,7 +1469,7 @@ export function inFlightDonations(
   held: readonly HeldPayment[],
   corporationId: number,
   startDate: string
-): { amount: number; at: string }[] {
+): InFlightDonation[] {
   return made
     .filter(
       (m) =>
@@ -1338,7 +1488,7 @@ export function inFlightDonations(
             Math.abs(Date.parse(h.at) - Date.parse(m.date)) <= SAME_TRANSFER_MS
         )
     )
-    .map((m) => ({ amount: m.amount as number, at: m.date }));
+    .map((m) => ({ characterId: m.characterId, amount: m.amount as number, at: m.date }));
 }
 
 /** Which rows an in-flight sum covers: whole days, oldest first, within the settle tolerance. */

@@ -217,6 +217,24 @@ describe('CorpRowDetailModal', () => {
     expect(onUnmarkPaid).toHaveBeenCalledOnce();
   });
 
+  it('says the book still bills a day the member marked paid while its Statement is open (#6204)', () => {
+    const marked: BookRowView = {
+      ...view,
+      state: 'paid',
+      taxOwed: 0,
+      settledBy: 'yourMark',
+      bookOwed: 900_000,
+      markedPaidIds: ['a1'],
+      dispute: undefined,
+    };
+    renderModal({ corp: { ...corp, view: marked } });
+    expect(
+      screen.getByText(
+        'Marked paid by you — Brass Meridian Logistics still shows 900,000 ISK owed. It confirms your mark against its wallet.'
+      )
+    ).toBeInTheDocument();
+  });
+
   it('says so when the member also marked a day the Statement settled, and offers the unmark', () => {
     const paid: BookRowView = {
       ...view,
