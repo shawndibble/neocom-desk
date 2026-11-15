@@ -37,6 +37,8 @@ export const CALLABLE_ACTIONS = {
     'setCommunityFleetShareDoneCallable',
     'removeCommunityFleetPayoutCallable',
     'removeCommunityPledgeCallable',
+    'listCommunityPopSharersCallable',
+    'setCommunityPopSharingBlockCallable',
   ],
   corpTaxBook: [
     'createCorpTaxBookFeederInviteCallable',
@@ -70,6 +72,8 @@ export const CALLABLE_ACTIONS = {
     'reconcileCorpTaxBookFeederPayoutsCallable',
     'disputeCorpTaxBookFeederPayoutCallable',
     'setCorpTaxBookFeederPopSharingCallable',
+    'listSharedPopsCallable',
+    'getCorpTaxBookPopSharingCommunitiesCallable',
     'listCorpTaxBookFeederInvitesCallable',
     'revokeCorpTaxBookSyncGrantCallable',
     'verifyCorpOfficerCallable',

@@ -689,6 +689,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Shared Pops (issue #6223, ADR 0034): a book's published pops, and the inputs kept to
+    // publish them (officers' last editing use, own refinery names). Function-only: a pilot
+    // reads pops through `listSharedPopsCallable`, which checks the audience live.
+    match /sharedPops/{corporationId} {
+      allow read, write: if false;
+    }
+    match /sharedPopSources/{corporationId} {
+      allow read, write: if false;
+    }
+
     // Collector books (issue #4507): feeder invite links (keyed by the code's hash)
     // and the feeder → Collector pointer. Function-only; a client never reads either.
     match /corpTaxBookFeederInvites/{inviteId} {
@@ -747,6 +757,12 @@ service cloud.firestore {
 
       allow get: if isMember();
       allow list, write: if false;
+
+      // Corporations whose Shared Pops the admin blocked here (issue #6223). Function-only:
+      // the admin reads and changes them through the community callables.
+      match /popSharingBlocks/{corporationId} {
+        allow read, write: if false;
+      }
 
       // Mail invites sent from this Community (issue #3604), one doc per
       // invited Character: only the admin reads them, only the callables write.

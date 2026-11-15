@@ -11671,6 +11671,14 @@
       "copy": "Copy to my plans",
       "formerMember": "a former Member"
     },
+    "popSharing": {
+      "title": "Moon pops shared here",
+      "hint": "Corporations whose Corp Tax Book shares moon pop schedules with this Community. Block one and its pops show to no Member here until you unblock it.",
+      "blocked": "Blocked",
+      "block": "Block",
+      "unblock": "Unblock",
+      "failed": "Couldn't change that. Try again."
+    },
     "approval": {
       "title": "Approve new Members",
       "hint": "Anyone who joins by the link waits here until you let them in. A Character you mail an invite to goes straight in.",
@@ -14736,7 +14744,7 @@
           "title": "Kept for your corporation",
           "description": "Only if your corporation uses SRP or a Corp Tax Book, or you shared a Vetting report with a corporation. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it. A Vetting report is the exception: the pilot can delete their own from its status page.",
           "srp": "SRP Claims: the killmail, the Character's name and ID, the hull, system and loss value, the fleet or FC and note you gave, the Reimbursement and the claim's state. Also the corporation's SRP settings, its Doctrine Fits and its SRP log: each filing (with the pilot's name, killmail, hull and amount) and each officer action. The CEO, Directors and Accountants read all of it; a pilot reads only their own claims.",
-          "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a log of who did each, and which books bill each Character (kept under that Character's ID). The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link.",
+          "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a log of who did each, and which books bill each Character (kept under that Character's ID). The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link. With Pop Sharing on, each shared moon's pop (refinery, moon, Pop Time, ore make-up if shared, notes and rate, never ISK) is kept for the pilots in the audiences the officers chose, until the belt expires; a Community admin's block of a sharing corporation is kept in the Community.",
           "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), the pilot's note and their answers to the corporation's questions, the invite link it started from, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist, questions, invite links and settings, and which of its reviewers opened the vetting page in the last 30 days, used only to send the alert for a new report."
         },
         "notes": {
@@ -17786,6 +17794,8 @@
         "overrides_one": "{{count}} set for this moon",
         "overrides_other": "{{count}} set for this moon",
         "ownerOptedOut": "Moon owner turned sharing off",
+        "noOfficer": "No officer in this Community",
+        "communityBlocked": "Its admin blocked this corporation",
         "bookRate": "Book's rate",
         "bookRatePct": "Book's rate ({{pct}}%)",
         "rateInvalid": "Enter a rate from 0 to 100, or leave it empty for the book's rate.",

@@ -631,6 +631,15 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   view summary. The one resolver for a moon's effective settings is `effectivePopSharing`
   (`functions/src/popSharing.ts`, shared with the client); the Sharing tab is
   `features/corp/moons/SharingTab.tsx` over `engine/corpTaxBook/sharingMoons.ts`.
+- **Shared Pops** (issue #6223, ADR 0034). The server publishes a sharing book's pops to
+  `sharedPops/{corp}` (server-only) after every sync and every settings, rate, survey or opt-out
+  change (`functions/src/sharedPopsStore.ts`; pure rules, Pop Time and lifetime in
+  `functions/src/sharedPops.ts`). Pilots read them only through the `listSharedPopsCallable`
+  action, which checks every proven Character's corporation, alliance (public ESI) and Communities
+  live; the client seam is `src/sync/sharedPops.ts` (`fetchSharedPops`). A Community share needs an
+  officer of the book among its Members (`sharedPopSources/{corp}.editors`, stamped by
+  `authorizeOfficer`); a Community admin blocks a corporation in `CommunityPopSharers.tsx`
+  (`communities/{id}/popSharingBlocks`).
 - **Corp Tax Book send queue** (issue #4064, D16). Pure rules:
   `src/engine/corpTaxBook/mailQueue.ts` (pacing, 520 holds, summary, D27
   reminder rule) and `statementMail.ts` (the short Statement mail). Client:

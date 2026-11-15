@@ -4,7 +4,15 @@
  * owners'), each row opening its overrides. Settings only: later tickets publish the Shared
  * Pops. Book editors change them; read-only officers see them.
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -29,21 +37,37 @@ import { audienceKey, type PopSharingSettings } from '../../../../functions/src/
 import { AudienceName, PopSharingDialog, type CommunityChoice } from './PopSharingDialog';
 import { PlaceCell } from './sectionParts';
 import { useBook } from './useBook';
-import { usePopSharing } from './usePopSharing';
+import { usePopSharing, usePopSharingCommunities } from './usePopSharing';
+import type { PopSharingCommunityStatus } from '../taxBook/popSharingClient';
 
 const k = 'corpTaxBook.moons.sharing';
 
+/** Which chosen Communities carry the pops (#6223): a Community with no officer shares nothing. */
+const CommunityStatus = createContext<Record<string, PopSharingCommunityStatus>>({});
+
 function Audiences({ settings }: { settings: PopSharingSettings }) {
   const { t } = useTranslation();
+  const status = useContext(CommunityStatus);
   if (settings.audiences.length === 0) return <>{t(`${k}.audience.none`)}</>;
   return (
     <>
-      {settings.audiences.map((a, i) => (
-        <span key={audienceKey(a)}>
-          {i > 0 && ', '}
-          <AudienceName audience={a} />
-        </span>
-      ))}
+      {settings.audiences.map((a, i) => {
+        const s = a.kind === 'community' ? status[a.communityId] : undefined;
+        return (
+          <span key={audienceKey(a)}>
+            {i > 0 && ', '}
+            <AudienceName audience={a} />
+            {s && (s.blocked || !s.officer) && (
+              <>
+                {' '}
+                <Pill tone="warning">
+                  {t(s.blocked ? `${k}.communityBlocked` : `${k}.noOfficer`)}
+                </Pill>
+              </>
+            )}
+          </span>
+        );
+      })}
     </>
   );
 }
@@ -86,6 +110,7 @@ export function SharingTab() {
   const { view, data, settings, names, canEdit, edit, characterId, corporationId, openSettings } =
     useBook();
   const { load, reload } = usePopSharing(characterId, corporationId);
+  const communityStatus = usePopSharingCommunities(characterId, corporationId, load);
   const [communities, setCommunities] = useState<CommunityChoice[]>([]);
   const [editing, setEditing] = useState<'default' | SharingMoonRow | null>(null);
   const [switching, setSwitching] = useState(false);
@@ -204,93 +229,95 @@ export function SharingTab() {
 
   const editingMoon = editing !== null && editing !== 'default' ? editing : null;
   return (
-    <div className="space-y-4">
-      <Panel
-        title={t(`${k}.title`)}
-        actions={
-          canEdit ? (
-            <Button size="sm" variant="ghost" onClick={() => setEditing('default')}>
-              {t(`${k}.editDefault`)}
-            </Button>
-          ) : undefined
-        }
-      >
-        <div className="space-y-3">
-          <p className="text-sm text-text-dim">{t(`${k}.intro`)}</p>
-          <label className="flex min-h-9 items-center gap-2 text-sm">
-            <Checkbox
-              checked={doc.enabled}
-              disabled={!canEdit || switching || (!doc.enabled && !syncOn)}
-              onChange={(e) => void toggle(e.target.checked)}
-            />
-            {t(`${k}.enabled`)}
-          </label>
-          {!syncOn && (
-            <p className="text-sm text-warning">
-              {t(doc.enabled ? `${k}.syncStopped` : `${k}.needsSync`)}{' '}
-              {openSettings && (
-                <button
-                  type="button"
-                  className={inlineLinkClassName}
-                  onClick={() => openSettings('access')}
-                >
-                  {t(`${k}.openSyncSettings`)}
-                </button>
-              )}
-            </p>
-          )}
-          {switchError && <InlineError>{switchError}</InlineError>}
-          <Eyebrow as="h3" className="pt-1">
-            {t(`${k}.default`)}
-          </Eyebrow>
-          <SettingsSummary settings={doc.defaults} bookRatePct={bookRatePct} />
-        </div>
-      </Panel>
-      <Panel title={t(`${k}.moons`)} padded={false}>
-        {rows.length === 0 ? (
-          <EmptyState title={t(`${k}.noMoons`)} />
-        ) : (
-          <div className="overflow-x-auto">
-            <DataTable
-              label={t(`${k}.moons`)}
-              columns={columns}
-              rows={rows}
-              rowKey={(row) => String(row.moonId)}
-              onRowClick={(row) => setEditing(row)}
-              defaultSort={{ columnId: 'moon', direction: 'asc' }}
-              mobileSort
-              stackColumns={2}
-              stackSummary={t(`${k}.moonsSummary`, { count: rows.length })}
-            />
-          </div>
-        )}
-      </Panel>
-      {editing === 'default' && (
-        <PopSharingDialog
-          title={t(`${k}.editDefault`)}
-          settings={doc.defaults}
-          communities={communities}
-          bookRatePct={bookRatePct}
-          canEdit={canEdit}
-          onClose={() => setEditing(null)}
-          onSave={(patch) => save({ action: 'setPopSharing', defaults: patch })}
-        />
-      )}
-      {editingMoon && (
-        <PopSharingDialog
-          title={t(`${k}.editMoon`, { moon: names.moon(editingMoon.moonId) })}
-          settings={editingMoon.effective.settings}
-          defaults={doc.defaults}
-          override={doc.moons[String(editingMoon.moonId)] ?? {}}
-          communities={communities}
-          bookRatePct={bookRateAt(editingMoon)}
-          canEdit={canEdit}
-          onClose={() => setEditing(null)}
-          onSave={(patch) =>
-            save({ action: 'setPopSharingMoon', moonId: editingMoon.moonId, ...patch })
+    <CommunityStatus.Provider value={communityStatus}>
+      <div className="space-y-4">
+        <Panel
+          title={t(`${k}.title`)}
+          actions={
+            canEdit ? (
+              <Button size="sm" variant="ghost" onClick={() => setEditing('default')}>
+                {t(`${k}.editDefault`)}
+              </Button>
+            ) : undefined
           }
-        />
-      )}
-    </div>
+        >
+          <div className="space-y-3">
+            <p className="text-sm text-text-dim">{t(`${k}.intro`)}</p>
+            <label className="flex min-h-9 items-center gap-2 text-sm">
+              <Checkbox
+                checked={doc.enabled}
+                disabled={!canEdit || switching || (!doc.enabled && !syncOn)}
+                onChange={(e) => void toggle(e.target.checked)}
+              />
+              {t(`${k}.enabled`)}
+            </label>
+            {!syncOn && (
+              <p className="text-sm text-warning">
+                {t(doc.enabled ? `${k}.syncStopped` : `${k}.needsSync`)}{' '}
+                {openSettings && (
+                  <button
+                    type="button"
+                    className={inlineLinkClassName}
+                    onClick={() => openSettings('access')}
+                  >
+                    {t(`${k}.openSyncSettings`)}
+                  </button>
+                )}
+              </p>
+            )}
+            {switchError && <InlineError>{switchError}</InlineError>}
+            <Eyebrow as="h3" className="pt-1">
+              {t(`${k}.default`)}
+            </Eyebrow>
+            <SettingsSummary settings={doc.defaults} bookRatePct={bookRatePct} />
+          </div>
+        </Panel>
+        <Panel title={t(`${k}.moons`)} padded={false}>
+          {rows.length === 0 ? (
+            <EmptyState title={t(`${k}.noMoons`)} />
+          ) : (
+            <div className="overflow-x-auto">
+              <DataTable
+                label={t(`${k}.moons`)}
+                columns={columns}
+                rows={rows}
+                rowKey={(row) => String(row.moonId)}
+                onRowClick={(row) => setEditing(row)}
+                defaultSort={{ columnId: 'moon', direction: 'asc' }}
+                mobileSort
+                stackColumns={2}
+                stackSummary={t(`${k}.moonsSummary`, { count: rows.length })}
+              />
+            </div>
+          )}
+        </Panel>
+        {editing === 'default' && (
+          <PopSharingDialog
+            title={t(`${k}.editDefault`)}
+            settings={doc.defaults}
+            communities={communities}
+            bookRatePct={bookRatePct}
+            canEdit={canEdit}
+            onClose={() => setEditing(null)}
+            onSave={(patch) => save({ action: 'setPopSharing', defaults: patch })}
+          />
+        )}
+        {editingMoon && (
+          <PopSharingDialog
+            title={t(`${k}.editMoon`, { moon: names.moon(editingMoon.moonId) })}
+            settings={editingMoon.effective.settings}
+            defaults={doc.defaults}
+            override={doc.moons[String(editingMoon.moonId)] ?? {}}
+            communities={communities}
+            bookRatePct={bookRateAt(editingMoon)}
+            canEdit={canEdit}
+            onClose={() => setEditing(null)}
+            onSave={(patch) =>
+              save({ action: 'setPopSharingMoon', moonId: editingMoon.moonId, ...patch })
+            }
+          />
+        )}
+      </div>
+    </CommunityStatus.Provider>
   );
 }

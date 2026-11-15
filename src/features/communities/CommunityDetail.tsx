@@ -43,6 +43,7 @@ import { useCommunityRequests } from './useCommunityRequests';
 import { CommunityMemberList } from './CommunityMemberList';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CommunityInvites } from './CommunityInvites';
+import { CommunityPopSharers } from './CommunityPopSharers';
 import { JoinRequestsList } from './JoinRequestsList';
 import { ShareFittingsTab } from './ShareFittingsTab';
 import { ShareSkillPlansTab } from './ShareSkillPlansTab';
@@ -449,6 +450,7 @@ export function CommunityDetail({
             onRevoke={() => setDialog({ kind: 'revoke' })}
             onPatch={onPatch}
           />
+          <CommunityPopSharers communityId={community.id} characterId={characterId} />
         </div>
         {/* Inside the window that raised it: the page behind is inert while it is open. */}
         {copied && <Toast message={copied} onClose={() => setCopied(null)} />}

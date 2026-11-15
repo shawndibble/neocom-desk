@@ -475,6 +475,41 @@ export async function setRequireApproval(
   });
 }
 
+/** A corporation sharing moon pops into a Community (#6223), as its admin sees it. */
+export interface CommunityPopSharer {
+  corporationId: number;
+  /** Whether it shares pops into the Community now. */
+  sharing: boolean;
+  blocked: boolean;
+}
+
+/** The admin's list of corporations that share moon pops into the Community, blocked ones too. */
+export async function listCommunityPopSharers(
+  characterId: number,
+  communityId: string
+): Promise<CommunityPopSharer[]> {
+  const result = await callCommunity<{ communityId: string }, { sharers?: CommunityPopSharer[] }>(
+    characterId,
+    'listCommunityPopSharersCallable',
+    { communityId }
+  );
+  return result.sharers ?? [];
+}
+
+/** The admin blocks (or unblocks) a corporation's moon pops in the Community. */
+export async function setCommunityPopSharingBlock(
+  characterId: number,
+  communityId: string,
+  corporationId: number,
+  blocked: boolean
+): Promise<void> {
+  await callCommunity(characterId, 'setCommunityPopSharingBlockCallable', {
+    communityId,
+    corporationId,
+    blocked,
+  });
+}
+
 export async function decideJoinRequest(
   characterId: number,
   communityId: string,
