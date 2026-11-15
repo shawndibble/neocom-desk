@@ -168,16 +168,17 @@ export function SurveyStartScreen() {
   );
   const { trackedAdd, busy, error } = useScanFeedback(add);
 
-  // An effect event, not a listener rebound per render: a rebind waits for the passive effects, so a
-  // scan pasted just after a name resolved reached the old listener and started under the typed name.
+  // An effect event, so a scan pasted just after a name resolves (before passive effects run) still
+  // sees that name: a listener rebound per render would still hold the old form.
   const onPaste = useEffectEvent((event: ClipboardEvent) => {
     if (event.defaultPrevented || isTypingTarget(event.target)) return;
     const text = event.clipboardData?.getData('text/plain') ?? '';
     if (parseSurveyScan(text) !== null) void trackedAdd(text);
   });
   useEffect(() => {
-    document.addEventListener('paste', onPaste);
-    return () => document.removeEventListener('paste', onPaste);
+    const listener = (event: ClipboardEvent) => onPaste(event);
+    document.addEventListener('paste', listener);
+    return () => document.removeEventListener('paste', listener);
   }, []);
 
   // A payee ESI found by its typed name travels as its ID, which names it for whoever opens the link.
