@@ -35,15 +35,15 @@ export interface FixtureRoute {
   respond: (request: FixtureRequest) => FixtureResponse;
 }
 
-const unexpected: { request: string; owner: unknown }[] = [];
-let currentOwner: () => unknown = () => undefined;
+const unexpected: { request: string; owner: string | undefined }[] = [];
+let currentOwner: () => string | undefined = () => undefined;
 
 /**
  * Lets the story smoke stamp each request with the story that issued it (it
  * reads an async context), so a request that outlives its story is never blamed
  * on the next one. Returns a function that stops stamping.
  */
-export function attributeRequestsTo(owner: () => unknown): () => void {
+export function attributeRequestsTo(owner: () => string | undefined): () => void {
   currentOwner = owner;
   return () => {
     currentOwner = () => undefined;
@@ -54,7 +54,7 @@ export function attributeRequestsTo(owner: () => unknown): () => void {
  * Requests the installed router had no fixture for since the last `install`;
  * given an `owner`, only those that owner issued (see `attributeRequestsTo`).
  */
-export function unexpectedRequests(owner?: unknown): readonly string[] {
+export function unexpectedRequests(owner?: string): readonly string[] {
   return unexpected
     .filter((entry) => owner === undefined || entry.owner === owner)
     .map((entry) => entry.request);

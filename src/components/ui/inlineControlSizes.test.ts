@@ -200,6 +200,16 @@ describe('inline control sizes', () => {
     ).toEqual(['x.tsx:1  SelectTrigger=sm Button=md']);
   });
 
+  it('lists only controls src/components/ui still exports', () => {
+    const exported = sourceFiles('src/components/ui')
+      .map((path) => readFileSync(path, 'utf8'))
+      .join('\n');
+    const missing = [...Object.keys(DEFAULT_SIZE), ...Object.keys(FIXED_SIZE)].filter(
+      (tag) => !new RegExp(`export (const|function) ${tag}\\b`).test(exported)
+    );
+    expect(missing).toEqual([]);
+  });
+
   it('finds no row whose controls mix sizes (DESIGN.md §3)', () => {
     const found = ROOTS.flatMap(sourceFiles).flatMap((path) =>
       mixedSizeRows(relative('.', path), readFileSync(path, 'utf8'))
