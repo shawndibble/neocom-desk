@@ -95,6 +95,8 @@ export function buildCorpBookView(
       ...(book.feeders ? { feeders: book.feeders } : {}),
       ...(book.adjustments ? { adjustments: book.adjustments } : {}),
       ...(book.writeOffs ? { writeOffs: book.writeOffs } : {}),
+      ...(book.declarations ? { declarations: book.declarations } : {}),
+      ...(book.disputes ? { disputes: book.disputes } : {}),
       ...(book.structureNames ? { structureNames: book.structureNames } : {}),
       hubId: book.hubId,
       oreForm: book.oreForm,

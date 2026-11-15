@@ -97,6 +97,8 @@ export const CALLABLE_ACTIONS = {
     'markSrpClaimsPaidCallable',
     'reclaimSrpCallable',
     'claimCorpTaxBookPaymentCallable',
+    'declareCorpTaxBookPaymentCallable',
+    'disputeCorpTaxBookConflictCallable',
     'confirmCorpTaxBookGroupingCallable',
     'declineCorpTaxBookGroupingCallable',
     'listPendingCorpTaxBookGroupingsCallable',

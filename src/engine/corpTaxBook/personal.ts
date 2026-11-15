@@ -48,7 +48,8 @@ import {
 } from './statements';
 import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry } from './types';
-import { overdueStatus, DEFAULT_OVERDUE_DAYS } from './overdue';
+import { overdueStatus, DEFAULT_OVERDUE_DAYS, type Declaration } from './overdue';
+import type { OreDispute } from './disputes';
 import { DAY_MS, MINUTE_MS } from '@/lib/age';
 
 /** What made a day Paid: the member's own mark, the corporation's settled Statement, or a donation. */
@@ -138,6 +139,10 @@ export interface PersonalBook {
    * outside coverage owes nothing; a day not read well after its grace is not Billable yet.
    */
   feeders?: readonly (FeederCoverage & Pick<FeederReadClock, 'lastReadWellAt'>)[];
+  /** Declarations on the member's own Statements the book lets them read (#6206). */
+  declarations?: readonly Declaration[];
+  /** The member's own Conflict disputes (#6206). */
+  disputes?: readonly OreDispute[];
   /** The member's own Adjustments the book lets them read (#4622). */
   adjustments?: readonly Adjustment[];
   /** The member's own officer write-offs the book lets them read (#4637). */
@@ -183,6 +188,50 @@ export interface BookDispute {
   /** The rate the member allocated the day at, when they allocated it at one rate. */
   personalPct?: number;
   bookPct: number;
+}
+
+/**
+ * A Statement's latest declaration as the member reads it (#6206): "I paid this another way"
+ * waiting for the corporation, or its answer.
+ */
+export interface MemberDeclaration {
+  state: 'waiting' | 'confirmed' | 'rejected';
+  /** When it was declared, or answered. */
+  at: string;
+  amount?: number;
+  /** The officer's reason for a rejection. */
+  reason?: string;
+}
+
+/** A Conflict day the member sent to the corporation (#6206), and its answer. */
+export interface MemberFlag {
+  state: 'sent' | 'rejected';
+  /** When it was sent, or rejected. */
+  at: string;
+  reason?: string;
+}
+
+/** Whether the member may declare now: never while one waits, or after the corporation confirmed. */
+export const canDeclare = (declaration: MemberDeclaration | undefined) =>
+  declaration === undefined || declaration.state === 'rejected';
+
+/** The latest declaration on `statementId`, as the member reads it. */
+export function declarationFor(
+  statementId: string,
+  declarations: readonly Declaration[]
+): MemberDeclaration | undefined {
+  const latest = declarations
+    .filter((d) => d.statementId === statementId)
+    .reduce<Declaration | undefined>((a, d) => (a === undefined || d.at > a.at ? d : a), undefined);
+  if (!latest) return undefined;
+  const amount = latest.amount !== undefined ? { amount: latest.amount } : {};
+  if (!latest.resolution) return { state: 'waiting', at: latest.at, ...amount };
+  return {
+    state: latest.resolution.kind,
+    at: latest.resolution.at,
+    ...amount,
+    ...(latest.resolution.reason !== undefined ? { reason: latest.resolution.reason } : {}),
+  };
 }
 
 export interface BookRowView {
@@ -231,6 +280,12 @@ export interface BookRowView {
   /** An `ownerCollected` conflict: the member's Payee that is the moon owner. */
   ownerPayeeId?: string;
   dispute?: BookDispute;
+  /** The day's Statement's latest declaration (#6206); absent when none was made. */
+  declaration?: MemberDeclaration;
+  /** A conflict: the record key (`character:refinery:date`) a dispute names (#6206). */
+  recordKey?: string;
+  /** A conflict the member sent to the corporation (#6206). */
+  flagged?: MemberFlag;
   /** The refinery that recorded the line. */
   structureId?: number;
   /** The refinery's name, when known; callers fall back to the system. */
@@ -263,7 +318,7 @@ export interface BookSummary {
   oreForm: 'compressed' | 'raw';
 }
 
-/** An Overdue Statement as the member reads it: without declarations, which only officers see. */
+/** An Overdue Statement as the member reads it, with its latest declaration (#6206). */
 export interface OverdueStatementView {
   statementId: string;
   minerId: string;
@@ -271,6 +326,7 @@ export interface OverdueStatementView {
   periodStart: string;
   periodEnd: string;
   overdueAt: string;
+  declaration?: MemberDeclaration;
 }
 
 /** A Statement the book has not settled yet. */
@@ -882,6 +938,7 @@ export function overlayCorpBooks(input: {
         ...common,
         id: `${book.corporationId}:${charge.charge.key}:conflict`,
         state: 'conflict',
+        recordKey: charge.charge.key,
         oreLines: conflict.lines,
         estimatedValue: worth.estimatedValue,
         taxOwed: null,
@@ -1323,8 +1380,44 @@ export function overlayCorpBooks(input: {
     };
   });
 
+  // #6206: what the member told the corporation, and its answer, on each row it concerns.
+  for (const row of rows) {
+    const book = books.find((b) => b.corporationId === row.corporationId);
+    if (row.statementId !== undefined) {
+      const declaration = declarationFor(row.statementId, book?.declarations ?? []);
+      if (declaration) row.declaration = declaration;
+    }
+    if (row.recordKey !== undefined) {
+      const flagged = flagFor(row, row.recordKey, book?.disputes ?? []);
+      if (flagged) row.flagged = flagged;
+    }
+  }
+
   rows.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
   return { rows, takenFromFree, absorbed, trimmed, alsoBilled, labels, books: summaries };
+}
+
+/** The dispute naming `recordKey`, as the member reads it. */
+function flagFor(
+  row: Pick<BookRowView, 'date' | 'characterId' | 'minerId'>,
+  recordKey: string,
+  disputes: readonly OreDispute[]
+): MemberFlag | undefined {
+  // A rejected day cannot be disputed again (the server refuses it): every row of it says so,
+  // not only the ones the dispute named.
+  const d =
+    disputes.find((x) => x.lines.some((l) => l.recordKey === recordKey)) ??
+    disputes.find(
+      (x) =>
+        x.resolution !== undefined &&
+        x.date === row.date &&
+        (x.minerId === row.minerId ||
+          x.lines.some((l) => l.recordKey.startsWith(`${row.characterId}:`)))
+    );
+  if (!d) return undefined;
+  return d.resolution
+    ? { state: 'rejected', at: d.resolution.at, reason: d.resolution.reason }
+    : { state: 'sent', at: d.at };
 }
 
 /** The book synced `UNCREDITED_AFTER_DAYS` after the donation and still does not hold it. */
@@ -1340,21 +1433,26 @@ function openAndOverdue(
   const open = p.book.statements
     .filter((s) => p.settlement.has(s.id) && p.settlement.get(s.id)?.settled !== true)
     .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id));
-  const view = (s: Statement) => ({
-    statementId: s.id,
-    minerId: s.minerId,
-    code: s.code,
-    periodStart: s.periodStart,
-    periodEnd: s.periodEnd,
-  });
+  const declarations = p.book.declarations ?? [];
+  const view = (s: Statement) => {
+    const declaration = declarationFor(s.id, declarations);
+    return {
+      statementId: s.id,
+      minerId: s.minerId,
+      code: s.code,
+      periodStart: s.periodStart,
+      periodEnd: s.periodEnd,
+      ...(declaration ? { declaration } : {}),
+    };
+  };
   const overdue: OverdueStatementView[] = [];
   for (const s of open) {
     const status = overdueStatus({
       issuedAt: s.issuedAt,
       settled: false,
       now,
-      // A member cannot read declarations: the plain due date is all they know.
-      declarations: [],
+      // The member reads their own declarations (#6206): a pause counts for them too.
+      declarations: declarations.filter((d) => d.statementId === s.id),
       overdueDays: p.book.overdueDays ?? DEFAULT_OVERDUE_DAYS,
     });
     if (status.state === 'overdue') overdue.push({ ...view(s), overdueAt: status.overdueAt });

@@ -17,6 +17,7 @@ import type { DisplayRow } from '../groupRows';
 import { CorpBookDiffModal } from './CorpBookDiffModal';
 import type { CorpBookViewBook } from './corpBookView';
 import { CorpStatusPill } from './CorpStatusPill';
+import { CorpDeclareSlot } from './CorpDeclareAction';
 import type { CorpRowInfo } from './corpRows';
 import { formatCount } from '@/lib/formatCount';
 
@@ -35,6 +36,8 @@ interface Props {
   onPay?: () => void;
   /** The notice for a day the miner's own list shares with the corporation's bill: the overlap notice, or a Conflict's. */
   notice?: ReactNode;
+  /** A declaration reached the corporation (#6206): reload the books. Absent: none is offered. */
+  onBookChanged?: () => void;
 }
 
 /**
@@ -56,6 +59,7 @@ export function CorpRowDetailModal({
   onPay,
   onUnmarkPaid,
   notice,
+  onBookChanged,
 }: Props) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -104,6 +108,14 @@ export function CorpRowDetailModal({
   const conflict = view.state === 'conflict';
   // Ore listed beyond what the book recorded: no Statement ever bills it.
   const excess = conflict && view.conflictCause === 'overListed';
+  // #6206: "I paid this another way" on a day its Statement still bills (owed, or marked paid by
+  // the member while the book still shows it owed), and what came of it. A day with an overlap
+  // says it in its notice instead.
+  const declaring =
+    onBookChanged !== undefined &&
+    view.statementId !== undefined &&
+    !view.overlap &&
+    (owing || view.bookOwed !== undefined || view.declaration !== undefined);
 
   return (
     <>
@@ -249,6 +261,7 @@ export function CorpRowDetailModal({
                     : t('miningTax.corpBook.detail.yourMarkNote')}
                 </p>
               )}
+              {declaring && <CorpDeclareSlot view={view} onDeclared={onBookChanged} />}
               {(view.state === 'dismissed' || view.state === 'waived') && view.dismissalReason && (
                 <p>{t('miningTax.corpBook.detail.reason', { reasons: view.dismissalReason })}</p>
               )}

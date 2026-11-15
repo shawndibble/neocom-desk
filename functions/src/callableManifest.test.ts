@@ -97,6 +97,8 @@ const WIRE_NAMES = [
   'corpTaxBook:markSrpClaimsPaidCallable',
   'corpTaxBook:reclaimSrpCallable',
   'corpTaxBook:claimCorpTaxBookPaymentCallable',
+  'corpTaxBook:declareCorpTaxBookPaymentCallable',
+  'corpTaxBook:disputeCorpTaxBookConflictCallable',
   'corpTaxBook:confirmCorpTaxBookGroupingCallable',
   'corpTaxBook:declineCorpTaxBookGroupingCallable',
   'corpTaxBook:listPendingCorpTaxBookGroupingsCallable',
