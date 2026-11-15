@@ -20,6 +20,9 @@ import { SAMPLE_ACTIVE_CHARACTER } from '@/storybook/sampleData';
  * tackle" was saved before, so it holds only its modules and rigs and its preview carries the
  * re-save note.
  *
+ * #6217: with rows from more than one source, a Source select beside the search narrows the list
+ * to one of them (`?source=`), on the search's line down to a phone.
+ *
  * The real `FittingStartScreen`, with the Doctrine list answered by the backend stand-in. No new
  * components. Sample data.
  */
@@ -184,5 +187,17 @@ export const OlderDoctrineFit: Story = { play: preview(/^Rifter - tackle/) };
 
 /** @summary The phone list: no preview pane, so the older fit's row carries the re-save note. */
 export const DoctrineRowsPhone: Story = {
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
+};
+
+/** @summary #6217: the Source filter set to Doctrine, beside the search: the Saved Fitting is hidden. */
+export const SourceDoctrine: Story = {
+  parameters: { shell: { path: '/fittings?source=doctrine', seed } },
+  play: preview(/^Thorax - brawl/),
+};
+
+/** @summary #6217 on a phone: the Source select stays on the search's line. */
+export const SourceDoctrinePhone: Story = {
+  parameters: { shell: { path: '/fittings?source=doctrine', seed } },
   globals: { viewport: { value: 'mobile1', isRotated: false } },
 };
