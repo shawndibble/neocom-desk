@@ -1557,7 +1557,11 @@ is clutter, and clutter hides the actions that matter.
   - `IskAmount` everywhere else
 
   The B/M/K suffix is the cue that the exact value is one hover or tap away.
-  No other compact formatter renders on screen.
+  No other compact formatter renders on screen, with one exception: inside a
+  chart (its axis ticks and its own hover tooltip) ISK may be plain compact
+  text. Those are already the reveal surface, and a tooltip inside a tooltip
+  can't be hovered. Use `formatIskCompact` and the i18n ISK unit there, never
+  a generic number formatter with a hand-appended " ISK".
 
   Where a panel holds many `IskAmount`s, wrap them in `IskFigureGroup`: one
   tab stop per group, arrow keys / Home / End between figures (roving

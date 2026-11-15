@@ -135,7 +135,8 @@ export interface ListRow {
  */
 export type TableCell =
   | string
-  | { text: string; iskAmount: number }
+  /** An ISK figure; `prefix` is a short translated word or sign drawn before it ("≤"). */
+  | { text: string; iskAmount: number; prefix?: string }
   /** Short text with more behind it (a ticker, the corporation's full name in a tooltip). */
   | { text: string; hint: string }
   | { text: string; tone?: 'good' | 'caution' | 'bad'; bar?: number };

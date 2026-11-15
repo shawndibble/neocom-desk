@@ -36,7 +36,7 @@ import {
   type SurveySeriesRow,
 } from '@/engine/survey/chartViews';
 import type { SurveySummary } from '@/engine/survey/series';
-import { formatCompactNumber } from '@/lib/compactNumber';
+import { formatIskCompact } from '@/lib/isk';
 import { FULL_HEIGHT, MARGIN, formatPace, makeScanDot, timeAxis, yAxis } from './surveyChartParts';
 import { oreTone } from './surveyTones';
 import { formatCount } from '@/lib/formatCount';
@@ -203,10 +203,13 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
   const { xAxis } = timeAxis(summary);
   const label = t('survey.chartIsk');
   const scanRows = rows.slice(0, summary.points.length);
-  const isk = (v: number | undefined) => (v === undefined ? '' : `${formatCount(v)} ISK`);
+  // Inside the chart's own tooltip ISK is plain compact text (DESIGN §6c "ISK").
+  const iskShort = (v: number) => t('survey.chartIskAmount', { amount: formatIskCompact(v) });
 
-  const columns = useMemo<DataTableColumn<SurveySeriesRow>[]>(
-    () => [
+  const columns = useMemo<DataTableColumn<SurveySeriesRow>[]>(() => {
+    const isk = (v: number | undefined) =>
+      v === undefined ? '' : t('common.iskExact', { amount: formatCount(v) });
+    return [
       {
         id: 'at',
         stickyStart: true,
@@ -224,9 +227,8 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
         header: ore,
         render: (r: SurveySeriesRow) => isk(r[ore]),
       })),
-    ],
-    [pricedOres, t]
-  );
+    ];
+  }, [pricedOres, t]);
 
   function Tip({ active, payload }: TooltipContentProps) {
     const row = payload?.[0]?.payload as SurveySeriesRow | undefined;
@@ -242,7 +244,7 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
               <div key={ore} className="flex items-center gap-2">
                 <Swatch tone={oreTone(toneIndex[ore])} />
                 <span className="min-w-0 flex-1 truncate">{ore}</span>
-                <span className="text-text">{formatCompactNumber(row[ore] ?? 0)} ISK</span>
+                <span className="text-text">{iskShort(row[ore] ?? 0)}</span>
               </div>
             ))}
             {unpricedOres.map((ore) => (
@@ -255,10 +257,10 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
           </div>
           <div className="flex justify-between gap-4 border-t border-line pt-1 font-semibold text-text">
             <span>{t('survey.chartTotal')}</span>
-            <span>{formatCompactNumber(row.total)} ISK</span>
+            <span>{iskShort(row.total)}</span>
           </div>
           {row.minedIsk !== undefined && row.minedIsk > 0 && (
-            <div>{t('survey.chartIskMined', { amount: formatCompactNumber(row.minedIsk) })}</div>
+            <div>{t('survey.chartIskMined', { amount: formatIskCompact(row.minedIsk) })}</div>
           )}
           <div className="border-t border-line pt-1">{scannedBy(row.at)}</div>
         </div>

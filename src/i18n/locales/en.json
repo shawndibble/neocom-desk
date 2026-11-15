@@ -664,6 +664,7 @@
       "isk": "{{isk}} ISK",
       "fromIsk": "from {{isk}} ISK",
       "perMinute": "{{isk}}/min",
+      "perMinuteAmount": "<isk/>/min",
       "noPrice": "no price",
       "rankLongest": "longest",
       "rankMostDamage": "most damage",
@@ -5696,8 +5697,8 @@
         "empty": "No Quickbar item has a price target. Set one from the Market page.",
         "nearest": "Nearest: {{name}}, {{pct}}% away",
         "target": {
-          "above": "≥ {{isk}}",
-          "below": "≤ {{isk}}"
+          "above": "≥",
+          "below": "≤"
         },
         "col": {
           "item": "Item",
@@ -7719,6 +7720,7 @@
     "chartAllOre": "All ore",
     "chartPercentLeft": "{{percent}}% left",
     "chartIskMined": "−{{amount}} ISK this scan",
+    "chartIskAmount": "{{amount}} ISK",
     "chartNoPrice": "no price",
     "tableMined": "Mined since previous scan",
     "tableFrom": "From",

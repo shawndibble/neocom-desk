@@ -87,7 +87,16 @@ const CELL_TONE = { good: 'text-success', caution: 'text-warning', bad: 'text-da
 /** At Small the bar is half as long: the first column keeps the width, the bar is only decoration. */
 function CellValue({ cell, compact }: { cell: TableCell; compact: boolean }) {
   if (typeof cell === 'string') return <>{cell}</>;
-  if ('iskAmount' in cell) return <IskAmount value={cell.iskAmount} decimals={0} />;
+  if ('iskAmount' in cell) {
+    const amount = <IskAmount value={cell.iskAmount} decimals={0} />;
+    return cell.prefix === undefined ? (
+      amount
+    ) : (
+      <>
+        {cell.prefix} {amount}
+      </>
+    );
+  }
   if ('hint' in cell) return <HintText content={cell.hint}>{cell.text}</HintText>;
   if (cell.bar === undefined) return <>{cell.text}</>;
   return (
