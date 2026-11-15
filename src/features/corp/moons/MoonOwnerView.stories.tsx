@@ -35,6 +35,18 @@ type Story = StoryObj<typeof meta>;
 /** @summary Page B with the rate override line ("Rate set to 8% by ... You asked for 6%."). */
 export const Normal: Story = {};
 
+const twoMonths = fixtureView();
+twoMonths.days = [
+  ...twoMonths.days,
+  {
+    date: '2026-09-28',
+    lines: [{ characterId: 2, structureId: 11, typeId: 45492, volume: 64_000, quantity: 64_000 }],
+  },
+];
+
+/** @summary Mining across two months: the Month filter in the Mined header narrows the day-by-day table. */
+export const TwoMonths: Story = { args: { view: twoMonths } };
+
 /** @summary Refineries through the label chain: a label either side set, the structure name the grant read, then the system, then the moon owner's own name plus the id. Officers edit a label behind the faint pencil. */
 export const RefineryLabels: Story = {
   args: {
@@ -100,7 +112,7 @@ export const RefineryNamesNotGranted: Story = {
 export const Stale: Story = {
   args: {
     view: fixtureView({ staleSince: Date.UTC(2026, 9, 11) }),
-    banner: <OwnerStaleBanner since={Date.UTC(2026, 9, 11)} onReconnect={() => {}} />,
+    banner: <OwnerStaleBanner since={Date.UTC(2026, 9, 11)} daysLeft={21} onReconnect={() => {}} />,
   },
 };
 

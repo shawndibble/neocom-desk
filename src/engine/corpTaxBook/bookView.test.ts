@@ -533,6 +533,28 @@ describe('a held moon owner day and a paid Statement (#6209)', () => {
   });
 });
 
+describe('a held day says why (#6210)', () => {
+  const FEEDER = 98000002;
+  const fed = (characterId: number, date: string, quantity: number) => ({
+    ...entry(characterId, date, quantity),
+    structureId: 2002,
+    sourceCorporationId: FEEDER,
+  });
+
+  it('names the moon owner whose ledger it waits for', () => {
+    const stale = input({
+      entries: [fed(1, '2026-08-10', 1000), entry(1, '2026-08-20', 1000)],
+      feeders: [{ corporationId: FEEDER, lastReadWellAt: '2026-08-15T10:00:00Z' }],
+    });
+    const days = minerDetail(buildBookView(stale), 'solo:1')!.days;
+    expect(days.find((d) => d.date === '2026-08-20')).toMatchObject({
+      status: 'not-billable',
+      heldBy: FEEDER,
+    });
+    expect(days.find((d) => d.date === '2026-08-10')?.heldBy).toBeUndefined();
+  });
+});
+
 describe('buildBookView: moon owner coverage (#4618)', () => {
   const OWNER = 98000002;
   const fed = (characterId: number, date: string, quantity: number) => ({

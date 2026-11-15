@@ -295,7 +295,9 @@ export function MinerDetail({ id }: { id: string }) {
             .join(', ')}
           {withStatus && (
             <span className={cx('block text-xs whitespace-nowrap', STATUS_TONE[d.status])}>
-              {t(`corpTaxBook.moons.dayStatus.${d.status}`)}
+              {d.heldBy !== undefined
+                ? t('corpTaxBook.moons.dayStatus.held', { owner: names.corporation(d.heldBy) })
+                : t(`corpTaxBook.moons.dayStatus.${d.status}`)}
               {(() => {
                 const st = statementOf(d.statementId);
                 return st && <> · {statementLink(st)}</>;

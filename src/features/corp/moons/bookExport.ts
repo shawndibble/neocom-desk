@@ -81,6 +81,7 @@ function rateTarget(rate: TaxRate, names: BookExportNames, minerName: MinerName)
     case 'guest':
       return null;
     case 'feeder':
+    case 'feeder-member':
       return names.corporation(rate.feederId);
     case 'miner':
       return minerName(rate.minerId);

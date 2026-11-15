@@ -101,6 +101,8 @@ export function parseRequestedRate(input: string): number | null {
 
 export interface MinedRow {
   key: string;
+  /** The UTC day it was mined. */
+  date: string;
   characterId: number;
   structureId: number;
   /** The ore; null on a view built before #5261. */
@@ -108,15 +110,26 @@ export interface MinedRow {
   volume: number;
 }
 
-/** Mined per character, refinery and ore over the covered days, most first. All of it, none capped. */
-export function minedRows(days: readonly FeederViewDay[]): MinedRow[] {
+/** The months (`YYYY-MM`) with mining on the page, newest first: the month filter's options. */
+export function minedMonths(days: readonly FeederViewDay[]): string[] {
+  return [...new Set(days.map((d) => d.date.slice(0, 7)))].sort().reverse();
+}
+
+/**
+ * Mined per day, character, refinery and ore, so the moon owner can check each day against its
+ * own ledger (#6210); one month, or every covered day with `month` null. Newest day first, the
+ * most mined first within a day. Nothing is capped.
+ */
+export function minedDayRows(days: readonly FeederViewDay[], month: string | null): MinedRow[] {
   const byKey = new Map<string, MinedRow>();
-  for (const day of days)
+  for (const day of days) {
+    if (month !== null && !day.date.startsWith(month)) continue;
     for (const line of day.lines) {
       const typeId = line.typeId ?? null;
-      const key = `${line.characterId}:${line.structureId}:${typeId ?? ''}`;
+      const key = `${day.date}:${line.characterId}:${line.structureId}:${typeId ?? ''}`;
       const row = byKey.get(key) ?? {
         key,
+        date: day.date,
         characterId: line.characterId,
         structureId: line.structureId,
         typeId,
@@ -125,7 +138,10 @@ export function minedRows(days: readonly FeederViewDay[]): MinedRow[] {
       row.volume += line.quantity ?? line.volume;
       byKey.set(key, row);
     }
-  return [...byKey.values()].sort((a, b) => b.volume - a.volume || a.key.localeCompare(b.key));
+  }
+  return [...byKey.values()].sort(
+    (a, b) => b.date.localeCompare(a.date) || b.volume - a.volume || a.key.localeCompare(b.key)
+  );
 }
 
 export function oreTypeIdsOf(days: readonly FeederViewDay[]): number[] {

@@ -14,7 +14,11 @@ import {
   type MailQueueItem,
 } from '@/engine/corpTaxBook/mailQueue';
 import { utcDay } from '@/engine/localDay';
-import { composeModeChangeMail, composeRateChangeMail } from '@/engine/corpTaxBook/ownerRateMail';
+import {
+  composeGrantStaleMail,
+  composeModeChangeMail,
+  composeRateChangeMail,
+} from '@/engine/corpTaxBook/ownerRateMail';
 import { composePayeeChangeMail } from '@/engine/corpTaxBook/payeeChange';
 import type { OwnerRateChange } from '@/engine/corpTaxBook/ownerRate';
 import { composeStatementMail, type StatementMailInput } from '@/engine/corpTaxBook/statementMail';
@@ -320,6 +324,43 @@ export function enqueueModeChangeMail(input: {
         recipientName: r.name,
         mode: input.mode,
         date: utcDay(input.at),
+      }),
+    }))
+  );
+}
+
+/**
+ * Queues the "we can't read the moon owner's ledger" mail (#6210), one per recipient, to both
+ * sides. One stale spell (`staleSince`) is mailed once per recipient.
+ */
+export function enqueueGrantStaleMail(input: {
+  corporationId: number;
+  accountingCorporationName: string;
+  moonOwnerName: string;
+  senderCharacterId: number;
+  feederCorporationId: number;
+  /** When the ledger was first refused (ms). */
+  staleSince: number;
+  /** The UTC day EVE drops the first unread day (`oreLostOn`). */
+  lostOn: string;
+  recipients: readonly { id: number; name: string }[];
+}): Promise<{ queued: number }> {
+  return queueNotices(
+    {
+      corporationId: input.corporationId,
+      senderCharacterId: input.senderCharacterId,
+      kind: 'grant-stale',
+      feederCorporationId: input.feederCorporationId,
+    },
+    input.recipients.map((r) => ({
+      recipient: r,
+      statementId: `stale:${input.feederCorporationId}:${input.staleSince}:${r.id}`,
+      mail: composeGrantStaleMail({
+        accountingCorporationName: input.accountingCorporationName,
+        moonOwnerName: input.moonOwnerName,
+        recipientName: r.name,
+        staleSince: utcDay(input.staleSince),
+        lostOn: input.lostOn,
       }),
     }))
   );

@@ -8052,6 +8052,7 @@
         "moon": "per-moon rate",
         "structure": "per-refinery rate",
         "feeder": "per-moon-owner rate",
+        "feeder-member": "moon owner's own members rate",
         "record": "correction for this day"
       },
       "detail": {
@@ -17687,6 +17688,7 @@
         "rate-change": "Rate change",
         "payee-change": "Who gets paid changed",
         "mode-change": "Settled otherwise changed",
+        "grant-stale": "Ledger can't be read",
         "srp-result": "SRP result",
         "vetting-result": "Vetting decision",
         "removal": "Moon owner removal",
@@ -17786,6 +17788,7 @@
         "on-statement": "On Statement",
         "unbilled": "Next Statement",
         "not-billable": "Today's mining",
+        "held": "Waiting for {{owner}}'s ledger",
         "dismissed": "Dismissed",
         "written-off": "Written off"
       },
@@ -18579,12 +18582,15 @@
           "even": "Nothing is owed to you right now, at your rate of {{pct}}%.",
           "paid": "They have paid {{paid}} so far; the last payment was {{amount}} on {{date}}.",
           "notPaid": "They have not paid you yet.",
+          "accrued": "How it adds up: {{accrued}} has built up for you at your rate, less {{paid}} paid to you.",
           "unpriced_one": "{{count}} day of mining had ore without a price yet, so it is not counted.",
           "unpriced_other": "{{count}} days of mining had ore without a price yet, so they are not counted."
         },
         "stale": {
           "title": "We can't read your mining ledger since {{date}}",
-          "hint": "The character who gave access lost the Accountant role or revoked it. Mining since then is not counted until it is reconnected.",
+          "hint_one": "The character who gave access lost the Accountant role or revoked it. Mining since then is not counted until it is reconnected. Reconnect within 1 day: after that, EVE drops the oldest unread mining and it can never be counted.",
+          "hint_other": "The character who gave access lost the Accountant role or revoked it. Mining since then is not counted until it is reconnected. Reconnect within {{count}} days: after that, EVE drops the oldest unread mining and it can never be counted.",
+          "hintLost": "The character who gave access lost the Accountant role or revoked it. EVE no longer holds the oldest unread mining, so it can never be counted. Reconnect to keep the rest.",
           "action": "Reconnect"
         },
         "refineryNames": {
@@ -18667,7 +18673,10 @@
         "minedVolume": "Volume mined",
         "units": "{{volume}} units",
         "since": "Since",
+        "month": "Month",
+        "allMonths": "All months",
         "cols": {
+          "date": "Day",
           "character": "Character",
           "refinery": "Refinery",
           "volume": "Units",
@@ -18736,7 +18745,8 @@
           "miner": "Miner",
           "moon": "Moon",
           "structure": "Refinery",
-          "feeder": "Moon owner"
+          "feeder": "Moon owner",
+          "feeder-member": "Moon owner's own members"
         },
         "from": "from {{date}}",
         "rateFor": "Applies to",
@@ -19002,6 +19012,7 @@
           "active": "Active",
           "cant-read": "Can't read ledger",
           "removal-pending": "Removal pending",
+          "removal-unsent": "Removal waiting on its notice mail",
           "settled-otherwise": "Settled otherwise",
           "rate-asked": "Rate asked",
           "no-rate": "No rate set",
@@ -19055,7 +19066,9 @@
           "remove": "Remove from this book",
           "settledOtherwise": "Settled otherwise",
           "settledNote": "Settled otherwise: nothing builds up while it lasts. What they were owed before stays owed until you pay it.",
-          "stale": "Can't read their ledger since {{date}}. Their days wait until it reads again.",
+          "stale_one": "Can't read their ledger since {{date}}. Their days wait until it reads again; in 1 day EVE starts dropping the oldest of them.",
+          "stale_other": "Can't read their ledger since {{date}}. Their days wait until it reads again; in {{count}} days EVE starts dropping the oldest of them.",
+          "staleLost": "Can't read their ledger since {{date}}. EVE has dropped the oldest unread days: that mining can never be counted.",
           "removal": {
             "title": "Removal pending, takes effect {{time}}",
             "titleNoTime": "Removal pending",

@@ -39,6 +39,7 @@ import {
   deriveOwnerRateHistory,
   effectiveOwnerRatePct,
   isDayCovered,
+  reconnectCoverageFrom,
   reopenPeriod,
 } from './corpTaxBookEngine.js';
 import type { CorporationLookup } from './corpTaxBookEsi.js';
@@ -270,8 +271,13 @@ async function reconnectCore(
     const reopened = rec.status === 'disconnected';
     let coveragePeriods: FeederRecord['coveragePeriods'] | undefined;
     if (reopened) {
-      // Back after a disconnect: a new coverage period, the balance and rate history carry on.
-      coveragePeriods = reopenPeriod(rec.coveragePeriods, utcDate(deps.now()));
+      // Back after a disconnect: a new coverage period from the day after the last covered one
+      // (as far back as EVE still holds), so no ore is lost; balance and rate history carry on.
+      const today = utcDate(deps.now());
+      coveragePeriods = reopenPeriod(
+        rec.coveragePeriods,
+        reconnectCoverageFrom(rec.coveragePeriods, today, utcDate(rec.joinedAt))
+      );
       patch.status = 'active';
       patch.coveragePeriods = coveragePeriods;
       patch.disconnectedAt = FieldValue.delete();

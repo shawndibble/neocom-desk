@@ -13,6 +13,7 @@ import { leaveFeeder } from './corpTaxBookFeederGrant.js';
 import { setBookFeederPayee, setFeederPayee } from './corpTaxBookPayee.js';
 import {
   cancelFeederRemoval,
+  claimFeederStaleMail,
   finalizeDueRemovals,
   forceRemovalNow,
   getRemovalLink,
@@ -273,6 +274,42 @@ emulatorSuite('removing a moon owner', () => {
         .get()
         .then((s) => s.size)
     ).toBe(0);
+  });
+
+  describe('the stale-ledger mail (#6210)', () => {
+    const claim = (id: number) => claimFeederStaleMail(deps(), who(id), target(id));
+    const goStale = (at: number) =>
+      collectorBook().collection('feeders').doc(String(FEEDER)).update({ staleSince: at });
+
+    it('names nobody while the ledger reads', async () => {
+      expect(await claim(ACCOUNTANT)).toEqual({ recipients: [], ownerRecipients: [] });
+    });
+
+    it('goes once per stale spell, to both sides, whichever officer asks first', async () => {
+      await goStale(T0 + 50 * H);
+      const first = await claim(ACCOUNTANT);
+      expect([...first.recipients].sort()).toEqual(
+        [CEO, OTHER_ACCOUNTANT, FEEDER_CEO, PAYEE].sort()
+      );
+      expect([...first.ownerRecipients].sort()).toEqual([FEEDER_CEO, PAYEE].sort());
+      expect(await claim(OTHER_ACCOUNTANT)).toEqual({ recipients: [], ownerRecipients: [] });
+      // A new spell (reconnected, then refused again) mails again.
+      await goStale(T0 + 90 * H);
+      expect((await claim(OTHER_ACCOUNTANT)).recipients).toContain(ACCOUNTANT);
+    });
+
+    it("never mails one of the book's own corporations", async () => {
+      await collectorBook()
+        .collection('feeders')
+        .doc(String(FEEDER))
+        .update({ staleSince: T0 + 50 * H, sameOwner: true });
+      expect(await claim(ACCOUNTANT)).toEqual({ recipients: [], ownerRecipients: [] });
+    });
+
+    it('refuses a junior', async () => {
+      await goStale(T0 + 50 * H);
+      expect(await reason(claim(JUNIOR))).toBe('role-required');
+    });
   });
 
   it('is ended by the moon owner leaving, and reads as removed', async () => {

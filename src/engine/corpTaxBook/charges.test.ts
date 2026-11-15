@@ -86,6 +86,21 @@ describe('buildDayCharges', () => {
     expect(charges[0]).toMatchObject({ isGuest: true, taxPct: 20, taxOwed: 600 });
   });
 
+  it("bills a moon owner's own member at its moon at the owner's member rate (#6210)", () => {
+    const OWNER = 98000050;
+    const member: TaxRate = {
+      scope: 'feeder-member',
+      feederId: OWNER,
+      pct: 3,
+      effectiveFrom: '2026-01-01',
+    };
+    const at = { ...book, rates: [...rates, member] };
+    const own = entry({ recordedCorporationId: OWNER, sourceCorporationId: OWNER });
+    expect(buildDayCharges([own], at).charges[0]).toMatchObject({ isGuest: true, taxPct: 3 });
+    const stranger = entry({ recordedCorporationId: 1, sourceCorporationId: OWNER });
+    expect(buildDayCharges([stranger], at).charges[0]).toMatchObject({ taxPct: 20 });
+  });
+
   it('carries the refinery’s moon and Extraction, and the moon rate', () => {
     const { charges } = buildDayCharges([entry({ structureId: 2002 })], book);
     expect(charges[0]).toMatchObject({ moonId: 40000001, extractionId: 'x1', taxPct: 5 });
