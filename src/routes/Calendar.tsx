@@ -202,7 +202,8 @@ export function Calendar() {
   const [selectedEventId, setSelectedEventId] = useState<number | null>(openParamId);
   const [selectedSkyhookId, setSelectedSkyhookId] = useState<number | null>(null);
   // `?pop=` (a Shared Moon Pop notification) opens that Shared Pop once the board loads.
-  const [selectedPopId, setSelectedPopId] = useState<string | null>(useSharedPopParam());
+  const popParam = useSharedPopParam();
+  const [selectedPopId, setSelectedPopId] = useState<string | null>(popParam);
 
   /**
    * RSVP responses applied locally, ahead of `data` catching up.

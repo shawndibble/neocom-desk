@@ -60,9 +60,7 @@ export function toSharedPopSources(
       detail: popped ? 'expires' : pop.popTime === 'ready' ? 'ready' : 'autoFracture',
       deadlineMs: popped ? Date.parse(pop.expiresAt) : popAtMs,
       sharedBy: entry.corporation,
-      ...(entry.pop.refineryName !== null && entry.moonName !== null
-        ? { subtitle: entry.moonName }
-        : {}),
+      ...(pop.refineryName !== null && entry.moonName !== null ? { subtitle: entry.moonName } : {}),
     });
   }
   return sources;
