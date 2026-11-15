@@ -11,7 +11,7 @@ import { lpRate } from '@/engine/loyalty/marketLpValue';
 import { planLpSpend, type SpendCandidate, type SpendPlanResult } from '@/engine/loyalty/spendPlan';
 import type { ReachableBuyOrder } from '@/engine/market/buyReach';
 import type { HubOrder } from '@/engine/market/haulingMarket';
-import { reachableBuyOrders } from '@/engine/market/liveBook';
+import { liveHubOrders, reachableBuyOrders } from '@/engine/market/liveBook';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { loadWalletBalance } from '@/features/character/wallet';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
@@ -24,7 +24,7 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useLpValue } from './lpValue';
 import { loadMarketLpValue } from './marketLpValue';
 import type { LoyaltyOfferRow } from './offerRows';
-import { outputUnitsOf, resolveLoyaltyRowItem } from './offerRowDisplay';
+import { buildCostOf, outputUnitsOf, resolveLoyaltyRowItem } from './offerRowDisplay';
 
 /** Offers the plan considers: the best ~10 by one-redemption ISK/LP that pass the filters. */
 export const SPEND_PLAN_CANDIDATES = 10;
@@ -52,7 +52,7 @@ export function spendCandidates(
         offerId: row.offer.offer_id,
         lpCost: row.offer.lp_cost,
         iskCost: row.offer.isk_cost,
-        buildCost: row.build ? row.build.materialCost + row.build.jobFee.total : 0,
+        buildCost: buildCostOf(row),
         requiredItems: row.requiredItems.map(({ typeId, quantity }) => ({ typeId, quantity })),
         outputTypeId: resolveLoyaltyRowItem(row).typeId,
         outputUnits: outputUnitsOf(row, catalog),
@@ -112,15 +112,7 @@ async function loadSpendPlan(request: Request): Promise<SpendPlanView> {
   const station = { locationId: hub.stationId, systemId: hub.systemId };
   for (const [typeId, book] of books) {
     if (requiredIds.has(typeId)) {
-      sellBooks.set(
-        typeId,
-        book.orders.map((o) => ({
-          price: o.price,
-          volume_remain: o.volume_remain ?? 0,
-          is_buy_order: o.is_buy_order,
-          location_id: o.location_id,
-        }))
-      );
+      sellBooks.set(typeId, liveHubOrders(book.orders));
     }
     if (outputIds.has(typeId))
       buyBooks.set(typeId, reachableBuyOrders(book.orders, station, jumps));

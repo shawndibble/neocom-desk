@@ -24,7 +24,19 @@ const names: Record<number, string> = {
 const rowsById = new Map(
   Object.entries(names).map(([id, itemName]) => [
     Number(id),
-    { itemName, offer: { offer_id: Number(id) } } as unknown as LoyaltyOfferRow,
+    {
+      itemName,
+      offer: { offer_id: Number(id) },
+      requiredItems: [
+        { typeId: 17_000, name: 'Caldari Navy Admiral Insignia I', quantity: 1, unitPrice: null },
+        {
+          typeId: 17_001,
+          name: 'Caldari Navy Vice Admiral Insignia I',
+          quantity: 2,
+          unitPrice: null,
+        },
+      ],
+    } as unknown as LoyaltyOfferRow,
   ])
 );
 
@@ -198,7 +210,7 @@ export const StoppedAtBestShare: Story = {
             reason: 'belowFloor',
             offerId: 1,
             iskPerLp: 1_310,
-            floor: { rate: 0.7 * 2_003, source: 'best' },
+            floor: { rate: 0.7 * 2_003, source: 'best', best: 2_003 },
           },
           null
         )

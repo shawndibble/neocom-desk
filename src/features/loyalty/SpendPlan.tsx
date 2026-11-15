@@ -18,6 +18,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import {
   FALLBACK_FLOOR_SHARE,
+  type SpendFloor,
   type SpendPlanRow,
   type SpendStop,
 } from '@/engine/loyalty/spendPlan';
@@ -57,15 +58,31 @@ export function SpendLpButton({
     );
   }
   return (
-    <Tooltip content={t('loyaltyStore.spendPlan.actionHint', { lp: formatCount(playerLp!) })}>
+    <Tooltip content={t('loyaltyStore.spendPlan.actionHint')}>
       <Button size="sm" loading={loading} onClick={onClick}>
-        {t('loyaltyStore.spendPlan.action')}
+        {t('loyaltyStore.spendPlan.actionWithLp', { lp: formatCount(playerLp!) })}
       </Button>
     </Tooltip>
   );
 }
 
 type PlanRow = SpendPlanRow & { row: LoyaltyOfferRow };
+
+const FLOOR_KEYS = {
+  yours: 'loyaltyStore.spendPlan.stopFloorYours',
+  market: 'loyaltyStore.spendPlan.stopFloorMarket',
+  best: 'loyaltyStore.spendPlan.stopFloorBest',
+} as const satisfies Record<SpendFloor['source'], string>;
+
+/** Turn-ins to buy as "5× Name", in the row's required-item order. */
+function turnInsToBuy(r: PlanRow): string[] {
+  return r.turnIns
+    .filter((line) => line.bought > 0)
+    .map((line) => {
+      const name = r.row.requiredItems.find((item) => item.typeId === line.typeId)?.name;
+      return `${formatCount(line.bought)}× ${name ?? `#${line.typeId}`}`;
+    });
+}
 
 function StopLine({ stop, view }: { stop: SpendStop; view: SpendPlanView }) {
   const { t } = useTranslation();
@@ -74,7 +91,7 @@ function StopLine({ stop, view }: { stop: SpendStop; view: SpendPlanView }) {
   let text: string;
   switch (stop.reason) {
     case 'lpExhausted':
-      text = t('loyaltyStore.spendPlan.stopLp', { lp: formatCount(view.result.lpLeft) });
+      text = t('loyaltyStore.spendPlan.stopLp', { lp: formatCount(view.result.lpLeft), name });
       break;
     case 'nothingProfitable':
       text =
@@ -90,17 +107,11 @@ function StopLine({ stop, view }: { stop: SpendStop; view: SpendPlanView }) {
       break;
     case 'belowFloor': {
       const floor = stop.floor!;
-      const key =
-        floor.source === 'yours'
-          ? 'loyaltyStore.spendPlan.stopFloorYours'
-          : floor.source === 'market'
-            ? 'loyaltyStore.spendPlan.stopFloorMarket'
-            : 'loyaltyStore.spendPlan.stopFloorBest';
-      text = t(key, {
+      text = t(FLOOR_KEYS[floor.source], {
         name,
         rate,
         floor: formatIskPerLp(floor.rate),
-        best: formatIskPerLp(floor.rate / FALLBACK_FLOOR_SHARE),
+        best: floor.source === 'best' ? formatIskPerLp(floor.best) : '',
         share: Math.round(FALLBACK_FLOOR_SHARE * 100),
       });
       break;
@@ -161,9 +172,11 @@ function PlanBody({
         render: (r) => {
           if (r.turnIns.length === 0) return '—';
           const owned = r.turnIns.reduce((sum, line) => sum + line.owned, 0);
+          const toBuy = turnInsToBuy(r);
           return (
-            <span className="inline-flex items-baseline gap-1.5">
+            <span className="inline-flex flex-col items-end">
               <IskAmount value={r.turnInsCost} decimals={0} />
+              {toBuy.length > 0 && <span className={noteClassName}>{toBuy.join(', ')}</span>}
               {owned > 0 && (
                 <span className={noteClassName}>
                   {t('loyaltyStore.spendPlan.ownedUsed', { count: owned })}
@@ -186,7 +199,11 @@ function PlanBody({
   if (result.rows.length === 0) {
     return (
       <EmptyState
-        title={t('loyaltyStore.spendPlan.empty')}
+        title={
+          result.stop.reason === 'nothingProfitable'
+            ? t('loyaltyStore.spendPlan.empty')
+            : t('loyaltyStore.spendPlan.emptyStopped')
+        }
         hint={<StopLine stop={result.stop} view={view} />}
       />
     );

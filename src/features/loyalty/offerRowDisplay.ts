@@ -67,3 +67,8 @@ export function outputUnitsOf(
   if (!row.isBlueprint) return row.offer.quantity;
   return catalog?.byBlueprintTypeID.get(row.offer.type_id)?.blueprint.products[0]?.quantity ?? null;
 }
+
+/** Per redemption: a blueprint's materials plus job fee, 0 for a plain item. */
+export function buildCostOf(row: LoyaltyOfferRow): number {
+  return row.build ? row.build.materialCost + row.build.jobFee.total : 0;
+}

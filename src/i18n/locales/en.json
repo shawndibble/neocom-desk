@@ -12135,7 +12135,8 @@
   "loyaltyStore": {
     "spendPlan": {
       "action": "Spend my LP",
-      "actionHint": "Plan how to turn your {{lp}} LP into ISK across this store's best offers. Reads the order books, so it takes a few seconds.",
+      "actionWithLp": "Spend my {{lp}} LP",
+      "actionHint": "Plan how to turn your LP into ISK across this store's best offers. Reads the order books, so it takes a few seconds.",
       "lpUnknown": "Your LP with this corporation isn't known yet.",
       "lpNone": "You have no LP with this corporation.",
       "title": "Spend my LP",
@@ -12151,7 +12152,8 @@
       "ownedUsed_other": "{{count}} owned",
       "headline": "Spends {{spent}} of {{balance}} LP → <income></income> instant income, <profit></profit> profit ({{rate}} ISK/LP). Needs <purchases></purchases> for purchases.",
       "empty": "Nothing in this store earns ISK on instant sell right now.",
-      "stopLp": "Stopped: the {{lp}} LP left buys none of these offers.",
+      "emptyStopped": "No redemption to plan right now.",
+      "stopLp": "Stopped: the {{lp}} LP left is short of the next one, {{name}}.",
       "stopLoss": "Stopped: the next one, {{name}}, would lose ISK.",
       "stopUnpriced": "Stopped: the order books can't price any of these offers.",
       "stopWallet": "Stopped: the next one, {{name}}, needs more ISK than your wallet holds ({{wallet}}).",
@@ -12160,8 +12162,8 @@
       "stopFloorBest": "Stopped: next was {{name}} at {{rate}} ISK/LP, under {{share}}% of the best, {{best}}.",
       "lpLeft": "{{lp}} LP left.",
       "walletUnknown": "Your wallet balance isn't known, so purchases aren't capped.",
-      "unpriced_one": "{{count}} offer left out: the order books couldn't price its next redemption.",
-      "unpriced_other": "{{count}} offers left out: the order books couldn't price their next redemption."
+      "unpriced_one": "{{count}} offer dropped out: the order books couldn't price its next redemption.",
+      "unpriced_other": "{{count}} offers dropped out: the order books couldn't price their next redemption."
     },
     "catalogUnavailable": "Blueprint data couldn't load, so blueprint offers show no build-versus-buy figures. Connect once to get them.",
     "csvIskCost": "ISK cost",

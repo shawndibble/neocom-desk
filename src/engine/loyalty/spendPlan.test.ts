@@ -52,7 +52,7 @@ describe('planLpSpend', () => {
       expect.objectContaining({ offerId: 1, redemptions: 3, lpSpent: 300 }),
     ]);
     expect(plan.lpLeft).toBe(50);
-    expect(plan.stop).toMatchObject({ reason: 'lpExhausted', offerId: null });
+    expect(plan.stop).toMatchObject({ reason: 'lpExhausted', offerId: 1 });
     expect(plan.rows[0]!.income).toBeCloseTo(net(300_000));
   });
 
@@ -180,6 +180,7 @@ describe('planLpSpend', () => {
     expect(plan.rows[0]!.redemptions).toBe(2);
     expect(plan.stop.floor).toMatchObject({ source: 'best' });
     expect(plan.stop.floor!.rate).toBeCloseTo((0.7 * net(100_000)) / 100);
+    expect(plan.stop.floor).toMatchObject({ best: net(100_000) / 100 });
   });
 
   it('caps purchases at a known wallet and says so', () => {

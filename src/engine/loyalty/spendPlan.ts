@@ -67,15 +67,19 @@ export interface SpendPlanInput {
 
 export type SpendStopReason = 'lpExhausted' | 'nothingProfitable' | 'belowFloor' | 'wallet';
 
-export interface SpendFloor {
-  rate: number;
-  /** `yours`: the pilot's LP Value; `market`: the store's rate; `best`: 70% of the best step. */
-  source: 'yours' | 'market' | 'best';
+export type SpendFloor =
+  /** `yours`: the pilot's LP Value; `market`: the store's market rate. */
+  | { rate: number; source: 'yours' | 'market' }
+  /** 70% of `best`, the plan's best step so far. */
+  | { rate: number; source: 'best'; best: number };
+
+function bestShareFloor(best: number): SpendFloor {
+  return { rate: FALLBACK_FLOOR_SHARE * best, source: 'best', best };
 }
 
 export interface SpendStop {
   reason: SpendStopReason;
-  /** The offer the plan would have taken next; null when none was in reach. */
+  /** The offer the plan would have taken next (on `lpExhausted`, the best one the LP left can't pay for); null when none was priced. */
   offerId: number | null;
   /** That next step's marginal ISK/LP. */
   iskPerLp: number | null;
@@ -127,7 +131,7 @@ export interface SpendPlanResult {
   /** `profit / lpSpent`; null with nothing spent. */
   iskPerLp: number | null;
   stop: SpendStop;
-  /** Offers that dropped out because a book could not price their next step. */
+  /** Offers that dropped out because a book could not price their next step (some may have planned rows). */
   unpriced: number[];
 }
 
@@ -264,22 +268,30 @@ export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
 
   for (;;) {
     let next: Step | null = null;
-    let anyFits = false;
+    /** The best priced step the LP left can't pay for: named when the LP runs out. */
+    let outOfReach: Step | null = null;
     for (const candidate of alive) {
       if (!steps.has(candidate)) steps.set(candidate, stepOf(candidate));
       const step = steps.get(candidate) ?? null;
       if (step === null) continue;
-      if (candidate.lpCost > lpLeft) continue;
-      anyFits = true;
-      if (next === null || step.iskPerLp > next.iskPerLp) next = step;
+      if (candidate.lpCost > lpLeft) {
+        if (outOfReach === null || step.iskPerLp > outOfReach.iskPerLp) outOfReach = step;
+      } else if (next === null || step.iskPerLp > next.iskPerLp) next = step;
     }
     const dead = alive.filter((c) => steps.get(c) === null);
     for (const c of dead) unpriced.push(c.offerId);
     alive = alive.filter((c) => steps.get(c) !== null);
 
     if (next === null) {
-      const reason = alive.length > 0 && !anyFits ? 'lpExhausted' : 'nothingProfitable';
-      stop = { reason, offerId: null, iskPerLp: null, floor: null };
+      stop =
+        outOfReach === null
+          ? { reason: 'nothingProfitable', offerId: null, iskPerLp: null, floor: null }
+          : {
+              reason: 'lpExhausted',
+              offerId: outOfReach.candidate.offerId,
+              iskPerLp: outOfReach.iskPerLp,
+              floor: null,
+            };
       break;
     }
     const at = { offerId: next.candidate.offerId, iskPerLp: next.iskPerLp };
@@ -292,7 +304,7 @@ export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
       input.lpValue.rate > 0 &&
       (input.lpValue.source === 'yours' || input.lpValue.source === 'market')
         ? { rate: input.lpValue.rate, source: input.lpValue.source }
-        : { rate: FALLBACK_FLOOR_SHARE * Math.max(best, next.iskPerLp), source: 'best' };
+        : bestShareFloor(Math.max(best, next.iskPerLp));
     if (next.iskPerLp < floor.rate) {
       stop = { reason: 'belowFloor', ...at, floor };
       break;
