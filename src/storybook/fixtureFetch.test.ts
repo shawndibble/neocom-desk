@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { installFixtureFetch, unexpectedRequests, whenFixturesRetired } from './fixtureFetch';
+import {
+  attributeRequestsTo,
+  installFixtureFetch,
+  unexpectedRequests,
+  whenFixturesRetired,
+} from './fixtureFetch';
 import { SAMPLE_CHARACTERS, SAMPLE_STATION_ID, SAMPLE_SYSTEM_ID } from './sampleData';
 
 let uninstall: (() => void) | undefined;
@@ -72,8 +77,28 @@ describe('installFixtureFetch', () => {
     expect(unexpectedRequests()).toEqual(['GET https://esi.evetech.net/characters/1/assets']);
   });
 
+  it('blames a miss on the story that issued it, not the one mounted when it lands', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let owner = 'page story';
+    const stop = attributeRequestsTo(() => owner);
+    try {
+      uninstall = installFixtureFetch([]);
+      const late = fetch('https://esi.evetech.net/late');
+      owner = 'component story';
+      await expect(fetch('https://esi.evetech.net/own')).rejects.toThrow();
+      await expect(late).rejects.toThrow();
+      expect(unexpectedRequests('component story')).toEqual(['GET https://esi.evetech.net/own']);
+      expect(unexpectedRequests('page story')).toEqual(['GET https://esi.evetech.net/late']);
+    } finally {
+      stop();
+    }
+  });
+
   it('names the request that keeps an unmounted story busy past the deadline', async () => {
-    installFixtureFetch([{ path: '/poll', respond: () => ({ body: 1 }) }])();
+    const stop = installFixtureFetch([{ path: '/poll', respond: () => ({ body: 1 }) }]);
+    // The story was fetching when it unmounted, so its table is not quiet yet.
+    await fetch('https://esi.evetech.net/poll');
+    stop();
     const poll = setInterval(() => void fetch('https://esi.evetech.net/poll'), 100);
     try {
       await expect(whenFixturesRetired(400)).rejects.toThrow(

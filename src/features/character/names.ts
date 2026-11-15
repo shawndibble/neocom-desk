@@ -127,6 +127,18 @@ export async function readCachedNames(ids: readonly number[]): Promise<Map<numbe
   return map;
 }
 
+/**
+ * Stores names as if ESI had just returned them, so a story or test that shows
+ * them never asks `/universe/names`.
+ */
+export async function seedCachedNames(names: Readonly<Record<number, string>>): Promise<void> {
+  await writeCachedMany(
+    GLOBAL_CACHE_CHARACTER_ID,
+    Object.entries(names).map(([id, name]) => [cacheKey(Number(id)), name] as const),
+    Date.now()
+  );
+}
+
 /** Resolves and caches. Never rejects, so the background call needs no handler of its own. */
 async function fetchNames(ids: readonly number[]): Promise<Map<number, string>> {
   const resolved = new Map<number, string>();
