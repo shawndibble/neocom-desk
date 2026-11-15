@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildBookView,
+  duePeriods,
   extractionDetail,
   isIssuedPeriod,
   minerDetail,
@@ -9,6 +10,7 @@ import {
   periodRows,
   periodStatements,
   planStatementRun,
+  planStatementRuns,
   statementDetail,
   statementForLine,
   type BookViewInput,
@@ -1052,5 +1054,56 @@ describe('Statement standings read as whole ISK and Due skips paused ones (#5247
       paid: 0,
       outstanding: 1_000_001,
     });
+  });
+});
+
+describe('planStatementRuns: every missed period in one run (#6208)', () => {
+  const late = input({
+    now: '2026-10-18T14:00:00Z',
+    lastSyncedAt: '2026-10-18T12:00:00Z',
+    entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 2000)],
+  });
+
+  it('plans Aug then Sep, the second carrying what the first bills', () => {
+    const runs = planStatementRuns(buildBookView(late));
+    expect(runs.map((r) => r.plan.period.start)).toEqual(['2026-08-01', '2026-09-01']);
+    const [aug, sep] = runs;
+    expect(aug.plan.lines[0]).toMatchObject({ carried: 0, balanceDue: 100_000 });
+    expect(sep.plan.lines[0]).toMatchObject({ carried: 100_000, balanceDue: 300_000 });
+    expect(duePeriods(buildBookView(late))).toEqual([
+      { start: '2026-08-01', end: '2026-08-31' },
+      { start: '2026-09-01', end: '2026-09-30' },
+    ]);
+  });
+
+  it('issues each period from its own view, so ids follow the period', () => {
+    const runs = planStatementRuns(buildBookView(late));
+    const ids = runs.map((r) => statementForLine(r.view, r.plan, r.plan.lines[0]).id);
+    expect(ids).toEqual(['2026-08-01_solo:1', '2026-09-01_solo:1']);
+  });
+
+  it('leaves out a period already on a Statement and returns nothing once all are issued', () => {
+    const first = buildBookView(late);
+    const [aug] = planStatementRuns(first);
+    const augStatement = statementForLine(aug.view, aug.plan, aug.plan.lines[0]);
+    const afterAug = buildBookView({ ...late, statements: [augStatement] });
+    expect(duePeriods(afterAug)).toEqual([{ start: '2026-09-01', end: '2026-09-30' }]);
+    const [sep] = planStatementRuns(afterAug);
+    const sepStatement = statementForLine(sep.view, sep.plan, sep.plan.lines[0]);
+    expect(
+      planStatementRuns(buildBookView({ ...late, statements: [augStatement, sepStatement] }))
+    ).toEqual([]);
+  });
+
+  it('rolls a period under the minimum into the next one', () => {
+    const view = buildBookView({ ...late, minimumStatement: 150_000 });
+    const runs = planStatementRuns(view);
+    expect(runs.map((r) => r.plan.period.start)).toEqual(['2026-09-01']);
+    expect(runs[0].plan.lines[0].draft.amount).toBe(300_000);
+  });
+
+  it('is empty when nothing has closed', () => {
+    expect(planStatementRuns(buildBookView(input()))).toEqual([]);
+    expect(duePeriods(buildBookView(input()))).toEqual([]);
   });
 });

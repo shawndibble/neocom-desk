@@ -53,6 +53,7 @@ import { incursionDomain } from './incursions';
 import { skyhookNearbyDomain } from './skyhooksNearby';
 import { communitiesDomain } from './communities';
 import { vettingDomain } from './vetting';
+import { corpTaxBookSyncDomain } from './corpTaxBookSync';
 import { killsDomain } from './kills';
 import { mercenaryDensDomain } from './mercenaryDens';
 import { acceleratorDomain } from './accelerator';
@@ -92,6 +93,7 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   skyhookNearbyDomain,
   communitiesDomain,
   vettingDomain,
+  corpTaxBookSyncDomain,
   killsDomain,
   mercenaryDensDomain,
   acceleratorDomain,

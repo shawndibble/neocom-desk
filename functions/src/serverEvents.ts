@@ -11,6 +11,7 @@
 // alerts' jump limits). The community events need no inputs: the backend writes them.
 
 import { isPlainRecord } from './guards.js';
+import type { SCHEDULED_STOP_REASONS } from './corpTaxBookSyncEngine.js';
 
 /** The events a Firestore trigger pushes the moment the backend writes them. */
 export const COMMUNITY_EVENT_IDS = [
@@ -21,6 +22,9 @@ export const COMMUNITY_EVENT_IDS = [
 
 /** The events a `vettingCall` action pushes when it writes them (vettingStore.ts). */
 export const VETTING_EVENT_IDS = ['vettingShared'] as const;
+
+/** The events the scheduled Corp Tax Book sync pushes when it stops a book's schedule (corpSyncGrant.ts). */
+export const CORP_TAX_BOOK_EVENT_IDS = ['corpTaxBookSyncStopped'] as const;
 
 /** The events the 15-minute dispatch tick polls for (public market data). */
 export const POLLED_EVENT_IDS = ['priceAlertTriggered'] as const;
@@ -205,12 +209,33 @@ export interface VettingSharedFire {
   kind: 'application' | 'promotion';
 }
 
+/**
+ * Why a stop is told: every stop reason but `book-off`, which an editor did on purpose
+ * (client: `SyncStoppedAlertReason` in src/engine/corpTaxBook/syncStoppedAlert.ts).
+ */
+export type SyncStoppedAlertReason = Exclude<(typeof SCHEDULED_STOP_REASONS)[number], 'book-off'>;
+
+/**
+ * The scheduled sync stopped a corporation's Automatic sync: told to each of the book's editors
+ * (`characterId`) seen in the last 30 days, and to the holder unless they lost the role or left.
+ * `characterName` is the holder's, for the reason's wording; `stoppedAt` is the stored status's.
+ */
+export interface CorpTaxBookSyncStoppedFire {
+  eventId: 'corpTaxBookSyncStopped';
+  characterId: number;
+  corporationId: number;
+  reason: SyncStoppedAlertReason;
+  characterName: string;
+  stoppedAt: number;
+}
+
 export type ServerEventFire =
   | CommunityJoinRequestFire
   | CommunityMemberJoinedFire
   | CommunityRequestPledgedFire
   | PriceAlertTriggeredFire
-  | VettingSharedFire;
+  | VettingSharedFire
+  | CorpTaxBookSyncStoppedFire;
 
 /* Price alerts: mirrors `diffPriceAlertTriggered` (src/engine/notificationDiffs/market.ts) */
 
@@ -284,6 +309,9 @@ export function serverEventOccurrenceKey(fire: ServerEventFire): string {
     case 'vettingShared':
       // A review is shared once, so its id is the occurrence.
       return [fire.characterId, fire.eventId, fire.corporationId, fire.reviewId].join(':');
+    case 'corpTaxBookSyncStopped':
+      // A schedule stops once; turned on again and stopped again is a later `stoppedAt`.
+      return [fire.characterId, fire.eventId, fire.corporationId, fire.stoppedAt].join(':');
   }
 }
 
@@ -329,6 +357,25 @@ function floorCopy(fire: ServerEventFire): { title: string; body: string } {
             ? 'A member shared the review they were asked for.'
             : 'A pilot shared a report for review.',
       };
+    case 'corpTaxBookSyncStopped':
+      return { title: 'Automatic sync stopped', body: syncStoppedFloorBody(fire) };
+  }
+}
+
+/** The app's own reason wording (`notifications.fired.corpTaxBookSyncStopped.*`), plain. */
+function syncStoppedFloorBody(fire: CorpTaxBookSyncStoppedFire): string {
+  const name = fire.characterName || 'The holder';
+  switch (fire.reason) {
+    case 'role-lost':
+      return `${name} no longer has the Accountant, Director or CEO role. Turn it on again to keep the Corp Tax Book current.`;
+    case 'left-corp':
+      return `${name} left the corporation. Turn it on again to keep the Corp Tax Book current.`;
+    case 'token-revoked':
+      return `${name}'s EVE authorization was revoked or expired. Turn it on again to keep the Corp Tax Book current.`;
+    case 'esi-refused':
+      return `EVE no longer lets ${name}'s authorization read the mining ledger. Turn it on again to keep the Corp Tax Book current.`;
+    case 'grant-unreadable':
+      return `The saved grant can't be read. Turn it on again to keep the Corp Tax Book current.`;
   }
 }
 

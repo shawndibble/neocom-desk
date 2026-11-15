@@ -54,6 +54,7 @@ import {
 } from '../functions/src/buybackTerms';
 import {
   COMMUNITY_EVENT_IDS,
+  CORP_TAX_BOOK_EVENT_IDS,
   POLLED_EVENT_IDS,
   VETTING_EVENT_IDS,
   diffPriceAlerts,
@@ -238,6 +239,7 @@ describe('server-pushed events (issue #5121)', () => {
         ...POLLED_EVENT_IDS,
         ...NEARBY_EVENT_IDS,
         ...VETTING_EVENT_IDS,
+        ...CORP_TAX_BOOK_EVENT_IDS,
         'newMail',
       ].sort()
     ).toEqual([...SERVER_PUSHED_EVENT_IDS].sort());
@@ -296,6 +298,14 @@ describe('server-pushed events (issue #5121)', () => {
       corporationId: 98000001,
       reviewId: 'v-0042',
       kind: 'application',
+    },
+    {
+      eventId: 'corpTaxBookSyncStopped',
+      characterId: 7,
+      corporationId: 98000001,
+      reason: 'esi-refused',
+      characterName: 'Holder',
+      stoppedAt: 4000,
     },
   ];
 

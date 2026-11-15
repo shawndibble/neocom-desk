@@ -8,6 +8,7 @@ import { db } from '@/db';
 import { NotificationEventList } from './NotificationEventList';
 import type { EventRowContext } from './eventRowSupport';
 import { NOTIFICATION_EVENT_IDS, NOTIFICATION_EVENTS } from './events';
+import { groupNotificationEvents } from './eventGroups';
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   useNotificationPreferences,
@@ -331,9 +332,9 @@ describe('NotificationEventList on desktop', () => {
   it('says the Corporation permission once on the corp group, not on every corp row', () => {
     render(
       <Harness
-        ids={NOTIFICATION_EVENT_IDS.filter(
-          (id) => id.startsWith('corp') || id === 'structureFuelLow'
-        )}
+        // The Corporation group's events (a corp-named event pushed by the backend, like
+        // corpTaxBookSyncStopped, files under World and needs no Permission).
+        ids={groupNotificationEvents(NOTIFICATION_EVENT_IDS).corp}
         over={{
           scopesByCharacterId: new Map([
             [1, ALL_SCOPES],

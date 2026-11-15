@@ -1,5 +1,6 @@
 import { formatIsk } from '@/lib/isk';
 import { verifyPeriodLabel } from '@/features/corpTaxBook/verifyPeriodLabel';
+import { formatList } from '@/lib/listFormat';
 import { MONTHS } from '@/engine/corpTaxBook/monthNames';
 import { extractionWindowDays } from '@/engine/corpTaxBook/extractionWindow';
 import type { TFunction } from 'i18next';
@@ -75,6 +76,11 @@ export function extractionWindowLabel(
 /** A period label: "Oct 2026" only for a whole calendar month, else the days it covers. */
 export function periodLabel(start: string, end: string): string {
   return verifyPeriodLabel(start, end, 'en');
+}
+
+/** Several periods as one phrase, oldest first: "Aug 2026 and Sep 2026". */
+export function periodsLabel(periods: readonly { start: string; end: string }[]): string {
+  return formatList(periods.map((p) => periodLabel(p.start, p.end)));
 }
 
 export function addDays(date: string, days: number): string {

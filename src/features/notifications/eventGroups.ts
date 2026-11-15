@@ -62,6 +62,8 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
   // Corporation Permission and only firing while the app is open. This one is pushed by the
   // backend and needs no Permission.
   vettingShared: 'world',
+  // Beside vettingShared, for the same reason: pushed by the backend, no Permission.
+  corpTaxBookSyncStopped: 'world',
   structureFuelLow: 'corp',
   skyhookRaidable: 'corp',
   corpIndustryJobReady: 'corp',

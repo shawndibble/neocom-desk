@@ -954,6 +954,9 @@ function corpSyncDeps(): CorpSyncDeps {
     readIdentity: esiIdentityReader(),
     openPrices: r2OpenPrices,
     log: (message, data) => logWarn(message, data),
+    // A stop tells the book's editors (`corpTaxBookSyncStopped`, ADR 0027): FCM through the
+    // Admin SDK, so the scheduled sync needs no secret for it.
+    push: getMessaging(),
   };
 }
 

@@ -126,6 +126,7 @@ interface RailPageProps {
   activeViewPath: string | null;
   badge?: number;
   badgeLabelKey?: string;
+  attention?: boolean;
 }
 
 /**
@@ -144,6 +145,7 @@ const RailPage = memo(function RailPage({
   activeViewPath,
   badge,
   badgeLabelKey,
+  attention,
 }: RailPageProps) {
   const { t } = useTranslation();
   const listId = useId();
@@ -164,6 +166,7 @@ const RailPage = memo(function RailPage({
           locked={locked}
           badge={badge}
           badgeLabelKey={badgeLabelKey}
+          attention={attention}
           className={cx('flex-1', editing && pageHidden && 'line-through')}
         />
         {shownViews.length > 0 && (

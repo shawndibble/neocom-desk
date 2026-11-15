@@ -11,6 +11,7 @@ import {
   trimBaseline,
   type PriceAlertSnapshotEntry,
   type ServerEventFire,
+  type SyncStoppedAlertReason,
 } from './serverEvents.js';
 
 describe('parseServerEvents', () => {
@@ -187,6 +188,17 @@ describe('serverEventOccurrenceKey', () => {
         },
         '7:vettingShared:98000001:r1',
       ],
+      [
+        {
+          eventId: 'corpTaxBookSyncStopped',
+          characterId: 7,
+          corporationId: 98000001,
+          reason: 'role-lost',
+          characterName: 'Holder',
+          stoppedAt: 5000,
+        },
+        '7:corpTaxBookSyncStopped:98000001:5000',
+      ],
     ];
     for (const [fire, key] of fires) expect(serverEventOccurrenceKey(fire)).toBe(key);
   });
@@ -255,6 +267,36 @@ describe('buildServerEventPush', () => {
       reviewId: 'r1',
       kind: 'application',
     });
+  });
+
+  it('words a stopped Automatic sync with the reason the book shows', () => {
+    const stopped = (reason: SyncStoppedAlertReason) =>
+      buildServerEventPush(
+        {
+          eventId: 'corpTaxBookSyncStopped',
+          characterId: 7,
+          corporationId: 98000001,
+          reason,
+          characterName: 'Holder',
+          stoppedAt: 5000,
+        },
+        6000
+      );
+    expect(stopped('left-corp')).toMatchObject({
+      eventId: 'corpTaxBookSyncStopped',
+      occurrenceKey: '7:corpTaxBookSyncStopped:98000001:5000',
+      title: 'Automatic sync stopped',
+      body: 'Holder left the corporation. Turn it on again to keep the Corp Tax Book current.',
+      fireAt: '6000',
+    });
+    for (const reason of [
+      'role-lost',
+      'token-revoked',
+      'esi-refused',
+      'grant-unreadable',
+    ] as const) {
+      expect(stopped(reason).body).toMatch(/Turn it on again/);
+    }
   });
 });
 

@@ -73,6 +73,7 @@ import { parseInstant } from './esiInstant';
 import { utcDay } from './localDay';
 import { DAY_MS } from '@/lib/age';
 import type { VettingSharedFire } from './vettingAlert';
+import type { CorpTaxBookSyncStoppedFire } from './corpTaxBook/syncStoppedAlert';
 
 /**
  * Every fire an Occurrence Key can be derived from — the same members as
@@ -117,7 +118,8 @@ export type OccurrenceFire =
   | CommunityRequestPledgedFire
   | IncursionNearbyFire
   | SkyhookRaidableNearbyFire
-  | VettingSharedFire;
+  | VettingSharedFire
+  | CorpTaxBookSyncStoppedFire;
 
 function dayBucket(nowMs: number): number {
   return Math.floor(nowMs / DAY_MS);
@@ -255,6 +257,9 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // A review is shared once, so its id is the occurrence.
     case 'vettingShared':
       return [characterId, fire.eventId, fire.corporationId, fire.reviewId].join(':');
+    // A schedule stops once; turned on again and stopped again is a later `stoppedAt`.
+    case 'corpTaxBookSyncStopped':
+      return [characterId, fire.eventId, fire.corporationId, fire.stoppedAt].join(':');
     // The latest new Pledge in the Community, by Request, Pledger and the time
     // it was written. A re-Pledge after a poll that saw the withdrawal writes a
     // later `at` and is its own occurrence; the same Pledge read twice, or an
@@ -329,6 +334,9 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
       return pastOrNow(fire.timeMs);
     case 'characterNeedsLogin':
       return fire.sinceMs;
+    // The stop the server stored, already past by the time the push arrives.
+    case 'corpTaxBookSyncStopped':
+      return pastOrNow(fire.stoppedAt);
     // The completed entry's `finish_date`, already in the past by the time
     // the diff fires (`isCompleted`). Null when the queue carried no date.
     case 'skillLevelComplete':

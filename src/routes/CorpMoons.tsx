@@ -48,6 +48,8 @@ import { useBookAudit } from '@/features/corp/moons/useBookAudit';
 import { BookProvider } from '@/features/corp/moons/BookContext';
 import { useBook } from '@/features/corp/moons/useBook';
 import { BookHealthStrip } from '@/features/corp/moons/BookHealthStrip';
+import { useMoonsAttentionPublisher } from '@/features/corp/moons/useMoonsAttentionPublisher';
+import { publishMoonsAttention } from '@/features/corp/moons/moonsNavAttention';
 import { DeleteBookDialog } from '@/features/corp/moons/DeleteBookSection';
 import { BookSettingsDialog, type SettingsTab } from '@/features/corp/moons/BookSettingsDialog';
 import { BookContext } from '@/features/corp/moons/bookContextValue';
@@ -96,6 +98,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const moonOwnersSync = useMoonOwnersSyncNow(moonOwnerRows);
   // A moon owner's ledger that can't be read is mailed to both sides once per spell (#6210).
   useStaleLedgerMail(moonOwnerRows);
+  useMoonsAttentionPublisher();
   const syncing = sync.run.phase === 'syncing' || moonOwnersSync.busy;
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
@@ -302,6 +305,13 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
     if (decided) setMoonsTabsHidden(unavailable);
     return () => setMoonsTabsHidden(false);
   }, [decided, unavailable]);
+  // No book, or no access to it: the Moons nav dot has nothing to point at (#6208).
+  useEffect(() => {
+    if (!unavailable || book.characterId === null || book.corporationId === null) return;
+    void publishMoonsAttention(book.characterId, book.corporationId, null).catch((err) =>
+      console.warn('Moons nav dot could not be cleared', err)
+    );
+  }, [unavailable, book.characterId, book.corporationId]);
 
   if (state.status === 'loading') return <MoonsLoading />;
   if (state.status === 'failed') {

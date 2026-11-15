@@ -124,6 +124,8 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   communityRequestPledged: '/communities',
   // The queue, where the new report is listed. The pop-up itself opens the report (`path`).
   vettingShared: '/corp/vetting/open',
+  // The book's Overview, where its health strip says why Automatic sync stopped.
+  corpTaxBookSyncStopped: '/corp/moons/overview',
 };
 
 export const NOTIFICATION_FALLBACK_ROUTE = '/alerts';

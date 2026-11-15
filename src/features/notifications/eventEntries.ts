@@ -177,6 +177,7 @@ import {
   communityMemberJoinedCopy,
   communityRequestPledgedCopy,
   vettingSharedCopy,
+  corpTaxBookSyncStoppedCopy,
   type IncursionNames,
   type DomainCopy,
   type NoNames,
@@ -191,6 +192,11 @@ import {
   type VettingAlertSnapshot,
   type VettingSharedFire,
 } from '@/engine/vettingAlert';
+import {
+  diffCorpTaxBookSyncStopped,
+  type CorpTaxBookSyncStoppedFire,
+  type SyncStoppedAlertSnapshot,
+} from '@/engine/corpTaxBook/syncStoppedAlert';
 import type { EveNotificationNames } from './eveNotificationText';
 import type { NotificationEventId } from './events';
 import { THRESHOLD_FIELDS, type ThresholdField } from './eventThresholdFields';
@@ -231,7 +237,8 @@ export type AnyNotificationFire =
   | CommunityJoinRequestFire
   | CommunityMemberJoinedFire
   | CommunityRequestPledgedFire
-  | VettingSharedFire;
+  | VettingSharedFire
+  | CorpTaxBookSyncStoppedFire;
 
 /* -------------------------------------------------------------------------- */
 /* Snapshot sources                                                            */
@@ -283,6 +290,7 @@ export const SNAPSHOT_SOURCES = {
   communities: source<CommunityAlertSnapshot>('communities'),
   signIn: source<SignInSnapshot>('signIn'),
   vetting: source<VettingAlertSnapshot>('vetting'),
+  corpTaxBookSync: source<SyncStoppedAlertSnapshot>('corpTaxBookSync'),
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -772,6 +780,15 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     projection: null,
     thresholds: null,
     rowHintKey: 'settings.notifications.vettingSharedHint',
+  }),
+  // Raised by the backend alone (`pollDomains/corpTaxBookSync.ts`): the diff never fires.
+  corpTaxBookSyncStopped: defineEvent({
+    source: SNAPSHOT_SOURCES.corpTaxBookSync,
+    diff: diffCorpTaxBookSyncStopped,
+    copy: corpTaxBookSyncStoppedCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: 'settings.notifications.corpTaxBookSyncStoppedHint',
   }),
 } satisfies { readonly [K in NotificationEventId]: ErasedEntryFor<K> };
 

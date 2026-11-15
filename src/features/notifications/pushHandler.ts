@@ -64,6 +64,7 @@ import {
   communityJoinRequestText,
   communityMemberJoinedText,
   vettingSharedText,
+  corpTaxBookSyncStoppedText,
   communityRequestPledgedText,
   newMailText,
   priceAlertText,
@@ -258,6 +259,8 @@ async function presentServerFire(
       return { ...priceAlertText(t, fire), feedKey, subjectId: fire.typeId };
     case 'vettingShared':
       return { ...vettingSharedText(t, fire), feedKey, path: vettingSharedPath(fire) };
+    case 'corpTaxBookSyncStopped':
+      return { ...corpTaxBookSyncStoppedText(t, fire), feedKey };
     // New mail (issue #5143): the pop-up names the sender and subject; the feed row never does.
     case 'newMail': {
       const character =

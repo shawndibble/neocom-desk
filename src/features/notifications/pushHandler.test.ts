@@ -593,6 +593,33 @@ describe('server-pushed events (issue #5121)', () => {
     );
   });
 
+  it('renders a stopped Automatic sync with the book’s reason and opens the book', async () => {
+    const fire = {
+      eventId: 'corpTaxBookSyncStopped',
+      characterId: 7,
+      corporationId: 98000001,
+      reason: 'role-lost',
+      characterName: 'Holder',
+      stoppedAt: 1000,
+    } as const;
+    const e = env();
+    await handlePush(e, serverPush(fire), 5000);
+    const [title, options] = vi.mocked(e.showNotification).mock.calls[0];
+    expect(title).toBe('Automatic sync stopped');
+    expect(options.body).toBe(
+      'Holder no longer has the Accountant, Director or CEO role. Turn it on again to keep the Corp Tax Book current.'
+    );
+    expect(String(options.data?.url)).toMatch(/^\/corp\/moons\/overview(\?|$)/);
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: '7:corpTaxBookSyncStopped:98000001:1000',
+        eventId: 'corpTaxBookSyncStopped',
+        firedAt: 1000,
+        title: 'Automatic sync stopped',
+      })
+    );
+  });
+
   it('falls back to the sender’s copy and key for a fire that is not the push’s own', async () => {
     const e = env();
     await handlePush(e, serverPush({ ...priceFire, characterId: 8 }, { characterId: '7' }), 5000);

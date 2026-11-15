@@ -380,6 +380,14 @@ const CATALOG = [
     labelKey: 'settings.notifications.event.vettingShared',
     defaultChannels: 'both',
   },
+  // The scheduled server sync stopped a Corp Tax Book's Automatic sync (issue #6208). Raised by
+  // the backend as it stops it (ADR 0027), so no ESI scope; like `vettingShared`, every Character
+  // is offered the row, whose hint says it only reaches the book's editors.
+  {
+    id: 'corpTaxBookSyncStopped',
+    labelKey: 'settings.notifications.event.corpTaxBookSyncStopped',
+    defaultChannels: 'both',
+  },
 ] as const satisfies readonly CatalogRow[];
 
 export type NotificationEventId = (typeof CATALOG)[number]['id'];
