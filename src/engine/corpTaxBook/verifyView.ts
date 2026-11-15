@@ -29,6 +29,10 @@ export interface VerifyPayload {
     startDate?: string;
     overdueDays?: number;
     minimumStatement?: number;
+    /** The wallet divisions the book reads donations from; absent from older servers. */
+    divisions?: number[];
+    /** The corp's own names for those divisions, when a Director's visit stored them. */
+    divisionNames?: Record<string, string>;
     /** The book's Statement cadence; absent from older servers. */
     cadence?: { kind: 'monthly' } | { kind: 'days'; days: number };
   };

@@ -240,7 +240,14 @@ export function CorpRowDetailModal({
                 </ValueList>
               )}
               {view.state === 'paid' && view.settledBy === 'yourMark' && (
-                <p>{t('miningTax.corpBook.detail.yourMarkNote')}</p>
+                <p>
+                  {view.bookOwed !== undefined
+                    ? t('miningTax.corpBook.detail.markedPaidNote', {
+                        corp: corp.corpName,
+                        owed: formatIsk(view.bookOwed, 0),
+                      })
+                    : t('miningTax.corpBook.detail.yourMarkNote')}
+                </p>
               )}
               {(view.state === 'dismissed' || view.state === 'waived') && view.dismissalReason && (
                 <p>{t('miningTax.corpBook.detail.reason', { reasons: view.dismissalReason })}</p>

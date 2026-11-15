@@ -184,6 +184,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       allPayees,
       estimatedValueOf,
       madePayments,
+      alsoBilled: corpView?.overlay.alsoBilled,
     });
 
   // A Corp Tax Book row is the corp's to continue, not the member's.
@@ -221,6 +222,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     data,
     resolvedCharacterFilter,
     personalRows,
+    displayRows: characterFiltered,
     payeeById,
     corpView,
     failedClaims,
@@ -355,7 +357,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                     key={book.loaded.corporationId}
                     book={book}
                     owedNow={corpOwedNow(book.loaded.corporationId)}
-                    showCredit={false}
                   />
                 ))}
 

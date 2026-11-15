@@ -15,6 +15,8 @@ import { getCorporationPublicInfo } from '@/esi/endpoints/corp';
 import { DEFAULT_OVERDUE_DAYS } from '@/engine/corpTaxBook/overdue';
 import { callableErrorCode } from '@/features/communities/callableError';
 import { cx } from '@/lib/cx';
+import { readDivisionNames } from '@/engine/corpTaxBook/divisionNames';
+import { corpPayAccounts } from '@/features/miningTax/corpBook/corpPayAccount';
 
 import { TRADE_HUBS } from '@/market/hubs';
 import { GroupingQuestions } from './GroupingQuestions';
@@ -159,6 +161,12 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
   const rates = ratesUsed(rows);
 
   const lastDeclaration = payload.declarations.at(-1);
+  // The wallet divisions the book reads (#6204); an older server sends none, and then the page
+  // names none rather than guess.
+  const divisionNames = readDivisionNames(terms.divisionNames);
+  const accounts = terms.divisions?.length
+    ? corpPayAccounts(terms.divisions, divisionNames, t).join(', ')
+    : null;
 
   return (
     <>
@@ -217,6 +225,7 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
               {t('corpTaxBook.verify.howToPay', { corp })} {t('corpTaxBook.verify.payCodeLead')}{' '}
               <span className="font-mono">{statement.code}</span>{' '}
               {t('corpTaxBook.verify.payCodeTail')}
+              {accounts && <> {t('corpTaxBook.verify.payAccount', { accounts })}</>}
             </p>
           )}
           {payload.settled && remaining === 0 && (
@@ -278,6 +287,7 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
             <Term label={t('corpTaxBook.verify.term.paying')}>
               {t('corpTaxBook.verify.payingValue', { corp })}
             </Term>
+            {accounts && <Term label={t('corpTaxBook.verify.term.account')}>{accounts}</Term>}
           </dl>
         </Panel>
         <div className="order-4 md:order-none md:col-start-2 md:row-start-3">
