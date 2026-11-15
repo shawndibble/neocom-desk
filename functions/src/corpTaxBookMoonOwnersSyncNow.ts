@@ -1,7 +1,7 @@
 // Sync now for moon owners (issue #6117): an editor of a Collector book reads every moon owner
 // at once instead of waiting for the next scheduled run. Each read is the scheduled pass's own
 // `syncOneFeeder`, so health, Extractions, refinery names and the views move exactly as they do
-// every six hours. Rested per book so a repeated press cannot spend the shared ESI error budget.
+// on every scheduled run. Rested per book so a repeated press cannot spend the shared ESI error budget.
 
 import type { Firestore } from 'firebase-admin/firestore';
 import type { Caller } from './actorAuth.js';

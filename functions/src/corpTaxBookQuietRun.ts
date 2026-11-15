@@ -37,7 +37,7 @@ export const QUIET_DOC = 'scheduledQuiet';
  * uses them for (naming the moon a ledger row mined: the ESI ledger holds 30 days, and a
  * chunk is minable for at most 96 h after it arrives; merging the ESI extractions over
  * the stored ones) never reaches a chunk older than that. The old ones are the
- * book's growth, and re-reading them every 6 h bought nothing.
+ * book's growth, and re-reading them every run bought nothing.
  */
 export const QUIET_EXTRACTION_WINDOW_MS = 60 * 24 * 3_600_000;
 

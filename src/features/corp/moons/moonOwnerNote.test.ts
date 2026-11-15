@@ -21,13 +21,13 @@ const row = (over: Partial<MoonOwnerRow> = {}): MoonOwnerRow => ({
 describe('moonOwnerNote', () => {
   it('says when a read moon owner is read next, in EVE time', () => {
     expect(moonOwnerNote(row(), NOW, t)).toBe(
-      '1 refinery · Synced 2h ago · next read 12:35\u00a0UTC'
+      '1 refinery · Synced 2h ago · next read 08:35\u00a0UTC'
     );
   });
 
   it('gives a moon owner nothing was seen at yet its next read too', () => {
     expect(moonOwnerNote(row({ nothingSeen: true, refineryCount: 0 }), NOW, t)).toBe(
-      'No mining or extraction seen yet · Synced 2h ago · next read 12:35\u00a0UTC'
+      'No mining or extraction seen yet · Synced 2h ago · next read 08:35\u00a0UTC'
     );
   });
 

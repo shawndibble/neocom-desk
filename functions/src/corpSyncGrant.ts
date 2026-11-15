@@ -531,8 +531,8 @@ export const SYNC_CORP_TAX_BOOKS_SCHEDULE = {
   timeZone: 'UTC',
 } as const;
 
-/** A synced book rests this long; under the 6-hour tick spacing, so a late run never skips a slot. */
-export const SYNC_REST_MS = 5 * 3_600_000;
+/** A synced book rests this long; under the 2-hour tick spacing, so a late run never skips a slot. */
+export const SYNC_REST_MS = 3_600_000;
 
 /** One doc: when the last `nextSyncAt` backfill scan ran. */
 const GRANT_BACKFILL_DOC = 'corpTaxBookSyncGrantMeta/nextSyncAtBackfill';
