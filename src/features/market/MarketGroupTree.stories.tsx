@@ -93,7 +93,7 @@ export const SearchResults: Story = {
 /** @summary While the region's list loads, it failed, or the scope spans regions: no cue at all. */
 export const NoCue: Story = { args: { noOrders: null } };
 
-/** @summary A phone-width tree: the name truncates before the cue does. */
+/** @summary A narrow tree: the cue gives way before the item's name does. */
 export const Narrow: Story = {
   decorators: [
     (Story) => (

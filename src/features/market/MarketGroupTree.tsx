@@ -65,10 +65,11 @@ export function MarketGroupTree({
               // it is plain text (never a chip) and the row stays at full
               // contrast (DESIGN.md §6c "No orders in {Region}"). It is part
               // of the row's name, so a screen reader hears it with the item;
-              // the space keeps the two apart there.
+              // the space keeps the two apart there. In a narrow tree the cue
+              // gives way first (`shrink-[100]`): the item's name matters more.
               <>
                 {' '}
-                <span className="ml-auto shrink-0 pl-2 pr-2 text-[0.6875rem] text-text-dim">
+                <span className="ml-auto min-w-16 shrink-[100] truncate pl-2 pr-2 text-[0.6875rem] text-text-dim">
                   {t('market.noOrdersInRegion', { regionName: noOrders.regionName })}
                 </span>
               </>
