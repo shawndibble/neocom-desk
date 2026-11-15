@@ -1,3 +1,4 @@
+import { clamp, sum } from '../math';
 import type { OreLine } from './types';
 
 /** The slice of one Mining Ledger Entry an Assignment already claims, plus whether it is the entry's growth collector. */
@@ -131,9 +132,11 @@ export interface UnreportedClaim {
 }
 
 /**
- * Where an Assignment claims more than ESI reports so far — a split whose
- * kept side was given the client's figure ahead of the ledger (issue #6180,
- * `planSplit`'s `unreported`). Shown so the pilot can watch ESI catch up;
+ * Where an Assignment claims more than ESI reports so far — most often a
+ * split whose kept side was given the client's figure ahead of the ledger
+ * (issue #6180, `planSplit`'s `unreported`), but equally a hand-corrected
+ * line or an entry ESI settled lower. Shown so the pilot can watch ESI
+ * catch up;
  * ownership itself needs nothing extra, since the claim already outranks
  * the collector's growth in `computeOwnership`.
  */
@@ -147,13 +150,12 @@ export function unreportedClaims(
   const out: UnreportedClaim[] = [];
   for (const line of sortedByType(own.oreLines)) {
     const entry = entryLines.find((l) => l.typeId === line.typeId)?.quantity ?? 0;
-    const others = covering
-      .filter((c) => c.id !== assignmentId)
-      .reduce(
-        (sum, c) => sum + (c.oreLines.find((l) => l.typeId === line.typeId)?.quantity ?? 0),
-        0
-      );
-    const reported = Math.max(0, Math.min(line.quantity, entry - others));
+    const others = sum(
+      covering
+        .filter((c) => c.id !== assignmentId)
+        .map((c) => c.oreLines.find((l) => l.typeId === line.typeId)?.quantity ?? 0)
+    );
+    const reported = clamp(entry - others, 0, line.quantity);
     if (reported < line.quantity)
       out.push({ typeId: line.typeId, claimed: line.quantity, reported });
   }

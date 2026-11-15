@@ -39,6 +39,9 @@ export function planSplit(
   const extraByType = new Map<number, number>();
   for (const extra of unreported) {
     if (extra.quantity <= 0) continue;
+    if (!original.some((l) => l.typeId === extra.typeId)) {
+      throw new Error(`Cannot claim more of type ${extra.typeId}: none held`);
+    }
     if (moveByType.has(extra.typeId)) {
       throw new Error(`Cannot both move and claim more of type ${extra.typeId}`);
     }
@@ -51,9 +54,6 @@ export function planSplit(
         line.quantity - (moveByType.get(line.typeId) ?? 0) + (extraByType.get(line.typeId) ?? 0),
     }))
     .filter((line) => line.quantity > 0);
-  for (const [typeId, quantity] of extraByType) {
-    if (!original.some((l) => l.typeId === typeId)) kept.push({ typeId, quantity });
-  }
   const moved = original
     .filter((line) => moveByType.has(line.typeId))
     .map((line) => ({ typeId: line.typeId, quantity: moveByType.get(line.typeId)! }));

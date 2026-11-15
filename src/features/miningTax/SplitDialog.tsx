@@ -30,6 +30,11 @@ import type { MoonMiningTaxRow } from './snapshot';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
 import { formatCount } from '@/lib/formatCount';
+import { clamp, sum } from '@/engine/math';
+
+// Whole units only: every non-digit is a grouping mark from the mask, so
+// `5,4930` is 54,930 — the locale parser would read it as 5.493.
+const typedUnits = (value: string) => Number(value.replace(/\D/g, ''));
 
 interface SplitDialogProps {
   open: boolean;
@@ -143,8 +148,8 @@ export function SplitDialog({
   };
   const keptValue = computeAssignmentValue(keptLines, prices.kept, assignment.taxPct);
   const newValue = computeAssignmentValue(movedLines, prices.moved, safePct);
-  const movedUnits = movedLines.reduce((sum, line) => sum + line.quantity, 0);
-  const unreportedUnits = unreported.reduce((sum, line) => sum + line.quantity, 0);
+  const movedUnits = sum(movedLines.map((line) => line.quantity));
+  const unreportedUnits = sum(unreported.map((line) => line.quantity));
 
   // The same Payee at the same rate would be fused back into one Assignment
   // on the next load (`coalesce.ts`), so it is no split at all.
@@ -165,7 +170,7 @@ export function SplitDialog({
 
   function setKeep(typeId: number, raw: number, held: number) {
     const ceiling = canClaimUnreported ? Number.MAX_SAFE_INTEGER : held;
-    const clamped = Math.max(0, Math.min(ceiling, Math.round(raw)));
+    const clamped = clamp(Math.round(raw), 0, ceiling);
     setKeeps((previous) => new Map(previous).set(typeId, clamped));
   }
 
@@ -289,9 +294,6 @@ export function SplitDialog({
               const keep = keeps.get(line.typeId) ?? line.quantity;
               const moved = Math.max(0, line.quantity - keep);
               const ore = typeNames.get(line.typeId) ?? `#${line.typeId}`;
-              // Whole units only: every non-digit is a grouping mark from the mask, so
-              // `5,4930` is 54,930 — the locale parser would read it as 5.493.
-              const digits = (value: string) => Number(value.replace(/\D/g, ''));
               return (
                 <li key={line.typeId} className="space-y-1.5 px-2 py-2">
                   <div className="flex items-center gap-2">
@@ -311,7 +313,9 @@ export function SplitDialog({
                         payee: originalPayeeName,
                       })}
                       value={formatCount(keep)}
-                      onChange={(e) => setKeep(line.typeId, digits(e.target.value), line.quantity)}
+                      onChange={(e) =>
+                        setKeep(line.typeId, typedUnits(e.target.value), line.quantity)
+                      }
                       className={cx('w-24 text-right', keep > line.quantity && 'border-accent')}
                     />
                     <TextInput
@@ -324,7 +328,7 @@ export function SplitDialog({
                       onChange={(e) =>
                         setKeep(
                           line.typeId,
-                          line.quantity - Math.min(line.quantity, digits(e.target.value)),
+                          line.quantity - Math.min(line.quantity, typedUnits(e.target.value)),
                           line.quantity
                         )
                       }

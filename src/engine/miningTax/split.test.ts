@@ -55,9 +55,8 @@ describe('planSplit with unreported ore', () => {
     expect(plan.moved).toEqual([{ typeId: B, quantity: 50 }]);
   });
 
-  it('adds a type the entry has not reported at all', () => {
-    const plan = planSplit(original, [], [{ typeId: 999, quantity: 7 }]);
-    expect(plan.kept).toEqual([...original, { typeId: 999, quantity: 7 }]);
+  it('refuses a claim on a type the original does not hold', () => {
+    expect(() => planSplit(original, [], [{ typeId: 999, quantity: 7 }])).toThrow();
   });
 
   it('refuses to both move and claim more of one type', () => {

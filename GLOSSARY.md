@@ -500,6 +500,9 @@ here — they go one per file in `docs/context/decisions/`.
   collects. Nothing on a split day is ever doubly claimed. A paid collector
   takes nothing (paid stays paid, ADR 0024): that ore stays unassigned until
   the pilot assigns it, and the new Assignment then takes over collecting.
+  The other side may claim more than ESI has reported yet (the client's
+  figure runs ahead of the ledger); later ore fills that claim first and the
+  collector gets only the excess.
 - **Global Market Region**: A region that exists only to hold one item's
   cluster-wide market. PLEX is the only one today: its orders live in a region
   of their own, yet each order still points at an ordinary station. So a global
