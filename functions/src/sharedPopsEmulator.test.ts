@@ -5,11 +5,14 @@ import type { Caller } from './actorAuth.js';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { OFFICER_WINDOW_MS } from './sharedPops.js';
 import type { Affiliation } from './sharedPopsEsi.js';
+import type { OfficerAccess } from './corpTaxBook.js';
+import { authorizeOfficer, editBookAs, type BookDeps } from './corpTaxBookStore.js';
 import {
   listCommunityPopSharers,
   publishSharedPops,
   setCommunityPopBlock,
   sharedPopsFor,
+  sharedPopSourcesRef,
   sharedPopsRef,
   sharingCommunities,
   stampEditorUse,
@@ -52,6 +55,30 @@ const readDeps = () => ({
   now: () => now,
   affiliations: async (ids: readonly number[]) =>
     new Map(ids.flatMap((id) => (affiliation[id] ? [[id, affiliation[id]] as const] : []))),
+});
+const bookDeps = (): BookDeps => ({
+  db,
+  now: () => now,
+  verifyToken: async () => {
+    throw new Error('no tokens here');
+  },
+  readIdentity: async () => {
+    throw new Error('no ESI here');
+  },
+});
+const officerAccess = (roles: { canEdit: boolean }): OfficerAccess => ({
+  isCeo: false,
+  isDirector: false,
+  isStationManager: false,
+  canView: true,
+  canEdit: roles.canEdit,
+  characterId: OFFICER,
+  characterName: 'Officer',
+  ownerHash: `h${OFFICER}`,
+  corporationId: BOOK,
+  roles: [roles.canEdit ? 'Accountant' : 'Junior_Accountant'],
+  checkedAt: now,
+  expiresAt: now + 24 * H,
 });
 const viewer = (id: number): PopViewer => ({ characterId: id, ownerHash: `h${id}` });
 const caller = (id: number): Caller => ({ uid: `char:${id}`, ownerHash: `h${id}` });
@@ -271,5 +298,34 @@ emulatorSuite('Shared Pops', () => {
     now = Date.parse(DECAY) + 48 * H;
     expect(await seen(CORPMATE)).toEqual([]);
     expect(await publishSharedPops(publishDeps(), BOOK)).toBeNull();
+  });
+
+  it('republishes when an officer turns sharing off through the edit callable', async () => {
+    await publishSharedPops(publishDeps(), BOOK);
+    await editBookAs(
+      bookDeps(),
+      officerAccess({ canEdit: true }),
+      { corporationId: BOOK },
+      { action: 'setPopSharing', enabled: false }
+    );
+    expect((await sharedPopsRef(db, BOOK).get()).exists).toBe(false);
+    expect(await seen(CORPMATE)).toEqual([]);
+  });
+
+  it("stamps an editor's use of the book, and a failed role check when an edit is refused", async () => {
+    const officerDoc = book().collection('officers').doc(`char:${OFFICER}`);
+    const call = { corporationId: BOOK };
+    await officerDoc.set(officerAccess({ canEdit: true }));
+    await authorizeOfficer(bookDeps(), caller(OFFICER), call, 'view', { live: false });
+    const stamped = (await sharedPopSourcesRef(db, BOOK).get()).get(`editors.char:${OFFICER}`);
+    expect(stamped).toMatchObject({ characterId: OFFICER, ownerHash: `h${OFFICER}`, usedAt: now });
+
+    now += 1;
+    await officerDoc.set(officerAccess({ canEdit: false }));
+    await expect(
+      authorizeOfficer(bookDeps(), caller(OFFICER), call, 'edit', { live: false })
+    ).rejects.toThrow();
+    const failed = (await sharedPopSourcesRef(db, BOOK).get()).get(`editors.char:${OFFICER}`);
+    expect(failed).toMatchObject({ usedAt: now - 1, failedAt: now });
   });
 });

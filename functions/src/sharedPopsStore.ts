@@ -16,9 +16,11 @@ import {
   COMMUNITIES_COLLECTION,
   COMMUNITY_MEMBERS_COLLECTION,
   record,
+  utcDayKey,
 } from './communities.js';
 import { requireAdmin } from './communitiesStore.js';
-import { isPlainRecord } from './guards.js';
+import { isFiniteNumber, isPlainRecord } from './guards.js';
+import { DAY_MS, HOUR_MS } from './vettingTypes.js';
 import { POP_SHARING_DOC, popSharingFrom } from './popSharing.js';
 import {
   POP_SHARING_BLOCKS,
@@ -39,13 +41,15 @@ import type { AffiliationLookup, CorporationAllianceLookup } from './sharedPopsE
 type Data = Record<string, unknown>;
 
 /** The book's alliance is re-read at most this often. */
-export const ALLIANCE_RECHECK_MS = 6 * 3_600_000;
+export const ALLIANCE_RECHECK_MS = 6 * HOUR_MS;
 /** The most of the book's own refinery names one scheduled run looks up. */
 export const MAX_REFINERY_NAME_LOOKUPS = 10;
 /** A refused or missing refinery name is asked for again after this long. */
-export const REFINERY_NAME_RECHECK_MS = 7 * 86_400_000;
-/** The most extra Characters one read may prove. */
+export const REFINERY_NAME_RECHECK_MS = 7 * DAY_MS;
+/** The most extra Characters one read proves; the client sends no more than this. */
 export const MAX_VIEWER_TOKENS = 50;
+/** An editor's use is stamped again only once the stored one is this old (the window is 30 days). */
+export const EDITOR_STAMP_EVERY_MS = HOUR_MS;
 
 export interface SharedPopsDeps {
   db: Firestore;
@@ -73,8 +77,7 @@ const memberDoc = (db: Firestore, communityId: string, characterId: number) =>
     .collection(COMMUNITY_MEMBERS_COLLECTION)
     .doc(`char:${characterId}`);
 
-const num = (v: unknown): number | undefined =>
-  typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+const num = (v: unknown): number | undefined => (isFiniteNumber(v) ? v : undefined);
 const str = (v: unknown): string | undefined =>
   typeof v === 'string' && v.length > 0 ? v : undefined;
 const recordOf = (v: unknown): Data => (isPlainRecord(v) ? v : {});
@@ -173,7 +176,7 @@ export async function publishSharedPops(
     if (held.exists) await ref.delete();
     return null;
   }
-  const since = new Date(now - MAX_EXPIRY_HOURS * 3_600_000).toISOString();
+  const since = new Date(now - MAX_EXPIRY_HOURS * HOUR_MS).toISOString();
   const [extractionSnap, feederSnap] = await Promise.all([
     book.collection(EXTRACTIONS).where('naturalDecayTime', '>=', since).get(),
     book.collection(FEEDERS).get(),
@@ -199,7 +202,7 @@ export async function publishSharedPops(
 
   const bookData = bookSnap.data() ?? {};
   const rates = (Array.isArray(bookData.rates) ? bookData.rates : []) as RateEntry[];
-  const today = new Date(now).toISOString().slice(0, 10);
+  const today = utcDayKey(now);
   const refineries = refineriesOf(
     handled,
     recordOf(sourcesSnap.get('refineries')),
@@ -262,7 +265,7 @@ export async function learnOwnRefineryNames(
     );
     if (!popSharingFrom(sharingSnap.data()).enabled) return;
     const known = recordOf(sourcesSnap.get('refineries'));
-    const since = new Date(now - MAX_EXPIRY_HOURS * 3_600_000).toISOString();
+    const since = new Date(now - MAX_EXPIRY_HOURS * HOUR_MS).toISOString();
     const live = await book.collection(EXTRACTIONS).where('naturalDecayTime', '>=', since).get();
     const ids = [
       ...new Set(
@@ -298,7 +301,24 @@ export async function stampEditorUse(
   officer: { characterId: number; ownerHash: string },
   at: number
 ): Promise<void> {
-  await sharedPopSourcesRef(db, corporationId)
+  const ref = sharedPopSourcesRef(db, corporationId);
+  const key = `char:${officer.characterId}`;
+  try {
+    // One write an hour at most: every officer call lands here, on one doc per book.
+    const held = editorStampsFrom({
+      editors: { [key]: recordOf((await ref.get()).get('editors'))[key] },
+    })[0];
+    if (
+      held &&
+      held.ownerHash === officer.ownerHash &&
+      at - held.usedAt < EDITOR_STAMP_EVERY_MS &&
+      (held.failedAt === undefined || held.failedAt < held.usedAt)
+    )
+      return;
+  } catch {
+    // Unread: stamp anyway.
+  }
+  await ref
     .set(
       {
         editors: {
@@ -348,18 +368,20 @@ export interface SharedPopsReadDeps {
 /** The Communities the viewers are current Members of (ownerHash checked, as `isCurrentMember`). */
 async function communitiesOf(db: Firestore, viewers: readonly PopViewer[]): Promise<Set<string>> {
   const out = new Set<string>();
-  for (const v of viewers) {
-    const index = await db
-      .collection('characters')
-      .doc(`char:${v.characterId}`)
-      .collection(CHARACTER_COMMUNITIES_COLLECTION)
-      .get();
-    if (index.empty) continue;
-    const members = await db.getAll(...index.docs.map((d) => memberDoc(db, d.id, v.characterId)));
-    members.forEach((m, i) => {
-      if (m.exists && m.get('ownerHash') === v.ownerHash) out.add(index.docs[i].id);
-    });
-  }
+  await Promise.all(
+    viewers.map(async (v) => {
+      const index = await db
+        .collection('characters')
+        .doc(`char:${v.characterId}`)
+        .collection(CHARACTER_COMMUNITIES_COLLECTION)
+        .get();
+      if (index.empty) return;
+      const members = await db.getAll(...index.docs.map((d) => memberDoc(db, d.id, v.characterId)));
+      members.forEach((m, i) => {
+        if (m.exists && m.get('ownerHash') === v.ownerHash) out.add(index.docs[i].id);
+      });
+    })
+  );
   return out;
 }
 
@@ -383,9 +405,12 @@ export async function sharingCommunities(
       ? []
       : await deps
           .affiliations(editors.map((e) => e.characterId))
-          .then((a) =>
-            editors.filter((e) => a.get(e.characterId)?.corporationId === corporationId)
-          );
+          .then((a) => editors.filter((e) => a.get(e.characterId)?.corporationId === corporationId))
+          // Unanswered: no officer is known to be in the corporation, so no Community counts.
+          .catch((e: unknown) => {
+            console.error('officer affiliation failed', e instanceof Error ? e.message : e);
+            return [];
+          });
   for (const c of communityIds) {
     const [block, ...members] = await db.getAll(
       blockRef(db, c, corporationId),

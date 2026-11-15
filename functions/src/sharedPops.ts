@@ -9,10 +9,13 @@ import {
   audienceKey,
   effectivePopSharing,
   startLinkRatePct,
-  type PopAudience,
   type PopSharingDoc,
   type PopTime,
 } from './popSharing.js';
+
+// Local: this module is shared with the client project, which cannot reach vettingTypes.ts.
+const HOUR_MS = 3_600_000;
+const DAY_MS = 24 * HOUR_MS;
 
 /** `sharedPops/{corporationId}`: one server-only doc per sharing book. */
 export const SHARED_POPS = 'sharedPops';
@@ -25,7 +28,7 @@ export const SHARED_POP_SOURCES = 'sharedPopSources';
 export const POP_SHARING_BLOCKS = 'popSharingBlocks';
 
 /** An officer counts for a Community share this long after their last editing use of the book. */
-export const OFFICER_WINDOW_MS = 30 * 86_400_000;
+export const OFFICER_WINDOW_MS = 30 * DAY_MS;
 
 export interface OreLine {
   typeId: number;
@@ -91,7 +94,7 @@ export interface SharedPopsDoc {
   corporationId: number;
   /** The book's corporation's alliance: the Alliance audience. Null outside an alliance. */
   allianceId: number | null;
-  /** Whether any pop names the Corp / Alliance audience (query helpers). */
+  /** Whether any pop names the Corp / Alliance audience. */
   corpShared: boolean;
   allianceShared: boolean;
   /** Every Community any pop names, for the array-contains query. */
@@ -119,8 +122,6 @@ export interface BuildSharedPopsInput {
   /** Epoch ms. */
   now: number;
 }
-
-const HOUR_MS = 3_600_000;
 
 /** When the chunk fractured, or will: the laser shot, else its natural decay. */
 const fracturedAt = (x: PopExtraction): string => x.laserFiredAt ?? x.naturalDecayTime;
@@ -262,7 +263,7 @@ export function qualifyingEditors(stamps: readonly EditorStamp[], now: number): 
   );
 }
 
-/** A stored `sharedPopEditors` doc as stamps, dropping what it cannot read. */
+/** A stored `sharedPopSources` doc's `editors` as stamps, dropping what it cannot read. */
 export function editorStampsFrom(raw: unknown): EditorStamp[] {
   const editors = (raw as { editors?: unknown } | undefined)?.editors;
   if (typeof editors !== 'object' || editors === null) return [];
@@ -325,6 +326,3 @@ export function bookRatePctFor(
     0
   );
 }
-
-/** Re-export so callers name an audience without a second import. */
-export type { PopAudience };

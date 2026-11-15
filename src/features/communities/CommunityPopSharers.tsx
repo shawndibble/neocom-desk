@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, NeedsConnection } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
+import { Pill } from '@/components/ui/Pill';
 import { usePartyNames } from '@/features/character/usePartyNames';
 import {
   listCommunityPopSharers,
@@ -72,9 +73,10 @@ export function CommunityPopSharers({
             <span className="min-w-0 truncate text-sm">
               {names.get(s.corporationId) ?? String(s.corporationId)}
               {s.blocked && (
-                <span className="ml-2 text-xs text-text-dim">
-                  {t('communities.popSharing.blocked')}
-                </span>
+                <>
+                  {' '}
+                  <Pill tone="warning">{t('communities.popSharing.blocked')}</Pill>
+                </>
               )}
             </span>
             <NeedsConnection>

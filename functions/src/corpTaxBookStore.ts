@@ -101,7 +101,13 @@ import { FEEDER_OBSERVED, rollupChanges, writeRollupChanges } from './corpTaxBoo
 import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
 import { POP_SHARING_DOC, applyMoonOverride, popSharingFrom } from './popSharing.js';
 import type { CorporationAllianceLookup } from './sharedPopsEsi.js';
-import { refreshSharedPops, stampEditorUse, stampFailedRoleCheck } from './sharedPopsStore.js';
+import {
+  refreshSharedPops,
+  sharedPopSourcesRef,
+  sharedPopsRef,
+  stampEditorUse,
+  stampFailedRoleCheck,
+} from './sharedPopsStore.js';
 import { editScope } from './corpTaxBookMinerTotals.js';
 import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
 import { pullsOfDays, refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
@@ -455,6 +461,11 @@ export async function deleteBook(
   await deleteBookContents(ref);
   // A scheduled sync that loaded its grant before it was dropped may still have been writing.
   await deleteBookContents(ref);
+  // Its published Shared Pops and their inputs go with it (#6223).
+  await Promise.all([
+    sharedPopsRef(deps.db, call.corporationId).delete(),
+    sharedPopSourcesRef(deps.db, call.corporationId).delete(),
+  ]);
   // Last, so a late sync has the narrowest window to write one back (can't close it).
   await deleteBilledByPointers(deps, call.corporationId);
   return { deleted: true };

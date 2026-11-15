@@ -11,6 +11,9 @@ import type { SharedPopView } from '../../functions/src/sharedPops';
 import { callRouted } from './routedCallable';
 import { ensureSignedIn } from './syncAuth';
 
+/** The most other Characters one read proves (the server's `MAX_VIEWER_TOKENS`). */
+const MAX_OTHER_CHARACTERS = 50;
+
 export type { SharedPopView };
 
 /**
@@ -33,7 +36,7 @@ export async function fetchSharedPops(): Promise<SharedPopView[]> {
   await ensureSignedIn(signer.characterId);
   const result = await callRouted<{ accessTokens: string[] }, { pops?: SharedPopView[] }>(
     'listSharedPopsCallable',
-    { accessTokens: others.map((t) => t.accessToken) },
+    { accessTokens: others.slice(0, MAX_OTHER_CHARACTERS).map((t) => t.accessToken) },
     signer.characterId
   );
   return result.pops ?? [];

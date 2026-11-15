@@ -175,15 +175,12 @@ export async function disputeFeederPayout(
     );
     return true;
   });
-  if (changed) {
+  if (changed)
     await tryRebuildFeederView(
       feederBookDeps(deps),
       ctx.collectorCorporationId,
       input.corporationId
     );
-    // An opt-out takes the moon owner's pops away at once; opting back in returns them (#6223).
-    await refreshSharedPops(feederBookDeps(deps), ctx.collectorCorporationId);
-  }
   return { ok: true };
 }
 
@@ -234,12 +231,15 @@ export async function setFeederPopSharing(
     );
     return true;
   });
-  if (changed)
+  if (changed) {
     await tryRebuildFeederView(
       feederBookDeps(deps),
       ctx.collectorCorporationId,
       input.corporationId
     );
+    // An opt-out takes the moon owner's pops away at once; opting back in returns them (#6223).
+    await refreshSharedPops(feederBookDeps(deps), ctx.collectorCorporationId);
+  }
   return { ok: true };
 }
 
