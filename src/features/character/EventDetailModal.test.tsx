@@ -52,13 +52,22 @@ afterEach(() => {
 });
 
 describe('EventDetailModal', () => {
-  it('shows the event title immediately and a loading state while the detail fetches', () => {
+  it('shows the event title immediately and a loading state while the detail fetches', async () => {
+    let requested = false;
     server.use(
-      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () => new Promise(() => {}))
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () => {
+        requested = true;
+        return new Promise(() => {});
+      })
     );
     render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: 'Fleet Op' })).toBeInTheDocument();
     expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    // Ends only once the request is parked in the handler. Ended earlier, the
+    // fetch went out after the test-end abort, untracked, and hung on this
+    // handler until the 30s request timeout; every later test's load deduped
+    // onto it (same `91:calendar:1` key) and timed out on CI.
+    await vi.waitFor(() => expect(requested).toBe(true));
   });
 
   it('shows importance and markup-stripped text on success', async () => {
