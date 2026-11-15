@@ -509,6 +509,28 @@ describe('a held moon owner day and a paid Statement (#6209)', () => {
     expect(miner.lateWriteOffs).toEqual([]);
     expect(miner.days.find((d) => d.date === '2026-08-20')?.status).toBe('unbilled');
   });
+
+  it("holds a stale owner's miner before its ore is read at all, so it lands later, not written off", () => {
+    // Miner 1 mined at the moon owner on 08-10 (read) and at the book's own refinery on 08-20;
+    // the owner's 08-20 ore is read only after the August Statement was paid.
+    const own = entry(1, '2026-08-20', 1000);
+    const stale = input({
+      entries: [fed(1, '2026-08-10', 1000), own],
+      feeders: [{ corporationId: FEEDER, lastReadWellAt: '2026-08-15T10:00:00Z' }],
+    });
+    const first = buildBookView(stale);
+    const plan = planStatementRun(first, { start: '2026-08-01', end: '2026-08-31' });
+    const statement = statementForLine(first, plan, plan.lines[0]);
+    expect(statement.coversThrough < '2026-08-15').toBe(true);
+    const later = buildBookView({
+      ...stale,
+      entries: [fed(1, '2026-08-10', 1000), own, fed(1, '2026-08-20', 500)],
+      feeders: [{ corporationId: FEEDER, lastReadWellAt: '2026-09-18T10:00:00Z' }],
+      statements: [statement],
+      paidStatementIds: new Set([statement.id]),
+    });
+    expect(minerDetail(later, 'solo:1')!.lateWriteOffs).toEqual([]);
+  });
 });
 
 describe('buildBookView: moon owner coverage (#4618)', () => {

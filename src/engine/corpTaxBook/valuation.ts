@@ -101,7 +101,7 @@ export function moonOwnerDayPrices(
 ): Map<number, number> {
   const out = new Map(own);
   for (const [typeId, price] of billed) {
-    if (!((out.get(typeId) ?? 0) > 0)) out.set(typeId, moonOwnerUnitPrice(undefined, price));
+    if (!((out.get(typeId) ?? 0) > 0)) out.set(typeId, price > 0 ? price : 0);
   }
   return out;
 }

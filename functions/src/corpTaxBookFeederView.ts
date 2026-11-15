@@ -32,6 +32,8 @@ import {
   type OwnerRateEntry,
   type Payee,
   moonOwnerUnitPrice,
+  FEEDER_VIEW_RULES,
+  latestOwnerRate,
 } from './corpTaxBookEngine.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
 import { COMPRESSED_ORE_TYPE_IDS } from './data/compressedOreTypeIds.js';
@@ -92,12 +94,6 @@ export async function refreshMemberCoverage(
     console.error('member coverage not written', e instanceof Error ? e.message : e);
   }
 }
-
-/**
- * The accrual rules a summary is built under (#6209: only an agreed rate accrues and the first one
- * reaches back; settled otherwise keeps a balance owed). Engine `FEEDER_VIEW_RULES`.
- */
-export const FEEDER_VIEW_RULES = 2;
 
 export interface FeederViewSummary {
   schemaVersion: 1;
@@ -345,18 +341,11 @@ const latestPct = (
   history: readonly OwnerRateEntry[],
   kind: OwnerRateEntry['kind'],
   today: string
-) =>
-  history
-    .filter((h) => h.kind === kind && h.effectiveFrom <= today)
-    .reduce<OwnerRateEntry | undefined>(
-      (l, h) =>
-        !l ||
-        h.effectiveFrom > l.effectiveFrom ||
-        (h.effectiveFrom === l.effectiveFrom && h.recordedAt >= l.recordedAt)
-          ? h
-          : l,
-      undefined
-    )?.pct ?? null;
+) => latestOwnerRate(history, kind, today)?.pct ?? null;
+
+/** A row's Statement line key (engine `observedEntryKey`): character, refinery and day. */
+const chargeKeyOf = (r: Pick<FeederViewRow, 'characterId' | 'structureId' | 'date'>) =>
+  `${r.characterId}:${r.structureId}:${r.date}`;
 
 export function buildFeederView(input: FeederViewInput): FeederView {
   const { record, now } = input;
@@ -393,9 +382,7 @@ export function buildFeederView(input: FeederViewInput): FeederView {
     const priced = oreFormTypeId(r.typeId, input.compressedByRaw, compressed);
     // The accounting side prices a moon owner's accrual with the same rule (#4621); a day with
     // no saved price takes what the miner's line was billed at (#6209).
-    const billed = input.billedPrices?.get(`${r.characterId}:${r.structureId}:${r.date}`)?.[
-      String(r.typeId)
-    ];
+    const billed = input.billedPrices?.get(chargeKeyOf(r))?.[String(r.typeId)];
     const unit = moonOwnerUnitPrice(input.prices.get(priceKey(priced, r.date)), billed);
     const value = r.quantity * unit;
     minedVolume += r.quantity;
@@ -606,7 +593,7 @@ async function readBilledPrices(
     if (!isDayCovered(record.coveragePeriods, r.date)) continue;
     const priced = oreFormTypeId(r.typeId, COMPRESSED_ORE_TYPE_IDS, oreForm === 'compressed');
     if (moonOwnerUnitPrice(prices.get(priceKey(priced, r.date))) > 0) continue;
-    keys.add(`${r.characterId}:${r.structureId}:${r.date}`);
+    keys.add(chargeKeyOf(r));
     if (earliest === undefined || r.date < earliest) earliest = r.date;
   }
   if (earliest === undefined) return out;

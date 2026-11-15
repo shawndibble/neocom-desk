@@ -568,7 +568,8 @@ export interface OwnerRateEntry {
   recordedAt: string;
 }
 
-function latestOwnerRate(
+/** The entry of one kind in effect on `date`: latest effective-from on or before it, then latest recorded. */
+export function latestOwnerRate(
   history: readonly OwnerRateEntry[],
   kind: OwnerRateEntry['kind'],
   date: string
@@ -610,6 +611,9 @@ export function effectiveOwnerRatePct(
 ): number | undefined {
   return (latestOwnerRate(history, 'agreed', date) ?? firstAgreedOwnerRate(history))?.pct;
 }
+
+/** Engine `FEEDER_VIEW_RULES`: the accrual rules a moon owner view summary is built under (#6209). */
+export const FEEDER_VIEW_RULES = 2;
 
 /** Engine `FeederMode`. */
 export type FeederMode = 'normal' | 'settled-otherwise';

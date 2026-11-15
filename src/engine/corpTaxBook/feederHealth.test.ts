@@ -7,8 +7,10 @@ import {
   withholdUnreadFeederDays,
   type FeederHealth,
   heldBillableThrough,
+  staleOwnerHolds,
 } from './feederHealth';
 import type { ObservedMiningEntry } from './types';
+import type { CoveragePeriod } from './coverage';
 
 const NOW = '2026-10-20T12:00:00.000Z';
 
@@ -224,5 +226,44 @@ describe('heldBillableThrough (#6209)', () => {
     expect(heldBillableThrough('2026-09-17', [3], held)).toBe('2026-09-17');
     expect(heldBillableThrough('2026-08-10', [1], held)).toBe('2026-08-10');
     expect(heldBillableThrough(undefined, [1], held)).toBeUndefined();
+  });
+});
+
+describe('staleOwnerHolds (#6209)', () => {
+  const OWNER = 98000002;
+  const row = (characterId: number, date: string, source?: number) =>
+    ({
+      characterId,
+      date,
+      ...(source !== undefined ? { sourceCorporationId: source } : {}),
+    }) as const;
+  const clock = (
+    lastReadWellAt: string | undefined,
+    coveragePeriods: CoveragePeriod[] = [{ from: '2026-08-01' }]
+  ) => ({
+    now: '2026-09-18T14:00:00Z',
+    graceHours: 6,
+    bookCorporationId: 1,
+    feeders: [
+      { corporationId: OWNER, coveragePeriods, ...(lastReadWellAt ? { lastReadWellAt } : {}) },
+    ],
+  });
+  const rows = [row(1, '2026-08-10', OWNER), row(2, '2026-08-12'), row(3, '2026-08-20', OWNER)];
+
+  it("holds every miner who mines at a stale owner's refineries from its first unread day", () => {
+    expect(staleOwnerHolds(rows, clock('2026-08-15T10:00:00Z'), '2026-09-17')).toEqual(
+      new Map([
+        [1, '2026-08-15'],
+        [3, '2026-08-15'],
+      ])
+    );
+  });
+  it('holds nothing for an owner read up to date, or whose coverage ended before it went stale', () => {
+    expect(staleOwnerHolds(rows, clock('2026-09-18T10:00:00Z'), '2026-09-17').size).toBe(0);
+    const ended = clock('2026-08-15T10:00:00Z', [{ from: '2026-08-01', to: '2026-08-14' }]);
+    expect(staleOwnerHolds(rows, ended, '2026-09-17').size).toBe(0);
+  });
+  it('an owner never read well holds from its first covered day', () => {
+    expect(staleOwnerHolds(rows, clock(undefined), '2026-09-17').get(1)).toBe('2026-08-01');
   });
 });

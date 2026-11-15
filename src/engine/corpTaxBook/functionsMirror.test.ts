@@ -22,6 +22,7 @@ import {
   feederBillableRule,
   onPayList,
 } from './feederAccrual';
+import { FEEDER_VIEW_RULES } from './moonOwners';
 import {
   balanceAfter,
   buildRecordedPayout,
@@ -800,6 +801,7 @@ describe('remaining engine parity (#4515, #4520, #4621)', () => {
   it('payout helpers agree', () => {
     expect(mirror.PAYOUT_LINK_WINDOW_DAYS).toBe(PAYOUT_LINK_WINDOW_DAYS);
     expect(mirror.PAYOUT_REASON_PREFIX).toBe(PAYOUT_REASON_PREFIX);
+    expect(mirror.FEEDER_VIEW_RULES).toBe(FEEDER_VIEW_RULES);
     for (const reason of [undefined, 'SRP refund', 'MOON MINING PAYOUT, 2026-10-01', ''])
       expect(mirror.carriesPayoutReference(reason)).toBe(carriesPayoutReference(reason));
     expect(mirror.payoutId({ division: 2, refId: 55 })).toBe(payoutId({ division: 2, refId: 55 }));

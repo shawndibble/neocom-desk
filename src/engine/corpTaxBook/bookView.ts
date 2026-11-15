@@ -20,9 +20,9 @@ import {
 } from './allocation';
 import { lastBillableDate } from './billable';
 import {
-  earliestHeldDays,
   heldBillableThrough,
   splitByCoverageAndRead,
+  staleOwnerHolds,
   type FeederReadClock,
 } from './feederHealth';
 import { buildDayCharges, type DayCharge, type Miner } from './charges';
@@ -364,11 +364,7 @@ export function standingOf(
 export function buildBookView(input: BookViewInput): BookView {
   const placeOf = placeOfFactory(input.extractions, input.structureExpiryHours);
   // Coverage first: a moon owner's day outside it owes nothing, so it never holds a miner's day.
-  const {
-    readable: entries,
-    outsideCoverage,
-    unread,
-  } = splitByCoverageAndRead(input.entries, {
+  const { readable: entries, outsideCoverage } = splitByCoverageAndRead(input.entries, {
     now: input.now,
     graceHours: input.graceHours,
     bookCorporationId: input.corporationId,
@@ -390,7 +386,17 @@ export function buildBookView(input: BookViewInput): BookView {
 
   const minerIds = minerIdsOf(input, charges);
   const latestCorp = latestCorporationOf(input.entries);
-  const heldFrom = earliestHeldDays(unread);
+  // A miner at a moon owner that cannot be read is held from its first unread day (#6209).
+  const heldFrom = staleOwnerHolds(
+    input.entries,
+    {
+      now: input.now,
+      graceHours: input.graceHours,
+      bookCorporationId: input.corporationId,
+      feeders: input.feeders ?? [],
+    },
+    billableThrough
+  );
 
   const byMiner = new Map<string, MinerInternals>();
   const miners: MinerRow[] = [];

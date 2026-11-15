@@ -18983,7 +18983,7 @@
         "since": "since {{date}}",
         "until": "until {{date}}",
         "notSet": "Not set",
-        "nothingDue": "Waits for a rate",
+        "waitsForRate": "Waits for a rate",
         "askedRate": "Asked {{pct}}%",
         "summary": "{{shown}} moon owners",
         "empty": {

@@ -1,4 +1,5 @@
 import { computeAssignmentValue } from '../miningTax/valuation';
+import { moonOwnerDayPrices } from './valuation';
 import { isDayCovered, type CoveragePeriod } from './coverage';
 import {
   accrueValuedDays,
@@ -116,6 +117,36 @@ export interface MoonOwnersInput {
   extractionRefineries?: ReadonlyMap<number, ReadonlySet<number>>;
   /** The day's unit prices, by raw type id. */
   pricesOn: (date: string) => ReadonlyMap<number, number>;
+  /**
+   * What issued Statements billed each miner's line at (`billedPricesOf`), by `chargeKey` then raw
+   * type id: an ore with no saved price takes it, as the moon owner's page does (#6209).
+   */
+  billedPrices?: ReadonlyMap<string, Readonly<Record<number, number>>>;
+}
+
+/** Each Statement line's billed unit prices by its `chargeKey`; the first Statement to bill a line wins. */
+export function billedPricesOf(
+  statements: readonly {
+    lines: readonly { chargeKey?: string; unitPrices?: Readonly<Record<number, number>> }[];
+  }[]
+): Map<string, Readonly<Record<number, number>>> {
+  const out = new Map<string, Readonly<Record<number, number>>>();
+  for (const s of statements)
+    for (const line of s.lines)
+      if (line.chargeKey && line.unitPrices && !out.has(line.chargeKey))
+        out.set(line.chargeKey, line.unitPrices);
+  return out;
+}
+
+/** An entry's unit prices: the day's, with its line's billed price where the day has none. */
+function entryPrices(input: MoonOwnersInput, e: ObservedMiningEntry): ReadonlyMap<number, number> {
+  const day = input.pricesOn(e.date);
+  const billed = input.billedPrices?.get(`${e.characterId}:${e.structureId}:${e.date}`);
+  if (!billed) return day;
+  return moonOwnerDayPrices(
+    day,
+    new Map(Object.entries(billed).map(([typeId, price]) => [Number(typeId), price]))
+  );
 }
 
 export interface MoonOwnerRow {
@@ -421,7 +452,7 @@ function work(
   const covered = own.filter((e) => isDayCovered(f.coveragePeriods, e.date));
   // Each entry priced once: the accrual, `mined` and the detail's lines share it.
   const coveredValues = covered.map(
-    (e) => computeAssignmentValue(e.oreLines, input.pricesOn(e.date), 100).estimatedValue
+    (e) => computeAssignmentValue(e.oreLines, entryPrices(input, e), 100).estimatedValue
   );
   const valueByDay = new Map<string, number>();
   covered.forEach((e, i) =>

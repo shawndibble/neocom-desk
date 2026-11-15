@@ -4,6 +4,7 @@ import {
   canPayMoonOwner,
   deriveModeChanges,
   deriveOwnerRateHistory,
+  billedPricesOf,
   extractionRefineriesOf,
   moonOwnerDetail,
   type MoonOwnerFeeder,
@@ -326,6 +327,28 @@ describe('buildMoonOwners', () => {
       })
     );
     expect(totals).toEqual({ owed: 55, paidThisMonth: 20, count: 2, needALook: 1 });
+  });
+});
+
+describe('billed prices (#6209)', () => {
+  it('keeps the first price each Statement line was billed at, by line', () => {
+    const lines = (key: string, price: number) => ({
+      lines: [{ chargeKey: key, unitPrices: { 100: price } }, { adjustmentId: 'a' }],
+    });
+    expect(billedPricesOf([lines('1:10:2026-10-05', 3), lines('1:10:2026-10-05', 9)])).toEqual(
+      new Map([['1:10:2026-10-05', { 100: 3 }]])
+    );
+  });
+
+  it('values ore with no saved price at the price its line was billed at, else 0', () => {
+    const unsaved = input({
+      entries: [entry(A, '2026-10-05', 1000), entry(A, '2026-10-06', 1000)],
+      pricesOn: () => new Map([[100, 0]]),
+      billedPrices: new Map([['1:10:2026-10-05', { 100: 2 }]]),
+    });
+    const r = rowOf(unsaved);
+    expect(r.mined).toBe(2000);
+    expect(r.owed).toBe(160);
   });
 });
 

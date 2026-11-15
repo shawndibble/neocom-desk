@@ -161,14 +161,55 @@ export function heldBillableThrough(
   return through;
 }
 
-/** Each character's earliest held day, from `splitByCoverageAndRead`'s `unread` rows. */
-export function earliestHeldDays(
-  unread: readonly Pick<ObservedMiningEntry, 'characterId' | 'date'>[]
+/**
+ * The day each miner is held from while a moon owner it mines at cannot be read (#6209): a stale
+ * moon owner's first unread day (its first covered day when never read well), for every character
+ * with a row at its refineries. Its ore for those days may not be read yet, so a Statement must not
+ * cover them. An owner read up to `billableThrough`, or whose coverage ended before its first
+ * unread day, holds nothing.
+ */
+export function staleOwnerHolds(
+  entries: readonly Pick<ObservedMiningEntry, 'characterId' | 'sourceCorporationId'>[],
+  clock: {
+    now: string;
+    graceHours?: number;
+    bookCorporationId: number;
+    feeders: readonly (FeederReadClock & FeederCoverage)[];
+  },
+  billableThrough: string | undefined
 ): Map<number, string> {
   const out = new Map<number, string>();
-  for (const r of unread) {
-    const held = out.get(r.characterId);
-    if (held === undefined || r.date < held) out.set(r.characterId, r.date);
+  if (billableThrough === undefined) return out;
+  const heldFrom = new Map<number, string>();
+  for (const f of clock.feeders) {
+    if (f.corporationId === clock.bookCorporationId) continue;
+    const lastRead =
+      f.lastReadWellAt === undefined
+        ? undefined
+        : lastBillableDate({
+            now: f.lastReadWellAt,
+            lastSyncedAt: f.lastReadWellAt,
+            ...(clock.graceHours !== undefined ? { graceHours: clock.graceHours } : {}),
+          });
+    const unread = lastRead === undefined ? '' : shiftDate(lastRead, 1);
+    // The first covered day on or after it; no coverage known: the first unread day itself.
+    const first =
+      f.coveragePeriods === undefined
+        ? unread || undefined
+        : f.coveragePeriods
+            .filter((p) => p.to === undefined || p.to >= unread)
+            .map((p) => (p.from > unread ? p.from : unread))
+            .sort()[0];
+    if (first === undefined || first === '' || first > billableThrough) continue;
+    heldFrom.set(f.corporationId, first);
+  }
+  if (heldFrom.size === 0) return out;
+  for (const e of entries) {
+    const day =
+      e.sourceCorporationId === undefined ? undefined : heldFrom.get(e.sourceCorporationId);
+    if (day === undefined) continue;
+    const held = out.get(e.characterId);
+    if (held === undefined || day < held) out.set(e.characterId, day);
   }
   return out;
 }

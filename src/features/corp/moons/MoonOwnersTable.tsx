@@ -128,7 +128,7 @@ export function MoonOwnersTable({
         ) : r.mode === 'settled-otherwise' ? (
           '—'
         ) : r.theirRatePct === undefined ? (
-          <span className="text-text-dim">{t(k('nothingDue'))}</span>
+          <span className="text-text-dim">{t(k('waitsForRate'))}</span>
         ) : (
           isk(r.owed)
         ),
