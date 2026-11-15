@@ -8,7 +8,7 @@ import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { App } from '@/app/App';
+import { renderSkillsRoutes } from '@/test/skillsRoutes';
 import { configureClipboard } from '@/lib/clipboard';
 import type { SkillType } from '@/sde/types';
 
@@ -136,7 +136,7 @@ beforeEach(async () => {
 
 describe('Skills', () => {
   it('renders groups, trained levels, and SP from mocked ESI', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     expect(await screen.findByText('Gunnery')).toBeInTheDocument();
     expect(await screen.findByText('Spaceship Command')).toBeInTheDocument();
@@ -167,7 +167,7 @@ describe('Skills', () => {
 
   it('opens the skill comparison drawer from the header, seeded with the active character', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderSkillsRoutes();
 
     await user.click(await screen.findByRole('button', { name: 'Compare with' }));
 
@@ -178,6 +178,9 @@ describe('Skills', () => {
   });
 
   it('opens the drawer on the selection a retired Compare link carried', async () => {
+    // App-level wiring: the retired path is `App`'s `LegacyPathRedirect`, so
+    // this one boots the whole app (imported here, so no other test loads it).
+    const { App } = await import('@/app/App');
     window.history.pushState({}, '', `/skills/compare?ids=${CHAR_ID}`);
     render(<App />);
 
@@ -200,7 +203,7 @@ describe('Skills', () => {
       updatedAt: 1,
     });
 
-    render(<App />);
+    renderSkillsRoutes();
 
     expect(await screen.findByText('Spaceship Command')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Spaceship Command/ }));
@@ -230,7 +233,7 @@ describe('Skills', () => {
       })
     );
 
-    render(<App />);
+    renderSkillsRoutes();
 
     expect(
       await screen.findByText('19 base + 3 implant = 22', { selector: '.sr-only' })
@@ -255,7 +258,7 @@ describe('Skills', () => {
       )
     );
 
-    render(<App />);
+    renderSkillsRoutes();
 
     // Perception: base 20 + implant 3 + booster 4 = effective 27. The chip
     // shows the total; the terms are the label the hover reveals.
@@ -287,7 +290,7 @@ describe('Skills', () => {
       )
     );
 
-    render(<App />);
+    renderSkillsRoutes();
 
     fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
     expect(screen.getByRole('img', { name: 'Level 4 of 5' })).toBeInTheDocument();
@@ -324,7 +327,7 @@ describe('Skills', () => {
       )
     );
 
-    render(<App />);
+    renderSkillsRoutes();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Expand all' }));
     // Level IV is the one training; V is queued behind it and must not show.
@@ -349,7 +352,7 @@ describe('Skills', () => {
       )
     );
 
-    render(<App />);
+    renderSkillsRoutes();
 
     const chips = await screen.findAllByText(/^Training → IV · 4d 0h$/);
     expect(chips).toHaveLength(1);
@@ -377,7 +380,7 @@ describe('Skills', () => {
       )
     );
 
-    render(<App />);
+    renderSkillsRoutes();
 
     fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
     expect(screen.getByRole('img', { name: 'Level 4 of 5' })).toBeInTheDocument();
@@ -404,7 +407,7 @@ describe('Skills', () => {
       )
     );
 
-    render(<App />);
+    renderSkillsRoutes();
 
     const unknownGroupButton = await screen.findByText('—');
     fireEvent.click(unknownGroupButton.closest('button')!);
@@ -430,7 +433,7 @@ describe('Skills', () => {
       })
     );
 
-    render(<App />);
+    renderSkillsRoutes();
 
     fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
     // Trained level comes from /skills alone — no queue correction attempted.
@@ -451,7 +454,7 @@ describe('Skills', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () => HttpResponse.error())
     );
 
-    render(<App />);
+    renderSkillsRoutes();
 
     expect(await screen.findByText('Gunnery')).toBeInTheDocument();
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
@@ -462,7 +465,7 @@ describe('Skills', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () => HttpResponse.error())
     );
 
-    render(<App />);
+    renderSkillsRoutes();
 
     expect(await screen.findByText(/no skill data cached/i)).toBeInTheDocument();
   });
@@ -474,7 +477,7 @@ describe('Skills', () => {
       )
     );
 
-    render(<App />);
+    renderSkillsRoutes();
 
     expect(await screen.findByRole('button', { name: /log in again/i })).toBeInTheDocument();
     expect(screen.queryByText(/no skill data cached/i)).not.toBeInTheDocument();
@@ -496,7 +499,7 @@ describe('Skills', () => {
       )
     );
 
-    render(<App />);
+    renderSkillsRoutes();
 
     expect(await screen.findByText(/log in again to refresh/i)).toBeInTheDocument();
     expect(screen.queryByText(/log in again to see skills/i)).not.toBeInTheDocument();
@@ -521,7 +524,7 @@ describe('Skills', () => {
       )
     );
 
-    render(<App />);
+    renderSkillsRoutes();
 
     // The route's own note, not Layout's global auth notice — the latter
     // fires on emitEsiAuthFailure, before the snapshot settles.
@@ -548,7 +551,7 @@ describe('Skills', () => {
   });
 
   it('shows trained of total on each tile, counting skills the character has not trained', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     // Gunnery has Small Hybrid Turret (trained) and Sharpshooter (not in ESI's skills).
     const gunnery = await screen.findByRole('button', { name: /^Gunnery/ });
@@ -561,7 +564,7 @@ describe('Skills', () => {
   });
 
   it('marks a skill ESI does not list as needing its book, with empty pips and no SP', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     fireEvent.click(await screen.findByRole('button', { name: /^Gunnery/ }));
     const row = screen.getByRole('button', { name: 'Sharpshooter' });
@@ -576,7 +579,7 @@ describe('Skills', () => {
 
   it('opens the skill info modal from the skill name and from the rest of the row', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderSkillsRoutes();
 
     fireEvent.click(await screen.findByRole('button', { name: /^Spaceship Command/ }));
     const link = screen.getByRole('link', { name: 'Frigate' });
@@ -609,7 +612,7 @@ describe('Skills', () => {
         ])
       )
     );
-    render(<App />);
+    renderSkillsRoutes();
 
     fireEvent.click(await screen.findByRole('button', { name: /^Spaceship Command/ }));
     const row = screen.getByRole('button', { name: 'Frigate' });
@@ -622,7 +625,7 @@ describe('Skills', () => {
   });
 
   it('finds a skill the character has not trained, and expands its group to show it', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     await screen.findByRole('button', { name: /^Gunnery/ });
     fireEvent.change(screen.getByPlaceholderText('Search skills…'), {
@@ -642,7 +645,7 @@ describe('Skills', () => {
 
   it('announces the match count, and no matches, for a search', async () => {
     const statusTexts = () => screen.getAllByRole('status').map((el) => el.textContent ?? '');
-    render(<App />);
+    renderSkillsRoutes();
     await screen.findByRole('button', { name: /Spaceship Command/ });
     const search = screen.getByPlaceholderText('Search skills…');
     fireEvent.change(search, { target: { value: 'frigate' } });
@@ -654,7 +657,7 @@ describe('Skills', () => {
   });
 
   it('exports only the skills a search leaves on screen', async () => {
-    render(<App />);
+    renderSkillsRoutes();
     await screen.findByRole('button', { name: /Spaceship Command/ });
     fireEvent.change(screen.getByPlaceholderText('Search skills…'), {
       target: { value: 'frigate' },
@@ -683,7 +686,7 @@ describe('Skills', () => {
   });
 
   it("shows a selected skill's prerequisites, marking an already-trained one distinct", async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
     const frigateRow = await screen.findByRole('button', { name: /^Frigate/ });
@@ -698,7 +701,7 @@ describe('Skills', () => {
   });
 
   it('shows what a selected skill unlocks, derived from the reverse of prereqs', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     fireEvent.click(await screen.findByRole('button', { name: /^Gunnery/ }));
     const turretRow = await screen.findByRole('button', { name: /^Small Hybrid Turret/ });
@@ -713,7 +716,7 @@ describe('Skills', () => {
   });
 
   it('does not render a tooltip bubble for a skill row with no description', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     fireEvent.click(await screen.findByRole('button', { name: /^Gunnery/ }));
     const turretRow = await screen.findByRole('button', { name: /^Small Hybrid Turret/ });
@@ -721,7 +724,7 @@ describe('Skills', () => {
   });
 
   it('offers Add to Skill Plan in the skill info modal, not on the row', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
     expect(screen.queryByRole('button', { name: /More actions for/ })).toBeNull();
@@ -735,7 +738,7 @@ describe('Skills', () => {
   });
 
   it('starts every group collapsed, expands on header click, and collapses again on a second click', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     await screen.findByText('Gunnery');
     expect(screen.queryByText('Frigate')).not.toBeInTheDocument();
@@ -752,7 +755,7 @@ describe('Skills', () => {
   });
 
   it('"Expand all" opens every group; a separate control collapses them again', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     await screen.findByText('Gunnery');
     expect(screen.queryByText('Frigate')).not.toBeInTheDocument();
@@ -768,7 +771,7 @@ describe('Skills', () => {
   });
 
   it('search hides non-matching groups, auto-expands a matching one, and restores prior state on clear', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     await screen.findByText('Gunnery');
     // Manually expand Gunnery so we can confirm its state survives a search.
@@ -795,7 +798,7 @@ describe('Skills', () => {
   });
 
   it('keeps the group search in the URL, and restores it on a fresh visit', async () => {
-    const { unmount } = render(<App />);
+    const { unmount } = renderSkillsRoutes();
     await screen.findByText('Gunnery');
 
     const search = screen.getByPlaceholderText('Search skills…');
@@ -804,14 +807,14 @@ describe('Skills', () => {
     await waitFor(() => expect(window.location.search).toContain('groupSearch=frigate'));
 
     unmount();
-    render(<App />);
+    renderSkillsRoutes();
     expect(await screen.findByText('Frigate')).toBeInTheDocument();
     expect(screen.queryByText('Gunnery')).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search skills…')).toHaveValue('frigate');
   });
 
   it('shows an empty state when the search matches no skill', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     await screen.findByText('Gunnery');
     fireEvent.change(screen.getByPlaceholderText('Search skills…'), {

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
-import { App } from '@/app/App';
+import { renderSkillsRoutes } from '@/test/skillsRoutes';
 import {
   CHAR_ID,
   server,
@@ -16,9 +16,6 @@ import {
   attributesPayload,
 } from '@/test/skillPlansPage';
 
-vi.mock('virtual:pwa-register/react', async () =>
-  (await import('@/test/skillPlansMocks')).pwaRegisterMock()
-);
 vi.mock('@/sync', async () => (await import('@/test/skillPlansMocks')).syncMock());
 vi.mock('@/app/syncStatus', async (importOriginal) =>
   (await import('@/test/skillPlansMocks')).syncStatusMock(
@@ -43,7 +40,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
   it('shows total training time, skill count, and projected finish, plus a live savings badge', async () => {
     await db.skillPlans.add(seedTwoSkillPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await screen.findByText('Your entries');
 
     // Skill count: distinct skills in the computed queue (Gunnery,
@@ -69,7 +66,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
     );
     await db.skillPlans.add(seedTwoSkillPlan(0));
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
     // The fallback text proves attributes have finished loading (unreadable)
     // and the "no remaps" state was reached deliberately, so the header has
@@ -91,7 +88,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedTwoSkillPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
     await openAssumptions();
     await screen.findByText('Your entries');
@@ -142,7 +139,7 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     // plan" that follows (from the list) is guaranteed to see the prefill value.
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     expect(
@@ -177,7 +174,7 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     expect(await screen.findByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument();
@@ -204,7 +201,7 @@ describe('SkillPlans editor: suggest reorder', () => {
       })
     );
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await screen.findByText('Your entries');
@@ -237,7 +234,7 @@ describe('SkillPlans editor: suggest reorder', () => {
       })
     );
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await screen.findByText('Your entries');
@@ -255,7 +252,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
     await openAssumptions();
 
@@ -283,7 +280,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    const first = render(<App />);
+    const first = renderSkillsRoutes();
     await openPlanTools();
     await openAssumptions();
 
@@ -303,7 +300,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
       updatedAt: 1,
     });
     first.unmount();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
     await openAssumptions();
     expect(await screen.findByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
@@ -314,7 +311,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
     await openAssumptions();
 
@@ -339,7 +336,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
     goToPlanEditor();
-    const first = render(<App />);
+    const first = renderSkillsRoutes();
     await openPlanTools();
     await openAssumptions();
     // The previous test's last keystroke can still be landing its write in Dexie: start from none.
@@ -366,7 +363,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     // The reported bug: reopening the page put every control back to its
     // default and quietly re-costed the plan.
     first.unmount();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
     await openAssumptions();
 

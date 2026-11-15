@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
-import { App } from '@/app/App';
+import { renderSkillsRoutes } from '@/test/skillsRoutes';
 import { stubViewport } from '@/test/viewport';
 import {
   CHAR_ID,
@@ -16,9 +16,6 @@ import {
 } from '@/test/skillPlansPage';
 import { scheduleSyncMock } from '@/test/skillPlansMocks';
 
-vi.mock('virtual:pwa-register/react', async () =>
-  (await import('@/test/skillPlansMocks')).pwaRegisterMock()
-);
 vi.mock('@/sync', async () => (await import('@/test/skillPlansMocks')).syncMock());
 vi.mock('@/app/syncStatus', async (importOriginal) =>
   (await import('@/test/skillPlansMocks')).syncStatusMock(
@@ -37,7 +34,7 @@ describe('SkillPlans editor: add-skill picker', () => {
     // Column headers (checked below) only render at desktop widths (#114) —
     // jsdom's matchMedia never matches by default, so mock it to desktop.
     stubViewport(() => true);
-    render(<App />);
+    renderSkillsRoutes();
 
     const search = await screen.findByRole('searchbox', { name: 'Add skill' });
     await user.type(search, 'Small Hybrid Turret');
@@ -76,7 +73,7 @@ describe('SkillPlans editor: add-skill picker', () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
 
     const search = await screen.findByRole('searchbox', { name: 'Add skill' });
     await user.type(search, 'Small Hybrid Turret');
@@ -102,7 +99,7 @@ describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
   it('says no entries yet when the plan is empty', async () => {
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
     expect(
@@ -127,7 +124,7 @@ describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
     );
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
     expect(
@@ -167,7 +164,7 @@ describe('SkillPlans: /skills is stale until the character logs in', () => {
     );
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
     // No priority-band divider (single band, #1415). Waits for the row's own
@@ -185,7 +182,7 @@ describe('SkillPlans: /skills is stale until the character logs in', () => {
     // default handler's entries are dateless, i.e. paused.
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
     // No priority-band divider (single band, #1415) — wait for the row itself before checking its duration, so a
@@ -225,7 +222,7 @@ describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
         ])
       )
     );
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = await queuePanel();
     expect(await within(panel).findByText('Done')).toBeInTheDocument();
@@ -247,7 +244,7 @@ describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
         ])
       )
     );
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = await queuePanel();
     expect(await screen.findByRole('region', { name: 'Training now' })).toBeInTheDocument();
@@ -258,7 +255,7 @@ describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
   it('calls a queue with no dates paused, rather than pretending it starts now', async () => {
     // The default fixture carries no date fields — a paused queue. Inventing
     // a start time here is the EVEMon bug (peterhaneve/evemon#40).
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = await queuePanel();
     // Both fixture rows are paused: the group heading, then a badge per row.
@@ -276,7 +273,7 @@ describe('SkillPlans editor: import / export', () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import' }));
@@ -319,7 +316,7 @@ describe('SkillPlans editor: import / export', () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import' }));
@@ -334,7 +331,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import' }));
@@ -366,7 +363,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import' }));
@@ -409,7 +406,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import' }));
@@ -448,7 +445,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import' }));
@@ -480,7 +477,7 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     // "Done by" date is the plan's own finish.
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
     const items = await within(panel).findAllByRole('listitem');
@@ -503,7 +500,7 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
   it('shows no projected finish date, and no invented start time, for an empty plan (#20)', async () => {
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
     await within(panel).findByText('No entries yet. Add a skill to get started.');
@@ -513,7 +510,7 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
 
 describe('SkillPlans: current skill queue panel', () => {
   it('shows the in-game skill queue with training times, separate from any plan', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = (await screen.findByText('Current skill queue')).closest('section')!;
     const items = await within(panel).findAllByRole('listitem');
@@ -527,7 +524,7 @@ describe('SkillPlans: current skill queue panel', () => {
   // with; the current queue is secondary reference info and must follow it,
   // not precede it.
   it('renders after the plan row and attributes on a phone, not before them', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     const plan = await screen.findByRole('button', { name: 'New plan' });
     const queuePanel = (await screen.findByText('Current skill queue')).closest('section')!;

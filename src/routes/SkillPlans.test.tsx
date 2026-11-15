@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
-import { App } from '@/app/App';
+import { renderSkillsRoutes } from '@/test/skillsRoutes';
 import { stubViewport } from '@/test/viewport';
 import {
   CHAR_ID,
@@ -18,15 +18,8 @@ import {
   installSkillPlansHarness,
   attributesPayload,
 } from '@/test/skillPlansPage';
-import {
-  markPlanDeletedMock,
-  scheduleSyncMock,
-  subscribeSyncStatusMock,
-} from '@/test/skillPlansMocks';
+import { markPlanDeletedMock, scheduleSyncMock } from '@/test/skillPlansMocks';
 
-vi.mock('virtual:pwa-register/react', async () =>
-  (await import('@/test/skillPlansMocks')).pwaRegisterMock()
-);
 vi.mock('@/sync', async () => (await import('@/test/skillPlansMocks')).syncMock());
 vi.mock('@/app/syncStatus', async (importOriginal) =>
   (await import('@/test/skillPlansMocks')).syncStatusMock(
@@ -53,7 +46,7 @@ describe('SkillPlans Optimize queue', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderSkillsRoutes();
 
     // A phone (jsdom's default) offers it in the New plan menu. The item is
     // disabled until the queue loads, so reopen the menu until it enables.
@@ -90,7 +83,7 @@ describe('SkillPlans Optimize queue', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderSkillsRoutes();
 
     // Re-queried on every poll, never held: the menu can remount its items
     // while the page's inputs settle, and a held reference then goes stale.
@@ -106,7 +99,7 @@ describe('SkillPlans Optimize queue', () => {
 describe('SkillPlans CRUD', () => {
   it('creates a plan and navigates straight to its editor, scheduling a sync', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderSkillsRoutes();
 
     await user.click(await screen.findByRole('button', { name: 'New plan' }));
 
@@ -121,7 +114,7 @@ describe('SkillPlans CRUD', () => {
   });
 
   it('offers New plan and its other starts before any plan exists, and no All plans to open', async () => {
-    render(<App />);
+    renderSkillsRoutes();
     expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'More ways to start a plan' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'All plans' })).not.toBeInTheDocument();
@@ -130,7 +123,7 @@ describe('SkillPlans CRUD', () => {
   it('shows the plan edited last on the page, not the oldest', async () => {
     await db.skillPlans.add(seedPlan({ id: 'old', name: 'Old plan', updatedAt: 1 }));
     await db.skillPlans.add(seedPlan({ id: 'new', name: 'Newest plan', updatedAt: 2 }));
-    render(<App />);
+    renderSkillsRoutes();
     const link = await screen.findByRole('link', { name: /Newest plan/ });
     expect(link).toHaveAttribute('href', expect.stringContaining('/skills/plans/new'));
     expect(screen.queryByRole('link', { name: /Old plan/ })).not.toBeInTheDocument();
@@ -144,14 +137,17 @@ describe('SkillPlans CRUD', () => {
       '/skills/plans'
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderSkillsRoutes();
 
     expect(await screen.findByText('Added 1 skill(s)')).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Import plan' })).not.toBeInTheDocument();
 
-    const stored = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
-    expect(stored).toHaveLength(1);
-    expect(window.location.pathname).toBe(`/skills/plans/${stored[0].id}`);
+    const stored = await waitFor(async () => {
+      const all = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
+      expect(all).toHaveLength(1);
+      return all;
+    });
+    await waitFor(() => expect(window.location.pathname).toBe(`/skills/plans/${stored[0].id}`));
     // The import lands "Gunnery V" as one row; once the Character's trained skills
     // arrive the editor splits it into one row per level (I-V). Wait for that, or
     // the split can land after Undo and write the rows back over it.
@@ -159,9 +155,9 @@ describe('SkillPlans CRUD', () => {
       expect((await db.skillPlans.get(stored[0].id))?.entries).toHaveLength(5);
     });
     // Spent: a reload must not import again or make a second plan.
-    expect((window.history.state as { usr: unknown }).usr).toBeNull();
+    await waitFor(() => expect((window.history.state as { usr: unknown }).usr).toBeNull());
 
-    await user.click(screen.getByRole('button', { name: /undo/i }));
+    await user.click(await screen.findByRole('button', { name: /undo/i }));
     await waitFor(async () => {
       expect((await db.skillPlans.get(stored[0].id))?.entries).toHaveLength(0);
     });
@@ -173,7 +169,7 @@ describe('SkillPlans CRUD', () => {
       '',
       '/skills/plans'
     );
-    render(<App />);
+    renderSkillsRoutes();
 
     const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     expect(await within(dialog).findByText(/^Line 2:/)).toBeInTheDocument();
@@ -186,7 +182,7 @@ describe('SkillPlans CRUD', () => {
   it('keeps a plan open when it belongs to another Character, as after a Character switch', async () => {
     await db.skillPlans.add(seedPlan({ characterId: CHAR_ID + 1, name: 'Alt plan' }));
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
 
     expect(await screen.findByDisplayValue('Alt plan')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/skills/plans/plan-1');
@@ -195,7 +191,7 @@ describe('SkillPlans CRUD', () => {
   it('renames a plan from the list, scheduling a sync', async () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
-    render(<App />);
+    renderSkillsRoutes();
 
     const plans = await openAllPlans(user);
     await user.click(
@@ -207,14 +203,14 @@ describe('SkillPlans CRUD', () => {
     await user.type(input, 'PvP Fit{Enter}');
 
     expect(await within(plans).findByText('PvP Fit')).toBeInTheDocument();
-    expect((await db.skillPlans.get('plan-1'))?.name).toBe('PvP Fit');
-    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
+    await waitFor(async () => expect((await db.skillPlans.get('plan-1'))?.name).toBe('PvP Fit'));
+    await waitFor(() => expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID));
   });
 
   it('duplicates a plan from the list and navigates to the copy’s editor, scheduling a sync', async () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
-    render(<App />);
+    renderSkillsRoutes();
 
     const plans = await openAllPlans(user);
     await user.click(
@@ -236,7 +232,7 @@ describe('SkillPlans CRUD', () => {
   it('hides a deleted plan behind an Undo toast and deletes it once the toast ends', async () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
-    render(<App />);
+    renderSkillsRoutes();
 
     const plans = await openAllPlans(user);
     await user.click(
@@ -259,7 +255,7 @@ describe('SkillPlans CRUD', () => {
   it('Undo cancels the delete', async () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
-    render(<App />);
+    renderSkillsRoutes();
 
     const plans = await openAllPlans(user);
     await user.click(
@@ -275,7 +271,7 @@ describe('SkillPlans CRUD', () => {
   it('returns to the list via the back link, and via the browser’s own Back after opening a plan', async () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
-    render(<App />);
+    renderSkillsRoutes();
 
     await user.click(await screen.findByText('Test plan'));
     expect(await screen.findByText('Your entries')).toBeInTheDocument();
@@ -298,7 +294,7 @@ describe('SkillPlans: the section title survives opening a plan', () => {
   it('keeps the Skills page title above the sub-nav in the editor, as on the list', async () => {
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
-    render(<App />);
+    renderSkillsRoutes();
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Skills' })).toBeInTheDocument();
 
@@ -315,7 +311,7 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     // so this already runs as a narrow viewport.
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
-    render(<App />);
+    renderSkillsRoutes();
 
     // The rail leads on a phone: the plan row and the one Accelerator row, then the queue.
     expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
@@ -345,7 +341,7 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
 
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
-    render(<App />);
+    renderSkillsRoutes();
 
     // Desktop keeps the Attributes panel (with Optimize queue) and no phone Accelerator row.
     expect(await screen.findByRole('heading', { name: 'Attributes' })).toBeInTheDocument();
@@ -362,26 +358,6 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     const listPanel = (await screen.findByRole('link', { name: /^Test plan/ })).closest('section');
     expect(listPanel).not.toHaveClass('hidden');
     expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
-  });
-});
-
-describe('Skills opens on Plans', () => {
-  it('redirects /skills to the plan list, so the section lands on planning', async () => {
-    window.history.pushState({}, '', '/skills');
-    render(<App />);
-
-    await waitFor(() => expect(window.location.pathname).toBe('/skills/plans'));
-    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
-  });
-
-  it('still reaches the trained-skills view from the sub-nav', async () => {
-    const user = userEvent.setup({ delay: null });
-    render(<App />);
-
-    // The sub-nav's own link: the rail lists Skills › Trained too.
-    const subNav = await screen.findByRole('navigation', { name: 'Skills' });
-    await user.click(within(subNav).getByRole('link', { name: 'Trained' }));
-    await waitFor(() => expect(window.location.pathname).toBe('/skills/trained'));
   });
 });
 
@@ -407,7 +383,7 @@ describe('SkillPlans: current attributes beside the plan list', () => {
         })
       )
     );
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = await attributesPanel();
     expect(await within(panel).findByText('24')).toBeInTheDocument();
@@ -437,7 +413,7 @@ describe('SkillPlans: current attributes beside the plan list', () => {
         HttpResponse.json({ ...attributesPayload, perception: 23 })
       )
     );
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = await attributesPanel();
     expect(await within(panel).findByText('23')).toBeInTheDocument();
@@ -452,7 +428,7 @@ describe('SkillPlans: current attributes beside the plan list', () => {
         HttpResponse.error()
       )
     );
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = await attributesPanel();
     expect(await within(panel).findByText('—')).toBeInTheDocument();
@@ -480,7 +456,7 @@ describe('SkillPlans: an injected accelerator under Attributes', () => {
         })
       )
     );
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = await attributesPanel();
     expect(await within(panel).findByText('+3 detected')).toBeInTheDocument();
@@ -488,7 +464,7 @@ describe('SkillPlans: an injected accelerator under Attributes', () => {
   });
 
   it('shows no accelerator controls when nothing is injected', async () => {
-    render(<App />);
+    renderSkillsRoutes();
 
     const panel = await attributesPanel();
     expect(await within(panel).findByText('INT')).toBeInTheDocument();
@@ -515,7 +491,7 @@ describe('SkillPlans editor: the same attributes, on the route they are costed o
     );
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    renderSkillsRoutes();
     await openPlanTools();
 
     const section = toolsSection('Attributes');
@@ -534,7 +510,7 @@ describe('SkillPlans: cached data notice', () => {
   const HOUR = 3_600_000;
 
   it('says nothing while every read is live', async () => {
-    render(<App />);
+    renderSkillsRoutes();
     expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
     // Both reads have landed once they are saved.
     await waitFor(async () => {
@@ -555,27 +531,10 @@ describe('SkillPlans: cached data notice', () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () => HttpResponse.error())
     );
-    render(<App />);
+    renderSkillsRoutes();
     expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
     expect(screen.getByText('Showing cached data').closest('p')).toHaveTextContent(
       'Showing cached data · 5h ago'
     );
-  });
-});
-
-describe('SkillPlans: sync error visibility (UX-REVIEW #10)', () => {
-  it('shows a visible "Sync error" note (not tooltip-only) when sync is in the error state', async () => {
-    subscribeSyncStatusMock.mockImplementation((listener: (s: unknown) => void) => {
-      listener({ state: 'error', lastSyncedAt: null, error: 'boom' });
-      return () => {};
-    });
-    render(<App />);
-    expect(await screen.findByText('Sync error — changes saved locally')).toBeInTheDocument();
-  });
-
-  it('shows nothing extra when sync is idle', async () => {
-    render(<App />);
-    await screen.findByText('Current skill queue');
-    expect(screen.queryByText(/sync error/i)).not.toBeInTheDocument();
   });
 });

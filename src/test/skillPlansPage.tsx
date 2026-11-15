@@ -7,9 +7,8 @@ import { db, type SkillPlanRecord } from '@/db';
 import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { App } from '@/app/App';
-import * as routeChunks from '@/app/routeChunks';
 import { mswServer } from '@/test/msw';
+import { renderSkillsRoutes } from '@/test/skillsRoutes';
 import {
   RIFTER_TYPE_ID,
   idleSubscribe,
@@ -163,14 +162,24 @@ export async function resetSession() {
   window.history.pushState({}, '', '/skills/plans');
 }
 
-export function installSkillPlansHarness(): void {
+/**
+ * Per-test session reset plus one warm-up render per file. `app: true` is for
+ * the few tests that boot the whole `<App />` (route wiring); the rest render
+ * the Skills pages alone with `renderSkillsRoutes` (src/test/skillsRoutes.tsx).
+ */
+export function installSkillPlansHarness({ app = false }: { app?: boolean } = {}): void {
   beforeAll(async () => {
     // One throwaway render of the plans page, so no test pays for the first one:
-    // a worker's first `App` render (lazy route chunks, jsdom, React warm-up) is
+    // a worker's first render (lazy route chunks, jsdom, React warm-up) is
     // seconds, and it landed on whichever test ran first, past its 1s findBy.
-    await Promise.all([routeChunks.loadSkillPlans(), routeChunks.loadSkillPlanEditor()]);
     await resetSession();
-    const { unmount } = render(<App />);
+    // Imported only here, so a file that never boots `App` never loads its graph.
+    const App = app ? (await import('@/app/App')).App : null;
+    if (app) {
+      const routeChunks = await import('@/app/routeChunks');
+      await Promise.all([routeChunks.loadSkillPlans(), routeChunks.loadSkillPlanEditor()]);
+    }
+    const { unmount } = App ? render(<App />) : renderSkillsRoutes();
     await screen.findByRole('button', { name: 'New plan' }, { timeout: 25_000 });
     unmount();
     server.resetHandlers();
