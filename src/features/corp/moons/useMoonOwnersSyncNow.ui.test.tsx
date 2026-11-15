@@ -65,13 +65,16 @@ describe('Sync now for moon owners', () => {
 
   it('says so when every read was skipped, and a second press replays the toast', async () => {
     syncMoonOwnersNowRemote.mockResolvedValue({ kind: 'synced', read: 0, stale: 0, skipped: 2 });
+    // A press is stamped with the clock: a later one gets a later stamp.
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
     const { result } = renderHook(() => useMoonOwnersSyncNow([row('active')]));
     await act(() => result.current.run());
     const first = result.current.notice;
     expect(first?.message).toMatch(/scheduled sync/);
-    await new Promise((r) => setTimeout(r, 2));
+    now.mockReturnValue(2_000);
     await act(() => result.current.run());
     expect(result.current.notice?.instance).not.toBe(first?.instance);
+    now.mockRestore();
   });
 
   it('is off for a viewer who cannot edit, and with no moon owner still read', async () => {

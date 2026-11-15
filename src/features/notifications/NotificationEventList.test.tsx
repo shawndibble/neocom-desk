@@ -109,7 +109,7 @@ describe('NotificationEventList on desktop', () => {
       })
     );
 
-    await waitFor(() => expect(screen.getByText('1 differs')).toBeInTheDocument());
+    expect(await screen.findByText('1 differs')).toBeInTheDocument();
     const chip = screen.getByText('Beta Pilot').closest('li')!;
     expect(chip.className).toMatch(/border-warning/);
     // The odd one is named by words and position too, not by colour alone.
@@ -488,7 +488,7 @@ describe('NotificationEventList Apply to all', () => {
         name: 'Skill level complete, Beta Pilot, device notifications',
       })
     );
-    await waitFor(() => expect(screen.getByText('1 differs')).toBeInTheDocument());
+    expect(await screen.findByText('1 differs')).toBeInTheDocument();
     expect(
       within(screen.getByText('Beta Pilot').closest('li')!).getByRole('checkbox', {
         name: 'Skill level complete, Beta Pilot, device notifications',
@@ -499,7 +499,7 @@ describe('NotificationEventList Apply to all', () => {
       screen.getByRole('button', { name: 'Apply to all characters: Skill level complete' })
     );
 
-    await waitFor(() => expect(screen.getByText('All 3 alike')).toBeInTheDocument());
+    expect(await screen.findByText('All 3 alike')).toBeInTheDocument();
     for (const { name } of CHARACTERS) {
       expect(
         within(screen.getByText(name).closest('li')!).getByRole('checkbox', {

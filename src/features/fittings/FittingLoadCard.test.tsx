@@ -79,7 +79,7 @@ describe('FittingLoadCard — Loaded EVE-XML fittings file (#1542)', () => {
     const { onOpenLoaded } = renderCard(async () => [RESOLVED, UNRESOLVED]);
     await pickFile(MULTI_FIT);
 
-    await waitFor(() => expect(screen.getByText(/nothing here is saved/i)).toBeInTheDocument());
+    expect(await screen.findByText(/nothing here is saved/i)).toBeInTheDocument();
     expect(onOpenLoaded).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByRole('button', { name: /open \[rifter, solo pvp\]/i }));
@@ -90,7 +90,7 @@ describe('FittingLoadCard — Loaded EVE-XML fittings file (#1542)', () => {
     renderCard(async () => [RESOLVED, UNRESOLVED]);
     await pickFile(MULTI_FIT);
 
-    await waitFor(() => expect(screen.getByText(/\[not a ship, broken\]/i)).toBeInTheDocument());
+    expect(await screen.findByText(/\[not a ship, broken\]/i)).toBeInTheDocument();
     expect(screen.getByText(/unknown ship/i)).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /open \[not a ship, broken\]/i })
@@ -101,7 +101,7 @@ describe('FittingLoadCard — Loaded EVE-XML fittings file (#1542)', () => {
     const { onOpenLoaded } = renderCard(async () => [UNRESOLVED]);
     await pickFile(SINGLE_FIT);
 
-    await waitFor(() => expect(screen.getByText(/unknown ship/i)).toBeInTheDocument());
+    expect(await screen.findByText(/unknown ship/i)).toBeInTheDocument();
     expect(onOpenLoaded).not.toHaveBeenCalled();
   });
 });

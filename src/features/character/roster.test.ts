@@ -330,7 +330,8 @@ describe('loadRosterSnapshot({ live: true })', () => {
     let released = 0;
     const total = ids.length * 3;
     for (let guard = 0; guard < 400 && released < total; guard += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      // Wait for the next wave to arrive.
+      await vi.waitFor(() => expect(pending.length).toBeGreaterThan(0), { interval: 1 });
       const wave = pending.splice(0, pending.length);
       released += wave.length;
       wave.forEach((resolve) => resolve());

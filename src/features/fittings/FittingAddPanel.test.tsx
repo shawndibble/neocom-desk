@@ -277,7 +277,7 @@ describe('FittingAddPanel', () => {
 
     await screen.findByRole('button', { name: 'Skills', pressed: true });
     await user.type(screen.getByLabelText('Search items to add'), 'Damage Control II');
-    expect(screen.queryByText('No matching items.')).toBeInTheDocument();
+    expect(screen.getByText('No matching items.')).toBeInTheDocument();
     await user.click(
       await screen.findByRole('button', { name: '1 more hidden by filters — show it' })
     );

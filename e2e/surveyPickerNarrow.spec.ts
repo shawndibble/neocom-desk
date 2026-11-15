@@ -83,8 +83,30 @@ test('the open survey list fits a phone and keeps the remove button on screen', 
     timeout: 15_000,
   });
   await expect(picker).toHaveCount(0);
-  // Give the first survey time to be noted before leaving it.
-  await page.waitForTimeout(500);
+  // Leave the first survey only once it is noted in the pilot's survey list.
+  await expect
+    .poll(() =>
+      page.evaluate(async (id) => {
+        const database = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open('neocom');
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        const row = await new Promise<{ value?: { id: string }[] } | undefined>(
+          (resolve, reject) => {
+            const read = database
+              .transaction('settings')
+              .objectStore('settings')
+              .get('sync.surveyHistory');
+            read.onsuccess = () => resolve(read.result);
+            read.onerror = () => reject(read.error);
+          }
+        );
+        database.close();
+        return row?.value?.some((entry) => entry.id === id) ?? false;
+      }, IDS[0])
+    )
+    .toBe(true);
   await page.goto(`./mining/survey?survey=${IDS[1]}`);
   await expect(picker).toBeVisible({ timeout: 15_000 });
 

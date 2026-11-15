@@ -56,11 +56,16 @@ describe('usePlaceDetails', () => {
       systems: { 30000142: { security: 0.95 } },
     });
     // Real ESI answers land on separate macrotasks, so React cannot merge them.
-    const tick = () => new Promise<void>((r) => setTimeout(r, 0));
     const source = {
       ...memory,
-      stationName: async (id: number) => (await tick(), memory.stationName(id)),
-      stationSystemId: async (id: number) => (await tick(), memory.stationSystemId(id)),
+      stationName: async (id: number) => {
+        await new Promise<void>((r) => setTimeout(r, 0));
+        return memory.stationName(id);
+      },
+      stationSystemId: async (id: number) => {
+        await new Promise<void>((r) => setTimeout(r, 0));
+        return memory.stationSystemId(id);
+      },
     } as typeof memory;
     const refs = ids.map((locationId) => ({
       locationId,
@@ -97,8 +102,8 @@ describe('usePlaceDetails', () => {
     );
     await waitFor(() => expect(result.current.get(placeKey(second))?.jumps).toBeDefined());
     // A new array identity with the same Places is not a new request.
+    // Any new read would start in the effects this rerender ran.
     rerender({ refs: [{ ...station }, { ...second }] });
-    await act(async () => {});
     expect(s2.calls.filter((c) => c === 'systemSecurity:30000142')).toHaveLength(1);
     expect(s2.calls.filter((c) => c.startsWith('stationSystemId'))).toHaveLength(2);
     expect(source.calls).toEqual([]);
@@ -260,7 +265,7 @@ describe('usePlaceDetails', () => {
         source,
       })
     );
-    await act(async () => {});
+    // Mounted, so every effect that would read has run.
     expect(source.calls).toEqual([]);
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { act, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
@@ -1007,9 +1007,8 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Log production' }));
 
     await waitFor(() => expect(gatedSetActiveCharacter).toHaveBeenCalledWith(CHAR_B));
-    // Flush every pending React update (including router transitions): with
-    // the switch still pending, nothing may have navigated yet.
-    await act(async () => {});
+    // waitFor drains a macrotask before it returns, so any router transition
+    // has landed: with the switch still pending, nothing may have navigated yet.
     expect(location?.pathname).toBe('/');
 
     releaseSwitch();

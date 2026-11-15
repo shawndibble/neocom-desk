@@ -24,8 +24,12 @@ describe('NearbyPushBadge', () => {
 
   it('shows nothing while the server does not take the scope at all', async () => {
     await db.settings.put({ key: 'alertsNearby', value: { supported: false, characterIds: [] } });
+    // The mail badge, which does show, beside it: once it is up, the same settings
+    // read has answered for the location badge too.
+    await db.settings.put({ key: 'alertsMail', value: { supported: true, characterIds: [] } });
     const { container } = render(<NearbyPushBadge />);
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    render(<MailPushBadge />);
+    await screen.findByRole('img', { name: /Needs Alerts when closed with mail/ });
     expect(container).toBeEmptyDOMElement();
   });
 

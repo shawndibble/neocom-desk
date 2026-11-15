@@ -328,7 +328,7 @@ describe('ProductionRunsPanel', () => {
     await expandRuns(user);
 
     await user.click(await screen.findByRole('button', { name: 'Sold' }));
-    await waitFor(() => screen.getByRole('button', { name: 'Link' }));
+    await screen.findByRole('button', { name: 'Link' });
     await user.click(screen.getByRole('button', { name: 'Link' }));
 
     await waitFor(async () => {
@@ -444,7 +444,7 @@ describe('ProductionRunsPanel', () => {
     await screen.findByRole('button', { name: 'Sold' });
 
     await chooseSoldMenuItem(user, 'Watch Open Order');
-    await waitFor(() => screen.getByRole('button', { name: 'Watch' }));
+    await screen.findByRole('button', { name: 'Watch' });
     await user.click(screen.getByRole('button', { name: 'Watch' }));
 
     await waitFor(async () => {

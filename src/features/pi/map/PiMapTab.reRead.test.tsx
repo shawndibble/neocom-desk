@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { GoalPlannerSnapshot } from '../goalPlannerSnapshot';
@@ -81,8 +81,8 @@ describe('PiMapTab while the colonies are re-read', () => {
 
     // The page's refresh: a new snapshot for the same Character, its advice still on its way.
     rerender(<Page characterId={7} reloadKey={1} />);
+    // waitFor drains pending work before it returns, so the re-read has rendered.
     await waitFor(() => expect(builds).toBe(2));
-    await act(async () => {});
     expect(screen.queryByRole('status', { name: 'Loading' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'full map' })).toHaveAttribute(
       'aria-expanded',

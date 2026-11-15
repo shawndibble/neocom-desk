@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { shiftUtcDate, utcDay } from '@/engine/localDay';
@@ -98,8 +98,8 @@ describe('CashFlowPanel', () => {
       typeNames: new Map(),
     });
     renderPanel();
-    await vi.waitFor(() => expect(loadAllCharactersJournals).toHaveBeenCalled());
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // Once the load has answered, what it draws is drawn.
+    await waitFor(() => expect(loadAllCharactersJournals).toHaveResolved());
     expect(screen.queryByRole('heading', { name: 'ISK flow' })).not.toBeInTheDocument();
   });
 });

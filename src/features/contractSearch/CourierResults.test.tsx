@@ -145,9 +145,7 @@ describe('CourierResults destination space key filter', () => {
   it('sits in the row with no pill, and is not repeated in the open box', async () => {
     const user = userEvent.setup();
     renderBoard();
-    await waitFor(() =>
-      expect(screen.getByRole('group', { name: 'Destination space' })).toBeInTheDocument()
-    );
+    expect(await screen.findByRole('group', { name: 'Destination space' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Change filter: Destination space/ })).toBeNull();
     await openFilters(user);
     expect(screen.getAllByRole('group', { name: 'Destination space' })).toHaveLength(1);
@@ -227,9 +225,7 @@ describe('CourierResults "From my region" shortcut', () => {
 
     await pressMyRegion(user);
 
-    await waitFor(() =>
-      expect(screen.getByText('No hauls start in your region')).toBeInTheDocument()
-    );
+    expect(await screen.findByText('No hauls start in your region')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'From my region' })).toBeDisabled();
     expect(screen.getByRole('combobox', { name: 'From region' })).toHaveTextContent('All regions');
   });

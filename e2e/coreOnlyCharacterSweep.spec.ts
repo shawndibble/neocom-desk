@@ -14,7 +14,7 @@
  * scope — `mockEsi.ts` alone answers 200 to any token, so without this a
  * Core-only sweep would find nothing.
  */
-import type { Page } from '@playwright/test';
+import type { Page, Request } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { installScopeGate } from './support/scopeGate';
@@ -111,10 +111,18 @@ test('Prefetch and the Foreground Poller make no calls for scopes the Core Grant
 }) => {
   const ungrantedHits: string[] = [];
   const esiPaths: string[] = [];
+  let esiInFlight = 0;
+  const isEsi = (url: string) => new URL(url).hostname === 'esi.evetech.net';
   page.on('request', (request) => {
-    const requestUrl = new URL(request.url());
-    if (requestUrl.hostname === 'esi.evetech.net') esiPaths.push(requestUrl.pathname);
+    if (!isEsi(request.url())) return;
+    esiPaths.push(new URL(request.url()).pathname);
+    esiInFlight += 1;
   });
+  const settle = (request: Request) => {
+    if (isEsi(request.url())) esiInFlight -= 1;
+  };
+  page.on('requestfinished', settle);
+  page.on('requestfailed', settle);
   await installScopeGate(page, CORE_GRANT, (pathname) => ungrantedHits.push(pathname));
   // Fake timers, so the poller's delayed first run is fast-forwarded to
   // rather than waited out in real time.
@@ -129,12 +137,12 @@ test('Prefetch and the Foreground Poller make no calls for scopes the Core Grant
   await expect(page.locator('main')).toBeVisible();
   // Both run fire-and-forget with no page signal of their own: Prefetch in the
   // first idle slot (`bootPrefetch.ts`), the poller ~10 s after mount
-  // (`FIRST_POLL_DELAY_MS`). Run the clock past both, then give the requests
-  // they start real time to land, rather than asserting on whatever has
+  // (`FIRST_POLL_DELAY_MS`). Run the clock past both, then wait for every ESI
+  // request they started to finish, rather than asserting on whatever has
   // landed so far.
   await page.clock.runFor(12_000);
   await expect.poll(() => esiPaths.some((path) => path.endsWith('/skills'))).toBe(true);
-  await page.waitForTimeout(2000);
+  await expect.poll(() => esiInFlight).toBe(0);
 
   expect(
     ungrantedHits,

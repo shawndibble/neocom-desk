@@ -21,6 +21,7 @@ describe('StatusPill', () => {
     expect(await screen.findByText('It grew.')).toBeInTheDocument();
     unmount();
     render(<StatusPill status="paid" label="Paid" />);
-    expect(screen.getByText('Paid').closest('[tabindex]')).toBeNull();
+    const textEl = screen.getByText('Paid');
+    expect(textEl.closest('[tabindex]')).toBeNull();
   });
 });

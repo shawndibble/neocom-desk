@@ -353,7 +353,8 @@ describe('FittingStatsSections offense', () => {
     );
     await user.hover(offense.getByText('53.7 DPS'));
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Sustained with reload: 50.1 DPS');
-    expect(offense.getByText('120.0 DPS').closest('[tabindex]')).toBeNull();
+    const textEl = offense.getByText('120.0 DPS');
+    expect(textEl.closest('[tabindex]')).toBeNull();
   });
 
   it("shows a turret's optimal and falloff, and a launcher's single range, under its DPS", () => {
@@ -1615,8 +1616,7 @@ describe('FittingStatsSections — column and side panels', () => {
         />
       </MemoryRouter>
     );
-    // Let the hydrate settle; nothing may start while the panel is shut.
-    await act(async () => {});
+    // Mounted (its effects have run) with the panel shut: nothing may have started.
     expect(compare).not.toHaveBeenCalled();
     await openPanel('Situation');
     expect(screen.getByRole('button', { name: 'Abyssal' })).toHaveAttribute(

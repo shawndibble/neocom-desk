@@ -9,12 +9,19 @@ vi.mock('@/stores/activeCharacter', () => ({
     select({ hydrated: true, activeCharacterId: 7 }),
 }));
 
-import { recordSrpProbe } from './srpNavProbe';
+// Spied, so a test can wait for every mount's probe to have answered.
+vi.mock('./srpNavProbe', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./srpNavProbe')>();
+  return { ...actual, probeSrp: vi.fn(actual.probeSrp) };
+});
+
+import { probeSrp, recordSrpProbe } from './srpNavProbe';
 import { useSrpNavVisible } from './useSrpNavVisible';
 
 beforeEach(() => {
   localStorage.clear();
   status.mockReset();
+  vi.mocked(probeSrp).mockClear();
 });
 
 describe('useSrpNavVisible', () => {
@@ -35,7 +42,8 @@ describe('useSrpNavVisible', () => {
     await vi.waitFor(() => expect(status).toHaveBeenCalledTimes(1));
     renderHook(() => useSrpNavVisible());
     renderHook(() => useSrpNavVisible());
-    await new Promise((r) => setTimeout(r, 20));
+    // Every mount asked, and every answer is in: still the one call.
+    await vi.waitFor(() => expect(probeSrp).toHaveResolvedTimes(3));
     expect(status).toHaveBeenCalledTimes(1);
   });
 });

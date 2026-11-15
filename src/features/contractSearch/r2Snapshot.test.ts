@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
-import { GLOBAL_CACHE_CHARACTER_ID, STALE_GRACE_MS, resetRevalidationState } from '@/esi/cache';
+import { GLOBAL_CACHE_CHARACTER_ID, resetRevalidationState } from '@/esi/cache';
 import { loadR2Snapshot, type R2Snapshot, type R2SnapshotSource } from './r2Snapshot';
 
 const STALE_AFTER_MS = 30 * 60_000;
@@ -28,11 +28,6 @@ async function seedLapsedRow(value: unknown): Promise<void> {
   });
 }
 
-/** Real timers: `fake-indexeddb` schedules on the same ones, so faking them deadlocks Dexie. */
-async function expireGrace(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, STALE_GRACE_MS + 25));
-}
-
 beforeEach(async () => {
   await db.esiCache.clear();
   resetRevalidationState();
@@ -51,7 +46,6 @@ describe('loadR2Snapshot', () => {
     });
 
     const pending = loadR2Snapshot(source(read));
-    await expireGrace();
     const result = await pending;
 
     // Settled while the live read is still in flight — the whole point.

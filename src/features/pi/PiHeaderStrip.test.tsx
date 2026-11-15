@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
 import { PiHeaderStrip } from './PiHeaderStrip';
 import { DEFAULT_PI_SETTINGS, usePiSettings } from './piSettings';
+import { routeExposure } from '@/features/route/routeExposure';
+import { loadCharacterSolarSystemId } from '@/features/character/location';
+import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 
 const routes = vi.hoisted(() => ({ jumps: {} as Record<number, number> }));
 // One object for every render, as the real hook's memoised basis is: a fresh one
@@ -48,13 +51,17 @@ beforeEach(async () => {
  * Lets the strip's async work finish before a test asserts something is absent:
  * first the settings store's own read of Dexie (a read still in flight would
  * land on top of a `setState` made afterwards and revert it), then the mocked
- * route and location lookups, which resolve within one macrotask.
+ * route and location lookups: every one the strip started has answered (and
+ * waitFor drains a tick after, for the renders they cause).
  */
 async function settled() {
   await waitFor(() => expect(usePiSettings.getState().hydrated).toBe(true));
-  await act(async () => {
-    await new Promise((r) => setTimeout(r, 0));
-  });
+  const lookups = [routeExposure, loadCharacterSolarSystemId, loadSystemNameAndSecurity].map(
+    (fn) => vi.mocked(fn).mock
+  );
+  await waitFor(() =>
+    expect(lookups.every((mock) => mock.settledResults.length === mock.calls.length)).toBe(true)
+  );
 }
 
 function renderStrip(props: Parameters<typeof PiHeaderStrip>[0]) {

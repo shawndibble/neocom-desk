@@ -213,13 +213,13 @@ describe('LinkWalletPaymentDialog grant note', () => {
 
   it('shows nothing when both permissions loaded', async () => {
     renderDialog([], SOURCES({}));
-    await new Promise((r) => setTimeout(r, 30));
+    // No source was skipped for a permission, so no Grant note is even mounted to load.
     expect(screen.queryByText(/Some payments can’t be seen/)).toBeNull();
   });
 
   it('shows nothing for a transient failure', async () => {
     renderDialog([], SOURCES({ journal: 'failed' }));
-    await new Promise((r) => setTimeout(r, 30));
+    // No source was skipped for a permission, so no Grant note is even mounted to load.
     expect(screen.queryByText(/Some payments can’t be seen/)).toBeNull();
   });
 });

@@ -50,9 +50,11 @@ describe('useFittingAlpha', () => {
   });
 
   it('gives no verdict while a fitted type’s requirements are unknown, rather than a false Alpha OK', async () => {
-    const { result } = renderHook(() => useFittingAlpha(UNKNOWN_MODULE));
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(result.current.blockers).toBeNull();
+    // A fit an Alpha can fly, beside it: once that has its verdict, the
+    // requirements have loaded for both.
+    const { result } = renderHook(() => [useFittingAlpha(UNKNOWN_MODULE), useFittingAlpha(RIFTER)]);
+    await waitFor(() => expect(result.current[1]!.blockers).toEqual([]));
+    expect(result.current[0]!.blockers).toBeNull();
   });
 
   it('reports none for a fit an Alpha can fly', async () => {

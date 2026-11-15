@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { blank } from './builderKit';
 import { OverviewRefreshContext } from './refreshContext';
@@ -75,9 +75,8 @@ describe('lazy builder load failure', () => {
       wrapper: Wrapper,
     });
     const view = () => [...hook.result.current.values()][0]!;
-    await act(async () => {});
+    await waitFor(() => expect(view().status.error).toBe(true));
     expect(calls()).toBe(1);
-    expect(view().status.error).toBe(true);
     expect(view().status.loading).toBe(false);
     await act(async () => bump());
     expect(calls()).toBe(2);

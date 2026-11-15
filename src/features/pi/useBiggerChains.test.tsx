@@ -182,7 +182,7 @@ describe('useWhatIfChains', () => {
   it('counts no route and prices nothing while asked for no type', async () => {
     const { result } = renderHook(() => useWhatIfChains(twoGas, pi, []));
     expect(result.current).toEqual({ byType: new Map(), pending: false });
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // Not pending once mounted: no count was started, now or later.
     expect(jumpsBetween).not.toHaveBeenCalled();
   });
 });

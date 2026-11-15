@@ -791,6 +791,7 @@ describe('ESI priority lanes', () => {
       // a load of its own — which the call count below would catch.
       await vi.waitFor(() => expect(rowReads.mock.calls.length).toBeGreaterThan(readsBefore));
       await rowReads.mock.results[readsBefore].value;
+      // eslint-disable-next-line no-restricted-syntax -- asserts no promotion: nothing to wait on but the microtask-only join, which one macrotask drains
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(seen.lane?.priority).toBe('low');
@@ -1112,6 +1113,7 @@ describe('grace period past the freshness window', () => {
    * A real quarter second per test is the cheaper price.
    */
   async function expireGrace(): Promise<void> {
+    // eslint-disable-next-line no-restricted-syntax -- the real grace timer; fake timers deadlock fake-indexeddb
     await new Promise((resolve) => setTimeout(resolve, STALE_GRACE_MS + 25));
   }
 
@@ -1130,7 +1132,6 @@ describe('grace period past the freshness window', () => {
     const { fetchLive, settle } = deferredFetch('fresh');
 
     const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
-    await expireGrace();
     const result = await pending;
 
     // Resolved while fetchLive is still pending — the point of the whole thing.
@@ -1155,7 +1156,6 @@ describe('grace period past the freshness window', () => {
     const signalled = nextRevalidation();
 
     const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
-    await expireGrace();
     await pending;
 
     settle(true);
@@ -1172,7 +1172,6 @@ describe('grace period past the freshness window', () => {
     const signalled = nextRevalidation();
 
     const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
-    await expireGrace();
     expect((await pending).cached?.fromCache).toBe(false);
 
     settle(false);
@@ -1195,7 +1194,6 @@ describe('grace period past the freshness window', () => {
     );
 
     const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
-    await expireGrace();
     await pending;
     settle(false);
 
@@ -1214,7 +1212,6 @@ describe('grace period past the freshness window', () => {
     const { fetchLive, settle } = deferredFetch('never-arrives');
     const signalled = nextRevalidation();
     const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
-    await expireGrace();
     await pending;
     settle(false);
     await signalled;
@@ -1232,7 +1229,6 @@ describe('grace period past the freshness window', () => {
     const { fetchLive, settle } = deferredFetch('never-arrives', new EsiError(401, 'expired'));
     const signalled = nextRevalidation();
     const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
-    await expireGrace();
     await pending;
     settle(false);
     await signalled;
@@ -1251,7 +1247,6 @@ describe('grace period past the freshness window', () => {
     const signalled = nextRevalidation();
 
     const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
-    await expireGrace();
     await pending;
     settle(false);
     await signalled;
@@ -1275,7 +1270,6 @@ describe('grace period past the freshness window', () => {
     const signalled = nextRevalidation();
 
     const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive, options);
-    await expireGrace();
     await pending;
 
     settle(false);
@@ -1515,7 +1509,6 @@ describe('grace period past the freshness window', () => {
       staleAfterMs: 30 * 60_000,
       allowStaleServe: true,
     });
-    await expireGrace();
     const result = await pending;
 
     // Resolved while the Firestore read is still in flight: the board renders
@@ -1545,7 +1538,6 @@ describe('grace period past the freshness window', () => {
       failing.fetchLive,
       options
     );
-    await expireGrace();
     expect((await first).cached?.fromCache).toBe(false);
 
     failing.settle(false);
@@ -1574,7 +1566,6 @@ describe('grace period past the freshness window', () => {
     });
 
     const pending = loadPaginatedWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
-    await expireGrace();
     const result = await pending;
 
     expect(result.cached?.data).toEqual(['a', 'b']);

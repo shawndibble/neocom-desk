@@ -63,7 +63,7 @@ describe('useOnboardingBannerSlot', () => {
     );
     expect(install.result.current).toBe(false);
 
-    act(() => corpGrant.rerender({ eligible: false }));
+    corpGrant.rerender({ eligible: false });
 
     expect(corpGrant.result.current).toBe(false);
     expect(install.result.current).toBe(true);

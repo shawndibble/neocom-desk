@@ -193,8 +193,17 @@ describe('PlanMap richness drawer', () => {
 
   it('ignores a planet the pilot has no colony on', async () => {
     stubPhone(true);
-    renderMap({}, '/planetary-industry/map?planet=123');
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    function Search() {
+      return <output data-testid="search">{useLocation().search}</output>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/planetary-industry/map?planet=123']}>
+        <PlanMap {...props()} />
+        <Search />
+      </MemoryRouter>
+    );
+    // The map drops an id it does not know from the URL: once gone, it has been read.
+    await waitFor(() => expect(screen.getByTestId('search')).toBeEmptyDOMElement());
     expect(screen.queryByRole('group', { name: 'Resources you would pull here' })).toBeNull();
   });
 });

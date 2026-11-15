@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { PaletteProvider, PaletteResult } from './types';
 import { usePaletteSearch } from './usePaletteSearch';
 
@@ -95,11 +95,12 @@ describe('usePaletteSearch', () => {
     };
     const providers = [failing, syncProvider('fine', 1)];
     const { result: hook } = renderHook(() => usePaletteSearch(providers, 'x'));
-    await act(async () => {});
-    expect(hook.current.map((group) => [group.provider.id, group.status])).toEqual([
-      ['broken', 'error'],
-      ['fine', 'ready'],
-    ]);
+    await waitFor(() =>
+      expect(hook.current.map((group) => [group.provider.id, group.status])).toEqual([
+        ['broken', 'error'],
+        ['fine', 'ready'],
+      ])
+    );
     expect(hook.current[0].results).toEqual([]);
   });
 });

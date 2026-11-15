@@ -779,7 +779,7 @@ describe('ItemDetailModal', () => {
     render(<Harness />);
     const trigger = screen.getByRole('button', { name: 'Open' });
     trigger.focus();
-    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Rifter' })).toBeInTheDocument());
+    expect(await screen.findByRole('dialog', { name: 'Rifter' })).toBeInTheDocument();
 
     await user.keyboard('{Escape}');
 

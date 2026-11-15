@@ -170,7 +170,7 @@ describe('ImportClipboardDialog', () => {
     );
     await user.upload(input, truncated);
 
-    await waitFor(() => expect(screen.getByText(/malformed or truncated/i)).toBeInTheDocument());
+    expect(await screen.findByText(/malformed or truncated/i)).toBeInTheDocument();
     expect(onApply).not.toHaveBeenCalled();
   });
 });

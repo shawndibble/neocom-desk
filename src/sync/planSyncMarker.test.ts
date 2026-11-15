@@ -103,7 +103,8 @@ describe('idle background pass', () => {
   it('counts as a full pass for the sweep gate', async () => {
     await triggerSync(1);
     const before = getSyncStatus(1).lastFullSyncAt;
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    // A later clock, rather than waiting for the real one to move.
+    vi.spyOn(Date, 'now').mockReturnValue((before ?? 0) + 60_000);
     await backgroundPass();
     expect(getSyncStatus(1).lastFullSyncAt).toBeGreaterThan(before ?? 0);
   });

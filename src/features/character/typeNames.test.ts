@@ -267,13 +267,14 @@ describe('loadTypeNames', () => {
     const namesPromise = loadTypeNames(ids);
 
     // Drain the deferred requests in waves: release whatever has arrived so
-    // far, then give the event loop a turn for the next wave to be
+    // far, then wait for the next wave to be
     // dispatched. A concurrency-limited implementation never has more than
     // its cap in flight at once; an unbounded one would show up here as a
     // single wave of `ids.length` requests all arriving before any resolve.
     let released = 0;
     for (let guard = 0; guard < 200 && released < ids.length; guard += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      // Wait for the next wave to arrive.
+      await vi.waitFor(() => expect(pending.length).toBeGreaterThan(0), { interval: 1 });
       const wave = pending.splice(0, pending.length);
       released += wave.length;
       wave.forEach((resolve) => resolve());

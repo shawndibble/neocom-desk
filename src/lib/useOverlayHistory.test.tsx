@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter, useLocation, useNavigate } from 'react-router-dom';
 import '@/i18n';
@@ -114,10 +114,15 @@ describe('stacked overlays', () => {
       </BrowserRouter>
     );
     const top = await screen.findByRole('dialog', { name: 'Layer c' });
+    // The closing layer's own history.back() lands as a popstate after a tick: wait for it.
+    const popped = new Promise((resolve) =>
+      window.addEventListener('popstate', resolve, { once: true })
+    );
     await user.click(within(top).getByRole('button', { name: /close/i }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Layer c' })).toBeNull());
-    // popstate from the closing layer's own history.back() lands after a tick.
-    await new Promise((r) => setTimeout(r, 50));
+    await act(async () => {
+      await popped;
+    });
     expect(screen.getByRole('dialog', { name: 'Layer b' })).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Layer a' })).toBeInTheDocument();
   });
