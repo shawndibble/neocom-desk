@@ -67,4 +67,22 @@ describe('settleEsiCacheLoads', () => {
     await load;
     await settleEsiCacheLoads();
   });
+
+  it('forgets a load that will not settle, so the next one of its key starts its own request', async () => {
+    const stuck = deferred<string>();
+    const stuckLoad = loadWithCacheStatus(CHAR_ID, KEY, () => stuck.promise);
+    await expect(settleEsiCacheLoads(30)).rejects.toThrow(`${CHAR_ID}:${KEY}`);
+
+    // Joined onto the stuck load, this would never call its own fetch.
+    const fetchLive = vi.fn(async () => 'fresh');
+    const next = await loadWithCacheStatus(CHAR_ID, KEY, fetchLive);
+    expect(fetchLive).toHaveBeenCalledOnce();
+    expect(next.cached?.data).toBe('fresh');
+    await settleEsiCacheLoads();
+
+    // The stuck load ending later leaves the next load's bookkeeping alone.
+    stuck.resolve('late');
+    await stuckLoad;
+    await settleEsiCacheLoads();
+  });
 });

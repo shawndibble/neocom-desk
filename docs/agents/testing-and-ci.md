@@ -81,7 +81,13 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
 - **Teardown is deterministic** (`src/test/teardown.ts`, both projects). Every
   `fetch` a test makes is aborted the moment its body ends, before any
   `afterEach` (`vitest.runner.ts`), so a late response can't write after the
-  file's resets or call `setState` once jsdom is gone. Then the shared
+  file's resets or call `setState` once jsdom is gone. A `fetch` the test's
+  leftover work starts after that (a load that was still reading IndexedDB)
+  is refused with the same `AbortError` until the next test, or the next
+  suite once those leftovers are drained;
+  `beforeAll` requests (warm-up renders) still run, but an `afterEach` or
+  `afterAll` can't fetch. The runner step also drains IndexedDB (real timers
+  only), so such a load fails before the file's resets. Then the shared
   `afterEach` puts real timers and the real `Date` back and waits for pending
   IndexedDB opens and transactions (Dexie, and Firebase's heartbeat probe that
   failed shards with "self is not defined"). A test that fakes timers still
