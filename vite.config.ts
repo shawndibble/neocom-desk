@@ -731,6 +731,9 @@ export default defineConfig({
     // the `node` project was importing `@testing-library/jest-dom` and a
     // stack of jsdom polyfills 462 times for matchers it never calls.
     setupFiles: ['./vitest.setup.ts'],
+    // Aborts a test's in-flight requests between its body and its `afterEach`
+    // hooks (src/test/teardown.ts says why it can't be a hook).
+    runner: './vitest.runner.ts',
     // Default 5000ms. A test can chain several `findBy*`/`waitFor` calls,
     // each with up to 5000ms of its own headroom (vitest.setup.ts) for CPU
     // contention under parallel runs. The ceiling is 10s, and it is a budget

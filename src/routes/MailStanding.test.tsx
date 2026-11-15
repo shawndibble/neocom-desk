@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, onTestFinished, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -154,6 +154,9 @@ describe('Mail', () => {
     // Only Date is faked: real timers keep findBy/waitFor polling. Local noon,
     // so the 09:00 mail is Today in any runner zone.
     vi.useFakeTimers({ toFake: ['Date'] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     vi.setSystemTime(new Date(2026, 7, 2, 12));
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>

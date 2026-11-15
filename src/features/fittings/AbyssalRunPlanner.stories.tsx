@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { AbyssalRunPlanner } from './AbyssalRunPlanner';
 import { useAbyssalRunPlan } from './abyssalRunPlan';
 import { useAbyssalWeather } from './abyssalWeatherSelection';
 import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { FittingStats } from '@/engine/fittings/types';
+import { installFixtureFetch } from '@/storybook/fixtureFetch';
 
 const before = baseFittingStats();
 const after: FittingStats = {
@@ -13,6 +14,28 @@ const after: FittingStats = {
 };
 const compare = () => Promise.resolve({ before, after });
 const typeName = (typeId: number) => `Filament #${typeId}`;
+
+/**
+ * The Buy line prices the filament at the hub (Fuzzwork). Installed on the first
+ * render, before the planner's effect asks, so no story reaches the network.
+ */
+function useFilamentPriceFixture() {
+  const [uninstall] = useState(() =>
+    installFixtureFetch([
+      {
+        path: '/aggregates/',
+        respond: ({ url }) => ({
+          body: Object.fromEntries(
+            (url.searchParams.get('types') ?? '')
+              .split(',')
+              .map((id) => [id, { sell: { min: '1450000', volume: '12', orderCount: '3' } }])
+          ),
+        }),
+      },
+    ])
+  );
+  useEffect(() => uninstall, [uninstall]);
+}
 
 /** Sets the session weather (and tier / security) before the planner mounts. */
 function Seeded({
@@ -26,6 +49,7 @@ function Seeded({
   security?: 0 | 5 | 6 | 7 | 8 | 9 | 10;
   hullGroupId?: number;
 }) {
+  useFilamentPriceFixture();
   useAbyssalWeather.setState({ weatherTypeId });
   useAbyssalRunPlan.setState({ tier, security });
   useEffect(() => () => useAbyssalWeather.setState({ weatherTypeId: null }), []);

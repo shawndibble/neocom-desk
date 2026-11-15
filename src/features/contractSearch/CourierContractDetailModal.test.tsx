@@ -128,6 +128,9 @@ function renderModal(
 beforeEach(() => {
   loadStructureInfo.mockReset();
   routeExposure.mockReset();
+  // The route lookup waits for Travel Settings to hydrate, which an earlier
+  // test's render may already have done.
+  routeExposure.mockResolvedValue({ kind: 'unknown' });
   lawlessSystems = new Set();
   openInEve.unavailable = false;
 });

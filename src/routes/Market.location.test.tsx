@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, onTestFinished, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -233,6 +233,9 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
   it('keeps the selected item when an item is picked before the search text has settled', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<App />);

@@ -78,6 +78,15 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   awaits `settleEsiCacheLoads()` after every dom test and warns naming any
   key still pending, so a read still writing to `esiCache` can't leak into the next
   test. Don't hand-roll drains (`waitFor(esiInFlight)`, extra ticks).
+- **Teardown is deterministic** (`src/test/teardown.ts`, both projects). Every
+  `fetch` a test makes is aborted the moment its body ends, before any
+  `afterEach` (`vitest.runner.ts`), so a late response can't write after the
+  file's resets or call `setState` once jsdom is gone. Then the shared
+  `afterEach` puts real timers and the real `Date` back and waits for pending
+  IndexedDB opens and transactions (Dexie, and Firebase's heartbeat probe that
+  failed shards with "self is not defined"). A test that fakes timers still
+  restores them itself. Dexie is not wiped between tests: files seed in
+  `beforeAll`, so each file keeps clearing the tables it uses.
 - **Tests stay under 10 seconds each.** `testTimeout` is 10000 in
   `vite.config.ts`, and that is a budget to stay under, not a number to raise.
   A test that needs more is too slow: make it faster instead of adding a
