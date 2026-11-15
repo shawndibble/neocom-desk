@@ -144,6 +144,8 @@ export interface FeederViewSummary {
    * grant again; absent on a view built before it existed.
    */
   refineryNamesGranted?: boolean;
+  /** The moon owner turned Pop Sharing off (#6222); absent on a view built before it existed. */
+  popSharingOptedOut?: boolean;
   /**
    * Hash of everything else the view holds, `builtAt` aside. A rebuild that hashes the same skips
    * every write; absent on a view built before it existed (#5241).
@@ -276,6 +278,7 @@ export type FeederViewRecord = Pick<
   | 'refinerySystems'
   | 'refineryStructures'
   | 'readsStructureNames'
+  | 'popSharingOptOut'
 >;
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -481,6 +484,7 @@ export function buildFeederView(input: FeederViewInput): FeederView {
       ? { side: record.payeeSetBy.side, at: record.payeeSetBy.at }
       : null,
     refineryNamesGranted: record.readsStructureNames === true,
+    popSharingOptedOut: record.popSharingOptOut !== undefined,
   };
   return {
     summary,

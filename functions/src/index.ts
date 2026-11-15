@@ -132,7 +132,9 @@ import {
   getFeederViewAccess,
   parseDisputeFeederPayoutInput,
   parseRequestFeederRateInput,
+  parseSetFeederPopSharingInput,
   requestFeederRate,
+  setFeederPopSharing,
 } from './corpTaxBookFeederViewCalls.js';
 import {
   parseSetBookFeederPayeeInput,
@@ -1030,6 +1032,15 @@ corpTaxBookAction('setCorpTaxBookFeederPayeeCallable', (request) =>
     callerOf(request),
     parseSetFeederPayeeInput(request.data),
     esiIdCategoryLookup()
+  )
+);
+
+// The moon owner's Pop Sharing opt-out (#6222): one switch for all its moons.
+corpTaxBookAction('setCorpTaxBookFeederPopSharingCallable', (request) =>
+  setFeederPopSharing(
+    corpSyncDeps(),
+    callerOf(request),
+    parseSetFeederPopSharingInput(request.data)
   )
 );
 

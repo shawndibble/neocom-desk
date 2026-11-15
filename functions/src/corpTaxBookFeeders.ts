@@ -72,6 +72,11 @@ export interface FeederRecord {
   payeeChangedAt?: number;
   /** Who set the payee last (#4653): either side may; absent on a payee set before it was kept. */
   payeeSetBy?: PayeeSetBy;
+  /**
+   * The moon owner turned Pop Sharing off for all its moons (#6222): who and when. Absent is the
+   * default, sharing allowed. The book's settings for its moons are kept and come back on opt-in.
+   */
+  popSharingOptOut?: { by: number; at: number };
   /** A removal the accounting corporation started (#4520); present while status is `pending-removal`. */
   removal?: Removal;
   /** The id (hash) of the removal mail's link; the link's code is only ever in the mail. */

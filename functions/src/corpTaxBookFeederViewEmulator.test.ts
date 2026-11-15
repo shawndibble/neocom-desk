@@ -19,6 +19,7 @@ import {
   disputeFeederPayout,
   getFeederViewAccess,
   requestFeederRate,
+  setFeederPopSharing,
 } from './corpTaxBookFeederViewCalls.js';
 import { setBookFeederPayee, setFeederPayee } from './corpTaxBookPayee.js';
 import type { FeederViewSummary } from './corpTaxBookFeederView.js';
@@ -378,6 +379,26 @@ emulatorSuite('moon owner view', () => {
         })
       )
     ).toBe('not-your-feeder');
+  });
+
+  it('pop sharing: the moon owner opts out and back in, audited and in the view (#6222)', async () => {
+    await save(await newInvite());
+    const share = (on: boolean, id = FEEDER_DIRECTOR) =>
+      setFeederPopSharing(deps(), who(id), {
+        corporationId: FEEDER,
+        accessToken: `roles-${id}`,
+        share: on,
+      });
+    expect(await summary()).toMatchObject({ popSharingOptedOut: false });
+    await share(false);
+    expect((await feederRecord())?.popSharingOptOut).toEqual({ by: FEEDER_DIRECTOR, at: T0 });
+    expect(await summary()).toMatchObject({ popSharingOptedOut: true });
+    await share(true);
+    expect(await feederRecord()).not.toHaveProperty('popSharingOptOut');
+    expect(await summary()).toMatchObject({ popSharingOptedOut: false });
+    const audit = (await collectorBook().collection('audit').get()).docs.map((d) => d.data());
+    expect(audit.filter((a) => a.action === 'feederPopSharingSet')).toHaveLength(2);
+    expect(await reason(share(false, FEEDER_JUNIOR))).toBe('not-your-feeder');
   });
 
   it('payee: the moon owner sets it, stamped and in the view, and names whom to tell (#4653)', async () => {
