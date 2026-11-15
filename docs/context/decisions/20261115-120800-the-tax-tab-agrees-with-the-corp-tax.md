@@ -13,7 +13,7 @@ _Recorded 2026-11-15 · issue #6204._
   Statement code is (the Miner name the officer stored, else its characters).
 - **Ore a book bills is not owed to another Payee as well.** Once the book bills ore the member's
   own list gives another Payee (on a Statement, or a Conflict that ran its 14 days), that share
-  of the Assignment leaves the Payee's balance in the owed strip; an Assignment the book bills
+  of the Assignment leaves every owed figure for that Payee (the owed strip and Manage Payees); an Assignment the book bills
   whole leaves Settle up for that Payee. The Assignment itself is not changed: an attention item
   names the overlap and opens the day, where "Let the corporation bill it" takes it off the list.
 - **Credit shows on the Tax tab and in the pay dialog.**

@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import type { PayeeRecord } from '@/db';
+import { useCallback, useMemo } from 'react';
+import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { computePayeeBalances, summarizeUnassigned } from '@/features/miningTax/balances';
 import { allMembers, type DisplayRow } from '@/features/miningTax/groupRows';
 import { systemsByPayee } from '@/features/miningTax/suggestPayee';
@@ -32,18 +32,19 @@ export function useTaxBalances({
   // The owed cards: per Payee, what is owed *now*. Follows the Character
   // filter (an alt's debts are still debts) but deliberately not the Payee
   // filter — narrowing the ledger to one Payee must not change a balance.
-  // Ore a Corp Tax Book bills is owed to the corporation, not to the member's own Payee too.
+  // Ore a Corp Tax Book bills is owed to the corporation, not to the member's own Payee too:
+  // every owed figure per Payee leaves that share out (#6204).
+  const alsoBilledShare = useCallback(
+    (a: Pick<MiningTaxAssignmentRecord, 'id' | 'characterId' | 'date' | 'solarSystemId'>) =>
+      alsoBilled?.get(entryKey(a.characterId, a.date, a.solarSystemId))?.get(a.id) ?? 0,
+    [alsoBilled]
+  );
   const balances = useMemo(
     () =>
-      computePayeeBalances(
-        characterFiltered,
-        ledgerPayees,
-        ({ row, assignment }) =>
-          alsoBilled
-            ?.get(entryKey(row.characterId, row.entry.date, row.entry.solarSystemId))
-            ?.get(assignment.id) ?? 0
+      computePayeeBalances(characterFiltered, ledgerPayees, ({ assignment }) =>
+        alsoBilledShare(assignment)
       ),
-    [characterFiltered, ledgerPayees, alsoBilled]
+    [characterFiltered, ledgerPayees, alsoBilledShare]
   );
   // A row a Corp Tax Book has labelled (Pending corp record, Unattributed) is not waiting on the
   // member: it stays out of the "needs assigning" count.
@@ -68,7 +69,10 @@ export function useTaxBalances({
     () => systemsByPayee(everyAssignment, allPayees),
     [everyAssignment, allPayees]
   );
-  const owedByPayee = useMemo(() => computeOwedByPayee(everyAssignment), [everyAssignment]);
+  const owedByPayee = useMemo(
+    () => computeOwedByPayee(everyAssignment, alsoBilledShare),
+    [everyAssignment, alsoBilledShare]
+  );
 
   return { balances, unassigned, everyAssignment, linkSuggestions, payeeSystems, owedByPayee };
 }
