@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import type userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
@@ -12,8 +12,9 @@ import { DEFAULT_MAIL_FOLDERS, useMailFolders } from '@/features/character/mailF
 import { useMailScope } from '@/features/character/mailScopePref';
 import { resetMailRefreshThrottle } from '@/features/character/mailAll';
 import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
-import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
+import { Mail } from '@/routes/Mail';
+import { renderPageRoute } from '@/test/renderPage';
 import { stubViewport } from '@/test/viewport';
 
 // Shared harness for the Mail route tests (src/routes/Mail*.test.tsx), one file
@@ -100,18 +101,24 @@ export const server = mswServer(
   http.post('https://esi.evetech.net/characters/affiliation', () => HttpResponse.json([]))
 );
 
+/**
+ * Renders the Mail route on its own (its ScopeGate and info modals, no App boot
+ * or shell) at the current `window.location`. The tests that prove the App
+ * wiring (the URL is reachable inside the shell) render `<App />` (Mail.test.tsx).
+ */
+export function renderMailRoute() {
+  return renderPageRoute('/mail', <Mail />);
+}
+
 export function installMailHarness(): void {
   beforeAll(async () => {
-    // One throwaway render, so no test pays for the first one. A worker's first
-    // `App` render (compiling the lazy Layout and route chunks, warming jsdom
-    // and React) took seconds under parallel load and landed on whichever test
-    // ran first, tipping it past its findBy / test timeout. Done here under the
-    // hook's own budget, as IndustryPlanPage.test.tsx does.
-    await Promise.all([routeChunks.loadLayout(), routeChunks.loadMail()]);
+    // One throwaway render, so no test pays for the first one: compiling the
+    // route chunk, warming jsdom and React and the first data load (Dexie, MSW,
+    // the ESI cache) land here under the hook's own budget instead of tipping
+    // whichever test runs first past its findBy timeout.
+    await routeChunks.loadMail();
     await seed();
-    const { unmount } = render(<App />);
-    // Wait for real content, not just the shell: the first data load (Dexie, MSW,
-    // the ESI cache) is part of the cold cost too.
+    const { unmount } = renderMailRoute();
     await screen.findByText('Fleet up!', {}, { timeout: 25_000 });
     unmount();
     server.resetHandlers();

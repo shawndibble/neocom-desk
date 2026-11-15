@@ -1,13 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import '@/i18n';
 import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
-import { App } from '@/app/App';
+import { loadLayout } from '@/app/routeChunks';
 import {
   installMailHarness,
+  renderMailRoute,
   CHAR_ID,
   CHAR_ID_2,
   headers,
@@ -37,13 +38,25 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 installMailHarness();
+// The one App-level test below: its graph and shell chunk load here, under the
+// hook's own budget, not inside the test's findBy.
+beforeAll(async () => {
+  await Promise.all([import('@/app/App'), loadLayout()]);
+}, 30_000);
 
 describe('Mail', () => {
-  it('lists headers newest first with resolved sender names', async () => {
+  // The one App-level test of the Mail route: it mounts at /mail inside the
+  // signed-in shell, its rail link current. Every other Mail test renders the
+  // page on its own (`renderMailRoute`).
+  it('lists headers newest first with resolved sender names, at /mail inside the shell', async () => {
+    const { App } = await import('@/app/App');
     render(<App />);
     expect(await screen.findByText('Fleet up!')).toBeInTheDocument();
     expect(await screen.findByText(/Fleet Commander/)).toBeInTheDocument();
     expect(await screen.findByText(/Market Bot/)).toBeInTheDocument();
+    const rail = (await screen.findAllByRole('navigation'))[0];
+    const mailLinks = await within(rail).findAllByRole('link', { name: 'Mail' });
+    expect(mailLinks.some((link) => link.getAttribute('aria-current') === 'page')).toBe(true);
   });
 
   it('renders no reading-pane header until a mail is selected, at desktop widths (issue #2104)', async () => {
@@ -51,7 +64,7 @@ describe('Mail', () => {
     // the acceptance criteria are asserted at.
     useDesktopViewport();
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     expect(screen.queryByRole('button', { name: 'Reply' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Forward' })).not.toBeInTheDocument();
@@ -68,7 +81,7 @@ describe('Mail', () => {
 
   it('Compose opens the New Mail composer on a phone and closing it returns to the list', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     await user.click(screen.getByRole('button', { name: 'Compose' }));
     expect(await screen.findByRole('dialog', { name: 'New mail' })).toBeInTheDocument();
@@ -80,7 +93,7 @@ describe('Mail', () => {
   it('Compose opens the New Mail composer in the reading pane on a wide screen', async () => {
     useDesktopViewport();
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     const header = document.querySelector('header')!;
     await user.click(within(header).getByRole('button', { name: 'Compose' }));
@@ -91,7 +104,7 @@ describe('Mail', () => {
   it('offers Compose from the empty reading pane on a wide screen, landing focus in To (issue #3972)', async () => {
     useDesktopViewport();
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     expect(screen.getByText('No message open')).toBeInTheDocument();
     expect(screen.getByText('Select a message from the list to read it.')).toBeInTheDocument();
@@ -106,7 +119,7 @@ describe('Mail', () => {
   });
 
   it('shows no reading-pane placeholder and one Compose on a phone (issue #3972)', async () => {
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     expect(screen.queryByText('No message open')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Compose' })).toHaveLength(1);
@@ -114,7 +127,7 @@ describe('Mail', () => {
 
   it('shows the body, markup rendered, on click', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await user.click(await screen.findByText('Fleet up!'));
     expect(await findUndockBody()).toBeInTheDocument();
     // `<b>now</b>` renders as bold, not as literal tags.
@@ -124,7 +137,7 @@ describe('Mail', () => {
   it('?open= opens that mail in the reader and strips the params (issue #5372)', async () => {
     useDesktopViewport();
     window.history.pushState({}, '', `/mail?open=1&owner=${CHAR_ID}`);
-    render(<App />);
+    renderMailRoute();
     expect(await screen.findByRole('heading', { name: 'Fleet up!' })).toBeInTheDocument();
     await waitFor(() => expect(window.location.search).toBe(''));
   });
@@ -132,14 +145,14 @@ describe('Mail', () => {
   it('?open= for a mail not in the mailbox opens nothing', async () => {
     useDesktopViewport();
     window.history.pushState({}, '', `/mail?open=1&owner=${CHAR_ID_2}`);
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     expect(screen.getByText('No message open')).toBeInTheDocument();
   });
 
   it('focuses the reader heading on open, and the mail row on Back (issue #1485)', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     const subjectText = await screen.findByText('Fleet up!');
     const rowButton = subjectText.closest('button');
     expect(rowButton).not.toBeNull();
@@ -154,7 +167,7 @@ describe('Mail', () => {
 
   it('opening Reply focuses the compose box, and Cancel returns focus to the Reply button (issue #1485)', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await user.click(await screen.findByText('Fleet up!'));
 
     await user.click(await screen.findByRole('button', { name: 'Reply' }));
@@ -188,7 +201,7 @@ describe('Mail', () => {
       })
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await user.click(await screen.findByText('Fleet up!'));
     await user.click(await screen.findByRole('button', { name: 'Reply' }));
 
@@ -213,7 +226,7 @@ describe('Mail', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await user.click(await screen.findByText('Fleet up!'));
     const senderButton = await screen.findByRole('link', { name: 'Fleet Commander' });
     await user.click(senderButton);
@@ -232,7 +245,7 @@ describe('Mail', () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () => HttpResponse.error())
     );
-    render(<App />);
+    renderMailRoute();
     expect(await screen.findByText('Fleet up!')).toBeInTheDocument();
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
   });
@@ -249,7 +262,7 @@ describe('Mail', () => {
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
-    render(<App />);
+    renderMailRoute();
     expect(await screen.findByText('Log in again to refresh.')).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your mail')).not.toBeInTheDocument();
     expect(await screen.findByText('Fleet up!')).toBeInTheDocument();
@@ -259,7 +272,7 @@ describe('Mail', () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () => HttpResponse.error())
     );
-    render(<App />);
+    renderMailRoute();
     expect(await screen.findByText(/no mail cached/i)).toBeInTheDocument();
   });
 
@@ -267,7 +280,7 @@ describe('Mail', () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () => HttpResponse.json([]))
     );
-    render(<App />);
+    renderMailRoute();
     expect(await screen.findByText('No mail')).toBeInTheDocument();
     expect(
       screen.getByText('EVE mail from players, your corporation and alliance shows here.')
@@ -285,7 +298,7 @@ describe('Mail', () => {
       )
     );
 
-    render(<App />);
+    renderMailRoute();
 
     expect(await screen.findByText(/From nobody/)).toBeInTheDocument();
     expect(screen.getByText(/Unknown sender/i)).toBeInTheDocument();
@@ -297,13 +310,13 @@ describe('Mail', () => {
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
-    render(<App />);
+    renderMailRoute();
     expect(await screen.findByText('Log in again to see your mail')).toBeInTheDocument();
     expect(screen.queryByText(/no mail cached/i)).not.toBeInTheDocument();
   });
 
   it('shows an Inbox/Corp/Alliance/Sent toggle group, all on, with unread counts from /mail/labels', async () => {
-    render(<App />);
+    renderMailRoute();
     const group = await screen.findByRole('group', { name: 'Mail folders' });
     // No synthetic "All": every folder selected is what All used to mean.
     expect(within(group).getAllByRole('button')).toHaveLength(4);
@@ -319,7 +332,7 @@ describe('Mail', () => {
 
   it('keeps several folders on at once, folding an uncategorized header into Inbox', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!'); // corp
     expect(screen.getByText('Market report')).toBeInTheDocument(); // no labels -> inbox
 
@@ -340,7 +353,7 @@ describe('Mail', () => {
 
   it('explains an empty folder selection and offers the way back, keeping the chips on screen', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     const group = screen.getByRole('group', { name: 'Mail folders' });
     for (const chip of within(group).getAllByRole('button')) await user.click(chip);
@@ -356,7 +369,7 @@ describe('Mail', () => {
 
   it('says no mail matched, not "no mail cached", and Clear search brings the list back', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     const search = screen.getByRole('searchbox', { name: /search/i });
     await user.type(search, 'zzzznotamatch');
@@ -372,7 +385,7 @@ describe('Mail', () => {
   /** Turns every folder chip off except `keep`. */
   it('says a folder is empty, with no action, when it holds no mail (issue #3972)', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     await onlyFolders(user, ['Sent']);
     expect(await screen.findByText('No mail in this folder')).toBeInTheDocument();
@@ -391,7 +404,7 @@ describe('Mail', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () => HttpResponse.error())
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     await onlyFolders(user, ['Sent']);
     expect(await screen.findByText('No saved mail in this folder')).toBeInTheDocument();
@@ -399,7 +412,7 @@ describe('Mail', () => {
 
   it('offers Show read mail when Hide read hid everything (issue #3972)', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     // Inbox holds only the read "Market report".
     await onlyFolders(user, ['Inbox']);
@@ -417,7 +430,7 @@ describe('Mail', () => {
 
   it('offers Clear search, not Show read mail, when the search alone empties the list', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     await user.click(screen.getByRole('button', { name: 'Hide read' }));
     await user.type(screen.getByRole('searchbox', { name: /search/i }), 'zzzznotamatch');
@@ -427,7 +440,7 @@ describe('Mail', () => {
 
   it('keeps search and hide-read in the URL, and restores them on a fresh visit', async () => {
     const user = userEvent.setup();
-    const { unmount } = render(<App />);
+    const { unmount } = renderMailRoute();
     await screen.findByText('Fleet up!');
 
     await user.type(screen.getByRole('searchbox', { name: /search/i }), 'fleet');
@@ -437,7 +450,7 @@ describe('Mail', () => {
     expect(screen.queryByText('Market report')).not.toBeInTheDocument();
 
     unmount();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     expect(screen.getByRole('searchbox', { name: /search/i })).toHaveValue('fleet');
     expect(screen.getByRole('button', { name: 'Hide read' })).toHaveAttribute(
@@ -449,14 +462,14 @@ describe('Mail', () => {
 
   it('applies a restored search filter as soon as data loads, without an unfiltered flash', async () => {
     window.history.pushState({}, '', '/mail?search=market');
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Market report');
     expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument();
   });
 
   it('omits default search/hide-read from the URL and ignores a garbage hideRead value', async () => {
     window.history.pushState({}, '', '/mail?hideRead=garbage');
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     expect(screen.getByRole('button', { name: 'Hide read' })).toHaveAttribute(
       'aria-pressed',
@@ -467,7 +480,7 @@ describe('Mail', () => {
   });
 
   it('gives a row its folder and unread state in words, not colour alone', async () => {
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     // 'Fleet up!' is corp + unread; 'Market report' is inbox + read.
     expect(screen.getByRole('button', { name: /^Fleet up!.*Corp.*Unread/s })).toBeInTheDocument();
@@ -504,7 +517,7 @@ describe('Mail', () => {
         ])
       )
     );
-    render(<App />);
+    renderMailRoute();
     const row = await screen.findByRole('button', { name: /^Contract terms/s });
     expect(row).toHaveTextContent('Corp Recruiter');
     expect(row).not.toHaveTextContent('Fleet Commander');
@@ -518,7 +531,7 @@ describe('Mail', () => {
 
   it('shows a resolved "To:" line in the reading pane', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await user.click(await screen.findByText('Fleet up!'));
     expect(await screen.findByText(/Corp Recruiter/)).toBeInTheDocument();
   });
