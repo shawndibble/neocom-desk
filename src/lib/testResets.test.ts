@@ -5,6 +5,7 @@ import { fetchAggregatesWithFallback } from '@/market/priceFallback';
 
 describe('registerTestReset', () => {
   it('runs every registered reset, once each', () => {
+    // Stays registered for the rest of this file; it only counts.
     let calls = 0;
     const reset = () => {
       calls += 1;
@@ -19,6 +20,8 @@ describe('registerTestReset', () => {
 /**
  * The leak this exists for: a request aborted at a test's end marks Fuzzwork
  * down, and without the shared reset the next test skips Fuzzwork entirely.
+ * The two tests run in order on purpose: the second is the one that fails
+ * without `vitest.setup.ts`'s `runTestResets`.
  */
 describe('the Fuzzwork outage flag between tests', () => {
   let fuzzworkAsked = 0;

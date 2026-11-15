@@ -14,17 +14,17 @@
  */
 const KEY = Symbol.for('neocom-desk.testResets');
 
-function resets(): Set<() => void> {
+function registry(): Set<() => void> {
   const scope = globalThis as unknown as Record<symbol, Set<() => void> | undefined>;
   return (scope[KEY] ??= new Set());
 }
 
 /** Registers a test-only reset of module state, run before every test. */
 export function registerTestReset(reset: () => void): void {
-  resets().add(reset);
+  registry().add(reset);
 }
 
 /** Runs every registered reset. Called by `vitest.setup.ts` before each test. */
 export function runTestResets(): void {
-  for (const reset of resets()) reset();
+  for (const reset of registry()) reset();
 }
