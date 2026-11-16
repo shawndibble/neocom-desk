@@ -311,14 +311,19 @@ export function placeRemaps(
     let bestSeconds = Infinity;
     let bestIndex = -1;
     // The winner is kept as its two values, read the moment it is priced, not
-    // as the result object. Once V8's Maglev tier (Node 24) has compiled this
-    // function, a kept object's `seconds` reads back as the LAST segment
-    // priced: CI returned 42338 s (25600 s attributes, the whole-plan
-    // segment's 29538 s) twice, #3074. Reproduce with
-    // `npx vitest run src/engine/optimizer/placeRemaps.test.ts
-    // --execArgv=--stress-maglev --execArgv=--no-turbofan
-    // --execArgv=--maglev-filter=placeRemaps`: about one run in three fails
-    // with the object kept; none of 34 runs fail with the two values.
+    // as the result object. Defensive, and kept: what it guards against is
+    // not confirmed. The observed symptom (#3074): CI twice returned 42338 s,
+    // the 25600 s attributes with the whole-plan segment's 29538 s, as if the
+    // kept object's `seconds` read back as the LAST segment priced. #3074
+    // blamed V8's Maglev tier overwriting it at runtime, but its repro
+    // (`--execArgv=--stress-maglev ...`) never applied those flags: vitest's
+    // forks-pool workers don't receive `--execArgv` (their `process.execArgv`
+    // lacks them), so its "about one run in three" failure rate is unconfirmed.
+    // With the flags applied (node flags plus `--pool=threads`), the code that
+    // kept the object failed only a stress-mode timeout ("stays fast at 300
+    // steps..."), never the "pure function" test, and instrumentation showed
+    // the kept object's `seconds` still matched its value at assignment. The
+    // same symptom is tracked, with diagnostics, in #6256.
     let bestSegmentAttributes: Attributes | null = null;
     let bestSegmentSeconds = 0;
     for (let i = runCount - 1; i >= 0; i--) {
