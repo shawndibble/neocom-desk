@@ -912,6 +912,32 @@ describe('settings patch: start date and member visibility', () => {
     expect(() => parseSettingsPatch({ showToMembers: false })).toThrow();
   });
 
+  it("takes who answers members' tax questions, null clearing it", () => {
+    const list = { kind: 'mailingList', id: 7, name: ' Desk ' };
+    expect(parseSettingsPatch({ taxContact: list })).toEqual({
+      taxContact: { kind: 'mailingList', id: 7, name: 'Desk' },
+    });
+    expect(parseSettingsPatch({ taxContact: { kind: 'characters', ids: [3, 4, 3] } })).toEqual({
+      taxContact: { kind: 'characters', ids: [3, 4] },
+    });
+    expect(parseSettingsPatch({ taxContact: null })).toEqual({ taxContact: null });
+    for (const bad of [
+      'x',
+      [],
+      { kind: 'other' },
+      { kind: 'mailingList', id: 0, name: 'x' },
+      { kind: 'mailingList', id: 7, name: '  ' },
+      { kind: 'mailingList', id: 7 },
+      { kind: 'characters', ids: [] },
+      { kind: 'characters', ids: [1, 2, 3, 4, 5, 6] },
+      { kind: 'characters', ids: [1.5] },
+      { kind: 'characters', ids: [-1] },
+      { kind: 'characters', ids: 'x' },
+    ]) {
+      expect(() => parseSettingsPatch({ taxContact: bad })).toThrow();
+    }
+  });
+
   it('takes the wallet division names a Director read (#6161)', () => {
     expect(parseSettingsPatch({ divisionNames: { '1': ' Master ', '5': 'MOON TAXES' } })).toEqual({
       divisionNames: { '1': 'Master', '5': 'MOON TAXES' },

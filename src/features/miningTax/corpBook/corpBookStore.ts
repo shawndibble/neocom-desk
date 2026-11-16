@@ -18,7 +18,7 @@ import {
   type QuerySnapshot,
 } from 'firebase/firestore/lite';
 import { db as localDb } from '@/db';
-import { parseBookSettings } from '@/engine/corpTaxBook/bookDocs';
+import { parseBookSettings, type TaxContact } from '@/engine/corpTaxBook/bookDocs';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
 import { readDisputes, type OreDispute } from '@/engine/corpTaxBook/disputes';
 import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/allocation';
@@ -72,6 +72,8 @@ export interface LoadedCorpBook {
   divisions: number[];
   /** The corp's own names for those divisions, when a Director's visit stored them (#6161). */
   divisionNames?: DivisionNames;
+  /** Who a member's tax question is also mailed to; absent → the CEO. */
+  taxContact?: TaxContact;
   rates: TaxRate[];
   /** When an officer last synced it; absent when never. */
   lastSyncedAt?: string;
@@ -140,6 +142,7 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
     oreForm: settings.oreForm,
     divisions: settings.divisions,
     ...(Object.keys(divisionNames).length > 0 ? { divisionNames } : {}),
+    ...(settings.taxContact ? { taxContact: settings.taxContact } : {}),
     rates: settings.rates,
     ...(syncedAt !== undefined ? { lastSyncedAt: new Date(syncedAt).toISOString() } : {}),
     ...checked,

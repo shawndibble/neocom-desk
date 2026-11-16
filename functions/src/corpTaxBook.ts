@@ -347,10 +347,35 @@ export interface SettingsPatch {
   chunkM3PerHour?: number;
   structureExpiryHours?: Record<string, number>;
   dismissApprovalAboveIsk?: number | null;
+  /** Who gets the EVE mail when a member asks about tax; `null` clears it (the CEO then). */
+  taxContact?: TaxContact | null;
   /** Move the book's start (Director): earlier freely, later only over unbilled days. */
   startDate?: string;
   /** End the member setup window now (Director): `membersSeeFrom` becomes the call time. */
   showToMembers?: true;
+}
+
+/** The mirror of the client's `TaxContact` (`src/engine/corpTaxBook/bookDocs.ts`). */
+export type TaxContact =
+  { kind: 'mailingList'; id: number; name: string } | { kind: 'characters'; ids: number[] };
+
+function parseTaxContact(value: unknown): TaxContact {
+  const c = record(value);
+  if (c.kind === 'mailingList') {
+    return {
+      kind: 'mailingList',
+      id: int(c.id, 'taxContact.id'),
+      name: boundedString(c.name, 'taxContact.name', 100),
+    };
+  }
+  if (c.kind === 'characters') {
+    const ids = list(c.ids, 'taxContact.ids', 5).map((x) => int(x, 'taxContact id'));
+    const unique = [...new Set(ids)];
+    if (unique.length === 0)
+      throw new HttpsError('invalid-argument', 'taxContact needs a character');
+    return { kind: 'characters', ids: unique };
+  }
+  throw new HttpsError('invalid-argument', 'taxContact.kind must be mailingList or characters');
 }
 
 const HUBS = ['jita', 'amarr', 'dodixie', 'rens', 'hek'] as const;
@@ -440,6 +465,9 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
       d.dismissApprovalAboveIsk === null
         ? null
         : num(d.dismissApprovalAboveIsk, 'dismissApprovalAboveIsk', 0, 1e13);
+  }
+  if (d.taxContact !== undefined) {
+    patch.taxContact = d.taxContact === null ? null : parseTaxContact(d.taxContact);
   }
   if (d.startDate !== undefined) patch.startDate = dateString(d.startDate, 'startDate');
   if (d.showToMembers !== undefined) {

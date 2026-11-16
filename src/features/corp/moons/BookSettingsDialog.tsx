@@ -37,6 +37,8 @@ import { AutomaticSyncSection } from './AutomaticSyncSection';
 import { DeleteBookSection } from './DeleteBookSection';
 import { ExportBookSection } from './ExportBook';
 import { ReclaimBookSection } from './ReclaimBookSection';
+import { TaxContactSection } from './TaxContactSection';
+import { draftFromContact, taxContactPatch } from './taxContactDraft';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { useCorpAccess } from '../useCorpAccess';
 import { loadCorporationDivisions } from '../wallet';
@@ -192,6 +194,7 @@ export function BookSettingsDialog({
       Object.entries(settings.structureExpiryHours).map(([k, v]) => [k, String(v)])
     )
   );
+  const [taxContact, setTaxContact] = useState(() => draftFromContact(settings.taxContact));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -301,6 +304,7 @@ export function BookSettingsDialog({
             .map(([k, v]) => [k, Number(v)])
         ),
       };
+      Object.assign(patch, taxContactPatch(taxContact, settings.taxContact));
       if (chunk !== '') patch.chunkM3PerHour = Number(chunk);
       // Unchanged divisions are left out, so a save of other settings never overwrites them.
       const baseDivisions = [...divisionsBase].sort((a, b) => a - b);
@@ -779,6 +783,15 @@ export function BookSettingsDialog({
                     />
                   </Field>
                 </Fields>
+              </Section>
+
+              <Section title={t('corpTaxBook.moons.settings.taxContact.section')}>
+                <TaxContactSection
+                  characterId={characterId}
+                  corporationId={corporationId}
+                  draft={taxContact}
+                  onChange={setTaxContact}
+                />
               </Section>
 
               <AutomaticSyncSection />

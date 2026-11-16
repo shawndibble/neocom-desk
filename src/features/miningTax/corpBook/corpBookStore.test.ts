@@ -53,6 +53,15 @@ describe('readBookSettings', () => {
     );
   });
 
+  it("surfaces who answers members' tax questions, absent when unset or malformed", () => {
+    const taxContact = { kind: 'characters', ids: [5, 6] };
+    expect(readBookSettings(1, { ...book, taxContact })?.taxContact).toEqual(taxContact);
+    expect(readBookSettings(1, book)).not.toHaveProperty('taxContact');
+    expect(readBookSettings(1, { ...book, taxContact: { kind: 'x' } })).not.toHaveProperty(
+      'taxContact'
+    );
+  });
+
   it('reads when a sync last read the wallet: null when none has, absent on an older book', () => {
     const at = Date.parse('2026-10-17T08:00:00Z');
     expect(readBookSettings(1, { ...book, donationsReadAt: at })?.donationsCheckedAt).toBe(

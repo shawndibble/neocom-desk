@@ -1164,6 +1164,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         divisions,
         divisionsBase,
         addDivision,
+        taxContact,
         ...rest
       } = action.patch;
       if ((startDate !== undefined || showToMembers) && !c.access.isDirector) {
@@ -1198,6 +1199,10 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           );
         }
         update.divisions = divisions;
+      }
+      // Any officer who can edit sets it (not a Director-only setting); null deletes the field.
+      if (taxContact !== undefined) {
+        update.taxContact = taxContact === null ? FieldValue.delete() : taxContact;
       }
       if (showToMembers) update.membersSeeFrom = now;
       const oldStart = c.book.startDate as string | undefined;

@@ -18941,6 +18941,22 @@
         "approvalHint": "Currently {{limit}}. Leave it empty for no limit.",
         "approvalHintNone": "No limit is set. Leave it empty to keep it that way.",
         "approvalDirector": "Only a Director sets the approval limit.",
+        "taxContact": {
+          "section": "Members' questions",
+          "title": "Who answers members' tax questions",
+          "hint": "Proof, disputes and won't-pay notes always land in Needs you. This is who also gets an EVE mail, for officers who aren't in Neocom Desk when it happens.",
+          "ceo": "The CEO",
+          "ceoNamed": "The CEO, {{name}}",
+          "ceoDefault": "The default.",
+          "list": "A mailing list",
+          "listPick": "Mailing list",
+          "listNone": "Choose one of your lists",
+          "listHint": "EVE only delivers to a list from its members, so a member who isn't on it mails the CEO instead.",
+          "officers": "These officers",
+          "officersHint": "One mail each; up to {{max}}.",
+          "officerSearch": "Add an officer by name",
+          "removeOfficer": "Remove {{name}}"
+        },
         "reclaim": {
           "title": "Ownership",
           "hint": "As CEO you can reclaim the book at any time.",
