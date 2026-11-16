@@ -519,6 +519,25 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       expect(payment?.reviewReason).toBe('no-open-balance');
     });
 
+    it('matches a held donation once the lagging ledger shows the ore mined before it was paid', async () => {
+      // Held on an earlier run: the ledger had not yet shown character 50's mining of that day.
+      await book().collection('payments').doc('j1_0').set({
+        id: 'j1_0',
+        source: 'donation',
+        characterId: 50,
+        uid: 'char:50',
+        amount: 1_000_000,
+        at: '2026-10-17T18:00:00.000Z',
+        division: 1,
+        reviewReason: 'no-open-balance',
+      });
+      await optIn(ACCOUNTANT);
+      await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+      const payment = (await book().collection('payments').doc('j1_0').get()).data();
+      expect(payment?.minerId).toBe('solo:50');
+      expect(payment?.reviewReason).toBeUndefined();
+    });
+
     it('notes tax paid into a division the book does not read, without crediting it (#6207)', async () => {
       await book().collection('statements').doc('s1').set(statement);
       await optIn(ACCOUNTANT);

@@ -729,6 +729,21 @@ export async function disputeCorpTaxBookConflict(
   });
 }
 
+/** A Miner takes back their own Conflict day dispute while no officer has answered it. */
+export async function withdrawCorpTaxBookDispute(
+  characterId: number,
+  input: { corporationId: number; date: string }
+): Promise<{ disputeId: string }> {
+  return underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return callRouted<typeof input, { disputeId: string }>(
+      'withdrawCorpTaxBookDisputeCallable',
+      input,
+      characterId
+    );
+  });
+}
+
 /** The server's `MAX_LEARNED_SYSTEMS`: it refuses a longer call. */
 const MAX_LEARNED_SYSTEMS = 50;
 /** `corp:structure` already reported this session, so a reload does not send them again. */

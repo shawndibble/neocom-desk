@@ -14,6 +14,7 @@ import {
   sendGapMs,
   stampRemovalEffectiveAt,
   startsRemovalClock,
+  staleMailSpell,
   summarize,
   type MailQueueItem,
   removalNoticeStillDue,
@@ -284,5 +285,22 @@ describe('removalNoticeStillDue (#4621)', () => {
   it('never holds back any other kind of mail', () => {
     expect(removalNoticeStillDue(item(1), undefined)).toBe(true);
     expect(removalNoticeStillDue(item(1, { kind: 'removalCancelled' }), undefined)).toBe(true);
+  });
+});
+
+describe('staleMailSpell (#6210)', () => {
+  it('reads the stale spell a queued stale-ledger copy was for', () => {
+    expect(
+      staleMailSpell({ kind: 'grant-stale', statementId: 'stale:98000002:1700000000000:90' })
+    ).toEqual({
+      feederCorporationId: 98000002,
+      staleSince: 1700000000000,
+    });
+  });
+
+  it('is undefined for any other mail, or a malformed id', () => {
+    expect(staleMailSpell({ kind: 'statement', statementId: 'stale:1:2:3' })).toBeUndefined();
+    expect(staleMailSpell({ kind: 'grant-stale', statementId: 'stale:x:2:3' })).toBeUndefined();
+    expect(staleMailSpell({ kind: 'grant-stale', statementId: 's1' })).toBeUndefined();
   });
 });

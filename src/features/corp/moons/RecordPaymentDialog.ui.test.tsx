@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { buildBookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
@@ -78,7 +78,7 @@ vi.mock('../taxBook/bookClient', () => ({
 function renderDialog(
   overrides: Partial<BookViewInput> = {},
   statementId?: string,
-  extra: { paymentId?: string; onRecorded?: () => Promise<void> } = {}
+  extra: { paymentId?: string; declarationId?: string; onRecorded?: () => Promise<void> } = {}
 ) {
   const view = buildBookView(input(overrides));
   const miner = view.miners.find((m) => m.id === MINER)!;
@@ -203,6 +203,27 @@ describe('RecordPaymentDialog', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: /^Record / }));
     await waitFor(() => expect(onRecorded).toHaveBeenCalled());
     expect(edit.mock.calls[0][0]).toMatchObject({ action: 'recordPayment', paymentId: 'm_x1' });
+  });
+
+  it('confirms the declaration in the same write, by hand or by a donation match', async () => {
+    const byHand = renderDialog({}, undefined, { paymentId: 'm_x1', declarationId: 'x1' });
+    await userEvent.click(within(byHand).getByRole('button', { name: /^Record / }));
+    await waitFor(() => expect(edit).toHaveBeenCalledTimes(1));
+    expect(edit.mock.calls[0][0]).toMatchObject({
+      action: 'recordPayment',
+      paymentId: 'm_x1',
+      declarationId: 'x1',
+    });
+    cleanup();
+    edit.mockClear();
+    const matched = renderDialog({ payments: [DONATION] }, undefined, { declarationId: 'x1' });
+    await userEvent.click(within(matched).getByRole('button', { name: 'Wallet donation (1)' }));
+    await userEvent.click(within(matched).getByRole('radio', { name: /12,000,000 from Pilot 99/ }));
+    await userEvent.click(within(matched).getByRole('button', { name: 'Assign 12,000,000' }));
+    await waitFor(() => expect(edit).toHaveBeenCalled());
+    expect(edit.mock.calls).toEqual([
+      [{ action: 'assignPayment', paymentId: 'u1', minerId: MINER, declarationId: 'x1' }],
+    ]);
   });
 
   it('still fails on a clash when the id was fresh', async () => {

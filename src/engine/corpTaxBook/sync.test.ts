@@ -8,6 +8,7 @@ import {
   openBalances,
   planSettlements,
   unbilledMinerIds,
+  unbilledWhenPaid,
   reconcileExtractions,
   resolveDonations,
   restampPlan,
@@ -413,6 +414,64 @@ describe('unbilledMinerIds (#6207)', () => {
       { miners, statements: [billed], startDate: '2026-01-01' }
     );
     expect([...ids]).toEqual([]);
+  });
+});
+
+describe('unbilledWhenPaid (held donation, lagging ledger)', () => {
+  const miners = [{ id: 'm1', characterIds: [7, 8], mainCharacterId: 7 }];
+  const row = (characterId: number, date: string, quantity = 10) => ({
+    characterId,
+    date,
+    quantity,
+  });
+  const billed = statement({
+    id: 's1',
+    minerId: 'm1',
+    coversThrough: '2026-08-31',
+    issuedAt: '2026-09-01T00:00:00Z',
+  });
+  const book = { miners, statements: [billed], startDate: '2026-01-01' };
+  const paid = (at: string, characterId = 8) => ({ characterId, at });
+
+  it('is true when ore mined on or before the payment day was on no Statement yet', () => {
+    expect(unbilledWhenPaid(paid('2026-09-05T10:00:00Z'), [row(7, '2026-09-05')], book)).toBe(true);
+    expect(unbilledWhenPaid(paid('2026-09-05T10:00:00Z'), [row(7, '2026-09-02')], book)).toBe(true);
+  });
+
+  it('is false when the only unbilled ore was mined after the payment day', () => {
+    expect(unbilledWhenPaid(paid('2026-09-05T10:00:00Z'), [row(7, '2026-09-06')], book)).toBe(
+      false
+    );
+  });
+
+  it('is false when a Statement issued before the payment already covered the ore', () => {
+    expect(unbilledWhenPaid(paid('2026-09-05T10:00:00Z'), [row(7, '2026-08-30')], book)).toBe(
+      false
+    );
+  });
+
+  it('counts ore a Statement issued only after the payment covers', () => {
+    const later = statement({
+      id: 's2',
+      minerId: 'm1',
+      coversThrough: '2026-09-30',
+      issuedAt: '2026-10-01T00:00:00Z',
+    });
+    expect(
+      unbilledWhenPaid(paid('2026-09-05T10:00:00Z'), [row(7, '2026-09-04')], {
+        ...book,
+        statements: [billed, later],
+      })
+    ).toBe(true);
+  });
+
+  it("ignores another Miner's ore, ore before the book and empty rows", () => {
+    const at = paid('2026-09-05T10:00:00Z');
+    expect(unbilledWhenPaid(at, [row(9, '2026-09-05')], book)).toBe(false);
+    expect(unbilledWhenPaid(at, [row(7, '2026-09-05', 0)], book)).toBe(false);
+    expect(unbilledWhenPaid(at, [row(7, '2026-09-05')], { ...book, startDate: '2026-09-06' })).toBe(
+      false
+    );
   });
 });
 

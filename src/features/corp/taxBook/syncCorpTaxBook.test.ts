@@ -240,7 +240,30 @@ describe('syncCorpTaxBook', () => {
     expect('uncounted' in vi.mocked(d.uploadSync).mock.calls[0][1]).toBe(false);
   });
 
-  it('never re-matches a donation held for review, even once its Miner owes', async () => {
+  it('never re-matches a donation held for review when its Miner owed nothing as they paid, even once they owe', async () => {
+    const d = deps({
+      readBookState: async () =>
+        emptyState({
+          miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
+          // Billed through the day mined before the donation: nothing was unbilled when they paid.
+          statements: [{ ...owing('m1'), coversThrough: '2026-07-19' } as unknown as Statement],
+          payments: [
+            {
+              id: 'j1_1',
+              characterId: 8,
+              amount: 5,
+              at: '2026-07-19T00:00:00Z',
+              source: 'donation',
+              reviewReason: 'no-open-balance',
+            },
+          ],
+        }),
+    });
+    await run(d);
+    expect(d.assignPayment).not.toHaveBeenCalled();
+  });
+
+  it('matches a held donation once the lagging ledger shows ore its Miner had not been billed for when paying', async () => {
     const d = deps({
       readBookState: async () =>
         emptyState({
@@ -259,7 +282,8 @@ describe('syncCorpTaxBook', () => {
         }),
     });
     await run(d);
-    expect(d.assignPayment).not.toHaveBeenCalled();
+    // Character 7 mined on the day character 8 paid; the ledger only showed it on this sync.
+    expect(d.assignPayment).toHaveBeenCalledWith(5, CORP, 'j1_1', 'm1');
   });
 
   it('does not resend donations the book already holds', async () => {

@@ -333,3 +333,15 @@ export function removalNoticeStillDue(
   if (record?.status !== 'pending-removal') return false;
   return item.removalStartedAt === undefined || record.removal?.startedAt === item.removalStartedAt;
 }
+
+/**
+ * The moon owner and stale spell a queued stale-ledger copy (`grant-stale`, #6210) was for, read
+ * from its `stale:{feeder}:{staleSince}:{recipient}` id; undefined for any other mail.
+ */
+export function staleMailSpell(
+  item: Pick<MailQueueItem, 'kind' | 'statementId'>
+): { feederCorporationId: number; staleSince: number } | undefined {
+  if (item.kind !== 'grant-stale') return undefined;
+  const m = /^stale:(\d+):(\d+):\d+$/.exec(item.statementId);
+  return m ? { feederCorporationId: Number(m[1]), staleSince: Number(m[2]) } : undefined;
+}

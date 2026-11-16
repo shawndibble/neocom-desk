@@ -61,6 +61,7 @@ import {
   MOON_NOTIFICATION_TYPES,
   SCHEDULED_STOP_REASONS,
   matchDonation,
+  minerIdFor,
   mergeGaps,
   observedRowsFromLedger,
   parseMoonPayload,
@@ -72,6 +73,7 @@ import {
   reconcileExtractions,
   resolveDonations,
   unbilledMinerIds,
+  unbilledWhenPaid,
   type JournalDonation,
   type MinerLike,
   type MoonNotification,
@@ -638,20 +640,31 @@ async function reassignUnmatched(
   known: ReadonlySet<number>,
   rows: readonly { characterId: number; date: string; quantity: number }[]
 ): Promise<{ assigned: Map<string, string>; error?: string }> {
-  // One held for review (#6207) is the officer's to place, never re-matched.
-  const unmatched = before.payments
-    .filter(
-      (p) =>
-        p.minerId === undefined &&
-        !(p.notTaxAmount && p.notTaxAmount > 0) &&
-        p.reviewReason === undefined
-    )
+  const open = before.payments
+    .filter((p) => p.minerId === undefined && !(p.notTaxAmount && p.notTaxAmount > 0))
     .sort((a, b) => a.at.localeCompare(b.at));
+  // One held for review (#6207) is the officer's to place, unless the ledger has since shown ore
+  // its Miner mined and had not been billed for when they paid: the hold was the ledger's lag.
+  const unmatched = open.filter((p) => p.reviewReason === undefined);
+  const caughtUp = open.filter(
+    (p) =>
+      p.reviewReason === 'no-open-balance' &&
+      unbilledWhenPaid({ characterId: p.characterId as number, at: p.at }, rows, {
+        miners: before.miners,
+        statements: before.statements,
+        startDate: before.startDate,
+      })
+  );
   const assigned = new Map<string, string>();
   // Only toward an open balance, spent oldest first: a sender whose Miner owes nothing waits.
   const balance = openBalanceOf(before);
   const unbilled = unbilledOf(before, rows);
   try {
+    for (const p of caughtUp) {
+      const minerId = minerIdFor(p.characterId as number, before.miners);
+      await edit({ action: 'assignPayment', paymentId: p.id, minerId });
+      assigned.set(p.id, minerId);
+    }
     for (const p of unmatched) {
       const match = matchDonation(
         { characterId: p.characterId as number, reason: (p as { reason?: string }).reason },
