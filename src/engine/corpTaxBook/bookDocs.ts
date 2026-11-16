@@ -5,6 +5,7 @@
  * The functions copy of `latestRecordedCorp` lives in `functions/src/corpTaxBookEngine.ts`
  * (ADR 0025: functions cannot import src), kept honest by `functionsMirror.test.ts`.
  */
+import { isFiniteNumber, isRecord } from '../guards';
 import { DEFAULT_GRACE_HOURS } from './billable';
 import { readDivisionNames, type DivisionNames } from './divisionNames';
 import { recordedLater, type CorpRecord } from './observed';
@@ -45,10 +46,8 @@ export interface BookSettings {
 /** Every scope a stored rate can have — the engine's own list, so a new scope is never dropped. */
 export const RATE_SCOPES: ReadonlySet<RateScope> = new Set(SCOPE_ORDER);
 
-const num = (v: unknown): number | undefined =>
-  typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+const num = (v: unknown): number | undefined => (isFiniteNumber(v) ? v : undefined);
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
-const isObject = (v: unknown): v is Data => typeof v === 'object' && v !== null;
 
 /** The field naming what a scoped rate targets, and whether it is a number or a string. */
 const TARGET: Partial<Record<RateScope, [field: string, kind: 'number' | 'string']>> = {
@@ -62,7 +61,7 @@ const TARGET: Partial<Record<RateScope, [field: string, kind: 'number' | 'string
 
 /** One stored rate, or null when it is not one the engine can resolve. */
 export function parseRate(v: unknown): TaxRate | null {
-  if (!isObject(v) || num(v.pct) === undefined) return null;
+  if (!isRecord(v) || num(v.pct) === undefined) return null;
   const scope = v.scope as RateScope;
   if (!RATE_SCOPES.has(scope)) return null;
   if (scope !== 'record' && str(v.effectiveFrom) === undefined) return null;
@@ -75,7 +74,7 @@ export function parseRate(v: unknown): TaxRate | null {
 }
 
 function parseCadence(v: unknown): StatementCadence {
-  if (isObject(v) && v.kind === 'days') {
+  if (isRecord(v) && v.kind === 'days') {
     const days = num(v.days);
     const anchor = str(v.anchor);
     if (days !== undefined && anchor !== undefined) return { kind: 'days', days, anchor };
@@ -88,7 +87,7 @@ function parseCadence(v: unknown): StatementCadence {
  * or malformed. Whether a member may see the book yet (active, setup window) is the caller's.
  */
 export function parseBookSettings(d: Data): BookSettings {
-  const expiry = isObject(d.structureExpiryHours) ? d.structureExpiryHours : {};
+  const expiry = isRecord(d.structureExpiryHours) ? d.structureExpiryHours : {};
   const membersSeeFrom = num(d.membersSeeFrom);
   return {
     active: d.active === true,
@@ -97,7 +96,7 @@ export function parseBookSettings(d: Data): BookSettings {
       ? d.divisions.filter((x): x is number => num(x) !== undefined)
       : [1],
     divisionNames: readDivisionNames(d.divisionNames),
-    lastSync: isObject(d.lastSync) ? (d.lastSync as unknown as LastSync) : null,
+    lastSync: isRecord(d.lastSync) ? (d.lastSync as unknown as LastSync) : null,
     structureExpiryHours: Object.fromEntries(
       Object.entries(expiry).filter((e): e is [string, number] => num(e[1]) !== undefined)
     ),

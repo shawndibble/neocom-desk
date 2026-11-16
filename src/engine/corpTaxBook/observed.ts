@@ -4,6 +4,7 @@
  * aged reads of the same ledger. The merge is monotonic so neither can undo
  * the other.
  */
+import { isFiniteNumber } from '../guards';
 import type { ObservedMiningEntry, ObservedRow, OreLine } from './types';
 
 type Data = Record<string, unknown>;
@@ -38,8 +39,7 @@ export function recordedLater(a: CorpRecord, b: CorpRecord): boolean {
   return a.recordedCorporationId > b.recordedCorporationId;
 }
 
-const num = (v: unknown): number | undefined =>
-  typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+const num = (v: unknown): number | undefined => (isFiniteNumber(v) ? v : undefined);
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
 /** A stored `observed` doc as an `ObservedRow`, or null when it is not one. */
