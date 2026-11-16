@@ -270,10 +270,8 @@ export async function settlePendingWork(
  * With `VITEST_FAIL_ON_LEFTOVER_WORK=1`, a test whose work outlives it by
  * `SETTLE_TIMEOUT_MS` fails instead of warning. CI's unit shards set it
  * (`.github/workflows/ci.yml`); a local run only warns unless you set it too.
- * The usual cause under fake timers is a faked `setImmediate`: it is
- * fake-indexeddb's scheduler, and a Dexie request queued on it is dropped when
- * the timers are restored, so it never finishes. Fake only what the test needs
- * (`toFake: ['setTimeout', 'clearTimeout']`, or `['Date']`).
+ * The usual cause under fake timers is a faked `setImmediate`: see "Teardown is
+ * deterministic" in `docs/agents/testing-and-ci.md`.
  */
 const FAIL_ON_LEFTOVER_WORK = process.env.VITEST_FAIL_ON_LEFTOVER_WORK === '1';
 
