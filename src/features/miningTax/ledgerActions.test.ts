@@ -638,6 +638,7 @@ describe('recordCorpPayment', () => {
       assignment({ id: 'day1', payeeId: 'p2', groupId: 'g' }),
       assignment({ id: 'day2', payeeId: 'p2', groupId: 'g', date: '2026-09-05' }),
       assignment({ id: 'other', payeeId: 'p2', groupId: 'h', date: '2026-09-06' }),
+      assignment({ id: 'stale', payeeId: 'p1', groupId: 'g', date: '2026-09-03' }),
     ]);
 
     const result = await recordCorpPayment(
@@ -648,11 +649,12 @@ describe('recordCorpPayment', () => {
 
     expect(result.ok).toBe(true);
     const byId = new Map((await db.miningTaxAssignments.toArray()).map((a) => [a.id, a]));
-    expect(byId.size).toBe(3);
+    expect(byId.size).toBe(4);
     expect(byId.get('day1')?.status).toBe('paid');
     expect(byId.get('day2')?.status).toBe('paid');
     expect(byId.get('day2')?.payment?.paymentId).toBe(byId.get('day1')?.payment?.paymentId);
     expect(byId.get('other')?.status).toBe('outstanding');
+    expect(byId.get('stale')?.status).toBe('outstanding');
   });
 
   it('records two rows on one entry (two refineries, same ore) in full, each once', async () => {

@@ -490,27 +490,33 @@ function fitsEntry(
 }
 
 /**
- * The other owed days of every Combined Entry one of `assignments` belongs to. A Combined Entry
- * is one obligation, so a Corp Tax Book Settle up that reaches one of its days pays them all —
- * paying only that day would leave the entry half paid, and `coalesce` would then dissolve it.
- * A group always shares one character, so each is read by its character.
+ * The other owed days of every Combined Entry one of `assignments` belongs to, under the same
+ * Payee. A Combined Entry is one obligation, so a Corp Tax Book Settle up that reaches one of its
+ * days pays them all — paying only that day would leave the entry half paid, and `coalesce` would
+ * then dissolve it. A needs-review day stays as it is: its new total is accepted first, the same
+ * as any Settle up. A member under another Payee is a stale group `coalesce` ejects, never paid
+ * here. A group always shares one character, so each is read by its character.
  */
 async function owedCombinedSiblings(
   assignments: readonly MiningTaxAssignmentRecord[]
 ): Promise<MiningTaxAssignmentRecord[]> {
-  const groups = new Map<number, Set<string>>();
+  const groups = new Map<number, Map<string, string | undefined>>();
   for (const a of assignments) {
     if (a.groupId === undefined) continue;
-    const set = groups.get(a.characterId) ?? new Set<string>();
-    set.add(a.groupId);
-    groups.set(a.characterId, set);
+    const payeeOf = groups.get(a.characterId) ?? new Map<string, string | undefined>();
+    payeeOf.set(a.groupId, a.payeeId);
+    groups.set(a.characterId, payeeOf);
   }
   const siblings: MiningTaxAssignmentRecord[] = [];
-  for (const [characterId, groupIds] of groups) {
+  for (const [characterId, payeeOf] of groups) {
     const own = await db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
     siblings.push(
       ...own.filter(
-        (a) => a.status === 'outstanding' && a.groupId !== undefined && groupIds.has(a.groupId)
+        (a) =>
+          a.status === 'outstanding' &&
+          a.groupId !== undefined &&
+          payeeOf.has(a.groupId) &&
+          payeeOf.get(a.groupId) === a.payeeId
       )
     );
   }

@@ -95,9 +95,9 @@ export function SplitDialog({
   // One figure per ore type — what the original's Payee keeps (issue #6180).
   // The pilot types whichever side they know: the Moves box writes
   // `held − moved` here. Above `held` is ore the client shows but ESI has
-  // not reported yet, up to `maxUnreportedClaim`. A needs-review Assignment starts with its growth moved,
-  // since that is what the pilot is nearly always here to hand on; anything
-  // else starts keeping everything.
+  // not reported yet, up to `maxUnreportedClaim`. A needs-review Assignment
+  // starts with its growth moved, since that is what the pilot is nearly
+  // always here to hand on; anything else starts keeping everything.
   const [keeps, setKeeps] = useState<ReadonlyMap<number, number>>(() => {
     const growth =
       assignment.status === 'needs-review' && assignment.reviewDiff
@@ -135,8 +135,12 @@ export function SplitDialog({
   for (const line of original) {
     const keep = keeps.get(line.typeId) ?? line.quantity;
     if (keep < line.quantity) moves.push({ typeId: line.typeId, quantity: line.quantity - keep });
+    // Clamped again here: an open dialog's entry can shrink under a typed keep.
     if (keep > line.quantity)
-      unreported.push({ typeId: line.typeId, quantity: keep - line.quantity });
+      unreported.push({
+        typeId: line.typeId,
+        quantity: Math.min(keep - line.quantity, maxUnreportedClaim(line.quantity)),
+      });
   }
   // `setKeep` keeps every figure in range, so this never throws — and it is
   // the same plan `splitAssignment` commits.
