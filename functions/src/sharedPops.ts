@@ -388,3 +388,43 @@ export function bookRatePctFor(
     0
   );
 }
+
+/**
+ * The pops whose time moved since the doc last published, with the new time: chiefly a chunk
+ * the laser fractured early, whose Pop Time drops back to the actual fracture. A Scheduled Push
+ * already projected for the old time is then stale (its Occurrence Key names that time).
+ */
+export function movedPops(
+  held: readonly SharedPop[] | undefined,
+  next: readonly SharedPop[]
+): { id: string; popAtMs: number }[] {
+  const before = new Map((held ?? []).map((p) => [p.id, p.popAt]));
+  return next.flatMap((p) => {
+    const was = before.get(p.id);
+    return was === undefined || was === p.popAt ? [] : [{ id: p.id, popAtMs: Date.parse(p.popAt) }];
+  });
+}
+
+/**
+ * The book's alliance now, read off the affiliation of any Character in its corporation (a
+ * viewer or an officer the read already looks up), so a book that left its alliance stops
+ * showing there at once rather than at the next republish. With no such Character, the alliance
+ * last published (re-read every 6 h at most).
+ */
+export function bookAllianceNow(
+  corporationId: number,
+  stored: number | null,
+  affiliations: Iterable<{ corporationId: number; allianceId: number | null }>
+): number | null {
+  for (const a of affiliations) if (a.corporationId === corporationId) return a.allianceId;
+  return stored;
+}
+
+/** The Communities the settings name (default and every Moon override), or none while off. */
+export function namedCommunityIds(sharing: PopSharingDoc): string[] {
+  if (!sharing.enabled) return [];
+  const ids = new Set<string>();
+  for (const s of [sharing.defaults, ...Object.values(sharing.moons)])
+    for (const a of s.audiences ?? []) if (a.kind === 'community') ids.add(a.communityId);
+  return [...ids].sort();
+}

@@ -31,10 +31,13 @@ import {
   POP_SHARING_BLOCKS,
   SHARED_POPS,
   SHARED_POP_SOURCES,
+  bookAllianceNow,
   bookRatePctFor,
   buildSharedPops,
   currentSharedPops,
   editorStampsFrom,
+  movedPops,
+  namedCommunityIds,
   qualifyingEditors,
   audienceCharacters,
   visiblePops,
@@ -43,7 +46,8 @@ import {
   type SharedPopView,
   type SharedPopsDoc,
 } from './sharedPops.js';
-import type { AffiliationLookup, CorporationAllianceLookup } from './sharedPopsEsi.js';
+import type { Affiliation, AffiliationLookup, CorporationAllianceLookup } from './sharedPopsEsi.js';
+import { PROJECTIONS_COLLECTION } from './projectionStore.js';
 
 type Data = Record<string, unknown>;
 
@@ -189,7 +193,13 @@ export async function publishSharedPops(
     ref
   );
   const sharing = popSharingFrom(sharingSnap.data());
-  if (!bookSnap.exists || bookSnap.get('active') !== true || !sharing.enabled) {
+  const active = bookSnap.exists && bookSnap.get('active') === true;
+  await indexSharingCommunities(
+    sourcesSnap,
+    active ? namedCommunityIds(sharing) : [],
+    sharedPopSourcesRef(db, corporationId)
+  );
+  if (!active || !sharing.enabled) {
     if (held.exists) await ref.delete();
     return null;
   }
@@ -237,7 +247,64 @@ export async function publishSharedPops(
     return null;
   }
   await ref.set({ ...doc, allianceCheckedAt, updatedAt: FieldValue.serverTimestamp() });
+  const heldPops = held.exists
+    ? (held.get('pops') as SharedPopsDoc['pops'] | undefined)
+    : undefined;
+  await cancelStalePopPushes(db, movedPops(heldPops, doc.pops));
   return doc;
+}
+
+/**
+ * `sharedPopSources/{corp}.sharingCommunityIds`: the Communities the book's settings name while
+ * it shares. Unlike `sharedPops/{corp}`, which goes whenever no pop is live, this lasts between
+ * extractions, so a Community's admin always sees (and can block) a corporation sharing into it.
+ * Written only when it changes.
+ */
+export const SHARING_COMMUNITY_IDS = 'sharingCommunityIds';
+
+async function indexSharingCommunities(
+  sources: DocumentSnapshot,
+  ids: string[],
+  ref: DocumentReference
+): Promise<void> {
+  const stored = sources.get(SHARING_COMMUNITY_IDS) as unknown;
+  if (Array.isArray(stored) && stored.join('\n') === ids.join('\n')) return;
+  if (!Array.isArray(stored) && ids.length === 0) return;
+  await ref.set({ [SHARING_COMMUNITY_IDS]: ids }, { merge: true });
+}
+
+/**
+ * Drops each device's unfired Scheduled Push for a pop whose time moved (an early fracture):
+ * its Occurrence Key (`sharedMoonPop:{popId}:{popAtMs}:{lead}`) names the old time, and a device
+ * whose app stays closed never uploads the Projection that would replace it, so it would still
+ * push at the stale time. The open app's poll tells the new time. Best effort.
+ */
+async function cancelStalePopPushes(
+  db: Firestore,
+  moved: readonly { id: string; popAtMs: number }[]
+): Promise<void> {
+  for (const { id, popAtMs } of moved) {
+    try {
+      const prefix = `sharedMoonPop:${id}:`;
+      const rows = await db
+        .collection(PROJECTIONS_COLLECTION)
+        .where('occurrenceKey', '>=', prefix)
+        .where('occurrenceKey', '<', `sharedMoonPop:${id};`)
+        .get();
+      const stale = rows.docs.filter(
+        (d) =>
+          d.get('fired') !== true &&
+          !String(d.get('occurrenceKey')).startsWith(`${prefix}${popAtMs}:`)
+      );
+      for (const part of chunk(stale, 400)) {
+        const batch = db.batch();
+        for (const d of part) batch.delete(d.ref);
+        await batch.commit();
+      }
+    } catch (e) {
+      console.error('stale pop push cancel failed', e instanceof Error ? e.message : e);
+    }
+  }
 }
 
 /** `publishSharedPops`, best effort: a failure is logged and never fails the sync or edit behind it. */
@@ -482,6 +549,43 @@ async function asSettingsAllowNow(
 }
 
 /**
+ * Each doc with the book's alliance as it is now (`bookAllianceNow`): from a viewer in the book's
+ * corporation, else from the book's officers (one batched affiliation read, cached per Character),
+ * else the alliance last published. So a book that left its alliance stops showing there at once.
+ */
+async function withAllianceNow(
+  deps: SharedPopsReadDeps,
+  docs: SharedPopsDoc[],
+  viewers: readonly Affiliation[]
+): Promise<SharedPopsDoc[]> {
+  const unsettled = docs.filter(
+    (d) => d.allianceId !== null && !viewers.some((v) => v.corporationId === d.corporationId)
+  );
+  let officers: Affiliation[] = [];
+  if (unsettled.length > 0) {
+    try {
+      const sources = await deps.db.getAll(
+        ...unsettled.map((d) => sharedPopSourcesRef(deps.db, d.corporationId))
+      );
+      const ids = [
+        ...new Set(sources.flatMap((s) => editorStampsFrom(s.data()).map((e) => e.characterId))),
+      ];
+      if (ids.length > 0) officers = [...(await deps.affiliations(ids)).values()];
+    } catch (e) {
+      // Unanswered: the alliance last published stands, as before this check.
+      console.error('book alliance affiliation failed', e instanceof Error ? e.message : e);
+    }
+  }
+  return docs.map((d) => {
+    if (d.allianceId === null) return d;
+    const allianceId = bookAllianceNow(d.corporationId, d.allianceId, [...viewers, ...officers]);
+    return allianceId === d.allianceId
+      ? d
+      : { ...d, allianceId, allianceShared: allianceId !== null && d.allianceShared };
+  });
+}
+
+/**
  * Which of `communityIds` carry this book's pops now: not blocked by the Community's admin, and
  * an officer of the book (an editing use in the last 30 days, no failed role check since, still
  * in the book's corporation) is a current Member.
@@ -555,7 +659,10 @@ export async function sharedPopsFor(
     ).docs.forEach(keep);
 
   const out: SharedPopView[] = [];
-  for (const doc of await asSettingsAllowNow(db, docs.values())) {
+  const current = await withAllianceNow(deps, await asSettingsAllowNow(db, docs.values()), [
+    ...affiliations.values(),
+  ]);
+  for (const doc of current) {
     const candidates = (doc.communityIds ?? []).filter((c) => memberOf.has(c));
     const status = await sharingCommunities(deps, doc.corporationId, candidates);
     const communityIds = new Set(
@@ -647,28 +754,58 @@ export async function settingsCommunityIds(
 
 export interface CommunityPopSharer {
   corporationId: number;
-  /** Whether the corporation shares pops into the Community now. */
+  /**
+   * Whether the corporation's pops reach the Community now, block aside: its settings name the
+   * Community and an officer of the book is a Member (the officer rule). False for a blocked
+   * corporation whose settings no longer name the Community.
+   */
   sharing: boolean;
   blocked: boolean;
 }
 
-/** A Community's admin: the corporations sharing moon pops into it, and the ones they blocked. */
+/**
+ * A Community's admin: the corporations whose Pop Sharing names the Community, and the ones
+ * they blocked. Listed from the settings' durable index (`sharingCommunityIds`), so a sharer
+ * stays listed (and blockable) between extractions, and from the published docs for a book not
+ * republished since that index existed. Each reports whether its pops actually reach the
+ * Community now (the officer rule), not just whether its settings name it.
+ */
 export async function listCommunityPopSharers(
-  db: Firestore,
+  deps: SharedPopsReadDeps,
   caller: Caller,
   communityId: string
 ): Promise<{ sharers: CommunityPopSharer[] }> {
+  const { db } = deps;
   await requireAdmin(db, communityId, caller);
-  const [sharing, blocks] = await Promise.all([
+  const [indexed, published, blocks] = await Promise.all([
+    db
+      .collection(SHARED_POP_SOURCES)
+      .where(SHARING_COMMUNITY_IDS, 'array-contains', communityId)
+      .get(),
     db.collection(SHARED_POPS).where('communityIds', 'array-contains', communityId).get(),
     db.collection(COMMUNITIES_COLLECTION).doc(communityId).collection(POP_SHARING_BLOCKS).get(),
   ]);
+  // A published doc counts only for a book the index has not caught up with yet.
+  const indexedNow = new Set(indexed.docs.map((d) => d.id));
+  const stale = (
+    await asSettingsAllowNow(
+      db,
+      published.docs.filter((d) => !indexedNow.has(d.id)).map((d) => d.data() as SharedPopsDoc)
+    )
+  ).filter((d) => d.pops.some((p) => p.audiences.includes(`community:${communityId}`)));
+  const named = [...indexedNow].map(Number).concat(stale.map((d) => d.corporationId));
   const byCorp = new Map<number, CommunityPopSharer>();
-  for (const d of sharing.docs)
-    byCorp.set(Number(d.id), { corporationId: Number(d.id), sharing: true, blocked: false });
+  for (const corporationId of named) {
+    const status = (await sharingCommunities(deps, corporationId, [communityId])).get(communityId);
+    byCorp.set(corporationId, {
+      corporationId,
+      sharing: status?.officer === true,
+      blocked: status?.blocked === true,
+    });
+  }
   for (const d of blocks.docs) {
     const id = Number(d.id);
-    byCorp.set(id, { corporationId: id, sharing: byCorp.has(id), blocked: true });
+    if (!byCorp.has(id)) byCorp.set(id, { corporationId: id, sharing: false, blocked: true });
   }
   return { sharers: [...byCorp.values()].sort((a, b) => a.corporationId - b.corporationId) };
 }

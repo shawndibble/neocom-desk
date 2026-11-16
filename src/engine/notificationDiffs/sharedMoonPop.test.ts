@@ -97,6 +97,43 @@ describe('diffSharedMoonPop', () => {
   });
 });
 
+describe('diffSharedMoonPop: a chunk fractured early', () => {
+  // Synced hours after the laser fired: the Pop Time moved back past both polls.
+  const before = entry({ popTime: 'auto-fracture', popAtMs: NOW + 3 * HOUR_MS });
+  const after = entry({ popTime: 'auto-fracture', popAtMs: NOW - 2 * HOUR_MS });
+
+  it('tells the moved Pop Time once, as fractured early, though it is already past', () => {
+    const prev = { entries: [before], nowMs: NOW - 10 * MINUTE_MS };
+    const next = { entries: [after], nowMs: NOW };
+    expect(diffSharedMoonPop(7, prev, next)).toEqual([
+      expect.objectContaining({ popId: after.popId, popAtMs: after.popAtMs, early: true }),
+    ]);
+    expect(diffSharedMoonPop(7, next, { entries: [after], nowMs: NOW + MINUTE_MS })).toEqual([]);
+  });
+
+  it('tells it at the new time when that is still ahead of this poll', () => {
+    const soon = entry({ popTime: 'auto-fracture', popAtMs: NOW + 5 * MINUTE_MS });
+    const prev = { entries: [before], nowMs: NOW };
+    expect(diffSharedMoonPop(7, prev, { entries: [soon], nowMs: NOW + MINUTE_MS })).toEqual([]);
+    expect(
+      diffSharedMoonPop(
+        7,
+        { entries: [soon], nowMs: NOW + MINUTE_MS },
+        { entries: [soon], nowMs: NOW + 10 * MINUTE_MS }
+      )
+    ).toEqual([expect.objectContaining({ popAtMs: soon.popAtMs })]);
+  });
+
+  it('stays quiet for a muted corporation, or a time moved back too far to be news', () => {
+    const prev = { entries: [before], nowMs: NOW - 10 * MINUTE_MS };
+    expect(
+      diffSharedMoonPop(7, prev, { entries: [{ ...after, muted: true }], nowMs: NOW })
+    ).toEqual([]);
+    const longAgo = entry({ popTime: 'auto-fracture', popAtMs: NOW - 13 * HOUR_MS });
+    expect(diffSharedMoonPop(7, prev, { entries: [longAgo], nowMs: NOW })).toEqual([]);
+  });
+});
+
 describe('projectSharedMoonPops', () => {
   const names = { corporations: new Map([[98000001, 'Moon Collectors']]), when: () => '14:00' };
   const project = (

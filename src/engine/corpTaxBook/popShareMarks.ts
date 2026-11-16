@@ -1,7 +1,7 @@
 /**
  * The share and opted-out marks on the book's moon lists (issue #6226): a shared moon carries
  * its effective audiences, a moon whose owner opted out carries the opted-out mark, an unshared
- * moon none. Built from the Sharing tab's own rows (`sharingMoons`), so a mark never disagrees
+ * moon none, and a book whose Pop Sharing is off marks nothing at all. Built from the Sharing tab's own rows (`sharingMoons`), so a mark never disagrees
  * with the settings. Keyed by moon, by refinery (the Moon extractions widget's rows name a
  * refinery, not a moon) and by moon owner. Plain records, so a widget read can carry them.
  */
@@ -36,6 +36,8 @@ export function popShareMarks(
   doc: PopSharingDoc
 ): PopShareMarks {
   const marks: PopShareMarks = { moons: {}, structures: {}, owners: {} };
+  // A book that shares nothing marks nothing: an opted-out mark there would only be noise.
+  if (!doc.enabled) return marks;
   const ownerAudiences = new Map<number, Map<string, PopAudience>>();
   for (const row of sharingMoons(extractions, feeders, doc)) {
     const mark = popShareMark(row);

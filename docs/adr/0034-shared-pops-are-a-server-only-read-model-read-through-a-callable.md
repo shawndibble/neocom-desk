@@ -18,7 +18,7 @@ A Corp Tax Book's officers can share the pop schedule of the moons the book hand
 ### Storage
 
 - **`sharedPops/{corporationId}`**: one doc per sharing book, top level and server-only (rules deny every client). It holds the book's corporation and alliance, `corpShared` / `allianceShared` / `communityIds` (for the queries below), the Community names the officers chose, `syncedAt` (data age) and `pops[]`. A pop holds its id (`{corporationId}_{extractionId}`, the deep-link id), moon, refinery id, name and system, Pop Time and its instant (`popAt`), whether the chunk was fractured, start and expiry, ore make-up in units when shared (never ISK), notes, start-link rate and the `audienceKey`s it is shared with. One doc per book is one read whatever its size; a book's live pops are a few dozen at most.
-- **`sharedPopSources/{corporationId}`**: server-only inputs for publishing: `editors` (per officer: `characterId`, `ownerHash`, `usedAt`, `failedAt`) and `refineries` (the book's own refinery names, looked up with the Automatic sync grant, which carries the structures scope).
+- **`sharedPopSources/{corporationId}`**: server-only inputs for publishing: `editors` (per officer: `characterId`, `ownerHash`, `usedAt`, `failedAt`) and `refineries` (the book's own refinery names, looked up with the Automatic sync grant, which carries the structures scope). Also `sharingCommunityIds`: the Communities the settings name while the book shares, kept between extractions (unlike `sharedPops`), so a Community's admin always lists and can block a sharer.
 - **`communities/{id}/popSharingBlocks/{corporationId}`**: an admin's block (`by`, `at`), server-only. Deleted with the Community (`recursiveDelete`).
 
 ### Publishing
