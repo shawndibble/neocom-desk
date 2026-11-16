@@ -30,7 +30,13 @@ const row = (over: Partial<BookRowView>): BookRowView =>
 const view = (rows: BookRowView[], s: BookSummary): CorpBookView =>
   ({
     overlay: { rows },
-    books: [{ corpName: 'Brass Meridian', summary: s, loaded: { corporationId: CORP } }],
+    books: [
+      {
+        corpName: 'Brass Meridian',
+        summary: s,
+        loaded: { corporationId: CORP, characterIds: [], statements: [] },
+      },
+    ],
   }) as unknown as CorpBookView;
 
 describe('corpBookAttention', () => {
@@ -73,5 +79,69 @@ describe('corpBookAttention', () => {
     expect(out.alsoBilled).toEqual([
       { corporationId: CORP, corpName: 'Brass Meridian', payeeIds: ['p1', 'p2'], rowId: 'a' },
     ]);
+  });
+
+  describe('with a Character filter', () => {
+    const overdue = (statementId: string) => ({
+      statementId,
+      minerId: 'solo:1',
+      code: statementId,
+      periodStart: '2026-10-01',
+      periodEnd: '2026-10-31',
+      overdueAt: '2026-11-14T00:00:00.000Z',
+    });
+    const statement = (id: string, characterIds: (number | undefined)[]) => ({
+      id,
+      lines: characterIds.map((characterId) => ({ characterId })),
+    });
+    const filteredView = (rows: BookRowView[], s: BookSummary): CorpBookView =>
+      ({
+        overlay: { rows },
+        books: [
+          {
+            corpName: 'Brass Meridian',
+            summary: s,
+            loaded: {
+              corporationId: CORP,
+              characterIds: [1, 2],
+              statements: [statement('s1', [1]), statement('s2', [2, 1]), statement('s3', [])],
+            },
+          },
+        ],
+      }) as unknown as CorpBookView;
+    const overlap = (payeeIds: string[]) => ({ payeeIds, ore: [], paid: false });
+    const books = filteredView(
+      [
+        row({ id: 'a', characterId: 1, overlap: overlap(['p1']) }),
+        row({ id: 'b', characterId: 2, overlap: overlap(['p2']) }),
+      ],
+      summary({
+        overdue: [overdue('s1'), overdue('s2'), overdue('s3')],
+        uncredited: [
+          { characterId: 1, amount: 1, at: '2026-11-01T10:00:00Z' },
+          { characterId: 2, amount: 2, at: '2026-11-01T10:00:00Z' },
+        ],
+      })
+    );
+
+    it('keeps only what the Characters in view mined, paid or are billed for', () => {
+      const out = corpBookAttention(books, new Set([2]));
+      expect(out.overdue.map((o) => [o.statementId, o.declarerId])).toEqual([['s2', 2]]);
+      expect(out.uncredited.map((u) => u.characterId)).toEqual([2]);
+      expect(out.alsoBilled).toEqual([
+        { corporationId: CORP, corpName: 'Brass Meridian', payeeIds: ['p2'], rowId: 'b' },
+      ]);
+    });
+
+    it('keeps everything, with the first tracked declarer, for all Characters', () => {
+      const out = corpBookAttention(books, 'all');
+      expect(out.overdue.map((o) => [o.statementId, o.declarerId])).toEqual([
+        ['s1', 1],
+        ['s2', 2],
+        ['s3', undefined],
+      ]);
+      expect(out.uncredited).toHaveLength(2);
+      expect(out.alsoBilled[0].payeeIds).toEqual(['p1', 'p2']);
+    });
   });
 });

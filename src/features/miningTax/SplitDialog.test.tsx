@@ -321,6 +321,17 @@ describe('SplitDialog — typing what the first Payee keeps (issue #6180)', () =
     );
   });
 
+  it('caps a keep at double what ESI reports and asks for that UTC day only', async () => {
+    renderDialog();
+    await pickHek();
+    await userEvent.clear(keepsBox());
+    await userEvent.type(keepsBox(), '500');
+
+    expect(keepsBox()).toHaveValue('200');
+    expect(screen.getByText(/100 more than ESI reports yet/)).toBeInTheDocument();
+    expect(screen.getByText(/this UTC day only/)).toBeInTheDocument();
+  });
+
   describe('a second split, with a third Assignment already the Growth Collector (#6205)', () => {
     const third: MiningTaxAssignmentRecord = {
       ...assignment,

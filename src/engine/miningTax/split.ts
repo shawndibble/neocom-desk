@@ -8,6 +8,16 @@ export interface SplitPlan {
 }
 
 /**
+ * The most ore a split may claim past what ESI holds of one type: as much again (a keep of at
+ * most double). ESI trails the client by up to an hour, so a real claim is a session's last
+ * stretch, not a second day — a bigger figure almost always counts ore mined after 00:00 UTC,
+ * which ESI files on the next day's entry and would bill twice. See decision 20261115-205445.
+ */
+export function maxUnreportedClaim(held: number): number {
+  return held;
+}
+
+/**
  * The kept/moved halves of a quantity split (issue #523) — one shape shared
  * by the Split dialog's live preview and `splitAssignment`'s commit, so the
  * figures a pilot sees are exactly what gets stored. Throws on a move the
@@ -20,7 +30,8 @@ export interface SplitPlan {
  * entry holds; `computeOwnership` then routes later ore to the kept side's
  * claim first, and only the excess to the growth collector. A type can take
  * a move or an unreported claim, never both — keeping more than held and
- * moving some of it away contradict each other.
+ * moving some of it away contradict each other — and a claim stays within
+ * `maxUnreportedClaim`.
  */
 export function planSplit(
   original: readonly OreLine[],
@@ -39,8 +50,12 @@ export function planSplit(
   const extraByType = new Map<number, number>();
   for (const extra of unreported) {
     if (extra.quantity <= 0) continue;
-    if (!original.some((l) => l.typeId === extra.typeId)) {
+    const held = original.find((l) => l.typeId === extra.typeId)?.quantity;
+    if (held === undefined) {
       throw new Error(`Cannot claim more of type ${extra.typeId}: none held`);
+    }
+    if (extra.quantity > maxUnreportedClaim(held)) {
+      throw new Error(`Cannot claim ${extra.quantity} more of type ${extra.typeId}: ${held} held`);
     }
     if (moveByType.has(extra.typeId)) {
       throw new Error(`Cannot both move and claim more of type ${extra.typeId}`);
