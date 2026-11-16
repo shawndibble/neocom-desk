@@ -2,6 +2,8 @@ import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { DisplayRow } from '../groupRows';
 import { recordCorpPayment } from '../ledgerActions';
+import { defaultPayer } from '../settlePayer';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { SettleUpDialog, type SettleUpRow } from '../SettleUpDialog';
 import { useCopiedField } from '../settleUpFields';
 import { CorpBookSyncNote } from './CorpBookSyncNote';
@@ -47,6 +49,7 @@ export function CorpPayDialog({
 }: Props) {
   const { t } = useTranslation();
   const { copied, copy } = useCopiedField();
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const division = book.loaded.divisions[0] ?? 1;
   // A book row's synthetic Assignment and its DisplayRow share the row's id (`corpRows.syntheticRow`).
   const views = new Map(
@@ -64,21 +67,21 @@ export function CorpPayDialog({
         ]
       : []
   );
-  const owed = settleRows.reduce((sum, r) => sum + r.assignment.taxOwed, 0);
   // The payer's Miner's oldest open Statement: payments settle the oldest first, and a code of
-  // another Miner's Statement is not credited to it.
-  const oldest = suggestedCode(statementCodes, focus?.characterId);
+  // another Miner's Statement is not credited to it. It follows the payer the pilot picks.
+  const oldestFor = (payerId: number | null) => suggestedCode(statementCodes, payerId ?? undefined);
   const several = statementCodes.length > 1;
+  const payerId = focus?.characterId ?? defaultPayer(settleRows, activeCharacterId) ?? undefined;
   return (
     <SettleUpDialog
       open
       onClose={onClose}
       onPaid={onPaid}
       rows={settleRows}
-      payerId={focus?.characterId}
+      payerId={payerId}
       focusIds={focus ? new Set([focus.rowId]) : undefined}
       systemNames={systemNames}
-      reason={oldest?.code}
+      reason={(payerId) => oldestFor(payerId)?.code}
       recordPaid={(ticked, payment) =>
         recordCorpPayment(
           { corporationId: book.loaded.corporationId, name: book.corpName },
@@ -86,47 +89,53 @@ export function CorpPayDialog({
           payment
         )
       }
-      notice={
-        <div className="space-y-1.5 text-xs text-text-dim">
-          <p>
-            <Trans
-              i18nKey="miningTax.corpBook.pay.account"
-              values={{ account: corpPayAccount(division, book.loaded.divisionNames, t) }}
-              components={{ strong: <strong className="font-semibold text-text" /> }}
-            />
-          </p>
-          {oldest && !several && (
-            <p>{t('miningTax.corpBook.pay.codeInReason', { period: oldest.period })}</p>
-          )}
-          {several && (
+      notice={(ticked, payerId) => {
+        const oldest = oldestFor(payerId);
+        const owed = ticked.reduce((sum, r) => sum + r.assignment.taxOwed, 0);
+        return (
+          <div className="space-y-1.5 text-xs text-text-dim">
             <p>
-              {oldest && <>{t('miningTax.corpBook.pay.codeOldest', { period: oldest.period })} </>}
-              {t('miningTax.corpBook.pay.oldestFirst')}
+              <Trans
+                i18nKey="miningTax.corpBook.pay.account"
+                values={{ account: corpPayAccount(division, book.loaded.divisionNames, t) }}
+                components={{ strong: <strong className="font-semibold text-text" /> }}
+              />
             </p>
-          )}
-          {several ? (
-            <ul className="space-y-1">
-              {statementCodes.map((s) => (
-                <li key={s.code} className="flex flex-wrap items-center gap-2">
-                  <span>
-                    {t('miningTax.corpBook.pay.codeOf', {
-                      period: s.period,
-                      character: s.character,
-                    })}
-                  </span>
-                  <span className="font-mono text-text">{s.code}</span>
-                  <Button size="sm" onClick={() => void copy(s.code, s.code)}>
-                    {copied === s.code
-                      ? t('miningTax.settleUpCopied')
-                      : t('miningTax.corpBook.pay.copy')}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          <CorpBookSyncNote book={book} owedNow={owed} />
-        </div>
-      }
+            {oldest && !several && (
+              <p>{t('miningTax.corpBook.pay.codeInReason', { period: oldest.period })}</p>
+            )}
+            {several && (
+              <p>
+                {oldest && (
+                  <>{t('miningTax.corpBook.pay.codeOldest', { period: oldest.period })} </>
+                )}
+                {t('miningTax.corpBook.pay.oldestFirst')}
+              </p>
+            )}
+            {several ? (
+              <ul className="space-y-1">
+                {statementCodes.map((s) => (
+                  <li key={s.code} className="flex flex-wrap items-center gap-2">
+                    <span>
+                      {t('miningTax.corpBook.pay.codeOf', {
+                        period: s.period,
+                        character: s.character,
+                      })}
+                    </span>
+                    <span className="font-mono text-text">{s.code}</span>
+                    <Button size="sm" onClick={() => void copy(s.code, s.code)}>
+                      {copied === s.code
+                        ? t('miningTax.settleUpCopied')
+                        : t('miningTax.corpBook.pay.copy')}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <CorpBookSyncNote book={book} owedNow={owed} />
+          </div>
+        );
+      }}
     />
   );
 }

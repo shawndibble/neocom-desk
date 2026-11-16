@@ -324,6 +324,14 @@ export function FittingStartScreen({
   const loading =
     savedPending ||
     (hasCharacter && (inGame.granted === undefined || (inGame.loading && !inGame.result)));
+  // A linked `?source=` whose source has no rows once every source has loaded is
+  // dropped from the URL, so it can't quietly narrow the list when rows arrive later.
+  const sourcesSettled =
+    !loading && !active.pending && (!hasCharacter || (community.settled && doctrine.settled));
+  const urlSourceDead = page && sourcesSettled && urlSource !== 'all' && urlSource !== source;
+  useEffect(() => {
+    if (urlSourceDead) setUrlSource('all');
+  }, [urlSourceDead, setUrlSource]);
 
   const refreshInGameButton =
     hasCharacter && inGame.granted === true ? (
@@ -600,9 +608,23 @@ export function FittingStartScreen({
                   {t('fittings.start.matches', { count: visible.length })}
                 </p>
               )}
-              {visible.length === 0 && (
-                <p className="p-3 text-xs text-text-dim">{t('fittings.start.noMatches')}</p>
-              )}
+              {visible.length === 0 &&
+                (source === 'all' ? (
+                  // Search only: the search box is the way out (DESIGN.md, EmptyState).
+                  <EmptyState title={t('fittings.start.noMatches')} />
+                ) : (
+                  // The Source pick can be what hides the match: name it, and offer its undo.
+                  <EmptyState
+                    title={t('fittings.start.noMatchesInSource', {
+                      source: t(SOURCE_LABEL[source]),
+                    })}
+                    action={
+                      <Button size="sm" onClick={() => setSource('all')}>
+                        {t('fittings.start.showAllSources')}
+                      </Button>
+                    }
+                  />
+                ))}
               {activeShown.length > 0 && (
                 <section className="pb-1">
                   <h3 className={cx(eyebrowClassName, 'px-3 pt-3 pb-1')}>

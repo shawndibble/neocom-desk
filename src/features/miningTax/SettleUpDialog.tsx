@@ -79,10 +79,16 @@ interface SettleUpDialogProps {
     rows: readonly SettleUpRow[],
     payment: PaymentInput | undefined
   ) => Promise<LedgerActionResult>;
-  /** The Reason to copy in place of the dates-and-systems one (a Statement's code). */
-  reason?: string;
-  /** Payee-specific lines under the To / Amount / Reason box (where a corp's book wants it sent). */
-  notice?: ReactNode;
+  /**
+   * The Reason to copy in place of the dates-and-systems one (a Statement's code). A function
+   * reads the paying Character as the pilot switches it; `undefined` falls back to the default.
+   */
+  reason?: string | ((payerId: number | null) => string | undefined);
+  /**
+   * Payee-specific lines under the To / Amount / Reason box (where a corp's book wants it sent).
+   * A function gets the entries ticked right now and the paying Character.
+   */
+  notice?: ReactNode | ((ticked: readonly SettleUpRow[], payerId: number | null) => ReactNode);
 }
 
 /** More Characters than this pick from a list instead of a segmented row (DESIGN §4). */
@@ -192,7 +198,7 @@ export function SettleUpDialog({
   const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
   const systems = [...new Set(included.map((r) => systemName(r.assignment.solarSystemId)))];
   const reason =
-    reasonOverride ??
+    (typeof reasonOverride === 'function' ? reasonOverride(payer) : reasonOverride) ??
     buildSettleUpReason(t('miningTax.settleUpReasonPrefix'), systems, sortedDates);
 
   function toggle(id: string) {
@@ -511,7 +517,7 @@ export function SettleUpDialog({
           )}
           {copyRow('reason', t('miningTax.settleUp.reasonLabel'), reason, reason, true)}
         </div>
-        {notice}
+        {typeof notice === 'function' ? notice(included, payer) : notice}
 
         <div className="space-y-1.5">
           <button

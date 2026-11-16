@@ -822,7 +822,9 @@
       "fitFlown": "Fit your {{ship}}",
       "importHint": "Paste an EFT block (the fit text EVE and other fitting tools copy) or a link, or pick a fittings file. You can also press Ctrl+V anywhere in the app to paste an EFT block.",
       "importHint_touch": "Paste an EFT block (the fit text EVE and other fitting tools copy) or a link, or pick a fittings file.",
-      "noMatches": "No saved or In-game fitting matches that search.",
+      "noMatches": "No fitting matches that search.",
+      "noMatchesInSource": "Nothing under {{source}} matches that search.",
+      "showAllSources": "Show all sources",
       "matches_one": "{{count}} matching fitting",
       "matches_other": "{{count}} matching fittings",
       "pickToPreview": "Pick a fitting to preview it.",
@@ -8153,7 +8155,9 @@
         "codeOf": "{{character}} · {{period}} Statement code:",
         "codeInReason": "The Reason is your {{period}} Statement's code.",
         "codeOldest": "The Reason is the code of the payer's oldest open Statement ({{period}}).",
-        "oldestFirst": "A payment goes to the oldest open Statement first; a code moves it to that Statement first."
+        "oldestFirst": "A payment goes to the oldest open Statement first; a code moves it to that Statement first.",
+        "heldElsewhere_one": "Nothing was recorded: the entry of {{dates}} already has its ore with another Payee, dismissed, or waiting for review in your ledger. Untick it, or sort it out on its row first.",
+        "heldElsewhere_other": "Nothing was recorded: {{count}} entries ({{dates}}) already have their ore with another Payee, dismissed, or waiting for review in your ledger. Untick them, or sort them out on their rows first."
       },
       "attention": {
         "overdueTitle": "{{corp}} Statement {{period}} overdue since {{date}}",
@@ -8526,7 +8530,8 @@
       "unassignedHint_one": "{{count}} entry has no Payee yet",
       "unassignedHint_other": "{{count}} entries have no Payee yet",
       "acrossPayees_one": "across {{count}} payee",
-      "acrossPayees_other": "across {{count}} payees"
+      "acrossPayees_other": "across {{count}} payees",
+      "uncreditedNote": "{{amount}} ISK you donated isn't credited yet — check the wallet division ({{accounts}}) before paying again."
     },
     "continue": {
       "eyebrow": "New EVE day",
@@ -12229,7 +12234,7 @@
       "lpUnknown": "Your LP with this corporation isn't known yet.",
       "lpNone": "You have no LP with this corporation.",
       "title": "Spend my LP",
-      "meta": "Sell now · top 10 offers that pass your filters",
+      "meta": "Sell now · top 10 offers by Sell now ISK/LP that pass your filters",
       "close": "Close the plan",
       "colOffer": "Offer",
       "colTimes": "Times",
@@ -12245,7 +12250,8 @@
       "stopLp": "Stopped: the {{lp}} LP left is short of the next one, {{name}}.",
       "stopLoss": "Stopped: the next one, {{name}}, would lose ISK.",
       "stopUnpriced": "Stopped: the order books can't price any of these offers.",
-      "stopWallet": "Stopped: the next one, {{name}}, needs more ISK than your wallet holds ({{wallet}}).",
+      "noRankedOffers": "No offer in the current view has a Sell now price to rank by. Clear the filters or search, or wait for prices to load.",
+      "stopWallet": "Stopped: no offer left fits your wallet ({{wallet}}); the best was {{name}}.",
       "stopFloorYours": "Stopped: next was {{name}} at {{rate}} ISK/LP, under your LP value of {{floor}}.",
       "stopFloorMarket": "Stopped: next was {{name}} at {{rate}} ISK/LP, under this store's market rate of {{floor}}.",
       "stopFloorBest": "Stopped: next was {{name}} at {{rate}} ISK/LP, under {{share}}% of the best, {{best}}.",

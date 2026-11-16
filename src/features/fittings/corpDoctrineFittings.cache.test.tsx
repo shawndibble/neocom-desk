@@ -40,6 +40,8 @@ describe('useCorpDoctrineFittings', () => {
     const again = renderHook(() => useCorpDoctrineFittings(501));
     // The cached rows stand in for the call.
     await waitFor(() => expect(again.result.current.rows).toHaveLength(1));
+    // Settled at once: the `?source=` cleanup needn't wait on a call that never happens.
+    expect(again.result.current.settled).toBe(true);
     expect(listCorpDoctrineFits).toHaveBeenCalledTimes(1);
 
     await act(() => again.result.current.refresh());

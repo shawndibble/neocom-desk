@@ -2,16 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PayeeRecord } from '@/db';
 import { useTicker } from '@/lib/ticker';
-import { resolveNames } from '@/features/character/names';
-import { loadDatedUnitPricesByHub, type DatedUnitPrices } from '@/features/miningTax/pricing';
+import type { DatedUnitPrices } from '@/features/miningTax/pricing';
 import type { MadePayment } from '../paymentLinks';
 import type { MoonMiningTaxRow, TrackedCharacter } from '../snapshot';
-import {
-  loadCorpBooks,
-  teachRefinerySystems,
-  trackedCharacterCorporations,
-  type LoadedCorpBook,
-} from './corpBookStore';
+import { teachRefinerySystems, type LoadedCorpBook } from './corpBookStore';
+import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBookSources';
 import { buildCorpBookView, type CorpBookView } from './corpBookView';
 import { MINUTE_MS } from '@/lib/age';
 
@@ -53,16 +48,14 @@ export function useCorpBookView({
     if (!loadedLedger) return;
     let cancelled = false;
     void (async () => {
-      const books = await trackedCharacterCorporations().then(loadCorpBooks, () => []);
+      const books = await loadTrackedCorpBooks();
       if (cancelled) return;
       setLoaded(books);
       if (books.length === 0) {
         setPricesByCorp(new Map());
         return;
       }
-      const names = await resolveNames(books.map((b) => b.corporationId)).catch(
-        () => new Map<number, string>()
-      );
+      const names = await loadCorpNames(books);
       if (!cancelled) setCorpNames(names);
     })();
     return () => {
@@ -75,24 +68,8 @@ export function useCorpBookView({
     if (loaded.length === 0 || activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const entries = await Promise.all(
-        loaded.map(async (book) => {
-          const typeIds = [
-            ...new Set(book.observed.flatMap((o) => o.oreLines.map((l) => l.typeId))),
-          ];
-          const dates = [...new Set(book.observed.map((o) => o.date))];
-          const prices = await loadDatedUnitPricesByHub(
-            typeIds,
-            [book.hubId],
-            dates,
-            book.oreForm === 'compressed'
-          ).catch(() => null);
-          return prices ? ([book.corporationId, prices] as const) : null;
-        })
-      );
-      if (!cancelled) {
-        setPricesByCorp(new Map(entries.filter((e): e is NonNullable<typeof e> => e !== null)));
-      }
+      const prices = await loadBookPrices(loaded);
+      if (!cancelled) setPricesByCorp(prices);
     })();
     return () => {
       cancelled = true;

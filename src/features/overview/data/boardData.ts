@@ -39,7 +39,8 @@ import { buildPriceAlertRows, type BoardPriceAlert } from './priceAlertsBoard';
 import { useMarketHub } from '@/features/market/hub';
 import { loadPriceVsMedian } from '@/features/market/priceVsMedian';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { payeesOwed, type PayeeOwed } from './miningTaxPayees';
+import { sum } from '@/engine/math';
+import { oldestOwedMs, payeesOwed, type PayeeOwed } from './miningTaxPayees';
 import type {
   BoardExtractionSource,
   BoardStructureSource,
@@ -61,7 +62,8 @@ import { DAY_MS } from '@/lib/age';
  *   holds them — `app/prefetch.ts`, the notification poller and the Calendar
  *   route warmer all name them — so an `import()` here cannot move them out
  *   of the entry chunk; Rollup reports it as an ineffective dynamic import.
- * - `miningTax/snapshot` stays behind `import()`. It reaches the ledger,
+ * - `miningTax/snapshot` stays behind `import()`, and so does `miningTax/owedNow`
+ *   (the Tax tab's owed figure, Corp Tax Books included). It reaches the ledger,
  *   payees, assignments, reconciliation and `sde/loadSde` for two numbers,
  *   and its only other importer is the code-split Mining page, so deferring
  *   it genuinely keeps that chain off the first paint. The card was going to
@@ -155,13 +157,13 @@ export async function loadPlanetaryBoard(
 // --- Mining tax -----------------------------------------------------------
 
 export interface MiningTaxBoardData {
-  /** Sum of `taxOwed` across every still-Outstanding Assignment. */
+  /** What the Tax tab's "You owe" totals across every Character (`loadOwedBalances`). */
   unpaidIsk: number;
   /** How many Payees that is spread across — "412.6M" reads differently across one and eleven. */
   payeeCount: number;
   /** Ledger entries carrying ore no Assignment covers yet. */
   unassignedCount: number;
-  /** Days since the oldest outstanding Assignment's entry, or null when nothing is owed. */
+  /** Days since the oldest owed entry, or null when nothing is owed. */
   oldestUnpaidDays: number | null;
   /**
    * No Character's ledger could be read, so the figures say nothing. One that
@@ -180,44 +182,27 @@ export interface MiningTaxBoardData {
 }
 
 export async function loadMiningTaxBoard(): Promise<MiningTaxBoardData> {
-  const { loadMoonMiningTaxSnapshot } = await import('@/features/miningTax/snapshot');
+  const [{ loadMoonMiningTaxSnapshot }, { loadOwedBalances }] = await Promise.all([
+    import('@/features/miningTax/snapshot'),
+    import('@/features/miningTax/owedNow'),
+  ]);
   const snapshot = await loadMoonMiningTaxSnapshot();
   const now = Date.now();
-
-  let unpaidIsk = 0;
-  let unassignedCount = 0;
-  let oldestUnpaidMs: number | null = null;
-  const payees = new Set<string>();
-
-  for (const row of snapshot.rows) {
-    if (row.unassignedOreLines.length > 0) unassignedCount += 1;
-    for (const assignment of row.assignments) {
-      if (assignment.status !== 'outstanding') continue;
-      unpaidIsk += assignment.taxOwed;
-      if (assignment.payeeId) payees.add(assignment.payeeId);
-      const entryMs = Date.parse(row.entry.date);
-      if (!Number.isNaN(entryMs) && (oldestUnpaidMs === null || entryMs < oldestUnpaidMs)) {
-        oldestUnpaidMs = entryMs;
-      }
-    }
-  }
+  // The Tax tab's "You owe" figure, Corp Tax Book overlay and all, so the two never disagree.
+  const { balances, unassignedCount } = await loadOwedBalances(snapshot, now);
+  const payees = payeesOwed(balances, now);
+  const oldestUnpaidMs = oldestOwedMs(balances);
 
   return {
-    unpaidIsk,
-    payeeCount: payees.size,
+    unpaidIsk: sum(payees.map((p) => p.unpaidIsk)),
+    payeeCount: payees.length,
     unassignedCount,
     oldestUnpaidDays: oldestUnpaidMs === null ? null : Math.floor((now - oldestUnpaidMs) / DAY_MS),
     needsReauth:
       snapshot.reauthCharacters.length > 0 &&
       snapshot.reauthCharacters.length >= snapshot.characters.length,
     fetchedAt: snapshot.fetchedAt,
-    payees: payeesOwed(
-      snapshot.rows,
-      new Map(
-        [...snapshot.payeesByCharacter.values()].flat().map((payee) => [payee.id, payee.name])
-      ),
-      now
-    ),
+    payees,
     characterCount: await db.characters.count(),
     missingCharacterNames: snapshot.reauthCharacters.map((character) => character.characterName),
     missingCharacterIds: snapshot.reauthCharacters.map((character) => character.characterId),
