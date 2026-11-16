@@ -103,6 +103,7 @@ export function bookSettingsValue(
         { corporationId: LEFT_OWNER, status: 'left' },
       ],
       state: { extractions: [] },
+      parts: new Set(['core', 'observed', 'ledger', 'answers']),
     } as unknown as BookData,
     verdict,
     reload: () => undefined,

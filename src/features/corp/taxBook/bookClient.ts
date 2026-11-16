@@ -31,17 +31,16 @@ import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { Adjustment, Statement, StatementCadence } from '@/engine/corpTaxBook/statements';
-import {
-  extractionId as extractionIdOf,
-  type JournalDonation,
-  type LastSync,
-  type SettlePayment,
-  type SyncExtraction,
-  type SyncGap,
+import type {
+  JournalDonation,
+  LastSync,
+  SettlePayment,
+  SyncExtraction,
+  SyncGap,
 } from '@/engine/corpTaxBook/sync';
-import { scheduledSyncFrom, type ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
-import { readUncounted, type UncountedDonation } from '@/engine/corpTaxBook/uncounted';
-import { readDisputes, type OreDispute } from '@/engine/corpTaxBook/disputes';
+import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
+import type { UncountedDonation } from '@/engine/corpTaxBook/uncounted';
+import type { OreDispute } from '@/engine/corpTaxBook/disputes';
 import type {
   FeederMode,
   FeederModeChange,
@@ -53,20 +52,9 @@ import type { OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
 import type { StoredRefineryLabel, StoredRefineryStructure } from '@/engine/corpTaxBook/refinery';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore } from '@/sync/firebaseApp';
-import { bookVersionsOf, cachedPart } from './bookCache';
-import { bookPartStore } from './bookPartStore';
-import { ALL_BOOK_PART_SET, mergeBookParts, type BookPart, type BookPartSet } from './bookParts';
 import type { FeederViewSummary } from './feederViewClient';
-import { readObservedRows } from './observedRead';
-import {
-  minerScopedRows,
-  openWindowStart,
-  type HeaderTotals,
-} from '@/engine/corpTaxBook/minerScope';
-import { forgetObservedCopy } from './observedStore';
+import { openBook } from './openBook';
 import type { ReadModelDocs } from '@/engine/corpTaxBook/readModels';
-import { moonDocUsable, planMoonScope } from '@/engine/corpTaxBook/pullFigures';
-import type { MoonDoc } from '../../../../functions/src/corpTaxBookMoonDocs';
 import { callRouted } from '@/sync/routedCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -349,77 +337,6 @@ export async function readDeclinedAutoGroup(
   return new Set(Array.isArray(ids) ? (ids as number[]) : []);
 }
 
-/**
- * Opens a book for reading: its settings document (always read: it carries
- * the version marker), and readers for its parts that reuse this tab's copy
- * while the part's stamp is unchanged (bookCache.ts, issue #5047).
- */
-async function openBook(characterId: number, corporationId: number) {
-  await ensureSignedIn(characterId);
-  const db = getSyncFirestore(characterId);
-  const snap = await getDoc(doc(db, 'corps', String(corporationId)));
-  if (!snap.exists()) {
-    // A deleted book takes its rows with it; a re-created one must not inherit ghosts.
-    await forgetObservedCopy(characterId, corporationId).catch(() => {});
-    return null;
-  }
-  const data = snap.data();
-  const versions = bookVersionsOf(data);
-  const key = `${characterId}:${corporationId}`;
-  // `meta/paid` is read fresh every time, never from the copy: it is
-  // officer-only, so the rules still decide each open. Every part waits on it,
-  // so no copy is handed out to a Character the rules now refuse.
-  const paid = getDoc(doc(db, 'corps', String(corporationId), 'meta', 'paid'));
-  // A refusal here means the rules no longer let this Character in: nothing of the book stays on the device.
-  paid.catch(async (error) => {
-    if (String((error as { code?: unknown } | null)?.code ?? '').endsWith('permission-denied'))
-      await forgetObservedCopy(characterId, corporationId).catch(() => {});
-  });
-  const store = bookPartStore(characterId, corporationId);
-  const paidStatementIds = async () =>
-    new Set(((await paid).data()?.ids as string[] | undefined) ?? []);
-  const part = async <T>(
-    collectionName: string,
-    readPart: () => Promise<T>,
-    slot?: string,
-    persist = true
-  ) => {
-    const [, value] = await Promise.all([
-      paid,
-      cachedPart(key, collectionName, versions, readPart, {
-        ...(slot ? { slot } : {}),
-        ...(persist ? { store } : {}),
-      }),
-    ]);
-    return value;
-  };
-  const read = async <T>(name: string): Promise<T[]> =>
-    (await getDocs(collection(db, 'corps', String(corporationId), name))).docs.map(
-      (d) => d.data() as T
-    );
-  const list = <T>(name: string): Promise<T[]> => part(name, () => read<T>(name));
-  // `observed` is the book's biggest part: a delta over this device's Dexie copy (observedRead.ts).
-  const observed = (): Promise<ObservedRow[]> =>
-    part(
-      'observed',
-      () =>
-        readObservedRows(
-          db,
-          characterId,
-          corporationId,
-          versions?.collections.observed,
-          paid,
-          Date.now(),
-          typeof data.createdAt === 'number' ? data.createdAt : undefined
-        ),
-      undefined,
-      false // its own Dexie copy (ADR 0031)
-    );
-  // A collection the stamps never name was never written (every server write stamps it): no read.
-  const written = (name: string) => versions === null || versions.collections[name] !== undefined;
-  return { db, data, part, read, list, observed, paidStatementIds, written };
-}
-
 /** The book's settings and the collections the sync needs. Officer-only: verify first. */
 export async function readBookState(
   characterId: number,
@@ -481,7 +398,8 @@ export async function readBookSettings(
   return snap.exists() ? settingsFrom(snap.data()) : null;
 }
 
-function settingsFrom(d: Record<string, unknown>): BookSettings {
+/** The settings document as `BookSettings`, every default filled in. */
+export function settingsFrom(d: Record<string, unknown>): BookSettings {
   const num = (v: unknown, fallback: number) => (typeof v === 'number' ? v : fallback);
   return {
     active: d.active === true,
@@ -587,7 +505,10 @@ export interface BookFeeder extends FeederReadClock {
   payouts: FeederPayoutRow[];
 }
 
-type FeederDoc = Omit<BookFeeder, 'lastReadWellAt' | 'payouts'> & { lastReadWellAt?: number };
+/** A feeder record as stored: the clock is epoch ms, and the payouts live under it. */
+export type FeederDoc = Omit<BookFeeder, 'lastReadWellAt' | 'payouts'> & {
+  lastReadWellAt?: number;
+};
 
 /** A stored feeder record and its payouts as a `BookFeeder`. */
 export function bookFeederFrom(record: FeederDoc, payouts: FeederPayoutRow[]): BookFeeder {
@@ -600,6 +521,12 @@ export function bookFeederFrom(record: FeederDoc, payouts: FeederPayoutRow[]): B
     payouts,
   };
 }
+
+/**
+ * A part of the book a read covers (`bookRead/parts.ts` says which page reads which, and
+ * `bookRead/slices.ts` which fields each part fills).
+ */
+export type BookPart = 'core' | 'observed' | 'ledger' | 'answers' | 'owners';
 
 /** Everything `/corp/moons` renders from. Officer-only: verify first. */
 export interface BookData {
@@ -617,8 +544,8 @@ export interface BookData {
   uncounted?: UncountedDonation[];
   /** #6206: Miners' Conflict disputes (`disputes`), answered or not. Read with the ledger. */
   disputes?: OreDispute[];
-  /** Which slices this read covered (bookParts.ts); the rest are empty. Absent: the whole book. */
-  parts?: BookPartSet;
+  /** Which parts this read covered (`bookRead/`); every field of the others is empty. */
+  parts: ReadonlySet<BookPart>;
   /** The Overview and Miners tab docs (ADR 0032); absent until the server has built them. */
   readModels?: ReadModelDocs;
   /**
@@ -627,475 +554,10 @@ export interface BookData {
    */
   feederSummaries?: ReadonlyMap<number, FeederViewSummary>;
   /**
-   * The Miner a one-Miner read (`readMinerBookData`) covered; absent for the whole book. Then
+   * The Miner a one-Miner read (`readBook` with a `minerId`) covered; absent for the whole book. Then
    * `state.miners` holds that Miner only, so a dialog listing other Miners reads them itself.
    */
   scopedMiner?: string;
-}
-
-const feederPayouts = (characterId: number, book: number, feeder: number) =>
-  collection(
-    getSyncFirestore(characterId),
-    'corps',
-    String(book),
-    'feeders',
-    String(feeder),
-    'payouts'
-  );
-
-type OpenBook = NonNullable<Awaited<ReturnType<typeof openBook>>>;
-
-/** Every feeder with its payouts. One stamp covers a feeder's record and its payouts: both live under `feeders`. */
-function feedersOf(
-  book: Pick<OpenBook, 'part' | 'read'>,
-  characterId: number,
-  corporationId: number
-): Promise<BookFeeder[]> {
-  return book.part(
-    'feeders',
-    async () =>
-      Promise.all(
-        (await book.read<FeederDoc>('feeders')).map(async (f) =>
-          bookFeederFrom(
-            f,
-            (await getDocs(feederPayouts(characterId, corporationId, f.corporationId))).docs.map(
-              (d) => ({ ...d.data(), id: d.id }) as FeederPayoutRow
-            )
-          )
-        )
-      ),
-    'feeders:rows'
-  );
-}
-
-/**
- * The book's moon owners' view summaries, one doc each, nothing under them. An officer of the
- * book may read them (rules, #5717). One that is missing, or that the rules do not yet let this
- * officer read, is left out: the caller prices that moon owner from its ledger rows instead.
- */
-async function readFeederSummaries(
-  characterId: number,
-  corporationId: number,
-  feederCorporationIds: readonly number[]
-): Promise<Map<number, FeederViewSummary>> {
-  const db = getSyncFirestore(characterId);
-  const found = await Promise.all(
-    feederCorporationIds.map(async (id) => {
-      try {
-        const snap = await getDoc(
-          doc(db, 'corps', String(corporationId), 'feederViews', String(id))
-        );
-        return snap.exists() ? ([id, snap.data() as FeederViewSummary] as const) : undefined;
-      } catch {
-        return undefined;
-      }
-    })
-  );
-  return new Map(found.flatMap((f) => (f ? [f] : [])));
-}
-
-/**
- * `parts` limits the read to those slices (bookParts.ts); the others come back
- * empty, and `parts` on the result says which were read. Default: the whole book.
- */
-export async function readBookData(
-  characterId: number,
-  corporationId: number,
-  parts: BookPartSet = ALL_BOOK_PART_SET
-): Promise<BookData | null> {
-  const book = await openBook(characterId, corporationId);
-  if (!book) return null;
-  const settings = settingsFrom(book.data);
-  const { list, part } = book;
-  const meta = (id: string) =>
-    getDoc(doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'meta', id));
-  const slice = <T>(name: BookPart, readSlice: () => Promise<T>, empty: T) =>
-    parts.has(name) ? readSlice() : Promise.resolve(empty);
-  const none: never[] = [];
-  const [
-    [miners, statements, extractions, scheduled, feederRows, uncountedDoc],
-    observed,
-    [payments, dismissals, declarations, adjustments, writeOffs, disputes],
-    answers,
-    paidStatementIds,
-    readModels,
-  ] = await Promise.all([
-    slice(
-      'core',
-      () =>
-        Promise.all([
-          list<Miner>('miners'),
-          list<Statement>('statements'),
-          list<SyncExtraction>('extractions'),
-          part('meta', async () => (await meta('scheduledSync')).data(), 'meta:schedule'),
-          feedersOf(book, characterId, corporationId),
-          part('meta', async () => (await meta('uncounted')).data(), 'meta:uncounted'),
-        ] as const),
-      [none, none, none, undefined, none, undefined] as const
-    ),
-    // The ledger rows are a part of their own: a tab that needs none never reads them (#5717).
-    slice('observed', () => book.observed(), [] as ObservedRow[]),
-    slice(
-      'ledger',
-      () =>
-        Promise.all([
-          list<SettlePayment>('payments'),
-          list<Dismissal>('dismissals'),
-          list<BookDeclaration>('declarations'),
-          list<Adjustment>('adjustments'),
-          list<RecordedWriteOff>('writeOffs'),
-          // #6206: best effort, so a book whose rules predate disputes still opens.
-          book.written('disputes')
-            ? list<unknown>('disputes').catch(() => [] as unknown[])
-            : Promise.resolve([] as unknown[]),
-        ] as const),
-      [none, none, none, none, none, none] as const
-    ),
-    slice(
-      'answers',
-      () => part('meta', async () => (await meta('groupingAnswers')).data(), 'meta:answers'),
-      undefined
-    ),
-    book.paidStatementIds(),
-    // Two docs, one stamp (ADR 0032). Best effort, even on a refusal (rules not deployed): the
-    // screens fall back to the whole-book view, and the book's own reads above already surface
-    // a lost role.
-    part('readModels', async () => {
-      const docs = async (id: string) =>
-        (
-          await getDoc(
-            doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'readModels', id)
-          )
-        ).data();
-      const [minerList, overview] = await Promise.all([docs('minerList'), docs('overview')]);
-      return { minerList, overview } as ReadModelDocs;
-    }).catch(() => undefined),
-  ]);
-  // One doc per moon owner, from the cached record list when `core` was read earlier.
-  const feederSummaries = parts.has('owners')
-    ? await readFeederSummaries(
-        characterId,
-        corporationId,
-        (parts.has('core') ? feederRows : await feedersOf(book, characterId, corporationId)).map(
-          (f) => f.corporationId
-        )
-      )
-    : undefined;
-  return {
-    settings,
-    state: {
-      book: settings,
-      miners,
-      statements,
-      payments,
-      dismissals,
-      extractions,
-      paidStatementIds,
-      writeOffs,
-    },
-    observed,
-    declarations,
-    adjustments,
-    feeders: feederRows,
-    groupingAnswers: groupingAnswersFrom(answers),
-    scheduledSync: scheduledSyncFrom(scheduled),
-    uncounted: readUncounted(uncountedDoc).donations,
-    disputes: readDisputes(disputes),
-    parts,
-    ...(readModels ? { readModels } : {}),
-    ...(feederSummaries ? { feederSummaries } : {}),
-  };
-}
-
-// --- One Miner's page from the read models (issue #5258, ADR 0032) ---------------
-
-/** What the Miner page reads, scoped to one Miner. */
-export interface MinerBookRead {
-  /** A whole-book shape, scoped: this Miner's records and ledger window only. */
-  data: BookData;
-  /** First day whose ledger rows were read; frozen days before it come from Statement lines. */
-  from: string;
-  /** The Miner's stored totals; absent when the read model is not deployed or built yet. */
-  totals?: HeaderTotals;
-}
-
-const IN_LIMIT = 30;
-const isMissingIndex = (error: unknown) =>
-  String((error as { code?: unknown } | null)?.code ?? '').endsWith('failed-precondition');
-
-/**
- * One Miner's page: the Miner's totals doc, their Statements, payments, write-offs,
- * adjustments and declarations by Miner, the book's dismissals and Extractions, and the
- * ledger rows since the newest Statement began. Never the whole ledger. Officer-only.
- * A missing composite index (observed: characterId + date) falls back to the Miner's
- * characters' whole ledger, filtered here, so an undeployed index costs reads, not the page.
- */
-export async function readMinerBookData(
-  characterId: number,
-  corporationId: number,
-  minerId: string
-): Promise<MinerBookRead | null> {
-  const book = await openBook(characterId, corporationId);
-  if (!book) return null;
-  const settings = settingsFrom(book.data);
-  const { db, list, part } = book;
-  const under = (name: string) => collection(db, 'corps', String(corporationId), name);
-  const byMiner = async <T>(name: string): Promise<T[]> =>
-    (await getDocs(query(under(name), where('minerId', '==', minerId)))).docs.map(
-      (d) => d.data() as T
-    );
-  const meta = (id: string) => getDoc(doc(db, 'corps', String(corporationId), 'meta', id));
-  const one = async (name: string) => {
-    const snap = await getDoc(doc(db, 'corps', String(corporationId), name, minerId));
-    return snap.exists() ? (snap.data() as Record<string, unknown>) : undefined;
-  };
-  // The totals doc may not be deployed or readable yet: no reason to lose the page.
-  // A refusal is not that, and neither is a failed grouping read (the Miner would vanish).
-  const totalsOrNone = async () => {
-    try {
-      return await one('minerTotals');
-    } catch (error) {
-      if (String((error as { code?: unknown } | null)?.code ?? '').endsWith('permission-denied'))
-        throw error;
-      return undefined;
-    }
-  };
-  const [grouping, totalsDoc, statements, payments, writeOffs, adjustments] = await Promise.all([
-    one('miners'),
-    totalsOrNone(),
-    byMiner<Statement>('statements'),
-    byMiner<SettlePayment>('payments'),
-    byMiner<RecordedWriteOff>('writeOffs'),
-    byMiner<Adjustment>('adjustments'),
-  ]);
-  const solo = /^solo:(\d+)$/.exec(minerId);
-  const characterIds = Array.isArray(grouping?.characterIds)
-    ? (grouping.characterIds as number[])
-    : solo
-      ? [Number(solo[1])]
-      : [];
-  const from = openWindowStart(statements, settings.startDate);
-
-  const windowRows = async (): Promise<ObservedRow[]> => {
-    const rows: ObservedRow[] = [];
-    for (let i = 0; i < characterIds.length; i += IN_LIMIT) {
-      const ids = characterIds.slice(i, i + IN_LIMIT);
-      try {
-        const snap = await getDocs(
-          query(under('observed'), where('characterId', 'in', ids), where('date', '>=', from))
-        );
-        rows.push(...snap.docs.map((d) => d.data() as ObservedRow));
-      } catch (error) {
-        if (!isMissingIndex(error)) throw error;
-        const snap = await getDocs(query(under('observed'), where('characterId', 'in', ids)));
-        rows.push(...snap.docs.map((d) => d.data() as ObservedRow).filter((r) => r.date >= from));
-      }
-    }
-    return rows;
-  };
-  /** The corporation a character's newest ledger row was recorded under: member, leaver or guest. */
-  const latestCorp = async (id: number, known: readonly ObservedRow[]) => {
-    const mine = known.filter((r) => r.characterId === id);
-    if (mine.length > 0)
-      return mine.reduce((a, b) => (b.date >= a.date ? b : a)).recordedCorporationId;
-    try {
-      const snap = await getDocs(
-        query(
-          under('observed'),
-          where('characterId', '==', id),
-          orderBy('date', 'desc'),
-          limitTo(1)
-        )
-      );
-      const newest = snap.docs[0]?.data() as ObservedRow | undefined;
-      return newest?.recordedCorporationId ?? corporationId;
-    } catch {
-      return corporationId;
-    }
-  };
-  const declarationsOf = async (): Promise<BookDeclaration[]> => {
-    const ids = statements.map((s) => s.id);
-    const out: BookDeclaration[] = [];
-    for (let i = 0; i < ids.length; i += IN_LIMIT)
-      out.push(
-        ...(
-          await getDocs(
-            query(under('declarations'), where('statementId', 'in', ids.slice(i, i + IN_LIMIT)))
-          )
-        ).docs.map((d) => d.data() as BookDeclaration)
-      );
-    return out;
-  };
-
-  const [windowed, dismissals, extractions, feeders, declarations, answers, scheduled, paid] =
-    await Promise.all([
-      windowRows(),
-      list<Dismissal>('dismissals'),
-      list<SyncExtraction>('extractions'),
-      feedersOf(book, characterId, corporationId),
-      statements.length > 0 ? declarationsOf() : Promise.resolve([] as BookDeclaration[]),
-      part('meta', async () => (await meta('groupingAnswers')).data(), 'meta:answers'),
-      part('meta', async () => (await meta('scheduledSync')).data(), 'meta:schedule'),
-      book.paidStatementIds(),
-    ]);
-  const corps = new Map(
-    await Promise.all(characterIds.map(async (id) => [id, await latestCorp(id, windowed)] as const))
-  );
-  const observed = minerScopedRows(statements, windowed, {
-    corpFor: (id) => corps.get(id) ?? corporationId,
-  });
-  const miner = grouping ? [grouping as unknown as Miner] : [];
-  return {
-    from,
-    ...(totalsDoc ? { totals: totalsDoc as unknown as HeaderTotals } : {}),
-    data: {
-      settings,
-      state: {
-        book: settings,
-        miners: miner,
-        statements,
-        payments,
-        dismissals,
-        extractions,
-        paidStatementIds: paid,
-        writeOffs,
-      },
-      observed,
-      declarations,
-      adjustments,
-      feeders,
-      groupingAnswers: groupingAnswersFrom(answers),
-      scheduledSync: scheduledSyncFrom(scheduled),
-      parts: ALL_BOOK_PART_SET,
-      scopedMiner: minerId,
-    },
-  };
-}
-
-// --- One moon's page from the moon docs (issue #5716, ADR 0032) ----------------
-
-/** What a moon page reads, scoped to one pull and its moon's cycles. */
-export interface MoonBookRead {
-  /** A whole-book shape without the ledger: the rows are the planned pulls' windows only. */
-  data: BookData;
-  /** The moon docs of the shown pull's refinery, by extraction id. */
-  docs: ReadonlyMap<string, MoonDoc>;
-  /** Cycles whose figures come from their docs, not from rows. */
-  fromDocs: ReadonlySet<string>;
-}
-
-const isPermissionDenied = (error: unknown) =>
-  String((error as { code?: unknown } | null)?.code ?? '').endsWith('permission-denied');
-
-/**
- * A moon page: the book's records without the ledger, the refinery's moon docs, and the
- * rows of the shown pull's window (plus any earlier cycle of the moon that can still have an
- * open day; pullFigures.ts). `'fallback'` when a doc the page needs is missing, on another
- * schema or unreadable: the caller then reads the whole book. A missing composite index
- * (observed: structureId + date) reads the window's days at every refinery and filters here,
- * so an undeployed index costs reads, not the page. Officer-only.
- */
-export async function readMoonBookData(
-  characterId: number,
-  corporationId: number,
-  extractionId: string
-): Promise<MoonBookRead | 'fallback' | null> {
-  const book = await openBook(characterId, corporationId);
-  if (!book) return null;
-  const settings = settingsFrom(book.data);
-  const { db, list, part } = book;
-  const under = (name: string) => collection(db, 'corps', String(corporationId), name);
-  const meta = (id: string) => getDoc(doc(db, 'corps', String(corporationId), 'meta', id));
-  const none: never[] = [];
-  const [miners, statements, extractions, scheduled, feeders] = await Promise.all([
-    list<Miner>('miners'),
-    list<Statement>('statements'),
-    list<SyncExtraction>('extractions'),
-    part('meta', async () => (await meta('scheduledSync')).data(), 'meta:schedule'),
-    feedersOf(book, characterId, corporationId),
-  ] as const);
-  const [payments, dismissals, declarations, adjustments, writeOffs, paidStatementIds] =
-    await Promise.all([
-      list<SettlePayment>('payments'),
-      list<Dismissal>('dismissals'),
-      list<BookDeclaration>('declarations'),
-      list<Adjustment>('adjustments'),
-      list<RecordedWriteOff>('writeOffs'),
-      book.paidStatementIds(),
-    ] as const);
-
-  const shown = extractions.find((x) => extractionIdOf(x) === extractionId);
-  const docList = shown
-    ? await part(
-        'moonDocs',
-        async () =>
-          (
-            await getDocs(query(under('moonDocs'), where('structureId', '==', shown.structureId)))
-          ).docs.map((d) => {
-            // The server's timestamp is not part of the figures, and a class instance does not clone into the copy.
-            const fields = { ...d.data() };
-            delete fields.updatedAt;
-            return fields as unknown as MoonDoc;
-          }),
-        `moonDocs:s:${shown.structureId}`
-      ).catch((error) => {
-        if (isPermissionDenied(error)) throw error;
-        return undefined;
-      })
-    : [];
-  if (!docList) return 'fallback';
-  const docs = new Map(docList.filter(moonDocUsable).map((d) => [d.extractionId, d]));
-  const scope = planMoonScope({
-    extractionId,
-    extractions,
-    docs,
-    statements,
-    startDate: settings.startDate,
-    expiryHours: settings.structureExpiryHours,
-  });
-  if (!scope.ok) return 'fallback';
-
-  const windowRows = async (w: { structureId: number; from: string; to: string }) => {
-    const days = [where('date', '>=', w.from), where('date', '<=', w.to)] as const;
-    try {
-      const snap = await getDocs(
-        query(under('observed'), where('structureId', '==', w.structureId), ...days)
-      );
-      return snap.docs.map((d) => d.data() as ObservedRow);
-    } catch (error) {
-      if (!isMissingIndex(error)) throw error;
-      const snap = await getDocs(query(under('observed'), ...days));
-      return snap.docs
-        .map((d) => d.data() as ObservedRow)
-        .filter((r) => r.structureId === w.structureId);
-    }
-  };
-  const observed = (await Promise.all(scope.rows.map(windowRows))).flat();
-  return {
-    docs,
-    fromDocs: scope.fromDocs,
-    data: {
-      settings,
-      state: {
-        book: settings,
-        miners,
-        statements,
-        payments,
-        dismissals,
-        extractions,
-        paidStatementIds,
-        writeOffs,
-      },
-      observed,
-      declarations,
-      adjustments,
-      feeders,
-      groupingAnswers: none,
-      scheduledSync: scheduledSyncFrom(scheduled),
-      // The shown pull's window stands in for the ledger rows.
-      parts: new Set<BookPart>(['core', 'observed', 'ledger']),
-    },
-  };
 }
 
 /**
@@ -1111,41 +573,6 @@ export async function readGroupingSources(
   if (!book) return null;
   const [miners, observed] = await Promise.all([book.list<Miner>('miners'), book.observed()]);
   return { miners, observed };
-}
-
-/** `extra`'s slices laid over `held`; everything else, and the settings, is `extra`'s fresher copy. */
-export function mergeBookData(held: BookData, extra: BookData): BookData {
-  const parts = mergeBookParts(held.parts, extra.parts);
-  const fresh = (name: BookPart) => extra.parts?.has(name) ?? true;
-  const pick = <T>(name: BookPart, fromHeld: T, fromExtra: T) =>
-    fresh(name) ? fromExtra : fromHeld;
-  return {
-    settings: extra.settings,
-    state: {
-      ...extra.state,
-      miners: pick('core', held.state.miners, extra.state.miners),
-      statements: pick('core', held.state.statements, extra.state.statements),
-      extractions: pick('core', held.state.extractions, extra.state.extractions),
-      payments: pick('ledger', held.state.payments, extra.state.payments),
-      dismissals: pick('ledger', held.state.dismissals, extra.state.dismissals),
-      writeOffs: pick('ledger', held.state.writeOffs, extra.state.writeOffs),
-    },
-    observed: pick('observed', held.observed, extra.observed),
-    feeders: pick('core', held.feeders, extra.feeders),
-    scheduledSync: pick('core', held.scheduledSync, extra.scheduledSync),
-    uncounted: pick('core', held.uncounted, extra.uncounted),
-    declarations: pick('ledger', held.declarations, extra.declarations),
-    disputes: pick('ledger', held.disputes, extra.disputes),
-    adjustments: pick('ledger', held.adjustments, extra.adjustments),
-    groupingAnswers: pick('answers', held.groupingAnswers, extra.groupingAnswers),
-    parts,
-    ...((extra.readModels ?? held.readModels)
-      ? { readModels: extra.readModels ?? held.readModels }
-      : {}),
-    ...(pick('owners', held.feederSummaries, extra.feederSummaries)
-      ? { feederSummaries: pick('owners', held.feederSummaries, extra.feederSummaries) }
-      : {}),
-  };
 }
 
 /** A declaration as stored: who recorded it, and who resolved it. */

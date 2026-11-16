@@ -10,9 +10,9 @@
  * is the caller's: Firestore here is the `lite` build, with no listeners.
  *
  * `options.minerId` names the Miner whose page is open. The book is then that Miner's read-model
- * slice (#5258, `readMinerBookData`) instead of the whole ledger. `options.extractionId` names the
- * pull whose moon page is open: the book is then its window's rows plus the moon docs
- * (#5716, `readMoonBookData`), or the whole book when a doc is missing.
+ * slice (#5258) instead of the whole ledger. `options.extractionId` names the pull whose moon page
+ * is open: the book is then its window's rows plus the moon docs (#5716), or the whole book when a
+ * doc is missing. `readBook` (taxBook/bookRead) decides which.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
@@ -45,25 +45,16 @@ import {
 } from '@/features/miningTax/pricing';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
-import { withMinerTotals, type HeaderTotals } from '@/engine/corpTaxBook/minerScope';
+import { withMinerTotals } from '@/engine/corpTaxBook/minerScope';
 import { withMoonDocs } from '@/engine/corpTaxBook/pullFigures';
-import type { MoonDoc } from '../../../../functions/src/corpTaxBookMoonDocs';
 import {
-  mergeBookData,
-  readBookData,
-  readMinerBookData,
-  readMoonBookData,
   verifyOfficer,
   type BookData,
+  type BookPart,
   type BookSettings,
   type OfficerVerdict,
 } from '../taxBook/bookClient';
-import {
-  ALL_BOOK_PART_SET,
-  missingBookParts,
-  type BookPart,
-  type BookPartSet,
-} from '../taxBook/bookParts';
+import { bookPartsFor, extendBook, holdsParts, readBook, type BookRead } from '../taxBook/bookRead';
 import { moonOwnersNeedRows } from '@/engine/corpTaxBook/moonOwners';
 import { forgetObservedCopy } from '../taxBook/observedStore';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
@@ -105,15 +96,9 @@ type Fetched =
   | {
       status: 'loaded';
       verdict: OfficerVerdict;
-      data: BookData;
+      data: BookRead;
       pricesOn: BookViewInput['pricesOn'];
       moonOwnerPricesOn: NonNullable<BookViewInput['moonOwnerPricesOn']>;
-      /** Set when the book is one Miner's read-model slice (#5258), not the whole book. */
-      scope?: { minerId: string; totals?: HeaderTotals };
-      /** The moon page this read was for (#5716), whether or not it could read the docs. */
-      forMoon?: string;
-      /** Set when the book is one pull's window plus the moon docs, not the whole book. */
-      moon?: { docs: ReadonlyMap<string, MoonDoc>; fromDocs: ReadonlySet<string> };
     };
 
 export type CorpBookState =
@@ -171,12 +156,12 @@ async function failedFetch(
 
 /**
  * `wanted` is what the open page joins (`bookPartsFor`); default the whole book. Only those
- * slices are read, and a page that wants more reads just the slices it adds. Until they
+ * parts are read, and a page that wants more reads just the parts it adds. Until they
  * are in, the state is `loading`.
  */
 export function useCorpBook(
   sync: CorpTaxBookSync,
-  wanted: BookPartSet = ALL_BOOK_PART_SET,
+  wanted: ReadonlySet<BookPart> = bookPartsFor(),
   options: { minerId?: string; extractionId?: string } = {}
 ): CorpBook {
   const scopedMiner = options.minerId;
@@ -233,30 +218,14 @@ export function useCorpBook(
           setFetched({ status: 'off', verdict });
           return;
         }
-        let data: BookData | null;
-        let scope: { minerId: string; from: string; totals?: HeaderTotals } | undefined;
-        let moon: { docs: ReadonlyMap<string, MoonDoc>; fromDocs: ReadonlySet<string> } | undefined;
-        if (scopedMiner !== undefined) {
-          const miner = await readMinerBookData(characterId, corporationId, scopedMiner);
-          data = miner?.data ?? null;
-          if (miner) scope = { minerId: scopedMiner, from: miner.from, totals: miner.totals };
-        } else {
-          const one =
-            scopedMoon === undefined
-              ? undefined
-              : await readMoonBookData(characterId, corporationId, scopedMoon);
-          if (one === null) data = null;
-          else if (one && one !== 'fallback') {
-            moon = { docs: one.docs, fromDocs: one.fromDocs };
-            data = one.data;
-          } else data = await readBookData(characterId, corporationId, wantedRef.current);
-          // The page moved on while this read ran: take the slices it now wants.
-          const late = data ? missingBookParts(wantedRef.current, data.parts) : undefined;
-          if (data && late && late.size > 0) {
-            const more = await readBookData(characterId, corporationId, late);
-            if (more) data = mergeBookData(data, more);
-          }
-        }
+        const read = await readBook(characterId, corporationId, {
+          parts: wantedRef.current,
+          ...(scopedMiner !== undefined ? { minerId: scopedMiner } : {}),
+          ...(scopedMoon !== undefined ? { extractionId: scopedMoon } : {}),
+        });
+        // The page moved on while this read ran: take the parts it now wants.
+        const data =
+          read && (await extendBook(characterId, corporationId, read, wantedRef.current));
         if (cancelled) return;
         if (!data?.settings.active) {
           setFetched({ status: 'off', verdict });
@@ -264,15 +233,12 @@ export function useCorpBook(
         }
         // Prices for every ore on every day it was mined, at the book's hub and Ore Form. A Miner's
         // slice prices only its open window: a day on a Statement is frozen and needs no price.
-        const { pricesOn, moonOwnerPricesOn } = await loadBookPrices(data, scope?.from);
+        const { pricesOn, moonOwnerPricesOn } = await loadBookPrices(data, data.minerScope?.from);
         if (cancelled) return;
         setFetched({
           status: 'loaded',
           verdict,
           data,
-          ...(scope ? { scope: { minerId: scope.minerId, totals: scope.totals } } : {}),
-          ...(scopedMoon !== undefined ? { forMoon: scopedMoon } : {}),
-          ...(moon ? { moon } : {}),
           pricesOn,
           moonOwnerPricesOn,
         });
@@ -286,20 +252,20 @@ export function useCorpBook(
     };
   }, [characterId, corporationId, attempt, finishedAt, scopedMiner, scopedMoon]);
 
-  // A page that wants slices the book was opened without reads just those.
+  // A page that wants parts the book was opened without reads just those.
   useEffect(() => {
     if (fetched.status !== 'loaded' || characterId === null || corporationId === null) return;
-    const missing = missingBookParts(wantedRef.current, fetched.data.parts);
-    if (missing.size === 0) return;
+    if (holdsParts(fetched.data, wantedRef.current)) return;
     let cancelled = false;
     const held = fetched.data;
-    readBookData(characterId, corporationId, missing)
-      .then(async (extra) => {
-        if (cancelled || !extra) return;
-        // The prices were built for the settings this page opened with: keep both.
-        const merged = { ...mergeBookData(held, extra), settings: held.settings };
+    extendBook(characterId, corporationId, held, wantedRef.current)
+      .then(async (merged) => {
+        if (cancelled || merged === held) return;
         // Rows that arrive late (the Moon owners tab's fallback) need their own prices.
-        const prices = missing.has('observed') ? await loadBookPrices(merged) : undefined;
+        const prices =
+          merged.parts.has('observed') && !held.parts.has('observed')
+            ? await loadBookPrices(merged)
+            : undefined;
         if (cancelled) return;
         setFetched((prev) =>
           prev.status === 'loaded' ? { ...prev, data: merged, ...prices } : prev
@@ -411,10 +377,9 @@ export function useCorpBook(
       memberIds,
       surveyOreLines,
     });
-    if (fetched.moon) return withMoonDocs(built, fetched.moon.docs, fetched.moon.fromDocs);
-    return fetched.scope
-      ? withMinerTotals(built, fetched.scope.minerId, fetched.scope.totals)
-      : built;
+    const { moon, scopedMiner: minerId, minerScope } = fetched.data;
+    if (moon) return withMoonDocs(built, moon.docs, moon.fromDocs);
+    return minerId !== undefined ? withMinerTotals(built, minerId, minerScope?.totals) : built;
   }, [fetched, now, corporationId, memberIds, surveyOreLines]);
 
   // Names, resolved after the figures so the tables never wait on them.
@@ -538,9 +503,9 @@ export function useCorpBook(
     fetched.status === 'loaded'
       ? // A book read for another page's scope is not this page's: wait for the right one.
         view &&
-        fetched.scope?.minerId === scopedMiner &&
-        fetched.forMoon === scopedMoon &&
-        missingBookParts(required, fetched.data.parts).size === 0
+        fetched.data.scopedMiner === scopedMiner &&
+        fetched.data.forMoon === scopedMoon &&
+        holdsParts(fetched.data, required)
         ? {
             status: 'ready',
             verdict: fetched.verdict,
@@ -559,13 +524,13 @@ export function useCorpBook(
  * its summary cannot stand in for (#5717).
  */
 export function needsRowsFallback(
-  wanted: BookPartSet,
+  wanted: ReadonlySet<BookPart>,
   data: BookData,
   now: string,
   corporationId: number | null
 ): boolean {
   if (wanted.has('observed') || !wanted.has('owners') || corporationId === null) return false;
-  if (!data.parts?.has('core') || !data.parts.has('owners')) return false;
+  if (!data.parts.has('core') || !data.parts.has('owners')) return false;
   const feeders = data.feeders ?? [];
   return moonOwnersNeedRows({
     now,

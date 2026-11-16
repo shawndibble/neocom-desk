@@ -9,13 +9,16 @@ import type { BookContextValue } from './bookContextValue';
 import type { OfficerVerdict } from '../taxBook/bookClient';
 
 const deleteBook = vi.fn();
-const readBookData = vi.fn();
+const readBook = vi.fn();
 vi.mock('@/esi/endpoints/corp', () => ({
   getCorporationPublicInfo: () => Promise.resolve({ data: { ticker: 'TEST' } }),
 }));
+vi.mock('../taxBook/bookRead', () => ({
+  bookPartsFor: () => new Set(['core', 'observed', 'ledger', 'answers']),
+  readBook: (...a: unknown[]) => readBook(...a),
+}));
 vi.mock('../taxBook/bookClient', () => ({
   deleteBook: (...a: unknown[]) => deleteBook(...a),
-  readBookData: (...a: unknown[]) => readBookData(...a),
   readAudit: () => Promise.resolve([]),
   readRebills: () => Promise.resolve([]),
   readDeclinedAutoGroup: () => Promise.resolve(new Set<number>()),
@@ -92,7 +95,7 @@ describe('DeleteBookSection', () => {
 
   it('offers a copy first, and holds Delete only while that copy is being read', async () => {
     let finish: (value: null) => void = () => {};
-    readBookData.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    readBook.mockReturnValue(new Promise((resolve) => (finish = resolve)));
     renderSection({ isDirector: true }, ME, true);
     const confirm = await lastButton('Delete the book');
     await userEvent.type(screen.getByRole('textbox'), 'test');

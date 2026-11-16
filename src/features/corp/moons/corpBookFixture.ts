@@ -284,6 +284,7 @@ export const BOOK_CONTEXT = {
     observed: [],
     state: { miners: base.miners },
     groupingAnswers: [],
+    parts: new Set(['core', 'observed', 'ledger', 'answers']),
   } as never,
   verdict,
   reload: () => {},

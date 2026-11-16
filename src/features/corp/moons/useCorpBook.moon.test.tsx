@@ -1,14 +1,17 @@
 // The moon page reads one pull's window and the moon docs (issue #5716); every other page the whole book.
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BookData } from '../taxBook/bookClient';
+import type { BookRead } from '../taxBook/bookRead';
 
-const readBookData = vi.hoisted(() => vi.fn());
-const readMoonBookData = vi.hoisted(() => vi.fn());
+const readBook = vi.hoisted(() => vi.fn());
+const extendBook = vi.hoisted(() => vi.fn());
+vi.mock('../taxBook/bookRead', async (orig) => ({
+  ...(await orig<typeof import('../taxBook/bookRead')>()),
+  readBook,
+  extendBook,
+}));
 vi.mock('../taxBook/bookClient', async (orig) => ({
   ...(await orig<typeof import('../taxBook/bookClient')>()),
-  readBookData,
-  readMoonBookData,
   verifyOfficer: vi.fn().mockResolvedValue({ canView: true, bookActive: true }),
 }));
 vi.mock('../taxBook/observedStore', () => ({ forgetObservedCopy: vi.fn() }));
@@ -57,7 +60,7 @@ const PULL = {
 };
 const PULL_ID = `1_${Date.parse(PULL.extractionStartTime)}`;
 
-function book(): BookData {
+function book(): BookRead {
   return {
     settings: {
       active: true,
@@ -102,16 +105,33 @@ function book(): BookData {
     ],
     declarations: [],
     adjustments: [],
+    parts: new Set(['core', 'observed', 'ledger', 'answers']),
   };
 }
 
+/** The read the hook asked for: its scope, and nothing else. */
+const asked = (n: number) =>
+  Object.fromEntries(
+    Object.entries(readBook.mock.calls[n]![2] as Record<string, unknown>).filter(
+      ([k]) => k !== 'parts'
+    )
+  );
+
+/** A moon read whose docs stood in: the pull's window only. */
+const scopedRead = (extractionId: string): BookRead => ({
+  ...book(),
+  observed: book().observed.slice(1),
+  forMoon: extractionId,
+  moon: { docs: new Map(), fromDocs: new Set() },
+});
+
 beforeEach(() => {
-  readBookData.mockReset().mockImplementation(async () => book());
-  readMoonBookData.mockReset().mockImplementation(async () => ({
-    data: { ...book(), observed: book().observed.slice(1) },
-    docs: new Map(),
-    fromDocs: new Set(),
-  }));
+  readBook
+    .mockReset()
+    .mockImplementation(async (_c, _b, ask: { extractionId?: string }) =>
+      ask.extractionId === undefined ? book() : scopedRead(ask.extractionId)
+    );
+  extendBook.mockReset().mockImplementation(async (_c, _b, held: BookRead) => held);
   loadDatedUnitPricesByHub.mockClear();
 });
 
@@ -119,24 +139,25 @@ describe('moon page read path', () => {
   it('reads the pull window only, and prices only its days', async () => {
     const { result } = renderHook(() => useCorpBook(SYNC, undefined, { extractionId: PULL_ID }));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
-    expect(readMoonBookData).toHaveBeenCalledWith(7, 98000001, PULL_ID);
-    expect(readBookData).not.toHaveBeenCalled();
+    expect(readBook).toHaveBeenCalledTimes(1);
+    expect(asked(0)).toEqual({ extractionId: PULL_ID });
     expect(loadDatedUnitPricesByHub.mock.calls[0]?.[0]).toEqual([22]);
   });
 
   it('a missing doc reads the whole book and prices every day', async () => {
-    readMoonBookData.mockResolvedValue('fallback');
+    // readBook falls back to the whole book itself (moonRead.test.ts): no moon docs, every row.
+    readBook.mockResolvedValue({ ...book(), forMoon: PULL_ID });
     const { result } = renderHook(() => useCorpBook(SYNC, undefined, { extractionId: PULL_ID }));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
-    expect(readBookData).toHaveBeenCalledTimes(1);
+    expect(readBook).toHaveBeenCalledTimes(1);
     expect(loadDatedUnitPricesByHub.mock.calls[0]?.[0]).toEqual(expect.arrayContaining([11, 22]));
   });
 
   it('every other page reads the whole book', async () => {
     const { result } = renderHook(() => useCorpBook(SYNC));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
-    expect(readBookData).toHaveBeenCalledTimes(1);
-    expect(readMoonBookData).not.toHaveBeenCalled();
+    expect(readBook).toHaveBeenCalledTimes(1);
+    expect(asked(0)).toEqual({});
   });
 
   it('leaving the moon page reads the whole book again, and shows loading meanwhile', async () => {
@@ -149,6 +170,7 @@ describe('moon page read path', () => {
     rerender({ extractionId: undefined });
     expect(result.current.state.status).toBe('loading');
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
-    expect(readBookData).toHaveBeenCalledTimes(1);
+    expect(readBook).toHaveBeenCalledTimes(2);
+    expect(asked(1)).toEqual({});
   });
 });

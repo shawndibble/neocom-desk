@@ -218,7 +218,12 @@ function renderBook(
             graceHours: 6,
             rates: input.rates as BookSettings['rates'],
           } as BookSettings,
-          data: { feeders, state: { extractions: [] }, ...bookData } as unknown as BookData,
+          data: {
+            feeders,
+            state: { extractions: [] },
+            parts: new Set(['core', 'observed', 'ledger', 'answers']),
+            ...bookData,
+          } as unknown as BookData,
           verdict,
           reload,
         }}
