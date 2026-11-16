@@ -218,7 +218,8 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
             settled: true,
           });
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        console.warn('LP balances could not be read', err);
         // Unread stays unknown, but the store list stops waiting on it.
         if (!cancelled) setBalances({ characterId: activeCharacterId, list: null, settled: true });
       });

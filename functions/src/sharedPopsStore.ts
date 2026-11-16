@@ -40,6 +40,7 @@ import {
   movedPops,
   namedCommunityIds,
   qualifyingEditors,
+  sharedPopsRepublishDue,
   audienceCharacters,
   visiblePops,
   type PopExtraction,
@@ -172,6 +173,11 @@ const ownersOf = (handled: readonly DocumentSnapshot[]) =>
     handled.map((f) => [Number(f.id), { optedOut: f.get('popSharingOptOut') !== undefined }])
   );
 
+/** The corporation's alliance a caller already read: `null` is none; `allianceId` absent, unread. */
+export interface KnownAlliance {
+  allianceId?: number | null;
+}
+
 /**
  * Rebuilds the book's Shared Pops: writes the doc, or deletes it when the book publishes nothing,
  * so turning sharing off, an opt-out or a removed audience takes a pop away at once.
@@ -180,7 +186,7 @@ export async function publishSharedPops(
   deps: SharedPopsDeps,
   corporationId: number,
   /** The corporation's alliance, already read by the caller: used as is, not re-read. */
-  known: { allianceId?: number | null } = {}
+  known: KnownAlliance = {}
 ): Promise<SharedPopsDoc | null> {
   const { db } = deps;
   const now = deps.now();
@@ -312,11 +318,46 @@ async function cancelStalePopPushes(
   }
 }
 
+/**
+ * Whether this sync republishes the book's Shared Pops (`sharedPopsRepublishDue`), with the
+ * corporation's alliance it read for that, so a book that joins an alliance shows its pops there
+ * now rather than at the next 6-hourly recheck. Costs the doc's read, and one public ESI read
+ * while a doc is held. Null: no republish.
+ */
+export async function sharedPopsRepublish(
+  deps: SharedPopsDeps,
+  corporationId: number,
+  changed: boolean
+): Promise<KnownAlliance | null> {
+  let held: { publishedAtMs: number | undefined; allianceId: number | null } | null = null;
+  let allianceNow: number | null | undefined;
+  try {
+    const snap = await sharedPopsRef(deps.db, corporationId).get();
+    if (snap.exists) {
+      held = {
+        publishedAtMs: (
+          snap.get('updatedAt') as { toMillis?: () => number } | undefined
+        )?.toMillis?.(),
+        allianceId: (snap.get('allianceId') as number | null | undefined) ?? null,
+      };
+      allianceNow = await deps.corporationAlliance?.(corporationId).catch((e: unknown) => {
+        console.error('book alliance lookup failed', e instanceof Error ? e.message : e);
+        return undefined;
+      });
+    }
+  } catch (e) {
+    console.error('shared pops age read failed', e instanceof Error ? e.message : e);
+    if (!changed) return null;
+  }
+  if (!sharedPopsRepublishDue({ changed, held, allianceNow, now: deps.now() })) return null;
+  return allianceNow === undefined ? {} : { allianceId: allianceNow };
+}
+
 /** `publishSharedPops`, best effort: a failure is logged and never fails the sync or edit behind it. */
 export async function refreshSharedPops(
   deps: SharedPopsDeps,
   corporationId: number,
-  known: { allianceId?: number | null } = {}
+  known: KnownAlliance = {}
 ): Promise<void> {
   try {
     await publishSharedPops(deps, corporationId, known);

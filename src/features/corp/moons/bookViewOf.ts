@@ -62,10 +62,13 @@ export function bookViewInputOf(
 }
 
 /**
- * The last prices loaded per hub and Ore Form this session, with the ores they cover: the Moons
+ * The last prices loaded per hub and Ore Form today, with the ores and days they price: the Moons
  * nav dot's 30-minute recount reads its count off these rather than loading the market again.
  */
-const heldPrices = new Map<string, { typeIds: ReadonlySet<number>; prices: BookPrices }>();
+const heldPrices = new Map<
+  string,
+  { loadedOn: string; typeIds: ReadonlySet<number>; dates: ReadonlySet<string>; prices: BookPrices }
+>();
 registerTestReset(() => heldPrices.clear());
 
 const heldKey = (data: BookData) => `${data.settings.hubId}:${data.settings.oreForm}`;
@@ -77,16 +80,18 @@ function typeIdsOf(data: BookData, priced: BookData['observed']): Set<number> {
 }
 
 /**
- * Prices for a count, not for display (the Moons nav dot): the ones this session last loaded at
- * the book's hub and Ore Form when they cover every ore it holds, else a load. A day the held
- * load never priced reads that load's own day (`pricesOn`), close enough to say whether a
- * Statement run is due; the Moons page loads its own, fresh.
+ * Prices for a count, not for display (the Moons nav dot): the ones loaded today at the book's
+ * hub and Ore Form when they price every ore and day it holds, else a load. The Moons page loads
+ * its own, fresh.
  */
-export async function heldBookPrices(data: BookData): Promise<BookPrices> {
+export async function cachedBookPrices(data: BookData): Promise<BookPrices> {
   const held = heldPrices.get(heldKey(data));
-  if (held && [...typeIdsOf(data, data.observed)].every((id) => held.typeIds.has(id)))
-    return held.prices;
-  return loadBookPrices(data);
+  const covers =
+    held !== undefined &&
+    held.loadedOn === utcDay() &&
+    [...typeIdsOf(data, data.observed)].every((id) => held.typeIds.has(id)) &&
+    data.observed.every((r) => held.dates.has(r.date));
+  return covers ? held.prices : loadBookPrices(data);
 }
 
 /** The unit prices every loaded row and Extraction needs, as the view's two lookups. */
@@ -113,7 +118,7 @@ export async function loadBookPrices(data: BookData, from?: string): Promise<Boo
     moonOwnerPricesOn: (date: string) =>
       moonOwnerPricesAtHubOnDate(prices, hubForPayee(data.settings.hubId).id, date),
   };
-  heldPrices.set(heldKey(data), { typeIds, prices: result });
+  heldPrices.set(heldKey(data), { loadedOn, typeIds, dates, prices: result });
   return result;
 }
 

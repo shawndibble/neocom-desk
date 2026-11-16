@@ -1,6 +1,6 @@
 // The Moons nav dot's background recount (#6208) must not load market prices on every
 // 30-minute poll: it reuses the prices this session already holds for the book.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BookRead } from '../taxBook/bookRead';
 
 const readBook = vi.hoisted(() => vi.fn());
@@ -60,6 +60,10 @@ beforeEach(() => {
   loadDatedUnitPricesByHub.mockReset().mockResolvedValue({});
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('loadNeedsYouCount', () => {
   it('loads no prices when the Moons page already loaded them this session', async () => {
     await loadBookPrices(book());
@@ -83,6 +87,18 @@ describe('loadNeedsYouCount', () => {
     expect(loadDatedUnitPricesByHub).toHaveBeenCalledTimes(2);
 
     readBook.mockResolvedValue(book([ROW], 'amarr'));
+    await loadNeedsYouCount(7, 98000001);
+    expect(loadDatedUnitPricesByHub).toHaveBeenCalledTimes(3);
+  });
+
+  it('loads again when the held prices skip a day the book mined, or were loaded on another day', async () => {
+    // The Moons page's windowed load prices only days from its `from`.
+    await loadBookPrices(book(), '2026-11-05');
+    await loadNeedsYouCount(7, 98000001);
+    expect(loadDatedUnitPricesByHub).toHaveBeenCalledTimes(2);
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 86_400_000);
     await loadNeedsYouCount(7, 98000001);
     expect(loadDatedUnitPricesByHub).toHaveBeenCalledTimes(3);
   });
