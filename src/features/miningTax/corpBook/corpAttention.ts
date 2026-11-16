@@ -3,7 +3,7 @@
  * tab's attention strip: Overdue Statements, donations a book never credited, and ore a book
  * bills that the member's own list also owes another Payee.
  */
-import type { InFlightDonation, OverdueStatementView } from '@/engine/corpTaxBook/personal';
+import type { OverdueStatementView, UncreditedDonation } from '@/engine/corpTaxBook/personal';
 import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
 import type { CorpBookView } from './corpBookView';
 
@@ -18,7 +18,7 @@ export interface CorpBookAttention {
    * on the Statement, so it may declare (#6206). Absent when none is.
    */
   overdue: (OfBook & OverdueStatementView & { declarerId?: number })[];
-  uncredited: (OfBook & InFlightDonation)[];
+  uncredited: (OfBook & UncreditedDonation)[];
   /** Per book: the Payees whose unpaid ore it bills too, and the first such row to open. */
   alsoBilled: (OfBook & { payeeIds: string[]; rowId: string })[];
 }

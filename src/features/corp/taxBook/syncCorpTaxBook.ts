@@ -280,6 +280,8 @@ export async function syncCorpTaxBook(
     donations: resolved,
     gaps,
     ...(uncounted ? { uncounted } : {}),
+    // Members' "not credited" notes wait on a sync that read the wallet, not on any sync.
+    donationsRead: capabilities.canReadWallet && donations !== null,
   });
   const { donationsAdded } = receipt;
   for (const observed of batches) {

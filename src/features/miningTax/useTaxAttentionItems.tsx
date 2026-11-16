@@ -9,6 +9,7 @@ import { claimKeyOf } from '@/features/miningTax/corpBook/useAutoClaimDonations'
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
 import { corpBookAttention } from '@/features/miningTax/corpBook/corpAttention';
 import { corpPayAccounts, readsEveryDivision } from '@/features/miningTax/corpBook/corpPayAccount';
+import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import {
   CorpDeclarationStatus,
   CorpDeclareAction,
@@ -284,11 +285,28 @@ export function useTaxAttentionItems({
         { corp: u.corpName, amount: formatIsk(u.amount, 0), date: u.at.slice(0, 10) }
       ),
       detail: (
-        <p>
-          {every
-            ? t('miningTax.corpBook.attention.uncreditedEveryDetail', { corp: u.corpName })
-            : t('miningTax.corpBook.attention.uncreditedDetail', { corp: u.corpName, accounts })}
-        </p>
+        <>
+          <p>
+            {every
+              ? t('miningTax.corpBook.attention.uncreditedEveryDetail', { corp: u.corpName })
+              : t('miningTax.corpBook.attention.uncreditedDetail', { corp: u.corpName, accounts })}
+          </p>
+          {/* What the member needs to dispute it: the days it paid, and the transfer itself. */}
+          {u.covered.length > 0 && (
+            <p>
+              {t('miningTax.corpBook.attention.uncreditedCovered', {
+                days: u.covered.join(', '),
+              })}
+            </p>
+          )}
+          <p>
+            {t('miningTax.corpBook.attention.uncreditedDispute', {
+              corp: u.corpName,
+              amount: formatIsk(u.amount, 0),
+              time: eveTimeLabel(Date.parse(u.at)),
+            })}
+          </p>
+        </>
       ),
     });
   }

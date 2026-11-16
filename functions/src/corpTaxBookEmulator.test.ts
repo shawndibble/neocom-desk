@@ -279,6 +279,24 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect((await book().get()).get('lastSync')).toMatchObject({ byCharacterId: ACCOUNTANT });
     });
 
+    it("records when a sync last read the wallet's donations, and never one that could not", async () => {
+      await turnOn();
+      const readAt = async () => (await book().get()).get('donationsReadAt');
+      // An older client says nothing: the book keeps no record either way.
+      await sync(ACCOUNTANT, {});
+      expect(await readAt()).toBeUndefined();
+      // A sync that could not read the wallet: no read yet.
+      await sync(ACCOUNTANT, { donationsRead: false });
+      expect(await readAt()).toBeNull();
+      await sync(ACCOUNTANT, { donationsRead: true });
+      const at = await readAt();
+      expect(at).toEqual(expect.any(Number));
+      // Neither a later unread sync nor an overflow call without the flag moves it back.
+      await sync(ACCOUNTANT, { donationsRead: false });
+      await sync(ACCOUNTANT, {});
+      expect(await readAt()).toBe(at);
+    });
+
     it('points each observed Character at the book, refreshed on every sync', async () => {
       await turnOn();
       await sync(ACCOUNTANT, { observed: [row(100, '2026-10-18T10:00:00Z')] });

@@ -217,6 +217,19 @@ describe('CorpRowDetailModal', () => {
     expect(onUnmarkPaid).toHaveBeenCalledOnce();
   });
 
+  it('names the donation that paid a day until the corporation never credited it', () => {
+    const unlinked: BookRowView = {
+      ...view,
+      unlinkedDonation: { amount: 26_952_549, at: '2026-11-02T22:38:00Z' },
+    };
+    renderModal({ corp: { ...corp, view: unlinked } });
+    expect(
+      screen.getByText(
+        /^Your 26,952,549 ISK donation sent 2 Nov 2026 22:38 EVE time paid this day, but Brass Meridian Logistics never credited it/
+      )
+    ).toBeInTheDocument();
+  });
+
   it('says the book still bills a day the member marked paid while its Statement is open (#6204)', () => {
     const marked: BookRowView = {
       ...view,

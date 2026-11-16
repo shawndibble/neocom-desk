@@ -75,6 +75,8 @@ export interface LoadedCorpBook {
   rates: TaxRate[];
   /** When an officer last synced it; absent when never. */
   lastSyncedAt?: string;
+  /** The last sync that read the wallet's donations (`PersonalBook.donationsCheckedAt`). */
+  donationsCheckedAt?: string | null;
   observed: ObservedMiningEntry[];
   payments: TaxPayment[];
   held: HeldPayment[];
@@ -131,6 +133,15 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
   });
   const syncedAt = num((d.lastSync as Data | null | undefined)?.at);
   const divisionNames = readDivisionNames(d.divisionNames);
+  // Absent on a book no sync has stamped since the record began: the engine then uses lastSync.
+  const donationsReadAt = d.donationsReadAt === null ? null : num(d.donationsReadAt);
+  const checked: { donationsCheckedAt?: string | null } =
+    donationsReadAt === undefined
+      ? {}
+      : {
+          donationsCheckedAt:
+            donationsReadAt === null ? null : new Date(donationsReadAt).toISOString(),
+        };
   return {
     corporationId,
     startDate,
@@ -144,6 +155,7 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
     ...(Object.keys(divisionNames).length > 0 ? { divisionNames } : {}),
     rates,
     ...(syncedAt !== undefined ? { lastSyncedAt: new Date(syncedAt).toISOString() } : {}),
+    ...checked,
   };
 }
 
