@@ -14,6 +14,7 @@ import {
   disputeIdFor,
   mergeDisputeLines,
   billedDisputeTax,
+  checkClaimedTransfer,
   needsLiveCheck,
   parseEditAction,
   parseSettingsPatch,
@@ -1044,6 +1045,106 @@ describe('Pop Sharing edits (#6222)', () => {
     bad({ set: { notes: 'a' }, clear: ['notes'] });
     expect(() =>
       parseEditAction({ action: 'setPopSharingMoon', moonId: 'x', set: { notes: 'a' } })
+    ).toThrow();
+  });
+});
+
+// Resolving in the app: an "I already paid" is checked against what the book synced of the
+// corporation's wallet before any officer sees it.
+describe('checkClaimedTransfer', () => {
+  const transfer = {
+    amount: 25_000_000,
+    at: '2026-11-02T18:41:00.000Z',
+    journalRef: 7_788_991,
+    recipient: 'corporation' as const,
+  };
+  const ctx = {
+    senderIds: [7],
+    payments: [] as {
+      id: string;
+      characterId?: number;
+      amount: number;
+      at: string;
+      minerId?: string;
+    }[],
+    uncounted: [] as { characterId: number; amount: number; at: string; division: number }[],
+    lastSyncAt: Date.parse('2026-11-16T14:00:00.000Z'),
+  };
+
+  it('finds a payment the book holds from the sender, even a day apart', () => {
+    const payments = [
+      { id: 'j1_9', characterId: 7, amount: 25_000_000, at: '2026-11-03T10:00:00.000Z' },
+    ];
+    expect(checkClaimedTransfer(transfer, { ...ctx, payments })).toEqual({
+      result: 'found',
+      paymentId: 'j1_9',
+    });
+  });
+
+  it('finds it in a division the book does not read', () => {
+    const uncounted = [{ characterId: 7, amount: 25_000_000, at: transfer.at, division: 3 }];
+    expect(checkClaimedTransfer(transfer, { ...ctx, uncounted })).toEqual({
+      result: 'division',
+      division: 3,
+    });
+  });
+
+  it('never matches another sender or another amount', () => {
+    const payments = [
+      { id: 'a', characterId: 8, amount: 25_000_000, at: transfer.at },
+      { id: 'b', characterId: 7, amount: 24_000_000, at: transfer.at },
+    ];
+    expect(checkClaimedTransfer(transfer, { ...ctx, payments }).result).toBe('notFound');
+  });
+
+  it('says the book has not synced since, rather than not found, for a transfer after the last sync', () => {
+    expect(checkClaimedTransfer({ ...transfer, at: '2026-11-16T15:00:00.000Z' }, ctx).result).toBe(
+      'notSynced'
+    );
+    expect(checkClaimedTransfer(transfer, { ...ctx, lastSyncAt: undefined }).result).toBe(
+      'notSynced'
+    );
+  });
+
+  // ESI keeps 30 days of a wallet journal: older than that before the last sync, the book
+  // could not have seen it, so "not found" would be a claim it cannot make.
+  it('says too old to check, never not found, beyond what the book could have read', () => {
+    expect(checkClaimedTransfer({ ...transfer, at: '2026-10-01T00:00:00.000Z' }, ctx).result).toBe(
+      'tooOld'
+    );
+  });
+
+  it('names a transfer paid to a person or another corporation, without searching', () => {
+    expect(checkClaimedTransfer({ ...transfer, recipient: 'character' }, ctx).result).toBe(
+      'person'
+    );
+    expect(checkClaimedTransfer({ ...transfer, recipient: 'otherCorporation' }, ctx).result).toBe(
+      'otherCorp'
+    );
+  });
+});
+
+describe('parseDeclareOwnInput transfers', () => {
+  it('reads up to 10 transfers with who received them', () => {
+    const t = {
+      amount: 25_000_000,
+      at: '2026-11-02T18:41:00.000Z',
+      journalRef: 7,
+      recipient: 'character',
+      recipientId: 2119,
+    };
+    expect(
+      parseDeclareOwnInput({ corporationId: 9, statementId: 's1', transfers: [t] })
+    ).toMatchObject({ transfers: [t] });
+    expect(() =>
+      parseDeclareOwnInput({ corporationId: 9, statementId: 's1', transfers: Array(11).fill(t) })
+    ).toThrow();
+    expect(() =>
+      parseDeclareOwnInput({
+        corporationId: 9,
+        statementId: 's1',
+        transfers: [{ ...t, recipient: 'someone' }],
+      })
     ).toThrow();
   });
 });

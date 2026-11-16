@@ -1338,6 +1338,24 @@ export function parseDeclineByTokenInput(data: unknown): { token: string; charac
   return { token: parseToken(data), characterId };
 }
 
+/** Who received a transfer, as the member's own wallet journal names it. */
+export const TRANSFER_RECIPIENTS = ['corporation', 'character', 'otherCorporation'] as const;
+export type TransferRecipient = (typeof TRANSFER_RECIPIENTS)[number];
+
+/** One transfer from the member's wallet journal, sent as the proof of an "I already paid". */
+export interface ClaimTransfer {
+  amount: number;
+  at: string;
+  /** The member's own journal id: what an officer searches their journal on. */
+  journalRef: number;
+  recipient: TransferRecipient;
+  /** The character or other corporation that received it. */
+  recipientId?: number;
+}
+
+/** The most transfers one "I already paid" carries. */
+export const CLAIM_TRANSFERS_MAX = 10;
+
 /** A Miner's own "I paid this another way" on one of their Statements (#6206). */
 export interface DeclareOwnInput {
   corporationId: number;
@@ -1345,17 +1363,85 @@ export interface DeclareOwnInput {
   /** What they say they paid; absent when they did not say. */
   amount?: number;
   note?: string;
+  /** The transfers from their wallet journal (resolving in the app); checked before an officer sees them. */
+  transfers?: ClaimTransfer[];
 }
 
 export function parseDeclareOwnInput(data: unknown): DeclareOwnInput {
   const d = record(data);
   const note = optNote(d.note);
+  const transfers =
+    d.transfers === undefined
+      ? undefined
+      : list(d.transfers, 'transfers', CLAIM_TRANSFERS_MAX).map((x) => {
+          const t = record(x);
+          const recipient = oneOf(t.recipient, 'recipient', TRANSFER_RECIPIENTS);
+          return {
+            amount: money(t.amount, 'amount'),
+            at: instant(t.at, 'at'),
+            journalRef: int(t.journalRef, 'journalRef'),
+            recipient,
+            ...(t.recipientId !== undefined
+              ? { recipientId: int(t.recipientId, 'recipientId') }
+              : {}),
+          };
+        });
   return {
     corporationId: parseBookCall(data).corporationId,
     statementId: docId(d.statementId, 'statementId'),
     ...(d.amount !== undefined ? { amount: money(d.amount, 'amount') } : {}),
     ...(note !== undefined ? { note } : {}),
+    ...(transfers !== undefined ? { transfers } : {}),
   };
+}
+
+/** What checking one claimed transfer against the book found. */
+export type ClaimCheckResult =
+  'found' | 'division' | 'notSynced' | 'tooOld' | 'notFound' | 'person' | 'otherCorp';
+export interface ClaimCheck {
+  result: ClaimCheckResult;
+  /** `found`: the book's payment it matched. */
+  paymentId?: string;
+  /** `division`: the wallet division it sits in, which the book does not read. */
+  division?: number;
+}
+
+/** How far apart the member's and the corporation's journals may stamp one transfer. */
+const CLAIM_MATCH_MS = 48 * 60 * 60 * 1000;
+/** ESI's wallet journal window: older than this before a sync, the sync could not have read it. */
+const JOURNAL_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Checks one claimed transfer against what the book synced of the corporation's wallet, before
+ * any officer sees it (resolving in the app): a payment it holds from the sender (`found`), a
+ * donation in a division it does not read (`division`), or why it cannot say — paid after the
+ * last sync (`notSynced`), or before the wallet history a sync could read (`tooOld`) — and only
+ * then `notFound`. A transfer to a person or another corporation is named, not searched.
+ */
+export function checkClaimedTransfer(
+  t: ClaimTransfer,
+  ctx: {
+    senderIds: readonly number[];
+    payments: readonly { id: string; characterId?: number; amount: number; at: string }[];
+    uncounted: readonly { characterId: number; amount: number; at: string; division: number }[];
+    lastSyncAt: number | undefined;
+  }
+): ClaimCheck {
+  if (t.recipient === 'character') return { result: 'person' };
+  if (t.recipient === 'otherCorporation') return { result: 'otherCorp' };
+  const at = Date.parse(t.at);
+  const same = (x: { characterId?: number; amount: number; at: string }) =>
+    x.characterId !== undefined &&
+    ctx.senderIds.includes(x.characterId) &&
+    Math.abs(x.amount - t.amount) < 1 &&
+    Math.abs(Date.parse(x.at) - at) <= CLAIM_MATCH_MS;
+  const payment = ctx.payments.find(same);
+  if (payment) return { result: 'found', paymentId: payment.id };
+  const uncounted = ctx.uncounted.find(same);
+  if (uncounted) return { result: 'division', division: uncounted.division };
+  if (ctx.lastSyncAt === undefined || at > ctx.lastSyncAt) return { result: 'notSynced' };
+  if (at < ctx.lastSyncAt - JOURNAL_WINDOW_MS) return { result: 'tooOld' };
+  return { result: 'notFound' };
 }
 
 /** One ore line of a disputed Conflict day: the record, the ore, and the Payee the Miner gave it to. */

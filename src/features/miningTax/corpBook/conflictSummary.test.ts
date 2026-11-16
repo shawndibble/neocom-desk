@@ -45,14 +45,23 @@ describe('summarizeConflicts', () => {
   // counted — `waiting` is what lets the caller stop calling it a warning.
   it('counts a day sent to the corporation, and one whose ore it waived, as waiting', () => {
     const sent = row(
-      view({ id: 'sent', billed: 300, flagged: { state: 'sent', at: '2026-11-01T10:00:00Z' } })
+      view({
+        id: 'sent',
+        billed: 300,
+        flagged: { kind: 'payee', state: 'sent', at: '2026-11-01T10:00:00Z' },
+      })
     );
     const waived = row(
       view({
         id: 'waived',
         billed: 400,
         date: '2026-10-29',
-        flagged: { state: 'dismissed', at: '2026-11-02T10:00:00Z', reason: 'Fair enough' },
+        flagged: {
+          kind: 'payee',
+          state: 'dismissed',
+          at: '2026-11-02T10:00:00Z',
+          reason: 'Fair enough',
+        },
       })
     );
     expect(summarizeConflicts([sent, waived])).toMatchObject({
@@ -67,7 +76,12 @@ describe('summarizeConflicts', () => {
       view({
         id: 'rejected',
         billed: 250,
-        flagged: { state: 'rejected', at: '2026-11-02T10:00:00Z', reason: 'Book stands' },
+        flagged: {
+          kind: 'payee',
+          state: 'rejected',
+          at: '2026-11-02T10:00:00Z',
+          reason: 'Book stands',
+        },
       })
     );
     expect(summarizeConflicts([rejected])).toMatchObject({ days: 1, waiting: 0, amount: 250 });
@@ -79,7 +93,7 @@ describe('summarizeConflicts', () => {
         id: 'sent',
         billed: 300,
         resolvesAt: '2026-11-10T00:00:00Z',
-        flagged: { state: 'sent', at: '2026-11-01T10:00:00Z' },
+        flagged: { kind: 'payee', state: 'sent', at: '2026-11-01T10:00:00Z' },
       })
     );
     const open = row(
@@ -93,7 +107,11 @@ describe('summarizeConflicts', () => {
   // One book answered, another on the same day not: the day still needs the member.
   it('only calls a day waiting once every book contesting it has been answered', () => {
     const answered = row(
-      view({ id: 'a', billed: 300, flagged: { state: 'sent', at: '2026-11-01T10:00:00Z' } })
+      view({
+        id: 'a',
+        billed: 300,
+        flagged: { kind: 'payee', state: 'sent', at: '2026-11-01T10:00:00Z' },
+      })
     );
     const open = row(view({ id: 'b', billed: 200 }), 'Other');
     expect(summarizeConflicts([answered, open])).toMatchObject({ days: 1, waiting: 0 });

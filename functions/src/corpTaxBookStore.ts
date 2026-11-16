@@ -34,6 +34,9 @@ import {
   DISMISSALS,
   DISPUTES,
   disputeIdFor,
+  type ClaimCheck,
+  type ClaimTransfer,
+  checkClaimedTransfer,
   type DeclareOwnInput,
   type DisputeConflictInput,
   type DisputeKind,
@@ -2360,19 +2363,52 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     );
     if (open.docs.some((d) => d.get('resolution') === undefined))
       fail('already-exists', 'A declaration is already waiting', 'already-declared');
+    // Resolving in the app: the transfers are checked against what the book synced of the
+    // corporation's wallet before any officer sees them.
+    const transfers = input.transfers ?? [];
+    const checked =
+      transfers.length > 0
+        ? await checkTransfers(tx, deps, corporationId, statement.uids as string[], transfers)
+        : { checks: [] as ClaimCheck[], unattributed: new Set<string>() };
+    const { checks } = checked;
+    // Every transfer found in the book: credited at once, nobody had to look.
+    const allFound = checks.length > 0 && checks.every((c) => c.result === 'found');
     const now = deps.now();
+    const iso = new Date(now).toISOString();
+    if (allFound) {
+      for (const c of checks) {
+        if (c.paymentId && checked.unattributed.has(c.paymentId))
+          tx.update(sub(deps.db, corporationId, PAYMENTS).doc(c.paymentId), {
+            minerId: statement.minerId,
+            claimedBy: characterId,
+            claimedAt: iso,
+          });
+      }
+    }
     const id = `x${now}_${rand(4)}`;
     tx.create(sub(deps.db, corporationId, DECLARATIONS).doc(id), {
       id,
       statementId,
       kind: 'another-way',
-      at: new Date(now).toISOString(),
+      at: iso,
       recordedBy: characterId,
       via: 'player',
       minerId: statement.minerId,
       uids: statement.uids,
       ...(input.amount !== undefined ? { amount: input.amount } : {}),
       ...(input.note !== undefined ? { note: input.note } : {}),
+      ...(transfers.length > 0 ? { transfers, checks } : {}),
+      // By the system (0): the book itself holds every transfer.
+      ...(allFound
+        ? {
+            resolution: {
+              kind: 'confirmed',
+              at: iso,
+              by: 0,
+              reason: "Found in the corporation's wallet",
+            },
+          }
+        : {}),
     });
     appendAudit(
       tx,
@@ -2387,11 +2423,58 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
         ...(input.amount !== undefined ? { amount: input.amount } : {}),
       }
     );
-    return { declarationId: id, minerId: statement.minerId as string };
+    return { declarationId: id, minerId: statement.minerId as string, checks, confirmed: allFound };
   });
   await refreshAfterEvent(deps.db, corporationId, [declared.minerId]);
   await refreshReadModels(deps.db, corporationId, deps.now());
-  return { declarationId: declared.declarationId };
+  return {
+    declarationId: declared.declarationId,
+    checks: declared.checks,
+    confirmed: declared.confirmed,
+  };
+}
+
+/**
+ * Checks each claimed transfer against the book (`checkClaimedTransfer`): the payments the
+ * Miner's own characters sent, the donations noted in divisions the book does not read, and its
+ * last sync. `unattributed`: matched payments credited to no Miner yet, which a full match claims.
+ */
+async function checkTransfers(
+  tx: Transaction,
+  deps: BookDeps,
+  corporationId: number,
+  uids: readonly string[],
+  transfers: readonly ClaimTransfer[]
+): Promise<{ checks: ClaimCheck[]; unattributed: Set<string> }> {
+  const senderIds = uids.flatMap((u) => (u.startsWith('char:') ? [Number(u.slice(5))] : []));
+  const book = (await tx.get(bookRef(deps.db, corporationId))).data() ?? {};
+  const payments =
+    senderIds.length === 0
+      ? []
+      : (
+          await tx.get(
+            sub(deps.db, corporationId, PAYMENTS).where('characterId', 'in', senderIds.slice(0, 30))
+          )
+        ).docs.map((d): Data & { id: string } => ({ ...(d.data() as Data), id: d.id }));
+  const uncounted =
+    ((await tx.get(sub(deps.db, corporationId, META).doc(UNCOUNTED_DOC))).data()?.donations as
+      { characterId: number; amount: number; at: string; division: number }[] | undefined) ?? [];
+  const lastSyncAt = (book.lastSync as { at?: number } | null | undefined)?.at;
+  const ctx = {
+    senderIds,
+    payments: payments.map((p) => ({
+      id: p.id,
+      characterId: p.characterId as number | undefined,
+      amount: p.amount as number,
+      at: p.at as string,
+    })),
+    uncounted,
+    lastSyncAt: typeof lastSyncAt === 'number' ? lastSyncAt : undefined,
+  };
+  return {
+    checks: transfers.map((t) => checkClaimedTransfer(t, ctx)),
+    unattributed: new Set(payments.filter((p) => p.minerId === undefined).map((p) => p.id)),
+  };
 }
 
 /**

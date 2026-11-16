@@ -331,14 +331,19 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
   it('says it was sent, or why an officer rejected it, instead of offering it again', () => {
     const { unmount } = renderWith({
       ...conflict,
-      flagged: { state: 'sent', at: '2026-10-18T10:00:00.000Z' },
+      flagged: { kind: 'payee', state: 'sent', at: '2026-10-18T10:00:00.000Z' },
     });
     expect(screen.getByText(/Sent to Brass Meridian on 2026-10-18/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Tell / })).toBeNull();
     unmount();
     renderWith({
       ...conflict,
-      flagged: { state: 'rejected', at: '2026-10-19T10:00:00.000Z', reason: 'Our ore' },
+      flagged: {
+        kind: 'payee',
+        state: 'rejected',
+        at: '2026-10-19T10:00:00.000Z',
+        reason: 'Our ore',
+      },
     });
     expect(screen.getByText('Brass Meridian kept the bill: Our ore')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Tell / })).toBeNull();
@@ -347,7 +352,12 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
   it('says an officer waived the tax on that ore, with the reason (#6206)', () => {
     renderWith({
       ...conflict,
-      flagged: { state: 'dismissed', at: '2026-10-19T10:00:00.000Z', reason: 'Their ore' },
+      flagged: {
+        kind: 'payee',
+        state: 'dismissed',
+        at: '2026-10-19T10:00:00.000Z',
+        reason: 'Their ore',
+      },
     });
     expect(
       screen.getByText('Brass Meridian waived the tax on that ore: Their ore')

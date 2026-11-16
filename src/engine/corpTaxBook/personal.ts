@@ -43,7 +43,7 @@ import {
 } from './statements';
 import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry } from './types';
-import type { Declaration, OverdueStatus } from './overdue';
+import type { ClaimCheck, ClaimedTransfer, Declaration, OverdueStatus } from './overdue';
 import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from './disputes';
 import { DAY_MS, MINUTE_MS } from '@/lib/age';
 
@@ -216,15 +216,31 @@ export interface MemberDeclaration {
   amount?: number;
   /** The officer's reason for a rejection. */
   reason?: string;
+  /** A rejection's next step: what the officer says the member should do now. */
+  nextStep?: string;
+  /** The member's own note, read back to them. */
+  note?: string;
+  /** The transfers sent as proof, and what checking each against the book found. */
+  transfers?: ClaimedTransfer[];
+  checks?: ClaimCheck[];
+  /** Confirmed by the book itself: every transfer was in the corporation's wallet. */
+  byBook?: boolean;
 }
 
-/** A Conflict day the member sent to the corporation (#6206), and its answer. */
+/** A day the member disputed (#6206, and resolving in the app), and its answer. */
 export interface MemberFlag {
-  /** `dismissed`: an officer waived the disputed ore's tax (#6206). */
+  /** `dismissed`: an officer waived the disputed tax (#6206). */
   state: 'sent' | 'rejected' | 'dismissed';
+  /** What the member said; a dispute stored before kinds is a payee dispute. */
+  kind: DisputeKind;
   /** When it was sent, or answered. */
   at: string;
+  /** The officer's reason, when answered. */
   reason?: string;
+  /** A kept bill's next step: what the officer says the member should do now. */
+  nextStep?: string;
+  /** The member's own reason, read back to them. */
+  said?: string;
 }
 
 /**
@@ -249,13 +265,21 @@ export function declarationFor(
     .filter((d) => d.statementId === statementId)
     .reduce<Declaration | undefined>((a, d) => (a === undefined || d.at > a.at ? d : a), undefined);
   if (!latest) return undefined;
-  const amount = latest.amount !== undefined ? { amount: latest.amount } : {};
-  if (!latest.resolution) return { state: 'waiting', at: latest.at, ...amount };
+  const shared = {
+    ...(latest.amount !== undefined ? { amount: latest.amount } : {}),
+    ...(latest.note !== undefined ? { note: latest.note } : {}),
+    ...(latest.transfers ? { transfers: latest.transfers } : {}),
+    ...(latest.checks ? { checks: latest.checks } : {}),
+  };
+  if (!latest.resolution) return { state: 'waiting', at: latest.at, ...shared };
+  const r = latest.resolution;
   return {
-    state: latest.resolution.kind,
-    at: latest.resolution.at,
-    ...amount,
-    ...(latest.resolution.reason !== undefined ? { reason: latest.resolution.reason } : {}),
+    state: r.kind,
+    at: r.at,
+    ...shared,
+    ...(r.reason !== undefined ? { reason: r.reason } : {}),
+    ...(r.nextStep !== undefined ? { nextStep: r.nextStep } : {}),
+    ...(r.kind === 'confirmed' && r.by === 0 ? { byBook: true } : {}),
   };
 }
 
@@ -1539,9 +1563,19 @@ function flagFor(
           x.lines.some((l) => l.recordKey.startsWith(`${row.characterId}:`)))
     );
   if (!d) return undefined;
-  return d.resolution
-    ? { state: d.resolution.kind, at: d.resolution.at, reason: d.resolution.reason }
-    : { state: 'sent', at: d.at };
+  const said = {
+    kind: disputeKindOf(d),
+    ...(d.reason !== undefined ? { said: d.reason } : {}),
+  };
+  if (!d.resolution) return { state: 'sent', at: d.at, ...said };
+  const r = d.resolution;
+  return {
+    state: r.kind,
+    at: r.at,
+    reason: r.reason,
+    ...said,
+    ...(r.kind === 'rejected' && r.nextStep !== undefined ? { nextStep: r.nextStep } : {}),
+  };
 }
 
 /** When the book last read its wallet's donations: the last sync, for a book with no record of it. */

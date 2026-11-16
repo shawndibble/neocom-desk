@@ -2526,7 +2526,11 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       });
       expect(before.rows[0].flagged).toBeUndefined();
       const out = overlay([toOther], [book({ disputes: [dispute()] })]);
-      expect(out.rows[0].flagged).toEqual({ state: 'sent', at: '2026-10-18T13:00:00.000Z' });
+      expect(out.rows[0].flagged).toEqual({
+        state: 'sent',
+        kind: 'payee',
+        at: '2026-10-18T13:00:00.000Z',
+      });
     });
 
     it('a rejected day says so on a row the dispute did not name', () => {
@@ -2549,6 +2553,7 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       });
       const out = overlay([toOther], [book({ disputes: [rejected] })]);
       expect(out.rows[0].flagged).toEqual({
+        kind: 'payee',
         state: 'rejected',
         at: '2026-10-19T00:00:00.000Z',
         reason: 'Ours',
@@ -2567,6 +2572,7 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       });
       const out = overlay([toOther], [book({ disputes: [waived] })]);
       expect(out.rows[0].flagged).toEqual({
+        kind: 'payee',
         state: 'dismissed',
         at: '2026-10-19T00:00:00.000Z',
         reason: 'Theirs',
