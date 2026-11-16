@@ -163,21 +163,24 @@ describe('readBook for one Miner', () => {
 
   // #6206/#6207: Needs you lists them on every page, so a one-Miner read that claims the core
   // and the ledger reads them as the whole book does.
-  it('reads the disputes and the uncounted donations it claims', async () => {
+  it("reads the disputes it claims, this Miner's only, and the uncounted donations", async () => {
     store.docs.set(BOOK, {
       active: true,
       startDate: '2026-08-01',
       bookVersion: 'b1',
       collectionVersions: { disputes: 'v1', meta: 'v1' },
     });
-    store.docs.set(`${BOOK}/disputes/q1`, {
-      id: 'q1',
-      minerId: 'm9',
-      date: '2026-09-12',
-      lines: [{ recordKey: 'k', typeId: 1, quantity: 1, payeeName: 'Corp' }],
-      by: 9,
-      at: '2026-09-13T00:00:00Z',
-    });
+    const dispute = (id: string, minerId: string) =>
+      store.docs.set(`${BOOK}/disputes/${id}`, {
+        id,
+        minerId,
+        date: '2026-09-12',
+        lines: [{ recordKey: 'k', typeId: 1, quantity: 1, payeeName: 'Corp' }],
+        by: 9,
+        at: '2026-09-13T00:00:00Z',
+      });
+    dispute('q1', 'm1');
+    dispute('q2', 'm9');
     store.docs.set(`${BOOK}/meta/uncounted`, {
       donations: [
         { id: 'u1', refId: 1, division: 3, characterId: 9, amount: 5, at: '2026-09-13T00:00:00Z' },
@@ -185,6 +188,8 @@ describe('readBook for one Miner', () => {
     });
     const d = (await readMiner('m1'))!;
     expect(d.disputes?.map((x) => x.id)).toEqual(['q1']);
+    // By Miner, as the page's other records: another Miner's dispute is never read.
+    expect(store.reads).not.toContain(`${BOOK}/disputes/q2`);
     expect(d.uncounted?.map((x) => x.id)).toEqual(['u1']);
   });
 });

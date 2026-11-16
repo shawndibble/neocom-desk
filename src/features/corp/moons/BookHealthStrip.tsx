@@ -76,7 +76,7 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
     });
   }
   // Counted from the ledger rows, so only on a tab that reads them (the Moon owners tab does not).
-  if ((data.parts?.has('observed') ?? true) && view.unrated.length > 0) {
+  if (data.parts.has('observed') && view.unrated.length > 0) {
     items.push({
       id: 'unrated',
       tone: 'warning',

@@ -50,16 +50,11 @@ import { withMoonDocs } from '@/engine/corpTaxBook/pullFigures';
 import {
   verifyOfficer,
   type BookData,
+  type BookPart,
   type BookSettings,
   type OfficerVerdict,
 } from '../taxBook/bookClient';
-import {
-  bookPartsFor,
-  extendBook,
-  readBook,
-  type BookPart,
-  type BookRead,
-} from '../taxBook/bookRead';
+import { bookPartsFor, extendBook, holdsParts, readBook, type BookRead } from '../taxBook/bookRead';
 import { moonOwnersNeedRows } from '@/engine/corpTaxBook/moonOwners';
 import { forgetObservedCopy } from '../taxBook/observedStore';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
@@ -161,7 +156,7 @@ async function failedFetch(
 
 /**
  * `wanted` is what the open page joins (`bookPartsFor`); default the whole book. Only those
- * slices are read, and a page that wants more reads just the slices it adds. Until they
+ * parts are read, and a page that wants more reads just the parts it adds. Until they
  * are in, the state is `loading`.
  */
 export function useCorpBook(
@@ -228,7 +223,7 @@ export function useCorpBook(
           ...(scopedMiner !== undefined ? { minerId: scopedMiner } : {}),
           ...(scopedMoon !== undefined ? { extractionId: scopedMoon } : {}),
         });
-        // The page moved on while this read ran: take the slices it now wants.
+        // The page moved on while this read ran: take the parts it now wants.
         const data =
           read && (await extendBook(characterId, corporationId, read, wantedRef.current));
         if (cancelled) return;
@@ -257,10 +252,10 @@ export function useCorpBook(
     };
   }, [characterId, corporationId, attempt, finishedAt, scopedMiner, scopedMoon]);
 
-  // A page that wants slices the book was opened without reads just those.
+  // A page that wants parts the book was opened without reads just those.
   useEffect(() => {
     if (fetched.status !== 'loaded' || characterId === null || corporationId === null) return;
-    if (holds(fetched.data, wantedRef.current)) return;
+    if (holdsParts(fetched.data, wantedRef.current)) return;
     let cancelled = false;
     const held = fetched.data;
     extendBook(characterId, corporationId, held, wantedRef.current)
@@ -510,7 +505,7 @@ export function useCorpBook(
         view &&
         fetched.data.scopedMiner === scopedMiner &&
         fetched.data.forMoon === scopedMoon &&
-        holds(fetched.data, required)
+        holdsParts(fetched.data, required)
         ? {
             status: 'ready',
             verdict: fetched.verdict,
@@ -524,11 +519,6 @@ export function useCorpBook(
   return { state, reload, requestRows, characterId, corporationId };
 }
 
-/** Whether a read holds every slice a page joins. */
-function holds(data: BookRead, parts: ReadonlySet<BookPart>): boolean {
-  return [...parts].every((p) => data.parts.has(p));
-}
-
 /**
  * Whether the Moon owners tab, read without ledger rows, must read them after all: a moon owner
  * its summary cannot stand in for (#5717).
@@ -540,7 +530,7 @@ export function needsRowsFallback(
   corporationId: number | null
 ): boolean {
   if (wanted.has('observed') || !wanted.has('owners') || corporationId === null) return false;
-  if (!data.parts?.has('core') || !data.parts.has('owners')) return false;
+  if (!data.parts.has('core') || !data.parts.has('owners')) return false;
   const feeders = data.feeders ?? [];
   return moonOwnersNeedRows({
     now,

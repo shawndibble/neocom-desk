@@ -1,8 +1,8 @@
 /**
- * Which slices of a Corp Tax Book a `/corp/moons` page reads (issue #5248); `slices.ts` names
+ * Which parts of a Corp Tax Book a `/corp/moons` page reads (issue #5248); `slices.ts` names
  * the fields each one fills, and is the list to trust over this summary.
- * Opening a tab reads only its slices; a later tab reads the ones it adds, and
- * the slices already held are reused.
+ * Opening a tab reads only its parts; a later tab reads the ones it adds, and
+ * the parts already held are reused.
  *
  * - `core`: miners, statements, extractions, feeders (with payouts), the scheduled-sync
  *   status and the uncounted donations (#6207). Every tab joins these.
@@ -16,10 +16,17 @@
  *   Moon owners tab shows in place of accrual worked from every ledger row (#5717). Not in
  *   `ALL_BOOK_PARTS`: a whole-book read (the export) has no use for it.
  *
- * The settings document and `meta/paid` are not slices: every read takes them fresh.
+ * The settings document and `meta/paid` are not parts: every read takes them fresh.
  */
-export const ALL_BOOK_PARTS = ['core', 'observed', 'ledger', 'answers'] as const;
-export type BookPart = (typeof ALL_BOOK_PARTS)[number] | 'owners';
+import type { BookPart } from '../bookClient';
+
+export type { BookPart };
+export const ALL_BOOK_PARTS = [
+  'core',
+  'observed',
+  'ledger',
+  'answers',
+] as const satisfies readonly BookPart[];
 
 export type BookPartSet = ReadonlySet<BookPart>;
 
@@ -59,4 +66,9 @@ export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null)
 /** The wanted parts not yet held. */
 export function missingParts(wanted: BookPartSet, held: BookPartSet): BookPartSet {
   return new Set([...wanted].filter((p) => !held.has(p)));
+}
+
+/** Whether a read holds every part a page joins: no `extendBook` read is due. */
+export function holdsParts(read: { parts: BookPartSet }, wanted: BookPartSet): boolean {
+  return missingParts(wanted, read.parts).size === 0;
 }

@@ -17,8 +17,8 @@ import {
 } from '@/engine/corpTaxBook/bookView';
 import { extractionId } from '@/engine/corpTaxBook/sync';
 import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
-import type { BookData, BookFeeder, OfficerVerdict } from '../taxBook/bookClient';
-import { bookPartsFor, readBook, type BookPart } from '../taxBook/bookRead';
+import type { BookData, BookFeeder, BookPart, OfficerVerdict } from '../taxBook/bookClient';
+import { bookPartsFor, readBook } from '../taxBook/bookRead';
 import { BookProvider } from './BookContext';
 import { ExtractionsTab } from './ExtractionsTab';
 import { MinerDetail } from './MinerDetail';

@@ -3,7 +3,7 @@
  * fills, how a field is read from the whole book, and what it holds when its part was not read.
  * Reading and merging both walk this table, so a new field is one entry here (and its place on
  * `BookData`). A scoped read (one Miner, one moon) swaps a field's reader for its own, never
- * leaves one out: a read's `parts` names exactly the slices it filled.
+ * leaves one out: a read's `parts` names exactly the parts it filled.
  */
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
@@ -34,9 +34,9 @@ import type { FeederViewSummary } from '../feederViewClient';
 import type { OpenBook } from '../openBook';
 import type { BookPart, BookPartSet } from './parts';
 
-/** A book read as a page joins it: the slices it asked for, and the scope it was read in. */
+/** A book read as a page joins it: the parts it asked for, and the scope it was read in. */
 export interface BookRead extends BookData {
-  /** The slices this read filled; every field of every other slice is empty. */
+  /** The parts this read filled; every field of every other part is empty. */
   parts: BookPartSet;
   /** A one-Miner read (#5258): the first day whose rows were read, and the Miner's stored totals. */
   minerScope?: { from: string; totals?: HeaderTotals };
@@ -185,7 +185,7 @@ type Slices = typeof SLICES;
 type FieldsOf<P extends BookPart> = {
   [K in keyof Slices[P]]: Slices[P][K] extends Field<infer T> ? T : never;
 };
-/** Every field a read fills, each from the one slice that holds it. */
+/** Every field a read fills, each from the one part that holds it. */
 export type Fields = FieldsOf<'core'> &
   FieldsOf<'observed'> &
   FieldsOf<'ledger'> &
@@ -277,7 +277,7 @@ function readModelsOf({ book, corporationId }: ReadContext): Promise<ReadModelDo
     .catch(() => undefined);
 }
 
-/** The asked slices of the whole book, and the read model docs. */
+/** The asked parts of the whole book, and the read model docs. */
 export async function readWhole(ctx: ReadContext, parts: BookPartSet): Promise<BookRead> {
   const [fields, readModels] = await Promise.all([readSlices(ctx, parts), readModelsOf(ctx)]);
   return { ...(await bookOf(ctx, parts, fields)), ...(readModels ? { readModels } : {}) };
@@ -289,8 +289,9 @@ function fieldsFrom(data: BookData): Fields {
 }
 
 /**
- * `extra`'s slices laid over `held`; the settings and `meta/paid` are `extra`'s fresher copy, and
- * the scope (which Miner, which moon) stays `held`'s.
+ * `extra`'s parts laid over `held`. The settings (top level and `state.book` alike) and the scope
+ * (which Miner, which moon) stay `held`'s: the page's prices were built for those settings.
+ * `meta/paid` is `extra`'s fresher copy.
  */
 export function mergeReads(held: BookRead, extra: BookRead): BookRead {
   const from = { held: fieldsFrom(held), extra: fieldsFrom(extra) };
@@ -303,7 +304,7 @@ export function mergeReads(held: BookRead, extra: BookRead): BookRead {
   const readModels = extra.readModels ?? held.readModels;
   return {
     ...shape(
-      extra.settings,
+      held.settings,
       extra.state.paidStatementIds,
       new Set([...held.parts, ...extra.parts]),
       fields

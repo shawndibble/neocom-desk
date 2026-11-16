@@ -34,7 +34,7 @@ export async function openBook(characterId: number, corporationId: number) {
   const paid = getDoc(doc(db, 'corps', String(corporationId), 'meta', 'paid'));
   // A refusal here means the rules no longer let this Character in: nothing of the book stays on the device.
   paid.catch(async (error) => {
-    if (String((error as { code?: unknown } | null)?.code ?? '').endsWith('permission-denied'))
+    if (errorCode(error).endsWith('permission-denied'))
       await forgetObservedCopy(characterId, corporationId).catch(() => {});
   });
   const store = bookPartStore(characterId, corporationId);
@@ -81,6 +81,10 @@ export async function openBook(characterId: number, corporationId: number) {
   const written = (name: string) => versions === null || versions.collections[name] !== undefined;
   return { db, data, part, read, list, observed, paidStatementIds, written };
 }
+
+/** A Firestore error's code (`permission-denied`, `failed-precondition`, ...); '' when it has none. */
+export const errorCode = (error: unknown): string =>
+  String((error as { code?: unknown } | null)?.code ?? '');
 
 /** An open book; null from `openBook` is a corporation with none. */
 export type OpenBook = NonNullable<Awaited<ReturnType<typeof openBook>>>;

@@ -25,7 +25,7 @@ export function PayMoonOwnerHost({
   // The balance and the period come from the ledger rows, which the Moon owners tab may not hold.
   useEffect(() => requestRows?.(), [requestRows]);
   const detail = moonOwnerDetail(input, owner);
-  if (!detail || !(data.parts?.has('observed') ?? true)) return null;
+  if (!detail || !data.parts.has('observed')) return null;
   const payeeName =
     detail.payee.kind === 'character'
       ? names.character(detail.payee.id)

@@ -1,8 +1,8 @@
 /**
  * One Miner's page from the read models (issue #5258, ADR 0032): the Miner's totals doc, their
- * Statements, payments, write-offs, adjustments and declarations by Miner, and the ledger rows
- * since the newest Statement began. Never the whole ledger. Every other field of its slices
- * (dismissals, Extractions, feeders, disputes, ...) is the whole book's, read as `slices.ts` reads it.
+ * Statements, payments, write-offs, adjustments, disputes and declarations by Miner, and the
+ * ledger rows since the newest Statement began. Never the whole ledger. Every other field of its
+ * parts (dismissals, Extractions, feeders, ...) is the whole book's, read as `slices.ts` reads it.
  * A missing composite index (observed: characterId + date) falls back to the Miner's characters'
  * whole ledger, filtered here, so an undeployed index costs reads, not the page.
  */
@@ -26,15 +26,18 @@ import {
 import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
+import { chunk } from '@/lib/chunk';
+import { readDisputes } from '@/engine/corpTaxBook/disputes';
 import { settingsFrom, type BookDeclaration } from '../bookClient';
+import { errorCode } from '../openBook';
 import { ALL_BOOK_PARTS, type BookPart, type BookPartSet } from './parts';
 import { bookOf, readSlices, type BookRead, type ReadContext } from './slices';
 
+/** Firestore's cap on an `in` filter's values. */
 const IN_LIMIT = 30;
-const codeOf = (error: unknown) => String((error as { code?: unknown } | null)?.code ?? '');
-const isMissingIndex = (error: unknown) => codeOf(error).endsWith('failed-precondition');
+const isMissingIndex = (error: unknown) => errorCode(error).endsWith('failed-precondition');
 
-/** A one-Miner read: every whole-book slice, scoped to `minerId`, and any other asked. */
+/** A one-Miner read: every whole-book part, scoped to `minerId`, and any other part asked. */
 export async function readMinerScope(
   ctx: ReadContext,
   minerId: string,
@@ -57,7 +60,7 @@ export async function readMinerScope(
     try {
       return (await one('minerTotals')) as HeaderTotals | undefined;
     } catch (error) {
-      if (codeOf(error).endsWith('permission-denied')) throw error;
+      if (errorCode(error).endsWith('permission-denied')) throw error;
       return undefined;
     }
   };
@@ -75,16 +78,15 @@ export async function readMinerScope(
 
   const windowRows = async (ids: readonly number[], since: string): Promise<ObservedRow[]> => {
     const rows: ObservedRow[] = [];
-    for (let i = 0; i < ids.length; i += IN_LIMIT) {
-      const chunk = ids.slice(i, i + IN_LIMIT);
+    for (const batch of chunk(ids, IN_LIMIT)) {
       try {
         const snap = await getDocs(
-          query(under('observed'), where('characterId', 'in', chunk), where('date', '>=', since))
+          query(under('observed'), where('characterId', 'in', batch), where('date', '>=', since))
         );
         rows.push(...snap.docs.map((d) => d.data() as ObservedRow));
       } catch (error) {
         if (!isMissingIndex(error)) throw error;
-        const snap = await getDocs(query(under('observed'), where('characterId', 'in', chunk)));
+        const snap = await getDocs(query(under('observed'), where('characterId', 'in', batch)));
         rows.push(...snap.docs.map((d) => d.data() as ObservedRow).filter((r) => r.date >= since));
       }
     }
@@ -121,12 +123,10 @@ export async function readMinerScope(
   const declarations = async (): Promise<BookDeclaration[]> => {
     const ids = (await statements).map((s) => s.id);
     const out: BookDeclaration[] = [];
-    for (let i = 0; i < ids.length; i += IN_LIMIT)
+    for (const batch of chunk(ids, IN_LIMIT))
       out.push(
         ...(
-          await getDocs(
-            query(under('declarations'), where('statementId', 'in', ids.slice(i, i + IN_LIMIT)))
-          )
+          await getDocs(query(under('declarations'), where('statementId', 'in', batch)))
         ).docs.map((d) => d.data() as BookDeclaration)
       );
     return out;
@@ -144,6 +144,11 @@ export async function readMinerScope(
       writeOffs: () => byMiner<RecordedWriteOff>('writeOffs'),
       adjustments: () => byMiner<Adjustment>('adjustments'),
       declarations,
+      // Best effort, as the whole book reads them: rules that predate disputes still open the page.
+      disputes: async () =>
+        book.written('disputes')
+          ? readDisputes(await byMiner<unknown>('disputes').catch(() => []))
+          : [],
       observed,
     }),
     from,

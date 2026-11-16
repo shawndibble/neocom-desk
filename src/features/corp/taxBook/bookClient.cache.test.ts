@@ -246,6 +246,7 @@ describe('readBook over the version marker', () => {
     store.docs.set(BOOK, { ...stamped(), graceHours: 99 });
     const merged = await extendBook(7, CORP, held!, new Set(['core', 'ledger']));
     expect(merged.settings).toBe(held!.settings);
+    expect(merged.state.book).toBe(held!.settings);
   });
 
   it('a warm Overview opens as it did before the split: the head doc and meta/paid only', async () => {

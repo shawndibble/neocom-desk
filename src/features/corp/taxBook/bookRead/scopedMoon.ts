@@ -12,6 +12,7 @@ import { extractionId as extractionIdOf } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { MoonDoc } from '../../../../../functions/src/corpTaxBookMoonDocs';
 import { settingsFrom } from '../bookClient';
+import { errorCode } from '../openBook';
 import type { BookPart, BookPartSet } from './parts';
 import {
   bookOf,
@@ -23,12 +24,10 @@ import {
   type ReadContext,
 } from './slices';
 
-const codeOf = (error: unknown) => String((error as { code?: unknown } | null)?.code ?? '');
-
-/** The slices a moon page reads in its scope: the window's rows stand in for the ledger rows. */
+/** The parts a moon page reads in its scope: the window's rows stand in for the ledger rows. */
 const MOON_PARTS: readonly BookPart[] = ['core', 'observed', 'ledger'];
 
-/** A moon page's read: the scoped slices and any other asked, or the asked slices whole. */
+/** A moon page's read: the scoped parts and any other asked, or the asked parts whole. */
 export async function readMoonScope(
   ctx: ReadContext,
   extractionId: string,
@@ -62,7 +61,7 @@ export async function readMoonScope(
           `moonDocs:s:${shown.structureId}`
         )
         .catch((error) => {
-          if (codeOf(error).endsWith('permission-denied')) throw error;
+          if (errorCode(error).endsWith('permission-denied')) throw error;
           return undefined;
         })
     : [];
@@ -86,7 +85,7 @@ export async function readMoonScope(
       );
       return snap.docs.map((d) => d.data() as ObservedRow);
     } catch (error) {
-      if (!codeOf(error).endsWith('failed-precondition')) throw error;
+      if (!errorCode(error).endsWith('failed-precondition')) throw error;
       const snap = await getDocs(query(under('observed'), ...days));
       return snap.docs
         .map((d) => d.data() as ObservedRow)
@@ -94,6 +93,8 @@ export async function readMoonScope(
     }
   };
   const parts = new Set<BookPart>([...MOON_PARTS, ...asked]);
+  // Every other field is the whole book's. Deliberately so for the disputes: they name a Miner and
+  // a day, not a refinery, and the list is stamp-gated and served from this tab's copy (bookCache).
   const fields = await readSlices(ctx, parts, {
     observed: async () => (await Promise.all(scope.rows.map(windowRows))).flat(),
   });

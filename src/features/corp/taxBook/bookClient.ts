@@ -52,7 +52,6 @@ import type { OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
 import type { StoredRefineryLabel, StoredRefineryStructure } from '@/engine/corpTaxBook/refinery';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore } from '@/sync/firebaseApp';
-import type { BookPart } from './bookRead';
 import type { FeederViewSummary } from './feederViewClient';
 import { openBook } from './openBook';
 import type { ReadModelDocs } from '@/engine/corpTaxBook/readModels';
@@ -522,6 +521,12 @@ export function bookFeederFrom(record: FeederDoc, payouts: FeederPayoutRow[]): B
   };
 }
 
+/**
+ * A part of the book a read covers (`bookRead/parts.ts` says which page reads which, and
+ * `bookRead/slices.ts` which fields each part fills).
+ */
+export type BookPart = 'core' | 'observed' | 'ledger' | 'answers' | 'owners';
+
 /** Everything `/corp/moons` renders from. Officer-only: verify first. */
 export interface BookData {
   settings: BookSettings;
@@ -538,8 +543,8 @@ export interface BookData {
   uncounted?: UncountedDonation[];
   /** #6206: Miners' Conflict disputes (`disputes`), answered or not. Read with the ledger. */
   disputes?: OreDispute[];
-  /** Which slices this read covered (`bookRead/`); the rest are empty. Absent: the whole book. */
-  parts?: ReadonlySet<BookPart>;
+  /** Which parts this read covered (`bookRead/`); every field of the others is empty. */
+  parts: ReadonlySet<BookPart>;
   /** The Overview and Miners tab docs (ADR 0032); absent until the server has built them. */
   readModels?: ReadModelDocs;
   /**

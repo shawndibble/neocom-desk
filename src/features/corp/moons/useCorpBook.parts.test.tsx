@@ -1,7 +1,8 @@
 // Which slices of the book `useCorpBook` reads as the page's tab changes (issue #5248).
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BookPart, BookRead } from '../taxBook/bookRead';
+import type { BookPart } from '../taxBook/bookClient';
+import type { BookRead } from '../taxBook/bookRead';
 
 type BookPartSet = ReadonlySet<BookPart>;
 /** Every read the hook makes, the ones `extendBook` makes for it included. */
