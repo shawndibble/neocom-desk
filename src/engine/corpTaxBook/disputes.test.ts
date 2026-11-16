@@ -96,6 +96,16 @@ describe('disputedTax (#6206)', () => {
 
   it('is unknown while a disputed day has no charge in view', () => {
     expect(disputedTax(dispute(), [charge('60:1000:2026-11-01', [])])).toBeUndefined();
+    const unpriced = {
+      ...charge('60:1000:2026-11-01', [{ typeId: 45490, quantity: 100 }]),
+      unitPrices: {},
+    } as DayCharge;
+    expect(
+      disputedTax(dispute(), [
+        unpriced,
+        charge('77:1000:2026-11-01', [{ typeId: 45491, quantity: 50 }]),
+      ])
+    ).toBeUndefined();
   });
 });
 

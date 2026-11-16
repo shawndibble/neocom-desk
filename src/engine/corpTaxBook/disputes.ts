@@ -58,7 +58,9 @@ export function disputedTax(
     const charge = charges.find((c) => c.key === recordKey);
     if (!charge) return undefined;
     const held = charge.oreLines.reduce((n, l) => (l.typeId === typeId ? n + l.quantity : n), 0);
-    tax += Math.min(quantity, held) * (charge.unitPrices[typeId] ?? 0) * (charge.taxPct / 100);
+    const price = charge.unitPrices[typeId];
+    if (price === undefined && held > 0) return undefined;
+    tax += Math.min(quantity, held) * (price ?? 0) * (charge.taxPct / 100);
   }
   return tax;
 }
