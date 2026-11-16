@@ -76,7 +76,16 @@ function view(rows: SpendPlanRow[], stop: SpendStop, walletBalance: number | nul
     stop,
     unpriced: [],
   };
-  return { result, rowsById, walletBalance, candidates: 10 };
+  return {
+    result,
+    rowsById,
+    walletBalance,
+    candidates: 10,
+    ownedPlacements: new Map([
+      [17_000, [{ characterId: 1, locationId: 60003760, locationType: 'station', quantity: 3 }]],
+    ]),
+    locationNames: new Map([[60003760, 'Jita IV - Moon 4 - Caldari Navy Assembly Plant']]),
+  };
 }
 
 const planRows = [

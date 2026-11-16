@@ -5,7 +5,11 @@
  * (decision 20261030-180139, amended by this issue's decision).
  */
 import { useCallback, useState } from 'react';
-import { detectOwnedStock } from '@/engine/industry/ownedStock';
+import {
+  detectOwnedStock,
+  type OwnedStockPlacement,
+  type OwnedStockSource,
+} from '@/engine/industry/ownedStock';
 import type { SkillLevels } from '@/engine/industry/types';
 import { lpRate } from '@/engine/loyalty/marketLpValue';
 import { planLpSpend, type SpendCandidate, type SpendPlanResult } from '@/engine/loyalty/spendPlan';
@@ -15,7 +19,10 @@ import { liveHubOrders, reachableBuyOrders } from '@/engine/market/liveBook';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { loadWalletBalance } from '@/features/character/wallet';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
-import type { OwnedStockSnapshot } from '@/features/industry/ownedStockDetection';
+import {
+  resolveStockLocationNames,
+  type OwnedStockSnapshot,
+} from '@/features/industry/ownedStockDetection';
 import { loadHubJumps } from '@/features/market/hubJumps';
 import { loadLiveBooks, type LiveBook } from '@/features/market/liveBooks';
 import type { TradeHub } from '@/market/hubs';
@@ -37,6 +44,39 @@ export interface SpendPlanView {
   walletBalance: number | null;
   /** Offers handed to the plan; 0 when nothing in the view had a Sell now price. */
   candidates: number;
+  /** Required type -> where the active Character's owned units sit, largest first. */
+  ownedPlacements: ReadonlyMap<number, readonly OwnedStockPlacement[]>;
+  /** Location id -> name, for `ownedPlacements`; a missing name falls back to an id label. */
+  locationNames: ReadonlyMap<number, string>;
+}
+
+/**
+ * The turn-ins the active Character owns, and where. Only its own hangars
+ * count: an alt's stack or the corporation's cannot be handed in by this
+ * Character without a trade, so counting it as free would understate the
+ * plan's purchases (decision: spend-my-lp-owned-turn-ins-are-the-active-character-s).
+ * Location is not filtered (an LP store redeems at any of its stations, and
+ * the plan names no station); the plan shows where each owned unit sits instead.
+ */
+export function activeCharacterTurnIns(
+  sources: readonly OwnedStockSource[],
+  activeCharacterId: number | null,
+  typeIds: ReadonlySet<number>
+): {
+  owned: Map<number, number>;
+  placements: Map<number, readonly OwnedStockPlacement[]>;
+} {
+  const owned = new Map<number, number>();
+  const placements = new Map<number, readonly OwnedStockPlacement[]>();
+  if (activeCharacterId === null) return { owned, placements };
+  const own = sources.filter(
+    (s) => s.characterId === activeCharacterId && s.corporationId === undefined
+  );
+  for (const [typeId, entry] of detectOwnedStock(own, typeIds)) {
+    owned.set(typeId, entry.quantity);
+    placements.set(typeId, entry.placements);
+  }
+  return { owned, placements };
 }
 
 /** An offer the plan can rank: it costs LP and has a Sell now ISK/LP. */
@@ -141,10 +181,11 @@ async function loadSpendPlan(request: Request): Promise<SpendPlanView> {
     if (outputIds.has(typeId))
       buyBooks.set(typeId, reachableBuyOrders(book.orders, station, jumps));
   }
-  const owned = new Map<number, number>();
-  for (const [typeId, entry] of detectOwnedStock(request.ownedStock.sources, requiredIds)) {
-    owned.set(typeId, entry.quantity);
-  }
+  const { owned, placements } = activeCharacterTurnIns(
+    request.ownedStock.sources,
+    request.activeCharacterId,
+    requiredIds
+  );
   const walletBalance = wallet?.data ?? null;
   const result = planLpSpend({
     candidates: picked.map((p) => p.candidate),
@@ -158,11 +199,21 @@ async function loadSpendPlan(request: Request): Promise<SpendPlanView> {
     skills: request.skills,
     standing: request.standing,
   });
+  // Names only for the turn-ins the plan used; a failed lookup falls back to id labels.
+  const usedPlacements = result.rows.flatMap((row) =>
+    row.turnIns.flatMap((line) => (line.owned > 0 ? (placements.get(line.typeId) ?? []) : []))
+  );
+  const locationNames =
+    usedPlacements.length === 0
+      ? new Map<number, string>()
+      : await resolveStockLocationNames(usedPlacements).catch(() => new Map<number, string>());
   return {
     result,
     rowsById: new Map(picked.map((p) => [p.row.offer.offer_id, p.row])),
     walletBalance,
     candidates: picked.length,
+    ownedPlacements: placements,
+    locationNames,
   };
 }
 

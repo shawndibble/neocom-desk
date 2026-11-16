@@ -75,9 +75,12 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { applyBlueprintPriceSeed } from '@/features/industry/planSeed';
 import { lpBlueprintPickPrice } from '@/features/industry/blueprintPurchaseOffers';
 import { formatNumber } from '@/lib/numberLocale';
+import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
+import type { EsiEndpointId } from '@/esi/registry';
 
 /** Module-level so the table's windowing and row memo see one stable function. */
 const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
+const LOYALTY_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterLoyaltyPoints'];
 
 /**
  * The filter row's three fields, in the URL (ADR 0015, issue #1302): all
@@ -179,6 +182,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const [sheetOpen, setSheetOpen] = useState(() => selectedOfferId !== null && !isDesktop);
 
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
+  const lacksLoyaltyScope = useCharacterLacksEndpoints(activeCharacterId, LOYALTY_ENDPOINTS);
   const itemActions = usePageItemActions({ activeCharacterId });
 
   const filteredRows = useMemo(() => {
@@ -345,6 +349,9 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           <span className="flex items-center gap-2">
             <SpendLpButton
               playerLp={playerLp}
+              lpAccess={
+                activeCharacterId === null ? 'signedOut' : lacksLoyaltyScope ? 'noScope' : null
+              }
               rankable={hasSpendCandidates(filteredRows, instantIskPerLp)}
               loading={spendPlan.plan.status === 'loading'}
               onClick={spendPlan.run}
