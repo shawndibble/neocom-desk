@@ -10,6 +10,8 @@ import { CorpBookSyncNote } from './CorpBookSyncNote';
 import { corpPayAccount } from './corpPayAccount';
 import { suggestedCode, type PayStatementCode } from './payStatementCodes';
 import type { CorpBookViewBook } from './corpBookView';
+import type { BookRowView } from '@/engine/corpTaxBook/personal';
+import { WherePaymentGoes } from './WherePaymentGoes';
 
 interface Props {
   onClose: () => void;
@@ -23,6 +25,11 @@ interface Props {
    * donation reason pins it to one.
    */
   statementCodes: readonly PayStatementCode[];
+  /**
+   * The member's open days in this book (`BookRowView`s of state `billed` still owing, for the
+   * Characters in view): the pay dialog shows where the amount lands among them.
+   */
+  openDays?: readonly BookRowView[];
   /** Opened from one row: only it starts ticked, paid by its Character. */
   focus?: { rowId: string; characterId: number };
 }
@@ -45,6 +52,7 @@ export function CorpPayDialog({
   rows,
   systemNames,
   statementCodes,
+  openDays = [],
   focus,
 }: Props) {
   const { t } = useTranslation();
@@ -89,11 +97,26 @@ export function CorpPayDialog({
           payment
         )
       }
-      notice={(ticked, payerId) => {
+      notice={(ticked, payerId, amount) => {
         const oldest = oldestFor(payerId);
         const owed = ticked.reduce((sum, r) => sum + r.assignment.taxOwed, 0);
+        // The book pays a Miner's days; the payer's own Miner grouping when the rows name one.
+        const minerIds = new Set(
+          openDays.flatMap((d) => (d.characterId === payerId && d.minerId ? [d.minerId] : []))
+        );
+        const payerDays = openDays
+          .filter((d) =>
+            d.minerId && minerIds.size > 0 ? minerIds.has(d.minerId) : d.characterId === payerId
+          )
+          .map((d) => ({
+            id: d.id,
+            date: d.date,
+            taxOwed: d.taxOwed ?? 0,
+            ...(d.held ? { held: d.held } : {}),
+          }));
         return (
           <div className="space-y-1.5 text-xs text-text-dim">
+            <WherePaymentGoes corpName={book.corpName} days={payerDays} amount={amount} />
             <p>
               <Trans
                 i18nKey="miningTax.corpBook.pay.account"

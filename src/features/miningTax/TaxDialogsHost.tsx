@@ -741,6 +741,15 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             allDisplayRows.map((dr) => [dr.row.characterId, dr.row.characterName])
           );
           const codes = payStatementCodes(book, (id) => names.get(id), i18n.language);
+          // The book's days still owing for the Characters in view, held ones included.
+          const inView = new Set(characterFiltered.map((dr) => dr.row.characterId));
+          const openDays = (corpView?.overlay.rows ?? []).filter(
+            (r) =>
+              r.corporationId === corpPayTarget &&
+              r.state === 'billed' &&
+              (r.taxOwed ?? 0) > 0 &&
+              inView.has(r.characterId)
+          );
           return (
             <Suspense fallback={null}>
               <CorpPayDialog
@@ -750,6 +759,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 rows={owedRows}
                 systemNames={systemNames}
                 statementCodes={codes}
+                openDays={openDays}
                 focus={corpPayFocus ?? undefined}
               />
             </Suspense>

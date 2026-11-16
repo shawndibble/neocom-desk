@@ -8254,6 +8254,25 @@
         "codeInReason": "The Reason is your {{period}} Statement's code.",
         "codeOldest": "The Reason is the code of the payer's oldest open Statement ({{period}}).",
         "oldestFirst": "A payment goes to the oldest open Statement first; a code moves it to that Statement first.",
+        "where": {
+          "intro": "{{corp}}'s book pays your oldest days first — a payment can't pick a moon or a day, so this shows where yours lands.",
+          "label": "Where it lands",
+          "paid": "Paid by this",
+          "part": "Part paid",
+          "partOf": "{{amount}} ISK of it",
+          "held": "Held",
+          "next": "Next in line",
+          "heldNote": "{{kind}} — waiting on {{corp}}; no payment lands here",
+          "more_one": "and {{count}} more day",
+          "more_other": "and {{count}} more days",
+          "credit": "{{amount}} ISK left over stays with the book as credit.",
+          "kind": {
+            "payee": "Payee dispute",
+            "quantity": "Quantity dispute",
+            "rate": "Rate dispute",
+            "notPaying": "Not paying"
+          }
+        },
         "heldElsewhere_one": "Nothing was recorded: the entry of {{dates}} already has its ore with another Payee, dismissed, or waiting for review in your ledger. Untick it, or sort it out on its row first.",
         "heldElsewhere_other": "Nothing was recorded: {{count}} entries ({{dates}}) already have their ore with another Payee, dismissed, or waiting for review in your ledger. Untick them, or sort them out on their rows first."
       },
