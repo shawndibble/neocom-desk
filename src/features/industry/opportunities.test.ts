@@ -28,7 +28,7 @@ import { recipeForLookup } from './recipes';
 import { computeBuildPlan } from './computeBuildPlan';
 import { resolveBuildPlan } from './resolveBuildPlan';
 import { planOwnedStockSale } from '@/engine/industry/ownedStockSale';
-import { profitOnBasis } from '@/engine/industry/profitBasis';
+import { profitOnBasis, type ProfitBasis } from '@/engine/industry/profitBasis';
 import type { DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
 import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { MarketSnapshot } from './marketData';
@@ -226,7 +226,10 @@ describe('computeOpportunityRow — auto make-or-buy depth (issue #652)', () => 
         recipeFor,
         depth,
       },
-      DEFAULT_TRADE_HUB
+      DEFAULT_TRADE_HUB,
+      undefined,
+      null,
+      'sellValue'
     );
   }
 
@@ -271,7 +274,9 @@ describe('computeOpportunityRow — priced like a Build Plan (issue #2055)', () 
       new Map(),
       { recipeFor, depth: 0 },
       DEFAULT_TRADE_HUB,
-      standing
+      standing,
+      null,
+      'sellValue'
     );
   }
 
@@ -350,7 +355,10 @@ describe('a plan opened from a row prices the row', () => {
     NO_CHARACTER_MODIFIERS,
     stock,
     { recipeFor, depth: 0 },
-    DEFAULT_TRADE_HUB
+    DEFAULT_TRADE_HUB,
+    undefined,
+    null,
+    'sellValue'
   )!;
 
   const profitOf = (plan: ReturnType<typeof planForOpportunityCandidate>) =>
@@ -412,7 +420,7 @@ describe('rows count owned materials as the plan page’s hero does', () => {
   };
   const stock = new Map([[34, { quantity: 90 }]]) as unknown as DetectedOwnedStockMap;
   const recipeFor = recipeForLookup({ catalog: cat, pi: null, ownedBlueprints: [ownedCopy] });
-  const priceRow = (held: DetectedOwnedStockMap) =>
+  const priceRow = (held: DetectedOwnedStockMap, profitBasis: ProfitBasis = 'sellValue') =>
     computeOpportunityRow(
       candidate,
       snapshot,
@@ -420,8 +428,52 @@ describe('rows count owned materials as the plan page’s hero does', () => {
       NO_CHARACTER_MODIFIERS,
       held,
       { recipeFor, depth: 0 },
-      DEFAULT_TRADE_HUB
+      DEFAULT_TRADE_HUB,
+      undefined,
+      null,
+      profitBasis
     )!;
+  const planResultFor = (row: ReturnType<typeof priceRow>) => {
+    const plan = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      row.materialSourcing,
+      row.buildHere,
+      100,
+      row.hub
+    );
+    return resolveBuildPlan(
+      plan,
+      {
+        catalog: cat,
+        pi: null,
+        ownedBlueprints: [ownedCopy],
+        assumedMe: 0,
+        modifiers: NO_CHARACTER_MODIFIERS,
+        bpcOffersFor: () => [],
+      },
+      { snapshot }
+    ).result!;
+  };
+
+  it('follows the Profit Basis setting: owned materials free reads the plan’s free-basis figure', () => {
+    const row = priceRow(stock, 'free');
+    const result = planResultFor(row);
+    // The stock is used, so the sell-value basis would have moved the figure.
+    expect(planOwnedStockSale(result.materials, snapshot, 'instant', {}).net).toBeGreaterThan(0);
+    const free = profitOnBasis('free', {
+      result,
+      ownedSellNet: null,
+      productQuantity: 1,
+      productUnitPrice: snapshot.hubPrices[2]!,
+      accountingLevel: 0,
+      brokerRelationsLevel: 0,
+    });
+    expect(row.result.profit).toBe(free.profit);
+    expect(row.result.iskPerHour).toBe(free.iskPerHour);
+    expect(row.result.marginPct).toBe(free.marginPct);
+    expect(row.forgoneSale).toBe(0);
+  });
 
   it('charges the stock it uses at what it would sell for, so ISK/hour matches the plan hero', () => {
     const row = priceRow(stock);
@@ -535,7 +587,8 @@ describe('rows price with the plan page’s settings', () => {
       { recipeFor, depth: 0 },
       DEFAULT_TRADE_HUB,
       undefined,
-      defaultsFrom
+      defaultsFrom,
+      'sellValue'
     )!;
 
   it('buys materials at the side of the market the latest plan’s basis names', () => {
@@ -629,7 +682,10 @@ describe('reaction rows (issue #5990)', () => {
       NO_CHARACTER_MODIFIERS,
       new Map(),
       { recipeFor, depth: 0 },
-      DEFAULT_TRADE_HUB
+      DEFAULT_TRADE_HUB,
+      undefined,
+      null,
+      'sellValue'
     )!;
 
   it('prices like the reaction Build Plan it opens: same profit, margin and ISK/hour', () => {
@@ -745,11 +801,18 @@ describe('opportunitiesInputsKey', () => {
     facilityDefaults: DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
     ownedByCharacter: new Map([[1, [owned(1), owned(2)]]]),
     defaultsByCharacter: new Map([[1, null]]),
+    profitBasis: 'sellValue',
   };
 
   it('changes when Assumed ME changes', () => {
     expect(opportunitiesInputsKey(INPUTS)).not.toBe(
       opportunitiesInputsKey({ ...INPUTS, assumedMe: 0 })
+    );
+  });
+
+  it('changes when the Profit Basis setting changes', () => {
+    expect(opportunitiesInputsKey(INPUTS)).not.toBe(
+      opportunitiesInputsKey({ ...INPUTS, profitBasis: 'free' })
     );
   });
 
@@ -840,6 +903,7 @@ describe('opportunitiesInputsKey', () => {
         modifiersByCharacter: new Map([[1, { ...NO_CHARACTER_MODIFIERS }]]),
         assumedMe: 10,
         defaultsByCharacter: new Map([[1, null]]),
+        profitBasis: 'sellValue',
       })
     );
   });
@@ -852,6 +916,7 @@ describe('opportunitiesInputsKey — the latest plan', () => {
     standingsByCharacter: new Map([[1, new Map([['jita', ZERO_STANDINGS]])]]),
     facilityDefaults: DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
     ownedByCharacter: new Map([[1, [owned(1)]]]),
+    profitBasis: 'sellValue',
   };
   const entry = catalogEntry(1);
   const plan = planForOpportunityCandidate(

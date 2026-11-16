@@ -23,6 +23,7 @@
  * codebase's `react-hooks/set-state-in-effect` rule.
  */
 import type { BuildPlanRecord } from '@/db';
+import type { ProfitBasis } from '@/engine/industry/profitBasis';
 import { startingLocation } from './newBuildPlan';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -83,6 +84,8 @@ export interface UseOpportunitiesArgs {
   ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
   /** ME to quote a sub-build at when the pilot owns no copy of its blueprint — same preference `BuildPlanDetail.tsx` uses. */
   assumedMe: number;
+  /** The pilot's Profit Basis setting: held stock is charged at its sell value only on `'sellValue'`, as on the plan page. */
+  profitBasis: ProfitBasis;
 }
 
 export interface UseOpportunitiesResult {
@@ -122,6 +125,7 @@ export function useOpportunities({
   ownedStockSnapshot,
   ownedByCharacter,
   assumedMe,
+  profitBasis,
 }: UseOpportunitiesArgs): UseOpportunitiesResult {
   const [state, setState] = useState<OpportunitiesState>(EMPTY_STATE);
   const [refreshToken, setRefreshToken] = useState(0);
@@ -152,6 +156,7 @@ export function useOpportunities({
     () =>
       opportunitiesInputsKey({
         assumedMe,
+        profitBasis,
         modifiersByCharacter,
         standingsByCharacter,
         facilityDefaults,
@@ -163,6 +168,7 @@ export function useOpportunities({
       }),
     [
       assumedMe,
+      profitBasis,
       modifiersByCharacter,
       standingsByCharacter,
       facilityDefaults,
@@ -284,7 +290,8 @@ export function useOpportunities({
             },
             hub,
             tradeHubStanding(standingsByCharacter.get(candidate.characterId) ?? new Map(), hub.id),
-            defaultsRef.current(candidate.characterId)
+            defaultsRef.current(candidate.characterId),
+            profitBasis
           );
           if (row) unranked.push(row);
         }
@@ -331,6 +338,7 @@ export function useOpportunities({
     ownedStockSnapshot,
     ownedByCharacter,
     assumedMe,
+    profitBasis,
     refreshToken,
     manualRefreshOnly,
   ]);
