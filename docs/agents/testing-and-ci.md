@@ -91,7 +91,14 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   `afterEach` puts real timers and the real `Date` back and waits for pending
   IndexedDB opens and transactions (Dexie, and Firebase's heartbeat probe that
   failed shards with "self is not defined"). A test that fakes timers still
-  restores them itself. Dexie is not wiped between tests: files seed in
+  restores them itself. A bare `vi.useFakeTimers()` leaves `setImmediate` and
+  `clearImmediate` real: the config default (`test.fakeTimers.toFake` in
+  `vite.config.ts`) is vitest's own list without them, because fake-indexeddb
+  schedules every request on `setImmediate`, and a Dexie request parked on the
+  fake clock is dropped when real timers come back, so it never finishes and
+  `VITEST_FAIL_ON_LEFTOVER_WORK=1` (CI) fails the test (#6267). A test that
+  needs `setImmediate` faked passes its own `toFake` (it replaces the default
+  list) and settles its IndexedDB work before restoring real timers. Dexie is not wiped between tests: files seed in
   `beforeAll`, so each file keeps clearing the tables it uses. Because that
   state is per file, `it.concurrent` / `describe.concurrent` are banned by lint,
   and `src/test/teardownOrder.test.ts` pins the runner order the abort relies on.

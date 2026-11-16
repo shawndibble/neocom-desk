@@ -1657,9 +1657,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
 
   describe('BPO availability (issue #1241)', () => {
     it('checks no market Order Book while the search is empty', async () => {
-      // Only the debounce's timers: a faked `setImmediate` is fake-indexeddb's
-      // scheduler, and the panel's Dexie reads left on it never finish.
-      vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] });
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1 })]));
       renderIndustry();
       await screen.findByRole('table', { name: 'BPC Sourcing' });
