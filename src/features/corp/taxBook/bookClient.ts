@@ -39,7 +39,7 @@ import type {
 } from '@/engine/corpTaxBook/sync';
 import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import type { UncountedDonation } from '@/engine/corpTaxBook/uncounted';
-import type { OreDispute } from '@/engine/corpTaxBook/disputes';
+import { readDisputes, type OreDispute } from '@/engine/corpTaxBook/disputes';
 import type {
   FeederMode,
   FeederModeChange,
@@ -93,6 +93,8 @@ export interface BookState {
   paidStatementIds: Set<string>;
   /** Officer write-offs (#4637): they reduce what a Miner owes. */
   writeOffs?: RecordedWriteOff[];
+  /** Members' disputes: an open one keeps its Statement from settling for good (resolving in the app). */
+  disputes?: OreDispute[];
 }
 
 export interface SyncUpload {
@@ -341,16 +343,25 @@ export async function readBookState(
   const book = await openBook(characterId, corporationId);
   if (!book) return null;
   const { list } = book;
-  const [miners, statements, payments, dismissals, extractions, paidStatementIds, writeOffs] =
-    await Promise.all([
-      list<Miner>('miners'),
-      list<Statement>('statements'),
-      list<SettlePayment>('payments'),
-      list<Dismissal>('dismissals'),
-      list<SyncExtraction>('extractions'),
-      book.paidStatementIds(),
-      list<RecordedWriteOff>('writeOffs'),
-    ]);
+  const [
+    miners,
+    statements,
+    payments,
+    dismissals,
+    extractions,
+    paidStatementIds,
+    writeOffs,
+    disputes,
+  ] = await Promise.all([
+    list<Miner>('miners'),
+    list<Statement>('statements'),
+    list<SettlePayment>('payments'),
+    list<Dismissal>('dismissals'),
+    list<SyncExtraction>('extractions'),
+    book.paidStatementIds(),
+    list<RecordedWriteOff>('writeOffs'),
+    list<unknown>('disputes'),
+  ]);
   return {
     book: summaryFrom(book.data),
     miners,
@@ -360,6 +371,7 @@ export async function readBookState(
     extractions,
     paidStatementIds,
     writeOffs,
+    disputes: readDisputes(disputes),
   };
 }
 

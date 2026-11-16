@@ -71,6 +71,12 @@ interface SettleUpDialogProps {
    */
   focusIds?: ReadonlySet<string>;
   /**
+   * Paid by amount, never by day (a Corp Tax Book, decision 20261116-194150): the book pays a
+   * Miner's oldest days first and cannot target one, so the entries are not offered to tick.
+   * "Sent a different amount?" still says where a smaller figure lands.
+   */
+  byAmount?: boolean;
+  /**
    * Writes the ticked entries paid, with the payment when one was recorded. Absent, they are
    * the member's own Assignments and `settle` marks them; a Corp Tax Book's rows are not, so
    * its Settle up records them its own way (`recordCorpPayment`).
@@ -86,9 +92,12 @@ interface SettleUpDialogProps {
   reason?: string | ((payerId: number | null) => string | undefined);
   /**
    * Payee-specific lines under the To / Amount / Reason box (where a corp's book wants it sent).
-   * A function gets the entries ticked right now and the paying Character.
+   * A function gets the entries ticked right now, the paying Character and the whole-ISK amount
+   * to send (so a notice can show where it lands as the pilot changes it).
    */
-  notice?: ReactNode | ((ticked: readonly SettleUpRow[], payerId: number | null) => ReactNode);
+  notice?:
+    | ReactNode
+    | ((ticked: readonly SettleUpRow[], payerId: number | null, amount: number) => ReactNode);
 }
 
 /** More Characters than this pick from a list instead of a segmented row (DESIGN §4). */
@@ -124,6 +133,7 @@ export function SettleUpDialog({
   arrivalCheck,
   payerId,
   focusIds,
+  byAmount = false,
   recordPaid,
   reason: reasonOverride,
   notice,
@@ -457,36 +467,40 @@ export function SettleUpDialog({
             )}
           </div>
         )}
-        {entryGroup(
-          t('miningTax.settleUp.entriesSummary', {
-            count: primaryTicked.length,
-            range: shortEveRange(primaryTicked.map((r) => r.assignment.date).sort()),
-          }),
-          sumOwed(primaryTicked),
-          primaryRows,
-          [entriesOpen, setEntriesOpen],
-          // With no picker, the row itself names who mined it; with one, the picker does.
-          payers.length === 1,
-          <li className="px-2 py-1.5 text-[0.6875rem] text-text-dim">
-            {t('miningTax.settleUpUntickHint')}
-          </li>
+        {!byAmount && (
+          <>
+            {entryGroup(
+              t('miningTax.settleUp.entriesSummary', {
+                count: primaryTicked.length,
+                range: shortEveRange(primaryTicked.map((r) => r.assignment.date).sort()),
+              }),
+              sumOwed(primaryTicked),
+              primaryRows,
+              [entriesOpen, setEntriesOpen],
+              // With no picker, the row itself names who mined it; with one, the picker does.
+              payers.length === 1,
+              <li className="px-2 py-1.5 text-[0.6875rem] text-text-dim">
+                {t('miningTax.settleUpUntickHint')}
+              </li>
+            )}
+            {sameCharacterRest.length > 0 &&
+              entryGroup(
+                t('miningTax.settleUp.alsoPayRest', { count: sameCharacterRest.length }),
+                sumOwed(sameCharacterRest),
+                sameCharacterRest,
+                [restOpen, setRestOpen],
+                false
+              )}
+            {otherCharacterRows.length > 0 &&
+              entryGroup(
+                t('miningTax.settleUp.alsoPayOthers', { count: otherCharacterRows.length }),
+                sumOwed(otherCharacterRows),
+                otherCharacterRows,
+                [othersOpen, setOthersOpen],
+                true
+              )}
+          </>
         )}
-        {sameCharacterRest.length > 0 &&
-          entryGroup(
-            t('miningTax.settleUp.alsoPayRest', { count: sameCharacterRest.length }),
-            sumOwed(sameCharacterRest),
-            sameCharacterRest,
-            [restOpen, setRestOpen],
-            false
-          )}
-        {otherCharacterRows.length > 0 &&
-          entryGroup(
-            t('miningTax.settleUp.alsoPayOthers', { count: otherCharacterRows.length }),
-            sumOwed(otherCharacterRows),
-            otherCharacterRows,
-            [othersOpen, setOthersOpen],
-            true
-          )}
 
         {perPayee.length === 1 && openInEveRow(perPayee[0])}
         <div className="divide-y divide-line rounded-xs border border-line bg-panel-2">
@@ -517,7 +531,7 @@ export function SettleUpDialog({
           )}
           {copyRow('reason', t('miningTax.settleUp.reasonLabel'), reason, reason, true)}
         </div>
-        {typeof notice === 'function' ? notice(included, payer) : notice}
+        {typeof notice === 'function' ? notice(included, payer, amountToSend) : notice}
 
         <div className="space-y-1.5">
           <button

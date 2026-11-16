@@ -18,9 +18,14 @@ import {
   type QuerySnapshot,
 } from 'firebase/firestore/lite';
 import { db as localDb } from '@/db';
-import { parseBookSettings } from '@/engine/corpTaxBook/bookDocs';
-import type { Declaration } from '@/engine/corpTaxBook/overdue';
-import { readDisputes, type OreDispute } from '@/engine/corpTaxBook/disputes';
+import { parseBookSettings, type TaxContact } from '@/engine/corpTaxBook/bookDocs';
+import {
+  readClaimEvidence,
+  type ClaimCheck,
+  type ClaimedTransfer,
+  type Declaration,
+} from '@/engine/corpTaxBook/overdue';
+import { readDisputes, type DisputeKind, type OreDispute } from '@/engine/corpTaxBook/disputes';
 import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
@@ -72,6 +77,8 @@ export interface LoadedCorpBook {
   divisions: number[];
   /** The corp's own names for those divisions, when a Director's visit stored them (#6161). */
   divisionNames?: DivisionNames;
+  /** Who a member's tax question is also mailed to; absent → the CEO. */
+  taxContact?: TaxContact;
   rates: TaxRate[];
   /** When an officer last synced it; absent when never. */
   lastSyncedAt?: string;
@@ -140,6 +147,7 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
     oreForm: settings.oreForm,
     divisions: settings.divisions,
     ...(Object.keys(divisionNames).length > 0 ? { divisionNames } : {}),
+    ...(settings.taxContact ? { taxContact: settings.taxContact } : {}),
     rates: settings.rates,
     ...(syncedAt !== undefined ? { lastSyncedAt: new Date(syncedAt).toISOString() } : {}),
     ...checked,
@@ -226,6 +234,8 @@ export function readMemberDeclaration(id: string, d: Data): Declaration | null {
   const rKind = str(r?.kind);
   const rAt = str(r?.at);
   const reason = str(r?.reason);
+  const nextStep = str(r?.nextStep);
+  const by = num(r?.by);
   return {
     id,
     statementId,
@@ -233,8 +243,18 @@ export function readMemberDeclaration(id: string, d: Data): Declaration | null {
     at,
     ...(amount !== undefined ? { amount } : {}),
     ...(note !== undefined ? { note } : {}),
+    ...readClaimEvidence(d),
     ...((rKind === 'confirmed' || rKind === 'rejected') && rAt
-      ? { resolution: { kind: rKind, at: rAt, ...(reason !== undefined ? { reason } : {}) } }
+      ? {
+          resolution: {
+            kind: rKind,
+            at: rAt,
+            ...(reason !== undefined ? { reason } : {}),
+            ...(nextStep !== undefined ? { nextStep } : {}),
+            // Only whether the book itself confirmed it (0): the member needs no officer's id.
+            ...(by === 0 ? { by } : {}),
+          },
+        }
       : {}),
   };
 }
@@ -665,25 +685,39 @@ export async function claimCorpTaxBookPayment(
  */
 export async function declareCorpTaxBookPayment(
   characterId: number,
-  input: { corporationId: number; statementId: string; amount?: number; note?: string }
-): Promise<{ declarationId: string }> {
+  input: {
+    corporationId: number;
+    statementId: string;
+    amount?: number;
+    note?: string;
+    /** The transfers from the member's wallet journal: checked against the book before any officer sees them. */
+    transfers?: ClaimedTransfer[];
+  }
+): Promise<{ declarationId: string; checks?: ClaimCheck[]; confirmed?: boolean }> {
   return underFirebaseSession(async () => {
     await ensureSignedIn(characterId);
-    return callRouted<typeof input, { declarationId: string }>(
-      'declareCorpTaxBookPaymentCallable',
-      input,
-      characterId
-    );
+    return callRouted<
+      typeof input,
+      { declarationId: string; checks?: ClaimCheck[]; confirmed?: boolean }
+    >('declareCorpTaxBookPaymentCallable', input, characterId);
   });
 }
 
-/** A Miner tells the book a Conflict day's ore went to another Payee (#6206). */
+/**
+ * A Miner tells the book about a day (#6206): its ore went to another Payee (`payee`, the
+ * default), or — resolving in the app — the book recorded too much ore, billed too high a rate,
+ * or they will not pay it, each with their reason. An open one holds the day for 14 days.
+ */
 export async function disputeCorpTaxBookConflict(
   characterId: number,
   input: {
     corporationId: number;
     date: string;
-    lines: { recordKey: string; typeId: number; quantity: number; payeeName: string }[];
+    kind?: DisputeKind;
+    reason?: string;
+    claimedPct?: number;
+    note?: string;
+    lines: { recordKey: string; typeId: number; quantity: number; payeeName?: string }[];
   }
 ): Promise<{ disputeId: string }> {
   return underFirebaseSession(async () => {

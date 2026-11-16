@@ -47,6 +47,8 @@ export async function loadRules(db: Firestore, corporationId: number) {
     dismissals: dismissals.docs.map(withId),
     declarations: declarations.docs.map(withId),
     extractions: extractions.docs.map((d) => d.data()),
+    disputes: [] as Data[],
+    now: undefined as string | undefined,
   };
 }
 
@@ -67,20 +69,28 @@ async function byMiner(
 }
 
 /** The records for `minerIds` (or every Miner), and the totals docs held for them. */
-async function load(db: Firestore, corporationId: number, minerIds: readonly string[] | 'all') {
+async function load(
+  db: Firestore,
+  corporationId: number,
+  minerIds: readonly string[] | 'all',
+  now: number
+) {
   const rules = await loadRules(db, corporationId);
+  rules.now = new Date(now).toISOString();
   let records: BookRecords;
   const existing = new Map<string, Data>();
   if (minerIds === 'all') {
-    const [statements, payments, writeOffs, miners, totals] = await Promise.all([
+    const [statements, payments, writeOffs, miners, totals, disputes] = await Promise.all([
       sub(db, corporationId, 'statements').get(),
       sub(db, corporationId, 'payments').get(),
       sub(db, corporationId, 'writeOffs').get(),
       sub(db, corporationId, 'miners').get(),
       sub(db, corporationId, MINER_TOTALS).get(),
+      sub(db, corporationId, 'disputes').get(),
     ]);
     records = {
       ...rules,
+      disputes: disputes.docs.map((d) => d.data()),
       statements: statements.docs.map(withId),
       payments: payments.docs.map(withId),
       writeOffs: writeOffs.docs.map(withId),
@@ -90,15 +100,17 @@ async function load(db: Firestore, corporationId: number, minerIds: readonly str
   } else {
     const minerRefs = minerIds.map((id) => sub(db, corporationId, 'miners').doc(id));
     const totalRefs = minerIds.map((id) => sub(db, corporationId, MINER_TOTALS).doc(id));
-    const [statements, payments, writeOffs, miners, totals] = await Promise.all([
+    const [statements, payments, writeOffs, miners, totals, disputes] = await Promise.all([
       byMiner(db, corporationId, 'statements', minerIds),
       byMiner(db, corporationId, 'payments', minerIds),
       byMiner(db, corporationId, 'writeOffs', minerIds),
       minerRefs.length > 0 ? db.getAll(...minerRefs) : [],
       totalRefs.length > 0 ? db.getAll(...totalRefs) : [],
+      byMiner(db, corporationId, 'disputes', minerIds),
     ]);
     records = {
       ...rules,
+      disputes,
       statements,
       payments,
       writeOffs,
@@ -136,9 +148,9 @@ export async function reconcileMinerTotals(
   db: Firestore,
   corporationId: number,
   scope: readonly string[] | 'all',
-  options: { repair: boolean } = { repair: true }
+  options: { repair: boolean; now?: () => number } = { repair: true }
 ): Promise<{ plan: TotalsPlan; records: BookRecords }> {
-  const { records, existing } = await load(db, corporationId, scope);
+  const { records, existing } = await load(db, corporationId, scope, (options.now ?? Date.now)());
   const plan = planTotals(records, existing, scope);
   if (options.repair) await apply(db, corporationId, plan);
   return { plan, records };
@@ -172,6 +184,16 @@ async function resolveMiners(db: Firestore, corporationId: number, scope: Scope)
       );
     }
   }
+  for (const did of scope.disputeIds ?? []) {
+    reads.push(
+      sub(db, corporationId, 'disputes')
+        .doc(did)
+        .get()
+        .then((d) => {
+          if (typeof d.get('minerId') === 'string') ids.add(d.get('minerId'));
+        })
+    );
+  }
   for (const pid of scope.paymentIds) {
     reads.push(
       sub(db, corporationId, 'payments')
@@ -194,21 +216,26 @@ async function resolveMiners(db: Firestore, corporationId: number, scope: Scope)
 export async function refreshAfterEvent(
   db: Firestore,
   corporationId: number,
-  scope: Scope | readonly string[]
+  scope: Scope | readonly string[],
+  now: () => number = Date.now
 ): Promise<void> {
   const full: Scope = Array.isArray(scope)
     ? { minerIds: [...scope], statementIds: [], paymentIds: [], all: false }
     : (scope as Scope);
+  const opts = { repair: true, now };
   // Until a Statement's or payment's Miner is looked up, any Miner may be the stale one.
-  const unresolved = full.statementIds.length > 0 || full.paymentIds.length > 0;
+  const unresolved =
+    full.statementIds.length > 0 ||
+    full.paymentIds.length > 0 ||
+    (full.disputeIds?.length ?? 0) > 0;
   let minerIds: readonly string[] | 'all' = full.all || unresolved ? 'all' : full.minerIds;
   try {
     if (full.all) {
-      await reconcileMinerTotals(db, corporationId, 'all');
+      await reconcileMinerTotals(db, corporationId, 'all', opts);
       return;
     }
     minerIds = await resolveMiners(db, corporationId, full);
-    if (minerIds.length > 0) await reconcileMinerTotals(db, corporationId, minerIds);
+    if (minerIds.length > 0) await reconcileMinerTotals(db, corporationId, minerIds, opts);
   } catch (e) {
     console.error('miner totals refresh failed', e instanceof Error ? e.message : e);
     await invalidateMinerTotals(db, corporationId, minerIds).catch((err) =>
@@ -251,7 +278,10 @@ export async function verifyMinerTotals(
   corporationId: number,
   now: () => number
 ): Promise<VerifyOutcome> {
-  const { plan, records } = await reconcileMinerTotals(db, corporationId, 'all');
+  const { plan, records } = await reconcileMinerTotals(db, corporationId, 'all', {
+    repair: true,
+    now,
+  });
   const overlaps = overlappingPulls(records.extractions, records.expiryHours);
   // The per-pull moon docs (#5256) are verified and repaired in the same pass; a failure here never fails the miner check.
   const moonPlan = await reconcileMoonDocs(db, corporationId, 'all').catch((e) => {

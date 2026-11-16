@@ -6,6 +6,7 @@ import {
   type TaxPayment,
 } from '../allocation';
 import type { DayCharge } from '../charges';
+import { heldByStatement } from '../disputes';
 import { heldBillableThrough, type StaleHold } from '../feederHealth';
 import { overdueStatus, type OverdueStatus } from '../overdue';
 import type { MinerSettlement, OpenSetInput } from './types';
@@ -52,12 +53,20 @@ export function settleMiner(
       p.minerId === minerId && (p.source !== 'donation' || !isBeforeBook(p.at, input.startDate))
   );
   const credits = dismissalCredits(statements, input.dismissals, charges);
+  // A member's open dispute holds its amount out of what is due (resolving in the app).
+  const held = heldByStatement(
+    statements,
+    (input.disputes ?? []).filter((d) => d.minerId === minerId),
+    new Set(credits.map((c) => `${c.statementId}|${c.chargeKey}`)),
+    input.now
+  );
   const allocationInput: AllocationInput = {
     statements,
     payments,
     dismissalCredits: credits,
     officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId),
     startDate: input.startDate,
+    ...(held.size > 0 ? { held } : {}),
   };
   const allocation = allocatePayments(allocationInput);
 

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, NeedsConnection } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { beginGrant } from '@/app/grantAction';
 import { formatIsk } from '@/lib/isk';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
@@ -9,11 +10,17 @@ import { claimKeyOf } from '@/features/miningTax/corpBook/useAutoClaimDonations'
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
 import { corpBookAttention } from '@/features/miningTax/corpBook/corpAttention';
 import { corpPayAccounts, readsEveryDivision } from '@/features/miningTax/corpBook/corpPayAccount';
-import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import {
-  CorpDeclarationStatus,
-  CorpDeclareAction,
-} from '@/features/miningTax/corpBook/CorpDeclareAction';
+  figureNeedsAnswer,
+  figureTarget,
+  keptBy,
+  keptTarget,
+  overdueTarget,
+  uncreditedTarget,
+  type ResolveTarget,
+} from '@/features/miningTax/corpBook/resolve/targets';
+import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
+import { CorpDeclarationStatus } from '@/features/miningTax/corpBook/CorpDeclareAction';
 import { canDeclare } from '@/engine/corpTaxBook/personal';
 import { verifyPeriodLabel } from '@/features/corpTaxBook/verifyPeriodLabel';
 import { systemLabel } from '@/features/miningTax/names';
@@ -24,6 +31,7 @@ import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import type { DisplayRow } from '@/features/miningTax/groupRows';
 import type { PayeeRecord } from '@/db';
 import type { TradeHub } from '@/market/hubs';
+import { duplicateRowToOpen } from './duplicateRowToOpen';
 import { PricingGapLinks } from './PricingGapLinks';
 import { UnpricedOreDetail } from './UnpricedOreDetail';
 import { hasReachableUnpricedHub } from './unpricedHubs';
@@ -46,6 +54,18 @@ interface Args {
   systemNames: ReadonlyMap<number, string>;
   refresh: () => void;
   openDetail: (dr: DisplayRow) => void;
+  /** Opens a row with the "unassign this?" question already asked — the duplicate's one-click fix. */
+  openUnassign: (dr: DisplayRow) => void;
+  /**
+   * The Resolve dialog (resolving in the app): opens it on a problem, and the member's own
+   * "Not paying" set, whose problems the strip leaves out — they are listed on the quiet line.
+   */
+  resolve: {
+    open: (target: ResolveTarget) => void;
+    hidden: ReadonlySet<string>;
+    /** "Not paying" in one click: hides the problem on this device, nothing is sent. */
+    hide: (key: string) => void;
+  };
 }
 
 /** What needs the pilot's attention above the ledger: lapsed logins, missing prices, duplicates, unclaimed donations, unclassified ore. */
@@ -62,10 +82,24 @@ export function useTaxAttentionItems({
   systemNames,
   refresh,
   openDetail,
+  openUnassign,
+  resolve,
 }: Args): AttentionItem[] {
   const { t, i18n } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
   const { claiming, claimError, handleClaim } = useClaimDonation(reloadCorpBooks);
+
+  // Every problem's two one-click answers: Resolve opens every way out; Not paying hides it here.
+  const resolveActions = (target: ResolveTarget) => (
+    <>
+      <Button size="sm" onClick={() => resolve.open(target)}>
+        {t('miningTax.resolve.open')}
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => void resolve.hide(target.hideKey)}>
+        {t('miningTax.resolve.notPayingAction')}
+      </Button>
+    </>
+  );
 
   // Which entries the pricing banner is about, so it can link to them — the
   // table only shows an entry's total, never per-ore prices.
@@ -178,6 +212,9 @@ export function useTaxAttentionItems({
     });
   }
   if (duplicateRows.length > 0) {
+    // The copy used to say "open the day and Unassign the extra one" over a list of plain text,
+    // leaving the member to find the row themselves. Each day now opens straight on the
+    // "unassign this?" question, which still shows what it removes before anything goes.
     attentionItems.push({
       id: 'duplicates',
       tone: 'warning',
@@ -186,12 +223,29 @@ export function useTaxAttentionItems({
         <>
           <p>{t('miningTax.duplicateHint')}</p>
           <ul className="space-y-0.5">
-            {duplicateRows.map((row) => (
-              <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
-                {row.characterName} — {row.entry.date} —{' '}
-                {systemLabel(systemNames, row.entry.solarSystemId)}
-              </li>
-            ))}
+            {duplicateRows.map((row) => {
+              const label = `${row.characterName} — ${row.entry.date} — ${systemLabel(
+                systemNames,
+                row.entry.solarSystemId
+              )}`;
+              const extra = duplicateRowToOpen(row.duplicateAssignmentIds, displayRows);
+              return (
+                <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
+                  {extra ? (
+                    <button
+                      type="button"
+                      className={`text-left ${inlineLinkClassName}`}
+                      aria-label={t('miningTax.duplicateOpen', { entry: label })}
+                      onClick={() => openUnassign(extra)}
+                    >
+                      {label}
+                    </button>
+                  ) : (
+                    label
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </>
       ),
@@ -237,12 +291,39 @@ export function useTaxAttentionItems({
     });
   }
   for (const o of corp.overdue) {
+    const period = verifyPeriodLabel(o.periodStart, o.periodEnd, i18n.language);
+    // #6206: the member says they paid it another way, or pays it, or stops being reminded;
+    // every way out is the Resolve dialog, which also mails whoever answers tax questions.
+    // Told the corporation already: the quiet "Waiting on the corp" line covers it, not the strip.
+    if (o.declaration?.state === 'waiting') continue;
+    // A recorded day of the Statement, so "Not paying" can tell the corporation why.
+    const dayOf = (corpView?.overlay.rows ?? []).find(
+      (r) =>
+        r.corporationId === o.corporationId &&
+        r.statementId === o.statementId &&
+        r.state === 'billed' &&
+        r.recordKey !== undefined
+    );
+    const target =
+      o.declarerId !== undefined && canDeclare(o.declaration)
+        ? overdueTarget({
+            corporationId: o.corporationId,
+            corpName: o.corpName,
+            statementId: o.statementId,
+            characterId: o.declarerId,
+            periodStart: o.periodStart,
+            period,
+            ...(o.declaration ? { declaration: o.declaration } : {}),
+            ...(dayOf ? { row: dayOf } : {}),
+          })
+        : undefined;
+    if (target && resolve.hidden.has(target.hideKey)) continue;
     attentionItems.push({
       id: `corp-overdue:${o.corporationId}:${o.statementId}`,
       tone: 'warning',
       title: t('miningTax.corpBook.attention.overdueTitle', {
         corp: o.corpName,
-        period: verifyPeriodLabel(o.periodStart, o.periodEnd, i18n.language),
+        period,
         date: o.overdueAt.slice(0, 10),
       }),
       detail: (
@@ -253,20 +334,7 @@ export function useTaxAttentionItems({
           )}
         </>
       ),
-      // #6206: the member says they paid it another way; the corporation's officers answer it.
-      ...(canDeclare(o.declaration) && o.declarerId !== undefined
-        ? {
-            action: (
-              <CorpDeclareAction
-                corporationId={o.corporationId}
-                corpName={o.corpName}
-                statementId={o.statementId}
-                characterId={o.declarerId}
-                onDeclared={reloadCorpBooks}
-              />
-            ),
-          }
-        : {}),
+      ...(target ? { action: resolveActions(target) } : {}),
     });
   }
   // One item per book, not per donation: a second uncredited donation to the same corporation
@@ -288,9 +356,15 @@ export function useTaxAttentionItems({
     const corpName = group[0].corpName;
     const only = group.length === 1 ? group[0] : undefined;
     const total = group.reduce((sum, u) => sum + u.amount, 0);
+    // Every way out of it in one dialog: pay again, not paying, or send the proof — the
+    // transfers with their journal refs, checked against the corporation's wallet first.
+    const target = uncreditedTarget(group, corpView?.overlay.rows ?? []);
+    // Hidden by the member, or already answered (a declaration waits): out of the list.
+    if (resolve.hidden.has(target.hideKey) || target.answered) continue;
     attentionItems.push({
       id: `corp-uncredited:${corporationId}`,
       tone: 'warning',
+      action: resolveActions(target),
       title: only
         ? t(
             every
@@ -327,6 +401,8 @@ export function useTaxAttentionItems({
                   amount: formatIsk(only.amount, 0),
                   time: eveTimeLabel(Date.parse(only.at)),
                 })}
+                {only.refId !== undefined &&
+                  ` ${t('miningTax.corpBook.attention.uncreditedRef', { ref: only.refId })}`}
               </p>
             </>
           ) : (
@@ -339,6 +415,8 @@ export function useTaxAttentionItems({
                       amount: formatIsk(u.amount, 0),
                       time: eveTimeLabel(Date.parse(u.at)),
                     })}
+                    {u.refId !== undefined &&
+                      ` ${t('miningTax.corpBook.attention.uncreditedRef', { ref: u.refId })}`}
                     {u.covered.length > 0 &&
                       ` — ${t('miningTax.corpBook.attention.uncreditedItemCovered', {
                         days: u.covered.join(', '),
@@ -350,6 +428,69 @@ export function useTaxAttentionItems({
           )}
         </>
       ),
+    });
+  }
+  // A billed day whose figures differ from the member's own record: it used to be said only
+  // inside Compare with the book, with no way to act on it. And a day an officer kept the bill
+  // on, with what they said to do next. Each once per day, for the Characters in view.
+  const inView = (id: number) =>
+    resolvedCharacterFilter === 'all' || resolvedCharacterFilter.has(id);
+  const seenDays = new Set<string>();
+  const overdueIds = new Set(corp.overdue.map((o) => `${o.corporationId}:${o.statementId}`));
+  for (const row of corpView?.overlay.rows ?? []) {
+    if (!inView(row.characterId)) continue;
+    const by = keptBy(row);
+    // The Statement's own item already says an officer rejected what it declared.
+    if (
+      by === 'declaration' &&
+      row.statementId !== undefined &&
+      overdueIds.has(`${row.corporationId}:${row.statementId}`)
+    )
+      continue;
+    const figure = by === undefined && figureNeedsAnswer(row);
+    if (by === undefined && !figure) continue;
+    const target = by ? keptTarget(row, by) : figureTarget(row);
+    if (resolve.hidden.has(target.hideKey) || seenDays.has(target.hideKey)) continue;
+    seenDays.add(target.hideKey);
+    const kept = target.problem.kind === 'kept' ? target.problem : undefined;
+    const d = row.dispute;
+    attentionItems.push({
+      id: `corp-${by ? `kept-${by}` : 'figure'}:${target.hideKey}`,
+      tone: 'warning',
+      title: kept
+        ? t(
+            kept.by === 'declaration'
+              ? 'miningTax.resolve.strip.keptDeclaration'
+              : 'miningTax.resolve.strip.kept',
+            { corp: row.corpName, date: row.date }
+          )
+        : d?.rate
+          ? d.personalPct === undefined
+            ? t('miningTax.resolve.strip.rateUnrecorded', {
+                corp: row.corpName,
+                date: row.date,
+                book: d.bookPct,
+              })
+            : t('miningTax.resolve.strip.rate', {
+                corp: row.corpName,
+                date: row.date,
+                book: d.bookPct,
+                yours: d.personalPct,
+              })
+          : t('miningTax.resolve.strip.quantity', { corp: row.corpName, date: row.date }),
+      detail: kept ? (
+        <>
+          {kept.reason && <p>{kept.reason}</p>}
+          {kept.nextStep && (
+            <p className="font-semibold text-text">
+              {t('miningTax.resolve.facts.nextStep', { step: kept.nextStep })}
+            </p>
+          )}
+        </>
+      ) : (
+        <p>{t('miningTax.resolve.strip.figureDetail', { amount: formatIsk(row.billed, 0) })}</p>
+      ),
+      action: resolveActions(target),
     });
   }
   for (const a of corp.alsoBilled) {

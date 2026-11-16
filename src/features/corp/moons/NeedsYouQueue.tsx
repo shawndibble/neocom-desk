@@ -1,13 +1,24 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Button, Panel, plainTextActionClassName } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
 import type { UncountedDonation } from '@/engine/corpTaxBook/uncounted';
-import { disputedTax, type OreDispute } from '@/engine/corpTaxBook/disputes';
+import {
+  disputeHold,
+  disputeKindOf,
+  disputedTax,
+  heldByStatement,
+  type DisputeKind,
+  type OreDispute,
+} from '@/engine/corpTaxBook/disputes';
+import type { ClaimedTransfer } from '@/engine/corpTaxBook/overdue';
+import { useCharacters } from '@/features/character/useCharacters';
 import { cx } from '@/lib/cx';
 import { formatCount } from '@/lib/formatCount';
+import { useNow } from '@/lib/useNow';
 import { useBook } from './useBook';
 import { useCorpAccess } from '../useCorpAccess';
 import { divisionNamesFor } from '../taxBook/pushDivisionNames';
@@ -19,10 +30,13 @@ import {
   RecordPaymentDialog,
   ReasonDialog,
 } from './BookDialogs';
-import { isk, periodLabel, periodsLabel, shortDate } from './moonsFormat';
+import { isk, periodLabel, periodsLabel, shortDate, shortDateTime } from './moonsFormat';
+import { autoCredited, paidToOwn, transferStatus, type TransferStatus } from './claimWalletCheck';
+import { useOwnWalletJournals } from './useOwnWalletJournals';
 import { MOONS_TABS, minerPath } from './moonsPaths';
 import { tabPath } from '@/lib/pageTabs';
 import { mailTarget, useCorporationName } from './statementMailing';
+import { declaredLeft } from './declaredLeft';
 
 /** The card's second action: a text link off the primary Button, so the pair is not two boxes (DESIGN.md §6, text action off a primary). */
 const secondaryActionClassName = plainTextActionClassName('min-h-9 md:min-h-6');
@@ -31,11 +45,14 @@ function QueueCard({
   tone,
   title,
   body,
+  detail,
   actions,
 }: {
   tone: 'danger' | 'warning' | 'neutral';
   title: ReactNode;
   body: string;
+  /** Under the body: a declaration's wallet check, a dispute's hold. */
+  detail?: ReactNode;
   actions: ReactNode;
 }) {
   return (
@@ -50,11 +67,45 @@ function QueueCard({
       <span className="min-w-0 flex-1 basis-60">
         <span className="block text-sm font-semibold">{title}</span>
         <span className="block text-xs text-text-dim">{body}</span>
+        {detail}
       </span>
       <span className="flex shrink-0 flex-wrap items-center gap-2 max-sm:pl-3">{actions}</span>
     </li>
   );
 }
+
+function TransferLines({
+  transfers,
+  statuses,
+}: {
+  transfers: ClaimedTransfer[];
+  statuses: (TransferStatus | undefined)[];
+}) {
+  const { t } = useTranslation();
+  return (
+    <ul className="mt-1 space-y-0.5 text-xs text-text-dim">
+      {transfers.map((tr, i) => {
+        const st = statuses[i];
+        return (
+          <li key={tr.journalRef} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            {st && <Pill tone={st.tone}>{st.label}</Pill>}
+            <span className="tabular-nums">
+              {t('corpTaxBook.moons.needs.declaration.transfer', {
+                amount: isk(tr.amount),
+                time: shortDateTime(tr.at),
+                ref: tr.journalRef,
+              })}
+            </span>
+            {st?.note && <span>{st.note}</span>}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+const sumOf = (transfers: readonly ClaimedTransfer[]) =>
+  transfers.reduce((n, tr) => n + tr.amount, 0);
 
 /** A card's headline, a link to the Miner's page whenever the item has a Miner. */
 function MinerTitle({ minerId, children }: { minerId: string | undefined; children: string }) {
@@ -65,6 +116,43 @@ function MinerTitle({ minerId, children }: { minerId: string | undefined; childr
     </Link>
   );
 }
+
+const D = 'corpTaxBook.moons.needs.dispute';
+
+/** What each kind of dispute says on its card: one record, so nothing branches on the kind twice. */
+const DISPUTE_COPY: Record<
+  DisputeKind,
+  {
+    titleKey: (facts: { billed: number | undefined; priced: number | undefined }) => string;
+    lineKey: string;
+    bodyKey?: string;
+    waiveKey: string;
+  }
+> = {
+  payee: {
+    titleKey: () => `${D}.title`,
+    lineKey: `${D}.line`,
+    bodyKey: `${D}.body`,
+    waiveKey: `${D}.dismiss`,
+  },
+  quantity: {
+    titleKey: () => `${D}.titleQuantity`,
+    lineKey: `${D}.lineQuantity`,
+    bodyKey: `${D}.bodyQuantity`,
+    waiveKey: `${D}.waive`,
+  },
+  rate: {
+    titleKey: ({ billed }) => (billed === undefined ? `${D}.titleRateUnknown` : `${D}.titleRate`),
+    lineKey: `${D}.lineQuantity`,
+    waiveKey: `${D}.waiveDifference`,
+  },
+  notPaying: {
+    titleKey: ({ priced }) =>
+      priced === undefined ? `${D}.titleNotPayingUnpriced` : `${D}.titleNotPaying`,
+    lineKey: `${D}.lineQuantity`,
+    waiveKey: `${D}.writeOff`,
+  },
+};
 
 type Open =
   | { kind: 'confirm'; item: Extract<NeedsYouItem, { kind: 'declaration' }>; miner: MinerRow }
@@ -84,8 +172,18 @@ export function NeedsYouQueue() {
   const { view, names, edit, canEdit, characterId, corporationId, settings } = ctx;
   const { miners } = useTabsProjection();
   const { needsYou, uncounted, disputes, runDue, count } = useNeedsYou();
+  // The officer's own Characters on this device: a transfer paid to one is checked in its journal.
+  const ownIds = new Set(useCharacters().map((c) => c.characterId));
+  const journals = useOwnWalletJournals(
+    needsYou.flatMap((item) =>
+      item.kind === 'declaration'
+        ? (item.declaration.transfers ?? []).flatMap((tr) => paidToOwn(tr, ownIds) ?? [])
+        : []
+    )
+  );
   const [open, setOpen] = useState<Open>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const now = useNow();
   const close = () => setOpen(null);
   // The tax on only the disputed ore: what waiving a dispute credits (undefined: cannot price it).
   const waiveIsk =
@@ -114,18 +212,12 @@ export function NeedsYouQueue() {
       ...(divisionNames ? { divisionNames } : {}),
     };
   };
-  const answerUncounted = async (u: UncountedDonation, how: 'count' | 'notTax') => {
+  const countDivision = async (division: number) => {
     setBusy(true);
     try {
-      await edit(
-        how === 'count'
-          ? { action: 'updateSettings', patch: await countPatch(u.division) }
-          : { action: 'ignoreUncounted', uncountedId: u.id }
-      );
+      await edit({ action: 'updateSettings', patch: await countPatch(division) });
       setNotice(
-        how === 'count'
-          ? t('corpTaxBook.moons.needs.uncounted.counted', { division: divisionLabel(u.division) })
-          : t('corpTaxBook.moons.needs.uncounted.ignored')
+        t('corpTaxBook.moons.needs.uncounted.counted', { division: divisionLabel(division) })
       );
     } catch {
       setNotice(t('corpTaxBook.moons.needs.uncounted.failed'));
@@ -133,9 +225,35 @@ export function NeedsYouQueue() {
       setBusy(false);
     }
   };
+  const answerUncounted = async (u: UncountedDonation, how: 'count' | 'notTax') => {
+    if (how === 'count') return countDivision(u.division);
+    setBusy(true);
+    try {
+      await edit({ action: 'ignoreUncounted', uncountedId: u.id });
+      setNotice(t('corpTaxBook.moons.needs.uncounted.ignored'));
+    } catch {
+      setNotice(t('corpTaxBook.moons.needs.uncounted.failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const nextStepOf = (name: string) => ({
+    label: t('corpTaxBook.moons.dialogs.nextStep.label', { name }),
+    hint: t('corpTaxBook.moons.dialogs.nextStep.hint', { name }),
+  });
   const corporationName = useCorporationName();
   const minerOf = (id: string) => miners.find((m) => m.id === id)!;
   const nameOf = (id: string) => names.character(minerOf(id).mainCharacterId);
+
+  const creditedAutomatically = autoCredited(view.input.declarations, now).flatMap((d) => {
+    const miner = miners.find((m) =>
+      view.input.statements.some((s) => s.id === d.statementId && s.minerId === m.id)
+    );
+    if (!miner) return [];
+    const transfers = d.transfers ?? [];
+    const amount = d.amount ?? transfers.reduce((n, tr) => n + tr.amount, 0);
+    return [{ d, miner, amount, at: transfers[0]?.at ?? d.at }];
+  });
 
   const statementPeriod = (id: string) => {
     const s = view.input.statements.find((x) => x.id === id);
@@ -175,6 +293,27 @@ export function NeedsYouQueue() {
       {count === 0 && (
         <p className="px-3 py-2.5 text-xs text-text-dim">{t('corpTaxBook.moons.needs.none')}</p>
       )}
+      {creditedAutomatically.map(({ d, miner, amount, at }) => (
+        <p key={d.id} className="px-3 py-2 text-xs text-text-dim">
+          <Trans
+            t={t}
+            i18nKey="corpTaxBook.moons.needs.autoCredited"
+            values={{
+              name: names.character(miner.mainCharacterId),
+              amount: isk(amount),
+              date: shortDate(at),
+            }}
+            components={{
+              miner: (
+                <Link
+                  to={minerPath(miner.id)}
+                  className={entityLinkClassName('inline-block py-0.5')}
+                />
+              ),
+            }}
+          />
+        </p>
+      ))}
       <ul className="divide-y divide-line">
         {runDue.length > 0 && (
           // #6208: closed periods nobody has billed. Overdue counts from issue, so a forgotten
@@ -197,47 +336,100 @@ export function NeedsYouQueue() {
           switch (item.kind) {
             case 'declaration': {
               const miner = minerOf(item.minerId);
+              const d = item.declaration;
+              const transfers = d.transfers ?? [];
+              const statuses = transfers.map((tr, k) =>
+                transferStatus(t, tr, d.checks?.[k], miner.characterIds, ownIds, journals)
+              );
+              const toYou = transfers.filter((tr) => paidToOwn(tr, ownIds) !== undefined);
+              const paidToYou = toYou.length > 0;
+              const ownStatuses = statuses.filter((st) => st?.own);
+              const foundInYours =
+                ownStatuses.length > 0 && ownStatuses.every((st) => st?.own?.found);
+              const missingInYours = ownStatuses.some((st) => st?.own?.found === false);
+              const divisionToCount = statuses.find((st) => st?.division !== undefined)?.division;
+              const keepBill = () => setOpen({ kind: 'reject', item, miner });
+              const record = () => setOpen({ kind: 'confirm', item, miner });
+              const [primary, secondary] =
+                paidToYou && foundInYours
+                  ? [
+                      { label: t('corpTaxBook.moons.needs.paidToYou.record'), run: record },
+                      { label: t('corpTaxBook.moons.needs.paidToYou.notTax'), run: keepBill },
+                    ]
+                  : paidToYou && missingInYours
+                    ? [
+                        { label: t('corpTaxBook.moons.needs.declaration.reject'), run: keepBill },
+                        { label: t('corpTaxBook.moons.needs.paidToYou.recordAnyway'), run: record },
+                      ]
+                    : [
+                        { label: t('corpTaxBook.moons.needs.declaration.confirm'), run: record },
+                        { label: t('corpTaxBook.moons.needs.declaration.reject'), run: keepBill },
+                      ];
               return (
                 <QueueCard
-                  key={`d-${item.declaration.id}`}
+                  key={`d-${d.id}`}
                   tone="warning"
                   title={
                     <MinerTitle minerId={item.minerId}>
-                      {t('corpTaxBook.moons.needs.declaration.title', {
-                        name: nameOf(item.minerId),
-                        amount: isk(item.owed),
-                      })}
+                      {paidToYou
+                        ? t('corpTaxBook.moons.needs.paidToYou.title', {
+                            name: nameOf(item.minerId),
+                            // Only what went to this officer: the rest went to the corporation.
+                            amount: isk(sumOf(toYou)),
+                          })
+                        : t('corpTaxBook.moons.needs.declaration.title', {
+                            name: nameOf(item.minerId),
+                            amount: isk(item.owed),
+                          })}
                     </MinerTitle>
                   }
                   body={[
                     t('corpTaxBook.moons.needs.declaration.body', {
-                      kind: t(`corpTaxBook.moons.needs.declaration.kind.${item.declaration.kind}`),
-                      date: shortDate(item.declaration.at),
+                      kind: t(`corpTaxBook.moons.needs.declaration.kind.${d.kind}`),
+                      date: shortDate(d.at),
                     }),
-                    item.declaration.amount !== undefined &&
+                    // What is still to count: transfers the check found are credited already.
+                    declaredLeft(d) !== undefined &&
                       t('corpTaxBook.moons.needs.declaration.declared', {
-                        amount: isk(item.declaration.amount),
+                        amount: isk(declaredLeft(d)!),
                       }),
-                    item.declaration.note &&
+                    d.note &&
                       t('corpTaxBook.moons.needs.declaration.note', {
-                        note: item.declaration.note,
+                        note: d.note,
                       }),
                   ]
                     .filter(Boolean)
                     .join(' ')}
+                  detail={
+                    transfers.length > 0 && (
+                      <TransferLines transfers={transfers} statuses={statuses} />
+                    )
+                  }
                   actions={
                     canEdit ? (
                       <>
-                        <Button size="sm" onClick={() => setOpen({ kind: 'confirm', item, miner })}>
-                          {t('corpTaxBook.moons.needs.declaration.confirm')}
+                        <Button size="sm" onClick={primary.run}>
+                          {primary.label}
                         </Button>
                         <button
                           type="button"
                           className={secondaryActionClassName}
-                          onClick={() => setOpen({ kind: 'reject', item, miner })}
+                          onClick={secondary.run}
                         >
-                          {t('corpTaxBook.moons.needs.declaration.reject')}
+                          {secondary.label}
                         </button>
+                        {divisionToCount !== undefined && (
+                          <button
+                            type="button"
+                            className={secondaryActionClassName}
+                            disabled={busy}
+                            onClick={() => void countDivision(divisionToCount)}
+                          >
+                            {t('corpTaxBook.moons.needs.declaration.count', {
+                              division: divisionToCount,
+                            })}
+                          </button>
+                        )}
                       </>
                     ) : null
                   }
@@ -374,53 +566,98 @@ export function NeedsYouQueue() {
             }
           }
         })}
-        {disputes.map((d) => (
-          <QueueCard
-            key={`p-${d.id}`}
-            tone="warning"
-            title={
-              <MinerTitle minerId={miners.some((m) => m.id === d.minerId) ? d.minerId : undefined}>
-                {t('corpTaxBook.moons.needs.dispute.title', {
-                  name: names.character(d.by),
-                  date: shortDate(d.date),
-                  payee: [...new Set(d.lines.map((l) => l.payeeName))].join(', '),
-                })}
-              </MinerTitle>
-            }
-            body={[
-              t('corpTaxBook.moons.needs.dispute.body', {
-                ore: d.lines
-                  .map((l) =>
-                    t('corpTaxBook.moons.needs.dispute.line', {
-                      quantity: formatCount(l.quantity),
-                      ore: names.ore(l.typeId),
-                      payee: l.payeeName,
-                    })
-                  )
-                  .join('; '),
-              }),
-              d.note && t('corpTaxBook.moons.needs.declaration.note', { note: d.note }),
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            actions={
-              canEdit ? (
-                <>
-                  <Button size="sm" onClick={() => setOpen({ kind: 'disputeDismiss', dispute: d })}>
-                    {t('corpTaxBook.moons.needs.dispute.dismiss')}
-                  </Button>
-                  <button
-                    type="button"
-                    className={secondaryActionClassName}
-                    onClick={() => setOpen({ kind: 'disputeReject', dispute: d })}
-                  >
-                    {t('corpTaxBook.moons.needs.dispute.reject')}
-                  </button>
-                </>
-              ) : null
-            }
-          />
-        ))}
+        {disputes.map((d) => {
+          const kind = disputeKindOf(d);
+          const name = names.character(d.by);
+          const date = shortDate(d.date);
+          const priced = disputedTax(d, view.charges);
+          const billed = view.charges.find((c) => c.key === d.lines[0]?.recordKey)?.taxPct;
+          const copy = DISPUTE_COPY[kind];
+          const ore = d.lines
+            .map((l) =>
+              t(copy.lineKey, {
+                quantity: formatCount(l.quantity),
+                ore: names.ore(l.typeId),
+                payee: l.payeeName,
+              })
+            )
+            .join('; ');
+          const title = t(copy.titleKey({ billed, priced }), {
+            name,
+            date,
+            claimed: d.claimedPct,
+            billed,
+            amount: priced === undefined ? undefined : isk(priced),
+            payee: [...new Set(d.lines.map((l) => l.payeeName))].join(', '),
+          });
+          const words = d.reason ?? d.note;
+          const body = [
+            copy.bodyKey && t(copy.bodyKey, { ore }),
+            words && t('corpTaxBook.moons.needs.dispute.reason', { reason: words }),
+          ]
+            .filter(Boolean)
+            .join(' ');
+          const hold = disputeHold(d, new Date(now).toISOString());
+          // What the hold did to this Miner's Statements: the part of the bill payments skip.
+          const heldIsk = hold
+            ? [
+                ...heldByStatement(
+                  view.input.statements.filter((s) => s.minerId === d.minerId),
+                  [d],
+                  new Set(),
+                  new Date(now).toISOString()
+                ).values(),
+              ].reduce((n, v) => n + v, 0)
+            : 0;
+          const waiveLabel = t(copy.waiveKey);
+          return (
+            <QueueCard
+              key={`p-${d.id}`}
+              tone={kind === 'notPaying' ? 'neutral' : 'warning'}
+              title={
+                <MinerTitle
+                  minerId={miners.some((m) => m.id === d.minerId) ? d.minerId : undefined}
+                >
+                  {title}
+                </MinerTitle>
+              }
+              body={body}
+              detail={
+                hold && (
+                  <span className="block text-xs text-text-dim">
+                    {heldIsk > 0
+                      ? t('corpTaxBook.moons.needs.dispute.heldAmount', {
+                          amount: isk(heldIsk),
+                          date: shortDate(hold.until),
+                        })
+                      : t('corpTaxBook.moons.needs.dispute.held', {
+                          date: shortDate(hold.until),
+                        })}
+                  </span>
+                )
+              }
+              actions={
+                canEdit ? (
+                  <>
+                    <Button
+                      size="sm"
+                      onClick={() => setOpen({ kind: 'disputeDismiss', dispute: d })}
+                    >
+                      {waiveLabel}
+                    </Button>
+                    <button
+                      type="button"
+                      className={secondaryActionClassName}
+                      onClick={() => setOpen({ kind: 'disputeReject', dispute: d })}
+                    >
+                      {t('corpTaxBook.moons.needs.dispute.reject')}
+                    </button>
+                  </>
+                ) : null
+              }
+            />
+          );
+        })}
         {uncounted.map((u) => (
           <QueueCard
             key={`x-${u.id}`}
@@ -468,7 +705,12 @@ export function NeedsYouQueue() {
           miner={open.miner}
           minerName={names.character(open.miner.mainCharacterId)}
           // The amount the Miner declared, when they gave one (#6206).
-          defaultAmount={open.item.declaration.amount ?? open.item.owed}
+          defaultAmount={
+            declaredLeft(open.item.declaration) ??
+            (open.item.declaration.transfers?.length
+              ? sumOf(open.item.declaration.transfers)
+              : open.item.owed)
+          }
           // One payment per declaration: a retry finds it recorded, and the declaration is
           // resolved in the same write, so a second officer (by hand or by matching a donation)
           // is refused instead of counting the ISK twice.
@@ -487,12 +729,14 @@ export function NeedsYouQueue() {
           reasonLabel={t('corpTaxBook.moons.dialogs.reject.reason')}
           confirmLabel={t('corpTaxBook.moons.dialogs.reject.confirm')}
           effect={t('corpTaxBook.moons.dialogs.reject.effect')}
-          run={async (reason) => {
+          nextStep={nextStepOf(names.character(open.miner.mainCharacterId))}
+          run={async (reason, nextStep) => {
             await edit({
               action: 'resolveDeclaration',
               declarationId: open.item.declaration.id,
               resolution: 'rejected',
               reason,
+              nextStep,
             });
           }}
         />
@@ -541,8 +785,9 @@ export function NeedsYouQueue() {
           intro={t('corpTaxBook.moons.dialogs.dispute.rejectIntro')}
           reasonLabel={t('corpTaxBook.moons.dialogs.reject.reason')}
           confirmLabel={t('corpTaxBook.moons.needs.dispute.reject')}
-          run={async (reason) => {
-            await edit({ action: 'rejectDispute', disputeId: open.dispute.id, reason });
+          nextStep={nextStepOf(names.character(open.dispute.by))}
+          run={async (reason, nextStep) => {
+            await edit({ action: 'rejectDispute', disputeId: open.dispute.id, reason, nextStep });
           }}
         />
       )}

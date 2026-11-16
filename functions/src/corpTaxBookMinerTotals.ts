@@ -15,9 +15,12 @@ import {
   DEFAULT_EXPIRY_HOURS,
   MAX_EXPIRY_HOURS,
   allocatePayments,
+  creditedLines,
   dismissalCredits,
+  heldByStatement,
   isBeforeBook,
   overdueAtFor,
+  readHoldingDisputes,
   writeOffForAllocation,
   type MirrorDeclaration,
   type MirrorDismissal,
@@ -84,6 +87,14 @@ export interface BookRules {
   dismissals: readonly Data[];
   declarations: readonly Data[];
   extractions: readonly Data[];
+  /**
+   * The book's raw dispute docs. An open one holds its Statement's disputed amount out of what is
+   * due, until its hold lapses at `now` (`disputeHolds`), so these totals depend on the clock:
+   * a dispute filed, answered or withdrawn and a hold lapsing all need a recompute.
+   */
+  disputes?: readonly unknown[];
+  /** ISO instant the holds are read at; without it nothing is held. */
+  now?: string;
 }
 
 const money = (n: number) => Math.round(n * 100) / 100;
@@ -118,12 +129,23 @@ export function allocateMiner(rec: MinerRecords, rules: BookRules) {
     extractions: rules.extractions as unknown as MirrorExtraction[],
     expiryHours: rules.expiryHours,
   });
+  // What open disputes hold of each Statement is not due (as the client's open set reads it).
+  const held =
+    rules.now === undefined
+      ? new Map<string, number>()
+      : heldByStatement(
+          statements,
+          readHoldingDisputes(rules.disputes ?? []).filter((d) => d.minerId === rec.minerId),
+          creditedLines(credits),
+          rules.now
+        );
   const allocation = allocatePayments({
     statements,
     payments,
     dismissalCredits: credits,
     officerWriteOffs: rec.writeOffs.flatMap((d) => writeOffForAllocation(d) ?? []),
     startDate: rules.startDate,
+    ...(held.size > 0 ? { held } : {}),
   });
   return { statements, payments, credits, allocation };
 }
@@ -307,6 +329,8 @@ export interface Scope {
   /** Statements and payments whose Miner has to be looked up after the write. */
   statementIds: string[];
   paymentIds: string[];
+  /** Disputes whose Miner has to be looked up after the write (an officer's answer names only the dispute). */
+  disputeIds?: string[];
   /** Everything: a rule every Miner reads changed. */
   all: boolean;
 }
@@ -344,6 +368,10 @@ export function editScope(action: { action: string } & Data): Scope {
       break;
     case 'assignPayment':
       miner(a.minerId);
+      break;
+    case 'rejectDispute':
+      // Answering ends the hold; the dispute's Miner is read from its doc.
+      (s.disputeIds ??= []).push(a.disputeId as string);
       break;
     case 'markNotTax':
       s.paymentIds.push(a.paymentId as string);

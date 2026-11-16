@@ -9,6 +9,7 @@
  * the Statements that are now paid, and report history ESI no longer holds.
  */
 import type { EveNotificationPayload } from '../eveNotificationPayload';
+import { heldByStatement, type OreDispute } from './disputes';
 import { shiftDate } from '../miningTax/yieldRange';
 import {
   allocatePayments,
@@ -409,6 +410,11 @@ export interface SettleInput {
   now?: string;
   /** The book's start date; a donation dated before it credits nothing. */
   startDate?: string;
+  /**
+   * Members' disputes (resolving in the app): with `now`, an open one holds its amount out of
+   * what is due, so a payment settles the next Statement rather than the disputed one.
+   */
+  disputes?: readonly OreDispute[];
 }
 
 /**
@@ -421,7 +427,10 @@ export function planSettlements(input: SettleInput): string[] {
   const settled: string[] = [];
   for (const { statements, allocation } of allocateEachMiner(input)) {
     for (const s of statements) {
-      if (allocation.byStatement.get(s.id)?.settled && !input.alreadyPaid.has(s.id)) {
+      const st = allocation.byStatement.get(s.id);
+      // Settled only because a dispute holds part of it: not for good (D22 closes its days for
+      // ever), since the hold may end with the officer keeping the bill.
+      if (st?.settled && !st.held && !input.alreadyPaid.has(s.id)) {
         settled.push(s.id);
       }
     }
@@ -531,12 +540,23 @@ function allocateEachMiner(input: Omit<SettleInput, 'alreadyPaid'>) {
       )
     );
     const payments = input.payments.filter((p): p is TaxPayment => p.minerId === minerId);
+    const credits = dismissalCredits(statements, input.dismissals, charges);
+    const held =
+      input.now !== undefined && input.disputes
+        ? heldByStatement(
+            statements,
+            input.disputes.filter((d) => d.minerId === minerId),
+            new Set(credits.map((c) => `${c.statementId}|${c.chargeKey}`)),
+            input.now
+          )
+        : new Map<string, number>();
     const allocation = allocatePayments({
       statements,
       payments,
-      dismissalCredits: dismissalCredits(statements, input.dismissals, charges),
+      dismissalCredits: credits,
       officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId),
       startDate: input.startDate,
+      ...(held.size > 0 ? { held } : {}),
     });
     return { minerId, statements, allocation };
   });

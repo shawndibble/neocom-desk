@@ -118,6 +118,7 @@ export function buildCorpBookView(
           amount: m.amount,
           date: m.date,
           method: m.method,
+          ...(m.kind === 'journal' ? { refId: m.refId } : {}),
         })),
         book.held,
         book.corporationId,

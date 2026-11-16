@@ -1388,6 +1388,18 @@ describe('inFlightDonations', () => {
     ...over,
   });
 
+  // The one number an officer can search the corporation's own journal on; without it they
+  // are left matching by amount and minute.
+  it('carries the wallet journal reference when the donation has one', () => {
+    expect(inFlightDonations([made({ refId: 7788991 })], [], CORP, '2026-10-01')).toEqual([
+      { characterId: ME, amount: 500_000, at: '2026-10-18T13:10:00Z', refId: 7788991 },
+    ]);
+  });
+
+  it('omits the reference rather than inventing one when the journal had none', () => {
+    expect(inFlightDonations([made()], [], CORP, '2026-10-01')[0]).not.toHaveProperty('refId');
+  });
+
   it('counts donations to the corp the book has not credited yet', () => {
     expect(inFlightDonations([made()], [], CORP, '2026-10-01')).toEqual([
       { characterId: ME, amount: 500_000, at: '2026-10-18T13:10:00Z' },
@@ -2514,7 +2526,11 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       });
       expect(before.rows[0].flagged).toBeUndefined();
       const out = overlay([toOther], [book({ disputes: [dispute()] })]);
-      expect(out.rows[0].flagged).toEqual({ state: 'sent', at: '2026-10-18T13:00:00.000Z' });
+      expect(out.rows[0].flagged).toEqual({
+        state: 'sent',
+        kind: 'payee',
+        at: '2026-10-18T13:00:00.000Z',
+      });
     });
 
     it('a rejected day says so on a row the dispute did not name', () => {
@@ -2537,6 +2553,7 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       });
       const out = overlay([toOther], [book({ disputes: [rejected] })]);
       expect(out.rows[0].flagged).toEqual({
+        kind: 'payee',
         state: 'rejected',
         at: '2026-10-19T00:00:00.000Z',
         reason: 'Ours',
@@ -2555,10 +2572,227 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       });
       const out = overlay([toOther], [book({ disputes: [waived] })]);
       expect(out.rows[0].flagged).toEqual({
+        kind: 'payee',
         state: 'dismissed',
         at: '2026-10-19T00:00:00.000Z',
         reason: 'Theirs',
       });
+    });
+  });
+});
+
+describe('resolving in the app: an open dispute holds its day', () => {
+  const keyOf = (date: string) => `${ME}:1000:${date}`;
+  const observedOn = (dates: string[]) =>
+    dates.map((date) => ({
+      characterId: ME,
+      recordedCorporationId: CORP,
+      structureId: 1000,
+      date,
+      solarSystemId: SYSTEM,
+      oreLines: [{ typeId: ZEO, quantity: 10_000 }],
+    }));
+  const disputeOn = (date: string, over: Partial<OreDispute> = {}): OreDispute => ({
+    id: `solo_${date}`,
+    minerId: `solo:${ME}`,
+    date,
+    kind: 'notPaying',
+    reason: 'The fleet boss said this op was untaxed',
+    lines: [{ recordKey: keyOf(date), typeId: ZEO, quantity: 10_000, payeeName: '' }],
+    by: ME,
+    at: '2026-10-18T13:00:00.000Z',
+    ...over,
+  });
+  const DAYS = ['2026-10-15', '2026-10-16', '2026-10-17'];
+  // 10,000 × 148 × 15% = 222,000 a day.
+  const days = () =>
+    DAYS.map((date) => entry({ date, oreLines: [{ typeId: ZEO, quantity: 10_000 }] }));
+
+  it('lets a billed day carry a dispute: its record, what was said, and the hold', () => {
+    const out = overlay(
+      [entry()],
+      [
+        book({
+          disputes: [
+            disputeOn('2026-10-17', {
+              lines: [
+                { recordKey: keyOf('2026-10-17'), typeId: ZEO, quantity: 43_050, payeeName: '' },
+              ],
+            }),
+          ],
+        }),
+      ]
+    );
+    expect(out.rows[0]).toMatchObject({
+      state: 'billed',
+      recordKey: keyOf('2026-10-17'),
+      flagged: { state: 'sent' },
+      held: { kind: 'notPaying', until: '2026-11-01T13:00:00.000Z' },
+    });
+  });
+
+  // The officer's next step must reach the member word for word on the billed day itself.
+  it('says a rejected quantity dispute on a billed, unpaid day, with the next step', () => {
+    const rejected = disputeOn('2026-10-17', {
+      kind: 'quantity',
+      reason: 'Your ledger is short',
+      resolution: {
+        kind: 'rejected',
+        at: '2026-10-19T00:00:00.000Z',
+        by: 1,
+        reason: 'The book is right',
+        nextStep: 'Pay it, or re-mine the shortfall',
+      },
+    });
+    const out = overlay([entry()], [book({ disputes: [rejected] })]);
+    expect(out.rows[0]).toMatchObject({
+      state: 'billed',
+      flagged: {
+        state: 'rejected',
+        kind: 'quantity',
+        reason: 'The book is right',
+        nextStep: 'Pay it, or re-mine the shortfall',
+      },
+    });
+    expect(out.rows[0].held).toBeUndefined();
+  });
+
+  // "Say it again" repeats the claim: the flag carries the ore this record disputed and the rate.
+  it("keeps a kept dispute's own claim on the flag: its ore and its rate", () => {
+    const rejected = disputeOn('2026-10-17', {
+      kind: 'rate',
+      claimedPct: 3,
+      lines: [{ recordKey: keyOf('2026-10-17'), typeId: ZEO, quantity: 1_000, payeeName: '' }],
+      resolution: { kind: 'rejected', at: '2026-10-19T00:00:00.000Z', by: 1, reason: 'No' },
+    });
+    const out = overlay([entry()], [book({ disputes: [rejected] })]);
+    expect(out.rows[0].flagged).toMatchObject({ kind: 'rate', claimedPct: 3 });
+    const quantity = disputeOn('2026-10-17', {
+      kind: 'quantity',
+      lines: [{ recordKey: keyOf('2026-10-17'), typeId: ZEO, quantity: 1_000, payeeName: '' }],
+      resolution: { kind: 'rejected', at: '2026-10-19T00:00:00.000Z', by: 1, reason: 'No' },
+    });
+    expect(overlay([entry()], [book({ disputes: [quantity] })]).rows[0].flagged?.lines).toEqual([
+      { typeId: ZEO, quantity: 1_000 },
+    ]);
+  });
+
+  it('skips a held day: a donation pays the next oldest instead', () => {
+    const out = overlay(days(), [
+      book({
+        observed: observedOn(DAYS),
+        disputes: [disputeOn('2026-10-15')],
+        inFlight: [{ characterId: ME, amount: 222_000, at: '2026-10-18T13:10:00Z' }],
+      }),
+    ]);
+    const byDate = Object.fromEntries(out.rows.map((r) => [r.date, r.state]));
+    expect(byDate).toEqual({
+      '2026-10-15': 'billed',
+      '2026-10-16': 'paid',
+      '2026-10-17': 'billed',
+    });
+  });
+
+  it('holds nothing once an officer has answered', () => {
+    const answered = disputeOn('2026-10-15', {
+      resolution: { kind: 'rejected', at: '2026-10-18T14:00:00.000Z', by: 1, reason: 'ours' },
+    });
+    const out = overlay(days(), [
+      book({
+        observed: observedOn(DAYS),
+        disputes: [answered],
+        inFlight: [{ characterId: ME, amount: 222_000, at: '2026-10-18T13:10:00Z' }],
+      }),
+    ]);
+    expect(out.rows.find((r) => r.date === '2026-10-15')).toMatchObject({ state: 'paid' });
+    expect(out.rows.find((r) => r.date === '2026-10-15')?.held).toBeUndefined();
+  });
+
+  describe('marks under the corporation’s own Payee follow the book: oldest day first', () => {
+    const owned = (status: 'paid' | 'outstanding') =>
+      DAYS.map((date, i) =>
+        entry({
+          date,
+          oreLines: [{ typeId: ZEO, quantity: 10_000 }],
+          freeOreLines: [],
+          allocations: [
+            {
+              id: `a-${i}`,
+              payeeId: 'bmw',
+              taxPct: 15,
+              oreLines: [{ typeId: ZEO, quantity: 10_000 }],
+              // Only the newest day was marked paid.
+              status: i === 2 ? status : 'outstanding',
+            },
+          ],
+        })
+      );
+
+    it('pays the oldest day with a mark made on the newest, as the book will', () => {
+      const out = overlay(owned('paid'), [
+        book({ observed: observedOn(DAYS), ownPayeeIds: ['bmw'] }),
+      ]);
+      const byDate = Object.fromEntries(out.rows.map((r) => [r.date, r.state]));
+      expect(byDate).toEqual({
+        '2026-10-15': 'paid',
+        '2026-10-16': 'billed',
+        '2026-10-17': 'billed',
+      });
+      expect(out.rows.find((r) => r.date === '2026-10-15')?.settledBy).toBe('yourMark');
+    });
+
+    it('skips a held day with a mark too', () => {
+      const out = overlay(owned('paid'), [
+        book({
+          observed: observedOn(DAYS),
+          ownPayeeIds: ['bmw'],
+          disputes: [disputeOn('2026-10-15')],
+        }),
+      ]);
+      const byDate = Object.fromEntries(out.rows.map((r) => [r.date, r.state]));
+      expect(byDate).toEqual({
+        '2026-10-15': 'billed',
+        '2026-10-16': 'paid',
+        '2026-10-17': 'billed',
+      });
+    });
+  });
+
+  describe('a disputed Conflict day', () => {
+    const assigned = () =>
+      entry({
+        freeOreLines: [],
+        oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+        allocations: [
+          {
+            payeeId: 'ashfall',
+            taxPct: 10,
+            oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+            status: 'outstanding',
+          },
+        ],
+      });
+    // Its own clock runs out on 2026-11-01T00:30; the dispute, raised 25 Oct, holds to 8 Nov.
+    const told = disputeOn('2026-10-17', {
+      kind: undefined,
+      reason: undefined,
+      at: '2026-10-25T00:00:00.000Z',
+      lines: [
+        { recordKey: keyOf('2026-10-17'), typeId: ZEO, quantity: 43_050, payeeName: 'Ashfall' },
+      ],
+    });
+
+    it('does not resolve to the corporation while the dispute holds it', () => {
+      const out = overlay([assigned()], [book({ disputes: [told] })], '2026-11-02T00:00:00Z');
+      expect(out.rows[0]).toMatchObject({
+        state: 'conflict',
+        resolvesAt: '2026-11-08T00:00:00.000Z',
+      });
+    });
+
+    it('resolves once the hold runs out unanswered', () => {
+      const out = overlay([assigned()], [book({ disputes: [told] })], '2026-11-09T00:00:00Z');
+      expect(out.rows.some((r) => r.state === 'conflict')).toBe(false);
     });
   });
 });

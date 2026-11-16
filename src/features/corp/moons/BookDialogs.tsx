@@ -145,6 +145,7 @@ export function ReasonDialog({
   confirmLabel,
   effect,
   canConfirm = true,
+  nextStep,
   run,
 }: {
   open: boolean;
@@ -156,22 +157,31 @@ export function ReasonDialog({
   effect?: ReactNode;
   /** False holds the action back whatever the reason says (the intro says why). */
   canConfirm?: boolean;
-  run: (reason: string) => Promise<void>;
+  /** A second REQUIRED field (keeping a bill: what the member should do next), sent as `run`'s 2nd argument. */
+  nextStep?: { label: string; hint: string };
+  run: (reason: string, nextStep: string) => Promise<void>;
 }) {
   const [reason, setReason] = useState('');
+  const [step, setStep] = useState('');
   return (
     <DialogShell
       open={open}
       onClose={onClose}
       title={title}
       confirmLabel={confirmLabel}
-      canConfirm={canConfirm && reason.trim().length > 0}
-      run={() => run(reason.trim())}
+      canConfirm={canConfirm && reason.trim().length > 0 && (!nextStep || step.trim().length > 0)}
+      run={() => run(reason.trim(), step.trim())}
     >
       <p>{intro}</p>
       <Label text={reasonLabel}>
         <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
       </Label>
+      {nextStep && (
+        <Label text={<span className="font-semibold text-text">{nextStep.label}</span>}>
+          <TextArea value={step} onChange={(e) => setStep(e.target.value)} rows={3} />
+          <span className="block text-xs text-text-dim">{nextStep.hint}</span>
+        </Label>
+      )}
       {effect && <Effect>{effect}</Effect>}
     </DialogShell>
   );

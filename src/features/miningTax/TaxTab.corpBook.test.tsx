@@ -68,13 +68,21 @@ vi.mock('@/lib/useRouteSnapshot', () => ({
   }),
 }));
 vi.mock('./corpBook/useCorpBookView', () => ({
-  useCorpBookView: () => ({ view: hoisted.view, reload: vi.fn() }),
+  useCorpBookView: () => ({
+    view: hoisted.view,
+    reload: vi.fn(),
+    // No book the member has left: the left-the-corp notice has nothing to say here.
+    shownBooks: [],
+    corpNameOf: (id: number) => `Corp ${id}`,
+    hiddenLeft: [],
+  }),
 }));
 vi.mock('@/features/miningTax/madePayments', () => ({
   loadMadePaymentsWithStatus: async () => ({ payments: [], sources: [] }),
 }));
 
 const { TaxTab } = await import('./TaxTab');
+const { keptDayKey, useNotPayingSetting } = await import('./corpBook/resolve/notPaying');
 
 const prices: DatedUnitPrices = {
   byHubAndDate: new Map([['jita', new Map([['2026-10-17', new Map([[ZEO, 148]])]])]]),
@@ -255,12 +263,15 @@ describe('uncredited donations in the attention strip', () => {
     const user = userEvent.setup();
     renderTab();
 
-    // Two donations, one corporation, one row in the strip — not the same advisory twice.
-    expect(screen.getByText('1 thing needs attention')).toBeInTheDocument();
+    // Two donations, one corporation, one row in the strip — not the same advisory twice. (The
+    // strip may also list the day's own figure dispute; that is another problem.)
     await user.click(screen.getByText('Show'));
+    expect(screen.getAllByText(/hasn't credited/)).toHaveLength(1);
     expect(
       screen.getByText(/Brass Meridian Logistics hasn't credited 2 of your donations/)
     ).toBeInTheDocument();
+    // And it has a way out, not advice: one Resolve.
+    expect(screen.getAllByRole('button', { name: 'Resolve' }).length).toBeGreaterThan(0);
 
     // Each donation still names itself, so the member can give an officer the exact transfers.
     const items = screen.getAllByRole('listitem');
@@ -286,6 +297,73 @@ describe('uncredited donations in the attention strip', () => {
   });
 });
 
+describe('a bill an officer kept', () => {
+  const rejected = {
+    id: `solo_${ME}_2026-10-17`,
+    minerId: `solo:${ME}`,
+    date: '2026-10-17',
+    kind: 'quantity' as const,
+    reason: 'My ledger says 41,200',
+    lines: [{ recordKey: `${ME}:1000:2026-10-17`, typeId: ZEO, quantity: 1850, payeeName: '' }],
+    by: ME,
+    at: '2026-10-17T13:00:00.000Z',
+    resolution: {
+      kind: 'rejected' as const,
+      at: '2026-10-18T09:00:00.000Z',
+      by: 1,
+      reason: 'The book is right',
+      nextStep: 'Pay it, or re-mine the shortfall',
+    },
+  };
+
+  // The officer's next step, word for word, with Resolve again and a one-click Not paying.
+  it('reads the next step on the attention strip with Resolve and Not paying', async () => {
+    hoisted.view = viewWith({ ...book, disputes: [rejected] });
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(screen.getByText('Show'));
+    expect(
+      screen.getByText(/Brass Meridian Logistics kept the bill on 2026-10-17/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('What to do next: Pay it, or re-mine the shortfall')
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Resolve' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Not paying' }).length).toBeGreaterThan(0);
+  });
+
+  // "If they say f-it the tool shouldn't annoy them" - but a later answer is a new problem.
+  it('hides the answer the member said no to, and shows a later one again', async () => {
+    const day = '2026-10-17';
+    const answered = (at: string) => ({
+      ...book,
+      disputes: [{ ...rejected, resolution: { ...rejected.resolution, at } }],
+    });
+    const hide = (at: string) =>
+      useNotPayingSetting.setState({
+        value: [keptDayKey(CORP, ME, day, at)],
+        hydrated: true,
+      });
+    hide('2026-10-18T09:00:00.000Z');
+    hoisted.view = viewWith(answered('2026-10-18T09:00:00.000Z'));
+    const { unmount } = render(
+      <MemoryRouter>
+        <TaxTab tabBar={null} tabsId="t" />
+      </MemoryRouter>
+    );
+    // Whatever else is on the strip, the answer the member said no to is not.
+    const show = screen.queryByText('Show');
+    if (show) await userEvent.setup().click(show);
+    expect(screen.queryByText(/kept the bill on 2026-10-17/)).toBeNull();
+    unmount();
+    hoisted.view = viewWith(answered('2026-10-18T12:00:00.000Z'));
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(screen.getByText('Show'));
+    expect(screen.getByText(/kept the bill on 2026-10-17/)).toBeInTheDocument();
+  });
+});
+
 /**
  * Open a 17 Oct row's detail and then Compare with the book. One day can carry several rows —
  * the member's surplus keeps a personal row where the book observed less, and a contested day
@@ -305,14 +383,14 @@ const openCompare = async (inRow = 'Brass Meridian Logistics') => {
 };
 
 describe('Compare with the book: which way the difference runs', () => {
-  it('sends the member to an officer when the book bills more than their record', async () => {
+  it('gives the member both ways out when the book bills more than their record', async () => {
     // The book observed 43,050; the member recorded 41,200.
     hoisted.view = viewWith(book);
     const compare = await openCompare();
     expect(compare.getByText(/The book recorded more ore than you did/)).toBeInTheDocument();
-    expect(
-      compare.getByText(/Ask a Brass Meridian Logistics officer to correct the book/)
-    ).toBeInTheDocument();
+    // No dead end: the two ways out are right beside the sentence.
+    expect(compare.getByText(/If the book is right, fix your records/)).toBeInTheDocument();
+    expect(compare.getByRole('button', { name: 'Resolve' })).toBeInTheDocument();
   });
 
   it('says there is nothing to raise when the book bills less', async () => {
@@ -337,9 +415,9 @@ describe('Compare with the book: which way the difference runs', () => {
     expect(
       compare.getByText(/The book's rate is higher than the one you recorded/)
     ).toBeInTheDocument();
-    expect(
-      compare.getByText(/Ask a Brass Meridian Logistics officer to correct the book/)
-    ).toBeInTheDocument();
+    // No dead end: the two ways out are right beside the sentence.
+    expect(compare.getByText(/If the book is right, fix your records/)).toBeInTheDocument();
+    expect(compare.getByRole('button', { name: 'Resolve' })).toBeInTheDocument();
   });
 
   it('says there is nothing to raise when the book’s rate is the lower one', async () => {
