@@ -29,13 +29,14 @@ export async function loadRegionMarketTypes(regionId: number): Promise<ReadonlyS
   return new Set(cached.data);
 }
 
-/** While the last load came back empty (failed, truncated), retry this often. */
+/** While the last load came back null (failed, truncated, too old), retry this often. */
 const RETRY_EMPTY_MS = MINUTE_MS;
 
 /**
  * Which reload a moment belongs to: a new slot reloads the list. Once per
  * cache window while a list is held, every `RETRY_EMPTY_MS` while the last
- * load came back empty.
+ * load came back null. The slot rides in the loader, not the key: a new key
+ * would blank the cue while the reload runs.
  */
 export function regionTypesReloadSlot(nowMs: number, lastEmpty: boolean): number {
   return Math.floor(nowMs / (lastEmpty ? RETRY_EMPTY_MS : STALE_AFTER.default));
@@ -47,7 +48,7 @@ export function regionTypesReloadSlot(nowMs: number, lastEmpty: boolean): number
  *
  * Reloaded after each cache window (inside it the cache answers with no
  * request), at once when the tab returns to view past one (the shared ticker
- * ticks on becoming visible), and every minute after an empty load.
+ * ticks on becoming visible), and every minute after a null load.
  */
 export function useRegionMarketTypes(regionId: number | null): ReadonlySet<number> | null {
   const key = regionId === null ? null : String(regionId);

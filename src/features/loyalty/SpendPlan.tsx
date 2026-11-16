@@ -111,14 +111,16 @@ function turnInsToBuy(r: PlanRow): string[] {
 function ownedNote(r: PlanRow, view: SpendPlanView, t: Translate): string | null {
   const owned = r.turnIns.reduce((sum, line) => sum + line.owned, 0);
   if (owned <= 0) return null;
-  const labels = [
-    ...new Set(
-      r.turnIns
-        .filter((line) => line.owned > 0)
-        .flatMap((line) => view.ownedPlacements.get(line.typeId) ?? [])
-        .map((placement) => stockLocationLabel(placement, view.locationNames, t))
-    ),
-  ];
+  // Units per place across every owned turn-in type, so the first named is the row's largest holding.
+  const unitsByLabel = new Map<string, number>();
+  for (const line of r.turnIns) {
+    if (line.owned <= 0) continue;
+    for (const placement of view.ownedPlacements.get(line.typeId) ?? []) {
+      const label = stockLocationLabel(placement, view.locationNames, t);
+      unitsByLabel.set(label, (unitsByLabel.get(label) ?? 0) + placement.quantity);
+    }
+  }
+  const labels = [...unitsByLabel].sort((a, b) => b[1] - a[1]).map(([label]) => label);
   if (labels.length === 0) return t('loyaltyStore.spendPlan.ownedUsed', { count: owned });
   return labels.length === 1
     ? t('loyaltyStore.spendPlan.ownedAt', { count: owned, place: labels[0] })
@@ -218,13 +220,13 @@ function PlanBody({
         align: 'right',
         render: (r) => {
           if (r.turnIns.length === 0) return '—';
-          const owned = ownedNote(r, view, t);
+          const ownedLabel = ownedNote(r, view, t);
           const toBuy = turnInsToBuy(r);
           return (
             <span className="inline-flex flex-col items-end">
               <IskAmount value={r.turnInsCost} decimals={0} />
               {toBuy.length > 0 && <span className={noteClassName}>{toBuy.join(', ')}</span>}
-              {owned !== null && <span className={noteClassName}>{owned}</span>}
+              {ownedLabel !== null && <span className={noteClassName}>{ownedLabel}</span>}
             </span>
           );
         },

@@ -114,7 +114,10 @@ describe('SpendPlanPanel', () => {
   it('says where the owned turn-ins it used sit', () => {
     const owned = view({});
     const row = owned.result.rows[0]!;
-    row.turnIns = [{ typeId: 34, owned: 5, bought: 0 }];
+    row.turnIns = [
+      { typeId: 34, owned: 5, bought: 0 },
+      { typeId: 35, owned: 10, bought: 0 },
+    ];
     const placement = (locationId: number, quantity: number) => ({
       characterId: 1,
       locationId,
@@ -123,10 +126,17 @@ describe('SpendPlanPanel', () => {
     });
     renderPlan({
       ...owned,
-      ownedPlacements: new Map([[34, [placement(60003760, 4), placement(60008494, 1)]]]),
-      locationNames: new Map([[60003760, 'Jita IV - Moon 4']]),
+      // Two types: the second type's holding is the row's largest, so it is named first.
+      ownedPlacements: new Map([
+        [34, [placement(60003760, 4), placement(60008494, 1)]],
+        [35, [placement(60008494, 10)]],
+      ]),
+      locationNames: new Map([
+        [60003760, 'Jita IV - Moon 4'],
+        [60008494, 'Amarr VIII'],
+      ]),
     });
-    expect(screen.getByText('5 owned, in Jita IV - Moon 4 and 1 more')).toBeInTheDocument();
+    expect(screen.getByText('15 owned, in Amarr VIII and 1 more')).toBeInTheDocument();
   });
 
   it('states LP left, and opens the offer from its row', () => {
