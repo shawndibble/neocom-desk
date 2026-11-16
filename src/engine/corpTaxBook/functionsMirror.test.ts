@@ -219,6 +219,15 @@ describe('functions mirror of the Corp Tax Book engine', () => {
       { ...base, lines: [line], resolution: { kind: 'dismissed', at: 'a', by: 1, reason: 'r' } },
       { ...base, lines: [] },
       { ...base },
+      // A withdrawn day's tombstone: no lines, so no reader sees a dispute, but it keeps its hold.
+      {
+        id: 'd',
+        minerId: 'm',
+        date: '2026-11-01',
+        holdFrom: '2026-10-01T00:00:00.000Z',
+        history: [],
+        withdrawnAt: '2026-11-04T00:00:00.000Z',
+      },
       { ...base, lines: [line, { recordKey: 5 }] },
       { ...base, lines: 'lines' },
       { ...base, lines: [line], kind: 'rate', claimedPct: 10 },

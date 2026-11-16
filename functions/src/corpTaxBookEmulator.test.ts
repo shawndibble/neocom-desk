@@ -1545,7 +1545,12 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       // Another Miner cannot withdraw it: they have no dispute of their own that day.
       expect(await reason(withdraw(51))).toBe('not-found');
       expect(await withdraw(50)).toEqual({ disputeId });
-      expect((await book().collection('disputes').doc(disputeId).get()).exists).toBe(false);
+      // A tombstone: no `lines` (no reader sees a dispute), the hold window and answers kept.
+      const gone = (await book().collection('disputes').doc(disputeId).get()).data();
+      expect(gone?.lines).toBeUndefined();
+      expect(gone).toMatchObject({ minerId: 'solo:50', date: '2026-10-17', uids: ['char:50'] });
+      expect(typeof gone?.holdFrom).toBe('string');
+      expect(typeof gone?.withdrawnAt).toBe('string');
       expect(
         (await book().collection('audit').where('action', '==', 'withdrawDispute').get()).size
       ).toBe(1);
@@ -1554,6 +1559,63 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       await dispute(50, [line(50)]);
       await edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Our ore' });
       expect(await reason(withdraw(50))).toBe('answered');
+    });
+
+    it('does not let withdrawing and filing again renew the hold, and officers cannot answer a withdrawn day', async () => {
+      await turnOn();
+      await recordOre([50]);
+      await billDay();
+      await pastSetup();
+      const withdraw = () =>
+        withdrawDispute(
+          deps(),
+          who(50),
+          parseWithdrawDisputeInput({ corporationId: CORP, date: '2026-10-17' })
+        );
+      const { disputeId } = await dispute(50, [line(50, { quantity: 40 })]);
+      const first = (await book().collection('disputes').doc(disputeId).get()).get('at');
+      // Day 13: withdrawn, and filed again at once.
+      now += 13 * 86_400_000;
+      await withdraw();
+      expect(
+        await reason(edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Ours' }))
+      ).toBe('not-found');
+      await dispute(50, [line(50, { quantity: 40 })]);
+      const again = (await book().collection('disputes').doc(disputeId).get()).data();
+      expect(again?.holdFrom).toBe(first);
+      expect(again?.withdrawnAt).toBeUndefined();
+      expect(again?.lines).toHaveLength(1);
+      expect(again?.history).toEqual([]);
+      // Day 15: the first dispute's 14 days are up, so the Statement settles.
+      now += 2 * 86_400_000;
+      await verifyOfficer(deps(), who(ACCOUNTANT), parseBookCall(withToken(ACCOUNTANT)));
+      expect(
+        await edit(ACCOUNTANT, { action: 'settleStatements', statementIds: ['s1'] })
+      ).toMatchObject({ settled: ['s1'] });
+    });
+
+    it('keeps the Miner’s stored totals hold-aware: filing, withdrawing and a lapse recompute them', async () => {
+      await turnOn();
+      await recordOre([50]);
+      await billDay();
+      await pastSetup();
+      const totals = async () =>
+        (await book().collection('minerTotals').doc('solo:50').get()).data();
+      const { disputeId } = await dispute(50, [line(50)]);
+      const held = await totals();
+      expect(held?.owed).toBeLessThan(held?.billed as number);
+      expect(typeof held?.overdueAt === 'string' || held?.overdueAt === null).toBe(true);
+      await withdrawDispute(
+        deps(),
+        who(50),
+        parseWithdrawDisputeInput({ corporationId: CORP, date: '2026-10-17' })
+      );
+      expect((await totals())?.owed).toBe(held?.billed);
+      // Filed again, then answered: the officer's answer ends the hold.
+      await dispute(50, [line(50)]);
+      expect((await totals())?.owed).toBeLessThan(held?.billed as number);
+      await edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Ours' });
+      expect((await totals())?.owed).toBe(held?.billed);
     });
 
     it('lets an officer reject a dispute once; the Miner may flag the day again, keeping the hold', async () => {

@@ -102,7 +102,8 @@ export interface HeaderTotals {
 export const MINER_TOTALS_SCHEMA_READ = 1;
 
 /**
- * The page header's owed, credit and last payment from the Miner's stored totals. No doc,
+ * The page header's owed, credit and last payment from the Miner's stored totals (owed and credit
+ * stay the computed ones while the Miner has an unanswered dispute). No doc,
  * or one of another schema, leaves the computed figures (the doc may not be deployed yet).
  */
 export function withMinerTotals(
@@ -117,11 +118,19 @@ export function withMinerTotals(
     Number.isFinite(totals.credit) &&
     (totals.lastPaidAt === null || typeof totals.lastPaidAt === 'string');
   if (!ok) return view;
+  // An unanswered dispute holds ISK out of what is due until its hold lapses, which the stored
+  // totals only catch up with after a recompute (and a doc written before holds counted them
+  // not at all): the live figures, which read the holds at this moment, stand for that Miner.
+  const holds = (view.input.disputes ?? []).some((d) => d.minerId === minerId && !d.resolution);
   return {
     ...view,
     miners: view.miners.map((m) =>
       m.id === minerId
-        ? { ...m, owed: totals.owed, credit: totals.credit, lastPaidAt: totals.lastPaidAt }
+        ? {
+            ...m,
+            ...(holds ? {} : { owed: totals.owed, credit: totals.credit }),
+            lastPaidAt: totals.lastPaidAt,
+          }
         : m
     ),
   };
