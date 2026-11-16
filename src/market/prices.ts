@@ -38,10 +38,14 @@ const NULL_AGGREGATE: HubAggregate = Object.freeze({
   buyVolume: 0,
 });
 
-/** An aggregate and whether it is yesterday's close (R2) rather than a live book. */
+/**
+ * An aggregate, whether it is a priced snapshot (R2) rather than a live book,
+ * and whether it came from a snapshot at all (a snapshot's "no price" is not live either).
+ */
 interface PricedAggregate {
   value: HubAggregate;
   stale: boolean;
+  snapshot: boolean;
 }
 
 interface CacheEntry<V> {
@@ -217,7 +221,7 @@ export async function getStationPricesWithStatus(
   const nowMs = now();
 
   const take = (typeId: number, priced: PricedAggregate | null): void => {
-    if (!priced || (priced.stale && !allowStale)) {
+    if (!priced || (priced.snapshot && !allowStale)) {
       unreachable = true;
       result.set(typeId, NULL_AGGREGATE);
       return;
@@ -268,7 +272,9 @@ export async function getStationPricesWithStatus(
     for (const typeId of toFetch) {
       const key = hubCacheKey(stationId, typeId);
       const perType = batch.then((fetched) =>
-        fetched ? (fetched.get(typeId) ?? { value: NULL_AGGREGATE, stale: false }) : null
+        fetched
+          ? (fetched.get(typeId) ?? { value: NULL_AGGREGATE, stale: false, snapshot: false })
+          : null
       );
       hubPricesInFlight.set(key, perType);
       void perType.finally(() => {
@@ -309,12 +315,13 @@ async function fetchHubPrices(
     priced.set(typeId, {
       value: fetched.prices.get(typeId) ?? NULL_AGGREGATE,
       stale: fetched.stale.has(typeId),
+      snapshot: fetched.fromSnapshot,
     });
   }
-  if (generation !== persistedGeneration) return priced;
+  // A snapshot answer is never cached, priced or not: the next ask retries live.
+  if (generation !== persistedGeneration || fetched.fromSnapshot) return priced;
   const rows: Array<readonly [string, HubAggregate]> = [];
-  for (const [typeId, { value, stale }] of priced) {
-    if (stale) continue;
+  for (const [typeId, { value }] of priced) {
     const key = hubCacheKey(stationId, typeId);
     hubPriceCache.set(key, { value, expiresAt: nowMs + HUB_PRICE_TTL_MS });
     persistedBypass.delete(key);

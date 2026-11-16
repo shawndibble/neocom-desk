@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadRegionMarketTypes } from './regionMarketTypes';
+import { loadRegionMarketTypes, regionTypesReloadSlot } from './regionMarketTypes';
 
 const REGION_ID = 10000002; // The Forge
 
@@ -84,5 +84,17 @@ describe('loadRegionMarketTypes', () => {
     );
 
     expect(await loadRegionMarketTypes(REGION_ID)).toBeNull();
+  });
+});
+
+describe('regionTypesReloadSlot', () => {
+  const MIN = 60_000;
+  it('moves once per cache window, so a held list reloads after it', () => {
+    expect(regionTypesReloadSlot(0, false)).toBe(regionTypesReloadSlot(9 * MIN, false));
+    expect(regionTypesReloadSlot(10 * MIN, false)).not.toBe(regionTypesReloadSlot(9 * MIN, false));
+  });
+
+  it('moves every minute while the last load came back empty, so a failed load retries', () => {
+    expect(regionTypesReloadSlot(MIN, true)).not.toBe(regionTypesReloadSlot(0, true));
   });
 });

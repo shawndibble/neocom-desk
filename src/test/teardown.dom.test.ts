@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
 import { loadWithCache } from '@/esi/cache';
 import { mswServer } from '@/test/msw';
+import { settleOrWarn } from '@/test/teardown';
 
 /**
  * The tests in each block run in order and depend on it: the first leaves
@@ -96,5 +97,22 @@ describe('fake timers a test never restored', () => {
     // eslint-disable-next-line no-restricted-syntax -- proves a dropped fake timer never fires: real time must pass its 10ms
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(fired).toBe(false);
+  });
+});
+
+describe('work a test leaves running past the settle window', () => {
+  it('fails the test when failing is switched on', async () => {
+    void fetch('https://teardown.test/hang').catch(() => {});
+    await expect(settleOrWarn('leaky test', 'fetch', true)).rejects.toThrow(
+      /\[teardown\] leaky test: still pending/
+    );
+  });
+
+  it('only warns locally', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    void fetch('https://teardown.test/hang').catch(() => {});
+    await settleOrWarn('leaky test', 'fetch', false);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/leaky test: still pending/));
+    warn.mockRestore();
   });
 });

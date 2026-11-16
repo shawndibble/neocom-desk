@@ -28,6 +28,8 @@ import type { AsyncLoad } from '@/lib/useAsyncLoad';
 import type { LoyaltyOfferRow } from './offerRows';
 import { formatIskPerLp } from './offerRowDisplay';
 import type { SpendPlanView } from './useSpendPlan';
+import { stockLocationLabel } from '@/features/industry/ownedStockDetection';
+import type { Translate } from '@/lib/translate';
 
 const noteClassName = 'text-[0.6875rem] text-text-dim';
 
@@ -37,11 +39,17 @@ const noteClassName = 'text-[0.6875rem] text-text-dim';
  */
 export function SpendLpButton({
   playerLp,
+  lpAccess = null,
   rankable,
   loading,
   onClick,
 }: {
   playerLp: number | null;
+  /**
+   * Why the balance can never load, when that is known: no Character signed in,
+   * or one whose grant lacks the loyalty scope. Null while it may still load.
+   */
+  lpAccess?: 'signedOut' | 'noScope' | null;
   /** Whether any offer in the current view has a Sell now ISK/LP to rank by. */
   rankable: boolean;
   loading: boolean;
@@ -50,7 +58,11 @@ export function SpendLpButton({
   const { t } = useTranslation();
   const reason =
     playerLp === null
-      ? t('loyaltyStore.spendPlan.lpUnknown')
+      ? lpAccess === 'signedOut'
+        ? t('loyaltyStore.spendPlan.lpSignedOut')
+        : lpAccess === 'noScope'
+          ? t('loyaltyStore.spendPlan.lpNoScope')
+          : t('loyaltyStore.spendPlan.lpUnknown')
       : playerLp <= 0
         ? t('loyaltyStore.spendPlan.lpNone')
         : !rankable
@@ -90,6 +102,33 @@ function turnInsToBuy(r: PlanRow): string[] {
       const name = r.row.requiredItems.find((item) => item.typeId === line.typeId)?.name;
       return `${formatCount(line.bought)}× ${name ?? `#${line.typeId}`}`;
     });
+}
+
+/**
+ * Where a row's owned turn-ins sit: the largest holding's location, then how
+ * many other places hold some. Null when nothing owned was used.
+ */
+function ownedNote(r: PlanRow, view: SpendPlanView, t: Translate): string | null {
+  const owned = r.turnIns.reduce((sum, line) => sum + line.owned, 0);
+  if (owned <= 0) return null;
+  // Units per place across every owned turn-in type, so the first named is the row's largest holding.
+  const unitsByLabel = new Map<string, number>();
+  for (const line of r.turnIns) {
+    if (line.owned <= 0) continue;
+    for (const placement of view.ownedPlacements.get(line.typeId) ?? []) {
+      const label = stockLocationLabel(placement, view.locationNames, t);
+      unitsByLabel.set(label, (unitsByLabel.get(label) ?? 0) + placement.quantity);
+    }
+  }
+  const labels = [...unitsByLabel].sort((a, b) => b[1] - a[1]).map(([label]) => label);
+  if (labels.length === 0) return t('loyaltyStore.spendPlan.ownedUsed', { count: owned });
+  return labels.length === 1
+    ? t('loyaltyStore.spendPlan.ownedAt', { count: owned, place: labels[0] })
+    : t('loyaltyStore.spendPlan.ownedAtMore', {
+        count: owned,
+        place: labels[0],
+        more: labels.length - 1,
+      });
 }
 
 function StopLine({ stop, view }: { stop: SpendStop; view: SpendPlanView }) {
@@ -181,17 +220,13 @@ function PlanBody({
         align: 'right',
         render: (r) => {
           if (r.turnIns.length === 0) return '—';
-          const owned = r.turnIns.reduce((sum, line) => sum + line.owned, 0);
+          const ownedLabel = ownedNote(r, view, t);
           const toBuy = turnInsToBuy(r);
           return (
             <span className="inline-flex flex-col items-end">
               <IskAmount value={r.turnInsCost} decimals={0} />
               {toBuy.length > 0 && <span className={noteClassName}>{toBuy.join(', ')}</span>}
-              {owned > 0 && (
-                <span className={noteClassName}>
-                  {t('loyaltyStore.spendPlan.ownedUsed', { count: owned })}
-                </span>
-              )}
+              {ownedLabel !== null && <span className={noteClassName}>{ownedLabel}</span>}
             </span>
           );
         },
@@ -203,7 +238,7 @@ function PlanBody({
         render: (r) => <IskAmount value={r.income} decimals={0} className="text-isk-pos" />,
       },
     ],
-    [t]
+    [t, view]
   );
 
   if (result.rows.length === 0) {

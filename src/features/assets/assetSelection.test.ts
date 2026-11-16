@@ -149,10 +149,18 @@ describe('selectionTotals (#6165)', () => {
   });
 
   it('counts a stack with no value as unpriced and adds nothing for it', () => {
-    expect(selectionTotals([1, 3], assets, prices, new Map(), volumes)).toEqual({
+    expect(selectionTotals([1, 4], assets, prices, new Map(), volumes)).toEqual({
       isk: 2500,
       volume: 5,
       unpriced: 1,
+    });
+  });
+
+  it('never counts a blueprint copy as unpriced: it is worth nothing by design', () => {
+    expect(selectionTotals([1, 3], assets, prices, new Map(), volumes)).toEqual({
+      isk: 2500,
+      volume: 5,
+      unpriced: 0,
     });
   });
 

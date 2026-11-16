@@ -4,6 +4,7 @@ import {
   activeLpLandingFilters,
   lpLandingBestOffers,
   lpLandingHoldings,
+  lpLandingStoreSort,
   lpLandingOffers,
   lpLandingStores,
   type LpLandingFilters,
@@ -252,5 +253,16 @@ describe('lpLandingHoldings', () => {
 
   it('is null when the Character holds no LP', () => {
     expect(lpLandingHoldings([held[3]!], 0)).toBeNull();
+  });
+});
+
+describe('lpLandingStoreSort', () => {
+  it('sorts by LP Value when the Character holds no LP, or its balances are unknown', () => {
+    expect(lpLandingStoreSort(null)).toEqual({ columnId: 'lpValue', direction: 'desc' });
+  });
+
+  it('puts the stores the Character holds LP with first when it holds any', () => {
+    const holdings = lpLandingHoldings([store({ corporationId: 1, yourLp: 10, lpValue: 1000 })], 0);
+    expect(lpLandingStoreSort(holdings)).toEqual({ columnId: 'yourLp', direction: 'desc' });
   });
 });

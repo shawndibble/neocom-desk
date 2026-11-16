@@ -13,7 +13,8 @@ vi.mock('@/features/character/wallet', () => ({
 }));
 vi.mock('./marketLpValue', () => ({ loadMarketLpValue: () => Promise.resolve(null) }));
 
-const { useSpendPlan, spendCandidates, SPEND_PLAN_CANDIDATES } = await import('./useSpendPlan');
+const { useSpendPlan, spendCandidates, activeCharacterTurnIns, SPEND_PLAN_CANDIDATES } =
+  await import('./useSpendPlan');
 
 function offerRow(id: number, iskPerLp: number | null, over: Partial<LoyaltyOfferRow> = {}) {
   return {
@@ -67,6 +68,38 @@ describe('spendCandidates', () => {
     ]);
     const picked = spendCandidates(rows, null, instant);
     expect(picked.map((p) => p.candidate.offerId)).toEqual([2, 1]);
+  });
+});
+
+describe('activeCharacterTurnIns', () => {
+  const stack = (item_id: number, type_id: number, quantity: number, location_id: number) => ({
+    item_id,
+    type_id,
+    quantity,
+    location_id,
+    location_type: 'station' as const,
+    location_flag: 'Hangar',
+    is_singleton: false,
+  });
+  const sources = [
+    { characterId: 1, assets: [stack(1, 34, 10, 60003760), stack(2, 34, 5, 60008494)] },
+    { characterId: 2, assets: [stack(3, 34, 100, 60003760)] },
+    { characterId: 1, corporationId: 98000001, assets: [stack(4, 34, 1000, 60003760)] },
+  ];
+
+  it("counts only the active Character's own stock, never an alt's or the corporation's", () => {
+    const { owned, placements } = activeCharacterTurnIns(sources, 1, new Set([34]));
+    expect(owned.get(34)).toBe(15);
+    expect(
+      placements
+        .get(34)
+        ?.map((p) => p.locationId)
+        .sort()
+    ).toEqual([60003760, 60008494]);
+  });
+
+  it('counts nothing with no active Character', () => {
+    expect(activeCharacterTurnIns(sources, null, new Set([34])).owned.size).toBe(0);
   });
 });
 

@@ -23,6 +23,28 @@ export function materialPriceBasisOf(stored: string | undefined): MaterialPriceB
 }
 
 /**
+ * Fee-added buy-order maps, per buy-price map and fee rate. Opportunities
+ * resolve one plan per candidate against the same snapshot, so without this
+ * each candidate copied the whole price map. Keyed weakly on the snapshot's
+ * own map, so a new snapshot drops the old entries with it.
+ */
+const buyOrderPriceCache = new WeakMap<HubPrices, Map<number, HubPrices>>();
+
+function cachedBuyOrderPrices(buyPrices: HubPrices, feePct: number): HubPrices {
+  let byFee = buyOrderPriceCache.get(buyPrices);
+  if (!byFee) {
+    byFee = new Map();
+    buyOrderPriceCache.set(buyPrices, byFee);
+  }
+  let prices = byFee.get(feePct);
+  if (!prices) {
+    prices = buyOrderMaterialPrices(buyPrices, feePct);
+    byFee.set(feePct, prices);
+  }
+  return prices;
+}
+
+/**
  * The prices to buy materials at. Null snapshot yields an empty map, which is
  * the same "nothing is priced yet" every caller already handles.
  * `feePct` is the plan Character's rate for placing an order at the hub
@@ -35,6 +57,6 @@ export function materialPricesFor(
 ): HubPrices {
   if (!snapshot) return {};
   return materialPriceBasisOf(basis) === 'buy'
-    ? buyOrderMaterialPrices(snapshot.hubBuyPrices, feePct)
+    ? cachedBuyOrderPrices(snapshot.hubBuyPrices, feePct)
     : snapshot.hubPrices;
 }

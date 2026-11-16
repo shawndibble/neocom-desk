@@ -451,7 +451,6 @@ function signedPercentOf(ratio: number): string {
 /** Within this fraction of its target a watched price is "close" (amber) until it crosses. */
 export const NEAR_TARGET = 0.05;
 
-/** Green once the target is hit, amber within `NEAR_TARGET` of it, plain beyond. */
 /** The watch target: its direction ("≤") before the figure, the figure an `IskAmount`. */
 function targetCell(direction: string, targetPrice: number): TableCell {
   return {
@@ -461,6 +460,7 @@ function targetCell(direction: string, targetPrice: number): TableCell {
   };
 }
 
+/** Green once the target is hit, amber within `NEAR_TARGET` of it, plain beyond. */
 function gapCell(alert: WatchedPrice, ratio: number): TableCell {
   const text = signedPercentOf(ratio);
   if (alert.crossed) return { text, tone: 'good' };

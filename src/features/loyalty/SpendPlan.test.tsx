@@ -45,6 +45,8 @@ function view(over: Partial<SpendPlanResult>, walletBalance: number | null = 1e9
     rowsById: new Map([[1, hookbill]]),
     walletBalance,
     candidates: 1,
+    ownedPlacements: new Map(),
+    locationNames: new Map(),
   };
 }
 
@@ -69,6 +71,28 @@ describe('SpendLpButton', () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['signedOut', /log in with EVE/i],
+    ['noScope', /loyalty points/i],
+  ] as const)(
+    'names why the LP is unknown when %s, not "isn\u2019t known yet"',
+    async (lpAccess, reason) => {
+      render(
+        <SpendLpButton
+          playerLp={null}
+          lpAccess={lpAccess}
+          rankable
+          loading={false}
+          onClick={vi.fn()}
+        />
+      );
+      const button = screen.getByRole('button', { name: 'Spend my LP' });
+      fireEvent.pointerMove(button);
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(reason);
+      expect(screen.getByRole('tooltip')).not.toHaveTextContent(/isn't known yet/);
+    }
+  );
+
   it('is disabled while no offer in view has a Sell now price', () => {
     const onClick = vi.fn();
     render(<SpendLpButton playerLp={400} rankable={false} loading={false} onClick={onClick} />);
@@ -87,6 +111,34 @@ describe('SpendLpButton', () => {
 });
 
 describe('SpendPlanPanel', () => {
+  it('says where the owned turn-ins it used sit', () => {
+    const owned = view({});
+    const row = owned.result.rows[0]!;
+    row.turnIns = [
+      { typeId: 34, owned: 5, bought: 0 },
+      { typeId: 35, owned: 10, bought: 0 },
+    ];
+    const placement = (locationId: number, quantity: number) => ({
+      characterId: 1,
+      locationId,
+      locationType: 'station' as const,
+      quantity,
+    });
+    renderPlan({
+      ...owned,
+      // Two types: the second type's holding is the row's largest, so it is named first.
+      ownedPlacements: new Map([
+        [34, [placement(60003760, 4), placement(60008494, 1)]],
+        [35, [placement(60008494, 10)]],
+      ]),
+      locationNames: new Map([
+        [60003760, 'Jita IV - Moon 4'],
+        [60008494, 'Amarr VIII'],
+      ]),
+    });
+    expect(screen.getByText('15 owned, in Amarr VIII and 1 more')).toBeInTheDocument();
+  });
+
   it('states LP left, and opens the offer from its row', () => {
     const onSelectOffer = vi.fn();
     renderPlan(view({}), onSelectOffer);

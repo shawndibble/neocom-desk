@@ -266,16 +266,33 @@ export async function settlePendingWork(
   }
 }
 
-/** `settlePendingWork`, reporting a timeout as a warning naming the test. */
+/**
+ * Opt-in: with `VITEST_FAIL_ON_LEFTOVER_WORK=1`, a test whose work outlives it
+ * by `SETTLE_TIMEOUT_MS` fails instead of warning. Off by default, CI included:
+ * switching it on for CI failed existing tests across a shard (e.g.
+ * ForegroundNotificationPoller, BpcSourcingPanel, ActiveJobsPanel), so those
+ * leaks are fixed first, then this becomes the CI default.
+ */
+const FAIL_ON_LEFTOVER_WORK = process.env.VITEST_FAIL_ON_LEFTOVER_WORK === '1';
+
+/**
+ * `settlePendingWork`, reporting a timeout naming the test: a warning, or a
+ * thrown error (failing that test, or the suite at file teardown) when
+ * `FAIL_ON_LEFTOVER_WORK` is on.
+ */
 export async function settleOrWarn(
   testName: string | undefined,
-  scope: SettleScope = 'all'
+  scope: SettleScope = 'all',
+  fail = FAIL_ON_LEFTOVER_WORK
 ): Promise<void> {
   try {
     await settlePendingWork(scope);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    console.warn(`[teardown] ${testName ?? '(file teardown)'}: ${reason}`);
+    const message = `[teardown] ${testName ?? '(file teardown)'}: ${reason}`;
+    if (fail)
+      throw new Error(`${message}. Await or stop the work the test started.`, { cause: error });
+    console.warn(message);
   }
 }
 
