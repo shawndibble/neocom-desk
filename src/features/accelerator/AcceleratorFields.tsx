@@ -142,6 +142,11 @@ export interface AcceleratorFieldsProps {
   hint?: ReactNode;
   /** Controls at the end of the bottom row, beside the entry-mode switch (Clear). */
   actions?: ReactNode;
+  /**
+   * Open with the time's boxes showing, so focus lands in the first: the
+   * Characters table's pencil, whose whole click is asking to edit the time.
+   */
+  editTimeOnOpen?: boolean;
 }
 
 type Editing = 'time' | 'bonus' | null;
@@ -155,6 +160,7 @@ export function AcceleratorFields({
   invalidProps,
   hint,
   actions,
+  editTimeOnOpen = false,
 }: AcceleratorFieldsProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -165,10 +171,10 @@ export function AcceleratorFields({
   const [mode, setMode] = useState<EntryMode>('remaining');
   // Once a time is set the values read as text; the one being edited shows its
   // field(s) while focus stays in them. Unset, the whole thing is a form.
-  const [editing, setEditing] = useState<Editing>(null);
+  const [editing, setEditing] = useState<Editing>(editTimeOnOpen ? 'time' : null);
   // What Escape restores: the value as it was when its field opened.
   const [snapshot, setSnapshot] = useState<{ expiresAt: number | null; bonus: number } | null>(
-    null
+    editTimeOnOpen ? { expiresAt, bonus } : null
   );
   // Focus moves to the field just opened from its text, and back on Enter or Escape.
   const focusAfterCommit = useFocusAfterCommit();

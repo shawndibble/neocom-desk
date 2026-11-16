@@ -19,12 +19,15 @@ interface CharacterAcceleratorEditorProps {
   record: CharacterAcceleratorRecord | undefined;
   /** What the attribute sheet implies, to prefill the bonus. */
   detectedBonus: number | null;
+  /** Open with the time's boxes showing (the Characters table's pencil popover). */
+  editTimeOnOpen?: boolean;
 }
 
 export function CharacterAcceleratorEditor({
   characterId,
   record,
   detectedBonus,
+  editTimeOnOpen,
 }: CharacterAcceleratorEditorProps) {
   const { t } = useTranslation();
   // Only the bonus can be typed before there is an expiry to save it with.
@@ -39,6 +42,7 @@ export function CharacterAcceleratorEditor({
     <AcceleratorFields
       bonus={bonus}
       expiresAt={record?.expiresAt ?? null}
+      editTimeOnOpen={editTimeOnOpen}
       bonusLocked={!record && detectedBonus !== null}
       onBonusChange={(next) => {
         // An emptied box reads as 0: not a bonus anyone means to save.

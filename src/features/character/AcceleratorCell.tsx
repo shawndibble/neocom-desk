@@ -80,6 +80,7 @@ export function AcceleratorCell({
             characterId={characterId}
             record={isAcceleratorLive(record, now) ? record : undefined}
             detectedBonus={detectedBonus}
+            editTimeOnOpen
           />
         </PopoverContent>
       </Popover>
