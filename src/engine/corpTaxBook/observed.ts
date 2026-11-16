@@ -6,6 +6,77 @@
  */
 import type { ObservedMiningEntry, ObservedRow, OreLine } from './types';
 
+type Data = Record<string, unknown>;
+
+/** What tells one recorded corporation from a later one: the day, the read, the refinery. */
+export interface CorpRecord {
+  date: string;
+  /** The ESI read's cache time; absent or unparsable counts as the oldest read. */
+  cachedAt?: string;
+  structureId?: number;
+  recordedCorporationId: number;
+}
+
+const readMs = (cachedAt: string | undefined) => {
+  const ms = cachedAt === undefined ? Number.NaN : Date.parse(cachedAt);
+  return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
+};
+
+/**
+ * Whether `a` records a character's corporation later than `b`: the newer day, then the fresher
+ * ESI read, then the higher refinery id, then the higher corporation id. The last two only
+ * break ties the data cannot order (one read listing both corps), so every reader — the
+ * officer's view, a Miner's page, the server's Close account guard — lands on the same corp
+ * whatever order its rows came in. Decision: docs/context/decisions (latest recorded corp).
+ */
+export function recordedLater(a: CorpRecord, b: CorpRecord): boolean {
+  if (a.date !== b.date) return a.date > b.date;
+  const read = readMs(a.cachedAt) - readMs(b.cachedAt);
+  if (read !== 0 && !Number.isNaN(read)) return read > 0;
+  const structure = (a.structureId ?? 0) - (b.structureId ?? 0);
+  if (structure !== 0) return structure > 0;
+  return a.recordedCorporationId > b.recordedCorporationId;
+}
+
+const num = (v: unknown): number | undefined =>
+  typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+
+/** A stored `observed` doc as an `ObservedRow`, or null when it is not one. */
+export function readObservedRow(d: Data): ObservedRow | null {
+  const structureId = num(d.structureId);
+  const characterId = num(d.characterId);
+  const typeId = num(d.typeId);
+  const quantity = num(d.quantity);
+  const date = str(d.date);
+  if (
+    structureId === undefined ||
+    characterId === undefined ||
+    typeId === undefined ||
+    quantity === undefined ||
+    !date
+  ) {
+    return null;
+  }
+  const solarSystemId = num(d.solarSystemId);
+  const moonId = num(d.moonId);
+  const extractionId = str(d.extractionId);
+  const sourceCorporationId = num(d.sourceCorporationId);
+  return {
+    structureId,
+    characterId,
+    recordedCorporationId: num(d.recordedCorporationId) ?? 0,
+    typeId,
+    date,
+    quantity,
+    cachedAt: str(d.cachedAt) ?? '1970-01-01T00:00:00Z',
+    ...(solarSystemId !== undefined ? { solarSystemId } : {}),
+    ...(moonId !== undefined ? { moonId } : {}),
+    ...(extractionId !== undefined ? { extractionId } : {}),
+    ...(sourceCorporationId !== undefined ? { sourceCorporationId } : {}),
+  };
+}
+
 /** The upsert key: miner + ore + day + structure. */
 export function observedRowKey(row: ObservedRow): string {
   return `${row.characterId}:${row.typeId}:${row.date}:${row.structureId}`;
@@ -85,16 +156,17 @@ export function groupObservedEntries(rows: readonly ObservedRow[]): ObservedMini
       };
       byKey.set(key, group);
     }
-    // A character who changed corp mid-day is judged by the freshest read.
-    if (Date.parse(row.cachedAt) > Date.parse(group.cachedAt)) {
+    // A character who changed corp mid-day is judged by the freshest read (`recordedLater`).
+    if (recordedLater(row, { ...group.entry, cachedAt: group.cachedAt })) {
       group.cachedAt = row.cachedAt;
       group.entry.recordedCorporationId = row.recordedCorporationId;
     }
     group.lines.set(row.typeId, (group.lines.get(row.typeId) ?? 0) + row.quantity);
   }
   return [...byKey.values()]
-    .map(({ entry, lines }) => ({
+    .map(({ entry, lines, cachedAt }) => ({
       ...entry,
+      cachedAt,
       oreLines: [...lines]
         .map(([typeId, quantity]): OreLine => ({ typeId, quantity }))
         .sort((a, b) => a.typeId - b.typeId),

@@ -54,8 +54,8 @@ export interface ResolvedRate {
   effectiveFrom?: string;
 }
 
-/** Most specific first. */
-const SCOPE_ORDER: readonly RateScope[] = [
+/** Most specific first. Every scope a rate can have: `bookDocs.RATE_SCOPES` reads stored rates by it. */
+export const SCOPE_ORDER: readonly RateScope[] = [
   'record',
   'miner',
   'moon',

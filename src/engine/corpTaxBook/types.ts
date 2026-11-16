@@ -59,6 +59,8 @@ export interface ObservedMiningEntry {
   moonId?: number;
   /** The feeder corporation whose refinery recorded the ore; absent means the book's own. */
   sourceCorporationId?: number;
+  /** The freshest ESI read among its rows, the one its `recordedCorporationId` came from. */
+  cachedAt?: string;
   /** Raw ore types, sorted by typeId ascending. */
   oreLines: OreLine[];
 }

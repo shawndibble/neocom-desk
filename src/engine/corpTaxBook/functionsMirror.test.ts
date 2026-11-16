@@ -49,6 +49,7 @@ import { DEFAULT_GRACE_HOURS, dayClosesAt } from './billable';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { DIVISION_NAME_MAX } from './divisionNames';
 import { mergeObservedRows, observedRowKey } from './observed';
+import { latestRecordedCorp } from './bookDocs';
 import { canOverrideRecordRate, isRetroactiveRate } from './rates';
 import {
   DEFAULT_MINIMUM_STATEMENT,
@@ -857,6 +858,35 @@ describe('remaining engine parity (#4515, #4520, #4621)', () => {
   it('isBeforeBook agrees', () => {
     for (const at of ['2026-09-30T23:59:59Z', '2026-10-01T00:00:00Z', '2026-10-02']) {
       expect(mirror.isBeforeBook(at, '2026-10-01')).toBe(isBeforeBook(at, '2026-10-01'));
+    }
+  });
+});
+
+describe('latest recorded corp mirror', () => {
+  const row = (over: Partial<Parameters<typeof latestRecordedCorp>[0][number]> = {}) => ({
+    characterId: 9,
+    date: '2026-10-17',
+    recordedCorporationId: 98000001,
+    structureId: 1020,
+    cachedAt: '2026-10-17T10:00:00Z',
+    ...over,
+  });
+  it.each([
+    ['newest day', [row({ date: '2026-10-16', recordedCorporationId: 2 }), row()]],
+    [
+      'mid-day corp change, fresher read',
+      [
+        row({ structureId: 2000 }),
+        row({ recordedCorporationId: 2, cachedAt: '2026-10-17T15:00:00Z' }),
+      ],
+    ],
+    ['one read, two refineries', [row({ structureId: 2000 }), row({ recordedCorporationId: 2 })]],
+    ['one read, one refinery', [row({ recordedCorporationId: 2 }), row()]],
+    ['a row with no read time', [row({ cachedAt: undefined, recordedCorporationId: 2 }), row()]],
+    ['several characters', [row(), row({ characterId: 10, recordedCorporationId: 2 })]],
+  ])('%s', (_, rows) => {
+    for (const order of [rows, [...rows].reverse()]) {
+      expect(mirror.latestRecordedCorp(order)).toEqual(latestRecordedCorp(order));
     }
   });
 });

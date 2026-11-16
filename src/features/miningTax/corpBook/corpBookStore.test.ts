@@ -9,7 +9,6 @@ import {
   readDismissal,
   readMemberDeclaration,
   readMiner,
-  readObservedRow,
   readPayment,
   readStatement,
 } from './corpBookStore';
@@ -63,16 +62,6 @@ describe('readBookSettings', () => {
     expect(readBookSettings(1, book)).not.toHaveProperty('donationsCheckedAt');
   });
 
-  it("reads the book's Overdue days, 14 when unset (#6204)", () => {
-    expect(readBookSettings(1, { ...book, overdueDays: 21 })?.overdueDays).toBe(21);
-    expect(readBookSettings(1, book)?.overdueDays).toBe(14);
-  });
-
-  it('keeps a per-feeder rate', () => {
-    const feeder = { scope: 'feeder', feederId: 7, pct: 6, effectiveFrom: '2026-10-01' };
-    expect(readBookSettings(1, { ...book, rates: [feeder] })?.rates).toEqual([feeder]);
-  });
-
   it('is null for a missing or switched-off book (D24: then nothing changes)', () => {
     expect(readBookSettings(1, undefined)).toBeNull();
     expect(readBookSettings(1, { ...book, active: false })).toBeNull();
@@ -87,9 +76,10 @@ describe('readBookSettings', () => {
     expect(readBookSettings(1, book, 0)).not.toBeNull();
   });
 
-  it('defaults to the book defaults when a field is absent', () => {
+  it('takes the defaults the shared parser fills in', () => {
     expect(readBookSettings(1, { active: true, startDate: '2026-10-01' })).toMatchObject({
       graceHours: 0.5,
+      overdueDays: 14,
       hubId: 'jita',
       oreForm: 'compressed',
       divisions: [1],
@@ -124,23 +114,6 @@ describe('readPayment', () => {
 });
 
 describe('the other readers', () => {
-  it('reads an observed row with the system and moon an officer client sent', () => {
-    expect(
-      readObservedRow({
-        structureId: 1,
-        characterId: 2,
-        recordedCorporationId: 3,
-        typeId: 4,
-        quantity: 5,
-        date: '2026-10-17',
-        cachedAt: '2026-10-18T00:00:00Z',
-        solarSystemId: 30003838,
-        moonId: 40000001,
-      })
-    ).toMatchObject({ solarSystemId: 30003838, moonId: 40000001 });
-    expect(readObservedRow({ structureId: 1 })).toBeNull();
-  });
-
   it('reads a dismissal with its reason and reversal', () => {
     expect(
       readDismissal('d1', {

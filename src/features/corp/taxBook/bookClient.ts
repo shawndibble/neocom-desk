@@ -9,8 +9,8 @@
  * a change.
  */
 import type { CallableAction } from '../../../../functions/src/callableManifest';
-import { DEFAULT_GRACE_HOURS } from '@/engine/corpTaxBook/billable';
-import { readDivisionNames, type DivisionNames } from '@/engine/corpTaxBook/divisionNames';
+import { parseBookSettings, type BookSettings } from '@/engine/corpTaxBook/bookDocs';
+import type { DivisionNames } from '@/engine/corpTaxBook/divisionNames';
 import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
 import {
   collection,
@@ -29,8 +29,7 @@ import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
-import type { TaxRate } from '@/engine/corpTaxBook/rates';
-import type { Adjustment, Statement, StatementCadence } from '@/engine/corpTaxBook/statements';
+import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
 import type {
   JournalDonation,
   LastSync,
@@ -316,14 +315,9 @@ export async function readBookSummary(
 }
 
 function summaryFrom(d: Record<string, unknown>): BookSummary {
-  return {
-    active: d.active === true,
-    startDate: String(d.startDate ?? ''),
-    divisions: Array.isArray(d.divisions) ? (d.divisions as number[]) : [1],
-    divisionNames: readDivisionNames(d.divisionNames),
-    lastSync: (d.lastSync as LastSync | null | undefined) ?? null,
-    structureExpiryHours: (d.structureExpiryHours as Record<string, number> | undefined) ?? {},
-  };
+  const { active, startDate, divisions, divisionNames, lastSync, structureExpiryHours } =
+    parseBookSettings(d);
+  return { active, startDate, divisions, divisionNames, lastSync, structureExpiryHours };
 }
 
 /** Characters an officer unlinked: automatic grouping leaves them alone (D26). Officer-only. */
@@ -372,23 +366,7 @@ export async function readBookState(
 // --- The whole book, for /corp/moons (issue #4063) --------------------------
 
 /** Every setting the Settings dialog edits, as the book document stores it. */
-export interface BookSettings extends BookSummary {
-  hubId: string;
-  oreForm: 'compressed' | 'raw';
-  graceHours: number;
-  minimumStatement: number;
-  overdueDays: number;
-  cadence: StatementCadence;
-  chunkM3PerHour: number | null;
-  rates: TaxRate[];
-  /** Above this a dismissal needs a Director (D6); null when there is no limit. */
-  dismissApprovalAboveIsk: number | null;
-  ownerCharacterId: number | null;
-  /** Who turned the book on; the owner changes when the CEO reclaims it. */
-  createdBy: number | null;
-  /** Epoch ms: until then members' own Mining Tax pages ignore the book (setup window). */
-  membersSeeFrom?: number;
-}
+export type { BookSettings };
 
 /** The book's settings document, or null when the corporation has none. */
 export async function readBookSettings(
@@ -400,31 +378,8 @@ export async function readBookSettings(
   return snap.exists() ? settingsFrom(snap.data()) : null;
 }
 
-/** The settings document as `BookSettings`, every default filled in. */
-export function settingsFrom(d: Record<string, unknown>): BookSettings {
-  const num = (v: unknown, fallback: number) => (typeof v === 'number' ? v : fallback);
-  return {
-    active: d.active === true,
-    startDate: String(d.startDate ?? ''),
-    divisions: Array.isArray(d.divisions) ? (d.divisions as number[]) : [1],
-    divisionNames: readDivisionNames(d.divisionNames),
-    lastSync: (d.lastSync as LastSync | null | undefined) ?? null,
-    structureExpiryHours: (d.structureExpiryHours as Record<string, number> | undefined) ?? {},
-    hubId: typeof d.hubId === 'string' ? d.hubId : 'jita',
-    oreForm: d.oreForm === 'raw' ? 'raw' : 'compressed',
-    graceHours: num(d.graceHours, DEFAULT_GRACE_HOURS),
-    minimumStatement: num(d.minimumStatement, 5_000_000),
-    overdueDays: num(d.overdueDays, 14),
-    cadence: (d.cadence as StatementCadence | undefined) ?? { kind: 'monthly' },
-    chunkM3PerHour: typeof d.chunkM3PerHour === 'number' ? d.chunkM3PerHour : null,
-    rates: Array.isArray(d.rates) ? (d.rates as TaxRate[]) : [],
-    dismissApprovalAboveIsk:
-      typeof d.dismissApprovalAboveIsk === 'number' ? d.dismissApprovalAboveIsk : null,
-    ownerCharacterId: typeof d.ownerCharacterId === 'number' ? d.ownerCharacterId : null,
-    createdBy: typeof d.createdBy === 'number' ? d.createdBy : null,
-    ...(typeof d.membersSeeFrom === 'number' ? { membersSeeFrom: d.membersSeeFrom } : {}),
-  };
-}
+/** The settings document as `BookSettings`, validated, every default filled in. */
+export const settingsFrom = (d: Record<string, unknown>): BookSettings => parseBookSettings(d);
 
 /** A guest's answer to a hand-made grouping (D26b), for the officers to see after the fact. */
 export interface GroupingAnswer {
