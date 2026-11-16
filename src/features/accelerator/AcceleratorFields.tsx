@@ -19,10 +19,10 @@
  * Once a time is set, the time and the bonus read as text (`EditableValue`)
  * until clicked: one click on the time opens all three boxes. A field closes
  * when focus leaves it; Enter closes it too, Escape restores the value it
- * opened with, and both hand focus back to the text.
+ * opened with, and both hand focus back to the text. Not `useInPlaceEdit`: that
+ * drafts one string and commits on close, while these fields save as typed.
  */
 import {
-  useEffect,
   useId,
   useRef,
   useState,
@@ -34,6 +34,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, EditableValue, TextInput } from '@/components/ui';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { inputValueToInstant, instantToInputValue } from '@/lib/zonedInput';
 import {
   MAX_BOOSTER_BONUS,
@@ -169,20 +170,19 @@ export function AcceleratorFields({
   const [snapshot, setSnapshot] = useState<{ expiresAt: number | null; bonus: number } | null>(
     null
   );
-  // Focus the field just opened from its text, and hand focus back on Enter or Escape.
-  const focusField = useRef(false);
-  const [returnFocus, setReturnFocus] = useState<Exclude<Editing, null>>();
-  const firstFieldRef = useRef<HTMLInputElement | null>(null);
+  // Focus moves to the field just opened from its text, and back on Enter or Escape.
+  const focusAfterCommit = useFocusAfterCommit();
+  const timeFieldRef = useRef<HTMLInputElement | null>(null);
+  const bonusFieldRef = useRef<HTMLInputElement | null>(null);
+  const timeTextRef = useRef<HTMLButtonElement | null>(null);
+  const bonusTextRef = useRef<HTMLButtonElement | null>(null);
   const expiresIn = useDurationFields(expiresAt, onExpiresChange);
   const endsAt = useEndTimeField(expiresAt, timeZone, onExpiresChange);
   const endedId = useId();
   const isSet = expiresAt !== null;
-
-  useEffect(() => {
-    if (!focusField.current) return;
-    focusField.current = false;
-    firstFieldRef.current?.focus();
-  });
+  // Entered from unset, the whole thing stays a form until focus leaves it, so
+  // the first digit saving an expiry doesn't turn the rest into text mid-entry.
+  const [formOpen, setFormOpen] = useState(false);
 
   const startEditing = (which: Exclude<Editing, null>): void => {
     if (editing !== which) setSnapshot({ expiresAt, bonus });
@@ -190,9 +190,10 @@ export function AcceleratorFields({
   };
   const open = (which: Exclude<Editing, null>, seed?: string): void => {
     startEditing(which);
-    focusField.current = true;
+    focusAfterCommit(which === 'time' ? timeFieldRef : bonusFieldRef);
     if (seed === undefined) return;
     if (which === 'bonus') onBonusChange(clampBoosterBonus(Number(seed)));
+    // A digit typed on the time left starts the days; an end time has no single box to seed.
     else if (mode === 'remaining') expiresIn.onChange('days', seed);
   };
   const close = (): void => {
@@ -200,28 +201,28 @@ export function AcceleratorFields({
     setSnapshot(null);
   };
   const onFieldKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
+    // Unset, the fields are a plain form: nothing to close or restore.
+    if (!isSet || formOpen || editing === null) return;
     if (event.key !== 'Enter' && event.key !== 'Escape') return;
     event.preventDefault();
     if (event.key === 'Escape' && snapshot !== null) {
       if (editing === 'bonus') onBonusChange(snapshot.bonus);
       else if (snapshot.expiresAt !== expiresAt) onExpiresChange(snapshot.expiresAt);
     }
-    if (isSet && editing !== null) setReturnFocus(editing);
+    // An ended end time keeps its field open, so focus stays where it is.
+    const stays = editing === 'time' && mode === 'expires' && endsAt.ended;
+    if (!stays) focusAfterCommit(editing === 'time' ? timeTextRef : bonusTextRef);
     close();
   };
   const closeOnLeave = (event: FocusEvent<HTMLElement>): void => {
     if (event.currentTarget.contains(event.relatedTarget)) return;
     close();
   };
-  const restFocus = (which: Exclude<Editing, null>) => ({
-    focusOnMount: returnFocus === which,
-    onFocused: () => setReturnFocus(undefined),
-  });
-
   // A typed end time that has already passed stays on screen with its warning.
-  const showTimeFields = !isSet || editing === 'time' || (mode === 'expires' && endsAt.ended);
-  const showBonusField = !isSet || editing === 'bonus';
-  const restText = (() => {
+  const showTimeFields =
+    !isSet || formOpen || editing === 'time' || (mode === 'expires' && endsAt.ended);
+  const showBonusField = !isSet || formOpen || editing === 'bonus';
+  const timeText = (() => {
     if (!isSet) return '';
     if (mode === 'expires') return formatTimestamp(new Date(expiresAt), timeZone);
     // eslint-disable-next-line react-hooks/purity -- display-only: the time left reads the clock
@@ -239,9 +240,9 @@ export function AcceleratorFields({
         <EditableValue
           label={mode === 'remaining' ? t('accelerator.editTimeLeft') : t('accelerator.editEndsAt')}
           onEdit={(seed) => open('time', seed)}
-          {...restFocus('time')}
+          ref={timeTextRef}
         >
-          {restText}
+          {timeText}
         </EditableValue>
       </div>
     );
@@ -263,7 +264,7 @@ export function AcceleratorFields({
             {DURATION_UNITS.map((unit, index) => (
               <label key={unit} className="flex items-center gap-1 text-text-dim">
                 <TextInput
-                  ref={index === 0 ? firstFieldRef : undefined}
+                  ref={index === 0 ? timeFieldRef : undefined}
                   size="md"
                   type="text"
                   inputMode="numeric"
@@ -287,7 +288,7 @@ export function AcceleratorFields({
         <label className="flex items-center justify-between gap-2" htmlFor={modeId}>
           {t('accelerator.expiresAt')}
           <TextInput
-            ref={firstFieldRef}
+            ref={timeFieldRef}
             id={modeId}
             size="md"
             type="datetime-local"
@@ -321,28 +322,27 @@ export function AcceleratorFields({
     );
   }
 
+  // A detected bonus is shown once by the caller, as a fact: no row here.
   let bonusRow: ReactNode = null;
-  if (bonusLocked) {
-    // The caller shows a detected bonus once, as a fact.
-  } else if (!showBonusField) {
+  if (!bonusLocked && !showBonusField) {
     bonusRow = (
       <div className="flex items-center justify-between gap-2">
         {t('plans.boosterBonus')}
         <EditableValue
           label={t('accelerator.editBonus')}
           onEdit={(seed) => open('bonus', seed)}
-          {...restFocus('bonus')}
+          ref={bonusTextRef}
         >
           {bonus}
         </EditableValue>
       </div>
     );
-  } else {
+  } else if (!bonusLocked) {
     bonusRow = (
       <label className="flex items-center justify-between gap-2">
         {t('plans.boosterBonus')}
         <TextInput
-          ref={isSet ? firstFieldRef : undefined}
+          ref={bonusFieldRef}
           size="md"
           type="number"
           min={1}
@@ -360,7 +360,15 @@ export function AcceleratorFields({
   }
 
   return (
-    <div className="space-y-2">
+    <div
+      className="space-y-2"
+      onFocus={() => {
+        if (!isSet) setFormOpen(true);
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFormOpen(false);
+      }}
+    >
       {time}
       {hint && <div id={hintId}>{hint}</div>}
       {bonusRow}

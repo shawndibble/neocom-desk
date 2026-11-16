@@ -59,6 +59,11 @@ describe('AcceleratorFields once a time is set', () => {
 
     await user.type(screen.getByLabelText('Days'), '1');
     expect(screen.getByLabelText('Days')).toHaveFocus();
+    // The rest of the form stays open while the first entry is still being made.
+    await user.tab();
+    await user.tab();
+    await user.tab();
+    expect(screen.getByRole('spinbutton')).toHaveFocus();
     await user.click(screen.getByRole('button', { name: 'Elsewhere' }));
     expect(timeText()).toHaveTextContent('1d 0h 0m');
   });
