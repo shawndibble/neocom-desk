@@ -85,6 +85,7 @@ import {
   donationsReadAtPatch,
 } from './corpTaxBook.js';
 import {
+  BOOK_DEFAULTS,
   extractionIdOf,
   allocatePayments,
   dismissalCredits,
@@ -1177,11 +1178,22 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         });
       }
       const update: Data = { ...rest };
-      const storedDivisions = (c.book.divisions as number[] | undefined) ?? [];
+      // A book stored without divisions reads division 1, as the client and the sync read it.
+      const storedDivisions = Array.isArray(c.book.divisions)
+        ? (c.book.divisions as number[])
+        : [...BOOK_DEFAULTS.divisions];
       if (addDivision !== undefined) {
         // Added to what is stored now, so a concurrent addition by another officer is kept.
         if (!storedDivisions.includes(addDivision)) {
           update.divisions = [...storedDivisions, addDivision].sort((a, b) => a - b);
+        }
+        // Its names were read for the client's own (maybe stale) list: merged, they never drop
+        // the name of a division another officer counted meanwhile.
+        if (rest.divisionNames) {
+          update.divisionNames = {
+            ...(c.book.divisionNames as Data | undefined),
+            ...rest.divisionNames,
+          };
         }
       } else if (divisions) {
         if (divisionsBase && !sameDivisions(divisionsBase, storedDivisions)) {
@@ -1230,7 +1242,12 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       }
       // Counting a division the book already reads changes nothing.
       if (Object.keys(update).length > 0) tx.update(bookDoc, update);
-      return { detail: { patch: action.patch as Data } };
+      // A counted division audits the list stored, never the fallback list sent for an older server.
+      const audited =
+        addDivision === undefined
+          ? action.patch
+          : { ...action.patch, divisions: update.divisions ?? storedDivisions };
+      return { detail: { patch: audited as Data } };
     }
     case 'recordPayment': {
       const ref = col(c, PAYMENTS).doc(action.paymentId);

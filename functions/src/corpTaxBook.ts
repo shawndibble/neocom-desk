@@ -334,6 +334,7 @@ export interface SettingsPatch {
    * One division to add to the stored list inside the edit's transaction ("Count division"), so
    * two officers counting different divisions at once both land. When set, `divisions` in the
    * same patch is ignored: a client sends it only for a server that predates `addDivision`.
+   * Its `divisionNames` merge into the stored names rather than replace them, for the same reason.
    */
   addDivision?: number;
   /**
@@ -400,7 +401,11 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
       throw new HttpsError('invalid-argument', 'divisionsBase needs divisions');
     patch.divisionsBase = parseDivisions(d.divisionsBase, 'divisionsBase');
   }
-  if (d.addDivision !== undefined) patch.addDivision = int(d.addDivision, 'addDivision', 1, 7);
+  if (d.addDivision !== undefined) {
+    if (patch.divisionsBase !== undefined)
+      throw new HttpsError('invalid-argument', 'addDivision takes no divisionsBase');
+    patch.addDivision = int(d.addDivision, 'addDivision', 1, 7);
+  }
   if (d.divisionNames !== undefined) patch.divisionNames = parseDivisionNames(d.divisionNames);
   if (d.cadence !== undefined) {
     const c = record(d.cadence);

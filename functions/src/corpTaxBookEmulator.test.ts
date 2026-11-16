@@ -4,6 +4,7 @@
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
+import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
   parseBookCall,
@@ -430,6 +431,43 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect((await book().get()).get('divisions')).toEqual([1, 3, 5]);
       await edit(ACCOUNTANT, { action: 'updateSettings', patch: { addDivision: 3 } });
       expect((await book().get()).get('divisions')).toEqual([1, 3, 5]);
+    });
+
+    it("merges a counted division's name into the stored names, and audits the stored list", async () => {
+      await turnOn();
+      await edit(DIRECTOR, {
+        action: 'updateSettings',
+        patch: { addDivision: 3, divisions: [1, 3], divisionNames: { '1': 'Main', '3': 'Tax' } },
+      });
+      await edit(ACCOUNTANT, {
+        action: 'updateSettings',
+        patch: { addDivision: 5, divisions: [1, 5], divisionNames: { '1': 'Main', '5': 'Ore' } },
+      });
+      expect((await book().get()).get('divisionNames')).toEqual({
+        '1': 'Main',
+        '3': 'Tax',
+        '5': 'Ore',
+      });
+      const audit = await book().collection('audit').get();
+      const details = audit.docs.map(
+        (d) => d.get('detail') as { patch?: { divisions?: number[] } }
+      );
+      expect(details.some((d) => d.patch?.divisions?.join() === '1,3,5')).toBe(true);
+      // The stale list the client sent for an older server was never stored, so never audited.
+      expect(details.some((d) => d.patch?.divisions?.join() === '1,5')).toBe(false);
+    });
+
+    it('reads a book with no stored divisions as division 1, as the sync does', async () => {
+      await turnOn();
+      await book().update({ divisions: FieldValue.delete() });
+      await edit(ACCOUNTANT, {
+        action: 'updateSettings',
+        patch: { divisions: [1, 2], divisionsBase: [1] },
+      });
+      expect((await book().get()).get('divisions')).toEqual([1, 2]);
+      await book().update({ divisions: FieldValue.delete() });
+      await edit(ACCOUNTANT, { action: 'updateSettings', patch: { addDivision: 3 } });
+      expect((await book().get()).get('divisions')).toEqual([1, 3]);
     });
 
     it('refuses a divisions list whose base no longer matches the stored one', async () => {

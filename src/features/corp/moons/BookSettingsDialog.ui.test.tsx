@@ -171,7 +171,11 @@ describe('BookSettingsDialog tabs', () => {
     );
   });
 
-  it('leaves unchanged divisions out of a save, so it never overwrites them', async () => {
+  it('leaves unchanged divisions and their names out of a save, so it never overwrites them', async () => {
+    loadDivisions.mockResolvedValue({
+      cached: { data: { wallet: [{ division: 1, name: 'Renamed' }] } },
+      needsReauth: false,
+    });
     const user = userEvent.setup();
     renderDialog();
     await user.click(screen.getByRole('button', { name: 'Save' }));
@@ -181,6 +185,7 @@ describe('BookSettingsDialog tabs', () => {
     const patch = (call?.[2] as { patch: Record<string, unknown> }).patch;
     expect(patch).not.toHaveProperty('divisions');
     expect(patch).not.toHaveProperty('divisionsBase');
+    expect(patch).not.toHaveProperty('divisionNames');
   });
 
   it('says another officer changed the divisions when the server refuses the save', async () => {

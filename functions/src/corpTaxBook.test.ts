@@ -141,6 +141,14 @@ describe('parsers', () => {
     // A base only says what a new `divisions` list started from.
     expect(() => parseSettingsPatch({ divisionsBase: [1] })).toThrow();
     expect(() => parseSettingsPatch({ divisions: [1], divisionsBase: [9] })).toThrow();
+    // `addDivision` adds to the stored list; a base check alongside it would never run.
+    expect(() =>
+      parseSettingsPatch({ addDivision: 2, divisions: [1, 2], divisionsBase: [1] })
+    ).toThrow();
+    expect(parseSettingsPatch({ addDivision: 2, divisions: [1, 2] })).toEqual({
+      addDivision: 2,
+      divisions: [1, 2],
+    });
   });
 
   it('compares divisions lists by the divisions they name', () => {
