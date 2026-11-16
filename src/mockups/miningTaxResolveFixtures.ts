@@ -84,3 +84,33 @@ export const CONFLICTS_OPEN = conflicts(0);
 export const CONFLICTS_WAITING = conflicts(1);
 
 export const isk = (n: number) => `${n.toLocaleString('en-US')} ISK`;
+
+/** When the book last read the corporation's wallet, and how far back its wallet history goes. */
+export const LAST_SYNC = '2026-11-16 14:00';
+export const WALLET_FROM = '2026-10-01';
+
+/** Tax the pilot paid straight to the CEO, not into the corporation's wallet. */
+export const TO_CEO = {
+  day: '2026-11-05',
+  amount: 8_000_000,
+  at: '2026-11-05 20:12',
+  ref: 7_789_410,
+  /** The same transfer in the CEO's own journal, under his own id. */
+  theirRef: 4_410_023,
+} as const;
+
+/** A payment that went to another corporation altogether. */
+export const TO_OTHER_CORP = { amount: 6_000_000, at: '2026-11-01 11:30', ref: 7_787_002 } as const;
+
+/** Other members' claims, one per thing the wallet check can find. */
+export const CLAIMS = {
+  division: {
+    who: 'Orsa Tellemar',
+    amount: 12_000_000,
+    at: '2026-11-12 08:05',
+    division: 'Reserves (Division 3)',
+    ref: 9_120_334,
+  },
+  old: { who: 'Brin Kael', amount: 9_000_000, at: '2026-09-03 16:20', ref: 6_002_187 },
+  notInYours: { who: 'Orsa Tellemar', amount: 4_500_000, at: '2026-11-07 19:44', ref: 9_120_110 },
+} as const;

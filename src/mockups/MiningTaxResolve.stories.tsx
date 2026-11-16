@@ -3,6 +3,12 @@ import { Button } from '@/components/ui';
 import { CONFLICTS_OPEN, CONFLICTS_WAITING } from './miningTaxResolveFixtures';
 import { AFTER_ITEMS, TODAY_ITEMS, proposedItems } from './miningTaxResolveItems';
 import {
+  OfficerPaidToYou,
+  OfficerVerified,
+  ResolvePaidChecked,
+  ResolvePaidPerson,
+} from './miningTaxResolveVerify';
+import {
   AfterLedger,
   Balances,
   InlineChoices,
@@ -34,7 +40,8 @@ import {
  * New components in this mockup: `ResolveOptions` (A's button and menu), `ResolveDialog` (B),
  * `QuietStatusLine`, `LeftCorpNotice`, `QueueCard: won't pay` (a new kind on the officer's
  * existing card), `RequiredNextStep` (in the officer's keep-the-bill dialog) and
- * `TaxContactSetting`. `AttentionStrip`, `OwedBalances`, `DataTable`, `Modal`, `Pill`, `Radio`
+ * `TaxContactSetting`; and for the wallet check, `WalletCheck` (in the pilot's dialog and on
+ * every officer card) and `AutoCreditedLine`. `AttentionStrip`, `OwedBalances`, `DataTable`, `Modal`, `Pill`, `Radio`
  * and the rest are the real components.
  */
 const meta = {
@@ -184,6 +191,52 @@ export const OfficerContact: Story = {
     <div className="mx-auto max-w-page space-y-4 px-4 py-4">
       <TaxContactSetting />
       <Button variant="primary">Save</Button>
+    </div>
+  ),
+};
+
+/** @summary I paid · checked: one donation was in the corp wallet and is credited on the spot; only the other goes to an officer, with the search attached. New component: WalletCheck. */
+export const PaidChecked: Story = {
+  render: () => (
+    <>
+      <ProposedTab />
+      <ResolvePaidChecked />
+    </>
+  ),
+};
+
+/** @summary I paid · checked, phone. */
+export const PaidCheckedPhone: Story = { ...PaidChecked, ...phone };
+
+/** @summary I paid · to a person: the pilot picks the payment; it went to the CEO, who is asked to confirm from his own wallet. Another corporation is flagged too. New component: WalletCheck: which payment. */
+export const PaidToPerson: Story = {
+  render: () => (
+    <>
+      <ProposedTab />
+      <ResolvePaidPerson />
+    </>
+  ),
+};
+
+/** @summary Officer · every "says they paid" arrives checked: credited automatically, found in an uncounted division, not in the corp wallet, or too old to check. New components: AutoCreditedLine, WalletCheck. */
+export const OfficerChecked: Story = {
+  ...officer,
+  render: () => (
+    <div className="mx-auto max-w-page px-4 py-4">
+      <OfficerVerified />
+    </div>
+  ),
+};
+
+/** @summary Officer · checked, phone. */
+export const OfficerCheckedPhone: Story = { ...OfficerChecked, ...phone };
+
+/** @summary The CEO · tax paid to him personally, checked in his own wallet: record it as tax in one click. New component: WalletCheck: paid to you. */
+export const CeoPaidToYou: Story = {
+  ...officer,
+  render: () => (
+    <div className="mx-auto max-w-page px-4 py-4">
+      <OfficerPaidToYou />
     </div>
   ),
 };

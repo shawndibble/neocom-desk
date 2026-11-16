@@ -194,7 +194,7 @@ export function InlineChoices() {
 // --- Proposed: the Resolve dialog -----------------------------------------------
 
 /** One outcome: a radio card that opens its own inputs when chosen. */
-function Choice({
+export function Choice({
   checked,
   title,
   hint,
@@ -224,7 +224,7 @@ function Choice({
   );
 }
 
-function Group({ label, children }: { label: string; children: ReactNode }) {
+export function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
     <section className="space-y-1.5">
       <p className={eyebrowClassName}>{label}</p>
@@ -238,7 +238,7 @@ function Facts({ children }: { children: ReactNode }) {
 }
 
 /** Who an "ask the corp" outcome reaches: the book's queue always, plus the contact setting's mail. */
-function SendsTo() {
+export function SendsTo() {
   return (
     <p className="text-xs text-text-dim">
       Goes to {BUH.name}&apos;s Needs you queue, and as an EVE mail to {BUH.ceo} (CEO). Until they
@@ -247,7 +247,7 @@ function SendsTo() {
   );
 }
 
-function ResolveDialog({
+export function ResolveDialog({
   title,
   facts,
   footer,
@@ -575,20 +575,24 @@ export function LeftCorpNotice() {
 // --- Proposed: the officer's side ----------------------------------------------
 
 /** The look of `NeedsYouQueue`'s `QueueCard` (feature-private, so mirrored here). */
-function QueueCard({
+export function QueueCard({
   tone,
   title,
+  status,
   body,
   primary,
   secondary,
-  isNew,
+  newName,
 }: {
   tone: 'danger' | 'warning' | 'neutral';
   title: string;
+  /** What the wallet check found, beside the title. */
+  status?: ReactNode;
   body: ReactNode;
   primary: string;
   secondary: string;
-  isNew?: boolean;
+  /** Marks the card as a new component, under this name. */
+  newName?: string;
 }) {
   const card = (
     <li className="flex flex-wrap items-start gap-x-3 gap-y-2 px-3 py-2.5">
@@ -600,7 +604,10 @@ function QueueCard({
         )}
       />
       <span className="min-w-0 flex-1 basis-60">
-        <span className="block text-sm font-semibold">{title}</span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="text-sm font-semibold">{title}</span>
+          {status}
+        </span>
         <span className="block text-xs text-text-dim">{body}</span>
       </span>
       <span className="flex shrink-0 flex-wrap items-center gap-2 max-sm:pl-3">
@@ -611,7 +618,7 @@ function QueueCard({
       </span>
     </li>
   );
-  return isNew ? <NewComponent name="QueueCard: won't pay">{card}</NewComponent> : card;
+  return newName ? <NewComponent name={newName}>{card}</NewComponent> : card;
 }
 
 export function OfficerNeedsYou() {
@@ -650,7 +657,7 @@ export function OfficerNeedsYou() {
           secondary="Keep the bill"
         />
         <QueueCard
-          isNew
+          newName="QueueCard: won't pay"
           tone="neutral"
           title={`${PILOT} isn't paying ${RATE_DAY.date} · ${isk(RATE_DAY.bookTax)}`}
           body="“The fleet boss said this op was untaxed.” Same two answers as a member who left."

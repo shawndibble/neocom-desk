@@ -14,7 +14,7 @@ Every problem the Tax tab reports has the same five possible outcomes, split by 
 
 Today the tab leads every warning with "ask an officer" — the slowest, least certain outcome — and offers no control for it. After an answer, the problem leaves the attention strip for one quiet line and comes back only when an officer hands it back, with what to do next. Hiding is never "resolved": the row reads "Not paying — {corp} still bills this".
 
-New components: `ResolveOptions` (A), `ResolveDialog` (B), `QuietStatusLine`, `LeftCorpNotice`, `QueueCard: won't pay`, `RequiredNextStep`, `TaxContactSetting`. Everything else is the real `AttentionStrip`, `OwedBalances`, `DataTable`, `Modal` and `src/components/ui` primitives.
+New components: `ResolveOptions` (A), `ResolveDialog` (B), `QuietStatusLine`, `LeftCorpNotice`, `QueueCard: won't pay`, `RequiredNextStep`, `TaxContactSetting`, `WalletCheck`, `AutoCreditedLine`. Everything else is the real `AttentionStrip`, `OwedBalances`, `DataTable`, `Modal` and `src/components/ui` primitives.
 
 ## Today
 
@@ -38,6 +38,17 @@ New components: `ResolveOptions` (A), `ResolveDialog` (B), `QuietStatusLine`, `L
 | A Conflict: Fix my records, with what it moves | ![](b-conflict-1440.png) | |
 | A day billed at a higher rate: Not paying, reason ticked | ![](b-not-paying-1440.png) | |
 
+## "I already paid", checked before anyone is asked
+
+The pilot's own journal entry already gives the amount, EVE time, journal ref and who received it. The app checks first — the corporation's wallet as the book last synced it (all 7 divisions), or, for ISK paid to a person, that person's own wallet on their own device — so an officer only ever sees a claim with the search done.
+
+| | 1440 | 390 |
+|---|---|---|
+| Two donations checked: one was in the corp wallet and is credited on the spot; only the other goes to an officer | ![](paid-checked-1440.png) | ![](paid-checked-phone-390.png) |
+| Paid to a person: the pilot picks the payment; it went to the CEO, who confirms from his own wallet. Another corporation is flagged too | ![](paid-to-person-1440.png) | |
+| Officer: every claim arrives checked — credited automatically (one quiet line, Undo), found in an uncounted division, not in the corp wallet, or too old to check | ![](officer-checked-1440.png) | ![](officer-checked-phone-390.png) |
+| The CEO: tax paid to him personally, found in his own wallet — record it as tax in one click | ![](ceo-paid-to-you-1440.png) | |
+
 ## After the pilot answers
 
 | | 1440 | 390 |
@@ -58,4 +69,7 @@ New components: `ResolveOptions` (A), `ResolveDialog` (B), `QuietStatusLine`, `L
 - The Payee card's "ask the corp to sync its book before paying again" is today's copy and still a dead end; it changes with the rest.
 - "Ask the corporation" always lands in Needs you; the EVE mail is for officers not in Neocom Desk at the time, and needs the member's mail permission. Without it, Needs you alone.
 - EVE delivers to a mailing list only from its members, so a member not on the corp's list falls back to the CEO.
+- Auto-credit only on exactly one match (sender, exact amount, not already credited); two candidates go to an officer side by side.
+- "Too old to check" is never "not found". The sync keeps only donations it credits or flags, so wallet history before the book started (or past ESI's window) can't be searched; keeping every donation the sync sees would shrink that gap.
+- A person's own wallet is checked on their own device: personal wallet tokens never leave it (CLAUDE.md).
 - Open question: an open dispute does not pause the 14-day Conflict clock today. The Overdue flow's pause budget (14 days per Statement) is the precedent to weigh.
