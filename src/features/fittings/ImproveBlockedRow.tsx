@@ -40,7 +40,7 @@ export function ImproveBlockedRow({ option, own, fitTotal, searched, swapLabel, 
           <span className="text-warning block text-xs">
             {option.guardrail === 'budget' && searched
               ? t('fittings.improve.flyableNoCover', { short: short.join(', ') })
-              : brokeText(t, option, settings, fitTotal)}
+              : brokeText(t, option, settings.value, fitTotal)}
           </span>
           <span className="block text-xs">{changeLine(t, option, own)}</span>
         </span>

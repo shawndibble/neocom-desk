@@ -1,44 +1,28 @@
-import type { DefenseChoice, ImproveHold, ImproveReach } from '@/engine/fittings/improve';
+import type { DefenseChoice } from '@/engine/fittings/improve';
 import type { DefenseSide } from '@/engine/fittings/improveGroups';
-import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improveJob';
 import type { ImproveSort } from '@/engine/fittings/improveRows';
+import type { ImproveConfig } from './improveSearch/types';
 
-/** What the drawer asks of a search beyond the goal; the hook that owns the state passes it whole. */
+/**
+ * What the drawer's controls show: the search's settings and the row order.
+ * Absent Job: no Job control is drawn (Explore space defaults to Dangerous).
+ */
+export type ImproveChoices = Omit<ImproveConfig, 'job' | 'space' | 'noPropulsion'> &
+  Partial<Pick<ImproveConfig, 'job' | 'space' | 'noPropulsion'>> & { sort: ImproveSort };
+
+/** Not remembered: a Defense Choice, the Officer tick and mutated swaps are about the open fit. */
+const PER_FIT_FIELDS = ['defense', 'includeOfficer', 'allowMutated'] as const;
+export type PerFitField = (typeof PER_FIT_FIELDS)[number];
+export const isPerFit = (field: string): field is PerFitField =>
+  (PER_FIT_FIELDS as readonly string[]).includes(field);
+
+/** The drawer's settings, handed whole to the panel: what they are, and how a control changes them. */
 export interface ImproveSettings {
-  /** Absent: no Job control is drawn. */
-  job?: ImproveJob;
-  onJobChange?: (job: ImproveJob) => void;
-  /** Explore only; Dangerous when absent. */
-  space?: ExploreSpace;
-  onSpaceChange?: (space: ExploreSpace) => void;
-  /** PvE only: the Makeover adds no propulsion module. */
-  noPropulsion?: boolean;
-  onNoPropulsionChange?: (on: boolean) => void;
-  reach: ImproveReach;
-  onReachChange: (reach: ImproveReach) => void;
-  /** How each section's rows are ordered. */
-  sort: ImproveSort;
-  onSortChange: (sort: ImproveSort) => void;
-  /** Total budget in ISK; null is no limit. */
-  iskBudget: number | null;
-  onIskBudgetChange: (cap: number | null) => void;
-  defense: DefenseChoice;
-  onDefenseChange: (defense: DefenseChoice) => void;
+  value: ImproveChoices;
+  /** One control's change; the hook that owns the state remembers what is remembered. */
+  onChange: (patch: Partial<ImproveChoices>) => void;
   /** The tank side the fit already has (`fittedSide`); null for none or an even split. */
   fittedSide?: DefenseSide | null;
-  includeRigs: boolean;
-  onIncludeRigsChange: (on: boolean) => void;
-  includeOfficer: boolean;
-  onIncludeOfficerChange: (on: boolean) => void;
-  /** Swap fitted mutated modules too, losing their rolls; off: they are kept (#5800). */
-  allowMutated: boolean;
-  onAllowMutatedChange: (on: boolean) => void;
-  /** Mine more: the crystal family (ore) the miners are scored with. */
-  oreFamily: string;
-  onOreFamilyChange: (family: string) => void;
-  /** Carry more: the hold scored. */
-  hold: ImproveHold;
-  onHoldChange: (hold: ImproveHold) => void;
 }
 
 /** The two sides the Defense control offers; the fit's own one is Keep as is. */

@@ -119,7 +119,10 @@ export function ImproveGoalPicker({
       {goal === 'mining' && (
         <div className="space-y-1 text-sm">
           <span aria-hidden="true">{t('fittings.improve.oreLabel')}</span>
-          <Select value={settings.oreFamily} onValueChange={settings.onOreFamilyChange}>
+          <Select
+            value={settings.value.oreFamily}
+            onValueChange={(oreFamily) => settings.onChange({ oreFamily })}
+          >
             <SelectTrigger aria-label={t('fittings.improve.oreLabel')} className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -138,8 +141,8 @@ export function ImproveGoalPicker({
         <div className="space-y-1 text-sm">
           <span aria-hidden="true">{t('fittings.improve.holdLabel')}</span>
           <Select
-            value={effectiveHold(before.holds, settings.hold)}
-            onValueChange={(value) => settings.onHoldChange(value as ImproveHold)}
+            value={effectiveHold(before.holds, settings.value.hold)}
+            onValueChange={(value) => settings.onChange({ hold: value as ImproveHold })}
           >
             <SelectTrigger aria-label={t('fittings.improve.holdLabel')} className="w-full">
               <SelectValue />

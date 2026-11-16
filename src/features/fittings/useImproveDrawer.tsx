@@ -6,20 +6,12 @@ import { useTranslation } from 'react-i18next';
 import { IconButton, Modal, Panel, Toast } from '@/components/ui';
 import {
   applyImproveCandidate,
-  type DefenseChoice,
-  type ImproveGoal,
   type ImproveOption,
   type RejectedOption,
 } from '@/engine/fittings/improve';
 import { fittedSide } from '@/engine/fittings/improveCandidateFilter';
 import { overBudgetResources } from '@/engine/fittings/improveFree';
-import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improveJob';
-import {
-  hullRoleOf,
-  rememberedGoal,
-  rememberedJob,
-  rememberedSpace,
-} from '@/engine/fittings/improveRole';
+import { hullRoleOf } from '@/engine/fittings/improveRole';
 import { loadBestCharges, unloadedWeapons } from '@/engine/fittings/improveCharges';
 import type { Fitting, FittingImplantSet, FittingModuleResult } from '@/engine/fittings/types';
 import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
@@ -34,23 +26,8 @@ import type { FitResource } from './makeItFitContext';
 import type { TargetProfiles } from './targetProfiles';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import { hullOf, useImprove } from './useImprove';
-import {
-  useImproveGoal,
-  useImproveGoalByRole,
-  useImproveHold,
-  useImproveJob,
-  useImproveJobByRole,
-  useImproveNoPropulsion,
-  useImproveRigs,
-  useImproveSpace,
-  useImproveSpaceByRole,
-  useImproveOre,
-  useImproveReach,
-  useImproveSettingsHydrated,
-  useImproveSort,
-  useImproveBudget,
-  migrateSpendCap,
-} from './useImproveSettingStores';
+import { useImproveSettings } from './useImproveSettings';
+import { isPerFit, type ImproveChoices, type PerFitField } from './improveSettings';
 import { hasImproveResults } from './improveHasResults';
 import type { FittingWorkspace } from './useFittingWorkspace';
 
@@ -112,48 +89,25 @@ export function useImproveDrawer({
   const [isOpen, setIsOpen] = useState(false);
   // The container's footer, where the panel puts its selection and Apply bar.
   const [footerTarget, setFooterTarget] = useState<HTMLDivElement | null>(null);
-  const legacyGoal = useImproveGoal((state) => state.value);
-  const goalsByRole = useImproveGoalByRole((state) => state.value);
-  const setGoalsByRole = useImproveGoalByRole((state) => state.setValue);
-  // One remembered goal per hull role: a Hulk does not start on the Drake's More damage.
+  // One remembered goal, Job and Explore space per hull role: a Hulk does not start on the Drake's More damage.
   const role = hullRoleOf(hullOf(fitting, catalogue));
-  const goal = rememberedGoal(goalsByRole, legacyGoal, role);
-  const setGoal = (next: ImproveGoal) => setGoalsByRole({ ...goalsByRole, [role]: next });
   // The remembered settings are read before the first search, so a reload never searches with the defaults.
-  const settingsReady = useImproveSettingsHydrated();
-  const reach = useImproveReach((state) => state.value);
-  const setReach = useImproveReach((state) => state.setValue);
-  const sort = useImproveSort((state) => state.value);
-  const setSort = useImproveSort((state) => state.setValue);
-  const oreFamily = useImproveOre((state) => state.value);
-  const setOreFamily = useImproveOre((state) => state.setValue);
-  const hold = useImproveHold((state) => state.value);
-  const setHold = useImproveHold((state) => state.setValue);
-  const iskBudget = useImproveBudget((state) => state.value);
-  const setIskBudget = useImproveBudget((state) => state.setValue);
-  useEffect(() => {
-    void migrateSpendCap();
-  }, []);
-  // Job and Explore space are remembered per hull role too: PvP on a Thrasher leaves the Astero on Explore.
-  const legacyJob = useImproveJob((state) => state.value);
-  const jobsByRole = useImproveJobByRole((state) => state.value);
-  const setJobsByRole = useImproveJobByRole((state) => state.setValue);
-  const job = rememberedJob(jobsByRole, legacyJob, role);
-  const setJob = (next: ImproveJob) => setJobsByRole({ ...jobsByRole, [role]: next });
-  const legacySpace = useImproveSpace((state) => state.value);
-  const spacesByRole = useImproveSpaceByRole((state) => state.value);
-  const setSpacesByRole = useImproveSpaceByRole((state) => state.setValue);
-  const space = rememberedSpace(spacesByRole, legacySpace, role);
-  const setSpace = (next: ExploreSpace) => setSpacesByRole({ ...spacesByRole, [role]: next });
-  const noPropulsion = useImproveNoPropulsion((state) => state.value);
-  const setNoPropulsion = useImproveNoPropulsion((state) => state.setValue);
-  // Rigs are on until the pilot unticks them, and that choice is remembered on this device.
-  const includeRigs = useImproveRigs((state) => state.value);
-  const setIncludeRigs = useImproveRigs((state) => state.setValue);
-  // Not remembered: a Defense Choice, and the Officer tick, are about this fit.
-  const [defense, setDefense] = useState<DefenseChoice>('keep');
-  const [includeOfficer, setIncludeOfficer] = useState(false);
-  const [allowMutated, setAllowMutated] = useState(false);
+  const remembered = useImproveSettings(role);
+  // Not remembered: a Defense Choice, the Officer tick and mutated swaps are about this fit.
+  const [perFit, setPerFit] = useState<Pick<ImproveChoices, PerFitField>>({
+    defense: 'keep',
+    includeOfficer: false,
+    allowMutated: false,
+  });
+  const { goal, sort, ...rememberedConfig } = remembered.value;
+  const choices: ImproveChoices = { ...rememberedConfig, ...perFit, sort };
+  const onChange = (patch: Partial<ImproveChoices>) => {
+    const fields = Object.entries(patch);
+    const fit = fields.filter(([field]) => isPerFit(field));
+    const kept = fields.filter(([field]) => !isPerFit(field));
+    if (fit.length > 0) setPerFit((prev) => ({ ...prev, ...Object.fromEntries(fit) }));
+    if (kept.length > 0) void remembered.set(Object.fromEntries(kept));
+  };
   // What the ticked and hovered rows would change, for the stats column; never part of the Fitting or its history.
   const [preview, setPreview] = useState<FittingStatsDelta | null>(null);
   const [previewIsk, setPreviewIsk] = useState<number | null>(null);
@@ -211,20 +165,8 @@ export function useImproveDrawer({
     catalogue,
     goal,
     targetProfiles.hydrated ? targetProfiles.selected : undefined,
-    isOpen && settingsReady,
-    {
-      job,
-      space,
-      noPropulsion,
-      reach,
-      iskBudget,
-      defense,
-      includeRigs,
-      includeOfficer,
-      allowMutated,
-      oreFamily,
-      hold,
-    },
+    isOpen && remembered.ready,
+    { ...rememberedConfig, ...perFit },
     chargeSteps
   );
 
@@ -292,7 +234,7 @@ export function useImproveDrawer({
   const body = (
     <ImprovePanel
       goal={search.goal}
-      onGoalChange={(next) => void setGoal(next)}
+      onGoalChange={(next) => void remembered.set({ goal: next })}
       search={search}
       catalogue={catalogue}
       onApply={apply}
@@ -309,7 +251,7 @@ export function useImproveDrawer({
                   basis: workspace.implantBasis,
                   onChange: workspace.setImplantSet,
                 }}
-                iskBudget={iskBudget}
+                iskBudget={choices.iskBudget}
                 fitTotal={search.state.status === 'done' ? search.state.fitTotal : null}
                 onApply={applyWithImplants}
               />
@@ -357,33 +299,11 @@ export function useImproveDrawer({
         )
       }
       settings={{
-        job,
-        onJobChange: (next) => void setJob(next),
-        space,
-        onSpaceChange: (next) => void setSpace(next),
-        noPropulsion,
-        onNoPropulsionChange: (next) => void setNoPropulsion(next),
-        reach,
-        onReachChange: (next) => void setReach(next),
-        sort,
-        onSortChange: (next) => void setSort(next),
-        iskBudget,
-        onIskBudgetChange: (next) => void setIskBudget(next),
-        defense,
-        onDefenseChange: setDefense,
+        value: choices,
+        onChange,
         fittedSide: fitting
           ? fittedSide(fitting.modules, (typeId) => catalogue?.types[String(typeId)]?.groupID)
           : null,
-        includeRigs,
-        onIncludeRigsChange: (next) => void setIncludeRigs(next),
-        includeOfficer,
-        onIncludeOfficerChange: setIncludeOfficer,
-        allowMutated,
-        onAllowMutatedChange: setAllowMutated,
-        oreFamily,
-        onOreFamilyChange: (next) => void setOreFamily(next),
-        hold,
-        onHoldChange: (next) => void setHold(next),
       }}
     />
   );

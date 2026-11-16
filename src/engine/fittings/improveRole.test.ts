@@ -3,9 +3,10 @@ import { findImprovements, goalAvailability, improveCandidates } from './improve
 import {
   DEFAULT_GOAL_OF_ROLE,
   hullRoleOf,
-  rememberedGoal,
-  rememberedJob,
-  rememberedSpace,
+  GOAL_MEMORY,
+  JOB_MEMORY,
+  rememberedByRole,
+  SPACE_MEMORY,
   roleUnlocks,
   type HullRef,
 } from './improveRole';
@@ -63,11 +64,24 @@ describe('goalAvailability by hull role', () => {
   });
 });
 
-describe('rememberedGoal', () => {
+describe('rememberedByRole', () => {
+  it('returns its own value whatever the rule, and ignores the old value once any role has one', () => {
+    const never = { seeds: () => false, fallback: () => 'fallback' };
+    const always = { seeds: () => true, fallback: () => 'fallback' };
+    expect(rememberedByRole({ combat: 'own' }, 'old', 'combat', always)).toBe('own');
+    expect(rememberedByRole({}, 'old', 'combat', always)).toBe('old');
+    expect(rememberedByRole({}, 'old', 'combat', never)).toBe('fallback');
+    expect(rememberedByRole({ mining: 'own' }, 'old', 'combat', always)).toBe('fallback');
+  });
+});
+
+describe('the remembered goal', () => {
   it('keeps one goal per role and falls back to the role default', () => {
     const byRole = { combat: 'damage' } as const;
-    expect(rememberedGoal(byRole, 'overall', 'combat')).toBe('damage');
-    expect(rememberedGoal(byRole, 'overall', 'mining')).toBe(DEFAULT_GOAL_OF_ROLE.mining);
+    expect(rememberedByRole(byRole, 'overall', 'combat', GOAL_MEMORY)).toBe('damage');
+    expect(rememberedByRole(byRole, 'overall', 'mining', GOAL_MEMORY)).toBe(
+      DEFAULT_GOAL_OF_ROLE.mining
+    );
     expect(DEFAULT_GOAL_OF_ROLE).toEqual({
       combat: 'overall',
       explorer: 'explore',
@@ -79,10 +93,10 @@ describe('rememberedGoal', () => {
   });
 
   it('uses the old global goal once, where no role has one yet and it suits the role', () => {
-    expect(rememberedGoal({}, 'damage', 'combat')).toBe('damage');
-    expect(rememberedGoal({}, 'damage', 'mining')).toBe('mining');
-    expect(rememberedGoal({}, 'mining', 'mining')).toBe('mining');
-    expect(rememberedGoal({ mining: 'mining' }, 'damage', 'combat')).toBe('overall');
+    expect(rememberedByRole({}, 'damage', 'combat', GOAL_MEMORY)).toBe('damage');
+    expect(rememberedByRole({}, 'damage', 'mining', GOAL_MEMORY)).toBe('mining');
+    expect(rememberedByRole({}, 'mining', 'mining', GOAL_MEMORY)).toBe('mining');
+    expect(rememberedByRole({ mining: 'mining' }, 'damage', 'combat', GOAL_MEMORY)).toBe('overall');
   });
 });
 
@@ -164,30 +178,36 @@ describe('explorer hulls and the Job per role', () => {
   });
 
   it('opens an Astero on Explore and a Drake on PvE', () => {
-    expect(rememberedJob({}, 'pve', hullRoleOf(ASTERO))).toBe('explore');
-    expect(rememberedJob({}, 'pve', hullRoleOf(DRAKE))).toBe('pve');
+    expect(rememberedByRole({}, 'pve', hullRoleOf(ASTERO), JOB_MEMORY)).toBe('explore');
+    expect(rememberedByRole({}, 'pve', hullRoleOf(DRAKE), JOB_MEMORY)).toBe('pve');
   });
 
   it('remembers PvP for combat hulls while explorers keep their own', () => {
     const byRole = { combat: 'pvp' } as const;
-    expect(rememberedJob(byRole, 'pve', 'combat')).toBe('pvp');
-    expect(rememberedJob(byRole, 'pve', 'explorer')).toBe('explore');
-    expect(rememberedJob({ ...byRole, explorer: 'pve' }, 'pve', 'explorer')).toBe('pve');
+    expect(rememberedByRole(byRole, 'pve', 'combat', JOB_MEMORY)).toBe('pvp');
+    expect(rememberedByRole(byRole, 'pve', 'explorer', JOB_MEMORY)).toBe('explore');
+    expect(rememberedByRole({ ...byRole, explorer: 'pve' }, 'pve', 'explorer', JOB_MEMORY)).toBe(
+      'pve'
+    );
   });
 
   it('uses the old device-wide Job once, only while no role has one, it was moved, and it suits the role', () => {
-    expect(rememberedJob({}, 'pvp', 'combat')).toBe('pvp');
-    expect(rememberedJob({ combat: 'pve' }, 'pvp', 'mining')).toBe('pve');
+    expect(rememberedByRole({}, 'pvp', 'combat', JOB_MEMORY)).toBe('pvp');
+    expect(rememberedByRole({ combat: 'pve' }, 'pvp', 'mining', JOB_MEMORY)).toBe('pve');
     // Explore set on an Astero must not open a Drake on Explore, nor PvP an Astero on PvP.
-    expect(rememberedJob({}, 'explore', 'combat')).toBe('pve');
-    expect(rememberedJob({}, 'explore', 'explorer')).toBe('explore');
-    expect(rememberedJob({}, 'pvp', 'explorer')).toBe('explore');
+    expect(rememberedByRole({}, 'explore', 'combat', JOB_MEMORY)).toBe('pve');
+    expect(rememberedByRole({}, 'explore', 'explorer', JOB_MEMORY)).toBe('explore');
+    expect(rememberedByRole({}, 'pvp', 'explorer', JOB_MEMORY)).toBe('explore');
   });
 
   it('remembers the Explore space per role the same way', () => {
-    expect(rememberedSpace({}, 'dangerous', 'explorer')).toBe('dangerous');
-    expect(rememberedSpace({}, 'safe', 'explorer')).toBe('safe');
-    expect(rememberedSpace({ explorer: 'dangerous' }, 'safe', 'explorer')).toBe('dangerous');
-    expect(rememberedSpace({ combat: 'safe' }, 'safe', 'explorer')).toBe('dangerous');
+    expect(rememberedByRole({}, 'dangerous', 'explorer', SPACE_MEMORY)).toBe('dangerous');
+    expect(rememberedByRole({}, 'safe', 'explorer', SPACE_MEMORY)).toBe('safe');
+    expect(rememberedByRole({ explorer: 'dangerous' }, 'safe', 'explorer', SPACE_MEMORY)).toBe(
+      'dangerous'
+    );
+    expect(rememberedByRole({ combat: 'safe' }, 'safe', 'explorer', SPACE_MEMORY)).toBe(
+      'dangerous'
+    );
   });
 });
