@@ -13,9 +13,17 @@ vi.mock('../taxBook/bookClient', async (importOriginal) => ({
   editBook: (...a: unknown[]) => editBook(...a),
 }));
 
+const loadDivisions = vi.fn();
+vi.mock('../wallet', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../wallet')>()),
+  loadCorporationDivisions: (...a: unknown[]) => loadDivisions(...a),
+}));
+
 beforeEach(() => {
   editBook.mockReset();
   editBook.mockResolvedValue({});
+  loadDivisions.mockReset();
+  loadDivisions.mockResolvedValue({ cached: null, needsReauth: false });
 });
 
 const renderDialog = () =>
@@ -161,6 +169,38 @@ describe('BookSettingsDialog tabs', () => {
         patch: expect.objectContaining({ startDate: '2026-09-20' }),
       })
     );
+  });
+
+  it("saves the corp's names for the divisions it reads, so members see them at once", async () => {
+    loadDivisions.mockResolvedValue({
+      cached: { data: { wallet: [{ division: 2, name: 'Market Funds' }] } },
+      needsReauth: false,
+    });
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('tab', { name: 'Billing' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Division 2, Market Funds' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(editBook).toHaveBeenCalledWith(
+      7,
+      98000000,
+      expect.objectContaining({
+        action: 'updateSettings',
+        patch: expect.objectContaining({ divisions: [1, 2], divisionNames: { 2: 'Market Funds' } }),
+      })
+    );
+  });
+
+  it('leaves the stored names alone when the names could not be read', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('tab', { name: 'Billing' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Division 2' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    const call = editBook.mock.calls.find(
+      (c) => (c[2] as { action: string }).action === 'updateSettings'
+    );
+    expect((call?.[2] as { patch: object }).patch).not.toHaveProperty('divisionNames');
   });
 
   it('opens on Access and sync when it reopens after the EVE opt-in', () => {

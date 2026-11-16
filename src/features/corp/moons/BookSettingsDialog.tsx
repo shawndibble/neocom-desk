@@ -40,6 +40,7 @@ import { ReclaimBookSection } from './ReclaimBookSection';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { useCorpAccess } from '../useCorpAccess';
 import { loadCorporationDivisions } from '../wallet';
+import { divisionNamesToPush } from '@/engine/corpTaxBook/divisionNames';
 import { utcDay } from '@/engine/localDay';
 
 const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
@@ -297,6 +298,17 @@ export function BookSettingsDialog({
         ),
       };
       if (chunk !== '') patch.chunkM3PerHour = Number(chunk);
+      // The names of the divisions it now reads go with them, so a member's Settle up names a
+      // newly read division at once rather than after a Director's next visit (#6161). Unread
+      // names (no role, or ESI not answered yet) say nothing: the stored ones stay.
+      if (divisionNames.size > 0) {
+        const names = divisionNamesToPush(
+          patch.divisions as number[],
+          settings.divisionNames,
+          [...divisionNames].map(([division, name]) => ({ division, name }))
+        );
+        if (names) patch.divisionNames = names;
+      }
       if (verdict.isDirector) {
         patch.dismissApprovalAboveIsk = approval === '' ? null : Number(approval);
         if (startDate !== settings.startDate) patch.startDate = startDate;
