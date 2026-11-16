@@ -6,7 +6,7 @@ import { PERMISSIONS, type EsiEndpointId } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginGrant } from './grantAction';
 import { missingPermissions } from './missingPermissions';
-import { useReauthSlot } from './reauthSlots';
+import { useReauthSlot, type SlotView } from './reauthSlots';
 import { useCharacterLacksEndpoints } from './useGrantedScopes';
 
 interface GrantBannerProps {
@@ -22,6 +22,12 @@ interface GrantBannerProps {
   soleAction?: boolean;
   /** The one-line form for a note beside saved data (`ReauthBanner`'s `compact`). */
   compact?: boolean;
+  /**
+   * A note on a figure that only assumes something, not data that cannot load:
+   * it shows on its own and never joins, speaks for, or silences the page's
+   * re-login banners (`reauthSlots`).
+   */
+  standalone?: boolean;
 }
 
 /**
@@ -50,10 +56,27 @@ function useGrantGap(characterId: number, endpoints: readonly EsiEndpointId[]) {
  * briefly: "Kestrel Vane: grant Wallet, Assets" when the stored grant lacks a
  * Permission (naming each), else "Kestrel Vane: log in again" (the grant was
  * refused or lapsed). Several on one page (Overview widgets, a page's panels)
- * collapse into the first: it speaks, and its one login asks for every
- * Permission the others needed (`reauthSlots`).
+ * collapse into the weightiest: it speaks, and its one login asks for every
+ * Permission the others needed (`reauthSlots`); the rest say in one line that
+ * the page's prompt covers them.
  */
-export function GrantBanner({
+export function GrantBanner(props: GrantBannerProps) {
+  return props.standalone ? (
+    <GrantBannerView
+      {...props}
+      slot={{ primary: true, endpoints: props.endpoints, shared: false }}
+    />
+  ) : (
+    <SlottedGrantBanner {...props} />
+  );
+}
+
+function SlottedGrantBanner(props: GrantBannerProps) {
+  const slot = useReauthSlot(props.characterId, props.compact ? 'note' : 'banner', props.endpoints);
+  return <GrantBannerView {...props} slot={slot} />;
+}
+
+function GrantBannerView({
   characterId,
   characterName,
   endpoints,
@@ -61,24 +84,30 @@ export function GrantBanner({
   variant,
   soleAction,
   compact,
-}: GrantBannerProps) {
+  slot,
+}: GrantBannerProps & { slot: SlotView }) {
   const { t } = useTranslation();
-  const slot = useReauthSlot(characterId, endpoints);
   const gap = useGrantGap(characterId, slot.primary ? slot.endpoints : endpoints);
   // Held back until read, so the wrong one of the two never flashes.
-  if (!slot.primary || gap?.characterId !== characterId) return null;
+  if (gap?.characterId !== characterId) return null;
   const character = characterName ?? gap.name ?? t('reauth.unknownCharacter');
+  if (!slot.primary) {
+    // Never an empty panel: one line saying the page's prompt covers it.
+    return <p className="text-xs text-text-dim">{t('reauth.coveredTitle', { character })}</p>;
+  }
   const permissions = gap.missing.map((group) => t(PERMISSIONS[group].labelKey)).join(', ');
+  const missing = gap.missing.length > 0;
+  // The panel's own context, unless this banner speaks for others too; else why, for a login.
+  const hint = title && !slot.shared ? title : missing ? undefined : t('reauth.refusedHint');
   return (
     <ReauthBanner
       title={
-        gap.missing.length > 0
+        missing
           ? t('reauth.missingTitle', { character, permissions })
           : t('reauth.loginTitle', { character })
       }
-      // A banner speaking for others too would put its own panel's context on theirs.
-      {...(title && !slot.shared ? { hint: title } : {})}
-      actionLabel={gap.missing.length > 0 ? t('reauth.grantAction') : t('reauth.loginAction')}
+      {...(hint ? { hint } : {})}
+      actionLabel={missing ? t('reauth.grantAction') : t('reauth.loginAction')}
       onLogin={() => void beginGrant(characterId, slot.endpoints)}
       {...(variant ? { variant } : {})}
       {...(soleAction ? { soleAction } : {})}
@@ -119,7 +148,7 @@ export function GrantNote({ characterId, className, ...banner }: GrantNoteProps)
   if (id === null || !lacks) return null;
   return (
     <div className={className}>
-      <GrantBanner variant="ghost" characterId={id} {...banner} />
+      <GrantBanner variant="ghost" characterId={id} standalone {...banner} />
     </div>
   );
 }

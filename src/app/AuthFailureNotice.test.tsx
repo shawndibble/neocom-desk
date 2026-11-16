@@ -168,7 +168,7 @@ describe('AuthFailureNotice', () => {
   });
 
   it('stands down while a banner on the page already speaks for that character', () => {
-    useReauthSlots.getState().claim('page', CHARACTER_ID, ['getCharacterWallet']);
+    useReauthSlots.getState().claim('page', CHARACTER_ID, 'banner', ['getCharacterWallet']);
     useAuthFailure.getState().reportRequestFailure(CHARACTER_ID);
     render(
       <MemoryRouter>
@@ -177,6 +177,24 @@ describe('AuthFailureNotice', () => {
     );
     expect(screen.queryByText(/: log in again$/)).not.toBeInTheDocument();
     useReauthSlots.getState().release('page');
+  });
+
+  it('names a missing corp role plainly, with no login to offer', async () => {
+    await db.characters.put({
+      characterId: CHARACTER_ID,
+      name: 'Ada Vance',
+      ownerHash: 'oh',
+      addedAt: 0,
+    });
+    useAuthFailure.getState().reportRoleRefusal(CHARACTER_ID, 'getCorporationWallets');
+    render(
+      <MemoryRouter>
+        <AuthFailureNotice />
+      </MemoryRouter>
+    );
+    expect(await screen.findAllByText(/Ada Vance: missing corp role/)).not.toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Log in' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
   });
 
   it('says "This character" until the character record is loaded', () => {

@@ -10,7 +10,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { beginEveLogin } from './loginFlow';
 import { pageOwnsReauth } from './pageOwnsReauth';
-import { useReauthSlots } from './reauthSlots';
+import { useSlotCovers } from './reauthSlots';
 
 /**
  * Total auth failure → /login, once, centrally. Covers what `ScopeGate` cannot:
@@ -113,9 +113,7 @@ export function AuthFailureNotice() {
 
   const { pathname } = useLocation();
   // A banner on the page already speaks for this Character: two login buttons would stack.
-  const pageCovers = useReauthSlots((state) =>
-    state.slots.some((slot) => slot.characterId === failure?.characterId)
-  );
+  const pageCovers = useSlotCovers(failure?.characterId);
 
   const shown =
     failure?.kind === 'request' &&
@@ -124,16 +122,32 @@ export function AuthFailureNotice() {
     !pageOwnsReauth(pathname, failure.endpointId)
       ? failure
       : null;
-  const title = t('reauth.loginTitle', {
-    character: character?.name ?? t('reauth.unknownCharacter'),
-  });
+  const name = character?.name ?? t('reauth.unknownCharacter');
+  const title = t('reauth.loginTitle', { character: name });
+  // A corp role the Character lacks: said plainly, with no login to offer, since none fixes it.
+  const role =
+    failure?.kind === 'role' && failure.characterId === activeCharacterId
+      ? t('reauth.roleTitle', { character: name })
+      : null;
 
   // The region stays mounted (empty) and fills when the notice appears. The
   // visible block holds buttons, so it is neither `aria-hidden` nor a live region.
   return (
     <>
-      <LiveStatus>{shown && `${title}. ${t('reauth.refusedHint')}`}</LiveStatus>
+      <LiveStatus>
+        {shown && `${title}. ${t('reauth.refusedHint')}`}
+        {role && `${role}. ${t('reauth.roleHint')}`}
+      </LiveStatus>
       {shown && <AuthFailureBlock failure={shown} title={title} onDismiss={dismiss} />}
+      {role && (
+        <div className="mb-4 rounded-xs border border-warning/40 bg-panel px-3 py-2 text-xs">
+          <p className="font-semibold text-warning">{role}</p>
+          <p className="text-text-dim">{t('reauth.roleHint')}</p>
+          <Button size="sm" className="mt-2" onClick={dismiss}>
+            {t('reauth.dismiss')}
+          </Button>
+        </div>
+      )}
     </>
   );
 }

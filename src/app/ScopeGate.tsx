@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { PERMISSIONS, type ScopeGroup } from '@/esi/registry';
-import { permissionForScope } from '@/esi/scopes';
+import { permissionsForScopes } from './missingPermissions';
+import { useReauthSlot } from './reauthSlots';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
 import { ReauthBanner } from '@/components/ui';
@@ -51,34 +52,60 @@ export function ScopeGate({ path, children }: ScopeGateProps) {
   // Character's grant itself (its own `GrantBanner`), not the active one's.
   const viewingOther = useViewedCharacterId() !== undefined && path === '/assets';
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const name = useLiveQuery(
-    async () =>
-      activeCharacterId === null ? undefined : (await db.characters.get(activeCharacterId))?.name,
-    [activeCharacterId]
-  );
 
-  if (!gated || granted === undefined || viewingOther) return <>{children}</>;
+  if (!gated || granted === undefined || viewingOther || activeCharacterId === null) {
+    return <>{children}</>;
+  }
   const missingScopes = missingScopesForRoute(path, granted);
   if (missingScopes.length === 0) return <>{children}</>;
 
-  // Each Permission the page still needs, named once: what to tick at EVE.
-  const missing = [
-    ...new Set(
-      missingScopes.map(permissionForScope).filter((g): g is ScopeGroup => g !== undefined)
-    ),
-  ];
   return (
     <>
       <h1 className="sr-only">{pageTitleFor(path, t)}</h1>
-      <ReauthBanner
-        title={t('reauth.missingTitle', {
-          character: name ?? t('reauth.unknownCharacter'),
-          permissions: missing.map((group) => t(PERMISSIONS[group].labelKey)).join(', '),
-        })}
-        actionLabel={t('reauth.grantAction')}
-        onLogin={() => void beginEveLogin({ groups: permissionsForRoute(path) })}
-        soleAction
+      <LockedRouteBanner
+        path={path}
+        characterId={activeCharacterId}
+        missing={permissionsForScopes(missingScopes)}
       />
     </>
+  );
+}
+
+/**
+ * The locked route's banner: "<Character>: grant <Permissions>", each named. It
+ * outweighs every other banner for the Character (`reauthSlots`), so the shell's
+ * notice stands down, and it waits for the name rather than flash a placeholder.
+ */
+function LockedRouteBanner({
+  path,
+  characterId,
+  missing,
+}: {
+  path: AppRoutePath;
+  characterId: number;
+  missing: readonly ScopeGroup[];
+}) {
+  const { t } = useTranslation();
+  useReauthSlot(characterId, 'page', []);
+  const read = useLiveQuery(
+    async () => ({ characterId, name: (await db.characters.get(characterId))?.name }),
+    [characterId]
+  );
+  if (read?.characterId !== characterId) return null;
+  const character = read.name ?? t('reauth.unknownCharacter');
+  return (
+    <ReauthBanner
+      title={
+        missing.length > 0
+          ? t('reauth.missingTitle', {
+              character,
+              permissions: missing.map((group) => t(PERMISSIONS[group].labelKey)).join(', '),
+            })
+          : t('reauth.loginTitle', { character })
+      }
+      actionLabel={missing.length > 0 ? t('reauth.grantAction') : t('reauth.loginAction')}
+      onLogin={() => void beginEveLogin({ groups: permissionsForRoute(path) })}
+      soleAction
+    />
   );
 }

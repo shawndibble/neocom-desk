@@ -216,11 +216,41 @@ describe('GrantBanner', () => {
     expect(await screen.findByText('Alt: grant Mail, Character details')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Grant in EVE' })).toHaveLength(1);
     expect(screen.queryByText('Alt: grant Mail')).toBeNull();
+    // The other panel is never left blank: it says the page's prompt covers it.
+    expect(screen.getByText('Alt: covered by the login prompt on this page.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Grant in EVE' }));
     expect(beginEveLogin).toHaveBeenCalledWith({
       characterId: ALT_ID,
       groups: ['mail', 'characterDetails'],
     });
+  });
+
+  it('lets a full banner outrank a one-line note, and a standalone note never join', async () => {
+    render(
+      <>
+        <GrantBanner
+          compact
+          characterId={ALT_ID}
+          characterName="Alt"
+          endpoints={['getCharacterMailHeaders']}
+        />
+        <GrantBanner characterId={ALT_ID} characterName="Alt" endpoints={ENDPOINTS} />
+        <GrantBanner
+          standalone
+          characterId={ALT_ID}
+          characterName="Alt"
+          endpoints={['getCharacterMailHeaders']}
+          title="Assumes no mail"
+        />
+      </>
+    );
+
+    // The full banner speaks for the note, not the other way round.
+    expect(await screen.findByText('Alt: grant Mail, Character details')).toBeInTheDocument();
+    expect(screen.getByText('Alt: covered by the login prompt on this page.')).toBeInTheDocument();
+    // The standalone note keeps its own banner and context.
+    expect(screen.getByText('Assumes no mail')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Grant in EVE' })).toHaveLength(2);
   });
 
   it("still shows another Character's banner beside them", async () => {

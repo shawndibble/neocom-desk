@@ -215,7 +215,8 @@ describe('Industry: owned-blueprint reauth', () => {
     );
     await renderIndustryRoutes();
 
-    expect(await screen.findByText('Log in again to see owned blueprints')).toBeInTheDocument();
+    // The test grant lacks the blueprints scope, so the banner names that Permission.
+    expect(await screen.findByText(/: grant Industry$/)).toBeInTheDocument();
     // The Build Plan list and Active Jobs panel still render.
     expect(await screen.findByRole('searchbox', { name: 'Add Build Plan' })).toBeInTheDocument();
     expect(screen.getByText('Jobs')).toBeInTheDocument();

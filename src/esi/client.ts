@@ -159,7 +159,8 @@ export function isSsoUnavailable(err: AuthError): boolean {
 }
 
 /** ESI's 403 for a Character without the corporation role an endpoint needs. */
-function isMissingRole(err: EsiError): boolean {
+export function isMissingRole(err: unknown): boolean {
+  if (!(err instanceof EsiError) || err.status !== 403) return false;
   const said = (err.body as { error?: unknown } | undefined)?.error;
   return /required role/i.test(`${err.message} ${typeof said === 'string' ? said : ''}`);
 }

@@ -105,6 +105,9 @@
     "loginAction": "Log in",
     "unknownCharacter": "This character",
     "refusedHint": "EVE refused the saved login.",
+    "coveredTitle": "{{character}}: covered by the login prompt on this page.",
+    "roleTitle": "{{character}}: missing corp role",
+    "roleHint": "Ask a director for the role. Logging in again won't help.",
     "cachedTitle": "Showing saved data.",
     "navLocked": "Needs a new login",
     "standingsTitle": "Broker fees are assuming 0 standings",
@@ -8485,10 +8488,7 @@
       "confirm_other": "Mark {{count}} paid with this payment",
       "empty": "No unlinked wallet payments found. Payments appear here once ESI shows them in your wallet journal.",
       "rememberFailed": "Payment linked, but couldn’t remember who {{payee}} is paid. You can close this.",
-      "grantTitle": "Some payments can’t be seen",
-      "grantJournal": "the wallet journal",
-      "grantContracts": "contracts",
-      "grantAnd": "or"
+      "grantTitle": "Some payments can’t be seen"
     },
     "attention": {
       "title_one": "{{count}} thing needs attention",

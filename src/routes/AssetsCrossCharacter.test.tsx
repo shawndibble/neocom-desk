@@ -579,7 +579,8 @@ describe('jumps-away distance (issue #87)', () => {
     const badges = await screen.findAllByText('-');
     await userEvent.hover(badges[0]);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Character location unavailable.');
-    expect(screen.queryByText('Log in again to see your assets')).not.toBeInTheDocument();
+    // No assets banner; the location note (Character details) is its own business.
+    expect(screen.queryByText(/: (log in again|grant Assets)$/)).not.toBeInTheDocument();
   });
 
   it('opens on the Travel default and lets the user switch preference for this view', async () => {

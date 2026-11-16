@@ -12,11 +12,15 @@ export function missingPermissions(
   granted: readonly string[]
 ): ScopeGroup[] {
   const held = new Set(granted);
-  const missing: ScopeGroup[] = [];
-  for (const scope of requiredScopesForEndpoints(endpoints)) {
-    if (held.has(scope)) continue;
+  return permissionsForScopes(requiredScopesForEndpoints(endpoints).filter((s) => !held.has(s)));
+}
+
+/** Each scope's Permission, once, in order; a Core Grant scope (no Permission) drops out. */
+export function permissionsForScopes(scopes: readonly string[]): ScopeGroup[] {
+  const groups: ScopeGroup[] = [];
+  for (const scope of scopes) {
     const group = permissionForScope(scope);
-    if (group !== undefined && !missing.includes(group)) missing.push(group);
+    if (group !== undefined && !groups.includes(group)) groups.push(group);
   }
-  return missing;
+  return groups;
 }
