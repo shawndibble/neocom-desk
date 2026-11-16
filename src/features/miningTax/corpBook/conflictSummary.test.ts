@@ -40,6 +40,34 @@ describe('summarizeConflicts', () => {
     expect(out).toMatchObject({ days: 3, amount: 650, firstCorpName: 'Brass' });
     expect(out?.first).toBe(soon);
   });
+
+  // #6206: once the member has acted, the prompt is asking them to review something they
+  // cannot move. The officer's answer is what brings it back.
+  it('leaves out a day already sent to the corporation, and one whose ore it waived', () => {
+    const sent = row(
+      view({ id: 'sent', billed: 300, flagged: { state: 'sent', at: '2026-11-01T10:00:00Z' } })
+    );
+    const waived = row(
+      view({
+        id: 'waived',
+        billed: 400,
+        date: '2026-10-29',
+        flagged: { state: 'dismissed', at: '2026-11-02T10:00:00Z', reason: 'Fair enough' },
+      })
+    );
+    expect(summarizeConflicts([sent, waived])).toBeNull();
+  });
+
+  it('keeps a day the corporation handed back, so the member answers it again', () => {
+    const rejected = row(
+      view({
+        id: 'rejected',
+        billed: 250,
+        flagged: { state: 'rejected', at: '2026-11-02T10:00:00Z', reason: 'Book stands' },
+      })
+    );
+    expect(summarizeConflicts([rejected])).toMatchObject({ days: 1, amount: 250 });
+  });
 });
 
 describe('conflictSiblings', () => {

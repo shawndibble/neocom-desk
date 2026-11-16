@@ -42,6 +42,13 @@ interface OwedBalancesProps {
   uncreditedOf?: (
     balance: PayeeBalance
   ) => { amount: number; accounts: string; everyDivision?: boolean } | undefined;
+  /**
+   * ISK this Payee was already sent that nothing here accounts for yet (#540's suggestions,
+   * attributed per Payee). Above 0 the card says so and Settle up drops to a plain button for
+   * the same reason an uncredited donation does: the owed figure is overstated until the
+   * payment is linked, so paying it in full pays twice.
+   */
+  unlinkedOf?: (balance: PayeeBalance) => { count: number; amount: number } | undefined;
   onAssignNext: () => void;
   onReviewPayments: () => void;
   /**
@@ -72,6 +79,7 @@ export function OwedBalances({
   onLinkPayment,
   hideLinkPayment,
   uncreditedOf,
+  unlinkedOf,
   onAssignNext,
   onReviewPayments,
   conflicts,
@@ -203,11 +211,40 @@ export function OwedBalances({
 
       {cardCount > 0 && !slimPrompts && (
         <div className={cx('grid grid-cols-1 gap-2', !wide && 'sm:grid-cols-2 xl:grid-cols-3')}>
+          {/* Before the owed cards, not after them: a payment that is already sent but unlinked
+              means every owed figure beside it is overstated, so this is the one card that has
+              to be dealt with before Settle up can be trusted. */}
+          {unlinkedPaymentCount > 0 && (
+            <Panel padded={false} fill className="flex flex-col border-dashed">
+              <div className="flex flex-1 flex-col gap-2 p-3">
+                <div className="flex items-start gap-2">
+                  <span className="flex-1 text-base font-semibold">
+                    {t('miningTax.unlinkedPaymentsCardTitle')}
+                  </span>
+                  <span className={cx(eyebrowClassName, 'shrink-0')}>
+                    {t('miningTax.unlinkedPaymentsCount', { count: unlinkedPaymentCount })}
+                  </span>
+                </div>
+                <div className="mt-auto space-y-2">
+                  <p className="text-xs text-text-dim">{t('miningTax.unlinkedPaymentsHint')}</p>
+                  <Button className="w-full" onClick={onReviewPayments}>
+                    {t('miningTax.linkPaymentAction')}
+                  </Button>
+                </div>
+              </div>
+            </Panel>
+          )}
           {owed.map((balance) => {
             const days = owedForDays(balance);
             const characterName = characterNameOf?.(balance);
             const uncredited = uncreditedOf?.(balance);
             const warnUncredited = uncredited !== undefined && uncredited.amount > 0;
+            const unlinked = unlinkedOf?.(balance);
+            const warnUnlinked = unlinked !== undefined && unlinked.count > 0;
+            // Both mean the same thing for the button: the owed figure is overstated, so paying
+            // it in full pays twice. Settle up stays reachable — it is sometimes right — but it
+            // stops being the card's loudest control.
+            const warnBeforePaying = warnUncredited || warnUnlinked;
             const meta = (
               <>
                 <p className="text-xs text-text-dim">
@@ -228,12 +265,20 @@ export function OwedBalances({
                         })}
                   </p>
                 )}
+                {warnUnlinked && (
+                  <p className="text-xs text-warning">
+                    {t('miningTax.owed.unlinkedNote', {
+                      count: unlinked.count,
+                      amount: formatIsk(unlinked.amount, 0),
+                    })}
+                  </p>
+                )}
               </>
             );
             const actions = (
               <div className="flex gap-1.5">
                 <Button
-                  variant={warnUncredited ? 'ghost' : 'primary'}
+                  variant={warnBeforePaying ? 'ghost' : 'primary'}
                   className={wide ? 'flex-1 sm:flex-none' : 'flex-1'}
                   onClick={() => onSettleUp(balance)}
                 >
@@ -294,26 +339,6 @@ export function OwedBalances({
                   </p>
                   <Button className="w-full" onClick={onAssignNext}>
                     {t('miningTax.assignNextAction')}
-                  </Button>
-                </div>
-              </div>
-            </Panel>
-          )}
-          {unlinkedPaymentCount > 0 && (
-            <Panel padded={false} fill className="flex flex-col border-dashed">
-              <div className="flex flex-1 flex-col gap-2 p-3">
-                <div className="flex items-start gap-2">
-                  <span className="flex-1 text-base font-semibold">
-                    {t('miningTax.unlinkedPaymentsCardTitle')}
-                  </span>
-                  <span className={cx(eyebrowClassName, 'shrink-0')}>
-                    {t('miningTax.unlinkedPaymentsCount', { count: unlinkedPaymentCount })}
-                  </span>
-                </div>
-                <div className="mt-auto space-y-2">
-                  <p className="text-xs text-text-dim">{t('miningTax.unlinkedPaymentsHint')}</p>
-                  <Button className="w-full" onClick={onReviewPayments}>
-                    {t('miningTax.linkPaymentAction')}
                   </Button>
                 </div>
               </div>

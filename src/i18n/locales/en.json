@@ -7941,7 +7941,8 @@
     "groupTotalValueLabel": "Combined estimated value: {{value}}",
     "markGroupPaidAction": "Mark all as paid",
     "duplicateTitle": "Possible double-assigned mining days",
-    "duplicateHint": "These days each have two identical Assignments, so the tax is counted twice. Open the day and Unassign the extra one — nothing is removed until you do.",
+    "duplicateHint": "These days each have two identical Assignments, so the tax is counted twice. Pick a day to drop its extra Assignment — nothing is removed until you confirm.",
+    "duplicateUnassign": "Drop the extra Assignment on {{entry}}",
     "duplicateRowHint": "This day has an identical twin Assignment, so its tax is counted twice. If this is the extra one, Unassign it.",
     "unclassifiedHint": "One or more ore types in your mining ledger aren't recognized as moon ore or ordinary ore/ice. This can happen after a CCP patch — tag it below.",
     "tagAsMoonOre": "Tag as moon ore",
@@ -7990,7 +7991,9 @@
         "unattributed": "Unattributed",
         "dismissed": "Dismissed by corp",
         "waived": "Waived",
-        "markedPaid": "Marked paid"
+        "markedPaid": "Marked paid",
+        "sent": "Sent",
+        "oreWaived": "Tax waived"
       },
       "hint": {
         "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own allocation applies and nothing is owed to the corp.",
@@ -8003,7 +8006,9 @@
         "dismissed": "{{corp}} dismissed this day: {{reason}}",
         "waived": "{{corp}} wrote this day off: {{reason}}",
         "paid": "Paid to {{corp}}.",
-        "markedPaid": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed."
+        "markedPaid": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed.",
+        "sent": "Sent to {{corp}} on {{sentOn}}. An officer answers it in the book; nothing more to do until they do.",
+        "oreWaived": "{{corp}} waived the tax on that ore: {{flagReason}}"
       },
       "sync": {
         "safe": "Safe to pay — {{date}} is closed ({{corp}} synced {{ago}}).",
@@ -8524,7 +8529,9 @@
       "acrossPayees_one": "across {{count}} payee",
       "acrossPayees_other": "across {{count}} payees",
       "uncreditedNote": "{{amount}} ISK you donated isn't credited yet — check the wallet division ({{accounts}}) before paying again.",
-      "uncreditedEveryNote": "{{amount}} ISK you donated isn't credited yet — ask the corp to sync its book before paying again."
+      "uncreditedEveryNote": "{{amount}} ISK you donated isn't credited yet — ask the corp to sync its book before paying again.",
+      "unlinkedNote_one": "{{amount}} ISK you already sent isn't linked yet — link it first, or this figure bills you twice.",
+      "unlinkedNote_other": "{{count}} payments you already sent ({{amount}} ISK) aren't linked yet — link them first, or this figure bills you twice."
     },
     "continue": {
       "eyebrow": "New EVE day",

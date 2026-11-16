@@ -173,3 +173,41 @@ describe('OwedBalances uncredited donation', () => {
     expect(screen.getByRole('button', { name: 'Settle up' }).className).toMatch(/bg-accent/);
   });
 });
+
+describe('OwedBalances with payments still to link', () => {
+  const unlinkedOf = () => ({ count: 1, amount: 4_000_000 });
+
+  it('puts "Payments to link" ahead of the owed cards, so it is dealt with first', () => {
+    const { container } = renderBalances([balance('a', 9_000_000)], {
+      unlinkedPaymentCount: 1,
+      unlinkedOf,
+    });
+    const titles = [...(container.querySelector('.grid')?.children ?? [])].map(
+      (tile) => tile.textContent ?? ''
+    );
+    expect(titles[0]).toContain('Payments to link');
+    expect(titles[1]).toContain('Payee a');
+  });
+
+  it('warns on the card and steps Settle up down, so the owed figure is not paid twice', () => {
+    renderBalances([balance('a', 9_000_000)], { unlinkedPaymentCount: 1, unlinkedOf });
+    expect(screen.getByText(/4,000,000 ISK you already sent isn't linked yet/)).toBeInTheDocument();
+    // `ghost`, not `primary`: still there, no longer the card's loudest control.
+    const settle = screen.getByRole('button', { name: 'Settle up' });
+    expect(settle.className).toMatch(/bg-transparent/);
+    expect(settle.className).not.toMatch(/bg-accent/);
+  });
+
+  it('leaves Settle up primary when every payment is accounted for', () => {
+    renderBalances([balance('a', 9_000_000)]);
+    expect(screen.getByRole('button', { name: 'Settle up' }).className).toMatch(/bg-accent/);
+  });
+
+  it('leaves a Payee with nothing unlinked alone', () => {
+    renderBalances([balance('a', 9_000_000), balance('b', 1_000_000)], {
+      unlinkedPaymentCount: 1,
+      unlinkedOf: (b) => (b.payee.id === 'a' ? { count: 1, amount: 4_000_000 } : undefined),
+    });
+    expect(screen.getAllByText(/isn't linked yet/)).toHaveLength(1);
+  });
+});

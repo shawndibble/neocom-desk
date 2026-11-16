@@ -1,11 +1,19 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ConflictCause } from '@/engine/corpTaxBook/personal';
+import type { BookRowView, ConflictCause } from '@/engine/corpTaxBook/personal';
 import { formatIsk } from '@/lib/isk';
 import type { CorpRowInfo } from './corpRows';
 
 export type PillState =
-  'pending' | 'billed' | 'conflict' | 'unattributed' | 'dismissed' | 'waived' | 'markedPaid';
+  | 'pending'
+  | 'billed'
+  | 'conflict'
+  | 'unattributed'
+  | 'dismissed'
+  | 'waived'
+  | 'markedPaid'
+  | 'sent'
+  | 'oreWaived';
 
 export const PILL_KEY: Record<PillState, string> = {
   pending: 'pending',
@@ -15,7 +23,22 @@ export const PILL_KEY: Record<PillState, string> = {
   dismissed: 'dismissed',
   waived: 'waived',
   markedPaid: 'markedPaid',
+  sent: 'sent',
+  oreWaived: 'oreWaived',
 };
+
+/**
+ * A Conflict the member has already answered reads as what it now is — waiting on the corporation,
+ * or answered by it — not as a warning they can do nothing more about (#6206). `rejected` is
+ * deliberately absent: an officer who kept the bill has handed the day back, so it stays a
+ * Conflict with the two ways out still on it.
+ */
+export function flaggedPillState(view: BookRowView): 'sent' | 'oreWaived' | undefined {
+  if (view.state !== 'conflict') return undefined;
+  if (view.flagged?.state === 'sent') return 'sent';
+  if (view.flagged?.state === 'dismissed') return 'oreWaived';
+  return undefined;
+}
 
 /** The conflict's resolution day, as the row prints it. */
 export const resolvesOn = (iso: string | undefined) => (iso ? iso.slice(0, 10) : '');
@@ -30,7 +53,11 @@ export function useCorpStateLabel() {
           ? t('miningTax.corpBook.state.markedPaid')
           : corp.view.state === 'paid'
             ? t('miningTax.status.paid')
-            : t(`miningTax.corpBook.state.${PILL_KEY[corp.view.state as PillState]}`),
+            : t(
+                `miningTax.corpBook.state.${
+                  PILL_KEY[flaggedPillState(corp.view) ?? (corp.view.state as PillState)]
+                }`
+              ),
     [t]
   );
 }
@@ -59,14 +86,18 @@ export function useCorpStateHint() {
           owed: formatIsk(view.bookOwed, 0),
         });
       }
+      const flagged = flaggedPillState(view);
       const key =
-        view.state === 'conflict' && view.conflictCause !== undefined
+        flagged ??
+        (view.state === 'conflict' && view.conflictCause !== undefined
           ? CONFLICT_HINT_KEY[view.conflictCause]
-          : view.state;
+          : view.state);
       return t(`miningTax.corpBook.hint.${key}`, {
         corp: corpName,
         date: resolvesOn(view.resolvesAt),
         reason: view.dismissalReason ?? '',
+        sentOn: view.flagged?.at.slice(0, 10) ?? '',
+        flagReason: view.flagged?.reason ?? '',
       });
     },
     [t]

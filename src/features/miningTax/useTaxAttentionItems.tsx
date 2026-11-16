@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, NeedsConnection } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { beginGrant } from '@/app/grantAction';
 import { formatIsk } from '@/lib/isk';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
@@ -24,6 +25,7 @@ import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import type { DisplayRow } from '@/features/miningTax/groupRows';
 import type { PayeeRecord } from '@/db';
 import type { TradeHub } from '@/market/hubs';
+import { extraDuplicateRow } from './duplicateRows';
 import { PricingGapLinks } from './PricingGapLinks';
 import { UnpricedOreDetail } from './UnpricedOreDetail';
 import { hasReachableUnpricedHub } from './unpricedHubs';
@@ -46,6 +48,8 @@ interface Args {
   systemNames: ReadonlyMap<number, string>;
   refresh: () => void;
   openDetail: (dr: DisplayRow) => void;
+  /** Opens a row with the "unassign this?" question already asked — the duplicate's one-click fix. */
+  openUnassign: (dr: DisplayRow) => void;
 }
 
 /** What needs the pilot's attention above the ledger: lapsed logins, missing prices, duplicates, unclaimed donations, unclassified ore. */
@@ -62,6 +66,7 @@ export function useTaxAttentionItems({
   systemNames,
   refresh,
   openDetail,
+  openUnassign,
 }: Args): AttentionItem[] {
   const { t, i18n } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
@@ -178,6 +183,9 @@ export function useTaxAttentionItems({
     });
   }
   if (duplicateRows.length > 0) {
+    // The copy used to say "open the day and Unassign the extra one" over a list of plain text,
+    // leaving the member to find the row themselves. Each day now opens straight on the
+    // "unassign this?" question, which still shows what it removes before anything goes.
     attentionItems.push({
       id: 'duplicates',
       tone: 'warning',
@@ -186,12 +194,29 @@ export function useTaxAttentionItems({
         <>
           <p>{t('miningTax.duplicateHint')}</p>
           <ul className="space-y-0.5">
-            {duplicateRows.map((row) => (
-              <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
-                {row.characterName} — {row.entry.date} —{' '}
-                {systemLabel(systemNames, row.entry.solarSystemId)}
-              </li>
-            ))}
+            {duplicateRows.map((row) => {
+              const label = `${row.characterName} — ${row.entry.date} — ${systemLabel(
+                systemNames,
+                row.entry.solarSystemId
+              )}`;
+              const extra = extraDuplicateRow(row.duplicateAssignmentIds, displayRows);
+              return (
+                <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
+                  {extra ? (
+                    <button
+                      type="button"
+                      className={`text-left ${inlineLinkClassName}`}
+                      aria-label={t('miningTax.duplicateUnassign', { entry: label })}
+                      onClick={() => openUnassign(extra)}
+                    >
+                      {label}
+                    </button>
+                  ) : (
+                    label
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </>
       ),

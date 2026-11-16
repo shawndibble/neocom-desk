@@ -256,6 +256,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     systemNames,
     refresh,
     openDetail: actions.openDetail,
+    openUnassign: actions.confirmUnassignFor,
   });
 
   const { open: openRows, history } = useMemo(
@@ -374,6 +375,20 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                       ? uncreditedByCorp.get(corporationOfPayee(balance.payee.id))
                       : undefined
                   }
+                  unlinkedOf={(balance) => {
+                    // A Corp Tax Book credits itself from the corp's wallet journal and hides
+                    // Link payment, so its card says this through `uncreditedOf` instead:
+                    // pointing at a button that isn't there would be worse than saying nothing.
+                    if (isCorpPayeeId(balance.payee.id)) return undefined;
+                    const mine = linkSuggestions.filter(
+                      (s) => s.balance.payee.id === balance.payee.id
+                    );
+                    if (mine.length === 0) return undefined;
+                    return {
+                      count: mine.length,
+                      amount: mine.reduce((sum, s) => sum + (s.payment.amount ?? 0), 0),
+                    };
+                  }}
                   onAssignNext={assignNext}
                   onReviewPayments={() => actions.openLinkPayment(true)}
                   conflicts={conflicts}

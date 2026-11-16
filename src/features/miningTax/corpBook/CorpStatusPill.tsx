@@ -2,7 +2,12 @@ import { HintText } from '@/components/ui/HintText';
 import { cx } from '@/lib/cx';
 import { StatusPill } from '../StatusPill';
 import type { CorpRowInfo } from './corpRows';
-import { useCorpStateHint, useCorpStateLabel, type PillState } from './useCorpStateText';
+import {
+  flaggedPillState,
+  useCorpStateHint,
+  useCorpStateLabel,
+  type PillState,
+} from './useCorpStateText';
 
 /** The tab's own pill look, with the Corp Tax Book values added (mockup F16). */
 const PILL_TONE: Record<PillState, string> = {
@@ -13,6 +18,9 @@ const PILL_TONE: Record<PillState, string> = {
   dismissed: 'text-text-dim',
   waived: 'text-text-dim',
   markedPaid: 'text-warning bg-warning/10',
+  // Acted on: no longer a warning the member has to answer.
+  sent: 'text-text-dim',
+  oreWaived: 'text-text-dim',
 };
 
 export function CorpStatusPill({ corp }: { corp: CorpRowInfo }) {
@@ -23,8 +31,9 @@ export function CorpStatusPill({ corp }: { corp: CorpRowInfo }) {
   if (corp.kind === 'row' && corp.view.state === 'paid' && !markedOnly) {
     return <StatusPill status="paid" label={label(corp)} hint={hint(corp)} />;
   }
+  const flagged = corp.kind === 'row' ? flaggedPillState(corp.view) : undefined;
   const state = (
-    markedOnly ? 'markedPaid' : corp.kind === 'label' ? corp.state : corp.view.state
+    markedOnly ? 'markedPaid' : (flagged ?? (corp.kind === 'label' ? corp.state : corp.view.state))
   ) as PillState;
   return (
     <HintText content={hint(corp)}>
