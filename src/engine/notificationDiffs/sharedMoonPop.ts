@@ -94,14 +94,16 @@ export function diffSharedMoonPop(
     if (entry.muted === true) return [];
     const was = prevAt.get(entry.popId);
     const fireAt = entry.popAtMs - entry.leadMs;
+    // Moved earlier to a fire time this poll's window can no longer cross: tell it now.
     if (
       was !== undefined &&
       entry.popAtMs < was &&
       fireAt <= prev.nowMs &&
-      entry.popAtMs <= next.nowMs &&
       next.nowMs - entry.popAtMs <= EARLY_LATE_LIMIT_MS
-    )
-      return [{ ...sharedMoonPopFire(characterId, entry), early: true as const }];
+    ) {
+      const fire = sharedMoonPopFire(characterId, entry);
+      return [entry.popAtMs <= next.nowMs ? { ...fire, early: true as const } : fire];
+    }
     const crossed =
       fireAt > prev.nowMs && fireAt <= next.nowMs && next.nowMs - fireAt <= LATE_LIMIT_MS;
     return crossed ? [sharedMoonPopFire(characterId, entry)] : [];

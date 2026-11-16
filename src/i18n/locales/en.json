@@ -9518,8 +9518,8 @@
     },
     "rail": {
       "title": "Coming up",
-      "longOverdue_one": "Overdue over 2 days · oldest {{count}} day",
-      "longOverdue_other": "Overdue over 2 days · oldest {{count}} days",
+      "longOverdue_one": "Overdue over {{windowDays}} days · oldest {{count}} day",
+      "longOverdue_other": "Overdue over {{windowDays}} days · oldest {{count}} days",
       "count_one": "{{count}} ahead",
       "count_other": "{{count}} ahead",
       "countForDay_one": "{{count}} ahead on this day",

@@ -289,6 +289,7 @@ async function cancelStalePopPushes(
       const rows = await db
         .collection(PROJECTIONS_COLLECTION)
         .where('occurrenceKey', '>=', prefix)
+        // `;` is the character after `:`, so this bounds every key under the prefix.
         .where('occurrenceKey', '<', `sharedMoonPop:${id};`)
         .get();
       const stale = rows.docs.filter(
@@ -795,14 +796,17 @@ export async function listCommunityPopSharers(
   ).filter((d) => d.pops.some((p) => p.audiences.includes(`community:${communityId}`)));
   const named = [...indexedNow].map(Number).concat(stale.map((d) => d.corporationId));
   const byCorp = new Map<number, CommunityPopSharer>();
-  for (const corporationId of named) {
-    const status = (await sharingCommunities(deps, corporationId, [communityId])).get(communityId);
+  const statuses = await Promise.all(
+    named.map((id) => sharingCommunities(deps, id, [communityId]))
+  );
+  named.forEach((corporationId, i) => {
+    const status = statuses[i].get(communityId);
     byCorp.set(corporationId, {
       corporationId,
       sharing: status?.officer === true,
       blocked: status?.blocked === true,
     });
-  }
+  });
   for (const d of blocks.docs) {
     const id = Number(d.id);
     if (!byCorp.has(id)) byCorp.set(id, { corporationId: id, sharing: false, blocked: true });

@@ -111,6 +111,22 @@ describe('diffSharedMoonPop: a chunk fractured early', () => {
     expect(diffSharedMoonPop(7, next, { entries: [after], nowMs: NOW + MINUTE_MS })).toEqual([]);
   });
 
+  it('tells it at once when the lead time before the new time is already behind the last poll', () => {
+    const led = { ...before, leadMs: HOUR_MS };
+    const soon = entry({
+      popTime: 'auto-fracture',
+      popAtMs: NOW + 20 * MINUTE_MS,
+      leadMs: HOUR_MS,
+    });
+    const fires = diffSharedMoonPop(
+      7,
+      { entries: [led], nowMs: NOW - MINUTE_MS },
+      { entries: [soon], nowMs: NOW }
+    );
+    expect(fires).toEqual([expect.objectContaining({ popAtMs: soon.popAtMs })]);
+    expect(fires[0].early).toBeUndefined();
+  });
+
   it('tells it at the new time when that is still ahead of this poll', () => {
     const soon = entry({ popTime: 'auto-fracture', popAtMs: NOW + 5 * MINUTE_MS });
     const prev = { entries: [before], nowMs: NOW };

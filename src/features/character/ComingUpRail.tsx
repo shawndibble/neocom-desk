@@ -131,7 +131,10 @@ export function ComingUpRail({
           <Disclosure
             className="border-b border-line"
             label={t('calendar.rail.longOverdue', {
-              count: Math.floor((nowMs - longOverdue[0].deadlineMs) / DAY_MS),
+              count: Math.floor(
+                (nowMs - Math.min(...longOverdue.map((i) => i.deadlineMs))) / DAY_MS
+              ),
+              windowDays: LONG_OVERDUE_MS / DAY_MS,
             })}
             trailing={longOverdue.length}
             expanded={showLongOverdue}
