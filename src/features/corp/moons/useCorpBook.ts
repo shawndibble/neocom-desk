@@ -16,7 +16,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
-import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
+import { bookViewInputOf, loadBookPrices } from './bookViewOf';
 import {
   learnedSystemsOf,
   officerLabelsOf,
@@ -36,13 +36,6 @@ import { loadMoonOreTypeIds, loadTypes } from '@/sde/loadSde';
 import { resolveNames } from '@/features/character/names';
 import { loadStructureAccess, loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
-import {
-  hubForPayee,
-  loadDatedUnitPricesByHub,
-  moonOwnerPricesAtHubOnDate,
-  pricesAtHubOnDate,
-  sourcesAtHubOnDate,
-} from '@/features/miningTax/pricing';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
 import { withMinerTotals } from '@/engine/corpTaxBook/minerScope';
@@ -345,38 +338,9 @@ export function useCorpBook(
 
   const view = useMemo(() => {
     if (fetched.status !== 'loaded' || corporationId === null) return null;
-    const { data } = fetched;
-    const s = data.settings;
-    const built = buildBookView({
-      corporationId,
-      now,
-      startDate: s.startDate,
-      graceHours: s.graceHours,
-      minimumStatement: s.minimumStatement,
-      overdueDays: s.overdueDays,
-      cadence: s.cadence,
-      hubId: s.hubId,
-      oreForm: s.oreForm,
-      structureExpiryHours: s.structureExpiryHours,
-      chunkM3PerHour: s.chunkM3PerHour ?? undefined,
-      lastSyncedAt: s.lastSync ? new Date(s.lastSync.at).toISOString() : undefined,
-      rates: s.rates,
-      entries: groupObservedEntries(data.observed),
-      miners: data.state.miners,
-      statements: data.state.statements,
-      payments: data.state.payments,
-      dismissals: data.state.dismissals,
-      declarations: data.declarations,
-      adjustments: data.adjustments,
-      ...(data.state.writeOffs ? { writeOffs: data.state.writeOffs } : {}),
-      feeders: data.feeders,
-      extractions: data.state.extractions,
-      paidStatementIds: data.state.paidStatementIds,
-      pricesOn: fetched.pricesOn,
-      moonOwnerPricesOn: fetched.moonOwnerPricesOn,
-      memberIds,
-      surveyOreLines,
-    });
+    const built = buildBookView(
+      bookViewInputOf(corporationId, now, fetched.data, fetched, { memberIds, surveyOreLines })
+    );
     const { moon, scopedMiner: minerId, minerScope } = fetched.data;
     if (moon) return withMoonDocs(built, moon.docs, moon.fromDocs);
     return minerId !== undefined ? withMinerTotals(built, minerId, minerScope?.totals) : built;
@@ -540,43 +504,4 @@ export function needsRowsFallback(
     feeders,
     ...(data.feederSummaries ? { summaries: data.feederSummaries } : {}),
   });
-}
-
-/** The unit prices every loaded row and Extraction needs, as the view's two lookups. */
-async function loadBookPrices(data: BookData, from?: string) {
-  const priced = from !== undefined ? data.observed.filter((r) => r.date >= from) : data.observed;
-  const typeIds = new Set<number>(priced.map((r) => r.typeId));
-  for (const x of data.state.extractions) for (const l of x.oreLines ?? []) typeIds.add(l.typeId);
-  const dates = new Set<string>(priced.map((r) => r.date));
-  const loadedOn = utcNow().slice(0, 10);
-  dates.add(loadedOn);
-  const prices = await loadDatedUnitPricesByHub(
-    [...typeIds],
-    [data.settings.hubId],
-    [...dates],
-    data.settings.oreForm === 'compressed',
-    { moonOwner: true }
-  );
-  return {
-    // A page left open past midnight asks for a day it never priced: use the last loaded one.
-    pricesOn: (date: string) => {
-      const day = priceDay(prices, data.settings.hubId, date);
-      return day.prices.size > 0 ? day : priceDay(prices, data.settings.hubId, loadedOn);
-    },
-    // No fallback day: the moon owner's page prices an unsaved day at 0, so this does too.
-    moonOwnerPricesOn: (date: string) =>
-      moonOwnerPricesAtHubOnDate(prices, hubForPayee(data.settings.hubId).id, date),
-  };
-}
-
-function priceDay(
-  data: Awaited<ReturnType<typeof loadDatedUnitPricesByHub>>,
-  hubId: string,
-  date: string
-) {
-  const id = hubForPayee(hubId).id;
-  return {
-    prices: new Map(pricesAtHubOnDate(data, id, date)),
-    sources: new Map(sourcesAtHubOnDate(data, id, date)),
-  };
 }

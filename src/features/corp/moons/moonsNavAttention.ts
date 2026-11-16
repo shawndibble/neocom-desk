@@ -4,13 +4,13 @@
  * Statement run, an Overdue Miner, an Unmatched donation or a dead schedule
  * reaches them outside the Moons page.
  *
- * The book is far too heavy to load in the shell, so the Moons page publishes
- * what it found (`useMoonsAttentionPublisher`) into Dexie, per Character and
- * corporation, and the nav reads that. Only an editor's visit publishes, so the
- * dot never shows for a viewer. A stop the server records after that visit is
- * picked up by a light shell poll of the one status doc
- * (`useMoonsSyncStoppedPoll`), and only for a Character whose editor visit is
- * on record; the scheduled sync's own push alert covers a closed app.
+ * The Moons page publishes what it found (`useMoonsAttentionPublisher`) into Dexie, per
+ * Character and corporation, and the nav reads that. Only an editor's visit publishes, so the
+ * dot never shows for a viewer. While the app is open, a shell poll (`useMoonsAttentionPoll`)
+ * recounts for a Character whose editor visit is on record: the schedule's status doc, and the
+ * book's Needs you as the Overview counts it (`moonsAttentionCount.ts`), so a declaration,
+ * dispute or due Statement run that arrives after the visit lights the dot, and one another
+ * officer handled clears it. The scheduled sync's own push alert covers a closed app.
  */
 import { useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -33,8 +33,8 @@ export interface MoonsAttention {
 const attentionKey = (characterId: number, corporationId: number) =>
   `moonsAttention:${characterId}:${corporationId}`;
 
-/** How often the open app rereads the schedule's status doc. */
-export const MOONS_SYNC_POLL_MS = 30 * MINUTE_MS;
+/** How often the open app recounts. */
+export const MOONS_ATTENTION_POLL_MS = 30 * MINUTE_MS;
 
 function readAttention(value: unknown): MoonsAttention | undefined {
   if (!isRecord(value)) return undefined;
@@ -71,11 +71,11 @@ export function useMoonsNavAttention(): boolean {
 }
 
 /**
- * Rereads `corps/{id}/meta/scheduledSync` for an editor whose visit is on record, and updates
- * the stop. Never mints a token: only while the Firebase session is already this Character's,
- * and a refused read (an expired officer record) keeps what the last visit found.
+ * Recounts the dot for an editor whose visit is on record: rereads `corps/{id}/meta/scheduledSync`
+ * for the stop, and the book for its Needs you count. Never mints a token: only while the Firebase
+ * session is already this Character's. A refused or failed read keeps what was stored for it.
  */
-export async function refreshMoonsSyncStopped(
+export async function refreshMoonsAttention(
   characterId: number,
   corporationId: number
 ): Promise<void> {
@@ -95,21 +95,32 @@ export async function refreshMoonsSyncStopped(
     'meta',
     'scheduledSync'
   );
-  let syncStopped: boolean;
-  try {
-    syncStopped = scheduledSyncFrom((await firestore.getDoc(ref)).data())?.status === 'stopped';
-  } catch {
-    return;
-  }
-  if (syncStopped === stored.syncStopped) return;
-  // Re-read: a Moons visit may have published while this read was in flight.
+  const [syncStopped, needsYou] = await Promise.all([
+    firestore.getDoc(ref).then(
+      (snap) => scheduledSyncFrom(snap.data())?.status === 'stopped',
+      () => undefined
+    ),
+    import('./moonsAttentionCount')
+      .then(({ loadNeedsYouCount }) => loadNeedsYouCount(characterId, corporationId))
+      .catch((err: unknown) => {
+        console.warn('Moons Needs you could not be recounted', err);
+        return undefined;
+      }),
+  ]);
+  // Re-read: a Moons visit may have published while these reads were in flight.
   const latest = readAttention((await db.settings.get(key))?.value);
   if (latest === undefined) return;
-  await db.settings.put({ key, value: { ...latest, syncStopped } });
+  // No active book any more: nothing needs this editor.
+  const next: MoonsAttention = {
+    needsYou: needsYou === null ? 0 : (needsYou ?? latest.needsYou),
+    syncStopped: syncStopped ?? latest.syncStopped,
+  };
+  if (next.needsYou === latest.needsYou && next.syncStopped === latest.syncStopped) return;
+  await db.settings.put({ key, value: next });
 }
 
 /** Mounted once in the shell, like the Communities Request poll: the visible Tab Leader only. */
-export function useMoonsSyncStoppedPoll() {
+export function useMoonsAttentionPoll() {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const corporationId = useActiveCorporationId();
   useEffect(() => {
@@ -117,12 +128,12 @@ export function useMoonsSyncStoppedPoll() {
     const seat = joinTabElection('poller', () => refresh());
     function refresh() {
       if (document.visibilityState !== 'visible' || !seat.isLeader() || !isOnline()) return;
-      void refreshMoonsSyncStopped(characterId!, corporationId!).catch((err) =>
-        console.warn('Moons sync status could not be refreshed', err)
+      void refreshMoonsAttention(characterId!, corporationId!).catch((err) =>
+        console.warn('Moons nav dot could not be refreshed', err)
       );
     }
     refresh();
-    const timer = setInterval(refresh, MOONS_SYNC_POLL_MS);
+    const timer = setInterval(refresh, MOONS_ATTENTION_POLL_MS);
     const onVisible = () => {
       if (document.visibilityState === 'visible') refresh();
     };

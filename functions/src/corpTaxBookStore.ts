@@ -108,6 +108,7 @@ import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
 import { POP_SHARING_DOC, applyMoonOverride, popSharingFrom } from './popSharing.js';
 import type { CorporationAllianceLookup } from './sharedPopsEsi.js';
 import {
+  ALLIANCE_RECHECK_MS,
   EDITOR_CHECKED_AT,
   editorStampFields,
   refreshSharedPops,
@@ -715,8 +716,8 @@ export async function syncBookAs(
   options: { scheduled?: boolean } = {}
 ) {
   const book = bookRef(deps.db, input.corporationId);
-  if (!(await book.get()).exists)
-    fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
+  const held = await book.get();
+  if (!held.exists) fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
   if (input.extractions.length > 0 && !access.isStationManager) {
     fail(
       'permission-denied',
@@ -772,6 +773,18 @@ export async function syncBookAs(
     }
   }
 
+  // A scheduled run that changed nothing (no row, Extraction or donation, the same gaps) is the
+  // common case every two hours: it still stamps `lastSync` (the health strip's "last synced",
+  // and the next run's gap detection), but adds no audit entry and republishes no Shared Pops.
+  const quiet =
+    options.scheduled === true &&
+    observedChanged === 0 &&
+    touchedPulls.size === 0 &&
+    donationsAdded === 0 &&
+    isDeepStrictEqual(
+      input.gaps,
+      (held.get('lastSync') as { gaps?: unknown } | undefined)?.gaps ?? []
+    );
   const now = deps.now();
   await deps.db.runTransaction(async (tx) => {
     tx.update(book, {
@@ -783,6 +796,7 @@ export async function syncBookAs(
         gaps: input.gaps,
       },
     });
+    if (quiet) return;
     appendAudit(
       tx,
       deps,
@@ -806,11 +820,28 @@ export async function syncBookAs(
   // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort, like the totals above.
   await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
   // Only donations and Extractions are in the Overview and Miners tab docs (ADR 0032); rows are not. Best effort.
-  if (donationsAdded > 0 || input.extractions.length > 0)
+  // A quiet run wrote none of either: the docs stand.
+  if (!quiet && (donationsAdded > 0 || input.extractions.length > 0))
     await refreshReadModels(deps.db, input.corporationId, deps.now());
-  // Every sync republishes the book's Shared Pops (#6223). Best effort.
-  await refreshSharedPops(deps, input.corporationId);
+  // A sync that changed something republishes the book's Shared Pops (#6223). Best effort. A
+  // quiet one has nothing new to publish (a viewer's read drops an expired pop by itself), except
+  // what the publish learns on its own clock: the alliance recheck, and refinery names the
+  // scheduled run learned. So it republishes a doc that old, and costs one read otherwise.
+  if (!quiet || (await sharedPopsStale(deps, input.corporationId)))
+    await refreshSharedPops(deps, input.corporationId);
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
+}
+
+/** Whether the book's Shared Pops doc was last published an alliance recheck ago or more. */
+async function sharedPopsStale(deps: BookDeps, corporationId: number): Promise<boolean> {
+  try {
+    const held = await sharedPopsRef(deps.db, corporationId).get();
+    const at = (held.get('updatedAt') as { toMillis?: () => number } | undefined)?.toMillis?.();
+    return held.exists && (at === undefined || deps.now() - at >= ALLIANCE_RECHECK_MS);
+  } catch (e) {
+    console.error('shared pops age read failed', e instanceof Error ? e.message : e);
+    return false;
+  }
 }
 
 /**
