@@ -25,6 +25,8 @@ import type { MarketSnapshot, MarketSnapshotRequest } from './marketData';
 import { buyOrderFeePct } from '@/engine/industry/buyOrderPrices';
 import { materialPricesFor } from './priceBasis';
 import { onPlanHeroBasis } from './planOwnedBasis';
+import type { ProfitBasis } from '@/engine/industry/profitBasis';
+import { DEFAULT_PROFIT_BASIS } from './profitBasisSetting';
 import { planReactionLocation } from './planReactionLocation';
 import type { ReactionLocationState } from '@/engine/industry/reactionLocation';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
@@ -335,7 +337,9 @@ export function computeOpportunityRow(
   hub: TradeHub,
   standing?: ResolvedStandings,
   /** The owner's latest plan: where a plan made on the plan page starts its price basis and build location. */
-  defaultsFrom: BuildPlanRecord | null = null
+  defaultsFrom: BuildPlanRecord | null = null,
+  /** The pilot's Profit Basis setting (`profitBasisSetting.ts`), which the plan page and the Build Plans list read too. */
+  profitBasis: ProfitBasis = DEFAULT_PROFIT_BASIS
 ): UnrankedOpportunityRow | null {
   const blueprint = toIndustryBlueprint(candidate.catalogEntry.blueprint);
   // The plan this row opens prices the product the same way (`capProductPrice`).
@@ -403,13 +407,18 @@ export function computeOpportunityRow(
 
   const productTypeID = candidate.catalogEntry.productTypeID;
   const sellPrice = productTypeID !== null ? snapshot.hubPrices[productTypeID] : undefined;
-  const { result: planResult, forgone } = onPlanHeroBasis(result, {
-    snapshot,
-    modifiers,
-    standing,
-    productQuantity: (blueprint.products[0]?.quantity ?? 0) * plan.runs,
-    productUnitPrice: sellPrice ?? null,
-  });
+  // Held stock is charged at its sell value only on that basis; owned
+  // materials free reads the plan's own figure, as the plan page does.
+  const { result: planResult, forgone } =
+    profitBasis === 'sellValue'
+      ? onPlanHeroBasis(result, {
+          snapshot,
+          modifiers,
+          standing,
+          productQuantity: (blueprint.products[0]?.quantity ?? 0) * plan.runs,
+          productUnitPrice: sellPrice ?? null,
+        })
+      : { result, forgone: 0 };
   const sellVolume = productTypeID !== null ? snapshot.hubSellVolumes[productTypeID] : undefined;
   const sellDepthIsk =
     sellPrice !== undefined && sellVolume !== undefined ? sellPrice * sellVolume : null;
@@ -510,6 +519,8 @@ export interface OpportunityPricingInputs {
   ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
   /** Each owning Character's latest plan, whose price basis and build location rows start from — as a new plan does. */
   defaultsByCharacter: ReadonlyMap<number, BuildPlanRecord | null>;
+  /** How owned materials are counted in a row's profit (`profitBasisSetting.ts`), as on the plan page. */
+  profitBasis: ProfitBasis;
   /** The batch holds a reaction formula, so the reaction Remembered Location prices a row too (issue #5990). */
   pricesReactions?: boolean;
 }
@@ -561,6 +572,7 @@ export function opportunitiesInputsKey(inputs: OpportunityPricingInputs): string
     .map(([characterId, plan]) => [characterId, planSettings(plan)]);
   return stableSerialize({
     assumedMe: inputs.assumedMe,
+    profitBasis: inputs.profitBasis,
     modifiers,
     standings,
     // The reaction record only when a reaction row reads it: a batch of
