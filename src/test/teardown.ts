@@ -266,16 +266,30 @@ export async function settlePendingWork(
   }
 }
 
-/** `settlePendingWork`, reporting a timeout as a warning naming the test. */
+/**
+ * On CI a test whose work outlives it by `SETTLE_TIMEOUT_MS` fails; locally it
+ * only warns, so a slow machine never blocks iterating. A sample of 160 files
+ * (1,873 tests) tripped it zero times when this was switched on.
+ */
+const FAIL_ON_LEFTOVER_WORK = Boolean(process.env.CI);
+
+/**
+ * `settlePendingWork`, reporting a timeout naming the test: a thrown error on
+ * CI (failing that test, or the suite at file teardown), a warning locally.
+ */
 export async function settleOrWarn(
   testName: string | undefined,
-  scope: SettleScope = 'all'
+  scope: SettleScope = 'all',
+  fail = FAIL_ON_LEFTOVER_WORK
 ): Promise<void> {
   try {
     await settlePendingWork(scope);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    console.warn(`[teardown] ${testName ?? '(file teardown)'}: ${reason}`);
+    const message = `[teardown] ${testName ?? '(file teardown)'}: ${reason}`;
+    if (fail)
+      throw new Error(`${message}. Await or stop the work the test started.`, { cause: error });
+    console.warn(message);
   }
 }
 

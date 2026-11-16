@@ -93,6 +93,10 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   failed shards with "self is not defined"). A test that fakes timers still
   restores them itself. Dexie is not wiped between tests: files seed in
   `beforeAll`, so each file keeps clearing the tables it uses.
+  Work still pending a second after the test ends fails that test on CI
+  (`process.env.CI`) and only warns locally. Because that state is per file,
+  `it.concurrent` / `describe.concurrent` are banned by lint, and
+  `src/test/teardownOrder.test.ts` pins the runner order the abort relies on.
 - **Tests stay under 10 seconds each.** `testTimeout` is 10000 in
   `vite.config.ts`, and that is a budget to stay under, not a number to raise.
   A test that needs more is too slow: make it faster instead of adding a

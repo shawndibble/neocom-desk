@@ -196,6 +196,18 @@ const sleepSyntax = [
   },
 ];
 
+// `src/test/teardown.ts` keeps the running test's fetch phase and abort
+// controller in module state, which is sound only while one test runs at a
+// time in a file. A `.concurrent` test or suite would share them.
+const concurrentSyntax = [
+  {
+    selector:
+      "MemberExpression[object.name=/^(it|test|describe)$/][property.name='concurrent'], MemberExpression[object.object.name=/^(it|test|describe)$/][property.name='concurrent']",
+    message:
+      'No .concurrent tests: src/test/teardown.ts tracks one running test per file (its fetch phase and abort controller are module state).',
+  },
+];
+
 // The async-settle half of eslint-plugin-testing-library: un-awaited queries,
 // utils and events, side effects or several assertions inside a `waitFor`
 // retry, `waitFor` + `getBy` where `findBy` says it, an `act` that wraps
@@ -318,6 +330,7 @@ export default tseslint.config(
         ),
         ...sortArrowSyntax,
         ...sleepSyntax,
+        ...concurrentSyntax,
       ],
     },
   },
@@ -357,7 +370,23 @@ export default tseslint.config(
         'error',
         ...withoutNumberFormat(withoutRadius(restrictedSyntax)),
         ...sleepSyntax,
+        ...concurrentSyntax,
       ],
+    },
+  },
+  {
+    // Test helpers wait like tests do: the no-sleep rule reaches them too.
+    files: ['src/test/**/*.ts'],
+    ignores: ['src/test/**/*.test.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...restrictedSyntax, ...sleepSyntax],
+    },
+  },
+  {
+    files: ['src/test/**/*.tsx'],
+    ignores: ['src/test/**/*.test.tsx'],
+    rules: {
+      'no-restricted-syntax': ['error', ...restrictedSyntax, ...sortArrowSyntax, ...sleepSyntax],
     },
   },
   {
@@ -386,13 +415,19 @@ export default tseslint.config(
     files: ['src/components/ui/**/*.test.tsx'],
     ignores: ['src/components/ui/DataTable.test.tsx'],
     rules: {
-      'no-restricted-syntax': ['error', ...sortArrowSyntax, ...iconSizeSyntax, ...sleepSyntax],
+      'no-restricted-syntax': [
+        'error',
+        ...sortArrowSyntax,
+        ...iconSizeSyntax,
+        ...sleepSyntax,
+        ...concurrentSyntax,
+      ],
     },
   },
   {
     files: ['src/components/ui/DataTable.test.tsx'],
     rules: {
-      'no-restricted-syntax': ['error', ...sleepSyntax],
+      'no-restricted-syntax': ['error', ...sleepSyntax, ...concurrentSyntax],
     },
   },
   {
