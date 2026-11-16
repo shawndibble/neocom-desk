@@ -93,9 +93,13 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   failed shards with "self is not defined"). A test that fakes timers still
   restores them itself. Dexie is not wiped between tests: files seed in
   `beforeAll`, so each file keeps clearing the tables it uses.
-  Work still pending a second after the test ends logs a `[teardown]` warning;
-  set `VITEST_FAIL_ON_LEFTOVER_WORK=1` to make it fail the test instead (not yet
-  on in CI: existing leaks must be fixed first). Because that state is per file,
+  Work still pending a second after the test ends fails the test on CI
+  (`VITEST_FAIL_ON_LEFTOVER_WORK=1` in `ci.yml`'s unit shards) and only logs a
+  `[teardown]` warning locally; set the variable to reproduce a CI failure. Under
+  fake timers the usual cause is a faked `setImmediate`, which is
+  fake-indexeddb's scheduler: a Dexie request queued on it is dropped when the
+  timers are restored and never finishes. Fake only what the test needs
+  (`toFake: ['setTimeout', 'clearTimeout']`, or `['Date']`). Because that state is per file,
   `it.concurrent` / `describe.concurrent` are banned by lint, and
   `src/test/teardownOrder.test.ts` pins the runner order the abort relies on.
 - **Tests stay under 10 seconds each.** `testTimeout` is 10000 in
