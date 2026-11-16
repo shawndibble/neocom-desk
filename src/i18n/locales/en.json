@@ -7933,7 +7933,7 @@
     "detailUnreported": "{{reported}} of {{claimed}} reported",
     "splitKeepsInputLabel": "Units of {{ore}} {{payee}} keeps",
     "splitMovesInputLabel": "Units of {{ore}} to move",
-    "splitUnreportedHint": "{{formatted}} more than ESI reports yet. {{payee}} claims it first; the new Payee gets only ore past it.",
+    "splitUnreportedHint": "{{formatted}} more than ESI reports yet. Count this UTC day only: ore mined after 00:00 UTC lands on the next day. {{payee}} claims it first; the new Payee gets only ore past it. At most double what ESI reports.",
     "splitConfirmClaimAction": "Split · keep {{formatted}} more units",
     "splitSliderLabel": "Units of {{ore}} to move",
     "splitCollectorLabel": "Further ore reported for this day goes to",
