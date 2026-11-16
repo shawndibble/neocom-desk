@@ -31,6 +31,7 @@ import {
 } from '@/components/ui';
 import { Pill, type PillTone } from '@/components/ui/Pill';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { AttentionStrip, type AttentionItem } from '@/features/miningTax/AttentionStrip';
 import { OwedBalances } from '@/features/miningTax/OwedBalances';
 import type { ConflictSummary } from '@/features/miningTax/corpBook/conflictSummary';
@@ -173,7 +174,7 @@ export function InlineChoices() {
         <DropdownMenu open modal={false}>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="ghost">
-              Other ways ▾
+              Other ways
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -405,10 +406,10 @@ export function ResolveNotPaying() {
           title="Not paying — hide this"
           hint={`Gone from your tab. ${BUH.name} still bills it.`}
         >
-          <span className="flex items-center gap-2 text-sm">
+          <label className={touchCheckboxLabelClassName}>
             <Checkbox checked onChange={noop} />
             Tell {BUH.name} why
-          </span>
+          </label>
           <TextArea rows={2} defaultValue="The fleet boss said this op was untaxed." />
           <p className="text-xs text-text-dim">
             Their officers see it beside the bill and can write it off or send a reminder. Hidden

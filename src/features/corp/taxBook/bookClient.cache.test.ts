@@ -381,7 +381,9 @@ describe('readBook over the version marker', () => {
 
     const state = await readBookState(7, CORP);
 
-    expect(store.reads).toEqual([BOOK, `${BOOK}/meta/paid`]);
+    // The disputes are the sync's own read (an open one holds its Statement); the page's copy
+    // above never read them.
+    expect(store.reads).toEqual([BOOK, `${BOOK}/meta/paid`, `${BOOK}/disputes`]);
     expect(state?.statements).toEqual([{ id: 's1' }]);
     expect(state?.paidStatementIds).toEqual(new Set(['s0']));
   });
