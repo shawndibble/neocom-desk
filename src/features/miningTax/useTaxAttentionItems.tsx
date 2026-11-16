@@ -10,7 +10,12 @@ import { claimKeyOf } from '@/features/miningTax/corpBook/useAutoClaimDonations'
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
 import { corpBookAttention } from '@/features/miningTax/corpBook/corpAttention';
 import { corpPayAccounts, readsEveryDivision } from '@/features/miningTax/corpBook/corpPayAccount';
-import { corpDayRow } from '@/features/miningTax/corpBook/corpRows';
+import {
+  figureTarget,
+  keptTarget,
+  uncreditedTarget,
+  type ResolveTarget,
+} from '@/features/miningTax/corpBook/resolve/targets';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import {
   CorpDeclarationStatus,
@@ -51,6 +56,11 @@ interface Args {
   openDetail: (dr: DisplayRow) => void;
   /** Opens a row with the "unassign this?" question already asked — the duplicate's one-click fix. */
   openUnassign: (dr: DisplayRow) => void;
+  /**
+   * The Resolve dialog (resolving in the app): opens it on a problem, and the member's own
+   * "Not paying" set, whose problems the strip leaves out — they are listed on the quiet line.
+   */
+  resolve: { open: (target: ResolveTarget) => void; hidden: ReadonlySet<string> };
 }
 
 /** What needs the pilot's attention above the ledger: lapsed logins, missing prices, duplicates, unclaimed donations, unclassified ore. */
@@ -68,6 +78,7 @@ export function useTaxAttentionItems({
   refresh,
   openDetail,
   openUnassign,
+  resolve,
 }: Args): AttentionItem[] {
   const { t, i18n } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
@@ -314,23 +325,18 @@ export function useTaxAttentionItems({
     const corpName = group[0].corpName;
     const only = group.length === 1 ? group[0] : undefined;
     const total = group.reduce((sum, u) => sum + u.amount, 0);
-    // The day the member can act on: the first the donation paid for, which is where its
-    // Statement, its declaration slot and its figures are. Without it the item could only
-    // repeat the advice to go and find an officer.
-    const day = group
-      .flatMap((u) => u.covered.map((date) => ({ characterId: u.characterId, date })))
-      .map((d) => corpDayRow(displayRows, { corporationId, ...d }))
-      .find((dr) => dr !== undefined);
+    // Every way out of it in one dialog: pay again, not paying, or send the proof — the
+    // transfers with their journal refs, checked against the corporation's wallet first.
+    const target = uncreditedTarget(group, corpView?.overlay.rows ?? []);
+    if (resolve.hidden.has(target.hideKey)) continue;
     attentionItems.push({
       id: `corp-uncredited:${corporationId}`,
       tone: 'warning',
-      ...(day && {
-        action: (
-          <Button size="sm" onClick={() => openDetail(day)}>
-            {t('miningTax.corpBook.attention.openDay')}
-          </Button>
-        ),
-      }),
+      action: (
+        <Button size="sm" onClick={() => resolve.open(target)}>
+          {t('miningTax.resolve.open')}
+        </Button>
+      ),
       title: only
         ? t(
             every
@@ -393,6 +399,52 @@ export function useTaxAttentionItems({
             </>
           )}
         </>
+      ),
+    });
+  }
+  // A billed day whose figures differ from the member's own record: it used to be said only
+  // inside Compare with the book, with no way to act on it. And a day an officer kept the bill
+  // on, with what they said to do next. Each once per day, for the Characters in view.
+  const inView = (id: number) =>
+    resolvedCharacterFilter === 'all' || resolvedCharacterFilter.has(id);
+  const seenDays = new Set<string>();
+  for (const row of corpView?.overlay.rows ?? []) {
+    if (!inView(row.characterId)) continue;
+    const kept = row.flagged?.state === 'rejected';
+    const figure = row.state === 'billed' && row.dispute !== undefined && row.flagged === undefined;
+    if (!kept && !figure) continue;
+    const target = kept ? keptTarget(row) : figureTarget(row);
+    if (resolve.hidden.has(target.hideKey) || seenDays.has(target.hideKey)) continue;
+    seenDays.add(target.hideKey);
+    attentionItems.push({
+      id: `corp-${kept ? 'kept' : 'figure'}:${target.hideKey}`,
+      tone: 'warning',
+      title: kept
+        ? t('miningTax.resolve.strip.kept', { corp: row.corpName, date: row.date })
+        : row.dispute?.rate
+          ? t('miningTax.resolve.strip.rate', {
+              corp: row.corpName,
+              date: row.date,
+              book: row.dispute.bookPct,
+              yours: row.dispute.personalPct ?? '?',
+            })
+          : t('miningTax.resolve.strip.quantity', { corp: row.corpName, date: row.date }),
+      detail: kept ? (
+        <>
+          {row.flagged?.reason && <p>{row.flagged.reason}</p>}
+          {row.flagged?.nextStep && (
+            <p className="font-semibold text-text">
+              {t('miningTax.resolve.facts.nextStep', { step: row.flagged.nextStep })}
+            </p>
+          )}
+        </>
+      ) : (
+        <p>{t('miningTax.resolve.strip.figureDetail', { amount: formatIsk(row.billed, 0) })}</p>
+      ),
+      action: (
+        <Button size="sm" onClick={() => resolve.open(target)}>
+          {t('miningTax.resolve.open')}
+        </Button>
       ),
     });
   }

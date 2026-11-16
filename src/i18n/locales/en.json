@@ -7844,6 +7844,13 @@
   },
   "miningTax": {
     "resolve": {
+      "open": "Resolve",
+      "strip": {
+        "kept": "{{corp}} kept the bill on {{date}}",
+        "rate": "{{date}}: {{corp}} bills {{book}}%, you recorded {{yours}}%",
+        "quantity": "{{date}}: {{corp}}'s book recorded more ore than you did",
+        "figureDetail": "Its book bills {{amount}} ISK for the day."
+      },
       "facts": {
         "uncredited": "You sent {{amount}}. {{corp}}'s book synced and still doesn't hold it, so days you had paid are billed again.",
         "journalRef": "journal ref {{ref}}",
@@ -7864,7 +7871,9 @@
         "show": "Show them",
         "hide": "Hide the list",
         "showAgain": "Show again",
-        "showAgainNamed": "Show {{item}} again"
+        "showAgainNamed": "Show {{item}} again",
+        "dayLabel": "{{corp}} · {{date}}",
+        "uncreditedLabel": "{{corp}} · donations not credited"
       },
       "title": {
         "uncredited": "Donations not credited",
@@ -8089,7 +8098,8 @@
         "waived": "Waived",
         "markedPaid": "Marked paid",
         "sent": "Sent",
-        "oreWaived": "Tax waived"
+        "oreWaived": "Tax waived",
+        "notPaying": "Not paying"
       },
       "hint": {
         "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own allocation applies and nothing is owed to the corp.",
@@ -8104,7 +8114,8 @@
         "paid": "Paid to {{corp}}.",
         "markedPaid": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed.",
         "sent": "Sent to {{corp}} on {{sentOn}}. An officer answers it in the book; nothing more to do until they do.",
-        "oreWaived": "{{corp}} waived the tax on that ore: {{flagReason}}"
+        "oreWaived": "{{corp}} waived the tax on that ore: {{flagReason}}",
+        "notPaying": "You chose not to pay this. {{corp}} still bills it; bring it back under Not paying, above."
       },
       "leftCorp": {
         "title": "You left {{corp}}",

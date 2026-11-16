@@ -160,15 +160,17 @@ export function ResolveDialog({
 
   const choiceView = (id: OutcomeId) => {
     const checked = choice === id;
+    // Only the radio, its title and its hint are the label: the chosen outcome's own inputs sit
+    // beside it, so each keeps its own name and the radio's name stays the outcome.
     return (
-      <label
+      <div
         key={id}
         className={cx(
-          'block cursor-pointer rounded-xs border p-2.5',
+          'rounded-xs border p-2.5',
           checked ? 'border-accent bg-accent/5' : 'border-line'
         )}
       >
-        <span className="flex items-start gap-2">
+        <label className="flex cursor-pointer items-start gap-2">
           <Radio
             name="resolve-outcome"
             checked={checked}
@@ -197,9 +199,9 @@ export function ResolveDialog({
               })}
             </span>
           </span>
-        </span>
-        {checked && <span className="mt-2 block space-y-2 pl-6">{inputsFor(id)}</span>}
-      </label>
+        </label>
+        {checked && <div className="mt-2 space-y-2 pl-6">{inputsFor(id)}</div>}
+      </div>
     );
   };
 
@@ -211,10 +213,10 @@ export function ResolveDialog({
         return (
           <>
             {offer.tellWhy && (
-              <span className="flex items-center gap-2 text-sm">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
                 <Checkbox checked={tell} onChange={(e) => setTell(e.target.checked)} />
                 {t(k('tellWhy'), { corp })}
-              </span>
+              </label>
             )}
             {tell && (
               <TextArea

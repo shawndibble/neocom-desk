@@ -6,6 +6,11 @@ import { AttentionStrip } from '@/features/miningTax/AttentionStrip';
 import { AutoAssignmentBar } from '@/features/miningTax/AutoAssignmentBar';
 import { CorpBookSyncNote } from '@/features/miningTax/corpBook/CorpBookSyncNote';
 import { LeftCorpNotices } from '@/features/miningTax/corpBook/LeftCorpNotice';
+import { dayKey } from '@/features/miningTax/corpBook/resolve/notPaying';
+import { QuietStatusLine } from '@/features/miningTax/corpBook/resolve/QuietStatusLine';
+import { conflictTarget } from '@/features/miningTax/corpBook/resolve/targets';
+import { useResolve } from '@/features/miningTax/corpBook/resolve/useResolve';
+import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import { leftCorpBooksOf } from '@/features/miningTax/corpBook/leftCorpBooks';
 import {
   corporationOfPayee,
@@ -255,6 +260,54 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     [linkSuggestions]
   );
 
+  // The Resolve dialog (resolving in the app): every problem's ways out, in one place.
+  const openBookDay = useCallback(
+    (row: BookRowView) => {
+      const target = allDisplayRows.find(
+        (dr) => dr.corp?.kind === 'row' && dr.corp.view.id === row.id
+      );
+      if (target) actions.openDetail(target);
+    },
+    [allDisplayRows, actions]
+  );
+  const resolve = useResolve({
+    corpView,
+    nameOf: (id) => characterNames.get(id) ?? '',
+    reloadCorpBooks,
+    onPay: actions.openCorpPay,
+    onOpenDay: openBookDay,
+  });
+  // What the member has answered: one quiet line, out of the strip, never gone.
+  const quiet = useMemo(() => {
+    const rows = corpView?.overlay.rows ?? [];
+    const waiting = new Set([
+      ...rows
+        .filter((r) => r.flagged?.state === 'sent')
+        .map((r) => dayKey(r.corporationId, r.characterId, r.date)),
+      ...rows
+        .filter((r) => r.declaration?.state === 'waiting' && r.statementId !== undefined)
+        .map((r) => `statement:${r.corporationId}:${r.statementId}`),
+    ]).size;
+    const corpName = (id: number) =>
+      corpView?.books.find((b) => b.loaded.corporationId === id)?.corpName ?? String(id);
+    const notPaying = [...resolve.hidden].sort().map((key) => {
+      const [kind, corporationId, , date] = key.split(':');
+      return {
+        key,
+        label:
+          kind === 'uncredited'
+            ? t('miningTax.resolve.quiet.uncreditedLabel', {
+                corp: corpName(Number(corporationId)),
+              })
+            : t('miningTax.resolve.quiet.dayLabel', {
+                corp: corpName(Number(corporationId)),
+                date,
+              }),
+      };
+    });
+    return { waiting, notPaying };
+  }, [corpView, resolve.hidden, t]);
+
   const attentionItems = useTaxAttentionItems({
     data,
     resolvedCharacterFilter,
@@ -269,6 +322,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     refresh,
     openDetail: actions.openDetail,
     openUnassign: actions.confirmUnassignFor,
+    resolve,
   });
 
   const { open: openRows, history } = useMemo(
@@ -356,6 +410,12 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             {data && data.fromCache && <CachedNotice fetchedAt={data.fetchedAt} />}
 
             <AttentionStrip items={attentionItems} />
+            <QuietStatusLine
+              waiting={quiet.waiting}
+              notPaying={quiet.notPaying}
+              onShow={resolve.show}
+            />
+            {resolve.dialog}
 
             <LeftCorpNotices
               books={leftCorpBooks}
@@ -417,7 +477,17 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                   onAssignNext={assignNext}
                   onReviewPayments={() => actions.openLinkPayment(true)}
                   conflicts={conflicts}
-                  onReviewConflicts={() => conflicts && actions.openDetail(conflicts.first)}
+                  onReviewConflicts={() => {
+                    const first = conflicts?.first.corp;
+                    if (first?.kind !== 'row') return;
+                    const payeeId = first.view.overlap?.payeeIds[0];
+                    resolve.open(
+                      conflictTarget(
+                        first.view,
+                        payeeId !== undefined ? payeeById.get(payeeId)?.name : undefined
+                      )
+                    );
+                  }}
                 />
 
                 {data && <PendingGroupingNotice characters={characters} />}

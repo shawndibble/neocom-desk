@@ -14,7 +14,8 @@ export type PillState =
   | 'waived'
   | 'markedPaid'
   | 'sent'
-  | 'oreWaived';
+  | 'oreWaived'
+  | 'notPaying';
 
 export const PILL_KEY: Record<PillState, string> = {
   pending: 'pending',
@@ -26,6 +27,7 @@ export const PILL_KEY: Record<PillState, string> = {
   markedPaid: 'markedPaid',
   sent: 'sent',
   oreWaived: 'oreWaived',
+  notPaying: 'notPaying',
 };
 
 /**
@@ -35,6 +37,8 @@ export const PILL_KEY: Record<PillState, string> = {
  * Conflict with the two ways out still on it.
  */
 export function flaggedPillState(view: BookRowView): 'sent' | 'oreWaived' | undefined {
+  // A billed day can be disputed too now (resolving in the app): while sent, it says so.
+  if (view.state === 'billed' && view.flagged?.state === 'sent') return 'sent';
   if (view.state !== 'conflict' || !answeredByMember(view)) return undefined;
   return view.flagged?.state === 'sent' ? 'sent' : 'oreWaived';
 }

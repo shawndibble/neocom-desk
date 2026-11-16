@@ -262,12 +262,15 @@ describe('uncredited donations in the attention strip', () => {
     const user = userEvent.setup();
     renderTab();
 
-    // Two donations, one corporation, one row in the strip — not the same advisory twice.
-    expect(screen.getByText('1 thing needs attention')).toBeInTheDocument();
+    // Two donations, one corporation, one row in the strip — not the same advisory twice. (The
+    // strip may also list the day's own figure dispute; that is another problem.)
     await user.click(screen.getByText('Show'));
+    expect(screen.getAllByText(/hasn't credited/)).toHaveLength(1);
     expect(
       screen.getByText(/Brass Meridian Logistics hasn't credited 2 of your donations/)
     ).toBeInTheDocument();
+    // And it has a way out, not advice: one Resolve.
+    expect(screen.getAllByRole('button', { name: 'Resolve' }).length).toBeGreaterThan(0);
 
     // Each donation still names itself, so the member can give an officer the exact transfers.
     const items = screen.getAllByRole('listitem');
