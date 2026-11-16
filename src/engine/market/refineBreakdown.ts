@@ -15,12 +15,12 @@
  * The comparison is deliberately the table's: `rowFigures(...).refine.verdict`
  * judges a row as refined value plus leftover units, at the row's as-is unit
  * price on the basis, against its as-is total on the basis
- * (`rowFigures(...).asIs`), and this does the same over the whole pile. A row with no
+ * (`asIsFigures`), and this does the same over the whole pile. A row with no
  * as-is price on the basis is no comparison there: not a win.
  */
 import { reprocessingYield } from '@/engine/industry/reprocessing';
 import { netOfReprocessingTax } from '@/engine/industry/refiningSetup';
-import { rowFigures } from './appraisalRowFigures';
+import { asIsFigures } from './appraisalRowFigures';
 import {
   priceOnBasis,
   REFINE_BASES,
@@ -147,7 +147,7 @@ function netMineralValue(
       gross += output.quantity * (mineralPrice(detail, output.typeId, basis) ?? 0);
     }
     value += (gross * pricePercent) / 100;
-    leftover += yielded.unitsLeftOver * (rowFigures(row, basis, null).asIs.each ?? 0);
+    leftover += yielded.unitsLeftOver * (asIsFigures(row, basis).each ?? 0);
   }
   return { value: netOfReprocessingTax(value, taxRate), leftover };
 }
@@ -219,7 +219,7 @@ export function buildRefineBreakdown({
       minerals.set(output.typeId, line);
     }
     const refined = netOfReprocessingTax(gross, taxRate);
-    const { asIs: rowAsIs } = rowFigures(row, basis, null);
+    const rowAsIs = asIsFigures(row, basis);
     const unpriced = rowAsIs.total === null || rowAsIs.each === null;
     const itemLeftover = yielded.unitsLeftOver * (rowAsIs.each ?? 0);
     const itemAsIs = rowAsIs.total ?? 0;

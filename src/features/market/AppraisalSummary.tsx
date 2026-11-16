@@ -39,7 +39,7 @@ interface AppraisalSummaryProps {
   refineEfficiency?: string | null;
   onOpenRefine?: () => void;
   /** The remembered price basis the Refine figures are on. */
-  refineBasis?: RefineBasis;
+  refineBasis: RefineBasis;
 }
 
 export function AppraisalSummary({
@@ -60,7 +60,7 @@ export function AppraisalSummary({
   compareLive,
   refineEfficiency,
   onOpenRefine,
-  refineBasis = 'buy',
+  refineBasis,
 }: AppraisalSummaryProps) {
   const { t } = useTranslation();
   const totals = result.appraisal.totals;

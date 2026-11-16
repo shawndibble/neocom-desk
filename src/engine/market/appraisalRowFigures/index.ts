@@ -3,4 +3,10 @@
  * the as-is figures, the refine figures and their verdict, and the sell fees.
  * Callers read the one record rather than picking a helper and a basis each.
  */
-export { rowFigures, pileFigures, type RowFigures, type PileFigures } from './rowFigures';
+export {
+  rowFigures,
+  pileFigures,
+  basisFreeFigures,
+  asIsFigures,
+  type RowFigures,
+} from './rowFigures';

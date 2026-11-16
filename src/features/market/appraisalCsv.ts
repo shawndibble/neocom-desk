@@ -5,7 +5,7 @@ import {
   type AppraisalRow,
   type RefineBasis,
 } from '@/engine/market/appraisal';
-import { rowFigures, type RowFigures } from '@/engine/market/appraisalRowFigures';
+import { basisFreeFigures, rowFigures } from '@/engine/market/appraisalRowFigures';
 import type { OwnedRow } from '@/engine/market/appraisalOwned';
 import { priceMarkKey } from './priceStateLabel';
 
@@ -39,15 +39,15 @@ export function appraisalCsvColumns(
   t: CsvTranslate,
   { fees, live }: AppraisalCsvOptions = {}
 ): CsvColumn<OwnedRow>[] {
-  // The basis only moves the refine figures, which a Shared Appraisal's file leaves out.
-  const basis: RefineBasis = live?.refineBasis ?? 'buy';
-  const figures = (row: AppraisalRow): RowFigures => rowFigures(row, basis, fees ?? null);
   const columns: CsvColumn<OwnedRow>[] = [
     { header: t('market.appraisal.columnQuantity'), value: (row) => row.quantity },
     { header: t('market.appraisal.columnItem'), value: (row) => row.name },
     { header: t('market.appraisal.columnBuyEach'), value: (row) => row.buyEach },
     { header: t('market.appraisal.columnSellEach'), value: (row) => row.sellEach },
-    { header: t('market.appraisal.columnSplitEach'), value: (row) => figures(row).splitEach },
+    {
+      header: t('market.appraisal.columnSplitEach'),
+      value: (row) => basisFreeFigures(row, null).splitEach,
+    },
     { header: t('market.appraisal.columnBuyTotal'), value: (row) => row.buyTotal },
     { header: t('market.appraisal.columnSellTotal'), value: (row) => row.sellTotal },
     // Packaged m³ (issue #2337); unknown exports empty, the same as an unpriced side.
@@ -55,15 +55,16 @@ export function appraisalCsvColumns(
     { header: t('market.appraisal.columnIskPerM3'), value: (row) => iskPerM3(row) },
   ];
   if (live !== undefined) {
+    const refineOf = (row: AppraisalRow) => rowFigures(row, live.refineBasis, null).refine;
     columns.push(
       // Blank where the type has no reprocessing data / no held LP store sells it.
       {
         header: t('market.appraisal.columnRefineTotal'),
-        value: (row) => figures(row).refine.minerals,
+        value: (row) => refineOf(row).minerals,
       },
       {
         header: t('market.appraisal.columnRefineWithLeftover'),
-        value: (row) => figures(row).refine.withLeftover,
+        value: (row) => refineOf(row).withLeftover,
       },
       { header: t('market.appraisal.columnLpTotal'), value: (row) => row.lpIskCost },
       { header: t('market.appraisal.columnLpCost'), value: (row) => row.lpCost },
@@ -83,18 +84,19 @@ export function appraisalCsvColumns(
   }
   if (fees !== undefined) {
     // Blank until the skills are known (`fees` null), never a base-rate guess.
+    const feesOf = (row: AppraisalRow) => basisFreeFigures(row, fees).fees;
     columns.push(
       {
         header: t('market.appraisal.columnSalesTax'),
-        value: (row) => figures(row).fees.salesTax,
+        value: (row) => feesOf(row).salesTax,
       },
       {
         header: t('market.appraisal.columnBrokerFee'),
-        value: (row) => figures(row).fees.brokerFee,
+        value: (row) => feesOf(row).brokerFee,
       },
       {
         header: t('market.appraisal.columnSellAfterFees'),
-        value: (row) => figures(row).fees.afterFees,
+        value: (row) => feesOf(row).afterFees,
       }
     );
   }

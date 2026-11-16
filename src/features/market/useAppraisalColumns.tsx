@@ -56,7 +56,7 @@ export function useAppraisalColumns({
   owned,
   standing,
   onOpenRefine,
-  refineBasis = 'buy',
+  refineBasis,
   refineReady = true,
 }: {
   controller: AppraisalController;
@@ -66,7 +66,7 @@ export function useAppraisalColumns({
   /** Opens the refine breakdown on one item; absent, the Refine figure is plain text. */
   onOpenRefine?: (typeId: number) => void;
   /** The side of the book the Refine total column is priced on (the remembered pick). */
-  refineBasis?: RefineBasis;
+  refineBasis: RefineBasis;
   /** False until the remembered basis has loaded, so the Refine figures do not show on buy first and then switch. */
   refineReady?: boolean;
 }) {

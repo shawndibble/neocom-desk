@@ -29,7 +29,7 @@ export interface AppraisalSellGroups {
 
 export function appraisalSellGroups(
   appraisal: Pick<Appraisal, 'rows' | 'items'>,
-  refineBasis: RefineBasis = 'buy'
+  refineBasis: RefineBasis
 ): AppraisalSellGroups {
   const groups: AppraisalSellGroups = { sellNow: [], list: [], refine: [] };
 
