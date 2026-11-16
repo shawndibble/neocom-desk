@@ -36,6 +36,7 @@ import {
   disputeIdFor,
   type DeclareOwnInput,
   type DisputeConflictInput,
+  type DisputeKind,
   type WithdrawDisputeInput,
   EXTRACTIONS,
   FEEDER_INVITES_COLLECTION,
@@ -1676,6 +1677,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           at: iso,
           by,
           ...(action.reason ? { reason: action.reason } : {}),
+          ...(action.nextStep ? { nextStep: action.nextStep } : {}),
         },
       });
       return {
@@ -1706,7 +1708,14 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         );
         billing.push(...snap.docs.map((d) => d.data()));
       }
-      const priced = billedDisputeTax({ lines }, billing);
+      const priced = billedDisputeTax(
+        {
+          lines,
+          ...(typeof dispute.kind === 'string' ? { kind: dispute.kind as DisputeKind } : {}),
+          ...(typeof dispute.claimedPct === 'number' ? { claimedPct: dispute.claimedPct } : {}),
+        },
+        billing
+      );
       const limit = c.book.dismissApprovalAboveIsk as number | null | undefined;
       if (priced === undefined && action.amountIsk === undefined)
         fail('failed-precondition', 'That ore is not billed yet', 'not-priced');
@@ -1758,8 +1767,11 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const ref = col(c, DISPUTES).doc(action.disputeId);
       const dispute = await mustGet(c, ref, 'Dispute');
       if (dispute.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
-      tx.update(ref, { resolution: { kind: 'rejected', at: iso, by, reason: action.reason } });
-      return { detail: { disputeId: action.disputeId, reason: action.reason } };
+      const nextStep = action.nextStep !== undefined ? { nextStep: action.nextStep } : {};
+      tx.update(ref, {
+        resolution: { kind: 'rejected', at: iso, by, reason: action.reason, ...nextStep },
+      });
+      return { detail: { disputeId: action.disputeId, reason: action.reason, ...nextStep } };
     }
     case 'recordReminder': {
       const ref = col(c, STATEMENTS).doc(action.statementId);
@@ -2400,6 +2412,9 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
     const ref = sub(deps.db, corporationId, DISPUTES).doc(disputeId);
     const held = (await tx.get(ref)).data();
     if (held?.resolution) fail('failed-precondition', 'An officer answered this day', 'rejected');
+    // One thing said per day: a second call adds lines to the same kind, never a different one.
+    if (held && ((held.kind as string | undefined) ?? 'payee') !== input.kind)
+      fail('already-exists', 'This day already has a dispute', 'already-disputed');
     const heldLines = (held?.lines as DisputeConflictInput['lines'] | undefined) ?? [];
     for (const line of heldLines) characters.add(parseRecordKey(line.recordKey).characterId);
     // The ore each line names, held or new, must be on the book's record, no more than recorded.
@@ -2414,13 +2429,15 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
     }
     const lines = mergeDisputeLines(heldLines, input.lines, recorded);
     const iso = new Date(deps.now()).toISOString();
+    // A payee dispute is stored as before (no `kind`), so a reader older than kinds still reads it.
+    const said = {
+      ...(input.kind !== 'payee' ? { kind: input.kind } : {}),
+      ...(input.reason !== undefined ? { reason: input.reason } : {}),
+      ...(input.claimedPct !== undefined ? { claimedPct: input.claimedPct } : {}),
+      ...(input.note !== undefined ? { note: input.note } : {}),
+    };
     if (held) {
-      tx.update(ref, {
-        lines,
-        uids,
-        updatedAt: iso,
-        ...(input.note !== undefined ? { note: input.note } : {}),
-      });
+      tx.update(ref, { lines, uids, updatedAt: iso, ...said });
     } else {
       tx.create(ref, {
         id: disputeId,
@@ -2431,7 +2448,7 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
         at: iso,
         updatedAt: iso,
         uids,
-        ...(input.note !== undefined ? { note: input.note } : {}),
+        ...said,
       });
     }
     appendAudit(
@@ -2440,7 +2457,7 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
       corporationId,
       { characterId, name: 'Player dispute', via: 'player-claim' },
       'disputeConflict',
-      { disputeId, minerId, date, lines: input.lines.length }
+      { disputeId, minerId, date, kind: input.kind, lines: input.lines.length }
     );
     return { disputeId };
   });

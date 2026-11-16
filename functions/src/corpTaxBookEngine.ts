@@ -170,6 +170,8 @@ export interface AllocPayment {
 export interface AllocDismissalCredit {
   statementId: string;
   amount: number;
+  /** The line it credits: `heldByStatement` never holds a line a dismissal already credits. */
+  chargeKey?: string;
 }
 
 /** Mirror of allocation.ts `OfficerWriteOff` (#4637). */
@@ -207,6 +209,8 @@ export function allocatePayments(rawInput: {
   dismissalCredits: readonly AllocDismissalCredit[];
   officerWriteOffs?: readonly AllocWriteOff[];
   startDate?: string;
+  /** Mirror of allocation.ts `held`: what open disputes hold of each Statement. */
+  held?: ReadonlyMap<string, number>;
 }) {
   const { startDate } = rawInput;
   const input = {
@@ -218,9 +222,20 @@ export function allocatePayments(rawInput: {
   const ordered = [...input.statements].sort(
     (a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id)
   );
-  type Running = { amount: number; credited: number; paidIn: number; forgiven: number };
+  type Running = {
+    amount: number;
+    held: number;
+    credited: number;
+    paidIn: number;
+    forgiven: number;
+  };
+  const heldOf = (s: { id: string; amount: number }) =>
+    Math.min(Math.max(0, input.held?.get(s.id) ?? 0), Math.max(0, s.amount));
   const state = new Map<string, Running>(
-    ordered.map((s) => [s.id, { amount: s.amount, credited: 0, paidIn: 0, forgiven: 0 }])
+    ordered.map((s) => [
+      s.id,
+      { amount: s.amount - heldOf(s), held: heldOf(s), credited: 0, paidIn: 0, forgiven: 0 },
+    ])
   );
   const isDone = (st: Running): boolean => {
     const remaining = st.amount - st.credited;
@@ -295,6 +310,7 @@ export function allocatePayments(rawInput: {
       writtenOff: number;
       remaining: number;
       settled: boolean;
+      held?: number;
     }
   >();
   let billed = 0;
@@ -308,6 +324,7 @@ export function allocatePayments(rawInput: {
     writtenOffTotal += writtenOff;
     byStatement.set(s.id, {
       amount: st.amount,
+      ...(st.held > 0 ? { held: st.held } : {}),
       credited: st.credited,
       forgiven: st.forgiven,
       writtenOff,
@@ -429,7 +446,8 @@ export function dismissalCredits(input: {
             return false;
         }
       });
-      if (hit) credits.push({ statementId: st.id, amount: line.tax ?? 0 });
+      if (hit)
+        credits.push({ statementId: st.id, amount: line.tax ?? 0, chargeKey: line.chargeKey });
     }
   }
   return credits;
@@ -1254,4 +1272,79 @@ export function payoutPeriod(
 /** The reason to paste into the in-game transfer. Never the miner rate or margin. */
 export function payoutReason(prefix: string, period: { from: string; to: string } | undefined) {
   return period ? `${prefix}, ${period.from} to ${period.to}` : prefix;
+}
+
+// --- Disputes that hold their day (resolving in the app) ------------------------
+// Mirror of src/engine/corpTaxBook/disputes.ts `disputeHold` and `heldByStatement`.
+
+export const DISPUTE_HOLD_DAYS = 14;
+
+export interface HoldingDispute {
+  lines: readonly { recordKey: string; typeId: number; quantity: number }[];
+  at: string;
+  resolution?: unknown;
+  kind?: string;
+  claimedPct?: number;
+}
+
+export interface HeldStatementLine {
+  kind?: string;
+  chargeKey?: string;
+  oreLines?: readonly { typeId: number; quantity: number }[];
+  unitPrices?: Readonly<Record<string, number>>;
+  taxPct?: number;
+  tax?: number;
+}
+
+/** Mirror of `disputeHold`: unanswered, and raised less than 14 days before `now`. */
+export function disputeHolds(
+  dispute: Pick<HoldingDispute, 'at' | 'resolution'>,
+  now: string
+): boolean {
+  if (dispute.resolution) return false;
+  return Date.parse(now) < Date.parse(dispute.at) + DISPUTE_HOLD_DAYS * 86_400_000;
+}
+
+/** Mirror of `heldByStatement`. */
+export function heldByStatement(
+  statements: readonly { id: string; lines: readonly HeldStatementLine[] }[],
+  disputes: readonly HoldingDispute[],
+  credited: ReadonlySet<string>,
+  now: string
+): Map<string, number> {
+  const held = new Map<string, number>();
+  for (const d of disputes) {
+    if (!disputeHolds(d, now)) continue;
+    for (const l of d.lines) {
+      let left = l.quantity;
+      for (const s of statements) {
+        for (const line of s.lines) {
+          if (left <= 0) break;
+          if (line.chargeKey !== l.recordKey) continue;
+          if (line.kind !== 'mined' && line.kind !== 'late-ore') continue;
+          if (credited.has(`${s.id}|${line.chargeKey}`)) continue;
+          const billed = (line.oreLines ?? []).reduce(
+            (n, o) => (o.typeId === l.typeId ? n + o.quantity : n),
+            0
+          );
+          const take = Math.min(left, billed);
+          const price = line.unitPrices?.[String(l.typeId)];
+          if (take <= 0 || price === undefined || line.taxPct === undefined) continue;
+          const pct =
+            d.kind === 'rate' && d.claimedPct !== undefined
+              ? Math.max(0, line.taxPct - d.claimedPct)
+              : line.taxPct;
+          const amount = Math.min(take * price * (pct / 100), line.tax ?? Infinity);
+          held.set(s.id, (held.get(s.id) ?? 0) + amount);
+          left -= take;
+        }
+      }
+    }
+  }
+  return held;
+}
+
+/** The `credited` set `heldByStatement` reads, from a Miner's dismissal credits. */
+export function creditedLines(credits: readonly AllocDismissalCredit[]): Set<string> {
+  return new Set(credits.flatMap((c) => (c.chargeKey ? [`${c.statementId}|${c.chargeKey}`] : [])));
 }

@@ -8,7 +8,10 @@
 
 import {
   allocatePayments,
+  creditedLines,
   dismissalCredits,
+  heldByStatement,
+  type HoldingDispute,
   moonOnDay,
   shiftDate,
   type AllocWriteOff,
@@ -621,7 +624,17 @@ export interface SettleStatement {
   minerId: string;
   amount: number;
   issuedAt: string;
-  lines: { chargeKey?: string; date?: string; tax?: number; structureId?: number }[];
+  lines: {
+    chargeKey?: string;
+    date?: string;
+    tax?: number;
+    structureId?: number;
+    /** Read by `heldByStatement` to price a disputed line as it was billed. */
+    kind?: string;
+    oreLines?: { typeId: number; quantity: number }[];
+    unitPrices?: Record<string, number>;
+    taxPct?: number;
+  }[];
 }
 
 export interface SettlePayment {
@@ -645,6 +658,9 @@ interface SettleInput {
   /** Officer write-offs (#4637): a Statement one forgives in full is settled. */
   writeOffs?: readonly (AllocWriteOff & { minerId: string })[];
   startDate?: string;
+  /** Engine `SettleInput.disputes`: with `now`, an open one holds its amount out of what is due. */
+  disputes?: readonly (HoldingDispute & { minerId: string })[];
+  now?: string;
 }
 
 /** Engine `planSettlements`: the Statements now settled that the book does not yet hold as paid. */
@@ -652,7 +668,9 @@ export function planSettlements(input: SettleInput): string[] {
   const settled: string[] = [];
   for (const { statements, allocation } of allocateEachMiner(input)) {
     for (const s of statements) {
-      if (allocation.byStatement.get(s.id)?.settled && !input.alreadyPaid.has(s.id)) {
+      const st = allocation.byStatement.get(s.id);
+      // Settled only because a dispute holds part of it: not for good (D22).
+      if (st?.settled && !st.held && !input.alreadyPaid.has(s.id)) {
         settled.push(s.id);
       }
     }
@@ -737,18 +755,29 @@ function allocateEachMiner(input: Omit<SettleInput, 'alreadyPaid'>) {
   return minerIds.map((minerId) => {
     const statements = input.statements.filter((s) => s.minerId === minerId);
     const payments = input.payments.filter((p) => p.minerId === minerId);
+    const credits = dismissalCredits({
+      minerId,
+      statements,
+      dismissals: input.dismissals,
+      extractions: input.extractions,
+      expiryHours: {},
+    });
+    const held =
+      input.now !== undefined && input.disputes
+        ? heldByStatement(
+            statements,
+            input.disputes.filter((d) => d.minerId === minerId),
+            creditedLines(credits),
+            input.now
+          )
+        : new Map<string, number>();
     const allocation = allocatePayments({
       statements,
       payments,
-      dismissalCredits: dismissalCredits({
-        minerId,
-        statements,
-        dismissals: input.dismissals,
-        extractions: input.extractions,
-        expiryHours: {},
-      }),
+      dismissalCredits: credits,
       officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId),
       startDate: input.startDate,
+      ...(held.size > 0 ? { held } : {}),
     });
     return { minerId, statements, allocation };
   });

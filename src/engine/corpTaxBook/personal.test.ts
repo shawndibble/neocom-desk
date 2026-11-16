@@ -2574,3 +2574,173 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
     });
   });
 });
+
+describe('resolving in the app: an open dispute holds its day', () => {
+  const keyOf = (date: string) => `${ME}:1000:${date}`;
+  const observedOn = (dates: string[]) =>
+    dates.map((date) => ({
+      characterId: ME,
+      recordedCorporationId: CORP,
+      structureId: 1000,
+      date,
+      solarSystemId: SYSTEM,
+      oreLines: [{ typeId: ZEO, quantity: 10_000 }],
+    }));
+  const disputeOn = (date: string, over: Partial<OreDispute> = {}): OreDispute => ({
+    id: `solo_${date}`,
+    minerId: `solo:${ME}`,
+    date,
+    kind: 'notPaying',
+    reason: 'The fleet boss said this op was untaxed',
+    lines: [{ recordKey: keyOf(date), typeId: ZEO, quantity: 10_000, payeeName: '' }],
+    by: ME,
+    at: '2026-10-18T13:00:00.000Z',
+    ...over,
+  });
+  const DAYS = ['2026-10-15', '2026-10-16', '2026-10-17'];
+  // 10,000 × 148 × 15% = 222,000 a day.
+  const days = () =>
+    DAYS.map((date) => entry({ date, oreLines: [{ typeId: ZEO, quantity: 10_000 }] }));
+
+  it('lets a billed day carry a dispute: its record, what was said, and the hold', () => {
+    const out = overlay(
+      [entry()],
+      [
+        book({
+          disputes: [
+            disputeOn('2026-10-17', {
+              lines: [
+                { recordKey: keyOf('2026-10-17'), typeId: ZEO, quantity: 43_050, payeeName: '' },
+              ],
+            }),
+          ],
+        }),
+      ]
+    );
+    expect(out.rows[0]).toMatchObject({
+      state: 'billed',
+      recordKey: keyOf('2026-10-17'),
+      flagged: { state: 'sent' },
+      held: { kind: 'notPaying', until: '2026-11-01T13:00:00.000Z' },
+    });
+  });
+
+  it('skips a held day: a donation pays the next oldest instead', () => {
+    const out = overlay(days(), [
+      book({
+        observed: observedOn(DAYS),
+        disputes: [disputeOn('2026-10-15')],
+        inFlight: [{ characterId: ME, amount: 222_000, at: '2026-10-18T13:10:00Z' }],
+      }),
+    ]);
+    const byDate = Object.fromEntries(out.rows.map((r) => [r.date, r.state]));
+    expect(byDate).toEqual({
+      '2026-10-15': 'billed',
+      '2026-10-16': 'paid',
+      '2026-10-17': 'billed',
+    });
+  });
+
+  it('holds nothing once an officer has answered', () => {
+    const answered = disputeOn('2026-10-15', {
+      resolution: { kind: 'rejected', at: '2026-10-18T14:00:00.000Z', by: 1, reason: 'ours' },
+    });
+    const out = overlay(days(), [
+      book({
+        observed: observedOn(DAYS),
+        disputes: [answered],
+        inFlight: [{ characterId: ME, amount: 222_000, at: '2026-10-18T13:10:00Z' }],
+      }),
+    ]);
+    expect(out.rows.find((r) => r.date === '2026-10-15')).toMatchObject({ state: 'paid' });
+    expect(out.rows.find((r) => r.date === '2026-10-15')?.held).toBeUndefined();
+  });
+
+  describe('marks under the corporation’s own Payee follow the book: oldest day first', () => {
+    const owned = (status: 'paid' | 'outstanding') =>
+      DAYS.map((date, i) =>
+        entry({
+          date,
+          oreLines: [{ typeId: ZEO, quantity: 10_000 }],
+          freeOreLines: [],
+          allocations: [
+            {
+              id: `a-${i}`,
+              payeeId: 'bmw',
+              taxPct: 15,
+              oreLines: [{ typeId: ZEO, quantity: 10_000 }],
+              // Only the newest day was marked paid.
+              status: i === 2 ? status : 'outstanding',
+            },
+          ],
+        })
+      );
+
+    it('pays the oldest day with a mark made on the newest, as the book will', () => {
+      const out = overlay(owned('paid'), [
+        book({ observed: observedOn(DAYS), ownPayeeIds: ['bmw'] }),
+      ]);
+      const byDate = Object.fromEntries(out.rows.map((r) => [r.date, r.state]));
+      expect(byDate).toEqual({
+        '2026-10-15': 'paid',
+        '2026-10-16': 'billed',
+        '2026-10-17': 'billed',
+      });
+      expect(out.rows.find((r) => r.date === '2026-10-15')?.settledBy).toBe('yourMark');
+    });
+
+    it('skips a held day with a mark too', () => {
+      const out = overlay(owned('paid'), [
+        book({
+          observed: observedOn(DAYS),
+          ownPayeeIds: ['bmw'],
+          disputes: [disputeOn('2026-10-15')],
+        }),
+      ]);
+      const byDate = Object.fromEntries(out.rows.map((r) => [r.date, r.state]));
+      expect(byDate).toEqual({
+        '2026-10-15': 'billed',
+        '2026-10-16': 'paid',
+        '2026-10-17': 'billed',
+      });
+    });
+  });
+
+  describe('a disputed Conflict day', () => {
+    const assigned = () =>
+      entry({
+        freeOreLines: [],
+        oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+        allocations: [
+          {
+            payeeId: 'ashfall',
+            taxPct: 10,
+            oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+            status: 'outstanding',
+          },
+        ],
+      });
+    // Its own clock runs out on 2026-11-01T00:30; the dispute, raised 25 Oct, holds to 8 Nov.
+    const told = disputeOn('2026-10-17', {
+      kind: undefined,
+      reason: undefined,
+      at: '2026-10-25T00:00:00.000Z',
+      lines: [
+        { recordKey: keyOf('2026-10-17'), typeId: ZEO, quantity: 43_050, payeeName: 'Ashfall' },
+      ],
+    });
+
+    it('does not resolve to the corporation while the dispute holds it', () => {
+      const out = overlay([assigned()], [book({ disputes: [told] })], '2026-11-02T00:00:00Z');
+      expect(out.rows[0]).toMatchObject({
+        state: 'conflict',
+        resolvesAt: '2026-11-08T00:00:00.000Z',
+      });
+    });
+
+    it('resolves once the hold runs out unanswered', () => {
+      const out = overlay([assigned()], [book({ disputes: [told] })], '2026-11-09T00:00:00Z');
+      expect(out.rows.some((r) => r.state === 'conflict')).toBe(false);
+    });
+  });
+});

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { DayCharge } from './charges';
-import { disputedTax, disputesToShow, readDisputes, type OreDispute } from './disputes';
+import {
+  DISPUTE_HOLD_DAYS,
+  disputeHold,
+  disputeKindOf,
+  disputedTax,
+  disputesToShow,
+  heldByStatement,
+  readDisputes,
+  type OreDispute,
+} from './disputes';
 import type { Dismissal } from './dismissals';
 
 const dispute = (overrides: Partial<OreDispute> = {}): OreDispute => ({
@@ -122,5 +131,171 @@ describe('a waived dispute (#6206)', () => {
     const [read] = readDisputes([dispute({ resolution: waived })]);
     expect(read.resolution).toEqual(waived);
     expect(disputesToShow([read], [])).toEqual([]);
+  });
+});
+
+describe('dispute kinds (resolve in the app)', () => {
+  it('reads a dispute stored before kinds as a payee dispute', () => {
+    expect(disputeKindOf(dispute())).toBe('payee');
+  });
+
+  it('reads back a kind, the member reason and a claimed rate', () => {
+    const [read] = readDisputes([
+      { ...dispute(), kind: 'rate', reason: 'We agreed 10%', claimedPct: 10 },
+    ]);
+    expect(read).toMatchObject({ kind: 'rate', reason: 'We agreed 10%', claimedPct: 10 });
+  });
+
+  it('drops an unknown kind back to payee rather than losing the dispute', () => {
+    const [read] = readDisputes([{ ...dispute(), kind: 'mystery' }]);
+    expect(disputeKindOf(read)).toBe('payee');
+  });
+
+  it("reads back the officer's next step on a kept bill", () => {
+    const [read] = readDisputes([
+      {
+        ...dispute(),
+        resolution: {
+          kind: 'rejected',
+          at: '2026-11-04T00:00:00.000Z',
+          by: 1,
+          reason: 'Book stands',
+          nextStep: 'Send the journal screenshot to Imra',
+        },
+      },
+    ]);
+    expect(read.resolution).toMatchObject({ nextStep: 'Send the journal screenshot to Imra' });
+  });
+});
+
+describe('disputedTax on a rate dispute', () => {
+  const charge = {
+    key: '60:1000:2026-11-01',
+    oreLines: [{ typeId: 45490, quantity: 100 }],
+    unitPrices: { 45490: 1000 },
+    taxPct: 12,
+  };
+
+  // Waiving a rate dispute credits only the difference between the two rates.
+  it('prices the gap between the billed rate and the claimed one', () => {
+    const rate = dispute({
+      kind: 'rate',
+      claimedPct: 10,
+      lines: [{ recordKey: charge.key, typeId: 45490, quantity: 100, payeeName: '' }],
+    });
+    expect(disputedTax(rate, [charge])).toBeCloseTo(100 * 1000 * 0.02);
+  });
+
+  it('credits nothing when the claimed rate is not lower', () => {
+    const rate = dispute({
+      kind: 'rate',
+      claimedPct: 15,
+      lines: [{ recordKey: charge.key, typeId: 45490, quantity: 100, payeeName: '' }],
+    });
+    expect(disputedTax(rate, [charge])).toBe(0);
+  });
+});
+
+describe('disputeHold', () => {
+  const at = '2026-11-03T00:00:00.000Z';
+  const day = 24 * 60 * 60 * 1000;
+
+  it('holds an unanswered dispute until 14 days after it was raised', () => {
+    const hold = disputeHold(dispute({ at }), '2026-11-05T00:00:00.000Z');
+    expect(hold).toEqual({
+      until: new Date(Date.parse(at) + DISPUTE_HOLD_DAYS * day).toISOString(),
+    });
+  });
+
+  it('lapses once the 14 days are up, so the day is owed as before', () => {
+    const late = new Date(Date.parse(at) + DISPUTE_HOLD_DAYS * day).toISOString();
+    expect(disputeHold(dispute({ at }), late)).toBeUndefined();
+  });
+
+  it('holds nothing an officer has answered', () => {
+    const answered = dispute({
+      at,
+      resolution: { kind: 'rejected', at: '2026-11-04T00:00:00.000Z', by: 1, reason: 'ours' },
+    });
+    expect(disputeHold(answered, '2026-11-05T00:00:00.000Z')).toBeUndefined();
+  });
+});
+
+describe('heldByStatement', () => {
+  const NOW = '2026-11-05T00:00:00.000Z';
+  const statement = (id: string, chargeKey: string, quantity: number, taxPct = 10) => ({
+    id,
+    lines: [
+      {
+        kind: 'mined',
+        chargeKey,
+        oreLines: [{ typeId: 45490, quantity }],
+        unitPrices: { 45490: 1000 },
+        taxPct,
+        tax: quantity * 1000 * (taxPct / 100),
+      },
+    ],
+  });
+  const open = dispute({
+    lines: [{ recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 100, payeeName: '' }],
+  });
+
+  it('holds the disputed ore of the Statement that billed it, at its price and rate', () => {
+    const held = heldByStatement(
+      [statement('s1', '60:1000:2026-11-01', 400)],
+      [open],
+      new Set(),
+      NOW
+    );
+    expect(held.get('s1')).toBe(100 * 1000 * 0.1);
+  });
+
+  it('holds only the rate gap for a rate dispute', () => {
+    const rate = { ...open, kind: 'rate' as const, claimedPct: 8 };
+    const held = heldByStatement(
+      [statement('s1', '60:1000:2026-11-01', 100, 12)],
+      [rate],
+      new Set(),
+      NOW
+    );
+    expect(held.get('s1')).toBeCloseTo(100 * 1000 * 0.04);
+  });
+
+  it('holds nothing of a line a dismissal already credits, so it is never counted twice', () => {
+    const held = heldByStatement(
+      [statement('s1', '60:1000:2026-11-01', 400)],
+      [open],
+      new Set(['s1|60:1000:2026-11-01']),
+      NOW
+    );
+    expect(held.size).toBe(0);
+  });
+
+  it('holds nothing once answered, or once its 14 days are up', () => {
+    const answered = {
+      ...open,
+      resolution: { kind: 'rejected' as const, at: NOW, by: 1, reason: 'r' },
+    };
+    expect(
+      heldByStatement([statement('s1', '60:1000:2026-11-01', 400)], [answered], new Set(), NOW).size
+    ).toBe(0);
+    expect(
+      heldByStatement(
+        [statement('s1', '60:1000:2026-11-01', 400)],
+        [open],
+        new Set(),
+        '2026-12-01T00:00:00.000Z'
+      ).size
+    ).toBe(0);
+  });
+
+  it('never holds more ore than the Statement billed', () => {
+    const held = heldByStatement(
+      [statement('s1', '60:1000:2026-11-01', 40)],
+      [open],
+      new Set(),
+      NOW
+    );
+    expect(held.get('s1')).toBe(40 * 1000 * 0.1);
   });
 });

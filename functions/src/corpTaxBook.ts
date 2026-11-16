@@ -587,7 +587,12 @@ export type EditAction =
       kind: 'contract' | 'other-division' | 'wrong-corp';
       note?: string;
     }
-  | { action: 'rejectDispute'; disputeId: string; reason: string }
+  /**
+   * `nextStep`: what the member should do now, shown to them word for word. The app requires it;
+   * the server accepts its absence until every deployed client sends it (production's client is
+   * older than this function).
+   */
+  | { action: 'rejectDispute'; disputeId: string; reason: string; nextStep?: string }
   /**
    * Waives only the disputed ore (#6206): a credit Adjustment on the day, not a dismissal of the
    * whole record. The server prices it from the Statements that billed the day; `amountIsk`, the
@@ -605,6 +610,8 @@ export type EditAction =
       declarationId: string;
       resolution: 'confirmed' | 'rejected';
       reason?: string;
+      /** A rejection's next step for the member (see `rejectDispute`). */
+      nextStep?: string;
     }
   | { action: 'recordReminder'; statementId: string }
   /** Pop Sharing (#6222): the switch and the Sharing default. Turning it on needs Automatic sync. */
@@ -660,6 +667,8 @@ export function dismissalNeedsDirector(
 
 const reason = (v: unknown) => boundedString(v, 'reason', 500);
 const optNote = (v: unknown) => (v === undefined ? undefined : boundedString(v, 'note', 500));
+const optNextStep = (v: unknown) =>
+  v === undefined ? undefined : boundedString(v, 'nextStep', 500);
 const optId = (v: unknown, f: string) => (v === undefined ? undefined : docId(v, f));
 const money = (v: unknown, f: string) => num(v, f, 0.01, 1e13);
 
@@ -875,15 +884,24 @@ export function parseEditAction(data: unknown): EditAction {
       };
     case 'resolveDeclaration': {
       const resolution = oneOf(d.resolution, 'resolution', ['confirmed', 'rejected'] as const);
+      const nextStep = resolution === 'rejected' ? optNextStep(d.nextStep) : undefined;
       return {
         action,
         declarationId: docId(d.declarationId, 'declarationId'),
         resolution,
         reason: resolution === 'rejected' ? reason(d.reason) : optNote(d.reason),
+        ...(nextStep !== undefined ? { nextStep } : {}),
       };
     }
-    case 'rejectDispute':
-      return { action, disputeId: docId(d.disputeId, 'disputeId'), reason: reason(d.reason) };
+    case 'rejectDispute': {
+      const nextStep = optNextStep(d.nextStep);
+      return {
+        action,
+        disputeId: docId(d.disputeId, 'disputeId'),
+        reason: reason(d.reason),
+        ...(nextStep !== undefined ? { nextStep } : {}),
+      };
+    }
     case 'dismissDispute':
       return {
         action,
@@ -1320,12 +1338,26 @@ export interface DisputeLine {
   payeeName: string;
 }
 
-/** A Miner's "I gave this ore to {payee}" on a Conflict day (#6206). */
+/**
+ * What a member says about a day (resolving in the app): `payee`, the ore went to another Payee
+ * (#6206); `quantity`, the book recorded more ore than they mined; `rate`, the book's rate is
+ * higher than the one that applies; `notPaying`, they will not pay it. Mirrors the engine's
+ * `DisputeKind` (`src/engine/corpTaxBook/disputes.ts`).
+ */
+export const DISPUTE_KINDS = ['payee', 'quantity', 'rate', 'notPaying'] as const;
+export type DisputeKind = (typeof DISPUTE_KINDS)[number];
+
+/** A Miner's word on a day: "I gave this ore to {payee}" (#6206), or one of the other kinds. */
 export interface DisputeConflictInput {
   corporationId: number;
   date: string;
+  kind: DisputeKind;
   lines: DisputeLine[];
   note?: string;
+  /** Why, in the member's own words: required for every kind but `payee`. */
+  reason?: string;
+  /** A `rate` dispute: the rate, in percent, the member says applies. */
+  claimedPct?: number;
 }
 
 /** The most ore lines one disputed day carries: a day's ore types across a Miner's characters. */
@@ -1334,6 +1366,8 @@ export const DISPUTE_LINES_MAX = 100;
 export function parseDisputeConflictInput(data: unknown): DisputeConflictInput {
   const d = record(data);
   const date = dateString(d.date, 'date');
+  // Absent on a client older than kinds: the original payee dispute.
+  const kind = d.kind === undefined ? 'payee' : oneOf(d.kind, 'kind', DISPUTE_KINDS);
   const raw = list(d.lines, 'lines', DISPUTE_LINES_MAX);
   if (raw.length === 0) throw new HttpsError('invalid-argument', 'lines must not be empty');
   const lines = raw.map((x) => {
@@ -1344,15 +1378,22 @@ export function parseDisputeConflictInput(data: unknown): DisputeConflictInput {
       recordKey: key.key,
       typeId: int(l.typeId, 'typeId'),
       quantity: int(l.quantity, 'quantity'),
-      payeeName: boundedString(l.payeeName, 'payeeName', 100),
+      // Only a payee dispute names a Payee; the other kinds are about the book's own figures.
+      payeeName:
+        kind === 'payee' || l.payeeName !== undefined
+          ? boundedString(l.payeeName, 'payeeName', 100)
+          : '',
     };
   });
   const note = optNote(d.note);
   return {
     corporationId: parseBookCall(data).corporationId,
     date,
+    kind,
     lines,
     ...(note !== undefined ? { note } : {}),
+    ...(kind !== 'payee' ? { reason: reason(d.reason) } : {}),
+    ...(kind === 'rate' ? { claimedPct: num(d.claimedPct, 'claimedPct', 0, 100) } : {}),
   };
 }
 
@@ -1451,7 +1492,11 @@ function billedLineOf(raw: unknown): (BilledLine & { chargeKey: string }) | null
  * client's word under the Director limit.
  */
 export function billedDisputeTax(
-  dispute: { lines: readonly Pick<DisputeLine, 'recordKey' | 'typeId' | 'quantity'>[] },
+  dispute: {
+    lines: readonly Pick<DisputeLine, 'recordKey' | 'typeId' | 'quantity'>[];
+    kind?: DisputeKind;
+    claimedPct?: number;
+  },
   statements: readonly { lines?: unknown }[]
 ): number | undefined {
   const billed = new Map<string, BilledLine[]>();
@@ -1480,7 +1525,12 @@ export function billedDisputeTax(
       if (take <= 0) continue;
       const price = line.unitPrices[String(typeId)];
       if (typeof price !== 'number') return undefined;
-      tax += take * price * (line.taxPct / 100);
+      // A rate dispute is about the rate, not the ore: waiving it credits only the gap.
+      const pct =
+        dispute.kind === 'rate' && dispute.claimedPct !== undefined
+          ? Math.max(0, line.taxPct - dispute.claimedPct)
+          : line.taxPct;
+      tax += take * price * (pct / 100);
       left -= take;
     }
   }

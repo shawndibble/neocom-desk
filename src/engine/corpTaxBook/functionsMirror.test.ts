@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as mirror from '../../../functions/src/corpTaxBookEngine';
 import { allocatePayments, dismissalCredits, isBeforeBook } from './allocation';
+import { DISPUTE_HOLD_DAYS, heldByStatement } from './disputes';
 import { placeOfFactory } from './openSet';
 import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
 import type { Dismissal } from './dismissals';
@@ -183,6 +184,93 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect(theirs.balance).toBe(ours.balance);
   });
 
+  it('holds disputed amounts identically, and allocates around them the same way', () => {
+    expect(mirror.DISPUTE_HOLD_DAYS).toBe(DISPUTE_HOLD_DAYS);
+    const statements = [
+      {
+        id: 's1',
+        lines: [
+          {
+            kind: 'mined',
+            chargeKey: '60:1000:2026-11-01',
+            oreLines: [{ typeId: 45490, quantity: 400 }],
+            unitPrices: { '45490': 1000 },
+            taxPct: 12,
+            tax: 48_000,
+          },
+          {
+            kind: 'mined',
+            chargeKey: '60:1000:2026-11-02',
+            oreLines: [{ typeId: 45490, quantity: 100 }],
+            unitPrices: { '45490': 1000 },
+            taxPct: 12,
+            tax: 12_000,
+          },
+        ],
+      },
+    ];
+    const disputes = [
+      {
+        at: '2026-11-03T00:00:00.000Z',
+        kind: 'rate',
+        claimedPct: 10,
+        lines: [{ recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 400 }],
+      },
+      {
+        at: '2026-11-03T00:00:00.000Z',
+        lines: [{ recordKey: '60:1000:2026-11-02', typeId: 45490, quantity: 100 }],
+      },
+    ];
+    for (const now of ['2026-11-05T00:00:00.000Z', '2026-12-01T00:00:00.000Z']) {
+      for (const credited of [new Set<string>(), new Set(['s1|60:1000:2026-11-02'])]) {
+        const theirs = mirror.heldByStatement(statements, disputes, credited, now);
+        const ours = heldByStatement(
+          statements,
+          disputes.map((d) => ({
+            ...d,
+            lines: d.lines.map((l) => ({ ...l, payeeName: '' })),
+          })) as never,
+          credited,
+          now
+        );
+        expect([...theirs]).toEqual([...ours]);
+      }
+    }
+    const held = new Map([['s1', 20_000]]);
+    const theirs = mirror.allocatePayments({
+      statements: [{ id: 's1', amount: 60_000, issuedAt: '2026-11-30T00:00:00Z' }],
+      payments: [{ id: 'p1', amount: 40_000, at: '2026-12-01T00:00:00Z' }],
+      dismissalCredits: [],
+      held,
+    });
+    const ours = allocatePayments({
+      statements: [
+        {
+          id: 's1',
+          amount: 60_000,
+          issuedAt: '2026-11-30T00:00:00Z',
+          minerId: 'm',
+          code: '',
+          lines: [],
+        } as never,
+      ],
+      payments: [
+        {
+          id: 'p1',
+          amount: 40_000,
+          at: '2026-12-01T00:00:00Z',
+          minerId: 'm',
+          characterId: 1,
+          source: 'donation',
+        },
+      ],
+      dismissalCredits: [],
+      held,
+    });
+    expect([...theirs.byStatement]).toEqual([...ours.byStatement]);
+    expect(ours.byStatement.get('s1')).toMatchObject({ settled: true, held: 20_000 });
+  });
+
   it('applies officer write-offs identically (#4637)', () => {
     const statements = [
       { id: 's2', amount: 8_000_000, issuedAt: '2026-07-31T00:00:00Z' },
@@ -355,7 +443,7 @@ describe('functions mirror of the Corp Tax Book engine', () => {
           ),
           dismissals,
           charges
-        ).map((c) => ({ statementId: c.statementId, amount: c.amount }));
+        ).map((c) => ({ statementId: c.statementId, amount: c.amount, chargeKey: c.chargeKey }));
         const theirs = mirror.dismissalCredits({
           minerId: 'solo:50',
           statements,

@@ -298,6 +298,8 @@ describe('parsers', () => {
     ).toEqual({
       corporationId: 9,
       date: '2026-11-01',
+      // A client older than kinds sends none: the original payee dispute.
+      kind: 'payee',
       lines: [line],
     });
     // A line from another day is not this day's dispute.
@@ -325,6 +327,77 @@ describe('parsers', () => {
         lines: [{ ...line, payeeName: '' }],
       })
     ).toThrow();
+  });
+
+  it('parses the other kinds: a reason always, a claimed rate for a rate dispute, no Payee', () => {
+    const line = { recordKey: '7:1000:2026-11-01', typeId: 45490, quantity: 1200 };
+    expect(
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-01',
+        kind: 'rate',
+        reason: 'We agreed 10%',
+        claimedPct: 10,
+        lines: [line],
+      })
+    ).toEqual({
+      corporationId: 9,
+      date: '2026-11-01',
+      kind: 'rate',
+      reason: 'We agreed 10%',
+      claimedPct: 10,
+      lines: [{ ...line, payeeName: '' }],
+    });
+    // Not paying, without saying why, is the member's own hide: nothing reaches the server.
+    expect(() =>
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-01',
+        kind: 'notPaying',
+        lines: [line],
+      })
+    ).toThrow();
+    expect(() =>
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-01',
+        kind: 'rate',
+        reason: 'r',
+        lines: [line],
+      })
+    ).toThrow();
+    expect(() =>
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-01',
+        kind: 'mystery',
+        reason: 'r',
+        lines: [line],
+      })
+    ).toThrow();
+  });
+
+  it("carries an officer's next step when a bill is kept, and still accepts none", () => {
+    expect(
+      parseEditAction({
+        action: 'rejectDispute',
+        disputeId: 'm_2026-11-01',
+        reason: 'Book stands',
+        nextStep: 'Send the journal screenshot to Imra',
+      })
+    ).toMatchObject({ nextStep: 'Send the journal screenshot to Imra' });
+    expect(
+      parseEditAction({ action: 'rejectDispute', disputeId: 'm_2026-11-01', reason: 'r' })
+    ).not.toHaveProperty('nextStep');
+    expect(
+      parseEditAction({
+        action: 'resolveDeclaration',
+        declarationId: 'x1',
+        resolution: 'rejected',
+        reason: 'Not in any division',
+        nextStep: 'Pay it to the Master wallet',
+      })
+    ).toMatchObject({ nextStep: 'Pay it to the Master wallet' });
   });
 
   it('names one dispute per Miner and day, a safe doc id (#6206)', () => {
@@ -458,6 +531,18 @@ describe('parsers', () => {
         billedDisputeTax(disputed, [{ lines: [mined('60:1000:2026-11-01', 45490, 100)] }])
       ).toBeUndefined();
       expect(billedDisputeTax(disputed, [])).toBeUndefined();
+    });
+
+    // A rate dispute is about the rate: waiving it credits the gap, never the whole tax.
+    it('prices a rate dispute as the gap between the billed and claimed rates', () => {
+      const statements = [{ lines: [mined('60:1000:2026-11-01', 45490, 100, 12)] }];
+      const rate = {
+        kind: 'rate' as const,
+        claimedPct: 10,
+        lines: [{ recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 100 }],
+      };
+      expect(billedDisputeTax(rate, statements)).toBeCloseTo(100 * 1000 * 0.02);
+      expect(billedDisputeTax({ ...rate, claimedPct: 15 }, statements)).toBe(0);
     });
 
     it('ignores correction lines and malformed lines', () => {

@@ -44,7 +44,7 @@ import {
 import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry } from './types';
 import type { Declaration, OverdueStatus } from './overdue';
-import type { OreDispute } from './disputes';
+import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from './disputes';
 import { DAY_MS, MINUTE_MS } from '@/lib/age';
 
 /** What made a day Paid: the member's own mark, the corporation's settled Statement, or a donation. */
@@ -227,6 +227,15 @@ export interface MemberFlag {
   reason?: string;
 }
 
+/**
+ * A day an open dispute holds (resolving in the app): payments skip it and a Conflict day does
+ * not resolve to the corporation, until an officer answers or `until` passes (`disputeHold`).
+ */
+export interface RowHold {
+  until: string;
+  kind: DisputeKind;
+}
+
 /** Whether the member may declare now: never while one waits, or after the corporation confirmed. */
 export const canDeclare = (declaration: MemberDeclaration | undefined) =>
   declaration === undefined || declaration.state === 'rejected';
@@ -302,6 +311,8 @@ export interface BookRowView {
   recordKey?: string;
   /** A conflict the member sent to the corporation (#6206). */
   flagged?: MemberFlag;
+  /** An open dispute holds the day: payments skip it (`RowHold`). */
+  held?: RowHold;
   /** The refinery that recorded the line. */
   structureId?: number;
   /** The refinery's name, when known; callers fall back to the system. */
@@ -489,6 +500,7 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
     dismissals: book.dismissals,
     ...(book.writeOffs ? { writeOffs: book.writeOffs } : {}),
     ...(book.declarations ? { declarations: book.declarations } : {}),
+    ...(book.disputes ? { disputes: book.disputes } : {}),
     ...(book.overdueDays !== undefined ? { overdueDays: book.overdueDays } : {}),
     ...(book.feeders ? { feeders: book.feeders } : {}),
     pricesOn: book.pricesOn,
@@ -939,6 +951,8 @@ export function overlayCorpBooks(input: {
     const { book } = p;
     const value = dayValue(charge);
     const owedLines = conflict ? minusLines(value.lines, conflict.lines) : value.lines;
+    // An open dispute on the record holds the day: computed here, before any payment covers it.
+    const held = holdFor(charge.charge.key, book.disputes ?? [], now);
     const common = commonOf(p, charge, value);
     // With several books the member's entry is split among them: each book is held to its share.
     const dispute = disputeOf(
@@ -967,6 +981,7 @@ export function overlayCorpBooks(input: {
         conflictCause: conflict.cause,
         ...(conflict.ownerPayeeId !== undefined ? { ownerPayeeId: conflict.ownerPayeeId } : {}),
         ...(dispute ? { dispute } : {}),
+        ...(held ? { held } : {}),
       });
       if (owedLines.length === 0) return;
     }
@@ -992,12 +1007,15 @@ export function overlayCorpBooks(input: {
       ...common,
       id,
       state: 'billed',
+      // The record a dispute names: a billed day can be disputed too (resolving in the app).
+      recordKey: charge.charge.key,
       oreLines: owedLines,
       estimatedValue: worth.estimatedValue,
       taxOwed: worth.taxOwed,
       billed: worth.taxOwed,
       ...(charge.statement ? { statementId: charge.statement.id } : {}),
       ...(dispute && !conflict ? { dispute } : {}),
+      ...(held ? { held } : {}),
     });
   };
 
@@ -1062,11 +1080,16 @@ export function overlayCorpBooks(input: {
       const freeTaken = minusLines(resolved.fromFree, own.lines);
       left = minusLines(left, freeTaken);
       addTaken(takenFromFree, key, freeTaken);
-      // A day on a Statement is the corp's decision, owed in full; so is a conflict that ran its 14 days.
+      // A day on a Statement is the corp's decision, owed in full; so is a conflict that ran its
+      // 14 days — unless the member disputed it, which holds the day until an officer answers or
+      // the hold's own 14 days run out.
+      const heldDay = here
+        .map((c) => holdFor(c.charge.key, p.book.disputes ?? [], now))
+        .find((h) => h !== undefined);
       const contested =
-        onStatement || resolved.conflict.length === 0 || resolved.conflictOwed
+        onStatement || resolved.conflict.length === 0 || (resolved.conflictOwed && !heldDay)
           ? undefined
-          : { resolvesAt: resolved.conflictResolvesAt ?? '' };
+          : { resolvesAt: laterOf(resolved.conflictResolvesAt, heldDay?.until) ?? '' };
       // What the member's Payees and this book both claim, whether or not it is still a
       // conflict (on a Statement, or after 14 days, the book bills it and it is an overlap).
       let remaining = resolved.conflict;
@@ -1259,8 +1282,12 @@ export function overlayCorpBooks(input: {
         row.taxOwed = parts.reduce((sum, part) => sum + part.owed, 0);
       }
     }
-    // What the member paid under the corporation's own Payee is paid on their side, day by day;
-    // the corporation still confirms it against its wallet.
+    // What the member paid under the corporation's own Payee is paid on their side; the
+    // corporation still confirms it against its wallet. The book cannot be told which days a
+    // payment was for — it pays a Miner's oldest days first — so the marks are measured on the
+    // days the member named, then spent the way the book will spend the ISK: oldest first, a day
+    // an open dispute holds skipped (resolving in the app). Otherwise the tab shows days 3 and 4
+    // paid while the book credits 1 and 2.
     const paidOf = memberPaid.get(p.book.corporationId);
     // The same payment may also be a donation in flight or credit the book holds: count it once,
     // per Miner.
@@ -1281,11 +1308,27 @@ export function overlayCorpBooks(input: {
         if (covered.length === 0) continue;
         paidOf.set(key, minusLines(left, covered));
         const { taxOwed } = computeAssignmentValue(covered, priceMap(row.unitPrices), row.taxPct);
-        const before = row.taxOwed ?? 0;
-        const owed = Math.max(0, before - taxOwed);
-        creditedByMark.set(minerOf(row), (creditedByMark.get(minerOf(row)) ?? 0) + before - owed);
-        row.taxOwed = owed < 0.01 ? 0 : owed;
-        if (row.taxOwed === 0) {
+        const worth = Math.min(row.taxOwed ?? 0, taxOwed);
+        creditedByMark.set(minerOf(row), (creditedByMark.get(minerOf(row)) ?? 0) + worth);
+      }
+      for (const [minerId, amount] of creditedByMark) {
+        const open = mine.filter(
+          (r) => minerOf(r) === minerId && r.state === 'billed' && (r.taxOwed ?? 0) > 0 && !r.held
+        );
+        // As `coverInFlight`, but what is left after the last whole day still reduces the next
+        // one: a part payment owes less, as the book will count it.
+        let left = amount;
+        for (const row of [...open].sort(
+          (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)
+        )) {
+          if (left <= 0) break;
+          const before = row.taxOwed ?? 0;
+          if (left < before - settleTolerance(before)) {
+            row.taxOwed = before - left;
+            break;
+          }
+          left = Math.max(0, left - before);
+          row.taxOwed = 0;
           row.state = 'paid';
           row.settledBy = 'yourMark';
           // The member's side is done; the book's Statement still bills the day until it credits it.
@@ -1316,7 +1359,8 @@ export function overlayCorpBooks(input: {
       const minerId = minerIdFor(d.characterId, p.book.miners);
       lostBy.set(minerId, (lostBy.get(minerId) ?? 0) + d.amount);
     }
-    const open = mine.filter((r) => r.state === 'billed' && (r.taxOwed ?? 0) > 0);
+    // A day an open dispute holds is skipped: the money pays the next oldest instead.
+    const open = mine.filter((r) => r.state === 'billed' && (r.taxOwed ?? 0) > 0 && !r.held);
     /** Per Miner: the days the uncredited money paid while it counted, oldest first. */
     const unlinked = new Map<string, BookRowView[]>();
     for (const minerId of new Set([...ahead.keys(), ...lostBy.keys()])) {
@@ -1458,6 +1502,24 @@ export function overlayCorpBooks(input: {
   rows.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
   return { rows, takenFromFree, absorbed, trimmed, alsoBilled, labels, books: summaries };
 }
+
+/** The hold an open dispute naming `recordKey` puts on it at `now`, if any. */
+function holdFor(
+  recordKey: string,
+  disputes: readonly OreDispute[],
+  now: string
+): RowHold | undefined {
+  for (const d of disputes) {
+    if (!d.lines.some((l) => l.recordKey === recordKey)) continue;
+    const hold = disputeHold(d, now);
+    if (hold) return { ...hold, kind: disputeKindOf(d) };
+  }
+  return undefined;
+}
+
+/** The later of two ISO instants; either may be missing. */
+const laterOf = (a: string | undefined, b: string | undefined) =>
+  a === undefined ? b : b === undefined ? a : a > b ? a : b;
 
 /** The dispute naming `recordKey`, as the member reads it. */
 function flagFor(
