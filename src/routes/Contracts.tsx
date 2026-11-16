@@ -17,6 +17,7 @@ import {
   TabPanel,
   useTabsId,
   CachedNotice,
+  IncompleteNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { CONTRACTS_HISTORY_COLUMN_IDS } from '@/features/contracts/contractsColumns';
@@ -509,12 +510,14 @@ export function Contracts() {
                     />
                   )}
                   {contractsTruncated && (
-                    <p className="flex flex-wrap items-center gap-2 px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                      <span>{t('common.incompleteTitle')}</span>
-                      <Button size="sm" disabled={loading} onClick={refresh}>
-                        {t('contracts.fetchTruncatedRetry')}
-                      </Button>
-                    </p>
+                    <IncompleteNotice
+                      className="px-3 pt-2"
+                      action={
+                        <Button size="sm" disabled={loading} onClick={refresh}>
+                          {t('contracts.fetchTruncatedRetry')}
+                        </Button>
+                      }
+                    />
                   )}
                 </>
               }

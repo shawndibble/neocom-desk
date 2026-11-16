@@ -8,6 +8,7 @@ import {
   LoadFailedState,
   Panel,
   Spinner,
+  IncompleteNotice,
 } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -133,9 +134,7 @@ export function WalletJournalPanel({
             />
           )}
           {journalIsTruncated && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
-            </p>
+            <IncompleteNotice className="px-3 pt-2" hint={t('wallet.journalTruncatedHint')} />
           )}
           {itemNamesTruncated && (
             <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">

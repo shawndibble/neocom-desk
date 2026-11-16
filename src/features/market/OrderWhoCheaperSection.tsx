@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Disclosure, LiveStatus } from '@/components/ui';
+import { Button, Disclosure, IncompleteNotice, LiveStatus } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { cx } from '@/lib/cx';
@@ -180,11 +180,8 @@ export function OrderWhoCheaperSection({
             // A truncated fetch isn't the pre-fetch state (the button below
             // stays hidden, same as any other resolved `deep`) — say why
             // system/region above read "not checked" instead of leaving the
-            // user to wonder where the "check deeper" button went. Same
-            // key/shape `VariationsTable.tsx` uses for its own truncated fetch.
-            <p className="pt-1.5 text-[0.6875rem] text-warning uppercase">
-              {t('common.incompleteTitle')}
-            </p>
+            // user to wonder where the "check deeper" button went.
+            <IncompleteNotice className="pt-1.5" />
           )}
           {showCheckDeeper && (
             <p className="pt-2">

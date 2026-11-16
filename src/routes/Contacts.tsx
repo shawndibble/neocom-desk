@@ -18,6 +18,7 @@ import {
   useTabsId,
   type DataTableColumn,
   CachedNotice,
+  IncompleteNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useColumnVisibility } from '@/lib/columnVisibility';
@@ -397,11 +398,7 @@ export function Contacts() {
                     fetchedAt={contactsResult.fetchedAt}
                   />
                 )}
-                {contactsTruncated && (
-                  <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                    {t('common.incompleteTitle')}
-                  </p>
-                )}
+                {contactsTruncated && <IncompleteNotice className="px-3 pt-2" />}
                 {filteredContacts.length === 0 ? (
                   <EmptyState
                     title={t('contacts.noResults')}

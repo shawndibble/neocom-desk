@@ -1,7 +1,7 @@
 import { formatCount } from '@/lib/formatCount';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CachedNotice, IconButton, InfoTooltip } from '@/components/ui';
+import { CachedNotice, IconButton, IncompleteNotice, InfoTooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
@@ -209,9 +209,7 @@ export function WalletBalanceTab({
                 </div>
               ) : (
                 journalTruncated && (
-                  <p className="mt-4 px-1 text-[0.6875rem] text-warning uppercase">
-                    {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
-                  </p>
+                  <IncompleteNotice className="mt-4 px-1" hint={t('wallet.journalTruncatedHint')} />
                 )
               )}
             </>

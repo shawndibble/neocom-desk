@@ -96,8 +96,10 @@ describe('CorpTransactionsPanel — Time format', () => {
       transactions: [transaction({ date: iso })],
       filteredTransactions: [transaction({ date: iso })],
     });
-    expect(screen.getByText(formatTimestamp(new Date(iso), 'UTC'))).toBeInTheDocument();
-    expect(screen.queryByText(formatTimestamp(new Date(iso)))).not.toBeInTheDocument();
+    // The cell splits date and time into spans (stacked on a phone), so read its whole text.
+    const dateCell = screen.getAllByRole('cell')[0]!;
+    expect(dateCell).toHaveTextContent(formatTimestamp(new Date(iso), 'UTC'));
+    expect(dateCell).not.toHaveTextContent(formatTimestamp(new Date(iso)));
   });
 });
 
