@@ -4,6 +4,12 @@ import Dexie from 'dexie';
 import { ForegroundNotificationPoller } from './ForegroundNotificationPoller';
 import { runForegroundPoll, FIRST_POLL_DELAY_MS, POLL_INTERVAL_MS } from './foregroundPoller';
 
+// The mount-time badge refresh reads Dexie. Under fake timers
+// fake-indexeddb's `setImmediate` is faked too, and `restoreRealTimers` drops it, so
+// that read never finishes and outlives every later test. These tests are
+// about polling; the badge has its own (`appBadge.test.ts`).
+vi.mock('./appBadge', () => ({ refreshAppBadge: vi.fn(async () => {}) }));
+
 vi.mock('./foregroundPoller', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./foregroundPoller')>();
   return { ...actual, runForegroundPoll: vi.fn(async () => {}), liveDependencies: vi.fn() };

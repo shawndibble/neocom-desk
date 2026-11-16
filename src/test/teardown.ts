@@ -267,11 +267,11 @@ export async function settlePendingWork(
 }
 
 /**
- * Opt-in: with `VITEST_FAIL_ON_LEFTOVER_WORK=1`, a test whose work outlives it
- * by `SETTLE_TIMEOUT_MS` fails instead of warning. Off by default, CI included:
- * switching it on for CI failed existing tests across a shard (e.g.
- * ForegroundNotificationPoller, BpcSourcingPanel, ActiveJobsPanel), so those
- * leaks are fixed first, then this becomes the CI default.
+ * With `VITEST_FAIL_ON_LEFTOVER_WORK=1`, a test whose work outlives it by
+ * `SETTLE_TIMEOUT_MS` fails instead of warning. CI's unit shards set it
+ * (`.github/workflows/ci.yml`); a local run only warns unless you set it too.
+ * The usual cause under fake timers is a faked `setImmediate`: see "Teardown is
+ * deterministic" in `docs/agents/testing-and-ci.md`.
  */
 const FAIL_ON_LEFTOVER_WORK = process.env.VITEST_FAIL_ON_LEFTOVER_WORK === '1';
 

@@ -1337,7 +1337,12 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
   });
 
   it('clears the spinner when the cross-character fan-out itself fails, rather than spinning forever', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // `setImmediate` stays real: it is fake-indexeddb's scheduler, and a Dexie
+    // read queued on a faked one is dropped at teardown, never finishing.
+    vi.useFakeTimers({
+      shouldAdvanceTime: true,
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'],
+    });
     vi.setSystemTime(NOW);
     await seedSecondCharacter();
     // The per-character ESI reads are already caught inside
