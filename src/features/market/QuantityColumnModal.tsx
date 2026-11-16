@@ -5,8 +5,7 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '@/components/ui';
-import { Radio } from '@/components/ui/Radio';
+import { Button, Modal, Radio } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { AppraisalUnreadableLine } from '@/engine/market/appraisalPaste';
 

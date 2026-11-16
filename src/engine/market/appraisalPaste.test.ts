@@ -351,7 +351,7 @@ describe('text in the quantity column (#6281)', () => {
   const TAB_TEXT = 'Tritanium\tMineral\t10000\nPyerite\tMineral\t500';
 
   it('reports a tab line whose second field is text instead of pricing it as one', () => {
-    expect(parseAppraisalPaste('Tritanium\tMineral\t10000')).toEqual([]);
+    expect(parseAppraisalPasteDetailed('Tritanium\tMineral\t10000').entries).toEqual([]);
     expect(parseAppraisalPasteDetailed('Tritanium\tMineral\t10000').unreadable).toEqual([
       {
         name: 'Tritanium\tMineral\t10000',
@@ -359,6 +359,12 @@ describe('text in the quantity column (#6281)', () => {
         reason: 'text-quantity',
         columns: [{ column: 3, value: '10000' }],
       },
+    ]);
+  });
+
+  it('parseAppraisalPaste keeps the old one-each reading for callers with no report', () => {
+    expect(parseAppraisalPaste('Tritanium\tMineral\t10000')).toEqual([
+      { name: 'Tritanium', quantity: 1, lines: [1] },
     ]);
   });
 

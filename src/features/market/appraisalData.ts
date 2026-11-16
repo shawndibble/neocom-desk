@@ -52,7 +52,6 @@ import {
   type AppraisalUnmatched,
 } from '@/engine/market/appraisalMatch';
 import {
-  parseAppraisalPaste,
   parseAppraisalPasteDetailed,
   type AppraisalUnreadableLine,
 } from '@/engine/market/appraisalPaste';
@@ -165,6 +164,12 @@ export interface AppraiseOptions {
   refining?: RefiningSetup;
   /** The tab column the pilot chose as the quantity of text-quantity lines. */
   quantityColumn?: number | null;
+  /**
+   * Price a text-quantity line as one instead of reporting it. The Appraisal
+   * reports it (its panel can show why); a caller with no such panel, like the
+   * fleet payout, keeps the old reading rather than silently paying nothing.
+   */
+  textQuantityAsOne?: boolean;
 }
 
 /** Every abyssal type's name, lower-case: read only when a paste has unmatched lines. */
@@ -188,9 +193,17 @@ export async function appraisePaste(
   hub: TradeHub,
   pricePercent: number,
   characterId: number | null = null,
-  { force = false, refining, quantityColumn = null }: AppraiseOptions = {}
+  {
+    force = false,
+    refining,
+    quantityColumn = null,
+    textQuantityAsOne = false,
+  }: AppraiseOptions = {}
 ): Promise<AppraisalOutcome> {
-  const { entries, unreadable } = parseAppraisalPasteDetailed(text, { quantityColumn });
+  const { entries, unreadable } = parseAppraisalPasteDetailed(text, {
+    quantityColumn,
+    textQuantityAsOne,
+  });
   const [catalogue, typesById] = await Promise.all([
     loadAppraisalCatalogue(),
     loadMarketTypesById(),
@@ -340,9 +353,10 @@ export interface HubComparisonRow {
 export async function compareHubs(
   text: string,
   pricePercent: number,
-  { force = false, quantityColumn = null }: AppraiseOptions = {}
+  { force = false, quantityColumn = null, textQuantityAsOne = false }: AppraiseOptions = {}
 ): Promise<HubComparisonRow[]> {
-  const entries = parseAppraisalPaste(text, { quantityColumn });
+  // The same reading appraisePaste prices, so the compare table matches the total.
+  const { entries } = parseAppraisalPasteDetailed(text, { quantityColumn, textQuantityAsOne });
   const catalogue = await loadAppraisalCatalogue();
   const { matched } = matchAppraisalEntries(entries, catalogue);
   const typeIds = matched.map((match) => match.typeId);

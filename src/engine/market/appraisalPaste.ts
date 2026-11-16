@@ -101,6 +101,13 @@ export interface AppraisalPasteOptions {
    * whose second field is text. Only those lines move; nothing else does.
    */
   quantityColumn?: number | null;
+  /**
+   * Count a text-quantity line as one of the thing instead of reporting it —
+   * the old reading, which `parseAppraisalPaste` keeps for the callers that
+   * have no report to show it in (paste routing, blueprint, stock and sell-to
+   * lists). Only the Appraisal reports such lines.
+   */
+  textQuantityAsOne?: boolean;
 }
 
 /** Every field from the third on that is a whole number, as the pilot typed it. */
@@ -116,7 +123,10 @@ function wholeNumberColumns(fields: string[]): QuantityColumn[] {
 /** Splits one non-blank line into its name and quantity, or flags it unreadable. */
 function parseLine(
   text: string,
-  quantityColumn: number | null
+  {
+    quantityColumn,
+    textQuantityAsOne,
+  }: { quantityColumn: number | null; textQuantityAsOne: boolean }
 ): { name: string; quantity: number } | UnreadableLine {
   if (text.includes('\t')) {
     const fields = text.split('\t');
@@ -137,6 +147,7 @@ function parseLine(
         const chosen = parseQuantity(fields[quantityColumn - 1] ?? '');
         if (chosen !== null) return { name: trimmedName, quantity: chosen };
       }
+      if (textQuantityAsOne) return { name: trimmedName, quantity: 1 };
       return { unreadable: true, reason: 'text-quantity', columns: wholeNumberColumns(fields) };
     }
     return { name: trimmedName, quantity: parsed ?? 1 };
@@ -217,7 +228,7 @@ function countOf(quantity: number): number {
  */
 function itemRows(
   text: string,
-  quantityColumn: number | null
+  options: { quantityColumn: number | null; textQuantityAsOne: boolean }
 ): { rows: PasteRow[]; unreadable: UnreadableRow[] } {
   const rows: PasteRow[] = [];
   const unreadable: UnreadableRow[] = [];
@@ -225,7 +236,7 @@ function itemRows(
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
     if (trimmed === '') continue;
-    const parsed = parseLine(trimmed, quantityColumn);
+    const parsed = parseLine(trimmed, options);
     if ('unreadable' in parsed) {
       unreadable.push({ name: trimmed, quantity: 1, line: i + 1, why: parsed });
     } else rows.push({ name: parsed.name, quantity: parsed.quantity, line: i + 1 });
@@ -331,13 +342,13 @@ export function quantityColumnChoices(
  */
 export function parseAppraisalPasteDetailed(
   text: string,
-  { quantityColumn = null }: AppraisalPasteOptions = {}
+  { quantityColumn = null, textQuantityAsOne = false }: AppraisalPasteOptions = {}
 ): {
   entries: AppraisalPasteEntry[];
   unreadable: AppraisalUnreadableLine[];
 } {
   if (looksLikeEftFit(text)) return { entries: mergeRows(eftRows(text)), unreadable: [] };
-  const { rows, unreadable } = itemRows(text, quantityColumn);
+  const { rows, unreadable } = itemRows(text, { quantityColumn, textQuantityAsOne });
   const whyByLine = new Map(unreadable.map((row) => [row.line, row.why]));
   return {
     entries: mergeRows(rows),
@@ -359,7 +370,7 @@ export function parseAppraisalPaste(
   text: string,
   options?: AppraisalPasteOptions
 ): AppraisalPasteEntry[] {
-  return parseAppraisalPasteDetailed(text, options).entries;
+  return parseAppraisalPasteDetailed(text, { textQuantityAsOne: true, ...options }).entries;
 }
 
 /**

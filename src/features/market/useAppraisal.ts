@@ -154,6 +154,9 @@ export function useAppraisal(
 
   const appraiseText = useCallback((next: string) => {
     setText(next);
+    // A replaced paste drops the pick for good, so pasting the old text back
+    // later does not revive it. The same text re-run keeps it.
+    setPick((current) => (current?.text === next ? current : null));
     // Guarded rather than left to the effect: an empty submit would otherwise
     // leave the previous result on screen with nothing backing it.
     if (next.trim() === '') return;
@@ -176,6 +179,7 @@ export function useAppraisal(
 
   const clear = useCallback(() => {
     setText('');
+    setPick(null);
     setSubmitted('');
     setBase(null);
     setBaseCompare(null);
