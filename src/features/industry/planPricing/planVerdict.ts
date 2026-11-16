@@ -46,7 +46,11 @@ export interface PlanVerdict<R extends Pick<ResolvedBuildPlan, 'result'> = Resol
   priceCapped: boolean;
   /** The product sold into buy orders instead, on the hero's basis. */
   sellNow: ProductSellNow | null | undefined;
-  /** The Depth Prices the plan was re-resolved at; empty when none. */
+  /**
+   * The Depth Prices `pricePlan` walked and re-resolved at; empty when it
+   * walked none, or when the caller resolved the plan itself (the page, a
+   * Build Group's summed walk).
+   */
   depth: ReadonlyMap<number, DepthPrice>;
 }
 
@@ -62,7 +66,11 @@ export interface PlanVerdictContext {
   saleBasis?: LiquidationBasis;
   modifiers: CharacterModifiers;
   standing: ResolvedStandings | undefined;
-  /** The owned stock's sale, when the caller already holds it (the page memoises it). */
+  /**
+   * The owned stock's sale, when the caller already holds it (the page
+   * memoises it; null there means no result or snapshot yet). Absent, it is
+   * computed here.
+   */
   ownedSale?: OwnedSale | null;
   depth?: ReadonlyMap<number, DepthPrice>;
 }
