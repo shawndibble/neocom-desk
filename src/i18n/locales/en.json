@@ -4367,6 +4367,11 @@
     "skillGateFilterChipCount_other": "{{count}} rows hidden",
     "assumesBaseStandingsHint": "Broker fees in these profit figures are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
     "productionLogAssumesBaseStandingsHint": "Broker fees on watched sell orders are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
+    "minedOre": {
+      "title": "From ore you mine (last 90 days)",
+      "empty": "No mining history on this device. Grant the mining Permission, or mine, and it fills in.",
+      "buyThese": "Buy these: {{minerals}}."
+    },
     "buyOre": {
       "action": "Buy ore instead",
       "title": "Buy ore instead of minerals",
