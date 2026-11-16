@@ -18237,14 +18237,52 @@
           "declared": "They say they paid {{amount}}.",
           "note": "“{{note}}”",
           "confirm": "Confirm paid",
-          "reject": "Reject declaration"
+          "reject": "Keep the bill",
+          "transfer": "{{amount}} · {{time}} · journal ref {{ref}}",
+          "count": "Count Division {{division}}"
         },
+        "check": {
+          "found": "Found",
+          "division": "Found · Division {{division}}",
+          "notSynced": "Not synced yet",
+          "tooOld": "Too old to check",
+          "tooOldBody": "before the wallet history the book holds",
+          "notFound": "Not in the corp wallet",
+          "person": "Paid to a person",
+          "otherCorp": "Another corporation"
+        },
+        "paidToYou": {
+          "title": "{{name}} says they paid you {{amount}} as tax",
+          "found": "In your wallet",
+          "foundBody": "{{time}}, your journal ref {{ref}}. The book can't see it because it went to you, not the corporation.",
+          "notFound": "Not in your wallet",
+          "notFoundBody": "Checked your wallet journal back to {{date}}.",
+          "noScope": "Can't check your wallet",
+          "noScopeBody": "This Character has not granted the wallet permission on this device.",
+          "reading": "Checking your wallet…",
+          "record": "Record it as tax",
+          "notTax": "It wasn't tax",
+          "recordAnyway": "Record it anyway"
+        },
+        "autoCredited": "Credited automatically: <miner>{{name}}</miner>, {{amount}} ({{date}}) — found in the corporation's wallet.",
         "dispute": {
           "title": "{{name}} says {{date}}'s ore went to {{payee}}",
-          "body": "{{ore}}. Waive that ore's tax if it was not ours to bill, or reject it with a note they read.",
+          "titleQuantity": "{{name}} says the book recorded too much ore on {{date}}",
+          "titleRate": "{{name}} says {{date}} should be {{claimed}}%, not {{billed}}%",
+          "titleRateUnknown": "{{name}} says {{date}} should be {{claimed}}%",
+          "titleNotPaying": "{{name}} isn't paying {{date}} · {{amount}}",
+          "titleNotPayingUnpriced": "{{name}} isn't paying {{date}}",
+          "body": "{{ore}}. Waive that ore's tax if it was not ours to bill, or keep the bill and tell them what to do next.",
+          "bodyQuantity": "Disputed: {{ore}}.",
+          "lineQuantity": "{{quantity}} {{ore}}",
+          "reason": "“{{reason}}”",
+          "held": "Held until {{date}} — payments skip it while you answer",
           "line": "{{quantity}} {{ore}} to {{payee}}",
           "dismiss": "Waive their ore",
-          "reject": "Reject"
+          "waive": "Waive it",
+          "waiveDifference": "Waive the difference",
+          "writeOff": "Write off",
+          "reject": "Keep the bill"
         },
         "overdue": {
           "title_one": "{{name}} · overdue {{count}} day · {{amount}}",
@@ -19204,8 +19242,8 @@
           "dismissIntro": "{{amount}} of tax on the ore they disputed is credited on their next Statement. The rest of the day stays billed.",
           "dismissUnpriced": "The book cannot price that day's ore yet, so it cannot be waived. Sync the book, then try again.",
           "dismissConfirm": "Waive {{amount}}",
-          "rejectTitle": "Reject {{name}}'s dispute for {{date}}?",
-          "rejectIntro": "The day stays billed. They read your reason on their Tax tab, and cannot dispute that day again."
+          "rejectTitle": "Keep the bill on {{name}}'s dispute for {{date}}?",
+          "rejectIntro": "The day stays billed. They read your reason and next step on their Tax tab."
         },
         "dismissMiner": {
           "title": "Dismiss {{name}}'s tax?",
@@ -19255,11 +19293,15 @@
           "effectUnmatchedPart": "{{amount}} is set aside. The rest stays Unmatched until you assign it."
         },
         "reject": {
-          "title": "Reject {{name}}'s declaration",
+          "title": "Keep the bill on {{name}}'s declaration?",
           "intro": "They said they paid {{amount}} by another route. Overdue has been paused since.",
           "reason": "Reason (required, shown to the Miner)",
-          "confirm": "Reject declaration",
+          "confirm": "Keep the bill",
           "effect": "Overdue resumes where it paused, with no extra days. Confirm paid instead if the payment turns up."
+        },
+        "nextStep": {
+          "label": "What should {{name}} do next?",
+          "hint": "Required. {{name}} sees this word for word beside the bill, with a Resolve button."
         },
         "assign": {
           "title": "Assign a donation to a Miner",
