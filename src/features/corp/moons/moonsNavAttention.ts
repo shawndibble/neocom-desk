@@ -34,7 +34,7 @@ const attentionKey = (characterId: number, corporationId: number) =>
   `moonsAttention:${characterId}:${corporationId}`;
 
 /** How often the open app recounts. */
-export const MOONS_SYNC_POLL_MS = 30 * MINUTE_MS;
+export const MOONS_ATTENTION_POLL_MS = 30 * MINUTE_MS;
 
 function readAttention(value: unknown): MoonsAttention | undefined {
   if (!isRecord(value)) return undefined;
@@ -133,7 +133,7 @@ export function useMoonsAttentionPoll() {
       );
     }
     refresh();
-    const timer = setInterval(refresh, MOONS_SYNC_POLL_MS);
+    const timer = setInterval(refresh, MOONS_ATTENTION_POLL_MS);
     const onVisible = () => {
       if (document.visibilityState === 'visible') refresh();
     };

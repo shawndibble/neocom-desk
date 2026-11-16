@@ -317,7 +317,7 @@ export const Layout = memo(function Layout() {
   const alertBadge = useAlertBadge();
   // New Requests on the Communities item, read while the app is open (issue #3810).
   useRequestBadgePoll();
-  // The corp Moons dot's Automatic sync stop, between Moons visits (#6208).
+  // The corp Moons dot's Needs you count and Automatic sync stop, between Moons visits (#6208).
   useMoonsAttentionPoll();
   const navBadge = useNavBadges();
   const settingsAttention = useSettingsNeedsAttention();

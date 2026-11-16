@@ -4,6 +4,7 @@
  */
 import type { BookViewInput } from '@/engine/corpTaxBook/bookView';
 import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
+import { utcDay } from '@/engine/localDay';
 import {
   hubForPayee,
   loadDatedUnitPricesByHub,
@@ -62,7 +63,7 @@ export async function loadBookPrices(data: BookData, from?: string) {
   const typeIds = new Set<number>(priced.map((r) => r.typeId));
   for (const x of data.state.extractions) for (const l of x.oreLines ?? []) typeIds.add(l.typeId);
   const dates = new Set<string>(priced.map((r) => r.date));
-  const loadedOn = new Date().toISOString().slice(0, 10);
+  const loadedOn = utcDay();
   dates.add(loadedOn);
   const prices = await loadDatedUnitPricesByHub(
     [...typeIds],
