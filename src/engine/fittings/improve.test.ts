@@ -6,6 +6,7 @@ import {
   improveCandidates,
   overIskBudget,
   rankImproveOptions,
+  searchableGoal,
   type FlyableCompensators,
   type ImproveCandidate,
   type ImproveGoal,
@@ -674,6 +675,15 @@ describe('goalAvailability', () => {
     const base = stats([]);
     const empty = { ...base, offense: { ...base.offense, dps: 0, chargelessWeaponCount: 2 } };
     expect(goalAvailability('reach', empty)).toEqual({ available: true });
+  });
+});
+
+describe('searchableGoal', () => {
+  const unarmed = { ...stats([]), offense: { ...stats([]).offense, dps: 0, sustainedDps: 0 } };
+
+  it('searches the remembered goal when the fit can score it, else Best overall on a combat hull', () => {
+    expect(searchableGoal('tank', unarmed, undefined)).toBe('tank');
+    expect(searchableGoal('damage', unarmed, undefined)).toBe('overall');
   });
 });
 

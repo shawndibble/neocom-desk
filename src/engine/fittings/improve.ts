@@ -24,7 +24,7 @@ import {
   type DefenseSide,
 } from './improveGroups';
 import { breakTies, type JobCommonality } from './hullCommonality';
-import { candidateFilter, FILL_RACKS } from './improveCandidateFilter';
+import { candidateFilter, FILL_RACKS, offerableIn } from './improveCandidateFilter';
 import { isMutated, placeKey } from './improveMutated';
 import {
   dropLimitsOf,
@@ -41,7 +41,7 @@ import { newRuleBreaks } from './ruleBreaks';
 import { applyModuleUpgrade } from './moduleUpgrades';
 import { findFitSwaps, PAIR_LIMIT, type FitSwap } from './makeItFit';
 import { commandGain, commandOf, hasCommand } from './improveCommand';
-import { hullRoleOf, roleUnlocks, type HullRef } from './improveRole';
+import { DEFAULT_GOAL_OF_ROLE, hullRoleOf, roleUnlocks, type HullRef } from './improveRole';
 import { ewarOf, tackleOf } from './improveTackle';
 import { changeVerdict } from './fittingStatFields';
 import { gainMetrics, improveOverall } from './skillGains';
@@ -248,9 +248,6 @@ export interface ImproveResult {
 /** How many rejected swaps the empty view lists. */
 export const REJECTED_LIMIT = 5;
 
-/** Officer and Deadspace: never offered unless the pilot asks (a later ticket adds the tick). */
-const EXCLUDED_META_GROUPS: ReadonlySet<number> = new Set([5, 6]);
-
 /** A change smaller than this (a fraction) is rounding, not a gain or a loss. */
 export const EPSILON = 1e-4;
 
@@ -318,6 +315,17 @@ export function goalAvailability(
   if (goal === 'explore' && before.explore.modules <= 0)
     return { available: false, reason: 'noExplore' };
   return { available: true };
+}
+
+/** The goal to search: `goal` if the fit can score it, else the hull role's default, else Best overall. */
+export function searchableGoal(
+  goal: ImproveGoal,
+  before: FittingStats,
+  hull: HullRef | undefined
+): ImproveGoal {
+  if (goalAvailability(goal, before, hull).available) return goal;
+  const fallback = DEFAULT_GOAL_OF_ROLE[hullRoleOf(hull)];
+  return goalAvailability(fallback, before, hull).available ? fallback : 'overall';
 }
 
 /**
@@ -861,17 +869,14 @@ export function improveCandidates(
     else copies.set(key, { typeId: module.typeId, at: [where], mutated });
   }
 
+  const offerable = offerableIn(index, rackOf, o.pool, o.includeOfficer);
   const allowed = (
     typeId: number,
     slot: FittingSlotKind,
     removedGroup: number | undefined,
     removed: number
   ) => {
-    if (rackOf[String(typeId)] !== slot) return false;
-    if (o.pool && !o.pool.published(typeId)) return false;
-    if (o.pool?.flyable && !o.pool.flyable(slot, typeId)) return false;
-    if (!o.includeOfficer && EXCLUDED_META_GROUPS.has(index.types[typeId]?.metaGroupId ?? 0))
-      return false;
+    if (!offerable(typeId, slot)) return false;
     // A second Damage Control (or cloak) is refused by the game.
     return !filter.uniqueBlocks(groupOf(typeId), removedGroup, removed);
   };

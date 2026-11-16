@@ -9,6 +9,7 @@ import {
   bestCrystalKey,
   crystalKeyOf,
   crystalParts,
+  crystalPlan,
   crystalsOfFamily,
   loadCrystals,
   minerWithoutCrystal,
@@ -211,5 +212,35 @@ describe('improveCandidates for Mine more', () => {
       }
     );
     expect(found.map((c) => c.toTypeId).sort()).toEqual([2, 3]);
+  });
+});
+
+describe('crystalPlan', () => {
+  const names: Record<number, string> = {
+    10: 'Simple Asteroid Mining Crystal Type A I',
+    11: 'Simple Asteroid Mining Crystal Type A II',
+    12: 'Simple Asteroid Mining Crystal Type B II',
+    20: 'Rare Moon Mining Crystal Type A II',
+  };
+  const source = (minerTypeIds: number[]) => ({
+    family: 'Simple Asteroid',
+    minerTypeIds,
+    // Miner 1 takes crystal group 5; module 2 takes no charge.
+    chargeGroupsOf: (typeId: number) => (typeId === 1 ? [5] : []),
+    typeIdsInGroup: (group: number) => (group === 5 ? [10, 11, 12, 20] : []),
+    nameOf: (typeId: number) => names[typeId],
+  });
+
+  it('loads the crystal key that scores best for every miner, and lists each miner’s crystals', async () => {
+    const yields: Record<number, number> = { 10: 5, 11: 9, 12: 7 };
+    const plan = await crystalPlan(source([1]), async (crystalFor) => yields[crystalFor(1)!]!);
+    expect(plan?.bestKey).toBe('A2');
+    expect(plan?.crystalFor(1)).toBe(11);
+    expect(plan?.crystalFor(2)).toBeNull();
+    expect(plan?.crystalsOf(1)).toEqual([10, 11, 12]);
+  });
+
+  it('is null when no miner takes a crystal of the family', async () => {
+    expect(await crystalPlan(source([2]), async () => 1)).toBeNull();
   });
 });

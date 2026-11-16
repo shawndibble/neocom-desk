@@ -21,6 +21,7 @@ import {
   JOB_NEEDS,
   jobSettingOf,
   propulsionNeedOf,
+  searchSpace,
   overallWeightsOf,
   unguardedJobs,
 } from './improveJob';
@@ -382,5 +383,20 @@ describe('an Explore fit that carries combat drones', () => {
 
   it('holds every warp core stabilizer, the module that gets it away when tackled', () => {
     expect(HELD_EVERY_COPY.explore).toContain('warpCore');
+  });
+});
+
+describe('searchSpace', () => {
+  const groupOf = (typeId: number) => (typeId === 2488 ? 100 : 101);
+  const drones = (typeId: number, quantity = 1) => [{ typeId, quantity }];
+
+  it('keeps Explore Safe in Dangerous when the fit carries combat drones', () => {
+    expect(searchSpace('explore', 'safe', drones(2488), groupOf)).toBe('dangerous');
+    expect(searchSpace('explore', 'safe', drones(2488, 0), groupOf)).toBe('safe');
+    expect(searchSpace('explore', 'safe', drones(3), groupOf)).toBe('safe');
+  });
+
+  it('leaves the space as chosen for other jobs', () => {
+    expect(searchSpace('pve', 'safe', drones(2488), groupOf)).toBe('safe');
   });
 });

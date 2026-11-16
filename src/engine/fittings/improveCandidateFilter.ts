@@ -9,7 +9,7 @@
  * `groupOf`.
  */
 import { commonGroups, propulsionKindOf, type JobCommonality } from './hullCommonality';
-import type { DefenseChoice, ImproveGoal } from './improve';
+import type { DefenseChoice, ImproveGoal, ModulePool } from './improve';
 import {
   jobOf,
   reworkGroups,
@@ -27,7 +27,30 @@ import {
   unguardedJobs,
   type JobSetting,
 } from './improveJob';
+import type { VariationIndex } from '../market/variations';
 import type { FittingModule, FittingSlotKind } from './types';
+
+/** Officer and Deadspace meta groups: offered only when the pilot asks for them, never as a compensating swap. */
+const EXCLUDED_META_GROUPS: ReadonlySet<number> = new Set([5, 6]);
+
+/**
+ * Whether `typeId` may go into a `slot` module's place at all: it fits that rack,
+ * it is market-listed, it is not Officer or Deadspace (unless `includeOfficer`),
+ * and the hull takes it and the pilot can fly it. The rule `improveCandidates`
+ * and `compensationSwaps` share.
+ */
+export function offerableIn(
+  index: VariationIndex,
+  rackOf: Readonly<Record<string, string>>,
+  pool: ModulePool | undefined,
+  includeOfficer: boolean
+): (typeId: number, slot: FittingSlotKind) => boolean {
+  return (typeId, slot) =>
+    rackOf[String(typeId)] === slot &&
+    (!pool || pool.published(typeId)) &&
+    (includeOfficer || !EXCLUDED_META_GROUPS.has(index.types[typeId]?.metaGroupId ?? 0)) &&
+    (pool?.flyable?.(slot, typeId) ?? true);
+}
 
 /** The racks an empty slot is filled in. */
 export const FILL_RACKS: readonly FittingSlotKind[] = ['high', 'medium', 'low', 'rig'];

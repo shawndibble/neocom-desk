@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
-import { migrateSpendCap, useImproveBudget } from './useImprove';
+import { migrateSpendCap, useImproveBudget } from './useImproveSettingStores';
 
 beforeEach(async () => {
   await db.settings.clear();
