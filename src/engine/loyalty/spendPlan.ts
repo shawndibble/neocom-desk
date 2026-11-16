@@ -13,8 +13,8 @@
  *
  * It stops when the LP runs out, when nothing left is profitable, when the next
  * step earns under the floor (the pilot's LP Value, else the store's market rate,
- * else 70% of the plan's best step), or when its purchases would pass a known
- * wallet balance. A required item the sell book can't fill, or an output with no
+ * else 70% of the plan's best step), or when no step left fits a known wallet
+ * balance (a step the wallet can't cover is skipped, like one the LP can't). A required item the sell book can't fill, or an output with no
  * buy book, leaves that offer unpriced: it drops out, never counted free.
  *
  * Pure: the caller (`features/loyalty`) fetches the books.
@@ -79,7 +79,7 @@ function bestShareFloor(best: number): SpendFloor {
 
 export interface SpendStop {
   reason: SpendStopReason;
-  /** The offer the plan would have taken next (on `lpExhausted`, the best one the LP left can't pay for); null when none was priced. */
+  /** The offer the plan would have taken next (on `lpExhausted`, the best one the LP left can't pay for; on `wallet`, the best one the wallet can't cover); null when none was priced. */
   offerId: number | null;
   /** That next step's marginal ISK/LP. */
   iskPerLp: number | null;
@@ -270,12 +270,19 @@ export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
     let next: Step | null = null;
     /** The best priced step the LP left can't pay for: named when the LP runs out. */
     let outOfReach: Step | null = null;
+    /** The best priced step the wallet can't cover: skipped, and named when nothing else is affordable. */
+    let overWallet: Step | null = null;
     for (const candidate of alive) {
       if (!steps.has(candidate)) steps.set(candidate, stepOf(candidate));
       const step = steps.get(candidate) ?? null;
       if (step === null) continue;
       if (candidate.lpCost > lpLeft) {
         if (outOfReach === null || step.iskPerLp > outOfReach.iskPerLp) outOfReach = step;
+      } else if (
+        input.walletBalance !== null &&
+        purchases + purchaseOf(step) > input.walletBalance
+      ) {
+        if (overWallet === null || step.iskPerLp > overWallet.iskPerLp) overWallet = step;
       } else if (next === null || step.iskPerLp > next.iskPerLp) next = step;
     }
     const dead = alive.filter((c) => steps.get(c) === null);
@@ -284,14 +291,21 @@ export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
 
     if (next === null) {
       stop =
-        outOfReach === null
-          ? { reason: 'nothingProfitable', offerId: null, iskPerLp: null, floor: null }
-          : {
-              reason: 'lpExhausted',
-              offerId: outOfReach.candidate.offerId,
-              iskPerLp: outOfReach.iskPerLp,
+        overWallet !== null
+          ? {
+              reason: 'wallet',
+              offerId: overWallet.candidate.offerId,
+              iskPerLp: overWallet.iskPerLp,
               floor: null,
-            };
+            }
+          : outOfReach === null
+            ? { reason: 'nothingProfitable', offerId: null, iskPerLp: null, floor: null }
+            : {
+                reason: 'lpExhausted',
+                offerId: outOfReach.candidate.offerId,
+                iskPerLp: outOfReach.iskPerLp,
+                floor: null,
+              };
       break;
     }
     const at = { offerId: next.candidate.offerId, iskPerLp: next.iskPerLp };
@@ -309,14 +323,8 @@ export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
       stop = { reason: 'belowFloor', ...at, floor };
       break;
     }
-    const stepPurchase = next.candidate.iskCost + next.candidate.buildCost + next.turnInsCost;
-    if (input.walletBalance !== null && purchases + stepPurchase > input.walletBalance) {
-      stop = { reason: 'wallet', ...at, floor: null };
-      break;
-    }
-
     commit(next);
-    purchases += stepPurchase;
+    purchases += purchaseOf(next);
     lpLeft -= next.candidate.lpCost;
     best = Math.max(best, next.iskPerLp);
     const touched = typesOf(next.candidate);
@@ -383,6 +391,11 @@ export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
     stop,
     unpriced,
   };
+}
+
+/** ISK one step needs up front: the store's price, any build cost and the turn-ins bought. */
+function purchaseOf(step: Step): number {
+  return step.candidate.iskCost + step.candidate.buildCost + step.turnInsCost;
 }
 
 /** Every type a candidate touches: its required items and its output. */

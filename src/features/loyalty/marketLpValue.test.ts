@@ -259,3 +259,26 @@ describe('loadMarketLpValue', () => {
     expect(loadLoyaltyStoreOffers).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('loadMarketLpValues on the instant basis', () => {
+  it('prices the store at the hub buy price, remembered apart from the listing rate', async () => {
+    vi.mocked(loadHaulingDemand).mockResolvedValue(null);
+    vi.mocked(loadMarketSnapshots).mockImplementation((requests) =>
+      requests.map(() =>
+        Promise.resolve({
+          ...snapshot({ 91: 200_000, 92: 150_000, 93: 100_000 }, { 91: 50, 92: 50, 93: 50 }),
+          // Bids at half the listings: selling now earns about half.
+          hubBuyPrices: { 91: 100_000, 92: 75_000, 93: 50_000 },
+        })
+      )
+    );
+    const offers = new Map([
+      [95, [itemOffer(1, 91, 100), itemOffer(2, 92, 100), itemOffer(3, 93, 100)]],
+    ]);
+    const listed = await loadMarketLpValues([95], JITA, { held: offers });
+    const now = await loadMarketLpValues([95], JITA, { held: offers, basis: 'buy' });
+    expect(listed.get(95)).toBeGreaterThan(1_300);
+    expect(now.get(95)).toBeGreaterThan(600);
+    expect(now.get(95)).toBeLessThan(800);
+  });
+});

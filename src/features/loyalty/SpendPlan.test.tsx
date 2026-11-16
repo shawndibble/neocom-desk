@@ -44,6 +44,7 @@ function view(over: Partial<SpendPlanResult>, walletBalance: number | null = 1e9
     },
     rowsById: new Map([[1, hookbill]]),
     walletBalance,
+    candidates: 1,
   };
 }
 
@@ -61,7 +62,16 @@ function renderPlan(data: SpendPlanView, onSelectOffer = vi.fn()) {
 describe('SpendLpButton', () => {
   it.each([null, 0])('is disabled with a reason at %s LP, and never runs', (playerLp) => {
     const onClick = vi.fn();
-    render(<SpendLpButton playerLp={playerLp} loading={false} onClick={onClick} />);
+    render(<SpendLpButton playerLp={playerLp} rankable loading={false} onClick={onClick} />);
+    const button = screen.getByRole('button', { name: 'Spend my LP' });
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('is disabled while no offer in view has a Sell now price', () => {
+    const onClick = vi.fn();
+    render(<SpendLpButton playerLp={400} rankable={false} loading={false} onClick={onClick} />);
     const button = screen.getByRole('button', { name: 'Spend my LP' });
     expect(button).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(button);
@@ -70,7 +80,7 @@ describe('SpendLpButton', () => {
 
   it('runs with LP to spend', () => {
     const onClick = vi.fn();
-    render(<SpendLpButton playerLp={400} loading={false} onClick={onClick} />);
+    render(<SpendLpButton playerLp={400} rankable loading={false} onClick={onClick} />);
     fireEvent.click(screen.getByRole('button', { name: 'Spend my 400 LP' }));
     expect(onClick).toHaveBeenCalledOnce();
   });
@@ -117,7 +127,11 @@ describe('SpendPlanPanel', () => {
     renderPlan(
       view({ stop: { reason: 'wallet', offerId: 1, iskPerLp: 900, floor: null } }, 12_400_000)
     );
-    expect(screen.getByText(/needs more ISK than your wallet holds \(12.4M\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /no offer left fits your wallet \(12.4M\); the best was Caldari Navy Hookbill/
+      )
+    ).toBeInTheDocument();
     expect(screen.queryByText(/wallet balance isn't known/)).toBeNull();
   });
 
@@ -148,6 +162,19 @@ describe('SpendPlanPanel', () => {
     );
     expect(screen.getByText('No redemption to plan right now.')).toBeInTheDocument();
     expect(screen.queryByText(/Nothing in this store earns ISK/)).toBeNull();
+  });
+
+  it('blames the view, not the order books, when no offer reached the plan', () => {
+    renderPlan({
+      ...view({
+        rows: [],
+        stop: { reason: 'nothingProfitable', offerId: null, iskPerLp: null, floor: null },
+      }),
+      candidates: 0,
+    });
+    expect(screen.getByText('No redemption to plan right now.')).toBeInTheDocument();
+    expect(screen.getByText(/Clear the filters or search/)).toBeInTheDocument();
+    expect(screen.queryByText(/order books can't price/)).toBeNull();
   });
 
   it('lists the turn-ins to buy and the owned ones used', () => {

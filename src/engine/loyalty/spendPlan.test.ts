@@ -195,6 +195,44 @@ describe('planLpSpend', () => {
     expect(plan.stop).toMatchObject({ reason: 'wallet', offerId: 1 });
   });
 
+  it('skips a step the wallet cannot cover and takes the next affordable one', () => {
+    // Offer 1 earns more per LP but costs 50k ISK a redemption; the wallet holds 40k.
+    const plan = planLpSpend(
+      input({
+        candidates: [
+          offer({ offerId: 1, iskCost: 50_000, outputTypeId: AMMO }),
+          offer({ offerId: 2 }),
+        ],
+        lpBalance: 300,
+        walletBalance: 40_000,
+        buyBooks: new Map([
+          [AMMO, [bid(300_000, 100)]],
+          [SHIP, [bid(100_000, 100)]],
+        ]),
+      })
+    );
+    expect(plan.rows).toEqual([expect.objectContaining({ offerId: 2, redemptions: 3 })]);
+    expect(plan.stop.reason).toBe('lpExhausted');
+  });
+
+  it('stops at the wallet when no affordable step remains, naming the best one', () => {
+    const plan = planLpSpend(
+      input({
+        candidates: [
+          offer({ offerId: 1, iskCost: 50_000, outputTypeId: AMMO }),
+          offer({ offerId: 2, iskCost: 60_000 }),
+        ],
+        walletBalance: 40_000,
+        buyBooks: new Map([
+          [AMMO, [bid(300_000, 100)]],
+          [SHIP, [bid(200_000, 100)]],
+        ]),
+      })
+    );
+    expect(plan.rows).toEqual([]);
+    expect(plan.stop).toMatchObject({ reason: 'wallet', offerId: 1 });
+  });
+
   it('shares a blueprint product buy book with an offer that sells the product', () => {
     const plan = planLpSpend(
       input({

@@ -190,6 +190,9 @@ export function PopularFitsPanel({
   const touch = useTouchContext();
   // Without verdicts there is nothing to filter on: a Character switched away leaves it off.
   const flyFilter = flyOnly && verdicts !== null;
+  // Nor to rank by training: Least training is offered only with verdicts, and a pick of it reads as Newest.
+  const sorts = verdicts === null ? SORTS.filter((value) => value !== 'training') : SORTS;
+  const shownSort: FitSort = sorts.includes(sort) ? sort : 'newest';
   const lookup = useMemo(
     () => ({
       canFly: (key: string) => {
@@ -201,7 +204,7 @@ export function PopularFitsPanel({
     [verdicts, seconds]
   );
   const { counts, inScope, shown, flyable } = useMemo(() => {
-    const inScope = listFits(rows, { source: filter, flyOnly: false, sort }, lookup);
+    const inScope = listFits(rows, { source: filter, flyOnly: false, sort: shownSort }, lookup);
     const flyableRows = inScope.filter((row) => lookup.canFly(row.key) === true);
     return {
       counts: sourceCounts(rows),
@@ -209,7 +212,7 @@ export function PopularFitsPanel({
       shown: flyFilter ? flyableRows : inScope,
       flyable: flyableRows.length,
     };
-  }, [rows, filter, sort, flyFilter, lookup]);
+  }, [rows, filter, shownSort, flyFilter, lookup]);
   const closest = flyFilter && shown.length === 0 ? closestFit(inScope, lookup.seconds) : undefined;
 
   const titleOf = (row: PanelRow) =>
@@ -325,12 +328,12 @@ export function PopularFitsPanel({
         )}
         <div className="ml-auto flex items-center gap-1.5 text-xs text-text-dim">
           <span aria-hidden="true">{t('fittings.popular.sortLabel')}</span>
-          <Select value={sort} onValueChange={(value) => setSort(value as FitSort)}>
+          <Select value={shownSort} onValueChange={(value) => setSort(value as FitSort)}>
             <SelectTrigger aria-label={t('fittings.popular.sortLabel')} size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {SORTS.map((value) => (
+              {sorts.map((value) => (
                 <SelectItem key={value} value={value}>
                   {t(`fittings.popular.sort.${value}`)}
                 </SelectItem>

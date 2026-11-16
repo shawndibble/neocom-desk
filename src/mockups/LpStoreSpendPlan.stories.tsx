@@ -76,7 +76,7 @@ function view(rows: SpendPlanRow[], stop: SpendStop, walletBalance: number | nul
     stop,
     unpriced: [],
   };
-  return { result, rowsById, walletBalance };
+  return { result, rowsById, walletBalance, candidates: 10 };
 }
 
 const planRows = [
@@ -145,7 +145,7 @@ function Frame({
         padded={false}
         actions={
           <NewComponent name="SpendLpButton">
-            <SpendLpButton playerLp={playerLp} loading={false} onClick={() => {}} />
+            <SpendLpButton playerLp={playerLp} rankable loading={false} onClick={() => {}} />
           </NewComponent>
         }
       >
@@ -243,7 +243,7 @@ export const ZeroLpDisabled: Story = {
         title="LP Store"
         meta="31 offers · Jita · Sell now"
         padded={false}
-        actions={<SpendLpButton playerLp={0} loading={false} onClick={() => {}} />}
+        actions={<SpendLpButton playerLp={0} rankable loading={false} onClick={() => {}} />}
       >
         <p className="p-4 text-xs text-text-dim">The offers table, unchanged.</p>
       </Panel>

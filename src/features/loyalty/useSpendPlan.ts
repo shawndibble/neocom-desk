@@ -26,7 +26,7 @@ import { loadMarketLpValue } from './marketLpValue';
 import type { LoyaltyOfferRow } from './offerRows';
 import { buildCostOf, outputUnitsOf, resolveLoyaltyRowItem } from './offerRowDisplay';
 
-/** Offers the plan considers: the best ~10 by one-redemption ISK/LP that pass the filters. */
+/** Offers the plan considers: the best ~10 by one-redemption Sell now ISK/LP that pass the filters. */
 export const SPEND_PLAN_CANDIDATES = 10;
 
 export interface SpendPlanView {
@@ -35,16 +35,24 @@ export interface SpendPlanView {
   rowsById: ReadonlyMap<number, LoyaltyOfferRow>;
   /** Null when the wallet could not be read: the plan has no ISK cap. */
   walletBalance: number | null;
+  /** Offers handed to the plan; 0 when nothing in the view had a Sell now price. */
+  candidates: number;
 }
 
-/** The top offers by the table's ISK/LP, as the engine's candidates. Unranked rows are left out. */
+/**
+ * The top offers by one-redemption ISK/LP on the Sell now basis — the basis the
+ * plan prices on, whatever the table's — as the engine's candidates. Offers
+ * with no Sell now price are left out.
+ */
 export function spendCandidates(
   rows: readonly LoyaltyOfferRow[],
-  catalog: BlueprintCatalog | null
+  catalog: BlueprintCatalog | null,
+  instantIskPerLp: ReadonlyMap<number, number | null>
 ): { candidate: SpendCandidate; row: LoyaltyOfferRow }[] {
+  const rank = (row: LoyaltyOfferRow) => instantIskPerLp.get(row.offer.offer_id) ?? null;
   return rows
-    .filter((row) => row.profit.iskPerLp !== null && row.offer.lp_cost > 0)
-    .sort((a, b) => b.profit.iskPerLp! - a.profit.iskPerLp!)
+    .filter((row) => rank(row) !== null && row.offer.lp_cost > 0)
+    .sort((a, b) => rank(b)! - rank(a)!)
     .slice(0, SPEND_PLAN_CANDIDATES)
     .map((row) => ({
       row,
@@ -65,6 +73,8 @@ interface Args {
   corporationId: number;
   /** The rows the table shows, filters applied. */
   rows: readonly LoyaltyOfferRow[];
+  /** Each offer's Sell now ISK/LP (`useLoyaltyStoreOffers`), which ranks the candidates. */
+  instantIskPerLp: ReadonlyMap<number, number | null>;
   catalog: BlueprintCatalog | null;
   hub: TradeHub;
   skills: SkillLevels;
@@ -81,7 +91,7 @@ interface Request extends Args {
 }
 
 async function loadSpendPlan(request: Request): Promise<SpendPlanView> {
-  const picked = spendCandidates(request.rows, request.catalog);
+  const picked = spendCandidates(request.rows, request.catalog, request.instantIskPerLp);
   const { hub } = request;
   const requiredIds = new Set(
     picked.flatMap((p) => p.candidate.requiredItems.map((i) => i.typeId))
@@ -98,10 +108,11 @@ async function loadSpendPlan(request: Request): Promise<SpendPlanView> {
       }
     ),
     loadHubJumps(hub.systemId),
-    // A typed LP Value wins; the store's market rate is only read when it's blank.
+    // A typed LP Value wins; the store's market rate is only read when it's blank,
+    // on Sell now like every step, so the floor and the steps compare like for like.
     request.ownLpValue > 0
       ? Promise.resolve(null)
-      : loadMarketLpValue(request.corporationId, hub).catch(() => null),
+      : loadMarketLpValue(request.corporationId, hub, undefined, 'buy').catch(() => null),
     request.activeCharacterId === null
       ? Promise.resolve(null)
       : loadWalletBalance(request.activeCharacterId).catch(() => null),
@@ -138,6 +149,7 @@ async function loadSpendPlan(request: Request): Promise<SpendPlanView> {
     result,
     rowsById: new Map(picked.map((p) => [p.row.offer.offer_id, p.row])),
     walletBalance,
+    candidates: picked.length,
   };
 }
 
@@ -153,6 +165,15 @@ export function useSpendPlan(args: Args): SpendPlanState {
   useHydratedStore(useLpValue);
   const ownLpValue = useLpValue((s) => s.value);
   const [request, setRequest] = useState<Request | null>(null);
+  // A plan priced for another character, hub or store no longer answers this page: close it.
+  if (
+    request !== null &&
+    (request.activeCharacterId !== args.activeCharacterId ||
+      request.hub.id !== args.hub.id ||
+      request.corporationId !== args.corporationId)
+  ) {
+    setRequest(null);
+  }
   const loader = useCallback(
     () => (request === null ? Promise.reject(new Error('idle')) : loadSpendPlan(request)),
     [request]

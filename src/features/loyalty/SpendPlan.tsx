@@ -31,13 +31,19 @@ import type { SpendPlanView } from './useSpendPlan';
 
 const noteClassName = 'text-[0.6875rem] text-text-dim';
 
-/** The plan's action: enabled only with a known, non-zero LP balance (never runs on load). */
+/**
+ * The plan's action: enabled only with a known, non-zero LP balance and at
+ * least one offer in view with a Sell now price (never runs on load).
+ */
 export function SpendLpButton({
   playerLp,
+  rankable,
   loading,
   onClick,
 }: {
   playerLp: number | null;
+  /** Whether any offer in the current view has a Sell now ISK/LP to rank by. */
+  rankable: boolean;
   loading: boolean;
   onClick: () => void;
 }) {
@@ -47,7 +53,9 @@ export function SpendLpButton({
       ? t('loyaltyStore.spendPlan.lpUnknown')
       : playerLp <= 0
         ? t('loyaltyStore.spendPlan.lpNone')
-        : null;
+        : !rankable
+          ? t('loyaltyStore.spendPlan.noRankedOffers')
+          : null;
   if (reason !== null) {
     return (
       <Tooltip content={reason}>
@@ -95,9 +103,11 @@ function StopLine({ stop, view }: { stop: SpendStop; view: SpendPlanView }) {
       break;
     case 'nothingProfitable':
       text =
-        name === null
-          ? t('loyaltyStore.spendPlan.stopUnpriced')
-          : t('loyaltyStore.spendPlan.stopLoss', { name });
+        view.candidates === 0
+          ? t('loyaltyStore.spendPlan.noRankedOffers')
+          : name === null
+            ? t('loyaltyStore.spendPlan.stopUnpriced')
+            : t('loyaltyStore.spendPlan.stopLoss', { name });
       break;
     case 'wallet':
       text = t('loyaltyStore.spendPlan.stopWallet', {
@@ -200,7 +210,7 @@ function PlanBody({
     return (
       <EmptyState
         title={
-          result.stop.reason === 'nothingProfitable'
+          result.stop.reason === 'nothingProfitable' && view.candidates > 0
             ? t('loyaltyStore.spendPlan.empty')
             : t('loyaltyStore.spendPlan.emptyStopped')
         }

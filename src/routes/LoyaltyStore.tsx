@@ -142,6 +142,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     offersError,
     reloadOffers,
     rows,
+    instantIskPerLp,
     catalog,
     catalogUnavailable,
     playerLp,
@@ -198,6 +199,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const spendPlan = useSpendPlan({
     corporationId,
     rows: filteredRows,
+    instantIskPerLp,
     catalog,
     hub,
     skills,
@@ -343,6 +345,11 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           <span className="flex items-center gap-2">
             <SpendLpButton
               playerLp={playerLp}
+              rankable={filteredRows.some(
+                (row) =>
+                  row.offer.lp_cost > 0 &&
+                  (instantIskPerLp.get(row.offer.offer_id) ?? null) !== null
+              )}
               loading={spendPlan.plan.status === 'loading'}
               onClick={spendPlan.run}
             />

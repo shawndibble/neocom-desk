@@ -187,11 +187,14 @@ export function useCommunityFittings(characterId: number | null) {
     sharerNames: ReadonlyMap<string, string>;
   } | null>(null);
   const requestIdRef = useRef(0);
+  /** The Character whose read last finished, landed or failed: its rows are final. */
+  const [settledFor, setSettledFor] = useState<number | null | undefined>(undefined);
 
   const refresh = useCallback(async () => {
     const requestId = ++requestIdRef.current;
     if (characterId === null || !isSyncConfigured()) {
       setState(null);
+      setSettledFor(characterId);
       return;
     }
     try {
@@ -202,6 +205,7 @@ export function useCommunityFittings(characterId: number | null) {
       // Offline or signed out of sync: the library just lists its own Fittings.
       if (requestId === requestIdRef.current) setState(null);
     }
+    if (requestId === requestIdRef.current) setSettledFor(characterId);
   }, [characterId]);
 
   useEffect(() => {
@@ -232,7 +236,14 @@ export function useCommunityFittings(characterId: number | null) {
       ),
     [current, uid]
   );
-  return { communities: current?.communities ?? [], rows, mine, refresh };
+  return {
+    communities: current?.communities ?? [],
+    rows,
+    mine,
+    refresh,
+    /** This Character's Shared rows have loaded, or will not. */
+    settled: settledFor === characterId,
+  };
 }
 
 /** Shared Fittings as list rows: not the viewer's own, one row per Fitting. */
