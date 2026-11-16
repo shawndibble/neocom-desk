@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import * as mirror from '../../../functions/src/corpTaxBookEngine';
+import * as calls from '../../../functions/src/corpTaxBook';
 import { allocatePayments, dismissalCredits, isBeforeBook } from './allocation';
-import { DISPUTE_HOLD_DAYS, heldByStatement } from './disputes';
+import {
+  DISPUTE_HOLD_DAYS,
+  DISPUTE_KINDS,
+  disputeHold,
+  heldByStatement,
+  readDisputes,
+} from './disputes';
+import { CLAIM_CHECK_RESULTS, TRANSFER_RECIPIENTS } from './overdue';
+import { TAX_CONTACT_MAX_CHARACTERS } from './bookDocs';
 import { placeOfFactory } from './openSet';
 import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
 import type { Dismissal } from './dismissals';
@@ -182,6 +191,53 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect([...theirs.byStatement]).toEqual([...ours.byStatement]);
     expect(theirs.credit).toBe(ours.credit);
     expect(theirs.balance).toBe(ours.balance);
+  });
+
+  it('keeps the dispute, transfer and tax contact vocabularies equal', () => {
+    expect([...calls.DISPUTE_KINDS]).toEqual([...DISPUTE_KINDS]);
+    expect([...calls.TRANSFER_RECIPIENTS]).toEqual([...TRANSFER_RECIPIENTS]);
+    expect([...calls.CLAIM_CHECK_RESULTS]).toEqual([...CLAIM_CHECK_RESULTS]);
+    expect(calls.TAX_CONTACT_MAX_CHARACTERS).toBe(TAX_CONTACT_MAX_CHARACTERS);
+  });
+
+  it('reads stored disputes and their hold the way the client does, malformed ones included', () => {
+    const line = { recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 10, payeeName: 'X' };
+    const base = {
+      id: 'd',
+      minerId: 'm',
+      date: '2026-11-01',
+      by: 60,
+      at: '2026-11-03T00:00:00.000Z',
+    };
+    const stored: unknown[] = [
+      { ...base, lines: [line] },
+      { ...base, lines: [line], holdFrom: '2026-10-01T00:00:00.000Z' },
+      { ...base, lines: [line], holdFrom: 'junk' },
+      { ...base, lines: [line], resolution: { kind: 'rejected', at: 'a', by: 1, reason: 'r' } },
+      { ...base, lines: [line], resolution: { kind: 'rejected' } },
+      { ...base, lines: [line], resolution: 'rejected' },
+      { ...base, lines: [line], resolution: { kind: 'dismissed', at: 'a', by: 1, reason: 'r' } },
+      { ...base, lines: [] },
+      { ...base },
+      { ...base, lines: [line, { recordKey: 5 }] },
+      { ...base, lines: 'lines' },
+      { ...base, lines: [line], kind: 'rate', claimedPct: 10 },
+      { ...base, lines: [line], kind: 'bogus' },
+      { ...base, at: 5, lines: [line] },
+      null,
+      'x',
+    ];
+    const theirs = mirror.readHoldingDisputes(stored);
+    const ours = readDisputes(stored);
+    expect(theirs).toHaveLength(ours.length);
+    for (const now of ['2026-11-05T00:00:00.000Z', '2026-11-20T00:00:00.000Z']) {
+      expect(theirs.map((d) => mirror.disputeHolds(d, now))).toEqual(
+        ours.map((d) => disputeHold(d, now) !== undefined)
+      );
+    }
+    // The first dispute's hold window survives a re-dispute: no renewal.
+    expect(mirror.disputeHolds(theirs[1], '2026-10-20T00:00:00.000Z')).toBe(false);
+    expect(disputeHold(ours[1], '2026-10-20T00:00:00.000Z')).toBeUndefined();
   });
 
   it('holds disputed amounts identically, and allocates around them the same way', () => {

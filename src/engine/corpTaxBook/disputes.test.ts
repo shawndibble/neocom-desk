@@ -221,6 +221,36 @@ describe('disputeHold', () => {
   });
 });
 
+describe('a dispute filed again after a kept bill', () => {
+  const kept = {
+    kind: 'rejected' as const,
+    at: '2026-11-04T00:00:00.000Z',
+    by: 1,
+    reason: 'ours',
+    nextStep: 'Pay it',
+  };
+
+  it('keeps the first dispute’s hold window, never renewing it', () => {
+    const again = dispute({ at: '2026-11-10T00:00:00.000Z', holdFrom: '2026-11-03T00:00:00.000Z' });
+    expect(disputeHold(again, '2026-11-12T00:00:00.000Z')).toEqual({
+      until: '2026-11-17T00:00:00.000Z',
+    });
+    expect(disputeHold(again, '2026-11-17T00:00:00.000Z')).toBeUndefined();
+  });
+
+  it('reads the hold start and the earlier answers kept in history', () => {
+    const [read] = readDisputes([
+      {
+        ...dispute({ holdFrom: '2026-11-03T00:00:00.000Z' }),
+        history: [{ kind: 'quantity', reason: 'too much', resolution: kept }, { kind: 'rate' }, 3],
+      },
+    ]);
+    expect(read.holdFrom).toBe('2026-11-03T00:00:00.000Z');
+    expect(read.history).toEqual([{ kind: 'quantity', reason: 'too much', resolution: kept }]);
+    expect(readDisputes([{ ...dispute(), holdFrom: 'soon' }])[0].holdFrom).toBeUndefined();
+  });
+});
+
 describe('heldByStatement', () => {
   const NOW = '2026-11-05T00:00:00.000Z';
   const statement = (id: string, chargeKey: string, quantity: number, taxPct = 10) => ({

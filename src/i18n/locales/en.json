@@ -18259,6 +18259,7 @@
           "tooOld": "Too old to check",
           "tooOldBody": "before the wallet history the book holds",
           "notFound": "Not in the corp wallet",
+          "ambiguous": "Several matches — an officer picks",
           "person": "Paid to a person",
           "otherCorp": "Another corporation"
         },

@@ -1,3 +1,4 @@
+import { isPlainRecord } from '@/engine/guards';
 import { DAY_MS } from '@/lib/age';
 /**
  * Overdue (D19, D29): an unsettled Statement goes Overdue N days (14 by
@@ -17,7 +18,7 @@ export type DeclarationKind = 'contract' | 'other-division' | 'wrong-corp' | 'an
 
 /** Who received a claimed transfer, as the member's own wallet journal names it. */
 export type TransferRecipient = 'corporation' | 'character' | 'otherCorporation';
-const TRANSFER_RECIPIENTS: readonly TransferRecipient[] = [
+export const TRANSFER_RECIPIENTS: readonly TransferRecipient[] = [
   'corporation',
   'character',
   'otherCorporation',
@@ -36,17 +37,19 @@ export interface ClaimedTransfer {
 /**
  * What the server's check of a claimed transfer found (resolving in the app): in the book
  * (`found`), in a division it does not read (`division`), paid after its last sync
- * (`notSynced`), older than any sync could read (`tooOld`), none of those (`notFound`), or paid
+ * (`notSynced`), older than any sync could read (`tooOld`), none of those (`notFound`), matched by several
+ * payments (`ambiguous`, an officer picks), or paid
  * to a person or another corporation, which the book cannot see.
  */
 export type ClaimCheckResult =
-  'found' | 'division' | 'notSynced' | 'tooOld' | 'notFound' | 'person' | 'otherCorp';
-const CLAIM_CHECK_RESULTS: readonly ClaimCheckResult[] = [
+  'found' | 'division' | 'notSynced' | 'tooOld' | 'notFound' | 'ambiguous' | 'person' | 'otherCorp';
+export const CLAIM_CHECK_RESULTS: readonly ClaimCheckResult[] = [
   'found',
   'division',
   'notSynced',
   'tooOld',
   'notFound',
+  'ambiguous',
   'person',
   'otherCorp',
 ];
@@ -86,11 +89,9 @@ export function readClaimEvidence(d: {
   transfers?: unknown;
   checks?: unknown;
 }): Pick<Declaration, 'transfers' | 'checks'> {
-  const isRecord = (x: unknown): x is Record<string, unknown> =>
-    typeof x === 'object' && x !== null && !Array.isArray(x);
   const transfers = Array.isArray(d.transfers)
     ? d.transfers.flatMap((t): ClaimedTransfer[] =>
-        isRecord(t) &&
+        isPlainRecord(t) &&
         typeof t.amount === 'number' &&
         typeof t.at === 'string' &&
         typeof t.journalRef === 'number' &&
@@ -109,7 +110,7 @@ export function readClaimEvidence(d: {
     : [];
   const checks = Array.isArray(d.checks)
     ? d.checks.flatMap((c): ClaimCheck[] =>
-        isRecord(c) && CLAIM_CHECK_RESULTS.includes(c.result as ClaimCheckResult)
+        isPlainRecord(c) && CLAIM_CHECK_RESULTS.includes(c.result as ClaimCheckResult)
           ? [
               {
                 result: c.result as ClaimCheckResult,
